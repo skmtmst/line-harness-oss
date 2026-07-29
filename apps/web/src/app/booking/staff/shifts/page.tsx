@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/header'
 import {
@@ -59,6 +59,11 @@ function monthRange(month: string): { from: string; to: string } {
   }
 }
 
+function compactShiftTime(startTime: string, endTime: string): string {
+  const compact = (value: string) => value.endsWith(':00') ? value.slice(0, 2) : value
+  return `${compact(startTime)}–${compact(endTime)}`
+}
+
 export default function StaffShiftsPage() {
   const sp = useSearchParams()
   const staffId = sp.get('staff_id') ?? ''
@@ -75,7 +80,7 @@ export default function StaffShiftsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
-  const editorRef = useRef<HTMLElement>(null)
+  const [editingShift, setEditingShift] = useState<BookingShift | null>(null)
 
   const load = useCallback(async () => {
     if (!selectedAccountId || !staffId) return
@@ -179,14 +184,31 @@ export default function StaffShiftsPage() {
   }
 
   function editShift(shift: BookingShift) {
-    setSelectedDates(new Set([shift.work_date]))
-    setLocationId(shift.location_id ?? locations[0]?.id ?? '')
-    setStartTime(shift.start_time)
-    setEndTime(shift.end_time)
     setSavedMessage(null)
-    requestAnimationFrame(() => {
-      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
+    setEditingShift(shift)
+  }
+
+  async function saveEditedShift(values: {
+    location_id: string
+    start_time: string
+    end_time: string
+  }) {
+    if (!selectedAccountId || !staffId || !editingShift) return
+    setSaving(true)
+    setError(null)
+    try {
+      await bookingApi.putShifts(selectedAccountId, staffId, [{
+        work_date: editingShift.work_date,
+        ...values,
+      }])
+      setEditingShift(null)
+      await load()
+      setSavedMessage(`${editingShift.work_date}のシフトを更新しました。`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function saveSelected() {
@@ -341,6 +363,9 @@ export default function StaffShiftsPage() {
                           }`}
                         >
                           <span className="sm:hidden">{shift.location_name?.replace('店', '') ?? '登録'}</span>
+                          <span className="block whitespace-nowrap text-[8px] font-semibold sm:hidden">
+                            {compactShiftTime(shift.start_time, shift.end_time)}
+                          </span>
                           <span className="hidden sm:inline">
                             登録済み
                             <br />
@@ -357,7 +382,7 @@ export default function StaffShiftsPage() {
             </div>
           </section>
 
-          <section ref={editorRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 scroll-mt-4">
+          <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <div>
                 <h2 className="text-sm font-semibold">選択した日付へ一括登録</h2>
@@ -556,6 +581,122 @@ export default function StaffShiftsPage() {
           </section>
         </div>
       )}
+      {editingShift && (
+        <ShiftEditModal
+          shift={editingShift}
+          locations={locations}
+          saving={saving}
+          onSave={saveEditedShift}
+          onClose={() => setEditingShift(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function ShiftEditModal({
+  shift,
+  locations,
+  saving,
+  onSave,
+  onClose,
+}: {
+  shift: BookingShift
+  locations: BookingLocation[]
+  saving: boolean
+  onSave: (values: { location_id: string; start_time: string; end_time: string }) => Promise<void>
+  onClose: () => void
+}) {
+  const [form, setForm] = useState({
+    location_id: shift.location_id ?? locations[0]?.id ?? '',
+    start_time: shift.start_time,
+    end_time: shift.end_time,
+  })
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit() {
+    if (!form.location_id) {
+      setError('店舗を選択してください。')
+      return
+    }
+    if (!form.start_time || !form.end_time || form.start_time >= form.end_time) {
+      setError('終了時間は開始時間より後に設定してください。')
+      return
+    }
+    setError(null)
+    await onSave(form)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-4">
+      <div className="w-full rounded-t-3xl bg-white shadow-2xl sm:max-w-md sm:rounded-2xl">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold text-green-700">登録済みシフトを編集</p>
+            <h2 className="mt-1 text-lg font-bold text-gray-900">{shift.work_date}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-600"
+            aria-label="閉じる"
+          >
+            ×
+          </button>
+        </div>
+        <div className="space-y-4 px-5 py-5">
+          <label className="block text-sm font-semibold text-gray-700">
+            店舗
+            <select
+              value={form.location_id}
+              onChange={(e) => setForm({ ...form, location_id: e.target.value })}
+              className="mt-2 block min-h-12 w-full rounded-xl border border-gray-300 bg-white px-3 text-base"
+            >
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>{location.name}</option>
+              ))}
+            </select>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block text-sm font-semibold text-gray-700">
+              開始時間
+              <input
+                type="time"
+                value={form.start_time}
+                onChange={(e) => setForm({ ...form, start_time: e.target.value })}
+                className="mt-2 block min-h-12 w-full rounded-xl border border-gray-300 px-3 text-base"
+              />
+            </label>
+            <label className="block text-sm font-semibold text-gray-700">
+              終了時間
+              <input
+                type="time"
+                value={form.end_time}
+                onChange={(e) => setForm({ ...form, end_time: e.target.value })}
+                className="mt-2 block min-h-12 w-full rounded-xl border border-gray-300 px-3 text-base"
+              />
+            </label>
+          </div>
+          {error && <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+        </div>
+        <div className="grid grid-cols-2 gap-3 border-t border-gray-100 px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-12 rounded-xl border border-gray-300 font-semibold text-gray-700"
+          >
+            キャンセル
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void submit()}
+            className="min-h-12 rounded-xl bg-green-600 font-bold text-white disabled:opacity-50"
+          >
+            {saving ? '保存中…' : '変更を保存'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

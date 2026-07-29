@@ -251,6 +251,19 @@ body.sb-active #app {
   color: #2f9e1d;
 }
 
+.sb-confirm-card {
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+.sb-confirm-date {
+  padding: 16px;
+  background: linear-gradient(135deg, #ecfdf3 0%, #f7fff9 100%);
+  border-bottom: 1px solid #d8f3e2;
+}
+
 .sb-consent-body {
   max-height: 280px;
   overflow-y: auto;
@@ -264,8 +277,9 @@ body.sb-active #app {
 }
 
 .sb-history-card {
-  border: 1.5px solid #2f9e1d;
-  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
   background: #fff;
   padding: 18px 16px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
 }

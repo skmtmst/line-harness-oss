@@ -58,7 +58,7 @@ export default function HistoryCard({
         <span className="sb-badge" style={{ background: meta.bg, color: meta.fg }}>{meta.label}</span>
         <span className="text-right text-sm font-bold sb-line-green-text">{utcToJstDisplay(booking.starts_at)}</span>
       </div>
-      <div className="mt-4 grid grid-cols-[78px_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+      <div className="mt-4 grid grid-cols-[78px_minmax(0,1fr)] gap-x-3 gap-y-2.5 text-sm">
         <span className="font-semibold text-gray-500">施術店舗</span>
         <span className="font-bold text-slate-800">{booking.location_name ?? '店舗未設定'}</span>
         <span className="font-semibold text-gray-500">メニュー</span>
@@ -70,8 +70,9 @@ export default function HistoryCard({
       </div>
 
       {expanded && (
-        <div className="mt-4 border-t border-dashed border-gray-300 pt-4 sb-fade-in">
-          <dl className="space-y-3 text-sm">
+        <div className="mt-5 rounded-2xl bg-gray-50 p-4 sb-fade-in">
+          <h3 className="mb-3 text-xs font-bold tracking-wide text-gray-500">お客様情報</h3>
+          <dl className="grid grid-cols-2 gap-3 text-sm">
             <Detail label="お名前" value={booking.customer_name ?? '未登録'} />
             <Detail label="お名前（カナ）" value={booking.customer_kana ?? '未登録'} />
             <Detail label="電話番号" value={booking.customer_phone ?? '未登録'} />
@@ -81,7 +82,7 @@ export default function HistoryCard({
           {booking.consent_body && (
             <details className="mt-4 rounded-xl bg-gray-50 p-3 text-xs text-gray-600">
               <summary className="cursor-pointer font-bold text-slate-700">
-                同意済み：{booking.consent_title}（版 {booking.consent_version}）
+                同意済み：{booking.consent_title}
               </summary>
               <div className="mt-3 max-h-44 overflow-auto whitespace-pre-wrap leading-6">{booking.consent_body}</div>
             </details>
@@ -118,9 +119,9 @@ export default function HistoryCard({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-100">
       <dt className="text-xs font-semibold text-gray-500">{label}</dt>
-      <dd className="mt-1 font-bold sb-line-green-text">{value}</dd>
+      <dd className="mt-1 break-words font-bold text-slate-800">{value}</dd>
     </div>
   );
 }

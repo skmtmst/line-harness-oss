@@ -107,11 +107,17 @@ export default function Confirm({
       <button onClick={onBack} className="sb-back-btn">
         <span aria-hidden>←</span>入力内容を変更
       </button>
-      <h1 className="text-xl font-bold text-slate-800">予約内容の確認</h1>
+      <div>
+        <h1 className="text-xl font-bold text-slate-800">予約内容の確認</h1>
+        <p className="mt-1 text-xs text-gray-500">内容をご確認のうえ、予約リクエストを送信してください</p>
+      </div>
 
-      <div className="sb-summary-card">
-        <dl className="space-y-3 text-sm">
-          <Row label="日時" value={`${formatJp(slot.date)} ${slot.start}〜`} strong />
+      <div className="sb-confirm-card">
+        <div className="sb-confirm-date">
+          <span className="text-[11px] font-bold tracking-wide text-green-700">ご予約日時</span>
+          <strong className="mt-1 block text-xl text-green-700">{formatJp(slot.date)} {slot.start}〜</strong>
+        </div>
+        <dl className="px-4 py-2 text-sm">
           <Row label="店舗" value={location.name} />
           <Row label="メニュー" value={menu.name} />
           <Row label="担当" value={staff.display_name} />
@@ -121,7 +127,8 @@ export default function Confirm({
       </div>
 
       <div className="sb-card">
-        <dl className="space-y-4 text-sm">
+        <h2 className="mb-2 text-sm font-bold text-slate-800">お客様情報</h2>
+        <dl className="text-sm">
           {fields.filter((field) => field.is_active === 1).map((field) => (
             <Row
               key={field.id}
@@ -175,9 +182,9 @@ function systemValue(customer: CustomerDetailsValue, key: string): string {
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 border-b border-dashed border-gray-200 pb-3 last:border-0 last:pb-0">
-      <dt className="text-xs font-semibold text-gray-500">{label}</dt>
-      <dd className={strong ? 'font-bold sb-line-green-text' : 'font-semibold text-slate-800'}>{value}</dd>
+    <div className="grid grid-cols-[88px_minmax(0,1fr)] items-start gap-3 border-b border-gray-100 py-3 last:border-0">
+      <dt className="pt-0.5 text-xs font-semibold text-gray-500">{label}</dt>
+      <dd className={`break-words leading-5 ${strong ? 'font-bold sb-line-green-text' : 'font-semibold text-slate-800'}`}>{value}</dd>
     </div>
   );
 }

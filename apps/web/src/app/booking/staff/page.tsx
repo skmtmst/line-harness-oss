@@ -99,8 +99,67 @@ export default function BookingStaffPage() {
           まだスタッフがいません。右上の「+ 新規スタッフ」から追加してください。
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          <div className="space-y-3 sm:hidden">
+            {items.map((s) => (
+              <article key={s.id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                <div className="flex items-center gap-3 p-4">
+                  {s.profile_image_url ? (
+                    <img
+                      src={s.profile_image_url}
+                      alt={s.display_name}
+                      className="h-12 w-12 shrink-0 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-50 text-base font-bold text-green-700">
+                      {s.display_name.slice(0, 1)}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="truncate font-bold text-gray-900">{s.display_name}</h2>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        s.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {s.is_active ? '有効' : '停止中'}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-gray-500">{s.role || '担当スタッフ'}</p>
+                  </div>
+                  <Link
+                    href={`/booking/staff/shifts?staff_id=${s.id}`}
+                    className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl bg-green-600 px-4 text-sm font-bold text-white shadow-sm"
+                  >
+                    <span aria-hidden>▣</span>
+                    シフト
+                  </Link>
+                </div>
+                <div className="grid grid-cols-3 border-t border-gray-100 bg-gray-50/70">
+                  <button
+                    onClick={() => setEditing(s)}
+                    className="min-h-12 border-r border-gray-100 text-sm font-semibold text-gray-700"
+                  >
+                    編集
+                  </button>
+                  <Link
+                    href={`/booking/staff/menus?staff_id=${s.id}`}
+                    className="flex min-h-12 items-center justify-center border-r border-gray-100 px-2 text-center text-sm font-semibold text-gray-700"
+                  >
+                    対応メニュー
+                  </Link>
+                  <button
+                    onClick={() => remove(s.id)}
+                    className="min-h-12 text-sm font-semibold text-red-600"
+                  >
+                    削除
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm sm:block">
+            <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -168,8 +227,9 @@ export default function BookingStaffPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {editing && <Modal staff={editing} onSave={save} onClose={() => setEditing(null)} />}

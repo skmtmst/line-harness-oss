@@ -42,17 +42,22 @@ export default function LocationList({
       </div>
       {locations.length === 0 ? (
         <div className="sb-card text-center text-sm text-gray-500">現在、予約できる店舗がありません</div>
-      ) : locations.map((location) => (
-        <button
-          key={location.id}
-          onClick={() => onSelect(location)}
-          className="w-full text-left sb-card hover:shadow-md transition-shadow"
-        >
-          <span className="font-semibold text-gray-900">{location.name}</span>
-          {location.address && <span className="block mt-1 text-xs text-gray-600">{location.address}</span>}
-          {location.access && <span className="block mt-1 text-xs text-gray-500">{location.access}</span>}
-        </button>
-      ))}
+      ) : (
+        <div className="grid gap-3">
+          {locations.map((location) => (
+            <button
+              key={location.id}
+              onClick={() => onSelect(location)}
+              className="w-full rounded-2xl bg-white px-5 py-5 text-left shadow-sm ring-1 ring-gray-100 transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-[0.99]"
+            >
+              <span className="flex items-center justify-between gap-3">
+                <span className="text-base font-bold text-gray-900">{location.name}</span>
+                <span className="sb-line-green-text text-xl" aria-hidden>›</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

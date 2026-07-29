@@ -67,6 +67,7 @@ export default function Booking({
   const [location, setLocation] = useState<LocationItem | null>(null);
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
+  const [staffAutoSelected, setStaffAutoSelected] = useState(false);
   const [slot, setSlot] = useState<{ date: string; start: string } | null>(null);
   const [customer, setCustomer] = useState<CustomerDetailsValue>(initialCustomer);
   const [consent, setConsent] = useState<ConsentSetting | null>(null);
@@ -126,6 +127,7 @@ export default function Booking({
     setLocation(selected);
     setMenu(null);
     setStaff(null);
+    setStaffAutoSelected(false);
     setSlot(null);
     setStep('menu');
   }, []);
@@ -196,7 +198,7 @@ export default function Booking({
         <div
           className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-xs leading-5 text-green-900"
         >
-          店舗・メニュー・担当者を選ぶと、予約可能な日時が表示されます。
+          店舗・メニューを選ぶと、予約可能な日時が表示されます。
         </div>
       )}
 
@@ -229,9 +231,10 @@ export default function Booking({
         <StaffList
           menuId={menu.id}
           basePrice={menu.base_price}
-          onSelect={(s) => {
+          onSelect={(s, autoSelected = false) => {
             if (staff?.id !== s.id) setSlot(null);
             setStaff(s);
+            setStaffAutoSelected(autoSelected);
             setStep('datetime');
           }}
           onBack={() => setStep('menu')}
@@ -254,7 +257,7 @@ export default function Booking({
             setSlot(picked);
             if (!peekMode) setStep('details');
           }}
-          onBack={() => setStep('staff')}
+          onBack={() => setStep(staffAutoSelected ? 'menu' : 'staff')}
         />
       )}
       {step === 'datetime' && peekMode && slot && (
