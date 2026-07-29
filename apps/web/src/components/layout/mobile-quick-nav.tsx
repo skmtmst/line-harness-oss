@@ -26,7 +26,7 @@ export default function MobileQuickNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-3 border-t border-gray-200 bg-white/95 px-2 pt-1.5 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 grid min-h-16 grid-cols-3 border-t border-gray-200 bg-white/95 px-2 pt-1.5 shadow-[0_-4px_16px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden"
       style={{ paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}
       aria-label="よく使う管理機能"
     >

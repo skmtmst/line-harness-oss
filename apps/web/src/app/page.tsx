@@ -73,6 +73,11 @@ function StatCard({ title, value, loading, icon, href, accentColor = '#06C755' }
 
 export default function DashboardPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
+  const basicId = selectedAccount?.basicId?.trim()
+  const friendAddUrl = basicId ? `https://line.me/R/ti/p/${basicId}` : null
+  const qrImageUrl = friendAddUrl
+    ? `${process.env.NEXT_PUBLIC_API_URL}/api/qr?size=180x180&data=${encodeURIComponent(friendAddUrl)}`
+    : null
   const [stats, setStats] = useState<DashboardStats>({
     friendCount: null,
     activeScenarioCount: null,
@@ -151,23 +156,48 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Demo banner */}
-      <a
-        href="https://your-worker.your-subdomain.workers.dev/auth/line?ref=dashboard"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block mb-6 p-4 rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 transition-colors"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-bold text-gray-900">LINE で体験する</p>
-            <p className="text-xs text-gray-500 mt-0.5">友だち追加でステップ配信・フォーム・自動返信を体験</p>
+      {/* Friend-add card */}
+      <section className="mb-6 overflow-hidden rounded-2xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4 sm:p-5">
+        <div className="flex items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold text-gray-900">LINEで体験する</p>
+            <p className="mt-1 text-xs leading-5 text-gray-600">
+              QRコードを読み取るか、ボタンを押して友だち追加できます
+            </p>
+            {friendAddUrl ? (
+              <a
+                href={friendAddUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-[#06C755] px-5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+              >
+                友だち追加
+              </a>
+            ) : (
+              <p className="mt-3 text-xs font-medium text-amber-700">
+                LINE公式アカウント情報を読み込んでいます
+              </p>
+            )}
           </div>
-          <span className="text-xs px-3 py-1.5 rounded-full text-white font-medium" style={{ backgroundColor: '#06C755' }}>
-            友だち追加
-          </span>
+          {qrImageUrl && (
+            <a
+              href={friendAddUrl ?? undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-xl border border-green-100 bg-white p-2 shadow-sm"
+              aria-label="LINE友だち追加ページを開く"
+            >
+              <img
+                src={qrImageUrl}
+                alt={`${selectedAccount?.displayName || selectedAccount?.name || 'LINE公式アカウント'}の友だち追加QRコード`}
+                className="h-20 w-20 sm:h-24 sm:w-24"
+                width={96}
+                height={96}
+              />
+            </a>
+          )}
         </div>
-      </a>
+      </section>
 
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">

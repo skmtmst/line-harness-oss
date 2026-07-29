@@ -1,7 +1,11 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { setAdminAccessToken } from '@/lib/api'
+import {
+  clearAdminAccessToken,
+  getAdminAccessToken,
+  setAdminAccessToken,
+} from '@/lib/api'
 
 function extractApiKey(value: string): string {
   const embeddedKey = value.match(/\blh_[a-fA-F0-9]{32}\b/)
@@ -13,6 +17,36 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const accessToken = getAdminAccessToken()
+    if (!accessToken) return
+
+    let cancelled = false
+    setLoading(true)
+    const restoreSession = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL
+        const res = await fetch(`${apiUrl}/api/auth/session`, {
+          credentials: 'include',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+        if (!res.ok) throw new Error('expired')
+        const data = await res.json()
+        if (!data?.success || !data?.data) throw new Error('expired')
+        if (data.accessToken) setAdminAccessToken(data.accessToken)
+        if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
+        if (data.data.name) localStorage.setItem('lh_staff_name', data.data.name)
+        if (data.data.role) localStorage.setItem('lh_staff_role', data.data.role)
+        if (!cancelled) router.replace('/')
+      } catch {
+        clearAdminAccessToken()
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void restoreSession()
+    return () => { cancelled = true }
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -26,8 +60,8 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
-      // Exchange the API key for an HttpOnly session cookie. The key is never
-      // stored in localStorage (removes the XSS-exposed credential).
+      // Exchange the API key for an HttpOnly cookie and a scoped signed token.
+      // The raw API key is never persisted on the device.
       const res = await fetch(`${apiUrl}/api/auth/login`, {
         method: 'POST',
         credentials: 'include',
@@ -75,7 +109,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#06C755' }}>
+    <div className="flex min-h-[100dvh] items-center justify-center px-4 py-[max(1rem,env(safe-area-inset-top))]" style={{ backgroundColor: '#06C755' }}>
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg mx-auto mb-3" style={{ backgroundColor: '#06C755' }}>
@@ -102,6 +136,7 @@ export default function LoginPage() {
               }}
               placeholder="APIキーを入力"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              autoComplete="current-password"
               autoFocus
             />
             <p className="mt-1.5 text-xs leading-5 text-gray-500">

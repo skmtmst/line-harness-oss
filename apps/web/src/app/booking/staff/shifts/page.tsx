@@ -657,23 +657,23 @@ function ShiftEditModal({
               ))}
             </select>
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block text-sm font-semibold text-gray-700">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block min-w-0 text-sm font-semibold text-gray-700">
               開始時間
               <input
                 type="time"
                 value={form.start_time}
                 onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                className="mt-2 block min-h-12 w-full rounded-xl border border-gray-300 px-3 text-base"
+                className="mt-2 block min-h-12 min-w-0 w-full max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 text-base"
               />
             </label>
-            <label className="block text-sm font-semibold text-gray-700">
+            <label className="block min-w-0 text-sm font-semibold text-gray-700">
               終了時間
               <input
                 type="time"
                 value={form.end_time}
                 onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                className="mt-2 block min-h-12 w-full rounded-xl border border-gray-300 px-3 text-base"
+                className="mt-2 block min-h-12 min-w-0 w-full max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 text-base"
               />
             </label>
           </div>

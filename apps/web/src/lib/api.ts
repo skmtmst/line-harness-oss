@@ -92,29 +92,67 @@ if (!API_URL) {
 }
 
 /**
- * Read the CSRF token issued at login. The session credential itself lives in
- * an HttpOnly cookie (never exposed to JS); only the CSRF token is held
- * client-side and echoed back via the X-CSRF-Token header on mutating
- * requests. In a cross-site topology the SPA cannot read the API's CSRF cookie
- * directly, so the token is delivered in the login/session response body and
- * cached here.
+ * Read the CSRF token issued at login. The primary session credential lives in
+ * an HttpOnly cookie. Cloudflare Pages and the Worker use different sites,
+ * however, and iOS can discard that cross-site cookie when a Home Screen web
+ * app is closed. The Worker therefore also issues a scoped, signed admin token.
+ * We persist only that exchanged token — never the staff API key — so the
+ * installed web app can restore the session on its next launch.
  */
 export const CSRF_STORAGE_KEY = 'lh_csrf'
 export const ADMIN_SESSION_STORAGE_KEY = 'lh_admin_access_token'
 
 export function getAdminAccessToken(): string {
   if (typeof window === 'undefined') return ''
-  return sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || ''
+  try {
+    const persisted = localStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || ''
+    if (persisted) return persisted
+
+    // One-time migration for sessions created before persistent Home Screen
+    // login was introduced.
+    const legacySessionToken = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || ''
+    if (legacySessionToken) {
+      localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, legacySessionToken)
+      sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+    }
+    return legacySessionToken
+  } catch {
+    // Storage can be blocked by a restrictive browser mode. Keep the current
+    // tab usable even though that mode cannot provide persistent login.
+    try {
+      return sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || ''
+    } catch {
+      return ''
+    }
+  }
 }
 
 export function setAdminAccessToken(token: string | undefined | null): void {
   if (typeof window === 'undefined' || !token) return
-  sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token)
+  try {
+    localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token)
+    sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+  } catch {
+    try {
+      sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token)
+    } catch {
+      // Storage unavailable: the HttpOnly cookie remains the fallback.
+    }
+  }
 }
 
 export function clearAdminAccessToken(): void {
   if (typeof window === 'undefined') return
-  sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+  try {
+    localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+  } catch {
+    // Storage unavailable.
+  }
+  try {
+    sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+  } catch {
+    // Storage unavailable.
+  }
 }
 
 export function getCsrfToken(): string {

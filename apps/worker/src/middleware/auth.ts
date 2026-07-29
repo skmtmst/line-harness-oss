@@ -9,7 +9,11 @@ export const CSRF_HEADER = 'x-csrf-token';
 
 // 7 days, matching the previous localStorage session longevity.
 const SESSION_MAX_AGE = 604800;
-const ACCESS_TOKEN_MAX_AGE_SECONDS = 12 * 60 * 60;
+// Home Screen web apps on iOS may discard cross-site cookies between launches.
+// The signed bearer is therefore long-lived and refreshed whenever the app
+// restores its session. Staff status is still checked against D1 on every
+// request, so disabling a staff member revokes access immediately.
+const ACCESS_TOKEN_MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
 const ACCESS_TOKEN_PREFIX = 'lhs_';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

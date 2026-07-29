@@ -74,10 +74,17 @@ adminAuth.post('/api/auth/logout', async (c) => {
  */
 adminAuth.get('/api/auth/session', async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
+  const staff = c.get('staff');
   let csrfToken = csrfTokenFromCookie(c);
   if (!csrfToken) {
     csrfToken = crypto.randomUUID();
     c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite), { append: true });
   }
-  return c.json({ success: true, data: c.get('staff'), csrfToken });
+  // Sliding renewal keeps an installed iOS web app signed in without ever
+  // persisting the original staff API key.
+  const accessToken = await createAdminAccessToken(
+    staff,
+    c.env.ADMIN_SESSION_SECRET ?? c.env.API_KEY,
+  );
+  return c.json({ success: true, data: staff, csrfToken, accessToken });
 });

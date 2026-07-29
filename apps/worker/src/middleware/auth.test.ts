@@ -259,9 +259,10 @@ describe('session endpoint', () => {
       headers: { Cookie: 'lh_admin_session=staff-key; lh_csrf=token-abc' },
     }, crossSiteEnv());
     expect(res.status).toBe(200);
-    const body = await res.json() as { data: { id: string }; csrfToken: string };
+    const body = await res.json() as { data: { id: string }; csrfToken: string; accessToken: string };
     expect(body.data).toMatchObject({ id: 'staff-1' });
     expect(body.csrfToken).toBe('token-abc');
+    expect(body.accessToken).toMatch(/^lhs_/);
   });
 
   test('mints and sets a CSRF cookie when none is present', async () => {
