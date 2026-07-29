@@ -158,6 +158,9 @@ export default function BookingStaffPage() {
                         <Link href={`/booking/staff/shifts?staff_id=${s.id}`} className="text-blue-600 hover:underline">
                           シフト
                         </Link>
+                        <Link href={`/booking/staff/menus?staff_id=${s.id}`} className="text-blue-600 hover:underline">
+                          対応メニュー
+                        </Link>
                         <button onClick={() => remove(s.id)} className="text-red-600 hover:underline">削除</button>
                       </div>
                     </td>
