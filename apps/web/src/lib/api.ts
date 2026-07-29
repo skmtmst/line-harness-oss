@@ -1537,11 +1537,36 @@ export interface BookingRequest {
   friend_name: string | null;
 }
 
+export interface BookingConsent {
+  title: string;
+  body: string;
+  version: number;
+  is_required: number;
+  is_active: number;
+}
+
 function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
 
 export const bookingApi = {
+  getConsent: (accountId: string) =>
+    fetchApi<{ consent: BookingConsent }>(
+      withAccount('/api/booking/admin/consent', accountId),
+    ),
+  updateConsent: (
+    accountId: string,
+    body: {
+      title: string;
+      body: string;
+      is_required: boolean;
+      is_active: boolean;
+    },
+  ) =>
+    fetchApi<{ consent: BookingConsent }>(
+      withAccount('/api/booking/admin/consent', accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
   // Locations
   listLocations: (accountId: string) =>
     fetchApi<{ locations: BookingLocation[] }>(

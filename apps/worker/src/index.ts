@@ -598,6 +598,7 @@ ${longPressBlock}
 // attribution を汚染する、という 2 つの問題があるため別ルートに分けている。
 // 仕様:
 // - クエリ: liffId (必須, `<digits>-<id>` 形式) / page / id
+//   salon-book では view / location_id / menu_id / mode も allowlist で引き継ぐ
 // - page は `/r/:ref` と同じ allowlist (salon-book / event / event-me)
 // - mobile UA は「LINEで開く」ボタン、desktop は QR を返す (`/r/:ref` 同等)
 app.get('/o', async (c) => {
@@ -617,6 +618,16 @@ app.get('/o', async (c) => {
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
+  if (page === 'salon-book') {
+    const view = c.req.query('view');
+    if (view === 'history') liffParams.set('view', view);
+    const mode = c.req.query('mode');
+    if (mode === 'peek') liffParams.set('mode', mode);
+    for (const key of ['location_id', 'menu_id'] as const) {
+      const value = c.req.query(key);
+      if (value && /^[A-Za-z0-9_-]{1,100}$/.test(value)) liffParams.set(key, value);
+    }
+  }
   const liffTarget = `https://liff.line.me/${liffId}?${liffParams.toString()}`;
 
   const ua = (c.req.header('user-agent') || '').toLowerCase();

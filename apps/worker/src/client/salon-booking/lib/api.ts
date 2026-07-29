@@ -4,6 +4,8 @@ import type { SalonBookingContext } from './context.js';
 
 export interface MenuItem {
   id: string;
+  location_id: string | null;
+  menu_id: string | null;
   name: string;
   category_label: string | null;
   description: string | null;
@@ -43,12 +45,29 @@ export interface AvailabilityResponse {
 export interface BookingHistoryItem {
   id: string;
   starts_at: string;
+  ends_at: string;
   status: string;
   customer_note?: string | null;
+  customer_name: string | null;
+  customer_kana: string | null;
+  customer_phone: string | null;
+  price_at_booking: number;
+  consent_title: string | null;
+  consent_body: string | null;
+  consent_version: number | null;
+  consent_agreed_at: string | null;
   menu_name: string;
   staff_name: string;
   location_name: string | null;
   profile_image_url: string | null;
+}
+
+export interface ConsentSetting {
+  title: string;
+  body: string;
+  version: number;
+  is_required: number;
+  is_active: number;
 }
 
 function authHeaders(ctx: SalonBookingContext, extra: Record<string, string> = {}): Record<string, string> {
@@ -114,7 +133,12 @@ export function createApi(ctx: SalonBookingContext) {
         menu_id: string;
         staff_id: string;
         starts_at: string;
+        customer_name: string;
+        customer_kana: string;
+        customer_phone: string;
         customer_note?: string;
+        consent_agreed: boolean;
+        consent_version: number;
       },
       idempotencyKey: string,
     ) =>
@@ -129,5 +153,9 @@ export function createApi(ctx: SalonBookingContext) {
         '/api/liff/booking/me',
         ctx,
       ),
+    consent: () =>
+      get<{ consent: ConsentSetting }>('/api/liff/booking/consent', ctx),
+    cancel: (bookingId: string) =>
+      post<{ status: string }>(`/api/liff/booking/me/${bookingId}/cancel`, {}, ctx),
   };
 }

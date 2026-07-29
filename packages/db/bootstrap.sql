@@ -140,6 +140,18 @@ CREATE TABLE automations (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT);
 
+CREATE TABLE booking_consent_settings (
+  line_account_id TEXT PRIMARY KEY,
+  title           TEXT NOT NULL,
+  body            TEXT NOT NULL,
+  version         INTEGER NOT NULL DEFAULT 1,
+  is_required     INTEGER NOT NULL DEFAULT 1,
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
+);
+
 CREATE TABLE booking_idempotency_keys (
   key              TEXT PRIMARY KEY,
   line_account_id  TEXT NOT NULL,
@@ -197,7 +209,7 @@ CREATE TABLE bookings (
   external_event_id       TEXT,                 -- Phase 3 余地 (Google Calendar)
   external_calendar_id    TEXT,                 -- Phase 3 余地
   created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), customer_name TEXT, customer_kana TEXT, customer_phone TEXT, consent_title TEXT, consent_body TEXT, consent_version INTEGER, consent_agreed_at TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),

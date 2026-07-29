@@ -56,7 +56,8 @@
     "047_affiliate_offers.sql",
     "048_chats_friend_unique.sql",
     "049_tracked_links_short_code.sql",
-    "050_booking_locations.sql"
+    "050_booking_locations.sql",
+    "051_booking_consent_and_customer_details.sql"
   ],
-  "migrationCount": 57
+  "migrationCount": 58
 }

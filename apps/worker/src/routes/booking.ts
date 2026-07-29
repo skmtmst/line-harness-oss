@@ -35,6 +35,41 @@ const booking = new Hono<Env>();
 
 const JST_OFFSET_MS = 9 * 3600_000;
 
+const DEFAULT_CONSENT = {
+  title: '注意事項・利用規約',
+  body: `【ご来店に際しての注意事項】
+
+・15分以上遅刻された場合は、施術をお断りする場合がございます。
+・予約の変更・キャンセルは前日の12:00までにご連絡ください。
+・当日キャンセル、無断キャンセルは料金の100%を申し受ける場合がございます。
+・体調不良や感染症が疑われる場合は、無理をせず事前にご連絡ください。
+・ノーメイクでのご来店をおすすめしております。`,
+  version: 1,
+  is_required: 1,
+  is_active: 1,
+} as const;
+
+type ConsentSetting = {
+  title: string;
+  body: string;
+  version: number;
+  is_required: number;
+  is_active: number;
+};
+
+async function getConsentSetting(db: D1Database, accountId: string): Promise<ConsentSetting> {
+  return (
+    await db
+      .prepare(
+        `SELECT title, body, version, is_required, is_active
+           FROM booking_consent_settings
+          WHERE line_account_id = ?`,
+      )
+      .bind(accountId)
+      .first<ConsentSetting>()
+  ) ?? { ...DEFAULT_CONSENT };
+}
+
 function startsAtJst(utcIso: string): string {
   const jst = new Date(new Date(utcIso).getTime() + JST_OFFSET_MS).toISOString();
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
@@ -328,10 +363,40 @@ booking.post('/api/liff/booking/requests', async (c) => {
     staff_id: string;
     location_id: string;
     starts_at: string; // UTC ISO8601
+    customer_name: string;
+    customer_kana: string;
+    customer_phone: string;
     customer_note?: string;
+    consent_agreed?: boolean;
+    consent_version?: number;
   }>();
-  if (!body.menu_id || !body.staff_id || !body.location_id || !body.starts_at) {
+  if (
+    !body.menu_id ||
+    !body.staff_id ||
+    !body.location_id ||
+    !body.starts_at ||
+    !body.customer_name?.trim() ||
+    !body.customer_kana?.trim() ||
+    !body.customer_phone?.trim()
+  ) {
     return c.json({ error: 'missing_params' }, 400);
+  }
+  const customerName = body.customer_name.trim();
+  const customerKana = body.customer_kana.trim();
+  const customerPhone = body.customer_phone.replace(/[^\d+]/g, '');
+  if (customerName.length > 100 || customerKana.length > 100 || !/^\+?\d{10,15}$/.test(customerPhone)) {
+    return c.json({ error: 'invalid_customer_details' }, 422);
+  }
+  if ((body.customer_note?.length ?? 0) > 2_000) {
+    return c.json({ error: 'customer_note_too_long' }, 422);
+  }
+  const consent = await getConsentSetting(c.env.DB, accountId);
+  if (
+    consent.is_active === 1 &&
+    consent.is_required === 1 &&
+    (!body.consent_agreed || body.consent_version !== consent.version)
+  ) {
+    return c.json({ error: 'consent_required', current_version: consent.version }, 422);
   }
   if (!(await assertLocationInAccount(c.env.DB, body.location_id, accountId))) {
     return c.json({ error: 'location_not_found' }, 404);
@@ -439,8 +504,10 @@ booking.post('/api/liff/booking/requests', async (c) => {
       `INSERT INTO bookings
         (id, line_account_id, friend_id, staff_id, menu_id, location_id,
          starts_at, ends_at, block_ends_at, status,
-         customer_note, price_at_booking, requested_at)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
+         customer_name, customer_kana, customer_phone, customer_note,
+         price_at_booking, consent_title, consent_body, consent_version,
+         consent_agreed_at, requested_at)
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           SELECT 1 FROM bookings
            WHERE staff_id = ?
@@ -460,8 +527,15 @@ booking.post('/api/liff/booking/requests', async (c) => {
       endsAt.toISOString(),
       blockEndsAt.toISOString(),
       'requested' satisfies BookingStatus,
+      customerName,
+      customerKana,
+      customerPhone,
       body.customer_note ?? null,
       menuRow.price,
+      consent.is_active === 1 ? consent.title : null,
+      consent.is_active === 1 ? consent.body : null,
+      consent.is_active === 1 ? consent.version : null,
+      consent.is_active === 1 && body.consent_agreed ? nowIso : null,
       nowIso,
       // NOT EXISTS subquery params
       body.staff_id,
@@ -530,7 +604,10 @@ booking.get('/api/liff/booking/me', async (c) => {
 
   const upcoming = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status, b.customer_note,
+      `SELECT b.id, b.location_id, b.menu_id, b.starts_at, b.ends_at, b.status, b.customer_note,
+              b.customer_name, b.customer_kana, b.customer_phone,
+              b.price_at_booking, b.consent_title, b.consent_body,
+              b.consent_version, b.consent_agreed_at,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url,
               bl.name AS location_name
@@ -548,7 +625,10 @@ booking.get('/api/liff/booking/me', async (c) => {
 
   const past = await c.env.DB
     .prepare(
-      `SELECT b.id, b.starts_at, b.status,
+      `SELECT b.id, b.location_id, b.menu_id, b.starts_at, b.ends_at, b.status, b.customer_note,
+              b.customer_name, b.customer_kana, b.customer_phone,
+              b.price_at_booking, b.consent_title, b.consent_body,
+              b.consent_version, b.consent_agreed_at,
               m.name AS menu_name,
               s.display_name AS staff_name, s.profile_image_url,
               bl.name AS location_name
@@ -567,6 +647,59 @@ booking.get('/api/liff/booking/me', async (c) => {
   return c.json({ upcoming: upcoming.results, past: past.results });
 });
 
+booking.get('/api/liff/booking/consent', async (c) => {
+  const accountId = await resolveAccountIdFromLiff(c);
+  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  return c.json({ consent: await getConsentSetting(c.env.DB, accountId) });
+});
+
+booking.post('/api/liff/booking/me/:id/cancel', async (c) => {
+  const accountId = await resolveAccountIdFromLiff(c);
+  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  const callerLineUserId = await verifyCallerLineUserId(c);
+  if (!callerLineUserId) return c.json({ error: 'unauthorized' }, 401);
+  const friendId = await resolveFriendId(c, callerLineUserId, accountId);
+  if (!friendId) return c.json({ error: 'not_found' }, 404);
+
+  const id = c.req.param('id');
+  const row = await c.env.DB
+    .prepare(
+      `SELECT id, status, starts_at
+         FROM bookings
+        WHERE id = ? AND line_account_id = ? AND friend_id = ?`,
+    )
+    .bind(id, accountId, friendId)
+    .first<{ id: string; status: BookingStatus; starts_at: string }>();
+  if (!row) return c.json({ error: 'not_found' }, 404);
+  if (!canTransition(row.status, 'cancel')) {
+    return c.json({ error: 'cannot_cancel', status: row.status }, 409);
+  }
+  if (new Date(row.starts_at) <= new Date()) {
+    return c.json({ error: 'booking_started' }, 409);
+  }
+
+  const updated = await c.env.DB
+    .prepare(
+      `UPDATE bookings
+          SET status = 'cancelled', decided_at = ?,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND line_account_id = ? AND friend_id = ? AND status = ?`,
+    )
+    .bind(new Date().toISOString(), id, accountId, friendId, row.status)
+    .run();
+  if ((updated.meta?.changes ?? 0) === 0) {
+    return c.json({ error: 'concurrent_update' }, 409);
+  }
+  await c.env.DB
+    .prepare(
+      `UPDATE booking_reminders SET status='cancelled'
+        WHERE booking_id = ? AND status IN ('pending','failed')`,
+    )
+    .bind(id)
+    .run();
+  return c.json({ status: 'cancelled' });
+});
+
 // ================================================================
 // Admin endpoints (/api/booking/admin/*)
 // authMiddleware enforces staff/owner auth at index.ts level.
@@ -574,6 +707,45 @@ booking.get('/api/liff/booking/me', async (c) => {
 // ================================================================
 
 // ---- Menus CRUD ----
+
+booking.get('/api/booking/admin/consent', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  return c.json({ consent: await getConsentSetting(c.env.DB, accountId) });
+});
+
+booking.put('/api/booking/admin/consent', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const body = await c.req.json<{
+    title?: string;
+    body?: string;
+    is_required?: boolean;
+    is_active?: boolean;
+  }>();
+  const title = body.title?.trim() ?? '';
+  const consentBody = body.body?.trim() ?? '';
+  if (!title || !consentBody) return c.json({ error: 'title_and_body_required' }, 400);
+  if (title.length > 120 || consentBody.length > 10_000) {
+    return c.json({ error: 'consent_too_long' }, 422);
+  }
+  await c.env.DB
+    .prepare(
+      `INSERT INTO booking_consent_settings
+        (line_account_id, title, body, version, is_required, is_active)
+       VALUES (?, ?, ?, 1, ?, ?)
+       ON CONFLICT(line_account_id) DO UPDATE SET
+         title = excluded.title,
+         body = excluded.body,
+         version = booking_consent_settings.version + 1,
+         is_required = excluded.is_required,
+         is_active = excluded.is_active,
+         updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')`,
+    )
+    .bind(accountId, title, consentBody, body.is_required === false ? 0 : 1, body.is_active === false ? 0 : 1)
+    .run();
+  return c.json({ consent: await getConsentSetting(c.env.DB, accountId) });
+});
 
 booking.get('/api/booking/admin/menus', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);

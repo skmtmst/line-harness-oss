@@ -9,7 +9,7 @@ export type BookingAction =
   | 'no_show';
 
 const TRANSITIONS: Record<BookingStatus, Partial<Record<BookingAction, BookingStatus>>> = {
-  requested: { approve: 'confirmed', reject: 'rejected', expire: 'expired' },
+  requested: { approve: 'confirmed', reject: 'rejected', expire: 'expired', cancel: 'cancelled' },
   confirmed: { cancel: 'cancelled', no_show: 'no_show', complete: 'completed' },
   rejected: {},
   expired: {},

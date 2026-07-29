@@ -38,7 +38,7 @@ export default function LocationList({
     <div className="space-y-4 sb-fade-in">
       <div>
         <h1 className="text-base font-bold text-gray-900">店舗を選んでください</h1>
-        <p className="text-xs text-gray-500 mt-1">step 1 / 5</p>
+        <p className="text-xs text-gray-500 mt-1">ご来店する店舗を選択します</p>
       </div>
       {locations.length === 0 ? (
         <div className="sb-card text-center text-sm text-gray-500">現在、予約できる店舗がありません</div>

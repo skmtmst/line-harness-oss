@@ -29,7 +29,7 @@ function readUrlState(): {
 function App({ ctx }: { ctx: SalonBookingContext }) {
   // peekMode は state として保持し、Booking から `exitPeek` で false に倒せる。
   const initial = readUrlState();
-  const [view] = useState(initial.view);
+  const [view, setView] = useState(initial.view);
   const [peekMode, setPeekMode] = useState(initial.peekMode);
   // menu_id ディープリンクは URL から1度だけ読む。お客様が「戻る」で
   // メニュー選択に戻った後にディープリンクで再ロックされないように、
@@ -37,20 +37,38 @@ function App({ ctx }: { ctx: SalonBookingContext }) {
   const [initialMenuId] = useState(initial.menuId);
   const [initialLocationId] = useState(initial.locationId);
 
-  const headerLabel = view === 'history' ? '予約履歴' : peekMode ? '空き状況' : 'ご予約';
+  const headerLabel = view === 'history' ? '予約の確認・履歴' : peekMode ? '空き状況' : 'ご予約';
+
+  function changeView(next: 'history' | null) {
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set('view', next);
+    else url.searchParams.delete('view');
+    window.history.replaceState(null, '', url.toString());
+    setView(next);
+  }
 
   return (
     <SalonBookingProvider value={ctx}>
-      <div className="min-h-screen sb-fade-in" style={{ background: '#f5f5f5' }}>
+      <div className="min-h-screen sb-fade-in" style={{ background: '#f7f8f7' }}>
         <header
-          className="px-4 py-3 text-white text-center font-bold"
-          style={{ background: '#06C755', fontSize: '15px' }}
+          className="sticky top-0 z-20 border-b border-green-500 bg-white px-4 py-3"
         >
-          {headerLabel}
+          <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+            <div>
+              <div className="text-lg font-bold text-slate-800">{headerLabel}</div>
+              <div className="text-[10px] text-gray-400">meauty 予約ページ</div>
+            </div>
+            <button
+              onClick={() => changeView(view === 'history' ? null : 'history')}
+              className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm"
+            >
+              {view === 'history' ? '予約する' : '予約の確認'}
+            </button>
+          </div>
         </header>
         <main className="max-w-md mx-auto px-4 py-4 pb-24">
           {view === 'history' ? (
-            <BookingHistory />
+            <BookingHistory onBook={() => changeView(null)} />
           ) : (
             <Booking
               peekMode={peekMode}

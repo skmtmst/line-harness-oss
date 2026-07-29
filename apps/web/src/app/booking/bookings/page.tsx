@@ -66,15 +66,16 @@ export default function BookingsPage() {
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
 
   const liffId = selectedAccount?.liffId ?? null
-  // Worker `/o` は ref 解決・追跡なしで liffId を直接受けるラップ URL。
-  // `liff.line.me` を直貼りすると OpenChat / IG DM 等で削除されるため、
-  // LINE 内配信も SNS 配信もこの 1 本で完結させる。/o は LINE 内 UA でも
-  // 「LINEで開く」ボタン経由で Universal Link → LIFF を起動する。
-  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
-  const shareUrl = workerBase && liffId
-    ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book`
+  // リッチメニューは LINE 内から開くため、LIFF の Universal Link を直接使う。
+  // /o ラップを挟まないので「LINEで開く」の中間画面が出ず、予約画面へ直行する。
+  const shareUrl = liffId
+    ? `https://liff.line.me/${encodeURIComponent(liffId)}/?page=salon-book&liffId=${encodeURIComponent(liffId)}`
+    : null
+  const historyUrl = liffId
+    ? `https://liff.line.me/${encodeURIComponent(liffId)}/?page=salon-book&view=history&liffId=${encodeURIComponent(liffId)}`
     : null
   const copied = copiedUrl !== null && copiedUrl === shareUrl
+  const historyCopied = copiedUrl !== null && copiedUrl === historyUrl
 
   async function copyUrl(url: string | null) {
     if (!url) return
@@ -145,11 +146,12 @@ export default function BookingsPage() {
                 d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-3 3a4 4 0 01-5.656 0L10 18.343M10.172 13.828a4 4 0 01-5.656 0L3.1 12.414a4 4 0 010-5.656l3-3a4 4 0 015.656 0L14 5.657"
               />
             </svg>
-            お客様向け 予約フォーム LIFF URL
+            リッチメニュー用 予約URL
           </div>
           {shareUrl ? (
             <>
               <div className="flex gap-2 items-center">
+                <div className="w-28 shrink-0 text-xs font-semibold text-blue-900">予約する</div>
                 <input
                   readOnly
                   value={shareUrl}
@@ -164,8 +166,24 @@ export default function BookingsPage() {
                   {copied ? 'コピー済' : 'コピー'}
                 </button>
               </div>
+              <div className="mt-3 flex gap-2 items-center">
+                <div className="w-28 shrink-0 text-xs font-semibold text-blue-900">予約の確認</div>
+                <input
+                  readOnly
+                  value={historyUrl ?? ''}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-xs bg-white font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => copyUrl(historyUrl)}
+                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  {historyCopied ? 'コピー済' : 'コピー'}
+                </button>
+              </div>
               <p className="text-xs text-blue-700 mt-2">
-                LINE / OpenChat / IG DM どこでも貼れます。受信者がタップすると LINE で予約画面が開きます。
+                上段は「予約する」、下段は「予約の確認」ボタンに設定します。確認画面から詳細・履歴・キャンセルへ進めます。
               </p>
             </>
           ) : (

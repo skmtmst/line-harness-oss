@@ -1,13 +1,22 @@
 import { useState } from 'react';
-import { createApi, type LocationItem, type MenuItem, type StaffItem } from '../lib/api.js';
+import {
+  createApi,
+  type ConsentSetting,
+  type LocationItem,
+  type MenuItem,
+  type StaffItem,
+} from '../lib/api.js';
 import { useSalonContext } from '../lib/context.js';
 import { jstStartsAtIso, formatJp } from '../lib/datetime.js';
+import type { CustomerDetailsValue } from './CustomerDetails.js';
 
 export default function Confirm({
   location,
   menu,
   staff,
   slot,
+  customer,
+  consent,
   onSubmitted,
   onBack,
 }: {
@@ -15,16 +24,23 @@ export default function Confirm({
   menu: MenuItem;
   staff: StaffItem;
   slot: { date: string; start: string };
+  customer: CustomerDetailsValue;
+  consent: ConsentSetting;
   onSubmitted: () => void;
   onBack: () => void;
 }) {
   const ctx = useSalonContext();
-  const [note, setNote] = useState('');
+  const [agreed, setAgreed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
+  const mustAgree = consent.is_active === 1 && consent.is_required === 1;
 
   async function handleSubmit() {
+    if (mustAgree && !agreed) {
+      setError(`${consent.title}への同意が必要です。`);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -34,15 +50,30 @@ export default function Confirm({
           menu_id: menu.id,
           staff_id: staff.id,
           starts_at: jstStartsAtIso(slot.date, slot.start),
-          customer_note: note || undefined,
+          customer_name: customer.name,
+          customer_kana: customer.kana,
+          customer_phone: customer.phone,
+          customer_note: customer.note || undefined,
+          consent_agreed: agreed,
+          consent_version: consent.version,
         },
         idemKey,
       );
+      try {
+        localStorage.setItem(
+          'meauty_booking_customer',
+          JSON.stringify({ name: customer.name, kana: customer.kana, phone: customer.phone }),
+        );
+      } catch {
+        // Private browsing/storage denial must not make a successful booking fail.
+      }
       onSubmitted();
     } catch (e) {
       const err = e as { status?: number; body?: { error?: string } };
       if (err.status === 409 && err.body?.error === 'slot_conflict') {
         setError('この時間枠は他の方の予約と重なりました。日時を選び直してください。');
+      } else if (err.status === 422 && err.body?.error === 'consent_required') {
+        setError('同意書が更新されました。一度戻って内容を再確認してください。');
       } else {
         setError('予約リクエストの送信に失敗しました。時間をおいて再度お試しください。');
       }
@@ -52,72 +83,69 @@ export default function Confirm({
   }
 
   return (
-    <div className="space-y-4 sb-slide-up">
+    <div className="space-y-5 sb-slide-up">
       <button onClick={onBack} className="sb-back-btn">
-        <span aria-hidden>←</span>
-        戻る
+        <span aria-hidden>←</span>入力内容を変更
       </button>
-      <div>
-        <h1 className="text-base font-bold text-gray-900">内容のご確認</h1>
-        <p className="text-xs text-gray-500 mt-1">step 5 / 5</p>
-      </div>
-      <div className="sb-card">
+      <h1 className="text-xl font-bold text-slate-800">予約内容の確認</h1>
+
+      <div className="sb-summary-card">
         <dl className="space-y-3 text-sm">
+          <Row label="日時" value={`${formatJp(slot.date)} ${slot.start}〜`} strong />
           <Row label="店舗" value={location.name} />
           <Row label="メニュー" value={menu.name} />
           <Row label="担当" value={staff.display_name} />
-          <Row label="日時" value={`${formatJp(slot.date)} ${slot.start}`} />
-          <Row label="所要" value={`${staff.duration_minutes} 分`} />
-          <Row
-            label="料金"
-            value={`¥${staff.price.toLocaleString()}`}
-            valueClassName="font-bold text-base sb-line-green-text"
-          />
+          <Row label="所要時間" value={`${staff.duration_minutes}分`} />
+          <Row label="料金" value={`¥${staff.price.toLocaleString()}`} strong />
         </dl>
       </div>
-      <label className="block">
-        <span className="text-xs font-medium text-gray-600 mb-1 block">ご要望（任意）</span>
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y bg-white"
-          rows={3}
-          placeholder="髪型の希望、アレルギー、その他"
-        />
-      </label>
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-          {error}
-        </div>
+
+      <div className="sb-card">
+        <dl className="space-y-4 text-sm">
+          <Row label="お名前" value={customer.name} />
+          <Row label="お名前（カナ）" value={customer.kana} />
+          <Row label="電話番号" value={customer.phone} />
+          {customer.note && <Row label="ご要望" value={customer.note} />}
+        </dl>
+      </div>
+
+      {consent.is_active === 1 && (
+        <section>
+          <h2 className="mb-2 text-sm font-bold text-slate-800">{consent.title}</h2>
+          <div className="sb-consent-body">{consent.body}</div>
+          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-white p-4">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-0.5 h-6 w-6 shrink-0 accent-green-600"
+            />
+            <span className="text-sm font-bold leading-6 text-slate-700">
+              {consent.title}に同意する
+              {mustAgree && <span className="ml-2 rounded bg-orange-600 px-1.5 py-0.5 text-[10px] text-white">必須</span>}
+            </span>
+          </label>
+        </section>
       )}
+
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <button
         onClick={handleSubmit}
-        disabled={submitting}
-        className="w-full text-white py-3.5 rounded-xl font-bold disabled:opacity-50"
-        style={{ background: '#06C755', boxShadow: '0 1px 3px rgba(6, 199, 85, 0.3)' }}
+        disabled={submitting || (mustAgree && !agreed)}
+        className="sb-primary-btn"
       >
-        {submitting ? '送信中…' : '予約をリクエスト'}
+        {submitting ? '送信中…' : '予約リクエストを確定する'}
       </button>
-      <p className="text-xs text-gray-400 text-center">
-        確定すると LINE に通知が届きます
-      </p>
+      <p className="text-center text-xs text-gray-400">店舗の承認後に予約確定となり、LINEでお知らせします。</p>
     </div>
   );
 }
 
-function Row({
-  label,
-  value,
-  valueClassName,
-}: {
-  label: string;
-  value: string;
-  valueClassName?: string;
-}) {
+function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
-    <div className="flex justify-between items-center pb-3 border-b border-gray-100 last:border-b-0 last:pb-0">
-      <dt className="text-gray-500 text-xs">{label}</dt>
-      <dd className={`text-gray-900 ${valueClassName ?? ''}`}>{value}</dd>
+    <div className="grid grid-cols-[92px_minmax(0,1fr)] gap-3 border-b border-dashed border-gray-200 pb-3 last:border-0 last:pb-0">
+      <dt className="text-xs font-semibold text-gray-500">{label}</dt>
+      <dd className={strong ? 'font-bold sb-line-green-text' : 'font-semibold text-slate-800'}>{value}</dd>
     </div>
   );
 }

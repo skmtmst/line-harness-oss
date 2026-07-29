@@ -325,3 +325,65 @@ describe('jstDayWindowUtc', () => {
     expect(jstDayWindowUtc('2026-11-09').startUtc).toBe('2026-11-08T15:00:00.000Z');
   });
 });
+
+describe('booking consent admin API', () => {
+  test('GET returns the default consent before the first save', async () => {
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request('/api/booking/admin/consent?account_id=acc1', {}, env);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      consent: { title: string; version: number; is_required: number };
+    };
+    expect(body.consent.title).toBe('注意事項・利用規約');
+    expect(body.consent.version).toBe(1);
+    expect(body.consent.is_required).toBe(1);
+  });
+
+  test('PUT rejects an empty title or body', async () => {
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request(
+      '/api/booking/admin/consent?account_id=acc1',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: '', body: '', is_required: true, is_active: true }),
+      },
+      env,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  test('PUT upserts and returns the saved consent', async () => {
+    const saved = {
+      title: '施術同意書',
+      body: '内容',
+      version: 2,
+      is_required: 1,
+      is_active: 1,
+    };
+    const db = scriptedDb([
+      ['INSERT INTO booking_consent_settings', { run: { meta: { changes: 1 } } }],
+      ['FROM booking_consent_settings', { first: saved }],
+    ]);
+    const { app, env } = makeApp(db);
+    const res = await app.request(
+      '/api/booking/admin/consent?account_id=acc1',
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: saved.title,
+          body: saved.body,
+          is_required: true,
+          is_active: true,
+        }),
+      },
+      env,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { consent: typeof saved };
+    expect(body.consent).toEqual(saved);
+    const insert = db.calls.find((call) => call.sql.includes('INSERT INTO booking_consent_settings'));
+    expect(insert?.params).toEqual(['acc1', saved.title, saved.body, 1, 1]);
+  });
+});
