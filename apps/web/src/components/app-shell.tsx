@@ -4,6 +4,7 @@ import Sidebar from './layout/sidebar'
 import { UpdateBanner } from './update/update-banner'
 import AuthGuard from './auth-guard'
 import { AccountProvider } from '@/contexts/account-context'
+import MobileQuickNav from './layout/mobile-quick-nav'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -23,10 +24,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-1 min-h-0">
             <Sidebar />
             <main className="flex-1 overflow-auto pt-[72px] lg:pt-0">
-              <div className="px-4 pb-6 sm:px-6 lg:pt-8 lg:px-8 lg:pb-8">
+              <div className="px-4 pb-24 sm:px-6 lg:pt-8 lg:px-8 lg:pb-8">
                 {children}
               </div>
             </main>
+            <MobileQuickNav />
           </div>
         </div>
       </AccountProvider>

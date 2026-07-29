@@ -299,13 +299,13 @@ export default function StaffShiftsPage() {
                 <button onClick={() => moveMonth(1)} className="px-3 py-1.5 border rounded-lg text-sm">→</button>
               </div>
             </div>
-            <div className="p-4">
+            <div className="p-2 sm:p-4">
               <div className="grid grid-cols-7 text-center text-xs text-gray-500 mb-2">
                 {DAYS.map((day) => (
                   <div key={day.label} className={day.tone}>{day.label}</div>
                 ))}
               </div>
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
                 {calendarDays.map((date) => {
                   const inMonth = date.startsWith(calendarMonth)
                   const selected = selectedDates.has(date)
@@ -319,7 +319,7 @@ export default function StaffShiftsPage() {
                       type="button"
                       disabled={!inMonth}
                       onClick={() => toggleDate(date)}
-                      className={`min-h-24 rounded-lg border p-1.5 text-left transition-colors ${
+                      className={`min-h-16 rounded-md border p-1 text-left transition-colors sm:min-h-24 sm:rounded-lg sm:p-1.5 ${
                         !inMonth
                           ? 'border-transparent bg-gray-50 text-gray-300'
                           : selected
@@ -328,7 +328,7 @@ export default function StaffShiftsPage() {
                       }`}
                     >
                       <span
-                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm tabular-nums ${
+                        className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs tabular-nums sm:h-7 sm:w-7 sm:text-sm ${
                           selected ? 'bg-blue-500 text-white font-semibold' : ''
                         }`}
                       >
@@ -336,15 +336,18 @@ export default function StaffShiftsPage() {
                       </span>
                       {shift && (
                         <span
-                          className={`block mt-1 rounded border p-1 text-[10px] leading-tight ${
+                          className={`block mt-0.5 rounded border p-0.5 text-[9px] leading-tight sm:mt-1 sm:p-1 sm:text-[10px] ${
                             shiftTone?.calendar ?? 'border-gray-200 bg-gray-100 text-gray-700'
                           }`}
                         >
-                          登録済み
-                          <br />
-                          {shift.location_name ?? '店舗未設定'}
-                          <br />
-                          {shift.start_time}〜{shift.end_time}
+                          <span className="sm:hidden">{shift.location_name?.replace('店', '') ?? '登録'}</span>
+                          <span className="hidden sm:inline">
+                            登録済み
+                            <br />
+                            {shift.location_name ?? '店舗未設定'}
+                            <br />
+                            {shift.start_time}〜{shift.end_time}
+                          </span>
                         </span>
                       )}
                     </button>
@@ -455,7 +458,49 @@ export default function StaffShiftsPage() {
             ) : shifts.length === 0 ? (
               <div className="p-10 text-center text-sm text-gray-500">まだシフトがありません</div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              <div className="divide-y divide-gray-100 sm:hidden">
+                {shifts.map((shift) => {
+                  const tone = shift.location_id
+                    ? locationToneById.get(shift.location_id)
+                    : undefined
+                  return (
+                    <article key={shift.id} className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold tabular-nums text-gray-900">{shift.work_date}</p>
+                          <p className="mt-1 text-sm tabular-nums text-gray-600">
+                            {shift.start_time}〜{shift.end_time}
+                          </p>
+                        </div>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                            tone?.badge ?? 'border-gray-200 bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          <span className={`h-2 w-2 rounded-full ${tone?.dot ?? 'bg-gray-400'}`} />
+                          {shift.location_name ?? '未設定'}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex justify-end gap-2 border-t border-gray-100 pt-3">
+                        <button
+                          onClick={() => editShift(shift)}
+                          className="min-h-10 rounded-lg border border-blue-200 px-4 text-xs font-semibold text-blue-600"
+                        >
+                          編集
+                        </button>
+                        <button
+                          onClick={() => void deleteShift(shift.id)}
+                          className="min-h-10 rounded-lg border border-red-200 px-4 text-xs font-semibold text-red-600"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+              <div className="hidden overflow-x-auto sm:block">
                 <table className="w-full">
                   <thead className="sticky top-0 bg-gray-50">
                     <tr className="border-b border-gray-200">
@@ -506,6 +551,7 @@ export default function StaffShiftsPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </section>
         </div>

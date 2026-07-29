@@ -168,8 +168,8 @@ export default function BookingsPage() {
           </div>
           {shareUrl ? (
             <>
-              <div className="flex gap-2 items-center">
-                <div className="w-28 shrink-0 text-xs font-semibold text-blue-900">予約する</div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="shrink-0 text-xs font-semibold text-blue-900 sm:w-28">予約する</div>
                 <input
                   readOnly
                   value={shareUrl}
@@ -179,13 +179,13 @@ export default function BookingsPage() {
                 <button
                   type="button"
                   onClick={() => copyUrl(shareUrl)}
-                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="min-h-11 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   {copied ? 'コピー済' : 'コピー'}
                 </button>
               </div>
-              <div className="mt-3 flex gap-2 items-center">
-                <div className="w-28 shrink-0 text-xs font-semibold text-blue-900">予約の確認</div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="shrink-0 text-xs font-semibold text-blue-900 sm:w-28">予約の確認</div>
                 <input
                   readOnly
                   value={historyUrl ?? ''}
@@ -195,7 +195,7 @@ export default function BookingsPage() {
                 <button
                   type="button"
                   onClick={() => copyUrl(historyUrl)}
-                  className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="min-h-11 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   {historyCopied ? 'コピー済' : 'コピー'}
                 </button>
@@ -286,7 +286,47 @@ export default function BookingsPage() {
           該当する予約はありません
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <>
+        <div className="space-y-3 md:hidden">
+          {items.map((booking) => (
+            <article key={booking.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-gray-900">{formatJpDateTime(booking.starts_at)}</p>
+                  <Link
+                    href={`/chats?friend=${booking.friend_id}`}
+                    className="mt-1 inline-block text-sm font-semibold text-blue-600"
+                  >
+                    {booking.friend_name ?? 'お客様'}へメッセージ
+                  </Link>
+                </div>
+                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeColor[booking.status] ?? 'bg-gray-100'}`}>
+                  {statusLabel[booking.status] ?? booking.status}
+                </span>
+              </div>
+              <dl className="mt-4 grid grid-cols-[72px_1fr] gap-x-3 gap-y-2 text-sm">
+                <dt className="text-gray-500">店舗</dt>
+                <dd className="font-medium text-gray-800">{booking.location_name ?? '-'}</dd>
+                <dt className="text-gray-500">メニュー</dt>
+                <dd className="font-medium text-gray-800">{booking.menu_name}</dd>
+                <dt className="text-gray-500">担当</dt>
+                <dd className="text-gray-800">{booking.staff_name}</dd>
+                <dt className="text-gray-500">料金</dt>
+                <dd className="font-semibold tabular-nums text-gray-900">¥{booking.price_at_booking.toLocaleString()}</dd>
+                {booking.customer_note && (
+                  <>
+                    <dt className="text-gray-500">要望</dt>
+                    <dd className="whitespace-pre-wrap text-gray-700">{booking.customer_note}</dd>
+                  </>
+                )}
+              </dl>
+              <div className="mt-4 border-t border-gray-100 pt-3 text-right">
+                <ActionButtons status={booking.status} onAction={(action) => handleDecide(booking.id, action)} />
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden md:block">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
               <thead>
@@ -335,6 +375,7 @@ export default function BookingsPage() {
             </table>
           </div>
         </div>
+        </>
       )}
     </div>
   )
@@ -349,17 +390,17 @@ function ActionButtons({
 }) {
   if (status === 'requested') {
     return (
-      <div className="inline-flex gap-1">
+      <div className="inline-flex gap-2">
         <button
           onClick={() => onAction('approve')}
-          className="px-3 py-1 text-xs font-medium text-white rounded-md transition-opacity hover:opacity-90"
+          className="min-h-10 px-4 py-2 text-xs font-medium text-white rounded-md transition-opacity hover:opacity-90"
           style={{ backgroundColor: '#06C755' }}
         >
           承認
         </button>
         <button
           onClick={() => onAction('reject')}
-          className="px-3 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md"
+          className="min-h-10 px-4 py-2 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md"
         >
           拒否
         </button>
@@ -368,22 +409,22 @@ function ActionButtons({
   }
   if (status === 'confirmed') {
     return (
-      <div className="inline-flex gap-1">
+      <div className="inline-flex flex-wrap justify-end gap-2">
         <button
           onClick={() => onAction('complete')}
-          className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md"
+          className="min-h-10 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-md"
         >
           完了
         </button>
         <button
           onClick={() => onAction('no_show')}
-          className="px-3 py-1 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-md"
+          className="min-h-10 px-3 py-2 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 rounded-md"
         >
           無断
         </button>
         <button
           onClick={() => onAction('cancel')}
-          className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
+          className="min-h-10 px-3 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
         >
           取消
         </button>
