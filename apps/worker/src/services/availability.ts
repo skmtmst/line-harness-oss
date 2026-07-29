@@ -99,6 +99,7 @@ export interface GetAvailabilityParams {
   to: string;
   now: Date;
   minLeadTimeMinutes: number;
+  granularityMinutes?: number;
 }
 
 export async function getAvailability(
@@ -214,7 +215,7 @@ export async function getAvailability(
         working: [{ start: shift.start_time, end: shift.end_time }],
         busy: dayBookings,
         menu: menuForCalc,
-        granularityMinutes: SLOT_GRANULARITY_MINUTES,
+        granularityMinutes: params.granularityMinutes ?? SLOT_GRANULARITY_MINUTES,
       });
       for (const slot of daySlots) {
         const slotStartUtc = new Date(`${date}T${slot.start}:00+09:00`);

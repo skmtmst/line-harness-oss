@@ -44,6 +44,9 @@ export interface AvailabilityResponse {
 
 export interface BookingHistoryItem {
   id: string;
+  staff_id: string;
+  location_id: string | null;
+  menu_id: string;
   starts_at: string;
   ends_at: string;
   status: string;
@@ -51,6 +54,9 @@ export interface BookingHistoryItem {
   customer_name: string | null;
   customer_kana: string | null;
   customer_phone: string | null;
+  customer_birthdate: string | null;
+  custom_fields_json: string | null;
+  pending_action_request: 'change' | 'cancel' | null;
   price_at_booking: number;
   consent_title: string | null;
   consent_body: string | null;
@@ -60,6 +66,29 @@ export interface BookingHistoryItem {
   staff_name: string;
   location_name: string | null;
   profile_image_url: string | null;
+}
+
+export interface BookingFormField {
+  id: string;
+  field_key: string;
+  label: string;
+  field_type: 'text' | 'tel' | 'date' | 'textarea';
+  placeholder: string | null;
+  is_required: number;
+  is_active: number;
+  sort_order: number;
+  is_system: number;
+}
+
+export interface BookingPublicSettings {
+  is_public: number;
+  allow_new_booking: number;
+  allow_change_request: number;
+  allow_cancel_request: number;
+  slot_interval_minutes: number;
+  calendar_view: 'week' | 'month';
+  change_deadline_minutes_before: number;
+  cancel_deadline_minutes_before: number;
 }
 
 export interface ConsentSetting {
@@ -111,6 +140,11 @@ async function post<T>(
 
 export function createApi(ctx: SalonBookingContext) {
   return {
+    config: () =>
+      get<{ settings: BookingPublicSettings; fields: BookingFormField[] }>(
+        '/api/liff/booking/config',
+        ctx,
+      ),
     locations: () =>
       get<{ locations: LocationItem[] }>('/api/liff/booking/locations', ctx),
     menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus', ctx),
@@ -136,6 +170,8 @@ export function createApi(ctx: SalonBookingContext) {
         customer_name: string;
         customer_kana: string;
         customer_phone: string;
+        customer_birthdate?: string;
+        form_values?: Record<string, string>;
         customer_note?: string;
         consent_agreed: boolean;
         consent_version: number;
@@ -156,6 +192,25 @@ export function createApi(ctx: SalonBookingContext) {
     consent: () =>
       get<{ consent: ConsentSetting }>('/api/liff/booking/consent', ctx),
     cancel: (bookingId: string) =>
-      post<{ status: string }>(`/api/liff/booking/me/${bookingId}/cancel`, {}, ctx),
+      post<{ request_id: string; status: string }>(
+        `/api/liff/booking/me/${bookingId}/cancel`,
+        {},
+        ctx,
+      ),
+    change: (
+      bookingId: string,
+      body: {
+        location_id: string;
+        menu_id: string;
+        staff_id: string;
+        starts_at: string;
+        customer_note?: string;
+      },
+    ) =>
+      post<{ request_id: string; status: string }>(
+        `/api/liff/booking/me/${bookingId}/change`,
+        body,
+        ctx,
+      ),
   };
 }

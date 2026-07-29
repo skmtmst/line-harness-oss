@@ -57,7 +57,8 @@
     "048_chats_friend_unique.sql",
     "049_tracked_links_short_code.sql",
     "050_booking_locations.sql",
-    "051_booking_consent_and_customer_details.sql"
+    "051_booking_consent_and_customer_details.sql",
+    "052_booking_management_settings.sql"
   ],
-  "migrationCount": 58
+  "migrationCount": 59
 }

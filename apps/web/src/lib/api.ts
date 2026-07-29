@@ -1545,11 +1545,113 @@ export interface BookingConsent {
   is_active: number;
 }
 
+export interface BookingManagementSettings {
+  is_public: number;
+  allow_new_booking: number;
+  allow_change_request: number;
+  allow_cancel_request: number;
+  reception_start_mode: 'always' | 'relative' | 'fixed';
+  reception_start_days_before: number | null;
+  reception_start_at: string | null;
+  reception_end_mode: 'until_start' | 'relative' | 'fixed';
+  reception_end_minutes_before: number;
+  reception_end_at: string | null;
+  change_deadline_minutes_before: number;
+  cancel_deadline_minutes_before: number;
+  slot_interval_minutes: number;
+  calendar_view: 'week' | 'month';
+  calendar_connection_id: string | null;
+  google_sync_enabled: number;
+}
+
+export interface BookingFormField {
+  id: string;
+  field_key: string;
+  label: string;
+  field_type: 'text' | 'tel' | 'date' | 'textarea';
+  placeholder: string | null;
+  is_required: number;
+  is_active: number;
+  sort_order: number;
+  is_system: number;
+}
+
+export interface BookingMessageSetting {
+  event_key: string;
+  message_text: string;
+  is_enabled: number;
+}
+
+export interface BookingCalendarConnection {
+  id: string;
+  calendar_id: string;
+  auth_type: string;
+  is_active: number;
+  has_access_token: number;
+}
+
+export interface BookingSettingsResponse {
+  settings: BookingManagementSettings;
+  fields: BookingFormField[];
+  messages: BookingMessageSetting[];
+  calendar_connections: BookingCalendarConnection[];
+}
+
+export interface BookingActionRequest {
+  id: string;
+  booking_id: string;
+  request_type: 'change' | 'cancel';
+  status: 'requested' | 'approved' | 'rejected';
+  requested_at: string;
+  current_starts_at: string;
+  requested_starts_at: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  current_menu_name: string;
+  current_staff_name: string;
+  current_location_name: string | null;
+  requested_menu_name: string | null;
+  requested_staff_name: string | null;
+  requested_location_name: string | null;
+}
+
 function withAccount(path: string, accountId: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`;
 }
 
 export const bookingApi = {
+  getSettings: (accountId: string) =>
+    fetchApi<BookingSettingsResponse>(
+      withAccount('/api/booking/admin/settings', accountId),
+    ),
+  updateSettings: (accountId: string, body: Partial<BookingManagementSettings>) =>
+    fetchApi<{ settings: BookingManagementSettings }>(
+      withAccount('/api/booking/admin/settings', accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+  updateFields: (accountId: string, fields: BookingFormField[]) =>
+    fetchApi<{ fields: BookingFormField[] }>(
+      withAccount('/api/booking/admin/settings/fields', accountId),
+      { method: 'PUT', body: JSON.stringify({ fields }) },
+    ),
+  updateMessages: (accountId: string, messages: BookingMessageSetting[]) =>
+    fetchApi<{ ok: true }>(
+      withAccount('/api/booking/admin/settings/messages', accountId),
+      { method: 'PUT', body: JSON.stringify({ messages }) },
+    ),
+  addCalendarConnection: (
+    accountId: string,
+    body: { calendar_id: string; access_token: string },
+  ) =>
+    fetchApi<{ id: string; calendar_id: string }>(
+      withAccount('/api/booking/admin/settings/calendar-connections', accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  deleteCalendarConnection: (accountId: string, id: string) =>
+    fetchApi<{ ok: true }>(
+      withAccount(`/api/booking/admin/settings/calendar-connections/${id}`, accountId),
+      { method: 'DELETE' },
+    ),
   getConsent: (accountId: string) =>
     fetchApi<{ consent: BookingConsent }>(
       withAccount('/api/booking/admin/consent', accountId),
@@ -1692,6 +1794,19 @@ export const bookingApi = {
     fetchApi<{ status: string }>(
       withAccount(`/api/booking/admin/requests/${id}`, accountId),
       { method: 'PATCH', body: JSON.stringify({ action }) },
+    ),
+  listActionRequests: (accountId: string, status: string = 'requested') =>
+    fetchApi<{ requests: BookingActionRequest[] }>(
+      withAccount(`/api/booking/admin/action-requests?status=${status}`, accountId),
+    ),
+  decideActionRequest: (
+    accountId: string,
+    id: string,
+    decision: 'approve' | 'reject',
+  ) =>
+    fetchApi<{ status: string }>(
+      withAccount(`/api/booking/admin/action-requests/${id}`, accountId),
+      { method: 'PATCH', body: JSON.stringify({ decision }) },
     ),
   pendingCount: (accountId: string) =>
     fetchApi<{ count: number }>(withAccount('/api/booking/admin/pending-count', accountId)),

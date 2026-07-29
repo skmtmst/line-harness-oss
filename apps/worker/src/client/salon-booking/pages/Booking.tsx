@@ -9,6 +9,8 @@ import CustomerDetails, { type CustomerDetailsValue } from '../components/Custom
 import { useSalonContext } from '../lib/context.js';
 import {
   createApi,
+  type BookingFormField,
+  type BookingPublicSettings,
   type ConsentSetting,
   type LocationItem,
   type MenuItem,
@@ -38,10 +40,12 @@ function initialCustomer(): CustomerDetailsValue {
       name: stored.name ?? '',
       kana: stored.kana ?? '',
       phone: stored.phone ?? '',
+      birthdate: stored.birthdate ?? '',
       note: '',
+      formValues: stored.formValues ?? {},
     };
   } catch {
-    return { name: '', kana: '', phone: '', note: '' };
+    return { name: '', kana: '', phone: '', birthdate: '', note: '', formValues: {} };
   }
 }
 
@@ -50,11 +54,13 @@ export default function Booking({
   exitPeek,
   initialLocationId,
   initialMenuId,
+  changeBookingId,
 }: {
   peekMode: boolean;
   exitPeek: () => void;
   initialLocationId?: string | null;
   initialMenuId?: string | null;
+  changeBookingId?: string | null;
 }) {
   const ctx = useSalonContext();
   const [step, setStep] = useState<Step>('location');
@@ -64,6 +70,8 @@ export default function Booking({
   const [slot, setSlot] = useState<{ date: string; start: string } | null>(null);
   const [customer, setCustomer] = useState<CustomerDetailsValue>(initialCustomer);
   const [consent, setConsent] = useState<ConsentSetting | null>(null);
+  const [settings, setSettings] = useState<BookingPublicSettings | null>(null);
+  const [fields, setFields] = useState<BookingFormField[]>([]);
   const [consentError, setConsentError] = useState(false);
   // ?menu_id=... が指定されたら、メニュー一覧をスキップして staff から開始。
   // 該当 menu が無効/未公開だった場合は通常フローに fallback（黙って全
@@ -73,10 +81,13 @@ export default function Booking({
 
   useEffect(() => {
     let cancelled = false;
-    createApi(ctx)
-      .consent()
-      .then((result) => {
-        if (!cancelled) setConsent(result.consent);
+    Promise.all([createApi(ctx).consent(), createApi(ctx).config()])
+      .then(([consentResult, configResult]) => {
+        if (!cancelled) {
+          setConsent(consentResult.consent);
+          setSettings(configResult.settings);
+          setFields(configResult.fields);
+        }
       })
       .catch(() => {
         if (!cancelled) setConsentError(true);
@@ -128,6 +139,19 @@ export default function Booking({
   }
 
   const phase = phaseOf(step);
+
+  if (!settings && !consentError) {
+    return <div className="flex flex-col items-center py-12"><div className="sb-spinner" /><p className="mt-3 text-sm text-gray-500">予約設定を読み込み中…</p></div>;
+  }
+
+  if (settings && (settings.is_public !== 1 || settings.allow_new_booking !== 1)) {
+    return (
+      <div className="sb-card py-12 text-center">
+        <h1 className="text-lg font-bold text-slate-800">現在、新規予約を受け付けていません</h1>
+        <p className="mt-3 text-sm text-gray-500">予約の確認・履歴は画面上部のボタンからご覧いただけます。</p>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -224,6 +248,7 @@ export default function Booking({
               : '○の時間をタップして選択してください'
           }
           selected={slot}
+          calendarView={settings?.calendar_view ?? 'week'}
           onSelect={(picked) => {
             setSlot(picked);
             if (!peekMode) setStep('details');
@@ -257,6 +282,7 @@ export default function Booking({
           staff={staff}
           slot={slot}
           initial={customer}
+          fields={fields}
           onNext={(value) => {
             setCustomer(value);
             setStep('confirm');
@@ -271,6 +297,8 @@ export default function Booking({
           staff={staff}
           slot={slot}
           customer={customer}
+          fields={fields}
+          changeBookingId={changeBookingId}
           consent={consent}
           onSubmitted={() => setStep('done')}
           onBack={() => setStep('details')}

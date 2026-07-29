@@ -16,20 +16,34 @@ export default function HistoryCard({
   booking,
   onCancel,
   onRebook,
+  onChange,
+  allowChange,
+  allowCancel,
 }: {
   booking: BookingHistoryItem;
   onCancel: (booking: BookingHistoryItem) => Promise<void>;
   onRebook: (booking: BookingHistoryItem) => void;
+  onChange: (booking: BookingHistoryItem) => void;
+  allowChange: boolean;
+  allowCancel: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const meta = STATUS_LABEL[booking.status] ?? { label: booking.status, bg: '#f3f4f6', fg: '#6b7280' };
-  const canCancel =
+  const canRequest =
     (booking.status === 'requested' || booking.status === 'confirmed') &&
-    new Date(booking.starts_at) > new Date();
+    new Date(booking.starts_at) > new Date() &&
+    !booking.pending_action_request;
+  const canRebook =
+    booking.status === 'rejected' ||
+    booking.status === 'expired' ||
+    booking.status === 'cancelled' ||
+    booking.status === 'completed' ||
+    booking.status === 'no_show' ||
+    new Date(booking.starts_at) <= new Date();
 
   async function cancel() {
-    if (!window.confirm('この予約をキャンセルしますか？この操作は取り消せません。')) return;
+    if (!window.confirm('キャンセルをリクエストしますか？店舗が承認するまでは予約は有効です。')) return;
     setCancelling(true);
     try {
       await onCancel(booking);
@@ -61,6 +75,7 @@ export default function HistoryCard({
             <Detail label="お名前" value={booking.customer_name ?? '未登録'} />
             <Detail label="お名前（カナ）" value={booking.customer_kana ?? '未登録'} />
             <Detail label="電話番号" value={booking.customer_phone ?? '未登録'} />
+            <Detail label="生年月日" value={booking.customer_birthdate ?? '未登録'} />
             {booking.customer_note && <Detail label="ご要望" value={booking.customer_note} />}
           </dl>
           {booking.consent_body && (
@@ -78,12 +93,22 @@ export default function HistoryCard({
         <button onClick={() => setExpanded(!expanded)} className="sb-outline-btn">
           {expanded ? '詳細を閉じる' : '予約を確認する'}
         </button>
-        {!canCancel && (
+        {canRebook && (
           <button onClick={() => onRebook(booking)} className="sb-outline-btn">同じ内容で予約する</button>
         )}
-        {canCancel && (
+        {booking.pending_action_request && (
+          <div className="rounded-xl bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-800">
+            {booking.pending_action_request === 'change' ? '変更' : 'キャンセル'}リクエスト承認待ち
+          </div>
+        )}
+        {canRequest && allowChange && (
+          <button onClick={() => onChange(booking)} className="sb-outline-btn">
+            予約変更をリクエスト
+          </button>
+        )}
+        {canRequest && allowCancel && (
           <button onClick={() => void cancel()} disabled={cancelling} className="sb-danger-btn">
-            {cancelling ? '処理中…' : booking.status === 'requested' ? '予約リクエストを取り消す' : '予約をキャンセルする'}
+            {cancelling ? '送信中…' : 'キャンセルをリクエスト'}
           </button>
         )}
       </div>

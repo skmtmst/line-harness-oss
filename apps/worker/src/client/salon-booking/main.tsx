@@ -16,6 +16,7 @@ function readUrlState(): {
   peekMode: boolean;
   locationId: string | null;
   menuId: string | null;
+  changeBookingId: string | null;
 } {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -23,6 +24,7 @@ function readUrlState(): {
     peekMode: params.get('mode') === 'peek',
     locationId: params.get('location_id'),
     menuId: params.get('menu_id'),
+    changeBookingId: params.get('change_booking_id'),
   };
 }
 
@@ -36,6 +38,7 @@ function App({ ctx }: { ctx: SalonBookingContext }) {
   // mount 時点の値だけ Booking に渡す。
   const [initialMenuId] = useState(initial.menuId);
   const [initialLocationId] = useState(initial.locationId);
+  const [changeBookingId] = useState(initial.changeBookingId);
 
   const headerLabel = view === 'history' ? '予約の確認・履歴' : peekMode ? '空き状況' : 'ご予約';
 
@@ -75,6 +78,7 @@ function App({ ctx }: { ctx: SalonBookingContext }) {
               exitPeek={() => setPeekMode(false)}
               initialLocationId={initialLocationId}
               initialMenuId={initialMenuId}
+              changeBookingId={changeBookingId}
             />
           )}
         </main>

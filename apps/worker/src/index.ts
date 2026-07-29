@@ -329,6 +329,16 @@ app.get('/r/:ref', async (c) => {
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
+  if (page === 'salon-book') {
+    const view = c.req.query('view');
+    if (view === 'history') liffParams.set('view', view);
+    const mode = c.req.query('mode');
+    if (mode === 'peek') liffParams.set('mode', mode);
+    for (const key of ['location_id', 'menu_id', 'change_booking_id'] as const) {
+      const value = c.req.query(key);
+      if (value && /^[A-Za-z0-9_-]{1,100}$/.test(value)) liffParams.set(key, value);
+    }
+  }
   const liffTarget = liffParams.toString() ? `${liffUrl}?${liffParams.toString()}` : liffUrl;
 
   // Help link carries the *resolved* liff target as `t=` so the help page
@@ -623,7 +633,7 @@ app.get('/o', async (c) => {
     if (view === 'history') liffParams.set('view', view);
     const mode = c.req.query('mode');
     if (mode === 'peek') liffParams.set('mode', mode);
-    for (const key of ['location_id', 'menu_id'] as const) {
+    for (const key of ['location_id', 'menu_id', 'change_booking_id'] as const) {
       const value = c.req.query(key);
       if (value && /^[A-Za-z0-9_-]{1,100}$/.test(value)) liffParams.set(key, value);
     }

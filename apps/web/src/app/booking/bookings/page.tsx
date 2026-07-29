@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
-import { bookingApi, type BookingRequest } from '@/lib/api'
+import { bookingApi, type BookingActionRequest, type BookingRequest } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
@@ -58,6 +58,7 @@ export default function BookingsPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [tab, setTab] = useState<string>('requested')
   const [items, setItems] = useState<BookingRequest[]>([])
+  const [actionRequests, setActionRequests] = useState<BookingActionRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copied 状態は URL 単位で持つ。アカウント切替で shareUrl が変わると
@@ -98,8 +99,14 @@ export default function BookingsPage() {
     // 残ってしまい、誤って別ステータスの予約を操作してしまう事故を防ぐ。
     setItems([])
     try {
-      const r = await bookingApi.listRequests(selectedAccountId, tab)
+      const [r, actions] = await Promise.all([
+        bookingApi.listRequests(selectedAccountId, tab),
+        bookingApi.listActionRequests(selectedAccountId, 'requested'),
+      ])
       setItems(r.requests)
+      // 変更・キャンセルは「未承認」で処理するものだけを同じ承認導線に出す。
+      // 予約本体の「確定」「キャンセル」タブと、アクション申請の内部状態を混在させない。
+      setActionRequests(tab === 'requested' ? actions.requests : [])
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -116,6 +123,17 @@ export default function BookingsPage() {
     if (!confirm(`この予約を「${actionLabel[action]}」しますか？`)) return
     try {
       await bookingApi.decideRequest(selectedAccountId, id, action)
+      await load()
+    } catch (e) {
+      alert(`操作に失敗しました: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  async function handleActionRequest(id: string, decision: 'approve' | 'reject') {
+    if (!selectedAccountId) return
+    if (!confirm(decision === 'approve' ? 'このリクエストを承認しますか？' : 'このリクエストを否認しますか？')) return
+    try {
+      await bookingApi.decideActionRequest(selectedAccountId, id, decision)
       await load()
     } catch (e) {
       alert(`操作に失敗しました: ${e instanceof Error ? e.message : String(e)}`)
@@ -215,6 +233,45 @@ export default function BookingsPage() {
           </button>
         ))}
       </div>
+
+      {selectedAccountId && actionRequests.length > 0 && (
+        <section className="mb-5 rounded-xl border border-orange-200 bg-orange-50 p-4">
+          <h2 className="mb-3 font-semibold text-orange-900">変更・キャンセルリクエスト</h2>
+          <div className="space-y-3">
+            {actionRequests.map((request) => (
+              <div key={request.id} className="rounded-lg border border-orange-100 bg-white p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className="rounded-full bg-orange-100 px-2.5 py-1 text-xs font-semibold text-orange-800">
+                      {request.request_type === 'change' ? '予約変更' : 'キャンセル'}
+                    </span>
+                    <p className="mt-2 text-sm font-semibold text-gray-900">
+                      {request.customer_name ?? 'お客様'}　
+                      {formatJpDateTime(request.current_starts_at)}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-600">
+                      現在：{request.current_location_name ?? '店舗未設定'}／{request.current_menu_name}／{request.current_staff_name}
+                    </p>
+                    {request.request_type === 'change' && request.requested_starts_at && (
+                      <p className="mt-1 text-xs font-semibold text-green-700">
+                        変更後：{formatJpDateTime(request.requested_starts_at)}／
+                        {request.requested_location_name ?? '店舗未設定'}／
+                        {request.requested_menu_name}／{request.requested_staff_name}
+                      </p>
+                    )}
+                  </div>
+                  {request.status === 'requested' && (
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => void handleActionRequest(request.id, 'reject')} className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700">否認</button>
+                      <button type="button" onClick={() => void handleActionRequest(request.id, 'approve')} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white">承認</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!selectedAccountId ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">

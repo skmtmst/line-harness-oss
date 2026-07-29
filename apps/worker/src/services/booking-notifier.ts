@@ -41,10 +41,33 @@ export interface SendNotificationParams {
   toLineUserId: string;
   kind: NotificationKind;
   ctx: NotificationContext;
+  templateText?: string | null;
+  variables?: Record<string, string | number | null | undefined>;
+}
+
+export function renderBookingTemplate(
+  template: string,
+  variables: Record<string, string | number | null | undefined>,
+): string {
+  return template
+    .replace(/\\n/g, '\n')
+    .replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (_match, key: string) => {
+      const value = variables[key];
+      return value === null || value === undefined ? '' : String(value);
+    })
+    .trim();
 }
 
 export async function sendBookingNotification(params: SendNotificationParams): Promise<void> {
-  const text = renderNotificationText(params.kind, params.ctx);
+  const text = params.templateText
+    ? renderBookingTemplate(params.templateText, {
+        menu_name: params.ctx.menuName,
+        staff_name: params.ctx.staffName,
+        starts_at: params.ctx.startsAtJst,
+        ...params.variables,
+      })
+    : renderNotificationText(params.kind, params.ctx);
+  if (!text) return;
   const client = new LineClient(params.channelAccessToken);
   await client.pushMessage(params.toLineUserId, [{ type: 'text', text }]);
 }

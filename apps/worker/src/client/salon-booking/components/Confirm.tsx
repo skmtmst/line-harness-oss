@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   createApi,
+  type BookingFormField,
   type ConsentSetting,
   type LocationItem,
   type MenuItem,
@@ -16,6 +17,8 @@ export default function Confirm({
   staff,
   slot,
   customer,
+  fields,
+  changeBookingId,
   consent,
   onSubmitted,
   onBack,
@@ -25,6 +28,8 @@ export default function Confirm({
   staff: StaffItem;
   slot: { date: string; start: string };
   customer: CustomerDetailsValue;
+  fields: BookingFormField[];
+  changeBookingId?: string | null;
   consent: ConsentSetting;
   onSubmitted: () => void;
   onBack: () => void;
@@ -44,25 +49,40 @@ export default function Confirm({
     setSubmitting(true);
     setError(null);
     try {
-      await createApi(ctx).createRequest(
-        {
+      const requestBody = {
           location_id: location.id,
           menu_id: menu.id,
           staff_id: staff.id,
           starts_at: jstStartsAtIso(slot.date, slot.start),
+          customer_note: customer.note || undefined,
+      };
+      if (changeBookingId) {
+        await createApi(ctx).change(changeBookingId, requestBody);
+      } else {
+        await createApi(ctx).createRequest(
+          {
+          ...requestBody,
           customer_name: customer.name,
           customer_kana: customer.kana,
           customer_phone: customer.phone,
-          customer_note: customer.note || undefined,
+          customer_birthdate: customer.birthdate,
+          form_values: customer.formValues,
           consent_agreed: agreed,
           consent_version: consent.version,
         },
         idemKey,
       );
+      }
       try {
         localStorage.setItem(
           'meauty_booking_customer',
-          JSON.stringify({ name: customer.name, kana: customer.kana, phone: customer.phone }),
+          JSON.stringify({
+            name: customer.name,
+            kana: customer.kana,
+            phone: customer.phone,
+            birthdate: customer.birthdate,
+            formValues: customer.formValues,
+          }),
         );
       } catch {
         // Private browsing/storage denial must not make a successful booking fail.
@@ -75,7 +95,7 @@ export default function Confirm({
       } else if (err.status === 422 && err.body?.error === 'consent_required') {
         setError('同意書が更新されました。一度戻って内容を再確認してください。');
       } else {
-        setError('予約リクエストの送信に失敗しました。時間をおいて再度お試しください。');
+        setError(`${changeBookingId ? '変更' : '予約'}リクエストの送信に失敗しました。時間をおいて再度お試しください。`);
       }
     } finally {
       setSubmitting(false);
@@ -102,9 +122,13 @@ export default function Confirm({
 
       <div className="sb-card">
         <dl className="space-y-4 text-sm">
-          <Row label="お名前" value={customer.name} />
-          <Row label="お名前（カナ）" value={customer.kana} />
-          <Row label="電話番号" value={customer.phone} />
+          {fields.filter((field) => field.is_active === 1).map((field) => (
+            <Row
+              key={field.id}
+              label={field.label}
+              value={customer.formValues[field.field_key] ?? systemValue(customer, field.field_key)}
+            />
+          ))}
           {customer.note && <Row label="ご要望" value={customer.note} />}
         </dl>
       </div>
@@ -134,11 +158,19 @@ export default function Confirm({
         disabled={submitting || (mustAgree && !agreed)}
         className="sb-primary-btn"
       >
-        {submitting ? '送信中…' : '予約リクエストを確定する'}
+        {submitting ? '送信中…' : changeBookingId ? '予約変更をリクエストする' : '予約リクエストを確定する'}
       </button>
-      <p className="text-center text-xs text-gray-400">店舗の承認後に予約確定となり、LINEでお知らせします。</p>
+      <p className="text-center text-xs text-gray-400">店舗の承認後に{changeBookingId ? '変更' : '予約'}確定となり、LINEでお知らせします。</p>
     </div>
   );
+}
+
+function systemValue(customer: CustomerDetailsValue, key: string): string {
+  if (key === 'customer_name') return customer.name;
+  if (key === 'customer_kana') return customer.kana;
+  if (key === 'customer_phone') return customer.phone;
+  if (key === 'customer_birthdate') return customer.birthdate;
+  return '';
 }
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {

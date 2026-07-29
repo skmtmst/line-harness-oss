@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import type { LocationItem, MenuItem, StaffItem } from '../lib/api.js';
+import type { BookingFormField, LocationItem, MenuItem, StaffItem } from '../lib/api.js';
 import { formatJp } from '../lib/datetime.js';
 
 export interface CustomerDetailsValue {
   name: string;
   kana: string;
   phone: string;
+  birthdate: string;
   note: string;
+  formValues: Record<string, string>;
 }
 
 export default function CustomerDetails({
@@ -15,6 +17,7 @@ export default function CustomerDetails({
   staff,
   slot,
   initial,
+  fields,
   onNext,
   onBack,
 }: {
@@ -23,6 +26,7 @@ export default function CustomerDetails({
   staff: StaffItem;
   slot: { date: string; start: string };
   initial: CustomerDetailsValue;
+  fields: BookingFormField[];
   onNext: (value: CustomerDetailsValue) => void;
   onBack: () => void;
 }) {
@@ -31,16 +35,31 @@ export default function CustomerDetails({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    const phone = value.phone.replace(/[^\d+]/g, '');
-    if (!value.name.trim() || !value.kana.trim() || !phone) {
-      setError('お名前・フリガナ・電話番号をすべて入力してください。');
-      return;
+    const normalized = { ...value.formValues };
+    normalized.customer_name = value.name;
+    normalized.customer_kana = value.kana;
+    normalized.customer_phone = value.phone;
+    normalized.customer_birthdate = value.birthdate;
+    for (const field of fields) {
+      if (field.is_required === 1 && !String(normalized[field.field_key] ?? '').trim()) {
+        setError(`${field.label}を入力してください。`);
+        return;
+      }
     }
-    if (!/^\+?\d{10,15}$/.test(phone)) {
+    const phone = String(normalized.customer_phone ?? '').replace(/[^\d+]/g, '');
+    if (phone && !/^\+?\d{10,15}$/.test(phone)) {
       setError('電話番号を数字10〜15桁で入力してください。');
       return;
     }
-    onNext({ ...value, name: value.name.trim(), kana: value.kana.trim(), phone });
+    normalized.customer_phone = phone;
+    onNext({
+      ...value,
+      name: String(normalized.customer_name ?? '').trim(),
+      kana: String(normalized.customer_kana ?? '').trim(),
+      phone,
+      birthdate: String(normalized.customer_birthdate ?? '').trim(),
+      formValues: normalized,
+    });
   }
 
   return (
@@ -61,36 +80,43 @@ export default function CustomerDetails({
         <div className="mt-2 text-lg font-bold sb-line-green-text">¥{staff.price.toLocaleString()}</div>
       </div>
 
-      <Field label="お名前" required>
-        <input
-          value={value.name}
-          onChange={(e) => setValue({ ...value, name: e.target.value })}
-          autoComplete="name"
-          maxLength={100}
-          placeholder="例：坂本 真人"
-          className="sb-input"
-        />
-      </Field>
-      <Field label="お名前（カナ）" required>
-        <input
-          value={value.kana}
-          onChange={(e) => setValue({ ...value, kana: e.target.value })}
-          maxLength={100}
-          placeholder="例：サカモト マサト"
-          className="sb-input"
-        />
-      </Field>
-      <Field label="電話番号" required>
-        <input
-          type="tel"
-          inputMode="tel"
-          value={value.phone}
-          onChange={(e) => setValue({ ...value, phone: e.target.value })}
-          autoComplete="tel"
-          placeholder="例：09012345678"
-          className="sb-input"
-        />
-      </Field>
+      {fields.filter((field) => field.is_active === 1).map((field) => {
+        const fieldValue = systemValue(value, field.field_key);
+        const setFieldValue = (next: string) => {
+          const patch = {
+            formValues: { ...value.formValues, [field.field_key]: next },
+          };
+          if (field.field_key === 'customer_name') setValue({ ...value, ...patch, name: next });
+          else if (field.field_key === 'customer_kana') setValue({ ...value, ...patch, kana: next });
+          else if (field.field_key === 'customer_phone') setValue({ ...value, ...patch, phone: next });
+          else if (field.field_key === 'customer_birthdate') setValue({ ...value, ...patch, birthdate: next });
+          else setValue({ ...value, ...patch });
+        };
+        return (
+          <Field key={field.id} label={field.label} required={field.is_required === 1}>
+            {field.field_type === 'textarea' ? (
+              <textarea
+                value={fieldValue}
+                onChange={(e) => setFieldValue(e.target.value)}
+                rows={4}
+                maxLength={2000}
+                placeholder={field.placeholder ?? undefined}
+                className="sb-input"
+              />
+            ) : (
+              <input
+                type={field.field_type}
+                inputMode={field.field_type === 'tel' ? 'tel' : undefined}
+                value={fieldValue}
+                onChange={(e) => setFieldValue(e.target.value)}
+                maxLength={field.field_type === 'date' ? undefined : 200}
+                placeholder={field.placeholder ?? undefined}
+                className="sb-input"
+              />
+            )}
+          </Field>
+        );
+      })}
       <Field label="ご要望・事前相談">
         <textarea
           value={value.note}
@@ -106,6 +132,14 @@ export default function CustomerDetails({
       <button type="submit" className="sb-primary-btn">入力内容を確認する</button>
     </form>
   );
+}
+
+function systemValue(value: CustomerDetailsValue, key: string): string {
+  if (key === 'customer_name') return value.name;
+  if (key === 'customer_kana') return value.kana;
+  if (key === 'customer_phone') return value.phone;
+  if (key === 'customer_birthdate') return value.birthdate;
+  return value.formValues[key] ?? '';
 }
 
 function Field({

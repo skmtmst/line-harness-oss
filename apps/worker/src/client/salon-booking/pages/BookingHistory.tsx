@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createApi, type BookingHistoryItem } from '../lib/api.js';
+import { createApi, type BookingHistoryItem, type BookingPublicSettings } from '../lib/api.js';
 import { useSalonContext } from '../lib/context.js';
 import HistoryCard from '../components/HistoryCard.js';
 
 export default function BookingHistory({ onBook }: { onBook: () => void }) {
   const ctx = useSalonContext();
   const [data, setData] = useState<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] } | null>(null);
+  const [settings, setSettings] = useState<BookingPublicSettings | null>(null);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setData(await createApi(ctx).me());
+      const [history, config] = await Promise.all([createApi(ctx).me(), createApi(ctx).config()]);
+      setData(history);
+      setSettings(config.settings);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -25,6 +28,7 @@ export default function BookingHistory({ onBook }: { onBook: () => void }) {
   async function cancelBooking(booking: BookingHistoryItem) {
     try {
       await createApi(ctx).cancel(booking.id);
+      window.alert('キャンセルリクエストを受け付けました。店舗の承認後にLINEでお知らせします。');
       await load();
     } catch (e) {
       const err = e as { status?: number; body?: { error?: string } };
@@ -44,6 +48,16 @@ export default function BookingHistory({ onBook }: { onBook: () => void }) {
     }
     const url = new URL(window.location.href);
     url.searchParams.delete('view');
+    url.searchParams.set('location_id', booking.location_id);
+    url.searchParams.set('menu_id', booking.menu_id);
+    window.location.href = url.toString();
+  }
+
+  function changeBooking(booking: BookingHistoryItem) {
+    if (!booking.location_id || !booking.menu_id) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    url.searchParams.set('change_booking_id', booking.id);
     url.searchParams.set('location_id', booking.location_id);
     url.searchParams.set('menu_id', booking.menu_id);
     window.location.href = url.toString();
@@ -77,7 +91,15 @@ export default function BookingHistory({ onBook }: { onBook: () => void }) {
       ) : (
         <ul className="space-y-3">
           {list.map((booking) => (
-            <HistoryCard key={booking.id} booking={booking} onCancel={cancelBooking} onRebook={rebook} />
+            <HistoryCard
+              key={booking.id}
+              booking={booking}
+              onCancel={cancelBooking}
+              onRebook={rebook}
+              onChange={changeBooking}
+              allowChange={settings?.allow_change_request === 1}
+              allowCancel={settings?.allow_cancel_request === 1}
+            />
           ))}
         </ul>
       )}
