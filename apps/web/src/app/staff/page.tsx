@@ -41,6 +41,7 @@ export default function StaffPage() {
   // New API key banner
   const [newKey, setNewKey] = useState<NewApiKey | null>(null)
   const [copied, setCopied] = useState(false)
+  const [keyCopied, setKeyCopied] = useState(false)
 
   // Create form
   const [showForm, setShowForm] = useState(false)
@@ -160,6 +161,13 @@ export default function StaffPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleKeyCopy = async () => {
+    if (!newKey) return
+    await navigator.clipboard.writeText(newKey.apiKey)
+    setKeyCopied(true)
+    setTimeout(() => setKeyCopied(false), 2000)
+  }
+
   const handleOpenMail = () => {
     if (!newKey?.email) return
     const subject = encodeURIComponent('meauty管理画面へのご招待')
@@ -196,10 +204,16 @@ export default function StaffPage() {
               {newKey.apiKey}
             </code>
             <button
-              onClick={handleCopy}
+              onClick={handleKeyCopy}
               className="min-h-11 shrink-0 px-3 py-2 text-xs font-medium text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
             >
-              {copied ? 'コピー済み' : '招待情報をコピー'}
+              {keyCopied ? 'コピー済み' : 'APIキーのみコピー'}
+            </button>
+            <button
+              onClick={handleCopy}
+              className="min-h-11 shrink-0 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              {copied ? 'コピー済み' : '招待文をコピー'}
             </button>
             {newKey.email && (
               <button

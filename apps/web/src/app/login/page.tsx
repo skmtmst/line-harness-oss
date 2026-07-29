@@ -2,6 +2,11 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+function extractApiKey(value: string): string {
+  const embeddedKey = value.match(/\blh_[a-fA-F0-9]{32}\b/)
+  return embeddedKey?.[0] ?? value.trim()
+}
+
 export default function LoginPage() {
   const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState('')
@@ -26,7 +31,7 @@ export default function LoginPage() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({ apiKey: extractApiKey(apiKey) }),
       })
 
       if (res.ok) {
@@ -83,10 +88,21 @@ export default function LoginPage() {
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData('text')
+                const extracted = extractApiKey(pasted)
+                if (extracted !== pasted.trim()) {
+                  e.preventDefault()
+                  setApiKey(extracted)
+                }
+              }}
               placeholder="APIキーを入力"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               autoFocus
             />
+            <p className="mt-1.5 text-xs leading-5 text-gray-500">
+              招待文全体を貼り付けてもAPIキーだけを自動で読み取ります
+            </p>
           </div>
 
           {error && (
