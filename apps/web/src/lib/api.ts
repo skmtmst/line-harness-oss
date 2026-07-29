@@ -130,7 +130,22 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       ...options?.headers,
     },
   })
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  if (!res.ok) {
+    // Worker が返す具体的な原因を表示する。以前は status だけを表示していたため、
+    // 入力不備も一律 "API error: 500" となり、管理画面から直し方を判断できなかった。
+    const raw = await res.text()
+    let message = ''
+    if (raw) {
+      try {
+        const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
+        if (typeof body.error === 'string') message = body.error
+        else if (typeof body.message === 'string') message = body.message
+      } catch {
+        // HTML 等の予期しない応答本文は画面にそのまま表示しない。
+      }
+    }
+    throw new Error(message || `API error: ${res.status}`)
+  }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
