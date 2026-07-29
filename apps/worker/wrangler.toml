@@ -48,6 +48,11 @@ MANIFEST_URL = "https://github.com/Shudesu/line-harness-oss/releases/latest/down
 WORKER_PUBLIC_URL = "https://line-harness.workers.dev"
 ADMIN_PUBLIC_URL = "https://line-harness-admin.pages.dev"
 LIFF_PUBLIC_URL = "https://line-harness-liff.pages.dev"
+# 管理画面(Pages)とAPI(Workers)が別サイトの場合の認証設定。
+# 未設定のままデプロイするとログイン直後にCookieが送られず、ログイン画面へ戻る。
+WORKER_URL = "https://line-harness.workers.dev"
+ADMIN_ORIGIN = "https://line-harness-admin.pages.dev"
+ADMIN_ALLOW_CROSS_SITE = "true"
 CF_ACCOUNT_ID = "YOUR_DEV_ACCOUNT_ID"
 
 # ═══════════════════════════════════════════════════════════════
