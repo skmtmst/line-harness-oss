@@ -595,6 +595,19 @@ chats.post('/api/chats/:id/send', async (c) => {
         parsed.originalContentUrl,
         parsed.previewImageUrl,
       );
+    } else if (messageType === 'video') {
+      const parsed = JSON.parse(body.content) as {
+        originalContentUrl: string;
+        previewImageUrl: string;
+      };
+      // LINE requires an HTTPS MP4 plus a JPEG/PNG preview for native playback.
+      await lineClient.pushMessage(friend.line_user_id, [{
+        type: 'video',
+        originalContentUrl: parsed.originalContentUrl,
+        previewImageUrl: parsed.previewImageUrl,
+      }]);
+    } else {
+      return c.json({ success: false, error: `Unsupported message type: ${messageType}` }, 400);
     }
 
     // メッセージログに記録

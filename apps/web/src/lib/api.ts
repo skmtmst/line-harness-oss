@@ -1481,6 +1481,18 @@ export const api = {
         body: buf,
       })
     },
+    media: async (file: File): Promise<ApiResponse<{ id: string; key: string; url: string; mimeType: string; size: number; filename: string }>> => {
+      const buf = await file.arrayBuffer()
+      return fetchApi<ApiResponse<{ id: string; key: string; url: string; mimeType: string; size: number; filename: string }>>('/api/media', {
+        method: 'POST',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+          // Encode the filename so non-ASCII salon documents survive HTTP headers.
+          'X-File-Name': encodeURIComponent(file.name),
+        },
+        body: buf,
+      })
+    },
   },
 }
 
