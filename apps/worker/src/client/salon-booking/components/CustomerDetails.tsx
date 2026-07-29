@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import type { BookingFormField, LocationItem, MenuItem, StaffItem } from '../lib/api.js';
+import type {
+  BookingFormField,
+  BookingOptionItem,
+  LocationItem,
+  MenuItem,
+  StaffItem,
+} from '../lib/api.js';
 import { formatJp } from '../lib/datetime.js';
 
 export interface CustomerDetailsValue {
@@ -16,6 +22,7 @@ export default function CustomerDetails({
   menu,
   staff,
   slot,
+  options,
   initial,
   fields,
   onNext,
@@ -25,6 +32,7 @@ export default function CustomerDetails({
   menu: MenuItem;
   staff: StaffItem;
   slot: { date: string; start: string };
+  options: BookingOptionItem[];
   initial: CustomerDetailsValue;
   fields: BookingFormField[];
   onNext: (value: CustomerDetailsValue) => void;
@@ -32,6 +40,14 @@ export default function CustomerDetails({
 }) {
   const [value, setValue] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  const totalDuration = staff.duration_minutes + options.reduce(
+    (sum, option) => sum + option.additional_duration_minutes,
+    0,
+  );
+  const totalPrice = staff.price + options.reduce(
+    (sum, option) => sum + option.additional_price,
+    0,
+  );
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,8 +92,14 @@ export default function CustomerDetails({
         <div className="sb-summary-date">{formatJp(slot.date)} {slot.start}〜</div>
         <div className="mt-3 text-sm font-bold text-slate-800">{location.name}</div>
         <div className="mt-2 font-bold sb-line-green-text">{menu.name}</div>
-        <div className="mt-1 text-xs text-gray-500">担当 {staff.display_name}・所要 {staff.duration_minutes}分</div>
-        <div className="mt-2 text-lg font-bold sb-line-green-text">¥{staff.price.toLocaleString()}</div>
+        {options.length > 0 && (
+          <div className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-xs text-slate-700">
+            <span className="font-bold">追加オプション</span>
+            {options.map((option) => <div key={option.id} className="mt-1">{option.name}</div>)}
+          </div>
+        )}
+        <div className="mt-2 text-xs text-gray-500">担当 {staff.display_name}・合計所要 {totalDuration}分</div>
+        <div className="mt-2 text-lg font-bold sb-line-green-text">¥{totalPrice.toLocaleString()}</div>
       </div>
 
       {fields.filter((field) => field.is_active === 1).map((field) => {

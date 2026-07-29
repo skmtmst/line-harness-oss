@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   createApi,
   type BookingFormField,
+  type BookingOptionItem,
   type ConsentSetting,
   type LocationItem,
   type MenuItem,
@@ -17,6 +18,7 @@ export default function Confirm({
   staff,
   slot,
   customer,
+  options,
   fields,
   changeBookingId,
   consent,
@@ -28,6 +30,7 @@ export default function Confirm({
   staff: StaffItem;
   slot: { date: string; start: string };
   customer: CustomerDetailsValue;
+  options: BookingOptionItem[];
   fields: BookingFormField[];
   changeBookingId?: string | null;
   consent: ConsentSetting;
@@ -40,6 +43,14 @@ export default function Confirm({
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
   const mustAgree = consent.is_active === 1 && consent.is_required === 1;
+  const totalDuration = staff.duration_minutes + options.reduce(
+    (sum, option) => sum + option.additional_duration_minutes,
+    0,
+  );
+  const totalPrice = staff.price + options.reduce(
+    (sum, option) => sum + option.additional_price,
+    0,
+  );
 
   async function handleSubmit() {
     if (mustAgree && !agreed) {
@@ -55,6 +66,7 @@ export default function Confirm({
           staff_id: staff.id,
           starts_at: jstStartsAtIso(slot.date, slot.start),
           customer_note: customer.note || undefined,
+          option_ids: options.map((option) => option.id),
       };
       if (changeBookingId) {
         await createApi(ctx).change(changeBookingId, requestBody);
@@ -120,9 +132,10 @@ export default function Confirm({
         <dl className="px-4 py-2 text-sm">
           <Row label="店舗" value={location.name} />
           <Row label="メニュー" value={menu.name} />
+          {options.length > 0 && <Row label="オプション" value={options.map((option) => option.name).join('、')} />}
           <Row label="担当" value={staff.display_name} />
-          <Row label="所要時間" value={`${staff.duration_minutes}分`} />
-          <Row label="料金" value={`¥${staff.price.toLocaleString()}`} strong />
+          <Row label="所要時間" value={`${totalDuration}分`} />
+          <Row label="料金" value={`¥${totalPrice.toLocaleString()}`} strong />
         </dl>
       </div>
 

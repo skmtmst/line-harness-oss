@@ -219,6 +219,104 @@ async function resolveAccountIdAdmin(c: Context<Env>): Promise<string | null> {
   return c.req.query('account_id') ?? null;
 }
 
+type BookingOptionRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  additional_price: number;
+  additional_duration_minutes: number;
+  sort_order: number;
+  is_active: number;
+};
+
+function uniqueOptionIds(input: unknown): string[] | null {
+  if (input === undefined || input === null || input === '') return [];
+  const source = Array.isArray(input) ? input : String(input).split(',');
+  const ids = [...new Set(source.map((value) => String(value).trim()).filter(Boolean))];
+  if (ids.length > 10 || ids.some((id) => id.length > 100)) return null;
+  return ids;
+}
+
+async function resolveBookingOptions(
+  db: D1Database,
+  accountId: string,
+  menuId: string,
+  locationId: string,
+  optionIds: string[],
+): Promise<BookingOptionRow[] | null> {
+  if (optionIds.length === 0) return [];
+  const placeholders = optionIds.map(() => '?').join(',');
+  const rows = await db
+    .prepare(
+      `SELECT bo.id, bo.name, bo.description, bo.additional_price,
+              bo.additional_duration_minutes, bo.sort_order, bo.is_active
+         FROM booking_options bo
+         INNER JOIN booking_option_menus bom
+                 ON bom.option_id = bo.id AND bom.menu_id = ?
+         INNER JOIN booking_option_locations bol
+                 ON bol.option_id = bo.id AND bol.location_id = ?
+        WHERE bo.line_account_id = ?
+          AND bo.deleted_at IS NULL AND bo.is_active = 1
+          AND bo.id IN (${placeholders})
+        ORDER BY bo.sort_order ASC, bo.id ASC`,
+    )
+    .bind(menuId, locationId, accountId, ...optionIds)
+    .all<BookingOptionRow>();
+  return rows.results.length === optionIds.length ? rows.results : null;
+}
+
+async function validateOptionRelations(
+  db: D1Database,
+  accountId: string,
+  menuIds: string[],
+  locationIds: string[],
+): Promise<boolean> {
+  if (menuIds.length === 0 || locationIds.length === 0) return false;
+  const menuPlaceholders = menuIds.map(() => '?').join(',');
+  const locationPlaceholders = locationIds.map(() => '?').join(',');
+  const [menuCount, locationCount] = await Promise.all([
+    db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM menus
+          WHERE line_account_id = ? AND deleted_at IS NULL
+            AND id IN (${menuPlaceholders})`,
+      )
+      .bind(accountId, ...menuIds)
+      .first<{ count: number }>(),
+    db
+      .prepare(
+        `SELECT COUNT(*) AS count FROM booking_locations
+          WHERE line_account_id = ? AND deleted_at IS NULL
+            AND id IN (${locationPlaceholders})`,
+      )
+      .bind(accountId, ...locationIds)
+      .first<{ count: number }>(),
+  ]);
+  return menuCount?.count === menuIds.length && locationCount?.count === locationIds.length;
+}
+
+async function replaceOptionRelations(
+  db: D1Database,
+  optionId: string,
+  menuIds: string[],
+  locationIds: string[],
+): Promise<void> {
+  await db.batch([
+    db.prepare(`DELETE FROM booking_option_menus WHERE option_id = ?`).bind(optionId),
+    db.prepare(`DELETE FROM booking_option_locations WHERE option_id = ?`).bind(optionId),
+    ...menuIds.map((menuId) =>
+      db
+        .prepare(`INSERT INTO booking_option_menus (option_id, menu_id) VALUES (?, ?)`)
+        .bind(optionId, menuId),
+    ),
+    ...locationIds.map((locationId) =>
+      db
+        .prepare(`INSERT INTO booking_option_locations (option_id, location_id) VALUES (?, ?)`)
+        .bind(optionId, locationId),
+    ),
+  ]);
+}
+
 // staff が指定 account に属することを保証する。属していなければ null を返す。
 async function assertStaffInAccount(
   db: D1Database,
@@ -587,6 +685,30 @@ booking.get('/api/liff/booking/menus', async (c) => {
   return c.json({ menus: rows.results });
 });
 
+booking.get('/api/liff/booking/options', async (c) => {
+  const accountId = await resolveAccountIdFromLiff(c);
+  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  const menuId = c.req.query('menu_id');
+  const locationId = c.req.query('location_id');
+  if (!menuId || !locationId) return c.json({ error: 'missing_params' }, 400);
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT bo.id, bo.name, bo.description, bo.additional_price,
+              bo.additional_duration_minutes, bo.sort_order
+         FROM booking_options bo
+         INNER JOIN booking_option_menus bom
+                 ON bom.option_id = bo.id AND bom.menu_id = ?
+         INNER JOIN booking_option_locations bol
+                 ON bol.option_id = bo.id AND bol.location_id = ?
+        WHERE bo.line_account_id = ?
+          AND bo.is_active = 1 AND bo.deleted_at IS NULL
+        ORDER BY bo.sort_order ASC, bo.id ASC`,
+    )
+    .bind(menuId, locationId, accountId)
+    .all();
+  return c.json({ options: rows.results });
+});
+
 booking.get('/api/liff/booking/menus/:id/staff', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
@@ -622,11 +744,18 @@ booking.get('/api/liff/booking/availability', async (c) => {
   const menuId = c.req.query('menu_id');
   const staffId = c.req.query('staff_id') || undefined;
   const locationId = c.req.query('location_id') || undefined;
+  const optionIds = uniqueOptionIds(c.req.query('option_ids'));
   const from = c.req.query('from');
   const to = c.req.query('to');
-  if (!menuId || !from || !to) {
+  if (!menuId || !from || !to || optionIds === null) {
     return c.json({ error: 'missing_params' }, 400);
   }
+  const selectedOptions = locationId
+    ? await resolveBookingOptions(c.env.DB, accountId, menuId, locationId, optionIds)
+    : optionIds.length === 0
+      ? []
+      : null;
+  if (!selectedOptions) return c.json({ error: 'invalid_options' }, 422);
   const fromD = new Date(`${from}T00:00:00Z`);
   const toD = new Date(`${to}T00:00:00Z`);
   if ((toD.getTime() - fromD.getTime()) / 86400_000 > 35) {
@@ -642,6 +771,10 @@ booking.get('/api/liff/booking/availability', async (c) => {
     now: new Date(),
     minLeadTimeMinutes: DEFAULT_ACCOUNT_SETTINGS.min_lead_time_minutes,
     granularityMinutes: settings.slot_interval_minutes,
+    additionalDurationMinutes: selectedOptions.reduce(
+      (sum, option) => sum + option.additional_duration_minutes,
+      0,
+    ),
   });
   return c.json(result);
 });
@@ -673,6 +806,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
     form_values?: Record<string, string>;
     consent_agreed?: boolean;
     consent_version?: number;
+    option_ids?: string[];
   }>();
   if (
     !body.menu_id ||
@@ -726,6 +860,24 @@ booking.post('/api/liff/booking/requests', async (c) => {
   if (!(await assertLocationInAccount(c.env.DB, body.location_id, accountId))) {
     return c.json({ error: 'location_not_found' }, 404);
   }
+  const optionIds = uniqueOptionIds(body.option_ids);
+  if (optionIds === null) return c.json({ error: 'invalid_options' }, 422);
+  const selectedOptions = await resolveBookingOptions(
+    c.env.DB,
+    accountId,
+    body.menu_id,
+    body.location_id,
+    optionIds,
+  );
+  if (!selectedOptions) return c.json({ error: 'invalid_options' }, 422);
+  const optionDuration = selectedOptions.reduce(
+    (sum, option) => sum + option.additional_duration_minutes,
+    0,
+  );
+  const optionPrice = selectedOptions.reduce(
+    (sum, option) => sum + option.additional_price,
+    0,
+  );
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
   if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
 
@@ -779,7 +931,8 @@ booking.post('/api/liff/booking/requests', async (c) => {
   if (!isWithinReceptionWindow(settings, startsAt)) {
     return c.json({ error: 'outside_reception_window' }, 422);
   }
-  const endsAt = new Date(startsAt.getTime() + menuRow.dur * 60_000);
+  const totalDuration = menuRow.dur + optionDuration;
+  const endsAt = new Date(startsAt.getTime() + totalDuration * 60_000);
   const blockEndsAt = new Date(endsAt.getTime() + menuRow.buffer_after_minutes * 60_000);
 
   // Server-side availability 再検証: シフト内 / リードタイム / 既存予約と非衝突を保証する。
@@ -813,7 +966,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
       start: new Date(new Date(b.starts_at).getTime() + 9 * 3600_000).toISOString().slice(11, 16),
       end: new Date(new Date(b.block_ends_at).getTime() + 9 * 3600_000).toISOString().slice(11, 16),
     })),
-    menu: { duration_minutes: menuRow.dur, buffer_after_minutes: menuRow.buffer_after_minutes },
+    menu: { duration_minutes: totalDuration, buffer_after_minutes: menuRow.buffer_after_minutes },
     granularityMinutes: settings.slot_interval_minutes,
   });
   const slotMatched = slotsToday.some((s) => s.start === startJstHHMM);
@@ -862,7 +1015,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
       customerBirthdate || null,
       JSON.stringify(formValues),
       body.customer_note ?? null,
-      menuRow.price,
+      menuRow.price + optionPrice,
       consent.is_active === 1 ? consent.title : null,
       consent.is_active === 1 ? consent.body : null,
       consent.is_active === 1 ? consent.version : null,
@@ -886,6 +1039,38 @@ booking.post('/api/liff/booking/requests', async (c) => {
       now: new Date(),
     });
     return c.json(err, 409);
+  }
+
+  if (selectedOptions.length > 0) {
+    try {
+      await c.env.DB.batch(
+        selectedOptions.map((option) =>
+          c.env.DB
+            .prepare(
+              `INSERT INTO booking_selected_options
+                (booking_id, option_id, option_name, additional_price, additional_duration_minutes)
+               VALUES (?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              bookingId,
+              option.id,
+              option.name,
+              option.additional_price,
+              option.additional_duration_minutes,
+            ),
+        ),
+      );
+    } catch (error) {
+      await c.env.DB.prepare(`DELETE FROM bookings WHERE id = ?`).bind(bookingId).run();
+      console.error(
+        JSON.stringify({
+          message: 'booking option snapshot failed',
+          bookingId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      return c.json({ error: 'option_save_failed' }, 500);
+    }
   }
 
   // Fire-and-forget notification — failures must not roll back the booking.
@@ -1086,6 +1271,7 @@ booking.post('/api/liff/booking/me/:id/change', async (c) => {
     staff_id: string;
     starts_at: string;
     customer_note?: string;
+    option_ids?: string[];
   }>();
   if (!body.location_id || !body.menu_id || !body.staff_id || !body.starts_at) {
     return c.json({ error: 'missing_params' }, 400);
@@ -1093,6 +1279,20 @@ booking.post('/api/liff/booking/me/:id/change', async (c) => {
   if (!(await assertLocationInAccount(c.env.DB, body.location_id, accountId))) {
     return c.json({ error: 'location_not_found' }, 404);
   }
+  const optionIds = uniqueOptionIds(body.option_ids);
+  if (optionIds === null) return c.json({ error: 'invalid_options' }, 422);
+  const selectedOptions = await resolveBookingOptions(
+    c.env.DB,
+    accountId,
+    body.menu_id,
+    body.location_id,
+    optionIds,
+  );
+  if (!selectedOptions) return c.json({ error: 'invalid_options' }, 422);
+  const optionDuration = selectedOptions.reduce(
+    (sum, option) => sum + option.additional_duration_minutes,
+    0,
+  );
   const menu = await c.env.DB
     .prepare(
       `SELECT m.buffer_after_minutes,
@@ -1116,7 +1316,9 @@ booking.post('/api/liff/booking/me/:id/change', async (c) => {
   if (!isWithinReceptionWindow(settings, startsAt)) {
     return c.json({ error: 'outside_reception_window' }, 422);
   }
-  const endsAt = new Date(startsAt.getTime() + menu.duration_minutes * 60_000);
+  const endsAt = new Date(
+    startsAt.getTime() + (menu.duration_minutes + optionDuration) * 60_000,
+  );
   const blockEndsAt = new Date(endsAt.getTime() + menu.buffer_after_minutes * 60_000);
   const startJstDate = new Date(startsAt.getTime() + JST_OFFSET_MS).toISOString().slice(0, 10);
   const startJstHHMM = new Date(startsAt.getTime() + JST_OFFSET_MS).toISOString().slice(11, 16);
@@ -1143,7 +1345,7 @@ booking.post('/api/liff/booking/me/:id/change', async (c) => {
       end: new Date(new Date(item.block_ends_at).getTime() + JST_OFFSET_MS).toISOString().slice(11, 16),
     })),
     menu: {
-      duration_minutes: menu.duration_minutes,
+      duration_minutes: menu.duration_minutes + optionDuration,
       buffer_after_minutes: menu.buffer_after_minutes,
     },
     granularityMinutes: settings.slot_interval_minutes,
@@ -1159,8 +1361,8 @@ booking.post('/api/liff/booking/me/:id/change', async (c) => {
           (id, line_account_id, booking_id, friend_id, request_type, status,
            requested_location_id, requested_staff_id, requested_menu_id,
            requested_starts_at, requested_ends_at, requested_block_ends_at,
-           customer_note, requested_at)
-         VALUES (?,?,?,?,?,'requested',?,?,?,?,?,?,?,?)`,
+           customer_note, requested_options_json, requested_at)
+         VALUES (?,?,?,?,?,'requested',?,?,?,?,?,?,?,?,?)`,
       )
       .bind(
         requestId,
@@ -1175,6 +1377,7 @@ booking.post('/api/liff/booking/me/:id/change', async (c) => {
         endsAt.toISOString(),
         blockEndsAt.toISOString(),
         body.customer_note ?? null,
+        JSON.stringify(selectedOptions),
         new Date().toISOString(),
       )
       .run();
@@ -1664,6 +1867,176 @@ booking.delete('/api/booking/admin/menus/:id', async (c) => {
         WHERE id = ? AND line_account_id = ?`,
     )
     .bind(id, accountId)
+    .run();
+  return c.json({ ok: true });
+});
+
+booking.get('/api/booking/admin/options', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const [options, menuRelations, locationRelations] = await Promise.all([
+    c.env.DB
+      .prepare(
+        `SELECT id, name, description, additional_price,
+                additional_duration_minutes, sort_order, is_active
+           FROM booking_options
+          WHERE line_account_id = ? AND deleted_at IS NULL
+          ORDER BY sort_order ASC, id ASC`,
+      )
+      .bind(accountId)
+      .all<BookingOptionRow>(),
+    c.env.DB
+      .prepare(
+        `SELECT bom.option_id, bom.menu_id
+           FROM booking_option_menus bom
+           INNER JOIN booking_options bo ON bo.id = bom.option_id
+          WHERE bo.line_account_id = ? AND bo.deleted_at IS NULL`,
+      )
+      .bind(accountId)
+      .all<{ option_id: string; menu_id: string }>(),
+    c.env.DB
+      .prepare(
+        `SELECT bol.option_id, bol.location_id
+           FROM booking_option_locations bol
+           INNER JOIN booking_options bo ON bo.id = bol.option_id
+          WHERE bo.line_account_id = ? AND bo.deleted_at IS NULL`,
+      )
+      .bind(accountId)
+      .all<{ option_id: string; location_id: string }>(),
+  ]);
+  return c.json({
+    options: options.results.map((option) => ({
+      ...option,
+      menu_ids: menuRelations.results
+        .filter((relation) => relation.option_id === option.id)
+        .map((relation) => relation.menu_id),
+      location_ids: locationRelations.results
+        .filter((relation) => relation.option_id === option.id)
+        .map((relation) => relation.location_id),
+    })),
+  });
+});
+
+booking.post('/api/booking/admin/options', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const body = await c.req.json<{
+    name: string;
+    description?: string | null;
+    additional_price: number;
+    additional_duration_minutes: number;
+    sort_order?: number;
+    is_active?: boolean;
+    menu_ids: string[];
+    location_ids: string[];
+  }>();
+  const name = body.name?.trim() ?? '';
+  const menuIds = uniqueOptionIds(body.menu_ids);
+  const locationIds = uniqueOptionIds(body.location_ids);
+  if (
+    !name ||
+    name.length > 120 ||
+    (body.description?.length ?? 0) > 10_000 ||
+    !Number.isInteger(body.additional_price) ||
+    body.additional_price < 0 ||
+    !Number.isInteger(body.additional_duration_minutes) ||
+    body.additional_duration_minutes < 0 ||
+    !menuIds ||
+    !locationIds ||
+    !(await validateOptionRelations(c.env.DB, accountId, menuIds, locationIds))
+  ) {
+    return c.json({ error: 'invalid_option' }, 422);
+  }
+  const id = crypto.randomUUID();
+  await c.env.DB
+    .prepare(
+      `INSERT INTO booking_options
+        (id, line_account_id, name, description, additional_price,
+         additional_duration_minutes, sort_order, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id,
+      accountId,
+      name,
+      body.description?.trim() || null,
+      body.additional_price,
+      body.additional_duration_minutes,
+      body.sort_order ?? 0,
+      body.is_active === false ? 0 : 1,
+    )
+    .run();
+  await replaceOptionRelations(c.env.DB, id, menuIds, locationIds);
+  return c.json({ id }, 201);
+});
+
+booking.put('/api/booking/admin/options/:id', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const id = c.req.param('id');
+  const body = await c.req.json<{
+    name: string;
+    description?: string | null;
+    additional_price: number;
+    additional_duration_minutes: number;
+    sort_order?: number;
+    is_active?: boolean;
+    menu_ids: string[];
+    location_ids: string[];
+  }>();
+  const name = body.name?.trim() ?? '';
+  const menuIds = uniqueOptionIds(body.menu_ids);
+  const locationIds = uniqueOptionIds(body.location_ids);
+  if (
+    !name ||
+    name.length > 120 ||
+    (body.description?.length ?? 0) > 10_000 ||
+    !Number.isInteger(body.additional_price) ||
+    body.additional_price < 0 ||
+    !Number.isInteger(body.additional_duration_minutes) ||
+    body.additional_duration_minutes < 0 ||
+    !menuIds ||
+    !locationIds ||
+    !(await validateOptionRelations(c.env.DB, accountId, menuIds, locationIds))
+  ) {
+    return c.json({ error: 'invalid_option' }, 422);
+  }
+  const result = await c.env.DB
+    .prepare(
+      `UPDATE booking_options
+          SET name = ?, description = ?, additional_price = ?,
+              additional_duration_minutes = ?, sort_order = ?, is_active = ?,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`,
+    )
+    .bind(
+      name,
+      body.description?.trim() || null,
+      body.additional_price,
+      body.additional_duration_minutes,
+      body.sort_order ?? 0,
+      body.is_active === false ? 0 : 1,
+      id,
+      accountId,
+    )
+    .run();
+  if ((result.meta?.changes ?? 0) === 0) return c.json({ error: 'option_not_found' }, 404);
+  await replaceOptionRelations(c.env.DB, id, menuIds, locationIds);
+  return c.json({ ok: true });
+});
+
+booking.delete('/api/booking/admin/options/:id', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  await c.env.DB
+    .prepare(
+      `UPDATE booking_options
+          SET is_active = 0,
+              deleted_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'),
+              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND line_account_id = ?`,
+    )
+    .bind(c.req.param('id'), accountId)
     .run();
   return c.json({ ok: true });
 });
@@ -2479,6 +2852,7 @@ booking.patch('/api/booking/admin/action-requests/:id', async (c) => {
       requested_block_ends_at: string | null;
       customer_note: string | null;
       requested_price: number | null;
+      requested_options_json: string | null;
     }>();
   if (!request) return c.json({ error: 'not_found' }, 404);
   if (request.status !== 'requested') {
@@ -2517,6 +2891,32 @@ booking.patch('/api/booking/admin/action-requests/:id', async (c) => {
       ) {
         return c.json({ error: 'invalid_change_request' }, 422);
       }
+      let requestedOptions: BookingOptionRow[] = [];
+      try {
+        const parsed = JSON.parse(request.requested_options_json ?? '[]') as unknown;
+        if (
+          !Array.isArray(parsed) ||
+          parsed.some(
+            (option) =>
+              typeof option !== 'object' ||
+              option === null ||
+              typeof (option as BookingOptionRow).id !== 'string' ||
+              typeof (option as BookingOptionRow).name !== 'string' ||
+              !Number.isInteger((option as BookingOptionRow).additional_price) ||
+              !Number.isInteger((option as BookingOptionRow).additional_duration_minutes),
+          )
+        ) {
+          return c.json({ error: 'invalid_change_options' }, 422);
+        }
+        requestedOptions = parsed as BookingOptionRow[];
+      } catch {
+        return c.json({ error: 'invalid_change_options' }, 422);
+      }
+      const requestedTotalPrice =
+        request.requested_price === null
+          ? null
+          : request.requested_price +
+            requestedOptions.reduce((sum, option) => sum + option.additional_price, 0);
       const result = await c.env.DB
         .prepare(
           `UPDATE bookings
@@ -2543,7 +2943,7 @@ booking.patch('/api/booking/admin/action-requests/:id', async (c) => {
           request.requested_starts_at,
           request.requested_ends_at,
           request.requested_block_ends_at,
-          request.requested_price,
+          requestedTotalPrice,
           request.customer_note,
           request.booking_id,
           accountId,
@@ -2556,6 +2956,26 @@ booking.patch('/api/booking/admin/action-requests/:id', async (c) => {
       if ((result.meta?.changes ?? 0) === 0) {
         return c.json({ error: 'slot_conflict_or_booking_state_changed' }, 409);
       }
+      await c.env.DB.batch([
+        c.env.DB
+          .prepare(`DELETE FROM booking_selected_options WHERE booking_id = ?`)
+          .bind(request.booking_id),
+        ...requestedOptions.map((option) =>
+          c.env.DB
+            .prepare(
+              `INSERT INTO booking_selected_options
+                (booking_id, option_id, option_name, additional_price, additional_duration_minutes)
+               VALUES (?, ?, ?, ?, ?)`,
+            )
+            .bind(
+              request.booking_id,
+              option.id,
+              option.name,
+              option.additional_price,
+              option.additional_duration_minutes,
+            ),
+        ),
+      ]);
       await c.env.DB
         .prepare(
           `UPDATE booking_reminders SET status = 'cancelled'

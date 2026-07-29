@@ -299,6 +299,34 @@ describe('getAvailability', () => {
     expect(result.by_staff[0].staff_id).toBe('S1');
   });
 
+  test('追加オプションの時間を空き枠計算に含める', async () => {
+    const db = stubDB({
+      menu: {
+        duration_minutes: 60,
+        buffer_after_minutes: 0,
+        override_duration: null,
+        override_price: null,
+      },
+      staff: [{ id: 'S1', display_name: '山田', is_designation_optional: 0 }],
+      shifts: [{ staff_id: 'S1', work_date: '2026-05-09', start_time: '10:00', end_time: '12:00' }],
+      bookings: [],
+    });
+    const result = await getAvailability(db, {
+      lineAccountId: 'A1',
+      menuId: 'M1',
+      staffId: 'S1',
+      from: '2026-05-09',
+      to: '2026-05-09',
+      now: new Date('2026-05-08T00:00:00Z'),
+      minLeadTimeMinutes: 60,
+      additionalDurationMinutes: 30,
+    });
+    expect(result.by_staff[0].slots).toEqual([
+      { date: '2026-05-09', start: '10:00', end: '11:30' },
+      { date: '2026-05-09', start: '10:30', end: '12:00' },
+    ]);
+  });
+
   test('メニュー無し → 空 by_staff', async () => {
     const db = stubDB({});
     const result = await getAvailability(db, {

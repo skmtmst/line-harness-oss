@@ -16,6 +16,7 @@ interface DateTimePickerProps {
   selected?: { date: string; start: string } | null;
   calendarView: 'week' | 'month';
   slotIntervalMinutes: number;
+  optionIds: string[];
 }
 
 export default function DateTimePicker(props: DateTimePickerProps) {
@@ -33,8 +34,10 @@ function WeekDateTimePicker({
   onBack,
   selected,
   slotIntervalMinutes,
+  optionIds,
 }: DateTimePickerProps) {
   const ctx = useSalonContext();
+  const optionKey = optionIds.join(',');
   const today = useMemo(() => jstToday(), []);
   const from = today;
   const to = addDays(today, RANGE_DAYS - 1);
@@ -47,7 +50,7 @@ function WeekDateTimePicker({
   useEffect(() => {
     setError(null);
     createApi(ctx)
-      .availability(locationId, menuId, staffId, from, to)
+      .availability(locationId, menuId, staffId, from, to, optionKey ? optionKey.split(',') : [])
       .then((r) => {
         const staffAvailability = r.by_staff[0];
         const slots = staffAvailability?.slots ?? [];
@@ -92,7 +95,7 @@ function WeekDateTimePicker({
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // selected は初回 mount 時の値だけ使う（毎回再マウント前提）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx, locationId, menuId, staffId, from, to, today, maxOffset]);
+  }, [ctx, locationId, menuId, staffId, from, to, today, maxOffset, optionKey]);
 
   if (error) {
     return (
@@ -176,8 +179,10 @@ function MonthDateTimePicker({
   onSelect,
   onBack,
   selected,
+  optionIds,
 }: DateTimePickerProps) {
   const ctx = useSalonContext();
+  const optionKey = optionIds.join(',');
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState(selected?.date ?? '');
   const [byDate, setByDate] = useState<Record<string, string[]> | null>(null);
@@ -196,7 +201,7 @@ function MonthDateTimePicker({
     setByDate(null);
     setError(null);
     createApi(ctx)
-      .availability(locationId, menuId, staffId, from, to)
+      .availability(locationId, menuId, staffId, from, to, optionKey ? optionKey.split(',') : [])
       .then((response) => {
         const grouped: Record<string, string[]> = {};
         for (const slot of response.by_staff[0]?.slots ?? []) {
@@ -205,7 +210,7 @@ function MonthDateTimePicker({
         setByDate(grouped);
       })
       .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)));
-  }, [ctx, locationId, menuId, staffId, from, to]);
+  }, [ctx, locationId, menuId, staffId, from, to, optionKey]);
 
   if (error) {
     return <div className="space-y-5"><BackButton onBack={onBack} /><div className="sb-card text-center text-sm text-red-600">空き枠の取得に失敗しました</div></div>;

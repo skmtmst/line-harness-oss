@@ -1551,6 +1551,18 @@ export interface BookingMenu {
   auto_tag_id: string | null;
 }
 
+export interface BookingOption {
+  id: string;
+  name: string;
+  description: string | null;
+  additional_price: number;
+  additional_duration_minutes: number;
+  sort_order: number;
+  is_active: number;
+  menu_ids: string[];
+  location_ids: string[];
+}
+
 export interface BookingStaff {
   id: string;
   name: string;
@@ -1773,6 +1785,26 @@ export const bookingApi = {
     fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
       method: 'DELETE',
     }),
+  // Menu options
+  listOptions: (accountId: string) =>
+    fetchApi<{ options: BookingOption[] }>(
+      withAccount('/api/booking/admin/options', accountId),
+    ),
+  createOption: (accountId: string, body: Partial<BookingOption>) =>
+    fetchApi<{ id: string }>(withAccount('/api/booking/admin/options', accountId), {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateOption: (accountId: string, id: string, body: Partial<BookingOption>) =>
+    fetchApi<{ ok: true }>(
+      withAccount(`/api/booking/admin/options/${id}`, accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+  deleteOption: (accountId: string, id: string) =>
+    fetchApi<{ ok: true }>(
+      withAccount(`/api/booking/admin/options/${id}`, accountId),
+      { method: 'DELETE' },
+    ),
   // Staff
   listStaff: (accountId: string) =>
     fetchApi<{ staff: BookingStaff[] }>(withAccount('/api/booking/admin/staff', accountId)),

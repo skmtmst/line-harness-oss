@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
-import { api, bookingApi, type BookingMenu } from '@/lib/api'
+import {
+  api,
+  bookingApi,
+  type BookingLocation,
+  type BookingMenu,
+  type BookingOption,
+} from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 
@@ -19,10 +25,24 @@ const EMPTY: Partial<BookingMenu> = {
   auto_tag_id: null,
 }
 
+const EMPTY_OPTION: Partial<BookingOption> = {
+  name: '',
+  description: '',
+  additional_price: 0,
+  additional_duration_minutes: 0,
+  sort_order: 0,
+  is_active: 1,
+  menu_ids: [],
+  location_ids: [],
+}
+
 export default function MenusPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
   const [editing, setEditing] = useState<Partial<BookingMenu> | null>(null)
+  const [options, setOptions] = useState<BookingOption[]>([])
+  const [locations, setLocations] = useState<BookingLocation[]>([])
+  const [editingOption, setEditingOption] = useState<Partial<BookingOption> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // copy 状態は menu.id 単位で持つ。複数メニューを連続でコピーしたとき
@@ -54,9 +74,17 @@ export default function MenusPage() {
     // アカウント切替時は前 account の menus が表示・操作可能なまま残らないよう
     // 先にクリア。fetch 失敗でも cross-account の操作事故が起きない。
     setItems([])
+    setOptions([])
+    setLocations([])
     try {
-      const r = await bookingApi.listMenus(selectedAccountId)
-      setItems(r.menus)
+      const [menuResult, optionResult, locationResult] = await Promise.all([
+        bookingApi.listMenus(selectedAccountId),
+        bookingApi.listOptions(selectedAccountId),
+        bookingApi.listLocations(selectedAccountId),
+      ])
+      setItems(menuResult.menus)
+      setOptions(optionResult.options)
+      setLocations(locationResult.locations)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -98,6 +126,24 @@ export default function MenusPage() {
     if (!selectedAccountId) return
     if (!confirm('このメニューを削除しますか？（既存予約は維持されます）')) return
     await bookingApi.deleteMenu(selectedAccountId, id)
+    await load()
+  }
+
+  async function saveOption(option: Partial<BookingOption>) {
+    if (!selectedAccountId) return
+    if (option.id) {
+      await bookingApi.updateOption(selectedAccountId, option.id, option)
+    } else {
+      await bookingApi.createOption(selectedAccountId, option)
+    }
+    setEditingOption(null)
+    await load()
+  }
+
+  async function removeOption(id: string) {
+    if (!selectedAccountId) return
+    if (!confirm('このオプションを削除しますか？（過去の予約内容は維持されます）')) return
+    await bookingApi.deleteOption(selectedAccountId, id)
     await load()
   }
 
@@ -214,6 +260,76 @@ export default function MenusPage() {
       )}
 
       {editing && <Modal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
+      {selectedAccountId && !loading && (
+        <section className="mt-8">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">オプション商品</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                追加施術の料金・時間と、表示するメニュー・提供店舗を設定します。
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditingOption(EMPTY_OPTION)}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-white"
+              style={{ backgroundColor: '#06C755' }}
+            >
+              + オプションを追加
+            </button>
+          </div>
+          {options.length === 0 ? (
+            <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
+              オプションはまだありません。
+            </div>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {options.map((option) => (
+                <article key={option.id} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-bold text-gray-900">{option.name}</h3>
+                        <span className={`rounded px-2 py-0.5 text-xs ${option.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                          {option.is_active ? '表示中' : '非表示'}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-green-700">
+                        +¥{option.additional_price.toLocaleString()}
+                        {option.additional_duration_minutes > 0 && ` / +${option.additional_duration_minutes}分`}
+                      </p>
+                    </div>
+                    <div className="flex gap-3 text-sm">
+                      <button type="button" onClick={() => setEditingOption(option)} className="text-blue-600 hover:underline">編集</button>
+                      <button type="button" onClick={() => removeOption(option.id)} className="text-red-600 hover:underline">削除</button>
+                    </div>
+                  </div>
+                  {option.description && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-600">{option.description}</p>}
+                  <div className="mt-4 grid gap-3 text-xs text-gray-600 sm:grid-cols-2">
+                    <div>
+                      <span className="font-semibold text-gray-800">対象メニュー</span>
+                      <p className="mt-1">{items.filter((menu) => option.menu_ids.includes(menu.id)).map((menu) => menu.name).join('、') || '未設定'}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-gray-800">提供店舗</span>
+                      <p className="mt-1">{locations.filter((location) => option.location_ids.includes(location.id)).map((location) => location.name).join('、') || '未設定'}</p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      {editingOption && (
+        <OptionModal
+          option={editingOption}
+          menus={items}
+          locations={locations}
+          onSave={saveOption}
+          onClose={() => setEditingOption(null)}
+        />
+      )}
     </div>
   )
 }
@@ -274,13 +390,14 @@ function Modal({
               placeholder="例: カット / カラー / パーマ"
             />
           </Field>
-          <Field label="説明">
+          <Field label="メニュー詳細（予約画面に全文表示）">
             <textarea
               value={form.description ?? ''}
               onChange={(e) => set('description', e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
-              rows={2}
-              placeholder="顧客に表示される説明文"
+              rows={12}
+              maxLength={10000}
+              placeholder="施術内容、おすすめの方、注意事項などを入力"
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
@@ -346,6 +463,160 @@ function Modal({
             onClick={submit}
             disabled={saving}
             className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
+            style={{ backgroundColor: '#06C755' }}
+          >
+            {saving ? '保存中…' : '保存'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OptionModal({
+  option,
+  menus,
+  locations,
+  onSave,
+  onClose,
+}: {
+  option: Partial<BookingOption>
+  menus: BookingMenu[]
+  locations: BookingLocation[]
+  onSave: (option: Partial<BookingOption>) => Promise<void>
+  onClose: () => void
+}) {
+  const [form, setForm] = useState<Partial<BookingOption>>(option)
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  function toggle(key: 'menu_ids' | 'location_ids', id: string) {
+    const current = form[key] ?? []
+    setForm({
+      ...form,
+      [key]: current.includes(id)
+        ? current.filter((value) => value !== id)
+        : [...current, id],
+    })
+  }
+
+  async function submit() {
+    if (!(form.name ?? '').trim()) {
+      setErr('オプション名を入力してください。')
+      return
+    }
+    if ((form.menu_ids ?? []).length === 0 || (form.location_ids ?? []).length === 0) {
+      setErr('対象メニューと提供店舗を1つ以上選択してください。')
+      return
+    }
+    setSaving(true)
+    setErr(null)
+    try {
+      await onSave(form)
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : String(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white shadow-xl">
+        <div className="border-b border-gray-200 px-6 py-4">
+          <h2 className="text-base font-semibold">{form.id ? 'オプション編集' : '新規オプション'}</h2>
+        </div>
+        <div className="space-y-5 px-6 py-5">
+          <Field label="オプション名" required>
+            <input
+              type="text"
+              value={form.name ?? ''}
+              onChange={(event) => setForm({ ...form, name: event.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="例: 爆上げ延髄幹細胞スプレー"
+            />
+          </Field>
+          <Field label="説明">
+            <textarea
+              value={form.description ?? ''}
+              onChange={(event) => setForm({ ...form, description: event.target.value })}
+              rows={4}
+              maxLength={10000}
+              className="w-full resize-y rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="予約画面に表示する説明"
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="追加料金（円）"
+              required
+              value={form.additional_price ?? 0}
+              onChange={(value) => setForm({ ...form, additional_price: value })}
+            />
+            <NumField
+              label="追加時間（分）"
+              required
+              value={form.additional_duration_minutes ?? 0}
+              onChange={(value) => setForm({ ...form, additional_duration_minutes: value })}
+            />
+            <NumField
+              label="並び順"
+              value={form.sort_order ?? 0}
+              onChange={(value) => setForm({ ...form, sort_order: value })}
+            />
+          </div>
+          <fieldset>
+            <legend className="mb-2 text-xs font-semibold text-gray-700">紐づけるメニュー（複数選択可）</legend>
+            <div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border border-gray-200 p-3">
+              {menus.map((menu) => (
+                <label key={menu.id} className="flex cursor-pointer items-start gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={(form.menu_ids ?? []).includes(menu.id)}
+                    onChange={() => toggle('menu_ids', menu.id)}
+                    className="mt-0.5 h-4 w-4 accent-green-600"
+                  />
+                  <span>{menu.name}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend className="mb-2 text-xs font-semibold text-gray-700">提供できる店舗（複数選択可）</legend>
+            <div className="grid gap-2 rounded-lg border border-gray-200 p-3 sm:grid-cols-2">
+              {locations.map((location) => (
+                <label key={location.id} className="flex cursor-pointer items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={(form.location_ids ?? []).includes(location.id)}
+                    onChange={() => toggle('location_ids', location.id)}
+                    className="h-4 w-4 accent-green-600"
+                  />
+                  <span>{location.name}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={Boolean(form.is_active)}
+              onChange={(event) => setForm({ ...form, is_active: event.target.checked ? 1 : 0 })}
+              className="rounded"
+            />
+            予約画面に表示する
+          </label>
+          {err && <p className="text-xs text-red-600">{err}</p>}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-gray-200 px-6 py-4">
+          <button type="button" onClick={onClose} className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200">
+            キャンセル
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={saving}
+            className="rounded-lg px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             style={{ backgroundColor: '#06C755' }}
           >
             {saving ? '保存中…' : '保存'}

@@ -10,6 +10,7 @@ import { useSalonContext } from '../lib/context.js';
 import {
   createApi,
   type BookingFormField,
+  type BookingOptionItem,
   type BookingPublicSettings,
   type ConsentSetting,
   type LocationItem,
@@ -66,6 +67,7 @@ export default function Booking({
   const [step, setStep] = useState<Step>('location');
   const [location, setLocation] = useState<LocationItem | null>(null);
   const [menu, setMenu] = useState<MenuItem | null>(null);
+  const [options, setOptions] = useState<BookingOptionItem[]>([]);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [staffAutoSelected, setStaffAutoSelected] = useState(false);
   const [slot, setSlot] = useState<{ date: string; start: string } | null>(null);
@@ -74,11 +76,6 @@ export default function Booking({
   const [settings, setSettings] = useState<BookingPublicSettings | null>(null);
   const [fields, setFields] = useState<BookingFormField[]>([]);
   const [consentError, setConsentError] = useState(false);
-  // ?menu_id=... が指定されたら、メニュー一覧をスキップして staff から開始。
-  // 該当 menu が無効/未公開だった場合は通常フローに fallback（黙って全
-  // メニュー一覧を出す方が「初回オリエン直リンク経由なのに別メニュー
-  // を選ばれる」事故より安全）。
-  const [deepLinkResolving, setDeepLinkResolving] = useState(Boolean(initialMenuId));
 
   useEffect(() => {
     let cancelled = false;
@@ -98,34 +95,10 @@ export default function Booking({
     };
   }, [ctx]);
 
-  useEffect(() => {
-    if (!initialMenuId || !location) return;
-    let cancelled = false;
-    createApi(ctx)
-      .menus()
-      .then((res) => {
-        if (cancelled) return;
-        const hit = res.menus.find((m) => m.id === initialMenuId);
-        if (hit) {
-          setMenu(hit);
-          setStep('staff');
-        }
-      })
-      .catch(() => {
-        // 解決失敗時は通常の menu 一覧フローへ。MenuList が同 API を
-        // 再度叩くのでここで UI エラーを出す必要は無い。
-      })
-      .finally(() => {
-        if (!cancelled) setDeepLinkResolving(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [ctx, initialMenuId, location]);
-
   const selectLocation = useCallback((selected: LocationItem) => {
     setLocation(selected);
     setMenu(null);
+    setOptions([]);
     setStaff(null);
     setStaffAutoSelected(false);
     setSlot(null);
@@ -205,26 +178,26 @@ export default function Booking({
       {step === 'location' && (
         <LocationList initialLocationId={initialLocationId} onSelect={selectLocation} />
       )}
-      {step === 'menu' && deepLinkResolving && (
-        <div className="py-12 text-center text-sm text-gray-500">読み込み中…</div>
-      )}
-      {step === 'menu' && !deepLinkResolving && (
+      {step === 'menu' && (
         <>
           <button onClick={() => setStep('location')} className="sb-back-btn mb-4">
             <span aria-hidden>←</span>
             店舗を選び直す
           </button>
           {location && <p className="mb-3 text-xs font-semibold sb-line-green-text">{location.name}</p>}
-          <MenuList
-            onSelect={(m) => {
+          {location && <MenuList
+            locationId={location.id}
+            initialExpandedMenuId={initialMenuId}
+            onConfirm={(m, selectedOptions) => {
               if (menu?.id !== m.id) {
                 setStaff(null);
                 setSlot(null);
               }
               setMenu(m);
+              setOptions(selectedOptions);
               setStep('staff');
             }}
-          />
+          />}
         </>
       )}
       {step === 'staff' && menu && (
@@ -253,6 +226,7 @@ export default function Booking({
           selected={slot}
           calendarView={settings?.calendar_view ?? 'week'}
           slotIntervalMinutes={settings?.slot_interval_minutes ?? 30}
+          optionIds={options.map((option) => option.id)}
           onSelect={(picked) => {
             setSlot(picked);
             if (!peekMode) setStep('details');
@@ -285,6 +259,7 @@ export default function Booking({
           menu={menu}
           staff={staff}
           slot={slot}
+          options={options}
           initial={customer}
           fields={fields}
           onNext={(value) => {
@@ -301,6 +276,7 @@ export default function Booking({
           staff={staff}
           slot={slot}
           customer={customer}
+          options={options}
           fields={fields}
           changeBookingId={changeBookingId}
           consent={consent}

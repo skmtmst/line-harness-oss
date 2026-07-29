@@ -15,6 +15,15 @@ export interface MenuItem {
   sort_order: number;
 }
 
+export interface BookingOptionItem {
+  id: string;
+  name: string;
+  description: string | null;
+  additional_price: number;
+  additional_duration_minutes: number;
+  sort_order: number;
+}
+
 export interface LocationItem {
   id: string;
   name: string;
@@ -149,6 +158,11 @@ export function createApi(ctx: SalonBookingContext) {
     locations: () =>
       get<{ locations: LocationItem[] }>('/api/liff/booking/locations', ctx),
     menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus', ctx),
+    options: (menuId: string, locationId: string) =>
+      get<{ options: BookingOptionItem[] }>(
+        `/api/liff/booking/options?menu_id=${encodeURIComponent(menuId)}&location_id=${encodeURIComponent(locationId)}`,
+        ctx,
+      ),
     staffOf: (menuId: string) =>
       get<{ staff: StaffItem[] }>(`/api/liff/booking/menus/${menuId}/staff`, ctx),
     availability: (
@@ -157,9 +171,11 @@ export function createApi(ctx: SalonBookingContext) {
       staffId: string | undefined,
       from: string,
       to: string,
+      optionIds: string[] = [],
     ) => {
       const qs = new URLSearchParams({ location_id: locationId, menu_id: menuId, from, to });
       if (staffId) qs.set('staff_id', staffId);
+      if (optionIds.length > 0) qs.set('option_ids', optionIds.join(','));
       return get<AvailabilityResponse>(`/api/liff/booking/availability?${qs}`, ctx);
     },
     createRequest: (
@@ -176,6 +192,7 @@ export function createApi(ctx: SalonBookingContext) {
         customer_note?: string;
         consent_agreed: boolean;
         consent_version: number;
+        option_ids?: string[];
       },
       idempotencyKey: string,
     ) =>
@@ -206,6 +223,7 @@ export function createApi(ctx: SalonBookingContext) {
         staff_id: string;
         starts_at: string;
         customer_note?: string;
+        option_ids?: string[];
       },
     ) =>
       post<{ request_id: string; status: string }>(

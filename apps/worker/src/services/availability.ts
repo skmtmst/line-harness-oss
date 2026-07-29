@@ -100,6 +100,7 @@ export interface GetAvailabilityParams {
   now: Date;
   minLeadTimeMinutes: number;
   granularityMinutes?: number;
+  additionalDurationMinutes?: number;
 }
 
 export async function getAvailability(
@@ -193,7 +194,9 @@ export async function getAvailability(
     .all<{ staff_id: string; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
-    duration_minutes: menu.override_duration ?? menu.duration_minutes,
+    duration_minutes:
+      (menu.override_duration ?? menu.duration_minutes) +
+      (params.additionalDurationMinutes ?? 0),
     buffer_after_minutes: menu.buffer_after_minutes,
   };
   const minLeadAt = new Date(params.now.getTime() + params.minLeadTimeMinutes * 60_000);
