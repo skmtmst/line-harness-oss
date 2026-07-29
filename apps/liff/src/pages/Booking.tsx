@@ -1,23 +1,32 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import LocationList from '../components/LocationList.js';
 import MenuList from '../components/MenuList.js';
 import StaffList from '../components/StaffList.js';
 import DateTimePicker from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
 import Done from '../components/Done.js';
-import type { MenuItem, StaffItem } from '../lib/api.js';
+import type { LocationItem, MenuItem, StaffItem } from '../lib/api.js';
 
-type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
+type Step = 'location' | 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
 
 export default function Booking() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const isPeek = params.get('mode') === 'peek';
 
-  const [step, setStep] = useState<Step>('menu');
+  const [step, setStep] = useState<Step>('location');
+  const [location, setLocation] = useState<LocationItem | null>(null);
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<{ date: string; start: string } | null>(null);
+  const selectLocation = useCallback((selected: LocationItem) => {
+    setLocation(selected);
+    setMenu(null);
+    setStaff(null);
+    setSlot(null);
+    setStep('menu');
+  }, []);
 
   function exitPeekToBooking() {
     // peek モードを抜けて通常フローへ。同じ menu/staff/slot を持ち回したまま step を進める。
@@ -29,13 +38,25 @@ export default function Booking() {
 
   return (
     <div className="max-w-md mx-auto p-4 pb-12 min-h-screen">
-      {step === 'menu' && (
-        <MenuList
-          onSelect={(m) => {
-            setMenu(m);
-            setStep('staff');
-          }}
+      {step === 'location' && (
+        <LocationList
+          initialLocationId={params.get('location_id')}
+          onSelect={selectLocation}
         />
+      )}
+      {step === 'menu' && (
+        <>
+          <button onClick={() => setStep('location')} className="mb-3 text-sm text-gray-500">
+            ← 店舗を選び直す
+          </button>
+          {location && <p className="mb-3 text-sm font-medium text-green-700">{location.name}</p>}
+          <MenuList
+            onSelect={(m) => {
+              setMenu(m);
+              setStep('staff');
+            }}
+          />
+        </>
       )}
       {step === 'staff' && menu && (
         <StaffList
@@ -48,8 +69,9 @@ export default function Booking() {
           onBack={() => setStep('menu')}
         />
       )}
-      {step === 'datetime' && menu && staff && (
+      {step === 'datetime' && location && menu && staff && (
         <DateTimePicker
+          locationId={location.id}
           menuId={menu.id}
           staffId={staff.id}
           ctaLabel={
@@ -80,8 +102,9 @@ export default function Booking() {
           </button>
         </div>
       )}
-      {step === 'confirm' && menu && staff && slot && (
+      {step === 'confirm' && location && menu && staff && slot && (
         <Confirm
+          location={location}
           menu={menu}
           staff={staff}
           slot={slot}

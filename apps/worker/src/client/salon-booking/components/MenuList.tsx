@@ -56,7 +56,7 @@ export default function MenuList({ onSelect }: { onSelect: (m: MenuItem) => void
     <div className="space-y-5 sb-fade-in">
       <div>
         <h1 className="text-base font-bold text-gray-900">メニューを選んでください</h1>
-        <p className="text-xs text-gray-500 mt-1">step 1 / 4</p>
+        <p className="text-xs text-gray-500 mt-1">step 2 / 5</p>
       </div>
       {[...grouped.entries()].map(([cat, items]) => (
         <section key={cat} className="space-y-2">

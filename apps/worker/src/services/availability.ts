@@ -94,6 +94,7 @@ export interface GetAvailabilityParams {
   lineAccountId: string;
   menuId: string;
   staffId?: string;
+  locationId?: string;
   from: string; // YYYY-MM-DD JST
   to: string;
   now: Date;
@@ -161,9 +162,15 @@ export async function getAvailability(
       `SELECT staff_id, work_date, start_time, end_time
          FROM staff_shifts
         WHERE staff_id IN (${placeholders})
-          AND work_date BETWEEN ? AND ?`,
+          AND work_date BETWEEN ? AND ?
+          ${params.locationId ? 'AND location_id = ?' : ''}`,
     )
-    .bind(...staffIds, params.from, params.to)
+    .bind(
+      ...staffIds,
+      params.from,
+      params.to,
+      ...(params.locationId ? [params.locationId] : []),
+    )
     .all<{ staff_id: string; work_date: string; start_time: string; end_time: string }>();
 
   // Coarse range filter: from の前日 00:00 UTC 〜 to の翌日 00:00 UTC で十分な余裕

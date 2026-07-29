@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import LocationList from '../components/LocationList.js';
 import MenuList from '../components/MenuList.js';
 import StaffList from '../components/StaffList.js';
 import DateTimePicker from '../components/DateTimePicker.js';
 import Confirm from '../components/Confirm.js';
 import Done from '../components/Done.js';
 import { useSalonContext } from '../lib/context.js';
-import { createApi, type MenuItem, type StaffItem } from '../lib/api.js';
+import { createApi, type LocationItem, type MenuItem, type StaffItem } from '../lib/api.js';
 
-type Step = 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
+type Step = 'location' | 'menu' | 'staff' | 'datetime' | 'confirm' | 'done';
 
 const STEPS: Array<{ key: Step; label: string }> = [
+  { key: 'location', label: '店舗' },
   { key: 'menu', label: 'メニュー' },
   { key: 'staff', label: '担当' },
   { key: 'datetime', label: '日時' },
@@ -19,14 +21,17 @@ const STEPS: Array<{ key: Step; label: string }> = [
 export default function Booking({
   peekMode,
   exitPeek,
+  initialLocationId,
   initialMenuId,
 }: {
   peekMode: boolean;
   exitPeek: () => void;
+  initialLocationId?: string | null;
   initialMenuId?: string | null;
 }) {
   const ctx = useSalonContext();
-  const [step, setStep] = useState<Step>('menu');
+  const [step, setStep] = useState<Step>('location');
+  const [location, setLocation] = useState<LocationItem | null>(null);
   const [menu, setMenu] = useState<MenuItem | null>(null);
   const [staff, setStaff] = useState<StaffItem | null>(null);
   const [slot, setSlot] = useState<{ date: string; start: string } | null>(null);
@@ -37,7 +42,7 @@ export default function Booking({
   const [deepLinkResolving, setDeepLinkResolving] = useState(Boolean(initialMenuId));
 
   useEffect(() => {
-    if (!initialMenuId) return;
+    if (!initialMenuId || !location) return;
     let cancelled = false;
     createApi(ctx)
       .menus()
@@ -59,7 +64,15 @@ export default function Booking({
     return () => {
       cancelled = true;
     };
-  }, [ctx, initialMenuId]);
+  }, [ctx, initialMenuId, location]);
+
+  const selectLocation = useCallback((selected: LocationItem) => {
+    setLocation(selected);
+    setMenu(null);
+    setStaff(null);
+    setSlot(null);
+    setStep('menu');
+  }, []);
 
   function exitPeekToBooking() {
     const url = new URL(window.location.href);
@@ -138,20 +151,30 @@ export default function Booking({
         </div>
       )}
 
+      {step === 'location' && (
+        <LocationList initialLocationId={initialLocationId} onSelect={selectLocation} />
+      )}
       {step === 'menu' && deepLinkResolving && (
         <div className="py-12 text-center text-sm text-gray-500">読み込み中…</div>
       )}
       {step === 'menu' && !deepLinkResolving && (
-        <MenuList
-          onSelect={(m) => {
-            if (menu?.id !== m.id) {
-              setStaff(null);
-              setSlot(null);
-            }
-            setMenu(m);
-            setStep('staff');
-          }}
-        />
+        <>
+          <button onClick={() => setStep('location')} className="sb-back-btn mb-4">
+            <span aria-hidden>←</span>
+            店舗を選び直す
+          </button>
+          {location && <p className="mb-3 text-xs font-semibold sb-line-green-text">{location.name}</p>}
+          <MenuList
+            onSelect={(m) => {
+              if (menu?.id !== m.id) {
+                setStaff(null);
+                setSlot(null);
+              }
+              setMenu(m);
+              setStep('staff');
+            }}
+          />
+        </>
       )}
       {step === 'staff' && menu && (
         <StaffList
@@ -165,14 +188,15 @@ export default function Booking({
           onBack={() => setStep('menu')}
         />
       )}
-      {step === 'datetime' && menu && staff && (
+      {step === 'datetime' && location && menu && staff && (
         <DateTimePicker
+          locationId={location.id}
           menuId={menu.id}
           staffId={staff.id}
           ctaLabel={
             peekMode
               ? '空き状況の確認モードです（タップで予約に進めます）'
-              : 'step 3 / 4'
+              : 'step 4 / 5'
           }
           selected={slot}
           onSelect={(picked) => {
@@ -201,8 +225,9 @@ export default function Booking({
           </div>
         </div>
       )}
-      {step === 'confirm' && menu && staff && slot && (
+      {step === 'confirm' && location && menu && staff && slot && (
         <Confirm
+          location={location}
           menu={menu}
           staff={staff}
           slot={slot}

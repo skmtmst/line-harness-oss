@@ -219,6 +219,7 @@ export default function BookingsPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">日時</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">顧客</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">メニュー</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">店舗</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">担当</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">要望</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">料金</th>
@@ -239,6 +240,7 @@ export default function BookingsPage() {
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-sm">{b.menu_name}</td>
+                    <td className="px-4 py-3 text-sm">{b.location_name ?? '-'}</td>
                     <td className="px-4 py-3 text-sm">{b.staff_name}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={b.customer_note ?? ''}>
                       {b.customer_note ?? '-'}

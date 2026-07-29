@@ -11,11 +11,17 @@ import './styles.css';
 
 let _root: Root | null = null;
 
-function readUrlState(): { view: string | null; peekMode: boolean; menuId: string | null } {
+function readUrlState(): {
+  view: string | null;
+  peekMode: boolean;
+  locationId: string | null;
+  menuId: string | null;
+} {
   const params = new URLSearchParams(window.location.search);
   return {
     view: params.get('view'),
     peekMode: params.get('mode') === 'peek',
+    locationId: params.get('location_id'),
     menuId: params.get('menu_id'),
   };
 }
@@ -29,6 +35,7 @@ function App({ ctx }: { ctx: SalonBookingContext }) {
   // メニュー選択に戻った後にディープリンクで再ロックされないように、
   // mount 時点の値だけ Booking に渡す。
   const [initialMenuId] = useState(initial.menuId);
+  const [initialLocationId] = useState(initial.locationId);
 
   const headerLabel = view === 'history' ? '予約履歴' : peekMode ? '空き状況' : 'ご予約';
 
@@ -48,6 +55,7 @@ function App({ ctx }: { ctx: SalonBookingContext }) {
             <Booking
               peekMode={peekMode}
               exitPeek={() => setPeekMode(false)}
+              initialLocationId={initialLocationId}
               initialMenuId={initialMenuId}
             />
           )}

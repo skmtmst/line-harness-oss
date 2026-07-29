@@ -7,6 +7,7 @@ import WeekCalendar from './WeekCalendar.js';
 const RANGE_DAYS = 14; // API は 14 日まで取得
 
 export default function DateTimePicker({
+  locationId,
   menuId,
   staffId,
   ctaLabel,
@@ -14,6 +15,7 @@ export default function DateTimePicker({
   onBack,
   selected,
 }: {
+  locationId: string;
   menuId: string;
   staffId: string;
   ctaLabel: string;
@@ -33,7 +35,7 @@ export default function DateTimePicker({
   useEffect(() => {
     setError(null);
     createApi(ctx)
-      .availability(menuId, staffId, from, to)
+      .availability(locationId, menuId, staffId, from, to)
       .then((r) => {
         const slots = r.by_staff[0]?.slots ?? [];
         const grouped: Record<string, string[]> = {};
@@ -72,7 +74,7 @@ export default function DateTimePicker({
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
     // selected は初回 mount 時の値だけ使う（毎回再マウント前提）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx, menuId, staffId, from, to, today, maxOffset]);
+  }, [ctx, locationId, menuId, staffId, from, to, today, maxOffset]);
 
   if (error) {
     return (

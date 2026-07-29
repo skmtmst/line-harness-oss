@@ -761,6 +761,26 @@ CREATE TABLE IF NOT EXISTS menus (
 CREATE INDEX IF NOT EXISTS idx_menus_account_sort ON menus (line_account_id, sort_order);
 
 -- ============================================================
+-- booking_locations: 店舗マスタ
+-- ============================================================
+CREATE TABLE IF NOT EXISTS booking_locations (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  address         TEXT,
+  phone           TEXT,
+  access          TEXT,
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  deleted_at      TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
+);
+CREATE INDEX IF NOT EXISTS idx_booking_locations_account_sort
+  ON booking_locations (line_account_id, sort_order);
+
+-- ============================================================
 -- staff: スタッフ
 -- ============================================================
 CREATE TABLE IF NOT EXISTS staff (
@@ -801,15 +821,18 @@ CREATE TABLE IF NOT EXISTS staff_menus (
 CREATE TABLE IF NOT EXISTS staff_shifts (
   id          TEXT PRIMARY KEY,
   staff_id    TEXT NOT NULL,
+  location_id TEXT,
   work_date   TEXT NOT NULL,    -- YYYY-MM-DD (JST)
   start_time  TEXT NOT NULL,    -- HH:MM (JST)
   end_time    TEXT NOT NULL,    -- HH:MM (JST)
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   UNIQUE (staff_id, work_date),
-  FOREIGN KEY (staff_id) REFERENCES staff(id)
+  FOREIGN KEY (staff_id) REFERENCES staff(id),
+  FOREIGN KEY (location_id) REFERENCES booking_locations(id)
 );
 CREATE INDEX IF NOT EXISTS idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
+CREATE INDEX IF NOT EXISTS idx_shifts_location_date ON staff_shifts (location_id, work_date);
 
 -- ============================================================
 -- bookings: 予約本体
@@ -820,6 +843,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   friend_id               TEXT NOT NULL,        -- friends.id
   staff_id                TEXT NOT NULL,
   menu_id                 TEXT NOT NULL,
+  location_id             TEXT,
   starts_at               TEXT NOT NULL,        -- UTC ISO8601 (Z)
   ends_at                 TEXT NOT NULL,        -- UTC ISO8601 (Z)
   block_ends_at           TEXT NOT NULL,        -- ends_at + buffer_after。衝突判定
@@ -837,11 +861,13 @@ CREATE TABLE IF NOT EXISTS bookings (
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
-  FOREIGN KEY (menu_id) REFERENCES menus(id)
+  FOREIGN KEY (menu_id) REFERENCES menus(id),
+  FOREIGN KEY (location_id) REFERENCES booking_locations(id)
 );
 CREATE INDEX IF NOT EXISTS idx_bookings_account_status_starts ON bookings (line_account_id, status, starts_at);
 CREATE INDEX IF NOT EXISTS idx_bookings_staff_overlap ON bookings (staff_id, status, starts_at, block_ends_at);
 CREATE INDEX IF NOT EXISTS idx_bookings_friend_starts ON bookings (friend_id, starts_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bookings_location_starts ON bookings (location_id, starts_at);
 
 -- ============================================================
 -- booking_idempotency_keys: LIFF 多重送信防止

@@ -28,6 +28,7 @@ export default function HistoryCard({ booking }: { booking: BookingHistoryItem }
       )}
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-gray-900 truncate">{booking.menu_name}</div>
+        {booking.location_name && <div className="text-xs text-gray-500 mt-0.5">{booking.location_name}</div>}
         <div className="text-xs text-gray-500 mt-0.5">{booking.staff_name}</div>
         <div className="text-xs text-gray-600 mt-1 tabular-nums">{utcToJstDisplay(booking.starts_at)}</div>
       </div>

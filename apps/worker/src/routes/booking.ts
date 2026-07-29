@@ -151,6 +151,22 @@ async function assertStaffInAccount(
   return Boolean(row?.ok);
 }
 
+async function assertLocationInAccount(
+  db: D1Database,
+  locationId: string,
+  accountId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS ok
+         FROM booking_locations
+        WHERE id = ? AND line_account_id = ? AND is_active = 1 AND deleted_at IS NULL`,
+    )
+    .bind(locationId, accountId)
+    .first<{ ok: number }>();
+  return Boolean(row?.ok);
+}
+
 // account-scope な friend 解決。friends.line_account_id が webhook で書き換わる
 // マルチアカウント環境で、別 tenant の friend 行を再利用しないようにする。
 // line_account_id が NULL の旧データ（multi-account 化前）は account 一致が判定できないので
@@ -215,6 +231,21 @@ async function notifyForBooking(
 // LIFF endpoints (/api/liff/booking/*)
 // ================================================================
 
+booking.get('/api/liff/booking/locations', async (c) => {
+  const accountId = await resolveAccountIdFromLiff(c);
+  if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT id, name, address, phone, access, sort_order
+         FROM booking_locations
+        WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL
+        ORDER BY sort_order ASC, id ASC`,
+    )
+    .bind(accountId)
+    .all();
+  return c.json({ locations: rows.results });
+});
+
 booking.get('/api/liff/booking/menus', async (c) => {
   const accountId = await resolveAccountIdFromLiff(c);
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
@@ -258,6 +289,7 @@ booking.get('/api/liff/booking/availability', async (c) => {
   if (!accountId) return c.json({ error: 'unknown_liff' }, 404);
   const menuId = c.req.query('menu_id');
   const staffId = c.req.query('staff_id') || undefined;
+  const locationId = c.req.query('location_id') || undefined;
   const from = c.req.query('from');
   const to = c.req.query('to');
   if (!menuId || !from || !to) {
@@ -272,6 +304,7 @@ booking.get('/api/liff/booking/availability', async (c) => {
     lineAccountId: accountId,
     menuId,
     staffId,
+    locationId,
     from,
     to,
     now: new Date(),
@@ -293,11 +326,15 @@ booking.post('/api/liff/booking/requests', async (c) => {
   const body = await c.req.json<{
     menu_id: string;
     staff_id: string;
+    location_id: string;
     starts_at: string; // UTC ISO8601
     customer_note?: string;
   }>();
-  if (!body.menu_id || !body.staff_id || !body.starts_at) {
+  if (!body.menu_id || !body.staff_id || !body.location_id || !body.starts_at) {
     return c.json({ error: 'missing_params' }, 400);
+  }
+  if (!(await assertLocationInAccount(c.env.DB, body.location_id, accountId))) {
+    return c.json({ error: 'location_not_found' }, 404);
   }
   const friendId = await resolveFriendId(c, callerLineUserId, accountId);
   if (!friendId) return c.json({ error: 'friend_not_found' }, 404);
@@ -357,8 +394,12 @@ booking.post('/api/liff/booking/requests', async (c) => {
   const startJstDate = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
   const startJstHHMM = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(11, 16);
   const shift = await c.env.DB
-    .prepare(`SELECT start_time, end_time FROM staff_shifts WHERE staff_id = ? AND work_date = ?`)
-    .bind(body.staff_id, startJstDate)
+    .prepare(
+      `SELECT start_time, end_time
+         FROM staff_shifts
+        WHERE staff_id = ? AND work_date = ? AND location_id = ?`,
+    )
+    .bind(body.staff_id, startJstDate, body.location_id)
     .first<{ start_time: string; end_time: string }>();
   if (!shift) return c.json({ error: 'out_of_shift' }, 422);
   const existingBookings = await c.env.DB
@@ -396,10 +437,10 @@ booking.post('/api/liff/booking/requests', async (c) => {
   const insertResult = await c.env.DB
     .prepare(
       `INSERT INTO bookings
-        (id, line_account_id, friend_id, staff_id, menu_id,
+        (id, line_account_id, friend_id, staff_id, menu_id, location_id,
          starts_at, ends_at, block_ends_at, status,
          customer_note, price_at_booking, requested_at)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           SELECT 1 FROM bookings
            WHERE staff_id = ?
@@ -414,6 +455,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
       friendId,
       body.staff_id,
       body.menu_id,
+      body.location_id,
       startsAt.toISOString(),
       endsAt.toISOString(),
       blockEndsAt.toISOString(),
@@ -490,10 +532,12 @@ booking.get('/api/liff/booking/me', async (c) => {
     .prepare(
       `SELECT b.id, b.starts_at, b.status, b.customer_note,
               m.name AS menu_name,
-              s.display_name AS staff_name, s.profile_image_url
+              s.display_name AS staff_name, s.profile_image_url,
+              bl.name AS location_name
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
+         LEFT JOIN booking_locations bl ON bl.id = b.location_id
         WHERE b.friend_id = ? AND b.line_account_id = ?
           AND b.status IN ('requested','confirmed')
           AND b.starts_at >= ?
@@ -506,10 +550,12 @@ booking.get('/api/liff/booking/me', async (c) => {
     .prepare(
       `SELECT b.id, b.starts_at, b.status,
               m.name AS menu_name,
-              s.display_name AS staff_name, s.profile_image_url
+              s.display_name AS staff_name, s.profile_image_url,
+              bl.name AS location_name
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
+         LEFT JOIN booking_locations bl ON bl.id = b.location_id
         WHERE b.friend_id = ? AND b.line_account_id = ?
           AND (b.status NOT IN ('requested','confirmed') OR b.starts_at < ?)
         ORDER BY b.starts_at DESC
@@ -719,6 +765,7 @@ booking.get('/api/booking/admin/availability', async (c) => {
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
   const menuId = c.req.query('menu_id');
   const staffId = c.req.query('staff_id') || undefined;
+  const locationId = c.req.query('location_id') || undefined;
   const from = c.req.query('from');
   const to = c.req.query('to');
   if (!menuId || !from || !to) {
@@ -733,6 +780,7 @@ booking.get('/api/booking/admin/availability', async (c) => {
     lineAccountId: accountId,
     menuId,
     staffId,
+    locationId,
     from,
     to,
     now: new Date(),
@@ -752,10 +800,11 @@ booking.post('/api/booking/admin/bookings', async (c) => {
     friend_id: string;
     menu_id: string;
     staff_id: string;
+    location_id: string;
     starts_at: string; // UTC ISO8601
     customer_note?: string;
   }>();
-  if (!body.friend_id || !body.menu_id || !body.staff_id || !body.starts_at) {
+  if (!body.friend_id || !body.menu_id || !body.staff_id || !body.location_id || !body.starts_at) {
     return c.json({ error: 'missing_params' }, 400);
   }
 
@@ -769,6 +818,9 @@ booking.post('/api/booking/admin/bookings', async (c) => {
   // staff が同じ account に属することを保証（別 tenant の staff への予約を防ぐ）。
   if (!(await assertStaffInAccount(c.env.DB, body.staff_id, accountId))) {
     return c.json({ error: 'staff_not_found' }, 404);
+  }
+  if (!(await assertLocationInAccount(c.env.DB, body.location_id, accountId))) {
+    return c.json({ error: 'location_not_found' }, 404);
   }
 
   const menuRow = await c.env.DB
@@ -802,8 +854,12 @@ booking.post('/api/booking/admin/bookings', async (c) => {
   const startJstDate = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(0, 10);
   const startJstHHMM = new Date(startsAt.getTime() + 9 * 3600_000).toISOString().slice(11, 16);
   const shift = await c.env.DB
-    .prepare(`SELECT start_time, end_time FROM staff_shifts WHERE staff_id = ? AND work_date = ?`)
-    .bind(body.staff_id, startJstDate)
+    .prepare(
+      `SELECT start_time, end_time
+         FROM staff_shifts
+        WHERE staff_id = ? AND work_date = ? AND location_id = ?`,
+    )
+    .bind(body.staff_id, startJstDate, body.location_id)
     .first<{ start_time: string; end_time: string }>();
   if (!shift) return c.json({ error: 'out_of_shift' }, 422);
   const existingBookings = await c.env.DB
@@ -836,10 +892,10 @@ booking.post('/api/booking/admin/bookings', async (c) => {
   const insertResult = await c.env.DB
     .prepare(
       `INSERT INTO bookings
-        (id, line_account_id, friend_id, staff_id, menu_id,
+        (id, line_account_id, friend_id, staff_id, menu_id, location_id,
          starts_at, ends_at, block_ends_at, status,
          customer_note, price_at_booking, requested_at, decided_at)
-       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
+       SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
           SELECT 1 FROM bookings
            WHERE staff_id = ?
@@ -854,6 +910,7 @@ booking.post('/api/booking/admin/bookings', async (c) => {
       body.friend_id,
       body.staff_id,
       body.menu_id,
+      body.location_id,
       startsAt.toISOString(),
       endsAt.toISOString(),
       blockEndsAt.toISOString(),
@@ -884,6 +941,110 @@ booking.post('/api/booking/admin/bookings', async (c) => {
   );
   return c.json({ booking_id: bookingId, status: 'confirmed' }, 201);
 });
+
+// ---- locations ----
+
+booking.get('/api/booking/admin/locations', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const rows = await c.env.DB
+    .prepare(
+      `SELECT id, name, address, phone, access, sort_order, is_active
+         FROM booking_locations
+        WHERE line_account_id = ? AND deleted_at IS NULL
+        ORDER BY sort_order ASC, id ASC`,
+    )
+    .bind(accountId)
+    .all();
+  return c.json({ locations: rows.results });
+});
+
+booking.post('/api/booking/admin/locations', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const b = await c.req.json<{
+    name: string;
+    address?: string | null;
+    phone?: string | null;
+    access?: string | null;
+    sort_order?: number;
+  }>();
+  if (!b.name?.trim()) return c.json({ error: 'name_required' }, 400);
+  const id = crypto.randomUUID();
+  await c.env.DB
+    .prepare(
+      `INSERT INTO booking_locations
+        (id, line_account_id, name, address, phone, access, sort_order)
+       VALUES (?,?,?,?,?,?,?)`,
+    )
+    .bind(
+      id,
+      accountId,
+      b.name.trim(),
+      b.address?.trim() || null,
+      b.phone?.trim() || null,
+      b.access?.trim() || null,
+      b.sort_order ?? 0,
+    )
+    .run();
+  return c.json({ id }, 201);
+});
+
+booking.put('/api/booking/admin/locations/:id', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const id = c.req.param('id');
+  const b = await c.req.json<{
+    name: string;
+    address?: string | null;
+    phone?: string | null;
+    access?: string | null;
+    sort_order?: number;
+    is_active?: boolean;
+  }>();
+  if (!b.name?.trim()) return c.json({ error: 'name_required' }, 400);
+  await c.env.DB
+    .prepare(
+      `UPDATE booking_locations
+          SET name = ?, address = ?, phone = ?, access = ?, sort_order = ?, is_active = ?,
+              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND line_account_id = ? AND deleted_at IS NULL`,
+    )
+    .bind(
+      b.name.trim(),
+      b.address?.trim() || null,
+      b.phone?.trim() || null,
+      b.access?.trim() || null,
+      b.sort_order ?? 0,
+      b.is_active === false ? 0 : 1,
+      id,
+      accountId,
+    )
+    .run();
+  return c.json({ ok: true });
+});
+
+booking.delete('/api/booking/admin/locations/:id', async (c) => {
+  const accountId = await resolveAccountIdAdmin(c);
+  if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const id = c.req.param('id');
+  const inUse = await c.env.DB
+    .prepare(`SELECT 1 AS ok FROM staff_shifts WHERE location_id = ? LIMIT 1`)
+    .bind(id)
+    .first<{ ok: number }>();
+  if (inUse) return c.json({ error: 'location_has_shifts' }, 409);
+  await c.env.DB
+    .prepare(
+      `UPDATE booking_locations
+          SET deleted_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND line_account_id = ?`,
+    )
+    .bind(id, accountId)
+    .run();
+  return c.json({ ok: true });
+});
+
+// ---- staff ----
 
 booking.get('/api/booking/admin/staff', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
@@ -1073,14 +1234,18 @@ booking.get('/api/booking/admin/staff/:id/shifts', async (c) => {
   const from = c.req.query('from');
   const to = c.req.query('to');
   const sql = from && to
-    ? `SELECT id, work_date, start_time, end_time
-         FROM staff_shifts
-        WHERE staff_id = ? AND work_date BETWEEN ? AND ?
-        ORDER BY work_date ASC`
-    : `SELECT id, work_date, start_time, end_time
-         FROM staff_shifts
-        WHERE staff_id = ?
-        ORDER BY work_date ASC`;
+    ? `SELECT ss.id, ss.work_date, ss.start_time, ss.end_time,
+              ss.location_id, bl.name AS location_name
+         FROM staff_shifts ss
+         LEFT JOIN booking_locations bl ON bl.id = ss.location_id
+        WHERE ss.staff_id = ? AND ss.work_date BETWEEN ? AND ?
+        ORDER BY ss.work_date ASC`
+    : `SELECT ss.id, ss.work_date, ss.start_time, ss.end_time,
+              ss.location_id, bl.name AS location_name
+         FROM staff_shifts ss
+         LEFT JOIN booking_locations bl ON bl.id = ss.location_id
+        WHERE ss.staff_id = ?
+        ORDER BY ss.work_date ASC`;
   const stmt = c.env.DB.prepare(sql);
   const rows = await (from && to ? stmt.bind(staffId, from, to) : stmt.bind(staffId)).all();
   return c.json({ shifts: rows.results });
@@ -1094,20 +1259,29 @@ booking.put('/api/booking/admin/staff/:id/shifts', async (c) => {
     return c.json({ error: 'staff_not_found_in_account' }, 404);
   }
   const b = await c.req.json<{
-    shifts: Array<{ work_date: string; start_time: string; end_time: string }>;
+    shifts: Array<{
+      work_date: string;
+      start_time: string;
+      end_time: string;
+      location_id: string;
+    }>;
   }>();
   // Upsert each row
   for (const s of b.shifts) {
+    if (!(await assertLocationInAccount(c.env.DB, s.location_id, accountId))) {
+      return c.json({ error: 'location_not_found' }, 404);
+    }
     await c.env.DB
       .prepare(
-        `INSERT INTO staff_shifts (id, staff_id, work_date, start_time, end_time)
-         VALUES (?, ?, ?, ?, ?)
+        `INSERT INTO staff_shifts (id, staff_id, location_id, work_date, start_time, end_time)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT(staff_id, work_date) DO UPDATE
-            SET start_time = excluded.start_time,
+            SET location_id = excluded.location_id,
+                start_time = excluded.start_time,
                 end_time = excluded.end_time,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')`,
       )
-      .bind(crypto.randomUUID(), staffId, s.work_date, s.start_time, s.end_time)
+      .bind(crypto.randomUUID(), staffId, s.location_id, s.work_date, s.start_time, s.end_time)
       .run();
   }
   return c.json({ ok: true, count: b.shifts.length });
@@ -1140,7 +1314,7 @@ booking.post('/api/booking/admin/staff/:id/shifts/generate', async (c) => {
     weeks: number;
     weekly_template: Record<
       'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat',
-      { start: string; end: string } | null
+      { start: string; end: string; location_id: string } | null
     >;
   }>();
   if (!b.from_date || !b.weeks || !b.weekly_template) {
@@ -1149,19 +1323,33 @@ booking.post('/api/booking/admin/staff/:id/shifts/generate', async (c) => {
   const dayKeys: Array<keyof typeof b.weekly_template> = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
   const start = new Date(`${b.from_date}T00:00:00Z`);
   const stmts: D1PreparedStatement[] = [];
+  const validatedLocationIds = new Set<string>();
   for (let i = 0; i < b.weeks * 7; i++) {
     const d = new Date(start);
     d.setUTCDate(start.getUTCDate() + i);
     const tpl = b.weekly_template[dayKeys[d.getUTCDay()]];
     if (!tpl) continue;
+    if (!validatedLocationIds.has(tpl.location_id)) {
+      if (!(await assertLocationInAccount(c.env.DB, tpl.location_id, accountId))) {
+        return c.json({ error: 'location_not_found' }, 404);
+      }
+      validatedLocationIds.add(tpl.location_id);
+    }
     stmts.push(
       c.env.DB
         .prepare(
-          `INSERT INTO staff_shifts (id, staff_id, work_date, start_time, end_time)
-           VALUES (?, ?, ?, ?, ?)
+          `INSERT INTO staff_shifts (id, staff_id, location_id, work_date, start_time, end_time)
+           VALUES (?, ?, ?, ?, ?, ?)
            ON CONFLICT(staff_id, work_date) DO NOTHING`,
         )
-        .bind(crypto.randomUUID(), staffId, d.toISOString().slice(0, 10), tpl.start, tpl.end),
+        .bind(
+          crypto.randomUUID(),
+          staffId,
+          tpl.location_id,
+          d.toISOString().slice(0, 10),
+          tpl.start,
+          tpl.end,
+        ),
     );
   }
   if (stmts.length === 0) return c.json({ inserted: 0 });
@@ -1179,10 +1367,12 @@ booking.get('/api/booking/admin/requests', async (c) => {
     ? `SELECT b.*,
               m.name AS menu_name,
               s.display_name AS staff_name,
+              bl.name AS location_name,
               f.display_name AS friend_name
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
+         LEFT JOIN booking_locations bl ON bl.id = b.location_id
          LEFT JOIN friends f ON f.id = b.friend_id
         WHERE b.line_account_id = ?
         ORDER BY b.starts_at ASC
@@ -1190,10 +1380,12 @@ booking.get('/api/booking/admin/requests', async (c) => {
     : `SELECT b.*,
               m.name AS menu_name,
               s.display_name AS staff_name,
+              bl.name AS location_name,
               f.display_name AS friend_name
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
+         LEFT JOIN booking_locations bl ON bl.id = b.location_id
          LEFT JOIN friends f ON f.id = b.friend_id
         WHERE b.line_account_id = ? AND b.status = ?
         ORDER BY b.starts_at ASC

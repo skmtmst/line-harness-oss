@@ -1,15 +1,17 @@
 import { useState } from 'react';
-import { createApi, type MenuItem, type StaffItem } from '../lib/api.js';
+import { createApi, type LocationItem, type MenuItem, type StaffItem } from '../lib/api.js';
 import { useSalonContext } from '../lib/context.js';
 import { jstStartsAtIso, formatJp } from '../lib/datetime.js';
 
 export default function Confirm({
+  location,
   menu,
   staff,
   slot,
   onSubmitted,
   onBack,
 }: {
+  location: LocationItem;
   menu: MenuItem;
   staff: StaffItem;
   slot: { date: string; start: string };
@@ -28,6 +30,7 @@ export default function Confirm({
     try {
       await createApi(ctx).createRequest(
         {
+          location_id: location.id,
           menu_id: menu.id,
           staff_id: staff.id,
           starts_at: jstStartsAtIso(slot.date, slot.start),
@@ -56,10 +59,11 @@ export default function Confirm({
       </button>
       <div>
         <h1 className="text-base font-bold text-gray-900">内容のご確認</h1>
-        <p className="text-xs text-gray-500 mt-1">step 4 / 4</p>
+        <p className="text-xs text-gray-500 mt-1">step 5 / 5</p>
       </div>
       <div className="sb-card">
         <dl className="space-y-3 text-sm">
+          <Row label="店舗" value={location.name} />
           <Row label="メニュー" value={menu.name} />
           <Row label="担当" value={staff.display_name} />
           <Row label="日時" value={`${formatJp(slot.date)} ${slot.start}`} />

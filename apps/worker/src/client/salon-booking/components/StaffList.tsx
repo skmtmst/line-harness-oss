@@ -69,7 +69,7 @@ export default function StaffList({
       <BackButton onBack={onBack} />
       <div>
         <h1 className="text-base font-bold text-gray-900">担当を選んでください</h1>
-        <p className="text-xs text-gray-500 mt-1">step 2 / 4</p>
+        <p className="text-xs text-gray-500 mt-1">step 3 / 5</p>
       </div>
       <ul className="space-y-2">
         {list.map((s) => (

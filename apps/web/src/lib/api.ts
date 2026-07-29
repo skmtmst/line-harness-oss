@@ -1495,8 +1495,20 @@ export interface BookingStaff {
   is_active: number;
 }
 
+export interface BookingLocation {
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  access: string | null;
+  sort_order: number;
+  is_active: number;
+}
+
 export interface BookingShift {
   id: string;
+  location_id: string | null;
+  location_name: string | null;
   work_date: string;
   start_time: string;
   end_time: string;
@@ -1521,6 +1533,7 @@ export interface BookingRequest {
   price_at_booking: number;
   menu_name: string;
   staff_name: string;
+  location_name: string | null;
   friend_name: string | null;
 }
 
@@ -1529,6 +1542,25 @@ function withAccount(path: string, accountId: string): string {
 }
 
 export const bookingApi = {
+  // Locations
+  listLocations: (accountId: string) =>
+    fetchApi<{ locations: BookingLocation[] }>(
+      withAccount('/api/booking/admin/locations', accountId),
+    ),
+  createLocation: (accountId: string, body: Partial<BookingLocation>) =>
+    fetchApi<{ id: string }>(withAccount('/api/booking/admin/locations', accountId), {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateLocation: (accountId: string, id: string, body: Partial<BookingLocation>) =>
+    fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/locations/${id}`, accountId), {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteLocation: (accountId: string, id: string) =>
+    fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/locations/${id}`, accountId), {
+      method: 'DELETE',
+    }),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
@@ -1590,7 +1622,12 @@ export const bookingApi = {
   putShifts: (
     accountId: string,
     staffId: string,
-    shifts: Array<{ work_date: string; start_time: string; end_time: string }>,
+    shifts: Array<{
+      work_date: string;
+      start_time: string;
+      end_time: string;
+      location_id: string;
+    }>,
   ) =>
     fetchApi<{ ok: true; count: number }>(
       withAccount(`/api/booking/admin/staff/${staffId}/shifts`, accountId),
@@ -1607,7 +1644,10 @@ export const bookingApi = {
     body: {
       from_date: string;
       weeks: number;
-      weekly_template: Record<string, { start: string; end: string } | null>;
+      weekly_template: Record<
+        string,
+        { start: string; end: string; location_id: string } | null
+      >;
     },
   ) =>
     fetchApi<{ inserted: number }>(

@@ -26,6 +26,7 @@ export default function HistoryCard({ booking }: { booking: BookingHistoryItem }
       )}
       <div className="flex-1">
         <div className="font-medium">{booking.menu_name}</div>
+        {booking.location_name && <div className="text-sm text-gray-600">{booking.location_name}</div>}
         <div className="text-sm text-gray-600">{booking.staff_name}</div>
         <div className="text-sm text-gray-600">{utcToJstDisplay(booking.starts_at)}</div>
       </div>

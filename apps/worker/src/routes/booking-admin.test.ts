@@ -137,6 +137,7 @@ describe('POST /api/booking/admin/bookings', () => {
     friend_id: 'f1',
     menu_id: 'm1',
     staff_id: 's1',
+    location_id: 'loc1',
     starts_at: futureStartsAt, // JST 11:00
   };
 
@@ -144,6 +145,7 @@ describe('POST /api/booking/admin/bookings', () => {
     return scriptedDb([
       ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
       ['FROM staff WHERE', { first: { ok: 1 } }],
+      ['FROM booking_locations', { first: { ok: 1 } }],
       [
         'FROM menus m',
         {
@@ -257,6 +259,7 @@ describe('POST /api/booking/admin/bookings', () => {
     const db = scriptedDb([
       ['FROM friends', { first: { id: 'f1', is_following: 1 } }],
       ['FROM staff WHERE', { first: null }],
+      ['FROM booking_locations', { first: { ok: 1 } }],
     ]);
     const { app, env } = makeApp(db);
     const res = await app.request(
