@@ -46,4 +46,16 @@ describe('renderBookingTemplate', () => {
       ),
     ).toBe('予約確定\n小顔矯正 / 2026-08-01 11:00 /');
   });
+
+  test('replaces LSTEP-compatible square bracket variables', () => {
+    expect(
+      renderBookingTemplate(
+        '[name]様\\n[context.reserve.create_request.course.name]\\n[unknown.value]',
+        {
+          name: '坂本 真⼈',
+          'context.reserve.create_request.course.name': 'オーダーメイド造顔ハイフ 65分',
+        },
+      ),
+    ).toBe('坂本 真⼈様\nオーダーメイド造顔ハイフ 65分');
+  });
 });

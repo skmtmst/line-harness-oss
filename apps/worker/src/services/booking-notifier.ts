@@ -49,12 +49,17 @@ export function renderBookingTemplate(
   template: string,
   variables: Record<string, string | number | null | undefined>,
 ): string {
+  const replaceVariable = (_match: string, key: string): string => {
+    const value = variables[key.trim()];
+    return value === null || value === undefined ? '' : String(value);
+  };
+
   return template
     .replace(/\\n/g, '\n')
-    .replace(/\{\{\s*([a-z0-9_]+)\s*\}\}/gi, (_match, key: string) => {
-      const value = variables[key];
-      return value === null || value === undefined ? '' : String(value);
-    })
+    .replace(/\{\{\s*([a-z0-9_.]+)\s*\}\}/gi, replaceVariable)
+    // LSTEP から移行した文面をそのまま使えるよう、角括弧の階層変数にも対応する。
+    // 日本語の見出しで使う全角括弧（【】）には一致しない。
+    .replace(/\[([a-z0-9_.]+)\]/gi, replaceVariable)
     .trim();
 }
 

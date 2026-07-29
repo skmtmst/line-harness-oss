@@ -22,6 +22,70 @@ const MESSAGE_LABELS: Record<string, string> = {
   cancel_rejected: 'キャンセルリクエスト否認時',
 }
 
+const MESSAGE_VARIABLES: Record<string, string[]> = {
+  booking_requested: [
+    '[name]',
+    '[context.reserve.create_request.full_name]',
+    '[context.reserve.create_request.date_time_range_for_display]',
+    '[context.reserve.create_request.course.name]',
+    '[context.reserve.create_request.price_for_display]',
+  ],
+  booking_approved: [
+    '[name]',
+    '[context.reserve.create_approve.full_name]',
+    '[context.reserve.create_approve.date_time_range_for_display]',
+    '[context.reserve.create_approve.course.name]',
+    '[context.reserve.create_approve.price_for_display]',
+    '[context.reserve.create_approve.location_block]',
+  ],
+  booking_rejected: ['[name]'],
+  change_requested: [
+    '[name]',
+    '[context.reserve.edit_request.current.date_time_range_for_display]',
+    '[context.reserve.edit_request.current.course.name]',
+    '[context.reserve.edit_request.current.price_for_display]',
+    '[context.reserve.edit_request.latest.date_time_range_for_display]',
+    '[context.reserve.edit_request.latest.course.name]',
+    '[context.reserve.edit_request.latest.price_for_display]',
+  ],
+  change_approved: [
+    '[name]',
+    '[context.reserve.edit_approve.latest.date_time_range_for_display]',
+    '[context.reserve.edit_approve.latest.course.name]',
+    '[context.reserve.edit_approve.latest.price_for_display]',
+    '[context.reserve.edit_approve.confirm_url]',
+  ],
+  change_rejected: [
+    '[name]',
+    '[context.reserve.edit_reject.current.date_time_range_for_display]',
+    '[context.reserve.edit_reject.current.course.name]',
+    '[context.reserve.edit_reject.current.price_for_display]',
+    '[context.reserve.edit_reject.latest.date_time_range_for_display]',
+    '[context.reserve.edit_reject.latest.course.name]',
+    '[context.reserve.edit_reject.latest.price_for_display]',
+    '[context.reserve.edit_reject.confirm_url]',
+  ],
+  cancel_requested: [
+    '[name]',
+    '[context.reserve.cancel_request.date_time_range_for_display]',
+    '[context.reserve.cancel_request.course.name]',
+    '[context.reserve.cancel_request.price_for_display]',
+  ],
+  cancel_approved: [
+    '[name]',
+    '[context.reserve.cancel_approve.date_time_range_for_display]',
+    '[context.reserve.cancel_approve.course.name]',
+    '[context.reserve.cancel_approve.price_for_display]',
+  ],
+  cancel_rejected: [
+    '[name]',
+    '[context.reserve.cancel_reject.date_time_range_for_display]',
+    '[context.reserve.cancel_reject.course.name]',
+    '[context.reserve.cancel_reject.price_for_display]',
+    '[context.reserve.cancel_reject.confirm_url]',
+  ],
+}
+
 const FIELD_TYPES: Array<{ value: BookingFormField['field_type']; label: string }> = [
   { value: 'text', label: '1行テキスト' },
   { value: 'tel', label: '電話番号' },
@@ -285,7 +349,7 @@ export default function BookingSettingsPage() {
         <SaveButton saving={saving === 'fields'} onClick={saveFields}>取得項目を保存</SaveButton>
       </Section>
 
-      <Section title="予約アクション時のLINE返信" description="二重波括弧の変数は送信時に置換されます：{{menu_name}}、{{staff_name}}、{{starts_at}}、{{requested_starts_at}}">
+      <Section title="予約アクション時のLINE返信" description="角括弧の項目は、送信時にお客様・予約・店舗ごとの実際の内容へ自動で置き換わります。">
         <div className="space-y-4">
           {draft.messages.map((message, index) => (
             <div key={message.event_key} className="rounded-xl border border-gray-200 p-4">
@@ -298,8 +362,26 @@ export default function BookingSettingsPage() {
                 onChange={(e) => updateMessage(draft, setDraft, index, { message_text: e.target.value })}
                 rows={5}
                 maxLength={5000}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-6"
+                className="min-h-64 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-6"
               />
+              <div className="mt-3">
+                <p className="mb-2 text-xs font-semibold text-gray-600">この返信で使える自動入力項目</p>
+                <div className="flex flex-wrap gap-2">
+                  {(MESSAGE_VARIABLES[message.event_key] ?? []).map((variable) => (
+                    <button
+                      key={variable}
+                      type="button"
+                      title="クリックして文末へ追加"
+                      onClick={() => updateMessage(draft, setDraft, index, {
+                        message_text: `${message.message_text}${message.message_text.endsWith('\n') ? '' : '\n'}${variable}`,
+                      })}
+                      className="rounded-md bg-gray-100 px-2 py-1 font-mono text-[11px] text-gray-700 hover:bg-green-50 hover:text-green-700"
+                    >
+                      {variable}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           ))}
         </div>

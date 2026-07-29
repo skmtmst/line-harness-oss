@@ -86,6 +86,41 @@ function startsAtJst(utcIso: string): string {
   return `${jst.slice(0, 10)} ${jst.slice(11, 16)}`;
 }
 
+function bookingRangeForDisplay(startsAt: string, endsAt: string): string {
+  const start = new Date(new Date(startsAt).getTime() + JST_OFFSET_MS);
+  const end = new Date(new Date(endsAt).getTime() + JST_OFFSET_MS);
+  const startIso = start.toISOString();
+  const endIso = end.toISOString();
+  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+  const weekday = weekdays[start.getUTCDay()];
+  return `${startIso.slice(0, 4)}年${startIso.slice(5, 7)}月${startIso.slice(8, 10)}日(${weekday}) ${startIso.slice(11, 16)}〜${endIso.slice(11, 16)}`;
+}
+
+function priceForDisplay(price: number | null): string {
+  return price === null ? '料金はスタッフよりご案内します' : `${price.toLocaleString('ja-JP')}円`;
+}
+
+function bookingConfirmUrl(liffId: string | null): string {
+  if (!liffId) return '';
+  const encoded = encodeURIComponent(liffId);
+  return `https://liff.line.me/${encoded}/?page=salon-book&liffId=${encoded}&view=history`;
+}
+
+function locationBlock(row: {
+  location_name: string | null;
+  location_address: string | null;
+  location_phone: string | null;
+  location_access: string | null;
+}): string {
+  const name = row.location_name ?? 'ご予約店舗';
+  const details = [row.location_access, row.location_address, row.location_phone]
+    .filter((value): value is string => Boolean(value?.trim()));
+  if (details.length === 0) {
+    return `アクセスは：${name}\n詳細住所はスタッフよりご案内します。`;
+  }
+  return [`アクセスは：${name}`, ...details].join('\n');
+}
+
 // UTC [start, end) bounds covering a JST calendar day (YYYY-MM-DD in JST).
 // The JST day runs [date 00:00 JST, date+1 00:00 JST) = [date-1 15:00Z, date 15:00Z).
 // Used to fetch a staff member's existing bookings for slot computation.
@@ -241,15 +276,19 @@ async function notifyForBooking(
 ): Promise<void> {
   const row = await db
     .prepare(
-      `SELECT b.starts_at,
+      `SELECT b.starts_at, b.ends_at, b.price_at_booking, b.customer_name,
               m.name AS menu_name,
               s.display_name AS staff_name,
+              bl.name AS location_name, bl.address AS location_address,
+              bl.phone AS location_phone, bl.access AS location_access,
               la.channel_access_token,
+              la.liff_id,
               f.line_user_id,
               b.line_account_id
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
          INNER JOIN staff s ON s.id = b.staff_id
+         LEFT JOIN booking_locations bl ON bl.id = b.location_id
          INNER JOIN line_accounts la ON la.id = b.line_account_id
          INNER JOIN friends f ON f.id = b.friend_id
         WHERE b.id = ?`,
@@ -257,13 +296,49 @@ async function notifyForBooking(
     .bind(bookingId)
     .first<{
       starts_at: string;
+      ends_at: string;
+      price_at_booking: number | null;
+      customer_name: string;
       menu_name: string;
       staff_name: string;
+      location_name: string | null;
+      location_address: string | null;
+      location_phone: string | null;
+      location_access: string | null;
       channel_access_token: string;
+      liff_id: string | null;
       line_user_id: string;
       line_account_id: string;
     }>();
   if (!row) return;
+  const actionType = eventKey?.startsWith('change_')
+    ? 'change'
+    : eventKey?.startsWith('cancel_')
+      ? 'cancel'
+      : null;
+  const action = actionType
+    ? await db
+        .prepare(
+          `SELECT ar.requested_starts_at, ar.requested_ends_at,
+                  rm.name AS requested_menu_name,
+                  COALESCE(rsm.override_price, rm.base_price) AS requested_price
+             FROM booking_action_requests ar
+             LEFT JOIN menus rm ON rm.id = ar.requested_menu_id
+             LEFT JOIN staff_menus rsm
+               ON rsm.menu_id = ar.requested_menu_id
+              AND rsm.staff_id = ar.requested_staff_id
+            WHERE ar.booking_id = ? AND ar.request_type = ?
+            ORDER BY ar.requested_at DESC
+            LIMIT 1`,
+        )
+        .bind(bookingId, actionType)
+        .first<{
+          requested_starts_at: string | null;
+          requested_ends_at: string | null;
+          requested_menu_name: string | null;
+          requested_price: number | null;
+        }>()
+    : null;
   const templateText = await getBookingMessage(
     db,
     row.line_account_id,
@@ -275,12 +350,72 @@ async function notifyForBooking(
           : 'booking_rejected'),
   );
   if (templateText === null) return;
+  const currentRange = bookingRangeForDisplay(row.starts_at, row.ends_at);
+  const currentPrice = priceForDisplay(row.price_at_booking);
+  const requestedRange =
+    action?.requested_starts_at && action.requested_ends_at
+      ? bookingRangeForDisplay(action.requested_starts_at, action.requested_ends_at)
+      : currentRange;
+  const requestedMenu = action?.requested_menu_name ?? row.menu_name;
+  const requestedPrice = priceForDisplay(action?.requested_price ?? row.price_at_booking);
+  const confirmUrl = bookingConfirmUrl(row.liff_id);
+  const commonVariables: Record<string, string | number | null | undefined> = {
+    name: row.customer_name,
+    customer_name: row.customer_name,
+    date_time_range_for_display: currentRange,
+    price_for_display: currentPrice,
+    confirm_url: confirmUrl,
+    location_block: locationBlock(row),
+    requested_starts_at: requestedRange,
+
+    'context.reserve.create_request.full_name': row.customer_name,
+    'context.reserve.create_request.date_time_range_for_display': currentRange,
+    'context.reserve.create_request.course.name': row.menu_name,
+    'context.reserve.create_request.price_for_display': currentPrice,
+
+    'context.reserve.create_approve.full_name': row.customer_name,
+    'context.reserve.create_approve.date_time_range_for_display': currentRange,
+    'context.reserve.create_approve.course.name': row.menu_name,
+    'context.reserve.create_approve.price_for_display': currentPrice,
+    'context.reserve.create_approve.location_block': locationBlock(row),
+
+    'context.reserve.edit_request.current.date_time_range_for_display': currentRange,
+    'context.reserve.edit_request.current.course.name': row.menu_name,
+    'context.reserve.edit_request.current.price_for_display': currentPrice,
+    'context.reserve.edit_request.latest.date_time_range_for_display': requestedRange,
+    'context.reserve.edit_request.latest.course.name': requestedMenu,
+    'context.reserve.edit_request.latest.price_for_display': requestedPrice,
+
+    'context.reserve.edit_approve.latest.date_time_range_for_display': currentRange,
+    'context.reserve.edit_approve.latest.course.name': row.menu_name,
+    'context.reserve.edit_approve.latest.price_for_display': currentPrice,
+    'context.reserve.edit_approve.confirm_url': confirmUrl,
+
+    'context.reserve.edit_reject.current.date_time_range_for_display': currentRange,
+    'context.reserve.edit_reject.current.course.name': row.menu_name,
+    'context.reserve.edit_reject.current.price_for_display': currentPrice,
+    'context.reserve.edit_reject.latest.date_time_range_for_display': requestedRange,
+    'context.reserve.edit_reject.latest.course.name': requestedMenu,
+    'context.reserve.edit_reject.latest.price_for_display': requestedPrice,
+    'context.reserve.edit_reject.confirm_url': confirmUrl,
+
+    'context.reserve.cancel_request.date_time_range_for_display': currentRange,
+    'context.reserve.cancel_request.course.name': row.menu_name,
+    'context.reserve.cancel_request.price_for_display': currentPrice,
+    'context.reserve.cancel_approve.date_time_range_for_display': currentRange,
+    'context.reserve.cancel_approve.course.name': row.menu_name,
+    'context.reserve.cancel_approve.price_for_display': currentPrice,
+    'context.reserve.cancel_reject.date_time_range_for_display': currentRange,
+    'context.reserve.cancel_reject.course.name': row.menu_name,
+    'context.reserve.cancel_reject.price_for_display': currentPrice,
+    'context.reserve.cancel_reject.confirm_url': confirmUrl,
+  };
   await sendBookingNotification({
     channelAccessToken: row.channel_access_token,
     toLineUserId: row.line_user_id,
     kind,
     templateText,
-    variables,
+    variables: { ...commonVariables, ...variables },
     ctx: {
       menuName: row.menu_name,
       staffName: row.staff_name,
@@ -2319,9 +2454,14 @@ booking.patch('/api/booking/admin/action-requests/:id', async (c) => {
   }
   const request = await c.env.DB
     .prepare(
-      `SELECT ar.*, b.status AS booking_status
+      `SELECT ar.*, b.status AS booking_status,
+              COALESCE(sm.override_price, m.base_price) AS requested_price
          FROM booking_action_requests ar
          INNER JOIN bookings b ON b.id = ar.booking_id
+         LEFT JOIN menus m ON m.id = ar.requested_menu_id
+         LEFT JOIN staff_menus sm
+           ON sm.menu_id = ar.requested_menu_id
+          AND sm.staff_id = ar.requested_staff_id
         WHERE ar.id = ? AND ar.line_account_id = ?`,
     )
     .bind(id, accountId)
@@ -2338,6 +2478,7 @@ booking.patch('/api/booking/admin/action-requests/:id', async (c) => {
       requested_ends_at: string | null;
       requested_block_ends_at: string | null;
       customer_note: string | null;
+      requested_price: number | null;
     }>();
   if (!request) return c.json({ error: 'not_found' }, 404);
   if (request.status !== 'requested') {
@@ -2381,6 +2522,7 @@ booking.patch('/api/booking/admin/action-requests/:id', async (c) => {
           `UPDATE bookings
               SET location_id = ?, staff_id = ?, menu_id = ?,
                   starts_at = ?, ends_at = ?, block_ends_at = ?,
+                  price_at_booking = COALESCE(?, price_at_booking),
                   customer_note = COALESCE(?, customer_note),
                   updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
             WHERE id = ? AND line_account_id = ?
@@ -2401,6 +2543,7 @@ booking.patch('/api/booking/admin/action-requests/:id', async (c) => {
           request.requested_starts_at,
           request.requested_ends_at,
           request.requested_block_ends_at,
+          request.requested_price,
           request.customer_note,
           request.booking_id,
           accountId,
