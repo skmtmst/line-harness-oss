@@ -192,6 +192,9 @@ describe('getAvailability', () => {
       '2026-05-09 10:30',
       '2026-05-09 11:00',
     ]);
+    expect(result.by_staff[0].working_hours).toEqual([
+      { date: '2026-05-09', start: '10:00', end: '12:00' },
+    ]);
   });
 
   test('リードタイム未満のスロットは除外', async () => {
@@ -217,6 +220,9 @@ describe('getAvailability', () => {
       minLeadTimeMinutes: 60,
     });
     expect(result.by_staff[0].slots).toEqual([]);
+    expect(result.by_staff[0].working_hours).toEqual([
+      { date: '2026-05-09', start: '10:00', end: '12:00' },
+    ]);
   });
 
   test('既存予約があるとその時間帯は除外', async () => {
@@ -265,6 +271,7 @@ describe('getAvailability', () => {
       minLeadTimeMinutes: 60,
     });
     expect(result.by_staff[0].slots).toEqual([]);
+    expect(result.by_staff[0].working_hours).toEqual([]);
   });
 
   test('staff_id 指定 → そのスタッフのみ', async () => {

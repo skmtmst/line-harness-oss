@@ -1,16 +1,18 @@
-// 週カレンダー: 横軸に7日、縦軸に時間軸（30分刻み）。
+// 週カレンダー: 横軸に7日、縦軸に管理画面で設定した時間単位。
 // availability で受け取った {date → [HH:MM, ...]} を grid セルにマップして
-// タップ可能なものは緑、空いてないものは灰色で示す。
+// タップ可能なものは○、空いてないものは×で示す。
 
 import { useMemo } from 'react';
 import { addDays, formatJp } from '../lib/datetime.js';
 
 export interface WeekCalendarProps {
   byDate: Record<string, string[]>; // 'YYYY-MM-DD' → ['10:00', '10:30', ...]
+  workingByDate: Record<string, { start: string; end: string }>;
   weekStart: string;                  // 表示開始日 (YYYY-MM-DD JST)
   onPick: (slot: { date: string; start: string }) => void;
   selectedDate?: string;
   selectedStart?: string;
+  slotIntervalMinutes: number;
 }
 
 // HH:MM ↔ 分数の変換
@@ -24,55 +26,54 @@ function fromMin(min: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-const SLOT_MIN = 30;
-
 export default function WeekCalendar({
   byDate,
+  workingByDate,
   weekStart,
   onPick,
   selectedDate,
   selectedStart,
+  slotIntervalMinutes,
 }: WeekCalendarProps) {
   const dates = useMemo(
     () => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)),
     [weekStart],
   );
 
-  const { rows, hasAny } = useMemo(() => {
-    const set = new Set<number>();
-    for (const d of dates) for (const t of byDate[d] ?? []) set.add(toMin(t));
-    if (set.size === 0) return { rows: [] as string[], hasAny: false };
-    const min = Math.min(...set);
-    const max = Math.max(...set);
+  const rows = useMemo(() => {
+    const ranges = Object.values(workingByDate);
+    const min = ranges.length > 0
+      ? Math.min(...ranges.map((range) => toMin(range.start)))
+      : 11 * 60;
+    const max = ranges.length > 0
+      ? Math.max(...ranges.map((range) => toMin(range.end) - slotIntervalMinutes))
+      : 19 * 60;
     const arr: string[] = [];
-    for (let m = min; m <= max; m += SLOT_MIN) arr.push(fromMin(m));
-    return { rows: arr, hasAny: true };
-  }, [byDate, dates]);
-
-  if (!hasAny) {
-    return (
-      <div className="sb-card text-center text-sm text-gray-500 py-8">
-        この週に空きはありません
-      </div>
-    );
-  }
+    for (let m = min; m <= max; m += slotIntervalMinutes) arr.push(fromMin(m));
+    return arr;
+  }, [slotIntervalMinutes, workingByDate]);
 
   const todayJst = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
 
   return (
     <div
-      className="bg-white rounded-2xl overflow-hidden"
-      style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: 4 }}
+      className="bg-white rounded-2xl overflow-auto"
+      style={{
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        padding: 4,
+        maxHeight: 560,
+      }}
     >
       <div
         className="grid text-center"
         style={{
-          gridTemplateColumns: `40px repeat(7, minmax(0, 1fr))`,
+          gridTemplateColumns: `52px repeat(7, minmax(42px, 1fr))`,
           gap: 0,
+          minWidth: 350,
         }}
       >
         {/* ヘッダー行: 空白セル + 7 日付 */}
-        <div className="bg-gray-50 border-b border-gray-200" />
+        <div className="sticky left-0 top-0 z-30 bg-gray-100 border-b border-r border-gray-200" />
         {dates.map((d) => {
           const dow = new Date(`${d}T00:00:00Z`).getUTCDay();
           const isToday = d === todayJst;
@@ -80,8 +81,11 @@ export default function WeekCalendar({
           return (
             <div
               key={d}
-              className="bg-gray-50 border-b border-gray-200 py-2 px-1"
-              style={{ color: tone }}
+              className="sticky top-0 z-20 border-b border-gray-200 py-2 px-1"
+              style={{
+                color: tone,
+                background: dow === 0 ? '#ffe4e6' : dow === 6 ? '#dbeafe' : '#f3f4f6',
+              }}
             >
               <div className="text-[10px] leading-none font-medium">
                 {'日月火水木金土'[dow]}
@@ -111,32 +115,31 @@ export default function WeekCalendar({
 
         {/* 時間行 */}
         {rows.map((t) => {
-          const isHourMark = t.endsWith(':00');
           return (
             <div key={`row-${t}`} style={{ display: 'contents' }}>
-              {/* 時間ラベル: 毎時 (HH:00) のみ表示 */}
               <div
-                className="border-r border-gray-100 text-[10px] text-gray-400 tabular-nums flex items-start justify-center pt-0.5"
+                className="sticky left-0 z-10 border-r border-t border-gray-200 bg-gray-100 text-[11px] font-semibold text-gray-600 tabular-nums flex items-center justify-center"
                 style={{
-                  height: 36,
-                  borderTop: isHourMark ? '1px solid #e5e7eb' : '1px dashed #f3f4f6',
+                  height: 42,
                 }}
               >
-                {isHourMark ? t : ''}
+                {t}
               </div>
               {dates.map((d) => {
                 const slots = byDate[d] ?? [];
                 const available = slots.includes(t);
                 const isSelected =
                   available && selectedDate === d && selectedStart === t;
+                const dow = new Date(`${d}T00:00:00Z`).getUTCDay();
+                const background = dow === 0 ? '#fff1f2' : dow === 6 ? '#eff6ff' : '#fff';
                 return (
                   <div
                     key={`${d}-${t}`}
-                    className="border-r border-gray-100"
+                    className="border-r border-t border-gray-200"
                     style={{
-                      height: 36,
-                      borderTop: isHourMark ? '1px solid #e5e7eb' : '1px dashed #f3f4f6',
-                      padding: 1,
+                      height: 42,
+                      padding: 3,
+                      background,
                     }}
                   >
                     {available ? (
@@ -146,20 +149,25 @@ export default function WeekCalendar({
                         style={{
                           width: '100%',
                           height: '100%',
-                          background: isSelected ? '#06C755' : '#ecfdf5',
-                          border: isSelected ? '1.5px solid #06C755' : '1px solid #86efac',
-                          color: isSelected ? '#fff' : '#047857',
-                          fontSize: 11,
+                          background: isSelected ? '#2f9e1d' : '#fff',
+                          border: '1.5px solid #2f9e1d',
+                          color: isSelected ? '#fff' : '#2f9e1d',
+                          fontSize: 20,
                           fontWeight: 700,
                           lineHeight: 1,
                         }}
                         aria-label={`${formatJp(d)} ${t}`}
                       >
-                        {/* セル内に時刻を表示。:30 開始の空き枠でも何時か即判別できる。
-                            選択中はチェックマークに切替して視認性 ↑ */}
-                        {isSelected ? '✓' : t}
+                        {isSelected ? '✓' : '○'}
                       </button>
-                    ) : null}
+                    ) : (
+                      <span
+                        className="flex h-full w-full items-center justify-center text-lg font-medium text-gray-500"
+                        aria-label={`${formatJp(d)} ${t} 予約不可`}
+                      >
+                        ×
+                      </span>
+                    )}
                   </div>
                 );
               })}

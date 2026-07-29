@@ -201,9 +201,15 @@ export async function getAvailability(
   const by_staff: AvailabilityByStaff[] = [];
   for (const s of staffRows.results) {
     const slots: AvailabilityByStaff['slots'] = [];
+    const workingHours: AvailabilityByStaff['working_hours'] = [];
     for (const date of dates) {
       const shift = shifts.results.find((r) => r.staff_id === s.id && r.work_date === date);
       if (!shift) continue;
+      workingHours.push({
+        date,
+        start: shift.start_time,
+        end: shift.end_time,
+      });
       const dayBookings = bookings.results
         .filter((b) => b.staff_id === s.id)
         .filter((b) => jstDateStr(new Date(b.starts_at)) === date)
@@ -223,7 +229,12 @@ export async function getAvailability(
         slots.push({ date, start: slot.start, end: slot.end });
       }
     }
-    by_staff.push({ staff_id: s.id, display_name: s.display_name, slots });
+    by_staff.push({
+      staff_id: s.id,
+      display_name: s.display_name,
+      slots,
+      working_hours: workingHours,
+    });
   }
   return { by_staff };
 }

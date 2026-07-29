@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/header'
 import {
@@ -21,8 +21,42 @@ const DAYS = [
   { label: '土', tone: 'text-blue-500' },
 ]
 
+const LOCATION_TONES = [
+  {
+    badge: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    calendar: 'bg-indigo-50 text-indigo-900 border-indigo-300',
+    dot: 'bg-indigo-500',
+  },
+  {
+    badge: 'bg-amber-100 text-amber-900 border-amber-200',
+    calendar: 'bg-amber-50 text-amber-900 border-amber-300',
+    dot: 'bg-amber-500',
+  },
+  {
+    badge: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    calendar: 'bg-emerald-50 text-emerald-900 border-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  {
+    badge: 'bg-rose-100 text-rose-800 border-rose-200',
+    calendar: 'bg-rose-50 text-rose-900 border-rose-300',
+    dot: 'bg-rose-500',
+  },
+] as const
+
 function jstToday(): string {
   return new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)
+}
+
+function monthRange(month: string): { from: string; to: string } {
+  const start = new Date(`${month}-01T00:00:00Z`)
+  const end = new Date(start)
+  end.setUTCMonth(end.getUTCMonth() + 1)
+  end.setUTCDate(0)
+  return {
+    from: `${month}-01`,
+    to: end.toISOString().slice(0, 10),
+  }
 }
 
 export default function StaffShiftsPage() {
@@ -41,6 +75,7 @@ export default function StaffShiftsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedMessage, setSavedMessage] = useState<string | null>(null)
+  const editorRef = useRef<HTMLElement>(null)
 
   const load = useCallback(async () => {
     if (!selectedAccountId || !staffId) return
@@ -49,8 +84,9 @@ export default function StaffShiftsPage() {
     setShifts([])
     setStaffMember(null)
     try {
+      const range = monthRange(calendarMonth)
       const [shiftResult, staffResult, locationResult] = await Promise.all([
-        bookingApi.getShifts(selectedAccountId, staffId),
+        bookingApi.getShifts(selectedAccountId, staffId, range.from, range.to),
         bookingApi.listStaff(selectedAccountId),
         bookingApi.listLocations(selectedAccountId),
       ])
@@ -64,7 +100,7 @@ export default function StaffShiftsPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedAccountId, staffId])
+  }, [calendarMonth, selectedAccountId, staffId])
 
   useEffect(() => {
     void load()
@@ -87,6 +123,18 @@ export default function StaffShiftsPage() {
     () => new Map(shifts.map((shift) => [shift.work_date, shift])),
     [shifts],
   )
+  const locationToneById = useMemo(() => {
+    const result = new Map<string, (typeof LOCATION_TONES)[number]>()
+    const ordered = [...locations].sort((a, b) => {
+      const aPriority = a.name.includes('渋谷') ? 0 : a.name.includes('甲府') ? 1 : 2
+      const bPriority = b.name.includes('渋谷') ? 0 : b.name.includes('甲府') ? 1 : 2
+      return aPriority - bPriority || a.sort_order - b.sort_order || a.name.localeCompare(b.name, 'ja')
+    })
+    ordered.forEach((location, index) => {
+      result.set(location.id, LOCATION_TONES[index % LOCATION_TONES.length])
+    })
+    return result
+  }, [locations])
   const sortedSelectedDates = useMemo(
     () => [...selectedDates].sort(),
     [selectedDates],
@@ -96,6 +144,8 @@ export default function StaffShiftsPage() {
     const next = new Date(monthStart)
     next.setUTCMonth(next.getUTCMonth() + offset)
     setCalendarMonth(next.toISOString().slice(0, 7))
+    setSelectedDates(new Set())
+    setSavedMessage(null)
   }
 
   function toggleDate(date: string) {
@@ -125,6 +175,17 @@ export default function StaffShiftsPage() {
       const next = new Set(current)
       next.delete(date)
       return next
+    })
+  }
+
+  function editShift(shift: BookingShift) {
+    setSelectedDates(new Set([shift.work_date]))
+    setLocationId(shift.location_id ?? locations[0]?.id ?? '')
+    setStartTime(shift.start_time)
+    setEndTime(shift.end_time)
+    setSavedMessage(null)
+    requestAnimationFrame(() => {
+      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }
 
@@ -249,6 +310,9 @@ export default function StaffShiftsPage() {
                   const inMonth = date.startsWith(calendarMonth)
                   const selected = selectedDates.has(date)
                   const shift = shiftByDate.get(date)
+                  const shiftTone = shift?.location_id
+                    ? locationToneById.get(shift.location_id)
+                    : undefined
                   return (
                     <button
                       key={date}
@@ -271,7 +335,11 @@ export default function StaffShiftsPage() {
                         {Number(date.slice(8, 10))}
                       </span>
                       {shift && (
-                        <span className="block mt-1 rounded bg-green-100 text-green-800 p-1 text-[10px] leading-tight">
+                        <span
+                          className={`block mt-1 rounded border p-1 text-[10px] leading-tight ${
+                            shiftTone?.calendar ?? 'border-gray-200 bg-gray-100 text-gray-700'
+                          }`}
+                        >
                           登録済み
                           <br />
                           {shift.location_name ?? '店舗未設定'}
@@ -286,7 +354,7 @@ export default function StaffShiftsPage() {
             </div>
           </section>
 
-          <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <section ref={editorRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 scroll-mt-4">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <div>
                 <h2 className="text-sm font-semibold">選択した日付へ一括登録</h2>
@@ -363,15 +431,31 @@ export default function StaffShiftsPage() {
           </section>
 
           <section className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-              <h2 className="text-sm font-semibold">登録済みシフト（{shifts.length}日）</h2>
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold">
+                  {calendarMonth.replace('-', '年')}月の登録済みシフト（{shifts.length}日）
+                </h2>
+                <p className="mt-1 text-xs text-gray-500">表示中の月だけを読み込んでいます</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {locations.map((location) => {
+                  const tone = locationToneById.get(location.id)
+                  return (
+                    <span key={location.id} className="inline-flex items-center gap-1.5 text-xs text-gray-600">
+                      <span className={`h-2.5 w-2.5 rounded-full ${tone?.dot ?? 'bg-gray-400'}`} />
+                      {location.name}
+                    </span>
+                  )
+                })}
+              </div>
             </div>
             {loading ? (
               <div className="p-10 text-center text-sm text-gray-500">読み込み中…</div>
             ) : shifts.length === 0 ? (
               <div className="p-10 text-center text-sm text-gray-500">まだシフトがありません</div>
             ) : (
-              <div className="max-h-[420px] overflow-y-auto">
+              <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="sticky top-0 bg-gray-50">
                     <tr className="border-b border-gray-200">
@@ -382,14 +466,33 @@ export default function StaffShiftsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {shifts.map((shift) => (
-                      <tr key={shift.id}>
+                    {shifts.map((shift) => {
+                      const tone = shift.location_id
+                        ? locationToneById.get(shift.location_id)
+                        : undefined
+                      return (
+                      <tr key={shift.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2 text-sm tabular-nums">{shift.work_date}</td>
-                        <td className="px-4 py-2 text-sm">{shift.location_name ?? '未設定'}</td>
+                        <td className="px-4 py-2 text-sm">
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                              tone?.badge ?? 'border-gray-200 bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            <span className={`h-2 w-2 rounded-full ${tone?.dot ?? 'bg-gray-400'}`} />
+                            {shift.location_name ?? '未設定'}
+                          </span>
+                        </td>
                         <td className="px-4 py-2 text-sm tabular-nums">
                           {shift.start_time}〜{shift.end_time}
                         </td>
                         <td className="px-4 py-2 text-right">
+                          <button
+                            onClick={() => editShift(shift)}
+                            className="mr-3 text-xs font-semibold text-blue-600 hover:underline"
+                          >
+                            編集
+                          </button>
                           <button
                             onClick={() => void deleteShift(shift.id)}
                             className="text-xs text-red-600 hover:underline"
@@ -398,7 +501,8 @@ export default function StaffShiftsPage() {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

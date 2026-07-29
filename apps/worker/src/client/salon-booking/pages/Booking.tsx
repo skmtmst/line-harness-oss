@@ -249,6 +249,7 @@ export default function Booking({
           }
           selected={slot}
           calendarView={settings?.calendar_view ?? 'week'}
+          slotIntervalMinutes={settings?.slot_interval_minutes ?? 30}
           onSelect={(picked) => {
             setSlot(picked);
             if (!peekMode) setStep('details');

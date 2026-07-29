@@ -39,6 +39,7 @@ export interface AvailabilityResponse {
     staff_id: string;
     display_name: string;
     slots: Array<{ date: string; start: string; end: string }>;
+    working_hours: Array<{ date: string; start: string; end: string }>;
   }>;
 }
 

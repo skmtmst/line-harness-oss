@@ -1742,9 +1742,16 @@ export const bookingApi = {
       { method: 'PUT', body: JSON.stringify({ menus }) },
     ),
   // Shifts
-  getShifts: (accountId: string, staffId: string) =>
+  getShifts: (accountId: string, staffId: string, from?: string, to?: string) =>
     fetchApi<{ shifts: BookingShift[] }>(
-      withAccount(`/api/booking/admin/staff/${staffId}/shifts`, accountId),
+      withAccount(
+        `/api/booking/admin/staff/${staffId}/shifts${
+          from && to
+            ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+            : ''
+        }`,
+        accountId,
+      ),
     ),
   putShifts: (
     accountId: string,

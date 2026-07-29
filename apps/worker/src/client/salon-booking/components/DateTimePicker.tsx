@@ -15,6 +15,7 @@ interface DateTimePickerProps {
   onBack: () => void;
   selected?: { date: string; start: string } | null;
   calendarView: 'week' | 'month';
+  slotIntervalMinutes: number;
 }
 
 export default function DateTimePicker(props: DateTimePickerProps) {
@@ -31,6 +32,7 @@ function WeekDateTimePicker({
   onSelect,
   onBack,
   selected,
+  slotIntervalMinutes,
 }: DateTimePickerProps) {
   const ctx = useSalonContext();
   const today = useMemo(() => jstToday(), []);
@@ -38,6 +40,7 @@ function WeekDateTimePicker({
   const to = addDays(today, RANGE_DAYS - 1);
   const maxOffset = Math.floor((RANGE_DAYS - 1) / 7);
   const [byDate, setByDate] = useState<Record<string, string[]> | null>(null);
+  const [workingByDate, setWorkingByDate] = useState<Record<string, { start: string; end: string }> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [weekOffset, setWeekOffset] = useState(0); // 0 = 今日始まり, 1 = +7 日
 
@@ -46,10 +49,16 @@ function WeekDateTimePicker({
     createApi(ctx)
       .availability(locationId, menuId, staffId, from, to)
       .then((r) => {
-        const slots = r.by_staff[0]?.slots ?? [];
+        const staffAvailability = r.by_staff[0];
+        const slots = staffAvailability?.slots ?? [];
         const grouped: Record<string, string[]> = {};
         for (const s of slots) (grouped[s.date] ??= []).push(s.start);
+        const working: Record<string, { start: string; end: string }> = {};
+        for (const range of staffAvailability?.working_hours ?? []) {
+          working[range.date] = { start: range.start, end: range.end };
+        }
         setByDate(grouped);
+        setWorkingByDate(working);
         // 確認画面 → 戻る で再 mount されたとき、選択済みの slot を含む週を
         // 優先して復元する。これがないと 2 週目の選択が画面外に隠れる。
         if (selected) {
@@ -96,7 +105,7 @@ function WeekDateTimePicker({
       </div>
     );
   }
-  if (!byDate) {
+  if (!byDate || !workingByDate) {
     return (
       <div className="space-y-5 sb-fade-in">
         <BackButton onBack={onBack} />
@@ -144,14 +153,16 @@ function WeekDateTimePicker({
 
       <WeekCalendar
         byDate={byDate}
+        workingByDate={workingByDate}
         weekStart={weekStart}
         onPick={onSelect}
         selectedDate={selected?.date}
         selectedStart={selected?.start}
+        slotIntervalMinutes={slotIntervalMinutes}
       />
 
       <p className="text-[11px] text-gray-400 text-center pt-1">
-        緑のセルをタップして時間を選択
+        ○をタップして時間を選択してください
       </p>
     </div>
   );
@@ -225,17 +236,28 @@ function MonthDateTimePicker({
           const count = (byDate[date] ?? []).length;
           const active = date >= today && count > 0;
           const picked = selectedDate === date;
+          const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
           return (
             <button
               key={date}
               type="button"
               disabled={!active}
               onClick={() => setSelectedDate(date)}
-              className="min-h-12 rounded-lg border text-center disabled:bg-gray-50 disabled:text-gray-300"
-              style={picked ? { borderColor: '#2f9e1d', background: '#ecfdf3', color: '#247817' } : undefined}
+              className="min-h-12 rounded-lg border text-center disabled:text-gray-400"
+              style={
+                picked
+                  ? { borderColor: '#2f9e1d', background: '#ecfdf3', color: '#247817' }
+                  : dayOfWeek === 0
+                    ? { background: '#fff1f2' }
+                    : dayOfWeek === 6
+                      ? { background: '#eff6ff' }
+                      : undefined
+              }
             >
               <span className="block text-xs font-semibold">{day}</span>
-              {active && <span className="mt-0.5 block text-[9px] text-green-600">○ {count}</span>}
+              <span className={`mt-0.5 block text-xs font-bold ${active ? 'text-green-600' : 'text-gray-400'}`}>
+                {active ? '○' : '×'}
+              </span>
             </button>
           );
         })}
