@@ -664,17 +664,17 @@ function ShiftEditModal({
                 type="time"
                 value={form.start_time}
                 onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                className="mt-2 block h-14 w-full min-w-0 max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-2 text-center text-base font-semibold text-gray-900"
+                className="mt-2 block h-12 w-full min-w-0 max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-1 py-0 text-center text-base font-semibold leading-[3rem] text-gray-900 [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:min-h-0 [&::-webkit-date-and-time-value]:text-center [&::-webkit-date-and-time-value]:leading-[3rem]"
               />
             </label>
-            <span className="mb-4 text-center text-lg font-bold text-gray-400" aria-hidden="true">〜</span>
+            <span className="mb-3.5 text-center text-lg font-bold text-gray-400" aria-hidden="true">〜</span>
             <label className="block w-full min-w-0 text-sm font-semibold text-gray-700">
               終了時間
               <input
                 type="time"
                 value={form.end_time}
                 onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                className="mt-2 block h-14 w-full min-w-0 max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-2 text-center text-base font-semibold text-gray-900"
+                className="mt-2 block h-12 w-full min-w-0 max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-1 py-0 text-center text-base font-semibold leading-[3rem] text-gray-900 [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:min-h-0 [&::-webkit-date-and-time-value]:text-center [&::-webkit-date-and-time-value]:leading-[3rem]"
               />
             </label>
           </div>

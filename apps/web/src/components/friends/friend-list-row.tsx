@@ -136,6 +136,24 @@ export default function FriendListRow({ friend, onTagEditClick }: Props) {
             {friend.refCode}
           </p>
         )}
+        {friend.customerName && (
+          <p className="text-[10px] text-gray-600">
+            <span className="text-gray-400">顧客名：</span>
+            {friend.customerName}
+          </p>
+        )}
+        {friend.customerPhone && (
+          <p className="text-[10px] text-gray-600">
+            <span className="text-gray-400">電話：</span>
+            {friend.customerPhone}
+          </p>
+        )}
+        {friend.customerBirthdate && (
+          <p className="text-[10px] text-gray-600">
+            <span className="text-gray-400">生年月日：</span>
+            {friend.customerBirthdate}
+          </p>
+        )}
         {/* IG account attribution (written by IG Harness cross-link, first touch) */}
         {(() => {
           const meta = (friend as unknown as { metadata?: Record<string, unknown> }).metadata

@@ -22,7 +22,11 @@ import {
 import { sendBookingNotification } from '../services/booking-notifier.js';
 import { insertConfirmationReminders } from '../services/booking-confirm.js';
 import { GoogleCalendarClient } from '../services/google-calendar.js';
-import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
+import {
+  attachTagAndFireSideEffects,
+  fireTagAddedSideEffects,
+} from '../services/friend-tag-attach.js';
+import { syncBookingFriendProfile } from '../services/booking-friend-sync.js';
 import {
   DEFAULT_BOOKING_FORM_FIELDS,
   DEFAULT_BOOKING_MESSAGES,
@@ -1071,6 +1075,49 @@ booking.post('/api/liff/booking/requests', async (c) => {
       );
       return c.json({ error: 'option_save_failed' }, 500);
     }
+  }
+
+  try {
+    const friendSync = await syncBookingFriendProfile(c.env.DB, {
+      accountId,
+      friendId,
+      locationId: body.location_id,
+      customer: {
+        name: customerName,
+        kana: customerKana,
+        phone: customerPhone,
+        birthdate: customerBirthdate || null,
+      },
+    });
+    if (friendSync.tagAdded) {
+      c.executionCtx.waitUntil(
+        fireTagAddedSideEffects(c.env.DB, friendId, friendSync.tagId, {
+          defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+          workerUrl: c.env.WORKER_URL,
+        }).catch((err) =>
+          console.error(
+            JSON.stringify({
+              message: 'booking store tag side effects failed',
+              bookingId,
+              friendId,
+              tagId: friendSync.tagId,
+              error: err instanceof Error ? err.message : String(err),
+            }),
+          ),
+        ),
+      );
+    }
+  } catch (error) {
+    await c.env.DB.prepare(`DELETE FROM bookings WHERE id = ?`).bind(bookingId).run();
+    console.error(
+      JSON.stringify({
+        message: 'booking friend profile sync failed',
+        bookingId,
+        friendId,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    return c.json({ error: 'customer_profile_save_failed' }, 500);
   }
 
   // Fire-and-forget notification — failures must not roll back the booking.

@@ -31,6 +31,16 @@ export async function attachTagAndFireSideEffects(
   const added = (result.meta?.changes ?? 0) > 0;
   if (!added) return { added: false };
 
+  await fireTagAddedSideEffects(db, friendId, tagId, push);
+  return { added: true };
+}
+
+export async function fireTagAddedSideEffects(
+  db: D1Database,
+  friendId: string,
+  tagId: string,
+  push?: ImmediatePushContext,
+): Promise<void> {
   const scenarios = await getScenarios(db);
   for (const scenario of scenarios) {
     if (
@@ -52,5 +62,4 @@ export async function attachTagAndFireSideEffects(
   }
 
   await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'add' } });
-  return { added: true };
 }

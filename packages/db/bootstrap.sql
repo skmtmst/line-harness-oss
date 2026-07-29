@@ -585,6 +585,11 @@ CREATE TABLE friends (
   score            INTEGER NOT NULL DEFAULT 0,
   last_ref_code    TEXT,
   last_ref_at      TEXT,
+  customer_name    TEXT,
+  customer_kana    TEXT,
+  customer_phone   TEXT,
+  customer_birthdate TEXT,
+  customer_details_updated_at TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL);
@@ -1115,6 +1120,12 @@ CREATE INDEX idx_friends_ig_igsid ON friends (ig_igsid);
 CREATE INDEX idx_friends_line_user_id ON friends (line_user_id);
 
 CREATE INDEX idx_friends_user_id ON friends (user_id);
+
+CREATE INDEX idx_friends_customer_name ON friends (customer_name);
+
+CREATE INDEX idx_friends_customer_phone ON friends (customer_phone);
+
+CREATE INDEX idx_friends_customer_birthdate ON friends (customer_birthdate);
 
 CREATE INDEX idx_google_calendar_connections_account
   ON google_calendar_connections (line_account_id, created_at);

@@ -9,6 +9,11 @@ export interface Friend {
   user_id: string | null;
   line_account_id: string | null;
   metadata: string;
+  customer_name?: string | null;
+  customer_kana?: string | null;
+  customer_phone?: string | null;
+  customer_birthdate?: string | null;
+  customer_details_updated_at?: string | null;
   first_tracked_link_id: string | null;
   created_at: string;
   updated_at: string;

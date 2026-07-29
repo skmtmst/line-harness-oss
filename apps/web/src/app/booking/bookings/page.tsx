@@ -147,72 +147,6 @@ export default function BookingsPage() {
         description="顧客からの予約リクエストを承認・拒否します"
       />
 
-      {selectedAccountId && (
-        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-blue-900 mb-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-3 3a4 4 0 01-5.656 0L10 18.343M10.172 13.828a4 4 0 01-5.656 0L3.1 12.414a4 4 0 010-5.656l3-3a4 4 0 015.656 0L14 5.657"
-              />
-            </svg>
-            リッチメニュー用 予約URL
-          </div>
-          {shareUrl ? (
-            <>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="shrink-0 text-xs font-semibold text-blue-900 sm:w-28">予約する</div>
-                <input
-                  readOnly
-                  value={shareUrl}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-xs bg-white font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => copyUrl(shareUrl)}
-                  className="min-h-11 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  {copied ? 'コピー済' : 'コピー'}
-                </button>
-              </div>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <div className="shrink-0 text-xs font-semibold text-blue-900 sm:w-28">予約の確認</div>
-                <input
-                  readOnly
-                  value={historyUrl ?? ''}
-                  onFocus={(e) => e.currentTarget.select()}
-                  className="flex-1 border border-blue-200 rounded-lg px-3 py-2 text-xs bg-white font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => copyUrl(historyUrl)}
-                  className="min-h-11 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  {historyCopied ? 'コピー済' : 'コピー'}
-                </button>
-              </div>
-              <p className="text-xs text-blue-700 mt-2">
-                上段は「予約する」、下段は「予約の確認」ボタンに設定します。確認画面から詳細・履歴・キャンセルへ進めます。
-              </p>
-            </>
-          ) : (
-            <p className="text-xs text-amber-700">
-              このアカウントには LIFF ID が未設定です。
-              <a href="/accounts" className="underline ml-1">アカウント設定</a> で LIFF ID を登録してください。
-            </p>
-          )}
-        </div>
-      )}
-
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {error}
@@ -376,6 +310,72 @@ export default function BookingsPage() {
           </div>
         </div>
         </>
+      )}
+
+      {selectedAccountId && (
+        <section className="mt-8 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-blue-900">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M13.828 10.172a4 4 0 015.656 0l1.414 1.414a4 4 0 010 5.656l-3 3a4 4 0 01-5.656 0L10 18.343M10.172 13.828a4 4 0 01-5.656 0L3.1 12.414a4 4 0 010-5.656l3-3a4 4 0 015.656 0L14 5.657"
+              />
+            </svg>
+            リッチメニュー用 予約URL
+          </div>
+          {shareUrl ? (
+            <>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="shrink-0 text-xs font-semibold text-blue-900 sm:w-28">予約する</div>
+                <input
+                  readOnly
+                  value={shareUrl}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="flex-1 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => copyUrl(shareUrl)}
+                  className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  {copied ? 'コピー済' : 'コピー'}
+                </button>
+              </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="shrink-0 text-xs font-semibold text-blue-900 sm:w-28">予約の確認</div>
+                <input
+                  readOnly
+                  value={historyUrl ?? ''}
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="flex-1 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => copyUrl(historyUrl)}
+                  className="min-h-11 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  {historyCopied ? 'コピー済' : 'コピー'}
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-blue-700">
+                上段は「予約する」、下段は「予約の確認」ボタンに設定します。確認画面から詳細・履歴・キャンセルへ進めます。
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-amber-700">
+              このアカウントには LIFF ID が未設定です。
+              <a href="/accounts" className="ml-1 underline">アカウント設定</a> で LIFF ID を登録してください。
+            </p>
+          )}
+        </section>
       )}
     </div>
   )

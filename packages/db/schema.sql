@@ -16,6 +16,11 @@ CREATE TABLE IF NOT EXISTS friends (
   score            INTEGER NOT NULL DEFAULT 0,
   last_ref_code    TEXT,
   last_ref_at      TEXT,
+  customer_name    TEXT,
+  customer_kana    TEXT,
+  customer_phone   TEXT,
+  customer_birthdate TEXT,
+  customer_details_updated_at TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -23,6 +28,9 @@ CREATE TABLE IF NOT EXISTS friends (
 CREATE INDEX IF NOT EXISTS idx_friends_line_user_id ON friends (line_user_id);
 CREATE INDEX IF NOT EXISTS idx_friends_user_id ON friends (user_id);
 CREATE INDEX IF NOT EXISTS idx_friends_ig_igsid ON friends (ig_igsid);
+CREATE INDEX IF NOT EXISTS idx_friends_customer_name ON friends (customer_name);
+CREATE INDEX IF NOT EXISTS idx_friends_customer_phone ON friends (customer_phone);
+CREATE INDEX IF NOT EXISTS idx_friends_customer_birthdate ON friends (customer_birthdate);
 
 -- ============================================================
 -- Tags

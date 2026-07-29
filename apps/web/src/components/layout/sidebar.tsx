@@ -81,6 +81,17 @@ const menuSections = [
   },
 ]
 
+// 日常的に最も操作する予約を、配信より上に表示する。
+const menuSectionsInDisplayOrder = [...menuSections].sort((a, b) => {
+  const priority = (label: string | null) => {
+    if (label === null) return 0
+    if (label === '予約') return 1
+    if (label === '配信') return 2
+    return 3
+  }
+  return priority(a.label) - priority(b.label)
+})
+
 function AccountAvatar({ account, size = 32 }: { account: AccountWithStats; size?: number }) {
   const displayName = account.displayName || account.name
   if (account.pictureUrl) {
@@ -269,7 +280,7 @@ export default function Sidebar() {
 
       {/* ナビゲーション */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {menuSections.map((section, si) => (
+        {menuSectionsInDisplayOrder.map((section, si) => (
           <div key={si}>
             {section.label && (
               <div className="pt-5 pb-2 px-3">

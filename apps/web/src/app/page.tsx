@@ -177,73 +177,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Friend-add card */}
-      <section className="mb-6 overflow-hidden rounded-2xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4 sm:p-5">
-        <div className="flex items-center gap-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-base font-bold text-gray-900">LINEで体験する</p>
-            <p className="mt-1 text-xs leading-5 text-gray-600">
-              QRコードを読み取るか、ボタンを押して友だち追加できます
-            </p>
-            {friendAddUrl ? (
-              <a
-                href={friendAddUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-[#06C755] px-5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
-              >
-                友だち追加
-              </a>
-            ) : (
-              <p className="mt-3 text-xs font-medium text-amber-700">
-                LINE公式アカウント情報を読み込んでいます
-              </p>
-            )}
-          </div>
-          {qrImageUrl && (
-            <a
-              href={friendAddUrl ?? undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 rounded-xl border border-green-100 bg-white p-2 shadow-sm"
-              aria-label="LINE友だち追加ページを開く"
-            >
-              <img
-                src={qrImageUrl}
-                alt={`${selectedAccount?.displayName || selectedAccount?.name || 'LINE公式アカウント'}の友だち追加QRコード`}
-                className="h-20 w-20 sm:h-24 sm:w-24"
-                width={96}
-                height={96}
-              />
-            </a>
-          )}
-        </div>
-        {friendAddUrl && (
-          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-green-200/70 pt-4">
-            <button
-              type="button"
-              onClick={() => void copyFriendAddUrl()}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-green-300 bg-white px-3 text-xs font-bold text-green-800 shadow-sm transition-colors hover:bg-green-50"
-            >
-              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v11a2 2 0 002 2h9a2 2 0 002-2v-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-4 6h10m0 0l-3-3m3 3l-3 3" />
-              </svg>
-              {copyMessage || 'URLをコピー'}
-            </button>
-            <a
-              href={qrDownloadUrl ?? undefined}
-              download="meauty-line-qr.png"
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-700 px-3 text-xs font-bold text-white shadow-sm transition-colors hover:bg-green-800"
-            >
-              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v11m0 0l-4-4m4 4l4-4" />
-              </svg>
-              QRをダウンロード
-            </a>
-          </div>
-        )}
-      </section>
-
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
         <StatCard
@@ -414,6 +347,73 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Friend-add card: operational widgets come first; setup utilities stay at the bottom. */}
+      <section className="mt-8 overflow-hidden rounded-2xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 p-4 sm:p-5">
+        <div className="flex items-center gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-base font-bold text-gray-900">LINEで体験する</p>
+            <p className="mt-1 text-xs leading-5 text-gray-600">
+              QRコードを読み取るか、ボタンを押して友だち追加できます
+            </p>
+            {friendAddUrl ? (
+              <a
+                href={friendAddUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex min-h-10 items-center justify-center rounded-full bg-[#06C755] px-5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+              >
+                友だち追加
+              </a>
+            ) : (
+              <p className="mt-3 text-xs font-medium text-amber-700">
+                LINE公式アカウント情報を読み込んでいます
+              </p>
+            )}
+          </div>
+          {qrImageUrl && (
+            <a
+              href={friendAddUrl ?? undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 rounded-xl border border-green-100 bg-white p-2 shadow-sm"
+              aria-label="LINE友だち追加ページを開く"
+            >
+              <img
+                src={qrImageUrl}
+                alt={`${selectedAccount?.displayName || selectedAccount?.name || 'LINE公式アカウント'}の友だち追加QRコード`}
+                className="h-20 w-20 sm:h-24 sm:w-24"
+                width={96}
+                height={96}
+              />
+            </a>
+          )}
+        </div>
+        {friendAddUrl && (
+          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-green-200/70 pt-4">
+            <button
+              type="button"
+              onClick={() => void copyFriendAddUrl()}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-green-300 bg-white px-3 text-xs font-bold text-green-800 shadow-sm transition-colors hover:bg-green-50"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v11a2 2 0 002 2h9a2 2 0 002-2v-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-4 6h10m0 0l-3-3m3 3l-3 3" />
+              </svg>
+              {copyMessage || 'URLをコピー'}
+            </button>
+            <a
+              href={qrDownloadUrl ?? undefined}
+              download="meauty-line-qr.png"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-700 px-3 text-xs font-bold text-white shadow-sm transition-colors hover:bg-green-800"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v11m0 0l-4-4m4 4l4-4" />
+              </svg>
+              QRをダウンロード
+            </a>
+          </div>
+        )}
+      </section>
 
       <CcPromptButton prompts={ccPrompts} />
     </div>
