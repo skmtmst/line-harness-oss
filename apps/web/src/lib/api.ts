@@ -100,6 +100,22 @@ if (!API_URL) {
  * cached here.
  */
 export const CSRF_STORAGE_KEY = 'lh_csrf'
+export const ADMIN_SESSION_STORAGE_KEY = 'lh_admin_access_token'
+
+export function getAdminAccessToken(): string {
+  if (typeof window === 'undefined') return ''
+  return sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || ''
+}
+
+export function setAdminAccessToken(token: string | undefined | null): void {
+  if (typeof window === 'undefined' || !token) return
+  sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token)
+}
+
+export function clearAdminAccessToken(): void {
+  if (typeof window === 'undefined') return
+  sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+}
 
 export function getCsrfToken(): string {
   if (typeof window === 'undefined') return ''
@@ -116,6 +132,7 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase()
   const csrfHeaders: Record<string, string> = {}
+  const accessToken = getAdminAccessToken()
   if (MUTATING_METHODS.has(method)) {
     const token = getCsrfToken()
     if (token) csrfHeaders['X-CSRF-Token'] = token
@@ -126,6 +143,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...csrfHeaders,
       ...options?.headers,
     },

@@ -5,6 +5,7 @@ import {
   CSRF_COOKIE,
   adminSessionCookie,
   authenticateApiToken,
+  createAdminAccessToken,
   csrfCookie,
   csrfTokenFromCookie,
   expiredCookie,
@@ -44,9 +45,13 @@ adminAuth.post('/api/auth/login', async (c) => {
   }
 
   const csrfToken = crypto.randomUUID();
+  const accessToken = await createAdminAccessToken(
+    staff,
+    c.env.ADMIN_SESSION_SECRET ?? c.env.API_KEY,
+  );
   c.header('Set-Cookie', adminSessionCookie(apiKey, config.sameSite), { append: true });
   c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite), { append: true });
-  return c.json({ success: true, data: staff, csrfToken });
+  return c.json({ success: true, data: staff, csrfToken, accessToken });
 });
 
 /**

@@ -9,7 +9,11 @@ import type { Env } from '../index.js';
 vi.mock('@line-crm/db', () => ({
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
     if (token !== 'staff-key') return null;
-    return { id: 'staff-1', name: 'Staff One', role: 'admin' };
+    return { id: 'staff-1', name: 'Staff One', role: 'admin', is_active: 1 };
+  }),
+  getStaffById: vi.fn(async (_db: unknown, id: string) => {
+    if (id !== 'staff-1') return null;
+    return { id: 'staff-1', name: 'Staff One', role: 'admin', is_active: 1 };
   }),
 }));
 
@@ -71,9 +75,15 @@ describe('admin login cookie attributes', () => {
     }, crossSiteEnv());
 
     expect(res.status).toBe(200);
-    const body = await res.json() as { success: boolean; data: { id: string }; csrfToken: string };
+    const body = await res.json() as {
+      success: boolean;
+      data: { id: string };
+      csrfToken: string;
+      accessToken: string;
+    };
     expect(body.data).toMatchObject({ id: 'staff-1', role: 'admin' });
     expect(body.csrfToken).toBeTruthy();
+    expect(body.accessToken).toMatch(/^lhs_/);
 
     const session = cookieFor(res, 'lh_admin_session') ?? '';
     expect(session).toContain('lh_admin_session=staff-key');
@@ -127,6 +137,38 @@ describe('topology guard', () => {
 });
 
 describe('protected API access', () => {
+  test('accepts the short-lived bearer returned by login when cookies are blocked', async () => {
+    const login = await app().request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey: 'staff-key' }),
+      headers: { 'Content-Type': 'application/json' },
+    }, crossSiteEnv());
+    const body = await login.json() as { accessToken: string };
+
+    const res = await app().request('/api/protected', {
+      headers: { Authorization: `Bearer ${body.accessToken}` },
+    }, crossSiteEnv());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      data: { id: 'staff-1', role: 'admin' },
+    });
+  });
+
+  test('rejects a tampered short-lived bearer', async () => {
+    const login = await app().request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey: 'staff-key' }),
+      headers: { 'Content-Type': 'application/json' },
+    }, crossSiteEnv());
+    const body = await login.json() as { accessToken: string };
+    const tampered = `${body.accessToken.slice(0, -1)}x`;
+
+    const res = await app().request('/api/protected', {
+      headers: { Authorization: `Bearer ${tampered}` },
+    }, crossSiteEnv());
+    expect(res.status).toBe(401);
+  });
+
   test('accepts the admin session cookie (GET, no CSRF needed)', async () => {
     const res = await app().request('/api/protected', {
       headers: { Cookie: 'lh_admin_session=staff-key' },

@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { setAdminAccessToken } from '@/lib/api'
 
 function extractApiKey(value: string): string {
   const embeddedKey = value.match(/\blh_[a-fA-F0-9]{32}\b/)
@@ -41,6 +42,9 @@ export default function LoginPage() {
           if (loginData.success && loginData.data) {
             localStorage.setItem('lh_staff_name', loginData.data.name)
             localStorage.setItem('lh_staff_role', loginData.data.role)
+          }
+          if (loginData.accessToken) {
+            setAdminAccessToken(loginData.accessToken)
           }
           // Cache the CSRF token for mutating requests (double-submit).
           if (loginData.csrfToken) {
