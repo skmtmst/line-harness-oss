@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   createApi,
   type BookingFormField,
@@ -9,6 +9,7 @@ import {
   type StaffItem,
 } from '../lib/api.js';
 import { useSalonContext } from '../lib/context.js';
+import { isConsentScrolledToBottom } from '../lib/consent-scroll.js';
 import { jstStartsAtIso, formatJp } from '../lib/datetime.js';
 import type { CustomerDetailsValue } from './CustomerDetails.js';
 
@@ -39,9 +40,11 @@ export default function Confirm({
 }) {
   const ctx = useSalonContext();
   const [agreed, setAgreed] = useState(false);
+  const [hasReadConsent, setHasReadConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [idemKey] = useState(() => crypto.randomUUID());
+  const consentBodyRef = useRef<HTMLDivElement>(null);
   const mustAgree = consent.is_active === 1 && consent.is_required === 1;
   const totalDuration = staff.duration_minutes + options.reduce(
     (sum, option) => sum + option.additional_duration_minutes,
@@ -51,6 +54,33 @@ export default function Confirm({
     (sum, option) => sum + option.additional_price,
     0,
   );
+
+  useEffect(() => {
+    setAgreed(false);
+    setHasReadConsent(false);
+
+    const element = consentBodyRef.current;
+    if (!element || consent.is_active !== 1) return;
+
+    const updateReadState = () => {
+      if (isConsentScrolledToBottom(element)) {
+        setHasReadConsent(true);
+      }
+    };
+
+    const animationFrame = requestAnimationFrame(updateReadState);
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(updateReadState);
+    resizeObserver?.observe(element);
+    window.addEventListener('resize', updateReadState);
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', updateReadState);
+    };
+  }, [consent.body, consent.is_active, consent.version]);
 
   async function handleSubmit() {
     if (mustAgree && !agreed) {
@@ -156,12 +186,42 @@ export default function Confirm({
       {consent.is_active === 1 && (
         <section>
           <h2 className="mb-2 text-sm font-bold text-slate-800">{consent.title}</h2>
-          <div className="sb-consent-body">{consent.body}</div>
-          <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-200 bg-white p-4">
+          <div
+            ref={consentBodyRef}
+            onScroll={(event) => {
+              if (isConsentScrolledToBottom(event.currentTarget)) {
+                setHasReadConsent(true);
+              }
+            }}
+            className="sb-consent-body"
+            tabIndex={0}
+            aria-label={`${consent.title}の本文`}
+          >
+            {consent.body}
+          </div>
+          <p
+            className={`mt-2 text-xs font-semibold ${
+              hasReadConsent ? 'text-green-700' : 'text-orange-700'
+            }`}
+            role="status"
+          >
+            {hasReadConsent
+              ? '最後まで確認しました。チェックできます。'
+              : '同意書を最後までスクロールするとチェックできます。'}
+          </p>
+          <label
+            aria-disabled={!hasReadConsent}
+            className={`mt-4 flex items-start gap-3 rounded-xl border p-4 transition ${
+              hasReadConsent
+                ? 'cursor-pointer border-gray-200 bg-white'
+                : 'cursor-not-allowed border-gray-200 bg-gray-100 opacity-60'
+            }`}
+          >
             <input
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
+              disabled={!hasReadConsent}
               className="mt-0.5 h-6 w-6 shrink-0 accent-green-600"
             />
             <span className="text-sm font-bold leading-6 text-slate-700">
