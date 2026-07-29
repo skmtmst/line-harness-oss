@@ -657,23 +657,24 @@ function ShiftEditModal({
               ))}
             </select>
           </label>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <label className="block min-w-0 text-sm font-semibold text-gray-700">
+          <div className="grid w-full grid-cols-[minmax(0,1fr)_1rem_minmax(0,1fr)] items-end gap-2 rounded-2xl bg-gray-50 p-3">
+            <label className="block w-full min-w-0 text-sm font-semibold text-gray-700">
               開始時間
               <input
                 type="time"
                 value={form.start_time}
                 onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                className="mt-2 block min-h-12 min-w-0 w-full max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 text-base"
+                className="mt-2 block h-14 w-full min-w-0 max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-2 text-center text-base font-semibold text-gray-900"
               />
             </label>
-            <label className="block min-w-0 text-sm font-semibold text-gray-700">
+            <span className="mb-4 text-center text-lg font-bold text-gray-400" aria-hidden="true">〜</span>
+            <label className="block w-full min-w-0 text-sm font-semibold text-gray-700">
               終了時間
               <input
                 type="time"
                 value={form.end_time}
                 onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                className="mt-2 block min-h-12 min-w-0 w-full max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 text-base"
+                className="mt-2 block h-14 w-full min-w-0 max-w-full appearance-none rounded-xl border border-gray-300 bg-white px-2 text-center text-base font-semibold text-gray-900"
               />
             </label>
           </div>

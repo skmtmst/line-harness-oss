@@ -217,6 +217,7 @@ app.get('/api/qr', async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
   const size = c.req.query('size') || '240x240';
+  const download = c.req.query('download') === '1';
   const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&data=${encodeURIComponent(data)}`;
   const res = await fetch(upstream);
   if (!res.ok) return c.text('QR generation failed', 502);
@@ -224,6 +225,7 @@ app.get('/api/qr', async (c) => {
     headers: {
       'Content-Type': res.headers.get('Content-Type') || 'image/png',
       'Cache-Control': 'public, max-age=86400',
+      ...(download ? { 'Content-Disposition': 'attachment; filename="meauty-line-qr.png"' } : {}),
     },
   });
 });

@@ -78,6 +78,8 @@ export default function DashboardPage() {
   const qrImageUrl = friendAddUrl
     ? `${process.env.NEXT_PUBLIC_API_URL}/api/qr?size=180x180&data=${encodeURIComponent(friendAddUrl)}`
     : null
+  const qrDownloadUrl = qrImageUrl ? `${qrImageUrl}&download=1` : null
+  const [copyMessage, setCopyMessage] = useState('')
   const [stats, setStats] = useState<DashboardStats>({
     friendCount: null,
     activeScenarioCount: null,
@@ -88,6 +90,25 @@ export default function DashboardPage() {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  async function copyFriendAddUrl() {
+    if (!friendAddUrl) return
+    try {
+      await navigator.clipboard.writeText(friendAddUrl)
+      setCopyMessage('コピーしました')
+    } catch {
+      const input = document.createElement('textarea')
+      input.value = friendAddUrl
+      input.style.position = 'fixed'
+      input.style.opacity = '0'
+      document.body.appendChild(input)
+      input.select()
+      const copied = document.execCommand('copy')
+      input.remove()
+      setCopyMessage(copied ? 'コピーしました' : 'コピーできませんでした')
+    }
+    window.setTimeout(() => setCopyMessage(''), 2200)
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -197,6 +218,30 @@ export default function DashboardPage() {
             </a>
           )}
         </div>
+        {friendAddUrl && (
+          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-green-200/70 pt-4">
+            <button
+              type="button"
+              onClick={() => void copyFriendAddUrl()}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-green-300 bg-white px-3 text-xs font-bold text-green-800 shadow-sm transition-colors hover:bg-green-50"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v11a2 2 0 002 2h9a2 2 0 002-2v-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-4 6h10m0 0l-3-3m3 3l-3 3" />
+              </svg>
+              {copyMessage || 'URLをコピー'}
+            </button>
+            <a
+              href={qrDownloadUrl ?? undefined}
+              download="meauty-line-qr.png"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-green-700 px-3 text-xs font-bold text-white shadow-sm transition-colors hover:bg-green-800"
+            >
+              <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v11m0 0l-4-4m4 4l4-4" />
+              </svg>
+              QRをダウンロード
+            </a>
+          </div>
+        )}
       </section>
 
       {/* Summary cards */}
