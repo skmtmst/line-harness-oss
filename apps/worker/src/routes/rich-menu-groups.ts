@@ -29,6 +29,7 @@ import {
   publishRichMenuGroup,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
+  RichMenuValidationError,
   type LineRichMenuClient,
   type R2Like,
   type GroupInput,
@@ -885,6 +886,9 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', async (c) => {
   } catch (e) {
     await releasePublishLock(c.env.DB, groupId);
     const message = e instanceof Error ? e.message : String(e);
+    if (e instanceof RichMenuValidationError) {
+      return c.json({ success: false, error: message }, 400);
+    }
     return c.json({ success: false, error: message }, 500);
   }
 });

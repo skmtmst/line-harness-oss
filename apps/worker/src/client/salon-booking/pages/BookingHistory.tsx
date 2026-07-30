@@ -1,91 +1,120 @@
-import { useEffect, useState } from 'react';
-import { createApi, type BookingHistoryItem } from '../lib/api.js';
+import { useCallback, useEffect, useState } from 'react';
+import { createApi, type BookingHistoryItem, type BookingPublicSettings } from '../lib/api.js';
 import { useSalonContext } from '../lib/context.js';
 import HistoryCard from '../components/HistoryCard.js';
 
-export default function BookingHistory() {
+export default function BookingHistory({ onBook }: { onBook: () => void }) {
   const ctx = useSalonContext();
-  const [data, setData] = useState<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] } | null>(
-    null,
-  );
+  const [data, setData] = useState<{ upcoming: BookingHistoryItem[]; past: BookingHistoryItem[] } | null>(null);
+  const [settings, setSettings] = useState<BookingPublicSettings | null>(null);
   const [tab, setTab] = useState<'upcoming' | 'past'>('upcoming');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     setError(null);
-    createApi(ctx)
-      .me()
-      .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    try {
+      const [history, config] = await Promise.all([createApi(ctx).me(), createApi(ctx).config()]);
+      setData(history);
+      setSettings(config.settings);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }, [ctx]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function cancelBooking(booking: BookingHistoryItem) {
+    try {
+      await createApi(ctx).cancel(booking.id);
+      window.alert('キャンセルリクエストを受け付けました。店舗の承認後にLINEでお知らせします。');
+      await load();
+    } catch (e) {
+      const err = e as { status?: number; body?: { error?: string } };
+      if (err.status === 409) {
+        window.alert('予約の状態が更新されたため、キャンセルできませんでした。画面を再読み込みします。');
+        await load();
+      } else {
+        window.alert('キャンセル処理に失敗しました。時間をおいて再度お試しください。');
+      }
+    }
+  }
+
+  function rebook(booking: BookingHistoryItem) {
+    if (!booking.location_id || !booking.menu_id) {
+      onBook();
+      return;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    url.searchParams.set('location_id', booking.location_id);
+    url.searchParams.set('menu_id', booking.menu_id);
+    window.location.href = url.toString();
+  }
+
+  function changeBooking(booking: BookingHistoryItem) {
+    if (!booking.location_id || !booking.menu_id) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('view');
+    url.searchParams.set('change_booking_id', booking.id);
+    url.searchParams.set('location_id', booking.location_id);
+    url.searchParams.set('menu_id', booking.menu_id);
+    window.location.href = url.toString();
+  }
 
   if (error) {
     return (
-      <div className="sb-fade-in space-y-5">
-        <div className="sb-card text-center">
-          <p className="text-red-600 text-sm mb-2">予約履歴の取得に失敗しました</p>
-          <p className="text-gray-500 text-xs mb-4">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="text-sm font-semibold sb-line-green-text underline"
-          >
-            再読み込み
-          </button>
-        </div>
+      <div className="sb-card text-center">
+        <p className="mb-2 text-sm text-red-600">予約履歴の取得に失敗しました</p>
+        <button onClick={() => void load()} className="sb-outline-btn">再読み込み</button>
       </div>
     );
   }
   if (!data) {
-    return (
-      <div className="flex flex-col items-center py-12 sb-fade-in">
-        <div className="sb-spinner" />
-        <p className="text-sm text-gray-500 mt-3">読み込み中…</p>
-      </div>
-    );
+    return <div className="flex flex-col items-center py-12"><div className="sb-spinner" /><p className="mt-3 text-sm text-gray-500">読み込み中…</p></div>;
   }
   const list = tab === 'upcoming' ? data.upcoming : data.past;
 
   return (
     <div className="space-y-4 sb-fade-in">
-      <div
-        className="grid grid-cols-2 rounded-xl overflow-hidden"
-        style={{ background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}
-      >
-        <button
-          onClick={() => setTab('upcoming')}
-          className="py-3 text-sm font-semibold transition-colors"
-          style={{
-            background: tab === 'upcoming' ? '#06C755' : '#fff',
-            color: tab === 'upcoming' ? '#fff' : '#6b7280',
-          }}
-        >
-          これから ({data.upcoming.length})
-        </button>
-        <button
-          onClick={() => setTab('past')}
-          className="py-3 text-sm font-semibold transition-colors"
-          style={{
-            background: tab === 'past' ? '#06C755' : '#fff',
-            color: tab === 'past' ? '#fff' : '#6b7280',
-          }}
-        >
-          過去 ({data.past.length})
-        </button>
+      <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <Tab active={tab === 'upcoming'} onClick={() => setTab('upcoming')}>これから ({data.upcoming.length})</Tab>
+        <Tab active={tab === 'past'} onClick={() => setTab('past')}>履歴 ({data.past.length})</Tab>
       </div>
+
       {list.length === 0 ? (
-        <div className="sb-card text-center text-sm text-gray-500 py-8">
-          {tab === 'upcoming' ? 'これからの予約はありません' : '過去の予約はありません'}
+        <div className="sb-card py-10 text-center">
+          <p className="text-sm text-gray-500">{tab === 'upcoming' ? 'これからの予約はありません' : '予約履歴はありません'}</p>
+          <button onClick={onBook} className="sb-primary-btn mt-5">予約する</button>
         </div>
       ) : (
-        <ul className="space-y-2">
-          {list.map((b) => (
-            <HistoryCard key={b.id} booking={b} />
+        <ul className="space-y-3">
+          {list.map((booking) => (
+            <HistoryCard
+              key={booking.id}
+              booking={booking}
+              onCancel={cancelBooking}
+              onRebook={rebook}
+              onChange={changeBooking}
+              allowChange={settings?.allow_change_request === 1}
+              allowCancel={settings?.allow_cancel_request === 1}
+            />
           ))}
         </ul>
       )}
-      <p className="text-xs text-gray-400 text-center pt-2">
-        変更・キャンセルはお店に LINE で直接ご連絡ください
-      </p>
     </div>
+  );
+}
+
+function Tab({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className="py-3 text-sm font-bold"
+      style={{ background: active ? '#2f9e1d' : '#fff', color: active ? '#fff' : '#6b7280' }}
+    >
+      {children}
+    </button>
   );
 }

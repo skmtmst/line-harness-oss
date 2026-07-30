@@ -7,6 +7,7 @@ import { useAccount } from '@/contexts/account-context'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { countryFlag } from '@/lib/country-flag'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { clearAdminAccessToken } from '@/lib/api'
 
 const appVersion = process.env.APP_VERSION || '0.0.0'
 const appCommitSha = process.env.APP_COMMIT_SHA || 'local'
@@ -59,9 +60,11 @@ const menuSections = [
     label: '予約',
     items: [
       { href: '/booking/bookings', label: '予約管理', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+      { href: '/booking/settings', label: '予約管理設定', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100 4m0-4v-8m12 4a2 2 0 100 4m0-4V4' },
+      { href: '/booking/locations', label: '店舗', icon: 'M12 21s7-4.35 7-11A7 7 0 105 10c0 6.65 7 11 7 11zm0-8a3 3 0 100-6 3 3 0 000 6z' },
       { href: '/booking/menus', label: 'メニュー', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
       { href: '/booking/staff', label: 'スタッフ', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-      { href: '/events', label: 'イベント予約', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' },
+      { href: '/booking/consent', label: '同意書設定', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
     ],
   },
   {
@@ -77,6 +80,17 @@ const menuSections = [
     ],
   },
 ]
+
+// 日常的に最も操作する予約を、配信より上に表示する。
+const menuSectionsInDisplayOrder = [...menuSections].sort((a, b) => {
+  const priority = (label: string | null) => {
+    if (label === null) return 0
+    if (label === '予約') return 1
+    if (label === '配信') return 2
+    return 3
+  }
+  return priority(a.label) - priority(b.label)
+})
 
 function AccountAvatar({ account, size = 32 }: { account: AccountWithStats; size?: number }) {
   const displayName = account.displayName || account.name
@@ -266,7 +280,7 @@ export default function Sidebar() {
 
       {/* ナビゲーション */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {menuSections.map((section, si) => (
+        {menuSectionsInDisplayOrder.map((section, si) => (
           <div key={si}>
             {section.label && (
               <div className="pt-5 pb-2 px-3">
@@ -349,6 +363,7 @@ export default function Sidebar() {
             localStorage.removeItem('lh_csrf')
             localStorage.removeItem('lh_staff_name')
             localStorage.removeItem('lh_staff_role')
+            clearAdminAccessToken()
             window.location.href = '/login'
           }}
           className="flex items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors"

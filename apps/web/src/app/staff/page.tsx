@@ -5,7 +5,12 @@ import { fetchApi } from '@/lib/api'
 import type { ApiResponse } from '@line-crm/shared'
 import type { StaffMember } from '@line-crm/shared'
 
-type NewApiKey = { apiKey: string; staffId: string }
+type NewApiKey = {
+  apiKey: string
+  staffId: string
+  name: string
+  email: string | null
+}
 
 function RoleBadge({ role }: { role: string }) {
   const styles =
@@ -36,6 +41,7 @@ export default function StaffPage() {
   // New API key banner
   const [newKey, setNewKey] = useState<NewApiKey | null>(null)
   const [copied, setCopied] = useState(false)
+  const [keyCopied, setKeyCopied] = useState(false)
 
   // Create form
   const [showForm, setShowForm] = useState(false)
@@ -83,7 +89,12 @@ export default function StaffPage() {
       })
       if (res.success) {
         if (res.data.apiKey) {
-          setNewKey({ apiKey: res.data.apiKey, staffId: res.data.id })
+          setNewKey({
+            apiKey: res.data.apiKey,
+            staffId: res.data.id,
+            name: res.data.name,
+            email: res.data.email,
+          })
         }
         setFormName('')
         setFormEmail('')
@@ -119,7 +130,12 @@ export default function StaffPage() {
         method: 'POST',
       })
       if (res.success) {
-        setNewKey({ apiKey: res.data.apiKey, staffId: member.id })
+        setNewKey({
+          apiKey: res.data.apiKey,
+          staffId: member.id,
+          name: member.name,
+          email: member.email,
+        })
       } else {
         setError(res.error ?? 'キー再生成に失敗しました')
       }
@@ -140,9 +156,23 @@ export default function StaffPage() {
 
   const handleCopy = async () => {
     if (!newKey) return
-    await navigator.clipboard.writeText(newKey.apiKey)
+    await navigator.clipboard.writeText(buildInvitationText(newKey))
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleKeyCopy = async () => {
+    if (!newKey) return
+    await navigator.clipboard.writeText(newKey.apiKey)
+    setKeyCopied(true)
+    setTimeout(() => setKeyCopied(false), 2000)
+  }
+
+  const handleOpenMail = () => {
+    if (!newKey?.email) return
+    const subject = encodeURIComponent('meauty管理画面へのご招待')
+    const body = encodeURIComponent(buildInvitationText(newKey))
+    window.location.href = `mailto:${encodeURIComponent(newKey.email)}?subject=${subject}&body=${body}`
   }
 
   return (
@@ -164,21 +194,38 @@ export default function StaffPage() {
       {newKey && (
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <p className="text-sm font-medium text-green-800 mb-2">
-            APIキーが発行されました。このキーは一度しか表示されません。
+            {newKey.name}さんのログイン情報を発行しました
           </p>
-          <div className="flex items-center gap-2">
+          <p className="mb-3 text-xs leading-5 text-green-800">
+            現在はメールの自動送信を行いません。下の「招待情報をコピー」または「メール作成」から安全に共有してください。
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <code className="flex-1 text-xs bg-white border border-green-200 rounded px-3 py-2 font-mono break-all">
               {newKey.apiKey}
             </code>
             <button
-              onClick={handleCopy}
-              className="shrink-0 px-3 py-2 text-xs font-medium text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
+              onClick={handleKeyCopy}
+              className="min-h-11 shrink-0 px-3 py-2 text-xs font-medium text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
             >
-              {copied ? 'コピー済み' : 'コピー'}
+              {keyCopied ? 'コピー済み' : 'APIキーのみコピー'}
             </button>
             <button
+              onClick={handleCopy}
+              className="min-h-11 shrink-0 px-3 py-2 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              {copied ? 'コピー済み' : '招待文をコピー'}
+            </button>
+            {newKey.email && (
+              <button
+                onClick={handleOpenMail}
+                className="min-h-11 shrink-0 rounded-lg border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50"
+              >
+                メール作成
+              </button>
+            )}
+            <button
               onClick={() => setNewKey(null)}
-              className="shrink-0 px-3 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              className="min-h-11 shrink-0 px-3 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
               閉じる
             </button>
@@ -204,7 +251,7 @@ export default function StaffPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">メールアドレス</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">メールアドレス（連絡先）</label>
                 <input
                   type="email"
                   value={formEmail}
@@ -212,6 +259,7 @@ export default function StaffPage() {
                   placeholder="taro@example.com"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
+                <p className="mt-1 text-[11px] text-gray-500">登録だけでは自動送信されません</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">ロール *</label>
@@ -276,7 +324,40 @@ export default function StaffPage() {
           <p className="text-gray-500 text-sm">スタッフがいません。「+ スタッフを追加」から追加してください。</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <>
+        <div className="space-y-3 sm:hidden">
+          {members.map((member) => (
+            <article key={member.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-gray-900">{member.name}</h2>
+                  <p className="mt-1 truncate text-xs text-gray-500">{member.email ?? 'メール未登録'}</p>
+                </div>
+                <RoleBadge role={member.role} />
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                <span className={`inline-flex items-center gap-1.5 text-xs ${member.isActive ? 'text-green-700' : 'text-gray-400'}`}>
+                  <span className={`h-1.5 w-1.5 rounded-full ${member.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  {member.isActive ? '有効' : '無効'}
+                </span>
+                {member.role !== 'owner' && (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button onClick={() => handleToggleActive(member)} className="min-h-10 rounded-lg border border-gray-300 px-3 text-xs text-gray-700">
+                      {member.isActive ? '無効化' : '有効化'}
+                    </button>
+                    <button onClick={() => handleRegenerateKey(member)} className="min-h-10 rounded-lg border border-blue-200 px-3 text-xs text-blue-700">
+                      キー再生成
+                    </button>
+                    <button onClick={() => handleDelete(member)} className="min-h-10 rounded-lg border border-red-200 px-3 text-xs text-red-600">
+                      削除
+                    </button>
+                  </div>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden sm:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
@@ -336,7 +417,26 @@ export default function StaffPage() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   )
+}
+
+function buildInvitationText(invite: NewApiKey): string {
+  const loginUrl = typeof window === 'undefined' ? '/login' : `${window.location.origin}/login`
+  return [
+    `${invite.name} 様`,
+    '',
+    'meauty管理画面へ招待されました。',
+    '以下のURLを開き、APIキーを入力してログインしてください。',
+    '',
+    '管理画面:',
+    loginUrl,
+    '',
+    'APIキー:',
+    invite.apiKey,
+    '',
+    'この情報は第三者へ共有しないでください。',
+  ].join('\n')
 }

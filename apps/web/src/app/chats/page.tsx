@@ -9,7 +9,7 @@ import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
-import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
+import ChatAttachmentPicker, { type ChatAttachment } from '@/components/chats/chat-attachment-picker'
 
 interface Chat {
   id: string
@@ -327,7 +327,7 @@ export default function ChatsPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
   const [messageContent, setMessageContent] = useState('')
-  const [pendingImage, setPendingImage] = useState<ImageUploaderValue | null>(null)
+  const [pendingAttachment, setPendingAttachment] = useState<ChatAttachment | null>(null)
   const [sending, setSending] = useState(false)
   const sendLockRef = useRef(false)
   const [notes, setNotes] = useState('')
@@ -580,7 +580,7 @@ export default function ChatsPage() {
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId)
     setMessageContent('')
-    setPendingImage(null)
+    setPendingAttachment(null)
   }
 
   const triggerLoadingAnimation = useCallback(async (chatId: string) => {
@@ -604,21 +604,21 @@ export default function ChatsPage() {
 
   const handleSendMessage = async () => {
     if (!selectedChatId || sending || sendLockRef.current) return
-    if (!messageContent.trim() && !pendingImage) return
+    if (!messageContent.trim() && !pendingAttachment) return
     const sendingChatId = selectedChatId  // capture the chat id for this send
     sendLockRef.current = true
     setSending(true)
     try {
       const now = new Date().toISOString()
-      // --- Image send path (runs first when image is present) ---
-      if (pendingImage && pendingImage.mode === 'line-image') {
-        const imgPayload = JSON.stringify({
-          originalContentUrl: pendingImage.originalContentUrl,
-          previewImageUrl: pendingImage.previewImageUrl,
+      // Images and videos are native LINE messages. Documents are sent below as
+      // a text link because LINE bots do not support outbound file messages.
+      if (pendingAttachment && pendingAttachment.kind !== 'file') {
+        const mediaType = pendingAttachment.kind
+        const mediaPayload = JSON.stringify({
+          originalContentUrl: pendingAttachment.originalContentUrl,
+          previewImageUrl: pendingAttachment.previewImageUrl,
         })
-        await api.chats.send(sendingChatId, { messageType: 'image', content: imgPayload })
-        setPendingImage(null)
-        // Optimistic update for image
+        await api.chats.send(sendingChatId, { messageType: mediaType, content: mediaPayload })
         setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
           ...prev,
           lastMessageAt: now,
@@ -628,8 +628,8 @@ export default function ChatsPage() {
             {
               id: crypto.randomUUID(),
               direction: 'outgoing',
-              messageType: 'image',
-              content: imgPayload,
+              messageType: mediaType,
+              content: mediaPayload,
               createdAt: now,
             },
           ],
@@ -643,9 +643,9 @@ export default function ChatsPage() {
             ...c,
             lastMessageAt: now,
             status: 'in_progress' as const,
-            lastMessageContent: '[画像]',
+            lastMessageContent: mediaType === 'image' ? '[画像]' : '[動画]',
             lastMessageDirection: 'outgoing' as const,
-            lastMessageType: 'image' as const,
+            lastMessageType: mediaType,
           } : c)
           // 未対応モード時は status filter を skip (worker 側で status を絞ってないため
           // 楽観更新で applied するとリストが歪む — Codex Round 1)
@@ -663,9 +663,13 @@ export default function ChatsPage() {
           })
         })
       }
-      // --- Text send path (runs independently — both paths execute when both image and text are present) ---
-      if (messageContent.trim()) {
-        const content = messageContent.trim()
+      const documentText = pendingAttachment?.kind === 'file'
+        ? `📎 ${pendingAttachment.name}\n${pendingAttachment.url}`
+        : ''
+      const textToSend = [messageContent.trim(), documentText].filter(Boolean).join('\n\n')
+      // Text can accompany native media; documents are represented by this link.
+      if (textToSend) {
+        const content = textToSend
         await api.chats.send(sendingChatId, { content })
         setMessageContent('')
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
@@ -719,6 +723,7 @@ export default function ChatsPage() {
           })
         })
       }
+      setPendingAttachment(null)
       // 手動返信で未対応が 1 件減るので、サイドバーのバッジを即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
     } catch {
@@ -770,7 +775,9 @@ export default function ChatsPage() {
 
   return (
     <div>
-      <Header title="オペレーターチャット" />
+      <div className={selectedChatId || selectedFriendId ? 'hidden lg:block' : ''}>
+        <Header title="個別メッセージ" description="お客様とのLINEメッセージを確認・返信します" />
+      </div>
 
       {/* Error */}
       {error && (
@@ -779,9 +786,13 @@ export default function ChatsPage() {
         </div>
       )}
 
-      <div className="flex gap-4 h-[calc(100vh-120px)] lg:h-[calc(100vh-180px)]">
+      <div className={`flex gap-4 lg:h-[calc(100vh-180px)] ${
+        selectedChatId || selectedFriendId
+          ? 'h-[calc(100dvh-152px)]'
+          : 'h-[calc(100dvh-220px)] sm:h-[calc(100dvh-190px)]'
+      }`}>
         {/* Left Panel: Chat List */}
-        <div className={`w-full lg:w-96 lg:flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col overflow-hidden ${selectedChatId ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`w-full lg:w-96 lg:flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 flex-col overflow-hidden ${selectedChatId || selectedFriendId ? 'hidden lg:flex' : 'flex'}`}>
           {/* タブ (全て / 未読 / 対応中 / 解決済) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
           {/* Filter row */}
@@ -928,7 +939,7 @@ export default function ChatsPage() {
           ) : chatDetail ? (
             <>
               {/* Chat Header */}
-              <div className="px-4 py-4 border-b border-gray-200 flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 border-b border-gray-200 px-3 py-2.5 sm:px-4 sm:py-4">
                 <div className="flex items-center gap-2 min-w-0">
                   <button
                     onClick={() => setSelectedChatId(null)}
@@ -953,7 +964,20 @@ export default function ChatsPage() {
                     </span>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2">
+                  {/* Mobile keeps status operations in one compact control so
+                      the conversation remains the largest part of the screen. */}
+                  <select
+                    value={chatDetail.status}
+                    onChange={(event) => void handleStatusUpdate(event.target.value as Chat['status'])}
+                    className="h-9 max-w-28 rounded-lg border border-gray-200 bg-white px-2 text-xs font-medium text-gray-700 sm:hidden"
+                    aria-label="対応ステータス"
+                  >
+                    <option value="unread">未読</option>
+                    <option value="in_progress">対応中</option>
+                    <option value="resolved">解決済</option>
+                  </select>
+                  <div className="hidden flex-wrap items-center gap-2 sm:flex">
                   {unansweredOnly && chats.length > 1 && (
                     <button
                       type="button"
@@ -997,11 +1021,12 @@ export default function ChatsPage() {
                       解決済にする
                     </button>
                   )}
+                  </div>
                 </div>
               </div>
 
               {/* Messages — LINE-style chat bubbles */}
-              <div ref={messagesScrollRef} className="flex-1 overflow-y-auto p-4 space-y-2" style={{ backgroundColor: '#7494C0' }}>
+              <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto p-3 space-y-2 sm:p-4" style={{ backgroundColor: '#7494C0' }}>
                 {(!chatDetail.messages || chatDetail.messages.length === 0) ? (
                   <div className="text-center py-8">
                     <p className="text-white/60 text-sm">メッセージはまだありません。</p>
@@ -1028,6 +1053,18 @@ export default function ChatsPage() {
                         )
                       } catch {
                         bubbleContent = <span>🖼️ [画像]</span>
+                      }
+                    } else if (msg.messageType === 'video') {
+                      try {
+                        const parsed = JSON.parse(msg.content)
+                        bubbleContent = (
+                          <a href={parsed.originalContentUrl} target="_blank" rel="noreferrer" className="block">
+                            <img src={parsed.previewImageUrl} alt="動画" className="max-w-[200px] rounded" />
+                            <span className="mt-1 block text-center text-xs">▶ 動画を開く</span>
+                          </a>
+                        )
+                      } catch {
+                        bubbleContent = <span>🎥 [動画]</span>
                       }
                     } else if (msg.messageType === 'sticker') {
                       bubbleContent = <StickerMessageImage content={msg.content} />
@@ -1081,7 +1118,7 @@ export default function ChatsPage() {
               </div>
 
               {/* Notes */}
-              <div className="px-4 py-2 border-t border-gray-200 bg-gray-50">
+              <div className="hidden px-4 py-2 border-t border-gray-200 bg-gray-50 sm:block">
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
@@ -1101,8 +1138,8 @@ export default function ChatsPage() {
               </div>
 
               {/* Send Message Form */}
-              <div className="px-4 py-3 border-t border-gray-200">
-                <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-gray-600">
+              <div className="border-t border-gray-200 bg-white px-2 py-2 sm:px-4 sm:py-3">
+                <div className="mb-2 hidden flex-wrap items-center gap-x-3 gap-y-2 text-xs text-gray-600 sm:flex">
                   <label className="inline-flex items-center gap-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -1142,18 +1179,11 @@ export default function ChatsPage() {
                     <span>Shift+Enter</span>
                   </label>
                 </div>
-                <div className="mb-2">
-                  <ImageUploader
-                    mode="line-image"
-                    value={pendingImage}
-                    onChange={setPendingImage}
-                    label="画像を送る (任意)"
-                  />
-                </div>
                 <div className="flex items-end gap-2">
+                  <ChatAttachmentPicker value={pendingAttachment} onChange={setPendingAttachment} />
                   <textarea
                     ref={textareaRef}
-                    rows={2}
+                    rows={1}
                     value={messageContent}
                     style={{ maxHeight: '200px', overflowY: 'auto' }}
                     onChange={(e) => {
@@ -1174,12 +1204,12 @@ export default function ChatsPage() {
                     onBlur={() => setIsMessageInputFocused(false)}
                     onKeyDown={handleKeyDown}
                     placeholder="メッセージを入力..."
-                    className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 resize-none overflow-y-auto"
+                    className="min-h-10 flex-1 resize-none overflow-y-auto rounded-2xl border border-gray-300 bg-gray-50 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-green-500 sm:rounded-lg sm:bg-white sm:text-sm"
                   />
                   <button
                     onClick={handleSendMessage}
-                    disabled={sending || (!messageContent.trim() && !pendingImage)}
-                    className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={sending || (!messageContent.trim() && !pendingAttachment)}
+                    className="h-10 shrink-0 rounded-full px-4 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:rounded-lg"
                     style={{ backgroundColor: '#06C755' }}
                   >
                     {sending ? '送信中...' : '送信'}

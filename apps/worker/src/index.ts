@@ -106,6 +106,7 @@ export type Env = {
     ADMIN_ORIGIN?: string;          // Comma-separated admin web origin allowlist for credentialed CORS
     ADMIN_COOKIE_SAMESITE?: string; // Optional override: 'Strict' | 'Lax' | 'None'
     ADMIN_ALLOW_CROSS_SITE?: string; // 'true' opts into SameSite=None cross-site cookies
+    ADMIN_SESSION_SECRET?: string;   // Optional HMAC secret for short-lived admin bearer sessions
     X_HARNESS_URL?: string;  // Optional: X Harness API URL for account linking
     IG_HARNESS_URL?: string;  // Optional: IG Harness API URL for cross-platform linking
     IG_HARNESS_LINK_SECRET?: string;  // Shared secret for IG Harness link-line webhook
@@ -216,6 +217,7 @@ app.get('/api/qr', async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
   const size = c.req.query('size') || '240x240';
+  const download = c.req.query('download') === '1';
   const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&data=${encodeURIComponent(data)}`;
   const res = await fetch(upstream);
   if (!res.ok) return c.text('QR generation failed', 502);
@@ -223,6 +225,7 @@ app.get('/api/qr', async (c) => {
     headers: {
       'Content-Type': res.headers.get('Content-Type') || 'image/png',
       'Cache-Control': 'public, max-age=86400',
+      ...(download ? { 'Content-Disposition': 'attachment; filename="meauty-line-qr.png"' } : {}),
     },
   });
 });
@@ -329,6 +332,16 @@ app.get('/r/:ref', async (c) => {
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
+  if (page === 'salon-book') {
+    const view = c.req.query('view');
+    if (view === 'history') liffParams.set('view', view);
+    const mode = c.req.query('mode');
+    if (mode === 'peek') liffParams.set('mode', mode);
+    for (const key of ['location_id', 'menu_id', 'change_booking_id'] as const) {
+      const value = c.req.query(key);
+      if (value && /^[A-Za-z0-9_-]{1,100}$/.test(value)) liffParams.set(key, value);
+    }
+  }
   const liffTarget = liffParams.toString() ? `${liffUrl}?${liffParams.toString()}` : liffUrl;
 
   // Help link carries the *resolved* liff target as `t=` so the help page
@@ -598,6 +611,7 @@ ${longPressBlock}
 // attribution を汚染する、という 2 つの問題があるため別ルートに分けている。
 // 仕様:
 // - クエリ: liffId (必須, `<digits>-<id>` 形式) / page / id
+//   salon-book では view / location_id / menu_id / mode も allowlist で引き継ぐ
 // - page は `/r/:ref` と同じ allowlist (salon-book / event / event-me)
 // - mobile UA は「LINEで開く」ボタン、desktop は QR を返す (`/r/:ref` 同等)
 app.get('/o', async (c) => {
@@ -617,6 +631,16 @@ app.get('/o', async (c) => {
   if (page && PAGE_PASSTHROUGH_ALLOWED.has(page)) liffParams.set('page', page);
   const id = c.req.query('id');
   if (id) liffParams.set('id', id);
+  if (page === 'salon-book') {
+    const view = c.req.query('view');
+    if (view === 'history') liffParams.set('view', view);
+    const mode = c.req.query('mode');
+    if (mode === 'peek') liffParams.set('mode', mode);
+    for (const key of ['location_id', 'menu_id', 'change_booking_id'] as const) {
+      const value = c.req.query(key);
+      if (value && /^[A-Za-z0-9_-]{1,100}$/.test(value)) liffParams.set(key, value);
+    }
+  }
   const liffTarget = `https://liff.line.me/${liffId}?${liffParams.toString()}`;
 
   const ua = (c.req.header('user-agent') || '').toLowerCase();

@@ -28,6 +28,14 @@ export interface Friend {
   isFollowing: boolean;
   /** メタデータ (フォーム回答, 業種等). serializeFriend が JSON.parse 済 */
   metadata?: Record<string, unknown>;
+  /** 予約時に取得した顧客名 */
+  customerName?: string | null;
+  /** 予約時に取得した顧客名のフリガナ */
+  customerKana?: string | null;
+  /** 予約時に取得した電話番号 */
+  customerPhone?: string | null;
+  /** 予約時に取得した生年月日 (YYYY-MM-DD) */
+  customerBirthdate?: string | null;
   /** 流入経路 ref コード (?ref=… で渡されたトラッキング識別子). 設定無しなら null */
   refCode?: string | null;
   /** 内部 user_id (UUIDv4). cross-account dedup 用 */

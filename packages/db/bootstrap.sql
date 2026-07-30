@@ -140,6 +140,59 @@ CREATE TABLE automations (
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT);
 
+CREATE TABLE booking_action_requests (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL,
+  booking_id TEXT NOT NULL,
+  friend_id TEXT NOT NULL,
+  request_type TEXT NOT NULL CHECK (request_type IN ('change','cancel')),
+  status TEXT NOT NULL DEFAULT 'requested' CHECK (status IN ('requested','approved','rejected')),
+  requested_location_id TEXT,
+  requested_staff_id TEXT,
+  requested_menu_id TEXT,
+  requested_starts_at TEXT,
+  requested_ends_at TEXT,
+  requested_block_ends_at TEXT,
+  customer_note TEXT,
+  requested_options_json TEXT,
+  requested_at TEXT NOT NULL,
+  decided_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
+  FOREIGN KEY (booking_id) REFERENCES bookings(id),
+  FOREIGN KEY (friend_id) REFERENCES friends(id)
+);
+
+CREATE TABLE booking_consent_settings (
+  line_account_id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  is_required INTEGER NOT NULL DEFAULT 1,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
+);
+
+CREATE TABLE booking_form_fields (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL,
+  field_key TEXT NOT NULL,
+  label TEXT NOT NULL,
+  field_type TEXT NOT NULL DEFAULT 'text' CHECK (field_type IN ('text','tel','date','textarea')),
+  placeholder TEXT,
+  is_required INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_system INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (line_account_id, field_key),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
+);
+
 CREATE TABLE booking_idempotency_keys (
   key              TEXT PRIMARY KEY,
   line_account_id  TEXT NOT NULL,
@@ -148,6 +201,54 @@ CREATE TABLE booking_idempotency_keys (
   response_body    TEXT NOT NULL,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   expires_at       TEXT NOT NULL                  -- UTC ISO8601
+);
+
+CREATE TABLE booking_locations (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL,
+  name            TEXT NOT NULL,
+  address         TEXT,
+  phone           TEXT,
+  access          TEXT,
+  sort_order      INTEGER NOT NULL DEFAULT 0,
+  is_active       INTEGER NOT NULL DEFAULT 1,
+  deleted_at      TEXT,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
+);
+
+CREATE TABLE booking_management_settings (
+  line_account_id TEXT PRIMARY KEY,
+  is_public INTEGER NOT NULL DEFAULT 1,
+  allow_new_booking INTEGER NOT NULL DEFAULT 1,
+  allow_change_request INTEGER NOT NULL DEFAULT 1,
+  allow_cancel_request INTEGER NOT NULL DEFAULT 1,
+  reception_start_mode TEXT NOT NULL DEFAULT 'always' CHECK (reception_start_mode IN ('always','relative','fixed')),
+  reception_start_days_before INTEGER,
+  reception_start_at TEXT,
+  reception_end_mode TEXT NOT NULL DEFAULT 'until_start' CHECK (reception_end_mode IN ('until_start','relative','fixed')),
+  reception_end_minutes_before INTEGER NOT NULL DEFAULT 0,
+  reception_end_at TEXT,
+  change_deadline_minutes_before INTEGER NOT NULL DEFAULT 1440,
+  cancel_deadline_minutes_before INTEGER NOT NULL DEFAULT 2880,
+  slot_interval_minutes INTEGER NOT NULL DEFAULT 30,
+  calendar_view TEXT NOT NULL DEFAULT 'week' CHECK (calendar_view IN ('week','month')),
+  calendar_connection_id TEXT REFERENCES google_calendar_connections(id),
+  google_sync_enabled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
+);
+
+CREATE TABLE booking_message_settings (
+  line_account_id TEXT NOT NULL,
+  event_key TEXT NOT NULL,
+  message_text TEXT NOT NULL,
+  is_enabled INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (line_account_id, event_key),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
 CREATE TABLE booking_reminders (
@@ -168,10 +269,16 @@ CREATE TABLE bookings (
   friend_id               TEXT NOT NULL,        -- friends.id
   staff_id                TEXT NOT NULL,
   menu_id                 TEXT NOT NULL,
+  location_id             TEXT,
   starts_at               TEXT NOT NULL,        -- UTC ISO8601 (Z)
   ends_at                 TEXT NOT NULL,        -- UTC ISO8601 (Z)
   block_ends_at           TEXT NOT NULL,        -- ends_at + buffer_after。衝突判定
   status                  TEXT NOT NULL CHECK (status IN ('requested','confirmed','rejected','expired','cancelled','completed','no_show')),
+  customer_name           TEXT,
+  customer_kana           TEXT,
+  customer_phone          TEXT,
+  customer_birthdate      TEXT,
+  custom_fields_json      TEXT,
   customer_note           TEXT,
   internal_note           TEXT,
   price_at_booking        INTEGER NOT NULL,
@@ -180,13 +287,32 @@ CREATE TABLE bookings (
   decided_by_staff_id     TEXT,
   external_event_id       TEXT,                 -- Phase 3 余地 (Google Calendar)
   external_calendar_id    TEXT,                 -- Phase 3 余地
+  consent_title           TEXT,
+  consent_body            TEXT,
+  consent_version         INTEGER,
+  consent_agreed_at       TEXT,
   created_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (friend_id) REFERENCES friends(id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
-  FOREIGN KEY (menu_id) REFERENCES menus(id)
+  FOREIGN KEY (menu_id) REFERENCES menus(id),
+  FOREIGN KEY (location_id) REFERENCES booking_locations(id)
 );
+
+CREATE TABLE booking_selected_options (
+  booking_id                  TEXT NOT NULL,
+  option_id                   TEXT NOT NULL,
+  option_name                 TEXT NOT NULL,
+  additional_price            INTEGER NOT NULL,
+  additional_duration_minutes INTEGER NOT NULL,
+  PRIMARY KEY (booking_id, option_id),
+  FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+  FOREIGN KEY (option_id) REFERENCES booking_options(id)
+);
+
+CREATE INDEX idx_booking_selected_options_booking
+  ON booking_selected_options (booking_id);
 
 CREATE TABLE broadcast_insights (
   id                  TEXT PRIMARY KEY,
@@ -459,12 +585,18 @@ CREATE TABLE friends (
   score            INTEGER NOT NULL DEFAULT 0,
   last_ref_code    TEXT,
   last_ref_at      TEXT,
+  customer_name    TEXT,
+  customer_kana    TEXT,
+  customer_phone   TEXT,
+  customer_birthdate TEXT,
+  customer_details_updated_at TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL);
 
 CREATE TABLE google_calendar_connections (
   id            TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id),
   calendar_id   TEXT NOT NULL,
   access_token  TEXT,
   refresh_token TEXT,
@@ -526,6 +658,40 @@ CREATE TABLE menus (
   updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (auto_tag_id) REFERENCES tags(id) ON DELETE SET NULL
+);
+
+CREATE TABLE booking_options (
+  id                          TEXT PRIMARY KEY,
+  line_account_id             TEXT NOT NULL,
+  name                        TEXT NOT NULL,
+  description                 TEXT,
+  additional_price            INTEGER NOT NULL DEFAULT 0,
+  additional_duration_minutes INTEGER NOT NULL DEFAULT 0,
+  sort_order                  INTEGER NOT NULL DEFAULT 0,
+  is_active                   INTEGER NOT NULL DEFAULT 1,
+  deleted_at                  TEXT,
+  created_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
+);
+
+CREATE INDEX idx_booking_options_account_sort
+  ON booking_options (line_account_id, sort_order);
+
+CREATE TABLE booking_option_menus (
+  option_id TEXT NOT NULL,
+  menu_id   TEXT NOT NULL,
+  PRIMARY KEY (option_id, menu_id),
+  FOREIGN KEY (option_id) REFERENCES booking_options(id) ON DELETE CASCADE,
+  FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE
+);
+
+CREATE TABLE booking_option_locations (
+  option_id   TEXT NOT NULL,
+  location_id TEXT NOT NULL,
+  PRIMARY KEY (option_id, location_id),
+  FOREIGN KEY (option_id) REFERENCES booking_options(id) ON DELETE CASCADE,
+  FOREIGN KEY (location_id) REFERENCES booking_locations(id) ON DELETE CASCADE
 );
 
 CREATE TABLE message_templates (
@@ -753,13 +919,15 @@ CREATE TABLE staff_menus (
 CREATE TABLE staff_shifts (
   id          TEXT PRIMARY KEY,
   staff_id    TEXT NOT NULL,
+  location_id TEXT,
   work_date   TEXT NOT NULL,    -- YYYY-MM-DD (JST)
   start_time  TEXT NOT NULL,    -- HH:MM (JST)
   end_time    TEXT NOT NULL,    -- HH:MM (JST)
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   UNIQUE (staff_id, work_date),
-  FOREIGN KEY (staff_id) REFERENCES staff(id)
+  FOREIGN KEY (staff_id) REFERENCES staff(id),
+  FOREIGN KEY (location_id) REFERENCES booking_locations(id)
 );
 
 CREATE TABLE stripe_events (
@@ -860,9 +1028,23 @@ CREATE INDEX idx_automations_active ON automations (is_active);
 
 CREATE INDEX idx_automations_event ON automations (event_type);
 
+CREATE INDEX idx_booking_action_requests_account_status
+  ON booking_action_requests (line_account_id, status, requested_at);
+
+CREATE UNIQUE INDEX idx_booking_action_requests_one_pending
+  ON booking_action_requests (booking_id, request_type) WHERE status = 'requested';
+
+CREATE INDEX idx_booking_form_fields_account_sort
+  ON booking_form_fields (line_account_id, sort_order, id);
+
+CREATE INDEX idx_booking_locations_account_sort
+  ON booking_locations (line_account_id, sort_order);
+
 CREATE INDEX idx_bookings_account_status_starts ON bookings (line_account_id, status, starts_at);
 
 CREATE INDEX idx_bookings_friend_starts ON bookings (friend_id, starts_at DESC);
+
+CREATE INDEX idx_bookings_location_starts ON bookings (location_id, starts_at);
 
 CREATE INDEX idx_bookings_staff_overlap ON bookings (staff_id, status, starts_at, block_ends_at);
 
@@ -939,6 +1121,15 @@ CREATE INDEX idx_friends_line_user_id ON friends (line_user_id);
 
 CREATE INDEX idx_friends_user_id ON friends (user_id);
 
+CREATE INDEX idx_friends_customer_name ON friends (customer_name);
+
+CREATE INDEX idx_friends_customer_phone ON friends (customer_phone);
+
+CREATE INDEX idx_friends_customer_birthdate ON friends (customer_birthdate);
+
+CREATE INDEX idx_google_calendar_connections_account
+  ON google_calendar_connections (line_account_id, created_at);
+
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
 CREATE INDEX idx_idempotency_expires ON booking_idempotency_keys (expires_at);
@@ -985,6 +1176,8 @@ CREATE INDEX idx_rich_menu_groups_account ON rich_menu_groups(account_id, status
 CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_index);
 
 CREATE INDEX idx_scenario_steps_scenario_id ON scenario_steps (scenario_id);
+
+CREATE INDEX idx_shifts_location_date ON staff_shifts (location_id, work_date);
 
 CREATE INDEX idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
 

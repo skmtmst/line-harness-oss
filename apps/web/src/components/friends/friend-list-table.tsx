@@ -107,6 +107,27 @@ export default function FriendListTable({ friends, allTags, onRefresh }: Props) 
                 {isExpanded && (
                   <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 space-y-3">
                     <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-2">予約者情報</p>
+                      <dl className="grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-lg bg-white p-3">
+                          <dt className="text-gray-400">お名前</dt>
+                          <dd className="mt-1 font-medium text-gray-800">{friend.customerName || '未登録'}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white p-3">
+                          <dt className="text-gray-400">フリガナ</dt>
+                          <dd className="mt-1 font-medium text-gray-800">{friend.customerKana || '未登録'}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white p-3">
+                          <dt className="text-gray-400">電話番号</dt>
+                          <dd className="mt-1 font-medium text-gray-800">{friend.customerPhone || '未登録'}</dd>
+                        </div>
+                        <div className="rounded-lg bg-white p-3">
+                          <dt className="text-gray-400">生年月日</dt>
+                          <dd className="mt-1 font-medium text-gray-800">{friend.customerBirthdate || '未登録'}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <div>
                       <p className="text-xs font-semibold text-gray-500 mb-1">LINE ユーザーID</p>
                       <p className="text-xs text-gray-600 font-mono break-all select-all">{friend.lineUserId}</p>
                     </div>

@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono';
-import { getStaffByApiKey } from '@line-crm/db';
+import { getStaffByApiKey, getStaffById } from '@line-crm/db';
 import type { Env } from '../index.js';
 import type { AdminSameSite } from './admin-auth-config.js';
 
@@ -9,6 +9,12 @@ export const CSRF_HEADER = 'x-csrf-token';
 
 // 7 days, matching the previous localStorage session longevity.
 const SESSION_MAX_AGE = 604800;
+// Home Screen web apps on iOS may discard cross-site cookies between launches.
+// The signed bearer is therefore long-lived and refreshed whenever the app
+// restores its session. Staff status is still checked against D1 on every
+// request, so disabling a staff member revokes access immediately.
+const ACCESS_TOKEN_MAX_AGE_SECONDS = 180 * 24 * 60 * 60;
+const ACCESS_TOKEN_PREFIX = 'lhs_';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -90,6 +96,94 @@ export type AuthenticatedStaff = {
   role: 'owner' | 'admin' | 'staff';
 };
 
+type AdminAccessTokenPayload = {
+  sub: string;
+  exp: number;
+};
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+function base64UrlToBytes(value: string): Uint8Array {
+  const normalized = value.replaceAll('-', '+').replaceAll('_', '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+async function adminAccessTokenKey(secret: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify'],
+  );
+}
+
+/**
+ * Short-lived bearer fallback for browsers that block third-party cookies
+ * (notably mobile Safari with Pages ↔ workers.dev). Only this derived token,
+ * never the long-lived API key, is stored by the admin SPA.
+ */
+export async function createAdminAccessToken(
+  staff: AuthenticatedStaff,
+  secret: string,
+  now = Date.now(),
+): Promise<string> {
+  const payload: AdminAccessTokenPayload = {
+    sub: staff.id,
+    exp: Math.floor(now / 1000) + ACCESS_TOKEN_MAX_AGE_SECONDS,
+  };
+  const encodedPayload = bytesToBase64Url(
+    new TextEncoder().encode(JSON.stringify(payload)),
+  );
+  const signature = await crypto.subtle.sign(
+    'HMAC',
+    await adminAccessTokenKey(secret),
+    new TextEncoder().encode(encodedPayload),
+  );
+  return `${ACCESS_TOKEN_PREFIX}${encodedPayload}.${bytesToBase64Url(new Uint8Array(signature))}`;
+}
+
+async function authenticateAdminAccessToken(
+  c: Context<Env>,
+  token: string,
+): Promise<AuthenticatedStaff | null> {
+  if (!token.startsWith(ACCESS_TOKEN_PREFIX)) return null;
+  const [encodedPayload, encodedSignature, ...extra] = token
+    .slice(ACCESS_TOKEN_PREFIX.length)
+    .split('.');
+  if (!encodedPayload || !encodedSignature || extra.length > 0) return null;
+
+  try {
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      await adminAccessTokenKey(c.env.ADMIN_SESSION_SECRET ?? c.env.API_KEY),
+      base64UrlToBytes(encodedSignature),
+      new TextEncoder().encode(encodedPayload),
+    );
+    if (!valid) return null;
+    const payload = JSON.parse(
+      new TextDecoder().decode(base64UrlToBytes(encodedPayload)),
+    ) as AdminAccessTokenPayload;
+    if (!payload.sub || !Number.isFinite(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    if (payload.sub === 'env-owner') {
+      return { id: 'env-owner', name: 'Owner', role: 'owner' };
+    }
+    const member = await getStaffById(c.env.DB, payload.sub);
+    if (!member || member.is_active !== 1) return null;
+    return { id: member.id, name: member.name, role: member.role };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Resolve a token (from a Bearer header or the session cookie) to a staff
  * identity. Shared by the auth middleware and the /api/auth/login endpoint so
@@ -100,6 +194,9 @@ export async function authenticateApiToken(
   token: string | null,
 ): Promise<AuthenticatedStaff | null> {
   if (!token) return null;
+
+  const accessTokenStaff = await authenticateAdminAccessToken(c, token);
+  if (accessTokenStaff) return accessTokenStaff;
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {

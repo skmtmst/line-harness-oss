@@ -94,10 +94,13 @@ export interface GetAvailabilityParams {
   lineAccountId: string;
   menuId: string;
   staffId?: string;
+  locationId?: string;
   from: string; // YYYY-MM-DD JST
   to: string;
   now: Date;
   minLeadTimeMinutes: number;
+  granularityMinutes?: number;
+  additionalDurationMinutes?: number;
 }
 
 export async function getAvailability(
@@ -161,9 +164,15 @@ export async function getAvailability(
       `SELECT staff_id, work_date, start_time, end_time
          FROM staff_shifts
         WHERE staff_id IN (${placeholders})
-          AND work_date BETWEEN ? AND ?`,
+          AND work_date BETWEEN ? AND ?
+          ${params.locationId ? 'AND location_id = ?' : ''}`,
     )
-    .bind(...staffIds, params.from, params.to)
+    .bind(
+      ...staffIds,
+      params.from,
+      params.to,
+      ...(params.locationId ? [params.locationId] : []),
+    )
     .all<{ staff_id: string; work_date: string; start_time: string; end_time: string }>();
 
   // Coarse range filter: from の前日 00:00 UTC 〜 to の翌日 00:00 UTC で十分な余裕
@@ -185,7 +194,9 @@ export async function getAvailability(
     .all<{ staff_id: string; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
-    duration_minutes: menu.override_duration ?? menu.duration_minutes,
+    duration_minutes:
+      (menu.override_duration ?? menu.duration_minutes) +
+      (params.additionalDurationMinutes ?? 0),
     buffer_after_minutes: menu.buffer_after_minutes,
   };
   const minLeadAt = new Date(params.now.getTime() + params.minLeadTimeMinutes * 60_000);
@@ -193,9 +204,15 @@ export async function getAvailability(
   const by_staff: AvailabilityByStaff[] = [];
   for (const s of staffRows.results) {
     const slots: AvailabilityByStaff['slots'] = [];
+    const workingHours: AvailabilityByStaff['working_hours'] = [];
     for (const date of dates) {
       const shift = shifts.results.find((r) => r.staff_id === s.id && r.work_date === date);
       if (!shift) continue;
+      workingHours.push({
+        date,
+        start: shift.start_time,
+        end: shift.end_time,
+      });
       const dayBookings = bookings.results
         .filter((b) => b.staff_id === s.id)
         .filter((b) => jstDateStr(new Date(b.starts_at)) === date)
@@ -207,7 +224,7 @@ export async function getAvailability(
         working: [{ start: shift.start_time, end: shift.end_time }],
         busy: dayBookings,
         menu: menuForCalc,
-        granularityMinutes: SLOT_GRANULARITY_MINUTES,
+        granularityMinutes: params.granularityMinutes ?? SLOT_GRANULARITY_MINUTES,
       });
       for (const slot of daySlots) {
         const slotStartUtc = new Date(`${date}T${slot.start}:00+09:00`);
@@ -215,7 +232,12 @@ export async function getAvailability(
         slots.push({ date, start: slot.start, end: slot.end });
       }
     }
-    by_staff.push({ staff_id: s.id, display_name: s.display_name, slots });
+    by_staff.push({
+      staff_id: s.id,
+      display_name: s.display_name,
+      slots,
+      working_hours: workingHours,
+    });
   }
   return { by_staff };
 }

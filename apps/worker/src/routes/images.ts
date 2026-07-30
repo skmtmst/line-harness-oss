@@ -3,6 +3,17 @@ import type { Env } from '../index.js';
 
 const images = new Hono<Env>();
 
+const MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+const ALLOWED_MEDIA_TYPES = [
+  'video/mp4',
+  'application/pdf',
+  'application/zip',
+  'text/plain',
+  'text/csv',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+
 // POST /api/images — upload image (base64 or binary)
 images.post('/api/images', async (c) => {
   try {
@@ -86,6 +97,83 @@ images.get('/images/:key', async (c) => {
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   headers.set('ETag', object.etag);
 
+  return new Response(object.body, { headers });
+});
+
+// POST /api/media — chat attachments that are not images.
+// LINE can send MP4 as a native video. Other documents are delivered as a
+// public HTTPS link because the Messaging API has no outbound "file" message.
+images.post('/api/media', async (c) => {
+  try {
+    const mimeType = (c.req.header('Content-Type') || 'application/octet-stream').split(';')[0];
+    const declaredSize = Number(c.req.header('Content-Length') || 0);
+    if (declaredSize > MEDIA_MAX_BYTES) {
+      return c.json({ success: false, error: 'File too large (max 25MB)' }, 413);
+    }
+    const encodedFilename = c.req.header('X-File-Name') || undefined;
+    let filename = encodedFilename;
+    if (encodedFilename) {
+      try {
+        filename = decodeURIComponent(encodedFilename);
+      } catch {
+        // Keep the original header value when a non-browser client sends a
+        // plain filename rather than an encoded one.
+      }
+    }
+    if (!ALLOWED_MEDIA_TYPES.includes(mimeType)) {
+      return c.json({ success: false, error: `Unsupported media type: ${mimeType}` }, 400);
+    }
+
+    const data = await c.req.arrayBuffer();
+    if (!data.byteLength) {
+      return c.json({ success: false, error: 'File is empty' }, 400);
+    }
+    if (data.byteLength > MEDIA_MAX_BYTES) {
+      return c.json({ success: false, error: 'File too large (max 25MB)' }, 400);
+    }
+
+    const safeExt = filename?.split('.').pop()?.toLowerCase().replace(/[^a-z0-9]/g, '')
+      || (mimeType === 'video/mp4' ? 'mp4' : 'bin');
+    const id = crypto.randomUUID();
+    const key = `${id}.${safeExt}`;
+    await c.env.IMAGES.put(key, data, {
+      httpMetadata: { contentType: mimeType },
+      customMetadata: { originalFilename: filename ?? key },
+    });
+
+    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    return c.json({
+      success: true,
+      data: {
+        id,
+        key,
+        url: `${workerUrl}/media/${key}`,
+        mimeType,
+        size: data.byteLength,
+        filename: filename ?? key,
+      },
+    }, 201);
+  } catch (err) {
+    console.error('POST /api/media error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// Public media is intentionally served without admin auth: LINE's servers and
+// the recipient's browser must be able to fetch it after a message is sent.
+images.get('/media/:key', async (c) => {
+  const key = c.req.param('key');
+  const object = await c.env.IMAGES.get(key);
+  if (!object) return c.json({ success: false, error: 'Media not found' }, 404);
+
+  const headers = new Headers();
+  headers.set('Content-Type', object.httpMetadata?.contentType || 'application/octet-stream');
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  const originalFilename = object.customMetadata?.originalFilename || key;
+  // HTTP header values must remain ASCII; filename* preserves Japanese names.
+  headers.set('Content-Disposition', `inline; filename="${key}"; filename*=UTF-8''${encodeURIComponent(originalFilename)}`);
+  headers.set('ETag', object.etag);
+  headers.set('Content-Length', String(object.size));
   return new Response(object.body, { headers });
 });
 

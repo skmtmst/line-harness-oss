@@ -11,6 +11,9 @@ describe('canTransition', () => {
   test('requested → expired via expire', () => {
     expect(canTransition('requested', 'expire')).toBe(true);
   });
+  test('requested → cancelled via cancel', () => {
+    expect(canTransition('requested', 'cancel')).toBe(true);
+  });
   test('confirmed → cancelled via cancel', () => {
     expect(canTransition('confirmed', 'cancel')).toBe(true);
   });
@@ -46,9 +49,9 @@ describe('nextStatus', () => {
 });
 
 describe('transitionsFrom', () => {
-  test('requested allows approve / reject / expire', () => {
+  test('requested allows approve / reject / expire / cancel', () => {
     const actions: BookingAction[] = transitionsFrom('requested');
-    expect(actions.sort()).toEqual(['approve', 'expire', 'reject']);
+    expect(actions.sort()).toEqual(['approve', 'cancel', 'expire', 'reject']);
   });
   test('confirmed allows cancel / complete / no_show', () => {
     const actions = transitionsFrom('confirmed');

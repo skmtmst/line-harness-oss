@@ -92,14 +92,68 @@ if (!API_URL) {
 }
 
 /**
- * Read the CSRF token issued at login. The session credential itself lives in
- * an HttpOnly cookie (never exposed to JS); only the CSRF token is held
- * client-side and echoed back via the X-CSRF-Token header on mutating
- * requests. In a cross-site topology the SPA cannot read the API's CSRF cookie
- * directly, so the token is delivered in the login/session response body and
- * cached here.
+ * Read the CSRF token issued at login. The primary session credential lives in
+ * an HttpOnly cookie. Cloudflare Pages and the Worker use different sites,
+ * however, and iOS can discard that cross-site cookie when a Home Screen web
+ * app is closed. The Worker therefore also issues a scoped, signed admin token.
+ * We persist only that exchanged token — never the staff API key — so the
+ * installed web app can restore the session on its next launch.
  */
 export const CSRF_STORAGE_KEY = 'lh_csrf'
+export const ADMIN_SESSION_STORAGE_KEY = 'lh_admin_access_token'
+
+export function getAdminAccessToken(): string {
+  if (typeof window === 'undefined') return ''
+  try {
+    const persisted = localStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || ''
+    if (persisted) return persisted
+
+    // One-time migration for sessions created before persistent Home Screen
+    // login was introduced.
+    const legacySessionToken = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || ''
+    if (legacySessionToken) {
+      localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, legacySessionToken)
+      sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+    }
+    return legacySessionToken
+  } catch {
+    // Storage can be blocked by a restrictive browser mode. Keep the current
+    // tab usable even though that mode cannot provide persistent login.
+    try {
+      return sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY) || ''
+    } catch {
+      return ''
+    }
+  }
+}
+
+export function setAdminAccessToken(token: string | undefined | null): void {
+  if (typeof window === 'undefined' || !token) return
+  try {
+    localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token)
+    sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+  } catch {
+    try {
+      sessionStorage.setItem(ADMIN_SESSION_STORAGE_KEY, token)
+    } catch {
+      // Storage unavailable: the HttpOnly cookie remains the fallback.
+    }
+  }
+}
+
+export function clearAdminAccessToken(): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+  } catch {
+    // Storage unavailable.
+  }
+  try {
+    sessionStorage.removeItem(ADMIN_SESSION_STORAGE_KEY)
+  } catch {
+    // Storage unavailable.
+  }
+}
 
 export function getCsrfToken(): string {
   if (typeof window === 'undefined') return ''
@@ -116,6 +170,7 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase()
   const csrfHeaders: Record<string, string> = {}
+  const accessToken = getAdminAccessToken()
   if (MUTATING_METHODS.has(method)) {
     const token = getCsrfToken()
     if (token) csrfHeaders['X-CSRF-Token'] = token
@@ -126,11 +181,27 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...csrfHeaders,
       ...options?.headers,
     },
   })
-  if (!res.ok) throw new Error(`API error: ${res.status}`)
+  if (!res.ok) {
+    // Worker が返す具体的な原因を表示する。以前は status だけを表示していたため、
+    // 入力不備も一律 "API error: 500" となり、管理画面から直し方を判断できなかった。
+    const raw = await res.text()
+    let message = ''
+    if (raw) {
+      try {
+        const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
+        if (typeof body.error === 'string') message = body.error
+        else if (typeof body.message === 'string') message = body.message
+      } catch {
+        // HTML 等の予期しない応答本文は画面にそのまま表示しない。
+      }
+    }
+    throw new Error(message || `API error: ${res.status}`)
+  }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
@@ -1448,6 +1519,18 @@ export const api = {
         body: buf,
       })
     },
+    media: async (file: File): Promise<ApiResponse<{ id: string; key: string; url: string; mimeType: string; size: number; filename: string }>> => {
+      const buf = await file.arrayBuffer()
+      return fetchApi<ApiResponse<{ id: string; key: string; url: string; mimeType: string; size: number; filename: string }>>('/api/media', {
+        method: 'POST',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream',
+          // Encode the filename so non-ASCII salon documents survive HTTP headers.
+          'X-File-Name': encodeURIComponent(file.name),
+        },
+        body: buf,
+      })
+    },
   },
 }
 
@@ -1468,6 +1551,18 @@ export interface BookingMenu {
   auto_tag_id: string | null;
 }
 
+export interface BookingOption {
+  id: string;
+  name: string;
+  description: string | null;
+  additional_price: number;
+  additional_duration_minutes: number;
+  sort_order: number;
+  is_active: number;
+  menu_ids: string[];
+  location_ids: string[];
+}
+
 export interface BookingStaff {
   id: string;
   name: string;
@@ -1480,8 +1575,20 @@ export interface BookingStaff {
   is_active: number;
 }
 
+export interface BookingLocation {
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  access: string | null;
+  sort_order: number;
+  is_active: number;
+}
+
 export interface BookingShift {
   id: string;
+  location_id: string | null;
+  location_name: string | null;
   work_date: string;
   start_time: string;
   end_time: string;
@@ -1506,7 +1613,86 @@ export interface BookingRequest {
   price_at_booking: number;
   menu_name: string;
   staff_name: string;
+  location_name: string | null;
   friend_name: string | null;
+}
+
+export interface BookingConsent {
+  title: string;
+  body: string;
+  version: number;
+  is_required: number;
+  is_active: number;
+}
+
+export interface BookingManagementSettings {
+  is_public: number;
+  allow_new_booking: number;
+  allow_change_request: number;
+  allow_cancel_request: number;
+  reception_start_mode: 'always' | 'relative' | 'fixed';
+  reception_start_days_before: number | null;
+  reception_start_at: string | null;
+  reception_end_mode: 'until_start' | 'relative' | 'fixed';
+  reception_end_minutes_before: number;
+  reception_end_at: string | null;
+  change_deadline_minutes_before: number;
+  cancel_deadline_minutes_before: number;
+  slot_interval_minutes: number;
+  calendar_view: 'week' | 'month';
+  calendar_connection_id: string | null;
+  google_sync_enabled: number;
+}
+
+export interface BookingFormField {
+  id: string;
+  field_key: string;
+  label: string;
+  field_type: 'text' | 'tel' | 'date' | 'textarea';
+  placeholder: string | null;
+  is_required: number;
+  is_active: number;
+  sort_order: number;
+  is_system: number;
+}
+
+export interface BookingMessageSetting {
+  event_key: string;
+  message_text: string;
+  is_enabled: number;
+}
+
+export interface BookingCalendarConnection {
+  id: string;
+  calendar_id: string;
+  auth_type: string;
+  is_active: number;
+  has_access_token: number;
+}
+
+export interface BookingSettingsResponse {
+  settings: BookingManagementSettings;
+  fields: BookingFormField[];
+  messages: BookingMessageSetting[];
+  calendar_connections: BookingCalendarConnection[];
+}
+
+export interface BookingActionRequest {
+  id: string;
+  booking_id: string;
+  request_type: 'change' | 'cancel';
+  status: 'requested' | 'approved' | 'rejected';
+  requested_at: string;
+  current_starts_at: string;
+  requested_starts_at: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
+  current_menu_name: string;
+  current_staff_name: string;
+  current_location_name: string | null;
+  requested_menu_name: string | null;
+  requested_staff_name: string | null;
+  requested_location_name: string | null;
 }
 
 function withAccount(path: string, accountId: string): string {
@@ -1514,6 +1700,74 @@ function withAccount(path: string, accountId: string): string {
 }
 
 export const bookingApi = {
+  getSettings: (accountId: string) =>
+    fetchApi<BookingSettingsResponse>(
+      withAccount('/api/booking/admin/settings', accountId),
+    ),
+  updateSettings: (accountId: string, body: Partial<BookingManagementSettings>) =>
+    fetchApi<{ settings: BookingManagementSettings }>(
+      withAccount('/api/booking/admin/settings', accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+  updateFields: (accountId: string, fields: BookingFormField[]) =>
+    fetchApi<{ fields: BookingFormField[] }>(
+      withAccount('/api/booking/admin/settings/fields', accountId),
+      { method: 'PUT', body: JSON.stringify({ fields }) },
+    ),
+  updateMessages: (accountId: string, messages: BookingMessageSetting[]) =>
+    fetchApi<{ ok: true }>(
+      withAccount('/api/booking/admin/settings/messages', accountId),
+      { method: 'PUT', body: JSON.stringify({ messages }) },
+    ),
+  addCalendarConnection: (
+    accountId: string,
+    body: { calendar_id: string; access_token: string },
+  ) =>
+    fetchApi<{ id: string; calendar_id: string }>(
+      withAccount('/api/booking/admin/settings/calendar-connections', accountId),
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+  deleteCalendarConnection: (accountId: string, id: string) =>
+    fetchApi<{ ok: true }>(
+      withAccount(`/api/booking/admin/settings/calendar-connections/${id}`, accountId),
+      { method: 'DELETE' },
+    ),
+  getConsent: (accountId: string) =>
+    fetchApi<{ consent: BookingConsent }>(
+      withAccount('/api/booking/admin/consent', accountId),
+    ),
+  updateConsent: (
+    accountId: string,
+    body: {
+      title: string;
+      body: string;
+      is_required: boolean;
+      is_active: boolean;
+    },
+  ) =>
+    fetchApi<{ consent: BookingConsent }>(
+      withAccount('/api/booking/admin/consent', accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+  // Locations
+  listLocations: (accountId: string) =>
+    fetchApi<{ locations: BookingLocation[] }>(
+      withAccount('/api/booking/admin/locations', accountId),
+    ),
+  createLocation: (accountId: string, body: Partial<BookingLocation>) =>
+    fetchApi<{ id: string }>(withAccount('/api/booking/admin/locations', accountId), {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateLocation: (accountId: string, id: string, body: Partial<BookingLocation>) =>
+    fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/locations/${id}`, accountId), {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  deleteLocation: (accountId: string, id: string) =>
+    fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/locations/${id}`, accountId), {
+      method: 'DELETE',
+    }),
   // Menus
   listMenus: (accountId: string) =>
     fetchApi<{ menus: BookingMenu[] }>(withAccount('/api/booking/admin/menus', accountId)),
@@ -1531,6 +1785,26 @@ export const bookingApi = {
     fetchApi<{ ok: true }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
       method: 'DELETE',
     }),
+  // Menu options
+  listOptions: (accountId: string) =>
+    fetchApi<{ options: BookingOption[] }>(
+      withAccount('/api/booking/admin/options', accountId),
+    ),
+  createOption: (accountId: string, body: Partial<BookingOption>) =>
+    fetchApi<{ id: string }>(withAccount('/api/booking/admin/options', accountId), {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateOption: (accountId: string, id: string, body: Partial<BookingOption>) =>
+    fetchApi<{ ok: true }>(
+      withAccount(`/api/booking/admin/options/${id}`, accountId),
+      { method: 'PUT', body: JSON.stringify(body) },
+    ),
+  deleteOption: (accountId: string, id: string) =>
+    fetchApi<{ ok: true }>(
+      withAccount(`/api/booking/admin/options/${id}`, accountId),
+      { method: 'DELETE' },
+    ),
   // Staff
   listStaff: (accountId: string) =>
     fetchApi<{ staff: BookingStaff[] }>(withAccount('/api/booking/admin/staff', accountId)),
@@ -1568,14 +1842,26 @@ export const bookingApi = {
       { method: 'PUT', body: JSON.stringify({ menus }) },
     ),
   // Shifts
-  getShifts: (accountId: string, staffId: string) =>
+  getShifts: (accountId: string, staffId: string, from?: string, to?: string) =>
     fetchApi<{ shifts: BookingShift[] }>(
-      withAccount(`/api/booking/admin/staff/${staffId}/shifts`, accountId),
+      withAccount(
+        `/api/booking/admin/staff/${staffId}/shifts${
+          from && to
+            ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+            : ''
+        }`,
+        accountId,
+      ),
     ),
   putShifts: (
     accountId: string,
     staffId: string,
-    shifts: Array<{ work_date: string; start_time: string; end_time: string }>,
+    shifts: Array<{
+      work_date: string;
+      start_time: string;
+      end_time: string;
+      location_id: string;
+    }>,
   ) =>
     fetchApi<{ ok: true; count: number }>(
       withAccount(`/api/booking/admin/staff/${staffId}/shifts`, accountId),
@@ -1592,7 +1878,10 @@ export const bookingApi = {
     body: {
       from_date: string;
       weeks: number;
-      weekly_template: Record<string, { start: string; end: string } | null>;
+      weekly_template: Record<
+        string,
+        { start: string; end: string; location_id: string } | null
+      >;
     },
   ) =>
     fetchApi<{ inserted: number }>(
@@ -1612,6 +1901,19 @@ export const bookingApi = {
     fetchApi<{ status: string }>(
       withAccount(`/api/booking/admin/requests/${id}`, accountId),
       { method: 'PATCH', body: JSON.stringify({ action }) },
+    ),
+  listActionRequests: (accountId: string, status: string = 'requested') =>
+    fetchApi<{ requests: BookingActionRequest[] }>(
+      withAccount(`/api/booking/admin/action-requests?status=${status}`, accountId),
+    ),
+  decideActionRequest: (
+    accountId: string,
+    id: string,
+    decision: 'approve' | 'reject',
+  ) =>
+    fetchApi<{ status: string }>(
+      withAccount(`/api/booking/admin/action-requests/${id}`, accountId),
+      { method: 'PATCH', body: JSON.stringify({ decision }) },
     ),
   pendingCount: (accountId: string) =>
     fetchApi<{ count: number }>(withAccount('/api/booking/admin/pending-count', accountId)),

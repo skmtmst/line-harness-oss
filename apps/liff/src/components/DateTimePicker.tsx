@@ -3,12 +3,14 @@ import { api } from '../lib/api.js';
 import { jstToday, addDays, formatJp } from '../lib/datetime.js';
 
 export default function DateTimePicker({
+  locationId,
   menuId,
   staffId,
   ctaLabel,
   onSelect,
   onBack,
 }: {
+  locationId: string;
   menuId: string;
   staffId: string;
   ctaLabel: string;
@@ -22,7 +24,7 @@ export default function DateTimePicker({
 
   useEffect(() => {
     api
-      .availability(menuId, staffId, from, to)
+      .availability(locationId, menuId, staffId, from, to)
       .then((r) => {
         const slots = r.by_staff[0]?.slots ?? [];
         const grouped: Record<string, string[]> = {};
@@ -30,7 +32,7 @@ export default function DateTimePicker({
         setByDate(grouped);
       })
       .catch((e) => setError(String(e)));
-  }, [menuId, staffId, from, to]);
+  }, [locationId, menuId, staffId, from, to]);
 
   if (error) return <p className="text-red-600">{error}</p>;
   if (!byDate) return <div className="text-gray-500">空き枠を取得中...</div>;

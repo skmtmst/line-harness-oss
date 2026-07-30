@@ -9,6 +9,10 @@ interface FriendDetail {
   pictureUrl: string | null
   isFollowing: boolean
   metadata: Record<string, unknown>
+  customerName: string | null
+  customerKana: string | null
+  customerPhone: string | null
+  customerBirthdate: string | null
   refCode: string | null
   createdAt: string
   tags: Array<{ id: string; name: string; color: string }>
@@ -204,6 +208,18 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                 </div>
               )}
             </div>
+
+            {(friend.customerName || friend.customerKana || friend.customerPhone || friend.customerBirthdate) && (
+              <div className="p-4">
+                <h4 className="text-[11px] font-medium text-gray-500 mb-2">予約者情報</h4>
+                <dl className="space-y-2 text-xs">
+                  <div><dt className="text-[10px] text-gray-400">お名前</dt><dd className="text-gray-700">{friend.customerName || '-'}</dd></div>
+                  <div><dt className="text-[10px] text-gray-400">フリガナ</dt><dd className="text-gray-700">{friend.customerKana || '-'}</dd></div>
+                  <div><dt className="text-[10px] text-gray-400">電話番号</dt><dd className="text-gray-700">{friend.customerPhone || '-'}</dd></div>
+                  <div><dt className="text-[10px] text-gray-400">生年月日</dt><dd className="font-medium text-gray-800">{friend.customerBirthdate || '-'}</dd></div>
+                </dl>
+              </div>
+            )}
 
             {/* Rich Menu */}
             <div className="p-4">

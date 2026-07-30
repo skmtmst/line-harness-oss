@@ -13,6 +13,14 @@ export interface MenuItem {
   sort_order: number;
 }
 
+export interface LocationItem {
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  access: string | null;
+}
+
 export interface StaffItem {
   id: string;
   display_name: string;
@@ -39,6 +47,7 @@ export interface BookingHistoryItem {
   customer_note?: string | null;
   menu_name: string;
   staff_name: string;
+  location_name: string | null;
   profile_image_url: string | null;
 }
 
@@ -117,17 +126,30 @@ export interface EventBookingMine {
 }
 
 export const api = {
+  locations: () => get<{ locations: LocationItem[] }>('/api/liff/booking/locations'),
   menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus'),
   staffOf: (menuId: string) =>
     get<{ staff: StaffItem[] }>(`/api/liff/booking/menus/${menuId}/staff`),
-  availability: (menuId: string, staffId: string | undefined, from: string, to: string) => {
-    const qs = new URLSearchParams({ menu_id: menuId, from, to });
+  availability: (
+    locationId: string,
+    menuId: string,
+    staffId: string | undefined,
+    from: string,
+    to: string,
+  ) => {
+    const qs = new URLSearchParams({ location_id: locationId, menu_id: menuId, from, to });
     if (staffId) qs.set('staff_id', staffId);
     return get<AvailabilityResponse>(`/api/liff/booking/availability?${qs}`);
   },
   // Worker 側で id_token を verify するので lineUserId は body に入れない。
   createRequest: (
-    body: { menu_id: string; staff_id: string; starts_at: string; customer_note?: string },
+    body: {
+      location_id: string;
+      menu_id: string;
+      staff_id: string;
+      starts_at: string;
+      customer_note?: string;
+    },
     idempotencyKey: string,
   ) =>
     post<{ booking_id: string; status: string }>(

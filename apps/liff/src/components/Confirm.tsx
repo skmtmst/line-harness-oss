@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { api, type MenuItem, type StaffItem } from '../lib/api.js';
+import { api, type LocationItem, type MenuItem, type StaffItem } from '../lib/api.js';
 import { jstStartsAtIso } from '../lib/datetime.js';
 
 export default function Confirm({
+  location,
   menu,
   staff,
   slot,
   onSubmitted,
   onBack,
 }: {
+  location: LocationItem;
   menu: MenuItem;
   staff: StaffItem;
   slot: { date: string; start: string };
@@ -26,6 +28,7 @@ export default function Confirm({
     try {
       await api.createRequest(
         {
+          location_id: location.id,
           menu_id: menu.id,
           staff_id: staff.id,
           starts_at: jstStartsAtIso(slot.date, slot.start),
@@ -51,6 +54,7 @@ export default function Confirm({
       <button onClick={onBack} className="text-sm text-gray-500">← 戻る</button>
       <h1 className="text-xl font-bold">内容のご確認</h1>
       <dl className="space-y-2 border rounded p-4 text-sm">
+        <Row label="店舗" value={location.name} />
         <Row label="メニュー" value={menu.name} />
         <Row label="担当" value={staff.display_name} />
         <Row label="日時" value={`${slot.date} ${slot.start}`} />

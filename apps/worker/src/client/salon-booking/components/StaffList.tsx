@@ -10,7 +10,7 @@ export default function StaffList({
 }: {
   menuId: string;
   basePrice: number;
-  onSelect: (s: StaffItem) => void;
+  onSelect: (s: StaffItem, autoSelected?: boolean) => void;
   onBack: () => void;
 }) {
   const ctx = useSalonContext();
@@ -21,7 +21,15 @@ export default function StaffList({
     setError(null);
     createApi(ctx)
       .staffOf(menuId)
-      .then((r) => setList(r.staff))
+      .then((r) => {
+        // 担当者が1人だけの間は、選択画面を見せず予約日時へ進める。
+        // 採用後に2人以上になれば、既存の担当者選択画面が自動的に復帰する。
+        if (r.staff.length === 1) {
+          onSelect(r.staff[0], true);
+          return;
+        }
+        setList(r.staff);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [ctx, menuId]);
 
@@ -69,13 +77,13 @@ export default function StaffList({
       <BackButton onBack={onBack} />
       <div>
         <h1 className="text-base font-bold text-gray-900">担当を選んでください</h1>
-        <p className="text-xs text-gray-500 mt-1">step 2 / 4</p>
+        <p className="text-xs text-gray-500 mt-1">このメニューに対応できる担当者を選択します</p>
       </div>
       <ul className="space-y-2">
         {list.map((s) => (
           <li key={s.id}>
             <button
-              onClick={() => onSelect(s)}
+              onClick={() => onSelect(s, false)}
               className="w-full sb-card flex items-center gap-3 active:scale-[0.99]"
               style={{ transition: 'transform 0.1s, box-shadow 0.15s' }}
             >

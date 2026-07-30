@@ -237,6 +237,51 @@ function Editor({
     if (!res.success) throw new Error(res.error ?? '保存失敗')
   }
 
+  function validateBeforePublish(): boolean {
+    if (!name.trim()) {
+      setError('リッチメニュー名を入力してください。')
+      return false
+    }
+    if (!chatBarText.trim()) {
+      setError('「トーク画面下の文言」を入力してください。')
+      return false
+    }
+    for (const page of pages) {
+      if (!page.imageR2Key) {
+        setActivePageId(page.id)
+        setSelectedAreaId(null)
+        setError(`「${page.name}」の画像を設定してください。`)
+        return false
+      }
+      for (let i = 0; i < page.areas.length; i += 1) {
+        const area = page.areas[i]
+        const data = area.actionData as Record<string, unknown>
+        let missing = ''
+        if (area.actionType === 'message' && !String(data.text ?? '').trim()) {
+          missing = '送信テキスト'
+        } else if (area.actionType === 'uri' && !String(data.uri ?? '').trim()) {
+          missing = 'URL'
+        } else if (area.actionType === 'postback' && !String(data.data ?? '').trim()) {
+          missing = 'postback data'
+        } else if (
+          area.actionType === 'richmenuswitch' &&
+          !String(data.targetPageId ?? '').trim()
+        ) {
+          missing = '遷移先ページ'
+        }
+        if (missing) {
+          setActivePageId(page.id)
+          setSelectedAreaId(area.id)
+          setError(
+            `「${page.name}」のエリア ${i + 1} に ${missing} が設定されていません。右側の「選択中エリア」で入力してください。`,
+          )
+          return false
+        }
+      }
+    }
+    return true
+  }
+
   async function handleSave() {
     setSaving(true)
     setError(null)
@@ -251,6 +296,8 @@ function Editor({
   }
 
   async function handlePublish() {
+    setError(null)
+    if (!validateBeforePublish()) return
     if (!confirm(
       'このリッチメニューを LINE 公式アカウントに登録します。\n\n' +
         '※ この操作だけでは友だちのトーク画面にはまだ表示されません。\n' +

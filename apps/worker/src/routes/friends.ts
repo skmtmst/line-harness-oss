@@ -35,6 +35,10 @@ function serializeFriend(row: DbFriend) {
     statusMessage: row.status_message,
     isFollowing: Boolean(row.is_following),
     metadata: JSON.parse(row.metadata || '{}'),
+    customerName: row.customer_name ?? null,
+    customerKana: row.customer_kana ?? null,
+    customerPhone: row.customer_phone ?? null,
+    customerBirthdate: row.customer_birthdate ?? null,
     refCode: (row as unknown as Record<string, unknown>).ref_code as string | null,
     lineAccountId: ((row as unknown as Record<string, unknown>).line_account_id as string | null) ?? null,
     userId: row.user_id,
@@ -124,8 +128,15 @@ friends.get('/api/friends', async (c) => {
       binds.push(lineAccountId);
     }
     if (search) {
-      conditions.push('f.display_name LIKE ?');
-      binds.push(`%${search}%`);
+      conditions.push(
+        `(f.display_name LIKE ?
+          OR f.customer_name LIKE ?
+          OR f.customer_kana LIKE ?
+          OR f.customer_phone LIKE ?
+          OR f.customer_birthdate LIKE ?)`,
+      );
+      const searchPattern = `%${search}%`;
+      binds.push(searchPattern, searchPattern, searchPattern, searchPattern, searchPattern);
     }
     // Unhandled filter: chats.status === 'unread'.
     //
