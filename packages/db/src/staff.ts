@@ -6,6 +6,7 @@ export interface StaffMember {
   email: string | null;
   role: 'owner' | 'admin' | 'staff';
   api_key: string;
+  line_user_id: string | null;
   is_active: number;
   created_at: string;
   updated_at: string;
@@ -15,6 +16,7 @@ export interface CreateStaffInput {
   name: string;
   email?: string | null;
   role: 'owner' | 'admin' | 'staff';
+  line_user_id?: string | null;
 }
 
 export interface UpdateStaffInput {
@@ -22,6 +24,7 @@ export interface UpdateStaffInput {
   email?: string | null;
   role?: 'owner' | 'admin' | 'staff';
   is_active?: number;
+  line_user_id?: string | null;
 }
 
 function generateApiKey(): string {
@@ -38,6 +41,16 @@ export async function getStaffByApiKey(
   return db
     .prepare('SELECT * FROM staff_members WHERE api_key = ? AND is_active = 1')
     .bind(apiKey)
+    .first<StaffMember>();
+}
+
+export async function getStaffByLineUserId(
+  db: D1Database,
+  lineUserId: string,
+): Promise<StaffMember | null> {
+  return db
+    .prepare('SELECT * FROM staff_members WHERE line_user_id = ? AND is_active = 1')
+    .bind(lineUserId)
     .first<StaffMember>();
 }
 
@@ -68,10 +81,10 @@ export async function createStaffMember(
 
   await db
     .prepare(
-      `INSERT INTO staff_members (id, name, email, role, api_key, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO staff_members (id, name, email, role, api_key, line_user_id, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     )
-    .bind(id, input.name, input.email ?? null, input.role, apiKey, now, now)
+    .bind(id, input.name, input.email ?? null, input.role, apiKey, input.line_user_id ?? null, now, now)
     .run();
 
   return (await db
@@ -93,6 +106,7 @@ export async function updateStaffMember(
   if (input.email !== undefined) { sets.push('email = ?'); values.push(input.email ?? null); }
   if (input.role !== undefined) { sets.push('role = ?'); values.push(input.role); }
   if (input.is_active !== undefined) { sets.push('is_active = ?'); values.push(input.is_active); }
+  if (input.line_user_id !== undefined) { sets.push('line_user_id = ?'); values.push(input.line_user_id); }
 
   values.push(id);
   await db
@@ -134,4 +148,43 @@ export async function countActiveStaffByRole(db: D1Database, role: string): Prom
     .bind(role)
     .first<{ count: number }>();
   return result?.count ?? 0;
+}
+
+export async function createAdminSession(
+  db: D1Database,
+  tokenHash: string,
+  staffId: string,
+  expiresAt: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO admin_sessions (token_hash, staff_id, expires_at)
+       VALUES (?, ?, ?)`,
+    )
+    .bind(tokenHash, staffId, expiresAt)
+    .run();
+}
+
+export async function getStaffByAdminSession(
+  db: D1Database,
+  tokenHash: string,
+  now: string,
+): Promise<StaffMember | null> {
+  return db
+    .prepare(
+      `SELECT sm.*
+       FROM admin_sessions s
+       JOIN staff_members sm ON sm.id = s.staff_id
+       WHERE s.token_hash = ? AND s.expires_at > ? AND sm.is_active = 1`,
+    )
+    .bind(tokenHash, now)
+    .first<StaffMember>();
+}
+
+export async function deleteAdminSession(db: D1Database, tokenHash: string): Promise<void> {
+  await db.prepare('DELETE FROM admin_sessions WHERE token_hash = ?').bind(tokenHash).run();
+}
+
+export async function deleteExpiredAdminSessions(db: D1Database, now: string): Promise<void> {
+  await db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now).run();
 }

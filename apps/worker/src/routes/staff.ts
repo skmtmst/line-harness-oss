@@ -7,6 +7,7 @@ import {
   deleteStaffMember,
   regenerateStaffApiKey,
   countActiveStaffByRole,
+  getFriendById,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
@@ -25,6 +26,7 @@ function serializeStaff(row: StaffMember, masked = true) {
     email: row.email,
     role: row.role,
     apiKey: masked ? maskApiKey(row.api_key) : row.api_key,
+    lineLinked: Boolean(row.line_user_id),
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -98,10 +100,19 @@ staff.get('/api/staff/:id', requireRole('owner'), async (c) => {
 // POST /api/staff — owner only. Create staff. Returns full API key (one-time visible).
 staff.post('/api/staff', requireRole('owner'), async (c) => {
   try {
-    const body = await c.req.json<{ name: string; email?: string; role: string }>();
+    const body = await c.req.json<{ name: string; email?: string; role: string; friendId?: string }>();
 
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
+    }
+
+    if (!body.friendId) {
+      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    }
+
+    const friend = await getFriendById(c.env.DB, body.friendId);
+    if (!friend?.line_user_id) {
+      return c.json({ success: false, error: '選択したLINEアカウントが見つかりません' }, 400);
     }
 
     const validRoles = ['owner', 'admin', 'staff'] as const;
@@ -113,6 +124,7 @@ staff.post('/api/staff', requireRole('owner'), async (c) => {
       name: body.name,
       email: body.email ?? null,
       role: body.role as 'owner' | 'admin' | 'staff',
+      line_user_id: friend.line_user_id,
     });
 
     // Return full (unmasked) API key one-time

@@ -11,6 +11,16 @@ vi.mock('@line-crm/db', () => ({
     if (token !== 'staff-key') return null;
     return { id: 'staff-1', name: 'Staff One', role: 'admin' };
   }),
+  getStaffByAdminSession: vi.fn(async (_db: unknown, tokenHash: string) => {
+    if (tokenHash !== 'c1e9199b97100cfa89cf5335e39753c0ee4caddde90d79bf5ca16ab99d4a7d9a') return null;
+    return { id: 'staff-1', name: 'Staff One', role: 'admin' };
+  }),
+  getStaffByLineUserId: vi.fn(async (_db: unknown, lineUserId: string) => {
+    if (lineUserId !== 'authorized-line-user') return null;
+    return { id: 'staff-1', name: 'Staff One', role: 'admin', is_active: 1 };
+  }),
+  createAdminSession: vi.fn(async () => undefined),
+  deleteAdminSession: vi.fn(async () => undefined),
 }));
 
 const PAGES = 'https://your-admin.pages.dev';
@@ -29,6 +39,7 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
     LINE_LOGIN_CHANNEL_ID: 'login-channel',
     LINE_LOGIN_CHANNEL_SECRET: 'login-secret',
     WORKER_URL: WORKERS,
+    ADMIN_PUBLIC_URL: PAGES,
     ...overrides,
   };
 }
@@ -82,7 +93,7 @@ describe('admin login cookie attributes', () => {
     expect(body.csrfToken).toBeTruthy();
 
     const session = cookieFor(res, 'lh_admin_session') ?? '';
-    expect(session).toContain('lh_admin_session=staff-key');
+    expect(session).toMatch(/^lh_admin_session=[^;]+/);
     expect(session).toContain('HttpOnly');
     expect(session).toContain('Secure');
     expect(session).toContain('SameSite=None');
@@ -113,6 +124,60 @@ describe('admin login cookie attributes', () => {
     }, crossSiteEnv());
     expect(res.status).toBe(401);
     expect(cookieFor(res, 'lh_admin_session')).toBeUndefined();
+  });
+});
+
+describe('LINE admin login', () => {
+  test('starts OAuth with state, nonce and PKCE', async () => {
+    const res = await app().request('/api/auth/line', {}, crossSiteEnv());
+    expect(res.status).toBe(302);
+    const location = new URL(res.headers.get('Location')!);
+    expect(location.origin).toBe('https://access.line.me');
+    expect(location.searchParams.get('client_id')).toBe('login-channel');
+    expect(location.searchParams.get('scope')).toBe('openid profile');
+    expect(location.searchParams.get('state')).toBeTruthy();
+    expect(location.searchParams.get('nonce')).toBeTruthy();
+    expect(location.searchParams.get('code_challenge_method')).toBe('S256');
+    expect(cookieFor(res, 'lh_line_state')).toBeTruthy();
+    expect(cookieFor(res, 'lh_line_nonce')).toBeTruthy();
+    expect(cookieFor(res, 'lh_line_verifier')).toBeTruthy();
+  });
+
+  test('rejects a callback when state does not match before calling LINE', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const res = await app().request('/api/auth/line/callback?code=abc&state=wrong', {
+      headers: { Cookie: 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier' },
+    }, crossSiteEnv());
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('/login?error=invalid_state');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  test('creates a session only for an explicitly authorized LINE user', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id_token: 'id-token' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sub: 'authorized-line-user' }), { status: 200 }));
+    const res = await app().request('/api/auth/line/callback?code=abc&state=expected', {
+      headers: { Cookie: 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier' },
+    }, crossSiteEnv());
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toBe(PAGES);
+    expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
+    fetchSpy.mockRestore();
+  });
+
+  test('does not create a session for an unregistered LINE user', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id_token: 'id-token' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sub: 'not-registered' }), { status: 200 }));
+    const res = await app().request('/api/auth/line/callback?code=abc&state=expected', {
+      headers: { Cookie: 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier' },
+    }, crossSiteEnv());
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('/login?error=not_authorized');
+    expect(cookieFor(res, 'lh_admin_session')).toBeUndefined();
+    fetchSpy.mockRestore();
   });
 });
 

@@ -855,6 +855,7 @@ export interface StaffMember {
   email: string | null;
   role: 'owner' | 'admin' | 'staff';
   apiKey: string;
+  lineLinked: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
