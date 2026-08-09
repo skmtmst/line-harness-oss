@@ -812,7 +812,12 @@ export type AutomationEventType =
   | "cv_fire"
   | "message_received"
   | "postback_received"
-  | "calendar_booked";
+  | "calendar_booked"
+  | "ec.order.confirmed"
+  | "ec.order.shipped"
+  | "ec.subscription.upcoming"
+  | "ec.subscription.payment_failed"
+  | "ec.subscription.cancelled";
 
 export interface AutomationAction {
   type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu";

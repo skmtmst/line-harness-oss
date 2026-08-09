@@ -231,6 +231,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
+    path === '/api/integrations/eccube/events' ||
     path.match(/^\/api\/webhooks\/incoming\/[^/]+\/receive$/) ||
     path === '/api/meet-callback' || // Meet Harness completion callback
     path === '/api/qr' || // Public QR proxy — used by desktop landing pages

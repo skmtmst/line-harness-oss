@@ -6,7 +6,7 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
 
-type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked"
+type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
 
 interface AutomationAction {
   type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu"
@@ -37,6 +37,11 @@ const eventTypeOptions: { value: AutomationEventType; label: string }[] = [
   { value: 'message_received', label: 'メッセージ受信' },
   { value: 'postback_received', label: 'ポストバック受信（リッチメニュー等）' },
   { value: 'calendar_booked', label: 'カレンダー予約' },
+  { value: 'ec.order.confirmed', label: 'EC：注文確定' },
+  { value: 'ec.order.shipped', label: 'EC：発送完了' },
+  { value: 'ec.subscription.upcoming', label: 'EC：定期便の次回予定' },
+  { value: 'ec.subscription.payment_failed', label: 'EC：定期便の決済失敗' },
+  { value: 'ec.subscription.cancelled', label: 'EC：定期便の解約' },
 ]
 
 const eventTypeLabelMap: Record<AutomationEventType, string> = {
@@ -47,6 +52,11 @@ const eventTypeLabelMap: Record<AutomationEventType, string> = {
   message_received: 'メッセージ受信',
   postback_received: 'ポストバック受信',
   calendar_booked: 'カレンダー予約',
+  'ec.order.confirmed': 'EC注文確定',
+  'ec.order.shipped': 'EC発送完了',
+  'ec.subscription.upcoming': '定期便予定',
+  'ec.subscription.payment_failed': '定期便決済失敗',
+  'ec.subscription.cancelled': '定期便解約',
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
@@ -57,6 +67,11 @@ const eventTypeBadgeColor: Record<AutomationEventType, string> = {
   message_received: 'bg-purple-100 text-purple-700',
   postback_received: 'bg-pink-100 text-pink-700',
   calendar_booked: 'bg-indigo-100 text-indigo-700',
+  'ec.order.confirmed': 'bg-emerald-100 text-emerald-700',
+  'ec.order.shipped': 'bg-cyan-100 text-cyan-700',
+  'ec.subscription.upcoming': 'bg-teal-100 text-teal-700',
+  'ec.subscription.payment_failed': 'bg-orange-100 text-orange-700',
+  'ec.subscription.cancelled': 'bg-slate-100 text-slate-700',
 }
 
 interface CreateFormState {

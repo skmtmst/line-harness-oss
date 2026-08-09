@@ -82,6 +82,7 @@ import { lineProxy } from './routes/line-proxy.js';
 import { webinarRoutes } from './routes/webinars.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
+import { ecIntegrations } from './routes/ec-integrations.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -103,6 +104,7 @@ export type Env = {
     LINE_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_SECRET: string;
+    ECCUBE_WEBHOOK_SECRET?: string;
     WORKER_URL: string;
     // Admin auth topology (see middleware/admin-auth-config.ts):
     ADMIN_ORIGIN?: string;          // Comma-separated admin web origin allowlist for credentialed CORS
@@ -205,6 +207,8 @@ app.route('/', richMenuGroups);
 app.route('/', webinarRoutes);
 // LINE Messaging API 互換プロキシ — 外部エージェントの直接送信を messages_log に残す
 app.route('/', lineProxy);
+// EC-CUBEの取引イベント。管理者認証ではなく署名・時刻・重複IDで検証する。
+app.route('/', ecIntegrations);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
