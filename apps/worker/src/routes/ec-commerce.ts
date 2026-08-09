@@ -17,6 +17,14 @@ const EVENT_LABELS: Record<string, string> = {
   'ec.subscription.cancelled': '定期便の解約',
 };
 
+const FIXED_FIELDS: Record<string, string[]> = {
+  'ec.order.confirmed': ['注文番号', '商品名・数量', '合計金額', 'お届け予定', '注文詳細URL'],
+  'ec.order.shipped': ['注文番号', '商品名・数量', '配送会社', '送り状番号', '配送確認URL'],
+  'ec.subscription.upcoming': ['次回確定日', '変更期限', '商品名・数量', '予定金額', '定期便管理URL'],
+  'ec.subscription.payment_failed': ['決済失敗の案内', '支払い方法確認の案内', '定期便管理URL'],
+  'ec.subscription.cancelled': ['解約受付の案内', '定期便番号'],
+};
+
 function testEvent(eventType: string): EcEvent {
   const base: EcEvent = {
     event_id: `test-${crypto.randomUUID()}`,
@@ -140,54 +148,81 @@ ecCommerce.get('/api/ec-commerce/events', async (c) => {
 
 ecCommerce.get('/api/ec-commerce/settings', async (c) => {
   const rows = await c.env.DB.prepare(
-    `SELECT event_type, is_enabled, title_override, updated_at
+    `SELECT event_type, is_enabled, title_override, intro_text, outro_text, updated_at
        FROM ec_notification_settings ORDER BY rowid`,
-  ).all<{ event_type: string; is_enabled: number; title_override: string | null; updated_at: string }>();
+  ).all<{
+    event_type: string; is_enabled: number; title_override: string | null;
+    intro_text: string | null; outro_text: string | null; updated_at: string;
+  }>();
   return c.json({
     success: true,
-    data: rows.results.map((row) => ({
-      eventType: row.event_type,
-      label: EVENT_LABELS[row.event_type] || row.event_type,
-      isEnabled: row.is_enabled === 1,
-      title: row.title_override,
-      updatedAt: row.updated_at,
-    })),
+    data: rows.results.map((row) => {
+      const fixedMessage = ecTextMessage(testEvent(row.event_type), { title: '__FIXED__' });
+      const fixedPreview = fixedMessage.type === 'text'
+        ? fixedMessage.text.replace(/^__FIXED__\n\n?/, '')
+        : '';
+      return {
+        eventType: row.event_type,
+        label: EVENT_LABELS[row.event_type] || row.event_type,
+        isEnabled: row.is_enabled === 1,
+        title: row.title_override,
+        introText: row.intro_text || '',
+        outroText: row.outro_text || '',
+        fixedFields: FIXED_FIELDS[row.event_type] || [],
+        fixedPreview,
+        updatedAt: row.updated_at,
+      };
+    }),
   });
 });
 
 ecCommerce.put('/api/ec-commerce/settings/:eventType', async (c) => {
   const eventType = c.req.param('eventType');
   if (!EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
-  const body = await c.req.json<{ isEnabled?: unknown; title?: unknown }>().catch(() => null);
-  if (!body || typeof body.isEnabled !== 'boolean' || typeof body.title !== 'string') {
-    return c.json({ success: false, error: 'isEnabled and title are required' }, 400);
+  const body = await c.req.json<{
+    isEnabled?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
+  }>().catch(() => null);
+  if (!body || typeof body.isEnabled !== 'boolean' || typeof body.title !== 'string'
+      || typeof body.introText !== 'string' || typeof body.outroText !== 'string') {
+    return c.json({ success: false, error: 'isEnabled, title, introText and outroText are required' }, 400);
   }
   const title = body.title.trim();
   if (!title || title.length > 80) return c.json({ success: false, error: 'Title must be 1-80 characters' }, 400);
+  const introText = body.introText.trim();
+  const outroText = body.outroText.trim();
+  if (introText.length > 800 || outroText.length > 800) {
+    return c.json({ success: false, error: 'Editable copy must be 800 characters or fewer' }, 400);
+  }
   const now = jstNow();
   await c.env.DB.prepare(
-    `INSERT INTO ec_notification_settings (event_type, is_enabled, title_override, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO ec_notification_settings
+       (event_type, is_enabled, title_override, intro_text, outro_text, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(event_type) DO UPDATE SET is_enabled = excluded.is_enabled,
-       title_override = excluded.title_override, updated_at = excluded.updated_at`,
-  ).bind(eventType, body.isEnabled ? 1 : 0, title, now, now).run();
+       title_override = excluded.title_override, intro_text = excluded.intro_text,
+       outro_text = excluded.outro_text, updated_at = excluded.updated_at`,
+  ).bind(eventType, body.isEnabled ? 1 : 0, title, introText, outroText, now, now).run();
   return c.json({ success: true });
 });
 
 ecCommerce.post('/api/ec-commerce/test-send', async (c) => {
-  const body = await c.req.json<{ eventType?: unknown; accountId?: unknown }>().catch(() => null);
+  const body = await c.req.json<{
+    eventType?: unknown; accountId?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
+  }>().catch(() => null);
   if (!body || typeof body.eventType !== 'string' || !EVENT_TYPE_SET.has(body.eventType)) {
     return c.json({ success: false, error: 'Invalid eventType' }, 400);
   }
   if (typeof body.accountId !== 'string' || !body.accountId) {
     return c.json({ success: false, error: 'accountId is required' }, 400);
   }
+  if (typeof body.title !== 'string' || !body.title.trim() || body.title.trim().length > 80
+      || typeof body.introText !== 'string' || body.introText.trim().length > 800
+      || typeof body.outroText !== 'string' || body.outroText.trim().length > 800) {
+    return c.json({ success: false, error: 'Invalid notification copy' }, 400);
+  }
   const account = await getLineAccountById(c.env.DB, body.accountId);
   if (!account?.channel_access_token) return c.json({ success: false, error: 'LINE account is not configured' }, 400);
 
-  const setting = await c.env.DB.prepare(
-    `SELECT title_override FROM ec_notification_settings WHERE event_type = ?`,
-  ).bind(body.eventType).first<{ title_override: string | null }>();
   const recipientSetting = await c.env.DB.prepare(
     `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
   ).bind(body.accountId).first<{ value: string }>();
@@ -206,7 +241,12 @@ ecCommerce.post('/api/ec-commerce/test-send', async (c) => {
   ).bind(body.accountId, ...friendIds).all<{ id: string; line_user_id: string }>();
   if (!friends.results.length) return c.json({ success: false, error: 'No active test recipients' }, 400);
 
-  const message = ecTextMessage(testEvent(body.eventType), { title: setting?.title_override, test: true });
+  const message = ecTextMessage(testEvent(body.eventType), {
+    title: body.title.trim(),
+    introText: body.introText.trim(),
+    outroText: body.outroText.trim(),
+    test: true,
+  });
   const client = new LineClient(account.channel_access_token);
   let sent = 0;
   for (const friend of friends.results) {

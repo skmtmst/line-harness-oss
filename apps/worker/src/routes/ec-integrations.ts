@@ -92,63 +92,68 @@ function yen(value: number | undefined): string {
 
 function itemSummary(items: EcItem[] | undefined): string {
   if (!items?.length) return '商品情報なし';
-  const visible = items.slice(0, 4).map((item) => `${item.name} × ${item.quantity}`);
+  const visible = items.slice(0, 4).map((item) => `${item.name.slice(0, 80)} × ${item.quantity}`);
   if (items.length > visible.length) visible.push(`ほか${items.length - visible.length}点`);
   return visible.join('\n');
 }
 
-export function ecTextMessage(event: EcEvent, options?: { title?: string | null; test?: boolean }): Message {
+export type EcMessageOptions = {
+  title?: string | null;
+  introText?: string | null;
+  outroText?: string | null;
+  test?: boolean;
+};
+
+function messageText(title: string, fixedLines: string[], options?: EcMessageOptions): Message {
+  const sections = [
+    `${options?.test ? '【テスト送信】\n' : ''}${options?.title || title}`,
+    options?.introText?.trim() || '',
+    fixedLines.filter(Boolean).join('\n'),
+    options?.outroText?.trim() || '',
+  ].filter(Boolean);
+  return { type: 'text', text: sections.join('\n\n').trim() };
+}
+
+export function ecTextMessage(event: EcEvent, options?: EcMessageOptions): Message {
   const orderNumber = event.order?.number || '—';
-  const testPrefix = options?.test ? '【テスト送信】\n' : '';
   if (event.event_type === 'ec.order.confirmed') {
-    return {
-      type: 'text',
-      text: [
-        `${testPrefix}${options?.title || 'ご注文ありがとうございます'}`,
-        '',
+    return messageText('ご注文ありがとうございます', [
         `注文番号：${orderNumber}`,
         itemSummary(event.order?.items),
         `合計：${yen(event.order?.total)}`,
         event.order?.delivery_date ? `お届け予定：${event.order.delivery_date}${event.order.delivery_time ? ` ${event.order.delivery_time}` : ''}` : '',
-        '',
         event.order?.detail_url || '',
-      ].filter((line, index) => line !== '' || index < 2).join('\n').trim(),
-    };
+    ], options);
   }
   if (event.event_type === 'ec.order.shipped') {
-    return {
-      type: 'text',
-      text: [
-        `${testPrefix}${options?.title || '商品を発送しました'}`,
-        '',
+    return messageText('商品を発送しました', [
         `注文番号：${orderNumber}`,
         itemSummary(event.order?.items),
         event.shipping?.carrier ? `配送会社：${event.shipping.carrier}` : '',
         event.shipping?.tracking_number ? `送り状番号：${event.shipping.tracking_number}` : '',
-        '',
         event.shipping?.tracking_url || event.order?.detail_url || '',
-      ].filter((line, index) => line !== '' || index < 2).join('\n').trim(),
-    };
+    ], options);
   }
   if (event.event_type === 'ec.subscription.upcoming') {
-    return {
-      type: 'text',
-      text: [
-        `${testPrefix}${options?.title || '次回の定期便をお知らせします'}`,
-        '',
+    return messageText('次回の定期便をお知らせします', [
         event.subscription?.next_order_date ? `次回確定日：${event.subscription.next_order_date}` : '',
         event.subscription?.change_deadline ? `変更期限：${event.subscription.change_deadline}` : '',
         itemSummary(event.order?.items),
         `予定金額：${yen(event.order?.total)}`,
-        '',
         event.subscription?.manage_url || '',
-      ].filter((line, index) => line !== '' || index < 2).join('\n').trim(),
-    };
+    ], options);
   }
   if (event.event_type === 'ec.subscription.payment_failed') {
-    return { type: 'text', text: `${testPrefix}${options?.title || '定期便のお支払いをご確認ください'}\n\n定期便のお支払いを確認できませんでした。\nお支払い方法をご確認ください。\n\n${event.subscription?.manage_url || ''}`.trim() };
+    return messageText('定期便のお支払いをご確認ください', [
+      '定期便のお支払いを確認できませんでした。',
+      'お支払い方法をご確認ください。',
+      event.subscription?.manage_url || '',
+    ], options);
   }
-  return { type: 'text', text: `${testPrefix}${options?.title || '定期便の解約を受け付けました'}\n\nご利用ありがとうございました。`.trim() };
+  return messageText('定期便の解約を受け付けました', [
+    '定期便の解約を受け付けました。',
+    event.subscription?.id ? `定期便番号：${event.subscription.id}` : '',
+  ], options);
 }
 
 ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
@@ -230,8 +235,11 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     if (!accessToken) throw new Error('LINE access token is not configured');
 
     const setting = await c.env.DB.prepare(
-      `SELECT is_enabled, title_override FROM ec_notification_settings WHERE event_type = ?`,
-    ).bind(event.event_type).first<{ is_enabled: number; title_override: string | null }>();
+      `SELECT is_enabled, title_override, intro_text, outro_text
+         FROM ec_notification_settings WHERE event_type = ?`,
+    ).bind(event.event_type).first<{
+      is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
+    }>();
 
     // Transactional delivery can be paused independently while automation
     // events continue to fire for segmentation and step campaigns.
@@ -246,7 +254,11 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       return c.json({ success: true, status: 'skipped' }, 202);
     }
 
-    const message = ecTextMessage(event, { title: setting?.title_override });
+    const message = ecTextMessage(event, {
+      title: setting?.title_override,
+      introText: setting?.intro_text,
+      outroText: setting?.outro_text,
+    });
     const lineClient = new LineClient(accessToken);
     await lineClient.pushMessage(event.line_user_id, [message]);
     await logOutgoingMessage(c.env.DB, {

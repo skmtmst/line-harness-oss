@@ -24,7 +24,7 @@ describe('ecTextMessage', () => {
     ['ec.order.shipped', '送り状番号：1234'],
     ['ec.subscription.upcoming', '次回確定日：2026年9月1日'],
     ['ec.subscription.payment_failed', 'お支払い方法をご確認ください'],
-    ['ec.subscription.cancelled', 'ご利用ありがとうございました'],
+    ['ec.subscription.cancelled', '定期便の解約を受け付けました。'],
   ])('builds the %s notification', (eventType, expected) => {
     const message = ecTextMessage(event(eventType));
     expect(message.type).toBe('text');
@@ -35,5 +35,18 @@ describe('ecTextMessage', () => {
     const message = ecTextMessage(event('ec.order.confirmed'), { title: '然からのお知らせ', test: true });
     expect(message.type).toBe('text');
     if (message.type === 'text') expect(message.text).toMatch(/^【テスト送信】\n然からのお知らせ/);
+  });
+
+  it('keeps mandatory order facts between editable copy', () => {
+    const message = ecTextMessage(event('ec.order.confirmed'), {
+      introText: '前に追加する文章',
+      outroText: '後ろに追加する文章',
+    });
+    expect(message.type).toBe('text');
+    if (message.type === 'text') {
+      expect(message.text).toContain('前に追加する文章\n\n注文番号：NEN-1001');
+      expect(message.text).toContain('合計：¥2,860');
+      expect(message.text).toContain('https://stg.nen-petfood.com/mypage\n\n後ろに追加する文章');
+    }
   });
 });
