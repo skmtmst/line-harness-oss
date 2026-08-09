@@ -8,11 +8,6 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import { countryFlag } from '@/lib/country-flag'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 
-const appVersion = process.env.APP_VERSION || '0.0.0'
-const appCommitSha = process.env.APP_COMMIT_SHA || 'local'
-const appBuildTime = process.env.APP_BUILD_TIME || ''
-const appBuildDate = appBuildTime ? appBuildTime.replace('T', ' ').replace(/\.\d{3}Z$/, 'Z') : ''
-
 // ─── メニュー定義（ユーザー目線のカテゴリ） ───
 
 const menuSections = [
@@ -323,39 +318,33 @@ export default function Sidebar() {
             </span>
           </div>
         )}
-        <div className="px-6 py-4 space-y-3">
-        <div className="space-y-0.5">
-          <p className="text-xs text-gray-400">L Harness v{appVersion}</p>
-          <p className="text-[10px] text-gray-400 font-mono break-all">
-            build {appCommitSha}{appBuildDate ? ` · ${appBuildDate}` : ''}
-          </p>
-        </div>
-        <button
-          onClick={async () => {
-            try {
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL
-              if (apiUrl) {
-                await fetch(`${apiUrl}/api/auth/logout`, {
-                  method: 'POST',
-                  credentials: 'include',
-                })
+        <div className="px-6 py-4">
+          <button
+            onClick={async () => {
+              try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL
+                if (apiUrl) {
+                  await fetch(`${apiUrl}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                  })
+                }
+              } catch {
+                // Local cleanup still logs the browser out if the network call fails.
               }
-            } catch {
-              // Local cleanup still logs the browser out if the network call fails.
-            }
-            localStorage.removeItem('lh_api_key')
-            localStorage.removeItem('lh_csrf')
-            localStorage.removeItem('lh_staff_name')
-            localStorage.removeItem('lh_staff_role')
-            window.location.href = '/login'
-          }}
-          className="flex items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          ログアウト
-        </button>
+              localStorage.removeItem('lh_api_key')
+              localStorage.removeItem('lh_csrf')
+              localStorage.removeItem('lh_staff_name')
+              localStorage.removeItem('lh_staff_role')
+              window.location.href = '/login'
+            }}
+            className="flex items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            ログアウト
+          </button>
         </div>
       </div>
     </>
