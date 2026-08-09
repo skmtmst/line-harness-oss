@@ -8,16 +8,17 @@ import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 const ecIntegrations = new Hono<Env>();
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_CLOCK_SKEW_SECONDS = 5 * 60;
-const EVENT_TYPES = new Set([
+export const EC_EVENT_TYPES = [
   'ec.order.confirmed',
   'ec.order.shipped',
   'ec.subscription.upcoming',
   'ec.subscription.payment_failed',
   'ec.subscription.cancelled',
-]);
+] as const;
+const EVENT_TYPES = new Set<string>(EC_EVENT_TYPES);
 
 type EcItem = { name: string; quantity: number };
-type EcEvent = {
+export type EcEvent = {
   event_id: string;
   event_type: string;
   occurred_at: string;
@@ -96,13 +97,14 @@ function itemSummary(items: EcItem[] | undefined): string {
   return visible.join('\n');
 }
 
-function textMessage(event: EcEvent): Message {
+export function ecTextMessage(event: EcEvent, options?: { title?: string | null; test?: boolean }): Message {
   const orderNumber = event.order?.number || '—';
+  const testPrefix = options?.test ? '【テスト送信】\n' : '';
   if (event.event_type === 'ec.order.confirmed') {
     return {
       type: 'text',
       text: [
-        'ご注文ありがとうございます',
+        `${testPrefix}${options?.title || 'ご注文ありがとうございます'}`,
         '',
         `注文番号：${orderNumber}`,
         itemSummary(event.order?.items),
@@ -117,7 +119,7 @@ function textMessage(event: EcEvent): Message {
     return {
       type: 'text',
       text: [
-        '商品を発送しました',
+        `${testPrefix}${options?.title || '商品を発送しました'}`,
         '',
         `注文番号：${orderNumber}`,
         itemSummary(event.order?.items),
@@ -132,7 +134,7 @@ function textMessage(event: EcEvent): Message {
     return {
       type: 'text',
       text: [
-        '次回の定期便をお知らせします',
+        `${testPrefix}${options?.title || '次回の定期便をお知らせします'}`,
         '',
         event.subscription?.next_order_date ? `次回確定日：${event.subscription.next_order_date}` : '',
         event.subscription?.change_deadline ? `変更期限：${event.subscription.change_deadline}` : '',
@@ -144,9 +146,9 @@ function textMessage(event: EcEvent): Message {
     };
   }
   if (event.event_type === 'ec.subscription.payment_failed') {
-    return { type: 'text', text: `定期便のお支払いを確認できませんでした。\nお支払い方法をご確認ください。\n\n${event.subscription?.manage_url || ''}`.trim() };
+    return { type: 'text', text: `${testPrefix}${options?.title || '定期便のお支払いをご確認ください'}\n\n定期便のお支払いを確認できませんでした。\nお支払い方法をご確認ください。\n\n${event.subscription?.manage_url || ''}`.trim() };
   }
-  return { type: 'text', text: '定期便の解約を受け付けました。ご利用ありがとうございました。' };
+  return { type: 'text', text: `${testPrefix}${options?.title || '定期便の解約を受け付けました'}\n\nご利用ありがとうございました。`.trim() };
 }
 
 ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
@@ -227,7 +229,24 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     const accessToken = account?.channel_access_token || c.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!accessToken) throw new Error('LINE access token is not configured');
 
-    const message = textMessage(event);
+    const setting = await c.env.DB.prepare(
+      `SELECT is_enabled, title_override FROM ec_notification_settings WHERE event_type = ?`,
+    ).bind(event.event_type).first<{ is_enabled: number; title_override: string | null }>();
+
+    // Transactional delivery can be paused independently while automation
+    // events continue to fire for segmentation and step campaigns.
+    if (setting?.is_enabled === 0) {
+      await c.env.DB.prepare(
+        `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
+      ).bind(friend.id, now, now, row.id).run();
+      await fireEvent(c.env.DB, event.event_type, {
+        friendId: friend.id,
+        eventData: event,
+      }, accessToken, account?.id ?? friend.line_account_id ?? undefined);
+      return c.json({ success: true, status: 'skipped' }, 202);
+    }
+
+    const message = ecTextMessage(event, { title: setting?.title_override });
     const lineClient = new LineClient(accessToken);
     await lineClient.pushMessage(event.line_user_id, [message]);
     await logOutgoingMessage(c.env.DB, {

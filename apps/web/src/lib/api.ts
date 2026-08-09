@@ -190,6 +190,39 @@ export type FriendListItem = FriendWithTags & Partial<{
   handled: boolean
 }>
 
+export type EcCommerceOverview = {
+  total: number
+  processed: number
+  failed: number
+  skipped: number
+  last24h: number
+  lastReceivedAt: string | null
+  byType: Array<{ eventType: string; label: string; count: number }>
+}
+
+export type EcCommerceEvent = {
+  id: string
+  externalEventId: string
+  eventType: string
+  eventLabel: string
+  customerId: string | null
+  friendId: string | null
+  friendName: string | null
+  orderNumber: string | null
+  status: 'received' | 'processing' | 'processed' | 'skipped' | 'failed'
+  errorMessage: string | null
+  receivedAt: string
+  processedAt: string | null
+}
+
+export type EcNotificationSetting = {
+  eventType: string
+  label: string
+  isEnabled: boolean
+  title: string | null
+  updatedAt: string
+}
+
 export const api = {
   friends: {
     list: (params?: FriendListParams) => {
@@ -814,6 +847,33 @@ export const api = {
       fetchApi<ApiResponse<AutomationLog[]>>(
         `/api/automations/${id}/logs` + (limit ? `?limit=${limit}` : ''),
       ),
+  },
+  ecCommerce: {
+    overview: () =>
+      fetchApi<ApiResponse<EcCommerceOverview>>('/api/ec-commerce/overview'),
+    events: (params?: { eventType?: string; status?: string; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams()
+      if (params?.eventType) query.set('eventType', params.eventType)
+      if (params?.status) query.set('status', params.status)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.offset !== undefined) query.set('offset', String(params.offset))
+      const suffix = query.size ? `?${query}` : ''
+      return fetchApi<ApiResponse<EcCommerceEvent[]> & { pagination: { total: number; limit: number; offset: number } }>(
+        `/api/ec-commerce/events${suffix}`,
+      )
+    },
+    settings: () =>
+      fetchApi<ApiResponse<EcNotificationSetting[]>>('/api/ec-commerce/settings'),
+    updateSetting: (eventType: string, data: { isEnabled: boolean; title: string }) =>
+      fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    testSend: (data: { eventType: string; accountId: string }) =>
+      fetchApi<ApiResponse<{ sent: number }>>('/api/ec-commerce/test-send', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
   },
   chats: {
     list: (params?: { status?: string; operatorId?: string; accountId?: string; unansweredOnly?: boolean; limit?: number; beforeAt?: string; beforeId?: string }) => {

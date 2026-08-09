@@ -58,6 +58,12 @@ const menuSections = [
     ],
   },
   {
+    label: 'EC',
+    items: [
+      { href: '/ec-commerce', label: 'EC連携', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.3 2.3c-.63.63-.18 1.7.7 1.7H17m0 0a2 2 0 110 4 2 2 0 010-4zm-10 0a2 2 0 110 4 2 2 0 010-4z' },
+    ],
+  },
+  {
     label: '予約',
     items: [
       { href: '/booking/bookings', label: '予約管理', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },

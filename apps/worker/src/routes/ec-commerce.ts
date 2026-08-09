@@ -1,0 +1,227 @@
+import { Hono } from 'hono';
+import { getLineAccountById, jstNow } from '@line-crm/db';
+import { LineClient } from '@line-crm/line-sdk';
+import type { Env } from '../index.js';
+import { logOutgoingMessage } from '../services/event-bus.js';
+import { EC_EVENT_TYPES, ecTextMessage, type EcEvent } from './ec-integrations.js';
+
+const ecCommerce = new Hono<Env>();
+const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
+const STATUS_SET = new Set(['received', 'processing', 'processed', 'skipped', 'failed']);
+
+const EVENT_LABELS: Record<string, string> = {
+  'ec.order.confirmed': '注文完了',
+  'ec.order.shipped': '発送完了',
+  'ec.subscription.upcoming': '次回定期便',
+  'ec.subscription.payment_failed': '定期便の決済失敗',
+  'ec.subscription.cancelled': '定期便の解約',
+};
+
+function testEvent(eventType: string): EcEvent {
+  const base: EcEvent = {
+    event_id: `test-${crypto.randomUUID()}`,
+    event_type: eventType,
+    occurred_at: new Date().toISOString(),
+    line_user_id: 'U00000000000000000000000000000000',
+    order: {
+      number: 'NEN-TEST-001',
+      total: 2860,
+      items: [{ name: '鹿肉ミンチ', quantity: 2 }],
+      delivery_date: '2026年8月15日',
+      delivery_time: '18:00〜20:00',
+      detail_url: 'https://stg.nen-petfood.com/mypage',
+    },
+    shipping: {
+      carrier: 'ヤマト運輸',
+      tracking_number: '1234-5678-9012',
+      tracking_url: 'https://stg.nen-petfood.com/mypage',
+    },
+    subscription: {
+      id: 'NEN-SUB-TEST',
+      next_order_date: '2026年9月1日',
+      change_deadline: '2026年8月28日',
+      manage_url: 'https://stg.nen-petfood.com/mypage',
+    },
+  };
+  return base;
+}
+
+ecCommerce.get('/api/ec-commerce/overview', async (c) => {
+  const summary = await c.env.DB.prepare(
+    `SELECT
+       COUNT(*) AS total,
+       SUM(CASE WHEN status = 'processed' THEN 1 ELSE 0 END) AS processed,
+       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+       SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) AS skipped,
+       SUM(CASE WHEN datetime(received_at) >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS last_24h,
+       MAX(received_at) AS last_received_at
+     FROM ec_events`,
+  ).first<{
+    total: number; processed: number; failed: number; skipped: number;
+    last_24h: number; last_received_at: string | null;
+  }>();
+  const types = await c.env.DB.prepare(
+    `SELECT event_type, COUNT(*) AS count FROM ec_events GROUP BY event_type ORDER BY count DESC`,
+  ).all<{ event_type: string; count: number }>();
+
+  return c.json({
+    success: true,
+    data: {
+      total: summary?.total ?? 0,
+      processed: summary?.processed ?? 0,
+      failed: summary?.failed ?? 0,
+      skipped: summary?.skipped ?? 0,
+      last24h: summary?.last_24h ?? 0,
+      lastReceivedAt: summary?.last_received_at ?? null,
+      byType: types.results.map((row) => ({
+        eventType: row.event_type,
+        label: EVENT_LABELS[row.event_type] || row.event_type,
+        count: row.count,
+      })),
+    },
+  });
+});
+
+ecCommerce.get('/api/ec-commerce/events', async (c) => {
+  const requestedLimit = Number(c.req.query('limit') || '30');
+  const requestedOffset = Number(c.req.query('offset') || '0');
+  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 30;
+  const offset = Number.isInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
+  const eventType = c.req.query('eventType') || '';
+  const status = c.req.query('status') || '';
+  if (eventType && !EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
+  if (status && !STATUS_SET.has(status)) return c.json({ success: false, error: 'Invalid status' }, 400);
+
+  const clauses: string[] = [];
+  const bindings: Array<string | number> = [];
+  if (eventType) { clauses.push('e.event_type = ?'); bindings.push(eventType); }
+  if (status) { clauses.push('e.status = ?'); bindings.push(status); }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  const query = c.env.DB.prepare(
+    `SELECT e.id, e.external_event_id, e.event_type, e.customer_id, e.friend_id,
+            e.status, e.error_message, e.received_at, e.processed_at,
+            json_extract(e.payload, '$.order.number') AS order_number,
+            f.display_name AS friend_name
+       FROM ec_events e
+       LEFT JOIN friends f ON f.id = e.friend_id
+       ${where}
+      ORDER BY e.received_at DESC
+      LIMIT ? OFFSET ?`,
+  ).bind(...bindings, limit, offset);
+  const [rows, countRow] = await Promise.all([
+    query.all<{
+      id: string; external_event_id: string; event_type: string; customer_id: string | null;
+      friend_id: string | null; status: string; error_message: string | null;
+      received_at: string; processed_at: string | null; order_number: string | null;
+      friend_name: string | null;
+    }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM ec_events e ${where}`).bind(...bindings).first<{ count: number }>(),
+  ]);
+
+  return c.json({
+    success: true,
+    data: rows.results.map((row) => ({
+      id: row.id,
+      externalEventId: row.external_event_id,
+      eventType: row.event_type,
+      eventLabel: EVENT_LABELS[row.event_type] || row.event_type,
+      customerId: row.customer_id,
+      friendId: row.friend_id,
+      friendName: row.friend_name,
+      orderNumber: row.order_number,
+      status: row.status,
+      errorMessage: row.error_message,
+      receivedAt: row.received_at,
+      processedAt: row.processed_at,
+    })),
+    pagination: { total: countRow?.count ?? 0, limit, offset },
+  });
+});
+
+ecCommerce.get('/api/ec-commerce/settings', async (c) => {
+  const rows = await c.env.DB.prepare(
+    `SELECT event_type, is_enabled, title_override, updated_at
+       FROM ec_notification_settings ORDER BY rowid`,
+  ).all<{ event_type: string; is_enabled: number; title_override: string | null; updated_at: string }>();
+  return c.json({
+    success: true,
+    data: rows.results.map((row) => ({
+      eventType: row.event_type,
+      label: EVENT_LABELS[row.event_type] || row.event_type,
+      isEnabled: row.is_enabled === 1,
+      title: row.title_override,
+      updatedAt: row.updated_at,
+    })),
+  });
+});
+
+ecCommerce.put('/api/ec-commerce/settings/:eventType', async (c) => {
+  const eventType = c.req.param('eventType');
+  if (!EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
+  const body = await c.req.json<{ isEnabled?: unknown; title?: unknown }>().catch(() => null);
+  if (!body || typeof body.isEnabled !== 'boolean' || typeof body.title !== 'string') {
+    return c.json({ success: false, error: 'isEnabled and title are required' }, 400);
+  }
+  const title = body.title.trim();
+  if (!title || title.length > 80) return c.json({ success: false, error: 'Title must be 1-80 characters' }, 400);
+  const now = jstNow();
+  await c.env.DB.prepare(
+    `INSERT INTO ec_notification_settings (event_type, is_enabled, title_override, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(event_type) DO UPDATE SET is_enabled = excluded.is_enabled,
+       title_override = excluded.title_override, updated_at = excluded.updated_at`,
+  ).bind(eventType, body.isEnabled ? 1 : 0, title, now, now).run();
+  return c.json({ success: true });
+});
+
+ecCommerce.post('/api/ec-commerce/test-send', async (c) => {
+  const body = await c.req.json<{ eventType?: unknown; accountId?: unknown }>().catch(() => null);
+  if (!body || typeof body.eventType !== 'string' || !EVENT_TYPE_SET.has(body.eventType)) {
+    return c.json({ success: false, error: 'Invalid eventType' }, 400);
+  }
+  if (typeof body.accountId !== 'string' || !body.accountId) {
+    return c.json({ success: false, error: 'accountId is required' }, 400);
+  }
+  const account = await getLineAccountById(c.env.DB, body.accountId);
+  if (!account?.channel_access_token) return c.json({ success: false, error: 'LINE account is not configured' }, 400);
+
+  const setting = await c.env.DB.prepare(
+    `SELECT title_override FROM ec_notification_settings WHERE event_type = ?`,
+  ).bind(body.eventType).first<{ title_override: string | null }>();
+  const recipientSetting = await c.env.DB.prepare(
+    `SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'test_recipients'`,
+  ).bind(body.accountId).first<{ value: string }>();
+  let friendIds: string[] = [];
+  try {
+    const parsed = recipientSetting ? JSON.parse(recipientSetting.value) : [];
+    if (Array.isArray(parsed)) friendIds = parsed.filter((value): value is string => typeof value === 'string').slice(0, 20);
+  } catch {
+    friendIds = [];
+  }
+  if (!friendIds.length) return c.json({ success: false, error: 'Test recipients are not configured' }, 400);
+
+  const placeholders = friendIds.map(() => '?').join(',');
+  const friends = await c.env.DB.prepare(
+    `SELECT id, line_user_id FROM friends WHERE line_account_id = ? AND is_following = 1 AND id IN (${placeholders})`,
+  ).bind(body.accountId, ...friendIds).all<{ id: string; line_user_id: string }>();
+  if (!friends.results.length) return c.json({ success: false, error: 'No active test recipients' }, 400);
+
+  const message = ecTextMessage(testEvent(body.eventType), { title: setting?.title_override, test: true });
+  const client = new LineClient(account.channel_access_token);
+  let sent = 0;
+  for (const friend of friends.results) {
+    await client.pushMessage(friend.line_user_id, [message]);
+    await logOutgoingMessage(c.env.DB, {
+      friendId: friend.id,
+      messageType: message.type,
+      content: message.type === 'text' ? message.text : JSON.stringify(message),
+      deliveryType: 'push',
+      source: 'ec_test',
+      lineAccountId: account.id,
+    });
+    sent += 1;
+  }
+  return c.json({ success: true, data: { sent } });
+});
+
+export { ecCommerce };

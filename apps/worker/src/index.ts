@@ -83,6 +83,7 @@ import { webinarRoutes } from './routes/webinars.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
 import { ecIntegrations } from './routes/ec-integrations.js';
+import { ecCommerce } from './routes/ec-commerce.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -209,6 +210,8 @@ app.route('/', webinarRoutes);
 app.route('/', lineProxy);
 // EC-CUBEの取引イベント。管理者認証ではなく署名・時刻・重複IDで検証する。
 app.route('/', ecIntegrations);
+// NEN EC連携の管理画面API（通常の管理者認証・CSRF保護対象）。
+app.route('/', ecCommerce);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
