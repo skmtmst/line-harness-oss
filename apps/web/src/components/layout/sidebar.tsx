@@ -256,18 +256,8 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <>
-      {/* ロゴ */}
-      <div className="px-6 py-5 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: '#06C755' }}>
-            H
-          </div>
-          <div>
-            <p className="text-sm font-bold text-gray-900 leading-tight">L Harness</p>
-            <p className="text-xs text-gray-400">管理画面</p>
-          </div>
-        </div>
-      </div>
+      {/* モバイルドロワーでは閉じるボタン分の余白だけ確保する */}
+      <div className="h-16 lg:hidden" aria-hidden="true" />
 
       {/* アカウント切替 */}
       <AccountSwitcher />
