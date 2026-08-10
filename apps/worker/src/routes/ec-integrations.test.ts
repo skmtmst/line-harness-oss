@@ -14,7 +14,15 @@ function event(eventType: string): EcEvent {
       detail_url: 'https://stg.nen-petfood.com/mypage',
     },
     shipping: { carrier: 'ヤマト運輸', tracking_number: '1234' },
-    subscription: { next_order_date: '2026年9月1日', manage_url: 'https://stg.nen-petfood.com/mypage' },
+    subscription: {
+      contract_number: 'NEN-SUB-0000000057',
+      amount: 3680,
+      scheduled_shipping_date: '2026-08-31',
+      next_order_date: '2026年9月1日',
+      manage_url: 'https://stg.nen-petfood.com/mypage',
+      mypage_subscription_url: 'https://stg.nen-petfood.com/mypage/subscription',
+      payment_method_update_url: 'https://stg.nen-petfood.com/mypage/subscription/7/payment-method',
+    },
   };
 }
 
@@ -35,6 +43,17 @@ describe('ecTextMessage', () => {
     const message = ecTextMessage(event('ec.order.confirmed'), { title: '然からのお知らせ', test: true });
     expect(message.type).toBe('text');
     if (message.type === 'text') expect(message.text).toMatch(/^【テスト送信】\n然からのお知らせ/);
+  });
+
+  it('includes both recovery links in a subscription payment failure notification', () => {
+    const message = ecTextMessage(event('ec.subscription.payment_failed'));
+    expect(message.type).toBe('text');
+    if (message.type === 'text') {
+      expect(message.text).toContain('契約番号：NEN-SUB-0000000057');
+      expect(message.text).toContain('お支払い金額：¥3,680');
+      expect(message.text).toContain('定期便の確認：\nhttps://stg.nen-petfood.com/mypage/subscription');
+      expect(message.text).toContain('クレジットカードの変更：\nhttps://stg.nen-petfood.com/mypage/subscription/7/payment-method');
+    }
   });
 
   it('keeps mandatory order facts between editable copy', () => {

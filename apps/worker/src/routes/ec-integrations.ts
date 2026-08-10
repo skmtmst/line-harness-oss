@@ -41,9 +41,14 @@ export type EcEvent = {
   };
   subscription?: {
     id?: string;
+    contract_number?: string;
+    amount?: number;
+    scheduled_shipping_date?: string | null;
     next_order_date?: string | null;
     change_deadline?: string | null;
     manage_url?: string | null;
+    mypage_subscription_url?: string | null;
+    payment_method_update_url?: string | null;
   };
 };
 
@@ -144,10 +149,16 @@ export function ecTextMessage(event: EcEvent, options?: EcMessageOptions): Messa
     ], options);
   }
   if (event.event_type === 'ec.subscription.payment_failed') {
+    const subscriptionUrl = event.subscription?.mypage_subscription_url || event.subscription?.manage_url || '';
+    const paymentMethodUrl = event.subscription?.payment_method_update_url || event.subscription?.manage_url || '';
     return messageText('定期便のお支払いをご確認ください', [
       '定期便のお支払いを確認できませんでした。',
       'お支払い方法をご確認ください。',
-      event.subscription?.manage_url || '',
+      event.subscription?.contract_number ? `契約番号：${event.subscription.contract_number}` : '',
+      typeof event.subscription?.amount === 'number' ? `お支払い金額：${yen(event.subscription.amount)}` : '',
+      event.subscription?.scheduled_shipping_date ? `発送予定日：${event.subscription.scheduled_shipping_date}` : '',
+      subscriptionUrl ? `定期便の確認：\n${subscriptionUrl}` : '',
+      paymentMethodUrl ? `クレジットカードの変更：\n${paymentMethodUrl}` : '',
     ], options);
   }
   return messageText('定期便の解約を受け付けました', [
