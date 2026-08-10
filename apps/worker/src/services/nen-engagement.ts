@@ -69,15 +69,27 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
   const coupon = payload.coupon as Record<string, unknown> | undefined;
   const event = payload.event as EcEvent | undefined;
   const heroUrl = String(article?.image_url || campaign.image_url || '');
-  const destination = String(
-    article?.article_url || campaign.button_url || event?.order?.detail_url || event?.shipping?.tracking_url || '',
-  );
+  const destination = String(article?.article_url
+    || (event?.event_type === 'ec.order.shipped' ? event.shipping?.tracking_url : event?.order?.detail_url)
+    || campaign.button_url || '');
   const title = renderCampaignCopy(String(article?.title || campaign.title), payload);
   const body = renderCampaignCopy(String(article?.excerpt || campaign.body_text), payload);
   const details: Array<{ type: 'text'; text: string; size: 'sm'; color: string; wrap: true }> = [];
   if (event?.order?.number) details.push({ type: 'text', text: `注文番号：${event.order.number}`, size: 'sm', color: '#64748B', wrap: true });
   const items = event ? orderSummary(event) : '';
   if (items) details.push({ type: 'text', text: items, size: 'sm', color: '#64748B', wrap: true });
+  if (typeof event?.order?.total === 'number') {
+    details.push({ type: 'text', text: `合計：¥${Math.round(event.order.total).toLocaleString('ja-JP')}`, size: 'sm', color: '#64748B', wrap: true });
+  }
+  if (event?.order?.delivery_date) {
+    details.push({
+      type: 'text',
+      text: `お届け予定：${event.order.delivery_date}${event.order.delivery_time ? ` ${event.order.delivery_time}` : ''}`,
+      size: 'sm', color: '#64748B', wrap: true,
+    });
+  }
+  if (event?.shipping?.carrier) details.push({ type: 'text', text: `配送会社：${event.shipping.carrier}`, size: 'sm', color: '#64748B', wrap: true });
+  if (event?.shipping?.tracking_number) details.push({ type: 'text', text: `送り状番号：${event.shipping.tracking_number}`, size: 'sm', color: '#64748B', wrap: true });
   if (coupon?.code) details.push({ type: 'text', text: `クーポンコード：${String(coupon.code)}`, size: 'sm', color: '#0F766E', wrap: true });
   if (coupon?.expires_at) details.push({ type: 'text', text: `有効期限：${String(coupon.expires_at).slice(0, 10)}`, size: 'sm', color: '#64748B', wrap: true });
 

@@ -26,8 +26,9 @@ describe('buildNenFlexMessage', () => {
         order: {
           number: 'NEN-1001',
           items: [{ name: '鹿肉ミンチ', quantity: 2 }],
+          total: 2860,
         },
-        shipping: { tracking_url: 'https://example.com/tracking/1001' },
+        shipping: { carrier: 'ヤマト運輸', tracking_number: '1234-5678-9012', tracking_url: 'https://example.com/tracking/1001' },
       },
     });
 
@@ -35,6 +36,9 @@ describe('buildNenFlexMessage', () => {
     expect(JSON.stringify(message)).toContain('商品を発送しました');
     expect(JSON.stringify(message)).toContain('注文番号：NEN-1001');
     expect(JSON.stringify(message)).toContain('鹿肉ミンチ × 2');
+    expect(JSON.stringify(message)).toContain('合計：¥2,860');
+    expect(JSON.stringify(message)).toContain('配送会社：ヤマト運輸');
+    expect(JSON.stringify(message)).toContain('送り状番号：1234-5678-9012');
     expect(JSON.stringify(message)).toContain('https://example.com/tracking/1001');
   });
 
