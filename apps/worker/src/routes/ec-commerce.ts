@@ -15,6 +15,7 @@ const EVENT_LABELS: Record<string, string> = {
   'ec.subscription.upcoming': '次回定期便',
   'ec.subscription.payment_failed': '定期便の決済失敗',
   'ec.subscription.cancelled': '定期便の解約',
+  'ec.customer.profile_updated': 'ペット情報更新',
 };
 
 const FIXED_FIELDS: Record<string, string[]> = {

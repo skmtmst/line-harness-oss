@@ -54,8 +54,11 @@ export default function EcCommercePage() {
       if (!overviewRes.success || !eventRes.success || !settingRes.success) throw new Error('API error')
       setOverview(overviewRes.data)
       setEvents(eventRes.data)
-      setSettings(settingRes.data)
-      setExpandedEventType((current) => current ?? settingRes.data[0]?.eventType ?? null)
+      const subscriptionSettings = settingRes.data.filter((setting) =>
+        !['ec.order.confirmed', 'ec.order.shipped'].includes(setting.eventType),
+      )
+      setSettings(subscriptionSettings)
+      setExpandedEventType((current) => current ?? subscriptionSettings[0]?.eventType ?? null)
     } catch {
       setMessage({ tone: 'error', text: 'EC連携情報を読み込めませんでした。時間をおいて再度お試しください。' })
     } finally {

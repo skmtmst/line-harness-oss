@@ -55,6 +55,7 @@ const menuSections = [
   {
     label: 'EC',
     items: [
+      { href: '/nen-campaigns', label: 'NEN配信', icon: 'M12 3v18m9-9H3m15.364-6.364L5.636 18.364m12.728 0L5.636 5.636' },
       { href: '/ec-commerce', label: 'EC連携', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.3 2.3c-.63.63-.18 1.7.7 1.7H17m0 0a2 2 0 110 4 2 2 0 010-4zm-10 0a2 2 0 110 4 2 2 0 010-4z' },
     ],
   },

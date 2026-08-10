@@ -4,6 +4,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
+import { buildNenImmediateMessage, enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
 
 const ecIntegrations = new Hono<Env>();
 const MAX_BODY_BYTES = 256 * 1024;
@@ -14,6 +15,7 @@ export const EC_EVENT_TYPES = [
   'ec.subscription.upcoming',
   'ec.subscription.payment_failed',
   'ec.subscription.cancelled',
+  'ec.customer.profile_updated',
 ] as const;
 const EVENT_TYPES = new Set<string>(EC_EVENT_TYPES);
 
@@ -49,6 +51,16 @@ export type EcEvent = {
     manage_url?: string | null;
     mypage_subscription_url?: string | null;
     payment_method_update_url?: string | null;
+  };
+  profile?: {
+    owner_name?: string | null;
+    pets?: Array<{
+      id?: string | number | null;
+      name: string;
+      animal_type?: 'dog' | 'cat' | 'other';
+      gender?: 'male' | 'female' | 'unknown';
+      birthday?: string | null;
+    }>;
   };
 };
 
@@ -86,6 +98,16 @@ function validateEvent(value: unknown): value is EcEvent {
   if (typeof event.line_user_id !== 'string' || !/^U[0-9a-f]{32}$/i.test(event.line_user_id)) return false;
   if (typeof event.occurred_at !== 'string' || !Number.isFinite(Date.parse(event.occurred_at))) return false;
   if (event.order?.items && (!Array.isArray(event.order.items) || event.order.items.length > 50)) return false;
+  if (event.profile?.pets) {
+    if (!Array.isArray(event.profile.pets) || event.profile.pets.length > 20) return false;
+    for (const pet of event.profile.pets) {
+      if (!pet || typeof pet !== 'object' || typeof pet.name !== 'string' || !pet.name.trim() || pet.name.length > 80) return false;
+      if (pet.animal_type && !['dog', 'cat', 'other'].includes(pet.animal_type)) return false;
+      if (pet.gender && !['male', 'female', 'unknown'].includes(pet.gender)) return false;
+      if (pet.birthday != null && (typeof pet.birthday !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(pet.birthday)
+        || !Number.isFinite(Date.parse(`${pet.birthday}T00:00:00Z`)))) return false;
+    }
+  }
   return true;
 }
 
@@ -245,16 +267,35 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     const accessToken = account?.channel_access_token || c.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!accessToken) throw new Error('LINE access token is not configured');
 
-    const setting = await c.env.DB.prepare(
-      `SELECT is_enabled, title_override, intro_text, outro_text
-         FROM ec_notification_settings WHERE event_type = ?`,
-    ).bind(event.event_type).first<{
-      is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
-    }>();
+    if (event.event_type === 'ec.customer.profile_updated') {
+      const { syncNenPetProfiles } = await import('../services/nen-engagement.js');
+      await syncNenPetProfiles(c.env.DB, event, friend.id);
+      await c.env.DB.prepare(
+        `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
+      ).bind(friend.id, now, now, row.id).run();
+      await fireEvent(c.env.DB, event.event_type, { friendId: friend.id, eventData: event }, accessToken, account?.id ?? friend.line_account_id ?? undefined);
+      return c.json({ success: true, status: 'processed' });
+    }
+
+    const nenImmediate = await buildNenImmediateMessage(c.env.DB, event);
+    const setting = nenImmediate.message || !nenImmediate.enabled
+      ? null
+      : await c.env.DB.prepare(
+          `SELECT is_enabled, title_override, intro_text, outro_text
+             FROM ec_notification_settings WHERE event_type = ?`,
+        ).bind(event.event_type).first<{
+          is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
+        }>();
+
+    if (event.event_type === 'ec.order.shipped') {
+      await enqueuePostShippingFollowUps(
+        c.env.DB, event, friend.id, account?.id ?? friend.line_account_id ?? null,
+      );
+    }
 
     // Transactional delivery can be paused independently while automation
     // events continue to fire for segmentation and step campaigns.
-    if (setting?.is_enabled === 0) {
+    if (!nenImmediate.enabled || setting?.is_enabled === 0) {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
@@ -265,7 +306,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       return c.json({ success: true, status: 'skipped' }, 202);
     }
 
-    const message = ecTextMessage(event, {
+    const message = nenImmediate.message ?? ecTextMessage(event, {
       title: setting?.title_override,
       introText: setting?.intro_text,
       outroText: setting?.outro_text,

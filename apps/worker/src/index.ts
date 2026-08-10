@@ -84,6 +84,7 @@ import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
 import { ecIntegrations } from './routes/ec-integrations.js';
 import { ecCommerce } from './routes/ec-commerce.js';
+import { nenCampaigns } from './routes/nen-campaigns.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -106,6 +107,7 @@ export type Env = {
     LINE_LOGIN_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_SECRET: string;
     ECCUBE_WEBHOOK_SECRET?: string;
+    NEN_EC_BASE_URL?: string;
     WORKER_URL: string;
     // Admin auth topology (see middleware/admin-auth-config.ts):
     ADMIN_ORIGIN?: string;          // Comma-separated admin web origin allowlist for credentialed CORS
@@ -212,6 +214,7 @@ app.route('/', lineProxy);
 app.route('/', ecIntegrations);
 // NEN EC連携の管理画面API（通常の管理者認証・CSRF保護対象）。
 app.route('/', ecCommerce);
+app.route('/', nenCampaigns);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -958,6 +961,28 @@ async function scheduled(
     }
   } catch (e) {
     console.error('webinar-reminders error:', e);
+  }
+
+  // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
+  try {
+    const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
+    const birthdayQueued = await enqueueBirthdayCoupons(
+      env.DB,
+      new Date(),
+      env.NEN_EC_BASE_URL && env.ECCUBE_WEBHOOK_SECRET
+        ? { baseUrl: env.NEN_EC_BASE_URL, secret: env.ECCUBE_WEBHOOK_SECRET }
+        : undefined,
+    );
+    const result = await processNenDeliveries(env.DB, {
+      proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+    if (birthdayQueued + result.sent + result.failed + result.skipped > 0) {
+      console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued, ...result }));
+    }
+  } catch (e) {
+    console.error('nen-campaign delivery error:', e);
   }
 
   // Phase 2: 配信系と定期ジョブを並列実行する。processScheduledBroadcasts は tag/all の
