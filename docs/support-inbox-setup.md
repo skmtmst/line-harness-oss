@@ -42,7 +42,7 @@ XServerサーバーパネルで対象ドメイン `nen-petfood.com` を選び、
 
 - `XSERVER_RELAY_SECRET`: Worker Secret
 - `XSERVER_RELAY_URL`: `https://nen-petfood.com/_system/support-mail-relay.php`
-- D1: `072_support_email_inbox.sql` と `073_support_email_sync_state.sql`
+- D1: `082_support_email_inbox.sql` と `083_support_email_sync_state.sql`
 
 従来のWorkerからXServerへ直接接続するIMAP方式は、XServer側でCloudflareの接続がタイムアウトするため本番では使用しません。中継Secretが設定されている間、定期IMAP取得は実行されません。
 
