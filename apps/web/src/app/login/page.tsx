@@ -22,14 +22,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#06C755' }}>
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg mx-auto mb-3" style={{ backgroundColor: '#06C755' }}>
-            H
+    <main className="min-h-[100svh] bg-[#06C755] px-4 py-8 sm:px-6 sm:py-12 flex items-center justify-center">
+      <section className="w-full max-w-md rounded-3xl bg-white px-5 py-8 shadow-xl sm:px-10 sm:py-10">
+        <div className="mb-7 text-center sm:mb-8">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#06C755] text-xl font-bold text-white shadow-sm" aria-hidden="true">
+            N
           </div>
-          <h1 className="text-xl font-bold text-gray-900">L Harness</h1>
-          <p className="text-sm text-gray-500 mt-1">管理画面にログイン</p>
+          <h1 className="mx-auto max-w-sm text-xl font-bold leading-snug text-gray-900 sm:text-2xl">
+            然-NEN- LINE管理システム TEST
+          </h1>
+          <p className="mt-2 text-sm text-gray-500 sm:text-base">管理画面にログイン</p>
         </div>
 
         <div>
@@ -41,17 +43,21 @@ export default function LoginPage() {
             type="button"
             onClick={handleLogin}
             disabled={loading}
-            className="w-full py-3 px-4 text-white font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-3"
+            className="flex min-h-14 w-full items-center justify-center gap-3 rounded-xl px-4 py-3 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:text-lg"
             style={{ backgroundColor: '#06C755' }}
           >
-            <span className="w-7 h-7 bg-white rounded-md flex items-center justify-center text-sm font-bold" style={{ color: '#06C755' }}>LINE</span>
-            {loading ? 'LINEへ移動中...' : 'LINEでログイン'}
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white" aria-hidden="true">
+              <svg viewBox="0 0 32 32" className="h-6 w-6 fill-[#06C755]">
+                <path d="M27.8 14.1c0-5.3-5.3-9.6-11.8-9.6S4.2 8.8 4.2 14.1c0 4.7 4.2 8.7 9.8 9.4.4.1.9.3 1 .7.1.3.1.9 0 1.2l-.2 1.1c-.1.3-.3 1.3 1.1.7 1.4-.6 7.5-4.4 10.2-7.5 1.8-2 1.7-4.1 1.7-5.6Z" />
+              </svg>
+            </span>
+            <span>{loading ? 'LINEへ移動中…' : 'LINEでログイン'}</span>
           </button>
-          <p className="mt-4 text-xs text-center text-gray-500 leading-relaxed">
-            管理者として許可されたLINEアカウントのみログインできます。
+          <p className="mt-5 text-center text-xs leading-relaxed text-gray-500 sm:text-sm">
+            管理者または閲覧者として許可された<br className="sm:hidden" />LINEアカウントのみログインできます。
           </p>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }
