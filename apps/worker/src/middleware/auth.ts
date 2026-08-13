@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 import type { AdminSameSite } from './admin-auth-config.js';
 
 export const ADMIN_AUTH_COOKIE = 'lh_admin_session';
+export const ADMIN_SESSION_BEARER_PREFIX = 'lh_session:';
 export const CSRF_COOKIE = 'lh_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
@@ -134,6 +135,14 @@ export async function authenticateApiToken(
   token: string | null,
 ): Promise<AuthenticatedStaff | null> {
   if (!token) return null;
+
+  // Some iOS/LINE WebViews reject the workers.dev cookie when the admin SPA
+  // is hosted on pages.dev. In that cross-site topology the OAuth callback
+  // hands the existing opaque admin-session token to the SPA via a URL
+  // fragment, and the SPA presents it as a Bearer credential.
+  if (token.startsWith(ADMIN_SESSION_BEARER_PREFIX)) {
+    return authenticateAdminSession(c, token.slice(ADMIN_SESSION_BEARER_PREFIX.length));
+  }
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {

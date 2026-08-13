@@ -1,3 +1,4 @@
+import { adminSessionHeaders } from './admin-session'
 import type {
   Friend,
   Tag,
@@ -143,6 +144,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...adminSessionHeaders(),
       ...csrfHeaders,
       ...options?.headers,
     },

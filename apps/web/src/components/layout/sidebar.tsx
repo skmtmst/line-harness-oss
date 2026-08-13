@@ -7,6 +7,7 @@ import { useAccount } from '@/contexts/account-context'
 import type { AccountWithStats } from '@/contexts/account-context'
 import { countryFlag } from '@/lib/country-flag'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
 
 // ─── メニュー定義（ユーザー目線のカテゴリ） ───
 
@@ -331,6 +332,7 @@ export default function Sidebar() {
                   await fetch(`${apiUrl}/api/auth/logout`, {
                     method: 'POST',
                     credentials: 'include',
+                    headers: adminSessionHeaders(),
                   })
                 }
               } catch {
@@ -340,6 +342,7 @@ export default function Sidebar() {
               localStorage.removeItem('lh_csrf')
               localStorage.removeItem('lh_staff_name')
               localStorage.removeItem('lh_staff_role')
+              clearAdminSession()
               window.location.href = '/login'
             }}
             className="flex items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors"

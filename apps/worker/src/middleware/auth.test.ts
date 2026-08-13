@@ -13,6 +13,9 @@ vi.mock('@line-crm/db', () => ({
     return { id: 'staff-1', name: 'Staff One', role: 'admin' };
   }),
   getStaffByAdminSession: vi.fn(async (_db: unknown, tokenHash: string) => {
+    if (tokenHash === 'dfac1ac3966cbe3d487761671296ced77cce526aa4ebb1cf70a1cf3f728dcd4e') {
+      return { id: 'viewer-1', name: 'Viewer One', role: 'staff', access_level: 'read_only' };
+    }
     if (tokenHash !== 'c1e9199b97100cfa89cf5335e39753c0ee4caddde90d79bf5ca16ab99d4a7d9a') return null;
     return { id: 'staff-1', name: 'Staff One', role: 'admin' };
   }),
@@ -163,7 +166,10 @@ describe('LINE admin login', () => {
       headers: { Cookie: 'lh_line_state=expected; lh_line_nonce=nonce; lh_line_verifier=verifier' },
     }, crossSiteEnv());
     expect(res.status).toBe(302);
-    expect(res.headers.get('Location')).toBe(PAGES);
+    const redirect = new URL(res.headers.get('Location')!);
+    expect(redirect.origin).toBe(PAGES);
+    expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_session')).toBeTruthy();
+    expect(new URLSearchParams(redirect.hash.slice(1)).get('lh_csrf')).toBeTruthy();
     expect(cookieFor(res, 'lh_admin_session')).toBeTruthy();
     fetchSpy.mockRestore();
   });
@@ -215,6 +221,29 @@ describe('protected API access', () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { data: { id: string } };
     expect(body.data).toMatchObject({ id: 'env-owner', role: 'owner' });
+  });
+
+  test('accepts an admin session as a Bearer fallback for cross-site browsers', async () => {
+    const res = await app().request('/api/protected', {
+      headers: { Authorization: 'Bearer lh_session:staff-key' },
+    }, crossSiteEnv());
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { id: string; role: string } };
+    expect(body.data).toMatchObject({ id: 'staff-1', role: 'admin' });
+  });
+
+  test('keeps read-only access when using the Bearer fallback', async () => {
+    const get = await app().request('/api/protected', {
+      headers: { Authorization: 'Bearer lh_session:viewer-session' },
+    }, crossSiteEnv());
+    expect(get.status).toBe(200);
+    expect((await get.json() as { data: { role: string } }).data.role).toBe('viewer');
+
+    const post = await app().request('/api/protected', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer lh_session:viewer-session' },
+    }, crossSiteEnv());
+    expect(post.status).toBe(403);
   });
 
   test('rejects requests with no credentials', async () => {
@@ -330,6 +359,21 @@ describe('logout', () => {
     const csrf = cookieFor(res, 'lh_csrf') ?? '';
     expect(session).toContain('Max-Age=0');
     expect(csrf).toContain('Max-Age=0');
+  });
+
+  test('revokes a Bearer fallback admin session', async () => {
+    const db = await import('@line-crm/db');
+    const deleteSession = vi.mocked(db.deleteAdminSession);
+    deleteSession.mockClear();
+    const res = await app().request('/api/auth/logout', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer lh_session:staff-key' },
+    }, crossSiteEnv());
+    expect(res.status).toBe(200);
+    expect(deleteSession).toHaveBeenCalledWith(
+      expect.anything(),
+      'c1e9199b97100cfa89cf5335e39753c0ee4caddde90d79bf5ca16ab99d4a7d9a',
+    );
   });
 });
 
