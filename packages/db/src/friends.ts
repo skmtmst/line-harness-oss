@@ -167,6 +167,11 @@ export interface UpsertFriendInput {
   statusMessage?: string | null;
 }
 
+function isMissingFollowLifecycleColumn(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:no such column:|has no column named) (first_followed_at|current_follow_started_at|last_followed_at|last_unfollowed_at|unfollow_count)/i.test(message);
+}
+
 export async function upsertFriend(
   db: D1Database,
   input: UpsertFriendInput,
@@ -175,8 +180,8 @@ export async function upsertFriend(
   const existing = await getFriendByLineUserId(db, input.lineUserId);
 
   if (existing) {
-    await db
-      .prepare(
+    try {
+      await db.prepare(
         `UPDATE friends
          SET display_name = ?,
              picture_url = ?,
@@ -193,8 +198,7 @@ export async function upsertFriend(
              is_following = 1,
              updated_at = ?
          WHERE line_user_id = ?`,
-      )
-      .bind(
+      ).bind(
         'displayName' in input ? (input.displayName ?? null) : existing.display_name,
         'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
         'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
@@ -202,22 +206,38 @@ export async function upsertFriend(
         now,
         now,
         input.lineUserId,
-      )
-      .run();
+      ).run();
+    } catch (error) {
+      if (!isMissingFollowLifecycleColumn(error)) throw error;
+      // Deployments can briefly run newer Worker code before migration 065 is
+      // applied. Preserve the friend-add/OAuth path using the legacy columns;
+      // the lifecycle fields are backfilled when the migration is applied.
+      await db.prepare(
+        `UPDATE friends
+         SET display_name = ?, picture_url = ?, status_message = ?,
+             is_following = 1, updated_at = ?
+         WHERE line_user_id = ?`,
+      ).bind(
+        'displayName' in input ? (input.displayName ?? null) : existing.display_name,
+        'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
+        'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
+        now,
+        input.lineUserId,
+      ).run();
+    }
 
     return (await getFriendByLineUserId(db, input.lineUserId))!;
   }
 
   const id = crypto.randomUUID();
-  await db
-    .prepare(
+  try {
+    await db.prepare(
       `INSERT INTO friends
          (id, line_user_id, display_name, picture_url, status_message, is_following,
           first_followed_at, current_follow_started_at, last_followed_at,
           created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
+    ).bind(
       id,
       input.lineUserId,
       input.displayName ?? null,
@@ -228,8 +248,24 @@ export async function upsertFriend(
       now,
       now,
       now,
-    )
-    .run();
+    ).run();
+  } catch (error) {
+    if (!isMissingFollowLifecycleColumn(error)) throw error;
+    await db.prepare(
+      `INSERT INTO friends
+         (id, line_user_id, display_name, picture_url, status_message, is_following,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+    ).bind(
+      id,
+      input.lineUserId,
+      input.displayName ?? null,
+      input.pictureUrl ?? null,
+      input.statusMessage ?? null,
+      now,
+      now,
+    ).run();
+  }
 
   return (await getFriendById(db, id))!;
 }
