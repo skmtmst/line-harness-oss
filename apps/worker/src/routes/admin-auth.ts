@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import type { Env } from '../index.js';
 import {
   ADMIN_AUTH_COOKIE,
+  ADMIN_SESSION_BEARER_PREFIX,
   CSRF_COOKIE,
   adminSessionCookie,
   adminSessionTokenFromCookie,
@@ -67,7 +68,7 @@ async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict'
   const csrfToken = randomToken();
   c.header('Set-Cookie', adminSessionCookie(sessionToken, sameSite), { append: true });
   c.header('Set-Cookie', csrfCookie(csrfToken, sameSite), { append: true });
-  return csrfToken;
+  return { csrfToken, sessionToken };
 }
 
 adminAuth.get('/api/auth/line', async (c) => {
@@ -153,8 +154,15 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
     if (config.misconfigured) return c.redirect(adminLoginUrl(c, 'configuration_error'));
-    await issueSession(c, staff.id, config.sameSite);
-    return c.redirect(c.env.ADMIN_PUBLIC_URL!.replace(/\/+$/, ''));
+    const session = await issueSession(c, staff.id, config.sameSite);
+    const adminUrl = new URL(c.env.ADMIN_PUBLIC_URL!.replace(/\/+$/, ''));
+    if (config.crossSite) {
+      adminUrl.hash = new URLSearchParams({
+        lh_session: session.sessionToken,
+        lh_csrf: session.csrfToken,
+      }).toString();
+    }
+    return c.redirect(adminUrl.toString());
   } catch (error) {
     console.error('[admin-auth] LINE Login callback failed', error);
     return c.redirect(adminLoginUrl(c, 'line_login_failed'));
@@ -198,7 +206,7 @@ adminAuth.post('/api/auth/login', async (c) => {
     c.header('Set-Cookie', adminSessionCookie(apiKey, config.sameSite), { append: true });
     c.header('Set-Cookie', csrfCookie(csrfToken, config.sameSite), { append: true });
   } else {
-    csrfToken = await issueSession(c, staff.id, config.sameSite);
+    csrfToken = (await issueSession(c, staff.id, config.sameSite)).csrfToken;
   }
   return c.json({ success: true, data: staff, csrfToken });
 });
@@ -211,6 +219,11 @@ adminAuth.post('/api/auth/login', async (c) => {
 adminAuth.post('/api/auth/logout', async (c) => {
   const token = adminSessionTokenFromCookie(c);
   if (token) await deleteAdminSession(c.env.DB, await sha256Hex(token));
+  const authorization = c.req.header('Authorization') || '';
+  const bearerPrefix = `Bearer ${ADMIN_SESSION_BEARER_PREFIX}`;
+  if (authorization.startsWith(bearerPrefix)) {
+    await deleteAdminSession(c.env.DB, await sha256Hex(authorization.slice(bearerPrefix.length)));
+  }
   const { sameSite } = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   c.header('Set-Cookie', expiredCookie(ADMIN_AUTH_COOKIE, sameSite), { append: true });
   c.header('Set-Cookie', expiredCookie(CSRF_COOKIE, sameSite), { append: true });
