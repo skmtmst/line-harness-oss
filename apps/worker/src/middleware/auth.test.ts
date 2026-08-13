@@ -8,6 +8,7 @@ import type { Env } from '../index.js';
 
 vi.mock('@line-crm/db', () => ({
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
+    if (token === 'viewer-key') return { id: 'viewer-1', name: 'Viewer One', role: 'staff', access_level: 'read_only' };
     if (token !== 'staff-key') return null;
     return { id: 'staff-1', name: 'Staff One', role: 'admin' };
   }),
@@ -219,6 +220,18 @@ describe('protected API access', () => {
   test('rejects requests with no credentials', async () => {
     const res = await app().request('/api/protected', {}, crossSiteEnv());
     expect(res.status).toBe(401);
+  });
+
+  test('allows viewer accounts to read authenticated APIs', async () => {
+    const res = await app().request('/api/protected', { headers: { Authorization: 'Bearer viewer-key' } }, crossSiteEnv());
+    expect(res.status).toBe(200);
+    expect((await res.json() as { data: { role: string } }).data.role).toBe('viewer');
+  });
+
+  test('blocks viewer accounts from state-changing API methods', async () => {
+    const res = await app().request('/api/protected', { method: 'POST', headers: { Authorization: 'Bearer viewer-key' } }, crossSiteEnv());
+    expect(res.status).toBe(403);
+    expect((await res.json() as { error: string }).error).toMatch(/閲覧のみ/);
   });
 
   test('a malformed cookie value yields 401, not a 500', async () => {

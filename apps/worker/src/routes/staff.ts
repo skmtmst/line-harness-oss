@@ -24,7 +24,7 @@ function serializeStaff(row: StaffMember, masked = true) {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: row.role,
+    role: row.access_level === 'read_only' ? 'viewer' : row.role,
     apiKey: masked ? maskApiKey(row.api_key) : row.api_key,
     lineLinked: Boolean(row.line_user_id),
     isActive: Boolean(row.is_active),
@@ -61,7 +61,7 @@ staff.get('/api/staff/me', async (c) => {
       data: {
         id: member.id,
         name: member.name,
-        role: member.role,
+        role: member.access_level === 'read_only' ? 'viewer' : member.role,
         email: member.email,
       },
     });
@@ -115,15 +115,16 @@ staff.post('/api/staff', requireRole('owner'), async (c) => {
       return c.json({ success: false, error: '選択したLINEアカウントが見つかりません' }, 400);
     }
 
-    const validRoles = ['owner', 'admin', 'staff'] as const;
+    const validRoles = ['owner', 'admin', 'staff', 'viewer'] as const;
     if (!body.role || !validRoles.includes(body.role as (typeof validRoles)[number])) {
-      return c.json({ success: false, error: 'role must be owner, admin, or staff' }, 400);
+      return c.json({ success: false, error: 'role must be owner, admin, staff, or viewer' }, 400);
     }
 
     const member = await createStaffMember(c.env.DB, {
       name: body.name,
       email: body.email ?? null,
-      role: body.role as 'owner' | 'admin' | 'staff',
+      role: body.role === 'viewer' ? 'staff' : body.role as 'owner' | 'admin' | 'staff',
+      access_level: body.role === 'viewer' ? 'read_only' : 'full',
       line_user_id: friend.line_user_id,
     });
 
@@ -146,9 +147,9 @@ staff.patch('/api/staff/:id', requireRole('owner'), async (c) => {
       isActive?: boolean;
     }>();
 
-    const validRoles = ['owner', 'admin', 'staff'] as const;
+    const validRoles = ['owner', 'admin', 'staff', 'viewer'] as const;
     if (body.role !== undefined && !validRoles.includes(body.role as (typeof validRoles)[number])) {
-      return c.json({ success: false, error: 'role must be owner, admin, or staff' }, 400);
+      return c.json({ success: false, error: 'role must be owner, admin, staff, or viewer' }, 400);
     }
 
     // Prevent removing the last active owner
@@ -171,7 +172,8 @@ staff.patch('/api/staff/:id', requireRole('owner'), async (c) => {
     const updated = await updateStaffMember(c.env.DB, id, {
       name: body.name,
       email: body.email,
-      role: body.role as 'owner' | 'admin' | 'staff' | undefined,
+      role: body.role === 'viewer' ? 'staff' : body.role as 'owner' | 'admin' | 'staff' | undefined,
+      access_level: body.role === undefined ? undefined : body.role === 'viewer' ? 'read_only' : 'full',
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
     });
 

@@ -87,8 +87,15 @@ export function expiredCookie(name: string, sameSite: AdminSameSite): string {
 export type AuthenticatedStaff = {
   id: string;
   name: string;
-  role: 'owner' | 'admin' | 'staff';
+  role: 'owner' | 'admin' | 'staff' | 'viewer';
 };
+
+function authenticatedRole(staff: {
+  role: 'owner' | 'admin' | 'staff';
+  access_level?: 'full' | 'read_only';
+}): AuthenticatedStaff['role'] {
+  return staff.access_level === 'read_only' ? 'viewer' : staff.role;
+}
 
 export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -104,7 +111,7 @@ export async function authenticateAdminSession(
   if (!token) return null;
   const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
   if (!staff) return null;
-  return { id: staff.id, name: staff.name, role: staff.role };
+  return { id: staff.id, name: staff.name, role: authenticatedRole(staff) };
 }
 
 async function authenticateCookieToken(
@@ -130,7 +137,7 @@ export async function authenticateApiToken(
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {
-    return { id: staff.id, name: staff.name, role: staff.role };
+    return { id: staff.id, name: staff.name, role: authenticatedRole(staff) };
   }
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
@@ -251,6 +258,10 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     : await authenticateCookieToken(c, cookie);
   if (!staff) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  if (staff.role === 'viewer' && !SAFE_METHODS.has(method)) {
+    return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
   }
 
   // CSRF protection applies ONLY to cookie-authenticated, state-changing

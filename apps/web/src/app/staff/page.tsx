@@ -11,9 +11,11 @@ function RoleBadge({ role }: { role: string }) {
       ? 'bg-yellow-100 text-yellow-800'
       : role === 'admin'
         ? 'bg-blue-100 text-blue-800'
+        : role === 'viewer'
+          ? 'bg-emerald-100 text-emerald-800'
         : 'bg-gray-100 text-gray-600'
   const label =
-    role === 'owner' ? 'オーナー' : role === 'admin' ? '管理者' : 'スタッフ'
+    role === 'owner' ? 'オーナー' : role === 'admin' ? '管理者' : role === 'viewer' ? '閲覧のみ' : 'スタッフ'
   return (
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${styles}`}>
       {label}
@@ -31,7 +33,7 @@ export default function StaffPage() {
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formEmail, setFormEmail] = useState('')
-  const [formRole, setFormRole] = useState<'admin' | 'staff'>('staff')
+  const [formRole, setFormRole] = useState<'admin' | 'staff' | 'viewer'>('staff')
   const [formFriendId, setFormFriendId] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
@@ -65,7 +67,7 @@ export default function StaffPage() {
     setFormLoading(true)
     setFormError('')
     try {
-      const body: { name: string; role: 'admin' | 'staff'; friendId: string; email?: string } = {
+      const body: { name: string; role: 'admin' | 'staff' | 'viewer'; friendId: string; email?: string } = {
         name: formName,
         role: formRole,
         friendId: formFriendId,
@@ -180,12 +182,14 @@ export default function StaffPage() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">ロール *</label>
                 <select
                   value={formRole}
-                  onChange={(e) => setFormRole(e.target.value as 'admin' | 'staff')}
+                  onChange={(e) => setFormRole(e.target.value as 'admin' | 'staff' | 'viewer')}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="staff">スタッフ</option>
+                  <option value="viewer">閲覧のみ</option>
                   <option value="admin">管理者</option>
                 </select>
+                <p className="mt-1 text-xs text-gray-400">「閲覧のみ」は画面を確認できますが、変更・送信・削除はできません。</p>
               </div>
             </div>
             {formError && (

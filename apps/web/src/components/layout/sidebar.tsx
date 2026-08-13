@@ -315,9 +315,10 @@ export default function Sidebar() {
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
               staffRole === 'owner' ? 'bg-yellow-100 text-yellow-800' :
               staffRole === 'admin' ? 'bg-blue-100 text-blue-800' :
+              staffRole === 'viewer' ? 'bg-emerald-100 text-emerald-800' :
               'bg-gray-100 text-gray-600'
             }`}>
-              {staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : 'スタッフ'}
+              {staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : staffRole === 'viewer' ? '閲覧のみ' : 'スタッフ'}
             </span>
           </div>
         )}

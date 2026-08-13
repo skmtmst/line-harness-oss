@@ -147,7 +147,7 @@ export type Env = {
     LIFF_PUBLIC_URL?: string;
   };
   Variables: {
-    staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff' };
+    staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff' | 'viewer' };
   };
 };
 

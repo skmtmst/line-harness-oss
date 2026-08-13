@@ -5,6 +5,7 @@ export interface StaffMember {
   name: string;
   email: string | null;
   role: 'owner' | 'admin' | 'staff';
+  access_level: 'full' | 'read_only';
   api_key: string;
   line_user_id: string | null;
   is_active: number;
@@ -16,6 +17,7 @@ export interface CreateStaffInput {
   name: string;
   email?: string | null;
   role: 'owner' | 'admin' | 'staff';
+  access_level?: 'full' | 'read_only';
   line_user_id?: string | null;
 }
 
@@ -23,6 +25,7 @@ export interface UpdateStaffInput {
   name?: string;
   email?: string | null;
   role?: 'owner' | 'admin' | 'staff';
+  access_level?: 'full' | 'read_only';
   is_active?: number;
   line_user_id?: string | null;
 }
@@ -81,10 +84,10 @@ export async function createStaffMember(
 
   await db
     .prepare(
-      `INSERT INTO staff_members (id, name, email, role, api_key, line_user_id, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO staff_members (id, name, email, role, access_level, api_key, line_user_id, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     )
-    .bind(id, input.name, input.email ?? null, input.role, apiKey, input.line_user_id ?? null, now, now)
+    .bind(id, input.name, input.email ?? null, input.role, input.access_level ?? 'full', apiKey, input.line_user_id ?? null, now, now)
     .run();
 
   return (await db
@@ -105,6 +108,7 @@ export async function updateStaffMember(
   if (input.name !== undefined) { sets.push('name = ?'); values.push(input.name); }
   if (input.email !== undefined) { sets.push('email = ?'); values.push(input.email ?? null); }
   if (input.role !== undefined) { sets.push('role = ?'); values.push(input.role); }
+  if (input.access_level !== undefined) { sets.push('access_level = ?'); values.push(input.access_level); }
   if (input.is_active !== undefined) { sets.push('is_active = ?'); values.push(input.is_active); }
   if (input.line_user_id !== undefined) { sets.push('line_user_id = ?'); values.push(input.line_user_id); }
 
