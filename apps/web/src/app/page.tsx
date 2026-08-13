@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { api } from '@/lib/api'
 import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
+import SupportAlertPanel from '@/components/support/support-alert-panel'
 
 const ccPrompts = [
   {
@@ -223,6 +224,8 @@ export default function DashboardPage() {
           {error}
         </div>
       )}
+
+      <SupportAlertPanel />
 
       <FriendAddLinkCard />
 

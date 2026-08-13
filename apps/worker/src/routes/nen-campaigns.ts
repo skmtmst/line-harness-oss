@@ -2,10 +2,12 @@ import { Hono } from 'hono';
 import { getLineAccountById, jstNow } from '@line-crm/db';
 import type { Env } from '../index.js';
 import {
-  buildNenFlexMessage,
+  buildDefaultColumnIntro,
+  buildNenDeliveryMessages,
   getNenCampaign,
   queueColumnDelivery,
 } from '../services/nen-engagement.js';
+import { syncNenPetTags } from '../services/nen-tag-sync.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
@@ -132,14 +134,14 @@ nenCampaigns.post('/api/nen-campaigns/test-send', async (c) => {
     article: { title: '愛犬・愛猫の健康を考えるNENコラム', excerpt: campaign.body_text, article_url: campaign.button_url, image_url: campaign.image_url },
     coupon: { code: 'NEN-BIRTHDAY-TEST', expires_at: '2026-09-30' },
   };
-  const message = buildNenFlexMessage(campaign, sample);
+  const messages = buildNenDeliveryMessages(campaign, sample);
   const { pushViaHarnessProxy } = await import('../services/line-proxy-send.js');
   const { dispatchLineProxyLocally } = await import('../services/local-line-proxy.js');
   await pushViaHarnessProxy(
     c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin,
     account.channel_access_token,
     friend.line_user_id,
-    [message],
+    messages,
     crypto.randomUUID(),
     (request) => dispatchLineProxyLocally(request, c.env),
   );
@@ -166,7 +168,10 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
   const rows = await c.env.DB.prepare(`SELECT * FROM nen_columns ORDER BY published_at DESC, created_at DESC`).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results.map((row) => ({
     id: row.id, externalId: row.external_id, slug: row.slug, title: row.title, category: row.category,
-    excerpt: row.excerpt, articleUrl: row.article_url, imageUrl: row.image_url,
+    excerpt: row.excerpt, introText: typeof row.intro_text === 'string' && row.intro_text.trim()
+      ? row.intro_text
+      : buildDefaultColumnIntro(String(row.title || ''), String(row.excerpt || '')),
+    articleUrl: row.article_url, imageUrl: row.image_url,
     publishedAt: row.published_at, deliveryStatus: row.delivery_status, deliveryAt: row.delivery_at,
     lineAccountId: row.line_account_id, updatedAt: row.updated_at,
   })) });
@@ -180,6 +185,19 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', async (c) => {
     : new Date().toISOString().slice(0, 19).replace('T', ' ');
   const queued = await queueColumnDelivery(c.env.DB, c.req.param('id'), body.accountId, when);
   return c.json({ success: true, data: { queued } });
+});
+
+nenCampaigns.put('/api/nen-campaigns/columns/:id/message', async (c) => {
+  const body = await c.req.json<{ introText?: string }>().catch(() => null);
+  const introText = body?.introText?.trim() || '';
+  if (!introText || introText.length > 1500) {
+    return c.json({ success: false, error: 'introText is required and must be 1500 characters or fewer' }, 400);
+  }
+  const result = await c.env.DB.prepare(
+    `UPDATE nen_columns SET intro_text = ?, updated_at = ? WHERE id = ?`,
+  ).bind(introText, jstNow(), c.req.param('id')).run();
+  if (!result.meta.changes) return c.json({ success: false, error: 'Column not found' }, 404);
+  return c.json({ success: true });
 });
 
 nenCampaigns.get('/api/nen-campaigns/pets', async (c) => {
@@ -213,6 +231,7 @@ nenCampaigns.post('/api/nen-campaigns/pets', async (c) => {
     `INSERT INTO nen_pet_profiles (id, friend_id, customer_id, name, animal_type, gender, birthday, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(id, body.friendId, typeof body.customerId === 'string' ? body.customerId : null, body.name.trim(), animalType, gender, birthday, now, now).run();
+  await syncNenPetTags(c.env.DB, body.friendId);
   return c.json({ success: true, data: { id } }, 201);
 });
 
@@ -222,14 +241,22 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', async (c) => {
   const animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
   const gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
   const birthday = typeof body.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.birthday) ? body.birthday : null;
+  const pet = await c.env.DB.prepare(`SELECT friend_id FROM nen_pet_profiles WHERE id = ?`)
+    .bind(c.req.param('id')).first<{ friend_id: string }>();
+  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
   await c.env.DB.prepare(
     `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, updated_at = ? WHERE id = ?`,
   ).bind(body.name.trim(), animalType, gender, birthday, jstNow(), c.req.param('id')).run();
+  await syncNenPetTags(c.env.DB, pet.friend_id);
   return c.json({ success: true });
 });
 
 nenCampaigns.delete('/api/nen-campaigns/pets/:id', async (c) => {
+  const pet = await c.env.DB.prepare(`SELECT friend_id FROM nen_pet_profiles WHERE id = ?`)
+    .bind(c.req.param('id')).first<{ friend_id: string }>();
+  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
   await c.env.DB.prepare(`DELETE FROM nen_pet_profiles WHERE id = ?`).bind(c.req.param('id')).run();
+  await syncNenPetTags(c.env.DB, pet.friend_id);
   return c.json({ success: true });
 });
 
@@ -284,15 +311,16 @@ nenCampaigns.post('/api/integrations/eccube/columns', async (c) => {
   const id = existing?.id || crypto.randomUUID();
   await c.env.DB.prepare(
     `INSERT INTO nen_columns
-      (id, external_id, slug, title, category, excerpt, article_url, image_url, published_at, delivery_status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)
+      (id, external_id, slug, title, category, excerpt, intro_text, article_url, image_url, published_at, delivery_status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?)
      ON CONFLICT(slug) DO UPDATE SET external_id = excluded.external_id, title = excluded.title,
        category = excluded.category, excerpt = excluded.excerpt, article_url = excluded.article_url,
        image_url = excluded.image_url, published_at = excluded.published_at, updated_at = excluded.updated_at`,
   ).bind(
     id, typeof body.external_id === 'string' ? body.external_id : body.slug, body.slug, body.title,
     typeof body.category === 'string' ? body.category : null,
-    typeof body.excerpt === 'string' ? body.excerpt.slice(0, 500) : '', body.article_url,
+    typeof body.excerpt === 'string' ? body.excerpt.slice(0, 500) : '',
+    buildDefaultColumnIntro(body.title, typeof body.excerpt === 'string' ? body.excerpt.slice(0, 500) : ''), body.article_url,
     typeof body.image_url === 'string' ? body.image_url : null,
     typeof body.published_at === 'string' ? body.published_at : null, now, now,
   ).run();

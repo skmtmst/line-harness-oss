@@ -212,6 +212,9 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/docs' ||
     path === '/openapi.json' ||
     path === '/api/affiliates/click' ||
+    path === '/webhooks/xserver/support-email' ||
+    path === '/api/public/nen/adopted-photos' ||
+    path === '/api/public/nen/gallery-preview' ||
     path.startsWith('/t/') ||
     path.startsWith('/r/') ||
     path.startsWith('/pool/') ||

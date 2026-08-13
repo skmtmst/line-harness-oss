@@ -250,6 +250,7 @@ export type NenColumn = {
   title: string
   category: string | null
   excerpt: string
+  introText: string
   articleUrl: string
   imageUrl: string | null
   publishedAt: string | null
@@ -269,6 +270,16 @@ export type NenPetProfile = {
   birthday: string | null
   ownerName: string | null
   lineUserId: string
+}
+
+export type NenFriendOverview = {
+  friend: Record<string, unknown>
+  member: Record<string, unknown> | null
+  pets: Array<Record<string, unknown>>
+  healthLogs: Array<Record<string, unknown>>
+  photos: Array<Record<string, unknown>>
+  pointLedger: Array<Record<string, unknown>>
+  ecEvents: Array<Record<string, unknown>>
 }
 
 export const api = {
@@ -948,6 +959,10 @@ export const api = {
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),
       }),
+    updateColumnMessage: (id: string, introText: string) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message`, {
+        method: 'PUT', body: JSON.stringify({ introText }),
+      }),
     pets: (search?: string) => fetchApi<ApiResponse<NenPetProfile[]>>(
       `/api/nen-campaigns/pets${search ? `?search=${encodeURIComponent(search)}` : ''}`,
     ),
@@ -961,6 +976,17 @@ export const api = {
     }>>('/api/nen-campaigns/birthday-coupon'),
     updateBirthdayCoupon: (data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/birthday-coupon', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  nenMembers: {
+    overview: () => fetchApi<ApiResponse<{ pets: number; healthLogs: number; activeCare: number; pendingPhotos: number; members: number; consultations: number }>>('/api/nen-members/overview'),
+    careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
+    updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    photos: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/photos'),
+    reviewPhoto: (id: string, data: { status: 'adopted' | 'rejected'; points: number }) => fetchApi<ApiResponse<{ awardedPoints: number; pointBalance: number | null; pointSync: string }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(data) }),
+    friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
+    ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),
+    consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),
+    installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   chats: {
     list: (params?: { status?: string; operatorId?: string; accountId?: string; unansweredOnly?: boolean; limit?: number; beforeAt?: string; beforeId?: string }) => {

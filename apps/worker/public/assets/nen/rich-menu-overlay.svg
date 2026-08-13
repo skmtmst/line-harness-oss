@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="1686" viewBox="0 0 2500 1686">
+  <defs>
+    <style>
+      .tile{fill:#fff;fill-opacity:.88;stroke:#0D4A32;stroke-opacity:.16;stroke-width:4}
+      .title{font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;font-size:66px;font-weight:700;fill:#123F2B;text-anchor:middle}
+      .sub{font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',sans-serif;font-size:28px;font-weight:500;fill:#577064;text-anchor:middle}
+      .icon{fill:none;stroke:#16815B;stroke-width:19;stroke-linecap:round;stroke-linejoin:round}
+    </style>
+  </defs>
+  <g transform="translate(55 55)">
+    <rect class="tile" x="0" y="0" width="780" height="755" rx="54"/>
+    <rect class="tile" x="805" y="0" width="780" height="755" rx="54"/>
+    <rect class="tile" x="1610" y="0" width="780" height="755" rx="54"/>
+    <rect class="tile" x="0" y="780" width="780" height="755" rx="54"/>
+    <rect class="tile" x="805" y="780" width="780" height="755" rx="54"/>
+    <rect class="tile" x="1610" y="780" width="780" height="755" rx="54"/>
+
+    <!-- home -->
+    <path class="icon" d="M260 306l130-113 130 113v173H420V374h-60v105H260z"/>
+    <text class="title" x="390" y="585">ホーム</text><text class="sub" x="390" y="635">会員ランク・ポイント</text>
+    <!-- pet -->
+    <circle class="icon" cx="1195" cy="336" r="93"/><circle class="icon" cx="1077" cy="240" r="38"/><circle class="icon" cx="1148" cy="185" r="38"/><circle class="icon" cx="1242" cy="185" r="38"/><circle class="icon" cx="1313" cy="240" r="38"/>
+    <text class="title" x="1195" y="585">マイペット</text><text class="sub" x="1195" y="635">登録・給与量の目安</text>
+    <!-- health -->
+    <path class="icon" d="M1847 345h77l43-90 72 177 50-87h111M2024 184v-46m-23 23h46"/>
+    <text class="title" x="2000" y="585">健康日記</text><text class="sub" x="2000" y="635">体重・便・食いつき</text>
+    <!-- order -->
+    <path class="icon" transform="translate(0 -105)" d="M225 1063h42l45 196h231l55-143H298m58 219a30 30 0 100 60 30 30 0 000-60zm178 0a30 30 0 100 60 30 30 0 000-60z"/>
+    <text class="title" x="390" y="1365">注文・定期</text><text class="sub" x="390" y="1415">履歴・次回お届け</text>
+    <!-- photo post -->
+    <rect class="icon" x="1052" y="1012" width="286" height="214" rx="24"/>
+    <circle class="icon" cx="1134" cy="1083" r="30"/>
+    <path class="icon" d="M1078 1190l72-70 53 50 38-36 71 56M1195 972v-74m-37 37h74"/>
+    <text class="title" x="1195" y="1365">投稿</text><text class="sub" x="1195" y="1415">写真掲載で5ポイント</text>
+    <!-- shop -->
+    <path class="icon" transform="translate(0 -55)" d="M1832 1115h336l-34-100h-268zM1872 1115v177h256v-177m-126 0v177"/>
+    <text class="title" x="2000" y="1365">商品を見る</text><text class="sub" x="2000" y="1415">NENオンラインストア</text>
+  </g>
+</svg>

@@ -22,6 +22,9 @@ database_id = "5b0fcea8-e05e-42bf-9efa-f2bc4c459552"
 binding = "IMAGES"
 bucket_name = "nen-line-images"
 
+[ai]
+binding = "AI"
+
 [triggers]
 crons = ["*/5 * * * *", "0 */6 * * *"]
 
@@ -35,4 +38,9 @@ WORKER_PUBLIC_URL = "https://nen-line.skmtmst.workers.dev"
 ADMIN_PUBLIC_URL = "https://nen-line-admin-98712679.pages.dev"
 LIFF_PUBLIC_URL = "https://nen-line.skmtmst.workers.dev"
 CF_ACCOUNT_ID = "55f40f5577bd68828d67716f8d900642"
-NEN_EC_BASE_URL = "https://stg.nen-petfood.com"
+NEN_EC_BASE_URL = "https://nen-petfood.com"
+NEN_RICH_MENU_STORE_URL = "https://nen-petfood.com"
+CONTACT_EMAIL = "contact-shed@nen-petfood.com"
+XSERVER_MAIL_HOST = "sv12504.xserver.jp"
+XSERVER_MAIL_USER = "contact-shed@nen-petfood.com"
+XSERVER_RELAY_URL = "https://nen-petfood.com/_system/support-mail-relay.php"

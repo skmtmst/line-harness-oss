@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildNenFlexMessage } from './nen-engagement.js';
+import { buildDefaultColumnIntro, buildNenDeliveryMessages, buildNenFlexMessage } from './nen-engagement.js';
 
 const campaign = {
   campaign_key: 'shipping_confirmed',
@@ -61,6 +61,31 @@ describe('buildNenFlexMessage', () => {
     expect(rendered).toContain('ジビエが愛犬の食事に選ばれる理由');
     expect(rendered).toContain('https://example.com/column.jpg');
     expect(rendered).toContain('https://example.com/column/gibier');
+  });
+
+  it('sends an editable greeting before a column card', () => {
+    const messages = buildNenDeliveryMessages({
+      ...campaign,
+      campaign_key: 'column',
+      title: 'NENコラム',
+      button_label: 'コラムを読む',
+    }, {
+      article: {
+        title: '鹿肉の選び方', excerpt: '原材料表示の基本をご紹介します。',
+        intro_text: 'こんにちは。\n今回の記事のポイントをご案内します。',
+        article_url: 'https://example.com/column',
+      },
+    });
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toEqual({ type: 'text', text: 'こんにちは。\n今回の記事のポイントをご案内します。' });
+    expect(messages[1].type).toBe('flex');
+  });
+
+  it('creates a friendly default column greeting from title and excerpt', () => {
+    const intro = buildDefaultColumnIntro('鹿肉の選び方', '原材料表示の基本をご紹介します。');
+    expect(intro).toContain('こんにちは、然-NEN-です');
+    expect(intro).toContain('「鹿肉の選び方」');
+    expect(intro).toContain('原材料表示の基本をご紹介します。');
   });
 
   it('shows a pet-specific birthday coupon code and expiry date', () => {

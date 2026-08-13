@@ -64,6 +64,18 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
     .replaceAll('{{coupon_expiry}}', String(coupon?.expires_at || '').slice(0, 10));
 }
 
+export function buildDefaultColumnIntro(title: string, excerpt: string): string {
+  const summary = excerpt.trim();
+  return [
+    'こんにちは、然-NEN-です🌿',
+    '',
+    `今回のNENコラムでは「${title.trim()}」についてご紹介します。`,
+    summary,
+    '',
+    '愛犬・愛猫との毎日に役立つ内容です。ぜひご覧ください。',
+  ].filter((line, index, lines) => line || (index > 0 && lines[index - 1])).join('\n').slice(0, 1500);
+}
+
 function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): Message {
   const article = payload.article as Record<string, unknown> | undefined;
   const coupon = payload.coupon as Record<string, unknown> | undefined;
@@ -120,6 +132,16 @@ function flexMessage(campaign: CampaignRow, payload: Record<string, unknown>): M
     } : {}),
   };
   return { type: 'flex', altText: title.slice(0, 400), contents: bubble } as Message;
+}
+
+export function buildNenDeliveryMessages(campaign: CampaignRow, payload: Record<string, unknown>): Message[] {
+  const card = flexMessage(campaign, payload);
+  if (campaign.campaign_key !== 'column') return [card];
+  const article = payload.article as Record<string, unknown> | undefined;
+  const title = String(article?.title || campaign.title);
+  const excerpt = String(article?.excerpt || campaign.body_text);
+  const intro = String(article?.intro_text || '').trim() || buildDefaultColumnIntro(title, excerpt);
+  return [{ type: 'text', text: intro.slice(0, 5000) }, card];
 }
 
 export async function getNenCampaign(
@@ -187,7 +209,7 @@ export async function queueColumnDelivery(
   scheduledAt: string,
 ): Promise<number> {
   const column = await db.prepare(
-    `SELECT id, title, excerpt, article_url, image_url FROM nen_columns WHERE id = ?`,
+    `SELECT id, title, excerpt, article_url, image_url, intro_text FROM nen_columns WHERE id = ?`,
   ).bind(columnId).first<Record<string, unknown>>();
   if (!column) throw new Error('Column not found');
   const friends = await db.prepare(
@@ -368,18 +390,20 @@ export async function processNenDeliveries(
       const account = job.line_account_id ? await getLineAccountById(db, job.line_account_id) : null;
       const accessToken = account?.channel_access_token || options.defaultAccessToken;
       const payload = JSON.parse(job.payload) as Record<string, unknown>;
-      const message = flexMessage(campaign, payload);
+      const messages = buildNenDeliveryMessages(campaign, payload);
       await pushViaHarnessProxy(
-        options.proxyBaseUrl, accessToken, friend.line_user_id, [message], job.id, options.proxyDispatch,
+        options.proxyBaseUrl, accessToken, friend.line_user_id, messages, job.id, options.proxyDispatch,
       );
-      await logOutgoingMessage(db, {
-        friendId: friend.id,
-        messageType: message.type,
-        content: JSON.stringify(message),
-        deliveryType: 'push',
-        source: `nen_${job.campaign_key}`,
-        lineAccountId: account?.id ?? job.line_account_id,
-      });
+      for (const message of messages) {
+        await logOutgoingMessage(db, {
+          friendId: friend.id,
+          messageType: message.type,
+          content: message.type === 'text' ? message.text : JSON.stringify(message),
+          deliveryType: 'push',
+          source: `nen_${job.campaign_key}`,
+          lineAccountId: account?.id ?? job.line_account_id,
+        });
+      }
       await db.prepare(
         `UPDATE nen_delivery_jobs SET status = 'sent', sent_at = ?, last_error = NULL, updated_at = ? WHERE id = ?`,
       ).bind(jstNow(), jstNow(), job.id).run();

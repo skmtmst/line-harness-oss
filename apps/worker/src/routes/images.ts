@@ -73,8 +73,13 @@ images.post('/api/images', async (c) => {
 });
 
 // GET /images/:key — serve image (public, no auth)
-images.get('/images/:key', async (c) => {
-  const key = c.req.param('key');
+images.get('/images/*', async (c) => {
+  // NENのペット写真は `nen-pets/{friendId}/{file}` の階層キーで保存する。
+  // `:key` では最初の `/` までしか一致せず404になっていたため、全パスを受け取る。
+  const key = c.req.path.slice('/images/'.length);
+  if (!key || key.includes('..')) {
+    return c.json({ success: false, error: 'Invalid image key' }, 400);
+  }
   const object = await c.env.IMAGES.get(key);
 
   if (!object) {

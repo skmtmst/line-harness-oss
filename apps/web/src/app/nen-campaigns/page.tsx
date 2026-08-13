@@ -22,6 +22,106 @@ function Toggle({ checked, disabled, onChange, label }: { checked: boolean; disa
   )
 }
 
+function ColumnLinePreview({ column, onClose }: { column: NenColumn; onClose: () => void }) {
+  return (
+    <section id={`column-preview-${column.id}`} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm sm:col-span-2">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-[#3f3f3f] px-4 py-3 text-white">
+        <div>
+          <p className="text-sm font-bold">LINE配信プレビュー</p>
+          <p className="mt-0.5 text-xs text-gray-300">実際のトーク画面に近い見え方です</p>
+        </div>
+        <button type="button" onClick={onClose} className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10">
+          プレビューを隠す
+        </button>
+      </div>
+      <div className="bg-[#8facd8] p-4 sm:p-6">
+        <div className="mx-auto flex max-w-md items-start gap-2.5">
+          <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/70 bg-[#075b36] text-sm font-bold text-white shadow-sm">
+            然
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="mb-1 text-xs font-medium text-white/95">然-NEN-</p>
+            <div className="rounded-2xl rounded-tl-md bg-white px-4 py-3 shadow-sm">
+              <p className="whitespace-pre-wrap text-sm leading-6 text-gray-800">{column.introText}</p>
+            </div>
+            <div className="overflow-hidden rounded-2xl rounded-tl-md bg-white shadow-md">
+              {column.imageUrl && <img src={column.imageUrl} alt={`${column.title}のアイキャッチ`} className="aspect-[3/2] w-full object-cover" />}
+              <div className="space-y-3 p-4">
+                <h4 className="text-base font-bold leading-6 text-[#123f2b]">{column.title}</h4>
+                <p className="text-sm leading-6 text-slate-600">{column.excerpt}</p>
+              </div>
+              <div className="border-t border-gray-100 p-3">
+                <div className="rounded-lg bg-[#0f766e] py-2.5 text-center text-sm font-semibold text-white">コラムを読む</div>
+              </div>
+            </div>
+            <p className="mt-1 text-right text-[10px] text-white/80">配信イメージ</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function CampaignLinePreview({ setting, onClose }: { setting: NenCampaignSetting; onClose: () => void }) {
+  const isBirthday = setting.campaignKey === 'birthday_coupon'
+  const isOrderConfirmed = setting.campaignKey === 'order_confirmed'
+  const title = setting.title.replaceAll('{{pet_name}}', 'ココ').replaceAll('{{coupon_code}}', 'NENBDAY-1234').replaceAll('{{coupon_expiry}}', '2026-09-30')
+  const body = setting.bodyText.replaceAll('{{pet_name}}', 'ココ').replaceAll('{{coupon_code}}', 'NENBDAY-1234').replaceAll('{{coupon_expiry}}', '2026-09-30')
+  const automaticDetails = isBirthday
+    ? ['クーポンコード：NENBDAY-1234', '有効期限：2026-09-30']
+    : [
+        '注文番号：NEN-000123',
+        '毎日の鹿肉バランス 4袋セット × 1',
+        '合計：¥6,280',
+        'お届け予定：2026-09-16 14:00〜16:00',
+        ...(!isOrderConfirmed ? ['配送会社：ヤマト運輸', '送り状番号：1234-5678-9012'] : []),
+      ]
+
+  return (
+    <section id={`campaign-preview-${setting.campaignKey}`} className="border-t border-gray-100 bg-gray-50/80 p-4 sm:p-5">
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 bg-[#3f3f3f] px-4 py-3 text-white">
+          <div>
+            <p className="text-sm font-bold">{setting.label}のLINE配信プレビュー</p>
+            <p className="mt-0.5 text-xs text-gray-300">見出し・本文・自動挿入データを含む送信イメージ</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-white/30 px-3 py-1.5 text-xs font-semibold hover:bg-white/10">プレビューを隠す</button>
+        </div>
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="bg-[#8facd8] p-4 sm:p-6">
+            <div className="mx-auto flex max-w-md items-start gap-2.5">
+              <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/70 bg-[#075b36] text-sm font-bold text-white shadow-sm">然</div>
+              <div className="min-w-0 flex-1">
+                <p className="mb-1 text-xs font-medium text-white/95">然-NEN-</p>
+                <div className="overflow-hidden rounded-2xl rounded-tl-md bg-white shadow-md">
+                  {setting.imageUrl && <img src={setting.imageUrl} alt="" className="aspect-[3/2] w-full object-cover" />}
+                  <div className="space-y-3 p-4">
+                    <h4 className="text-base font-bold leading-6 text-[#123f2b]">{title}</h4>
+                    <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{body}</p>
+                    <div className="space-y-1.5 border-t border-gray-100 pt-3">
+                      {automaticDetails.map((detail) => <p key={detail} className="text-xs leading-5 text-slate-500">{detail}</p>)}
+                    </div>
+                  </div>
+                  {setting.buttonLabel && <div className="border-t border-gray-100 p-3"><div className="rounded-lg bg-[#0f766e] py-2.5 text-center text-sm font-semibold text-white">{setting.buttonLabel}</div></div>}
+                </div>
+                <p className="mt-1 text-right text-[10px] text-white/80">配信イメージ</p>
+              </div>
+            </div>
+          </div>
+          <aside className="border-t border-gray-200 p-4 lg:border-l lg:border-t-0">
+            <p className="text-sm font-bold text-gray-900">表示内容の見方</p>
+            <div className="mt-4 space-y-4 text-xs leading-5 text-gray-600">
+              <div><span className="mb-1 inline-block rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">編集できる内容</span><p>見出し・本文・画像・下部ボタンです。</p></div>
+              <div><span className="mb-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">自動で入る内容</span><p>{isBirthday ? 'ペット名・クーポン番号・有効期限' : '注文番号・商品・金額・配送情報'}は、お客様ごとの実データに置き換わります。</p></div>
+              <p className="rounded-xl bg-amber-50 p-3 text-amber-800">ここでプレビューを開いても、LINEへの送信は発生しません。</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function NenCampaignsPage() {
   const { selectedAccountId } = useAccount()
   const [tab, setTab] = useState<Tab>('flow')
@@ -35,6 +135,10 @@ export default function NenCampaignsPage() {
   const [expanded, setExpanded] = useState<string | null>('arrival_check')
   const [saving, setSaving] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
+  const [previewCampaignKey, setPreviewCampaignKey] = useState<string | null>(null)
+  const [previewColumnId, setPreviewColumnId] = useState<string | null>(null)
+  const [editingColumnId, setEditingColumnId] = useState<string | null>(null)
+  const [savingColumnId, setSavingColumnId] = useState<string | null>(null)
   const [testFriendId, setTestFriendId] = useState('')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [loading, setLoading] = useState(true)
@@ -113,6 +217,23 @@ export default function NenCampaignsPage() {
     } catch { setNotice({ tone: 'error', text: 'コラムを配信予約できませんでした。' }) }
   }
 
+  const updateColumnDraft = (id: string, introText: string) => {
+    setColumns((current) => current.map((column) => column.id === id ? { ...column, introText } : column))
+  }
+
+  const saveColumnMessage = async (column: NenColumn) => {
+    if (!column.introText.trim()) {
+      setNotice({ tone: 'error', text: '挨拶・要約文を入力してください。' }); return
+    }
+    setSavingColumnId(column.id)
+    try {
+      await api.nenCampaigns.updateColumnMessage(column.id, column.introText)
+      setNotice({ tone: 'success', text: `「${column.title}」の配信文を保存しました。` })
+      setEditingColumnId(null)
+    } catch { setNotice({ tone: 'error', text: 'コラムの配信文を保存できませんでした。' }) }
+    finally { setSavingColumnId(null) }
+  }
+
   const addPet = async () => {
     if (!petDraft.friendId || !petDraft.name.trim()) { setNotice({ tone: 'error', text: 'LINEユーザーとペットのお名前を入力してください。' }); return }
     try {
@@ -170,10 +291,20 @@ export default function NenCampaignsPage() {
                   <div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold text-gray-900">{setting.label}</h3><span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{categoryLabel[setting.category]}</span></div>
                     <p className="mt-1 text-xs text-gray-500">{setting.delayDays === 0 ? 'イベント発生後すぐ' : `発送完了から${setting.delayDays}日後 ${setting.deliveryTime}`}</p></div>
                 </div>
-                <button onClick={() => setExpanded(expanded === setting.campaignKey ? null : setting.campaignKey)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">{expanded === setting.campaignKey ? '閉じる' : '内容を編集'}</button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    aria-expanded={previewCampaignKey === setting.campaignKey}
+                    aria-controls={`campaign-preview-${setting.campaignKey}`}
+                    onClick={() => setPreviewCampaignKey(previewCampaignKey === setting.campaignKey ? null : setting.campaignKey)}
+                    className={`rounded-xl border px-4 py-2 text-sm font-semibold ${previewCampaignKey === setting.campaignKey ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
+                  >{previewCampaignKey === setting.campaignKey ? 'プレビューを隠す' : '配信プレビュー'}</button>
+                  <button onClick={() => setExpanded(expanded === setting.campaignKey ? null : setting.campaignKey)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">{expanded === setting.campaignKey ? '編集を閉じる' : '内容を編集'}</button>
+                </div>
               </div>
-              {expanded === setting.campaignKey && <div className="grid gap-5 border-t border-gray-100 bg-gray-50/70 p-4 lg:grid-cols-2 sm:p-5">
-                <div className="space-y-4">
+              {previewCampaignKey === setting.campaignKey && <CampaignLinePreview setting={setting} onClose={() => setPreviewCampaignKey(null)} />}
+              {expanded === setting.campaignKey && <div className="border-t border-gray-100 bg-gray-50/70 p-4 sm:p-5">
+                <div className="mx-auto max-w-4xl space-y-4">
                   {setting.category === 'follow_up' && <div className="grid grid-cols-2 gap-3"><label className="text-sm font-semibold text-gray-700">発送から何日後<input type="number" min={1} max={365} value={setting.delayDays} onChange={(e) => updateDraft(setting.campaignKey, { delayDays: Number(e.target.value) })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label><label className="text-sm font-semibold text-gray-700">送信時刻<input type="time" value={setting.deliveryTime} onChange={(e) => updateDraft(setting.campaignKey, { deliveryTime: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label></div>}
                   <label className="block text-sm font-semibold text-gray-700">見出し<input value={setting.title} maxLength={120} onChange={(e) => updateDraft(setting.campaignKey, { title: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label>
                   <label className="block text-sm font-semibold text-gray-700">本文<textarea value={setting.bodyText} rows={5} maxLength={1500} onChange={(e) => updateDraft(setting.campaignKey, { bodyText: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 leading-6" /></label>
@@ -181,7 +312,6 @@ export default function NenCampaignsPage() {
                   <label className="block text-sm font-semibold text-gray-700">画像URL（任意）<input type="url" value={setting.imageUrl || ''} onChange={(e) => updateDraft(setting.campaignKey, { imageUrl: e.target.value })} className="mt-1.5 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5" /></label>
                   <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"><button onClick={() => void testSend(setting)} disabled={testing === setting.campaignKey} className="rounded-xl border border-emerald-600 px-4 py-2.5 text-sm font-semibold text-emerald-700">{testing === setting.campaignKey ? '送信中...' : 'テスト送信'}</button><button onClick={() => void saveSetting(setting)} disabled={saving === setting.campaignKey} className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white">{saving === setting.campaignKey ? '保存中...' : '保存'}</button></div>
                 </div>
-                <div className="rounded-2xl bg-[#d8efe2] p-5"><p className="mb-3 text-xs font-semibold text-emerald-800">LINEプレビュー</p><div className="overflow-hidden rounded-2xl bg-white shadow-sm">{setting.imageUrl && <img src={setting.imageUrl} alt="" className="aspect-[3/2] w-full object-cover" />}<div className="space-y-3 p-5"><h4 className="text-lg font-bold text-[#123f2b]">{setting.title}</h4><p className="whitespace-pre-wrap text-sm leading-6 text-gray-600">{setting.bodyText}</p><p className="text-xs text-gray-400">注文番号・商品・配送情報は送信時に自動で入ります。</p>{setting.buttonLabel && <div className="rounded-lg bg-emerald-700 py-2.5 text-center text-sm font-semibold text-white">{setting.buttonLabel}</div>}</div></div></div>
               </div>}
             </article>
           ))}
@@ -189,7 +319,44 @@ export default function NenCampaignsPage() {
 
         {tab === 'columns' && <section className="space-y-4">
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><strong>EC-CUBEと自動連携します。</strong><br />NENコラムを保存すると、タイトル・概要・アイキャッチ・記事URLがここへ下書きとして届きます。確認後にLINE配信してください。</div>
-          {columns.length === 0 ? <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center text-gray-500">同期されたコラムはまだありません。</div> : columns.map((column) => <article key={column.id} className="grid gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[180px_1fr] sm:p-5">{column.imageUrl ? <img src={column.imageUrl} alt="" className="aspect-[3/2] w-full rounded-xl object-cover" /> : <div className="aspect-[3/2] rounded-xl bg-gray-100" />}<div><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{column.category || 'コラム'}</span><span className="text-xs text-gray-400">{column.deliveryStatus}</span></div><h3 className="mt-2 text-lg font-bold text-gray-900">{column.title}</h3><p className="mt-1 text-sm leading-6 text-gray-600">{column.excerpt}</p><div className="mt-4 flex flex-wrap gap-2"><a href={column.articleUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">記事を確認</a><button onClick={() => void deliverColumn(column)} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">今すぐ配信予約</button><input type="datetime-local" aria-label="配信日時" onChange={(e) => { if (e.target.value) void deliverColumn(column, new Date(e.target.value).toISOString()) }} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" /></div></div></article>)}
+          {columns.length === 0 ? <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center text-gray-500">同期されたコラムはまだありません。</div> : columns.map((column) => {
+            const isPreviewOpen = previewColumnId === column.id
+            return (
+              <article key={column.id} className="grid gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-[180px_1fr] sm:p-5">
+                {column.imageUrl ? <img src={column.imageUrl} alt="" className="aspect-[3/2] w-full rounded-xl object-cover" /> : <div className="aspect-[3/2] rounded-xl bg-gray-100" />}
+                <div>
+                  <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">{column.category || 'コラム'}</span><span className="text-xs text-gray-400">{column.deliveryStatus}</span></div>
+                  <h3 className="mt-2 text-lg font-bold text-gray-900">{column.title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">{column.excerpt}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <a href={column.articleUrl} target="_blank" rel="noreferrer" className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">記事を確認</a>
+                    <button
+                      type="button"
+                      aria-expanded={isPreviewOpen}
+                      aria-controls={`column-preview-${column.id}`}
+                      onClick={() => setPreviewColumnId(isPreviewOpen ? null : column.id)}
+                      className={`rounded-xl border px-4 py-2 text-sm font-semibold ${isPreviewOpen ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
+                    >
+                      {isPreviewOpen ? 'プレビューを隠す' : '配信プレビュー'}
+                    </button>
+                    <button type="button" onClick={() => setEditingColumnId(editingColumnId === column.id ? null : column.id)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">
+                      {editingColumnId === column.id ? '編集を閉じる' : '配信文を編集'}
+                    </button>
+                    <button onClick={() => void deliverColumn(column)} className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">今すぐ配信予約</button>
+                    <input type="datetime-local" aria-label="配信日時" onChange={(e) => { if (e.target.value) void deliverColumn(column, new Date(e.target.value).toISOString()) }} className="rounded-xl border border-gray-200 px-3 py-2 text-sm" />
+                  </div>
+                  {editingColumnId === column.id && <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
+                    <label className="block text-sm font-semibold text-gray-800">カードの前に送る挨拶・要約文
+                      <textarea value={column.introText} maxLength={1500} rows={7} onChange={(e) => updateColumnDraft(column.id, e.target.value)} className="mt-2 w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm leading-6" />
+                    </label>
+                    <div className="mt-2 flex items-center justify-between gap-3"><p className="text-xs text-gray-500">タイトルと概要から自動作成されています。配信前に自由に編集できます。</p><span className="text-xs text-gray-400">{column.introText.length}/1500</span></div>
+                    <div className="mt-3 flex justify-end"><button type="button" onClick={() => void saveColumnMessage(column)} disabled={savingColumnId === column.id} className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{savingColumnId === column.id ? '保存中...' : '配信文を保存'}</button></div>
+                  </div>}
+                </div>
+                {isPreviewOpen && <ColumnLinePreview column={column} onClose={() => setPreviewColumnId(null)} />}
+              </article>
+            )
+          })}
         </section>}
 
         {tab === 'pets' && <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">

@@ -5,6 +5,7 @@ import type { Message } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { buildNenImmediateMessage, enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
+import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
 
 const ecIntegrations = new Hono<Env>();
 const MAX_BODY_BYTES = 256 * 1024;
@@ -19,12 +20,15 @@ export const EC_EVENT_TYPES = [
 ] as const;
 const EVENT_TYPES = new Set<string>(EC_EVENT_TYPES);
 
-type EcItem = { name: string; quantity: number };
+type EcItem = { name: string; quantity: number; product_id?: string | number | null; product_url?: string | null };
 export type EcEvent = {
   event_id: string;
   event_type: string;
   occurred_at: string;
   customer_id?: string | number | null;
+  point_balance?: number | null;
+  purchase_count?: number | null;
+  purchase_amount?: number | null;
   line_user_id: string;
   order?: {
     number?: string;
@@ -35,6 +39,24 @@ export type EcEvent = {
     delivery_time?: string | null;
     detail_url?: string | null;
   };
+  order_history?: Array<{
+    id?: string;
+    number?: string;
+    date?: string;
+    total?: number;
+    items?: EcItem[];
+    detail_url?: string | null;
+  }>;
+  subscriptions?: Array<{
+    id?: string;
+    contract_number?: string;
+    status?: string;
+    status_code?: string;
+    next_charge_date?: string | null;
+    next_shipping_date?: string | null;
+    cycle?: string | null;
+    items?: EcItem[];
+  }>;
   shipping?: {
     carrier?: string | null;
     tracking_number?: string | null;
@@ -51,6 +73,12 @@ export type EcEvent = {
     manage_url?: string | null;
     mypage_subscription_url?: string | null;
     payment_method_update_url?: string | null;
+    status?: string;
+    status_code?: string;
+    next_charge_date?: string | null;
+    next_shipping_date?: string | null;
+    cycle?: string | null;
+    items?: EcItem[];
   };
   profile?: {
     owner_name?: string | null;
@@ -98,6 +126,8 @@ function validateEvent(value: unknown): value is EcEvent {
   if (typeof event.line_user_id !== 'string' || !/^U[0-9a-f]{32}$/i.test(event.line_user_id)) return false;
   if (typeof event.occurred_at !== 'string' || !Number.isFinite(Date.parse(event.occurred_at))) return false;
   if (event.order?.items && (!Array.isArray(event.order.items) || event.order.items.length > 50)) return false;
+  if (event.order_history && (!Array.isArray(event.order_history) || event.order_history.length > 50)) return false;
+  if (event.subscriptions && (!Array.isArray(event.subscriptions) || event.subscriptions.length > 20)) return false;
   if (event.profile?.pets) {
     if (!Array.isArray(event.profile.pets) || event.profile.pets.length > 20) return false;
     for (const pet of event.profile.pets) {
@@ -122,6 +152,61 @@ function itemSummary(items: EcItem[] | undefined): string {
   const visible = items.slice(0, 4).map((item) => `${item.name.slice(0, 80)} × ${item.quantity}`);
   if (items.length > visible.length) visible.push(`ほか${items.length - visible.length}点`);
   return visible.join('\n');
+}
+
+function memberRank(_count: number, amount: number): string {
+  if (amount >= 100000) return 'プラチナ会員';
+  if (amount >= 50000) return 'ゴールド会員';
+  if (amount >= 20000) return 'シルバー会員';
+  return '会員';
+}
+
+async function syncMemberSnapshot(db: D1Database, friendId: string, event: EcEvent, now: string): Promise<void> {
+  const current = await db.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friendId).first<Record<string, unknown>>();
+  let orders: Array<Record<string, unknown>> = current ? JSON.parse(String(current.orders_json || '[]')) : [];
+  let subscription: Record<string, unknown> | null = current?.subscription_json ? JSON.parse(String(current.subscription_json)) : null;
+  const hasPurchaseCount = Number.isFinite(event.purchase_count);
+  const hasPurchaseAmount = Number.isFinite(event.purchase_amount);
+  let count = hasPurchaseCount ? Math.max(0, Math.round(Number(event.purchase_count))) : Number(current?.purchase_count || 0);
+  let amount = hasPurchaseAmount ? Math.max(0, Math.round(Number(event.purchase_amount))) : Number(current?.purchase_amount || 0);
+  const pointBalance = Number.isFinite(event.point_balance)
+    ? Math.max(0, Math.round(Number(event.point_balance)))
+    : Number(current?.point_balance || 0);
+  if (event.event_type === 'ec.customer.profile_updated' && Array.isArray(event.order_history)) {
+    orders = event.order_history.map((order) => ({
+      id: order.id || `eccube:order:${order.number || crypto.randomUUID()}`,
+      number: order.number,
+      date: order.date,
+      total: order.total || 0,
+      items: order.items || [],
+      detailUrl: order.detail_url || null,
+    })).slice(0, 50);
+    subscription = { contracts: Array.isArray(event.subscriptions) ? event.subscriptions : [], updatedAt: event.occurred_at };
+  }
+  if (event.event_type === 'ec.order.confirmed' && event.order) {
+    const order = { id: event.event_id, number: event.order.number, date: event.occurred_at, total: event.order.total || 0, paymentMethod: event.order.payment_method || null, items: event.order.items || [], detailUrl: event.order.detail_url || null };
+    if (!orders.some((item) => item.id === event.event_id || (event.order?.number && item.number === event.order.number))) {
+      orders = [order, ...orders].slice(0, 50);
+      if (!hasPurchaseCount) count += 1;
+      if (!hasPurchaseAmount) amount += Math.max(0, Math.round(event.order.total || 0));
+    }
+  }
+  if (event.event_type.startsWith('ec.subscription.') && event.subscription) {
+    const currentContracts = Array.isArray(subscription?.contracts) ? subscription.contracts as Array<Record<string, unknown>> : subscription ? [subscription] : [];
+    const nextContract = { ...event.subscription, status: event.event_type === 'ec.subscription.cancelled' ? '解約済み' : event.event_type === 'ec.subscription.payment_failed' ? '決済確認が必要' : '契約中', updatedAt: event.occurred_at };
+    const matchIndex = currentContracts.findIndex(contract => (event.subscription?.id && contract.id === event.subscription.id) || (event.subscription?.contract_number && contract.contract_number === event.subscription.contract_number));
+    if (matchIndex >= 0) currentContracts[matchIndex] = { ...currentContracts[matchIndex], ...nextContract };
+    else currentContracts.unshift(nextContract);
+    subscription = { contracts: currentContracts.slice(0, 20), updatedAt: event.occurred_at };
+  }
+  await db.prepare(
+    `INSERT INTO nen_ec_member_snapshots (friend_id, customer_id, orders_json, subscription_json, purchase_count, purchase_amount, point_balance, member_rank, synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(friend_id) DO UPDATE SET customer_id=COALESCE(excluded.customer_id, customer_id), orders_json=excluded.orders_json,
+       subscription_json=excluded.subscription_json, purchase_count=excluded.purchase_count,
+       purchase_amount=excluded.purchase_amount, point_balance=excluded.point_balance,
+       member_rank=excluded.member_rank, synced_at=excluded.synced_at`,
+  ).bind(friendId, event.customer_id == null ? null : String(event.customer_id), JSON.stringify(orders), subscription ? JSON.stringify(subscription) : null, count, amount, pointBalance, memberRank(count, amount), now).run();
 }
 
 export type EcMessageOptions = {
@@ -267,9 +352,13 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     const accessToken = account?.channel_access_token || c.env.LINE_CHANNEL_ACCESS_TOKEN;
     if (!accessToken) throw new Error('LINE access token is not configured');
 
+    await syncMemberSnapshot(c.env.DB, friend.id, event, now);
+    await syncNenEcTags(c.env.DB, friend.id);
+
     if (event.event_type === 'ec.customer.profile_updated') {
       const { syncNenPetProfiles } = await import('../services/nen-engagement.js');
       await syncNenPetProfiles(c.env.DB, event, friend.id);
+      await syncNenPetTags(c.env.DB, friend.id);
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'processed', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
