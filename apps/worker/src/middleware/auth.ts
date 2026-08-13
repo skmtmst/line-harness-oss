@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono';
-import { getStaffByApiKey } from '@line-crm/db';
+import { getStaffByAdminSession, getStaffByApiKey } from '@line-crm/db';
 import type { Env } from '../index.js';
 import type { AdminSameSite } from './admin-auth-config.js';
 
@@ -8,7 +8,7 @@ export const CSRF_COOKIE = 'lh_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
 // 7 days, matching the previous localStorage session longevity.
-const SESSION_MAX_AGE = 604800;
+export const SESSION_MAX_AGE = 604800;
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -42,7 +42,7 @@ function bearerToken(c: Context<Env>): string | null {
   return authHeader.slice('Bearer '.length);
 }
 
-function cookieToken(c: Context<Env>): string | null {
+export function adminSessionTokenFromCookie(c: Context<Env>): string | null {
   return parseCookieHeader(c.req.header('Cookie'))[ADMIN_AUTH_COOKIE] || null;
 }
 
@@ -87,8 +87,42 @@ export function expiredCookie(name: string, sameSite: AdminSameSite): string {
 export type AuthenticatedStaff = {
   id: string;
   name: string;
-  role: 'owner' | 'admin' | 'staff';
+  role: 'owner' | 'admin' | 'staff' | 'viewer';
 };
+
+function authenticatedRole(staff: {
+  role: 'owner' | 'admin' | 'staff';
+  access_level?: 'full' | 'read_only';
+}): AuthenticatedStaff['role'] {
+  return staff.access_level === 'read_only' ? 'viewer' : staff.role;
+}
+
+export async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export async function authenticateAdminSession(
+  c: Context<Env>,
+  token: string | null,
+): Promise<AuthenticatedStaff | null> {
+  if (!token) return null;
+  const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
+  if (!staff) return null;
+  return { id: staff.id, name: staff.name, role: authenticatedRole(staff) };
+}
+
+async function authenticateCookieToken(
+  c: Context<Env>,
+  token: string | null,
+): Promise<AuthenticatedStaff | null> {
+  const session = await authenticateAdminSession(c, token);
+  if (session) return session;
+  // Backward-compatible emergency session created by the hidden API-key route.
+  return authenticateApiToken(c, token);
+}
 
 /**
  * Resolve a token (from a Bearer header or the session cookie) to a staff
@@ -103,7 +137,7 @@ export async function authenticateApiToken(
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {
-    return { id: staff.id, name: staff.name, role: staff.role };
+    return { id: staff.id, name: staff.name, role: authenticatedRole(staff) };
   }
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
@@ -161,8 +195,11 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   const isPublicFormDefinition =
     method === 'GET' && /^\/api\/forms\/[^/]+$/.test(path);
   if (isPublicFormDefinition) {
-    const token = bearerToken(c) ?? cookieToken(c);
-    const staff = await authenticateApiToken(c, token);
+    const bearer = bearerToken(c);
+    const cookie = adminSessionTokenFromCookie(c);
+    const staff = bearer
+      ? await authenticateApiToken(c, bearer)
+      : await authenticateCookieToken(c, cookie);
     if (staff) c.set('staff', staff);
     return next();
   }
@@ -182,6 +219,9 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/docs' ||
     path === '/openapi.json' ||
     path === '/api/affiliates/click' ||
+    path === '/webhooks/xserver/support-email' ||
+    path === '/api/public/nen/adopted-photos' ||
+    path === '/api/public/nen/gallery-preview' ||
     path.startsWith('/t/') ||
     path.startsWith('/r/') ||
     path.startsWith('/pool/') ||
@@ -196,9 +236,13 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     // Admin login/logout — issue/clear the session cookie before auth exists.
     path === '/api/auth/login' ||
     path === '/api/auth/logout' ||
+    path === '/api/auth/line' ||
+    path === '/api/auth/line/callback' ||
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
+    path === '/api/integrations/eccube/events' ||
+    path === '/api/integrations/eccube/columns' ||
     path.match(/^\/api\/webhooks\/incoming\/[^/]+\/receive$/) ||
     path === '/api/meet-callback' || // Meet Harness completion callback
     path === '/api/qr' || // Public QR proxy — used by desktop landing pages
@@ -208,12 +252,16 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
   }
 
   const bearer = bearerToken(c);
-  const cookie = cookieToken(c);
-  const token = bearer ?? cookie;
-
-  const staff = await authenticateApiToken(c, token);
+  const cookie = adminSessionTokenFromCookie(c);
+  const staff = bearer
+    ? await authenticateApiToken(c, bearer)
+    : await authenticateCookieToken(c, cookie);
   if (!staff) {
     return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+
+  if (staff.role === 'viewer' && !SAFE_METHODS.has(method)) {
+    return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
   }
 
   // CSRF protection applies ONLY to cookie-authenticated, state-changing

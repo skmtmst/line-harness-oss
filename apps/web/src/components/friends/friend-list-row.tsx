@@ -2,24 +2,19 @@
 
 import { useRouter } from 'next/navigation'
 import type { FriendListItem } from '@/lib/api'
-import TagBadge from './tag-badge'
 
 interface Props {
   friend: FriendListItem
-  // Toggles the inline tag-management section underneath the row. Wired up
-  // to a discrete button (with stopPropagation) inside this component, NOT
-  // to the row body — the row body navigates to /chats and we don't want
-  // the tag-edit affordance to compete with that primary click target.
-  onTagEditClick?: () => void
+  onDetailClick?: () => void
 }
 
-// Single row of the L-step style friend list. Renders 5 columns:
-// 対応マーク / 名前 / シナリオ / 受信メッセージ / ★つきタグ・友だち情報
+// Single row of the L-step style friend list. Renders 6 columns:
+// 対応マーク / 名前 / シナリオ / 受信メッセージ / 友だち情報 / 詳細
 // Clicking the row navigates to the per-friend chat view at
 // `/chats?friend=<id>` so the operator can read history / reply / mark as
-// resolved without leaving the list. The "タグ" button at the end of the
-// last column opens an inline tag editor (handled by the parent table).
-export default function FriendListRow({ friend, onTagEditClick }: Props) {
+// resolved without leaving the list. Tags are intentionally kept in the
+// detail drawer so a large number of automatic tags cannot stretch the row.
+export default function FriendListRow({ friend, onDetailClick }: Props) {
   const router = useRouter()
   const navigateToChat = () => router.push(`/chats?friend=${friend.id}`)
   const incoming = friend.latestIncomingMessage
@@ -42,7 +37,7 @@ export default function FriendListRow({ friend, onTagEditClick }: Props) {
           navigateToChat()
         }
       }}
-      className="grid grid-cols-[80px_220px_120px_1fr_280px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
+      className="grid grid-cols-[80px_220px_120px_1fr_160px_88px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
     >
       {/* 対応マーク — chats.status 由来 (unread / in_progress / resolved). */}
       <div className="pt-1">
@@ -115,15 +110,8 @@ export default function FriendListRow({ friend, onTagEditClick }: Props) {
         )}
       </div>
 
-      {/* ★つきタグ・友だち情報 */}
+      {/* 流入など、一覧で判別しやすい最小限の友だち情報だけを表示。 */}
       <div className="space-y-1">
-        {friend.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {friend.tags.map((tag) => (
-              <TagBadge key={tag.id} tag={tag} />
-            ))}
-          </div>
-        )}
         {friend.firstTrackedLinkName && (
           <p className="text-[10px] text-gray-500">
             <span className="text-gray-400">ASP_LP名：</span>
@@ -149,20 +137,21 @@ export default function FriendListRow({ friend, onTagEditClick }: Props) {
             </p>
           )
         })()}
-        {friend.tags.length === 0 && !friend.firstTrackedLinkName && !friend.refCode &&
+        {!friend.firstTrackedLinkName && !friend.refCode &&
           !(friend as unknown as { metadata?: Record<string, unknown> }).metadata?.ig_account_username &&
           !(friend as unknown as { metadata?: Record<string, unknown> }).metadata?.ig_account_id && (
           <span className="text-[10px] text-gray-300">—</span>
         )}
-        {onTagEditClick && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onTagEditClick() }}
-            className="text-[10px] text-blue-600 hover:text-blue-800 underline mt-0.5"
-          >
-            タグ編集
-          </button>
-        )}
+      </div>
+
+      <div className="pt-0.5 text-right">
+        <button
+          type="button"
+          onClick={(event) => { event.stopPropagation(); onDetailClick?.() }}
+          className="w-full rounded-lg border border-emerald-600 bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+        >
+          詳細
+        </button>
       </div>
     </div>
   )

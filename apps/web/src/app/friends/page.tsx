@@ -203,7 +203,7 @@ export default function FriendsPage() {
       {loading ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-gray-100 grid grid-cols-[80px_220px_120px_1fr_280px] gap-3 animate-pulse">
+            <div key={i} className="px-4 py-4 border-b border-gray-100 grid grid-cols-[80px_220px_120px_1fr_250px_88px] gap-3 animate-pulse">
               <div className="h-5 bg-gray-100 rounded w-16" />
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-full bg-gray-200" />
@@ -215,6 +215,7 @@ export default function FriendsPage() {
                 <div className="h-2 bg-gray-100 rounded w-20" />
               </div>
               <div className="h-5 bg-gray-100 rounded w-32" />
+              <div className="h-8 bg-gray-100 rounded w-20" />
             </div>
           ))}
         </div>

@@ -1,0 +1,359 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import Header from '@/components/layout/header'
+import { api, type EcCommerceEvent, type EcCommerceOverview, type EcNotificationSetting } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+
+const statusStyle: Record<EcCommerceEvent['status'], { label: string; className: string }> = {
+  received: { label: '受信済み', className: 'bg-blue-50 text-blue-700' },
+  processing: { label: '処理中', className: 'bg-amber-50 text-amber-700' },
+  processed: { label: '送信完了', className: 'bg-emerald-50 text-emerald-700' },
+  skipped: { label: '送信なし', className: 'bg-gray-100 text-gray-600' },
+  failed: { label: '失敗', className: 'bg-red-50 text-red-700' },
+}
+
+function dateTime(value: string | null) {
+  if (!value) return 'まだありません'
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function MetricCard({ label, value, note, tone = 'green' }: { label: string; value: number | string; note: string; tone?: 'green' | 'red' | 'gray' }) {
+  const toneClass = tone === 'red' ? 'text-red-600' : tone === 'gray' ? 'text-gray-700' : 'text-emerald-700'
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <p className="text-sm font-medium text-gray-500">{label}</p>
+      <p className={`mt-2 text-3xl font-bold tracking-tight ${toneClass}`}>{value}</p>
+      <p className="mt-1 text-xs text-gray-400">{note}</p>
+    </div>
+  )
+}
+
+export default function EcCommercePage() {
+  const { selectedAccountId } = useAccount()
+  const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
+  const [events, setEvents] = useState<EcCommerceEvent[]>([])
+  const [settings, setSettings] = useState<EcNotificationSetting[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState<string | null>(null)
+  const [testing, setTesting] = useState<string | null>(null)
+  const [expandedEventType, setExpandedEventType] = useState<string | null>(null)
+  const [message, setMessage] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const [overviewRes, eventRes, settingRes] = await Promise.all([
+        api.ecCommerce.overview(),
+        api.ecCommerce.events({ limit: 30 }),
+        api.ecCommerce.settings(),
+      ])
+      if (!overviewRes.success || !eventRes.success || !settingRes.success) throw new Error('API error')
+      setOverview(overviewRes.data)
+      setEvents(eventRes.data)
+      const subscriptionSettings = settingRes.data.filter((setting) =>
+        !['ec.order.confirmed', 'ec.order.shipped'].includes(setting.eventType),
+      )
+      setSettings(subscriptionSettings)
+      setExpandedEventType((current) => current ?? subscriptionSettings[0]?.eventType ?? null)
+    } catch {
+      setMessage({ tone: 'error', text: 'EC連携情報を読み込めませんでした。時間をおいて再度お試しください。' })
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
+
+  const updateDraft = (eventType: string, patch: Partial<EcNotificationSetting>) => {
+    setSettings((current) => current.map((setting) => setting.eventType === eventType ? { ...setting, ...patch } : setting))
+  }
+
+  const saveSetting = async (setting: EcNotificationSetting) => {
+    if (!setting.title?.trim()) {
+      setMessage({ tone: 'error', text: '通知タイトルを入力してください。' })
+      return
+    }
+    setSaving(setting.eventType)
+    setMessage(null)
+    try {
+      await api.ecCommerce.updateSetting(setting.eventType, {
+        isEnabled: setting.isEnabled,
+        title: setting.title,
+        introText: setting.introText,
+        outroText: setting.outroText,
+      })
+      setMessage({ tone: 'success', text: `${setting.label}の通知設定を保存しました。` })
+    } catch {
+      setMessage({ tone: 'error', text: '通知設定を保存できませんでした。' })
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const livePreview = (setting: EcNotificationSetting) => [
+    setting.title?.trim() || '',
+    setting.introText.trim(),
+    setting.fixedPreview,
+    setting.outroText.trim(),
+  ].filter(Boolean).join('\n\n')
+
+  const toggleSetting = async (setting: EcNotificationSetting) => {
+    const isEnabled = !setting.isEnabled
+    updateDraft(setting.eventType, { isEnabled })
+    setSaving(setting.eventType)
+    setMessage(null)
+    try {
+      await api.ecCommerce.updateSetting(setting.eventType, {
+        isEnabled,
+        title: setting.title || '',
+        introText: setting.introText,
+        outroText: setting.outroText,
+      })
+      setMessage({ tone: 'success', text: `${setting.label}を${isEnabled ? 'ON' : 'OFF'}にしました。` })
+    } catch {
+      updateDraft(setting.eventType, { isEnabled: setting.isEnabled })
+      setMessage({ tone: 'error', text: '通知のON/OFFを保存できませんでした。' })
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  const testSend = async (setting: EcNotificationSetting) => {
+    if (!selectedAccountId) {
+      setMessage({ tone: 'error', text: '左メニュー上部でLINEアカウントを選択してください。' })
+      return
+    }
+    setTesting(setting.eventType)
+    setMessage(null)
+    try {
+      const result = await api.ecCommerce.testSend({
+        eventType: setting.eventType,
+        accountId: selectedAccountId,
+        title: setting.title || '',
+        introText: setting.introText,
+        outroText: setting.outroText,
+      })
+      if (!result.success) throw new Error(result.error)
+      setMessage({ tone: 'success', text: `テスト受信者 ${result.data.sent}名へ送信しました。` })
+    } catch {
+      setMessage({ tone: 'error', text: 'テスト送信できませんでした。「設定 → LINEアカウント」でテスト受信者を確認してください。' })
+    } finally {
+      setTesting(null)
+    }
+  }
+
+  return (
+    <div>
+      <Header
+        title="EC連携"
+        description="然-NEN-の注文・発送・定期便通知を、ここから確認・管理できます。"
+        action={(
+          <button onClick={() => void load()} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            再読み込み
+          </button>
+        )}
+      />
+
+      {message && (
+        <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${message.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
+          {message.text}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center text-sm text-gray-400">読み込み中...</div>
+      ) : (
+        <div className="space-y-8">
+          <section>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="24時間の受信" value={overview?.last24h ?? 0} note="ECから受け取ったイベント" />
+              <MetricCard label="LINE送信完了" value={overview?.processed ?? 0} note={`累計 ${overview?.total ?? 0}件中`} />
+              <MetricCard label="送信なし" value={overview?.skipped ?? 0} note="未連携・通知OFFを含む" tone="gray" />
+              <MetricCard label="要確認" value={overview?.failed ?? 0} note={`最終受信 ${dateTime(overview?.lastReceivedAt ?? null)}`} tone="red" />
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-100 px-5 py-5 sm:px-6">
+              <h2 className="text-lg font-bold text-gray-900">通知設定</h2>
+              <p className="mt-1 text-sm text-gray-500">OFFにしてもECイベントは記録され、ステップ配信の条件には利用できます。</p>
+            </div>
+            <div className="space-y-4 p-4 sm:p-6">
+              {settings.map((setting) => (
+                <div key={setting.eventType} className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                  <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={setting.isEnabled}
+                        aria-label={`${setting.label}の通知を${setting.isEnabled ? 'OFF' : 'ON'}にする`}
+                        onClick={() => void toggleSetting(setting)}
+                        disabled={saving === setting.eventType}
+                        className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 ${setting.isEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                      >
+                        <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${setting.isEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                      </button>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-gray-900">{setting.label}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${setting.isEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {setting.isEnabled ? '通知ON' : '通知OFF'}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 break-all text-xs text-gray-400">{setting.eventType}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedEventType((current) => current === setting.eventType ? null : setting.eventType)}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
+                    >
+                      {expandedEventType === setting.eventType ? '編集を閉じる' : '本文を確認・編集'}
+                      <svg className={`h-4 w-4 transition-transform ${expandedEventType === setting.eventType ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {expandedEventType === setting.eventType && (
+                    <div className="border-t border-gray-100 bg-gray-50/70 p-4 sm:p-5">
+                      <div className="grid gap-5 xl:grid-cols-2">
+                        <div className="space-y-4">
+                          <label className="block">
+                            <span className="mb-1.5 block text-sm font-semibold text-gray-700">通知の見出し</span>
+                            <input
+                              value={setting.title ?? ''}
+                              onChange={(event) => updateDraft(setting.eventType, { title: event.target.value })}
+                              maxLength={80}
+                              className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-sm text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="mb-1.5 block text-sm font-semibold text-gray-700">必須情報の前に入れる文章</span>
+                            <textarea
+                              value={setting.introText}
+                              onChange={(event) => updateDraft(setting.eventType, { introText: event.target.value })}
+                              maxLength={800}
+                              rows={4}
+                              placeholder="例：このたびは然-NEN-をご利用いただきありがとうございます。"
+                              className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-sm leading-6 text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                            />
+                            <span className="mt-1 block text-right text-xs text-gray-400">{setting.introText.length}/800</span>
+                          </label>
+
+                          <div className="rounded-xl border border-slate-200 bg-slate-100 p-4">
+                            <div className="flex items-center gap-2">
+                              <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.1.9-2 2-2s2 .9 2 2v1m-4 0h4m-6 8h8a2 2 0 002-2v-6a2 2 0 00-2-2h-1V7a5 5 0 00-10 0v3H6a2 2 0 00-2 2v6a2 2 0 002 2h4z" />
+                              </svg>
+                              <p className="text-sm font-semibold text-slate-700">必ず送信される情報（編集不可）</p>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {setting.fixedFields.map((field) => (
+                                <span key={field} className="rounded-lg bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200">{field}</span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <label className="block">
+                            <span className="mb-1.5 block text-sm font-semibold text-gray-700">必須情報の後に入れる文章</span>
+                            <textarea
+                              value={setting.outroText}
+                              onChange={(event) => updateDraft(setting.eventType, { outroText: event.target.value })}
+                              maxLength={800}
+                              rows={4}
+                              placeholder="例：ご不明点がございましたら、このLINEへお気軽にご連絡ください。"
+                              className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-sm leading-6 text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                            />
+                            <span className="mt-1 block text-right text-xs text-gray-400">{setting.outroText.length}/800</span>
+                          </label>
+                        </div>
+
+                        <div>
+                          <div className="sticky top-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-gray-900">送信内容プレビュー</p>
+                                <p className="mt-0.5 text-xs text-gray-400">テスト用の注文情報で表示しています</p>
+                              </div>
+                              <span className="rounded-full bg-[#06C755]/10 px-2.5 py-1 text-xs font-semibold text-[#059b43]">LINE</span>
+                            </div>
+                            <div className="mt-4 rounded-2xl rounded-tl-md bg-[#d9fdd3] p-4 text-sm leading-6 text-gray-800 shadow-sm">
+                              <p className="whitespace-pre-wrap break-words">{livePreview(setting)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex flex-col-reverse gap-2 border-t border-gray-200 pt-5 sm:flex-row sm:justify-end">
+                        <button onClick={() => void testSend(setting)} disabled={testing === setting.eventType} className="rounded-xl border border-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+                          {testing === setting.eventType ? '送信中...' : 'この内容をテスト送信'}
+                        </button>
+                        <button onClick={() => void saveSetting(setting)} disabled={saving === setting.eventType} className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                          {saving === setting.eventType ? '保存中...' : '通知設定を保存'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+              <div className="border-b border-gray-100 px-5 py-5 sm:px-6">
+                <h2 className="text-lg font-bold text-gray-900">イベント履歴</h2>
+                <p className="mt-1 text-sm text-gray-500">注文番号とLINE配信結果を確認できます。LINE user IDや決済情報は表示しません。</p>
+              </div>
+              {events.length === 0 ? (
+                <div className="p-12 text-center text-sm text-gray-400">まだECイベントはありません。</div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {events.map((event) => {
+                    const status = statusStyle[event.status]
+                    return (
+                      <div key={event.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-gray-900">{event.eventLabel}</p>
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
+                          </div>
+                          <p className="mt-1 text-sm text-gray-600">
+                            注文番号：{event.orderNumber || '—'} <span className="mx-1 text-gray-300">/</span> {event.friendName || 'LINE未連携'}
+                          </p>
+                          {event.errorMessage && <p className="mt-1 text-xs text-red-600">{event.errorMessage}</p>}
+                        </div>
+                        <time className="shrink-0 text-xs text-gray-400">{dateTime(event.receivedAt)}</time>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <aside className="rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">EC STEP</p>
+              <h2 className="mt-2 text-xl font-bold text-gray-900">購入後の関係づくり</h2>
+              <p className="mt-2 text-sm leading-6 text-gray-600">注文完了などのECイベントを起点に、食べ方の案内、到着確認、次回提案を自動化できます。</p>
+              <div className="mt-5 space-y-3 text-sm">
+                <div className="rounded-xl bg-white p-3.5 text-gray-700 ring-1 ring-emerald-100">1. 注文直後：お礼と商品案内</div>
+                <div className="rounded-xl bg-white p-3.5 text-gray-700 ring-1 ring-emerald-100">2. 到着後：与え方・保存方法</div>
+                <div className="rounded-xl bg-white p-3.5 text-gray-700 ring-1 ring-emerald-100">3. 継続後：定期便・関連商品の提案</div>
+              </div>
+              <Link href="/automations" className="mt-5 block rounded-xl bg-gray-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-gray-800">
+                ECステップ配信を設定する
+              </Link>
+              <p className="mt-3 text-xs leading-5 text-gray-500">定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します。</p>
+            </aside>
+          </section>
+        </div>
+      )}
+    </div>
+  )
+}

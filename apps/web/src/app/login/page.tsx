@@ -1,68 +1,24 @@
 'use client'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 export default function LoginPage() {
-  const [apiKey, setApiKey] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
+  const [error, setError] = useState('')
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL
-      if (!apiUrl) {
-        setError('NEXT_PUBLIC_API_URL is not set in build env')
-        setLoading(false)
-        return
-      }
-      // Exchange the API key for an HttpOnly session cookie. The key is never
-      // stored in localStorage (removes the XSS-exposed credential).
-      const res = await fetch(`${apiUrl}/api/auth/login`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey }),
-      })
-
-      if (res.ok) {
-        localStorage.removeItem('lh_api_key')
-        try {
-          const loginData = await res.json()
-          if (loginData.success && loginData.data) {
-            localStorage.setItem('lh_staff_name', loginData.data.name)
-            localStorage.setItem('lh_staff_role', loginData.data.role)
-          }
-          // Cache the CSRF token for mutating requests (double-submit).
-          if (loginData.csrfToken) {
-            localStorage.setItem('lh_csrf', loginData.csrfToken)
-          }
-        } catch {
-          // Profile / CSRF caching is best-effort.
-        }
-        router.push('/')
-      } else if (res.status === 401) {
-        setError('APIキーが正しくありません')
-      } else {
-        // Surface topology / configuration errors (e.g. cross-site cookie guard).
-        let message = 'ログインに失敗しました'
-        try {
-          const data = await res.json()
-          if (data?.error) message = data.error
-        } catch {
-          // keep default message
-        }
-        setError(message)
-      }
-    } catch {
-      setError('接続に失敗しました')
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    const errorCode = new URLSearchParams(window.location.search).get('error')
+    if (errorCode === 'not_authorized') {
+      setError('このLINEアカウントには管理者権限がありません。オーナーに追加を依頼してください。')
+    } else if (errorCode) {
+      setError('LINEログインを完了できませんでした。もう一度お試しください。')
     }
+  }, [])
+
+  const handleLogin = () => {
+    setLoading(true)
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL
+    if (!apiUrl) return setLoading(false)
+    window.location.assign(`${apiUrl}/api/auth/line`)
   }
 
   return (
@@ -76,32 +32,25 @@ export default function LoginPage() {
           <p className="text-sm text-gray-500 mt-1">管理画面にログイン</p>
         </div>
 
-        <form onSubmit={handleLogin}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="APIキーを入力"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              autoFocus
-            />
-          </div>
-
+        <div>
           {error && (
             <p className="text-sm text-red-600 mb-4">{error}</p>
           )}
 
           <button
-            type="submit"
-            disabled={loading || !apiKey}
-            className="w-full py-3 text-white font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
+            type="button"
+            onClick={handleLogin}
+            disabled={loading}
+            className="w-full py-3 px-4 text-white font-medium rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-3"
             style={{ backgroundColor: '#06C755' }}
           >
-            {loading ? 'ログイン中...' : 'ログイン'}
+            <span className="w-7 h-7 bg-white rounded-md flex items-center justify-center text-sm font-bold" style={{ color: '#06C755' }}>LINE</span>
+            {loading ? 'LINEへ移動中...' : 'LINEでログイン'}
           </button>
-        </form>
+          <p className="mt-4 text-xs text-center text-gray-500 leading-relaxed">
+            管理者として許可されたLINEアカウントのみログインできます。
+          </p>
+        </div>
       </div>
     </div>
   )

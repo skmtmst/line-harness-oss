@@ -4,7 +4,6 @@ export interface SortableForm {
   createdAt: string
   lastSubmittedAt: string | null
 }
-
 /** Convert accidental escaped line breaks and uneven whitespace into a readable title. */
 export function displayFormName(name: string): string {
   return name.replace(/\\n/g, ' ').replace(/\s+/g, ' ').trim()
@@ -25,4 +24,3 @@ export function sortFormsByLatestAnswer<T extends SortableForm>(forms: T[]): T[]
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
 }
-

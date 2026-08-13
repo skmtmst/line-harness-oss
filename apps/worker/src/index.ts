@@ -87,6 +87,12 @@ import { webinarRoutes } from './routes/webinars.js';
 import { instagramEngagement } from './routes/instagram-engagement.js';
 import adminVersion from './routes/admin-version.js';
 import adminUpdate from './routes/admin-update.js';
+import { ecIntegrations } from './routes/ec-integrations.js';
+import { ecCommerce } from './routes/ec-commerce.js';
+import { nenCampaigns } from './routes/nen-campaigns.js';
+import { nenMembers } from './routes/nen-members.js';
+import { supportInbox } from './routes/support-inbox.js';
+import { receiveSupportEmail } from './services/support-email.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -100,6 +106,15 @@ export type Env = {
     DB: D1Database;
     IMAGES: R2Bucket;
     ASSETS: Fetcher;
+    AI?: Ai;
+    EMAIL?: SendEmail;
+    CONTACT_EMAIL?: string;
+    SUPPORT_INBOUND_EMAIL?: string;
+    XSERVER_MAIL_HOST?: string;
+    XSERVER_MAIL_USER?: string;
+    XSERVER_MAIL_PASSWORD?: string;
+    XSERVER_RELAY_URL?: string;
+    XSERVER_RELAY_SECRET?: string;
     LINE_CHANNEL_SECRET: string;
     LINE_CHANNEL_ACCESS_TOKEN: string;
     API_KEY: string;
@@ -108,6 +123,9 @@ export type Env = {
     LINE_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_SECRET: string;
+    ECCUBE_WEBHOOK_SECRET?: string;
+    NEN_EC_BASE_URL?: string;
+    NEN_RICH_MENU_STORE_URL?: string;
     WORKER_URL: string;
     // Admin auth topology (see middleware/admin-auth-config.ts):
     ADMIN_ORIGIN?: string;          // Comma-separated admin web origin allowlist for credentialed CORS
@@ -138,7 +156,7 @@ export type Env = {
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
   };
   Variables: {
-    staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff' };
+    staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff' | 'viewer' };
   };
 };
 
@@ -216,6 +234,13 @@ app.route('/', webinarRoutes);
 app.route('/', instagramEngagement);
 // LINE Messaging API 互換プロキシ — 外部エージェントの直接送信を messages_log に残す
 app.route('/', lineProxy);
+// EC-CUBEの取引イベント。管理者認証ではなく署名・時刻・重複IDで検証する。
+app.route('/', ecIntegrations);
+// NEN EC連携の管理画面API（通常の管理者認証・CSRF保護対象）。
+app.route('/', ecCommerce);
+app.route('/', nenCampaigns);
+app.route('/', nenMembers);
+app.route('/', supportInbox);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -917,6 +942,17 @@ async function scheduled(
     console.error('token refresh error:', e);
   }
 
+  // XServerメールボックスを5分Cronごとに確認し、LINEと同じ未対応一覧へ取り込む。
+  if (!env.XSERVER_RELAY_SECRET && env.XSERVER_MAIL_HOST && env.XSERVER_MAIL_USER && env.XSERVER_MAIL_PASSWORD) {
+    try {
+      const { syncXServerSupportMailbox } = await import('./services/xserver-mail.js');
+      const result = await syncXServerSupportMailbox(env);
+      if (result.checked > 0) console.log(JSON.stringify({ event: 'support_email_sync', ...result }));
+    } catch (e) {
+      console.error('support email sync error:', e);
+    }
+  }
+
   try {
     const result = await processDueReminders(env.DB, {
       now: new Date(),
@@ -978,6 +1014,49 @@ async function scheduled(
     }
   } catch (e) {
     console.error('webinar-reminders error:', e);
+  }
+
+  // NEN専用の購入後フォローと誕生日クーポン。自動配信なのでmanualヘッダーは付けない。
+  try {
+    const { processNenDeliveries, enqueueBirthdayCoupons } = await import('./services/nen-engagement.js');
+    const birthdayQueued = await enqueueBirthdayCoupons(
+      env.DB,
+      new Date(),
+      env.NEN_EC_BASE_URL && env.ECCUBE_WEBHOOK_SECRET
+        ? { baseUrl: env.NEN_EC_BASE_URL, secret: env.ECCUBE_WEBHOOK_SECRET }
+        : undefined,
+    );
+    const result = await processNenDeliveries(env.DB, {
+      proxyBaseUrl: env.WORKER_PUBLIC_URL ?? 'https://your-worker.your-subdomain.workers.dev',
+      defaultAccessToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      proxyDispatch: (request) => Promise.resolve(lineProxy.fetch(request, env, ctx)),
+    });
+    if (birthdayQueued + result.sent + result.failed + result.skipped > 0) {
+      console.log(JSON.stringify({ event: 'nen_campaign_tick', birthdayQueued, ...result }));
+    }
+  } catch (e) {
+    console.error('nen-campaign delivery error:', e);
+  }
+
+  // 誕生日月・最終購入日・次回発送日など、時間経過だけで条件が変わるタグを6時間ごとに再判定する。
+  // 登録・購入・健康記録・写真審査時は各APIが即時同期するため、ここでは日付条件の補正を担う。
+  if (event.cron === '0 */6 * * *') {
+    try {
+      const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
+      const result = await refreshAllNenTags(env.DB, 500, new Date());
+      if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
+    } catch (e) {
+      console.error('nen-tag refresh error:', e);
+    }
+  }
+
+  // 管理画面ログインに依存せず、DBに登録された一度限りの設置ジョブを安全に実行する。
+  try {
+    const { processPendingNenRichMenuJobs } = await import('./services/nen-rich-menu.js');
+    const result = await processPendingNenRichMenuJobs(env);
+    if (result.processed > 0) console.log(JSON.stringify({ event: 'nen_rich_menu_job', ...result }));
+  } catch (e) {
+    console.error('nen-rich-menu job error:', e);
   }
 
   // 予約画面の未予約、予約後の未視聴、フォーム途中離脱、回答後の相談未予約を
@@ -1093,5 +1172,17 @@ async function scheduled(
 export default {
   fetch: app.fetch,
   scheduled,
+  async email(
+    message: ForwardableEmailMessage,
+    env: Env['Bindings'],
+    _ctx: ExecutionContext,
+  ): Promise<void> {
+    try {
+      await receiveSupportEmail(message, env);
+    } catch (error) {
+      console.error(JSON.stringify({ event: 'support_email_receive_failed', error: String(error) }));
+      message.setReject('メール受信処理に失敗しました');
+    }
+  },
 };
 // redeploy trigger

@@ -56,6 +56,14 @@ CREATE TABLE ad_platforms (
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE admin_sessions (
+  token_hash TEXT PRIMARY KEY,
+  staff_id   TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
+);
+
 CREATE TABLE admin_users (
   id            TEXT PRIMARY KEY,
   email         TEXT NOT NULL UNIQUE,
@@ -276,6 +284,33 @@ CREATE TABLE conversion_points (
   value      REAL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
+
+CREATE TABLE ec_events (
+  id                TEXT PRIMARY KEY,
+  source            TEXT NOT NULL,
+  external_event_id TEXT NOT NULL,
+  event_type        TEXT NOT NULL,
+  customer_id       TEXT,
+  line_user_id      TEXT NOT NULL,
+  friend_id         TEXT,
+  payload           TEXT NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'received'
+                    CHECK (status IN ('received', 'processing', 'processed', 'skipped', 'failed')),
+  error_message     TEXT,
+  received_at       TEXT NOT NULL,
+  processed_at      TEXT,
+  updated_at        TEXT NOT NULL,
+  UNIQUE (source, external_event_id),
+  FOREIGN KEY (friend_id) REFERENCES friends(id) ON DELETE SET NULL
+);
+
+CREATE TABLE ec_notification_settings (
+  event_type TEXT PRIMARY KEY,
+  is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+  title_override TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+, intro_text TEXT, outro_text TEXT);
 
 CREATE TABLE engagement_events (
   id                TEXT PRIMARY KEY,
@@ -674,6 +709,216 @@ CREATE TABLE mileage_rules (
   updated_at     TEXT NOT NULL
 );
 
+CREATE TABLE nen_birthday_coupon_settings (
+  id TEXT PRIMARY KEY CHECK (id = 'default'),
+  is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+  code_prefix TEXT NOT NULL DEFAULT 'NENBDAY',
+  benefit_label TEXT NOT NULL DEFAULT 'お誕生日月限定クーポン',
+  discount_amount INTEGER NOT NULL DEFAULT 500 CHECK (discount_amount BETWEEN 1 AND 100000),
+  validity_days INTEGER NOT NULL DEFAULT 31 CHECK (validity_days BETWEEN 1 AND 365),
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE nen_campaign_settings (
+  campaign_key TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('transactional', 'follow_up', 'column', 'birthday')),
+  trigger_event TEXT,
+  delay_days INTEGER NOT NULL DEFAULT 0 CHECK (delay_days BETWEEN 0 AND 365),
+  delivery_time TEXT NOT NULL DEFAULT '10:00',
+  is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+  title TEXT NOT NULL,
+  body_text TEXT NOT NULL DEFAULT '',
+  button_label TEXT,
+  button_url TEXT,
+  image_url TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE nen_care_flags (
+  id TEXT PRIMARY KEY,
+  pet_id TEXT NOT NULL REFERENCES nen_pet_profiles(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  flag_type TEXT NOT NULL CHECK (flag_type IN ('poor_appetite','abnormal_stool')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','resolved')),
+  consecutive_days INTEGER NOT NULL DEFAULT 0,
+  advice_ready INTEGER NOT NULL DEFAULT 1 CHECK (advice_ready IN (0,1)),
+  detected_at TEXT NOT NULL,
+  resolved_at TEXT,
+  updated_at TEXT NOT NULL,
+  UNIQUE (pet_id, flag_type)
+);
+
+CREATE TABLE nen_columns (
+  id TEXT PRIMARY KEY,
+  external_id TEXT UNIQUE,
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  category TEXT,
+  excerpt TEXT NOT NULL DEFAULT '',
+  article_url TEXT NOT NULL,
+  image_url TEXT,
+  published_at TEXT,
+  delivery_status TEXT NOT NULL DEFAULT 'draft' CHECK (delivery_status IN ('draft', 'scheduled', 'queued', 'sent')),
+  delivery_at TEXT,
+  line_account_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+, intro_text TEXT);
+
+CREATE TABLE nen_consultation_logs (
+  id TEXT PRIMARY KEY,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  pet_id TEXT REFERENCES nen_pet_profiles(id) ON DELETE SET NULL,
+  topic TEXT NOT NULL CHECK (topic IN ('tear_stain','appetite','allergy')),
+  answers_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(answers_json)),
+  result_key TEXT NOT NULL,
+  result_text TEXT NOT NULL,
+  tag_name TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE nen_consultation_logs_v2 (
+  id TEXT PRIMARY KEY,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  pet_id TEXT REFERENCES nen_pet_profiles(id) ON DELETE SET NULL,
+  animal_type TEXT NOT NULL DEFAULT 'dog' CHECK (animal_type IN ('dog','cat')),
+  topic TEXT NOT NULL DEFAULT 'free_text',
+  question_text TEXT NOT NULL DEFAULT '',
+  answers_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(answers_json)),
+  result_key TEXT NOT NULL,
+  result_text TEXT NOT NULL,
+  tag_name TEXT NOT NULL,
+  tags_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(tags_json)),
+  source_ids_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(source_ids_json)),
+  safety_level TEXT NOT NULL DEFAULT 'general' CHECK (safety_level IN ('general','caution','urgent')),
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE nen_coupon_issues (
+  id TEXT PRIMARY KEY,
+  pet_id TEXT NOT NULL REFERENCES nen_pet_profiles(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  issue_year INTEGER NOT NULL,
+  coupon_code TEXT NOT NULL UNIQUE,
+  benefit_label TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  issued_at TEXT NOT NULL,
+  used_at TEXT,
+  UNIQUE (pet_id, issue_year)
+);
+
+CREATE TABLE nen_delivery_jobs (
+  id TEXT PRIMARY KEY,
+  campaign_key TEXT NOT NULL REFERENCES nen_campaign_settings(campaign_key),
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  line_account_id TEXT,
+  source_key TEXT NOT NULL,
+  payload TEXT NOT NULL CHECK (json_valid(payload)),
+  scheduled_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'sent', 'skipped', 'failed', 'cancelled')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  sent_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (campaign_key, friend_id, source_key)
+);
+
+CREATE TABLE nen_ec_member_snapshots (
+  friend_id TEXT PRIMARY KEY REFERENCES friends(id) ON DELETE CASCADE,
+  customer_id TEXT,
+  orders_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(orders_json)),
+  subscription_json TEXT CHECK (subscription_json IS NULL OR json_valid(subscription_json)),
+  purchase_count INTEGER NOT NULL DEFAULT 0,
+  purchase_amount INTEGER NOT NULL DEFAULT 0,
+  point_balance INTEGER NOT NULL DEFAULT 0,
+  member_rank TEXT NOT NULL DEFAULT '会員',
+  synced_at TEXT NOT NULL
+);
+
+CREATE TABLE nen_health_logs (
+  id TEXT PRIMARY KEY,
+  pet_id TEXT NOT NULL REFERENCES nen_pet_profiles(id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  logged_on TEXT NOT NULL,
+  weight_kg REAL,
+  stool_status TEXT NOT NULL CHECK (stool_status IN ('normal','soft','hard','diarrhea','bloody','other')),
+  appetite TEXT NOT NULL CHECK (appetite IN ('good','normal','poor')),
+  skin_status TEXT NOT NULL DEFAULT 'normal' CHECK (skin_status IN ('normal','itchy','red','other')),
+  tear_stain_status TEXT NOT NULL DEFAULT 'normal' CHECK (tear_stain_status IN ('normal','mild','concern')),
+  note TEXT NOT NULL DEFAULT '',
+  care_flag INTEGER NOT NULL DEFAULT 0 CHECK (care_flag IN (0,1)),
+  created_at TEXT NOT NULL, heart_rate_bpm INTEGER, respiratory_rate_bpm INTEGER,
+  UNIQUE (pet_id, logged_on)
+);
+
+CREATE TABLE nen_knowledge_articles (
+  id TEXT PRIMARY KEY,
+  source_name TEXT NOT NULL,
+  source_url TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  animal_type TEXT NOT NULL CHECK (animal_type IN ('dog','cat','all')),
+  tags_json TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(tags_json)),
+  body TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+, source_kind TEXT NOT NULL DEFAULT 'commercial_editorial', authority_rank INTEGER NOT NULL DEFAULT 40, language TEXT NOT NULL DEFAULT 'ja', reviewed_at TEXT);
+
+CREATE TABLE nen_pet_profiles (
+  id TEXT PRIMARY KEY,
+  external_id TEXT UNIQUE,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  customer_id TEXT,
+  name TEXT NOT NULL,
+  animal_type TEXT NOT NULL DEFAULT 'dog' CHECK (animal_type IN ('dog', 'cat', 'other')),
+  gender TEXT NOT NULL DEFAULT 'unknown' CHECK (gender IN ('male', 'female', 'unknown')),
+  birthday TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+, breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT);
+
+CREATE TABLE nen_photo_submissions (
+  id TEXT PRIMARY KEY,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  pet_id TEXT NOT NULL REFERENCES nen_pet_profiles(id) ON DELETE CASCADE,
+  r2_key TEXT NOT NULL UNIQUE,
+  image_url TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  caption TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','adopted','rejected')),
+  awarded_points INTEGER NOT NULL DEFAULT 0,
+  point_transaction_id TEXT,
+  created_at TEXT NOT NULL,
+  reviewed_at TEXT,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE nen_point_ledger (
+  id TEXT PRIMARY KEY,
+  friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  amount INTEGER NOT NULL,
+  balance_after INTEGER NOT NULL CHECK (balance_after >= 0),
+  reason TEXT NOT NULL,
+  external_ref TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE nen_rich_menu_jobs (
+  id TEXT PRIMARY KEY,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+  rich_menu_id TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  completed_at TEXT
+);
+
 CREATE TABLE notification_rules (
   id           TEXT PRIMARY KEY,
   name         TEXT NOT NULL,
@@ -868,11 +1113,12 @@ CREATE TABLE staff_members (
   name       TEXT NOT NULL,
   email      TEXT,
   role       TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'staff')),
+  access_level TEXT NOT NULL DEFAULT 'full' CHECK (access_level IN ('full', 'read_only')),
   api_key    TEXT UNIQUE NOT NULL,
   is_active  INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, line_user_id TEXT);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -906,6 +1152,48 @@ CREATE TABLE stripe_events (
   currency         TEXT,
   metadata         TEXT,
   processed_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE support_email_messages (
+  id                TEXT PRIMARY KEY,
+  thread_id         TEXT NOT NULL REFERENCES support_email_threads (id) ON DELETE CASCADE,
+  direction         TEXT NOT NULL CHECK (direction IN ('incoming', 'outgoing')),
+  sender_email      TEXT NOT NULL,
+  sender_name       TEXT,
+  recipient_email   TEXT NOT NULL,
+  subject           TEXT NOT NULL,
+  body_text         TEXT NOT NULL,
+  message_id        TEXT UNIQUE,
+  in_reply_to       TEXT,
+  references_header TEXT,
+  sent_by_staff_id  TEXT,
+  created_at        TEXT NOT NULL
+);
+
+CREATE TABLE support_email_sync_state (
+  mailbox TEXT PRIMARY KEY,
+  uid_validity TEXT,
+  last_uid INTEGER NOT NULL DEFAULT 0,
+  last_checked_at TEXT,
+  last_error TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE support_email_threads (
+  id                 TEXT PRIMARY KEY,
+  customer_email     TEXT NOT NULL,
+  customer_name      TEXT,
+  subject            TEXT NOT NULL,
+  normalized_subject TEXT NOT NULL,
+  status             TEXT NOT NULL DEFAULT 'unread'
+                     CHECK (status IN ('unread', 'in_progress', 'resolved')),
+  assigned_staff_id  TEXT,
+  last_message_at    TEXT NOT NULL,
+  last_incoming_at   TEXT NOT NULL,
+  last_outgoing_at   TEXT,
+  resolved_at        TEXT,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL
 );
 
 CREATE TABLE tags (
@@ -1125,6 +1413,10 @@ CREATE INDEX idx_ad_conversion_logs_platform ON ad_conversion_logs (ad_platform_
 
 CREATE INDEX idx_ad_conversion_logs_status ON ad_conversion_logs (status);
 
+CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+
+CREATE INDEX idx_admin_sessions_staff_id ON admin_sessions(staff_id);
+
 CREATE INDEX idx_affiliate_clicks_affiliate ON affiliate_clicks (affiliate_id);
 
 CREATE INDEX idx_affiliate_links_affiliate ON affiliate_links (affiliate_id);
@@ -1168,6 +1460,15 @@ CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_cod
 CREATE INDEX idx_conversion_events_friend ON conversion_events (friend_id);
 
 CREATE INDEX idx_conversion_events_point ON conversion_events (conversion_point_id);
+
+CREATE INDEX idx_ec_events_customer
+  ON ec_events(customer_id, received_at DESC);
+
+CREATE INDEX idx_ec_events_friend
+  ON ec_events(friend_id, received_at DESC);
+
+CREATE INDEX idx_ec_events_status_received
+  ON ec_events(status, received_at);
 
 CREATE INDEX idx_engagement_events_actor_friend
   ON engagement_events(program_id, actor_friend_id, occurred_at DESC);
@@ -1286,6 +1587,43 @@ CREATE INDEX idx_mileage_ledger_user
 CREATE INDEX idx_mileage_rules_match
   ON mileage_rules(program_id, event_type, source, is_active);
 
+CREATE INDEX idx_nen_care_flags_status ON nen_care_flags(status, detected_at DESC);
+
+CREATE INDEX idx_nen_consultations_friend ON nen_consultation_logs(friend_id, created_at DESC);
+
+CREATE INDEX idx_nen_consultations_v2_friend ON nen_consultation_logs_v2(friend_id, created_at DESC);
+
+CREATE INDEX idx_nen_consultations_v2_safety ON nen_consultation_logs_v2(safety_level, created_at DESC);
+
+CREATE INDEX idx_nen_delivery_jobs_due
+  ON nen_delivery_jobs(status, scheduled_at);
+
+CREATE INDEX idx_nen_delivery_jobs_friend
+  ON nen_delivery_jobs(friend_id, created_at DESC);
+
+CREATE INDEX idx_nen_health_logs_pet_date ON nen_health_logs(pet_id, logged_on DESC);
+
+CREATE INDEX idx_nen_knowledge_animal ON nen_knowledge_articles(animal_type, is_active);
+
+CREATE INDEX idx_nen_knowledge_authority
+  ON nen_knowledge_articles(is_active, animal_type, authority_rank DESC);
+
+CREATE INDEX idx_nen_member_rank ON nen_ec_member_snapshots(member_rank, purchase_amount DESC);
+
+CREATE INDEX idx_nen_pet_profiles_birthday
+  ON nen_pet_profiles(substr(birthday, 6, 2), friend_id);
+
+CREATE INDEX idx_nen_pet_profiles_customer
+  ON nen_pet_profiles(customer_id);
+
+CREATE INDEX idx_nen_photos_status ON nen_photo_submissions(status, created_at DESC);
+
+CREATE INDEX idx_nen_point_ledger_friend_created
+  ON nen_point_ledger(friend_id, created_at DESC);
+
+CREATE INDEX idx_nen_rich_menu_jobs_status
+  ON nen_rich_menu_jobs(status, created_at);
+
 CREATE INDEX idx_notifications_created ON notifications (created_at);
 
 CREATE INDEX idx_notifications_status ON notifications (status);
@@ -1319,11 +1657,27 @@ CREATE INDEX idx_staff_availability_rules_staff
 
 CREATE UNIQUE INDEX idx_staff_members_api_key ON staff_members(api_key);
 
+CREATE UNIQUE INDEX idx_staff_members_line_user_id
+  ON staff_members(line_user_id)
+  WHERE line_user_id IS NOT NULL;
+
 CREATE INDEX idx_staff_members_role ON staff_members(role);
 
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 
 CREATE INDEX idx_stripe_events_type ON stripe_events (event_type);
+
+CREATE INDEX idx_support_email_messages_reply_lookup
+  ON support_email_messages (message_id);
+
+CREATE INDEX idx_support_email_messages_thread_created
+  ON support_email_messages (thread_id, created_at ASC);
+
+CREATE INDEX idx_support_email_threads_customer_subject
+  ON support_email_threads (customer_email, normalized_subject, last_message_at DESC);
+
+CREATE INDEX idx_support_email_threads_status_last
+  ON support_email_threads (status, last_message_at DESC);
 
 CREATE INDEX idx_templates_category ON templates (category);
 

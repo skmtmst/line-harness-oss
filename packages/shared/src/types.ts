@@ -820,7 +820,12 @@ export type AutomationEventType =
   | "cv_fire"
   | "message_received"
   | "postback_received"
-  | "calendar_booked";
+  | "calendar_booked"
+  | "ec.order.confirmed"
+  | "ec.order.shipped"
+  | "ec.subscription.upcoming"
+  | "ec.subscription.payment_failed"
+  | "ec.subscription.cancelled";
 
 export interface AutomationAction {
   type: "add_tag" | "remove_tag" | "start_scenario" | "send_message" | "send_webhook" | "switch_rich_menu";
@@ -861,8 +866,9 @@ export interface StaffMember {
   id: string;
   name: string;
   email: string | null;
-  role: 'owner' | 'admin' | 'staff';
+  role: 'owner' | 'admin' | 'staff' | 'viewer';
   apiKey: string;
+  lineLinked: boolean;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -871,7 +877,7 @@ export interface StaffMember {
 export interface StaffProfile {
   id: string;
   name: string;
-  role: 'owner' | 'admin' | 'staff';
+  role: 'owner' | 'admin' | 'staff' | 'viewer';
   email: string | null;
 }
 

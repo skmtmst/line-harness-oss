@@ -70,7 +70,25 @@
     "063_webinar_instagram_mileage.sql",
     "064_async_mileage_and_tag_policy.sql",
     "065_following_loyalty_mileage.sql",
-    "066_referral_quality_mileage.sql"
+    "066_referral_quality_mileage.sql",
+    "067_staff_line_login.sql",
+    "068_ec_events.sql",
+    "069_ec_notification_settings.sql",
+    "070_ec_notification_copy.sql",
+    "071_nen_engagement.sql",
+    "072_nen_member_experience.sql",
+    "073_nen_rich_menu_jobs.sql",
+    "074_nen_point_ledger.sql",
+    "075_nen_pet_profile_images.sql",
+    "076_nen_health_vitals.sql",
+    "077_nen_ai_consultation.sql",
+    "078_nen_knowledge_authority.sql",
+    "079_nen_column_intro_text.sql",
+    "080_nen_tag_catalog.sql",
+    "081_nen_tag_initial_backfill.sql",
+    "082_support_email_inbox.sql",
+    "083_support_email_sync_state.sql",
+    "084_staff_read_only_access.sql"
   ],
-  "migrationCount": 71
+  "migrationCount": 89
 }

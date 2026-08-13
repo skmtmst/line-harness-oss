@@ -69,3 +69,21 @@ export async function attachTagAndFireSideEffects(
   await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'add' } });
   return { added: true };
 }
+
+// 自動判定から外れたタグを解除し、付与時と同じく automation / webhook / scoring に
+// 状態変化を知らせる。DELETE の changes を見ることで再同期を冪等に保つ。
+export async function detachTagAndFireSideEffects(
+  db: D1Database,
+  friendId: string,
+  tagId: string,
+): Promise<{ removed: boolean }> {
+  const result = await db
+    .prepare(`DELETE FROM friend_tags WHERE friend_id = ? AND tag_id = ?`)
+    .bind(friendId, tagId)
+    .run();
+  const removed = (result.meta?.changes ?? 0) > 0;
+  if (!removed) return { removed: false };
+
+  await fireEvent(db, 'tag_change', { friendId, eventData: { tagId, action: 'remove' } });
+  return { removed: true };
+}

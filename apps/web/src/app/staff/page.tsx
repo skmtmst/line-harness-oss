@@ -2,10 +2,8 @@
 import { useState, useEffect } from 'react'
 import Header from '@/components/layout/header'
 import { fetchApi } from '@/lib/api'
-import type { ApiResponse } from '@line-crm/shared'
+import type { ApiResponse, Friend, PaginatedResponse } from '@line-crm/shared'
 import type { StaffMember } from '@line-crm/shared'
-
-type NewApiKey = { apiKey: string; staffId: string }
 
 function RoleBadge({ role }: { role: string }) {
   const styles =
@@ -13,9 +11,11 @@ function RoleBadge({ role }: { role: string }) {
       ? 'bg-yellow-100 text-yellow-800'
       : role === 'admin'
         ? 'bg-blue-100 text-blue-800'
+        : role === 'viewer'
+          ? 'bg-emerald-100 text-emerald-800'
         : 'bg-gray-100 text-gray-600'
   const label =
-    role === 'owner' ? 'オーナー' : role === 'admin' ? '管理者' : 'スタッフ'
+    role === 'owner' ? 'オーナー' : role === 'admin' ? '管理者' : role === 'viewer' ? '閲覧のみ' : 'スタッフ'
   return (
     <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${styles}`}>
       {label}
@@ -23,25 +23,18 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
-function maskKey(key: string): string {
-  if (!key || key.length <= 8) return '••••••••'
-  return key.slice(0, 4) + '••••••••' + key.slice(-4)
-}
-
 export default function StaffPage() {
   const [members, setMembers] = useState<StaffMember[]>([])
+  const [friends, setFriends] = useState<Friend[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
-  // New API key banner
-  const [newKey, setNewKey] = useState<NewApiKey | null>(null)
-  const [copied, setCopied] = useState(false)
 
   // Create form
   const [showForm, setShowForm] = useState(false)
   const [formName, setFormName] = useState('')
   const [formEmail, setFormEmail] = useState('')
-  const [formRole, setFormRole] = useState<'admin' | 'staff'>('staff')
+  const [formRole, setFormRole] = useState<'admin' | 'staff' | 'viewer'>('staff')
+  const [formFriendId, setFormFriendId] = useState('')
   const [formLoading, setFormLoading] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -64,6 +57,9 @@ export default function StaffPage() {
 
   useEffect(() => {
     loadMembers()
+    fetchApi<ApiResponse<PaginatedResponse<Friend>>>('/api/friends?limit=100&includeTags=false')
+      .then((res) => { if (res.success) setFriends(res.data.items) })
+      .catch(() => setError('LINEアカウントの読み込みに失敗しました'))
   }, [])
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -71,9 +67,10 @@ export default function StaffPage() {
     setFormLoading(true)
     setFormError('')
     try {
-      const body: { name: string; role: 'admin' | 'staff'; email?: string } = {
+      const body: { name: string; role: 'admin' | 'staff' | 'viewer'; friendId: string; email?: string } = {
         name: formName,
         role: formRole,
+        friendId: formFriendId,
       }
       if (formEmail) body.email = formEmail
 
@@ -82,12 +79,10 @@ export default function StaffPage() {
         body: JSON.stringify(body),
       })
       if (res.success) {
-        if (res.data.apiKey) {
-          setNewKey({ apiKey: res.data.apiKey, staffId: res.data.id })
-        }
         setFormName('')
         setFormEmail('')
         setFormRole('staff')
+        setFormFriendId('')
         setShowForm(false)
         await loadMembers()
       } else {
@@ -112,22 +107,6 @@ export default function StaffPage() {
     }
   }
 
-  const handleRegenerateKey = async (member: StaffMember) => {
-    if (!confirm(`${member.name} のAPIキーを再生成しますか？\n現在のキーは無効になります。`)) return
-    try {
-      const res = await fetchApi<ApiResponse<{ apiKey: string }>>(`/api/staff/${member.id}/regenerate-key`, {
-        method: 'POST',
-      })
-      if (res.success) {
-        setNewKey({ apiKey: res.data.apiKey, staffId: member.id })
-      } else {
-        setError(res.error ?? 'キー再生成に失敗しました')
-      }
-    } catch {
-      setError('キー再生成に失敗しました')
-    }
-  }
-
   const handleDelete = async (member: StaffMember) => {
     if (!confirm(`${member.name} を削除しますか？\nこの操作は元に戻せません。`)) return
     try {
@@ -136,13 +115,6 @@ export default function StaffPage() {
     } catch {
       setError('削除に失敗しました')
     }
-  }
-
-  const handleCopy = async () => {
-    if (!newKey) return
-    await navigator.clipboard.writeText(newKey.apiKey)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   return (
@@ -160,38 +132,31 @@ export default function StaffPage() {
         }
       />
 
-      {/* New API key banner */}
-      {newKey && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm font-medium text-green-800 mb-2">
-            APIキーが発行されました。このキーは一度しか表示されません。
-          </p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 text-xs bg-white border border-green-200 rounded px-3 py-2 font-mono break-all">
-              {newKey.apiKey}
-            </code>
-            <button
-              onClick={handleCopy}
-              className="shrink-0 px-3 py-2 text-xs font-medium text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 transition-colors"
-            >
-              {copied ? 'コピー済み' : 'コピー'}
-            </button>
-            <button
-              onClick={() => setNewKey(null)}
-              className="shrink-0 px-3 py-2 text-xs font-medium text-gray-500 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              閉じる
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Create form */}
       {showForm && (
         <div className="mb-6 p-5 bg-white border border-gray-200 rounded-lg shadow-sm">
           <h2 className="text-sm font-semibold text-gray-900 mb-4">新しいスタッフを追加</h2>
           <form onSubmit={handleCreate} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">LINEアカウント *</label>
+                <select
+                  value={formFriendId}
+                  onChange={(e) => {
+                    setFormFriendId(e.target.value)
+                    const selected = friends.find((friend) => friend.id === e.target.value)
+                    if (selected?.displayName) setFormName(selected.displayName)
+                  }}
+                  required
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="">選択してください</option>
+                  {friends.map((friend) => (
+                    <option key={friend.id} value={friend.id}>{friend.displayName || '名前未設定'}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">公式LINEの友だちから選択します。</p>
+              </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">名前 *</label>
                 <input
@@ -217,12 +182,14 @@ export default function StaffPage() {
                 <label className="block text-xs font-medium text-gray-700 mb-1">ロール *</label>
                 <select
                   value={formRole}
-                  onChange={(e) => setFormRole(e.target.value as 'admin' | 'staff')}
+                  onChange={(e) => setFormRole(e.target.value as 'admin' | 'staff' | 'viewer')}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="staff">スタッフ</option>
+                  <option value="viewer">閲覧のみ</option>
                   <option value="admin">管理者</option>
                 </select>
+                <p className="mt-1 text-xs text-gray-400">「閲覧のみ」は画面を確認できますが、変更・送信・削除はできません。</p>
               </div>
             </div>
             {formError && (
@@ -231,7 +198,7 @@ export default function StaffPage() {
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                disabled={formLoading || !formName}
+                disabled={formLoading || !formName || !formFriendId}
                 className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
                 style={{ backgroundColor: '#06C755' }}
               >
@@ -283,7 +250,7 @@ export default function StaffPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">名前</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden sm:table-cell">メール</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ロール</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">APIキー</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">LINE連携</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">状態</th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
               </tr>
@@ -296,8 +263,10 @@ export default function StaffPage() {
                   <td className="px-4 py-3">
                     <RoleBadge role={member.role} />
                   </td>
-                  <td className="px-4 py-3 text-gray-400 font-mono text-xs hidden md:table-cell">
-                    {maskKey(member.apiKey ?? '')}
+                  <td className="px-4 py-3 text-xs hidden md:table-cell">
+                    <span className={member.lineLinked ? 'text-green-700' : 'text-amber-600'}>
+                      {member.lineLinked ? '連携済み' : '未連携'}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1.5 text-xs ${member.isActive ? 'text-green-700' : 'text-gray-400'}`}>
@@ -314,12 +283,6 @@ export default function StaffPage() {
                             className="px-2.5 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
                           >
                             {member.isActive ? '無効化' : '有効化'}
-                          </button>
-                          <button
-                            onClick={() => handleRegenerateKey(member)}
-                            className="px-2.5 py-1 text-xs font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition-colors"
-                          >
-                            キー再生成
                           </button>
                           <button
                             onClick={() => handleDelete(member)}

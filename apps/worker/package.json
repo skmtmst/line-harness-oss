@@ -19,6 +19,7 @@
     "@line-harness/update-engine": "workspace:*",
     "hls.js": "^1.6.16",
     "hono": "^4.6.0",
+    "postal-mime": "^2.7.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

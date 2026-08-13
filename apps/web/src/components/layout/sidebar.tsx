@@ -8,11 +8,6 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import { countryFlag } from '@/lib/country-flag'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 
-const appVersion = process.env.APP_VERSION || '0.0.0'
-const appCommitSha = process.env.APP_COMMIT_SHA || 'local'
-const appBuildTime = process.env.APP_BUILD_TIME || ''
-const appBuildDate = appBuildTime ? appBuildTime.replace('T', ' ').replace(/\.\d{3}Z$/, 'Z') : ''
-
 // ─── メニュー定義（ユーザー目線のカテゴリ） ───
 
 const menuSections = [
@@ -23,6 +18,7 @@ const menuSections = [
       { href: '/friends', label: '友だち管理', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
       { href: '/tags', label: 'タグ管理', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
       { href: '/chats', label: '個別チャット', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
+      { href: '/support', label: 'お問い合わせ', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 9h18V7H3v10z' },
     ],
   },
   {
@@ -55,6 +51,14 @@ const menuSections = [
       { href: '/auto-replies', label: '自動返信ルール', icon: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6' },
       { href: '/webhooks', label: 'Webhook', icon: 'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
       { href: '/notifications', label: '未対応', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
+    ],
+  },
+  {
+    label: 'EC',
+    items: [
+      { href: '/nen-campaigns', label: 'NEN配信', icon: 'M12 3v18m9-9H3m15.364-6.364L5.636 18.364m12.728 0L5.636 5.636' },
+      { href: '/nen-members', label: '写真審査', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+      { href: '/ec-commerce', label: 'EC連携', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.3 2.3c-.63.63-.18 1.7.7 1.7H17m0 0a2 2 0 110 4 2 2 0 010-4zm-10 0a2 2 0 110 4 2 2 0 010-4z' },
     ],
   },
   {
@@ -250,18 +254,8 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <>
-      {/* ロゴ */}
-      <div className="px-6 py-5 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm" style={{ backgroundColor: '#06C755' }}>
-            H
-          </div>
-          <div>
-            <p className="text-sm font-bold text-gray-900 leading-tight">L Harness</p>
-            <p className="text-xs text-gray-400">管理画面</p>
-          </div>
-        </div>
-      </div>
+      {/* モバイルドロワーでは閉じるボタン分の余白だけ確保する */}
+      <div className="h-16 lg:hidden" aria-hidden="true" />
 
       {/* アカウント切替 */}
       <AccountSwitcher />
@@ -321,45 +315,40 @@ export default function Sidebar() {
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
               staffRole === 'owner' ? 'bg-yellow-100 text-yellow-800' :
               staffRole === 'admin' ? 'bg-blue-100 text-blue-800' :
+              staffRole === 'viewer' ? 'bg-emerald-100 text-emerald-800' :
               'bg-gray-100 text-gray-600'
             }`}>
-              {staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : 'スタッフ'}
+              {staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : staffRole === 'viewer' ? '閲覧のみ' : 'スタッフ'}
             </span>
           </div>
         )}
-        <div className="px-6 py-4 space-y-3">
-        <div className="space-y-0.5">
-          <p className="text-xs text-gray-400">L Harness v{appVersion}</p>
-          <p className="text-[10px] text-gray-400 font-mono break-all">
-            build {appCommitSha}{appBuildDate ? ` · ${appBuildDate}` : ''}
-          </p>
-        </div>
-        <button
-          onClick={async () => {
-            try {
-              const apiUrl = process.env.NEXT_PUBLIC_API_URL
-              if (apiUrl) {
-                await fetch(`${apiUrl}/api/auth/logout`, {
-                  method: 'POST',
-                  credentials: 'include',
-                })
+        <div className="px-6 py-4">
+          <button
+            onClick={async () => {
+              try {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL
+                if (apiUrl) {
+                  await fetch(`${apiUrl}/api/auth/logout`, {
+                    method: 'POST',
+                    credentials: 'include',
+                  })
+                }
+              } catch {
+                // Local cleanup still logs the browser out if the network call fails.
               }
-            } catch {
-              // Local cleanup still logs the browser out if the network call fails.
-            }
-            localStorage.removeItem('lh_api_key')
-            localStorage.removeItem('lh_csrf')
-            localStorage.removeItem('lh_staff_name')
-            localStorage.removeItem('lh_staff_role')
-            window.location.href = '/login'
-          }}
-          className="flex items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          ログアウト
-        </button>
+              localStorage.removeItem('lh_api_key')
+              localStorage.removeItem('lh_csrf')
+              localStorage.removeItem('lh_staff_name')
+              localStorage.removeItem('lh_staff_role')
+              window.location.href = '/login'
+            }}
+            className="flex items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            ログアウト
+          </button>
         </div>
       </div>
     </>

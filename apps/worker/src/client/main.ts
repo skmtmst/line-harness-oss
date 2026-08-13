@@ -15,11 +15,13 @@
  *   ?page=salon-book  — salon booking flow (React, dynamic-imported)
  *   ?page=affiliate   — affiliate self-serve page (React, dynamic-imported)
  *   ?page=webinar     — auto-webinar pseudo-live viewer (React, dynamic-imported; &slug=)
+ *   ?page=nen-member  — NEN customer member/pet/health portal
  */
 
 import { initBooking } from './booking.js';
 import { initForm } from './form.js';
 import { safeRedirectTarget } from '../lib/safe-redirect.js';
+import { restoreLiffStateInCurrentUrl } from './liff-query.js';
 
 declare const liff: {
   init(config: { liffId: string }): Promise<void>;
@@ -34,6 +36,10 @@ declare const liff: {
   closeWindow(): void;
   logout(): void;
 };
+
+// LINE returns the rich-menu query string inside `liff.state`. Restore it
+// before any routing or LIFF ID detection reads window.location.search.
+restoreLiffStateInCurrentUrl();
 
 // Resolve LIFF ID: ?liffId= param (from endpoint URL) > env var (fallback to ①)
 function detectLiffId(): string {
@@ -622,6 +628,27 @@ async function initAffiliate(): Promise<void> {
   });
 }
 
+// ─── NEN member portal (React, dynamic-imported) ─────────
+
+async function initNenMember(): Promise<void> {
+  const [profile, idToken, friendship] = await Promise.all([
+    liff.getProfile(), Promise.resolve(liff.getIDToken()), liff.getFriendship(),
+  ]);
+  if (!idToken) {
+    showError('LINE 認証情報の取得に失敗しました。LINE アプリ内で再度開いてください。');
+    return;
+  }
+  await apiCall('/api/liff/link', {
+    method: 'POST',
+    body: JSON.stringify({ idToken, displayName: profile.displayName, existingUuid: getSavedUuid() }),
+  }).catch(() => undefined);
+  if (!friendship.friendFlag) { showFriendAdd(profile); return; }
+  const container = document.getElementById('app');
+  if (!container) { showError('mount target #app が見つかりません'); return; }
+  const { mountNenMember } = await import('./nen-member/main.js');
+  mountNenMember(container, { liffId: LIFF_ID, lineUserId: profile.userId, idToken });
+}
+
 // ─── Entry Point ────────────────────────────────────────
 
 // External-browser LIFF sessions persist in localStorage, and the SDK keeps
@@ -699,6 +726,8 @@ async function main() {
       await initWebinar();
     } else if (page === 'affiliate') {
       await initAffiliate();
+    } else if (page === 'nen-member') {
+      await initNenMember();
     } else if (page === 'form') {
       const params = new URLSearchParams(window.location.search);
       const formId = params.get('id');
