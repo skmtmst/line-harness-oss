@@ -87,6 +87,27 @@ export interface WebinarAnalyticsSummaryRow {
   form_submissions: number;
 }
 
+export type WebinarFunnelEventType =
+  | 'cta_impression'
+  | 'cta_click'
+  | 'form_open'
+  | 'form_start'
+  | 'field_complete'
+  | 'submit_attempt'
+  | 'submit_success'
+  | 'submit_error';
+
+export interface WebinarFormFunnelStats {
+  cta_impressions: number;
+  cta_clicks: number;
+  form_opens: number;
+  form_starts: number;
+  submit_attempts: number;
+  submit_successes: number;
+  submit_errors: number;
+  field_completions: Array<{ field_name: string; users: number }>;
+}
+
 export interface WebinarCreateInput {
   accountId?: string | null;
   title: string;
@@ -170,6 +191,7 @@ export async function deleteWebinar(db: D1Database, id: string): Promise<void> {
   // D1 は FK OFF がデフォルトのことがあるので子テーブルも明示削除
   await db.batch([
     db.prepare('DELETE FROM webinar_user_comments WHERE webinar_id = ?').bind(id),
+    db.prepare('DELETE FROM webinar_funnel_events WHERE webinar_id = ?').bind(id),
     db.prepare('DELETE FROM webinar_viewers WHERE webinar_id = ?').bind(id),
     db.prepare('DELETE FROM webinar_comments WHERE webinar_id = ?').bind(id),
     db.prepare('DELETE FROM webinar_ctas WHERE webinar_id = ?').bind(id),
@@ -257,6 +279,112 @@ export async function recordWebinarCtaClick(
     )
     .bind(jstNow(), webinarId, friendId, sessionStartAt)
     .run();
+}
+
+/**
+ * CTA→フォームの途中離脱を friend 単位で計測する。
+ * INSERT OR IGNORE により再入場・連打・React の再描画でも重複計上しない。
+ */
+export async function recordWebinarFunnelEvent(
+  db: D1Database,
+  input: {
+    webinarId: string;
+    friendId: string;
+    sessionStartAt: number;
+    eventType: WebinarFunnelEventType;
+    ctaId?: string | null;
+    formId?: string | null;
+    fieldName?: string | null;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO webinar_funnel_events
+         (id, webinar_id, friend_id, session_start_at, event_type,
+          cta_id, form_id, field_name, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.webinarId,
+      input.friendId,
+      input.sessionStartAt,
+      input.eventType,
+      input.ctaId ?? '',
+      input.formId ?? '',
+      input.fieldName ?? '',
+      jstNow(),
+    )
+    .run();
+}
+
+export async function getWebinarFormFunnelStats(
+  db: D1Database,
+  webinarId: string,
+): Promise<WebinarFormFunnelStats> {
+  const [summary, fields] = await Promise.all([
+    db
+      .prepare(
+        `WITH config AS (
+           SELECT enabled_at FROM webinar_followup_configs WHERE webinar_id = ?
+         ), first_cta AS (
+           SELECT MIN(at_seconds) AS at_seconds FROM webinar_ctas WHERE webinar_id = ?
+         ), tracked_forms AS (
+           SELECT DISTINCT form_id FROM webinar_ctas
+           WHERE webinar_id = ? AND form_id IS NOT NULL
+         )
+         SELECT
+           (SELECT COUNT(DISTINCT v.friend_id)
+            FROM webinar_viewers v, config, first_cta
+            WHERE v.webinar_id = ?
+              AND datetime(v.joined_at) >= datetime(config.enabled_at)
+              AND v.last_position_seconds >= first_cta.at_seconds) AS cta_impressions,
+           (SELECT COUNT(DISTINCT v.friend_id)
+            FROM webinar_viewers v, config
+            WHERE v.webinar_id = ? AND v.cta_clicked_at IS NOT NULL
+              AND datetime(v.cta_clicked_at) >= datetime(config.enabled_at)) AS cta_clicks,
+           (SELECT COUNT(DISTINCT fo.friend_id)
+            FROM form_opens fo, config
+            WHERE fo.form_id IN (SELECT form_id FROM tracked_forms)
+              AND fo.friend_id IS NOT NULL
+              AND datetime(fo.opened_at) >= datetime(config.enabled_at)) AS form_opens,
+           (SELECT COUNT(DISTINCT e.friend_id) FROM webinar_funnel_events e
+            WHERE e.webinar_id = ? AND e.event_type = 'form_start') AS form_starts,
+           (SELECT COUNT(DISTINCT e.friend_id) FROM webinar_funnel_events e
+            WHERE e.webinar_id = ? AND e.event_type = 'submit_attempt') AS submit_attempts,
+           (SELECT COUNT(DISTINCT fs.friend_id)
+            FROM form_submissions fs, config
+            WHERE fs.form_id IN (SELECT form_id FROM tracked_forms)
+              AND datetime(fs.created_at) >= datetime(config.enabled_at)) AS submit_successes,
+           (SELECT COUNT(DISTINCT e.friend_id) FROM webinar_funnel_events e
+            WHERE e.webinar_id = ? AND e.event_type = 'submit_error') AS submit_errors`,
+      )
+      .bind(
+        webinarId, webinarId, webinarId, webinarId, webinarId,
+        webinarId, webinarId, webinarId,
+      )
+      .first<Omit<WebinarFormFunnelStats, 'field_completions'>>(),
+    db
+      .prepare(
+        `SELECT field_name, COUNT(DISTINCT friend_id) AS users
+         FROM webinar_funnel_events
+         WHERE webinar_id = ? AND event_type = 'field_complete' AND field_name <> ''
+         GROUP BY field_name
+         ORDER BY users DESC, field_name ASC`,
+      )
+      .bind(webinarId)
+      .all<{ field_name: string; users: number }>(),
+  ]);
+  return {
+    cta_impressions: summary?.cta_impressions ?? 0,
+    cta_clicks: summary?.cta_clicks ?? 0,
+    form_opens: summary?.form_opens ?? 0,
+    form_starts: summary?.form_starts ?? 0,
+    submit_attempts: summary?.submit_attempts ?? 0,
+    submit_successes: summary?.submit_successes ?? 0,
+    submit_errors: summary?.submit_errors ?? 0,
+    field_completions: fields.results ?? [],
+  };
 }
 
 export async function insertWebinarUserComment(
@@ -615,6 +743,26 @@ export async function getWebinarRegistration(
     )
     .bind(webinarId, friendId, sessionStartAt)
     .first<WebinarRegistration>();
+}
+
+/**
+ * An authenticated friend was shown the session picker.
+ * INSERT OR IGNORE anchors the follow-up delay to the first real visit and
+ * prevents reloads/re-renders from postponing the follow-up indefinitely.
+ */
+export async function recordWebinarPickerOpen(
+  db: D1Database,
+  webinarId: string,
+  friendId: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT OR IGNORE INTO webinar_picker_opens
+         (id, webinar_id, friend_id, opened_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+    .bind(crypto.randomUUID(), webinarId, friendId, jstNow())
+    .run();
 }
 
 /** 開始 leadSeconds 前〜開始後 (セッション継続中) の未通知予約 */

@@ -25,6 +25,7 @@ import type {
   Friend as DbFriend,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { awardActivityMileage } from '../services/activity-mileage.js';
 
 const forms = new Hono<Env>();
 
@@ -447,6 +448,16 @@ forms.post('/api/forms/:id/submit', async (c) => {
       formId,
       friendId,
       data: JSON.stringify(submissionData),
+    });
+
+    await awardActivityMileage(c.env.DB, {
+      eventType: 'form_submitted',
+      source: 'form',
+      sourceEventId: submission.id,
+      friendId,
+      subjectKey: formId,
+      metadata: { formId, formName: form.name },
+      occurredAt: submission.created_at,
     });
 
     // Side effects (best-effort, don't fail the request)

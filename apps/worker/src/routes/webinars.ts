@@ -27,6 +27,7 @@ import {
   upsertWebinarViewer,
   updateWebinarViewerPosition,
   recordWebinarCtaClick,
+  recordWebinarFunnelEvent,
   insertWebinarUserComment,
   countSessionUserComments,
   getWebinarUserComments,
@@ -35,6 +36,7 @@ import {
   getWebinarParticipantStats,
   getWebinarAnalyticsSummary,
   getWebinarDailyStats,
+  getWebinarFormFunnelStats,
   getFriendByLineUserId,
   getFriendByLineUserIdForAccount,
   getFormById,
@@ -42,6 +44,7 @@ import {
   upsertWebinarRegistration,
   getUpcomingWebinarRegistration,
   getWebinarRegistration,
+  recordWebinarPickerOpen,
 } from '@line-crm/db';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -49,6 +52,10 @@ import { resolveSession, parseScheduleRules, upcomingSessions } from '../service
 import { sendWebinarRegistrationConfirmation } from '../services/webinar-reminders.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { signWebinarToken, verifyWebinarToken } from '../lib/webinar-token.js';
+import {
+  awardWebinarCtaMileage,
+  awardWebinarPositionMileage,
+} from '../services/webinar-mileage.js';
 import type { Env } from '../index.js';
 
 const webinarRoutes = new Hono<Env>();
@@ -63,6 +70,15 @@ const CURRENT_SESSION_JOIN_GRACE_SECONDS = 5 * 60;
 // と視聴者コメントが動く。管理画面での編集余地を持たせて負方向は 1h まで許容。
 const WAITING_ROOM_SECONDS = 600;
 const COMMENT_MIN_AT_SECONDS = -3600;
+const FUNNEL_EVENT_TYPES = new Set([
+  'cta_impression',
+  'form_open',
+  'form_start',
+  'field_complete',
+  'submit_attempt',
+  'submit_success',
+  'submit_error',
+]);
 
 function nowEpoch(): number {
   return Math.floor(Date.now() / 1000);
@@ -214,6 +230,9 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
       // 30分間隔・24時間開催の1日分。クライアントは直近6件から段階表示し、
       // 48件を一度に並べて離脱を招かない。
       const upcoming = upcomingSessions(rules, webinar.duration_seconds, now, 48);
+      if (!reg && upcoming.length > 0) {
+        await recordWebinarPickerOpen(c.env.DB, webinar.id, auth.friendId);
+      }
       return c.json({
         live: false,
         title: webinar.title,
@@ -237,6 +256,9 @@ webinarRoutes.get('/api/liff/webinars/:slug', async (c) => {
       const bookable = withinJoinGrace
         ? [session.sessionStartAt!, ...liveUpcoming].slice(0, 48)
         : liveUpcoming;
+      if (!liveReg && bookable.length > 0) {
+        await recordWebinarPickerOpen(c.env.DB, webinar.id, auth.friendId);
+      }
       return c.json({
         live: false,
         title: webinar.title,
@@ -316,6 +338,13 @@ webinarRoutes.post('/api/liff/webinars/:slug/heartbeat', async (c) => {
     await updateWebinarViewerPosition(
       c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt, positionSeconds,
     );
+    c.executionCtx.waitUntil(awardWebinarPositionMileage(c.env.DB, {
+      webinarId: loaded.webinar.id,
+      friendId: auth.friendId,
+      sessionStartAt,
+      positionSeconds,
+      durationSeconds: loaded.webinar.duration_seconds,
+    }));
     return c.json({ ok: true });
   } catch (err) {
     console.error('POST heartbeat error:', err);
@@ -437,11 +466,32 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', async (c) => {
     if (auth instanceof Response) return auth;
     const loaded = { webinar: auth.webinar };
 
-    const body = await c.req.json<{ sessionStartAt?: unknown }>();
+    const body = await c.req.json<{ sessionStartAt?: unknown; ctaId?: unknown }>();
     const sessionStartAt = Number(body.sessionStartAt);
+    const ctaId = typeof body.ctaId === 'string' ? body.ctaId.slice(0, 128) : '';
     if (!Number.isFinite(sessionStartAt)) return c.json({ error: 'invalid_body' }, 422);
 
+    if (ctaId) {
+      const ctas = await getWebinarCtas(c.env.DB, loaded.webinar.id);
+      if (!ctas.some((cta) => cta.id === ctaId)) {
+        return c.json({ error: 'invalid_cta' }, 422);
+      }
+    }
+
     await recordWebinarCtaClick(c.env.DB, loaded.webinar.id, auth.friendId, sessionStartAt);
+    await recordWebinarFunnelEvent(c.env.DB, {
+      webinarId: loaded.webinar.id,
+      friendId: auth.friendId,
+      sessionStartAt,
+      eventType: 'cta_click',
+      ctaId,
+    });
+    c.executionCtx.waitUntil(awardWebinarCtaMileage(c.env.DB, {
+      webinarId: loaded.webinar.id,
+      friendId: auth.friendId,
+      sessionStartAt,
+      ctaId,
+    }));
     if (loaded.webinar.tag_on_cta_click) {
       c.executionCtx.waitUntil(
         Promise.resolve(
@@ -454,6 +504,59 @@ webinarRoutes.post('/api/liff/webinars/:slug/cta-click', async (c) => {
     return c.json({ ok: true });
   } catch (err) {
     console.error('POST cta-click error:', err);
+    return c.json({ error: 'internal_error' }, 500);
+  }
+});
+
+// CTA表示→フォーム入力→送信の途中離脱を段階計測する。
+// 同一 friend・同一回・同一段階はDB側の一意制約で1件にまとめる。
+webinarRoutes.post('/api/liff/webinars/:slug/funnel-event', async (c) => {
+  try {
+    const auth = await resolveWebinarCaller(c, c.req.param('slug'));
+    if (auth instanceof Response) return auth;
+    const body = await c.req.json<{
+      sessionStartAt?: unknown;
+      eventType?: unknown;
+      ctaId?: unknown;
+      formId?: unknown;
+      fieldName?: unknown;
+    }>();
+    const sessionStartAt = Number(body.sessionStartAt);
+    const eventType = typeof body.eventType === 'string' ? body.eventType : '';
+    const ctaId = typeof body.ctaId === 'string' ? body.ctaId.slice(0, 128) : '';
+    const formId = typeof body.formId === 'string' ? body.formId.slice(0, 128) : '';
+    const fieldName = typeof body.fieldName === 'string' ? body.fieldName.slice(0, 64) : '';
+    if (!Number.isInteger(sessionStartAt) || !FUNNEL_EVENT_TYPES.has(eventType)) {
+      return c.json({ error: 'invalid_body' }, 422);
+    }
+    if (fieldName && !/^[A-Za-z0-9_]+$/.test(fieldName)) {
+      return c.json({ error: 'invalid_field_name' }, 422);
+    }
+    const registration = await getWebinarRegistration(
+      c.env.DB, auth.webinar.id, auth.friendId, sessionStartAt,
+    );
+    if (!registration) return c.json({ error: 'not_registered' }, 409);
+
+    const ctas = await getWebinarCtas(c.env.DB, auth.webinar.id);
+    if (ctaId && !ctas.some((cta) => cta.id === ctaId)) {
+      return c.json({ error: 'invalid_cta' }, 422);
+    }
+    if (formId && !ctas.some((cta) => cta.form_id === formId)) {
+      return c.json({ error: 'invalid_form' }, 422);
+    }
+
+    await recordWebinarFunnelEvent(c.env.DB, {
+      webinarId: auth.webinar.id,
+      friendId: auth.friendId,
+      sessionStartAt,
+      eventType: eventType as Parameters<typeof recordWebinarFunnelEvent>[1]['eventType'],
+      ctaId,
+      formId,
+      fieldName,
+    });
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('POST funnel-event error:', err);
     return c.json({ error: 'internal_error' }, 500);
   }
 });
@@ -843,12 +946,13 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const completionThreshold = Math.max(1, Math.floor(row.duration_seconds * 0.9));
-    const [sessions, dropoff, participants, summary, daily] = await Promise.all([
+    const [sessions, dropoff, participants, summary, daily, formFunnel] = await Promise.all([
       getWebinarSessionStats(c.env.DB, id),
       getWebinarDropoff(c.env.DB, id),
       getWebinarParticipantStats(c.env.DB, id, 200),
       getWebinarAnalyticsSummary(c.env.DB, id, completionThreshold),
       getWebinarDailyStats(c.env.DB, id),
+      getWebinarFormFunnelStats(c.env.DB, id),
     ]);
     return c.json({
       success: true,
@@ -890,6 +994,19 @@ webinarRoutes.get('/api/webinars/:id/analytics', async (c) => {
           ctaClicks: s.cta_clicks,
         })),
         dropoff: dropoff.map((d) => ({ bucketStart: d.bucket_start, viewers: d.viewers })),
+        formFunnel: {
+          ctaImpressions: formFunnel.cta_impressions,
+          ctaClicks: formFunnel.cta_clicks,
+          formOpens: formFunnel.form_opens,
+          formStarts: formFunnel.form_starts,
+          submitAttempts: formFunnel.submit_attempts,
+          submitSuccesses: formFunnel.submit_successes,
+          submitErrors: formFunnel.submit_errors,
+          fieldCompletions: formFunnel.field_completions.map((field) => ({
+            fieldName: field.field_name,
+            users: field.users,
+          })),
+        },
       },
     });
   } catch (err) {

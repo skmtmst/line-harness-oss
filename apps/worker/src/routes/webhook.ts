@@ -20,6 +20,7 @@ import { matchAndReply } from '../services/auto-reply.js';
 import { buildMessage } from '../services/step-delivery.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
 import type { Env } from '../index.js';
+import { awardActivityMileage } from '../services/activity-mileage.js';
 
 const webhook = new Hono<Env>();
 
@@ -214,6 +215,19 @@ async function handleEvent(
         .bind(lineAccountId, jstNow(), friend.id).run();
       console.log(`[follow] line_account_id set to ${lineAccountId} for friend ${friend.id}`);
     }
+
+    // 新規・再フォローのどちらでも、最初の友だち登録マイルを同じキーで非同期投入する。
+    // first_followed_at を使うため再フォローやWebhook再送では二重加算されない。
+    const firstFollowedAt = friend.first_followed_at ?? friend.created_at;
+    await awardActivityMileage(db, {
+      eventType: 'friend_registered',
+      source: 'line_relationship',
+      sourceEventId: `${friend.id}:friend_registered:${firstFollowedAt}`,
+      friendId: friend.id,
+      subjectKey: friend.id,
+      metadata: { lineAccountId },
+      occurredAt: firstFollowedAt,
+    });
 
     // Resolve referral link (entry_route) for this friend.
     // /auth/callback (OAuth path) writes friends.ref_code in parallel with
@@ -442,13 +456,21 @@ async function handleEvent(
       }
     }
 
+    const logId = crypto.randomUUID();
     await db
       .prepare(
         `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
          VALUES (?, ?, 'incoming', ?, ?, NULL, NULL, 'user', ?)`,
       )
-      .bind(crypto.randomUUID(), friend.id, msg.type, finalContent, jstNow())
+      .bind(logId, friend.id, msg.type, finalContent, jstNow())
       .run();
+    await awardActivityMileage(db, {
+      eventType: 'message_received',
+      source: 'line',
+      sourceEventId: logId,
+      friendId: friend.id,
+      metadata: { messageType: msg.type },
+    });
     // text と同様、非 text の自発メッセージ (画像/スタンプ等) でも chat を unread に戻す。
     // これが無いと resolved 除外 (unanswered-inbox CANDIDATES_SQL) が「解決済み後に
     // 画像だけ送ってきた友だち」をバッジ・未対応一覧から永久に落としてしまう。
@@ -478,6 +500,15 @@ async function handleEvent(
       )
       .bind(logId, friend.id, incomingText, now)
       .run();
+
+    await awardActivityMileage(db, {
+      eventType: 'message_received',
+      source: 'line',
+      sourceEventId: logId,
+      friendId: friend.id,
+      metadata: { messageType: 'text' },
+      occurredAt: now,
+    });
 
     // Cross-account trigger: send message from another account via UUID
     if (incomingText === '体験を完了する' && lineAccountId) {
