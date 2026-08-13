@@ -3,8 +3,14 @@ import './globals.css'
 import AppShell from '@/components/app-shell'
 
 export const metadata: Metadata = {
-  title: 'L Harness',
-  description: 'L Harness 管理画面',
+  title: '然-NEN- LINE管理システム TEST',
+  description: '然-NEN- LINE管理システム TEST',
+  openGraph: {
+    title: '然-NEN- LINE管理システム TEST',
+    description: '然-NEN- LINE管理システム TEST',
+    type: 'website',
+    locale: 'ja_JP',
+  },
 }
 
 export default function RootLayout({
