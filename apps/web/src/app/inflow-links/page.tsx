@@ -437,7 +437,7 @@ export default function InflowLinksPage() {
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="grid gap-5 2xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside>
           <button
             onClick={() => setEditingGenre('new')}
@@ -549,44 +549,54 @@ export default function InflowLinksPage() {
             : '左側の「新しいジャンル」から最初のジャンルを作成してください。'}
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table className="w-full min-w-[1180px]">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <table className="w-full table-fixed text-xs">
+            <colgroup>
+              <col className="w-[11%]" />
+              <col className="w-[10%]" />
+              <col className="w-[9%]" />
+              <col className="w-[16%]" />
+              <col className="w-[10%]" />
+              <col className="w-[6%]" />
+              <col className="w-[6%]" />
+              <col className="w-[6%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+              <col className="w-[7%]" />
+            </colgroup>
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  ジャンル
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-gray-500">
                   名前
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  ref コード
+                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-gray-500">
+                  REF
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  送り先 Pool
+                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-gray-500">
+                  Pool
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  起動シナリオ
+                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-gray-500">
+                  シナリオ
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  自動付与タグ
+                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-gray-500">
+                  タグ
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-gray-500">
                   モード
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  友だち数
+                <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-gray-500">
+                  友だち
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                  クリック数
+                <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-gray-500">
+                  クリック
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-gray-500">
                   最新追加
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-gray-500">
                   URL
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
+                <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-gray-500">編集</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -608,37 +618,31 @@ export default function InflowLinksPage() {
                     refDetail={refDetail}
                     refCode={r.refCode}
                   >
-                    <td className="px-4 py-3 text-sm text-gray-700">
-                      {r.genre ? (
-                        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">{r.genre}</span>
-                      ) : (
-                        <span className="text-gray-400">未分類</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                    <td className="px-2 py-3 font-medium text-gray-900">
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
                           href={`/inflow-links/detail?id=${r.entryRouteId}`}
-                          className="text-blue-600 hover:underline"
+                          className="block truncate whitespace-nowrap text-blue-600 hover:underline"
                           onClick={(e) => e.stopPropagation()}
+                          title={r.name}
                         >
                           {r.name}
                         </Link>
                       ) : r.source === 'tracked_link' ? (
-                        <span className="text-gray-700">
-                          {r.name}
+                        <span className="flex min-w-0 items-center gap-1 text-gray-700" title={r.name}>
+                          <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="ml-2 text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5"
+                            className="shrink-0 rounded border border-emerald-200 bg-emerald-50 px-1 py-0.5 text-[9px] text-emerald-700"
                             title="tracked_links 登録済み — クリック計測 + シナリオ起動が設定されています。Pool 振り分けは持ちません。"
                           >
-                            Tracked Link
+                            計測済
                           </span>
                         </span>
                       ) : (
-                        <span className="text-gray-700">
-                          {r.name}
+                        <span className="flex min-w-0 items-center gap-1 text-gray-700" title={r.name}>
+                          <span className="truncate whitespace-nowrap">{r.name}</span>
                           <span
-                            className="ml-2 text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5"
+                            className="shrink-0 rounded border border-amber-200 bg-amber-50 px-1 py-0.5 text-[9px] text-amber-700"
                             title="entry_routes / tracked_links いずれにも未登録 — X Harness など外部システムが発行した ref。流入実績のみ集計。"
                           >
                             未登録
@@ -646,12 +650,12 @@ export default function InflowLinksPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm font-mono text-blue-600 break-all">
-                      {r.refCode}
+                    <td className="px-2 py-3 font-mono text-blue-600" title={r.refCode}>
+                      <span className="block truncate whitespace-nowrap">{r.refCode}</span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
+                    <td className="px-2 py-3 text-gray-700">
                       {pool ? (
-                        pool.name
+                        <span className="block truncate whitespace-nowrap" title={pool.name}>{pool.name}</span>
                       ) : r.source === 'tracked_link' ? (
                         <span
                           className="text-gray-400"
@@ -668,15 +672,18 @@ export default function InflowLinksPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{sc?.name ?? '—'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">
+                    <td className="px-2 py-3 text-gray-700" title={sc?.name ?? undefined}>
+                      <span className="block truncate whitespace-nowrap">{sc?.name ?? '—'}</span>
+                    </td>
+                    <td className="px-2 py-3 text-gray-700">
                       {tag ? (
                         <span
-                          className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                          className="block truncate whitespace-nowrap rounded-full px-2 py-0.5 text-center text-[11px] font-medium"
                           style={{
                             backgroundColor: `${tag.color}22`,
                             color: tag.color,
                           }}
+                          title={tag.name}
                         >
                           {tag.name}
                         </span>
@@ -684,7 +691,7 @@ export default function InflowLinksPage() {
                         <span className="text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="whitespace-nowrap px-2 py-3 text-gray-600">
                       {r.source === 'entry_route'
                         ? r.runAccountFriendAddScenarios
                           ? '並走'
@@ -696,38 +703,41 @@ export default function InflowLinksPage() {
                             '並走'
                           : '—'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                    <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-gray-900">
                       {r.stats?.friendCount ?? 0}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-600">
+                    <td className="whitespace-nowrap px-2 py-3 text-right text-gray-600">
                       {r.stats?.clickCount ?? 0}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
+                    <td className="whitespace-nowrap px-2 py-3 text-gray-500">
                       {formatDate(r.stats?.latestAt ?? null)}
                     </td>
-                    <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-3">
+                    <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-2 whitespace-nowrap">
                         <button
                           onClick={() => onCopy(r.refCode, r.refCode)}
-                          className="text-xs text-blue-500 hover:text-blue-700"
+                          className="text-[11px] font-medium text-blue-600 hover:text-blue-800"
+                          aria-label={`${r.name}のURLをコピー`}
                         >
-                          {copiedId === r.refCode ? 'コピー済' : 'URLコピー'}
+                          {copiedId === r.refCode ? '済み' : 'コピー'}
                         </button>
                         <button
                           onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
-                          className="text-xs text-emerald-600 hover:text-emerald-800"
+                          className="text-[11px] font-medium text-emerald-600 hover:text-emerald-800"
+                          aria-label={`${r.name}のQRコードを表示`}
                         >
-                          QR表示
+                          QR
                         </button>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       {editTarget ? (
                         <button
                           onClick={() => setEditing(editTarget)}
-                          className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                          className="whitespace-nowrap rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100"
+                          aria-label={`${r.name}のリンクを編集`}
                         >
-                          リンク編集
+                          編集
                         </button>
                       ) : r.source === 'tracked_link' ? (
                         // tracked_links は別管理 (Web app に編集 UI 未提供)。
@@ -834,7 +844,7 @@ function FragmentRow({
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={12} className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <td colSpan={11} className="px-6 py-4 bg-gray-50 border-t border-gray-100">
             {refDetailLoading ? (
               <p className="text-sm text-gray-400">読み込み中…</p>
             ) : !friends ? (
