@@ -6,60 +6,91 @@
  * share one validation stack:
  *
  *   - both work trees clean (this repo AND the parent EC-CUBE repo)
- *   - deploying only what is already integrated into `codex/development`
- *   - local HEAD identical to `origin/codex/development`
+ *   - deploying only from the base branch that belongs to the environment
+ *   - local HEAD identical to that branch on the deploy remote
  *   - the wrangler config matches the environment being deployed
- *   - production requires an explicit named approval (Masato)
+ *   - production additionally requires a named approver and an approval record
  *   - the deploy lock for this environment is held by the operator
+ *
+ * Base branches differ per environment on purpose. `codex/development` is the
+ * development/validation integration branch; `main` is the version already
+ * validated and approved for production. Requiring `codex/development` for a
+ * production deploy would ship unvalidated work, and requiring `main` for a
+ * staging deploy would make validation impossible.
+ *
+ * Nothing machine-specific is baked in: the parent repository path and the
+ * deploy remote both come from flags or environment variables, because the
+ * checkout location differs per developer and forks use different remote
+ * names. A value that cannot be confirmed is a stop, not a default.
  *
  * `evaluatePreflight` is pure so every rule is unit-tested without touching
  * git, wrangler, or Cloudflare. The CLI collects the real state and feeds it in.
  *
  * CLI:
- *   tsx scripts/deploy/preflight.ts <staging|production> [--config <path>]
- *                                   [--parent-repo <path>] [--approved-by <name>]
+ *   tsx scripts/deploy/preflight.ts <staging|production>
+ *       [--config <path>] [--remote <name>] [--parent-repo <path>]
+ *       [--approved-by <github-login>] [--approval-ref <url>]
  *
  * Exit code 0 = all gates pass, 1 = at least one violation.
  */
 
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { argv, exit, stderr, stdout } from 'node:process';
+import { argv, env as processEnv, exit, stderr, stdout } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 import {
   type DeployEnv,
+  type GitEnv,
   type LockPayload,
   isDeployEnv,
   lockRef,
   parseLockPayload,
+  resolveRemote,
 } from './deploy-lock';
 
-/** The only branch a deploy may ship from. */
-export const INTEGRATION_BRANCH = 'codex/development';
-
-/** Wrangler config required for each environment. */
-export const CONFIG_BY_ENV: Record<DeployEnv, string> = {
-  staging: 'apps/worker/wrangler.staging.toml',
-  production: 'apps/worker/wrangler.toml',
+/** Base branch and wrangler config that belong to each environment. */
+export const ENV_POLICY: Record<DeployEnv, { branch: string; config: string }> = {
+  staging: {
+    branch: 'codex/development',
+    config: 'apps/worker/wrangler.staging.toml',
+  },
+  production: {
+    branch: 'main',
+    config: 'apps/worker/wrangler.toml',
+  },
 };
 
-/** Who may authorise a production deploy. Owner-only per the agreed rules. */
-export const PRODUCTION_APPROVERS: readonly string[] = ['masato', 'skmtmst'];
+/**
+ * GitHub logins allowed to authorise a production deploy.
+ *
+ * This is a guard rail, not proof: `--approved-by` is typed by whoever runs
+ * the command, so it cannot by itself demonstrate that the owner approved
+ * anything. The actual approval record lives in the PR (see --approval-ref
+ * and docs/DEPLOY-GATE.md).
+ */
+export const PRODUCTION_APPROVERS: readonly string[] = ['skmtmst'];
+
+/** Environment variable consulted when `--parent-repo` is not passed. */
+export const PARENT_REPO_ENV_VAR = 'LINE_HARNESS_PARENT_REPO';
 
 export interface PreflightInput {
   env: DeployEnv;
   /** Wrangler config the caller intends to pass to `wrangler deploy`. */
   configPath: string;
+  /** Deploy remote name, already verified to exist. */
+  remote: string;
   /** Current branch of this repo. */
   branch: string;
   /** Local HEAD sha. */
   headSha: string;
-  /** `origin/codex/development` sha, freshly fetched. */
+  /** `<remote>/<base branch>` sha, freshly fetched. */
   remoteSha: string;
-  /** `git status --short` paths in this repo (empty = clean). */
+  /** `git status --porcelain` paths in this repo (empty = clean). */
   dirtyPaths: string[];
-  /** Same for the parent EC-CUBE repo; null when the repo was not found. */
+  /** Resolved parent EC-CUBE repository path; null when not specified. */
+  parentRepoPath: string | null;
+  /** Dirty paths in the parent repo; null when the path is not a usable repo. */
   parentDirtyPaths: string[] | null;
   /** Current remote lock for this environment, or null when unlocked. */
   lock: LockPayload | null;
@@ -67,6 +98,8 @@ export interface PreflightInput {
   holder: string;
   /** `--approved-by` value for production deploys. */
   approvedBy: string | null;
+  /** `--approval-ref` URL pointing at the approval record. */
+  approvalRef: string | null;
 }
 
 export interface Violation {
@@ -82,6 +115,7 @@ export type PreflightResult =
 
 export function evaluatePreflight(input: PreflightInput): PreflightResult {
   const violations: Violation[] = [];
+  const policy = ENV_POLICY[input.env];
 
   if (input.dirtyPaths.length > 0) {
     violations.push({
@@ -92,11 +126,20 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
     });
   }
 
-  if (input.parentDirtyPaths === null) {
+  if (input.parentRepoPath === null) {
+    violations.push({
+      code: 'parent-repo-unspecified',
+      message:
+        '親の EC-CUBE リポジトリが指定されていません。' +
+        `--parent-repo または ${PARENT_REPO_ENV_VAR} で指定してください。` +
+        'PC ごとに配置が違うため、既定値は持ちません。',
+    });
+  } else if (input.parentDirtyPaths === null) {
     violations.push({
       code: 'parent-repo-missing',
       message:
-        '親の EC-CUBE リポジトリを確認できませんでした。--parent-repo でパスを指定してください。',
+        `親の EC-CUBE リポジトリを ${input.parentRepoPath} で確認できませんでした。` +
+        'パスが正しいか、git リポジトリかを確認してください。',
     });
   } else if (input.parentDirtyPaths.length > 0) {
     violations.push({
@@ -107,12 +150,14 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
     });
   }
 
-  if (input.branch !== INTEGRATION_BRANCH) {
+  if (input.branch !== policy.branch) {
     violations.push({
       code: 'wrong-branch',
       message:
-        `デプロイは ${INTEGRATION_BRANCH} からのみ行えます（現在: ${input.branch}）。` +
-        'PR を統合してから、統合済みのコミットをデプロイしてください。',
+        `${input.env} のデプロイは ${policy.branch} からのみ行えます（現在: ${input.branch}）。` +
+        (input.env === 'production'
+          ? '検証に合格した内容を main へ反映してから実行してください。'
+          : 'PR を統合してから、統合済みのコミットをデプロイしてください。'),
     });
   }
 
@@ -121,17 +166,16 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
       code: 'head-behind-remote',
       message:
         `ローカル HEAD (${input.headSha.slice(0, 7)}) が ` +
-        `origin/${INTEGRATION_BRANCH} (${input.remoteSha.slice(0, 7)}) と一致しません。` +
+        `${input.remote}/${policy.branch} (${input.remoteSha.slice(0, 7)}) と一致しません。` +
         '共同開発者の更新が入っている可能性があります。取り込んでテストをやり直してください。',
     });
   }
 
-  const expectedConfig = CONFIG_BY_ENV[input.env];
-  if (input.configPath !== expectedConfig) {
+  if (input.configPath !== policy.config) {
     violations.push({
       code: 'config-env-mismatch',
       message:
-        `${input.env} には ${expectedConfig} を指定してください（指定値: ${input.configPath}）。` +
+        `${input.env} には ${policy.config} を指定してください（指定値: ${input.configPath}）。` +
         '設定ファイルの取り違えは、検証のつもりで本番へ配備する事故に直結します。',
     });
   }
@@ -142,8 +186,8 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
       violations.push({
         code: 'production-approval-missing',
         message:
-          '本番デプロイには Masato さんの明示的な承認と担当指定が必要です。' +
-          '--approved-by <承認者> を付けてください。Cloudflare の権限があること自体は承認ではありません。',
+          '本番デプロイには --approved-by <GitHubログイン> が必要です。' +
+          'Cloudflare の権限があること自体は承認ではありません。',
       });
     } else if (!PRODUCTION_APPROVERS.includes(approver)) {
       violations.push({
@@ -151,6 +195,15 @@ export function evaluatePreflight(input: PreflightInput): PreflightResult {
         message:
           `${input.approvedBy} は本番デプロイの承認者ではありません` +
           `（承認できるのは ${PRODUCTION_APPROVERS.join(' / ')}）。`,
+      });
+    }
+    if (!input.approvalRef?.trim()) {
+      violations.push({
+        code: 'production-approval-ref-missing',
+        message:
+          '本番デプロイには --approval-ref で承認記録の URL が必要です。' +
+          '--approved-by は実行者が自分で入力できるため、それ単独では承認の証明になりません。' +
+          'PR コメントなど、承認が残っている場所を指定してください。',
       });
     }
   }
@@ -220,6 +273,7 @@ function dirtyPaths(cwd?: string): string[] {
   const out = execFileSync('git', ['status', '--porcelain'], {
     encoding: 'utf8',
     cwd,
+    stdio: ['pipe', 'pipe', 'pipe'],
   });
   return parseStatusPaths(out);
 }
@@ -230,19 +284,30 @@ function readFlag(args: string[], name: string): string | undefined {
   return args[i + 1];
 }
 
-function readRemoteLock(env: DeployEnv): LockPayload | null {
+function readRemoteLock(env: DeployEnv, gitEnv: GitEnv): LockPayload | null {
   const ref = lockRef(env);
-  const ls = git(['ls-remote', 'origin', ref]);
+  const ls = git(['ls-remote', gitEnv.remote, ref]);
   if (!ls) return null;
   const sha = ls.split(/\s+/)[0];
-  git(['fetch', '--quiet', 'origin', `+${ref}:${ref}`]);
+  git(['fetch', '--quiet', gitEnv.remote, `+${ref}:${ref}`]);
   return parseLockPayload(git(['show', `${sha}:lock.json`]));
 }
 
 function currentHolder(): string {
   return execFileSync('gh', ['api', 'user', '--jq', '.login'], {
     encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'pipe'],
   }).trim();
+}
+
+/** A path only counts as the parent repo when git can actually read it. */
+function readParentDirtyPaths(path: string): string[] | null {
+  if (!existsSync(path)) return null;
+  try {
+    return dirtyPaths(path);
+  } catch {
+    return null;
+  }
 }
 
 function main(): void {
@@ -251,30 +316,35 @@ function main(): void {
   if (!envArg || !isDeployEnv(envArg)) {
     stderr.write(
       '使い方: tsx scripts/deploy/preflight.ts <staging|production> ' +
-        '[--config <path>] [--parent-repo <path>] [--approved-by <name>]\n',
+        '[--config <path>] [--remote <name>] [--parent-repo <path>] ' +
+        '[--approved-by <github-login>] [--approval-ref <url>]\n',
     );
     exit(1);
   }
   const env = envArg;
-  const parentRepo =
-    readFlag(args, '--parent-repo') ??
-    '/Volumes/My Passport/Github/nen-petfood-eccube';
+  const policy = ENV_POLICY[env];
+  const gitEnv: GitEnv = { remote: resolveRemote(readFlag(args, '--remote')) };
+  const parentRepoPath =
+    readFlag(args, '--parent-repo') ?? processEnv[PARENT_REPO_ENV_VAR] ?? null;
 
   // Fetch first: the whole point of the gate is comparing against the
-  // *current* remote, not a stale local ref.
-  git(['fetch', '--quiet', 'origin', INTEGRATION_BRANCH]);
+  // *current* remote branch, not a stale local ref.
+  git(['fetch', '--quiet', gitEnv.remote, policy.branch]);
 
   const input: PreflightInput = {
     env,
-    configPath: readFlag(args, '--config') ?? CONFIG_BY_ENV[env],
+    configPath: readFlag(args, '--config') ?? policy.config,
+    remote: gitEnv.remote,
     branch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
     headSha: git(['rev-parse', 'HEAD']),
-    remoteSha: git(['rev-parse', `origin/${INTEGRATION_BRANCH}`]),
+    remoteSha: git(['rev-parse', 'FETCH_HEAD']),
     dirtyPaths: dirtyPaths(),
-    parentDirtyPaths: existsSync(parentRepo) ? dirtyPaths(parentRepo) : null,
-    lock: readRemoteLock(env),
+    parentRepoPath,
+    parentDirtyPaths: parentRepoPath ? readParentDirtyPaths(parentRepoPath) : null,
+    lock: readRemoteLock(env, gitEnv),
     holder: currentHolder(),
     approvedBy: readFlag(args, '--approved-by') ?? null,
+    approvalRef: readFlag(args, '--approval-ref') ?? null,
   };
 
   const result = evaluatePreflight(input);
@@ -284,7 +354,8 @@ function main(): void {
     exit(1);
   }
   stdout.write(
-    `OK — ${env} の事前確認をすべて通過しました（${input.headSha.slice(0, 7)}）。\n`,
+    `OK — ${env} の事前確認をすべて通過しました` +
+      `（${policy.branch} @ ${input.headSha.slice(0, 7)} / remote: ${input.remote}）。\n`,
   );
 }
 
