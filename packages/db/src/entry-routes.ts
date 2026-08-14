@@ -2,6 +2,7 @@ import { jstNow } from './utils.js';
 export interface EntryRoute {
   id: string;
   ref_code: string;
+  genre: string | null;
   name: string;
   tag_id: string | null;
   scenario_id: string | null;
@@ -34,6 +35,7 @@ export interface RefTracking {
 
 export interface CreateEntryRouteInput {
   refCode: string;
+  genre?: string | null;
   name: string;
   tagId?: string | null;
   scenarioId?: string | null;
@@ -81,14 +83,15 @@ export async function createEntryRoute(
   await db
     .prepare(
       `INSERT INTO entry_routes
-         (id, ref_code, name, tag_id, scenario_id, redirect_url,
+         (id, ref_code, genre, name, tag_id, scenario_id, redirect_url,
           pool_id, intro_template_id, run_account_friend_add_scenarios,
           is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       input.refCode,
+      input.genre?.trim() || null,
       input.name,
       input.tagId ?? null,
       input.scenarioId ?? null,
@@ -135,6 +138,7 @@ export async function updateEntryRoute(
   const values: unknown[] = [now];
 
   if (input.name !== undefined) { fields.push('name = ?'); values.push(input.name); }
+  if (input.genre !== undefined) { fields.push('genre = ?'); values.push(input.genre?.trim() || null); }
   if (input.refCode !== undefined) { fields.push('ref_code = ?'); values.push(input.refCode); }
   if (input.tagId !== undefined) { fields.push('tag_id = ?'); values.push(input.tagId ?? null); }
   if (input.scenarioId !== undefined) { fields.push('scenario_id = ?'); values.push(input.scenarioId ?? null); }

@@ -445,6 +445,7 @@ export interface PoolAccount {
 export interface EntryRoute {
   id: string;
   refCode: string;
+  genre: string | null;
   name: string;
   tagId: string | null;
   scenarioId: string | null;
@@ -459,6 +460,7 @@ export interface EntryRoute {
 
 export interface CreateEntryRouteInput {
   refCode: string;
+  genre?: string | null;
   name: string;
   tagId?: string | null;
   scenarioId?: string | null;
