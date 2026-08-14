@@ -341,7 +341,7 @@ CREATE TABLE entry_routes (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1);
+, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT);
 
 CREATE TABLE event_booking_idempotency_keys (
   key              TEXT PRIMARY KEY,
@@ -1478,6 +1478,9 @@ CREATE INDEX idx_engagement_events_actor_user
 
 CREATE INDEX idx_engagement_events_source
   ON engagement_events(source, source_event_id);
+
+CREATE INDEX idx_entry_routes_genre
+  ON entry_routes (genre, created_at DESC);
 
 CREATE INDEX idx_entry_routes_pool ON entry_routes (pool_id);
 

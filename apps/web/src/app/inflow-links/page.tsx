@@ -52,6 +52,7 @@ interface RefDetail {
 }
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
+const referralUrl = (refCode: string) => `${WORKER_BASE.replace(/\/$/, '')}/r/${encodeURIComponent(refCode)}`
 
 export default function InflowLinksPage() {
   const { selectedAccountId } = useAccount()
@@ -74,6 +75,8 @@ export default function InflowLinksPage() {
     EntryRoute | 'new' | { register: string } | null
   >(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [genreFilter, setGenreFilter] = useState('')
+  const [qrRoute, setQrRoute] = useState<{ refCode: string; name: string; genre: string | null } | null>(null)
   // Expanded-row state for showing friends acquired through a given ref.
   // Mirrors the legacy /affiliates page UX — click row → load via
   // /api/analytics/ref/:refCode → render friend list inline.
@@ -152,7 +155,7 @@ export default function InflowLinksPage() {
   }, [selectedAccountId])
 
   const onCopy = async (refCode: string, id: string) => {
-    const url = `${WORKER_BASE}/r/${refCode}`
+    const url = referralUrl(refCode)
     try {
       await navigator.clipboard.writeText(url)
       setCopiedId(id)
@@ -216,6 +219,7 @@ export default function InflowLinksPage() {
     /** entry_routes に登録があれば id。tracked_link / orphan は null。 */
     entryRouteId: string | null
     refCode: string
+    genre: string | null
     name: string
     poolId: string | null
     tagId: string | null
@@ -246,6 +250,7 @@ export default function InflowLinksPage() {
       source: 'entry_route',
       entryRouteId: r.id,
       refCode: r.refCode,
+      genre: r.genre,
       name: r.name,
       poolId: r.poolId,
       tagId: r.tagId,
@@ -269,6 +274,7 @@ export default function InflowLinksPage() {
       source: 'tracked_link',
       entryRouteId: null,
       refCode: tl.id,
+      genre: null,
       name: tl.name,
       poolId: null, // tracked_links は pool を持たない
       tagId: null,
@@ -283,6 +289,7 @@ export default function InflowLinksPage() {
       source: 'orphan',
       entryRouteId: null,
       refCode: s.refCode,
+      genre: null,
       name: s.name ?? '(未登録)',
       poolId: null,
       tagId: null,
@@ -322,8 +329,14 @@ export default function InflowLinksPage() {
       })
     : allRows
 
-  // Newest "最新追加" first. Routes with no recorded inflow yet sink to the bottom.
-  const sortedRows = [...accountFilteredRows].sort((a, b) => {
+  // ジャンルでまとめ、各ジャンル内は最新流入順に並べる。
+  const genreOptions = Array.from(new Set(routes.map((route) => route.genre).filter((genre): genre is string => !!genre))).sort((a, b) => a.localeCompare(b, 'ja'))
+  const genreFilteredRows = genreFilter
+    ? accountFilteredRows.filter((row) => row.genre === genreFilter)
+    : accountFilteredRows
+  const sortedRows = [...genreFilteredRows].sort((a, b) => {
+    const genreOrder = (a.genre ?? '未分類').localeCompare(b.genre ?? '未分類', 'ja')
+    if (genreOrder !== 0) return genreOrder
     const sa = a.stats?.latestAt ?? ''
     const sb = b.stats?.latestAt ?? ''
     if (!sa && !sb) return 0
@@ -369,19 +382,32 @@ export default function InflowLinksPage() {
         </div>
       )}
 
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-sm text-gray-500">
           {sortedRows.length} リンク
-          {selectedAccountId && allRows.length !== sortedRows.length
-            ? `（全 ${allRows.length} 件中、選択中アカ）`
-            : ''}
+          {genreFilter
+            ? `（ジャンル: ${genreFilter}）`
+            : selectedAccountId && allRows.length !== sortedRows.length
+              ? `（全 ${allRows.length} 件中、選択中アカ）`
+              : ''}
         </span>
-        <button
-          onClick={() => setEditing('new')}
-          className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-        >
-          + 新規リンク
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={genreFilter}
+            onChange={(event) => setGenreFilter(event.target.value)}
+            className="rounded border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
+            aria-label="ジャンルで絞り込み"
+          >
+            <option value="">すべてのジャンル</option>
+            {genreOptions.map((genre) => <option key={genre} value={genre}>{genre}</option>)}
+          </select>
+          <button
+            onClick={() => setEditing('new')}
+            className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+          >
+            + 新規リンク
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -402,9 +428,12 @@ export default function InflowLinksPage() {
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-          <table className="w-full min-w-[1080px]">
+          <table className="w-full min-w-[1180px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  ジャンル
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   名前
                 </th>
@@ -457,6 +486,13 @@ export default function InflowLinksPage() {
                     refDetail={refDetail}
                     refCode={r.refCode}
                   >
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {r.genre ? (
+                        <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">{r.genre}</span>
+                      ) : (
+                        <span className="text-gray-400">未分類</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
                       {r.source === 'entry_route' && r.entryRouteId ? (
                         <Link
@@ -548,12 +584,20 @@ export default function InflowLinksPage() {
                       {formatDate(r.stats?.latestAt ?? null)}
                     </td>
                     <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={() => onCopy(r.refCode, r.refCode)}
-                        className="text-xs text-blue-500 hover:text-blue-700"
-                      >
-                        {copiedId === r.refCode ? 'コピー済' : 'コピー'}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => onCopy(r.refCode, r.refCode)}
+                          className="text-xs text-blue-500 hover:text-blue-700"
+                        >
+                          {copiedId === r.refCode ? 'コピー済' : 'URLコピー'}
+                        </button>
+                        <button
+                          onClick={() => setQrRoute({ refCode: r.refCode, name: r.name, genre: r.genre })}
+                          className="text-xs text-emerald-600 hover:text-emerald-800"
+                        >
+                          QR表示
+                        </button>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                       {editTarget ? (
@@ -604,13 +648,16 @@ export default function InflowLinksPage() {
           scenarios={scenarios}
           templates={templates}
           tags={tags}
+          existingGenres={genreOptions}
           onClose={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(savedRoute, created) => {
             setEditing(null)
             load()
+            if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre })
           }}
         />
       )}
+      {qrRoute && <ReferralQrModal route={qrRoute} onClose={() => setQrRoute(null)} />}
     </div>
   )
 }
@@ -644,7 +691,7 @@ function FragmentRow({
       </tr>
       {isExpanded && (
         <tr>
-          <td colSpan={11} className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+          <td colSpan={12} className="px-6 py-4 bg-gray-50 border-t border-gray-100">
             {refDetailLoading ? (
               <p className="text-sm text-gray-400">読み込み中…</p>
             ) : !friends ? (
@@ -684,5 +731,50 @@ function FragmentRow({
         </tr>
       )}
     </Fragment>
+  )
+}
+
+function ReferralQrModal({
+  route,
+  onClose,
+}: {
+  route: { refCode: string; name: string; genre: string | null }
+  onClose: () => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const url = referralUrl(route.refCode)
+  const qrBase = `${WORKER_BASE.replace(/\/$/, '')}/api/qr?size=320x320&data=${encodeURIComponent(url)}`
+  const downloadUrl = `${qrBase}&download=1&filename=${encodeURIComponent(`referral-${route.refCode}`)}`
+  const copy = async () => {
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium text-emerald-700">リファラルリンク・QRコード</p>
+            <h2 className="mt-1 text-lg font-bold text-gray-900">{route.name}</h2>
+            <p className="mt-1 text-sm text-gray-500">{route.genre ?? '未分類'}</p>
+          </div>
+          <button onClick={onClose} className="text-2xl leading-none text-gray-400" aria-label="閉じる">×</button>
+        </div>
+        <div className="mt-5 rounded-xl bg-gray-50 p-3">
+          <p className="break-all font-mono text-xs text-gray-700">{url}</p>
+          <button onClick={copy} className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-blue-600">
+            {copied ? 'コピーしました' : 'URLをコピー'}
+          </button>
+        </div>
+        <div className="mt-5 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element -- Workerが動的生成するQRコード */}
+          <img src={qrBase} alt={`${route.name}のQRコード`} className="mx-auto h-64 w-64 rounded-xl border border-gray-100 bg-white p-2" />
+          <a href={downloadUrl} download={`referral-${route.refCode}.png`} className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
+            QRコードをダウンロード
+          </a>
+        </div>
+      </div>
+    </div>
   )
 }

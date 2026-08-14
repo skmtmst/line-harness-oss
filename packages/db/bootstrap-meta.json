@@ -88,7 +88,8 @@
     "081_nen_tag_initial_backfill.sql",
     "082_support_email_inbox.sql",
     "083_support_email_sync_state.sql",
-    "084_staff_read_only_access.sql"
+    "084_staff_read_only_access.sql",
+    "085_entry_route_genre.sql"
   ],
-  "migrationCount": 89
+  "migrationCount": 90
 }

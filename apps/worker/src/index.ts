@@ -93,6 +93,7 @@ import { nenCampaigns } from './routes/nen-campaigns.js';
 import { nenMembers } from './routes/nen-members.js';
 import { supportInbox } from './routes/support-inbox.js';
 import { receiveSupportEmail } from './services/support-email.js';
+import { qrResponseHeaders } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -261,10 +262,11 @@ app.get('/api/qr', async (c) => {
   const res = await fetch(upstream);
   if (!res.ok) return c.text('QR generation failed', 502);
   return new Response(res.body, {
-    headers: {
-      'Content-Type': res.headers.get('Content-Type') || 'image/png',
-      'Cache-Control': 'public, max-age=86400',
-    },
+    headers: qrResponseHeaders(
+      res.headers.get('Content-Type'),
+      c.req.query('download') === '1',
+      c.req.query('filename') || 'referral-link-qr',
+    ),
   });
 });
 
