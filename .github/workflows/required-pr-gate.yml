@@ -1,0 +1,140 @@
+name: Required PR gate
+
+# This workflow intentionally runs for every pull request targeting either
+# integration branch. Path-filtered workflows are useful for speed, but they
+# cannot be made a universal branch-protection requirement because GitHub
+# reports no check at all when their path filter does not match.
+
+on:
+  pull_request:
+    branches:
+      - codex/development
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  required-pr-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install the committed dependency graph
+        run: pnpm install --frozen-lockfile
+
+      - name: Reject whitespace errors in the PR diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ] && [ -n "$HEAD_SHA" ]; then
+            git diff --check "$BASE_SHA...$HEAD_SHA"
+          else
+            git diff --check
+          fi
+
+      - name: Build shared packages
+        run: >-
+          pnpm
+          --filter @line-crm/shared
+          --filter @line-crm/line-sdk
+          --filter @line-crm/db
+          --filter @line-harness/update-engine
+          build
+
+      - name: Test repository scripts
+        run: pnpm test:scripts
+
+      - name: Typecheck repository scripts
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/typedeps" @types/node@22
+          pnpm exec tsc -p scripts/tsconfig.json \
+            --typeRoots "$RUNNER_TEMP/typedeps/node_modules/@types"
+
+      - name: Check shell syntax
+        run: |
+          failed=0
+          while IFS= read -r script; do
+            echo "bash -n $script"
+            bash -n "$script" || failed=1
+          done < <(find scripts -name '*.sh' -type f)
+          exit "$failed"
+
+      - name: Check workflow YAML and run-step shell syntax
+        run: |
+          python3 -m pip install --quiet 'pyyaml==6.0.2'
+          python3 - <<'PY'
+          import glob
+          import os
+          import re
+          import subprocess
+          import sys
+          import tempfile
+
+          import yaml
+
+          failed = False
+          for path in sorted(glob.glob('.github/workflows/*.yml')):
+              try:
+                  with open(path, encoding='utf-8') as source:
+                      document = yaml.safe_load(source)
+              except Exception as exc:
+                  print(f'[NG] {path}: YAML parse failed: {exc}')
+                  failed = True
+                  continue
+
+              print(f'[OK] {path}: YAML parsed')
+              for job in (document.get('jobs') or {}).values():
+                  for step in (job.get('steps') or []):
+                      script = step.get('run')
+                      if not script:
+                          continue
+                      script = re.sub(r'\$\{\{[^}]*\}\}', 'GH_EXPR', script)
+                      with tempfile.NamedTemporaryFile(
+                          'w', suffix='.sh', delete=False, encoding='utf-8'
+                      ) as handle:
+                          handle.write(script)
+                          temporary_path = handle.name
+                      result = subprocess.run(
+                          ['bash', '-n', temporary_path],
+                          capture_output=True,
+                          text=True,
+                      )
+                      os.unlink(temporary_path)
+                      if result.returncode != 0:
+                          name = step.get('name', '(unnamed step)')
+                          print(f'[NG] {path} / {name}: {result.stderr.strip()}')
+                          failed = True
+
+          sys.exit(1 if failed else 0)
+          PY
+
+      - name: Typecheck and test Worker
+        run: |
+          pnpm --filter worker typecheck
+          pnpm --filter worker test
+
+      - name: Build Worker
+        env:
+          VITE_LIFF_ID: ${{ vars.VITE_LIFF_ID }}
+          VITE_BOT_BASIC_ID: ${{ vars.VITE_BOT_BASIC_ID }}
+          VITE_CALENDAR_CONNECTION_ID: ${{ vars.VITE_CALENDAR_CONNECTION_ID }}
+        run: pnpm --filter worker build
+
+      - name: Test and build Admin
+        env:
+          NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
+        run: |
+          pnpm --filter web test
+          pnpm --filter web build
