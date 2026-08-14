@@ -24,6 +24,7 @@ interface Props {
   templates: MessageTemplate[]
   tags: Tag[]
   existingGenres: string[]
+  initialGenre?: string
   /** Pre-filled ref_code for "register an unregistered inflow ref" flow. */
   initialRefCode?: string
   onClose: () => void
@@ -37,6 +38,7 @@ export default function EditRouteModal({
   templates,
   tags,
   existingGenres,
+  initialGenre,
   initialRefCode,
   onClose,
   onSaved,
@@ -66,9 +68,10 @@ export default function EditRouteModal({
   // that has already been seen in inflow), so we lock the input to prevent
   // the user from accidentally renaming the ref and orphaning the prior stats.
   const refCodeLocked = isNew && !!initialRefCode
+  const genreLocked = isNew && !!initialGenre
   const [form, setForm] = useState<CreateEntryRouteInput>(() => ({
     refCode: route?.refCode ?? initialRefCode ?? '',
-    genre: route?.genre ?? '',
+    genre: route?.genre ?? initialGenre ?? '',
     name: route?.name ?? '',
     tagId: route?.tagId ?? null,
     poolId: route?.poolId ?? mainPool?.id ?? null,
@@ -128,10 +131,11 @@ export default function EditRouteModal({
 
         <Field label="ジャンル（協力会社・グループ）">
           <input
-            list="referral-genre-options"
+            list={genreLocked ? undefined : 'referral-genre-options'}
             value={form.genre ?? ''}
             onChange={(e) => setForm({ ...form, genre: e.target.value })}
-            className="w-full border border-gray-200 rounded px-3 py-2 text-sm"
+            readOnly={genreLocked}
+            className="w-full border border-gray-200 rounded px-3 py-2 text-sm read-only:bg-emerald-50 read-only:border-emerald-200 read-only:text-emerald-800 read-only:font-medium"
             placeholder="例: A店"
             maxLength={80}
           />
@@ -139,7 +143,9 @@ export default function EditRouteModal({
             {existingGenres.map((genre) => <option key={genre} value={genre} />)}
           </datalist>
           <p className="text-xs text-gray-500 mt-1">
-            同じ協力会社や媒体を同じジャンル名にすると、一覧でまとめて管理できます。
+            {genreLocked
+              ? '左側で選択したジャンルへ登録されます。'
+              : '同じ協力会社や媒体を同じジャンル名にすると、一覧でまとめて管理できます。'}
           </p>
         </Field>
 

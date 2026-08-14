@@ -6,8 +6,10 @@ import {
   updateEntryRoute,
   deleteEntryRoute,
   getEntryRouteFunnel,
+  getEntryRouteGenres,
+  createEntryRouteGenre,
 } from '@line-crm/db';
-import type { EntryRoute } from '@line-crm/db';
+import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import type { Env } from '../index.js';
 
 const entryRoutes = new Hono<Env>();
@@ -29,6 +31,43 @@ function serialize(row: EntryRoute) {
     updatedAt: row.updated_at,
   };
 }
+
+function serializeGenre(row: EntryRouteGenre) {
+  return {
+    id: row.id,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+entryRoutes.get('/api/entry-route-genres', async (c) => {
+  try {
+    const rows = await getEntryRouteGenres(c.env.DB);
+    return c.json({ success: true, data: rows.map(serializeGenre) });
+  } catch (err) {
+    console.error('GET /api/entry-route-genres error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+entryRoutes.post('/api/entry-route-genres', async (c) => {
+  try {
+    const body = await c.req.json<{ name?: string }>();
+    const name = body.name?.trim();
+    if (!name || name.length > 80) {
+      return c.json({ success: false, error: 'ジャンル名は1〜80文字で入力してください' }, 400);
+    }
+    const row = await createEntryRouteGenre(c.env.DB, name);
+    return c.json({ success: true, data: serializeGenre(row) }, 201);
+  } catch (err) {
+    console.error('POST /api/entry-route-genres error:', err);
+    if (String(err).includes('UNIQUE constraint failed: entry_route_genres.name')) {
+      return c.json({ success: false, error: '同じ名前のジャンルが既にあります' }, 409);
+    }
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 // GET /api/entry-routes — list all
 entryRoutes.get('/api/entry-routes', async (c) => {
