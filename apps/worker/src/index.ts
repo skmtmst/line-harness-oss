@@ -92,6 +92,7 @@ import { ecCommerce } from './routes/ec-commerce.js';
 import { nenCampaigns } from './routes/nen-campaigns.js';
 import { nenMembers } from './routes/nen-members.js';
 import { supportInbox } from './routes/support-inbox.js';
+import { searchConsole } from './routes/search-console.js';
 import { receiveSupportEmail } from './services/support-email.js';
 import { qrResponseHeaders } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -155,6 +156,8 @@ export type Env = {
     // Calendar owners only enter/share their Google Calendar ID in admin UI.
     GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
+    // Read-only Google Search Console performance dashboard.
+    SEARCH_CONSOLE_SITE_URL?: string;
   };
   Variables: {
     staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff' | 'viewer' };
@@ -242,6 +245,7 @@ app.route('/', ecCommerce);
 app.route('/', nenCampaigns);
 app.route('/', nenMembers);
 app.route('/', supportInbox);
+app.route('/', searchConsole);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version

@@ -50,6 +50,7 @@ crons = ["*/5 * * * *"]
 | `LINE_LOGIN_CHANNEL_SECRET` | 任意 | string | LINE Login チャネルシークレット | `xyz789...` |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | 任意 | string | 予約とGoogleカレンダーを同期するサービスアカウント | `calendar-sync@project.iam.gserviceaccount.com` |
 | `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | 任意 | string | 上記サービスアカウントのPKCS#8秘密鍵 | `-----BEGIN PRIVATE KEY-----...` |
+| `SEARCH_CONSOLE_SITE_URL` | 任意 | string | Search ConsoleのURLプレフィックスまたはドメインプロパティ | `sc-domain:example.com` |
 
 ### シークレット設定コマンド
 
@@ -68,6 +69,10 @@ npx wrangler secret put GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY
 # 設定済みシークレット一覧確認
 npx wrangler secret list
 ```
+
+Search Console分析を使う場合は、同じサービスアカウントをSearch Consoleの対象プロパティへ
+「制限付きユーザー」として追加し、Worker変数 `SEARCH_CONSOLE_SITE_URL` を設定します。
+取得スコープは `webmasters.readonly` のみで、サイト設定の変更は行いません。
 
 ### Env 型定義
 
