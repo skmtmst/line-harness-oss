@@ -15,6 +15,9 @@
     "deploy:update": "node packages/create-line-harness/dist/index.js update",
     "sandbox:create-line-harness": "bash scripts/run-create-line-harness-sandbox.sh",
     "test:scripts": "vitest run --config vitest.config.ts",
+    "deploy:lock": "tsx scripts/deploy/deploy-lock.ts",
+    "deploy:preflight": "tsx scripts/deploy/preflight.ts",
+    "deploy:staging": "bash scripts/deploy/staging-deploy.sh",
     "build:bundle": "tsx scripts/release/build-bundle.ts"
   },
   "packageManager": "pnpm@9.15.4",
