@@ -185,8 +185,7 @@ export default function SearchConsolePage() {
   return (
     <div>
       <Header
-        title="Google検索パフォーマンス"
-        description="然-NEN-サイトがGoogle検索でどのように見つけられているかを確認します。"
+        title="Googleアナリティクス"
         action={<div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">{ranges.map((range) => <button key={range} onClick={() => setDays(range)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>{range}日</button>)}</div>}
       />
 
@@ -196,8 +195,7 @@ export default function SearchConsolePage() {
         <SetupCard setup={setup} denied={denied} />
       ) : (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-            <p className="truncate whitespace-nowrap" title={data.siteUrl}>{data.siteUrl}</p>
+          <div className="flex justify-end text-xs text-slate-400">
             <p className="whitespace-nowrap">集計期間 {data.startDate.replaceAll('-', '/')}〜{data.endDate.replaceAll('-', '/')}</p>
           </div>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
