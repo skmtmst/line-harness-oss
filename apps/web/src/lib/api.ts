@@ -132,18 +132,49 @@ export function setCsrfToken(token: string | undefined | null): void {
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 /**
- * Non-2xx API responses. message keeps the legacy `API error: <status>` shape
- * (existing catch blocks render e.message), while `status` lets callers
- * branch on the code without parsing the string.
+ * Non-2xx API responses. message prefers the reason the Worker sent, falling
+ * back to the legacy `API error: <status>` shape (existing catch blocks render
+ * e.message), while `status` lets callers branch on the code without parsing
+ * the string.
  */
 export class ApiError extends Error {
   readonly status: number
 
-  constructor(status: number) {
-    super(`API error: ${status}`)
+  constructor(status: number, message?: string) {
+    super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
   }
+}
+
+/**
+ * Statuses whose response body is safe to show the operator verbatim.
+ *
+ * 400 is the Worker rejecting input it validated itself — the message names
+ * what to fix and contains nothing the operator should not see. Everything
+ * else (upstream LINE API failures, unhandled exceptions, proxy pages) can
+ * carry internal detail, so those keep the generic status message no matter
+ * what the body says.
+ */
+const BODY_MESSAGE_STATUSES = new Set([400])
+
+/**
+ * Pull the human-readable reason out of an error response body.
+ *
+ * Without this a fixable input mistake reached the operator as
+ * `API error: 500`, indistinguishable from a server fault. Bodies that are
+ * not JSON (HTML error pages, proxies) are dropped rather than shown as-is.
+ */
+export function extractApiErrorMessage(raw: string, status: number): string {
+  if (!raw || !BODY_MESSAGE_STATUSES.has(status)) return ''
+  try {
+    const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
+    if (typeof body.error === 'string') return body.error
+    if (typeof body.message === 'string') return body.message
+  } catch {
+    // Not JSON — fall through to the status-only message.
+  }
+  return ''
 }
 
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -164,7 +195,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       ...options?.headers,
     },
   })
-  if (!res.ok) throw new ApiError(res.status)
+  if (!res.ok) throw new ApiError(res.status, extractApiErrorMessage(await res.text(), res.status))
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }

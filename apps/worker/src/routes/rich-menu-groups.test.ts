@@ -480,6 +480,38 @@ describe('POST /api/rich-menu-groups/:groupId/publish', () => {
     expect(res.status).toBe(409);
   });
 
+  test('400 with actionable message when an area action is incomplete — releases lock', async () => {
+    dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
+      id: 'gid12345-aaaa', account_id: 'acc-1',
+      name: 'x', chat_bar_text: 'メニュー', size: 'large',
+      default_page_id: 'p1', is_default_for_all: 0, status: 'draft', publishing_at: null,
+      created_at: '', updated_at: '',
+      pages: [{
+        id: 'p1', group_id: 'gid12345-aaaa', order_index: 0, name: '基本メニュー',
+        alias_id: 'lhx-gid12345-0', line_richmenu_id: null,
+        image_r2_key: 'rich-menus/p1.png', image_content_type: 'image/png',
+        created_at: '', updated_at: '',
+        areas: [{
+          id: 'a1', page_id: 'p1',
+          bounds_x: 0, bounds_y: 0, bounds_width: 100, bounds_height: 100,
+          action_type: 'message', action_data: '{"text":""}', actionData: { text: '' },
+          created_at: '', updated_at: '',
+        }],
+      }],
+    });
+    dbMocks.getLineAccountById.mockResolvedValue({ channel_access_token: 'tk' });
+    dbMocks.acquirePublishLock.mockResolvedValue(true);
+
+    const app = setupApp();
+    const res = await app.request('/api/rich-menu-groups/gid12345-aaaa/publish', { method: 'POST' });
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: 'ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください',
+    });
+    expect(dbMocks.releasePublishLock).toHaveBeenCalledWith(expect.anything(), 'gid12345-aaaa');
+  });
+
   test('500 when LINE fetch throws — releases lock', async () => {
     dbMocks.getRichMenuGroupWithPages.mockResolvedValue({
       id: 'gid12345-aaaa', account_id: 'acc-1',
