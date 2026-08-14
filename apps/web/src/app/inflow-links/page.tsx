@@ -8,7 +8,8 @@ import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
-import CreateGenreModal from './_components/create-genre-modal'
+import GenreModal from './_components/create-genre-modal'
+import { shouldShowReferralRow } from './visibility'
 
 interface MessageTemplate {
   id: string
@@ -95,7 +96,7 @@ export default function InflowLinksPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [selectedGenre, setSelectedGenre] = useState('')
   const [search, setSearch] = useState('')
-  const [creatingGenre, setCreatingGenre] = useState(false)
+  const [editingGenre, setEditingGenre] = useState<EntryRouteGenre | 'new' | null>(null)
   const [qrRoute, setQrRoute] = useState<{ refCode: string; name: string; genre: string | null } | null>(null)
   // Expanded-row state for showing friends acquired through a given ref.
   // Mirrors the legacy /affiliates page UX — click row → load via
@@ -330,11 +331,12 @@ export default function InflowLinksPage() {
   //   - 全アカウント表示: entry_routes 全件 + 未登録 ref 全件
   //   - アカ選択中:
   //       a) 未登録 ref: そのアカで実流入があった分のみ (friendCount > 0)
-  //       b) 登録済み行: 実流入 > 0 OR その pool に選択中アカが所属
-  //          (pool_id 未設定なら実行時 main フォールバックで main 所属判定)
+  //       b) 登録済み行: 実流入 > 0 OR pool未設定 OR
+  //          その pool に選択中アカが所属
   //
-  // 登録済み行を friendCount > 0 だけで絞ると、作りたての行が一覧から消えて
-  // 「保存したのに出てこない」事故になる。一方で「登録済みは全部表示」だと
+  // 登録済み行を friendCount > 0 やPool所属だけで絞ると、Poolがまだない環境で
+  // 作りたての行が一覧から消えて「保存したのに出てこない」事故になる。
+  // 一方でPool割当済みをすべて表示すると
   // X Harness 1 サイドバー選択中に main プール向けの lp/lp2 が並んで紛らわしい。
   // ルーティングの真実は pool_accounts (worker の getRandomPoolAccount が
   // ここから抽選する) なので、poolMembers を見て所属判定する。
@@ -346,15 +348,11 @@ export default function InflowLinksPage() {
     if (!targetPoolId) return false
     return poolMembers[targetPoolId]?.has(accountId) ?? false
   }
-  const accountFilteredRows = selectedAccountId
-    ? allRows.filter((r) => {
-        if ((r.stats?.friendCount ?? 0) > 0) return true
-        if (r.source === 'orphan') return false
-        // entry_route / tracked_link は pool 所属判定にフォールバック
-        // (tracked_link は poolId=null なので mainPool 所属チェックになる)
-        return poolRoutesToAccount(r.poolId, selectedAccountId)
-      })
-    : allRows
+  const accountFilteredRows = allRows.filter((row) => shouldShowReferralRow({
+    source: row.source,
+    poolId: row.poolId,
+    friendCount: row.stats?.friendCount ?? 0,
+  }, selectedAccountId, poolRoutesToAccount))
 
   const availableGenres = useMemo(() => {
     const routeGenreNames = routes
@@ -442,7 +440,7 @@ export default function InflowLinksPage() {
       <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside>
           <button
-            onClick={() => setCreatingGenre(true)}
+            onClick={() => setEditingGenre('new')}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
           >
             <span className="text-xl leading-none">＋</span>
@@ -455,7 +453,7 @@ export default function InflowLinksPage() {
             </div>
             {availableGenres.length === 0 && !hasUncategorized ? (
               <button
-                onClick={() => setCreatingGenre(true)}
+                onClick={() => setEditingGenre('new')}
                 className="w-full px-4 py-8 text-center text-sm text-gray-400 hover:bg-gray-50"
               >
                 最初のジャンルを作成してください
@@ -466,17 +464,30 @@ export default function InflowLinksPage() {
                   const count = accountFilteredRows.filter((row) => row.genre === genre.name).length
                   const active = selectedGenre === genre.name
                   return (
-                    <button
+                    <div
                       key={genre.id}
-                      onClick={() => setSelectedGenre(genre.name)}
-                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${active ? 'bg-emerald-50 text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}
+                      className={`flex items-center transition ${active ? 'bg-emerald-50 text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}
                     >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-emerald-600' : 'text-gray-400'}`} />
-                        <span className="truncate text-sm font-semibold">{genre.name}</span>
-                      </span>
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{count}</span>
-                    </button>
+                      <button
+                        onClick={() => setSelectedGenre(genre.name)}
+                        className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left"
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-emerald-600' : 'text-gray-400'}`} />
+                          <span className="truncate text-sm font-semibold">{genre.name}</span>
+                        </span>
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{count}</span>
+                      </button>
+                      {!genre.id.startsWith('legacy-') && (
+                        <button
+                          onClick={() => setEditingGenre(genre)}
+                          className="mr-2 rounded-md px-2 py-1 text-xs font-medium text-gray-500 hover:bg-white hover:text-blue-600"
+                          aria-label={`${genre.name}を編集`}
+                        >
+                          編集
+                        </button>
+                      )}
+                    </div>
                   )
                 })}
                 {hasUncategorized && (
@@ -575,7 +586,7 @@ export default function InflowLinksPage() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   URL
                 </th>
-                <th className="px-4 py-3"></th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -714,9 +725,9 @@ export default function InflowLinksPage() {
                       {editTarget ? (
                         <button
                           onClick={() => setEditing(editTarget)}
-                          className="text-xs text-gray-600 hover:underline"
+                          className="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
                         >
-                          編集
+                          リンク編集
                         </button>
                       ) : r.source === 'tracked_link' ? (
                         // tracked_links は別管理 (Web app に編集 UI 未提供)。
@@ -771,13 +782,21 @@ export default function InflowLinksPage() {
           }}
         />
       )}
-      {creatingGenre && (
-        <CreateGenreModal
-          onClose={() => setCreatingGenre(false)}
-          onCreated={(genre) => {
-            setGenres((current) => [...current, genre])
-            setSelectedGenre(genre.name)
-            setCreatingGenre(false)
+      {editingGenre && (
+        <GenreModal
+          genre={editingGenre === 'new' ? null : editingGenre}
+          onClose={() => setEditingGenre(null)}
+          onSaved={(savedGenre, previousName) => {
+            setGenres((current) => previousName
+              ? current.map((genre) => genre.id === savedGenre.id ? savedGenre : genre)
+              : [...current, savedGenre])
+            if (previousName) {
+              setRoutes((current) => current.map((route) => route.genre === previousName
+                ? { ...route, genre: savedGenre.name }
+                : route))
+            }
+            setSelectedGenre(savedGenre.name)
+            setEditingGenre(null)
           }}
         />
       )}
