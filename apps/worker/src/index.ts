@@ -35,6 +35,7 @@ import { friends } from './routes/friends.js';
 import { tags } from './routes/tags.js';
 import { scenarios } from './routes/scenarios.js';
 import { broadcasts } from './routes/broadcasts.js';
+import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
 import { lineAccounts } from './routes/line-accounts.js';
 import { conversions } from './routes/conversions.js';
@@ -174,7 +175,7 @@ app.use('*', cors({
   origin: (origin, c) => resolveCorsOrigin(c.env, origin, c.req.url),
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'x-admin-api-key'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'x-admin-api-key', 'X-Filename'],
   maxAge: 600,
 }));
 
@@ -190,6 +191,7 @@ app.route('/', friends);
 app.route('/', tags);
 app.route('/', scenarios);
 app.route('/', broadcasts);
+app.route('/', broadcastMessageAssets);
 app.route('/', users);
 app.route('/', lineAccounts);
 app.route('/', conversions);

@@ -55,6 +55,7 @@ type CreateBroadcastBody = {
   title: string;
   messageType: BroadcastMessageType;
   messageContent: string;
+  messageBubbles?: unknown[];
   targetType: BroadcastTargetType;
   targetTagId?: string | null;
   scheduledAt?: string | null;
@@ -71,6 +72,7 @@ function sameCreateRequest(existing: DbBroadcast, body: CreateBroadcastBody): bo
   return existing.title === body.title
     && existing.message_type === body.messageType
     && existing.message_content === body.messageContent
+    && (existing.message_bubbles_json ?? null) === (body.messageBubbles ? JSON.stringify(body.messageBubbles) : null)
     && existing.target_type === body.targetType
     && existing.target_tag_id === (body.targetTagId ?? null)
     && existing.scheduled_at === (body.scheduledAt ?? null)
@@ -88,6 +90,7 @@ function serializeBroadcast(row: DbBroadcast) {
     title: row.title,
     messageType: row.message_type,
     messageContent: row.message_content,
+    messageBubbles: row.message_bubbles_json ? JSON.parse(row.message_bubbles_json) as unknown[] : null,
     targetType: row.target_type,
     targetTagId: row.target_tag_id,
     status: row.status,
@@ -320,6 +323,10 @@ broadcasts.post('/api/broadcasts', async (c) => {
       );
     }
 
+    if (body.messageBubbles !== undefined && (!Array.isArray(body.messageBubbles) || body.messageBubbles.length < 1 || body.messageBubbles.length > 3)) {
+      return c.json({ success: false, error: 'messageBubbles must contain 1 to 3 items' }, 400);
+    }
+
     const variableError = unsupportedVariablesError(body.messageContent);
     if (variableError) {
       return c.json({ success: false, error: variableError }, 400);
@@ -362,6 +369,7 @@ broadcasts.post('/api/broadcasts', async (c) => {
         title: body.title,
         messageType: body.messageType,
         messageContent: body.messageContent,
+        messageBubblesJson: body.messageBubbles ? JSON.stringify(body.messageBubbles) : null,
         targetType: body.targetType,
         targetTagId: body.targetTagId ?? null,
         scheduledAt: body.scheduledAt ?? null,
@@ -503,6 +511,10 @@ broadcasts.post('/api/broadcasts/:id/send', async (c) => {
 
     if (!existing) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+
+    if (existing.message_bubbles_json) {
+      return c.json({ success: false, error: '複数吹き出しの実配信は次フェーズです。現在は下書き保存のみ利用できます。' }, 400);
     }
 
     const variableError = unsupportedVariablesError(existing.message_content);
