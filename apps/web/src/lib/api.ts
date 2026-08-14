@@ -148,14 +148,25 @@ export class ApiError extends Error {
 }
 
 /**
+ * Statuses whose response body is safe to show the operator verbatim.
+ *
+ * 400 is the Worker rejecting input it validated itself — the message names
+ * what to fix and contains nothing the operator should not see. Everything
+ * else (upstream LINE API failures, unhandled exceptions, proxy pages) can
+ * carry internal detail, so those keep the generic status message no matter
+ * what the body says.
+ */
+const BODY_MESSAGE_STATUSES = new Set([400])
+
+/**
  * Pull the human-readable reason out of an error response body.
  *
- * Without this every failure reached the operator as `API error: 500`, so a
- * fixable input mistake looked identical to a server fault. Unparseable bodies
- * (HTML error pages, proxies) are dropped rather than shown as-is.
+ * Without this a fixable input mistake reached the operator as
+ * `API error: 500`, indistinguishable from a server fault. Bodies that are
+ * not JSON (HTML error pages, proxies) are dropped rather than shown as-is.
  */
-export function extractApiErrorMessage(raw: string): string {
-  if (!raw) return ''
+export function extractApiErrorMessage(raw: string, status: number): string {
+  if (!raw || !BODY_MESSAGE_STATUSES.has(status)) return ''
   try {
     const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
     if (typeof body.error === 'string') return body.error
@@ -184,7 +195,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       ...options?.headers,
     },
   })
-  if (!res.ok) throw new ApiError(res.status, extractApiErrorMessage(await res.text()))
+  if (!res.ok) throw new ApiError(res.status, extractApiErrorMessage(await res.text(), res.status))
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }

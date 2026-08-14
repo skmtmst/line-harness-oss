@@ -170,6 +170,209 @@ describe('publishRichMenuGroup', () => {
     expect(() => validateRichMenuGroupForPublish(group))
       .toThrow('URLを入力してください');
   });
+});
+
+/**
+ * Per-action-type validation. These run before any LINE call, so a mistake in
+ * the editor is reported as something the operator can fix rather than as an
+ * upstream 400 surfaced as a generic failure.
+ */
+describe('validateRichMenuGroupForPublish', () => {
+  const groupWith = (
+    actionType: 'message' | 'uri' | 'postback' | 'richmenuswitch',
+    actionData: Record<string, unknown>,
+    pageName = '基本メニュー',
+  ) => ({
+    id: 'gid12345-aaaa',
+    size: 'large' as const,
+    chatBarText: 'm',
+    isDefaultForAll: false,
+    pages: [{
+      id: 'p1', orderIndex: 0, name: pageName,
+      imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: null,
+      areas: [{
+        bounds: { x: 0, y: 0, width: 100, height: 100 },
+        actionType,
+        actionData,
+      }],
+    }],
+  });
+
+  const rejects = (group: ReturnType<typeof groupWith>, fragment: string) => {
+    expect(() => validateRichMenuGroupForPublish(group)).toThrowError(RichMenuValidationError);
+    expect(() => validateRichMenuGroupForPublish(group)).toThrow(fragment);
+  };
+
+  const accepts = (group: ReturnType<typeof groupWith>) => {
+    expect(() => validateRichMenuGroupForPublish(group)).not.toThrow();
+  };
+
+  describe('message', () => {
+    it.each([
+      ['未設定', {}],
+      ['空文字', { text: '' }],
+      ['空白のみ', { text: '   ' }],
+    ])('%s は拒否する', (_label, data) => {
+      rejects(groupWith('message', data), '送信テキストを入力してください');
+    });
+
+    it('300文字を超えたら拒否する', () => {
+      rejects(groupWith('message', { text: 'あ'.repeat(301) }), '300文字以内');
+    });
+
+    it('300文字ちょうどは許可する', () => {
+      accepts(groupWith('message', { text: 'あ'.repeat(300) }));
+    });
+  });
+
+  describe('uri', () => {
+    it.each([
+      ['未設定', {}],
+      ['空文字', { uri: '' }],
+      ['空白のみ', { uri: '   ' }],
+    ])('%s は拒否する', (_label, data) => {
+      rejects(groupWith('uri', data), 'URLを入力してください');
+    });
+
+    it('1000文字を超えたら拒否する', () => {
+      rejects(groupWith('uri', { uri: `https://x.example/${'a'.repeat(1000)}` }), '1000文字以内');
+    });
+
+    it('1000文字ちょうどは許可する', () => {
+      accepts(groupWith('uri', { uri: `https://x.example/${'a'.repeat(981)}` }));
+    });
+  });
+
+  describe('postback', () => {
+    it.each([
+      ['未設定', {}],
+      ['空文字', { data: '' }],
+      ['空白のみ', { data: '   ' }],
+    ])('data が %s なら拒否する', (_label, data) => {
+      rejects(groupWith('postback', data), 'postback dataを入力してください');
+    });
+
+    it('data が300文字を超えたら拒否する', () => {
+      rejects(groupWith('postback', { data: 'a'.repeat(301) }), 'postback dataは300文字以内');
+    });
+
+    it('displayText が300文字を超えたら拒否する', () => {
+      rejects(
+        groupWith('postback', { data: 'ok', displayText: 'あ'.repeat(301) }),
+        'displayTextは300文字以内',
+      );
+    });
+
+    it('displayText は任意なので未設定でも許可する', () => {
+      accepts(groupWith('postback', { data: 'ok' }));
+    });
+  });
+
+  describe('richmenuswitch', () => {
+    it.each([
+      ['どちらも無い', {}],
+      ['alias が無い', { data: 'switch-to-p2' }],
+      ['data が無い', { richMenuAliasId: 'lhx-gid12345-1' }],
+    ])('%s なら拒否する', (_label, data) => {
+      rejects(groupWith('richmenuswitch', data), '遷移先ページを選択してください');
+    });
+
+    it('alias と data が揃っていれば許可する', () => {
+      accepts(
+        groupWith('richmenuswitch', { richMenuAliasId: 'lhx-gid12345-1', data: 'switch-to-p2' }),
+      );
+    });
+  });
+
+  it('どのページのどの領域かをメッセージに含める', () => {
+    const group = groupWith('message', { text: '' }, 'クーポン');
+    expect(() => validateRichMenuGroupForPublish(group))
+      .toThrow('ページ「クーポン」のタップ領域1: 送信テキストを入力してください');
+  });
+});
+
+describe('publishRichMenuGroup', () => {
+  it('入力不備なら LINE API を一度も呼ばない', async () => {
+    const line = makeMockLineClient();
+    const r2 = makeMockR2();
+    await expect(
+      publishRichMenuGroup(
+        {
+          id: 'gid12345-aaaa', size: 'large', chatBarText: 'menu', isDefaultForAll: false,
+          pages: [{
+            id: 'p1', orderIndex: 0, name: '基本メニュー',
+            imageR2Key: 'rich-menus/test/p1.png', imageContentType: 'image/png',
+            lineRichMenuId: null,
+            areas: [{
+              bounds: { x: 0, y: 0, width: 100, height: 100 },
+              actionType: 'message',
+              actionData: { text: '' },
+            }],
+          }],
+        },
+        line,
+        r2,
+      ),
+    ).rejects.toThrowError(RichMenuValidationError);
+    expect(line.calls).toEqual([]);
+  });
+
+  it('空の displayText は LINE へ送らない', async () => {
+    const line = makeMockLineClient();
+    const r2 = makeMockR2();
+    await publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'menu', isDefaultForAll: false,
+        pages: [{
+          id: 'p1', orderIndex: 0, name: 'p1',
+          imageR2Key: 'rich-menus/test/p1.png', imageContentType: 'image/png',
+          lineRichMenuId: null,
+          areas: [{
+            bounds: { x: 0, y: 0, width: 100, height: 100 },
+            actionType: 'postback',
+            actionData: { data: 'go', displayText: '' },
+          }],
+        }],
+      },
+      line,
+      r2,
+    );
+    const payload = (line.createRichMenu as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      areas: { action: Record<string, unknown> }[];
+    };
+    expect(payload.areas[0].action).toEqual({ type: 'postback', data: 'go' });
+    expect(payload.areas[0].action).not.toHaveProperty('displayText');
+  });
+
+  it('displayText が入力されていれば LINE へ送る', async () => {
+    const line = makeMockLineClient();
+    const r2 = makeMockR2();
+    await publishRichMenuGroup(
+      {
+        id: 'gid12345-aaaa', size: 'large', chatBarText: 'menu', isDefaultForAll: false,
+        pages: [{
+          id: 'p1', orderIndex: 0, name: 'p1',
+          imageR2Key: 'rich-menus/test/p1.png', imageContentType: 'image/png',
+          lineRichMenuId: null,
+          areas: [{
+            bounds: { x: 0, y: 0, width: 100, height: 100 },
+            actionType: 'postback',
+            actionData: { data: 'go', displayText: '受付しました' },
+          }],
+        }],
+      },
+      line,
+      r2,
+    );
+    const payload = (line.createRichMenu as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      areas: { action: Record<string, unknown> }[];
+    };
+    expect(payload.areas[0].action).toEqual({
+      type: 'postback',
+      data: 'go',
+      displayText: '受付しました',
+    });
+  });
 
   it('1 page: create → upload → alias upsert → 旧削除', async () => {
     const line = makeMockLineClient();
