@@ -89,7 +89,8 @@
     "082_support_email_inbox.sql",
     "083_support_email_sync_state.sql",
     "084_staff_read_only_access.sql",
-    "085_entry_route_genre.sql"
+    "085_entry_route_genre.sql",
+    "086_entry_route_genres.sql"
   ],
-  "migrationCount": 90
+  "migrationCount": 91
 }

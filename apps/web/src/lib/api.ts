@@ -29,6 +29,7 @@ import type {
   Broadcast,
   BroadcastTargetType,
   EntryRoute,
+  EntryRouteGenre,
   CreateEntryRouteInput,
   EntryRouteFunnel,
   TrafficPool,
@@ -1647,6 +1648,14 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
+  },
+  entryRouteGenres: {
+    list: () => fetchApi<ApiResponse<EntryRouteGenre[]>>('/api/entry-route-genres'),
+    create: (name: string) =>
+      fetchApi<ApiResponse<EntryRouteGenre>>('/api/entry-route-genres', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
   },
   // tracked_links は別管理だが /inflow-links 一覧で「(未登録)」誤表示を防ぐため
   // 同ページから参照する。Worker の applyRefAttribution は entry_routes → tracked_links

@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { ensureEntryRouteGenre } from './entry-route-genres.js';
 export interface EntryRoute {
   id: string;
   ref_code: string;
@@ -80,6 +81,8 @@ export async function createEntryRoute(
 
   const runAccount = input.runAccountFriendAddScenarios !== false ? 1 : 0;
 
+  if (input.genre) await ensureEntryRouteGenre(db, input.genre);
+
   await db
     .prepare(
       `INSERT INTO entry_routes
@@ -136,6 +139,8 @@ export async function updateEntryRoute(
   const now = jstNow();
   const fields: string[] = ['updated_at = ?'];
   const values: unknown[] = [now];
+
+  if (input.genre) await ensureEntryRouteGenre(db, input.genre);
 
   if (input.name !== undefined) { fields.push('name = ?'); values.push(input.name); }
   if (input.genre !== undefined) { fields.push('genre = ?'); values.push(input.genre?.trim() || null); }

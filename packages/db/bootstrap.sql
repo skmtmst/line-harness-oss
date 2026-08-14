@@ -331,6 +331,13 @@ CREATE TABLE engagement_events (
   UNIQUE (program_id, idempotency_key)
 );
 
+CREATE TABLE entry_route_genres (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE entry_routes (
   id          TEXT PRIMARY KEY,
   ref_code    TEXT UNIQUE NOT NULL,
@@ -1478,6 +1485,9 @@ CREATE INDEX idx_engagement_events_actor_user
 
 CREATE INDEX idx_engagement_events_source
   ON engagement_events(source, source_event_id);
+
+CREATE INDEX idx_entry_route_genres_created
+  ON entry_route_genres (created_at ASC);
 
 CREATE INDEX idx_entry_routes_genre
   ON entry_routes (genre, created_at DESC);

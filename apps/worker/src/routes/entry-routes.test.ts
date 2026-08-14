@@ -8,6 +8,8 @@ const mocks = {
   updateEntryRoute: vi.fn(),
   deleteEntryRoute: vi.fn(),
   getEntryRouteFunnel: vi.fn(),
+  getEntryRouteGenres: vi.fn(),
+  createEntryRouteGenre: vi.fn(),
 };
 vi.mock('@line-crm/db', () => mocks);
 
@@ -18,6 +20,14 @@ const env = { DB: {} as D1Database };
 
 function post(body: unknown) {
   return app.fetch(new Request('https://example.com/api/entry-routes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }), env);
+}
+
+function postGenre(body: unknown) {
+  return app.fetch(new Request('https://example.com/api/entry-route-genres', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -60,5 +70,25 @@ describe('POST /api/entry-routes', () => {
     const response = await post({ genre: 'A店', name: 'Instagram', refCode: 'duplicate' });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: 'この ref_code は既に使われています' });
+  });
+});
+
+describe('entry route genre API', () => {
+  it('lists independent genres, including genres with no links', async () => {
+    mocks.getEntryRouteGenres.mockResolvedValue([
+      { id: 'genre-1', name: 'A店', created_at: '2026-08-14', updated_at: '2026-08-14' },
+    ]);
+    const response = await app.fetch(new Request('https://example.com/api/entry-route-genres'), env);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: [{ id: 'genre-1', name: 'A店' }] });
+  });
+
+  it('creates a trimmed genre', async () => {
+    mocks.createEntryRouteGenre.mockResolvedValue({
+      id: 'genre-1', name: 'A店', created_at: '2026-08-14', updated_at: '2026-08-14',
+    });
+    const response = await postGenre({ name: ' A店 ' });
+    expect(response.status).toBe(201);
+    expect(mocks.createEntryRouteGenre).toHaveBeenCalledWith(env.DB, 'A店');
   });
 });

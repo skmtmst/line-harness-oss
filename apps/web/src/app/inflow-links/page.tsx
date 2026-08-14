@@ -1,13 +1,14 @@
 'use client'
 
-import { Fragment, useEffect, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
-import type { EntryRoute, TrafficPool, Scenario, Tag } from '@line-crm/shared'
+import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
+import CreateGenreModal from './_components/create-genre-modal'
 
 interface MessageTemplate {
   id: string
@@ -52,11 +53,28 @@ interface RefDetail {
 }
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
+const UNCATEGORIZED = '__uncategorized__'
 const referralUrl = (refCode: string) => `${WORKER_BASE.replace(/\/$/, '')}/r/${encodeURIComponent(refCode)}`
+
+function FolderIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75A1.75 1.75 0 0 1 5.5 5h4l2 2H18.5a1.75 1.75 0 0 1 1.75 1.75v8.75a1.75 1.75 0 0 1-1.75 1.75h-13a1.75 1.75 0 0 1-1.75-1.75V6.75Z" />
+    </svg>
+  )
+}
 
 export default function InflowLinksPage() {
   const { selectedAccountId } = useAccount()
   const [routes, setRoutes] = useState<EntryRoute[]>([])
+  const [genres, setGenres] = useState<EntryRouteGenre[]>([])
   const [pools, setPools] = useState<TrafficPool[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [templates, setTemplates] = useState<MessageTemplate[]>([])
@@ -75,7 +93,9 @@ export default function InflowLinksPage() {
     EntryRoute | 'new' | { register: string } | null
   >(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [genreFilter, setGenreFilter] = useState('')
+  const [selectedGenre, setSelectedGenre] = useState('')
+  const [search, setSearch] = useState('')
+  const [creatingGenre, setCreatingGenre] = useState(false)
   const [qrRoute, setQrRoute] = useState<{ refCode: string; name: string; genre: string | null } | null>(null)
   // Expanded-row state for showing friends acquired through a given ref.
   // Mirrors the legacy /affiliates page UX — click row → load via
@@ -95,8 +115,14 @@ export default function InflowLinksPage() {
     // ref_code のみ」に絞れる。pool_id NULL のリンクが多い現状ではアカ別の
     // pool 紐付け判定よりも、こちらの実流入ベースの方が運用実態に合う。
     const summaryQuery = selectedAccountId ? `?lineAccountId=${selectedAccountId}` : ''
-    const [r, p, s, t, tagRes, sum, tl] = await Promise.all([
+    const [r, genreRes, p, s, t, tagRes, sum, tl] = await Promise.all([
       api.entryRoutes.list(),
+      // Worker と Pages の反映順に短い時間差があっても、旧 Worker に対して
+      // 画面全体をエラーにしない。ジャンル一覧だけ空として既存リンクを表示する。
+      api.entryRouteGenres.list().catch(() => ({
+        success: false as const,
+        data: [] as EntryRouteGenre[],
+      })),
       api.pools.list(),
       api.scenarios.list(),
       api.messageTemplates.list(),
@@ -108,6 +134,7 @@ export default function InflowLinksPage() {
     ])
     if (r.success) setRoutes(r.data)
     else setError('リファラルリンクの取得に失敗しました')
+    if (genreRes.success) setGenres(genreRes.data)
     if (p.success) setPools(p.data)
     if (s.success) setScenarios(s.data)
     if (t.success) setTemplates(t.data)
@@ -329,14 +356,37 @@ export default function InflowLinksPage() {
       })
     : allRows
 
-  // ジャンルでまとめ、各ジャンル内は最新流入順に並べる。
-  const genreOptions = Array.from(new Set(routes.map((route) => route.genre).filter((genre): genre is string => !!genre))).sort((a, b) => a.localeCompare(b, 'ja'))
-  const genreFilteredRows = genreFilter
-    ? accountFilteredRows.filter((row) => row.genre === genreFilter)
-    : accountFilteredRows
-  const sortedRows = [...genreFilteredRows].sort((a, b) => {
-    const genreOrder = (a.genre ?? '未分類').localeCompare(b.genre ?? '未分類', 'ja')
-    if (genreOrder !== 0) return genreOrder
+  const availableGenres = useMemo(() => {
+    const routeGenreNames = routes
+      .map((route) => route.genre)
+      .filter((genre): genre is string => !!genre)
+    return [
+      ...genres,
+      ...Array.from(new Set(routeGenreNames))
+        .filter((name) => !genres.some((genre) => genre.name === name))
+        .map((name) => ({ id: `legacy-${name}`, name, createdAt: '', updatedAt: '' })),
+    ]
+  }, [genres, routes])
+  const hasUncategorized = accountFilteredRows.some((row) => !row.genre)
+  useEffect(() => {
+    const selectable = [
+      ...availableGenres.map((genre) => genre.name),
+      ...(hasUncategorized ? [UNCATEGORIZED] : []),
+    ]
+    setSelectedGenre((current) => selectable.includes(current) ? current : (selectable[0] ?? ''))
+  }, [availableGenres, hasUncategorized])
+
+  const selectedGenreLabel = selectedGenre === UNCATEGORIZED ? '未分類' : selectedGenre
+  const genreRows = selectedGenre === UNCATEGORIZED
+    ? accountFilteredRows.filter((row) => !row.genre)
+    : accountFilteredRows.filter((row) => row.genre === selectedGenre)
+  const normalizedSearch = search.trim().toLocaleLowerCase('ja')
+  const filteredRows = normalizedSearch
+    ? genreRows.filter((row) =>
+        row.name.toLocaleLowerCase('ja').includes(normalizedSearch)
+        || row.refCode.toLocaleLowerCase('ja').includes(normalizedSearch))
+    : genreRows
+  const sortedRows = [...filteredRows].sort((a, b) => {
     const sa = a.stats?.latestAt ?? ''
     const sb = b.stats?.latestAt ?? ''
     if (!sa && !sb) return 0
@@ -344,6 +394,7 @@ export default function InflowLinksPage() {
     if (!sb) return -1
     return sb.localeCompare(sa)
   })
+  const genreOptions = availableGenres.map((genre) => genre.name)
 
   const formatDate = (iso: string | null) => {
     if (!iso) return '—'
@@ -382,39 +433,99 @@ export default function InflowLinksPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-sm text-gray-500">
-          {sortedRows.length} リンク
-          {genreFilter
-            ? `（ジャンル: ${genreFilter}）`
-            : selectedAccountId && allRows.length !== sortedRows.length
-              ? `（全 ${allRows.length} 件中、選択中アカ）`
-              : ''}
-        </span>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={genreFilter}
-            onChange={(event) => setGenreFilter(event.target.value)}
-            className="rounded border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-700"
-            aria-label="ジャンルで絞り込み"
-          >
-            <option value="">すべてのジャンル</option>
-            {genreOptions.map((genre) => <option key={genre} value={genre}>{genre}</option>)}
-          </select>
-          <button
-            onClick={() => setEditing('new')}
-            className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
-          >
-            + 新規リンク
-          </button>
-        </div>
-      </div>
-
       {error && (
         <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm mb-4">
           {error}
         </div>
       )}
+
+      <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <aside>
+          <button
+            onClick={() => setCreatingGenre(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
+          >
+            <span className="text-xl leading-none">＋</span>
+            新しいジャンル
+          </button>
+          <div className="mt-3 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-100 px-4 py-3">
+              <h2 className="text-sm font-bold text-gray-900">ジャンル</h2>
+              <p className="mt-0.5 text-xs text-gray-400">選ぶと右側のリンクが切り替わります</p>
+            </div>
+            {availableGenres.length === 0 && !hasUncategorized ? (
+              <button
+                onClick={() => setCreatingGenre(true)}
+                className="w-full px-4 py-8 text-center text-sm text-gray-400 hover:bg-gray-50"
+              >
+                最初のジャンルを作成してください
+              </button>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {availableGenres.map((genre) => {
+                  const count = accountFilteredRows.filter((row) => row.genre === genre.name).length
+                  const active = selectedGenre === genre.name
+                  return (
+                    <button
+                      key={genre.id}
+                      onClick={() => setSelectedGenre(genre.name)}
+                      className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${active ? 'bg-emerald-50 text-emerald-800' : 'text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <FolderIcon className={`h-5 w-5 shrink-0 ${active ? 'text-emerald-600' : 'text-gray-400'}`} />
+                        <span className="truncate text-sm font-semibold">{genre.name}</span>
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{count}</span>
+                    </button>
+                  )
+                })}
+                {hasUncategorized && (
+                  <button
+                    onClick={() => setSelectedGenre(UNCATEGORIZED)}
+                    className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition ${selectedGenre === UNCATEGORIZED ? 'bg-amber-50 text-amber-800' : 'text-gray-600 hover:bg-gray-50'}`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <FolderIcon className="h-5 w-5 shrink-0" />
+                      未分類
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                      {accountFilteredRows.filter((row) => !row.genre).length}
+                    </span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <section className="min-w-0">
+          <div className="mb-3 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-medium text-gray-400">選択中のジャンル</p>
+              <h2 className="mt-0.5 text-lg font-bold text-gray-900">{selectedGenreLabel || 'ジャンルを選択してください'}</h2>
+              <p className="text-xs text-gray-500">{genreRows.length} リンク</p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <label className="relative block">
+                <span className="sr-only">リンクを検索</span>
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="名前・refコードで検索"
+                  className="w-full rounded-lg border border-gray-200 py-2 pl-3 pr-9 text-sm sm:w-64"
+                />
+                <span aria-hidden="true" className="absolute right-3 top-2 text-gray-400">⌕</span>
+              </label>
+              <button
+                onClick={() => setEditing('new')}
+                disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                title={selectedGenre === UNCATEGORIZED ? '先に左側でジャンルを選択してください' : undefined}
+              >
+                ＋ このジャンルに新規リンク
+              </button>
+            </div>
+          </div>
 
       {loading ? (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
@@ -422,9 +533,9 @@ export default function InflowLinksPage() {
         </div>
       ) : sortedRows.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          {selectedAccountId
-            ? '選択中のアカウントに紐づくリファラルリンクはありません。'
-            : 'リファラルリンクがありません。「+ 新規リンク」から作成してください。'}
+          {selectedGenre
+            ? `「${selectedGenreLabel}」にはまだリンクがありません。`
+            : '左側の「新しいジャンル」から最初のジャンルを作成してください。'}
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
@@ -631,6 +742,8 @@ export default function InflowLinksPage() {
           </table>
         </div>
       )}
+        </section>
+      </div>
 
       {editing && (
         <EditRouteModal
@@ -644,6 +757,7 @@ export default function InflowLinksPage() {
               ? editing.register
               : undefined
           }
+          initialGenre={editing === 'new' && selectedGenre !== UNCATEGORIZED ? selectedGenre : undefined}
           pools={pools}
           scenarios={scenarios}
           templates={templates}
@@ -654,6 +768,16 @@ export default function InflowLinksPage() {
             setEditing(null)
             load()
             if (created) setQrRoute({ refCode: savedRoute.refCode, name: savedRoute.name, genre: savedRoute.genre })
+          }}
+        />
+      )}
+      {creatingGenre && (
+        <CreateGenreModal
+          onClose={() => setCreatingGenre(false)}
+          onCreated={(genre) => {
+            setGenres((current) => [...current, genre])
+            setSelectedGenre(genre.name)
+            setCreatingGenre(false)
           }}
         />
       )}

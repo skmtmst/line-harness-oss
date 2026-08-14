@@ -458,6 +458,13 @@ export interface EntryRoute {
   updatedAt: string;
 }
 
+export interface EntryRouteGenre {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateEntryRouteInput {
   refCode: string;
   genre?: string | null;
