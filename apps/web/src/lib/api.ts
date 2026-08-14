@@ -1656,6 +1656,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ name }),
       }),
+    update: (id: string, name: string) =>
+      fetchApi<ApiResponse<EntryRouteGenre>>(`/api/entry-route-genres/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      }),
   },
   // tracked_links は別管理だが /inflow-links 一覧で「(未登録)」誤表示を防ぐため
   // 同ページから参照する。Worker の applyRefAttribution は entry_routes → tracked_links

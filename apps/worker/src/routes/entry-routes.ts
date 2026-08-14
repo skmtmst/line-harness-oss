@@ -8,6 +8,7 @@ import {
   getEntryRouteFunnel,
   getEntryRouteGenres,
   createEntryRouteGenre,
+  updateEntryRouteGenre,
 } from '@line-crm/db';
 import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -62,6 +63,26 @@ entryRoutes.post('/api/entry-route-genres', async (c) => {
     return c.json({ success: true, data: serializeGenre(row) }, 201);
   } catch (err) {
     console.error('POST /api/entry-route-genres error:', err);
+    if (String(err).includes('UNIQUE constraint failed: entry_route_genres.name')) {
+      return c.json({ success: false, error: '同じ名前のジャンルが既にあります' }, 409);
+    }
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+entryRoutes.patch('/api/entry-route-genres/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json<{ name?: string }>();
+    const name = body.name?.trim();
+    if (!name || name.length > 80) {
+      return c.json({ success: false, error: 'ジャンル名は1〜80文字で入力してください' }, 400);
+    }
+    const row = await updateEntryRouteGenre(c.env.DB, id, name);
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: serializeGenre(row) });
+  } catch (err) {
+    console.error('PATCH /api/entry-route-genres/:id error:', err);
     if (String(err).includes('UNIQUE constraint failed: entry_route_genres.name')) {
       return c.json({ success: false, error: '同じ名前のジャンルが既にあります' }, 409);
     }

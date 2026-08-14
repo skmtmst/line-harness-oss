@@ -33,6 +33,38 @@ export async function createEntryRouteGenre(
     .first<EntryRouteGenre>())!;
 }
 
+export async function updateEntryRouteGenre(
+  db: D1Database,
+  id: string,
+  name: string,
+): Promise<EntryRouteGenre | null> {
+  const current = await db
+    .prepare('SELECT * FROM entry_route_genres WHERE id = ?')
+    .bind(id)
+    .first<EntryRouteGenre>();
+  if (!current) return null;
+
+  const normalized = name.trim();
+  const now = jstNow();
+  await db.batch([
+    db.prepare(
+      `UPDATE entry_route_genres
+       SET name = ?, updated_at = ?
+       WHERE id = ?`,
+    ).bind(normalized, now, id),
+    db.prepare(
+      `UPDATE entry_routes
+       SET genre = ?, updated_at = ?
+       WHERE genre = ?`,
+    ).bind(normalized, now, current.name),
+  ]);
+
+  return db
+    .prepare('SELECT * FROM entry_route_genres WHERE id = ?')
+    .bind(id)
+    .first<EntryRouteGenre>();
+}
+
 export async function ensureEntryRouteGenre(
   db: D1Database,
   name: string,

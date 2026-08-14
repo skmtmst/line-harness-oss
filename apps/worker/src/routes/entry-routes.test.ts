@@ -10,6 +10,7 @@ const mocks = {
   getEntryRouteFunnel: vi.fn(),
   getEntryRouteGenres: vi.fn(),
   createEntryRouteGenre: vi.fn(),
+  updateEntryRouteGenre: vi.fn(),
 };
 vi.mock('@line-crm/db', () => mocks);
 
@@ -29,6 +30,14 @@ function post(body: unknown) {
 function postGenre(body: unknown) {
   return app.fetch(new Request('https://example.com/api/entry-route-genres', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }), env);
+}
+
+function patchGenre(id: string, body: unknown) {
+  return app.fetch(new Request(`https://example.com/api/entry-route-genres/${id}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }), env);
@@ -90,5 +99,15 @@ describe('entry route genre API', () => {
     const response = await postGenre({ name: ' A店 ' });
     expect(response.status).toBe(201);
     expect(mocks.createEntryRouteGenre).toHaveBeenCalledWith(env.DB, 'A店');
+  });
+
+  it('renames a genre and returns the updated value', async () => {
+    mocks.updateEntryRouteGenre.mockResolvedValue({
+      id: 'genre-1', name: 'A店 SNS', created_at: '2026-08-14', updated_at: '2026-08-14',
+    });
+    const response = await patchGenre('genre-1', { name: ' A店 SNS ' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { id: 'genre-1', name: 'A店 SNS' } });
+    expect(mocks.updateEntryRouteGenre).toHaveBeenCalledWith(env.DB, 'genre-1', 'A店 SNS');
   });
 });
