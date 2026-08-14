@@ -3,6 +3,8 @@ import {
   buildAliasId,
   resolveSwitcherActions,
   publishRichMenuGroup,
+  RichMenuValidationError,
+  validateRichMenuGroupForPublish,
   unpublishRichMenuGroup,
   linkRichMenuBulkChunked,
   type LineRichMenuClient,
@@ -122,6 +124,53 @@ function makeMockR2(): R2Like {
 }
 
 describe('publishRichMenuGroup', () => {
+  it('空の message action は LINE API を呼ぶ前に分かりやすく拒否する', async () => {
+    const line = makeMockLineClient();
+    const r2 = makeMockR2();
+    await expect(
+      publishRichMenuGroup(
+        {
+          id: 'gid12345-aaaa', size: 'large', chatBarText: 'm', isDefaultForAll: false,
+          pages: [{
+            id: 'p1', orderIndex: 0, name: '基本メニュー',
+            imageR2Key: 'a.png', imageContentType: 'image/png',
+            lineRichMenuId: null,
+            areas: [{
+              bounds: { x: 0, y: 0, width: 100, height: 100 },
+              actionType: 'message',
+              actionData: { text: '' },
+            }],
+          }],
+        },
+        line,
+        r2,
+      ),
+    ).rejects.toThrow('ページ「基本メニュー」のタップ領域1: 送信テキストを入力してください');
+    expect(line.calls).toEqual([]);
+  });
+
+  it('アクション必須値を publish 前に検証する', () => {
+    const group = {
+      id: 'gid12345-aaaa',
+      size: 'large' as const,
+      chatBarText: 'm',
+      isDefaultForAll: false,
+      pages: [{
+        id: 'p1', orderIndex: 0, name: 'p1',
+        imageR2Key: 'a.png', imageContentType: 'image/png', lineRichMenuId: null,
+        areas: [{
+          bounds: { x: 0, y: 0, width: 100, height: 100 },
+          actionType: 'uri' as const,
+          actionData: { uri: '   ' },
+        }],
+      }],
+    };
+    expect(() => validateRichMenuGroupForPublish(group))
+      .toThrowError(RichMenuValidationError);
+    expect(() => validateRichMenuGroupForPublish(group))
+      .toThrow('URLを入力してください');
+  });
+
   it('1 page: create → upload → alias upsert → 旧削除', async () => {
     const line = makeMockLineClient();
     const r2 = makeMockR2();

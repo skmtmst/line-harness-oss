@@ -38,6 +38,13 @@ export type GroupInput = {
   pages: PageInput[];
 };
 
+export class RichMenuValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RichMenuValidationError';
+  }
+}
+
 export interface LineRichMenuClient {
   createRichMenu(payload: unknown): Promise<{ richMenuId: string }>;
   uploadRichMenuImage(richMenuId: string, image: Uint8Array, contentType: string): Promise<void>;
@@ -92,6 +99,67 @@ export function resolveSwitcherActions(pages: PageInput[], groupId: string): Pag
   }));
 }
 
+function requiredString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * LINE API を呼ぶ前に、アクションの必須値を検証する。
+ *
+ * エディタのテンプレート領域は空の message action で作られるため、未設定のまま
+ * publish すると LINE API が 400 を返す。外部 API を呼ぶ前に、管理画面で修正可能な
+ * 日本語メッセージとして返す。
+ */
+export function validateRichMenuGroupForPublish(group: GroupInput): void {
+  for (const page of group.pages) {
+    for (let i = 0; i < page.areas.length; i++) {
+      const area = page.areas[i];
+      const prefix = `ページ「${page.name}」のタップ領域${i + 1}`;
+
+      if (area.actionType === 'message') {
+        const text = area.actionData.text;
+        if (!requiredString(text)) {
+          throw new RichMenuValidationError(`${prefix}: 送信テキストを入力してください`);
+        }
+        if ([...text].length > 300) {
+          throw new RichMenuValidationError(`${prefix}: 送信テキストは300文字以内にしてください`);
+        }
+      } else if (area.actionType === 'uri') {
+        const uri = area.actionData.uri;
+        if (!requiredString(uri)) {
+          throw new RichMenuValidationError(`${prefix}: URLを入力してください`);
+        }
+        if ([...uri].length > 1000) {
+          throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
+        }
+      } else if (area.actionType === 'postback') {
+        const data = area.actionData.data;
+        if (!requiredString(data)) {
+          throw new RichMenuValidationError(`${prefix}: postback dataを入力してください`);
+        }
+        if ([...data].length > 300) {
+          throw new RichMenuValidationError(`${prefix}: postback dataは300文字以内にしてください`);
+        }
+        const displayText = area.actionData.displayText;
+        if (typeof displayText === 'string' && [...displayText].length > 300) {
+          throw new RichMenuValidationError(`${prefix}: displayTextは300文字以内にしてください`);
+        }
+      } else if (area.actionType === 'richmenuswitch') {
+        if (!requiredString(area.actionData.richMenuAliasId) || !requiredString(area.actionData.data)) {
+          throw new RichMenuValidationError(`${prefix}: 遷移先ページを選択してください`);
+        }
+      }
+    }
+  }
+}
+
+function toLineAction(area: AreaInput): Record<string, unknown> {
+  const action: Record<string, unknown> = { type: area.actionType, ...area.actionData };
+  // displayText は任意項目。エディタの初期値 "" を LINE に送らない。
+  if (action.displayText === '') delete action.displayText;
+  return action;
+}
+
 export type PublishResult = {
   pages: { pageId: string; newRichMenuId: string }[];
 };
@@ -110,6 +178,7 @@ export async function publishRichMenuGroup(
 ): Promise<PublishResult> {
   const resolvedPages = resolveSwitcherActions(group.pages, group.id);
   resolvedPages.sort((a, b) => a.orderIndex - b.orderIndex);
+  validateRichMenuGroupForPublish({ ...group, pages: resolvedPages });
 
   const dimensions = SIZE_DIMENSIONS[group.size];
   const results: { pageId: string; newRichMenuId: string }[] = [];
@@ -127,7 +196,7 @@ export async function publishRichMenuGroup(
       chatBarText: group.chatBarText,
       areas: page.areas.map((a) => ({
         bounds: a.bounds,
-        action: { type: a.actionType, ...a.actionData },
+        action: toLineAction(a),
       })),
     });
     const newRichMenuId = created.richMenuId;

@@ -132,18 +132,38 @@ export function setCsrfToken(token: string | undefined | null): void {
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 /**
- * Non-2xx API responses. message keeps the legacy `API error: <status>` shape
- * (existing catch blocks render e.message), while `status` lets callers
- * branch on the code without parsing the string.
+ * Non-2xx API responses. message prefers the reason the Worker sent, falling
+ * back to the legacy `API error: <status>` shape (existing catch blocks render
+ * e.message), while `status` lets callers branch on the code without parsing
+ * the string.
  */
 export class ApiError extends Error {
   readonly status: number
 
-  constructor(status: number) {
-    super(`API error: ${status}`)
+  constructor(status: number, message?: string) {
+    super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
   }
+}
+
+/**
+ * Pull the human-readable reason out of an error response body.
+ *
+ * Without this every failure reached the operator as `API error: 500`, so a
+ * fixable input mistake looked identical to a server fault. Unparseable bodies
+ * (HTML error pages, proxies) are dropped rather than shown as-is.
+ */
+export function extractApiErrorMessage(raw: string): string {
+  if (!raw) return ''
+  try {
+    const body = JSON.parse(raw) as { error?: unknown; message?: unknown }
+    if (typeof body.error === 'string') return body.error
+    if (typeof body.message === 'string') return body.message
+  } catch {
+    // Not JSON — fall through to the status-only message.
+  }
+  return ''
 }
 
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -164,7 +184,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       ...options?.headers,
     },
   })
-  if (!res.ok) throw new ApiError(res.status)
+  if (!res.ok) throw new ApiError(res.status, extractApiErrorMessage(await res.text()))
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
