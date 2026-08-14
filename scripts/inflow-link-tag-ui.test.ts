@@ -14,15 +14,22 @@ const modal = readFileSync(
 
 describe('inflow link tag auto-assignment UI wiring', () => {
   test('inflow-links page loads tags and shows the assigned auto-tag in the route list', () => {
-    expect(page).toContain("import type { EntryRoute, TrafficPool, Scenario, Tag }");
+    expect(page).toContain("import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag }");
     expect(page).toContain('const [tags, setTags] = useState<Tag[]>([])');
     expect(page).toContain('api.tags.list()');
     expect(page).toContain('if (tagRes.success) setTags(tagRes.data)');
     expect(page).toContain('tagId: r.tagId');
-    expect(page).toContain('自動付与タグ');
     expect(page).toContain('const tag = tags.find((t) => t.id === r.tagId)');
+    expect(page).toContain('title={tag.name}');
     expect(page).toContain('tags={tags}');
     expect(page).toContain('colSpan={11}');
+  });
+
+  test('desktop referral table stays compact without breaking identifiers mid-word', () => {
+    expect(page).toContain('w-full table-fixed text-xs');
+    expect(page).toContain('truncate whitespace-nowrap');
+    expect(page).not.toContain('min-w-[1180px]');
+    expect(page).not.toContain('font-mono text-blue-600 break-all');
   });
 
   test('edit route modal lets operators select a tagId that is sent with create/update payloads', () => {
