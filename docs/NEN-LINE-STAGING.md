@@ -74,9 +74,34 @@
 
 ## 検証環境のデプロイ
 
+検証環境は1組しかないため、共同開発中は**必ずデプロイロックを取得してから**反映します。
+手順とルールは `docs/DEPLOY-GATE.md` を参照してください。
+
 ```bash
 cd line-harness-nen
 
+# 0. PC ごとに違う値を設定（.zshrc などに書いておくと省略できる）
+export LINE_HARNESS_PARENT_REPO="$HOME/path/to/nen-petfood-eccube"
+
+# 1. 使用宣言（ロック取得）
+pnpm deploy:lock acquire staging --note "変更範囲"
+
+# 2. デプロイ（既定は dry-run。実反映は --apply）
+pnpm deploy:staging -- --apply
+
+# 3. 解放して結果を共有（反映コミット / 確認結果 / 未確認事項）
+pnpm deploy:lock release staging
+```
+
+スクリプトは事前確認として、両リポジトリの作業ツリーがクリーンなこと、
+`codex/development` と一致していること、`wrangler.staging.toml` を指していること、
+ロックを自分が保持していることを確認し、1つでも違反があれば中止します。
+本番は基準ブランチが `main` になり、承認者と承認記録URLが追加で必要です。
+
+スクリプトが実行している内容は次のとおりです。手動で流す場合も
+`--config apps/worker/wrangler.staging.toml` の指定を省略しないでください。
+
+```bash
 # Worker / LIFF assets
 pnpm --filter worker build
 ./node_modules/.bin/wrangler deploy \
