@@ -73,6 +73,20 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   dedupPriority: string[] | null;
   failedAccountIds: string[] | null;
   trackLinks: boolean;
+  messageBubbles?: BroadcastBubble[] | null;
+};
+
+export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
+export type BroadcastBubble = { id: string; type: BroadcastBubbleType; content: Record<string, unknown> };
+export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
+export type BroadcastMessageAsset = {
+  id: string;
+  lineAccountId: string | null;
+  kind: BroadcastAssetKind;
+  name: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type BroadcastInsight = {
@@ -576,6 +590,7 @@ export const api = {
       title: string
       messageType: ApiBroadcast['messageType']
       messageContent: string
+      messageBubbles?: BroadcastBubble[]
       targetType: ApiBroadcast['targetType']
       targetTagId?: string | null
       scheduledAt?: string | null
@@ -667,6 +682,28 @@ export const api = {
       }>('/api/broadcasts/dedup-preview', {
         method: 'POST',
         body: JSON.stringify(input),
+      }),
+  },
+
+  broadcastMessageAssets: {
+    list: (params?: { accountId?: string; kind?: BroadcastAssetKind }) => {
+      const query = new URLSearchParams()
+      if (params?.accountId) query.set('lineAccountId', params.accountId)
+      if (params?.kind) query.set('kind', params.kind)
+      const suffix = query.size ? `?${query.toString()}` : ''
+      return fetchApi<ApiResponse<BroadcastMessageAsset[]>>(`/api/broadcast-message-assets${suffix}`)
+    },
+    create: (data: { lineAccountId?: string | null; kind: BroadcastAssetKind; name: string; payload: Record<string, unknown> }) =>
+      fetchApi<ApiResponse<BroadcastMessageAsset>>('/api/broadcast-message-assets', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: { name: string; payload: Record<string, unknown> }) =>
+      fetchApi<ApiResponse<BroadcastMessageAsset>>(`/api/broadcast-message-assets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/broadcast-message-assets/${id}`, { method: 'DELETE' }),
+    upload: (file: File) =>
+      fetchApi<ApiResponse<{ key: string; url: string; mimeType: string; size: number }>>('/api/broadcast-message-assets/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': file.type, 'X-Filename': encodeURIComponent(file.name) },
+        body: file,
       }),
   },
 

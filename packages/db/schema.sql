@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS scenario_steps (
   delay_minutes   INTEGER NOT NULL DEFAULT 0,
   message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
   message_content TEXT NOT NULL,
+  message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
   offset_days     INTEGER,
   offset_minutes  INTEGER,
   delivery_time   TEXT,
@@ -140,6 +141,19 @@ CREATE TABLE IF NOT EXISTS broadcasts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_broadcasts_status ON broadcasts (status);
+
+CREATE TABLE IF NOT EXISTS broadcast_message_assets (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL CHECK (kind IN ('rich_message', 'card_message', 'coupon', 'research')),
+  name            TEXT NOT NULL,
+  payload_json    TEXT NOT NULL CHECK (json_valid(payload_json)),
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_broadcast_message_assets_account_kind
+  ON broadcast_message_assets(line_account_id, kind, updated_at DESC);
 
 -- ============================================================
 --- Account Settings

@@ -214,6 +214,16 @@ CREATE TABLE broadcast_insights (
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE broadcast_message_assets (
+  id              TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
+  kind            TEXT NOT NULL CHECK (kind IN ('rich_message', 'card_message', 'coupon', 'research')),
+  name            TEXT NOT NULL,
+  payload_json    TEXT NOT NULL CHECK (json_valid(payload_json)),
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
+
 CREATE TABLE "broadcasts" (
   id                 TEXT PRIMARY KEY,
   title              TEXT NOT NULL,
@@ -236,7 +246,8 @@ CREATE TABLE "broadcasts" (
   account_ids        TEXT CHECK (account_ids IS NULL OR json_valid(account_ids)),
   dedup_priority     TEXT CHECK (dedup_priority IS NULL OR json_valid(dedup_priority)),
   failed_account_ids TEXT CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids))
-, dedup_progress TEXT, batch_lock_at TEXT, track_links INTEGER NOT NULL DEFAULT 1);
+, dedup_progress TEXT, batch_lock_at TEXT, track_links INTEGER NOT NULL DEFAULT 1, message_bubbles_json TEXT
+  CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)));
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -1054,6 +1065,7 @@ CREATE TABLE scenario_steps (
   delay_minutes   INTEGER NOT NULL DEFAULT 0,
   message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
   message_content TEXT NOT NULL,
+  message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
   offset_days     INTEGER,
   offset_minutes  INTEGER,
   delivery_time   TEXT,
@@ -1449,6 +1461,9 @@ CREATE INDEX idx_bookings_staff_overlap ON bookings (staff_id, status, starts_at
 CREATE INDEX idx_broadcast_insights_broadcast_id ON broadcast_insights(broadcast_id);
 
 CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
+
+CREATE INDEX idx_broadcast_message_assets_account_kind
+  ON broadcast_message_assets(line_account_id, kind, updated_at DESC);
 
 CREATE INDEX idx_broadcasts_status ON broadcasts (status);
 

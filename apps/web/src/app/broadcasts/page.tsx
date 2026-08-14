@@ -8,6 +8,8 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
+import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
+import type { BroadcastAssetKind } from '@/lib/api'
 import CcPromptButton from '@/components/cc-prompt-button'
 
 const ccPrompts = [
@@ -74,6 +76,7 @@ function BroadcastList() {
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
+  const [activeSection, setActiveSection] = useState<'list' | BroadcastAssetKind>('list')
 
   const loadInsight = async (id: string) => {
     try {
@@ -152,7 +155,7 @@ function BroadcastList() {
     <div>
       <Header
         title="一斉配信"
-        action={
+        action={activeSection === 'list' ? (
           <button
             onClick={() => setShowCreate(true)}
             className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
@@ -160,8 +163,20 @@ function BroadcastList() {
           >
             + 新規配信
           </button>
-        }
+        ) : undefined}
       />
+
+      <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2" aria-label="一斉配信メニュー">
+        {([
+          ['list', '配信一覧'],
+          ['rich_message', 'リッチメッセージ'],
+          ['card_message', 'カードタイプ'],
+          ['coupon', 'クーポン'],
+          ['research', 'リサーチ'],
+        ] as const).map(([id, label]) => <button key={id} onClick={() => { setActiveSection(id); setShowCreate(false) }} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${activeSection === id ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}
+      </nav>
+
+      {activeSection !== 'list' ? <BroadcastAssetManager kind={activeSection} /> : <>
 
       {/* Error */}
       {error && (
@@ -379,6 +394,7 @@ function BroadcastList() {
       )}
 
       <CcPromptButton prompts={ccPrompts} />
+      </>}
     </div>
   )
 }

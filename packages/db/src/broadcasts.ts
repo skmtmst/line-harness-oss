@@ -8,6 +8,7 @@ export interface Broadcast {
   title: string;
   message_type: BroadcastMessageType;
   message_content: string;
+  message_bubbles_json?: string | null;
   target_type: BroadcastTargetType;
   target_tag_id: string | null;
   status: BroadcastStatus;
@@ -82,6 +83,7 @@ export interface CreateBroadcastInput {
   title: string;
   messageType: BroadcastMessageType;
   messageContent: string;
+  messageBubblesJson?: string | null;
   targetType: BroadcastTargetType;
   targetTagId?: string | null;
   scheduledAt?: string | null;
@@ -104,14 +106,15 @@ export async function createBroadcast(
   await db
     .prepare(
       `INSERT INTO broadcasts
-         (id, title, message_type, message_content, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?)`,
+         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       input.title,
       input.messageType,
       input.messageContent,
+      input.messageBubblesJson ?? null,
       input.targetType,
       input.targetTagId ?? null,
       initialStatus,
