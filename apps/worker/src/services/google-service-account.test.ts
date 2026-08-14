@@ -64,4 +64,25 @@ describe('getGoogleServiceAccountToken', () => {
     await expect(getGoogleServiceAccountToken({})).rejects.toThrow('google_service_account_not_configured');
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  test('Search Console用のread-only scopeを指定できる', async () => {
+    const keys = await crypto.subtle.generateKey(
+      { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+      true,
+      ['sign', 'verify'],
+    ) as CryptoKeyPair;
+    const exported = await crypto.subtle.exportKey('pkcs8', keys.privateKey) as ArrayBuffer;
+    const privateKey = `-----BEGIN PRIVATE KEY-----\n${base64(new Uint8Array(exported))}\n-----END PRIVATE KEY-----`;
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      const assertion = new URLSearchParams(String(init?.body)).get('assertion') ?? '';
+      expect(decodeJwtPart(assertion.split('.')[1])).toMatchObject({
+        scope: 'https://www.googleapis.com/auth/webmasters.readonly',
+      });
+      return Response.json({ access_token: 'search-token', expires_in: 3600 });
+    }));
+    await expect(getGoogleServiceAccountToken({
+      email: 'search@example.iam.gserviceaccount.com',
+      privateKey,
+    }, 'https://www.googleapis.com/auth/webmasters.readonly')).resolves.toBe('search-token');
+  });
 });

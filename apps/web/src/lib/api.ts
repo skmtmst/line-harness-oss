@@ -379,7 +379,43 @@ export type NenFriendOverview = {
   ecEvents: Array<Record<string, unknown>>
 }
 
+export type SearchConsoleMetric = {
+  clicks: number
+  impressions: number
+  ctr: number
+  position: number
+}
+
+export type SearchConsoleMetricRow = SearchConsoleMetric & { key: string }
+
+export type SearchConsolePerformance = {
+  status: 'connected'
+  siteUrl: string
+  startDate: string
+  endDate: string
+  rangeDays: number
+  summary: SearchConsoleMetric
+  previousSummary: SearchConsoleMetric
+  daily: SearchConsoleMetricRow[]
+  queries: SearchConsoleMetricRow[]
+  pages: SearchConsoleMetricRow[]
+  devices: SearchConsoleMetricRow[]
+  fetchedAt: string
+}
+
+export type SearchConsoleSetup = {
+  status: 'not_configured'
+  siteUrl: string | null
+  serviceAccountEmail: string | null
+}
+
 export const api = {
+  searchConsole: {
+    performance: (days: 7 | 28 | 90) =>
+      fetchApi<ApiResponse<SearchConsolePerformance | SearchConsoleSetup>>(
+        `/api/search-console/performance?days=${days}`,
+      ),
+  },
   friends: {
     list: (params?: FriendListParams) => {
       const query: Record<string, string> = {}

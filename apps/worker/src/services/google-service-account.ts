@@ -6,7 +6,7 @@ export interface GoogleServiceAccountCredentials {
   privateKey?: string;
 }
 
-type CachedToken = { accessToken: string; expiresAtMs: number; email: string };
+type CachedToken = { accessToken: string; expiresAtMs: number; email: string; scope: string };
 let cachedToken: CachedToken | null = null;
 
 function base64Url(bytes: Uint8Array): string {
@@ -39,6 +39,7 @@ function pemToArrayBuffer(pem: string): ArrayBuffer {
  */
 export async function getGoogleServiceAccountToken(
   credentials: GoogleServiceAccountCredentials,
+  scopes: string | string[] = CALENDAR_SCOPE,
 ): Promise<string> {
   const email = credentials.email?.trim();
   const privateKey = credentials.privateKey?.trim();
@@ -46,7 +47,8 @@ export async function getGoogleServiceAccountToken(
     throw new Error('google_service_account_not_configured');
   }
 
-  if (cachedToken && cachedToken.email === email && cachedToken.expiresAtMs > Date.now() + 60_000) {
+  const scope = (Array.isArray(scopes) ? scopes : [scopes]).join(' ');
+  if (cachedToken && cachedToken.email === email && cachedToken.scope === scope && cachedToken.expiresAtMs > Date.now() + 60_000) {
     return cachedToken.accessToken;
   }
 
@@ -54,7 +56,7 @@ export async function getGoogleServiceAccountToken(
   const header = encodeJson({ alg: 'RS256', typ: 'JWT' });
   const payload = encodeJson({
     iss: email,
-    scope: CALENDAR_SCOPE,
+    scope,
     aud: TOKEN_URL,
     iat: nowSeconds,
     exp: nowSeconds + 3600,
@@ -92,6 +94,7 @@ export async function getGoogleServiceAccountToken(
     accessToken: data.access_token,
     expiresAtMs: Date.now() + (data.expires_in ?? 3600) * 1000,
     email,
+    scope,
   };
   return data.access_token;
 }
