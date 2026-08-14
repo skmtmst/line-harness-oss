@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Distributed deploy lock backed by a git ref on `origin`.
+ * Distributed deploy lock backed by a git ref on the deploy remote.
  *
  * Why a git ref: the validation stack (Worker `nen-line-stg`, D1, R2, Pages,
  * and the test LINE channel) exists exactly once, so two developers deploying
@@ -9,11 +9,21 @@
  * infrastructure. A ref under `refs/deploy-locks/<env>` gives us that for
  * free: `git push` of a fresh orphan commit into an already-occupied ref is
  * rejected as non-fast-forward by the server, so "who got the lock" is decided
- * atomically by GitHub rather than by a check-then-act race on the client.
+ * atomically by the server rather than by a check-then-act race on the client.
+ *
+ * Release is guarded the same way. Deleting the ref unconditionally would let
+ * a slow release wipe out a lock somebody else acquired in the meantime, so
+ * the delete carries the SHA we read via `--force-with-lease=<ref>:<sha>` and
+ * the server refuses it if the ref has moved.
  *
  * The lock never touches the working tree: the payload is written with git
  * plumbing (hash-object / mktree / commit-tree), so acquiring a lock cannot
  * violate the clean-worktree gate in AGENTS.md.
+ *
+ * The remote is never hard-coded: forks use different remote names (`origin`
+ * here, `fork` on other machines), so it comes from `--remote`, then
+ * `LINE_HARNESS_DEPLOY_REMOTE`, then `origin` — and is verified to exist
+ * before any push. An unverifiable remote is a stop, not a guess.
  *
  * Library API (pure, unit-tested):
  *   lockRef(env)                     → "refs/deploy-locks/<env>"
@@ -23,21 +33,33 @@
  *   evaluateRelease(input)           → { ok: true } | { ok: false; reason }
  *   describeLock(payload, now)       → operator-facing one-liner
  *
+ * Git-backed API (injectable via GitEnv, integration-tested):
+ *   resolveRemote(explicit, gitEnv)  → verified remote name
+ *   readLock(env, gitEnv)            → { payload, sha } | null
+ *   acquireLock(payload, gitEnv)     → AcquireResult
+ *   releaseLock(env, expectedSha, gitEnv) → ReleaseOutcome
+ *
  * CLI:
- *   tsx scripts/deploy/deploy-lock.ts status  <env>
- *   tsx scripts/deploy/deploy-lock.ts acquire <env> [--note "..."]
- *   tsx scripts/deploy/deploy-lock.ts release <env> [--force]
+ *   tsx scripts/deploy/deploy-lock.ts status  <env> [--remote <name>]
+ *   tsx scripts/deploy/deploy-lock.ts acquire <env> [--note "..."] [--remote <name>]
+ *   tsx scripts/deploy/deploy-lock.ts release <env> [--force] [--remote <name>]
  *
  * `<env>` is `staging` or `production`. Exit code 0 = success, 1 = failure.
  */
 
 import { execFileSync } from 'node:child_process';
-import { argv, exit, stderr, stdout } from 'node:process';
+import { argv, env as processEnv, exit, stderr, stdout } from 'node:process';
 import { pathToFileURL } from 'node:url';
 
 export type DeployEnv = 'staging' | 'production';
 
 export const DEPLOY_ENVS: readonly DeployEnv[] = ['staging', 'production'];
+
+/** Environment variable consulted when `--remote` is not passed. */
+export const REMOTE_ENV_VAR = 'LINE_HARNESS_DEPLOY_REMOTE';
+
+/** Fallback remote name, still verified against `git remote` before use. */
+export const DEFAULT_REMOTE = 'origin';
 
 /**
  * A lock older than this is reported as stale. Staleness is informational
@@ -58,6 +80,14 @@ export interface LockPayload {
   startedAt: string;
   /** Free-form scope note, e.g. "紹介リンク一覧の列幅修正". */
   note: string;
+}
+
+/** Where git commands run, and which remote they talk to. */
+export interface GitEnv {
+  /** Working directory; defaults to the current process directory. */
+  cwd?: string;
+  /** Verified remote name. */
+  remote: string;
 }
 
 export function isDeployEnv(value: string): value is DeployEnv {
@@ -96,12 +126,12 @@ export function parseLockPayload(text: string): LockPayload {
       throw new Error(`ロック情報が壊れています（${key} がありません）`);
     }
   }
-  const env = rec.env as string;
-  if (!isDeployEnv(env)) {
-    throw new Error(`ロック情報が壊れています（未知の環境: ${env}）`);
+  const value = rec.env as string;
+  if (!isDeployEnv(value)) {
+    throw new Error(`ロック情報が壊れています（未知の環境: ${value}）`);
   }
   return {
-    env,
+    env: value,
     holder: rec.holder as string,
     sha: rec.sha as string,
     startedAt: rec.startedAt as string,
@@ -155,7 +185,7 @@ export function describeLock(payload: LockPayload, now: Date): string {
 }
 
 // ---------------------------------------------------------------------------
-// git plumbing (side-effecting; kept out of the pure API above)
+// git plumbing (side-effecting, but injectable through GitEnv)
 // ---------------------------------------------------------------------------
 
 /**
@@ -163,17 +193,21 @@ export function describeLock(payload: LockPayload, now: Date): string {
  * particular) never reaches the operator. A failed lock acquisition should
  * print our explanation of who holds it, not a fast-forward tutorial.
  */
-function git(args: string[], input?: string): string {
+function git(args: string[], gitEnv?: Pick<GitEnv, 'cwd'>, input?: string): string {
   return execFileSync('git', args, {
     encoding: 'utf8',
+    cwd: gitEnv?.cwd,
     input,
     stdio: ['pipe', 'pipe', 'pipe'],
   }).trim();
 }
 
-function gitAllowFail(args: string[]): { ok: boolean; out: string } {
+function gitAllowFail(
+  args: string[],
+  gitEnv?: Pick<GitEnv, 'cwd'>,
+): { ok: boolean; out: string } {
   try {
-    return { ok: true, out: git(args) };
+    return { ok: true, out: git(args, gitEnv) };
   } catch (err) {
     const e = err as { stderr?: Buffer | string; stdout?: Buffer | string };
     const out = `${e.stdout ?? ''}${e.stderr ?? ''}`.toString().trim();
@@ -181,30 +215,47 @@ function gitAllowFail(args: string[]): { ok: boolean; out: string } {
   }
 }
 
-/** Resolve the GitHub login of the current operator via the gh CLI. */
-function currentHolder(): string {
-  try {
-    return execFileSync('gh', ['api', 'user', '--jq', '.login'], {
-      encoding: 'utf8',
-    }).trim();
-  } catch {
+/**
+ * Pick the deploy remote and prove it exists. Guessing a remote name would
+ * mean pushing locks somewhere nobody else reads them, which is worse than
+ * refusing to run.
+ */
+export function resolveRemote(
+  explicit: string | undefined,
+  gitEnv?: Pick<GitEnv, 'cwd'>,
+): string {
+  const candidate = explicit ?? processEnv[REMOTE_ENV_VAR] ?? DEFAULT_REMOTE;
+  const configured = git(['remote'], gitEnv).split('\n').filter(Boolean);
+  if (!configured.includes(candidate)) {
     throw new Error(
-      'GitHub ログインを取得できません。`gh auth login` を済ませてから実行してください。',
+      `デプロイ対象の remote "${candidate}" が見つかりません` +
+        `（設定済み: ${configured.join(', ') || 'なし'}）。` +
+        `--remote または ${REMOTE_ENV_VAR} で指定してください。`,
     );
   }
+  return candidate;
+}
+
+export interface ReadLock {
+  payload: LockPayload;
+  /** SHA of the ref, used as the lease when releasing. */
+  sha: string;
 }
 
 /** Read the remote lock, or null when the ref does not exist. */
-function readRemoteLock(env: DeployEnv): LockPayload | null {
+export function readLock(env: DeployEnv, gitEnv: GitEnv): ReadLock | null {
   const ref = lockRef(env);
-  const ls = git(['ls-remote', 'origin', ref]);
+  const ls = git(['ls-remote', gitEnv.remote, ref], gitEnv);
   if (!ls) return null;
   const sha = ls.split(/\s+/)[0];
   // Fetch the object so we can read the blob without a working-tree checkout.
-  git(['fetch', '--quiet', 'origin', `+${ref}:${ref}`]);
-  const text = git(['show', `${sha}:lock.json`]);
-  return parseLockPayload(text);
+  git(['fetch', '--quiet', gitEnv.remote, `+${ref}:${ref}`], gitEnv);
+  return { payload: parseLockPayload(git(['show', `${sha}:lock.json`], gitEnv)), sha };
 }
+
+export type AcquireResult =
+  | { ok: true }
+  | { ok: false; existing: ReadLock | null; detail: string };
 
 /**
  * Build an orphan commit holding the payload and push it into the lock ref.
@@ -212,25 +263,78 @@ function readRemoteLock(env: DeployEnv): LockPayload | null {
  * server rejects the push when the ref is already taken — that rejection is
  * the mutual exclusion.
  */
-function pushLock(payload: LockPayload): { ok: boolean; out: string } {
-  const blob = git(['hash-object', '-w', '--stdin'], formatLockPayload(payload));
-  const tree = git(['mktree'], `100644 blob ${blob}\tlock.json\n`);
-  const commit = git([
-    'commit-tree',
-    tree,
-    '-m',
-    `deploy-lock(${payload.env}): ${payload.holder} ${payload.sha}`,
-  ]);
-  return gitAllowFail([
-    'push',
-    '--quiet',
-    'origin',
-    `${commit}:${lockRef(payload.env)}`,
-  ]);
+export function acquireLock(payload: LockPayload, gitEnv: GitEnv): AcquireResult {
+  const blob = git(['hash-object', '-w', '--stdin'], gitEnv, formatLockPayload(payload));
+  const tree = git(['mktree'], gitEnv, `100644 blob ${blob}\tlock.json\n`);
+  const commit = git(
+    [
+      'commit-tree',
+      tree,
+      '-m',
+      `deploy-lock(${payload.env}): ${payload.holder} ${payload.sha}`,
+    ],
+    gitEnv,
+  );
+  const pushed = gitAllowFail(
+    ['push', '--quiet', gitEnv.remote, `${commit}:${lockRef(payload.env)}`],
+    gitEnv,
+  );
+  if (pushed.ok) return { ok: true };
+  return { ok: false, existing: readLock(payload.env, gitEnv), detail: pushed.out };
 }
 
-function deleteLock(env: DeployEnv): { ok: boolean; out: string } {
-  return gitAllowFail(['push', '--quiet', 'origin', `:${lockRef(env)}`]);
+export type ReleaseOutcome =
+  | { ok: true }
+  | { ok: false; reason: 'lease-stale'; detail: string }
+  | { ok: false; reason: 'push-failed'; detail: string };
+
+/**
+ * Delete the lock ref only if it still points at `expectedSha`.
+ *
+ * Without the lease this is a read-then-delete race: A reads the lock, B
+ * acquires it a moment later (after A's own lock expired from A's point of
+ * view, or after a forced release), and A's delete removes B's lock while B
+ * is mid-deploy. `--force-with-lease=<ref>:<sha>` pushes the expected value
+ * to the server and lets the server reject the delete instead.
+ */
+export function releaseLock(
+  env: DeployEnv,
+  expectedSha: string,
+  gitEnv: GitEnv,
+): ReleaseOutcome {
+  const ref = lockRef(env);
+  const result = gitAllowFail(
+    [
+      'push',
+      '--quiet',
+      `--force-with-lease=${ref}:${expectedSha}`,
+      gitEnv.remote,
+      `:${ref}`,
+    ],
+    gitEnv,
+  );
+  if (result.ok) return { ok: true };
+  // git reports a failed lease as "stale info"; anything else is a real error.
+  const stale = /stale info|force-with-lease/i.test(result.out);
+  return {
+    ok: false,
+    reason: stale ? 'lease-stale' : 'push-failed',
+    detail: result.out,
+  };
+}
+
+/** Resolve the GitHub login of the current operator via the gh CLI. */
+function currentHolder(): string {
+  try {
+    return execFileSync('gh', ['api', 'user', '--jq', '.login'], {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    throw new Error(
+      'GitHub ログインを取得できません。`gh auth login` を済ませてから実行してください。',
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -241,9 +345,11 @@ function usage(): never {
   stderr.write(
     [
       '使い方:',
-      '  tsx scripts/deploy/deploy-lock.ts status  <staging|production>',
-      '  tsx scripts/deploy/deploy-lock.ts acquire <staging|production> [--note "変更範囲"]',
-      '  tsx scripts/deploy/deploy-lock.ts release <staging|production> [--force]',
+      '  tsx scripts/deploy/deploy-lock.ts status  <staging|production> [--remote <name>]',
+      '  tsx scripts/deploy/deploy-lock.ts acquire <staging|production> [--note "変更範囲"] [--remote <name>]',
+      '  tsx scripts/deploy/deploy-lock.ts release <staging|production> [--force] [--remote <name>]',
+      '',
+      `remote は --remote / ${REMOTE_ENV_VAR} / ${DEFAULT_REMOTE} の順で解決し、実在を確認します。`,
       '',
     ].join('\n'),
   );
@@ -262,38 +368,36 @@ function main(): void {
   if (!command || !envArg || !isDeployEnv(envArg)) usage();
   const env = envArg;
   const now = new Date();
+  const gitEnv: GitEnv = { remote: resolveRemote(readFlag(args, '--remote')) };
 
   if (command === 'status') {
-    const lock = readRemoteLock(env);
-    if (!lock) {
-      stdout.write(`${env} は空いています。\n`);
+    const current = readLock(env, gitEnv);
+    if (!current) {
+      stdout.write(`${env} は空いています（remote: ${gitEnv.remote}）。\n`);
       return;
     }
-    stdout.write(`${describeLock(lock, now)}\n`);
+    stdout.write(`${describeLock(current.payload, now)}\n  ロックref SHA: ${current.sha}\n`);
     exit(1);
   }
 
   if (command === 'acquire') {
     const holder = currentHolder();
-    const sha = git(['rev-parse', 'HEAD']);
-    const note = readFlag(args, '--note') ?? '(変更範囲の記載なし)';
     const payload: LockPayload = {
       env,
       holder,
-      sha,
+      sha: git(['rev-parse', 'HEAD']),
       startedAt: now.toISOString(),
-      note,
+      note: readFlag(args, '--note') ?? '(変更範囲の記載なし)',
     };
-    const pushed = pushLock(payload);
-    if (!pushed.ok) {
-      const existing = readRemoteLock(env);
+    const result = acquireLock(payload, gitEnv);
+    if (!result.ok) {
       stderr.write(`${env} のロックを取得できませんでした。\n`);
-      if (existing) stderr.write(`${describeLock(existing, now)}\n`);
-      else stderr.write(`${pushed.out}\n`);
+      if (result.existing) stderr.write(`${describeLock(result.existing.payload, now)}\n`);
+      else stderr.write(`${result.detail}\n`);
       exit(1);
     }
     stdout.write(
-      `${env} のロックを取得しました（${holder} / ${sha.slice(0, 7)} / ${note}）。\n` +
+      `${env} のロックを取得しました（${holder} / ${payload.sha.slice(0, 7)} / ${payload.note}）。\n` +
         '終了後は必ず release してください。\n',
     );
     return;
@@ -301,23 +405,31 @@ function main(): void {
 
   if (command === 'release') {
     const holder = currentHolder();
-    const lock = readRemoteLock(env);
-    if (!lock) {
+    const current = readLock(env, gitEnv);
+    if (!current) {
       stdout.write(`${env} は既に空いています。\n`);
       return;
     }
     const verdict = evaluateRelease({
-      lock,
+      lock: current.payload,
       holder,
       force: args.includes('--force'),
     });
     if (!verdict.ok) {
-      stderr.write(`${verdict.reason}\n${describeLock(lock, now)}\n`);
+      stderr.write(`${verdict.reason}\n${describeLock(current.payload, now)}\n`);
       exit(1);
     }
-    const deleted = deleteLock(env);
-    if (!deleted.ok) {
-      stderr.write(`ロックを解放できませんでした。\n${deleted.out}\n`);
+    const outcome = releaseLock(env, current.sha, gitEnv);
+    if (!outcome.ok) {
+      if (outcome.reason === 'lease-stale') {
+        stderr.write(
+          `${env} のロックは、確認した時点から別の内容に変わっています。\n` +
+            '別の担当者が取得し直した可能性があるため、削除しませんでした。\n' +
+            'status で現在の保持者を確認してください。\n',
+        );
+      } else {
+        stderr.write(`ロックを解放できませんでした。\n${outcome.detail}\n`);
+      }
       exit(1);
     }
     stdout.write(`${env} のロックを解放しました。\n`);
@@ -327,7 +439,7 @@ function main(): void {
   usage();
 }
 
-// Only run the CLI when executed directly, so tests can import the pure API.
+// Only run the CLI when executed directly, so tests can import the API.
 // pathToFileURL (not string interpolation) because the checkout path contains
 // spaces, which import.meta.url percent-encodes and a raw path does not.
 if (argv[1] && import.meta.url === pathToFileURL(argv[1]).href) {
