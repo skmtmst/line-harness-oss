@@ -1327,6 +1327,8 @@ export const api = {
         activeUntil: string | null;
         cooldownMinutes: number | null;
         skipWhenOperatorActive: boolean;
+        priority: number;
+        messageKinds: string[] | null;
         createdAt: string;
         effectiveAccounts?: Array<{
           accountId: string;
@@ -1366,6 +1368,10 @@ export const api = {
       cooldownMinutes?: number | null;
       /** 担当者が対応中のトークでは返さない */
       skipWhenOperatorActive?: boolean;
+      /** 評価順。小さいほど先に見る */
+      priority?: number;
+      /** 対象にするメッセージ種別。null で全部 */
+      messageKinds?: string[] | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -1383,6 +1389,8 @@ export const api = {
       activeUntil?: string | null;
       cooldownMinutes?: number | null;
       skipWhenOperatorActive?: boolean;
+      priority?: number;
+      messageKinds?: string[] | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',

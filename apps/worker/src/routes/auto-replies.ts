@@ -12,6 +12,27 @@ import { requireRole } from '../middleware/role-guard.js';
 
 const autoReplies = new Hono<Env>();
 
+/** LINE から届くメッセージの種別。ここに無いものは対象にできない。 */
+const MESSAGE_KINDS = ['text', 'image', 'video', 'audio', 'file', 'location', 'sticker', 'postback'];
+
+function readPriority(raw: unknown): { ok: true; value: number } | { ok: false } {
+  const n = Number(raw);
+  // 上下に余裕を持たせる。間に挿し込めないと、並べ替えのたびに
+  // 全件を振り直すことになる。
+  if (!Number.isInteger(n) || n < -9999 || n > 9999) return { ok: false };
+  return { ok: true, value: n };
+}
+
+function readMessageKinds(raw: unknown): { ok: true; value: string[] | null } | { ok: false } {
+  if (raw === null || raw === undefined || (Array.isArray(raw) && raw.length === 0)) {
+    return { ok: true, value: null };
+  }
+  if (!Array.isArray(raw)) return { ok: false };
+  if (raw.some((v) => typeof v !== 'string' || !MESSAGE_KINDS.includes(v))) return { ok: false };
+  return { ok: true, value: raw as string[] };
+}
+
+
 /** "HH:MM"（24時間表記）かどうか。空文字と null は「指定なし」。 */
 function parseHhmm(value: unknown): { ok: true; value: string | null } | { ok: false } {
   if (value === null || value === undefined || value === '') return { ok: true, value: null };
@@ -47,6 +68,8 @@ interface SerializedAutoReply {
   activeUntil: string | null;
   cooldownMinutes: number | null;
   skipWhenOperatorActive: boolean;
+  priority: number;
+  messageKinds: string[] | null;
   createdAt: string;
   effectiveAccounts?: EffectiveAccount[];
 }
@@ -65,6 +88,10 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     activeUntil: row.active_until,
     cooldownMinutes: row.cooldown_minutes,
     skipWhenOperatorActive: Boolean(row.skip_when_operator_active),
+    priority: Number(row.priority ?? 0),
+    messageKinds: row.message_kinds_json
+      ? (JSON.parse(row.message_kinds_json) as string[])
+      : null,
     createdAt: row.created_at,
   };
 }
@@ -185,6 +212,8 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       activeUntil?: unknown;
       cooldownMinutes?: unknown;
       skipWhenOperatorActive?: unknown;
+      priority?: unknown;
+      messageKinds?: unknown;
     }>();
 
     if (!body.keyword) {
@@ -205,6 +234,17 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     if (!cooldown.ok) {
       return c.json(
         { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
+        400,
+      );
+    }
+    const priority = body.priority === undefined ? { ok: true as const, value: 0 } : readPriority(body.priority);
+    if (!priority.ok) {
+      return c.json({ success: false, error: 'priority must be an integer between -9999 and 9999' }, 400);
+    }
+    const messageKinds = readMessageKinds(body.messageKinds);
+    if (!messageKinds.ok) {
+      return c.json(
+        { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` },
         400,
       );
     }
@@ -234,6 +274,8 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       activeUntil: activeUntil.value,
       cooldownMinutes: cooldown.value,
       skipWhenOperatorActive: body.skipWhenOperatorActive === true,
+      priority: priority.value,
+      messageKinds: messageKinds.value,
     });
 
     return c.json({ success: true, data: serializeAutoReply(item) }, 201);
@@ -259,6 +301,8 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
       activeUntil?: unknown;
       cooldownMinutes?: unknown;
       skipWhenOperatorActive?: unknown;
+      priority?: unknown;
+      messageKinds?: unknown;
     }>();
 
     const input: Record<string, unknown> = {};
@@ -291,6 +335,23 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     }
     if ('skipWhenOperatorActive' in body) {
       input.skipWhenOperatorActive = body.skipWhenOperatorActive === true;
+    }
+    if ('priority' in body) {
+      const parsed = readPriority(body.priority);
+      if (!parsed.ok) {
+        return c.json({ success: false, error: 'priority must be an integer between -9999 and 9999' }, 400);
+      }
+      input.priority = parsed.value;
+    }
+    if ('messageKinds' in body) {
+      const parsed = readMessageKinds(body.messageKinds);
+      if (!parsed.ok) {
+        return c.json(
+          { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` },
+          400,
+        );
+      }
+      input.messageKinds = parsed.value;
     }
 
     // templateId が新たに set されて responseContent が来てない場合は template の

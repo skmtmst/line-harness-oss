@@ -19,6 +19,15 @@ export interface AutoReply {
   cooldown_minutes: number | null;
   /** 担当者が対応中のトークでは返さない（1）か、返す（0）か */
   skip_when_operator_active: number;
+  /** 評価順。小さいほど先に見る。同じ値なら created_at 順 */
+  priority: number;
+  /** 対象にするメッセージ種別のJSON配列。NULL なら全部 */
+  message_kinds_json: string | null;
+  /** 友だちの条件（saved_searches と同じ形）。NULL なら絞らない */
+  friend_conditions_json: string | null;
+  /** 所属フォルダ */
+  folder_id: string | null;
+  display_order: number;
   created_at: string;
 }
 
@@ -30,13 +39,18 @@ export async function getAutoReplies(
 ): Promise<AutoReply[]> {
   if (lineAccountId) {
     const result = await db
-      .prepare(`SELECT * FROM auto_replies WHERE (line_account_id IS NULL OR line_account_id = ?) ORDER BY created_at DESC`)
+      .prepare(
+        // 上から順に評価して最初に当てはまった1件だけが動く。画面の並び順と
+        // 評価順を一致させるため、一覧もこの順で返す。
+        `SELECT * FROM auto_replies WHERE (line_account_id IS NULL OR line_account_id = ?)
+          ORDER BY priority ASC, created_at ASC`,
+      )
       .bind(lineAccountId)
       .all<AutoReply>();
     return result.results;
   }
   const result = await db
-    .prepare(`SELECT * FROM auto_replies ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM auto_replies ORDER BY priority ASC, created_at ASC`)
     .all<AutoReply>();
   return result.results;
 }
@@ -62,6 +76,8 @@ export interface CreateAutoReplyInput {
   activeUntil?: string | null;
   cooldownMinutes?: number | null;
   skipWhenOperatorActive?: boolean;
+  priority?: number;
+  messageKinds?: string[] | null;
 }
 
 export async function createAutoReply(
@@ -77,8 +93,8 @@ export async function createAutoReply(
          (id, keyword, match_type, response_type, response_content,
           template_id, line_account_id, is_active,
           active_from, active_until, cooldown_minutes, skip_when_operator_active,
-          created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+          priority, message_kinds_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -92,6 +108,10 @@ export async function createAutoReply(
       input.activeUntil ?? null,
       input.cooldownMinutes ?? null,
       input.skipWhenOperatorActive ? 1 : 0,
+      input.priority ?? 0,
+      input.messageKinds && input.messageKinds.length > 0
+        ? JSON.stringify(input.messageKinds)
+        : null,
       now,
     )
     .run();
@@ -111,6 +131,8 @@ export interface UpdateAutoReplyInput {
   activeUntil?: string | null;
   cooldownMinutes?: number | null;
   skipWhenOperatorActive?: boolean;
+  priority?: number;
+  messageKinds?: string[] | null;
 }
 
 export async function updateAutoReply(
@@ -137,6 +159,8 @@ export async function updateAutoReply(
            active_until = ?,
            cooldown_minutes = ?,
            skip_when_operator_active = ?,
+           priority = ?,
+           message_kinds_json = ?,
            created_at = ?
        WHERE id = ?`,
     )
@@ -154,6 +178,12 @@ export async function updateAutoReply(
       'skipWhenOperatorActive' in input
         ? (input.skipWhenOperatorActive ? 1 : 0)
         : existing.skip_when_operator_active,
+      'priority' in input ? (input.priority ?? 0) : existing.priority,
+      'messageKinds' in input
+        ? (input.messageKinds && input.messageKinds.length > 0
+            ? JSON.stringify(input.messageKinds)
+            : null)
+        : existing.message_kinds_json,
       existing.created_at,
       id,
     )

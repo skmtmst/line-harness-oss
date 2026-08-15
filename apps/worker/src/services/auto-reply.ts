@@ -26,6 +26,26 @@ export function keywordMatches(
 }
 
 /**
+ * 対象のメッセージ種別か。
+ *
+ * message_kinds_json が無ければ何でも対象。壊れていても対象にする。
+ * 設定が読めないからといって返さない、では自動応答が黙って消える。
+ */
+export function matchesMessageKind(
+  rule: { message_kinds_json?: string | null },
+  kind = 'text',
+): boolean {
+  if (!rule.message_kinds_json) return true;
+  try {
+    const kinds = JSON.parse(rule.message_kinds_json) as unknown;
+    if (!Array.isArray(kinds) || kinds.length === 0) return true;
+    return kinds.includes(kind);
+  } catch {
+    return true;
+  }
+}
+
+/**
  * auto_reply 行の content/type を resolve する。template_id が set なら templates
  * から取得、参照切れや NULL のときは inline response_content/response_type を使う。
  */
@@ -66,15 +86,25 @@ export async function matchAndReply(
   friend: Friend,
   incomingText: string,
   replyToken: string,
-  opts: { lineAccountId?: string | null; workerUrl?: string; logContext?: string } = {},
+  opts: {
+    lineAccountId?: string | null;
+    workerUrl?: string;
+    logContext?: string;
+    /** 受け取ったメッセージの種別。省略時は text として扱う */
+    messageKind?: string;
+  } = {},
 ): Promise<MatchAndReplyResult> {
   const { lineAccountId = null, workerUrl, logContext } = opts;
 
   // グローバルルール (line_account_id IS NULL) + このアカウントのルール。
   // lineAccountId が null のときは `= NULL` が偽になるのでグローバルのみ残る。
+  // 上から順に評価して、最初に当てはまった1件だけを動かす。
+  // 並び順は priority が先で、同じなら作った順。一覧の並びと評価順を
+  // 一致させないと、「上にあるのに動かない」という形で食い違う。
   const autoReplies = await db
     .prepare(
-      `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?) ORDER BY created_at ASC`,
+      `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)
+        ORDER BY priority ASC, created_at ASC`,
     )
     .bind(lineAccountId)
     .all<AutoReply>();
@@ -85,6 +115,7 @@ export async function matchAndReply(
   const now = new Date();
   let rule: AutoReply | undefined;
   for (const candidate of autoReplies.results) {
+    if (!matchesMessageKind(candidate, opts.messageKind)) continue;
     if (!keywordMatches(candidate, incomingText)) continue;
     if (await shouldReply(db, candidate, friend.id, now)) {
       rule = candidate;
