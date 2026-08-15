@@ -14,6 +14,7 @@ import { Hono, type Context } from 'hono';
 import { getLineAccounts } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { enrollByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
 import { getAvailability } from '../services/availability.js';
 import {
@@ -468,6 +469,17 @@ booking.post('/api/liff/booking/requests', async (c) => {
       metadata: { bookingType: 'salon', menuId: body.menu_id, staffId: body.staff_id },
       occurredAt: nowIso,
     }),
+  );
+
+  // 予約をきっかけにするリマインダへ登録する。通知やタグ付与と同じく
+  // 予約成功は左右しない。リマインダが登録できなかったからといって
+  // 予約そのものを失敗させるのは筋が違う。
+  c.executionCtx.waitUntil(
+    enrollByTrigger(c.env.DB, {
+      triggerType: 'booking',
+      friendId,
+      startsAtIso: startsAt.toISOString(),
+    }).catch((err) => console.error('reminder enroll (booking) failed:', err)),
   );
 
   // Fire-and-forget notification — failures must not roll back the booking.
@@ -988,6 +1000,13 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     startsAt,
     now: new Date(),
   });
+  c.executionCtx.waitUntil(
+    enrollByTrigger(c.env.DB, {
+      triggerType: 'booking',
+      friendId: body.friend_id,
+      startsAtIso: startsAt.toISOString(),
+    }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
+  );
   let calendarSync: 'not_configured' | 'synced' | 'failed' = 'not_configured';
   try {
     const synced = await syncConfirmedBookingToGoogle(

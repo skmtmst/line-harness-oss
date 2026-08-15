@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import type { ReminderTriggerType, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
@@ -11,6 +12,10 @@ interface Reminder {
   name: string
   description: string | null
   isActive: boolean
+  triggerType?: ReminderTriggerType
+  triggerOffsetMinutes?: number | null
+  sendAtTime?: string | null
+  targetTagId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -31,6 +36,25 @@ interface ReminderWithSteps extends Reminder {
 interface CreateFormState {
   name: string
   description: string
+  triggerType: ReminderTriggerType
+  sendAtTime: string
+  triggerOffsetMinutes: string
+  targetTagId: string
+}
+
+const EMPTY_CREATE_FORM: CreateFormState = {
+  name: '',
+  description: '',
+  triggerType: 'manual',
+  sendAtTime: '',
+  triggerOffsetMinutes: '',
+  targetTagId: '',
+}
+
+const TRIGGER_LABELS: Record<ReminderTriggerType, string> = {
+  manual: '手動で対象を登録',
+  booking: '予約が入ったとき',
+  event: 'イベントに申し込まれたとき',
 }
 
 interface StepFormState {
@@ -89,7 +113,8 @@ export default function RemindersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState<CreateFormState>({ name: '', description: '' })
+  const [form, setForm] = useState<CreateFormState>(EMPTY_CREATE_FORM)
+  const [tags, setTags] = useState<Tag[]>([])
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
 
@@ -112,7 +137,11 @@ export default function RemindersPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.reminders.list({ accountId: selectedAccountId || undefined })
+      const [res, tagRes] = await Promise.all([
+        api.reminders.list({ accountId: selectedAccountId || undefined }),
+        api.tags.list(),
+      ])
+      if (tagRes.success) setTags(tagRes.data)
       if (res.success) {
         setReminders(res.data)
       } else {
@@ -170,10 +199,18 @@ export default function RemindersPage() {
       const res = await api.reminders.create({
         name: form.name,
         description: form.description || undefined,
+        triggerType: form.triggerType,
+        // 手動のときは起点の設定が効かないので、送らずに空のままにする。
+        sendAtTime: form.triggerType === 'manual' ? null : form.sendAtTime || null,
+        triggerOffsetMinutes:
+          form.triggerType === 'manual' || form.triggerOffsetMinutes === ''
+            ? null
+            : Number(form.triggerOffsetMinutes),
+        targetTagId: form.targetTagId || null,
       })
       if (res.success) {
         setShowCreate(false)
-        setForm({ name: '', description: '' })
+        setForm(EMPTY_CREATE_FORM)
         loadReminders()
       } else {
         setFormError(res.error)
@@ -298,6 +335,85 @@ export default function RemindersPage() {
               />
             </div>
 
+
+            {/* きっかけ。ここを手動以外にすると、予約やイベントから自動で登録される。 */}
+            <div className="border-hairline space-y-3 rounded-lg border p-3">
+              <div>
+                <label htmlFor="rm-trigger" className="text-ink-secondary mb-1 block text-xs font-medium">
+                  いつ対象に加えるか
+                </label>
+                <select
+                  id="rm-trigger"
+                  value={form.triggerType}
+                  onChange={(e) =>
+                    setForm({ ...form, triggerType: e.target.value as ReminderTriggerType })
+                  }
+                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                >
+                  {(Object.keys(TRIGGER_LABELS) as ReminderTriggerType[]).map((k) => (
+                    <option key={k} value={k}>
+                      {TRIGGER_LABELS[k]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {form.triggerType !== 'manual' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="rm-time" className="text-ink-secondary mb-1 block text-xs font-medium">
+                      送る時刻を固定する
+                    </label>
+                    <input
+                      id="rm-time"
+                      type="time"
+                      value={form.sendAtTime}
+                      onChange={(e) => setForm({ ...form, sendAtTime: e.target.value })}
+                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="rm-offset" className="text-ink-secondary mb-1 block text-xs font-medium">
+                      起点をずらす（分）
+                    </label>
+                    <input
+                      id="rm-offset"
+                      type="number"
+                      value={form.triggerOffsetMinutes}
+                      onChange={(e) => setForm({ ...form, triggerOffsetMinutes: e.target.value })}
+                      placeholder="0"
+                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm tabular-nums"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="rm-tag" className="text-ink-secondary mb-1 block text-xs font-medium">
+                  対象を絞るタグ
+                </label>
+                <select
+                  id="rm-tag"
+                  value={form.targetTagId}
+                  onChange={(e) => setForm({ ...form, targetTagId: e.target.value })}
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                >
+                  <option value="">— 絞らない —</option>
+                  {tags.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <p className="text-ink-faint text-xs leading-relaxed">
+                「送る時刻を固定する」を空にすると、予約時刻を起点にステップの時間差だけずらして届きます。
+                10時の予約は前日10時、20時の予約は前日20時、という具合です。
+                時刻を入れると、予約が何時でもその時刻に届きます。
+              </p>
+            </div>
+
             {formError && <p className="text-xs text-red-600">{formError}</p>}
 
             <div className="flex gap-2">
@@ -358,6 +474,14 @@ export default function RemindersPage() {
                       <h3 className="text-sm font-semibold text-gray-900 truncate">{reminder.name}</h3>
                       {reminder.description && (
                         <p className="text-xs text-gray-500 mt-1 line-clamp-2">{reminder.description}</p>
+                      )}
+                      {/* 自動で動くものだけ印を出す。手動は既定なので、
+                          全件に「手動」と並べると自動のものが埋もれる。 */}
+                      {reminder.triggerType && reminder.triggerType !== 'manual' && (
+                        <span className="bg-accent-soft text-success rounded-pill mt-2 inline-flex items-center px-2 py-0.5 text-[11px] font-medium">
+                          {TRIGGER_LABELS[reminder.triggerType]}
+                          {reminder.sendAtTime && ` ・${reminder.sendAtTime}`}
+                        </span>
                       )}
                     </div>
                     <span
