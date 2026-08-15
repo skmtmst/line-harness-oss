@@ -72,8 +72,7 @@ export default function BookingStaffPage() {
           <button
             onClick={() => setEditing(EMPTY)}
             disabled={!selectedAccountId}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             + 新規スタッフ
           </button>
@@ -81,40 +80,40 @@ export default function BookingStaffPage() {
       />
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
       {!selectedAccountId ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
           サイドバーでアカウントを選択してください
         </div>
       ) : loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
           読み込み中…
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
           まだスタッフがいません。右上の「+ 新規スタッフ」から追加してください。
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">スタッフ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">役職</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">指名なし枠</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">並び順</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">有効</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">操作</th>
+                <tr className="bg-canvas-sunken border-b border-hairline">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">スタッフ</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">役職</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">指名なし枠</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">並び順</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">有効</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {items.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
+                  <tr key={s.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm">
                       <div className="flex items-center gap-3">
                         {s.profile_image_url ? (
@@ -124,19 +123,19 @@ export default function BookingStaffPage() {
                             className="w-9 h-9 rounded-full object-cover"
                           />
                         ) : (
-                          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs">
+                          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-ink-faint text-xs">
                             {s.display_name.slice(0, 1)}
                           </div>
                         )}
                         <div>
                           <div className="font-medium">{s.display_name}</div>
                           {s.name !== s.display_name && (
-                            <div className="text-xs text-gray-400">{s.name}</div>
+                            <div className="text-xs text-ink-faint">{s.name}</div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{s.role ?? '-'}</td>
+                    <td className="px-4 py-3 text-sm text-ink-secondary">{s.role ?? '-'}</td>
                     <td className="px-4 py-3 text-center">
                       {s.is_designation_optional ? (
                         <span className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs">指名なし</span>
@@ -144,12 +143,12 @@ export default function BookingStaffPage() {
                         <span className="text-xs text-gray-300">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-500">{s.sort_order}</td>
+                    <td className="px-4 py-3 text-sm text-right tabular-nums text-ink-faint">{s.sort_order}</td>
                     <td className="px-4 py-3 text-center">
                       {s.is_active ? (
-                        <span className="inline-block px-2 py-0.5 rounded bg-green-100 text-green-800 text-xs">ON</span>
+                        <span className="inline-block px-2 py-0.5 rounded bg-success-bg text-success text-xs">ON</span>
                       ) : (
-                        <span className="inline-block px-2 py-0.5 rounded bg-gray-100 text-gray-500 text-xs">OFF</span>
+                        <span className="inline-block px-2 py-0.5 rounded bg-canvas-sunken text-ink-faint text-xs">OFF</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -206,7 +205,7 @@ function Modal({
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-hairline">
           <h2 className="text-base font-semibold">{form.id ? 'スタッフ編集' : '新規スタッフ'}</h2>
         </div>
         <div className="px-6 py-4 space-y-4">
@@ -279,18 +278,17 @@ function Modal({
           </label>
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
-        <div className="px-6 py-4 border-t border-gray-200 flex gap-2 justify-end">
+        <div className="px-6 py-4 border-t border-hairline flex gap-2 justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg"
+            className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
           >
             キャンセル
           </button>
           <button
             onClick={submit}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
             {saving ? '保存中…' : '保存'}
           </button>
@@ -303,7 +301,7 @@ function Modal({
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-gray-600 mb-1">
+      <span className="block text-xs font-medium text-ink-secondary mb-1">
         {label}
         {required && <span className="text-red-500 ml-0.5">*</span>}
       </span>

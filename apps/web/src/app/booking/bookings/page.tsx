@@ -16,11 +16,11 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
 ]
 
 const statusBadgeColor: Record<string, string> = {
-  requested: 'bg-yellow-100 text-yellow-800',
-  confirmed: 'bg-green-100 text-green-800',
-  rejected: 'bg-gray-100 text-gray-700',
-  expired: 'bg-gray-100 text-gray-600',
-  cancelled: 'bg-gray-100 text-gray-600',
+  requested: 'bg-warning-bg text-warning',
+  confirmed: 'bg-success-bg text-success',
+  rejected: 'bg-canvas-sunken text-ink-secondary',
+  expired: 'bg-canvas-sunken text-ink-secondary',
+  cancelled: 'bg-canvas-sunken text-ink-secondary',
   completed: 'bg-blue-100 text-blue-800',
   no_show: 'bg-red-100 text-red-800',
 }
@@ -196,7 +196,7 @@ export default function BookingsPage() {
       )}
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
@@ -218,36 +218,36 @@ export default function BookingsPage() {
       </div>
 
       {!selectedAccountId ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
           サイドバーでアカウントを選択してください
         </div>
       ) : loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
           読み込み中…
         </div>
       ) : items.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-sm text-gray-500">
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
           該当する予約はありません
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">日時</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">顧客</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">メニュー</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">担当</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">要望</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">料金</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">状態</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">操作</th>
+                <tr className="bg-canvas-sunken border-b border-hairline">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">日時</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">顧客</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">メニュー</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">担当</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">要望</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">料金</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">状態</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {items.map((b) => (
-                  <tr key={b.id} className="hover:bg-gray-50">
+                  <tr key={b.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm whitespace-nowrap">{formatJpDateTime(b.starts_at)}</td>
                     <td className="px-4 py-3 text-sm">
                       <Link
@@ -259,12 +259,12 @@ export default function BookingsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm">{b.menu_name}</td>
                     <td className="px-4 py-3 text-sm">{b.staff_name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate" title={b.customer_note ?? ''}>
+                    <td className="px-4 py-3 text-sm text-ink-secondary max-w-xs truncate" title={b.customer_note ?? ''}>
                       {b.customer_note ?? '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-right tabular-nums">¥{b.price_at_booking.toLocaleString()}</td>
                     <td className="px-4 py-3 text-sm">
-                      <span className={`inline-block px-2 py-0.5 rounded text-xs ${statusBadgeColor[b.status] ?? 'bg-gray-100'}`}>
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}>
                         {statusLabel[b.status] ?? b.status}
                       </span>
                     </td>
@@ -272,7 +272,7 @@ export default function BookingsPage() {
                       <div className="inline-flex items-center gap-1">
                         <button
                           onClick={() => setDetailId(b.id)}
-                          className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
+                          className="px-3 py-1 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-md"
                         >
                           詳細
                         </button>
@@ -300,9 +300,9 @@ export default function BookingsPage() {
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex gap-4 py-2.5 border-b border-gray-100 last:border-b-0">
-      <span className="w-28 shrink-0 text-xs font-medium text-gray-500 pt-0.5">{label}</span>
-      <div className="flex-1 text-sm text-gray-900 break-words">{children}</div>
+    <div className="flex gap-4 py-2.5 border-b border-hairline last:border-b-0">
+      <span className="w-28 shrink-0 text-xs font-medium text-ink-faint pt-0.5">{label}</span>
+      <div className="flex-1 text-sm text-ink break-words">{children}</div>
     </div>
   )
 }
@@ -325,17 +325,17 @@ function BookingDetailPanel({
         className="absolute inset-0 bg-black/30"
       />
       <aside className="relative h-full w-full max-w-md overflow-y-auto bg-white shadow-xl">
-        <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-5 py-4">
+        <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-hairline bg-white px-5 py-4">
           <div className="min-w-0">
-            <p className="text-xs text-gray-500">予約の詳細</p>
-            <h2 className="truncate text-base font-semibold text-gray-900">{b.menu_name}</h2>
+            <p className="text-xs text-ink-faint">予約の詳細</p>
+            <h2 className="truncate text-base font-semibold text-ink">{b.menu_name}</h2>
           </div>
-          <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-gray-100'}`}>
+          <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-canvas-sunken'}`}>
             {statusLabel[b.status] ?? b.status}
           </span>
           <button
             onClick={onClose}
-            className="shrink-0 rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+            className="shrink-0 rounded-md px-2 py-1 text-sm text-ink-faint hover:bg-canvas-sunken"
           >
             閉じる
           </button>
@@ -343,7 +343,7 @@ function BookingDetailPanel({
 
         <div className="px-5 py-4">
           <section className="mb-6">
-            <h3 className="mb-1 text-sm font-semibold text-gray-900">予約内容</h3>
+            <h3 className="mb-1 text-sm font-semibold text-ink">予約内容</h3>
             <DetailRow label="日時">
               {formatJpDateTime(b.starts_at)} 〜 {formatJpTime(b.ends_at)}
             </DetailRow>
@@ -352,12 +352,12 @@ function BookingDetailPanel({
               <span className="tabular-nums">¥{b.price_at_booking.toLocaleString()}</span>
             </DetailRow>
             <DetailRow label="予約番号">
-              <span className="font-mono text-xs text-gray-600">{b.id}</span>
+              <span className="font-mono text-xs text-ink-secondary">{b.id}</span>
             </DetailRow>
           </section>
 
           <section className="mb-6">
-            <h3 className="mb-1 text-sm font-semibold text-gray-900">お客様</h3>
+            <h3 className="mb-1 text-sm font-semibold text-ink">お客様</h3>
             <DetailRow label="お名前">
               <Link href={`/chats?friend=${b.friend_id}`} className="text-blue-600 hover:underline">
                 {b.friend_name ?? '名前未設定'}
@@ -367,28 +367,28 @@ function BookingDetailPanel({
               {b.customer_note ? (
                 <span className="whitespace-pre-wrap">{b.customer_note}</span>
               ) : (
-                <span className="text-gray-400">記入なし</span>
+                <span className="text-ink-faint">記入なし</span>
               )}
             </DetailRow>
           </section>
 
           <section className="mb-6">
-            <h3 className="mb-1 text-sm font-semibold text-gray-900">記録</h3>
+            <h3 className="mb-1 text-sm font-semibold text-ink">記録</h3>
             <DetailRow label="申込日時">{formatJpDateTime(b.requested_at)}</DetailRow>
             <DetailRow label="決定日時">
-              {b.decided_at ? formatJpDateTime(b.decided_at) : <span className="text-gray-400">未決定</span>}
+              {b.decided_at ? formatJpDateTime(b.decided_at) : <span className="text-ink-faint">未決定</span>}
             </DetailRow>
             <DetailRow label="カレンダー">
               {b.external_event_id ? (
                 <span className="text-green-700">Googleカレンダーに登録済み</span>
               ) : (
-                <span className="text-gray-400">未連携</span>
+                <span className="text-ink-faint">未連携</span>
               )}
             </DetailRow>
           </section>
 
-          <div className="border-t border-gray-200 pt-4">
-            <p className="mb-2 text-xs text-gray-500">
+          <div className="border-t border-hairline pt-4">
+            <p className="mb-2 text-xs text-ink-faint">
               承認するとお客様のLINEに確定のお知らせが届きます。
             </p>
             <ActionButtons status={b.status} onAction={onAction} />
@@ -417,7 +417,7 @@ function ActionButtons({
         </button>
         <button
           onClick={() => onAction('reject')}
-          className="px-3 py-1 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-md"
+          className="px-3 py-1 text-xs font-medium text-danger bg-danger-bg hover:bg-red-100 rounded-md"
         >
           拒否
         </button>
@@ -441,12 +441,12 @@ function ActionButtons({
         </button>
         <button
           onClick={() => onAction('cancel')}
-          className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
+          className="px-3 py-1 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-md"
         >
           取消
         </button>
       </div>
     )
   }
-  return <span className="text-xs text-gray-400">-</span>
+  return <span className="text-xs text-ink-faint">-</span>
 }
