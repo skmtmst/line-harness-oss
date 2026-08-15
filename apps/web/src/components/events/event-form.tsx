@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
+import { api, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
 import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
@@ -36,6 +36,9 @@ const DEFAULT_DRAFT: EventDetail = {
   og_title: null,
   og_description: null,
   og_image_url: null,
+  visible_tag_id: null,
+  waitlist_enabled: 0,
+  entry_cutoff_hours_before: null,
 }
 
 export interface EventFormProps {
@@ -66,6 +69,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const [toast, setToast] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
+  const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
 
   async function copyValue(v: string) {
     try {
@@ -85,6 +89,23 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
   const liffUrl = eventId && liffId && workerBase
     ? `${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=event&id=${encodeURIComponent(eventId)}`
     : null
+
+  // 公開対象のプルダウンに出すタグ。新規作成のときも要るので、
+  // イベントの読み込みとは分けて取る。
+  useEffect(() => {
+    let cancelled = false
+    void api.tags
+      .list()
+      .then((res) => {
+        if (!cancelled && res.success) setTags(res.data.map((t) => ({ id: t.id, name: t.name })))
+      })
+      .catch(() => {
+        // タグが取れなくてもフォームは使える。公開対象が「友だち全員」だけになる。
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -165,6 +186,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
         og_title: draft.og_title,
         og_description: draft.og_description,
         og_image_url: draft.og_image_url,
+        visible_tag_id: draft.visible_tag_id ?? null,
+        waitlist_enabled: draft.waitlist_enabled ?? 0,
+        entry_cutoff_hours_before: draft.entry_cutoff_hours_before ?? null,
         target_type: targetType,
         // Worker は account_ids を配列で受け取って内部で JSON.stringify するので、
         // ここでは配列のまま送る (Partial<EventDetail> の union 型を許容)
@@ -406,7 +430,7 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
               setSlots={setSlots}
             />
           )}
-          {tab === 'publish' && <PublishTab draft={draft} update={update} />}
+          {tab === 'publish' && <PublishTab draft={draft} update={update} tags={tags} />}
         </div>
 
         {/* tab footer */}
@@ -1051,9 +1075,11 @@ function jstHHMMToUtcIso(date: string, hhmm: string): string {
 function PublishTab({
   draft,
   update,
+  tags,
 }: {
   draft: EventDetail
   update: <K extends keyof EventDetail>(k: K, v: EventDetail[K]) => void
+  tags: Array<{ id: string; name: string }>
 }) {
   return (
     <div className="space-y-5">
@@ -1072,6 +1098,71 @@ function PublishTab({
           </div>
         </div>
       </label>
+
+      <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
+        <input
+          type="checkbox"
+          checked={draft.waitlist_enabled === 1}
+          onChange={(e) => update('waitlist_enabled', e.target.checked ? 1 : 0)}
+          className="mt-0.5 rounded border-gray-300"
+        />
+        <div>
+          <div className="text-sm font-medium text-gray-900">キャンセル待ちを受ける</div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            ON: 定員に達したあとも申込を受け、待ちとして記録する<br />
+            OFF: 定員に達したら締め切る<br />
+            待ちの人は予約の件数に入りません。空きが出ても自動では繰り上げず、
+            誰を通すかは一覧から運営が決めます。
+          </div>
+        </div>
+      </label>
+
+      <div>
+        <label htmlFor="ev-visible-tag" className="mb-1.5 block text-sm font-medium text-gray-700">
+          公開対象
+        </label>
+        <select
+          id="ev-visible-tag"
+          value={draft.visible_tag_id ?? ''}
+          onChange={(e) => update('visible_tag_id', e.target.value === '' ? null : e.target.value)}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">友だち全員</option>
+          {tags.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name} を持つ人だけ
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          絞ると、タグを持たない人にはイベントが存在しないものとして扱われます。
+          URL を直接開いても表示されません。
+        </p>
+      </div>
+
+      <div>
+        <label htmlFor="ev-entry-cutoff" className="mb-1.5 block text-sm font-medium text-gray-700">
+          申込の締め切り
+        </label>
+        <select
+          id="ev-entry-cutoff"
+          value={draft.entry_cutoff_hours_before ?? 'disabled'}
+          onChange={(e) =>
+            update(
+              'entry_cutoff_hours_before',
+              e.target.value === 'disabled' ? null : Number(e.target.value),
+            )
+          }
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="disabled">開始まで受ける</option>
+          <option value="1">1時間前まで</option>
+          <option value="3">3時間前まで</option>
+          <option value="24">前日まで（24時間前）</option>
+          <option value="48">2日前まで（48時間前）</option>
+          <option value="168">1週間前まで</option>
+        </select>
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1.5">

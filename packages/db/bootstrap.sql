@@ -420,6 +420,21 @@ CREATE TABLE event_slots (
   FOREIGN KEY (event_id) REFERENCES events(id)
 );
 
+CREATE TABLE event_waitlist (
+  id            TEXT PRIMARY KEY,
+  event_id      TEXT NOT NULL,
+  slot_id       TEXT NOT NULL,
+  friend_id     TEXT NOT NULL,
+  -- 予約と同じ識別子。複数アカウントの同一人物が二重に並ばないようにする。
+  identity_key  TEXT NOT NULL,
+  -- waiting: 待っている / invited: 空きを知らせた / converted: 予約になった
+  -- / cancelled: 本人が取り消した
+  status        TEXT NOT NULL DEFAULT 'waiting'
+    CHECK (status IN ('waiting', 'invited', 'converted', 'cancelled')),
+  notified_at   TEXT,
+  created_at    TEXT NOT NULL
+);
+
 CREATE TABLE events (
   id                            TEXT PRIMARY KEY,
   line_account_id               TEXT NOT NULL,
@@ -1535,6 +1550,12 @@ CREATE INDEX idx_event_bookings_identity_status
 CREATE INDEX idx_event_bookings_slot_status ON event_bookings (slot_id, status);
 
 CREATE INDEX idx_event_slots_event_starts ON event_slots (event_id, starts_at);
+
+CREATE INDEX idx_event_waitlist_slot_created
+  ON event_waitlist(slot_id, status, created_at);
+
+CREATE UNIQUE INDEX idx_event_waitlist_slot_identity
+  ON event_waitlist(slot_id, identity_key);
 
 CREATE INDEX idx_events_account_published_sort ON events (line_account_id, is_published, sort_order);
 

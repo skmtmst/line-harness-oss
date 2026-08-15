@@ -109,7 +109,12 @@ function validateEventInput(
       }
     }
   }
-  for (const key of ['cancel_deadline_hours_before', 'reminder_hours_before', 'max_bookings_per_friend'] as const) {
+  for (const key of [
+    'cancel_deadline_hours_before',
+    'reminder_hours_before',
+    'max_bookings_per_friend',
+    'entry_cutoff_hours_before',
+  ] as const) {
     if (has(key) && body[key] != null) {
       const v = body[key];
       if (!Number.isInteger(v) || (v as number) < 0) {
@@ -178,8 +183,9 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
          is_published, sort_order,
          target_type, account_ids, dedup_priority,
          confirmation_message_extra, reminder_message_extra,
-         og_title, og_description, og_image_url
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         og_title, og_description, og_image_url,
+         visible_tag_id, waitlist_enabled, entry_cutoff_hours_before
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -205,6 +211,9 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
       (body.og_title as string | null | undefined) ?? null,
       (body.og_description as string | null | undefined) ?? null,
       (body.og_image_url as string | null | undefined) ?? null,
+      (body.visible_tag_id as string | null | undefined) ?? null,
+      (body.waitlist_enabled as number | undefined) ?? 0,
+      (body.entry_cutoff_hours_before as number | null | undefined) ?? null,
     )
     .run();
   const row = await c.env.DB
@@ -311,6 +320,9 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
     'og_title',
     'og_description',
     'og_image_url',
+    'visible_tag_id',
+    'waitlist_enabled',
+    'entry_cutoff_hours_before',
   ] as const;
   const setClauses: string[] = [];
   const setValues: unknown[] = [];
@@ -530,6 +542,31 @@ events.get('/api/events/admin/events/:id/slots', async (c) => {
     .bind(c.req.param('id'))
     .all();
   return c.json({ items: results ?? [] });
+});
+
+// GET /api/events/admin/events/:id/waitlist — キャンセル待ちの一覧
+//
+// 空きが出たときに誰へ声をかけるかを見るための画面用。並び順は「先に
+// 並んだ人から」。自動では繰り上げない。誰を通すかは運用の判断で、
+// 勝手に確定させると定員や承認の設定と食い違う。
+events.get('/api/events/admin/events/:id/waitlist', async (c) => {
+  const account_id = getAccountId(c);
+  if (!account_id) return bad(c, 'account_id_required', 400);
+  const { results } = await c.env.DB
+    .prepare(
+      `SELECT w.id, w.slot_id, w.friend_id, w.status, w.notified_at, w.created_at,
+              s.starts_at AS slot_starts_at,
+              f.display_name AS friend_name
+         FROM event_waitlist w
+         JOIN event_slots s ON s.id = w.slot_id
+         LEFT JOIN friends f ON f.id = w.friend_id
+        WHERE w.event_id = ? AND w.status IN ('waiting', 'invited')
+        ORDER BY s.starts_at ASC, w.created_at ASC
+        LIMIT 500`,
+    )
+    .bind(c.req.param('id'))
+    .all();
+  return c.json({ waitlist: results });
 });
 
 events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'), async (c) => {
@@ -799,6 +836,22 @@ events.get('/api/liff/events/:id', async (c) => {
     }
   }
 
+  // 公開対象を絞っているイベントは、そのタグを持たない人には無いものとして扱う。
+  // 「あるが見られない」だと、存在すること自体が伝わってしまう。
+  if (row.visible_tag_id) {
+    if (!caller) return bad(c, 'not_found', 404);
+    const me = await c.env.DB
+      .prepare(
+        `SELECT 1 FROM friend_tags ft
+           JOIN friends f ON f.id = ft.friend_id
+          WHERE f.line_user_id = ? AND f.line_account_id = ? AND ft.tag_id = ?
+          LIMIT 1`,
+      )
+      .bind(caller, account_id, row.visible_tag_id as string)
+      .first<{ 1: number }>();
+    if (!me) return bad(c, 'not_found', 404);
+  }
+
   return c.json({ ...row, my_existing_booking: myExistingBooking });
 });
 
@@ -837,6 +890,12 @@ interface EventDbRow {
   max_bookings_per_friend: number | null;
   reminder_day_before_enabled: number;
   reminder_hours_before: number | null;
+  /** 公開対象を絞るタグ。null なら友だち全員 */
+  visible_tag_id: string | null;
+  /** 満席のあとキャンセル待ちを受けるか */
+  waitlist_enabled: number;
+  /** 申込の締め切り（開始の何時間前まで）。null なら開始まで受ける */
+  entry_cutoff_hours_before: number | null;
 }
 
 interface SlotDbRow {
@@ -924,7 +983,8 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   const event = await c.env.DB
     .prepare(
       `SELECT id, name, venue_name, venue_url, requires_approval, max_bookings_per_friend,
-              reminder_day_before_enabled, reminder_hours_before
+              reminder_day_before_enabled, reminder_hours_before,
+              visible_tag_id, waitlist_enabled, entry_cutoff_hours_before
          FROM events
         WHERE id = ? AND deleted_at IS NULL AND is_published = 1 AND (
           (target_type = 'single' AND line_account_id = ?)
@@ -956,6 +1016,24 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   if (!slot || slot.is_active !== 1) return finalize(409, { error: 'slot_inactive' });
   if (new Date(slot.starts_at).getTime() <= Date.now()) return finalize(410, { error: 'slot_started' });
 
+  // 公開対象を絞っているイベントは、そのタグを持つ人だけが申し込める。
+  // 一覧や詳細でも同じ条件で隠すが、URL を直接叩けば素通りするので
+  // 申込のところでも見る。
+  if (event.visible_tag_id) {
+    const tagged = await c.env.DB
+      .prepare(`SELECT 1 FROM friend_tags WHERE friend_id = ? AND tag_id = ? LIMIT 1`)
+      .bind(friend.id, event.visible_tag_id)
+      .first<{ 1: number }>();
+    if (!tagged) return finalize(409, { error: 'event_unpublished' });
+  }
+
+  // 申込の締め切り。開始そのものは上で見ているので、ここは「何時間前まで」。
+  if (event.entry_cutoff_hours_before != null) {
+    const cutoffAt =
+      new Date(slot.starts_at).getTime() - event.entry_cutoff_hours_before * 3600_000;
+    if (Date.now() >= cutoffAt) return finalize(410, { error: 'entry_closed' });
+  }
+
   // Pre-flight friend-limit check は identity_key ベースに統合済 (後段の
   // sameIdentityActive ブロック参照)。friend_id ベースの単一アカウント
   // 内カウントは cross-account 同一人物を捉えられないので使わない。
@@ -972,7 +1050,30 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       )
       .bind(slot.id)
       .first<{ c: number }>();
-    if ((cnt?.c ?? 0) >= slotRow.capacity) return finalize(409, { error: 'slot_full' });
+    if ((cnt?.c ?? 0) >= slotRow.capacity) {
+      if (event.waitlist_enabled !== 1) return finalize(409, { error: 'slot_full' });
+      // キャンセル待ちは event_bookings に入れない。定員を数えている箇所が
+      // 多く、そこへ「待ちは数えない」条件を足して回ると必ずどこかで漏れる。
+      const identityKeyForWait = computeIdentityKey(friend);
+      await c.env.DB
+        .prepare(
+          `INSERT OR IGNORE INTO event_waitlist
+             (id, event_id, slot_id, friend_id, identity_key, status, created_at)
+           VALUES (?, ?, ?, ?, ?, 'waiting', ?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          event.id,
+          slot.id,
+          friend.id,
+          identityKeyForWait,
+          new Date().toISOString(),
+        )
+        .run();
+      // 200 で返す。409 だと画面側は失敗として扱い、「待ちに入りました」を
+      // 出せない。
+      return finalize(200, { waitlisted: true, slot_id: slot.id });
+    }
   }
 
   // identity_key 算出: broadcasts dedup と同じ式 (url_token > uid > solo)。

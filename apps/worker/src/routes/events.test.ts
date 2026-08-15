@@ -110,11 +110,17 @@ function makeEventDb(state: {
   bookings?: BookingRow[];
   accounts?: LineAccount[];
   friends?: FriendRow[];
+  /** [friendId, tagId] の組。公開対象の絞り込みで引かれる */
+  friendTags?: Array<{ friend_id: string; tag_id: string }>;
+  /** キャンセル待ちの行。INSERT がここへ積まれる */
+  waitlist?: Array<Record<string, unknown>>;
 }): D1Database {
   state.slots ??= [];
   state.bookings ??= [];
   state.accounts ??= [];
   state.friends ??= [];
+  state.friendTags ??= [];
+  state.waitlist ??= [];
   const db = {
     prepare(sql: string) {
       let bound: unknown[] = [];
@@ -149,6 +155,25 @@ function makeEventDb(state: {
               channel_access_token: acc.channel_access_token ?? '',
               confirmation_message_extra: (ev as Record<string, unknown>).confirmation_message_extra ?? null,
             } as T;
+          }
+          // SELECT 1 FROM friend_tags WHERE friend_id = ? AND tag_id = ?
+          // FROM friends より前に置く。詳細画面側の JOIN 版も "FROM friends" を
+          // 含むので、後ろに置くと友だちの検索として拾われてしまう。
+          if (sql.includes('friend_tags')) {
+            if (sql.includes('JOIN friends')) {
+              const [lineUserId, account, tagId] = bound as [string, string, string];
+              const f = (state.friends ?? []).find(
+                (x) => x.line_user_id === lineUserId && x.line_account_id === account,
+              );
+              const hit =
+                f && (state.friendTags ?? []).some((t) => t.friend_id === f.id && t.tag_id === tagId);
+              return (hit ? { 1: 1 } : null) as T | null;
+            }
+            const [friendId, tagId] = bound as [string, string];
+            const hit = (state.friendTags ?? []).some(
+              (t) => t.friend_id === friendId && t.tag_id === tagId,
+            );
+            return (hit ? { 1: 1 } : null) as T | null;
           }
           // SELECT id [, user_id] FROM friends WHERE line_user_id = ? AND line_account_id = ?
           if (sql.includes('FROM friends')) {
@@ -588,6 +613,23 @@ function makeEventDb(state: {
           return { results: [] };
         },
         async run() {
+          if (sql.includes('INSERT OR IGNORE INTO event_waitlist')) {
+            const [id, event_id, slot_id, friend_id, identity_key, created_at] = bound as string[];
+            const dup = (state.waitlist ?? []).some(
+              (w) => w.slot_id === slot_id && w.identity_key === identity_key,
+            );
+            if (dup) return { success: true, meta: { changes: 0 } };
+            (state.waitlist ??= []).push({
+              id,
+              event_id,
+              slot_id,
+              friend_id,
+              identity_key,
+              status: 'waiting',
+              created_at,
+            });
+            return { success: true, meta: { changes: 1 } };
+          }
           if (sql.startsWith('UPDATE event_bookings') && sql.includes('internal_note = COALESCE')) {
             // reject reason append
             const [appended, _updated_at, id] = bound as [string, string, string];
@@ -777,7 +819,7 @@ function makeEventDb(state: {
   return db;
 }
 
-function setupApp(state: { events: EventRow[]; slots?: SlotRow[]; bookings?: BookingRow[] }) {
+function setupApp(state: Parameters<typeof makeEventDb>[0]) {
   const app = new Hono<TestEnv>();
   const db = makeEventDb(state);
   app.use('*', async (c, next) => {
@@ -2125,6 +2167,140 @@ function baseEvent(over: Partial<EventRow>): EventRow {
     target_type: 'single',
     account_ids: null,
     dedup_priority: null,
+    // 094。既定はいずれも「これまでと同じ」。
+    visible_tag_id: null,
+    waitlist_enabled: 0,
+    entry_cutoff_hours_before: null,
     ...over,
   };
 }
+
+describe('094 公開対象・申込締切・キャンセル待ち', () => {
+  const account = { id: 'la1', liff_id: 'L1', is_active: 1, channel_access_token: 'tok' };
+  const friend = { id: 'f1', line_account_id: 'la1', line_user_id: 'U1' };
+  const futureSlot = {
+    id: 's1',
+    event_id: 'e1',
+    starts_at: '2099-06-01T10:00:00Z',
+    ends_at: '2099-06-01T12:00:00Z',
+    capacity: 1,
+    is_active: 1,
+    sort_order: 0,
+    deleted_at: null,
+  };
+
+  function book(app: ReturnType<typeof setupApp>) {
+    return app.request('/api/liff/events/e1/bookings?liffId=L1', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'Idempotency-Key': 'k1',
+        Authorization: 'Bearer t',
+      },
+      body: JSON.stringify({ slot_id: 's1' }),
+    });
+  }
+
+  test('公開対象タグを持たない人は申し込めない', async () => {
+    // 一覧や詳細でも隠すが、URL を直接叩けば素通りするので申込でも見る。
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, visible_tag_id: 't1' })],
+      slots: [{ ...futureSlot, capacity: 5 }],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+      friendTags: [],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(409);
+    // 「タグが無い」ではなく「公開されていない」として返す。存在を伝えない。
+    expect((await res.json()) as { error: string }).toEqual({ error: 'event_unpublished' });
+    expect(state.bookings).toHaveLength(0);
+  });
+
+  test('公開対象タグを持つ人は申し込める', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, visible_tag_id: 't1' })],
+      slots: [{ ...futureSlot, capacity: 5 }],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+      friendTags: [{ friend_id: 'f1', tag_id: 't1' }],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(201);
+    expect(state.bookings).toHaveLength(1);
+  });
+
+  test('締め切りを過ぎていれば申し込めない', async () => {
+    const soon = new Date(Date.now() + 30 * 60_000).toISOString(); // 30分後
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, entry_cutoff_hours_before: 1 })],
+      slots: [{ ...futureSlot, starts_at: soon, capacity: 5 }],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(410);
+    expect((await res.json()) as { error: string }).toEqual({ error: 'entry_closed' });
+  });
+
+  test('締め切りより前なら申し込める', async () => {
+    const later = new Date(Date.now() + 5 * 3600_000).toISOString(); // 5時間後
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, entry_cutoff_hours_before: 1 })],
+      slots: [{ ...futureSlot, starts_at: later, capacity: 5 }],
+      bookings: [],
+      accounts: [account],
+      friends: [friend],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(201);
+  });
+
+  test('満席かつキャンセル待ちが無効なら、これまでどおり締め切る', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, waitlist_enabled: 0 })],
+      slots: [futureSlot],
+      bookings: [{ id: 'b0', event_id: 'e1', slot_id: 's1', status: 'confirmed' }],
+      accounts: [account],
+      friends: [friend],
+      waitlist: [],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    expect(res.status).toBe(409);
+    expect((await res.json()) as { error: string }).toEqual({ error: 'slot_full' });
+    expect(state.waitlist).toHaveLength(0);
+  });
+
+  test('満席でキャンセル待ちが有効なら、待ちとして受ける', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', is_published: 1, waitlist_enabled: 1 })],
+      slots: [futureSlot],
+      bookings: [{ id: 'b0', event_id: 'e1', slot_id: 's1', status: 'confirmed' }],
+      accounts: [account],
+      friends: [friend],
+      waitlist: [],
+    };
+    liffAuthMocks.verifyCallerLineUserId.mockResolvedValue('U1');
+    idempotencyMocks.reserveEventIdempotency.mockResolvedValue({ kind: 'inserted' });
+    const res = await book(setupApp(state));
+    // 409 だと画面側は失敗として扱い、「待ちに入りました」を出せない。
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { waitlisted: boolean }).toMatchObject({ waitlisted: true });
+    expect(state.waitlist).toHaveLength(1);
+    // 待ちは予約に入れない。定員の数え方に手を入れずに済ませるため。
+    expect(state.bookings).toHaveLength(1);
+  });
+});
