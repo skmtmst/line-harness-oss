@@ -3,6 +3,23 @@
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
+
+const EMPTY_FORM = {
+  name: '',
+  eventType: '',
+  value: '',
+  measureMethod: 'manual' as 'url_reach' | 'webhook' | 'manual',
+  targetUrl: '',
+  countRepeat: true,
+  attributionDays: '',
+}
+
+/** 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。 */
+function measureLabel(method: ConversionPoint['measureMethod']): string {
+  if (method === 'url_reach') return 'URL到達'
+  if (method === 'webhook') return '外部通知'
+  return '手動'
+}
 import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
 
@@ -38,7 +55,7 @@ export default function ConversionsPage() {
   const [report, setReport] = useState<ConversionReportItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', eventType: '', value: '' })
+  const [form, setForm] = useState(EMPTY_FORM)
 
   const load = async () => {
     setLoading(true)
@@ -58,13 +75,19 @@ export default function ConversionsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name || !form.eventType) return
+    // サーバー側でも弾くが、押してからエラーで戻されるより、押す前に止める。
+    if (form.measureMethod === 'url_reach' && !form.targetUrl.trim()) return
     try {
       await api.conversions.createPoint({
         name: form.name,
         eventType: form.eventType,
         value: form.value ? Number(form.value) : null,
+        measureMethod: form.measureMethod,
+        targetUrl: form.measureMethod === 'url_reach' ? form.targetUrl.trim() : null,
+        countRepeat: form.countRepeat,
+        attributionDays: form.attributionDays ? Number(form.attributionDays) : null,
       })
-      setForm({ name: '', eventType: '', value: '' })
+      setForm(EMPTY_FORM)
       setShowCreate(false)
       load()
     } catch {}
@@ -141,6 +164,84 @@ export default function ConversionsPage() {
               />
             </div>
           </div>
+
+          {/* どうやって数えるか。ここを決めないと、作っただけで1件も増えない。 */}
+          <div className="border-hairline mt-4 space-y-4 rounded-lg border p-4">
+            <p className="text-ink-secondary text-sm font-semibold">数え方</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label htmlFor="cv-method" className="text-ink-secondary mb-1 block text-sm font-medium">
+                  計測方法
+                </label>
+                <select
+                  id="cv-method"
+                  value={form.measureMethod}
+                  onChange={(e) =>
+                    setForm({ ...form, measureMethod: e.target.value as typeof form.measureMethod })
+                  }
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                >
+                  <option value="manual">手動で記録する</option>
+                  <option value="url_reach">URLに到達したら数える</option>
+                  <option value="webhook">外部から通知を受けて数える</option>
+                </select>
+              </div>
+              {form.measureMethod === 'url_reach' && (
+                <div className="sm:col-span-2">
+                  <label htmlFor="cv-url" className="text-ink-secondary mb-1 block text-sm font-medium">
+                    対象URL
+                  </label>
+                  <input
+                    id="cv-url"
+                    type="url"
+                    value={form.targetUrl}
+                    onChange={(e) => setForm({ ...form, targetUrl: e.target.value })}
+                    className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                    placeholder="https://example.com/thanks"
+                    required
+                  />
+                  <p className="text-ink-faint mt-1 text-xs">
+                    前方一致で見ます。<code>?utm_source=...</code> のような文字が後ろに付いても数えます。
+                    計測リンク（/t/…）を踏んだ人だけが対象です。
+                  </p>
+                </div>
+              )}
+              <div>
+                <label htmlFor="cv-days" className="text-ink-secondary mb-1 block text-sm font-medium">
+                  紹介を紐づける期間
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id="cv-days"
+                    type="number"
+                    min={1}
+                    max={365}
+                    value={form.attributionDays}
+                    onChange={(e) => setForm({ ...form, attributionDays: e.target.value })}
+                    className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
+                    placeholder="90"
+                  />
+                  <span className="text-ink-faint text-xs">日</span>
+                </div>
+                <p className="text-ink-faint mt-1 text-xs">空欄なら既定の90日</p>
+              </div>
+            </div>
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={!form.countRepeat}
+                onChange={(e) => setForm({ ...form, countRepeat: !e.target.checked })}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+              <span className="text-ink-secondary text-sm">
+                同じ人は一回だけ数える
+                <span className="text-ink-faint block text-xs">
+                  外すと、同じ人が何度でも数えられます（購入のように毎回数えたいとき）。
+                </span>
+              </span>
+            </label>
+          </div>
+
           <button
             type="submit"
  className="bg-accent text-on-accent transition-colors hover:bg-accent-hover mt-4 px-4 py-2 min-h-[44px] rounded-control text-sm font-medium"
@@ -183,12 +284,13 @@ export default function ConversionsPage() {
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">CVポイントがまだありません</div>
       ) : (
         <div className="bg-canvas rounded-card border border-hairline overflow-x-auto">
-          <table className="w-full min-w-[640px]">
+          <table className="w-full min-w-[880px]">
             <thead className="bg-canvas-sunken border-b border-hairline">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">CV名</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">イベントタイプ</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">金額</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">数え方</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">作成日</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-ink-faint uppercase">操作</th>
               </tr>
@@ -202,6 +304,28 @@ export default function ConversionsPage() {
                   </td>
                   <td className="px-4 py-3 text-sm text-ink-secondary">
                     {point.value !== null ? `¥${point.value.toLocaleString()}` : '-'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap items-center gap-1">
+                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
+                        {measureLabel(point.measureMethod)}
+                      </span>
+                      {point.countRepeat === false && (
+                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
+                          一人一回
+                        </span>
+                      )}
+                      {point.attributionDays != null && (
+                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap tabular-nums">
+                          {point.attributionDays}日
+                        </span>
+                      )}
+                    </div>
+                    {point.targetUrl && (
+                      <p className="text-ink-faint mt-1 max-w-[22rem] truncate text-[11px]" title={point.targetUrl}>
+                        {point.targetUrl}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm text-ink-faint">{new Date(point.createdAt).toLocaleDateString('ja-JP')}</td>
                   <td className="px-4 py-3 text-right">
