@@ -421,3 +421,48 @@ describe('共通情報の日付切り替え', () => {
     expect((await getCommonVarById(db, v.id))?.value).toBe('C');
   });
 });
+
+describe('タグの分類は folders を見る', () => {
+  test('分類を作ると folders(kind=tag) に入る', async () => {
+    const { createTagGroup, getTagGroups } = await import('../src/tags.js');
+    const group = await createTagGroup(db, { name: 'お悩み', sortOrder: 1 });
+    // 形は変えていない。中で見るテーブルだけ差し替えた。
+    expect(group).toMatchObject({ name: 'お悩み', sort_order: 1 });
+    const row = sqlite.prepare(`SELECT kind FROM folders WHERE id = ?`).get(group.id) as {
+      kind: string;
+    };
+    expect(row.kind).toBe('tag');
+    // 移送後は tag_groups へ書かない。
+    const { c } = sqlite.prepare(`SELECT COUNT(*) AS c FROM tag_groups`).get() as { c: number };
+    expect(c).toBe(0);
+    expect(await getTagGroups(db)).toHaveLength(1);
+  });
+
+  test('タグの所属は folder_id に入る', async () => {
+    const { createTagGroup, createTag, assignTagToGroup } = await import('../src/tags.js');
+    const group = await createTagGroup(db, { name: 'お悩み' });
+    const tag = await createTag(db, { name: '腰痛', groupId: group.id });
+    expect(tag.folder_id).toBe(group.id);
+    expect(tag.group_id).toBeNull();
+
+    const moved = await assignTagToGroup(db, tag.id, null);
+    expect(moved?.folder_id).toBeNull();
+  });
+
+  test('分類を消してもタグは残り、未分類に戻る', async () => {
+    const { createTagGroup, createTag, deleteTagGroup } = await import('../src/tags.js');
+    const group = await createTagGroup(db, { name: 'お悩み' });
+    const tag = await createTag(db, { name: '腰痛', groupId: group.id });
+    await deleteTagGroup(db, group.id);
+    const row = sqlite.prepare(`SELECT folder_id FROM tags WHERE id = ?`).get(tag.id) as {
+      folder_id: string | null;
+    };
+    expect(row.folder_id).toBeNull();
+  });
+
+  test('別の種類のフォルダは分類として出てこない', async () => {
+    const { getTagGroups } = await import('../src/tags.js');
+    await createFolder(db, { kind: 'template', name: 'よく使う' });
+    expect(await getTagGroups(db)).toHaveLength(0);
+  });
+});

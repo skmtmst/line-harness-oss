@@ -4,7 +4,13 @@ export interface Tag {
   id: string;
   name: string;
   color: string;
+  /**
+   * @deprecated 099 で folders へ移送済み。folder_id を見ること。
+   * 追加のみポリシーで列を落とせないため残っているだけで、読み書きしない。
+   */
   group_id: string | null;
+  /** 所属する分類。folders(kind='tag') の id */
+  folder_id: string | null;
   mileage_reward: number;
   referral_mileage_reward: number;
   mileage_multiplier_bps: number | null;
@@ -12,6 +18,13 @@ export interface Tag {
   created_at: string;
 }
 
+/**
+ * タグの分類。
+ *
+ * 099 で folders(kind='tag') へ移送した。形は変えずに、中で見るテーブルだけ
+ * 差し替えている（画面とAPIの経路はそのまま）。sort_order は
+ * folders.display_order を写したもの。
+ */
 export interface TagGroup {
   id: string;
   name: string;
@@ -68,7 +81,8 @@ export async function createTag(
 
   await db
     .prepare(
-      `INSERT INTO tags (id, name, color, group_id, created_at)
+      // group_id は書かない。folders が正で、group_id は移送前の名残。
+      `INSERT INTO tags (id, name, color, folder_id, created_at)
        VALUES (?, ?, ?, ?, ?)`,
     )
     .bind(id, input.name, color, input.groupId ?? null, now)
@@ -92,7 +106,7 @@ export async function assignTagToGroup(
   groupId: string | null,
 ): Promise<Tag | null> {
   await db
-    .prepare(`UPDATE tags SET group_id = ? WHERE id = ?`)
+    .prepare(`UPDATE tags SET folder_id = ? WHERE id = ?`)
     .bind(groupId, id)
     .run();
   return (
@@ -112,7 +126,11 @@ export async function deleteTag(db: D1Database, id: string): Promise<void> {
 
 export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
   const result = await db
-    .prepare(`SELECT * FROM tag_groups ORDER BY sort_order ASC, name ASC`)
+    .prepare(
+      `SELECT id, name, display_order AS sort_order, created_at, updated_at
+         FROM folders WHERE kind = 'tag'
+        ORDER BY display_order ASC, name ASC`,
+    )
     .all<TagGroup>();
   return result.results;
 }
@@ -125,13 +143,16 @@ export async function createTagGroup(
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO tag_groups (id, name, sort_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
+       VALUES (?, 'tag', ?, ?, ?, ?)`,
     )
     .bind(id, input.name, input.sortOrder ?? 0, now, now)
     .run();
   return (await db
-    .prepare(`SELECT * FROM tag_groups WHERE id = ?`)
+    .prepare(
+      `SELECT id, name, display_order AS sort_order, created_at, updated_at
+         FROM folders WHERE id = ?`,
+    )
     .bind(id)
     .first<TagGroup>())!;
 }
@@ -148,20 +169,23 @@ export async function updateTagGroup(
     values.push(input.name);
   }
   if (input.sortOrder !== undefined) {
-    sets.push('sort_order = ?');
+    sets.push('display_order = ?');
     values.push(input.sortOrder);
   }
   if (sets.length > 0) {
     sets.push('updated_at = ?');
     values.push(jstNow(), id);
     await db
-      .prepare(`UPDATE tag_groups SET ${sets.join(', ')} WHERE id = ?`)
+      .prepare(`UPDATE folders SET ${sets.join(', ')} WHERE id = ? AND kind = 'tag'`)
       .bind(...values)
       .run();
   }
   return (
     (await db
-      .prepare(`SELECT * FROM tag_groups WHERE id = ?`)
+      .prepare(
+        `SELECT id, name, display_order AS sort_order, created_at, updated_at
+           FROM folders WHERE id = ? AND kind = 'tag'`,
+      )
       .bind(id)
       .first<TagGroup>()) ?? null
   );
@@ -169,13 +193,13 @@ export async function updateTagGroup(
 
 /**
  * 分類を消す。属していたタグは消さず「未分類」に戻る
- * （tags.group_id は ON DELETE SET NULL）。
+ * （tags.folder_id は ON DELETE SET NULL）。
  *
  * 分類は入れ物であって、タグそのものではない。入れ物を捨てたら中身も
  * 捨てる、では友だちに付いたタグまで巻き込まれる。
  */
 export async function deleteTagGroup(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM tag_groups WHERE id = ?`).bind(id).run();
+  await db.prepare(`DELETE FROM folders WHERE id = ? AND kind = 'tag'`).bind(id).run();
 }
 
 export async function addTagToFriend(
