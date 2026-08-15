@@ -35,10 +35,10 @@ const statusConfig: Record<
   ApiBroadcast['status'],
   { label: string; className: string }
 > = {
-  draft: { label: '下書き', className: 'bg-gray-100 text-gray-600' },
+  draft: { label: '下書き', className: 'bg-canvas-sunken text-ink-secondary' },
   scheduled: { label: '予約済み', className: 'bg-blue-100 text-blue-700' },
-  sending: { label: '送信中', className: 'bg-yellow-100 text-yellow-700' },
-  sent: { label: '送信完了', className: 'bg-green-100 text-green-700' },
+  sending: { label: '送信中', className: 'bg-warning-bg text-yellow-700' },
+  sent: { label: '送信完了', className: 'bg-success-bg text-green-700' },
 }
 
 function formatDatetime(iso: string | null): string {
@@ -158,8 +158,7 @@ function BroadcastList() {
         action={activeSection === 'list' ? (
           <button
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
           >
             + 新規配信
           </button>
@@ -180,7 +179,7 @@ function BroadcastList() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
@@ -196,7 +195,7 @@ function BroadcastList() {
 
       {/* Tabs */}
       {!loading && broadcasts.length > 0 && (
-        <div className="mb-4 flex gap-1 border-b border-gray-200">
+        <div className="mb-4 flex gap-1 border-b border-hairline">
           {([
             { id: 'all', label: '全部', count: broadcasts.length },
             { id: 'single', label: '単アカ配信', count: singleCount },
@@ -207,13 +206,13 @@ function BroadcastList() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-green-500 text-gray-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-green-500 text-ink'
+                  : 'border-transparent text-ink-faint hover:text-ink-secondary'
               }`}
               style={activeTab === tab.id ? { borderColor: '#06C755' } : undefined}
             >
               {tab.label}
-              <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0 rounded-full bg-gray-100 text-xs text-gray-600 min-w-[20px]">
+              <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0 rounded-full bg-canvas-sunken text-xs text-ink-secondary min-w-[20px]">
                 {tab.count}
               </span>
             </button>
@@ -223,50 +222,50 @@ function BroadcastList() {
 
       {/* Loading */}
       {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-gray-100 flex items-center gap-4 animate-pulse">
+            <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
               <div className="flex-1 space-y-2">
                 <div className="h-3 bg-gray-200 rounded w-48" />
-                <div className="h-2 bg-gray-100 rounded w-32" />
+                <div className="h-2 bg-canvas-sunken rounded w-32" />
               </div>
-              <div className="h-5 bg-gray-100 rounded-full w-16" />
-              <div className="h-3 bg-gray-100 rounded w-24" />
+              <div className="h-5 bg-canvas-sunken rounded-full w-16" />
+              <div className="h-3 bg-canvas-sunken rounded w-24" />
             </div>
           ))}
         </div>
       ) : broadcasts.length === 0 && !showCreate ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">配信がありません。「新規配信」から作成してください。</p>
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
+          <p className="text-ink-faint">配信がありません。「新規配信」から作成してください。</p>
         </div>
       ) : visibleBroadcasts.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
+          <p className="text-ink-faint">
             {activeTab === 'dedup' ? '複数アカ重複除外配信はまだありません。' : 'このタブに該当する配信はありません。'}
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full min-w-[640px]">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <tr className="bg-canvas-sunken border-b border-hairline">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
                   配信タイトル
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
                   ステータス
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
                   配信対象
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
                   予約日時
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
                   送信完了日時
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
                   実績
                 </th>
                 <th className="px-4 py-3" />
@@ -279,7 +278,7 @@ function BroadcastList() {
                 const isDedup = broadcast.targetType === 'multi-account-dedup'
 
                 return (
-                  <tr key={broadcast.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={broadcast.id} className="hover:bg-canvas-sunken transition-colors">
                     {/* Title */}
                     <td className="px-4 py-3">
                       <div>
@@ -293,7 +292,7 @@ function BroadcastList() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-xs text-ink-faint mt-0.5">
                           {broadcast.messageType === 'text' ? 'テキスト' : broadcast.messageType === 'image' ? '画像' : 'Flex'}
                         </p>
                       </div>
@@ -307,7 +306,7 @@ function BroadcastList() {
                     </td>
 
                     {/* Target */}
-                    <td className="px-4 py-3 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-ink-secondary">
                       {isDedup ? (
                         <span className="text-purple-700">重複除外{tagName ? `: ${tagName}` : ''}</span>
                       ) : broadcast.targetType === 'all' ? (
@@ -320,17 +319,17 @@ function BroadcastList() {
                     </td>
 
                     {/* Scheduled */}
-                    <td className="px-4 py-3 text-sm text-gray-500">
+                    <td className="px-4 py-3 text-sm text-ink-faint">
                       {formatDatetime(broadcast.scheduledAt)}
                     </td>
 
                     {/* Sent */}
-                    <td className="px-4 py-3 text-sm text-gray-500">
+                    <td className="px-4 py-3 text-sm text-ink-faint">
                       {formatDatetime(broadcast.sentAt)}
                     </td>
 
                     {/* Stats & Insight */}
-                    <td className="px-4 py-3 text-sm text-gray-500">
+                    <td className="px-4 py-3 text-sm text-ink-faint">
                       {broadcast.status === 'sent' ? (
                         <div>
                           {broadcast.totalCount > 0 && (
@@ -339,19 +338,19 @@ function BroadcastList() {
                           {insights[broadcast.id] ? (
                             <div className="mt-1 space-y-0.5">
                               {insights[broadcast.id].delivered != null && (
-                                <p className="text-xs">配信: <span className="font-medium text-gray-700">{insights[broadcast.id].delivered!.toLocaleString('ja-JP')}</span></p>
+                                <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insights[broadcast.id].delivered!.toLocaleString('ja-JP')}</span></p>
                               )}
                               {insights[broadcast.id].uniqueImpression != null && (
                                 <p className="text-xs">開封: <span className="font-medium text-blue-600">{insights[broadcast.id].uniqueImpression!.toLocaleString('ja-JP')}</span>
                                   {insights[broadcast.id].openRate != null && (
-                                    <span className="text-gray-400"> ({(insights[broadcast.id].openRate! * 100).toFixed(1)}%)</span>
+                                    <span className="text-ink-faint"> ({(insights[broadcast.id].openRate! * 100).toFixed(1)}%)</span>
                                   )}
                                 </p>
                               )}
                               {insights[broadcast.id].uniqueClick != null && (
                                 <p className="text-xs">クリック: <span className="font-medium text-green-600">{insights[broadcast.id].uniqueClick!.toLocaleString('ja-JP')}</span>
                                   {insights[broadcast.id].clickRate != null && (
-                                    <span className="text-gray-400"> ({(insights[broadcast.id].clickRate! * 100).toFixed(1)}%)</span>
+                                    <span className="text-ink-faint"> ({(insights[broadcast.id].clickRate! * 100).toFixed(1)}%)</span>
                                   )}
                                 </p>
                               )}
@@ -377,7 +376,7 @@ function BroadcastList() {
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
                             onClick={() => handleDelete(broadcast.id)}
-                            className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                            className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
                           >
                             削除
                           </button>
