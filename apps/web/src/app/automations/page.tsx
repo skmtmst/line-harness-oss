@@ -60,10 +60,10 @@ const eventTypeLabelMap: Record<AutomationEventType, string> = {
 }
 
 const eventTypeBadgeColor: Record<AutomationEventType, string> = {
-  friend_add: 'bg-green-100 text-green-700',
+  friend_add: 'bg-success-bg text-green-700',
   tag_change: 'bg-blue-100 text-blue-700',
-  score_threshold: 'bg-yellow-100 text-yellow-700',
-  cv_fire: 'bg-red-100 text-red-700',
+  score_threshold: 'bg-warning-bg text-yellow-700',
+  cv_fire: 'bg-red-100 text-danger',
   message_received: 'bg-purple-100 text-purple-700',
   postback_received: 'bg-pink-100 text-pink-700',
   calendar_booked: 'bg-indigo-100 text-indigo-700',
@@ -256,8 +256,7 @@ export default function AutomationsPage() {
         action={
           <button
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 min-h-[44px] text-sm font-medium"
           >
             + 新規ルール
           </button>
@@ -266,18 +265,18 @@ export default function AutomationsPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
       {/* Create form */}
       {showCreate && (
-        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
           <h2 className="text-sm font-semibold text-gray-800 mb-4">新規オートメーションを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">ルール名 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">ルール名 <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -287,7 +286,7 @@ export default function AutomationsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">説明</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">説明</label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
                 rows={2}
@@ -297,7 +296,7 @@ export default function AutomationsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">イベントタイプ</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">イベントタイプ</label>
               <select
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 value={form.eventType}
@@ -309,7 +308,7 @@ export default function AutomationsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">アクション (JSON)</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">アクション (JSON)</label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                 rows={6}
@@ -319,7 +318,7 @@ export default function AutomationsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">条件 (JSON)</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">条件 (JSON)</label>
               <textarea
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                 rows={3}
@@ -329,7 +328,7 @@ export default function AutomationsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">優先度</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">優先度</label>
               <input
                 type="number"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -344,14 +343,13 @@ export default function AutomationsPage() {
               <button
                 onClick={handleCreate}
                 disabled={saving}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity"
-                style={{ backgroundColor: '#06C755' }}
+                className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 min-h-[44px] text-sm font-medium disabled:opacity-50"
               >
                 {saving ? '作成中...' : '作成'}
               </button>
               <button
                 onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors"
               >
                 キャンセル
               </button>
@@ -364,30 +362,30 @@ export default function AutomationsPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-5 animate-pulse space-y-3">
+            <div key={i} className="bg-canvas rounded-card border border-hairline p-5 animate-pulse space-y-3">
               <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-gray-100 rounded w-full" />
+              <div className="h-3 bg-canvas-sunken rounded w-full" />
               <div className="flex gap-4">
-                <div className="h-3 bg-gray-100 rounded w-24" />
-                <div className="h-3 bg-gray-100 rounded w-16" />
+                <div className="h-3 bg-canvas-sunken rounded w-24" />
+                <div className="h-3 bg-canvas-sunken rounded w-16" />
               </div>
             </div>
           ))}
         </div>
       ) : automations.length === 0 && !showCreate ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">オートメーションがありません。「新規ルール」から作成してください。</p>
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
+          <p className="text-ink-faint">オートメーションがありません。「新規ルール」から作成してください。</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {automations.map((automation) => (
             <div
               key={automation.id}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow"
+              className="bg-canvas rounded-card border border-hairline p-5 hover:shadow-md transition-shadow"
             >
               {/* Header row */}
               <div className="flex items-start justify-between mb-2">
-                <h3 className="text-sm font-semibold text-gray-900 leading-tight">{automation.name}</h3>
+                <h3 className="text-sm font-semibold text-ink leading-tight">{automation.name}</h3>
                 <button
                   onClick={() => handleToggleActive(automation.id, automation.isActive)}
                   className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
@@ -405,7 +403,7 @@ export default function AutomationsPage() {
 
               {/* Description */}
               {automation.description && (
-                <p className="text-xs text-gray-500 mb-3 line-clamp-2">{automation.description}</p>
+                <p className="text-xs text-ink-faint mb-3 line-clamp-2">{automation.description}</p>
               )}
 
               {/* Event type badge */}
@@ -414,7 +412,7 @@ export default function AutomationsPage() {
                   {eventTypeLabelMap[automation.eventType]}
                 </span>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                  automation.isActive ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+                  automation.isActive ? 'bg-green-50 text-green-700' : 'bg-canvas-sunken text-ink-faint'
                 }`}>
                   {automation.isActive ? '有効' : '無効'}
                 </span>
@@ -436,7 +434,7 @@ export default function AutomationsPage() {
                   (a) => a.type === 'send_message' && (a.params as { template_id?: string }).template_id,
                 ).length
                 return (
-                  <div className="flex items-center gap-4 text-xs text-gray-400 mb-3">
+                  <div className="flex items-center gap-4 text-xs text-ink-faint mb-3">
                     <span>アクション: {automation.actions.length}件</span>
                     {sendMsgWithTpl > 0 && (
                       <a href="/templates" className="text-blue-600 hover:underline" title="template_id 参照を含む send_message action あり">
@@ -449,10 +447,10 @@ export default function AutomationsPage() {
               })()}
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-hairline">
                 <button
                   onClick={() => handleDelete(automation.id)}
-                  className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                  className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
                 >
                   削除
                 </button>

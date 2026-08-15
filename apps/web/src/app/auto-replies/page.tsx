@@ -73,9 +73,9 @@ export default function AutoRepliesPage() {
   const renderEffectiveCell = (r: AutoReply) => {
     if (!r.effectiveAccounts || r.effectiveAccounts.length === 0) {
       // 古い shape の fallback (effectiveAccounts 計算前)
-      if (!r.lineAccountId) return <span className="text-gray-400 italic">全アカウント</span>
+      if (!r.lineAccountId) return <span className="text-ink-faint italic">全アカウント</span>
       const acc = accountById.get(r.lineAccountId)
-      return <span className="text-gray-700">{acc?.displayName ?? acc?.name ?? r.lineAccountId.slice(0, 8)}</span>
+      return <span className="text-ink-secondary">{acc?.displayName ?? acc?.name ?? r.lineAccountId.slice(0, 8)}</span>
     }
     return (
       <div className="flex flex-wrap gap-1">
@@ -86,7 +86,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-gray-50 text-gray-300 line-through"
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-gray-300 line-through"
                 title={`${label}: 適用外 (line_account_id 別アカ固定)`}
               >
                 {label}
@@ -97,7 +97,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-green-100 text-green-700 font-medium"
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-green-700 font-medium"
                 title={`${label}: 返信あり (${ea.via === 'automation' ? 'automation 経由' : 'inline'})`}
               >
                 ✓ {label}{ea.via === 'automation' && <span className="text-green-500">⚙</span>}
@@ -120,14 +120,14 @@ export default function AutoRepliesPage() {
   }
 
   const renderResponseCell = (r: AutoReply) => {
-    if (r.responseType === 'silent') return <span className="text-gray-400 text-xs">silent</span>
+    if (r.responseType === 'silent') return <span className="text-ink-faint text-xs">silent</span>
     if (r.responseType === 'flex') return <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-medium">📋 flex</span>
     if (r.responseType === 'image') return <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-medium">🖼️ image</span>
-    return <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px] font-medium">📝 text</span>
+    return <span className="px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium">📝 text</span>
   }
 
   const renderTemplateCell = (r: AutoReply) => {
-    if (!r.templateId) return <span className="text-[11px] text-gray-400 italic">(inline)</span>
+    if (!r.templateId) return <span className="text-[11px] text-ink-faint italic">(inline)</span>
     const tpl = templateById.get(r.templateId)
     return (
       <a href="/templates" className="text-blue-600 hover:underline text-xs">
@@ -161,8 +161,7 @@ export default function AutoRepliesPage() {
               lineAccountId: selectedAccountId,
               isActive: true,
             })}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
           >
             + 新規ルール
           </button>
@@ -170,46 +169,46 @@ export default function AutoRepliesPage() {
       />
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-1">
-        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ アカ名</span> 返信あり (inline) / <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-green-100 text-green-700">✓ アカ名 ⚙</span> automation 経由</p>
+        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700">✓ アカ名</span> 返信あり (inline) / <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700">✓ アカ名 ⚙</span> automation 経由</p>
         <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">⚠ アカ名</span> silent rule のみ — match するが返信しない (同 keyword の automation rule 未登録)</p>
-        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-50 text-gray-300 line-through">アカ名</span> 適用外 (line_account_id が別アカに固定)</p>
+        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-gray-300 line-through">アカ名</span> 適用外 (line_account_id が別アカに固定)</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px]">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">keyword</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">match</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">response</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">template</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">適用アカウント</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">状態</th>
+              <tr className="bg-canvas-sunken border-b border-hairline">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">keyword</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">match</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">response</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">template</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">適用アカウント</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">状態</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">読み込み中...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400 text-sm">自動返信ルールがありません</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
               ) : (
                 items.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.keyword}</td>
-                    <td className="px-4 py-3 text-xs text-gray-600">{matchTypeLabel[r.matchType]}</td>
+                  <tr key={r.id} className="hover:bg-canvas-sunken">
+                    <td className="px-4 py-3 text-sm font-medium text-ink">{r.keyword}</td>
+                    <td className="px-4 py-3 text-xs text-ink-secondary">{matchTypeLabel[r.matchType]}</td>
                     <td className="px-4 py-3">{renderResponseCell(r)}</td>
                     <td className="px-4 py-3">{renderTemplateCell(r)}</td>
                     <td className="px-4 py-3">{renderEffectiveCell(r)}</td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}>
                         {r.isActive ? '有効' : '無効'}
                       </span>
                     </td>
@@ -231,7 +230,7 @@ export default function AutoRepliesPage() {
                       </button>
                       <button
                         onClick={() => handleDelete(r.id)}
-                        className="ml-1 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50 rounded-md"
+                        className="ml-1 px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
                       >
                         削除
                       </button>
