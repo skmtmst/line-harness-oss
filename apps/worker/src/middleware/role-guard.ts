@@ -1,4 +1,4 @@
-import type { Context, Next } from 'hono';
+import type { MiddlewareHandler } from 'hono';
 import type { Env } from '../index.js';
 import type { StaffRole } from './auth.js';
 
@@ -12,8 +12,8 @@ import type { StaffRole } from './auth.js';
  * GET を役割で絞りたい場合もここを使う。読み取り専用の人まで止めたい GET は
  * denyReadOnly と併用する（鍵情報の一覧など）。
  */
-export function requireRole(...allowed: StaffRole[]) {
-  return async (c: Context<Env>, next: Next): Promise<Response | void> => {
+export function requireRole(...allowed: StaffRole[]): MiddlewareHandler<Env> {
+  return async (c, next) => {
     const staff = c.get('staff');
     if (!staff || !allowed.includes(staff.role)) {
       return c.json(
@@ -32,8 +32,8 @@ export function requireRole(...allowed: StaffRole[]) {
  * 「見えること自体が権限」なので、閲覧のみの人には役割にかかわらず
  * 見せない。requireRole と重ねて使う。
  */
-export function denyReadOnly() {
-  return async (c: Context<Env>, next: Next): Promise<Response | void> => {
+export function denyReadOnly(): MiddlewareHandler<Env> {
+  return async (c, next) => {
     const staff = c.get('staff');
     if (!staff || staff.readOnly) {
       return c.json(

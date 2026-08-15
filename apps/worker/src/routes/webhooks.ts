@@ -12,6 +12,7 @@ import {
   deleteOutgoingWebhook,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const webhooks = new Hono<Env>();
 
@@ -88,7 +89,7 @@ webhooks.get('/api/webhooks/incoming', async (c) => {
   }
 });
 
-webhooks.post('/api/webhooks/incoming', async (c) => {
+webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
   try {
     const body = await c.req.json<{ name: string; sourceType?: string; secret?: string }>();
     if (!body.name) {
@@ -125,7 +126,7 @@ webhooks.post('/api/webhooks/incoming', async (c) => {
   }
 });
 
-webhooks.put('/api/webhooks/incoming/:id', async (c) => {
+webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean }>();
@@ -174,7 +175,7 @@ webhooks.put('/api/webhooks/incoming/:id', async (c) => {
   }
 });
 
-webhooks.delete('/api/webhooks/incoming/:id', async (c) => {
+webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
   try {
     await deleteIncomingWebhook(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
@@ -208,7 +209,7 @@ webhooks.get('/api/webhooks/outgoing', async (c) => {
   }
 });
 
-webhooks.post('/api/webhooks/outgoing', async (c) => {
+webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -255,7 +256,7 @@ webhooks.post('/api/webhooks/outgoing', async (c) => {
   }
 });
 
-webhooks.put('/api/webhooks/outgoing/:id', async (c) => {
+webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -326,7 +327,7 @@ webhooks.put('/api/webhooks/outgoing/:id', async (c) => {
   }
 });
 
-webhooks.delete('/api/webhooks/outgoing/:id', async (c) => {
+webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   try {
     await deleteOutgoingWebhook(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
