@@ -2017,6 +2017,12 @@ export interface BookingRequest {
   menu_name: string;
   staff_name: string;
   friend_name: string | null;
+  // 一覧 API は `SELECT b.*` なので bookings の全列が返る。詳細パネルで使う分だけ
+  // 型に足す。internal_note / decided_by_staff_id は列こそあるが書き込み経路が
+  // ないため、常に null になる。表示すると「いつまでも空欄」に見えるので出さない。
+  requested_at: string;
+  decided_at: string | null;
+  external_event_id: string | null;
 }
 
 export interface BookingAvailabilityRule {
