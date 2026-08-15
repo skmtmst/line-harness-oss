@@ -16,6 +16,7 @@ import type {
   Chat,
   Reminder,
   ReminderStep,
+  ReminderTriggerType,
   ScoringRule,
   IncomingWebhook,
   IncomingWebhookCreated,
@@ -1306,12 +1307,33 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Reminder & { steps: ReminderStep[] }>>(`/api/reminders/${id}`),
-    create: (data: { name: string; description?: string | null }) =>
+    create: (data: {
+      name: string
+      description?: string | null
+      triggerType?: ReminderTriggerType
+      triggerOffsetMinutes?: number | null
+      sendAtTime?: string | null
+      targetTagId?: string | null
+    }) =>
       fetchApi<ApiResponse<Reminder>>('/api/reminders', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: Partial<Pick<Reminder, 'name' | 'description' | 'isActive'>>) =>
+    update: (
+      id: string,
+      data: Partial<
+        Pick<
+          Reminder,
+          | 'name'
+          | 'description'
+          | 'isActive'
+          | 'triggerType'
+          | 'triggerOffsetMinutes'
+          | 'sendAtTime'
+          | 'targetTagId'
+        >
+      >,
+    ) =>
       fetchApi<ApiResponse<Reminder>>(`/api/reminders/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),

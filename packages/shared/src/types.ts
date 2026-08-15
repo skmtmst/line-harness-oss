@@ -657,11 +657,22 @@ export interface CalendarBooking {
 // リマインダ (Reminder)
 // -----------------------------------------------------------------------------
 
+/** リマインダを動かすきっかけ */
+export type ReminderTriggerType = "manual" | "booking" | "event";
+
 export interface Reminder {
   id: string;
   name: string;
   description: string | null;
   isActive: boolean;
+  /** きっかけ。manual は従来どおり手で登録する */
+  triggerType?: ReminderTriggerType;
+  /** 起点を何分ずらすか。null ならずらさない。負の値も使える */
+  triggerOffsetMinutes?: number | null;
+  /** 起点の時刻を固定する JST の "HH:MM"。null なら予約時刻のまま */
+  sendAtTime?: string | null;
+  /** 対象を絞るタグ。null なら対象者全員 */
+  targetTagId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

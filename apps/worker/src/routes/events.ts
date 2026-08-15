@@ -12,6 +12,7 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { enrollByTrigger } from '../services/reminder-trigger.js';
 import {
   EVENT_NAME_MAX,
   EVENT_DESCRIPTION_MAX,
@@ -1112,6 +1113,16 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       reminder_hours_before: event.reminder_hours_before,
     });
     await insertRemindersForBooking(c.env.DB, id, reminders);
+  }
+
+  // イベントをきっかけにするリマインダへ登録する。承認待ちの段階では
+  // まだ登録しない。落選した人にまで「明日です」と届く。
+  if (status === 'confirmed') {
+    await enrollByTrigger(c.env.DB, {
+      triggerType: 'event',
+      friendId: friend.id,
+      startsAtIso: slot.starts_at as string,
+    }).catch((err) => console.error('reminder enroll (event) failed:', err));
   }
 
   // best-effort notification: do not fail the booking if push fails.
