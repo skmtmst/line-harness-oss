@@ -10,8 +10,8 @@ const statusStyle: Record<EcCommerceEvent['status'], { label: string; className:
   received: { label: '受信済み', className: 'bg-blue-50 text-blue-700' },
   processing: { label: '処理中', className: 'bg-amber-50 text-amber-700' },
   processed: { label: '送信完了', className: 'bg-emerald-50 text-emerald-700' },
-  skipped: { label: '送信なし', className: 'bg-gray-100 text-gray-600' },
-  failed: { label: '失敗', className: 'bg-red-50 text-red-700' },
+  skipped: { label: '送信なし', className: 'bg-canvas-sunken text-ink-secondary' },
+  failed: { label: '失敗', className: 'bg-danger-bg text-danger' },
 }
 
 function dateTime(value: string | null) {
@@ -22,12 +22,12 @@ function dateTime(value: string | null) {
 }
 
 function MetricCard({ label, value, note, tone = 'green' }: { label: string; value: number | string; note: string; tone?: 'green' | 'red' | 'gray' }) {
-  const toneClass = tone === 'red' ? 'text-red-600' : tone === 'gray' ? 'text-gray-700' : 'text-emerald-700'
+  const toneClass = tone === 'red' ? 'text-red-600' : tone === 'gray' ? 'text-ink-secondary' : 'text-emerald-700'
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-gray-500">{label}</p>
+    <div className="rounded-2xl border border-hairline bg-white p-5 shadow-sm">
+      <p className="text-sm font-medium text-ink-faint">{label}</p>
       <p className={`mt-2 text-3xl font-bold tracking-tight ${toneClass}`}>{value}</p>
-      <p className="mt-1 text-xs text-gray-400">{note}</p>
+      <p className="mt-1 text-xs text-ink-faint">{note}</p>
     </div>
   )
 }
@@ -152,20 +152,20 @@ export default function EcCommercePage() {
         title="EC連携"
         description="然-NEN-の注文・発送・定期便通知を、ここから確認・管理できます。"
         action={(
-          <button onClick={() => void load()} className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <button onClick={() => void load()} className="rounded-lg border border-hairline bg-white px-4 py-2 text-sm font-medium text-ink-secondary hover:bg-canvas-sunken">
             再読み込み
           </button>
         )}
       />
 
       {message && (
-        <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${message.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-700'}`}>
+        <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${message.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-danger-bg bg-danger-bg text-danger'}`}>
           {message.text}
         </div>
       )}
 
       {loading ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center text-sm text-gray-400">読み込み中...</div>
+        <div className="rounded-2xl border border-hairline bg-white p-12 text-center text-sm text-ink-faint">読み込み中...</div>
       ) : (
         <div className="space-y-8">
           <section>
@@ -177,14 +177,14 @@ export default function EcCommercePage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-100 px-5 py-5 sm:px-6">
-              <h2 className="text-lg font-bold text-gray-900">通知設定</h2>
-              <p className="mt-1 text-sm text-gray-500">OFFにしてもECイベントは記録され、ステップ配信の条件には利用できます。</p>
+          <section className="rounded-2xl border border-hairline bg-white shadow-sm">
+            <div className="border-b border-hairline px-5 py-5 sm:px-6">
+              <h2 className="text-lg font-bold text-ink">通知設定</h2>
+              <p className="mt-1 text-sm text-ink-faint">OFFにしてもECイベントは記録され、ステップ配信の条件には利用できます。</p>
             </div>
             <div className="space-y-4 p-4 sm:p-6">
               {settings.map((setting) => (
-                <div key={setting.eventType} className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                <div key={setting.eventType} className="overflow-hidden rounded-2xl border border-hairline bg-white">
                   <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
                     <div className="flex min-w-0 items-center gap-4">
                       <button
@@ -200,18 +200,18 @@ export default function EcCommercePage() {
                       </button>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-gray-900">{setting.label}</p>
-                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${setting.isEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                          <p className="font-semibold text-ink">{setting.label}</p>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${setting.isEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-canvas-sunken text-ink-faint'}`}>
                             {setting.isEnabled ? '通知ON' : '通知OFF'}
                           </span>
                         </div>
-                        <p className="mt-0.5 break-all text-xs text-gray-400">{setting.eventType}</p>
+                        <p className="mt-0.5 break-all text-xs text-ink-faint">{setting.eventType}</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={() => setExpandedEventType((current) => current === setting.eventType ? null : setting.eventType)}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 sm:w-auto"
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary hover:bg-canvas-sunken sm:w-auto"
                     >
                       {expandedEventType === setting.eventType ? '編集を閉じる' : '本文を確認・編集'}
                       <svg className={`h-4 w-4 transition-transform ${expandedEventType === setting.eventType ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -221,29 +221,29 @@ export default function EcCommercePage() {
                   </div>
 
                   {expandedEventType === setting.eventType && (
-                    <div className="border-t border-gray-100 bg-gray-50/70 p-4 sm:p-5">
+                    <div className="border-t border-hairline bg-canvas-sunken/70 p-4 sm:p-5">
                       <div className="grid gap-5 xl:grid-cols-2">
                         <div className="space-y-4">
                           <label className="block">
-                            <span className="mb-1.5 block text-sm font-semibold text-gray-700">通知の見出し</span>
+                            <span className="mb-1.5 block text-sm font-semibold text-ink-secondary">通知の見出し</span>
                             <input
                               value={setting.title ?? ''}
                               onChange={(event) => updateDraft(setting.eventType, { title: event.target.value })}
                               maxLength={80}
-                              className="w-full rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-sm text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                              className="w-full rounded-xl border border-hairline bg-white px-3.5 py-3 text-sm text-ink outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                             />
                           </label>
                           <label className="block">
-                            <span className="mb-1.5 block text-sm font-semibold text-gray-700">必須情報の前に入れる文章</span>
+                            <span className="mb-1.5 block text-sm font-semibold text-ink-secondary">必須情報の前に入れる文章</span>
                             <textarea
                               value={setting.introText}
                               onChange={(event) => updateDraft(setting.eventType, { introText: event.target.value })}
                               maxLength={800}
                               rows={4}
                               placeholder="例：このたびは然-NEN-をご利用いただきありがとうございます。"
-                              className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-sm leading-6 text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                              className="w-full resize-y rounded-xl border border-hairline bg-white px-3.5 py-3 text-sm leading-6 text-ink outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                             />
-                            <span className="mt-1 block text-right text-xs text-gray-400">{setting.introText.length}/800</span>
+                            <span className="mt-1 block text-right text-xs text-ink-faint">{setting.introText.length}/800</span>
                           </label>
 
                           <div className="rounded-xl border border-slate-200 bg-slate-100 p-4">
@@ -261,27 +261,27 @@ export default function EcCommercePage() {
                           </div>
 
                           <label className="block">
-                            <span className="mb-1.5 block text-sm font-semibold text-gray-700">必須情報の後に入れる文章</span>
+                            <span className="mb-1.5 block text-sm font-semibold text-ink-secondary">必須情報の後に入れる文章</span>
                             <textarea
                               value={setting.outroText}
                               onChange={(event) => updateDraft(setting.eventType, { outroText: event.target.value })}
                               maxLength={800}
                               rows={4}
                               placeholder="例：ご不明点がございましたら、このLINEへお気軽にご連絡ください。"
-                              className="w-full resize-y rounded-xl border border-gray-200 bg-white px-3.5 py-3 text-sm leading-6 text-gray-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                              className="w-full resize-y rounded-xl border border-hairline bg-white px-3.5 py-3 text-sm leading-6 text-ink outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                             />
-                            <span className="mt-1 block text-right text-xs text-gray-400">{setting.outroText.length}/800</span>
+                            <span className="mt-1 block text-right text-xs text-ink-faint">{setting.outroText.length}/800</span>
                           </label>
                         </div>
 
                         <div>
-                          <div className="sticky top-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-5">
+                          <div className="sticky top-5 rounded-2xl border border-hairline bg-white p-4 shadow-sm sm:p-5">
                             <div className="flex items-center justify-between gap-3">
                               <div>
-                                <p className="font-semibold text-gray-900">送信内容プレビュー</p>
-                                <p className="mt-0.5 text-xs text-gray-400">テスト用の注文情報で表示しています</p>
+                                <p className="font-semibold text-ink">送信内容プレビュー</p>
+                                <p className="mt-0.5 text-xs text-ink-faint">テスト用の注文情報で表示しています</p>
                               </div>
-                              <span className="rounded-full bg-[#06C755]/10 px-2.5 py-1 text-xs font-semibold text-[#059b43]">LINE</span>
+                              <span className="rounded-pill bg-accent-soft px-2.5 py-1 text-xs font-semibold text-success">LINE</span>
                             </div>
                             <div className="mt-4 rounded-2xl rounded-tl-md bg-[#d9fdd3] p-4 text-sm leading-6 text-gray-800 shadow-sm">
                               <p className="whitespace-pre-wrap break-words">{livePreview(setting)}</p>
@@ -290,7 +290,7 @@ export default function EcCommercePage() {
                         </div>
                       </div>
 
-                      <div className="mt-5 flex flex-col-reverse gap-2 border-t border-gray-200 pt-5 sm:flex-row sm:justify-end">
+                      <div className="mt-5 flex flex-col-reverse gap-2 border-t border-hairline pt-5 sm:flex-row sm:justify-end">
                         <button onClick={() => void testSend(setting)} disabled={testing === setting.eventType} className="rounded-xl border border-emerald-500 px-5 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
                           {testing === setting.eventType ? '送信中...' : 'この内容をテスト送信'}
                         </button>
@@ -306,13 +306,13 @@ export default function EcCommercePage() {
           </section>
 
           <section className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-            <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className="border-b border-gray-100 px-5 py-5 sm:px-6">
-                <h2 className="text-lg font-bold text-gray-900">イベント履歴</h2>
-                <p className="mt-1 text-sm text-gray-500">注文番号とLINE配信結果を確認できます。LINE user IDや決済情報は表示しません。</p>
+            <div className="overflow-hidden rounded-2xl border border-hairline bg-white shadow-sm">
+              <div className="border-b border-hairline px-5 py-5 sm:px-6">
+                <h2 className="text-lg font-bold text-ink">イベント履歴</h2>
+                <p className="mt-1 text-sm text-ink-faint">注文番号とLINE配信結果を確認できます。LINE user IDや決済情報は表示しません。</p>
               </div>
               {events.length === 0 ? (
-                <div className="p-12 text-center text-sm text-gray-400">まだECイベントはありません。</div>
+                <div className="p-12 text-center text-sm text-ink-faint">まだECイベントはありません。</div>
               ) : (
                 <div className="divide-y divide-gray-100">
                   {events.map((event) => {
@@ -321,15 +321,15 @@ export default function EcCommercePage() {
                       <div key={event.id} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:px-6">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-gray-900">{event.eventLabel}</p>
+                            <p className="font-semibold text-ink">{event.eventLabel}</p>
                             <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}>{status.label}</span>
                           </div>
-                          <p className="mt-1 text-sm text-gray-600">
+                          <p className="mt-1 text-sm text-ink-secondary">
                             注文番号：{event.orderNumber || '—'} <span className="mx-1 text-gray-300">/</span> {event.friendName || 'LINE未連携'}
                           </p>
                           {event.errorMessage && <p className="mt-1 text-xs text-red-600">{event.errorMessage}</p>}
                         </div>
-                        <time className="shrink-0 text-xs text-gray-400">{dateTime(event.receivedAt)}</time>
+                        <time className="shrink-0 text-xs text-ink-faint">{dateTime(event.receivedAt)}</time>
                       </div>
                     )
                   })}
@@ -339,17 +339,17 @@ export default function EcCommercePage() {
 
             <aside className="rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50 to-white p-6 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">EC STEP</p>
-              <h2 className="mt-2 text-xl font-bold text-gray-900">購入後の関係づくり</h2>
-              <p className="mt-2 text-sm leading-6 text-gray-600">注文完了などのECイベントを起点に、食べ方の案内、到着確認、次回提案を自動化できます。</p>
+              <h2 className="mt-2 text-xl font-bold text-ink">購入後の関係づくり</h2>
+              <p className="mt-2 text-sm leading-6 text-ink-secondary">注文完了などのECイベントを起点に、食べ方の案内、到着確認、次回提案を自動化できます。</p>
               <div className="mt-5 space-y-3 text-sm">
-                <div className="rounded-xl bg-white p-3.5 text-gray-700 ring-1 ring-emerald-100">1. 注文直後：お礼と商品案内</div>
-                <div className="rounded-xl bg-white p-3.5 text-gray-700 ring-1 ring-emerald-100">2. 到着後：与え方・保存方法</div>
-                <div className="rounded-xl bg-white p-3.5 text-gray-700 ring-1 ring-emerald-100">3. 継続後：定期便・関連商品の提案</div>
+                <div className="rounded-xl bg-white p-3.5 text-ink-secondary ring-1 ring-emerald-100">1. 注文直後：お礼と商品案内</div>
+                <div className="rounded-xl bg-white p-3.5 text-ink-secondary ring-1 ring-emerald-100">2. 到着後：与え方・保存方法</div>
+                <div className="rounded-xl bg-white p-3.5 text-ink-secondary ring-1 ring-emerald-100">3. 継続後：定期便・関連商品の提案</div>
               </div>
               <Link href="/automations" className="mt-5 block rounded-xl bg-gray-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-gray-800">
                 ECステップ配信を設定する
               </Link>
-              <p className="mt-3 text-xs leading-5 text-gray-500">定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します。</p>
+              <p className="mt-3 text-xs leading-5 text-ink-faint">定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します。</p>
             </aside>
           </section>
         </div>
