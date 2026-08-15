@@ -7,6 +7,8 @@ import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
 import FriendFieldList from '@/components/friend-fields/field-list'
+import SupportMarkList from '@/components/friend-fields/mark-list'
+import SavedSearchList from '@/components/friend-fields/saved-search-list'
 
 const PRESET_COLORS = [
   '#3B82F6', // blue (server default)
@@ -334,16 +336,8 @@ function TagsPageInner() {
       </div>
 
       {tab === 'fields' && <FriendFieldList />}
-      {tab === 'marks' && (
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          対応マークの管理はこの次のまとまりで作ります。
-        </p>
-      )}
-      {tab === 'searches' && (
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          保存した検索の管理はこの次のまとまりで作ります。
-        </p>
-      )}
+      {tab === 'marks' && <SupportMarkList />}
+      {tab === 'searches' && <SavedSearchList />}
 
       {tab === 'tags' && (
       <>

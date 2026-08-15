@@ -5,6 +5,9 @@ import type {
   TagGroup,
   FriendField,
   FriendFieldType,
+  SupportMark,
+  Folder,
+  SavedSearch,
   Scenario,
   ScenarioStep,
   ApiResponse,
@@ -635,6 +638,88 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+  },
+  /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
+  supportMarks: {
+    list: () =>
+      fetchApi<ApiResponse<Array<SupportMark & { friendCount: number }>>>('/api/support-marks'),
+    create: (data: {
+      name: string
+      color?: string
+      isDefault?: boolean
+      autoOnInbound?: boolean
+      displayOrder?: number
+    }) =>
+      fetchApi<ApiResponse<SupportMark>>('/api/support-marks', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (
+      id: string,
+      data: Partial<Pick<SupportMark, 'name' | 'color' | 'isDefault' | 'autoOnInbound' | 'displayOrder'>>,
+    ) =>
+      fetchApi<ApiResponse<SupportMark>>(`/api/support-marks/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    /** 付いている人がいると 409。force で未設定に戻して消す。 */
+    delete: (id: string, opts?: { force?: boolean }) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/support-marks/${id}${opts?.force ? '?force=1' : ''}`,
+        { method: 'DELETE' },
+      ),
+    setForFriend: (friendId: string, markId: string | null) =>
+      fetchApi<ApiResponse<null>>(`/api/friends/${friendId}/support-mark`, {
+        method: 'PATCH',
+        body: JSON.stringify({ markId }),
+      }),
+    bulk: (friendIds: string[], markId: string | null) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/friends/support-mark/bulk', {
+        method: 'POST',
+        body: JSON.stringify({ friendIds, markId }),
+      }),
+  },
+  /** 保存した検索。上限50件。 */
+  savedSearches: {
+    list: (params?: { scope?: 'friends' | 'chats' | 'bookings' }) =>
+      fetchApi<ApiResponse<SavedSearch[]>>(
+        `/api/saved-searches${params?.scope ? `?scope=${params.scope}` : ''}`,
+      ),
+    create: (data: {
+      name: string
+      scope?: 'friends' | 'chats' | 'bookings'
+      conditions: unknown
+      isShared?: boolean
+    }) =>
+      fetchApi<ApiResponse<SavedSearch>>('/api/saved-searches', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
+      fetchApi<ApiResponse<SavedSearch>>(`/api/saved-searches/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/saved-searches/${id}`, { method: 'DELETE' }),
+  },
+  /** 汎用フォルダ。一覧13画面で共通に使う。 */
+  folders: {
+    list: (kind?: string) =>
+      fetchApi<ApiResponse<Folder[]>>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
+    create: (data: { kind: string; name: string; parentId?: string | null }) =>
+      fetchApi<ApiResponse<Folder>>('/api/folders', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number }) =>
+      fetchApi<ApiResponse<Folder>>(`/api/folders/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    /** 中身は消えず未分類に戻る。子フォルダは一緒に消える。 */
+    delete: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/folders/${id}`, { method: 'DELETE' }),
   },
   tagGroups: {
     list: () => fetchApi<ApiResponse<TagGroup[]>>('/api/tag-groups'),

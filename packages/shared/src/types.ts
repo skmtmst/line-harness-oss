@@ -170,6 +170,19 @@ export interface SupportMark {
   createdAt: string;
 }
 
+/** 保存した検索 */
+export interface SavedSearch {
+  id: string;
+  name: string;
+  scope: "friends" | "chats" | "bookings";
+  /** { all: [...], any: [...], visibility } の形 */
+  conditions: unknown;
+  createdBy: string | null;
+  isShared: boolean;
+  displayOrder: number;
+  createdAt: string;
+}
+
 /**
  * タグの親分類。「お悩み」「ペット」のようにタグをまとめる。
  * 入れ子にはしない（二段で足りる）。
