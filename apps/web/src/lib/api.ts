@@ -2239,6 +2239,12 @@ export interface EventDetail {
   og_title: string | null;
   og_description: string | null;
   og_image_url: string | null;
+  /** 公開対象を絞るタグ。null なら友だち全員に見える */
+  visible_tag_id?: string | null;
+  /** 満席のあとキャンセル待ちを受けるか。0 なら締め切る */
+  waitlist_enabled?: number;
+  /** 申込の締め切り（開始の何時間前まで）。null なら開始まで受ける */
+  entry_cutoff_hours_before?: number | null;
   // Multi-account fields (migration 040, broadcasts と同パターン)
   target_type?: 'single' | 'multi-account-dedup';
   // Worker は JSON 文字列で返す。UI 側で parse して string[] を扱う。

@@ -101,7 +101,8 @@
     "094_event_visibility.sql",
     "095_affiliate_settlement.sql",
     "096_line_account_capacity.sql",
-    "097_friends_account_index.sql"
+    "097_friends_account_index.sql",
+    "098_event_waitlist.sql"
   ],
-  "migrationCount": 102
+  "migrationCount": 103
 }
