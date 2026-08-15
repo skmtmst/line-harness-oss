@@ -136,7 +136,7 @@ export default function FriendsPage() {
       />
 
       {/* Search + sort bar — L-step style */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-4">
+      <div className="bg-canvas rounded-card border border-hairline p-4 mb-4">
         <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
             type="text"
@@ -155,17 +155,16 @@ export default function FriendsPage() {
           </select>
           <button
             type="submit"
-            className="px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
           >
             検索
           </button>
         </form>
 
         {/* Secondary filters — タグ + 対応マーク */}
-        <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-gray-100">
+        <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-hairline">
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-600 font-medium whitespace-nowrap">タグ:</label>
+            <label className="text-xs text-ink-secondary font-medium whitespace-nowrap">タグ:</label>
             <select
               className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
               value={selectedTagId}
@@ -178,7 +177,7 @@ export default function FriendsPage() {
             </select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-600 font-medium whitespace-nowrap">対応マーク:</label>
+            <label className="text-xs text-ink-secondary font-medium whitespace-nowrap">対応マーク:</label>
             <select
               className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
               value={responseFilter}
@@ -188,34 +187,34 @@ export default function FriendsPage() {
               <option value="unhandled">未対応のみ</option>
             </select>
           </div>
-          <span className="text-xs text-gray-500 ml-auto">
+          <span className="text-xs text-ink-faint ml-auto">
             {loading ? '読み込み中...' : `${total.toLocaleString('ja-JP')} 件`}
           </span>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-gray-100 grid grid-cols-[80px_220px_120px_1fr_250px_88px] gap-3 animate-pulse">
-              <div className="h-5 bg-gray-100 rounded w-16" />
+            <div key={i} className="px-4 py-4 border-b border-hairline grid grid-cols-[80px_220px_120px_1fr_250px_88px] gap-3 animate-pulse">
+              <div className="h-5 bg-canvas-sunken rounded w-16" />
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-full bg-gray-200" />
                 <div className="h-3 bg-gray-200 rounded w-24" />
               </div>
-              <div className="h-3 bg-gray-100 rounded w-20" />
+              <div className="h-3 bg-canvas-sunken rounded w-20" />
               <div className="space-y-2">
-                <div className="h-3 bg-gray-100 rounded w-3/4" />
-                <div className="h-2 bg-gray-100 rounded w-20" />
+                <div className="h-3 bg-canvas-sunken rounded w-3/4" />
+                <div className="h-2 bg-canvas-sunken rounded w-20" />
               </div>
-              <div className="h-5 bg-gray-100 rounded w-32" />
-              <div className="h-8 bg-gray-100 rounded w-20" />
+              <div className="h-5 bg-canvas-sunken rounded w-32" />
+              <div className="h-8 bg-canvas-sunken rounded w-20" />
             </div>
           ))}
         </div>
@@ -225,22 +224,22 @@ export default function FriendsPage() {
 
       {!loading && total > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-4">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-ink-faint">
             {((page - 1) * PAGE_SIZE) + 1}〜{Math.min(page * PAGE_SIZE, total)} 件 / 全{total.toLocaleString('ja-JP')}件
           </p>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-2 min-h-[44px] text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-2 min-h-[44px] text-sm border border-gray-300 rounded-lg bg-white hover:bg-canvas-sunken disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               前へ
             </button>
-            <span className="text-sm text-gray-600 px-1">{page} ページ</span>
+            <span className="text-sm text-ink-secondary px-1">{page} ページ</span>
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={!hasNextPage}
-              className="px-3 py-2 min-h-[44px] text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="px-3 py-2 min-h-[44px] text-sm border border-gray-300 rounded-lg bg-white hover:bg-canvas-sunken disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               次へ
             </button>
