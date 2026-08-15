@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
 import SupportAlertPanel from '@/components/support/support-alert-panel'
+import ShipmentPanel from '@/components/dashboard/shipment-panel'
 
 const ccPrompts = [
   {
@@ -330,6 +331,11 @@ export default function DashboardPage() {
             </svg>
           }
         />
+      </div>
+
+      {/* 出荷予定 — ec_events.payload から算出した予定日で並べる */}
+      <div className="mb-6">
+        <ShipmentPanel />
       </div>
 
       {/* Quick links */}

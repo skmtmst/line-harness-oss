@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getLineAccountById, jstNow } from '@line-crm/db';
+import { addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
@@ -263,6 +264,134 @@ ecCommerce.post('/api/ec-commerce/test-send', async (c) => {
     sent += 1;
   }
   return c.json({ success: true, data: { sent } });
+});
+
+// ---------------------------------------------------------------------------
+// 出荷予定
+//
+// ec_events.payload には商品・数量・定期便の発送予定日が入っているのに、
+// これまで取り出していたのは注文番号だけだった。ダッシュボードで
+// 「いつ何を出すのか」を見せるために、payload から必要な値を取り出す。
+//
+// 出荷予定日そのものは payload に無い（通常注文が持つのはお届け希望日）。
+// 業務ルールに沿った算出は @line-crm/shared の shipping-schedule に閉じてあり、
+// ここでは呼ぶだけ。将来ロジックを差し替えるときも、この箇所は変わらない。
+// 算出結果はDBに保存せず、都度計算する。
+
+/** 出荷予定として扱うイベント。発送済み・解約などは対象外。 */
+const SHIPMENT_EVENT_TYPES = ['ec.order.confirmed', 'ec.subscription.upcoming'] as const;
+
+type ShipmentRow = {
+  id: string;
+  event_type: string;
+  friend_id: string | null;
+  friend_name: string | null;
+  received_at: string;
+  order_number: string | null;
+  occurred_at: string | null;
+  scheduled_shipping_date: string | null;
+  order_items: string | null;
+  subscription_items: string | null;
+};
+
+/** payload の items 配列（JSON文字列）を「商品名 × 数量」の一行にする。 */
+function summarizeItems(raw: string | null): { text: string; count: number } {
+  if (!raw) return { text: '', count: 0 };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { text: '', count: 0 };
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return { text: '', count: 0 };
+  const items = parsed
+    .filter((item): item is { name?: unknown; quantity?: unknown } => typeof item === 'object' && item !== null)
+    .map((item) => ({
+      name: typeof item.name === 'string' ? item.name.slice(0, 80) : '',
+      quantity: typeof item.quantity === 'number' && Number.isFinite(item.quantity) ? item.quantity : null,
+    }))
+    .filter((item) => item.name);
+  if (items.length === 0) return { text: '', count: 0 };
+  const head = items.slice(0, 2).map((item) => (item.quantity === null ? item.name : `${item.name} × ${item.quantity}`));
+  const text = items.length > head.length ? `${head.join('、')} ほか${items.length - head.length}点` : head.join('、');
+  return { text, count: items.length };
+}
+
+ecCommerce.get('/api/ec-commerce/shipments', async (c) => {
+  const requestedLimit = Number(c.req.query('limit') || '20');
+  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
+
+  // 出荷予定日は計算値なのでSQLでは並べ替えられない。直近のイベントを多めに
+  // 取り出してから、算出した日付で並べ替えて limit で切る。
+  const scanLimit = Math.min(limit * 5, 200);
+  const placeholders = SHIPMENT_EVENT_TYPES.map(() => '?').join(', ');
+  const rows = await c.env.DB.prepare(
+    `SELECT e.id, e.event_type, e.friend_id, e.received_at,
+            f.display_name AS friend_name,
+            json_extract(e.payload, '$.order.number') AS order_number,
+            json_extract(e.payload, '$.occurred_at') AS occurred_at,
+            json_extract(e.payload, '$.subscription.scheduled_shipping_date') AS scheduled_shipping_date,
+            json_extract(e.payload, '$.order.items') AS order_items,
+            json_extract(e.payload, '$.subscription.items') AS subscription_items
+       FROM ec_events e
+       LEFT JOIN friends f ON f.id = e.friend_id
+      WHERE e.event_type IN (${placeholders})
+        AND e.status != 'failed'
+      ORDER BY e.received_at DESC
+      LIMIT ?`,
+  )
+    .bind(...SHIPMENT_EVENT_TYPES, scanLimit)
+    .all<ShipmentRow>();
+
+  const todayJst = toJstMoment(new Date().toISOString())?.date ?? '';
+  const tomorrowJst = todayJst ? addDays(todayJst, 1) : '';
+
+  const shipments = rows.results
+    .map((row) => {
+      const { date, source } = resolveShipDate({
+        scheduledShippingDate: row.scheduled_shipping_date,
+        // occurred_at が欠けている払い出しもありうるので、受信時刻で代替する。
+        orderedAt: row.occurred_at || row.received_at,
+      });
+      // 型定義上は定期便の商品は subscription.items。実データで order が
+      // 入っている可能性があるため、型どおりを優先しつつ order へ落とす。
+      const items = summarizeItems(row.subscription_items) ;
+      const fallback = items.count > 0 ? items : summarizeItems(row.order_items);
+      return {
+        id: row.id,
+        eventType: row.event_type,
+        eventLabel: EVENT_LABELS[row.event_type] || row.event_type,
+        orderNumber: row.order_number,
+        friendId: row.friend_id,
+        friendName: row.friend_name,
+        items: fallback.text,
+        itemCount: fallback.count,
+        shipDate: date,
+        shipDateSource: source,
+        // 今日・明日とそれ以降で分けるための印。日付の比較は文字列で足りる。
+        bucket: date && todayJst && date <= tomorrowJst ? ('soon' as const) : ('later' as const),
+      };
+    })
+    .filter((row) => row.shipDate !== null)
+    .sort((a, b) => (a.shipDate ?? '').localeCompare(b.shipDate ?? ''));
+
+  const soon = shipments.filter((row) => row.bucket === 'soon');
+  const later = shipments.filter((row) => row.bucket === 'later');
+
+  return c.json({
+    success: true,
+    data: {
+      today: todayJst,
+      tomorrow: tomorrowJst,
+      soon: soon.slice(0, limit),
+      later: later.slice(0, limit),
+      soonCount: soon.length,
+      laterCount: later.length,
+      // 走査した件数を返す。上限に張り付いていたら取りこぼしがありうる。
+      scanned: rows.results.length,
+      scanLimit,
+    },
+  });
 });
 
 export { ecCommerce };
