@@ -13,11 +13,27 @@ export interface Interval {
   end: string;   // HH:MM
 }
 
+/**
+ * 埋まっている時間帯。
+ *
+ * sameMenu は「この予約が、いま空きを計算しているメニューのものか」。
+ * 同時受付数が2以上のメニュー（グループ施術など）では、同じメニューの
+ * 予約は定員まで重ねられるが、別メニューの予約は定員に関係なく塞ぐ。
+ * 1対1の施術とグループを同じ時間に入れることはできないため。
+ *
+ * Googleカレンダーの予定も別メニュー扱い（sameMenu = false）。
+ */
+export interface BusyInterval extends Interval {
+  sameMenu?: boolean;
+}
+
 export interface ComputeSlotsInput {
   working: Interval[];
-  busy: Interval[];
+  busy: BusyInterval[];
   menu: { duration_minutes: number; buffer_after_minutes: number };
   granularityMinutes: number;
+  /** 同時に受けられる件数。省略時は1（従来どおり重ねない） */
+  capacity?: number;
 }
 
 function toMin(hhmm: string): number {
@@ -31,38 +47,52 @@ function fromMin(min: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-function subtract(working: Interval[], busy: Interval[]): { start: number; end: number }[] {
-  let intervals = working.map((w) => ({ start: toMin(w.start), end: toMin(w.end) }));
-  for (const b of busy) {
-    const bs = toMin(b.start);
-    const be = toMin(b.end);
-    const next: { start: number; end: number }[] = [];
-    for (const iv of intervals) {
-      if (be <= iv.start || bs >= iv.end) {
-        next.push(iv);
-        continue;
-      }
-      if (bs > iv.start) next.push({ start: iv.start, end: Math.min(bs, iv.end) });
-      if (be < iv.end) next.push({ start: Math.max(be, iv.start), end: iv.end });
-    }
-    intervals = next;
-  }
-  return intervals;
+function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  return aStart < bEnd && bStart < aEnd;
 }
 
+/**
+ * 勤務時間から、予約を入れられる開始時刻を並べる。
+ *
+ * 候補の枠を1つずつ見て、埋まっている時間帯と重なるかを判定する。
+ * 以前は「勤務時間から埋まりを引き算する」形だったが、同時受付数を
+ * 数えるには「何件重なっているか」が要るので、枠ごとの判定に変えた。
+ * 定員1・全て別メニュー扱い、という従来の条件では結果は変わらない。
+ */
 export function computeSlots(input: ComputeSlotsInput): Interval[] {
   const occupy = input.menu.duration_minutes + input.menu.buffer_after_minutes;
   const display = input.menu.duration_minutes;
   const granularity = input.granularityMinutes;
+  // 0 や負の値が入ると全ての枠が消える。設定ミスで予約が一切取れなくなる
+  // 方が事故として大きいので、1 に寄せる。
+  const capacity = Math.max(1, input.capacity ?? 1);
 
-  const available = subtract(input.working, input.busy);
+  const busy = input.busy.map((b) => ({
+    start: toMin(b.start),
+    end: toMin(b.end),
+    sameMenu: b.sameMenu === true,
+  }));
+
   const out: Interval[] = [];
-  for (const iv of available) {
-    let t = Math.ceil(iv.start / granularity) * granularity;
-    if (t < iv.start) t = iv.start;
-    while (t + occupy <= iv.end) {
+  for (const w of input.working) {
+    const wStart = toMin(w.start);
+    const wEnd = toMin(w.end);
+    let t = Math.ceil(wStart / granularity) * granularity;
+    if (t < wStart) t = wStart;
+    for (; t + occupy <= wEnd; t += granularity) {
+      const slotEnd = t + occupy;
+      let sameMenuCount = 0;
+      let blocked = false;
+      for (const b of busy) {
+        if (!overlaps(t, slotEnd, b.start, b.end)) continue;
+        if (!b.sameMenu) {
+          blocked = true;
+          break;
+        }
+        sameMenuCount++;
+      }
+      if (blocked || sameMenuCount >= capacity) continue;
       out.push({ start: fromMin(t), end: fromMin(t + display) });
-      t += granularity;
     }
   }
   return out;
@@ -137,6 +167,7 @@ export async function getAvailability(
   const menu = await db
     .prepare(
       `SELECT m.duration_minutes, m.buffer_after_minutes,
+              m.concurrent_capacity, m.booking_window_days, m.cutoff_hours_before,
               sm.override_duration_minutes AS override_duration,
               sm.override_price AS override_price
          FROM menus m
@@ -148,6 +179,9 @@ export async function getAvailability(
     .first<{
       duration_minutes: number;
       buffer_after_minutes: number;
+      concurrent_capacity: number;
+      booking_window_days: number | null;
+      cutoff_hours_before: number | null;
       override_duration: number | null;
     }>();
   if (!menu) {
@@ -213,7 +247,7 @@ export async function getAvailability(
 
   const bookings = await db
     .prepare(
-      `SELECT staff_id, starts_at, block_ends_at
+      `SELECT staff_id, menu_id, starts_at, block_ends_at
          FROM bookings
         WHERE staff_id IN (${placeholders})
           AND status IN ('requested','confirmed')
@@ -221,13 +255,28 @@ export async function getAvailability(
           AND block_ends_at > ?`,
     )
     .bind(...staffIds, rangeEnd.toISOString(), rangeStart.toISOString())
-    .all<{ staff_id: string; starts_at: string; block_ends_at: string }>();
+    .all<{ staff_id: string; menu_id: string; starts_at: string; block_ends_at: string }>();
 
   const menuForCalc = {
     duration_minutes: menu.override_duration ?? menu.duration_minutes,
     buffer_after_minutes: menu.buffer_after_minutes,
   };
-  const minLeadAt = new Date(params.now.getTime() + params.minLeadTimeMinutes * 60_000);
+  // 受付の締め切り。全体の最短リード時間とメニューごとの締め切りの、
+  // 遅い方を採る。片方だけを見ると、どちらかの設定が黙って無視される。
+  const cutoffMinutes = Math.max(
+    params.minLeadTimeMinutes,
+    (menu.cutoff_hours_before ?? 0) * 60,
+  );
+  const minLeadAt = new Date(params.now.getTime() + cutoffMinutes * 60_000);
+
+  // 何日先まで受けるか。未設定なら制限しない。
+  // 期間の判定は「その日の終わり」ではなく開始時刻で行う。3日先まで、が
+  // 「3日後の23:59まで」ではなく「3日後の同時刻まで」だと分かりにくいため、
+  // 日付で切る。
+  const windowLastDate =
+    menu.booking_window_days == null
+      ? null
+      : jstDateStr(new Date(params.now.getTime() + menu.booking_window_days * 24 * 60 * 60_000));
 
   const googleBusyByStaff = new Map<string, Array<{ start: string; end: string }> | null>();
   const calendarSync: CalendarSyncState[] = [];
@@ -259,26 +308,31 @@ export async function getAvailability(
       continue;
     }
     for (const date of dates) {
+      if (windowLastDate && date > windowLastDate) continue;
       const shift = shifts.results.find((r) => r.staff_id === s.id && r.work_date === date);
       const rule = rules.results.find(
         (r) => r.staff_id === s.id && r.weekday === weekdayForDate(date),
       );
       const working = shift ?? rule;
       if (!working) continue;
-      const dayBookings = bookings.results
+      const dayBookings: BusyInterval[] = bookings.results
         .filter((b) => b.staff_id === s.id)
         .filter((b) => jstDateStr(new Date(b.starts_at)) === date)
         .map((b) => ({
           start: jstHHMM(new Date(b.starts_at)),
           end: jstHHMM(new Date(b.block_ends_at)),
+          // 同じメニューの予約だけが定員まで重ねられる。
+          sameMenu: b.menu_id === params.menuId,
         }));
       const googleBusy = googleBusyByStaff.get(s.id);
+      // 外の予定は定員に関係なく塞ぐ（sameMenu を付けない）。
       if (googleBusy) dayBookings.push(...googleBusyForJstDate(googleBusy, date));
       const daySlots = computeSlots({
         working: [{ start: working.start_time, end: working.end_time }],
         busy: dayBookings,
         menu: menuForCalc,
         granularityMinutes: SLOT_GRANULARITY_MINUTES,
+        capacity: menu.concurrent_capacity,
       });
       for (const slot of daySlots) {
         const slotStartUtc = new Date(`${date}T${slot.start}:00+09:00`);

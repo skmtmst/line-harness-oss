@@ -1986,6 +1986,16 @@ export interface BookingMenu {
   sort_order: number;
   is_active: number;
   auto_tag_id: string | null;
+  /** 同じ時間帯に受けられる件数。1 なら重ねない（従来どおり） */
+  concurrent_capacity?: number;
+  /** 何日先まで予約を受けるか。null なら制限なし */
+  booking_window_days?: number | null;
+  /** 開始の何時間前で締め切るか。null なら直前まで受ける */
+  cutoff_hours_before?: number | null;
+  /** 開始の何時間前までキャンセルできるか。null なら制限なし */
+  cancel_deadline_hours_before?: number | null;
+  /** 予約時にお客様へ聞く質問。null なら質問しない */
+  intake_question?: string | null;
 }
 
 export interface BookingStaff {
