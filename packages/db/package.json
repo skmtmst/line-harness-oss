@@ -1,6 +1,6 @@
 {
   "name": "@line-crm/db",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "D1 database query helpers for LINE CRM",
   "license": "MIT",
   "main": "./src/index.ts",

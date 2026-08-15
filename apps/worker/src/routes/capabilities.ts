@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
-export const HARNESS_VERSION = '0.12.0';
+// リリースのたびに root の package.json と一緒に上げる。
+// 0.12.0 のまま長く放置されていて、/admin/version と食い違っていた。
+export const HARNESS_VERSION = '0.24.0';
 export const API_VERSION = 1;
 export const CONNECTOR_VERSION = '2026-05-20';
 export const MIN_APP_VERSION = '1.0.0';
@@ -28,6 +30,15 @@ export const FEATURES = [
   'line-cross-link',
   'x-cross-link',
   'ig-cross-link',
+  // v0.24.0 で追加
+  'friend_fields',
+  'support_marks',
+  'saved_searches',
+  'folders',
+  'media',
+  'common_vars',
+  'analytics',
+  'site_tracking',
 ] as const;
 
 export const capabilities = new Hono<Env>();

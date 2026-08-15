@@ -102,7 +102,12 @@
     "095_affiliate_settlement.sql",
     "096_line_account_capacity.sql",
     "097_friends_account_index.sql",
-    "098_event_waitlist.sql"
+    "098_event_waitlist.sql",
+    "099_folders_and_fields.sql",
+    "100_friend_attributes.sql",
+    "101_content_library.sql",
+    "102_analytics.sql",
+    "103_ops_and_flags.sql"
   ],
-  "migrationCount": 103
+  "migrationCount": 108
 }

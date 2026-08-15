@@ -69,7 +69,7 @@ CREATE TABLE admin_users (
   email         TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, two_factor_enabled INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE affiliate_clicks (
   id           TEXT PRIMARY KEY,
@@ -125,7 +125,9 @@ CREATE TABLE auto_replies (
   line_account_id  TEXT DEFAULT NULL,
   is_active        INTEGER NOT NULL DEFAULT 1,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0);
+, active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0, message_kinds_json TEXT
+  CHECK (message_kinds_json IS NULL OR json_valid(message_kinds_json)), friend_conditions_json TEXT
+  CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)));
 
 CREATE TABLE automation_logs (
   id             TEXT PRIMARY KEY,
@@ -247,7 +249,7 @@ CREATE TABLE "broadcasts" (
   dedup_priority     TEXT CHECK (dedup_priority IS NULL OR json_valid(dedup_priority)),
   failed_account_ids TEXT CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids))
 , dedup_progress TEXT, batch_lock_at TEXT, track_links INTEGER NOT NULL DEFAULT 1, message_bubbles_json TEXT
-  CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)));
+  CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)), stealth_spread_minutes INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -273,6 +275,27 @@ CREATE TABLE chats (
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT);
+
+CREATE TABLE common_var_schedules (
+  id             TEXT PRIMARY KEY,
+  var_id         TEXT NOT NULL REFERENCES common_vars(id) ON DELETE CASCADE,
+  effective_from TEXT NOT NULL,
+  value          TEXT NOT NULL,
+  applied_at     TEXT
+);
+
+CREATE TABLE common_vars (
+  id          TEXT PRIMARY KEY,
+  folder_id   TEXT REFERENCES folders(id) ON DELETE SET NULL,
+  name        TEXT NOT NULL,
+  -- {shop_hours} のように使う。形の制約は friend_fields.field_key と同じ。
+  var_key     TEXT NOT NULL UNIQUE,
+  type        TEXT NOT NULL DEFAULT 'text'
+                CHECK (type IN ('text','url','image','number')),
+  value       TEXT NOT NULL DEFAULT '',
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
 
 CREATE TABLE conversion_events (
   id                   TEXT PRIMARY KEY,
@@ -462,6 +485,19 @@ CREATE TABLE events (
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
+CREATE TABLE folders (
+  id            TEXT PRIMARY KEY,
+  kind          TEXT NOT NULL CHECK (kind IN (
+                  'tag','template','scenario','reminder','auto_reply',
+                  'rich_menu','webinar','form','media','common_var',
+                  'mileage_rule','automation','event','entry_route')),
+  name          TEXT NOT NULL,
+  parent_id     TEXT REFERENCES folders(id) ON DELETE CASCADE,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
 CREATE TABLE form_opens (
   id TEXT PRIMARY KEY,
   form_id TEXT NOT NULL,
@@ -491,6 +527,42 @@ CREATE TABLE forms (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT);
+
+CREATE TABLE friend_field_values (
+  friend_id   TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  field_id    TEXT NOT NULL REFERENCES friend_fields(id) ON DELETE CASCADE,
+  value       TEXT,
+  -- staff.id / 'form' / 'ec' / 'automation'。誰が入れた値かで扱いが変わる。
+  updated_by  TEXT,
+  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  PRIMARY KEY (friend_id, field_id)
+);
+
+CREATE TABLE friend_fields (
+  id             TEXT PRIMARY KEY,
+  folder_id      TEXT REFERENCES folders(id) ON DELETE SET NULL,
+  name           TEXT NOT NULL,
+  -- 差し込み変数名。{pet_name} のように使うので、日本語・記号は入れない。
+  -- 形の検証はAPI側（^[a-z][a-z0-9_]{0,31}$）。
+  field_key      TEXT NOT NULL UNIQUE,
+  type           TEXT NOT NULL CHECK (type IN (
+                   'text','textarea','number','date','select',
+                   'multi_select','checkbox','url','tel','email')),
+  options_json   TEXT CHECK (options_json IS NULL OR json_valid(options_json)),
+  default_value  TEXT,
+  source         TEXT NOT NULL DEFAULT 'manual'
+                   CHECK (source IN ('manual','form','ec','automation')),
+  -- EC連携時のマッピング元。ec_is_master が1なら EC 側を正とし、
+  -- 管理画面からは書き換えさせない。
+  ec_field_path  TEXT,
+  ec_is_master   INTEGER NOT NULL DEFAULT 0,
+  -- 本名・電話・住所など。閲覧を役割で絞り、開いたら記録を残す。
+  is_personal    INTEGER NOT NULL DEFAULT 0,
+  is_starred     INTEGER NOT NULL DEFAULT 0,
+  display_order  INTEGER NOT NULL DEFAULT 0,
+  created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
 
 CREATE TABLE friend_reminder_deliveries (
   id                TEXT PRIMARY KEY,
@@ -556,7 +628,27 @@ CREATE TABLE friends (
   unfollow_count   INTEGER NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL);
+, ref_code TEXT, metadata TEXT NOT NULL DEFAULT '{}', line_account_id TEXT REFERENCES line_accounts(id), first_tracked_link_id TEXT REFERENCES tracked_links (id) ON DELETE SET NULL, support_mark_id TEXT REFERENCES support_marks(id) ON DELETE SET NULL, is_hidden INTEGER NOT NULL DEFAULT 0, real_name TEXT, system_display_name TEXT, private_memo TEXT);
+
+CREATE TABLE funnel_steps (
+  id         TEXT PRIMARY KEY,
+  funnel_id  TEXT NOT NULL REFERENCES funnels(id) ON DELETE CASCADE,
+  step_order INTEGER NOT NULL,
+  label      TEXT NOT NULL,
+  kind       TEXT NOT NULL CHECK (kind IN (
+               'tag','field','form','site_event','purchase','link_click','conversion')),
+  match_json TEXT NOT NULL CHECK (json_valid(match_json)),
+  UNIQUE (funnel_id, step_order)
+);
+
+CREATE TABLE funnels (
+  id           TEXT PRIMARY KEY,
+  name         TEXT NOT NULL,
+  segment_json TEXT CHECK (segment_json IS NULL OR json_valid(segment_json)),
+  -- 何日以内に次の段へ進んだものを数えるか。
+  window_days  INTEGER NOT NULL DEFAULT 30,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
 
 CREATE TABLE google_calendar_connections (
   id            TEXT PRIMARY KEY,
@@ -606,6 +698,43 @@ CREATE TABLE link_clicks (
   tracked_link_id TEXT NOT NULL REFERENCES tracked_links (id) ON DELETE CASCADE,
   friend_id TEXT REFERENCES friends (id) ON DELETE SET NULL,
   clicked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE login_audit (
+  id            TEXT PRIMARY KEY,
+  admin_user_id TEXT,
+  action        TEXT NOT NULL CHECK (action IN ('login','logout','fail','view_personal','export')),
+  screen        TEXT,
+  ip            TEXT,
+  user_agent    TEXT,
+  result        TEXT NOT NULL DEFAULT 'ok',
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE media (
+  id          TEXT PRIMARY KEY,
+  folder_id   TEXT REFERENCES folders(id) ON DELETE SET NULL,
+  kind        TEXT NOT NULL CHECK (kind IN ('image','video','audio','file')),
+  filename    TEXT NOT NULL,
+  mime_type   TEXT NOT NULL,
+  size_bytes  INTEGER NOT NULL,
+  width       INTEGER,
+  height      INTEGER,
+  duration_ms INTEGER,
+  r2_key      TEXT NOT NULL UNIQUE,
+  public_url  TEXT,
+  uploaded_by TEXT,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE media_usages (
+  media_id   TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
+  ref_kind   TEXT NOT NULL CHECK (ref_kind IN (
+               'template','broadcast','rich_menu','scenario_step',
+               'nen_column','event','webinar')),
+  ref_id     TEXT NOT NULL,
+  scanned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  PRIMARY KEY (media_id, ref_kind, ref_id)
 );
 
 CREATE TABLE meet_consultation_reminders (
@@ -1032,7 +1161,7 @@ CREATE TABLE reminders (
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT, trigger_type TEXT NOT NULL DEFAULT 'manual'
-  CHECK (trigger_type IN ('manual', 'booking', 'event')), trigger_offset_minutes INTEGER, send_at_time TEXT, target_tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL);
+  CHECK (trigger_type IN ('manual', 'booking', 'event')), trigger_offset_minutes INTEGER, send_at_time TEXT, target_tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE rich_menu_areas (
   id              TEXT PRIMARY KEY,
@@ -1075,6 +1204,19 @@ CREATE TABLE rich_menu_pages (
   UNIQUE (group_id, order_index)
 );
 
+CREATE TABLE saved_searches (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  scope           TEXT NOT NULL DEFAULT 'friends'
+                    CHECK (scope IN ('friends','chats','bookings')),
+  -- { all: [...], any: [...], visibility: '...' } の形。AND群とOR群の2グループ。
+  conditions_json TEXT NOT NULL CHECK (json_valid(conditions_json)),
+  created_by      TEXT,
+  is_shared       INTEGER NOT NULL DEFAULT 1,
+  display_order   INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
 CREATE TABLE scenario_steps (
   id              TEXT PRIMARY KEY,
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
@@ -1102,7 +1244,7 @@ CREATE TABLE scenarios (
   delivery_mode   TEXT NOT NULL DEFAULT 'relative' CHECK (delivery_mode IN ('relative', 'elapsed', 'absolute_time')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT);
+, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE scoring_rules (
   id          TEXT PRIMARY KEY,
@@ -1112,6 +1254,28 @@ CREATE TABLE scoring_rules (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE site_events (
+  id          TEXT PRIMARY KEY,
+  visitor_id  TEXT NOT NULL REFERENCES site_visitors(id) ON DELETE CASCADE,
+  friend_id   TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  event_type  TEXT NOT NULL CHECK (event_type IN (
+                'page_view','click','scroll_depth','custom','purchase')),
+  path        TEXT,
+  label       TEXT,
+  value_num   INTEGER,
+  referrer    TEXT,
+  occurred_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
+CREATE TABLE site_visitors (
+  id            TEXT PRIMARY KEY,
+  friend_id     TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  first_seen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  last_seen_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  linked_at     TEXT,
+  linked_by     TEXT CHECK (linked_by IS NULL OR linked_by IN ('entry_route','liff','form','manual'))
 );
 
 CREATE TABLE staff (
@@ -1232,6 +1396,18 @@ CREATE TABLE support_email_threads (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE support_marks (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  color           TEXT NOT NULL DEFAULT '#94A3B8',
+  -- 新規友だちの初期値。1行だけ1にする（複数あってもアプリ側で最初の1件を使う）。
+  is_default      INTEGER NOT NULL DEFAULT 0,
+  -- 友だちから受信したとき自動でこれにする。
+  auto_on_inbound INTEGER NOT NULL DEFAULT 0,
+  display_order   INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
+);
+
 CREATE TABLE tag_groups (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -1249,7 +1425,7 @@ CREATE TABLE tags (
   mileage_multiplier_bps      INTEGER CHECK (mileage_multiplier_bps IS NULL OR mileage_multiplier_bps BETWEEN 1000 AND 100000),
   mileage_multiplier_priority INTEGER NOT NULL DEFAULT 0,
   created_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, group_id TEXT REFERENCES tag_groups(id) ON DELETE SET NULL);
+, group_id TEXT REFERENCES tag_groups(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
 CREATE TABLE templates (
   id              TEXT PRIMARY KEY,
@@ -1259,7 +1435,7 @@ CREATE TABLE templates (
   message_content TEXT NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
@@ -1508,6 +1684,9 @@ CREATE INDEX idx_conversion_events_friend ON conversion_events (friend_id);
 
 CREATE INDEX idx_conversion_events_point ON conversion_events (conversion_point_id);
 
+CREATE INDEX idx_cvs_pending
+  ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
+
 CREATE INDEX idx_ec_events_customer
   ON ec_events(customer_id, received_at DESC);
 
@@ -1559,11 +1738,17 @@ CREATE UNIQUE INDEX idx_event_waitlist_slot_identity
 
 CREATE INDEX idx_events_account_published_sort ON events (line_account_id, is_published, sort_order);
 
+CREATE INDEX idx_ffv_field ON friend_field_values(field_id, value);
+
+CREATE INDEX idx_folders_kind ON folders(kind, display_order);
+
 CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
+
+CREATE INDEX idx_friend_fields_order ON friend_fields(display_order, id);
 
 CREATE INDEX idx_friend_reminders_friend ON friend_reminders (friend_id);
 
@@ -1588,9 +1773,13 @@ CREATE INDEX idx_friends_account_created
 
 CREATE INDEX idx_friends_follow_tenure ON friends(is_following, current_follow_started_at);
 
+CREATE INDEX idx_friends_hidden_created ON friends(is_hidden, created_at DESC);
+
 CREATE INDEX idx_friends_ig_igsid ON friends (ig_igsid);
 
 CREATE INDEX idx_friends_line_user_id ON friends (line_user_id);
+
+CREATE INDEX idx_friends_mark ON friends(support_mark_id);
 
 CREATE INDEX idx_friends_user_id ON friends (user_id);
 
@@ -1607,6 +1796,10 @@ CREATE INDEX idx_line_accounts_display_order
 CREATE INDEX idx_link_clicks_friend ON link_clicks (friend_id);
 
 CREATE INDEX idx_link_clicks_link ON link_clicks (tracked_link_id);
+
+CREATE INDEX idx_login_audit_user ON login_audit(admin_user_id, created_at);
+
+CREATE INDEX idx_media_kind ON media(kind, created_at DESC);
 
 CREATE INDEX idx_meet_consultation_reminders_due
   ON meet_consultation_reminders (status, scheduled_at);
@@ -1708,9 +1901,17 @@ CREATE INDEX idx_rich_menu_groups_account ON rich_menu_groups(account_id, status
 
 CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_index);
 
+CREATE INDEX idx_saved_searches_scope ON saved_searches(scope, display_order);
+
 CREATE INDEX idx_scenario_steps_scenario_id ON scenario_steps (scenario_id);
 
 CREATE INDEX idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
+
+CREATE INDEX idx_site_events_friend ON site_events(friend_id, occurred_at);
+
+CREATE INDEX idx_site_events_path ON site_events(path, occurred_at);
+
+CREATE INDEX idx_site_visitors_friend ON site_visitors(friend_id);
 
 CREATE INDEX idx_staff_account_sort ON staff (line_account_id, sort_order);
 
