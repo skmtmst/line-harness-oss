@@ -237,7 +237,10 @@ describe('protected API access', () => {
       headers: { Authorization: 'Bearer lh_session:viewer-session' },
     }, crossSiteEnv());
     expect(get.status).toBe(200);
-    expect((await get.json() as { data: { role: string } }).data.role).toBe('viewer');
+    // 役割と読み取り専用は別々に持つ。読み取り専用でも元の役割は残る。
+    const body = await get.json() as { data: { role: string; readOnly: boolean } };
+    expect(body.data.role).toBe('staff');
+    expect(body.data.readOnly).toBe(true);
 
     const post = await app().request('/api/protected', {
       method: 'POST',
@@ -251,13 +254,15 @@ describe('protected API access', () => {
     expect(res.status).toBe(401);
   });
 
-  test('allows viewer accounts to read authenticated APIs', async () => {
+  test('allows read-only accounts to read authenticated APIs', async () => {
     const res = await app().request('/api/protected', { headers: { Authorization: 'Bearer viewer-key' } }, crossSiteEnv());
     expect(res.status).toBe(200);
-    expect((await res.json() as { data: { role: string } }).data.role).toBe('viewer');
+    const body = await res.json() as { data: { role: string; readOnly: boolean } };
+    expect(body.data.role).toBe('staff');
+    expect(body.data.readOnly).toBe(true);
   });
 
-  test('blocks viewer accounts from state-changing API methods', async () => {
+  test('blocks read-only accounts from state-changing API methods', async () => {
     const res = await app().request('/api/protected', { method: 'POST', headers: { Authorization: 'Bearer viewer-key' } }, crossSiteEnv());
     expect(res.status).toBe(403);
     expect((await res.json() as { error: string }).error).toMatch(/閲覧のみ/);

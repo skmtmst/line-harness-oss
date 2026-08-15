@@ -85,17 +85,38 @@ export function expiredCookie(name: string, sameSite: AdminSameSite): string {
   return buildCookie(name, '', sameSite, 0, name === ADMIN_AUTH_COOKIE);
 }
 
+export type StaffRole = 'owner' | 'admin' | 'staff';
+
+/**
+ * 認証済みの利用者。
+ *
+ * 役割と読み取り専用は別々に持つ。以前は access_level='read_only' の人を
+ * 役割にかかわらず 'viewer' へ潰していたため、「閲覧のみのオーナー」と
+ * 「閲覧のみのスタッフ」を区別できず、機密情報の閲覧をサーバー側で
+ * 制御できなかった。
+ *
+ * 更新の可否は readOnly、閲覧の可否は role で判定する。
+ */
 export type AuthenticatedStaff = {
   id: string;
   name: string;
-  role: 'owner' | 'admin' | 'staff' | 'viewer';
+  role: StaffRole;
+  /** true なら役割にかかわらず更新・削除・設定変更をさせない。 */
+  readOnly: boolean;
 };
 
-function authenticatedRole(staff: {
-  role: 'owner' | 'admin' | 'staff';
+function toAuthenticatedStaff(staff: {
+  id: string;
+  name: string;
+  role: StaffRole;
   access_level?: 'full' | 'read_only';
-}): AuthenticatedStaff['role'] {
-  return staff.access_level === 'read_only' ? 'viewer' : staff.role;
+}): AuthenticatedStaff {
+  return {
+    id: staff.id,
+    name: staff.name,
+    role: staff.role,
+    readOnly: staff.access_level === 'read_only',
+  };
 }
 
 export async function sha256Hex(value: string): Promise<string> {
@@ -112,7 +133,7 @@ export async function authenticateAdminSession(
   if (!token) return null;
   const staff = await getStaffByAdminSession(c.env.DB, await sha256Hex(token), new Date().toISOString());
   if (!staff) return null;
-  return { id: staff.id, name: staff.name, role: authenticatedRole(staff) };
+  return toAuthenticatedStaff(staff);
 }
 
 async function authenticateCookieToken(
@@ -146,12 +167,12 @@ export async function authenticateApiToken(
 
   const staff = await getStaffByApiKey(c.env.DB, token);
   if (staff) {
-    return { id: staff.id, name: staff.name, role: authenticatedRole(staff) };
+    return toAuthenticatedStaff(staff);
   }
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    return { id: 'env-owner', name: 'Owner', role: 'owner' };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false };
   }
 
   // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
@@ -165,7 +186,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     console.log('[auth] accept_via=LEGACY_API_KEY');
-    return { id: 'env-owner', name: 'Owner', role: 'owner' };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false };
   }
 
   return null;
@@ -269,7 +290,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
-  if (staff.role === 'viewer' && !SAFE_METHODS.has(method)) {
+  if (staff.readOnly && !SAFE_METHODS.has(method)) {
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
   }
 
