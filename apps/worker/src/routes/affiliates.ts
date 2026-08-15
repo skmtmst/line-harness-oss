@@ -339,7 +339,7 @@ affiliates.post('/api/affiliates/click', async (c) => {
 });
 
 // GET /api/affiliates/report - all affiliates report
-affiliates.get('/api/affiliates-report', async (c) => {
+affiliates.get('/api/affiliates-report', requireRole('owner', 'admin'), async (c) => {
   try {
     const report = await getAffiliateReport(c.env.DB, undefined, {
       startDate: c.req.query('startDate'),

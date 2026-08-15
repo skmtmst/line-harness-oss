@@ -184,7 +184,7 @@ chats.delete('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
 
 // ========== チャットCRUD ==========
 
-chats.get('/api/chats', async (c) => {
+chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const status = c.req.query('status') ?? undefined;
     const operatorId = c.req.query('operatorId') ?? undefined;

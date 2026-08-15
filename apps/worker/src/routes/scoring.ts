@@ -44,7 +44,7 @@ function serializeMileageRule(rule: MileageRuleRow) {
 
 // ========== マイル管理 ==========
 
-scoring.get('/api/mileage/overview', async (c) => {
+scoring.get('/api/mileage/overview', requireRole('owner', 'admin'), async (c) => {
   try {
     const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') || 50)));
     const offset = Math.max(0, Number(c.req.query('offset') || 0));

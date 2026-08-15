@@ -126,9 +126,10 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     const staff = c.get('staff');
-    const data = staff?.role === 'staff'
-      ? serializeLineAccount(account)
-      : serializeLineAccountFull(account);
+    // 鍵は「見えること自体が権限」。役割がオーナー／管理者でも、閲覧のみの人には
+    // レスポンスに含めない。画面で隠すだけでは API を直接叩けば取得できてしまう。
+    const canSeeSecrets = !!staff && staff.role !== 'staff' && !staff.readOnly;
+    const data = canSeeSecrets ? serializeLineAccountFull(account) : serializeLineAccount(account);
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/line-accounts/:id error:', err);
