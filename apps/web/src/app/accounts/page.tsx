@@ -37,6 +37,9 @@ interface LineAccountListItem {
   ogSiteName: string | null
   ogDefaultDescription: string | null
   ogDefaultImageUrl: string | null
+  friendCapacity?: number | null
+  capacityWarnAt?: number | null
+  iconUrl?: string | null
 }
 
 const ccPrompts = [
@@ -372,6 +375,9 @@ export default function AccountsPage() {
           initialOgSiteName={editing.ogSiteName}
           initialOgDefaultDescription={editing.ogDefaultDescription}
           initialOgDefaultImageUrl={editing.ogDefaultImageUrl}
+          initialFriendCapacity={editing.friendCapacity ?? null}
+          initialCapacityWarnAt={editing.capacityWarnAt ?? null}
+          initialIconUrl={editing.iconUrl ?? null}
           onClose={() => setEditing(null)}
           onSaved={load}
         />
