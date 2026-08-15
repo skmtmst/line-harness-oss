@@ -17,6 +17,7 @@ import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const friends = new Hono<Env>();
 
@@ -455,7 +456,7 @@ friends.get('/api/friends/:id', async (c) => {
 });
 
 // POST /api/friends/:id/tags - add tag
-friends.post('/api/friends/:id/tags', async (c) => {
+friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ tagId: string }>();
@@ -492,7 +493,7 @@ friends.post('/api/friends/:id/tags', async (c) => {
 });
 
 // DELETE /api/friends/:id/tags/:tagId - remove tag
-friends.delete('/api/friends/:id/tags/:tagId', async (c) => {
+friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const friendId = c.req.param('id');
     const tagId = c.req.param('tagId');
@@ -510,7 +511,7 @@ friends.delete('/api/friends/:id/tags/:tagId', async (c) => {
 });
 
 // PUT /api/friends/:id/metadata - merge metadata fields
-friends.put('/api/friends/:id/metadata', async (c) => {
+friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const friendId = c.req.param('id');
     const db = c.env.DB;
@@ -572,7 +573,7 @@ friends.get('/api/friends/:id/messages', async (c) => {
 });
 
 // POST /api/friends/:id/messages - send message to friend
-friends.post('/api/friends/:id/messages', async (c) => {
+friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{

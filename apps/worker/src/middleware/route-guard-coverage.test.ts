@@ -19,6 +19,11 @@ const ROUTES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'routes')
 
 /** 認証そのものを通さない公開経路。権限の対象外。 */
 const PUBLIC_PREFIXES = [
+  // /admin/update/* は x-admin-api-key での専用認証を router 自身が持つ。
+  // 通常の認証を通らないので c.get('staff') が無く、requireRole は使えない。
+  '/start',
+  '/status/',
+  '/stream/',
   '/api/liff/',
   '/api/integrations/',
   '/webhook',
@@ -35,15 +40,16 @@ const PUBLIC_PREFIXES = [
 ];
 
 /**
- * まだ役割ガードを付けていない更新系。0.22.0 で順に潰していく。
- * ここに追記して回避してはいけない。追記が必要になったということは、
+ * 役割ガードを付けていない更新系。
+ *
+ * 0.22.0 で全て潰し終えた。ここが空である限り、権限を決めずに更新系APIを
+ * 足すとテストが落ちる。追記して回避してはいけない。追記が必要になったのは、
  * 権限を決めずにAPIを足したということ。
+ *
+ * admin-auth と meet-callback は認証そのものを通さない公開経路なので、
+ * PUBLIC_PREFIXES 側で対象外になっている。
  */
-const ALLOWLIST = new Set<string>([
-  'account-settings', 'admin-auth', 'admin-update', 'booking', 'chats', 'events',
-  'friends', 'images', 'liff', 'meet-callback', 'meet-consultations',
-  'nen-members', 'support-inbox',
-]);
+const ALLOWLIST = new Set<string>([]);
 
 const MUTATING = /\.(post|put|patch|delete)\(\s*'([^']+)'/g;
 

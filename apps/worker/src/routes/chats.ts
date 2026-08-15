@@ -15,6 +15,7 @@ import {
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const chats = new Hono<Env>();
 
@@ -145,7 +146,7 @@ chats.get('/api/operators', async (c) => {
   }
 });
 
-chats.post('/api/operators', async (c) => {
+chats.post('/api/operators', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{ name: string; email: string; role?: string }>();
     if (!body.name || !body.email) return c.json({ success: false, error: 'name and email are required' }, 400);
@@ -157,7 +158,7 @@ chats.post('/api/operators', async (c) => {
   }
 });
 
-chats.put('/api/operators/:id', async (c) => {
+chats.put('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
@@ -171,7 +172,7 @@ chats.put('/api/operators/:id', async (c) => {
   }
 });
 
-chats.delete('/api/operators/:id', async (c) => {
+chats.delete('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     await deleteOperator(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
@@ -483,7 +484,7 @@ chats.get('/api/chats/:id', async (c) => {
   }
 });
 
-chats.post('/api/chats', async (c) => {
+chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const body = await c.req.json<{ friendId: string; operatorId?: string; lineAccountId?: string | null }>();
     if (!body.friendId) return c.json({ success: false, error: 'friendId is required' }, 400);
@@ -501,7 +502,7 @@ chats.post('/api/chats', async (c) => {
 });
 
 // チャットのアサイン/ステータス更新/ノート更新
-chats.put('/api/chats/:id', async (c) => {
+chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const id = c.req.param('id');
     const resolved = await resolveOrCreateChat(c.env.DB, id);
@@ -522,7 +523,7 @@ chats.put('/api/chats/:id', async (c) => {
 });
 
 // オペレーター入力中のローディング表示を開始
-chats.post('/api/chats/:id/loading', async (c) => {
+chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const chatId = c.req.param('id');
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
@@ -559,7 +560,7 @@ chats.post('/api/chats/:id/loading', async (c) => {
 });
 
 // オペレーターからメッセージ送信
-chats.post('/api/chats/:id/send', async (c) => {
+chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const chatId = c.req.param('id');
     const chat = await resolveOrCreateChat(c.env.DB, chatId);

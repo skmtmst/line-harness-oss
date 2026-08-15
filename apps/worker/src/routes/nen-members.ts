@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
 import { jstNow } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
@@ -474,7 +475,7 @@ nenMembers.get('/api/nen-members/care-flags', async (c) => {
   return c.json({ success: true, data: rows.results });
 });
 
-nenMembers.put('/api/nen-members/care-flags/:id', async (c) => {
+nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   const body = await c.req.json<{ status?: string; adviceReady?: boolean }>().catch(() => null);
   if (!body || !['active', 'resolved'].includes(String(body.status))) return c.json({ success: false, error: 'Invalid status' }, 400);
   const flag = await c.env.DB.prepare(`SELECT friend_id FROM nen_care_flags WHERE id=?`)
@@ -491,7 +492,7 @@ nenMembers.get('/api/nen-members/photos', async (c) => {
   return c.json({ success: true, data: rows.results });
 });
 
-nenMembers.put('/api/nen-members/photos/:id/review', async (c) => {
+nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin', 'staff'), async (c) => {
   const body = await c.req.json<{ status?: string; points?: number }>().catch(() => null);
   const status = String(body?.status || '');
   if (!['adopted', 'rejected'].includes(status)) return c.json({ success: false, error: 'Invalid review' }, 400);
@@ -535,7 +536,7 @@ nenMembers.put('/api/nen-members/photos/:id/review', async (c) => {
   return c.json({ success: true, data: { awardedPoints: awarded, pointBalance, pointSync: status === 'adopted' ? 'synced' : 'not_required' } });
 });
 
-nenMembers.post('/api/nen-members/tags/resync', async (c) => {
+nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), async (c) => {
   const body: { limit?: number } = await c.req.json<{ limit?: number }>().catch(() => ({}));
   const limit = Number.isFinite(body.limit) ? Number(body.limit) : 500;
   const result = await refreshAllNenTags(c.env.DB, limit);
