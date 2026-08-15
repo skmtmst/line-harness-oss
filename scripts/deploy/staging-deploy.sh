@@ -36,6 +36,13 @@ cd "$REPO_ROOT"
 STAGING_CONFIG="apps/worker/wrangler.staging.toml"
 STAGING_API_URL="https://nen-line-stg.skmtmst.workers.dev"
 STAGING_PAGES_PROJECT="nen-line-stg-admin"
+# wrangler.staging.toml の account_id を唯一の出どころにする。ここに同じ値を
+# 書き写すと、片方だけ直したときに黙って別アカウントへ配りかねない。
+STAGING_ACCOUNT_ID="$(sed -n 's/^[[:space:]]*account_id[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$STAGING_CONFIG" | head -1)"
+if [ -z "$STAGING_ACCOUNT_ID" ]; then
+  echo "[NG] $STAGING_CONFIG から account_id を読み取れませんでした。" >&2
+  exit 1
+fi
 
 APPLY=0
 SKIP_ADMIN=0
@@ -116,7 +123,10 @@ else
   step "4/4 管理画面 ビルド＋デプロイ"
   NEXT_PUBLIC_API_URL="$STAGING_API_URL" pnpm --filter web build
   if [ "$APPLY" -eq 1 ]; then
-    "$WRANGLER" pages deploy apps/web/out \
+    # `pages deploy` は wrangler.staging.toml を読まないため、Worker と違って
+    # account_id が渡らない。複数の Cloudflare アカウントに所属していると
+    # 「どれか選べない」で失敗するので、Worker と同じ account を明示する。
+    CLOUDFLARE_ACCOUNT_ID="$STAGING_ACCOUNT_ID" "$WRANGLER" pages deploy apps/web/out \
       --project-name "$STAGING_PAGES_PROJECT" \
       --branch main
   else
