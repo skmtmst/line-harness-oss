@@ -533,6 +533,9 @@ export interface LineFriend {
 // コンバージョンポイント (ConversionPoint) — CV計測
 // -----------------------------------------------------------------------------
 
+/** 成果をどうやって数えるか */
+export type ConversionMeasureMethod = "url_reach" | "webhook" | "manual";
+
 export interface ConversionPoint {
   /** 主キー (UUIDv4) */
   id: string;
@@ -542,6 +545,16 @@ export interface ConversionPoint {
   eventType: string;
   /** 金額 (任意) */
   value: number | null;
+  /** どうやって数えるか。既定は manual（人が記録する） */
+  measureMethod?: ConversionMeasureMethod;
+  /** url_reach のときの対象URL。前方一致で判定する */
+  targetUrl?: string | null;
+  /** 同じ人を何度でも数えるか。false なら一人一回 */
+  countRepeat?: boolean;
+  /** 成果を紐づける日数。null なら全体の既定（90日） */
+  attributionDays?: number | null;
+  /** 集計対象を1アカウントに絞る場合。null なら全アカウント */
+  lineAccountId?: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }

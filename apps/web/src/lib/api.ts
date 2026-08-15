@@ -10,6 +10,7 @@ import type {
   User,
   LineAccount,
   ConversionPoint,
+  ConversionMeasureMethod,
   Affiliate,
   Template,
   Automation,
@@ -947,9 +948,35 @@ export const api = {
   conversions: {
     points: () =>
       fetchApi<ApiResponse<ConversionPoint[]>>('/api/conversions/points'),
-    createPoint: (data: { name: string; eventType: string; value?: number | null }) =>
+    createPoint: (data: {
+      name: string
+      eventType: string
+      value?: number | null
+      measureMethod?: ConversionMeasureMethod
+      /** url_reach のときは必須。前方一致で判定する */
+      targetUrl?: string | null
+      /** false で「一人一回だけ数える」 */
+      countRepeat?: boolean
+      attributionDays?: number | null
+      lineAccountId?: string | null
+    }) =>
       fetchApi<ApiResponse<ConversionPoint>>('/api/conversions/points', {
         method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    /** 送った項目だけを書き換える。 */
+    updatePoint: (id: string, data: {
+      name?: string
+      eventType?: string
+      value?: number | null
+      measureMethod?: ConversionMeasureMethod
+      targetUrl?: string | null
+      countRepeat?: boolean
+      attributionDays?: number | null
+      lineAccountId?: string | null
+    }) =>
+      fetchApi<ApiResponse<ConversionPoint>>(`/api/conversions/points/${id}`, {
+        method: 'PUT',
         body: JSON.stringify(data),
       }),
     deletePoint: (id: string) =>
