@@ -12,6 +12,7 @@ import {
 } from '@line-crm/db';
 import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const entryRoutes = new Hono<Env>();
 
@@ -52,7 +53,7 @@ entryRoutes.get('/api/entry-route-genres', async (c) => {
   }
 });
 
-entryRoutes.post('/api/entry-route-genres', async (c) => {
+entryRoutes.post('/api/entry-route-genres', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{ name?: string }>();
     const name = body.name?.trim();
@@ -70,7 +71,7 @@ entryRoutes.post('/api/entry-route-genres', async (c) => {
   }
 });
 
-entryRoutes.patch('/api/entry-route-genres/:id', async (c) => {
+entryRoutes.patch('/api/entry-route-genres/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{ name?: string }>();
@@ -115,7 +116,7 @@ entryRoutes.get('/api/entry-routes/:id', async (c) => {
 });
 
 // POST /api/entry-routes — create
-entryRoutes.post('/api/entry-routes', async (c) => {
+entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       refCode: string;
@@ -153,7 +154,7 @@ entryRoutes.post('/api/entry-routes', async (c) => {
 });
 
 // PATCH /api/entry-routes/:id — update
-entryRoutes.patch('/api/entry-routes/:id', async (c) => {
+entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<
@@ -195,7 +196,7 @@ entryRoutes.patch('/api/entry-routes/:id', async (c) => {
 });
 
 // DELETE /api/entry-routes/:id
-entryRoutes.delete('/api/entry-routes/:id', async (c) => {
+entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     await deleteEntryRoute(c.env.DB, id);

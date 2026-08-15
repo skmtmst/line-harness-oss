@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../index.js';
 
 const mocks = {
   getEntryRoutes: vi.fn(),
@@ -15,7 +16,13 @@ const mocks = {
 vi.mock('@line-crm/db', () => mocks);
 
 const { entryRoutes } = await import('./entry-routes.js');
-const app = new Hono();
+const app = new Hono<Env>();
+// 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
+// 認証は通った状態にしてから渡す。権限の検証は role-guard.test.ts が持つ。
+app.use('*', async (c, next) => {
+  c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false });
+  return next();
+});
 app.route('/', entryRoutes);
 const env = { DB: {} as D1Database };
 

@@ -3,6 +3,7 @@ import { getLineAccountById, jstNow } from '@line-crm/db';
 import { addDays, resolveShipDate, toJstMoment } from '@line-crm/shared';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
 import { EC_EVENT_TYPES, ecTextMessage, type EcEvent } from './ec-integrations.js';
 
@@ -178,7 +179,7 @@ ecCommerce.get('/api/ec-commerce/settings', async (c) => {
   });
 });
 
-ecCommerce.put('/api/ec-commerce/settings/:eventType', async (c) => {
+ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'admin'), async (c) => {
   const eventType = c.req.param('eventType');
   if (!EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
   const body = await c.req.json<{
@@ -207,7 +208,7 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', async (c) => {
   return c.json({ success: true });
 });
 
-ecCommerce.post('/api/ec-commerce/test-send', async (c) => {
+ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{
     eventType?: unknown; accountId?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
   }>().catch(() => null);

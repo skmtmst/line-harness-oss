@@ -15,6 +15,8 @@ import {
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { notifyAffiliateApproval } from '../services/affiliate-notifier.js';
 import type { Env } from '../index.js';
+import { auditLog } from '../lib/audit-log.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const conversions = new Hono<Env>();
 
@@ -41,7 +43,7 @@ conversions.get('/api/conversions/points', async (c) => {
 });
 
 // POST /api/conversions/points - create
-conversions.post('/api/conversions/points', async (c) => {
+conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -71,7 +73,7 @@ conversions.post('/api/conversions/points', async (c) => {
 });
 
 // DELETE /api/conversions/points/:id - delete
-conversions.delete('/api/conversions/points/:id', async (c) => {
+conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     await deleteConversionPoint(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
@@ -84,7 +86,7 @@ conversions.delete('/api/conversions/points/:id', async (c) => {
 // ── Conversion Tracking ─────────────────────────────────────────────────────
 
 // POST /api/conversions/track - record conversion
-conversions.post('/api/conversions/track', async (c) => {
+conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       conversionPointId: string;
@@ -208,7 +210,8 @@ conversions.get('/api/conversions/approvals', async (c) => {
 });
 
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
-conversions.patch('/api/conversions/events/:id/approval', async (c) => {
+conversions.patch('/api/conversions/events/:id/approval', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: c.req.param('id') });
   try {
     const body = await c.req
       .json<{ status?: string }>()

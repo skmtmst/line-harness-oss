@@ -40,11 +40,9 @@ const PUBLIC_PREFIXES = [
  * 権限を決めずにAPIを足したということ。
  */
 const ALLOWLIST = new Set<string>([
-  'account-settings', 'admin-auth', 'admin-update', 'affiliate-offers',
-  'affiliates', 'auto-replies', 'automations', 'booking', 'chats', 'conversions', 'ec-commerce', 'entry-routes', 'events',
-  'forms', 'friends', 'images', 'liff', 'meet-callback', 'meet-consultations',
-  'nen-members', 'notifications', 'scoring', 'support-inbox',
-  'tags', 'tracked-links',
+  'account-settings', 'admin-auth', 'admin-update', 'booking', 'chats', 'events',
+  'friends', 'images', 'liff', 'meet-callback', 'meet-consultations',
+  'nen-members', 'support-inbox',
 ]);
 
 const MUTATING = /\.(post|put|patch|delete)\(\s*'([^']+)'/g;
