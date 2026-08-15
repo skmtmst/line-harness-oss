@@ -882,6 +882,9 @@ export const api = {
           | 'ogSiteName'
           | 'ogDefaultDescription'
           | 'ogDefaultImageUrl'
+          | 'friendCapacity'
+          | 'capacityWarnAt'
+          | 'iconUrl'
         >
       >,
     ) => {
@@ -960,7 +963,21 @@ export const api = {
           body: JSON.stringify(data),
         },
       ),
-    update: (id: string, data: Partial<Pick<Affiliate, 'name' | 'commissionRate' | 'isActive'>>) =>
+    update: (
+      id: string,
+      data: Partial<
+        Pick<
+          Affiliate,
+          | 'name'
+          | 'commissionRate'
+          | 'isActive'
+          | 'email'
+          | 'holdDays'
+          | 'payoutCycle'
+          | 'notifyOnConversion'
+        >
+      >,
+    ) =>
       fetchApi<ApiResponse<Affiliate>>(`/api/affiliates/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),

@@ -394,6 +394,12 @@ export interface LineAccount {
   liffId: string | null;
   /** 有効/無効 */
   isActive: boolean;
+  /** 友だち数の上限。null なら上限を管理しない */
+  friendCapacity?: number | null;
+  /** 何人で警告を出すか。null なら警告しない */
+  capacityWarnAt?: number | null;
+  /** 管理画面の一覧やヘッダーで使うアイコン。OGP用の ogDefaultImageUrl とは用途が違う */
+  iconUrl?: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */
@@ -563,6 +569,14 @@ export interface Affiliate {
   commissionRate: number;
   /** 有効/無効 */
   isActive: boolean;
+  /** 連絡先。報酬の連絡に使う。null なら未登録 */
+  email?: string | null;
+  /** 成果が確定するまでの保留日数。null なら即確定 */
+  holdDays?: number | null;
+  /** 支払いサイクルの覚書。計算には使わない */
+  payoutCycle?: string | null;
+  /** 成果が出たときに本人へ知らせるか */
+  notifyOnConversion?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }

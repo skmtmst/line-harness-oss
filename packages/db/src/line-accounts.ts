@@ -20,6 +20,12 @@ export interface LineAccount {
   og_site_name: string | null;
   og_default_image_url: string | null;
   og_default_description: string | null;
+  /** 友だち数の上限。NULL なら上限を管理しない */
+  friend_capacity: number | null;
+  /** 何人で警告を出すか。NULL なら警告しない */
+  capacity_warn_at: number | null;
+  /** 管理画面の一覧やヘッダーで使うアイコン。OGP用の og_default_image_url とは用途が違う */
+  icon_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -123,6 +129,9 @@ export type UpdateLineAccountInput = Partial<
     | 'og_site_name'
     | 'og_default_image_url'
     | 'og_default_description'
+    | 'friend_capacity'
+    | 'capacity_warn_at'
+    | 'icon_url'
   >
 >;
 
@@ -174,6 +183,18 @@ export async function updateLineAccount(
     fields.push('og_default_image_url = ?');
     values.push(updates.og_default_image_url);
   }
+  if (updates.friend_capacity !== undefined) {
+    fields.push('friend_capacity = ?');
+    values.push(updates.friend_capacity);
+  }
+  if (updates.capacity_warn_at !== undefined) {
+    fields.push('capacity_warn_at = ?');
+    values.push(updates.capacity_warn_at);
+  }
+  if (updates.icon_url !== undefined) {
+    fields.push('icon_url = ?');
+    values.push(updates.icon_url);
+  }
   if (updates.og_default_description !== undefined) {
     fields.push('og_default_description = ?');
     values.push(updates.og_default_description);
@@ -210,6 +231,12 @@ export interface UpdateLineAccountFieldsInput {
   ogSiteName?: string | null;
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
+  /** 友だち数の上限。null で「上限を管理しない」に戻す */
+  friendCapacity?: number | null;
+  /** 何人で警告を出すか。null で「警告しない」に戻す */
+  capacityWarnAt?: number | null;
+  /** 管理画面で使うアイコン。null で未設定に戻す */
+  iconUrl?: string | null;
 }
 
 export async function updateLineAccountFields(
@@ -255,6 +282,18 @@ export async function updateLineAccountFields(
   if (input.ogDefaultDescription !== undefined) {
     sets.push('og_default_description = ?');
     binds.push(input.ogDefaultDescription);
+  }
+  if (input.friendCapacity !== undefined) {
+    sets.push('friend_capacity = ?');
+    binds.push(input.friendCapacity);
+  }
+  if (input.capacityWarnAt !== undefined) {
+    sets.push('capacity_warn_at = ?');
+    binds.push(input.capacityWarnAt);
+  }
+  if (input.iconUrl !== undefined) {
+    sets.push('icon_url = ?');
+    binds.push(input.iconUrl);
   }
 
   if (sets.length === 0) {
