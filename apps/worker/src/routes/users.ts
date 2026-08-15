@@ -29,7 +29,7 @@ function serializeUser(row: DbUser) {
 }
 
 // GET /api/users - list all
-users.get('/api/users', async (c) => {
+users.get('/api/users', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const items = await getUsers(c.env.DB);
     return c.json({ success: true, data: items.map(serializeUser) });

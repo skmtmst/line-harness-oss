@@ -84,7 +84,7 @@ function serializeTag(row: DbTag) {
 }
 
 // GET /api/friends - list with pagination
-friends.get('/api/friends', async (c) => {
+friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const limit = Number(c.req.query('limit') ?? '50');
     const offset = Number(c.req.query('offset') ?? '0');

@@ -280,7 +280,7 @@ forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
 });
 
 // GET /api/forms/:id/submissions — list submissions
-forms.get('/api/forms/:id/submissions', async (c) => {
+forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const id = c.req.param('id');
     const form = await getFormById(c.env.DB, id);

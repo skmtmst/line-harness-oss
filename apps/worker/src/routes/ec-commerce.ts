@@ -93,7 +93,7 @@ ecCommerce.get('/api/ec-commerce/overview', async (c) => {
   });
 });
 
-ecCommerce.get('/api/ec-commerce/events', async (c) => {
+ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff'), async (c) => {
   const requestedLimit = Number(c.req.query('limit') || '30');
   const requestedOffset = Number(c.req.query('offset') || '0');
   const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 30;
@@ -318,7 +318,7 @@ function summarizeItems(raw: string | null): { text: string; count: number } {
   return { text, count: items.length };
 }
 
-ecCommerce.get('/api/ec-commerce/shipments', async (c) => {
+ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staff'), async (c) => {
   const requestedLimit = Number(c.req.query('limit') || '20');
   const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
 

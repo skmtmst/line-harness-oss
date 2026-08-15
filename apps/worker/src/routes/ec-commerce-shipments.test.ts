@@ -1,4 +1,6 @@
+import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
+import type { Env } from '../index.js';
 import { ecCommerce } from './ec-commerce.js';
 
 /**
@@ -27,7 +29,16 @@ function dbReturning(rows: Row[]) {
 }
 
 async function callShipments(rows: Row[], query = '') {
-  const res = await ecCommerce.request(`/api/ec-commerce/shipments${query}`, {}, {
+  // 注文内容を含むため、閲覧はスタッフ以上に限定した。ここで見たいのは
+  // payload の組み立てなので、認証は通った状態にしてから渡す。
+  // 権限そのものの検証は middleware/role-guard.test.ts が持つ。
+  const app = new Hono<Env>();
+  app.use('*', async (c, next) => {
+    c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false });
+    return next();
+  });
+  app.route('/', ecCommerce);
+  const res = await app.request(`/api/ec-commerce/shipments${query}`, {}, {
     DB: dbReturning(rows),
   } as never);
   expect(res.status).toBe(200);

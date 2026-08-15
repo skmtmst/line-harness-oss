@@ -161,7 +161,7 @@ conversions.get('/api/conversions/events', async (c) => {
 });
 
 // GET /api/conversions/report - aggregated report
-conversions.get('/api/conversions/report', async (c) => {
+conversions.get('/api/conversions/report', requireRole('owner', 'admin'), async (c) => {
   try {
     const report = await getConversionReport(c.env.DB, {
       startDate: c.req.query('startDate'),

@@ -146,7 +146,7 @@ supportInbox.get('/api/support/summary', async (c) => {
   }
 });
 
-supportInbox.get('/api/support/inbox', async (c) => {
+supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const channel = c.req.query('channel') || 'all';
     const status = c.req.query('status') || 'open';
