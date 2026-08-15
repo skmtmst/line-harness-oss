@@ -113,7 +113,7 @@ CREATE TABLE affiliates (
   is_active       INTEGER NOT NULL DEFAULT 1,
   friend_id       TEXT REFERENCES friends (id),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE auto_replies (
   id               TEXT PRIMARY KEY,
@@ -125,7 +125,7 @@ CREATE TABLE auto_replies (
   line_account_id  TEXT DEFAULT NULL,
   is_active        INTEGER NOT NULL DEFAULT 1,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE automation_logs (
   id             TEXT PRIMARY KEY,
@@ -294,7 +294,8 @@ CREATE TABLE conversion_points (
   event_type TEXT NOT NULL,
   value      REAL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, measure_method TEXT NOT NULL DEFAULT 'manual'
+  CHECK (measure_method IN ('url_reach', 'webhook', 'manual')), target_url TEXT, count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
 
 CREATE TABLE ec_events (
   id                TEXT PRIMARY KEY,
@@ -442,7 +443,7 @@ CREATE TABLE events (
   CHECK (target_type IN ('single', 'multi-account-dedup')), account_ids TEXT
   CHECK (account_ids IS NULL OR json_valid(account_ids)), dedup_priority TEXT
   CHECK (dedup_priority IS NULL OR json_valid(dedup_priority)), failed_account_ids TEXT
-  CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)), confirmation_message_extra TEXT, reminder_message_extra TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT,
+  CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)), confirmation_message_extra TEXT, reminder_message_extra TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, visible_tag_id TEXT, waitlist_enabled INTEGER NOT NULL DEFAULT 0, entry_cutoff_hours_before INTEGER,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
@@ -583,7 +584,7 @@ CREATE TABLE line_accounts (
   og_default_description TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT);
+, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT);
 
 CREATE TABLE link_clicks (
   id TEXT PRIMARY KEY,
@@ -635,7 +636,7 @@ CREATE TABLE menus (
   deleted_at            TEXT,
   auto_tag_id           TEXT,                  -- 予約申込時に friend に自動付与するタグ
   created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), concurrent_capacity INTEGER NOT NULL DEFAULT 1, booking_window_days INTEGER, cutoff_hours_before INTEGER, cancel_deadline_hours_before INTEGER, intake_question TEXT,
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id),
   FOREIGN KEY (auto_tag_id) REFERENCES tags(id) ON DELETE SET NULL
 );
@@ -979,7 +980,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT);
 
 CREATE TABLE pool_accounts (
   id TEXT PRIMARY KEY,
@@ -1015,7 +1016,8 @@ CREATE TABLE reminders (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT);
+, line_account_id TEXT, trigger_type TEXT NOT NULL DEFAULT 'manual'
+  CHECK (trigger_type IN ('manual', 'booking', 'event')), trigger_offset_minutes INTEGER, send_at_time TEXT, target_tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL);
 
 CREATE TABLE rich_menu_areas (
   id              TEXT PRIMARY KEY,
@@ -1215,6 +1217,14 @@ CREATE TABLE support_email_threads (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE tag_groups (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE tags (
   id                          TEXT PRIMARY KEY,
   name                        TEXT UNIQUE NOT NULL,
@@ -1224,7 +1234,7 @@ CREATE TABLE tags (
   mileage_multiplier_bps      INTEGER CHECK (mileage_multiplier_bps IS NULL OR mileage_multiplier_bps BETWEEN 1000 AND 100000),
   mileage_multiplier_priority INTEGER NOT NULL DEFAULT 0,
   created_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, group_id TEXT REFERENCES tag_groups(id) ON DELETE SET NULL);
 
 CREATE TABLE templates (
   id              TEXT PRIMARY KEY,
@@ -1552,6 +1562,9 @@ CREATE INDEX idx_friend_scores_friend ON friend_scores (friend_id);
 
 CREATE INDEX idx_friend_tags_tag_id ON friend_tags (tag_id);
 
+CREATE INDEX idx_friends_account_created
+  ON friends(line_account_id, created_at DESC);
+
 CREATE INDEX idx_friends_follow_tenure ON friends(is_following, current_follow_started_at);
 
 CREATE INDEX idx_friends_ig_igsid ON friends (ig_igsid);
@@ -1706,6 +1719,10 @@ CREATE INDEX idx_support_email_threads_customer_subject
 
 CREATE INDEX idx_support_email_threads_status_last
   ON support_email_threads (status, last_message_at DESC);
+
+CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
+
+CREATE INDEX idx_tags_group ON tags(group_id, name);
 
 CREATE INDEX idx_templates_category ON templates (category);
 
