@@ -16,6 +16,20 @@ import { requireRole } from '../middleware/role-guard.js';
 
 const webhooks = new Hono<Env>();
 
+/**
+ * 送り直しの回数を検証する。
+ *
+ * 上限を5にしているのは、待ち時間を倍にしていくと6回目以降は
+ * Worker の実行時間に収まらなくなるため。相手が長時間落ちている場合まで
+ * 面倒を見るなら、キューに積む別の設計が要る。
+ */
+function readMaxRetries(raw: unknown): { ok: true; value: number } | { ok: false } {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n > 5) return { ok: false };
+  return { ok: true, value: n };
+}
+
+
 const MIN_SECRET_LENGTH = 32;
 
 function validateSecret(secret: unknown): string | null {
@@ -199,6 +213,9 @@ webhooks.get('/api/webhooks/outgoing', async (c) => {
         eventTypes: JSON.parse(w.event_types),
         hasSecret: Boolean(w.secret && w.secret.length >= MIN_SECRET_LENGTH),
         isActive: Boolean(w.is_active),
+        maxRetries: w.max_retries ?? 0,
+        consecutiveFailures: w.consecutive_failures ?? 0,
+        lastFailedAt: w.last_failed_at ?? null,
         createdAt: w.created_at,
         updatedAt: w.updated_at,
       })),
@@ -216,6 +233,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       url: string;
       eventTypes?: string[];
       secret?: string;
+      maxRetries?: unknown;
     }>();
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
@@ -228,11 +246,20 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
     if (secretError) {
       return c.json({ success: false, error: secretError }, 400);
     }
+    let maxRetries = 0;
+    if (body.maxRetries !== undefined) {
+      const parsed = readMaxRetries(body.maxRetries);
+      if (!parsed.ok) {
+        return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 5' }, 400);
+      }
+      maxRetries = parsed.value;
+    }
     const item = await createOutgoingWebhook(c.env.DB, {
       name: body.name,
       url: body.url,
       eventTypes: body.eventTypes ?? [],
       secret: body.secret as string,
+      maxRetries,
     });
     return c.json(
       {
@@ -245,6 +272,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
           // Returned exactly once on create.
           secret: item.secret,
           isActive: Boolean(item.is_active),
+          maxRetries: item.max_retries ?? 0,
           createdAt: item.created_at,
         },
       },
@@ -265,7 +293,18 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       eventTypes?: string[];
       secret?: string;
       isActive?: boolean;
+      maxRetries?: unknown;
     }>();
+    // 検証済みの値だけを別に持つ。body をそのまま書き換えると unknown のまま
+    // 下流へ渡ることになる。
+    let maxRetries: number | undefined;
+    if (body.maxRetries !== undefined) {
+      const parsed = readMaxRetries(body.maxRetries);
+      if (!parsed.ok) {
+        return c.json({ success: false, error: 'maxRetries must be an integer between 0 and 5' }, 400);
+      }
+      maxRetries = parsed.value;
+    }
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
     }
@@ -307,7 +346,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateOutgoingWebhook(c.env.DB, id, body);
+    await updateOutgoingWebhook(c.env.DB, id, { ...body, maxRetries });
     const updated = await getOutgoingWebhookById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -319,6 +358,9 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         eventTypes: JSON.parse(updated.event_types),
         hasSecret: Boolean(updated.secret && updated.secret.length >= MIN_SECRET_LENGTH),
         isActive: Boolean(updated.is_active),
+        maxRetries: updated.max_retries ?? 0,
+        consecutiveFailures: updated.consecutive_failures ?? 0,
+        lastFailedAt: updated.last_failed_at ?? null,
       },
     });
   } catch (err) {
