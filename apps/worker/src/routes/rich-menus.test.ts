@@ -18,6 +18,12 @@ describe('POST /api/rich-menus/:id/image', () => {
         LINE_CHANNEL_ACCESS_TOKEN: string;
       };
     }>();
+    // 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
+    // 認証は通った状態にしてから渡す。権限の検証は role-guard.test.ts が持つ。
+    app.use('*', async (c, next) => {
+      (c as unknown as { set: (k: string, v: unknown) => void }).set('staff', { id: 'owner-1', name: 'Owner', role: 'owner' as const, readOnly: false });
+      return next();
+    });
     app.route('/', richMenus);
     return app;
   }

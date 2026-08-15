@@ -9,6 +9,7 @@ import {
   type BroadcastMessageAssetKind,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 import { storeBroadcastMedia } from '../services/broadcast-media-storage.js';
 
 const broadcastMessageAssets = new Hono<Env>();
@@ -45,7 +46,7 @@ broadcastMessageAssets.get('/api/broadcast-message-assets', async (c) => {
   return c.json({ success: true, data: rows.map(serialize) });
 });
 
-broadcastMessageAssets.post('/api/broadcast-message-assets', async (c) => {
+broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ lineAccountId?: string | null; kind?: BroadcastMessageAssetKind; name?: string; payload?: unknown }>();
   if (!body.kind || !ASSET_KINDS.has(body.kind) || !body.name?.trim()) {
     return c.json({ success: false, error: 'kind and name are required' }, 400);
@@ -61,7 +62,7 @@ broadcastMessageAssets.post('/api/broadcast-message-assets', async (c) => {
   return c.json({ success: true, data: row ? serialize(row) : null }, 201);
 });
 
-broadcastMessageAssets.put('/api/broadcast-message-assets/:id', async (c) => {
+broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), async (c) => {
   const existing = await getBroadcastMessageAsset(c.env.DB, c.req.param('id'));
   if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
   const body = await c.req.json<{ name?: string; payload?: unknown }>();
@@ -75,14 +76,14 @@ broadcastMessageAssets.put('/api/broadcast-message-assets/:id', async (c) => {
   return c.json({ success: true, data: row ? serialize(row) : null });
 });
 
-broadcastMessageAssets.delete('/api/broadcast-message-assets/:id', async (c) => {
+broadcastMessageAssets.delete('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), async (c) => {
   const deleted = await deleteBroadcastMessageAsset(c.env.DB, c.req.param('id'));
   return deleted
     ? c.json({ success: true, data: null })
     : c.json({ success: false, error: 'Not found' }, 404);
 });
 
-broadcastMessageAssets.post('/api/broadcast-message-assets/upload', async (c) => {
+broadcastMessageAssets.post('/api/broadcast-message-assets/upload', requireRole('owner', 'admin'), async (c) => {
   const mimeType = (c.req.header('Content-Type') ?? '').split(';')[0];
   const contentLength = Number(c.req.header('Content-Length'));
   const maxBytes = mimeType === 'video/mp4' ? 200 * 1024 * 1024 : 10 * 1024 * 1024;

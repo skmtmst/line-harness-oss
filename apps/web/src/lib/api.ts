@@ -117,6 +117,10 @@ if (!API_URL) {
  * directly, so the token is delivered in the login/session response body and
  * cached here.
  */
+// 一斉配信の本送信は取り消せない。サーバー側がこのヘッダを見て、
+// 画面の確認手順を経ずに URL を直接叩く操作を弾く。
+const IRREVERSIBLE_BROADCAST_HEADERS = { 'X-Confirm-Irreversible': 'broadcast-send' }
+
 export const CSRF_STORAGE_KEY = 'lh_csrf'
 
 export function getCsrfToken(): string {
@@ -683,8 +687,13 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/broadcasts/${id}`, { method: 'DELETE' }),
+    // 本送信は取り消せないため、サーバー側が確認ヘッダを要求する。
+    // 画面の確認ダイアログを経たことをここで示す。
     send: (id: string) =>
-      fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/send`, { method: 'POST' }),
+      fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/send`, {
+        method: 'POST',
+        headers: IRREVERSIBLE_BROADCAST_HEADERS,
+      }),
     getInsight: (id: string) =>
       fetchApi<ApiResponse<BroadcastInsight | null>>(`/api/broadcasts/${id}/insight`),
     fetchInsight: (id: string) =>
@@ -717,6 +726,7 @@ export const api = {
     sendSegment: (id: string, conditions: unknown) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/send-segment`, {
         method: 'POST',
+        headers: IRREVERSIBLE_BROADCAST_HEADERS,
         body: JSON.stringify({ conditions }),
       }),
     dedupPreview: (input: { accountIds: string[]; dedupPriority: string[]; targetTagId?: string | null }) =>

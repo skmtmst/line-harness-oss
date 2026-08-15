@@ -8,6 +8,7 @@ import {
 } from '@line-crm/db';
 import type { MessageTemplate } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const messageTemplates = new Hono<Env>();
 
@@ -46,7 +47,7 @@ messageTemplates.get('/api/message-templates/:id', async (c) => {
 });
 
 // POST /api/message-templates — create
-messageTemplates.post('/api/message-templates', async (c) => {
+messageTemplates.post('/api/message-templates', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -84,7 +85,7 @@ messageTemplates.post('/api/message-templates', async (c) => {
 });
 
 // PUT /api/message-templates/:id — update
-messageTemplates.put('/api/message-templates/:id', async (c) => {
+messageTemplates.put('/api/message-templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       name?: string;
@@ -124,7 +125,7 @@ messageTemplates.put('/api/message-templates/:id', async (c) => {
 });
 
 // DELETE /api/message-templates/:id — delete
-messageTemplates.delete('/api/message-templates/:id', async (c) => {
+messageTemplates.delete('/api/message-templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const deleted = await deleteMessageTemplate(c.env.DB, c.req.param('id'));
     if (!deleted) return c.json({ success: false, error: 'Not found' }, 404);

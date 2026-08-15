@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getLineAccountById, jstNow } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 import {
   buildDefaultColumnIntro,
   buildNenDeliveryMessages,
@@ -82,7 +83,7 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
   })) });
 });
 
-nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', async (c) => {
+nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', requireRole('owner', 'admin'), async (c) => {
   const key = c.req.param('campaignKey');
   if (!CAMPAIGN_KEYS.has(key)) return c.json({ success: false, error: 'Invalid campaign' }, 400);
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
@@ -111,7 +112,7 @@ nenCampaigns.put('/api/nen-campaigns/settings/:campaignKey', async (c) => {
   return c.json({ success: true });
 });
 
-nenCampaigns.post('/api/nen-campaigns/test-send', async (c) => {
+nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ campaignKey?: string; accountId?: string; friendId?: string }>().catch(() => null);
   if (!body?.campaignKey || !CAMPAIGN_KEYS.has(body.campaignKey) || !body.accountId || !body.friendId) {
     return c.json({ success: false, error: 'campaignKey, accountId and friendId are required' }, 400);
@@ -177,7 +178,7 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
   })) });
 });
 
-nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', async (c) => {
+nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ accountId?: string; scheduledAt?: string }>().catch(() => null);
   if (!body?.accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
   const when = body.scheduledAt && Number.isFinite(Date.parse(body.scheduledAt))
@@ -187,7 +188,7 @@ nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', async (c) => {
   return c.json({ success: true, data: { queued } });
 });
 
-nenCampaigns.put('/api/nen-campaigns/columns/:id/message', async (c) => {
+nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ introText?: string }>().catch(() => null);
   const introText = body?.introText?.trim() || '';
   if (!introText || introText.length > 1500) {
@@ -217,7 +218,7 @@ nenCampaigns.get('/api/nen-campaigns/pets', async (c) => {
   })) });
 });
 
-nenCampaigns.post('/api/nen-campaigns/pets', async (c) => {
+nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || typeof body.friendId !== 'string' || typeof body.name !== 'string' || !body.name.trim()) {
     return c.json({ success: false, error: 'friendId and name are required' }, 400);
@@ -235,7 +236,7 @@ nenCampaigns.post('/api/nen-campaigns/pets', async (c) => {
   return c.json({ success: true, data: { id } }, 201);
 });
 
-nenCampaigns.put('/api/nen-campaigns/pets/:id', async (c) => {
+nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   if (!body || typeof body.name !== 'string' || !body.name.trim()) return c.json({ success: false, error: 'name is required' }, 400);
   const animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
@@ -251,7 +252,7 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', async (c) => {
   return c.json({ success: true });
 });
 
-nenCampaigns.delete('/api/nen-campaigns/pets/:id', async (c) => {
+nenCampaigns.delete('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), async (c) => {
   const pet = await c.env.DB.prepare(`SELECT friend_id FROM nen_pet_profiles WHERE id = ?`)
     .bind(c.req.param('id')).first<{ friend_id: string }>();
   if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
@@ -269,7 +270,7 @@ nenCampaigns.get('/api/nen-campaigns/birthday-coupon', async (c) => {
   } });
 });
 
-nenCampaigns.put('/api/nen-campaigns/birthday-coupon', async (c) => {
+nenCampaigns.put('/api/nen-campaigns/birthday-coupon', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => null);
   const days = Number(body?.validityDays);
   const amount = Number(body?.discountAmount);
