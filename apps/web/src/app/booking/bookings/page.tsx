@@ -206,10 +206,11 @@ export default function BookingsPage() {
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              tab === key ? 'text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+            className={`rounded-pill px-3 py-1.5 text-xs font-medium transition-colors ${
+              tab === key
+                ? 'bg-accent text-on-accent'
+                : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
             }`}
-            style={tab === key ? { backgroundColor: '#06C755' } : undefined}
           >
             {label}
           </button>
@@ -410,8 +411,7 @@ function ActionButtons({
       <div className="inline-flex gap-1">
         <button
           onClick={() => onAction('approve')}
-          className="px-3 py-1 text-xs font-medium text-white rounded-md transition-opacity hover:opacity-90"
-          style={{ backgroundColor: '#06C755' }}
+          className="rounded-control bg-accent px-3 py-1 text-xs font-medium text-on-accent transition-colors hover:bg-accent-hover"
         >
           承認
         </button>

@@ -1,1 +1,57 @@
 @import "tailwindcss";
+
+/**
+ * デザイントークン。
+ *
+ * これまで色や角丸を各画面へ直接書いていた。実測すると #06c755 が99か所、
+ * グレーは gray と slate の2系統が混在し、text-gray-500 だけで479か所あった。
+ * この状態だと「アクセント色を変える」が50ページの一括置換になり、
+ * 見落としが必ず出る。
+ *
+ * ここで名前を与えて、以後は名前で参照する。値を変えるときは1か所で済む。
+ *
+ * 使い方（Tailwind v4 は @theme の変数からユーティリティを自動生成する）:
+ *   bg-accent / text-ink / border-hairline / rounded-card ...
+ *
+ * 既存のクラス（text-gray-500 など）はそのまま動く。置き換えは画面を
+ * 作り直すタイミングで順に行い、一度に全部は触らない。
+ */
+@theme {
+  /* --- 色 ---------------------------------------------------------------
+   * アクセントはLINEブランドの緑1色。状態色（成功・注意・危険）とは
+   * 役割が別で、アクセントを状態表示に使わない。
+   */
+  --color-accent: #06c755;
+  --color-accent-hover: #05b34c;
+  --color-accent-soft: #e8f8ee;
+  --color-on-accent: #ffffff;
+
+  /* 文字。ink が本文、ink-secondary が補足、ink-faint がラベル。
+   * 実測で最も多かった text-gray-500 / 400 / 900 に対応する。 */
+  --color-ink: #1a1c1a;
+  --color-ink-secondary: #565f59;
+  --color-ink-faint: #8b938d;
+
+  /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
+  --color-canvas: #ffffff;
+  --color-canvas-sunken: #f7f7f5;
+  --color-hairline: #e2e4df;
+
+  /* 状態。アクセントと混ぜない。 */
+  --color-success: #05913e;
+  --color-success-bg: #e8f8ee;
+  --color-warning: #94600a;
+  --color-warning-bg: #faf0dc;
+  --color-danger: #b3261e;
+  --color-danger-bg: #fce9e7;
+  --color-info: #0a6e80;
+  --color-info-bg: #e2f2f5;
+
+  /* --- 角丸 -------------------------------------------------------------
+   * 大きさで役割を分ける。カードは card、押せるものは control、
+   * 丸いものは pill。すべて rounded-lg で済ませない。
+   */
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+  --radius-pill: 9999px;
+}
