@@ -54,6 +54,14 @@ function formatJpDateTime(iso: string): string {
   })
 }
 
+function formatJpTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
+  })
+}
+
 export default function BookingsPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [tab, setTab] = useState<string>('requested')
@@ -64,6 +72,9 @@ export default function BookingsPage() {
   // 自動で「コピー済」が消えるので、A の URL をコピーしたまま B 画面で
   // 「B フォームと思い込んで送信」する事故を防ぐ。
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null)
+  // 詳細パネルは行の実体ではなく id を保持する。承認などで再読み込みしたあとも
+  // 最新の行を引き直せるので、パネルに古い状態が残らない。
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   const liffId = selectedAccount?.liffId ?? null
   // Worker `/o` は ref 解決・追跡なしで liffId を直接受けるラップ URL。
@@ -120,6 +131,13 @@ export default function BookingsPage() {
       alert(`操作に失敗しました: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
+
+  // タブ切替やアカウント切替で items が入れ替わったとき、開いていた予約が
+  // 一覧から消えることがある。その場合はパネルを閉じる。
+  const detail = detailId ? (items.find((b) => b.id === detailId) ?? null) : null
+  useEffect(() => {
+    if (detailId && !items.some((b) => b.id === detailId)) setDetailId(null)
+  }, [items, detailId])
 
   return (
     <div>
@@ -250,7 +268,15 @@ export default function BookingsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <ActionButtons status={b.status} onAction={(a) => handleDecide(b.id, a)} />
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => setDetailId(b.id)}
+                          className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
+                        >
+                          詳細
+                        </button>
+                        <ActionButtons status={b.status} onAction={(a) => handleDecide(b.id, a)} />
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -259,6 +285,115 @@ export default function BookingsPage() {
           </div>
         </div>
       )}
+
+      {detail && (
+        <BookingDetailPanel
+          booking={detail}
+          onClose={() => setDetailId(null)}
+          onAction={(a) => handleDecide(detail.id, a)}
+        />
+      )}
+    </div>
+  )
+}
+
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-4 py-2.5 border-b border-gray-100 last:border-b-0">
+      <span className="w-28 shrink-0 text-xs font-medium text-gray-500 pt-0.5">{label}</span>
+      <div className="flex-1 text-sm text-gray-900 break-words">{children}</div>
+    </div>
+  )
+}
+
+function BookingDetailPanel({
+  booking: b,
+  onClose,
+  onAction,
+}: {
+  booking: BookingRequest
+  onClose: () => void
+  onAction: (a: 'approve' | 'reject' | 'cancel' | 'no_show' | 'complete') => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <button
+        type="button"
+        aria-label="閉じる"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/30"
+      />
+      <aside className="relative h-full w-full max-w-md overflow-y-auto bg-white shadow-xl">
+        <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-xs text-gray-500">予約の詳細</p>
+            <h2 className="truncate text-base font-semibold text-gray-900">{b.menu_name}</h2>
+          </div>
+          <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${statusBadgeColor[b.status] ?? 'bg-gray-100'}`}>
+            {statusLabel[b.status] ?? b.status}
+          </span>
+          <button
+            onClick={onClose}
+            className="shrink-0 rounded-md px-2 py-1 text-sm text-gray-500 hover:bg-gray-100"
+          >
+            閉じる
+          </button>
+        </div>
+
+        <div className="px-5 py-4">
+          <section className="mb-6">
+            <h3 className="mb-1 text-sm font-semibold text-gray-900">予約内容</h3>
+            <DetailRow label="日時">
+              {formatJpDateTime(b.starts_at)} 〜 {formatJpTime(b.ends_at)}
+            </DetailRow>
+            <DetailRow label="担当">{b.staff_name}</DetailRow>
+            <DetailRow label="料金">
+              <span className="tabular-nums">¥{b.price_at_booking.toLocaleString()}</span>
+            </DetailRow>
+            <DetailRow label="予約番号">
+              <span className="font-mono text-xs text-gray-600">{b.id}</span>
+            </DetailRow>
+          </section>
+
+          <section className="mb-6">
+            <h3 className="mb-1 text-sm font-semibold text-gray-900">お客様</h3>
+            <DetailRow label="お名前">
+              <Link href={`/chats?friend=${b.friend_id}`} className="text-blue-600 hover:underline">
+                {b.friend_name ?? '名前未設定'}
+              </Link>
+            </DetailRow>
+            <DetailRow label="ご要望">
+              {b.customer_note ? (
+                <span className="whitespace-pre-wrap">{b.customer_note}</span>
+              ) : (
+                <span className="text-gray-400">記入なし</span>
+              )}
+            </DetailRow>
+          </section>
+
+          <section className="mb-6">
+            <h3 className="mb-1 text-sm font-semibold text-gray-900">記録</h3>
+            <DetailRow label="申込日時">{formatJpDateTime(b.requested_at)}</DetailRow>
+            <DetailRow label="決定日時">
+              {b.decided_at ? formatJpDateTime(b.decided_at) : <span className="text-gray-400">未決定</span>}
+            </DetailRow>
+            <DetailRow label="カレンダー">
+              {b.external_event_id ? (
+                <span className="text-green-700">Googleカレンダーに登録済み</span>
+              ) : (
+                <span className="text-gray-400">未連携</span>
+              )}
+            </DetailRow>
+          </section>
+
+          <div className="border-t border-gray-200 pt-4">
+            <p className="mb-2 text-xs text-gray-500">
+              承認するとお客様のLINEに確定のお知らせが届きます。
+            </p>
+            <ActionButtons status={b.status} onAction={onAction} />
+          </div>
+        </div>
+      </aside>
     </div>
   )
 }
