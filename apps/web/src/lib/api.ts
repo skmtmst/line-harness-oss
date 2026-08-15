@@ -703,6 +703,21 @@ export const api = {
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/saved-searches/${id}`, { method: 'DELETE' }),
   },
+  /**
+   * 機能のオン／オフ。account_settings の key/value に入る。
+   * 切ったものだけが記録され、記録が無ければ有効。
+   */
+  featureSettings: {
+    get: (accountId: string) =>
+      fetchApi<ApiResponse<{ features: Record<string, boolean>; sidebarOrder: string[] | null }>>(
+        `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    save: (accountId: string, data: { features?: Record<string, boolean>; sidebarOrder?: string[] }) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify(data) },
+      ),
+  },
   /** 汎用フォルダ。一覧13画面で共通に使う。 */
   folders: {
     list: (kind?: string) =>

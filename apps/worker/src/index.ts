@@ -96,6 +96,7 @@ import { supportInbox } from './routes/support-inbox.js';
 import { searchConsole } from './routes/search-console.js';
 import { friendFields } from './routes/friend-fields.js';
 import { friendAttributes } from './routes/friend-attributes.js';
+import { featureSettings } from './routes/feature-settings.js';
 import { receiveSupportEmail } from './services/support-email.js';
 import { qrResponseHeaders } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -253,6 +254,7 @@ app.route('/', supportInbox);
 app.route('/', searchConsole);
 app.route('/', friendFields);
 app.route('/', friendAttributes);
+app.route('/', featureSettings);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
