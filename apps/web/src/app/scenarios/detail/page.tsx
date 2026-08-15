@@ -8,7 +8,7 @@ export default function ScenarioDetailPage() {
   const id = searchParams.get('id')
   if (!id) {
     return (
-      <div className="p-8 text-center text-sm text-gray-500">
+      <div className="p-8 text-center text-sm text-ink-faint">
         シナリオ ID が指定されていません
       </div>
     )

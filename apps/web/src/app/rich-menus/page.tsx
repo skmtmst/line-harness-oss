@@ -21,8 +21,8 @@ type RichMenuGroupListItem = {
 function StatusBadge({ status }: { status: 'draft' | 'published' }) {
   const cls =
     status === 'published'
-      ? 'bg-green-100 text-green-800'
-      : 'bg-gray-100 text-gray-700'
+      ? 'bg-success-bg text-success'
+      : 'bg-canvas-sunken text-ink-secondary'
   return (
     <span className={`text-xs px-2 py-0.5 rounded ${cls}`}>
       {status === 'published' ? 'LINE 登録済み' : '下書き'}
@@ -165,8 +165,7 @@ export default function RichMenusListPage() {
         action={
           <Link
             href="/rich-menus/new"
-            className="inline-flex items-center gap-1 px-4 py-2 text-white rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover inline-flex items-center gap-1 rounded-control px-4 py-2 text-sm font-medium"
           >
             <span className="text-lg leading-none">+</span> 新規作成
           </Link>
@@ -174,17 +173,17 @@ export default function RichMenusListPage() {
       />
 
       {!selectedAccount && (
-        <div className="text-sm text-gray-500">
+        <div className="text-sm text-ink-faint">
           アカウントを選択してください。
         </div>
       )}
 
       {selectedAccount && loading && (
-        <div className="text-sm text-gray-500">読み込み中...</div>
+        <div className="text-sm text-ink-faint">読み込み中...</div>
       )}
 
       {selectedAccount && !loading && error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded mb-4">
+        <div className="bg-danger-bg border border-danger-bg text-danger text-sm p-3 rounded mb-4">
           {error}
         </div>
       )}
@@ -207,20 +206,19 @@ export default function RichMenusListPage() {
 
       {/* Admin 管理メニュー見出し */}
       {selectedAccount && !loading && !error && (
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
+        <h2 className="text-sm font-semibold text-ink-secondary mb-3">
           管理画面で作成・編集するメニュー
         </h2>
       )}
 
       {selectedAccount && !loading && !error && groups.length === 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-12 text-center">
-          <p className="text-gray-500 mb-4">
+        <div className="bg-white border border-hairline rounded-lg shadow-sm p-12 text-center">
+          <p className="text-ink-faint mb-4">
             まだリッチメニューが作成されていません。
           </p>
           <Link
             href="/rich-menus/new"
-            className="inline-flex items-center gap-1 px-4 py-2 text-white rounded-lg text-sm font-medium transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover inline-flex items-center gap-1 rounded-control px-4 py-2 text-sm font-medium"
           >
             <span className="text-lg leading-none">+</span> 最初のメニューを作る
           </Link>
@@ -232,15 +230,15 @@ export default function RichMenusListPage() {
           {groups.map((g) => (
             <div
               key={g.id}
-              className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col"
+              className="bg-white border border-hairline rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col"
             >
               <Link
                 href={`/rich-menus/edit?id=${g.id}`}
-                className="flex-1 hover:bg-gray-50 rounded-t-lg overflow-hidden"
+                className="flex-1 hover:bg-canvas-sunken rounded-t-lg overflow-hidden"
               >
                 {/* thumbnail */}
                 <div
-                  className="w-full bg-gray-100 border-b border-gray-100"
+                  className="w-full bg-canvas-sunken border-b border-hairline"
                   style={{
                     aspectRatio: g.size === 'large' ? '2500 / 1686' : '2500 / 843',
                   }}
@@ -253,20 +251,20 @@ export default function RichMenusListPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+                    <div className="w-full h-full flex items-center justify-center text-xs text-ink-faint">
                       画像未設定
                     </div>
                   )}
                 </div>
                 <div className="p-5">
                   <div className="flex items-start justify-between mb-2 gap-2">
-                    <h2 className="font-semibold text-gray-900 truncate">{g.name}</h2>
+                    <h2 className="font-semibold text-ink truncate">{g.name}</h2>
                     <StatusBadge status={g.status} />
                   </div>
-                  <p className="text-sm text-gray-500 truncate">
-                    トーク表示: <span className="text-gray-700">{g.chatBarText}</span>
+                  <p className="text-sm text-ink-faint truncate">
+                    トーク表示: <span className="text-ink-secondary">{g.chatBarText}</span>
                   </p>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-faint">
                     <span>サイズ: {g.size === 'large' ? '2500×1686' : '2500×843'}</span>
                     {g.isDefaultForAll && (
                       <span className="text-blue-600 font-medium">★ 全員のデフォルト</span>
@@ -274,25 +272,24 @@ export default function RichMenusListPage() {
                   </div>
                 </div>
               </Link>
-              <div className="border-t border-gray-100 px-4 py-2.5 flex justify-end gap-4 text-xs">
+              <div className="border-t border-hairline px-4 py-2.5 flex justify-end gap-4 text-xs">
                 {g.status === 'published' && (
                   <button
                     onClick={() => setApplyTo(g)}
-                    className="font-medium hover:underline"
-                    style={{ color: '#06C755' }}
+                    className="text-accent font-medium hover:underline"
                   >
                     友だちに表示
                   </button>
                 )}
                 <Link
                   href={`/rich-menus/edit?id=${g.id}`}
-                  className="text-gray-600 hover:underline"
+                  className="text-ink-secondary hover:underline"
                 >
                   編集
                 </Link>
                 <button
                   onClick={() => handleDelete(g)}
-                  className="text-gray-400 hover:text-red-600 hover:underline"
+                  className="text-ink-faint hover:text-red-600 hover:underline"
                   title={g.status === 'published' ? 'LINE から取り下げてから削除' : '削除'}
                 >
                   削除
@@ -339,12 +336,12 @@ function ExternalSection({
   const unmanagedCount = lineMenus.filter((m) => !m.adminManaged).length
 
   return (
-    <section className="mb-8 bg-white border border-gray-200 rounded-lg shadow-sm p-5">
+    <section className="mb-8 bg-white border border-hairline rounded-lg shadow-sm p-5">
       <div className="flex items-baseline justify-between gap-3 mb-3">
-        <h2 className="text-sm font-semibold text-gray-900">
+        <h2 className="text-sm font-semibold text-ink">
           LINE 公式アカウントの現状
         </h2>
-        <span className="text-xs text-gray-500 truncate">{accountName}</span>
+        <span className="text-xs text-ink-faint truncate">{accountName}</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
@@ -354,11 +351,11 @@ function ExternalSection({
           </div>
           {currentDefaultMenu ? (
             <div>
-              <div className="font-medium text-gray-900 truncate">
+              <div className="font-medium text-ink truncate">
                 {currentDefaultMenu.name}
               </div>
               {currentDefaultMenu.adminInfo ? (
-                <div className="text-xs text-gray-600 truncate">
+                <div className="text-xs text-ink-secondary truncate">
                   管理画面: {currentDefaultMenu.adminInfo.groupName}
                 </div>
               ) : (
@@ -366,19 +363,19 @@ function ExternalSection({
               )}
             </div>
           ) : (
-            <div className="text-gray-500 text-xs">設定なし</div>
+            <div className="text-ink-faint text-xs">設定なし</div>
           )}
           {currentDefault && (
-            <div className="text-[10px] text-gray-400 font-mono mt-1 truncate">
+            <div className="text-[10px] text-ink-faint font-mono mt-1 truncate">
               {currentDefault}
             </div>
           )}
         </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <div className="text-xs text-gray-700 font-medium mb-0.5">
+        <div className="bg-canvas-sunken border border-hairline rounded-lg p-3">
+          <div className="text-xs text-ink-secondary font-medium mb-0.5">
             LINE 上に登録されているメニュー
           </div>
-          <div className="font-medium text-gray-900">{lineMenus.length} 個</div>
+          <div className="font-medium text-ink">{lineMenus.length} 個</div>
           {unmanagedCount > 0 && (
             <div className="text-xs text-amber-700">
               うち {unmanagedCount} 個が管理画面外
@@ -388,14 +385,14 @@ function ExternalSection({
       </div>
 
       {lineMenus.length === 0 ? (
-        <div className="text-xs text-gray-500 py-3">
+        <div className="text-xs text-ink-faint py-3">
           LINE 公式アカウントにはまだ rich menu が登録されていません。
         </div>
       ) : (
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="border border-hairline rounded-lg overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr className="text-left text-xs font-medium text-gray-600">
+            <thead className="bg-canvas-sunken">
+              <tr className="text-left text-xs font-medium text-ink-secondary">
                 <th className="px-3 py-2 w-[88px]">画像</th>
                 <th className="px-3 py-2">名前</th>
                 <th className="px-3 py-2">サイズ</th>
@@ -405,10 +402,10 @@ function ExternalSection({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {sortedMenus.map((m) => (
-                <tr key={m.richMenuId} className="text-gray-700">
+                <tr key={m.richMenuId} className="text-ink-secondary">
                   <td className="px-3 py-2.5">
                     <div
-                      className="w-20 bg-gray-100 rounded overflow-hidden"
+                      className="w-20 bg-canvas-sunken rounded overflow-hidden"
                       style={{
                         aspectRatio:
                           m.size.width === 2500 && m.size.height === 1686
@@ -439,25 +436,25 @@ function ExternalSection({
                       )}
                       <span className="font-medium truncate max-w-[180px]">{m.name}</span>
                     </div>
-                    <div className="text-[11px] text-gray-500 truncate max-w-[200px]">
+                    <div className="text-[11px] text-ink-faint truncate max-w-[200px]">
                       {m.chatBarText}
                     </div>
-                    <div className="text-[10px] text-gray-400 font-mono truncate max-w-[280px]">
+                    <div className="text-[10px] text-ink-faint font-mono truncate max-w-[280px]">
                       {m.richMenuId}
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">
+                  <td className="px-3 py-2.5 text-xs text-ink-secondary whitespace-nowrap">
                     {m.size.width}×{m.size.height}
-                    <div className="text-[10px] text-gray-400">{m.areasCount} エリア</div>
+                    <div className="text-[10px] text-ink-faint">{m.areasCount} エリア</div>
                   </td>
                   <td className="px-3 py-2.5 text-xs">
                     {m.adminManaged && m.adminInfo ? (
                       <Link
                         href={`/rich-menus/edit?id=${m.adminInfo.groupId}`}
-                        className="text-gray-700 hover:underline"
+                        className="text-ink-secondary hover:underline"
                       >
                         管理画面 → {m.adminInfo.groupName}
-                        <span className="text-gray-400 ml-1">({m.adminInfo.pageName})</span>
+                        <span className="text-ink-faint ml-1">({m.adminInfo.pageName})</span>
                       </Link>
                     ) : (
                       <span
@@ -473,15 +470,14 @@ function ExternalSection({
                       <div className="flex flex-col items-end gap-1">
                         <button
                           onClick={() => onImport(m)}
-                          className="text-xs font-medium hover:underline"
-                          style={{ color: '#06C755' }}
+                          className="text-accent text-xs font-medium hover:underline"
                           title="管理画面に取り込んで以後 UI で操作可能にする"
                         >
                           管理画面に取り込む
                         </button>
                         <button
                           onClick={() => onDeleteExternal(m)}
-                          className="text-xs text-gray-400 hover:text-red-600 hover:underline"
+                          className="text-xs text-ink-faint hover:text-red-600 hover:underline"
                           title="LINE から削除 (管理画面外メニューのみ)"
                         >
                           LINE から削除

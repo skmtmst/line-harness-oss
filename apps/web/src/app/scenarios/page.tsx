@@ -131,8 +131,7 @@ export default function ScenariosPage() {
         action={
           <button
             onClick={() => setPickerOpen(true)}
-            className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 min-h-[44px] text-sm font-medium"
           >
             + 新規シナリオ
           </button>
@@ -140,7 +139,7 @@ export default function ScenariosPage() {
       />
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
@@ -154,12 +153,12 @@ export default function ScenariosPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-5 animate-pulse space-y-3">
+            <div key={i} className="bg-canvas rounded-card border border-hairline p-5 animate-pulse space-y-3">
               <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-gray-100 rounded w-full" />
+              <div className="h-3 bg-canvas-sunken rounded w-full" />
               <div className="flex gap-4">
-                <div className="h-3 bg-gray-100 rounded w-24" />
-                <div className="h-3 bg-gray-100 rounded w-16" />
+                <div className="h-3 bg-canvas-sunken rounded w-24" />
+                <div className="h-3 bg-canvas-sunken rounded w-16" />
               </div>
             </div>
           ))}
