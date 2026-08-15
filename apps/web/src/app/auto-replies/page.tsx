@@ -22,6 +22,10 @@ interface AutoReply {
   templateId: string | null
   lineAccountId: string | null
   isActive: boolean
+  activeFrom: string | null
+  activeUntil: string | null
+  cooldownMinutes: number | null
+  skipWhenOperatorActive: boolean
   createdAt: string
   effectiveAccounts?: EffectiveAccount[]
 }
@@ -34,6 +38,21 @@ interface TemplateLite {
 }
 
 const matchTypeLabel: Record<'exact' | 'contains', string> = { exact: '完全一致', contains: '包含' }
+
+/**
+ * 設定してある条件をその場で読める形にする。
+ * 条件が無いものは何も出さない。「条件なし」と書くと、条件付きの行が
+ * 埋もれてしまう。
+ */
+function conditionChips(r: AutoReply) {
+  const chips: string[] = []
+  if (r.activeFrom || r.activeUntil) {
+    chips.push(`${r.activeFrom ?? ''}〜${r.activeUntil ?? ''}`)
+  }
+  if (r.cooldownMinutes) chips.push(`${r.cooldownMinutes}分あけて`)
+  if (r.skipWhenOperatorActive) chips.push('対応中は止める')
+  return chips
+}
 
 export default function AutoRepliesPage() {
   const { selectedAccountId, accounts } = useAccount()
@@ -182,13 +201,14 @@ export default function AutoRepliesPage() {
 
       <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px]">
+          <table className="w-full min-w-[1000px]">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">keyword</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">match</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">response</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">template</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">返す条件</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">適用アカウント</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">状態</th>
                 <th className="px-4 py-3" />
@@ -196,9 +216,9 @@ export default function AutoRepliesPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
               ) : (
                 items.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
@@ -206,6 +226,18 @@ export default function AutoRepliesPage() {
                     <td className="px-4 py-3 text-xs text-ink-secondary">{matchTypeLabel[r.matchType]}</td>
                     <td className="px-4 py-3">{renderResponseCell(r)}</td>
                     <td className="px-4 py-3">{renderTemplateCell(r)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {conditionChips(r).map((label) => (
+                          <span
+                            key={label}
+                            className="bg-canvas-sunken text-ink-secondary rounded-pill px-1.5 py-0.5 text-[10px] whitespace-nowrap"
+                          >
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">{renderEffectiveCell(r)}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}>
@@ -223,6 +255,10 @@ export default function AutoRepliesPage() {
                           templateId: r.templateId,
                           lineAccountId: r.lineAccountId,
                           isActive: r.isActive,
+                          activeFrom: r.activeFrom,
+                          activeUntil: r.activeUntil,
+                          cooldownMinutes: r.cooldownMinutes,
+                          skipWhenOperatorActive: r.skipWhenOperatorActive,
                         })}
                         className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md"
                       >

@@ -2,6 +2,7 @@ import type { LineClient } from '@line-crm/line-sdk';
 import { getTemplateById } from '@line-crm/db';
 import type { AutoReply, Friend } from '@line-crm/db';
 import { logOutgoingMessage } from './event-bus.js';
+import { shouldReply } from './auto-reply-conditions.js';
 import {
   buildMessage,
   expandVariables,
@@ -77,7 +78,18 @@ export async function matchAndReply(
     .bind(lineAccountId)
     .all<AutoReply>();
 
-  const rule = autoReplies.results.find((r) => keywordMatches(r, incomingText));
+  // キーワードが合っても、時間帯・連投抑制・有人対応で返さないことがある。
+  // 合ったものを1件だけ見るのではなく、条件まで通る最初の1件を探す。
+  // 「営業時間内はAで返し、時間外はBで返す」を2行で書けるようにするため。
+  const now = new Date();
+  let rule: AutoReply | undefined;
+  for (const candidate of autoReplies.results) {
+    if (!keywordMatches(candidate, incomingText)) continue;
+    if (await shouldReply(db, candidate, friend.id, now)) {
+      rule = candidate;
+      break;
+    }
+  }
   if (!rule) return { matched: false, replyTokenConsumed: false };
   if (rule.response_type === 'silent') return { matched: true, replyTokenConsumed: false };
 

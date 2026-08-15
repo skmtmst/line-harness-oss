@@ -1097,6 +1097,10 @@ export const api = {
         templateId: string | null;
         lineAccountId: string | null;
         isActive: boolean;
+        activeFrom: string | null;
+        activeUntil: string | null;
+        cooldownMinutes: number | null;
+        skipWhenOperatorActive: boolean;
         createdAt: string;
         effectiveAccounts?: Array<{
           accountId: string;
@@ -1116,6 +1120,10 @@ export const api = {
         templateId: string | null;
         lineAccountId: string | null;
         isActive: boolean;
+        activeFrom: string | null;
+        activeUntil: string | null;
+        cooldownMinutes: number | null;
+        skipWhenOperatorActive: boolean;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {
@@ -1125,6 +1133,13 @@ export const api = {
       responseContent?: string;
       templateId?: string | null;
       lineAccountId?: string | null;
+      /** JST の "HH:MM"。null で時間帯を問わない */
+      activeFrom?: string | null;
+      activeUntil?: string | null;
+      /** この分数は同じ相手へ自動応答を返さない。null/0 で抑制しない */
+      cooldownMinutes?: number | null;
+      /** 担当者が対応中のトークでは返さない */
+      skipWhenOperatorActive?: boolean;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -1138,6 +1153,10 @@ export const api = {
       templateId?: string | null;
       lineAccountId?: string | null;
       isActive?: boolean;
+      activeFrom?: string | null;
+      activeUntil?: string | null;
+      cooldownMinutes?: number | null;
+      skipWhenOperatorActive?: boolean;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',

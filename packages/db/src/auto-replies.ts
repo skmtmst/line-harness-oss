@@ -12,6 +12,13 @@ export interface AutoReply {
   template_id: string | null;
   line_account_id: string | null;
   is_active: number;
+  /** 返す時間帯（JST の HH:MM）。NULL なら時間帯を問わない */
+  active_from: string | null;
+  active_until: string | null;
+  /** 同じ相手へ自動応答を返してから、この分数は返さない。NULL なら抑制しない */
+  cooldown_minutes: number | null;
+  /** 担当者が対応中のトークでは返さない（1）か、返す（0）か */
+  skip_when_operator_active: number;
   created_at: string;
 }
 
@@ -51,6 +58,10 @@ export interface CreateAutoReplyInput {
   responseContent: string;
   templateId?: string | null;
   lineAccountId?: string | null;
+  activeFrom?: string | null;
+  activeUntil?: string | null;
+  cooldownMinutes?: number | null;
+  skipWhenOperatorActive?: boolean;
 }
 
 export async function createAutoReply(
@@ -64,8 +75,10 @@ export async function createAutoReply(
     .prepare(
       `INSERT INTO auto_replies
          (id, keyword, match_type, response_type, response_content,
-          template_id, line_account_id, is_active, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+          template_id, line_account_id, is_active,
+          active_from, active_until, cooldown_minutes, skip_when_operator_active,
+          created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -75,6 +88,10 @@ export async function createAutoReply(
       input.responseContent,
       input.templateId ?? null,
       input.lineAccountId ?? null,
+      input.activeFrom ?? null,
+      input.activeUntil ?? null,
+      input.cooldownMinutes ?? null,
+      input.skipWhenOperatorActive ? 1 : 0,
       now,
     )
     .run();
@@ -90,6 +107,10 @@ export interface UpdateAutoReplyInput {
   templateId?: string | null;
   lineAccountId?: string | null;
   isActive?: boolean;
+  activeFrom?: string | null;
+  activeUntil?: string | null;
+  cooldownMinutes?: number | null;
+  skipWhenOperatorActive?: boolean;
 }
 
 export async function updateAutoReply(
@@ -112,6 +133,10 @@ export async function updateAutoReply(
            template_id = ?,
            line_account_id = ?,
            is_active = ?,
+           active_from = ?,
+           active_until = ?,
+           cooldown_minutes = ?,
+           skip_when_operator_active = ?,
            created_at = ?
        WHERE id = ?`,
     )
@@ -123,6 +148,12 @@ export async function updateAutoReply(
       'templateId' in input ? (input.templateId ?? null) : existing.template_id,
       'lineAccountId' in input ? (input.lineAccountId ?? null) : existing.line_account_id,
       'isActive' in input ? (input.isActive ? 1 : 0) : existing.is_active,
+      'activeFrom' in input ? (input.activeFrom ?? null) : existing.active_from,
+      'activeUntil' in input ? (input.activeUntil ?? null) : existing.active_until,
+      'cooldownMinutes' in input ? (input.cooldownMinutes ?? null) : existing.cooldown_minutes,
+      'skipWhenOperatorActive' in input
+        ? (input.skipWhenOperatorActive ? 1 : 0)
+        : existing.skip_when_operator_active,
       existing.created_at,
       id,
     )
