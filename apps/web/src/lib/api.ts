@@ -1401,12 +1401,15 @@ export const api = {
     outgoing: {
       list: () =>
         fetchApi<ApiResponse<OutgoingWebhook[]>>('/api/webhooks/outgoing'),
-      create: (data: { name: string; url: string; eventTypes: string[]; secret: string }) =>
+      create: (data: { name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive'>> & { secret?: string }) =>
+      update: (
+        id: string,
+        data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string },
+      ) =>
         fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}`, {
           method: 'PUT',
           body: JSON.stringify(data),

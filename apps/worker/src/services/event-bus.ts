@@ -20,6 +20,7 @@ import {
   jstNow,
   getFriendScore,
 } from '@line-crm/db';
+import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
@@ -90,27 +91,16 @@ async function fireOutgoingWebhooks(
           timestamp: jstNow(),
           data: payload,
         });
-
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-
-        // HMAC署名（シークレットがある場合）
-        if (wh.secret) {
-          const encoder = new TextEncoder();
-          const key = await crypto.subtle.importKey(
-            'raw',
-            encoder.encode(wh.secret),
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign'],
+        // 以前は fetch を投げっぱなしにしていて、相手が 500 を返しても
+        // 成功として扱っていた（例外にならないため）。deliverWebhook は
+        // 応答の状態まで見て、必要なら送り直す。
+        const result = await deliverWebhook(wh, body);
+        if (!result.ok) {
+          console.error(
+            `送信Webhook ${wh.id} 失敗 (${result.attempts}回試行, 最後の応答=${result.lastStatus ?? '接続不可'})`,
           );
-          const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-          const hexSignature = Array.from(new Uint8Array(signature))
-            .map((b) => b.toString(16).padStart(2, '0'))
-            .join('');
-          headers['X-Webhook-Signature'] = hexSignature;
         }
-
-        await fetch(wh.url, { method: 'POST', headers, body });
+        await recordDeliveryOutcome(db, wh.id, result.ok);
       } catch (err) {
         console.error(`送信Webhook ${wh.id} への通知失敗:`, err);
       }

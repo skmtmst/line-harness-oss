@@ -617,6 +617,12 @@ export interface OutgoingWebhook {
   eventTypes: string[];
   hasSecret: boolean;
   isActive: boolean;
+  /** 失敗したとき何回まで送り直すか。0 なら送り直さない */
+  maxRetries?: number;
+  /** 連続して失敗している回数。成功すると 0 に戻る */
+  consecutiveFailures?: number;
+  /** 最後に失敗した時刻。成功すると null に戻る */
+  lastFailedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
