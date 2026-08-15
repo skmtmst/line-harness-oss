@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import type { Tag } from '@line-crm/shared'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
@@ -113,22 +113,76 @@ function TagMileageEditor({ tag, onSaved }: { tag: Tag; onSaved: () => void }) {
   )
 }
 
+/** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
+const UNGROUPED = '__ungrouped__'
+
+/**
+ * 分類ごとにタグを並べる一行。分類の付け替えは一覧から直接できるようにする。
+ * 編集画面を開かせると、10個並べ替えるのに10回開くことになる。
+ */
+function TagGroupSelect({
+  tag,
+  groups,
+  onChanged,
+}: {
+  tag: Tag
+  groups: TagGroup[]
+  onChanged: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+  return (
+    <select
+      aria-label={`${tag.name}の分類`}
+      value={tag.groupId ?? ''}
+      disabled={saving}
+      onChange={async (e) => {
+        const next = e.target.value === '' ? null : e.target.value
+        setSaving(true)
+        try {
+          await api.tags.setGroup(tag.id, next)
+          onChanged()
+        } finally {
+          setSaving(false)
+        }
+      }}
+      className="border-hairline rounded-control max-w-[10rem] border px-2 py-1.5 text-sm disabled:opacity-40"
+    >
+      <option value="">未分類</option>
+      {groups.map((g) => (
+        <option key={g.id} value={g.id}>
+          {g.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 export default function TagsPage() {
   const [items, setItems] = useState<Tag[]>([])
+  const [groups, setGroups] = useState<TagGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState(PRESET_COLORS[0])
+  const [newGroupId, setNewGroupId] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const [filter, setFilter] = useState<string>('')
+  const [groupName, setGroupName] = useState('')
+  const [addingGroup, setAddingGroup] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await api.tags.list({ withCounts: true })
-      if (res.success) setItems(res.data)
+      const [tagsRes, groupsRes] = await Promise.all([
+        api.tags.list({ withCounts: true }),
+        api.tagGroups.list(),
+      ])
+      if (tagsRes.success) setItems(tagsRes.data)
+      if (groupsRes.success) setGroups(groupsRes.data)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
@@ -137,6 +191,51 @@ export default function TagsPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const visible = useMemo(() => {
+    if (filter === '') return items
+    if (filter === UNGROUPED) return items.filter((t) => !t.groupId)
+    return items.filter((t) => t.groupId === filter)
+  }, [items, filter])
+
+  const ungroupedCount = useMemo(() => items.filter((t) => !t.groupId).length, [items])
+
+  const handleAddGroup = async () => {
+    const name = groupName.trim()
+    if (!name) return
+    if (groups.some((g) => g.name === name)) {
+      setError(`分類「${name}」は既にあります`)
+      return
+    }
+    setAddingGroup(true)
+    setError('')
+    try {
+      await api.tagGroups.create({ name, sortOrder: groups.length })
+      setGroupName('')
+      load()
+    } catch {
+      setError('分類の作成に失敗しました')
+    } finally {
+      setAddingGroup(false)
+    }
+  }
+
+  const handleDeleteGroup = async (group: TagGroup) => {
+    const count = items.filter((t) => t.groupId === group.id).length
+    const message =
+      count > 0
+        ? `分類「${group.name}」を削除しますか？\n${count} 個のタグは削除されず、未分類に戻ります。`
+        : `分類「${group.name}」を削除しますか？`
+    if (!confirm(message)) return
+    setError('')
+    try {
+      await api.tagGroups.delete(group.id)
+      if (filter === group.id) setFilter('')
+      load()
+    } catch {
+      setError('分類の削除に失敗しました')
+    }
+  }
 
   const handleCreate = async () => {
     if (saving) return
@@ -149,7 +248,7 @@ export default function TagsPage() {
     setSaving(true)
     setError('')
     try {
-      await api.tags.create({ name, color: newColor })
+      await api.tags.create({ name, color: newColor, groupId: newGroupId || null })
       setNewName('')
       setCreating(false)
       load()
@@ -205,6 +304,83 @@ export default function TagsPage() {
         </div>
       )}
 
+      {/* 分類。一覧の上に置いて、ここで絞り込みと分類の追加の両方をする。
+          下に置くと、タグが増えたときにスクロールしないと分類を触れなくなる。 */}
+      <div className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-ink-faint mr-1 text-xs font-semibold">分類</span>
+          <button
+            onClick={() => setFilter('')}
+            className={`rounded-pill px-3 py-1 text-sm transition-colors ${
+              filter === ''
+                ? 'bg-accent text-on-accent'
+                : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+            }`}
+          >
+            すべて
+            <span className="ml-1.5 tabular-nums opacity-70">{items.length}</span>
+          </button>
+          {groups.map((g) => {
+            const count = items.filter((t) => t.groupId === g.id).length
+            return (
+              <span key={g.id} className="group inline-flex items-center">
+                <button
+                  onClick={() => setFilter(g.id)}
+                  className={`rounded-pill px-3 py-1 text-sm transition-colors ${
+                    filter === g.id
+                      ? 'bg-accent text-on-accent'
+                      : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                  }`}
+                >
+                  {g.name}
+                  <span className="ml-1.5 tabular-nums opacity-70">{count}</span>
+                </button>
+                <button
+                  onClick={() => handleDeleteGroup(g)}
+                  aria-label={`分類「${g.name}」を削除`}
+                  title={`分類「${g.name}」を削除（タグは残ります）`}
+                  className="text-ink-faint hover:text-danger ml-0.5 px-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                >
+                  ×
+                </button>
+              </span>
+            )
+          })}
+          <button
+            onClick={() => setFilter(UNGROUPED)}
+            className={`rounded-pill px-3 py-1 text-sm transition-colors ${
+              filter === UNGROUPED
+                ? 'bg-accent text-on-accent'
+                : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+            }`}
+          >
+            未分類
+            <span className="ml-1.5 tabular-nums opacity-70">{ungroupedCount}</span>
+          </button>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddGroup() }}
+            placeholder="例: お悩み"
+            aria-label="新しい分類名"
+            className="border-hairline rounded-control focus:ring-accent w-48 border px-3 py-1.5 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
+          />
+          <button
+            onClick={handleAddGroup}
+            disabled={addingGroup || !groupName.trim()}
+            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+          >
+            {addingGroup ? '追加中...' : '分類を追加'}
+          </button>
+          <span className="text-ink-faint text-xs">
+            分類を削除しても、属していたタグは未分類として残ります。
+          </span>
+        </div>
+      </div>
+
       {creating && (
         <div className="mb-4 p-4 bg-canvas rounded-card border border-hairline">
           <div className="flex flex-wrap items-end gap-4">
@@ -241,6 +417,27 @@ export default function TagsPage() {
                 />
               </div>
             </div>
+            <div>
+              <label
+                htmlFor="new-tag-group"
+                className="block text-xs font-semibold text-ink-faint mb-1.5"
+              >
+                分類
+              </label>
+              <select
+                id="new-tag-group"
+                value={newGroupId}
+                onChange={(e) => setNewGroupId(e.target.value)}
+                className="border-hairline rounded-control border px-3 py-2 text-sm"
+              >
+                <option value="">未分類</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={handleCreate}
@@ -262,10 +459,11 @@ export default function TagsPage() {
 
       <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1020px]">
+          <table className="w-full min-w-[1180px]">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">分類</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち数</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">作成日</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">獲得マイル</th>
@@ -278,14 +476,19 @@ export default function TagsPage() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
-              ) : items.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-faint text-sm">タグがありません</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
+              ) : visible.length === 0 ? (
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">
+                  {items.length === 0 ? 'タグがありません' : 'この分類のタグはありません'}
+                </td></tr>
               ) : (
-                items.map((t) => (
+                visible.map((t) => (
                   <tr key={t.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3">
                       <TagBadge tag={t} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <TagGroupSelect tag={t} groups={groups} onChanged={load} />
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {t.friendCount ?? 0}

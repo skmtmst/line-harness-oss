@@ -4,11 +4,20 @@ export interface Tag {
   id: string;
   name: string;
   color: string;
+  group_id: string | null;
   mileage_reward: number;
   referral_mileage_reward: number;
   mileage_multiplier_bps: number | null;
   mileage_multiplier_priority: number;
   created_at: string;
+}
+
+export interface TagGroup {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface FriendTag {
@@ -46,6 +55,7 @@ export async function getTagsWithCounts(
 export interface CreateTagInput {
   name: string;
   color?: string;
+  groupId?: string | null;
 }
 
 export async function createTag(
@@ -58,10 +68,10 @@ export async function createTag(
 
   await db
     .prepare(
-      `INSERT INTO tags (id, name, color, created_at)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO tags (id, name, color, group_id, created_at)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, color, now)
+    .bind(id, input.name, color, input.groupId ?? null, now)
     .run();
 
   return (await db
@@ -70,8 +80,102 @@ export async function createTag(
     .first<Tag>())!;
 }
 
+/**
+ * タグの所属分類を変える。null で「未分類」に戻す。
+ *
+ * 名前や色の変更と分けているのは、分類の付け替えが一覧の画面から
+ * 一括で行われる操作で、名前の編集とは使われ方が違うため。
+ */
+export async function assignTagToGroup(
+  db: D1Database,
+  id: string,
+  groupId: string | null,
+): Promise<Tag | null> {
+  await db
+    .prepare(`UPDATE tags SET group_id = ? WHERE id = ?`)
+    .bind(groupId, id)
+    .run();
+  return (
+    (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ??
+    null
+  );
+}
+
 export async function deleteTag(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM tags WHERE id = ?`).bind(id).run();
+}
+
+// --- タグの親分類 -----------------------------------------------------------
+//
+// 「お悩み」「ペット」のような分類でタグをまとめる。分類は入れ子にしない。
+// 二段で足りることが分かっているし、階層を許すと画面もクエリも一気に複雑になる。
+
+export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
+  const result = await db
+    .prepare(`SELECT * FROM tag_groups ORDER BY sort_order ASC, name ASC`)
+    .all<TagGroup>();
+  return result.results;
+}
+
+export async function createTagGroup(
+  db: D1Database,
+  input: { name: string; sortOrder?: number },
+): Promise<TagGroup> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  await db
+    .prepare(
+      `INSERT INTO tag_groups (id, name, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .bind(id, input.name, input.sortOrder ?? 0, now, now)
+    .run();
+  return (await db
+    .prepare(`SELECT * FROM tag_groups WHERE id = ?`)
+    .bind(id)
+    .first<TagGroup>())!;
+}
+
+export async function updateTagGroup(
+  db: D1Database,
+  id: string,
+  input: { name?: string; sortOrder?: number },
+): Promise<TagGroup | null> {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    values.push(input.name);
+  }
+  if (input.sortOrder !== undefined) {
+    sets.push('sort_order = ?');
+    values.push(input.sortOrder);
+  }
+  if (sets.length > 0) {
+    sets.push('updated_at = ?');
+    values.push(jstNow(), id);
+    await db
+      .prepare(`UPDATE tag_groups SET ${sets.join(', ')} WHERE id = ?`)
+      .bind(...values)
+      .run();
+  }
+  return (
+    (await db
+      .prepare(`SELECT * FROM tag_groups WHERE id = ?`)
+      .bind(id)
+      .first<TagGroup>()) ?? null
+  );
+}
+
+/**
+ * 分類を消す。属していたタグは消さず「未分類」に戻る
+ * （tags.group_id は ON DELETE SET NULL）。
+ *
+ * 分類は入れ物であって、タグそのものではない。入れ物を捨てたら中身も
+ * 捨てる、では友だちに付いたタグまで巻き込まれる。
+ */
+export async function deleteTagGroup(db: D1Database, id: string): Promise<void> {
+  await db.prepare(`DELETE FROM tag_groups WHERE id = ?`).bind(id).run();
 }
 
 export async function addTagToFriend(

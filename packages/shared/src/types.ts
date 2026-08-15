@@ -85,6 +85,8 @@ export interface Tag {
   name: string;
   /** 表示色 (HEX: #RRGGBB) */
   color: string;
+  /** 所属する親分類のID。null は未分類 */
+  groupId?: string | null;
   /** このタグを初めて獲得したときに付与するマイル */
   mileageReward?: number;
   /** 紹介された友だちがこのタグを獲得したとき、紹介者へ付与するマイル */
@@ -97,6 +99,23 @@ export interface Tag {
   createdAt: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
   friendCount?: number;
+}
+
+/**
+ * タグの親分類。「お悩み」「ペット」のようにタグをまとめる。
+ * 入れ子にはしない（二段で足りる）。
+ */
+export interface TagGroup {
+  /** 主キー (UUIDv4) */
+  id: string;
+  /** 分類名 */
+  name: string;
+  /** 一覧での並び順。小さいほど上 */
+  sortOrder: number;
+  /** 作成日時 (ISO 8601) */
+  createdAt: string;
+  /** 更新日時 (ISO 8601) */
+  updatedAt: string;
 }
 
 // -----------------------------------------------------------------------------

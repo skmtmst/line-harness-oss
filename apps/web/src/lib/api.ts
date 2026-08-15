@@ -2,6 +2,7 @@ import { adminSessionHeaders } from './admin-session'
 import type {
   Friend,
   Tag,
+  TagGroup,
   Scenario,
   ScenarioStep,
   ApiResponse,
@@ -536,10 +537,16 @@ export const api = {
     /** withCounts で friendCount 付き (JOIN 集計 — タグ管理ページ用)。 */
     list: (params?: { withCounts?: boolean }) =>
       fetchApi<ApiResponse<Tag[]>>(`/api/tags${params?.withCounts ? '?withCounts=1' : ''}`),
-    create: (data: { name: string; color: string }) =>
+    create: (data: { name: string; color: string; groupId?: string | null }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
         method: 'POST',
         body: JSON.stringify(data),
+      }),
+    /** 所属する親分類を変える。null で未分類に戻す。 */
+    setGroup: (id: string, groupId: string | null) =>
+      fetchApi<ApiResponse<Tag>>(`/api/tags/${id}/group`, {
+        method: 'PATCH',
+        body: JSON.stringify({ groupId }),
       }),
     updateMileage: (id: string, data: {
       rewardMiles: number
@@ -553,6 +560,26 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/tags/${id}`, { method: 'DELETE' }),
+  },
+  /**
+   * タグの親分類。経路が /api/tag-groups なのは /api/tags/:id と
+   * 衝突させないため（/api/tags/groups だと :id に食われる）。
+   */
+  tagGroups: {
+    list: () => fetchApi<ApiResponse<TagGroup[]>>('/api/tag-groups'),
+    create: (data: { name: string; sortOrder?: number }) =>
+      fetchApi<ApiResponse<TagGroup>>('/api/tag-groups', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { name?: string; sortOrder?: number }) =>
+      fetchApi<ApiResponse<TagGroup>>(`/api/tag-groups/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    /** 消しても属していたタグは残り、未分類に戻る。 */
+    delete: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/tag-groups/${id}`, { method: 'DELETE' }),
   },
   scenarios: {
     list: (params?: { accountId?: string }) => {
