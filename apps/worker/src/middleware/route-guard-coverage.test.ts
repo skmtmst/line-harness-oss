@@ -40,13 +40,12 @@ const PUBLIC_PREFIXES = [
  * 権限を決めずにAPIを足したということ。
  */
 const ALLOWLIST = new Set<string>([
-  'account-settings', 'ad-platforms', 'admin-auth', 'admin-update', 'affiliate-offers',
+  'account-settings', 'admin-auth', 'admin-update', 'affiliate-offers',
   'affiliates', 'auto-replies', 'automations', 'booking', 'broadcast-message-assets',
   'broadcasts', 'chats', 'conversions', 'ec-commerce', 'entry-routes', 'events',
-  'forms', 'friends', 'health', 'images', 'liff', 'meet-callback', 'meet-consultations',
-  'message-templates', 'nen-campaigns', 'nen-members', 'notifications', 'profile-refresh',
-  'reminders', 'rich-menu-groups', 'rich-menus', 'scenarios', 'scoring', 'support-inbox',
-  'tags', 'templates', 'tracked-links', 'traffic-pools', 'users', 'webhooks', 'webinars',
+  'forms', 'friends', 'images', 'liff', 'meet-callback', 'meet-consultations',
+  'message-templates', 'nen-campaigns', 'nen-members', 'notifications', 'reminders', 'rich-menu-groups', 'rich-menus', 'scenarios', 'scoring', 'support-inbox',
+  'tags', 'templates', 'tracked-links', 'webinars',
 ]);
 
 const MUTATING = /\.(post|put|patch|delete)\(\s*'([^']+)'/g;

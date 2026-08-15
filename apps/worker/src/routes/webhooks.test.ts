@@ -30,13 +30,21 @@ import {
   createOutgoingWebhook,
   updateOutgoingWebhook,
 } from '@line-crm/db';
+import type { Env } from '../index.js';
 import { webhooks } from './webhooks.js';
 
 const VALID_SECRET = 'a'.repeat(32);
 const SHORT_SECRET = 'a'.repeat(31);
 
 function setupApp() {
-  const app = new Hono();
+  const app = new Hono<Env>();
+  // Webhook の作成・更新・削除はオーナー限定になった。ここで見たいのは
+  // 入力の検証なので、認証は通った状態にしてから本体へ渡す。
+  // 権限そのものの検証は middleware/role-guard.test.ts にある。
+  app.use('*', async (c, next) => {
+    c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false });
+    return next();
+  });
   app.route('/', webhooks);
   return app;
 }
