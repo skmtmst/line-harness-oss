@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import type { Env } from '../index.js';
-import { denyReadOnly, requireRole } from './role-guard.js';
+import { denyReadOnly, requireIrreversibleConfirmation, requireRole } from './role-guard.js';
 
 /**
  * 役割と読み取り専用を分けたあとの権限判定。
@@ -81,5 +81,34 @@ describe('denyReadOnly', () => {
     expect(await status({ ...owner, readOnly: true }, guards)).toBe(403);
     // 役割が足りない
     expect(await status(admin, guards)).toBe(403);
+  });
+});
+
+describe('requireIrreversibleConfirmation', () => {
+  function app(header?: string) {
+    const a = new Hono<Env>();
+    a.use('/x', async (c, next) => {
+      c.set('staff', owner);
+      return next();
+    });
+    a.use('/x', requireIrreversibleConfirmation('broadcast-send'));
+    a.post('/x', (c) => c.json({ ok: true }));
+    return a.request('/x', { method: 'POST', headers: header ? { 'X-Confirm-Irreversible': header } : {} });
+  }
+
+  it('確認ヘッダが無ければ 428 で止める', async () => {
+    const res = await app();
+    expect(res.status).toBe(428);
+    expect((await res.json() as { code: string }).code).toBe('CONFIRMATION_REQUIRED');
+  });
+
+  it('合言葉が違えば止める（たまたま付いていた、では通さない）', async () => {
+    expect((await app('yes')).status).toBe(428);
+    expect((await app('true')).status).toBe(428);
+    expect((await app('scenario-send')).status).toBe(428);
+  });
+
+  it('正しい合言葉なら通る', async () => {
+    expect((await app('broadcast-send')).status).toBe(200);
   });
 });

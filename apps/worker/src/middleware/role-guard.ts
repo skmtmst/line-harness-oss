@@ -45,6 +45,32 @@ export function denyReadOnly(): MiddlewareHandler<Env> {
   };
 }
 
+/**
+ * 取り消せない操作に、明示的な確認を要求する。
+ *
+ * 一斉配信の本送信のように「押したら友だち全員に届き、取り消せない」操作は、
+ * 権限があるだけでは足りない。画面の確認ダイアログは押し間違いを減らすが、
+ * URL を直接叩けば素通りするので、サーバー側でも意思表示を求める。
+ *
+ * 呼び出し側は `X-Confirm-Irreversible: <合言葉>` を送る。合言葉は操作ごとに
+ * 決め打ちで、たまたま付いていた、では通らないようにする。
+ */
+export function requireIrreversibleConfirmation(token: string): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    if (c.req.header('x-confirm-irreversible') !== token) {
+      return c.json(
+        {
+          success: false,
+          error: 'この操作は取り消せません。画面の確認手順を経てから実行してください。',
+          code: 'CONFIRMATION_REQUIRED',
+        },
+        428,
+      );
+    }
+    return next();
+  };
+}
+
 function roleLabel(role: StaffRole | undefined): string {
   switch (role) {
     case 'owner':

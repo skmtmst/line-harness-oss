@@ -14,6 +14,7 @@ import { processSegmentSend } from '../services/segment-send.js';
 import type { SegmentCondition } from '../services/segment-query.js';
 import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import {
   assertNoUnresolvedBroadcastVariables,
   getUnsupportedBroadcastVariables,
@@ -307,7 +308,7 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
 });
 
 // POST /api/broadcasts - create
-broadcasts.post('/api/broadcasts', async (c) => {
+broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<CreateBroadcastBody>();
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
@@ -401,7 +402,7 @@ broadcasts.post('/api/broadcasts', async (c) => {
 });
 
 // PUT /api/broadcasts/:id - update draft
-broadcasts.put('/api/broadcasts/:id', async (c) => {
+broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -486,7 +487,7 @@ broadcasts.put('/api/broadcasts/:id', async (c) => {
 });
 
 // DELETE /api/broadcasts/:id - delete
-broadcasts.delete('/api/broadcasts/:id', async (c) => {
+broadcasts.delete('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     await deleteBroadcast(c.env.DB, id);
@@ -504,7 +505,8 @@ broadcasts.delete('/api/broadcasts/:id', async (c) => {
 // 進入しうる (2026-04-10 19:50 の重複配信事故 broadcast 0069eb9f / 57c9667d)。
 // 既存の lock 修正 (a27ad9f / bffcdf8 / 3ac2fec) は cron / scheduled 経路を
 // 守ったが、API direct 経路は未対応のままだった。
-broadcasts.post('/api/broadcasts/:id/send', async (c) => {
+// 友だちへ実際に届き、取り消せない。権限に加えて明示的な確認を要求する。
+broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requireIrreversibleConfirmation('broadcast-send'), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -740,7 +742,8 @@ broadcasts.post('/api/broadcasts/:id/send', async (c) => {
 });
 
 // POST /api/broadcasts/:id/send-segment - send to a filtered segment (常にキュー方式)
-broadcasts.post('/api/broadcasts/:id/send-segment', async (c) => {
+// 友だちへ実際に届き、取り消せない。権限に加えて明示的な確認を要求する。
+broadcasts.post('/api/broadcasts/:id/send-segment', requireRole('owner', 'admin'), requireIrreversibleConfirmation('broadcast-send'), async (c) => {
   try {
     const id = c.req.param('id');
     const existing = await getBroadcastById(c.env.DB, id);
@@ -837,7 +840,7 @@ broadcasts.get('/api/broadcasts/:id/insight', async (c) => {
 });
 
 // POST /api/broadcasts/:id/fetch-insight — LINE APIからインサイトを即時取得
-broadcasts.post('/api/broadcasts/:id/fetch-insight', async (c) => {
+broadcasts.post('/api/broadcasts/:id/fetch-insight', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const broadcast = await getBroadcastById(c.env.DB, id);
@@ -1002,7 +1005,7 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', async (c) => {
 });
 
 // POST /api/broadcasts/:id/test-send — send to test recipients with 【テスト配信】 label
-broadcasts.post('/api/broadcasts/:id/test-send', async (c) => {
+broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), async (c) => {
   const id = c.req.param('id');
   try {
     const broadcast = await getBroadcastById(c.env.DB, id);
@@ -1103,7 +1106,7 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
 });
 
 // POST /api/segments/count — count friends matching segment conditions
-broadcasts.post('/api/segments/count', async (c) => {
+broadcasts.post('/api/segments/count', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ conditions: unknown; accountId?: string }>();
   try {
     const { buildSegmentQuery } = await import('../services/segment-query.js');

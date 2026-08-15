@@ -51,6 +51,9 @@ function setupApp() {
   const app = new Hono<{ Bindings: { DB: D1Database } }>();
   app.use('*', async (c, next) => {
     c.env = { DB: {} as D1Database };
+    // 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
+    // 認証は通った状態にしてから渡す。権限の検証は role-guard.test.ts が持つ。
+    (c as unknown as { set: (k: string, v: unknown) => void }).set('staff', { id: 'owner-1', name: 'Owner', role: 'owner' as const, readOnly: false });
     await next();
   });
   app.route('/', broadcasts);

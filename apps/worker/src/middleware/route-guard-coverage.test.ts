@@ -41,11 +41,10 @@ const PUBLIC_PREFIXES = [
  */
 const ALLOWLIST = new Set<string>([
   'account-settings', 'admin-auth', 'admin-update', 'affiliate-offers',
-  'affiliates', 'auto-replies', 'automations', 'booking', 'broadcast-message-assets',
-  'broadcasts', 'chats', 'conversions', 'ec-commerce', 'entry-routes', 'events',
+  'affiliates', 'auto-replies', 'automations', 'booking', 'chats', 'conversions', 'ec-commerce', 'entry-routes', 'events',
   'forms', 'friends', 'images', 'liff', 'meet-callback', 'meet-consultations',
-  'message-templates', 'nen-campaigns', 'nen-members', 'notifications', 'reminders', 'rich-menu-groups', 'rich-menus', 'scenarios', 'scoring', 'support-inbox',
-  'tags', 'templates', 'tracked-links', 'webinars',
+  'nen-members', 'notifications', 'scoring', 'support-inbox',
+  'tags', 'tracked-links',
 ]);
 
 const MUTATING = /\.(post|put|patch|delete)\(\s*'([^']+)'/g;
