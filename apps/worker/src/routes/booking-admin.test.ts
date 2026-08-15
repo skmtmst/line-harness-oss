@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../index.js';
 
 const availabilityMocks = {
   computeSlots: vi.fn(() => [] as { start: string; end: string }[]),
@@ -19,7 +20,14 @@ vi.mock('../services/booking-notifier.js', () => notifierMocks);
 const { default: booking } = await import('./booking.js');
 
 function makeApp(db: unknown) {
-  const app = new Hono();
+  const app = new Hono<Env>();
+  // 予約の枠組みは管理者、承認はスタッフに限定した。ここで見たいのは本体の
+  // 挙動なので、認証は通った状態にしてから渡す。権限の検証は
+  // middleware/role-guard.test.ts が持つ。
+  app.use('*', async (c, next) => {
+    c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false });
+    return next();
+  });
   app.route('/', booking);
   return { app, env: { DB: db } };
 }

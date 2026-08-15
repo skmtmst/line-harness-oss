@@ -33,6 +33,7 @@ import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { safeRedirectTarget } from '../lib/safe-redirect.js';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 import { verifyCrossAccountToken } from '../lib/cross-account-token.js';
 
 
@@ -1487,7 +1488,7 @@ liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
 });
 
 // POST /api/links/wrap - wrap a URL with LIFF redirect proxy
-liffRoutes.post('/api/links/wrap', async (c) => {
+liffRoutes.post('/api/links/wrap', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{ url: string; ref?: string }>();
     if (!body.url) {

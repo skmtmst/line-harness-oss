@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
 import { verifySupportRelay } from '../services/support-relay.js';
@@ -254,7 +255,7 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
   return c.json({ success: true, data: { thread, messages: messages.results } });
 });
 
-supportInbox.patch('/api/support/email/threads/:id/status', async (c) => {
+supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = c.req.param('id');
   const body: { status?: string } = await c.req.json<{ status?: string }>().catch(() => ({}));
   if (!body.status || !['unread', 'in_progress', 'resolved'].includes(body.status)) {
@@ -276,7 +277,7 @@ supportInbox.patch('/api/support/email/threads/:id/status', async (c) => {
   return c.json({ success: true });
 });
 
-supportInbox.post('/api/support/email/threads/:id/reply', async (c) => {
+supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = c.req.param('id');
   const body: { body?: string } = await c.req.json<{ body?: string }>().catch(() => ({}));
   const content = body.body?.trim() || '';
