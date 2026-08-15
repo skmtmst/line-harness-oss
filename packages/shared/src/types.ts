@@ -101,6 +101,75 @@ export interface Tag {
   friendCount?: number;
 }
 
+/** 友だち情報欄の種類 */
+export type FriendFieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "date"
+  | "select"
+  | "multi_select"
+  | "checkbox"
+  | "url"
+  | "tel"
+  | "email";
+
+/**
+ * 友だち情報欄の項目。
+ *
+ * フォームの回答 → 情報欄 → 友だち詳細 → テンプレートの差し込み、が
+ * 1本の線で繋がる。その起点。
+ */
+export interface FriendField {
+  id: string;
+  folderId: string | null;
+  /** 画面に出す名前 */
+  name: string;
+  /** 差し込み変数名。{{field.pet_name}} のように使う */
+  fieldKey: string;
+  type: FriendFieldType;
+  /** select / multi_select のときの選択肢 */
+  options: string[] | null;
+  defaultValue: string | null;
+  source: "manual" | "form" | "ec" | "automation";
+  ecFieldPath: string | null;
+  /** true ならEC側が正。管理画面からは変更できない */
+  ecIsMaster: boolean;
+  /** 本名・電話・住所など。閲覧を役割で絞る */
+  isPersonal: boolean;
+  isStarred: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  /** GET /api/friends/:id/fields のときだけ付く */
+  value?: string | null;
+  updatedBy?: string | null;
+  /** ?withUsage=1 のときだけ付く */
+  usageCount?: number;
+}
+
+/** 汎用フォルダ */
+export interface Folder {
+  id: string;
+  kind: string;
+  name: string;
+  parentId: string | null;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 対応マーク */
+export interface SupportMark {
+  id: string;
+  name: string;
+  color: string;
+  isDefault: boolean;
+  autoOnInbound: boolean;
+  displayOrder: number;
+  createdAt: string;
+}
+
 /**
  * タグの親分類。「お悩み」「ペット」のようにタグをまとめる。
  * 入れ子にはしない（二段で足りる）。

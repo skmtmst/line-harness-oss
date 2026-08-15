@@ -3,6 +3,7 @@ import { getTemplateById } from '@line-crm/db';
 import type { AutoReply, Friend } from '@line-crm/db';
 import { logOutgoingMessage } from './event-bus.js';
 import { shouldReply } from './auto-reply-conditions.js';
+import { resolveInterpolationExtra } from './interpolation-context.js';
 import {
   buildMessage,
   expandVariables,
@@ -97,11 +98,13 @@ export async function matchAndReply(
   try {
     const resolvedMeta = await resolveMetadata(db, friend);
     const resolved = await resolveAutoReplyContent(db, rule);
+    const extra = await resolveInterpolationExtra(db, friend.id, resolved.content);
     const expandedContent = expandVariables(
       resolved.content,
       { ...friend, metadata: resolvedMeta },
       workerUrl,
       resolved.messageType,
+      extra,
     );
     const replyMsg = buildMessage(resolved.messageType, expandedContent);
     await lineClient.replyMessage(replyToken, [replyMsg]);

@@ -3,6 +3,8 @@ import type {
   Friend,
   Tag,
   TagGroup,
+  FriendField,
+  FriendFieldType,
   Scenario,
   ScenarioStep,
   ApiResponse,
@@ -567,6 +569,73 @@ export const api = {
    * タグの親分類。経路が /api/tag-groups なのは /api/tags/:id と
    * 衝突させないため（/api/tags/groups だと :id に食われる）。
    */
+  /**
+   * 友だち情報欄。
+   *
+   * 差し込み名（fieldKey）と種類は作成時にしか決められない。後から変えると
+   * 既存の値の意味が変わったり、テンプレートの差し込みが空になったりする。
+   */
+  friendFields: {
+    list: (params?: { folderId?: string; withUsage?: boolean }) => {
+      const q = new URLSearchParams()
+      if (params?.folderId) q.set('folderId', params.folderId)
+      if (params?.withUsage) q.set('withUsage', '1')
+      const query = q.toString()
+      return fetchApi<ApiResponse<FriendField[]>>(
+        `/api/friend-fields${query ? `?${query}` : ''}`,
+      )
+    },
+    create: (data: {
+      name: string
+      fieldKey: string
+      type: FriendFieldType
+      folderId?: string | null
+      options?: string[] | null
+      defaultValue?: string | null
+      isPersonal?: boolean
+      isStarred?: boolean
+      displayOrder?: number
+    }) =>
+      fetchApi<ApiResponse<FriendField>>('/api/friend-fields', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (
+      id: string,
+      data: Partial<
+        Pick<
+          FriendField,
+          'name' | 'folderId' | 'defaultValue' | 'isPersonal' | 'isStarred' | 'displayOrder'
+        >
+      > & { options?: string[] | null },
+    ) =>
+      fetchApi<ApiResponse<FriendField>>(`/api/friend-fields/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    /** 値が入っていると 409 で人数が返る。force で消せる。 */
+    delete: (id: string, opts?: { force?: boolean }) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/friend-fields/${id}${opts?.force ? '?force=1' : ''}`,
+        { method: 'DELETE' },
+      ),
+    /** 1人ぶんの全項目と値。個人情報は役割で絞られる。 */
+    forFriend: (friendId: string) =>
+      fetchApi<ApiResponse<{ items: FriendField[]; hiddenPersonalCount: number }>>(
+        `/api/friends/${friendId}/fields`,
+      ),
+    /** まとめて更新。EC が正の項目は無視され warnings に理由が入る。 */
+    saveForFriend: (friendId: string, values: Record<string, string | null>) =>
+      fetchApi<ApiResponse<{ updated: number }> & { warnings?: string[] }>(
+        `/api/friends/${friendId}/fields`,
+        { method: 'PUT', body: JSON.stringify({ values }) },
+      ),
+    bulk: (data: { friendIds: string[]; fieldId: string; value: string | null }) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/friend-fields/bulk', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+  },
   tagGroups: {
     list: () => fetchApi<ApiResponse<TagGroup[]>>('/api/tag-groups'),
     create: (data: { name: string; sortOrder?: number }) =>

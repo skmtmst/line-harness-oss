@@ -1,4 +1,5 @@
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
+import { resolveInterpolationExtra } from './interpolation-context.js';
 import {
   getFriendScenariosDueForDelivery,
   getScenarioSteps,
@@ -29,11 +30,27 @@ import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
  * - {{auth_url:CHANNEL_ID}} → full /auth/line URL with uid for cross-account linking
  * - {{metadata.KEY}}       → friend's metadata value (from form responses etc.)
  */
+/**
+ * 差し込みの記法について。
+ *
+ * 友だち情報欄は {{field.pet_name}}、共通情報は {{var.shop_hours}} で書く。
+ * 要件定義書は {pet_name} という単一の波括弧を想定していたが、それは採れない。
+ * Flex メッセージの本文は JSON で、{ が至るところに出てくる。単一の波括弧で
+ * 置換すると、差し込みのつもりが無い箇所まで書き換えて本文を壊す。
+ *
+ * 既存の {{metadata.KEY}} と同じ形にそろえたので、書き方も1つで済む。
+ */
 export function expandVariables(
   content: string,
   friend: { id: string; display_name: string | null; user_id: string | null; ref_code?: string | null; metadata?: Record<string, unknown> | string | null },
   apiOrigin?: string,
   messageType?: string,
+  extra?: {
+    /** 友だち情報欄。field_key => 値 */
+    fields?: Record<string, string>;
+    /** 共通情報。var_key => 値 */
+    vars?: Record<string, string>;
+  },
 ): string {
   let result = content;
   result = result.replace(/\{\{name\}\}/g, friend.display_name || '');
@@ -69,6 +86,29 @@ export function expandVariables(
     const val = meta[key];
     if (val == null) return '';
     return Array.isArray(val) ? val.join(', ') : String(val);
+  });
+
+  // 友だち情報欄。{{#if_field.KEY}}...{{/if_field.KEY}} で「値があるときだけ」も書ける。
+  // 条件ブロックを先に処理するのは、中の {{field.KEY}} を消してからでは
+  // 判定できないため。
+  const fields = extra?.fields ?? {};
+  result = result.replace(
+    /\{\{#if_field\.([a-z][a-z0-9_]*)\}\}([\s\S]*?)\{\{\/if_field\.\1\}\}/g,
+    (_match, key: string, inner: string) => {
+      const val = fields[key];
+      return val == null || val === '' ? '' : inner;
+    },
+  );
+  result = result.replace(/\{\{field\.([a-z][a-z0-9_]*)\}\}/g, (_match, key: string) => {
+    // 未設定の項目は空文字にする。「未設定」と書くと、そのまま送られて
+    // お客様に見えてしまう。空にしておけば文として不自然でも意味は壊れない。
+    return fields[key] ?? '';
+  });
+
+  // 共通情報。営業時間や電話番号のように、全テンプレートで同じ値を使うもの。
+  const vars = extra?.vars ?? {};
+  result = result.replace(/\{\{var\.([a-z][a-z0-9_]*)\}\}/g, (_match, key: string) => {
+    return vars[key] ?? '';
   });
   if (apiOrigin) {
     result = result.replace(/\{\{auth_url:([^}]+)\}\}/g, (_match, channelId) => {
@@ -314,7 +354,8 @@ async function processSingleDelivery(
   // Expand template variables ({{name}}, {{uid}}, {{auth_url:CHANNEL_ID}}, {{metadata.KEY}}, etc.)
   const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
   const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
-  const expandedContent = expandVariables(resolved.messageContent, friendWithMeta, workerUrl, resolved.messageType);
+  const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent);
+  const expandedContent = expandVariables(resolved.messageContent, friendWithMeta, workerUrl, resolved.messageType, extra);
   // Auto-wrap URLs with tracking links + bake f=<friendId> into /t links —
   // shared pipeline with the instant first-step push (immediate-first-step.ts).
   // リンクの所有アカウントは実際に配信するアカウント (= friend の account) に合わせる

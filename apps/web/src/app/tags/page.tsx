@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Suspense, useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
+import FriendFieldList from '@/components/friend-fields/field-list'
 
 const PRESET_COLORS = [
   '#3B82F6', // blue (server default)
@@ -157,7 +159,16 @@ function TagGroupSelect({
   )
 }
 
-export default function TagsPage() {
+/** 友だち属性の4タブ。URLに出して、ブラウザバックとブックマークを壊さない。 */
+const TABS = [
+  { key: 'tags', label: 'タグ' },
+  { key: 'fields', label: '友だち情報欄' },
+  { key: 'marks', label: '対応マーク' },
+  { key: 'searches', label: '保存した検索' },
+] as const
+type TabKey = (typeof TABS)[number]['key']
+
+function TagsPageInner() {
   const [items, setItems] = useState<Tag[]>([])
   const [groups, setGroups] = useState<TagGroup[]>([])
   const [loading, setLoading] = useState(true)
@@ -168,6 +179,11 @@ export default function TagsPage() {
   const [newColor, setNewColor] = useState(PRESET_COLORS[0])
   const [newGroupId, setNewGroupId] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const router = useRouter()
+  const params = useSearchParams()
+  const rawTab = params.get('tab')
+  const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'tags') as TabKey
 
   const [filter, setFilter] = useState<string>('')
   const [groupName, setGroupName] = useState('')
@@ -286,17 +302,51 @@ export default function TagsPage() {
   return (
     <div>
       <Header
-        title="タグ管理"
-        description="本人のタグ獲得マイル、紹介した友だちがタグを獲得した時の紹介者マイル、今後の行動倍率を設定できます。反映は非同期です。"
+        title="友だち属性"
+        description="タグ・情報欄・対応マーク・保存した検索をまとめて扱います。"
         action={
-          <button
-            onClick={() => { setCreating(!creating); setError('') }}
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
-          >
-            + 新規タグ
-          </button>
+          tab === 'tags' ? (
+            <button
+              onClick={() => { setCreating(!creating); setError('') }}
+              className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
+            >
+              + 新規タグ
+            </button>
+          ) : undefined
         }
       />
+
+      {/* タブはURLに出す。直リンクとブラウザバックが効くようにするため。 */}
+      <div className="border-hairline mb-5 flex gap-1 border-b">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => router.replace(`/tags?tab=${t.key}`)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              tab === t.key
+                ? 'border-accent text-accent'
+                : 'text-ink-secondary hover:text-ink border-transparent'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'fields' && <FriendFieldList />}
+      {tab === 'marks' && (
+        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
+          対応マークの管理はこの次のまとまりで作ります。
+        </p>
+      )}
+      {tab === 'searches' && (
+        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
+          保存した検索の管理はこの次のまとまりで作ります。
+        </p>
+      )}
+
+      {tab === 'tags' && (
+      <>
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -513,6 +563,17 @@ export default function TagsPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
+  )
+}
+
+export default function TagsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <TagsPageInner />
+    </Suspense>
   )
 }

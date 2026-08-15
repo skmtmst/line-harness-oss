@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { FriendListItem } from '@/lib/api'
 
@@ -70,7 +71,16 @@ export default function FriendListRow({ friend, onDetailClick }: Props) {
           </div>
         )}
         <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">{friend.displayName}</p>
+          {/* 行のクリックはトークを開く。名前からは詳細へ行けるようにする。
+              行の動きを変えると、既にトークを開く操作として覚えられている
+              ものが変わってしまう。 */}
+          <Link
+            href={`/friends/detail?id=${friend.id}`}
+            onClick={(event) => event.stopPropagation()}
+            className="block truncate text-sm font-medium text-gray-900 hover:underline"
+          >
+            {friend.displayName}
+          </Link>
           <p className="text-[10px] text-gray-400 mt-0.5">登録: {formatJstDate(friend.createdAt)}</p>
           {!isFollowing && (
             <p className="text-[10px] text-red-400 mt-0.5">ブロック / 退会</p>
