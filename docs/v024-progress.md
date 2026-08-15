@@ -1,0 +1,144 @@
+# v0.24.0 の進み具合（2026-08-16 朝の時点）
+
+夜のあいだに進めたぶんのまとめ。**どこまで動いて、何が残っているか**を
+そのまま書く。
+
+---
+
+## 出したPR
+
+積み上げになっている。下から順にマージすると、上のPRの差分が小さくなる。
+
+| PR | 中身 | ベース |
+|---|---|---|
+| [#44](https://github.com/skmtmst/line-harness-oss/pull/44) | フェーズ1 土台（マイグレーション099〜103・ヘルパ9本・バージョン統一） | `codex/development` |
+| [#45](https://github.com/skmtmst/line-harness-oss/pull/45) | フェーズ2 友だち情報欄の一本線 | #44 |
+| [#46](https://github.com/skmtmst/line-harness-oss/pull/46) | 旧8ルートのタブ統合と行き止まりの検査 | #45 |
+| [#47](https://github.com/skmtmst/line-harness-oss/pull/47) | 対応マーク・保存した検索・汎用フォルダ | #46 |
+| [#48](https://github.com/skmtmst/line-harness-oss/pull/48) | 自動応答の評価順とメッセージ種別 | #47 |
+| [#49](https://github.com/skmtmst/line-harness-oss/pull/49) | 機能設定の画面とサイドバーの修正 | #48 |
+| [#50](https://github.com/skmtmst/line-harness-oss/pull/50) | タグの分類を folders から読む | #49 |
+
+0.23.0 のぶん（#32 #34 #35 #36 #37 #39 #40 #41 #43）と #38 も、
+この積み上げの土台に入っている。
+
+---
+
+## 動くようになったこと
+
+**フォームに回答 → 情報欄に入る → 友だち詳細に出る → テンプレートで差し込める。**
+要件定義書が「ここが核」としていた一本線が通っている。
+
+| V2 | ルート | 状態 |
+|---|---|---|
+| 3-2 友だち情報欄 | `/tags?tab=fields` | 動く |
+| 3-2-1 項目を追加する | `/tags/fields/new` | 動く |
+| 3-3 対応マーク管理 | `/tags?tab=marks` | 動く |
+| 3-4 保存した検索 | `/tags?tab=searches` | 一覧と削除だけ（条件を組むのは友だち一覧側） |
+| 2-2-1 友だち詳細 | `/friends/detail?id=` | 動く |
+| 10-3 機能設定 | `/settings` | 動く |
+
+旧8ルートは 308 で新しい場所へ飛び、飛んだ先には**中身が入っている**。
+
+---
+
+## 残っていること
+
+### フェーズ3の残り — 作成画面
+
+要件定義書 §2-2 B の28画面のうち、**まだ無いもの**。
+
+```
+/tags/new  /broadcasts/new  /conversions/new  /affiliates/new
+/affiliate-offers/new  /reminders/new  /automations/new  /webhooks/new
+/inflow-links/new  /staff/new  /accounts/new  /pools/new
+/booking/menus/new  /booking/staff/new  /scoring/new
+/templates/edit  /templates/carousel  /nen-campaigns/edit
+/auto-replies/edit  /form-submissions/edit  /rich-menus/edit?areas
+```
+
+ただし**多くは一覧画面に作る仕組みが既にある**（タグ・成果地点・Webhook・
+アフィリエイター・リマインダ・アカウント・プール・予約メニュー）。
+行き止まりにはなっていない。独立した作成画面が要るかは、実際に使ってから
+決めた方がよい。
+
+**本当に無いのは `/broadcasts/new`**（一斉配信の作成）。これは大きいので、
+まとまった時間が要る。
+
+### フェーズ4 — コンテンツと分析
+
+テーブルとヘルパは入っているが、**APIと画面が無い**。
+
+| 対象 | 入っているもの | 無いもの |
+|---|---|---|
+| メディアライブラリ | `media` `media_usages` とヘルパ | R2連携のAPI・`/contents`・使用箇所スキャンのCron |
+| 共通情報 | `common_vars` とヘルパ、差し込み `{{var.x}}` | API・`/contents?tab=vars`・日付切り替えのCron |
+| サイトスクリプト | `site_visitors` `site_events` とヘルパ | 収集の入口・埋め込みJS・レート制限 |
+| ファネル | `funnels` `funnel_steps` とヘルパ | API・`/analytics?tab=funnel` |
+| アクセス解析 | （既存データのみ） | `/analytics` 全体 |
+
+差し込みの `{{var.shop_hours}}` は**もう動く**。値を入れる画面が無いだけ。
+
+### フェーズ5 — 仕上げ
+
+| 項目 | 状態 |
+|---|---|
+| 自動応答の評価順・種別 | **完了**（#48） |
+| 機能設定 | **完了**（#49。サイドバーの並び替えは未） |
+| 配信前チェック | 未着手 |
+| カルーセル編集 | 未着手 |
+| ログイン履歴の画面 | テーブルとヘルパはある。`view_personal` は既に記録している。一覧の画面が無い |
+| 二要素認証 | 列だけ |
+
+---
+
+## 使わずに残した列（理由付き）
+
+`docs/v024-decisions.md` の §5 §6 に詳しく書いた。**どちらも入れると壊す方が
+大きい**という判断。
+
+- `scenarios.allow_concurrent` — 既に部分UNIQUE索引があり、重複登録はいまも
+  起きない。索引を落とすのは追加のみポリシーで禁止。別の読み方（シナリオを
+  またぐ排他）なら実装できるが、既定が 0 なので入れた瞬間に全シナリオの
+  挙動が変わる
+- `broadcasts.stealth_spread_minutes` — 二重送信の危険に直に触れるので、
+  冪等性テストの拡張とセットでないと出せない
+
+---
+
+## 受け入れ条件（§8）の状態
+
+| # | 条件 | 状態 |
+|---|---|---|
+| 1 | V2の85画面すべてにルートがある | **未達**。上の残りぶん |
+| 2 | 行き止まりがゼロ | **達成**（`route-integrity.test.ts` が毎回見る） |
+| 3 | 旧ルートが308で飛ぶ | **達成**。飛んだ先に中身も入っている |
+| 4 | 更新系すべてに `requireRole` | **達成**（`route-guard-coverage.test.ts` 通過） |
+| 5 | 外部API停止時に500を返さない | 既存ぶんは維持。新規APIは外部を叩かない |
+| 6 | 一斉配信が二重送信しない | 既存のまま（触っていない） |
+| 7 | マイグレーションが既存データに当たる | **未確認**。どのDBにも適用していない |
+| 8 | build / typecheck / test が通る | **達成** |
+| 9 | 1440px・1920px で横スクロールが出ない | 未確認 |
+| 10 | 版が全パッケージで 0.24.0 | **達成** |
+
+---
+
+## 数字
+
+- マイグレーション: 099〜103 の5件（+ 0.23.0 の 088〜098）
+- 新しいテーブル: 12
+- DBヘルパ: 9本
+- 新しいWorkerルート: 3本（`friend-fields` `friend-attributes` `feature-settings`）
+- 新しい画面: 3（`/tags/fields/new` `/friends/detail` `/settings`）＋ タブ統合7画面
+- テスト: worker **1180** / db **195** / web **43**
+
+---
+
+## 次にやるとよい順
+
+1. **PRを下から順にマージ**。積み上げなので、#44 から順に見てもらうのが速い
+2. **マイグレーションの適用**。対象・影響・バックアップ・切り戻し方法を
+   直前に共有する（0.23.0 のぶんと合わせて 088〜103 の16件）
+3. `/broadcasts/new`（一斉配信の作成）。B群で唯一「本当に無い」もの
+4. フェーズ4のうち**共通情報**。差し込みは既に動くので、画面だけで完結する
+5. `/analytics`。既存データの集計なので新しいテーブルが要らない
