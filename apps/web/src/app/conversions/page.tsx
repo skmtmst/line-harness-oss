@@ -96,8 +96,7 @@ export default function ConversionsPage() {
         action={
           <button
             onClick={() => setShowCreate(!showCreate)}
-            className="px-4 py-2 min-h-[44px] rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+ className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 min-h-[44px] rounded-control text-sm font-medium"
           >
             {showCreate ? 'キャンセル' : '+ CVポイント作成'}
           </button>
@@ -105,10 +104,10 @@ export default function ConversionsPage() {
       />
 
       {showCreate && (
-        <form onSubmit={handleCreate} className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <form onSubmit={handleCreate} className="bg-canvas rounded-card border border-hairline p-6 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CV名</label>
+              <label className="block text-sm font-medium text-ink-secondary mb-1">CV名</label>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -118,7 +117,7 @@ export default function ConversionsPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">イベントタイプ</label>
+              <label className="block text-sm font-medium text-ink-secondary mb-1">イベントタイプ</label>
               <select
                 value={form.eventType}
                 onChange={(e) => setForm({ ...form, eventType: e.target.value })}
@@ -132,7 +131,7 @@ export default function ConversionsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">金額 (任意)</label>
+              <label className="block text-sm font-medium text-ink-secondary mb-1">金額 (任意)</label>
               <input
                 type="number"
                 value={form.value}
@@ -144,8 +143,7 @@ export default function ConversionsPage() {
           </div>
           <button
             type="submit"
-            className="mt-4 px-4 py-2 min-h-[44px] rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+ className="bg-accent text-on-accent transition-colors hover:bg-accent-hover mt-4 px-4 py-2 min-h-[44px] rounded-control text-sm font-medium"
           >
             作成
           </button>
@@ -156,20 +154,20 @@ export default function ConversionsPage() {
       {report.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
           {report.map((r) => (
-            <div key={r.conversionPointId} className="bg-white rounded-lg border border-gray-200 p-4">
+            <div key={r.conversionPointId} className="bg-canvas rounded-card border border-hairline p-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-gray-700">{r.conversionPointName}</p>
+                <p className="text-sm font-medium text-ink-secondary">{r.conversionPointName}</p>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{r.eventType}</span>
               </div>
               <div className="flex items-end gap-4">
                 <div>
-                  <p className="text-2xl font-bold text-gray-900">{r.totalCount}</p>
-                  <p className="text-xs text-gray-400">CV数</p>
+                  <p className="text-2xl font-bold text-ink">{r.totalCount}</p>
+                  <p className="text-xs text-ink-faint">CV数</p>
                 </div>
                 {r.totalValue > 0 && (
                   <div>
                     <p className="text-lg font-semibold text-green-600">{r.totalValue.toLocaleString('ja-JP', { style: 'currency', currency: 'JPY' })}</p>
-                    <p className="text-xs text-gray-400">売上</p>
+                    <p className="text-xs text-ink-faint">売上</p>
                   </div>
                 )}
               </div>
@@ -180,36 +178,36 @@ export default function ConversionsPage() {
 
       {/* Points Table */}
       {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">読み込み中...</div>
+        <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">読み込み中...</div>
       ) : points.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">CVポイントがまだありません</div>
+        <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">CVポイントがまだありません</div>
       ) : (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+        <div className="bg-canvas rounded-card border border-hairline overflow-x-auto">
           <table className="w-full min-w-[640px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-canvas-sunken border-b border-hairline">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CV名</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">イベントタイプ</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">金額</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">作成日</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">操作</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">CV名</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">イベントタイプ</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">金額</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-ink-faint uppercase">作成日</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-ink-faint uppercase">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {points.map((point) => (
-                <tr key={point.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{point.name}</td>
+                <tr key={point.id} className="hover:bg-canvas-sunken">
+                  <td className="px-4 py-3 text-sm font-medium text-ink">{point.name}</td>
                   <td className="px-4 py-3">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{point.eventType}</span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
+                  <td className="px-4 py-3 text-sm text-ink-secondary">
                     {point.value !== null ? `¥${point.value.toLocaleString()}` : '-'}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(point.createdAt).toLocaleDateString('ja-JP')}</td>
+                  <td className="px-4 py-3 text-sm text-ink-faint">{new Date(point.createdAt).toLocaleDateString('ja-JP')}</td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => handleDelete(point.id)}
-                      className="text-red-500 hover:text-red-700 text-sm"
+                      className="text-red-500 hover:text-danger text-sm"
                     >
                       削除
                     </button>
