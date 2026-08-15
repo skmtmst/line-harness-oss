@@ -7,6 +7,8 @@ import {
   type AffiliateOffer,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { auditLog } from '../lib/audit-log.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 /**
  * Admin-side affiliate offer (案件) CRUD. Mounted under `/api/affiliate-offers`,
@@ -65,7 +67,8 @@ affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
 });
 
 // POST /api/affiliate-offers - create
-affiliateOffers.post('/api/affiliate-offers', async (c) => {
+affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.offer.create', { kind: 'affiliate_offer' });
   try {
     const body = await c.req
       .json<{
@@ -113,7 +116,8 @@ affiliateOffers.post('/api/affiliate-offers', async (c) => {
 });
 
 // PUT /api/affiliate-offers/:id - update
-affiliateOffers.put('/api/affiliate-offers/:id', async (c) => {
+affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.offer.update', { kind: 'affiliate_offer', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
     const body = await c.req

@@ -14,6 +14,7 @@ import { enrollFriendInScenario } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import type { TrackedLink } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { requireRole } from '../middleware/role-guard.js';
 import { isLinkPreviewBot } from '../lib/og-bot.js';
 import { buildOgHtml } from '../lib/og-html.js';
 import { resolveOgForTrackedLink } from '../lib/og-resolver.js';
@@ -121,7 +122,7 @@ trackedLinks.get('/api/tracked-links/:id', async (c) => {
 });
 
 // POST /api/tracked-links — create
-trackedLinks.post('/api/tracked-links', async (c) => {
+trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       name: string;
@@ -162,7 +163,7 @@ trackedLinks.post('/api/tracked-links', async (c) => {
 });
 
 // PATCH /api/tracked-links/:id — update mutable fields
-trackedLinks.patch('/api/tracked-links/:id', async (c) => {
+trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -191,7 +192,7 @@ trackedLinks.patch('/api/tracked-links/:id', async (c) => {
 });
 
 // DELETE /api/tracked-links/:id
-trackedLinks.delete('/api/tracked-links/:id', async (c) => {
+trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const link = await getTrackedLinkById(c.env.DB, id);

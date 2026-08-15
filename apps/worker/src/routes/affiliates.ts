@@ -21,6 +21,8 @@ import {
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import type { Env } from '../index.js';
+import { auditLog } from '../lib/audit-log.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const affiliates = new Hono<Env>();
 
@@ -74,7 +76,8 @@ affiliates.get('/api/affiliates/:id', async (c) => {
 //        - OSS back-compat. `code` must be >= 4 chars, alphanumeric only.
 const CODE_RE = /^[A-Za-z0-9]{4,}$/;
 
-affiliates.post('/api/affiliates', async (c) => {
+affiliates.post('/api/affiliates', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.create', { kind: 'affiliate' });
   try {
     const body = await c.req.json<{
       name?: string;
@@ -195,7 +198,8 @@ affiliates.post('/api/affiliates', async (c) => {
 });
 
 // PUT /api/affiliates/:id - update
-affiliates.put('/api/affiliates/:id', async (c) => {
+affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.update', { kind: 'affiliate', id: c.req.param('id') });
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -221,7 +225,8 @@ affiliates.put('/api/affiliates/:id', async (c) => {
 });
 
 // DELETE /api/affiliates/:id - delete
-affiliates.delete('/api/affiliates/:id', async (c) => {
+affiliates.delete('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'affiliate.delete', { kind: 'affiliate', id: c.req.param('id') });
   try {
     await deleteAffiliate(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });

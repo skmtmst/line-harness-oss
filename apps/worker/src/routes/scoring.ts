@@ -18,6 +18,8 @@ import {
 } from '@line-crm/db';
 import type { MileageRuleRow } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { auditLog } from '../lib/audit-log.js';
+import { requireRole } from '../middleware/role-guard.js';
 
 const scoring = new Hono<Env>();
 
@@ -71,7 +73,8 @@ scoring.get('/api/mileage/rules', async (c) => {
 
 // Generic authenticated ingestion point for future Harness products/SNS.
 // The request only records an event + queue row; mileage is calculated by cron.
-scoring.post('/api/mileage/events', async (c) => {
+scoring.post('/api/mileage/events', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'mileage.event.create', { kind: 'mileage_event' });
   try {
     const body = await c.req.json<{
       friendId?: unknown;
@@ -117,7 +120,8 @@ scoring.post('/api/mileage/events', async (c) => {
   }
 });
 
-scoring.post('/api/mileage/rules', async (c) => {
+scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'mileage.rule.create', { kind: 'mileage_rule' });
   try {
     const body = await c.req.json<{
       name?: string;
@@ -153,7 +157,8 @@ scoring.post('/api/mileage/rules', async (c) => {
   }
 });
 
-scoring.put('/api/mileage/rules/:id', async (c) => {
+scoring.put('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'mileage.rule.update', { kind: 'mileage_rule', id: c.req.param('id') });
   try {
     const body = await c.req.json<{
       name?: string;
@@ -184,7 +189,8 @@ scoring.put('/api/mileage/rules/:id', async (c) => {
   }
 });
 
-scoring.delete('/api/mileage/rules/:id', async (c) => {
+scoring.delete('/api/mileage/rules/:id', requireRole('owner', 'admin'), async (c) => {
+  auditLog(c, 'mileage.rule.delete', { kind: 'mileage_rule', id: c.req.param('id') });
   try {
     const existing = await getMileageRuleById(c.env.DB, c.req.param('id'));
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
@@ -233,7 +239,7 @@ scoring.get('/api/scoring-rules/:id', async (c) => {
   }
 });
 
-scoring.post('/api/scoring-rules', async (c) => {
+scoring.post('/api/scoring-rules', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{ name: string; eventType: string; scoreValue: number }>();
     if (!body.name || !body.eventType || body.scoreValue === undefined) {
@@ -247,7 +253,7 @@ scoring.post('/api/scoring-rules', async (c) => {
   }
 });
 
-scoring.put('/api/scoring-rules/:id', async (c) => {
+scoring.put('/api/scoring-rules/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
@@ -261,7 +267,7 @@ scoring.put('/api/scoring-rules/:id', async (c) => {
   }
 });
 
-scoring.delete('/api/scoring-rules/:id', async (c) => {
+scoring.delete('/api/scoring-rules/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     await deleteScoringRule(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
@@ -301,7 +307,7 @@ scoring.get('/api/friends/:id/score', async (c) => {
 });
 
 // 手動スコア加算
-scoring.post('/api/friends/:id/score', async (c) => {
+scoring.post('/api/friends/:id/score', requireRole('owner', 'admin'), async (c) => {
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ scoreChange: number; reason?: string }>();
