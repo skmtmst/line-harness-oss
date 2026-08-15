@@ -42,7 +42,7 @@ const messageTypeLabels: Record<string, string> = {
 }
 
 const typeBadgeColor: Record<string, string> = {
-  text: 'bg-gray-100 text-gray-700',
+  text: 'bg-canvas-sunken text-ink-secondary',
   flex: 'bg-purple-100 text-purple-700',
   image: 'bg-blue-100 text-blue-700',
   carousel: 'bg-amber-100 text-amber-700',
@@ -222,8 +222,7 @@ export default function TemplatesPage() {
         action={
           <button
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
           >
             + 新規テンプレート
           </button>
@@ -231,7 +230,7 @@ export default function TemplatesPage() {
       />
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
@@ -249,7 +248,7 @@ export default function TemplatesPage() {
             key={key}
             onClick={() => setTypeFilter(key)}
             className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-              typeFilter === key ? 'text-white' : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+              typeFilter === key ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
             }`}
             style={typeFilter === key ? { backgroundColor: '#06C755' } : undefined}
           >
@@ -260,11 +259,11 @@ export default function TemplatesPage() {
 
       {/* Create form */}
       {showCreate && (
-        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
           <h2 className="text-sm font-semibold text-gray-800 mb-4">新規テンプレートを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">名前 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -274,7 +273,7 @@ export default function TemplatesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">カテゴリ</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">カテゴリ</label>
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
@@ -284,7 +283,7 @@ export default function TemplatesPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">タイプ</label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
               <select
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 value={form.messageType}
@@ -296,7 +295,7 @@ export default function TemplatesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">内容 / JSON <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">内容 / JSON <span className="text-red-500">*</span></label>
               {form.messageType === 'image' ? (
                 <ImageUploader
                   mode="line-image"
@@ -342,14 +341,13 @@ export default function TemplatesPage() {
               <button
                 onClick={handleCreate}
                 disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-                style={{ backgroundColor: '#06C755' }}
+                className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium disabled:opacity-50"
               >
                 {saving ? '作成中...' : '作成'}
               </button>
               <button
                 onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg"
+                className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
               >
                 キャンセル
               </button>
@@ -360,34 +358,34 @@ export default function TemplatesPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-gray-100 flex items-center gap-4 animate-pulse">
-              <div className="h-5 bg-gray-100 rounded w-12" />
+            <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
+              <div className="h-5 bg-canvas-sunken rounded w-12" />
               <div className="flex-1 space-y-2">
                 <div className="h-3 bg-gray-200 rounded w-48" />
-                <div className="h-2 bg-gray-100 rounded w-32" />
+                <div className="h-2 bg-canvas-sunken rounded w-32" />
               </div>
-              <div className="h-3 bg-gray-100 rounded w-12" />
-              <div className="h-3 bg-gray-100 rounded w-24" />
+              <div className="h-3 bg-canvas-sunken rounded w-12" />
+              <div className="h-3 bg-canvas-sunken rounded w-24" />
             </div>
           ))}
         </div>
       ) : filteredTemplates.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">該当するテンプレートがありません</p>
+        <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
+          <p className="text-ink-faint">該当するテンプレートがありません</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">タイプ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">カテゴリ</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">使用数</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">更新日</th>
+                <tr className="bg-canvas-sunken border-b border-hairline">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タイプ</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">名前</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">カテゴリ</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">使用数</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">更新日</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -396,16 +394,16 @@ export default function TemplatesPage() {
                   <tr
                     key={t.id}
                     onClick={() => setDrawerId(t.id)}
-                    className={`hover:bg-gray-50 cursor-pointer transition-colors ${drawerId === t.id ? 'bg-green-50' : ''}`}
+                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors ${drawerId === t.id ? 'bg-green-50' : ''}`}
                   >
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-gray-100 text-gray-700'}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                         {messageTypeLabels[t.messageType] ?? t.messageType}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-gray-900">{t.name}</p>
-                      <p className="text-[11px] text-gray-400 mt-0.5 truncate max-w-md">
+                      <p className="text-sm font-medium text-ink">{t.name}</p>
+                      <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
                     </td>
@@ -415,15 +413,15 @@ export default function TemplatesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`text-sm ${t.usageCount === 0 ? 'text-gray-400' : 'text-gray-900 font-medium'}`}>
+                      <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
                         {t.usageCount}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{formatDate(t.updatedAt)}</td>
+                    <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.usageCount) }}
-                        className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50 rounded-md"
+                        className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
                       >
                         削除
                       </button>
@@ -443,8 +441,8 @@ export default function TemplatesPage() {
             className="fixed inset-0 bg-black/30 z-30 lg:hidden"
             onClick={() => setDrawerId(null)}
           />
-          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-white shadow-xl border-l border-gray-200 z-40 overflow-y-auto">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-white shadow-xl border-l border-hairline z-40 overflow-y-auto">
+            <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-white z-10">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {editName !== null ? (
                   <input
@@ -466,37 +464,37 @@ export default function TemplatesPage() {
               </div>
               <button
                 onClick={() => setDrawerId(null)}
-                className="ml-2 text-gray-400 hover:text-gray-600 text-2xl leading-none px-1"
+                className="ml-2 text-ink-faint hover:text-ink-secondary text-2xl leading-none px-1"
               >
                 ×
               </button>
             </div>
 
             {drawerLoading ? (
-              <div className="p-6 text-sm text-gray-400">読み込み中...</div>
+              <div className="p-6 text-sm text-ink-faint">読み込み中...</div>
             ) : drawerError ? (
               <div className="p-6">
                 <p className="text-sm text-red-600 mb-2">読み込みに失敗しました</p>
-                <p className="text-xs text-gray-500">{drawerError}</p>
+                <p className="text-xs text-ink-faint">{drawerError}</p>
               </div>
             ) : !drawerData ? null : (
               <div className="p-4 space-y-5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.messageType] ?? 'bg-gray-100 text-gray-700'}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                     {messageTypeLabels[drawerData.messageType] ?? drawerData.messageType}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
                     {drawerData.category}
                   </span>
-                  <span className="text-[10px] text-gray-400">
+                  <span className="text-[10px] text-ink-faint">
                     更新: {formatDate(drawerData.updatedAt)}
                   </span>
                 </div>
 
                 {/* Preview */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">プレビュー</h4>
-                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 overflow-x-auto">
+                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
+                  <div className="border border-hairline rounded-lg p-3 bg-canvas-sunken overflow-x-auto">
                     {drawerData.messageType === 'flex' ? (
                       (() => {
                         try {
@@ -522,7 +520,7 @@ export default function TemplatesPage() {
 
                 {/* Edit JSON / content */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
+                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
@@ -536,14 +534,13 @@ export default function TemplatesPage() {
                     <button
                       onClick={handleSaveEdit}
                       disabled={savingEdit}
-                      className="px-3 py-1.5 text-xs font-medium text-white rounded-md disabled:opacity-50"
-                      style={{ backgroundColor: '#06C755' }}
+                      className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                     >
                       {savingEdit ? '保存中...' : '保存'}
                     </button>
                     <button
                       onClick={() => { setEditContent(null); setEditName(null) }}
-                      className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-md"
+                      className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-md"
                     >
                       キャンセル
                     </button>
@@ -552,32 +549,32 @@ export default function TemplatesPage() {
 
                 {/* Used by */}
                 <div>
-                  <h4 className="text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
+                  <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">
                     使用箇所 ({drawerData.usedBy.autoReplies.length + drawerData.usedBy.automations.length + scenarioStepUsages.length})
                   </h4>
                   {(drawerData.usedBy.autoReplies.length === 0 && drawerData.usedBy.automations.length === 0 && scenarioStepUsages.length === 0) ? (
-                    <p className="text-[11px] text-gray-400 italic">どこからも使用されていません</p>
+                    <p className="text-[11px] text-ink-faint italic">どこからも使用されていません</p>
                   ) : (
                     <>
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
                             <a href="/auto-replies" className="text-blue-600 hover:underline">
-                              🔗 自動返信: {ar.keyword} <span className="text-gray-400">({ar.matchType})</span>
+                              🔗 自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
                         ))}
                         {drawerData.usedBy.automations.map((au) => (
                           <li key={`au-${au.id}`}>
                             <a href="/automations" className="text-blue-600 hover:underline">
-                              🔗 オートメーション: {au.name} <span className="text-gray-400">({au.eventType})</span>
+                              🔗 オートメーション: {au.name} <span className="text-ink-faint">({au.eventType})</span>
                             </a>
                           </li>
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
                             <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-blue-600 hover:underline">
-                              🎬 シナリオ: {ss.scenarioName} <span className="text-gray-400">#{ss.stepOrder}</span>
+                              🎬 シナリオ: {ss.scenarioName} <span className="text-ink-faint">#{ss.stepOrder}</span>
                             </a>
                           </li>
                         ))}
