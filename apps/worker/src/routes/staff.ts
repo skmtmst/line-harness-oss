@@ -10,7 +10,7 @@ import {
   getFriendById,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
-import { requireRole } from '../middleware/role-guard.js';
+import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import type { Env } from '../index.js';
 
 const staff = new Hono<Env>();
@@ -72,7 +72,8 @@ staff.get('/api/staff/me', async (c) => {
 });
 
 // GET /api/staff — owner only. List all staff with masked API keys.
-staff.get('/api/staff', requireRole('owner'), async (c) => {
+// APIキーを含む一覧。閲覧のみのオーナーにも見せない（見えること自体が権限）。
+staff.get('/api/staff', requireRole('owner'), denyReadOnly(), async (c) => {
   try {
     const members = await getStaffMembers(c.env.DB);
     return c.json({ success: true, data: members.map((m) => serializeStaff(m, true)) });
@@ -83,7 +84,7 @@ staff.get('/api/staff', requireRole('owner'), async (c) => {
 });
 
 // GET /api/staff/:id — owner only. Get staff detail with masked key.
-staff.get('/api/staff/:id', requireRole('owner'), async (c) => {
+staff.get('/api/staff/:id', requireRole('owner'), denyReadOnly(), async (c) => {
   try {
     const id = c.req.param('id')!;
     const member = await getStaffById(c.env.DB, id);
