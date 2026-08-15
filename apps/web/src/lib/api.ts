@@ -357,6 +357,33 @@ export type EcCommerceEvent = {
   processedAt: string | null
 }
 
+export type EcShipment = {
+  id: string
+  eventType: string
+  eventLabel: string
+  orderNumber: string | null
+  friendId: string | null
+  friendName: string | null
+  /** 「鹿肉ミンチ × 2」のような一行。商品情報が無ければ空文字。 */
+  items: string
+  itemCount: number
+  /** JSTの暦日（YYYY-MM-DD）。 */
+  shipDate: string
+  /** subscription = EC側の予定日、ordered_at = 注文日時からの算出。 */
+  shipDateSource: 'subscription' | 'ordered_at'
+}
+
+export type EcShipmentList = {
+  today: string
+  tomorrow: string
+  soon: EcShipment[]
+  later: EcShipment[]
+  soonCount: number
+  laterCount: number
+  scanned: number
+  scanLimit: number
+}
+
 export type EcNotificationSetting = {
   eventType: string
   label: string
@@ -1168,6 +1195,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    shipments: (params?: { limit?: number }) => {
+      const suffix = params?.limit === undefined ? '' : `?limit=${params.limit}`
+      return fetchApi<ApiResponse<EcShipmentList>>(`/api/ec-commerce/shipments${suffix}`)
+    },
   },
   nenCampaigns: {
     overview: () => fetchApi<ApiResponse<{
