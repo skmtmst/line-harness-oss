@@ -10,6 +10,9 @@ import CcPromptButton from '@/components/cc-prompt-button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import SupportPage from '@/app/support/page'
 
 interface Chat {
   id: string
@@ -293,7 +296,12 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   )
 }
 
-export default function ChatsPage() {
+const MERGED_TABS = [
+  { key: 'line', label: 'LINE' },
+  { key: 'email', label: 'お問い合わせ（メール）' },
+]
+
+function ChatsPageInner() {
   const { selectedAccountId } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   const [allFriends, setAllFriends] = useState<FriendItem[]>([])
@@ -1210,5 +1218,25 @@ export default function ChatsPage() {
       </div>
       <CcPromptButton prompts={ccPrompts} />
     </div>
+  )
+}
+
+function ChatsPageHost() {
+  const tab = useMergedTab(MERGED_TABS, 'channel')
+  return (
+    <div>
+      <MergedTabs basePath="/chats" paramName="channel" tabs={MERGED_TABS} active={tab} />
+      {tab === 'line' && <ChatsPageInner />}
+      {tab === 'email' && <SupportPage />}
+    </div>
+  )
+}
+
+export default function ChatsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <ChatsPageHost />
+    </Suspense>
   )
 }

@@ -16,6 +16,9 @@ import AccountSetupUrls from '@/components/accounts/account-setup-urls'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import LinkBaseUrlSetting from '@/components/accounts/link-base-url-setting'
 import FollowerImportButton from '@/components/accounts/follower-import-button'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import PoolsPage from '@/app/pools/page'
 
 interface LineAccountListItem {
   id: string
@@ -61,7 +64,12 @@ const ccPrompts = [
   },
 ]
 
-export default function AccountsPage() {
+const MERGED_TABS = [
+  { key: 'accounts', label: 'アカウント' },
+  { key: 'pools', label: 'プール' },
+]
+
+function AccountsPageInner() {
   const [accounts, setAccounts] = useState<LineAccountListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -383,5 +391,25 @@ export default function AccountsPage() {
         />
       )}
     </div>
+  )
+}
+
+function AccountsPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'accounts' && <AccountsPageInner />}
+      {tab === 'pools' && <PoolsPage />}
+    </div>
+  )
+}
+
+export default function AccountsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <AccountsPageHost />
+    </Suspense>
   )
 }

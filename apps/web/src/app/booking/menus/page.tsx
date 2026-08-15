@@ -6,6 +6,9 @@ import Header from '@/components/layout/header'
 import { api, bookingApi, type BookingMenu } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import BookingStaffPage from '@/app/booking/staff/page'
 
 const EMPTY: Partial<BookingMenu> = {
   name: '',
@@ -19,7 +22,12 @@ const EMPTY: Partial<BookingMenu> = {
   auto_tag_id: null,
 }
 
-export default function MenusPage() {
+const MERGED_TABS = [
+  { key: 'menus', label: 'メニュー' },
+  { key: 'staff', label: 'スタッフ' },
+]
+
+function MenusPageInner() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
   const [editing, setEditing] = useState<Partial<BookingMenu> | null>(null)
@@ -465,5 +473,25 @@ function NumField({
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
       />
     </Field>
+  )
+}
+
+function MenusPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/booking/menus" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'menus' && <MenusPageInner />}
+      {tab === 'staff' && <BookingStaffPage />}
+    </div>
+  )
+}
+
+export default function MenusPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <MenusPageHost />
+    </Suspense>
   )
 }

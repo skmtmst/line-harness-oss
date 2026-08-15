@@ -22,6 +22,9 @@ function measureLabel(method: ConversionPoint['measureMethod']): string {
 }
 import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import AffiliatesPage from '@/app/affiliates/page'
 
 interface ConversionReportItem {
   conversionPointId: string
@@ -50,7 +53,12 @@ const ccPrompts = [
   },
 ]
 
-export default function ConversionsPage() {
+const MERGED_TABS = [
+  { key: 'points', label: '成果地点' },
+  { key: 'affiliates', label: 'アフィリエイト' },
+]
+
+function ConversionsPageInner() {
   const [points, setPoints] = useState<ConversionPoint[]>([])
   const [report, setReport] = useState<ConversionReportItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -344,5 +352,25 @@ export default function ConversionsPage() {
       )}
       <CcPromptButton prompts={ccPrompts} />
     </div>
+  )
+}
+
+function ConversionsPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/conversions" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'points' && <ConversionsPageInner />}
+      {tab === 'affiliates' && <AffiliatesPage />}
+    </div>
+  )
+}
+
+export default function ConversionsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <ConversionsPageHost />
+    </Suspense>
   )
 }

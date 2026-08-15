@@ -5,6 +5,9 @@ import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import CcPromptButton from '@/components/cc-prompt-button'
 import type { IncomingWebhook, OutgoingWebhook } from '@line-crm/shared'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import NotificationsPage from '@/app/notifications/page'
 
 type Tab = 'incoming' | 'outgoing'
 
@@ -48,7 +51,12 @@ function isHttpsUrl(value: string): boolean {
   }
 }
 
-export default function WebhooksPage() {
+const MERGED_TABS = [
+  { key: 'webhooks', label: 'Webhook' },
+  { key: 'notify', label: '未対応の通知' },
+]
+
+function WebhooksPageInner() {
   const [tab, setTab] = useState<Tab>('incoming')
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
   const [outgoing, setOutgoing] = useState<OutgoingWebhook[]>([])
@@ -766,5 +774,25 @@ export default function WebhooksPage() {
       )}
       <CcPromptButton prompts={ccPrompts} />
     </div>
+  )
+}
+
+function WebhooksPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'webhooks' && <WebhooksPageInner />}
+      {tab === 'notify' && <NotificationsPage />}
+    </div>
+  )
+}
+
+export default function WebhooksPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <WebhooksPageHost />
+    </Suspense>
   )
 }
