@@ -86,7 +86,7 @@ function TagMileageEditor({ tag, onSaved }: { tag: Tag; onSaved: () => void }) {
             onChange={(e) => setMultiplier(e.target.value)}
             className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
           />
-          <span className="text-xs text-gray-400">倍</span>
+          <span className="text-xs text-ink-faint">倍</span>
         </div>
       </td>
       <td className="px-3 py-3">
@@ -192,8 +192,7 @@ export default function TagsPage() {
         action={
           <button
             onClick={() => { setCreating(!creating); setError('') }}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
           >
             + 新規タグ
           </button>
@@ -201,16 +200,16 @@ export default function TagsPage() {
       />
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
       {creating && (
-        <div className="mb-4 p-4 bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="mb-4 p-4 bg-canvas rounded-card border border-hairline">
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">タグ名</label>
+              <label className="block text-xs font-semibold text-ink-faint mb-1.5">タグ名</label>
               <input
                 type="text"
                 value={newName}
@@ -222,7 +221,7 @@ export default function TagsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1.5">色</label>
+              <label className="block text-xs font-semibold text-ink-faint mb-1.5">色</label>
               <div className="flex items-center gap-1.5">
                 {PRESET_COLORS.map((c) => (
                   <button
@@ -246,14 +245,13 @@ export default function TagsPage() {
               <button
                 onClick={handleCreate}
                 disabled={saving || !newName.trim()}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90 disabled:opacity-40"
-                style={{ backgroundColor: '#06C755' }}
+                className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-40"
               >
                 {saving ? '作成中...' : '作成'}
               </button>
               <button
                 onClick={() => { setCreating(false); setNewName('') }}
-                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg"
+                className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
               >
                 キャンセル
               </button>
@@ -262,45 +260,45 @@ export default function TagsPage() {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1020px]">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">タグ</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">友だち数</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">作成日</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">獲得マイル</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">紹介者マイル</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">行動倍率</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-gray-500 uppercase">優先度</th>
+              <tr className="bg-canvas-sunken border-b border-hairline">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち数</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">作成日</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">獲得マイル</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">紹介者マイル</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">行動倍率</th>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">優先度</th>
                 <th className="px-3 py-3" />
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">読み込み中...</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-gray-400 text-sm">タグがありません</td></tr>
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-faint text-sm">タグがありません</td></tr>
               ) : (
                 items.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50">
+                  <tr key={t.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3">
                       <TagBadge tag={t} />
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700 tabular-nums">
+                    <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {t.friendCount ?? 0}
-                      <span className="text-xs text-gray-400 ml-0.5">人</span>
+                      <span className="text-xs text-ink-faint ml-0.5">人</span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="px-4 py-3 text-xs text-ink-faint">
                       {t.createdAt ? new Date(t.createdAt).toLocaleDateString('ja-JP') : ''}
                     </td>
                     <TagMileageEditor tag={t} onSaved={load} />
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <button
                         onClick={() => handleDelete(t)}
-                        className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-red-50 rounded-md"
+                        className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
                       >
                         削除
                       </button>
