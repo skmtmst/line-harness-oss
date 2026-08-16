@@ -1489,6 +1489,35 @@ function ChatsPageHost() {
         <Header
           title="受信箱"
           description="LINEのトーク・メールでの問い合わせ・返信待ちを、1か所にまとめて扱います。"
+          action={
+            <div className="flex items-center gap-2">
+              {/*
+                設計にあるボタン。行き先の文書がまだ無いので押せなくしている。
+                リンク先を仮置きすると行き止まりになる（route-integrity が落ちる）。
+              */}
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              {/*
+                すべて確認済みにする。押し間違えると未対応が全部消えるので、
+                確認を挟む。設計にも同じボタンがある。
+              */}
+              <button
+                onClick={() => {
+                  if (window.confirm('未対応をすべて確認済みにします。よろしいですか。')) {
+                    window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
+                  }
+                }}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+              >
+                すべて確認済みにする
+              </button>
+            </div>
+          }
         />
       </div>
 
@@ -1512,6 +1541,21 @@ function ChatsPageHost() {
             {c.label}
           </button>
         ))}
+
+        {/*
+          設計 `Filters` の右側。トークに何を出すかの切り替え。
+          いまは常に全部出しているので、選んでも表示は変わらない。
+          仕組みが入るまでの枠。docs/v025-open-questions.md に残している。
+        */}
+        <label className="text-ink-faint ml-auto flex items-center gap-1.5 text-xs">
+          表示
+          <select
+            disabled
+            className="border-hairline rounded-control border px-2 py-1 text-xs disabled:opacity-50"
+          >
+            <option>受信・送信・システム</option>
+          </select>
+        </label>
       </div>
 
       {/*

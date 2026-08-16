@@ -68,7 +68,7 @@ export default function InboxKpis() {
       title: 'メールの受信',
       value: stats?.todayByChannel.email ?? null,
       unit: '件',
-      detail: '今日ぶん',
+      detail: '過去7日',
       warn: false,
     },
   ]
