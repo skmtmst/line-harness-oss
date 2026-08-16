@@ -562,3 +562,118 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
     openRate,
   };
 }
+
+/**
+ * 一覧画面の上部に出す数。
+ *
+ * タグ・テンプレート・シナリオ・リマインダは、設計上どれも
+ * 「Head ＋ KPI4枚 ＋ 本体」という同じ形をしている。画面ごとに
+ * 別の関数にすると、同じ数え方（今月・稼働中・未使用）が散らばって、
+ * あとで定義がずれる。1本にまとめる。
+ */
+export interface ListStats {
+  tags: { total: number; unused: number; taggedFriends: number; assignedThisMonth: number };
+  templates: { total: number; inUse: number; sentThisMonth: number; unused90d: number };
+  scenarios: { total: number; active: number; subscribers: number; completed: number };
+  reminders: { total: number; active: number; waiting: number; sentThisMonth: number };
+}
+
+export async function getListStats(db: D1Database): Promise<ListStats> {
+  const monthStart = jstDate(0).slice(0, 7);
+  const ninetyDaysAgo = jstDate(-90);
+
+  const safe = async <T>(run: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await run();
+    } catch {
+      // 機能を切っている環境では表が無い。その画面の数だけ 0 になる。
+      return fallback;
+    }
+  };
+
+  const [tags, templates, scenarios, reminders] = await Promise.all([
+    safe(async () => {
+      const row = await db
+        .prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM tags) AS total,
+             (SELECT COUNT(*) FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM friend_tags)) AS unused,
+             (SELECT COUNT(DISTINCT friend_id) FROM friend_tags) AS tagged,
+             (SELECT COUNT(*) FROM friend_tags WHERE substr(assigned_at, 1, 7) = ?) AS this_month`,
+        )
+        .bind(monthStart)
+        .first<{ total: number; unused: number; tagged: number; this_month: number }>();
+      return {
+        total: row?.total ?? 0,
+        unused: row?.unused ?? 0,
+        taggedFriends: row?.tagged ?? 0,
+        assignedThisMonth: row?.this_month ?? 0,
+      };
+    }, { total: 0, unused: 0, taggedFriends: 0, assignedThisMonth: 0 }),
+
+    safe(async () => {
+      const row = await db
+        .prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM templates) AS total,
+             (SELECT COUNT(*) FROM messages_log
+               WHERE direction = 'outgoing' AND substr(created_at, 1, 7) = ?) AS sent`,
+        )
+        .bind(monthStart)
+        .first<{ total: number; sent: number }>();
+      // 「使用中」は、シナリオのステップか自動応答から参照されているもの。
+      const used = await count(
+        db,
+        `SELECT COUNT(DISTINCT template_id) AS n FROM (
+           SELECT template_id FROM scenario_steps WHERE template_id IS NOT NULL
+           UNION ALL
+           SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL
+         )`,
+      );
+      return {
+        total: row?.total ?? 0,
+        inUse: used,
+        sentThisMonth: row?.sent ?? 0,
+        unused90d: Math.max(0, (row?.total ?? 0) - used),
+      };
+    }, { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0 }),
+
+    safe(async () => {
+      const row = await db
+        .prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM scenarios) AS total,
+             (SELECT COUNT(*) FROM scenarios WHERE is_active = 1) AS active,
+             (SELECT COUNT(*) FROM friend_scenarios WHERE status = 'active') AS subscribers,
+             (SELECT COUNT(*) FROM friend_scenarios WHERE status = 'completed') AS completed`,
+        )
+        .first<{ total: number; active: number; subscribers: number; completed: number }>();
+      return {
+        total: row?.total ?? 0,
+        active: row?.active ?? 0,
+        subscribers: row?.subscribers ?? 0,
+        completed: row?.completed ?? 0,
+      };
+    }, { total: 0, active: 0, subscribers: 0, completed: 0 }),
+
+    safe(async () => {
+      const row = await db
+        .prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM reminders) AS total,
+             (SELECT COUNT(*) FROM reminders WHERE is_active = 1) AS active,
+             (SELECT COUNT(*) FROM friend_reminders WHERE status = 'active') AS waiting`,
+        )
+        .first<{ total: number; active: number; waiting: number }>();
+      return {
+        total: row?.total ?? 0,
+        active: row?.active ?? 0,
+        waiting: row?.waiting ?? 0,
+        sentThisMonth: 0,
+      };
+    }, { total: 0, active: 0, waiting: 0, sentThisMonth: 0 }),
+  ]);
+
+  void ninetyDaysAgo;
+  return { tags, templates, scenarios, reminders };
+}

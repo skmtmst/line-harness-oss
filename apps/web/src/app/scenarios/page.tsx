@@ -6,6 +6,7 @@ import type { Scenario, ScenarioTriggerType, DeliveryMode } from '@line-crm/shar
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import ListKpis from '@/components/shared/list-kpis'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import ScenarioModePicker from '@/components/scenarios/scenario-mode-picker'
 import CcPromptButton from '@/components/cc-prompt-button'
@@ -128,6 +129,7 @@ export default function ScenariosPage() {
     <div>
       <Header
         title="シナリオ配信"
+        description="配信のタイミングを指定して複数のメッセージを順に送ります。友だちの反応に応じて分岐もできます。作成しただけでは配信されません。"
         action={
           <button
             onClick={() => setPickerOpen(true)}
@@ -136,6 +138,24 @@ export default function ScenariosPage() {
             + 新規シナリオ
           </button>
         }
+      />
+
+      {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
+      <ListKpis
+        build={(s) => [
+            { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
+            { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '重複を含む' },
+            {
+              title: '読了済',
+              value: s.scenarios.completed,
+              unit: '人',
+              detail:
+                s.scenarios.subscribers + s.scenarios.completed > 0
+                  ? `完了率 ${Math.round((s.scenarios.completed / (s.scenarios.subscribers + s.scenarios.completed)) * 100)}%`
+                  : '—',
+            },
+            { title: '稼働中', value: s.scenarios.active, unit: '件', detail: '止めているものを除く' },
+        ]}
       />
 
       {error && (

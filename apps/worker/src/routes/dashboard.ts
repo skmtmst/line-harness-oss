@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import {
   getDashboardOverview,
+  getListStats,
   type DashboardPeriod,
   type DashboardOverview,
 } from '@line-crm/db';
@@ -72,5 +73,20 @@ dashboard.get('/api/dashboard/overview', async (c) => {
   } catch (err) {
     console.error('GET /api/dashboard/overview error:', err);
     return c.json({ success: false as const, error: 'ダッシュボードの数を取得できませんでした' }, 500);
+  }
+});
+
+/**
+ * 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。
+ *
+ * 4画面ぶんをまとめて返す。画面ごとに叩くと同じ数え方が散らばって、
+ * あとで定義がずれる。1回で返して、画面側が必要なところだけ読む。
+ */
+dashboard.get('/api/list-stats', async (c) => {
+  try {
+    return c.json({ success: true as const, data: await getListStats(c.env.DB) });
+  } catch (err) {
+    console.error('GET /api/list-stats error:', err);
+    return c.json({ success: false as const, error: '集計を取得できませんでした' }, 500);
   }
 });

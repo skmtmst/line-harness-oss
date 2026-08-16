@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import ListKpis from '@/components/shared/list-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
 import CcPromptButton from '@/components/cc-prompt-button'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -218,7 +219,8 @@ export default function TemplatesPage() {
   return (
     <div>
       <Header
-        title="テンプレート管理"
+        title="テンプレート"
+        description="配信で使うメッセージを管理します。友だち情報や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
         action={
           <button
             onClick={() => setShowCreate(true)}
@@ -227,6 +229,23 @@ export default function TemplatesPage() {
             + 新規テンプレート
           </button>
         }
+      />
+
+      {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
+      <ListKpis
+        build={(s) => [
+            { title: 'テンプレート', value: s.templates.total, unit: '件', detail: `使用中 ${s.templates.inUse}` },
+            {
+              title: '今月の送信',
+              value: s.templates.sentThisMonth,
+              unit: '通',
+              detail: 'テンプレート経由を含む全送信',
+            },
+            // 設計は「平均クリック率」。短縮URL経由の実測をテンプレート単位で
+            // 集計する口がまだ無い。使われていない数のほうが、いま手を打てる。
+            { title: '未使用', value: s.templates.unused90d, unit: '件', detail: 'どこからも参照されていない' },
+            { title: '使用中', value: s.templates.inUse, unit: '件', detail: 'シナリオ・自動応答から参照' },
+        ]}
       />
 
       {error && (

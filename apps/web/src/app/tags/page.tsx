@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
+import ListKpis from '@/components/shared/list-kpis'
 import TagBadge from '@/components/friends/tag-badge'
 import FriendFieldList from '@/components/friend-fields/field-list'
 import SupportMarkList from '@/components/friend-fields/mark-list'
@@ -305,7 +306,7 @@ function TagsPageInner() {
     <div>
       <Header
         title="友だち属性"
-        description="タグ・情報欄・対応マーク・保存した検索をまとめて扱います。"
+        description="友だちを分類するタグを管理します。タグはシナリオの開始条件、配信の絞り込み、自動応答の付与先として使えます。"
         action={
           tab === 'tags' ? (
             <button
@@ -316,6 +317,29 @@ function TagsPageInner() {
             </button>
           ) : undefined
         }
+      />
+
+      {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
+      <ListKpis
+        build={(s) => [
+            { title: 'タグ数', value: s.tags.total, unit: '件', detail: `うち未使用 ${s.tags.unused}` },
+            {
+              title: '付与済み友だち',
+              value: s.tags.taggedFriends,
+              unit: '人',
+              detail: 'タグが1つ以上ついている人',
+            },
+            {
+              title: '今月の付与',
+              value: s.tags.assignedThisMonth,
+              unit: '回',
+              detail: '手動・自動の合計',
+            },
+            // 設計の4枚目は「自動付与ルール」。自動応答・フォーム由来の
+            // 付与ルールを数える口がまだ無いので、未使用タグを出す。
+            // どちらも「整理が要るか」を見るための数。
+            { title: '未使用のタグ', value: s.tags.unused, unit: '件', detail: '誰にもついていない' },
+        ]}
       />
 
       {/* タブはURLに出す。直リンクとブラウザバックが効くようにするため。 */}
