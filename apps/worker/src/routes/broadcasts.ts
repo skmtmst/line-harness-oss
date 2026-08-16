@@ -131,6 +131,21 @@ broadcasts.get('/api/broadcasts', async (c) => {
 });
 
 // GET /api/broadcasts/:id - get single
+/**
+ * 一覧の上部に出す数（設計 `V2 4-2 一斉配信` の KPIs）。
+ *
+ * :id より前に置くこと。あとに置くと 'stats' が id として拾われる。
+ */
+broadcasts.get('/api/broadcasts/stats', async (c) => {
+  try {
+    const { getBroadcastStats } = await import('@line-crm/db');
+    return c.json({ success: true as const, data: await getBroadcastStats(c.env.DB) });
+  } catch (err) {
+    console.error('GET /api/broadcasts/stats error:', err);
+    return c.json({ success: false as const, error: '配信の集計を取得できませんでした' }, 500);
+  }
+});
+
 broadcasts.get('/api/broadcasts/:id', async (c) => {
   try {
     const id = c.req.param('id');

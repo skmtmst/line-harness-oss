@@ -5,6 +5,7 @@ import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import type { FriendListItem } from '@/lib/api'
 import Header from '@/components/layout/header'
+import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
@@ -140,10 +141,13 @@ function FriendsPageInner() {
 
   return (
     <div>
+      {/* 設計 `V2 2-2 友だち`。呼び名は「友だち」でサイドバーと揃えている。 */}
       <Header
-        title="友だちリスト"
-        description="友だちの検索や、詳細情報の確認ができます。"
+        title="友だち"
+        description="登録された友だちの検索・タグ付け・対応状況を管理します。"
       />
+
+      <FriendKpis />
 
       {/* Search + sort bar — L-step style */}
       <div className="bg-canvas rounded-card border border-hairline p-4 mb-4">

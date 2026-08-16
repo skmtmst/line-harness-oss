@@ -6,6 +6,7 @@ import { api, fetchApi } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import InboxKpis from '@/components/chats/inbox-kpis'
 import CcPromptButton from '@/components/cc-prompt-button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
@@ -781,7 +782,17 @@ function ChatsPageInner() {
 
   return (
     <div>
-      <Header title="オペレーターチャット" />
+      {/*
+        設計 `V2 2-1 受信箱`。呼び名は「受信箱」で、サイドバーとも揃えている。
+        LINEのトーク・メールでの問い合わせ・返信待ちを1か所で扱う画面なので、
+        「オペレーターチャット」だと中身より狭く見える。
+      */}
+      <Header
+        title="受信箱"
+        description="LINEのトーク・メールでの問い合わせ・返信待ちを、1か所にまとめて扱います。"
+      />
+
+      <InboxKpis />
 
       {/* Error */}
       {error && (
