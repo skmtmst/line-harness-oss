@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
+import ListToolbar from '@/components/shared/list-toolbar'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import ScenarioModePicker from '@/components/scenarios/scenario-mode-picker'
 import CcPromptButton from '@/components/cc-prompt-button'
@@ -37,6 +38,8 @@ export default function ScenariosPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const router = useRouter()
   const [scenarios, setScenarios] = useState<ScenarioWithCount[]>([])
+  // 名前の絞り込み（設計 `Body` の検索）。手元で絞る。
+  const [nameQuery, setNameQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -132,12 +135,35 @@ export default function ScenariosPage() {
         title="シナリオ配信"
         description="配信のタイミングを指定して複数のメッセージを順に送ります。友だちの反応に応じて分岐もできます。作成しただけでは配信されません。"
         action={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              disabled
+              title="準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            <button
+              disabled
+              title="準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              並び替え
+            </button>
+            <button
+              disabled
+              title="準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              フォルダを追加
+            </button>
           <button
             onClick={() => setPickerOpen(true)}
             className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 min-h-[44px] text-sm font-medium"
           >
             + 新規シナリオ
           </button>
+          </div>
         }
       />
       </div>
@@ -164,6 +190,14 @@ export default function ScenariosPage() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
+      <ListToolbar
+        folders={['すべて', '01_新規フォロー', '02_定期便', '未分類']}
+        searchPlaceholder="シナリオ名で検索"
+        searchValue={nameQuery}
+        onSearchChange={setNameQuery}
+        sortLabel="購読中が多い順"
+      />
+
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -192,7 +226,11 @@ export default function ScenariosPage() {
         </div>
       ) : (
         <ScenarioList
-          scenarios={scenarios}
+          scenarios={scenarios.filter((sc) =>
+            nameQuery.trim() === ''
+              ? true
+              : sc.name.toLowerCase().includes(nameQuery.trim().toLowerCase()),
+          )}
           onToggleActive={handleToggleActive}
           onDelete={handleDelete}
           loading={loading}
