@@ -26,6 +26,7 @@
     "node": ">=20"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "typescript": "^5.9.3",
     "wrangler": "4",
     "tsx": "^4.21.0",
