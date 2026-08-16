@@ -8,6 +8,10 @@ import type {
   SupportMark,
   Folder,
   SavedSearch,
+  MediaItem,
+  MediaUsage,
+  CommonVar,
+  CommonVarSchedule,
   Scenario,
   ScenarioStep,
   ApiResponse,
@@ -717,6 +721,66 @@ export const api = {
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
+  },
+  /** メディアライブラリ。1か所に置いて使い回す。 */
+  media: {
+    list: (params?: { kind?: string; folderId?: string }) => {
+      const q = new URLSearchParams()
+      if (params?.kind) q.set('kind', params.kind)
+      if (params?.folderId) q.set('folderId', params.folderId)
+      const query = q.toString()
+      return fetchApi<ApiResponse<MediaItem[]>>(`/api/media${query ? `?${query}` : ''}`)
+    },
+    /** data は base64。data: URL 形式でも受け付ける。 */
+    upload: (data: {
+      filename: string
+      mimeType: string
+      data: string
+      folderId?: string | null
+    }) =>
+      fetchApi<ApiResponse<MediaItem>>('/api/media', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: { filename?: string; folderId?: string | null }) =>
+      fetchApi<ApiResponse<MediaItem>>(`/api/media/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    usages: (id: string) => fetchApi<ApiResponse<MediaUsage[]>>(`/api/media/${id}/usages`),
+    /** 使用中は 409 で件数が返る。force で消せる。 */
+    delete: (id: string, opts?: { force?: boolean }) =>
+      fetchApi<ApiResponse<null>>(`/api/media/${id}${opts?.force ? '?force=1' : ''}`, {
+        method: 'DELETE',
+      }),
+  },
+  /** 共通情報。営業時間などを1か所で直す。 */
+  commonVars: {
+    list: () => fetchApi<ApiResponse<CommonVar[]>>('/api/common-vars'),
+    create: (data: { name: string; varKey: string; type?: string; value?: string }) =>
+      fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
+    update: (id: string, data: { name?: string; value?: string }) =>
+      fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}`, { method: 'DELETE' }),
+    schedules: (id: string) =>
+      fetchApi<ApiResponse<CommonVarSchedule[]>>(`/api/common-vars/${id}/schedules`),
+    addSchedule: (id: string, data: { effectiveFrom: string; value: string }) =>
+      fetchApi<ApiResponse<CommonVarSchedule>>(`/api/common-vars/${id}/schedules`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    deleteSchedule: (id: string, scheduleId: string) =>
+      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}/schedules/${scheduleId}`, {
+        method: 'DELETE',
+      }),
   },
   /** 汎用フォルダ。一覧13画面で共通に使う。 */
   folders: {

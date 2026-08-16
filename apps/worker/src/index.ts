@@ -97,6 +97,7 @@ import { searchConsole } from './routes/search-console.js';
 import { friendFields } from './routes/friend-fields.js';
 import { friendAttributes } from './routes/friend-attributes.js';
 import { featureSettings } from './routes/feature-settings.js';
+import { contents } from './routes/contents.js';
 import { receiveSupportEmail } from './services/support-email.js';
 import { qrResponseHeaders } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -255,6 +256,7 @@ app.route('/', searchConsole);
 app.route('/', friendFields);
 app.route('/', friendAttributes);
 app.route('/', featureSettings);
+app.route('/', contents);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -1063,6 +1065,21 @@ async function scheduled(
     } catch (e) {
       console.error('nen-tag refresh error:', e);
     }
+  }
+
+  // 共通情報の日付での切り替え。
+  //
+  // applied_at が NULL で、予約した日時を過ぎたものだけを反映する。
+  // 二度当たらないので、cron が重なっても値が飛ばない。
+  // 失敗しても他の処理は続ける。営業時間の表記が1周ぶん古いままなのと、
+  // 配信そのものが止まるのとでは、後者の方がはるかに重い。
+  try {
+    const { applyDueCommonVarSchedules } = await import('@line-crm/db');
+    const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
+    const applied = await applyDueCommonVarSchedules(env.DB, jstNowIso);
+    if (applied > 0) console.log(JSON.stringify({ event: 'common_var_schedule_applied', applied }));
+  } catch (e) {
+    console.error('common-var schedule error:', e);
   }
 
   // 管理画面ログインに依存せず、DBに登録された一度限りの設置ジョブを安全に実行する。

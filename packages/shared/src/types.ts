@@ -170,6 +170,50 @@ export interface SupportMark {
   createdAt: string;
 }
 
+/** メディアライブラリの1件 */
+export interface MediaItem {
+  id: string;
+  folderId: string | null;
+  kind: "image" | "video" | "audio" | "file";
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  url: string;
+  uploadedBy: string | null;
+  createdAt: string;
+}
+
+/** メディアの使用箇所 */
+export interface MediaUsage {
+  refKind: string;
+  refId: string;
+  scannedAt: string;
+}
+
+/** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
+export interface CommonVar {
+  id: string;
+  folderId: string | null;
+  name: string;
+  varKey: string;
+  type: "text" | "url" | "image" | "number";
+  value: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 共通情報の日付での切り替え予約 */
+export interface CommonVarSchedule {
+  id: string;
+  varId: string;
+  effectiveFrom: string;
+  value: string;
+  appliedAt: string | null;
+}
+
 /** 保存した検索 */
 export interface SavedSearch {
   id: string;
