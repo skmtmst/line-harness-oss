@@ -766,6 +766,32 @@ export const api = {
         `/api/analytics/cross?fieldId=${encodeURIComponent(fieldId)}`,
       ),
   },
+  /**
+   * ログイン履歴。オーナーと管理者だけが見られる。
+   * IPは末尾を伏せて返る。
+   */
+  loginAudit: {
+    list: (params?: { userId?: string; action?: string; limit?: number }) => {
+      const q = new URLSearchParams()
+      if (params?.userId) q.set('userId', params.userId)
+      if (params?.action) q.set('action', params.action)
+      if (params?.limit) q.set('limit', String(params.limit))
+      const query = q.toString()
+      return fetchApi<
+        ApiResponse<
+          Array<{
+            id: string
+            adminUserId: string | null
+            action: string
+            screen: string | null
+            ip: string | null
+            result: string
+            createdAt: string
+          }>
+        >
+      >(`/api/login-audit${query ? `?${query}` : ''}`)
+    },
+  },
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
     pages: (params?: { from?: string; to?: string }) =>

@@ -17,6 +17,10 @@ import {
   validateSearchConditions,
   SAVED_SEARCH_LIMIT,
   SAVED_SEARCH_SCOPES,
+  getLoginAudit,
+  LOGIN_AUDIT_ACTIONS,
+  type LoginAuditRow,
+  type LoginAuditAction,
   getFolders,
   getFolderById,
   createFolder,
@@ -78,6 +82,23 @@ function serializeFolder(row: Folder) {
 
 /** 色は #RRGGBB だけ許す。名前付きの色を混ぜると、画面での見た目が揃わない。 */
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * IPの末尾を伏せる。
+ *
+ * 監査で見たいのは「いつもと違うところから入っていないか」で、
+ * 完全な値は要らない。画面に出す以上、出す量は少ない方がよい。
+ */
+function maskIp(ip: string): string {
+  if (ip.includes(':')) {
+    // IPv6。前半だけ残す。
+    const parts = ip.split(':');
+    return parts.slice(0, 3).join(':') + ':***';
+  }
+  const parts = ip.split('.');
+  if (parts.length !== 4) return '***';
+  return `${parts[0]}.${parts[1]}.${parts[2]}.***`;
+}
 
 // ── 対応マーク ──────────────────────────────────────────────
 
@@ -344,6 +365,44 @@ friendAttributes.delete(
     }
   },
 );
+
+// ── ログイン履歴 ────────────────────────────────────────────
+//
+// 誰がいつ入ったか、誰が個人情報を開いたか。個人情報保護法上の利用記録
+// として残す必要がある。
+//
+// オーナーと管理者だけが見られる。誰がいつ入ったかは、それ自体が
+// 見せてよい情報とは限らない。
+friendAttributes.get('/api/login-audit', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const rawAction = c.req.query('action');
+    const action = (LOGIN_AUDIT_ACTIONS as readonly string[]).includes(rawAction ?? '')
+      ? (rawAction as LoginAuditAction)
+      : undefined;
+    const items = await getLoginAudit(c.env.DB, {
+      adminUserId: c.req.query('userId') || undefined,
+      action,
+      limit: Number(c.req.query('limit') ?? 100),
+    });
+    return c.json({
+      success: true,
+      data: items.map((row: LoginAuditRow) => ({
+        id: row.id,
+        adminUserId: row.admin_user_id,
+        action: row.action,
+        screen: row.screen,
+        // IPは残すが、一覧では末尾を伏せる。監査に必要なのは
+        // 「いつもと違うところから入っていないか」で、完全な値は要らない。
+        ip: row.ip ? maskIp(row.ip) : null,
+        result: row.result,
+        createdAt: row.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/login-audit error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 // ── 汎用フォルダ ────────────────────────────────────────────
 
