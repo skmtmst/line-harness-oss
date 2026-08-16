@@ -792,6 +792,63 @@ export const api = {
       >(`/api/login-audit${query ? `?${query}` : ''}`)
     },
   },
+  /** 回答フォーム。 */
+  forms: {
+    list: () =>
+      fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null }>>>(
+        '/api/forms',
+      ),
+    get: (id: string) =>
+      fetchApi<
+        ApiResponse<{
+          id: string
+          name: string
+          description: string | null
+          fields: unknown
+          onSubmitTagId: string | null
+          onSubmitMessageType: string | null
+          onSubmitMessageContent: string | null
+          isActive: boolean
+        }>
+      >(`/api/forms/${id}`),
+    update: (
+      id: string,
+      data: {
+        name?: string
+        description?: string | null
+        fields?: unknown
+        onSubmitTagId?: string | null
+        onSubmitMessageType?: string | null
+        onSubmitMessageContent?: string | null
+        isActive?: boolean
+      },
+    ) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+  },
+  /** NENコラム。 */
+  nenColumns: {
+    list: () =>
+      fetchApi<
+        ApiResponse<
+          Array<{
+            id: string
+            slug: string
+            title: string
+            intro_text: string | null
+            published_at: string | null
+          }>
+        >
+      >('/api/nen-campaigns/columns'),
+    /** コラムに添える紹介文。本文そのものはEC側にある。 */
+    updateMessage: (id: string, introText: string) =>
+      fetchApi<ApiResponse<null>>(`/api/nen-campaigns/columns/${id}/message`, {
+        method: 'PUT',
+        body: JSON.stringify({ introText }),
+      }),
+  },
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
     pages: (params?: { from?: string; to?: string }) =>
@@ -1569,6 +1626,8 @@ export const api = {
         activeUntil: string | null;
         cooldownMinutes: number | null;
         skipWhenOperatorActive: boolean;
+        priority: number;
+        messageKinds: string[] | null;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {
