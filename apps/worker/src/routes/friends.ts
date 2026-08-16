@@ -419,6 +419,22 @@ friends.get('/api/friends/:id/mileage', async (c) => {
 });
 
 // GET /api/friends/:id - get single friend with tags
+/**
+ * 友だち画面の上部に出す数（設計 `V2 2-2 友だち` の KPIs）。
+ *
+ * :id より前に置くこと。あとに置くと 'stats' が id として拾われる。
+ */
+friends.get('/api/friends/stats', async (c) => {
+  try {
+    const { getFriendStats } = await import('@line-crm/db');
+    const stats = await getFriendStats(c.env.DB, c.req.query('accountId') ?? null);
+    return c.json({ success: true as const, data: stats });
+  } catch (err) {
+    console.error('GET /api/friends/stats error:', err);
+    return c.json({ success: false as const, error: '友だちの集計を取得できませんでした' }, 500);
+  }
+});
+
 friends.get('/api/friends/:id', async (c) => {
   try {
     const id = c.req.param('id');

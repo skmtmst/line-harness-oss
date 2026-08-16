@@ -6,6 +6,7 @@ import type { Tag } from '@line-crm/shared'
 import { api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
@@ -153,8 +154,10 @@ function BroadcastList() {
 
   return (
     <div>
+      {/* 設計 `V2 4-2 一斉配信` */}
       <Header
         title="一斉配信"
+        description="条件を指定した友だちにメッセージをまとめて送ります。予約配信と開封の計測ができます。"
         action={activeSection === 'list' ? (
           <button
             onClick={() => setShowCreate(true)}
@@ -164,6 +167,8 @@ function BroadcastList() {
           </button>
         ) : undefined}
       />
+
+      {activeSection === 'list' && <BroadcastKpis />}
 
       <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2" aria-label="一斉配信メニュー">
         {([

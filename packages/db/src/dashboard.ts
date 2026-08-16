@@ -372,3 +372,193 @@ export async function getDashboardOverview(
     conversions,
   };
 }
+
+/** 受信箱の上部に出す数（設計 `V2 2-1 受信箱` の KPIs）。 */
+export interface InboxStats {
+  /** 返信を待っている人。 */
+  waiting: number;
+  /** そのうち1時間以上待たせているもの。 */
+  waitingOverAnHour: number;
+  /** 自分が担当しているもの（対応中）。 */
+  mine: number;
+  /** 今日の受信。 */
+  todayInbound: number;
+  todayByChannel: { line: number; email: number };
+}
+
+/**
+ * 受信箱の集計。
+ *
+ * 設計の4枚目「平均の初回返信」は、返信までの時間を記録していないので出せない。
+ * 代わりに「1時間以上待たせている件数」を1枚目の内訳として出す。
+ * どちらも「放置に気づく」ための数で、役割は同じ。
+ */
+export async function getInboxStats(
+  db: D1Database,
+  operatorId: string | null,
+): Promise<InboxStats> {
+  const hourAgo = new Date(Date.now() - 3600_000).toISOString();
+  const today = jstDate(0);
+
+  const waiting = await db
+    .prepare(
+      `SELECT
+         COUNT(*) AS n,
+         SUM(CASE WHEN last_message_at < ? THEN 1 ELSE 0 END) AS over_hour
+       FROM chats WHERE status = 'unread'`,
+    )
+    .bind(hourAgo)
+    .first<{ n: number; over_hour: number }>();
+
+  const mine = operatorId
+    ? await count(
+        db,
+        `SELECT COUNT(*) AS n FROM chats WHERE status = 'in_progress' AND operator_id = ?`,
+        operatorId,
+      )
+    : await count(db, `SELECT COUNT(*) AS n FROM chats WHERE status = 'in_progress'`);
+
+  // source は 'line' 以外にメール由来などが入る。line 以外をまとめてメール扱いに
+  // すると、将来 source が増えたときに黙って混ざる。line と email だけを数える。
+  const byChannel = await db
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN source = 'line' OR source IS NULL THEN 1 ELSE 0 END) AS line_n,
+         SUM(CASE WHEN source = 'email' THEN 1 ELSE 0 END) AS email_n,
+         COUNT(*) AS total
+       FROM messages_log
+        WHERE direction = 'incoming' AND substr(created_at, 1, 10) = ?`,
+    )
+    .bind(today)
+    .first<{ line_n: number; email_n: number; total: number }>();
+
+  return {
+    waiting: waiting?.n ?? 0,
+    waitingOverAnHour: waiting?.over_hour ?? 0,
+    mine,
+    todayInbound: byChannel?.total ?? 0,
+    todayByChannel: { line: byChannel?.line_n ?? 0, email: byChannel?.email_n ?? 0 },
+  };
+}
+
+/** 友だち画面の上部に出す数（設計 `V2 2-2 友だち` の KPIs）。 */
+export interface FriendStats {
+  active: number;
+  total: number;
+  blockedByThem: number;
+  hiddenByUs: number;
+  unanswered: number;
+  resolved: number;
+  /** 今月に追加された人数と、前月同期比。 */
+  addedThisMonth: number;
+  addedLastMonth: number;
+}
+
+/**
+ * 友だち画面の集計。
+ *
+ * ダッシュボードの overview と数え方を揃えている。同じ「有効友だち」が
+ * 画面によって違う数だと、どちらが正しいのか分からなくなる。
+ */
+export async function getFriendStats(
+  db: D1Database,
+  accountId: string | null,
+): Promise<FriendStats> {
+  const breakdown = await friendBreakdown(db, accountId);
+  const inbox = await inboxState(db);
+
+  // JST の月の頭。月をまたぐ集計は UTC のままだと9時間ずれる。
+  const now = new Date(Date.now() + 9 * 3600_000);
+  const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const lastMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
+
+  const where = accountId ? 'AND line_account_id = ?' : '';
+  const bindsFor = (month: string) => (accountId ? [month, accountId] : [month]);
+  const [addedThisMonth, addedLastMonth] = await Promise.all([
+    count(db, `SELECT COUNT(*) AS n FROM friends WHERE substr(created_at, 1, 7) = ? ${where}`, ...bindsFor(thisMonth)),
+    count(db, `SELECT COUNT(*) AS n FROM friends WHERE substr(created_at, 1, 7) = ? ${where}`, ...bindsFor(lastMonth)),
+  ]);
+
+  return {
+    active: breakdown.active,
+    total: breakdown.total,
+    // 設計は「相手から / 自分から」の2つ。相互は相手からに含める
+    // （相手にブロックされている事実は変わらないため）。
+    blockedByThem: breakdown.blockedByThem + breakdown.blockedBoth,
+    hiddenByUs: breakdown.hiddenByUs,
+    unanswered: inbox.unanswered,
+    resolved: inbox.resolved,
+    addedThisMonth,
+    addedLastMonth,
+  };
+}
+
+/** 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信` の KPIs）。 */
+export interface BroadcastStats {
+  /** 今月の配信件数と、そのうち予約中。 */
+  thisMonth: number;
+  scheduled: number;
+  /** 過去28日の到達と失敗。 */
+  delivered: number;
+  failed: number;
+  /** 過去28日の平均開封率（%）。取れないときは null。 */
+  openRate: number | null;
+}
+
+/**
+ * 一斉配信の集計。
+ *
+ * 開封率は broadcast_insights から。LINEは20人未満の配信だと開封数を返さない
+ * ので、その配信は平均から外す。0として混ぜると平均が不当に下がる。
+ */
+export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats> {
+  const monthStart = jstDate(0).slice(0, 7);
+  const since = jstDate(-27);
+
+  const [counts, reach] = await Promise.all([
+    db
+      .prepare(
+        `SELECT
+           SUM(CASE WHEN substr(created_at, 1, 7) = ? THEN 1 ELSE 0 END) AS this_month,
+           SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) AS scheduled
+         FROM broadcasts`,
+      )
+      .bind(monthStart)
+      .first<{ this_month: number; scheduled: number }>(),
+    db
+      .prepare(
+        `SELECT
+           COALESCE(SUM(success_count), 0) AS delivered,
+           COALESCE(SUM(total_count - success_count), 0) AS failed
+         FROM broadcasts
+          WHERE status = 'sent' AND substr(created_at, 1, 10) >= ?`,
+      )
+      .bind(since)
+      .first<{ delivered: number; failed: number }>(),
+  ]);
+
+  let openRate: number | null = null;
+  try {
+    const row = await db
+      .prepare(
+        // open_rate は取り込み時に計算済み。ここで割り直すと、
+        // 分母の取り方が2か所に分かれて食い違う。
+        `SELECT AVG(open_rate) * 100 AS rate
+           FROM broadcast_insights
+          WHERE delivered >= 20 AND open_rate IS NOT NULL`,
+      )
+      .first<{ rate: number | null }>();
+    openRate = row?.rate === null || row?.rate === undefined ? null : Math.round(row.rate * 10) / 10;
+  } catch {
+    // broadcast_insights がまだ無い環境もある。開封率だけ出ない。
+  }
+
+  return {
+    thisMonth: counts?.this_month ?? 0,
+    scheduled: counts?.scheduled ?? 0,
+    delivered: reach?.delivered ?? 0,
+    failed: reach?.failed ?? 0,
+    openRate,
+  };
+}

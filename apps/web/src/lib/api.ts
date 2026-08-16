@@ -349,6 +349,39 @@ export type FriendListItem = FriendWithTags & Partial<{
 }>
 
 
+
+/** 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信`）。 */
+export type BroadcastStats = {
+  thisMonth: number
+  scheduled: number
+  delivered: number
+  failed: number
+  /** 過去28日の平均開封率（%）。20人未満の配信は平均から外している。 */
+  openRate: number | null
+}
+
+/** 友だち画面の上部に出す数（設計 `V2 2-2 友だち`）。 */
+export type FriendStats = {
+  active: number
+  total: number
+  blockedByThem: number
+  hiddenByUs: number
+  unanswered: number
+  resolved: number
+  addedThisMonth: number
+  addedLastMonth: number
+}
+
+/** 受信箱の上部に出す数（設計 `V2 2-1 受信箱`）。 */
+export type InboxStats = {
+  waiting: number
+  /** そのうち1時間以上待たせているもの。 */
+  waitingOverAnHour: number
+  mine: number
+  todayInbound: number
+  todayByChannel: { line: number; email: number }
+}
+
 /** ダッシュボードが1回で読む数（設計 `V2 1-1 ダッシュボード`）。 */
 export type DashboardOverview = {
   period: 'today' | 'last7' | 'last28'
@@ -1747,6 +1780,18 @@ export const api = {
     logs: (id: string, limit?: number) =>
       fetchApi<ApiResponse<AutomationLog[]>>(
         `/api/automations/${id}/logs` + (limit ? `?limit=${limit}` : ''),
+      ),
+  },
+  chatStats: {
+    get: () => fetchApi<ApiResponse<InboxStats>>('/api/chats/stats'),
+  },
+  broadcastStats: {
+    get: () => fetchApi<ApiResponse<BroadcastStats>>('/api/broadcasts/stats'),
+  },
+  friendStats: {
+    get: (accountId?: string) =>
+      fetchApi<ApiResponse<FriendStats>>(
+        `/api/friends/stats${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`,
       ),
   },
   dashboard: {
