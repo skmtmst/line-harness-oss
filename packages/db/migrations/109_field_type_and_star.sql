@@ -1,17 +1,20 @@
--- 友だち情報欄の型と、よく見る印。
+-- 何もしない。
 --
--- friend_fields は文字列しか持たない。そのため次が出せない
--- （docs/v025-open-questions.md §D / §18-2）。
---   ・リマインダの「起点になる項目」… 日付型を数えられない
---   ・友だち情報欄の「種別」列      … 単一行 / 電話番号 などが出せない
---   ・入力欄が全部ただの文字入力になる（日付でもカレンダーが出ない）
+-- もともとは friend_fields に field_type と is_starred を足すつもりだった。
+-- しかし 099 で既に入っている。
 --
--- 既定は 'text'。いまの項目はすべて文字列として扱われているので、
--- 既定を入れても今日の動きは変わらない。
-ALTER TABLE friend_fields ADD COLUMN field_type TEXT NOT NULL DEFAULT 'text';
-
--- よく見る印。友だち詳細の「★つき友だち情報」に出す。
+--   type        text / textarea / number / date / select /
+--               multi_select / checkbox / url / tel / email
+--   is_starred  INTEGER NOT NULL DEFAULT 0
 --
--- 項目が20を超えると、詳細を開いても目的の値がすぐ見つからない。
--- 上位N件を機械的に出すより、人が選べる方がよい。
-ALTER TABLE friend_fields ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0;
+-- つまり docs/v025-open-questions.md の「§D 友だち情報欄に型が無い」は
+-- 誤りだった。突き合わせ表を書いたときに実物を確かめず、
+-- 「型が無い」と決めつけていた。
+--
+-- このファイルはどの環境にも当たっていない。migrate.ts が
+-- 「一部だけ入っている」と判定して止めたため（is_starred は 099 由来で
+-- 既にあり、field_type は無い、という状態を部分適用と読んだ）。
+--
+-- 番号を空けたまま消すと、次に読む人が「抜けている」と誤解する。
+-- 何もしない形で残し、なぜ空なのかを書いておく。
+SELECT 1;
