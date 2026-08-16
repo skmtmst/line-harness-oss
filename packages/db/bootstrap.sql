@@ -274,7 +274,7 @@ CREATE TABLE chats (
   last_message_at TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT);
+, line_account_id TEXT, first_replied_at TEXT, last_incoming_at TEXT);
 
 CREATE TABLE common_var_schedules (
   id             TEXT PRIMARY KEY,
