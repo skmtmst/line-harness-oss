@@ -15,6 +15,7 @@ import {
   sha256Hex,
 } from '../middleware/auth.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
+import { recordLoginAudit } from '@line-crm/db';
 import {
   createAdminSession,
   deleteAdminSession,
@@ -182,6 +183,21 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
  * turning the silent "login breaks after deploy" failure into an actionable
  * configuration error.
  */
+/**
+ * 接続元のIP。
+ *
+ * Cloudflare が付けるヘッダを優先する。前段のプロキシが入る構成でも
+ * 何かしら残るよう、順に見て最初に見つかったものを使う。
+ */
+function clientIp(c: { req: { header: (name: string) => string | undefined } }): string | null {
+  return (
+    c.req.header('cf-connecting-ip') ||
+    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+    c.req.header('x-real-ip') ||
+    null
+  );
+}
+
 adminAuth.post('/api/auth/login', async (c) => {
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) {
@@ -196,6 +212,14 @@ adminAuth.post('/api/auth/login', async (c) => {
   const staff = await authenticateApiToken(c, apiKey || null);
 
   if (!staff) {
+    // 失敗も残す。誰が入れたかだけでなく、誰が入ろうとしたかも
+    // 分からないと、鍵が漏れたときに気づけない。
+    await recordLoginAudit(c.env.DB, {
+      action: 'fail',
+      ip: clientIp(c),
+      userAgent: c.req.header('user-agent') ?? null,
+      result: 'unauthorized',
+    });
     return c.json({ success: false, error: 'Unauthorized' }, 401);
   }
 
@@ -208,6 +232,12 @@ adminAuth.post('/api/auth/login', async (c) => {
   } else {
     csrfToken = (await issueSession(c, staff.id, config.sameSite)).csrfToken;
   }
+  await recordLoginAudit(c.env.DB, {
+    adminUserId: staff.id,
+    action: 'login',
+    ip: clientIp(c),
+    userAgent: c.req.header('user-agent') ?? null,
+  });
   return c.json({ success: true, data: staff, csrfToken });
 });
 
@@ -217,6 +247,14 @@ adminAuth.post('/api/auth/login', async (c) => {
  * even if the CSRF token was lost client-side.
  */
 adminAuth.post('/api/auth/logout', async (c) => {
+  // 誰がログアウトしたかは、この時点では staff から取れる場合と
+  // 取れない場合がある。取れなければ null で残す。記録が無いより
+  // 「誰かがログアウトした」の方が手がかりになる。
+  await recordLoginAudit(c.env.DB, {
+    adminUserId: c.get('staff')?.id ?? null,
+    action: 'logout',
+    ip: clientIp(c),
+  });
   const token = adminSessionTokenFromCookie(c);
   if (token) await deleteAdminSession(c.env.DB, await sha256Hex(token));
   const authorization = c.req.header('Authorization') || '';

@@ -14,6 +14,8 @@ export interface Scenario {
   line_account_id: string | null;
   is_active: number;
   delivery_mode: DeliveryMode;
+  /** 他のシナリオと同時に動いてよいか。1 が既定（並行を許す） */
+  allow_concurrent: number;
   created_at: string;
   updated_at: string;
 }
@@ -97,6 +99,8 @@ export interface CreateScenarioInput {
   triggerType: ScenarioTriggerType;
   triggerTagId?: string | null;
   deliveryMode?: DeliveryMode;
+  /** 他のシナリオと同時に動いてよいか。省略時は許す（従来どおり） */
+  allowConcurrent?: boolean;
 }
 
 export async function createScenario(
@@ -108,8 +112,11 @@ export async function createScenario(
 
   await db
     .prepare(
-      `INSERT INTO scenarios (id, name, description, trigger_type, trigger_tag_id, is_active, delivery_mode, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      // allow_concurrent は必ず渡す。列の既定は 0 だが、それは
+      // 「他のシナリオが動いていたら登録しない」という強い動きになる。
+      // 既定は従来どおり「並行を許す」(1) にする。
+      `INSERT INTO scenarios (id, name, description, trigger_type, trigger_tag_id, is_active, delivery_mode, allow_concurrent, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -118,6 +125,7 @@ export async function createScenario(
       input.triggerType,
       input.triggerTagId ?? null,
       input.deliveryMode ?? 'relative',
+      input.allowConcurrent === false ? 0 : 1,
       now,
       now,
     )
@@ -130,7 +138,10 @@ export async function createScenario(
 }
 
 export type UpdateScenarioInput = Partial<
-  Pick<Scenario, 'name' | 'description' | 'trigger_type' | 'trigger_tag_id' | 'is_active'>
+  Pick<
+    Scenario,
+    'name' | 'description' | 'trigger_type' | 'trigger_tag_id' | 'is_active' | 'allow_concurrent'
+  >
 >;
 
 export async function updateScenario(
@@ -153,6 +164,10 @@ export async function updateScenario(
   if (updates.trigger_type !== undefined) {
     fields.push('trigger_type = ?');
     values.push(updates.trigger_type);
+  }
+  if (updates.allow_concurrent !== undefined) {
+    fields.push('allow_concurrent = ?');
+    values.push(updates.allow_concurrent);
   }
   if (updates.trigger_tag_id !== undefined) {
     fields.push('trigger_tag_id = ?');
@@ -371,10 +386,33 @@ export async function enrollFriendInScenario(
 
   // delivery_mode を取得（migration 037 適用前の DB では 'relative' が DEFAULT で既に入っている）
   const scenarioRow = await db
-    .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
+    .prepare(`SELECT delivery_mode, allow_concurrent FROM scenarios WHERE id = ?`)
     .bind(scenarioId)
-    .first<{ delivery_mode: DeliveryMode }>();
+    .first<{ delivery_mode: DeliveryMode; allow_concurrent: number | null }>();
   if (!scenarioRow) return null;
+
+  // 並行を許さないシナリオは、他のシナリオが動いている人には登録しない。
+  //
+  // 既定は「許す」（104 で既存の行を 1 に寄せ、作成時も 1 を渡す）。
+  // ここを既定で塞ぐと、いま複数のシナリオに入っている人への配信が
+  // 止まってしまう。止めたい人だけが画面から 0 にする。
+  //
+  // 同じシナリオへの二重登録は、これとは別に部分UNIQUE索引が防いでいる
+  // （idx_friend_scenarios_unique）。ここで見るのは「他のシナリオ」だけ。
+  if (scenarioRow.allow_concurrent === 0) {
+    const other = await db
+      .prepare(
+        `SELECT 1 FROM friend_scenarios
+          WHERE friend_id = ? AND scenario_id != ? AND status = 'active'
+          LIMIT 1`,
+      )
+      .bind(friendId, scenarioId)
+      .first<{ 1: number }>();
+    // null を返す。例外にしないのは、呼び出し口が「友だち追加」や
+    // 「タグが付いた」といった副作用の中にあり、そこで throw すると
+    // 本来の処理まで巻き添えで失敗するため。
+    if (other) return null;
+  }
 
   const firstStep = await db
     .prepare(

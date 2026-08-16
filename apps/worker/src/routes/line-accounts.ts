@@ -22,6 +22,47 @@ import type { Env } from '../index.js';
 
 const lineAccounts = new Hono<Env>();
 
+/**
+ * 友だち数の上限と警告値を検証する。
+ *
+ * 警告値が上限を超えていたら弾く。超えた値は永久に鳴らないので、
+ * 設定したつもりで一度も警告が出ない、という壊れ方をする。
+ */
+function readCapacity(
+  body: { friendCapacity?: unknown; capacityWarnAt?: unknown },
+  current: { friend_capacity: number | null; capacity_warn_at: number | null } | null,
+): { ok: true; value: { friendCapacity?: number | null; capacityWarnAt?: number | null } } | { ok: false; error: string } {
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
+  const out: { friendCapacity?: number | null; capacityWarnAt?: number | null } = {};
+
+  const parse = (raw: unknown): number | null | 'invalid' => {
+    if (raw === null || raw === '' || raw === undefined) return null;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > 100_000_000) return 'invalid';
+    return n;
+  };
+
+  if (has('friendCapacity')) {
+    const v = parse(body.friendCapacity);
+    if (v === 'invalid') return { ok: false, error: 'friendCapacity must be a positive integer' };
+    out.friendCapacity = v;
+  }
+  if (has('capacityWarnAt')) {
+    const v = parse(body.capacityWarnAt);
+    if (v === 'invalid') return { ok: false, error: 'capacityWarnAt must be a positive integer' };
+    out.capacityWarnAt = v;
+  }
+
+  const effectiveCapacity =
+    out.friendCapacity !== undefined ? out.friendCapacity : (current?.friend_capacity ?? null);
+  const effectiveWarn =
+    out.capacityWarnAt !== undefined ? out.capacityWarnAt : (current?.capacity_warn_at ?? null);
+  if (effectiveCapacity != null && effectiveWarn != null && effectiveWarn > effectiveCapacity) {
+    return { ok: false, error: 'capacityWarnAt must not exceed friendCapacity' };
+  }
+  return { ok: true, value: out };
+}
+
 function serializeLineAccount(row: DbLineAccount) {
   return {
     id: row.id,
@@ -40,6 +81,10 @@ function serializeLineAccount(row: DbLineAccount) {
     ogSiteName: row.og_site_name,
     ogDefaultImageUrl: row.og_default_image_url,
     ogDefaultDescription: row.og_default_description,
+    // 上限とアイコンは鍵ではない。閲覧のみの人にも見せる。
+    friendCapacity: row.friend_capacity ?? null,
+    capacityWarnAt: row.capacity_warn_at ?? null,
+    iconUrl: row.icon_url ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     // Intentionally omit channelAccessToken / channelSecret / loginChannelSecret
@@ -500,6 +545,9 @@ lineAccounts.patch(
         ogSiteName?: string | null;
         ogDefaultImageUrl?: string | null;
         ogDefaultDescription?: string | null;
+        friendCapacity?: unknown;
+        capacityWarnAt?: unknown;
+        iconUrl?: string | null;
       }>();
 
       // Normalize: trim non-empty strings; treat empty/whitespace-only as null.
@@ -513,6 +561,18 @@ lineAccounts.patch(
       const ogSiteName = normalizeOptionalString(body.ogSiteName);
       const ogDefaultImageUrl = normalizeOptionalString(body.ogDefaultImageUrl);
       const ogDefaultDescription = normalizeOptionalString(body.ogDefaultDescription);
+      const iconUrl = normalizeOptionalString(body.iconUrl);
+
+      // 警告値と上限の突き合わせには、送られていない側の現在値が要る。
+      // 上限だけを下げたときに、既存の警告値が上限を超える場合があるため。
+      const touchesCapacity =
+        Object.prototype.hasOwnProperty.call(body, 'friendCapacity') ||
+        Object.prototype.hasOwnProperty.call(body, 'capacityWarnAt');
+      const capacity = readCapacity(
+        body,
+        touchesCapacity ? await getLineAccountById(c.env.DB, id) : null,
+      );
+      if (!capacity.ok) return c.json({ success: false, error: capacity.error }, 400);
 
       // Pre-validate Login pair + uniqueness against the existing row so the
       // caller gets a clean error before we mutate. Skip the lookup entirely
@@ -556,7 +616,9 @@ lineAccounts.patch(
         role !== undefined ||
         body.isActive !== undefined ||
         touchesLoginOrLiff ||
-        touchesOg;
+        touchesOg ||
+        touchesCapacity ||
+        iconUrl !== undefined;
 
       // Route to the fields helper when name is not being changed.
       if (body.name === undefined && fieldsTouched) {
@@ -570,6 +632,8 @@ lineAccounts.patch(
           ogSiteName,
           ogDefaultImageUrl,
           ogDefaultDescription,
+          iconUrl,
+          ...capacity.value,
         });
         if (!updated) return c.json({ success: false, error: 'not found' }, 404);
         return c.json({ success: true, data: serializeLineAccount(updated) });
@@ -585,6 +649,9 @@ lineAccounts.patch(
         og_site_name: ogSiteName,
         og_default_image_url: ogDefaultImageUrl,
         og_default_description: ogDefaultDescription,
+        icon_url: iconUrl,
+        friend_capacity: capacity.value.friendCapacity,
+        capacity_warn_at: capacity.value.capacityWarnAt,
       });
       if (!updated) return c.json({ success: false, error: 'LINE account not found' }, 404);
       return c.json({ success: true, data: serializeLineAccount(updated) });

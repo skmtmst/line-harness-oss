@@ -17,6 +17,58 @@ import { requireRole } from '../middleware/role-guard.js';
 
 const reminders = new Hono<Env>();
 
+const TRIGGER_TYPES = ['manual', 'booking', 'event'] as const;
+type TriggerType = (typeof TRIGGER_TYPES)[number];
+
+/**
+ * きっかけの設定を検証して取り出す。送られた項目だけを含める。
+ *
+ * PUT は本文をそのまま updateReminder へ渡す作りだったので、
+ * 新しい項目はここで形を確かめてから渡す。
+ */
+function readTriggerInput(
+  body: Record<string, unknown>,
+): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
+  const out: Record<string, unknown> = {};
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
+
+  if (has('triggerType')) {
+    if (!TRIGGER_TYPES.includes(body.triggerType as TriggerType)) {
+      return { ok: false, error: `triggerType must be one of ${TRIGGER_TYPES.join(', ')}` };
+    }
+    out.triggerType = body.triggerType;
+  }
+  if (has('triggerOffsetMinutes')) {
+    const raw = body.triggerOffsetMinutes;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.triggerOffsetMinutes = null;
+    } else {
+      const n = Number(raw);
+      // 前にも後ろにもずらせるので負の値を許す。上限は前後30日。
+      if (!Number.isInteger(n) || Math.abs(n) > 60 * 24 * 30) {
+        return { ok: false, error: 'triggerOffsetMinutes must be an integer within +/- 43200' };
+      }
+      out.triggerOffsetMinutes = n;
+    }
+  }
+  if (has('sendAtTime')) {
+    const raw = body.sendAtTime;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.sendAtTime = null;
+    } else if (typeof raw !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(raw)) {
+      return { ok: false, error: 'sendAtTime must be HH:MM' };
+    } else {
+      out.sendAtTime = raw;
+    }
+  }
+  if (has('targetTagId')) {
+    const raw = body.targetTagId;
+    out.targetTagId = raw === null || raw === '' || raw === undefined ? null : String(raw);
+  }
+  return { ok: true, value: out };
+}
+
+
 // ========== リマインダCRUD ==========
 
 reminders.get('/api/reminders', async (c) => {
@@ -39,6 +91,10 @@ reminders.get('/api/reminders', async (c) => {
         name: r.name,
         description: r.description,
         isActive: Boolean(r.is_active),
+        triggerType: r.trigger_type ?? 'manual',
+        triggerOffsetMinutes: r.trigger_offset_minutes ?? null,
+        sendAtTime: r.send_at_time ?? null,
+        targetTagId: r.target_tag_id ?? null,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),
@@ -64,6 +120,10 @@ reminders.get('/api/reminders/:id', async (c) => {
         name: reminder.name,
         description: reminder.description,
         isActive: Boolean(reminder.is_active),
+        triggerType: reminder.trigger_type ?? 'manual',
+        triggerOffsetMinutes: reminder.trigger_offset_minutes ?? null,
+        sendAtTime: reminder.send_at_time ?? null,
+        targetTagId: reminder.target_tag_id ?? null,
         createdAt: reminder.created_at,
         updatedAt: reminder.updated_at,
         steps: steps.map((s) => ({
@@ -84,9 +144,15 @@ reminders.get('/api/reminders/:id', async (c) => {
 
 reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name: string; description?: string; lineAccountId?: string | null }>();
+    const body = await c.req.json<{
+      name: string;
+      description?: string;
+      lineAccountId?: string | null;
+    } & Record<string, unknown>>();
     if (!body.name) return c.json({ success: false, error: 'name is required' }, 400);
-    const item = await createReminder(c.env.DB, body);
+    const trigger = readTriggerInput(body);
+    if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
+    const item = await createReminder(c.env.DB, { ...body, ...trigger.value });
     // Save line_account_id if provided
     if (body.lineAccountId) {
       await c.env.DB.prepare(`UPDATE reminders SET line_account_id = ? WHERE id = ?`)
@@ -102,8 +168,10 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
 reminders.put('/api/reminders/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json();
-    await updateReminder(c.env.DB, id, body);
+    const body = await c.req.json<Record<string, unknown>>();
+    const trigger = readTriggerInput(body);
+    if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
+    await updateReminder(c.env.DB, id, { ...body, ...trigger.value });
     const updated = await getReminderById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: { id: updated.id, name: updated.name, isActive: Boolean(updated.is_active) } });

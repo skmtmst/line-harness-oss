@@ -8,6 +8,10 @@ import Header from '@/components/layout/header'
 import FriendListTable from '@/components/friends/friend-list-table'
 import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import DuplicatesPage from '@/app/duplicates/page'
+import MergedUsersPage from '@/app/users/page'
 
 const ccPrompts = [
   {
@@ -33,7 +37,13 @@ const PAGE_SIZE = 20
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 
-export default function FriendsPage() {
+const MERGED_TABS = [
+  { key: 'list', label: '友だち一覧' },
+  { key: 'duplicates', label: '重複の検出' },
+  { key: 'merged', label: '統合ユーザー' },
+]
+
+function FriendsPageInner() {
   const { selectedAccountId } = useAccount()
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
@@ -249,5 +259,26 @@ export default function FriendsPage() {
 
       <CcPromptButton prompts={ccPrompts} />
     </div>
+  )
+}
+
+function FriendsPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/friends" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'list' && <FriendsPageInner />}
+      {tab === 'duplicates' && <DuplicatesPage />}
+      {tab === 'merged' && <MergedUsersPage />}
+    </div>
+  )
+}
+
+export default function FriendsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <FriendsPageHost />
+    </Suspense>
   )
 }

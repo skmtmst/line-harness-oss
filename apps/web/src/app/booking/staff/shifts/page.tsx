@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/header'
 import { bookingApi, type BookingShift, type BookingStaff } from '@/lib/api'
@@ -28,7 +28,7 @@ const DEFAULT_TEMPLATE: WeeklyTemplate = {
   sat: { start: '10:00', end: '19:00' },
 }
 
-export default function StaffShiftsPage() {
+function StaffShiftsPageContent() {
   const sp = useSearchParams()
   const staffId = sp.get('staff_id') ?? ''
   const { selectedAccountId } = useAccount()
@@ -181,7 +181,7 @@ export default function StaffShiftsPage() {
                 )
               })}
               <div className="flex justify-end pt-2">
-                <button onClick={saveRules} disabled={savingRules} className="rounded-lg bg-[#06C755] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+                <button onClick={saveRules} disabled={savingRules} className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
                   {savingRules ? '保存中…' : '受付時間を保存'}
                 </button>
               </div>
@@ -224,7 +224,7 @@ export default function StaffShiftsPage() {
               </label>
               <div className="flex justify-end gap-2">
                 {calendarConnected && <button onClick={disconnectCalendar} className="rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600">連携解除</button>}
-                <button onClick={connectCalendar} disabled={savingCalendar || !calendarId.trim() || !serviceAccountConfigured} className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                <button onClick={connectCalendar} disabled={savingCalendar || !calendarId.trim() || !serviceAccountConfigured} className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-white disabled:opacity-50">
                   {savingCalendar ? '接続確認中…' : calendarConnected ? '再接続して確認' : '接続して確認'}
                 </button>
               </div>
@@ -248,5 +248,14 @@ export default function StaffShiftsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+// useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+export default function StaffShiftsPage() {
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <StaffShiftsPageContent />
+    </Suspense>
   )
 }

@@ -91,7 +91,24 @@
     "084_staff_read_only_access.sql",
     "085_entry_route_genre.sql",
     "086_entry_route_genres.sql",
-    "087_broadcast_composer.sql"
+    "087_broadcast_composer.sql",
+    "088_tag_groups.sql",
+    "089_auto_reply_conditions.sql",
+    "090_conversion_point_options.sql",
+    "091_menu_booking_rules.sql",
+    "092_reminder_triggers.sql",
+    "093_outgoing_webhook_retry.sql",
+    "094_event_visibility.sql",
+    "095_affiliate_settlement.sql",
+    "096_line_account_capacity.sql",
+    "097_friends_account_index.sql",
+    "098_event_waitlist.sql",
+    "099_folders_and_fields.sql",
+    "100_friend_attributes.sql",
+    "101_content_library.sql",
+    "102_analytics.sql",
+    "103_ops_and_flags.sql",
+    "104_scenario_concurrency_default.sql"
   ],
-  "migrationCount": 92
+  "migrationCount": 109
 }

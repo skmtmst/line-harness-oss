@@ -1,1 +1,22 @@
+# V2で統合して消えた旧ルート。
+#
+# ブックマーク・社内Wiki・LINEのリッチメニューから旧URLを踏んでいる
+# 可能性があるので、消さずに恒久リダイレクト（308）で新しい場所へ送る。
+# リッチメニューは作り直さない限りURLが変わらないため、ここを消すと
+# 友だちが踏んだときに404になる。
+#
+# next.config の redirects() は使えない。output: 'export' には
+# リダイレクトを処理するサーバが無いので、Cloudflare Pages が読む
+# このファイルに書く必要がある。
+#
+# /pools/new や /affiliates/new のような作成画面は残す。親のパスだけを
+# 対象にしているので、下の階層は素通りする。
 
+/duplicates      /friends?tab=duplicates     308
+/users           /friends?tab=merged         308
+/support         /chats?channel=email        308
+/notifications   /webhooks?tab=notify        308
+/updates         /emergency?tab=history      308
+/pools           /accounts?tab=pools         308
+/affiliates      /conversions?tab=affiliates 308
+/booking/staff   /booking/menus?tab=staff    308

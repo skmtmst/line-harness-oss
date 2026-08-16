@@ -401,7 +401,7 @@ function Editor({
               onClick={handlePublish}
               disabled={saving || publishing || unpublishing || busy}
               className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#06C755' }}
+              style={{ backgroundColor: 'var(--color-accent)' }}
             >
               {publishing
                 ? 'LINE 登録中...'
@@ -442,7 +442,7 @@ function Editor({
                   ? 'text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
-              style={active ? { backgroundColor: '#06C755' } : undefined}
+              style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
             >
               {p.name}
               {p.id.startsWith('tmp-') && (

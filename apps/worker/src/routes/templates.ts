@@ -9,8 +9,38 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { validateCarousel } from '../services/carousel-validation.js';
 
 const templates = new Hono<Env>();
+
+/**
+ * カルーセルなら中身を確かめる。
+ *
+ * 送ってから「400 が返りました」では、どのパネルが悪いのか分からない。
+ * 保存の時点で、何枚目の何が問題かを返す。
+ */
+function checkCarousel(
+  messageType: string | undefined,
+  messageContent: string | undefined,
+): { ok: true } | { ok: false; error: string } {
+  if (messageType !== 'carousel') return { ok: true };
+  if (!messageContent) return { ok: false, error: 'カルーセルの中身がありません' };
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(messageContent);
+  } catch {
+    return { ok: false, error: 'カルーセルの中身が読み取れません' };
+  }
+  // { columns: [...] } でも [...] でも受ける。書き方の違いで弾かない。
+  const columns =
+    Array.isArray(parsed)
+      ? parsed
+      : (parsed as { columns?: unknown })?.columns;
+  const errors = validateCarousel(columns);
+  if (errors.length === 0) return { ok: true };
+  return { ok: false, error: errors.map((e) => e.message).join(' / ') };
+}
+
 
 templates.get('/api/templates', async (c) => {
   try {
@@ -125,6 +155,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (!body.name || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
+    const carousel = checkCarousel(body.messageType, body.messageContent);
+    if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
     const item = await createTemplate(c.env.DB, body);
     return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, createdAt: item.created_at } }, 201);
   } catch (err) {
@@ -136,7 +168,14 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
 templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json();
+    const body = await c.req.json<{ messageType?: string; messageContent?: string }>();
+    // 種別が送られていなければ、いまの種別で見る。本文だけ直す場合がある。
+    const existing = await getTemplateById(c.env.DB, id);
+    const carousel = checkCarousel(
+      body.messageType ?? existing?.message_type,
+      body.messageContent ?? existing?.message_content,
+    );
+    if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
     await updateTemplate(c.env.DB, id, body);
     const updated = await getTemplateById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);

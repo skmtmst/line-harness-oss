@@ -1,0 +1,60 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import type { Tag } from '@line-crm/shared'
+import { api } from '@/lib/api'
+import Header from '@/components/layout/header'
+import BroadcastForm from '@/components/broadcasts/broadcast-form'
+
+/**
+ * 一斉配信の作成を、URL で開けるようにする。
+ *
+ * 中身は一覧で使っているフォームをそのまま出す。作成の中身を2つ持つと、
+ * 片方だけ直したときに食い違う。
+ */
+export default function NewBroadcastPage() {
+  const router = useRouter()
+  const [tags, setTags] = useState<Tag[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api.tags.list()
+      if (res.success) setTags(res.data)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  return (
+    <div>
+      <Header title="配信を作成" description="友だちへまとめて送るメッセージを作ります。" />
+
+      <nav className="text-ink-faint mb-4 text-xs">
+        <Link href="/broadcasts" className="hover:underline">
+          一斉配信
+        </Link>
+        <span className="mx-1.5">›</span>
+        <span>作成</span>
+      </nav>
+
+      {loading ? (
+        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+          読み込み中...
+        </div>
+      ) : (
+        <BroadcastForm
+          tags={tags}
+          onSuccess={() => router.push('/broadcasts')}
+          onCancel={() => router.push('/broadcasts')}
+        />
+      )}
+    </div>
+  )
+}

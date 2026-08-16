@@ -13,6 +13,14 @@ export interface Affiliate {
   is_active: number;
   created_at: string;
   friend_id: string | null;
+  /** 連絡先。報酬の連絡に使う。NULL なら未登録 */
+  email: string | null;
+  /** 成果が確定するまでの保留日数。NULL なら即確定 */
+  hold_days: number | null;
+  /** 支払いサイクルの覚書。計算には使わない */
+  payout_cycle: string | null;
+  /** 成果が出たときに本人へ知らせるか */
+  notify_on_conversion: number;
 }
 
 export interface AffiliateClick {
@@ -138,7 +146,16 @@ export async function createAffiliateWithRandomCode(
 }
 
 export type UpdateAffiliateInput = Partial<
-  Pick<Affiliate, 'name' | 'commission_rate' | 'is_active'>
+  Pick<
+    Affiliate,
+    | 'name'
+    | 'commission_rate'
+    | 'is_active'
+    | 'email'
+    | 'hold_days'
+    | 'payout_cycle'
+    | 'notify_on_conversion'
+  >
 >;
 
 export async function updateAffiliate(
@@ -160,6 +177,24 @@ export async function updateAffiliate(
   if (updates.is_active !== undefined) {
     fields.push('is_active = ?');
     values.push(updates.is_active);
+  }
+  // 支払いの取り決めは、送られたときだけ触る。空文字は「消す」意味で
+  // NULL に寄せる。画面の入力欄を空にした = 未登録に戻す、と読める形にする。
+  if ('email' in updates) {
+    fields.push('email = ?');
+    values.push(updates.email || null);
+  }
+  if ('hold_days' in updates) {
+    fields.push('hold_days = ?');
+    values.push(updates.hold_days ?? null);
+  }
+  if ('payout_cycle' in updates) {
+    fields.push('payout_cycle = ?');
+    values.push(updates.payout_cycle || null);
+  }
+  if (updates.notify_on_conversion !== undefined) {
+    fields.push('notify_on_conversion = ?');
+    values.push(updates.notify_on_conversion);
   }
 
   if (fields.length === 0) return getAffiliateById(db, id);

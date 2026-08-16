@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/header'
 import { bookingApi, type BookingMenu, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
@@ -8,7 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 
 // このメニューを各スタッフが提供するか／料金所要を上書きするかの一括編集 UI。
 // staff_menus は staff_id × menu_id 主キー。スタッフごとに個別 PUT で書く。
-export default function MenuStaffMatrix() {
+function MenuStaffMatrixContent() {
   const sp = useSearchParams()
   const id = sp.get('menu_id') ?? ''
   const { selectedAccountId } = useAccount()
@@ -114,7 +114,7 @@ export default function MenuStaffMatrix() {
             // 「保存して再取得」のショートサーキットを防ぎ、ユーザーが再読み込みする導線へ。
             disabled={saving || !selectedAccountId || loading || Boolean(error)}
             className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             {saving ? '保存中…' : '保存'}
           </button>
@@ -233,5 +233,14 @@ export default function MenuStaffMatrix() {
         </div>
       )}
     </div>
+  )
+}
+
+// useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+export default function MenuStaffMatrix() {
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <MenuStaffMatrixContent />
+    </Suspense>
   )
 }

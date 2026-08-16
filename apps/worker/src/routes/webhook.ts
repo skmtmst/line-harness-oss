@@ -382,6 +382,7 @@ async function handleEvent(
         lineAccountId,
         workerUrl,
         logContext: 'postback',
+        messageKind: 'postback',
       });
 
     // イベントバス発火: 専用イベント postback_received。
@@ -569,7 +570,9 @@ async function handleEvent(
       friend,
       incomingText,
       event.replyToken,
-      { lineAccountId, workerUrl },
+      // 種別は LINE から届いたものをそのまま渡す。ルール側で
+      // 「画像には返さない」といった絞り込みができる。
+      { lineAccountId, workerUrl, messageKind: event.message?.type ?? 'text' },
     );
 
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする

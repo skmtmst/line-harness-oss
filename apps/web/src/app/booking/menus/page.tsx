@@ -6,6 +6,9 @@ import Header from '@/components/layout/header'
 import { api, bookingApi, type BookingMenu } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import BookingStaffPage from '@/app/booking/staff/page'
 
 const EMPTY: Partial<BookingMenu> = {
   name: '',
@@ -19,7 +22,12 @@ const EMPTY: Partial<BookingMenu> = {
   auto_tag_id: null,
 }
 
-export default function MenusPage() {
+const MERGED_TABS = [
+  { key: 'menus', label: 'メニュー' },
+  { key: 'staff', label: 'スタッフ' },
+]
+
+function MenusPageInner() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [items, setItems] = useState<BookingMenu[]>([])
   const [editing, setEditing] = useState<Partial<BookingMenu> | null>(null)
@@ -323,6 +331,56 @@ function Modal({
               このメニューが予約されると、申込者の友だちに自動でこのタグが付きます。タグは既存のものから選択してください (友だち画面 / シナリオ等で使われているタグ)。
             </p>
           </Field>
+
+          {/* 受付条件。空欄は「制限しない」で、これまでと同じ動きになる。 */}
+          <div className="border-hairline space-y-3 rounded-lg border p-3">
+            <p className="text-ink-secondary text-sm font-semibold">受付条件</p>
+            <div className="grid grid-cols-2 gap-3">
+              <NumField
+                label="同時に受ける件数"
+                value={form.concurrent_capacity ?? 1}
+                onChange={(v) => set('concurrent_capacity', v)}
+              />
+              <NullableNumField
+                label="何日先まで受けるか"
+                unit="日"
+                value={form.booking_window_days ?? null}
+                onChange={(v) => set('booking_window_days', v)}
+              />
+              <NullableNumField
+                label="受付の締め切り"
+                unit="時間前"
+                value={form.cutoff_hours_before ?? null}
+                onChange={(v) => set('cutoff_hours_before', v)}
+              />
+              <NullableNumField
+                label="キャンセルの期限"
+                unit="時間前"
+                value={form.cancel_deadline_hours_before ?? null}
+                onChange={(v) => set('cancel_deadline_hours_before', v)}
+              />
+            </div>
+            <p className="text-ink-faint text-xs leading-relaxed">
+              空欄は「制限しない」です。<br />
+              「同時に受ける件数」を2以上にすると、<strong>このメニュー同士だけ</strong>が同じ枠に入ります。
+              別のメニューの予約が入っている時間には、件数にかかわらず入りません。<br />
+              キャンセルの期限はお客様の画面に表示されます。管理画面からはいつでもキャンセルできます。
+            </p>
+            <Field label="予約時にお客様へ聞くこと">
+              <input
+                type="text"
+                value={form.intake_question ?? ''}
+                onChange={(e) => set('intake_question', e.target.value === '' ? null : e.target.value)}
+                placeholder="例: 気になっている箇所はありますか？"
+                maxLength={200}
+                className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
+              />
+              <p className="text-ink-faint mt-1 text-xs">
+                空欄なら質問しません。回答は予約のメモとして残ります。
+              </p>
+            </Field>
+          </div>
+
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -366,6 +424,40 @@ function Field({ label, required, children }: { label: string; required?: boolea
   )
 }
 
+/**
+ * 空欄を「制限しない」として扱う数値欄。
+ *
+ * 0 を「制限しない」に使わないのは、0時間前・0日先という読み方も
+ * できてしまい、どちらの意味か画面から判断できないため。
+ */
+function NullableNumField({
+  label,
+  unit,
+  value,
+  onChange,
+}: {
+  label: string
+  unit: string
+  value: number | null
+  onChange: (v: number | null) => void
+}) {
+  return (
+    <Field label={label}>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          min={1}
+          value={value ?? ''}
+          placeholder="なし"
+          onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+          className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm tabular-nums focus:outline-none focus:ring-2"
+        />
+        <span className="text-ink-faint whitespace-nowrap text-xs">{unit}</span>
+      </div>
+    </Field>
+  )
+}
+
 function NumField({
   label,
   required,
@@ -381,5 +473,25 @@ function NumField({
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 tabular-nums"
       />
     </Field>
+  )
+}
+
+function MenusPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/booking/menus" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'menus' && <MenusPageInner />}
+      {tab === 'staff' && <BookingStaffPage />}
+    </div>
+  )
+}
+
+export default function MenusPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <MenusPageHost />
+    </Suspense>
   )
 }

@@ -6,6 +6,14 @@ export interface ReminderRow {
   name: string;
   description: string | null;
   is_active: number;
+  /** manual / booking / event。manual は従来どおり手で登録する */
+  trigger_type: string;
+  /** 起点を何分ずらすか。null ならずらさない */
+  trigger_offset_minutes: number | null;
+  /** 起点の時刻を固定する JST の HH:MM。null なら予約時刻のまま */
+  send_at_time: string | null;
+  /** 対象を絞るタグ。null なら対象者全員 */
+  target_tag_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -40,27 +48,54 @@ export async function getReminderById(db: D1Database, id: string): Promise<Remin
   return db.prepare(`SELECT * FROM reminders WHERE id = ?`).bind(id).first<ReminderRow>();
 }
 
+export interface ReminderTriggerInput {
+  triggerType?: 'manual' | 'booking' | 'event';
+  triggerOffsetMinutes?: number | null;
+  sendAtTime?: string | null;
+  targetTagId?: string | null;
+}
+
 export async function createReminder(
   db: D1Database,
-  input: { name: string; description?: string },
+  input: { name: string; description?: string } & ReminderTriggerInput,
 ): Promise<ReminderRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO reminders (id, name, description, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.description ?? null, now, now).run();
+  await db.prepare(
+    `INSERT INTO reminders
+       (id, name, description, trigger_type, trigger_offset_minutes,
+        send_at_time, target_tag_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(
+      id,
+      input.name,
+      input.description ?? null,
+      input.triggerType ?? 'manual',
+      input.triggerOffsetMinutes ?? null,
+      input.sendAtTime ?? null,
+      input.targetTagId ?? null,
+      now,
+      now,
+    )
+    .run();
   return (await getReminderById(db, id))!;
 }
 
 export async function updateReminder(
   db: D1Database,
   id: string,
-  updates: Partial<{ name: string; description: string; isActive: boolean }>,
+  updates: Partial<{ name: string; description: string; isActive: boolean }> & ReminderTriggerInput,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
   if (updates.name !== undefined) { sets.push('name = ?'); values.push(updates.name); }
   if (updates.description !== undefined) { sets.push('description = ?'); values.push(updates.description); }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
+  if (updates.triggerType !== undefined) { sets.push('trigger_type = ?'); values.push(updates.triggerType); }
+  if ('triggerOffsetMinutes' in updates) { sets.push('trigger_offset_minutes = ?'); values.push(updates.triggerOffsetMinutes ?? null); }
+  if ('sendAtTime' in updates) { sets.push('send_at_time = ?'); values.push(updates.sendAtTime ?? null); }
+  if ('targetTagId' in updates) { sets.push('target_tag_id = ?'); values.push(updates.targetTagId ?? null); }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');
   values.push(jstNow());

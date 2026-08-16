@@ -14,6 +14,7 @@ import { Hono, type Context } from 'hono';
 import { getLineAccounts } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { enrollByTrigger } from '../services/reminder-trigger.js';
 import { canTransition, nextStatus, type BookingAction } from '../services/booking-state.js';
 import { getAvailability } from '../services/availability.js';
 import {
@@ -236,7 +237,8 @@ booking.get('/api/liff/booking/menus', async (c) => {
     .prepare(
       `SELECT id, name, category_label, description,
               duration_minutes, buffer_after_minutes,
-              base_price, sort_order
+              base_price, sort_order,
+              cancel_deadline_hours_before, intake_question
          FROM menus
         WHERE line_account_id = ? AND is_active = 1 AND deleted_at IS NULL
         ORDER BY sort_order ASC, id ASC`,
@@ -342,7 +344,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
   const menuRow = await c.env.DB
     .prepare(
       `SELECT m.id, m.duration_minutes, m.buffer_after_minutes, m.base_price,
-              m.auto_tag_id,
+              m.auto_tag_id, m.concurrent_capacity,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS dur,
               COALESCE(sm.override_price, m.base_price) AS price,
               sm.is_offered
@@ -352,7 +354,7 @@ booking.post('/api/liff/booking/requests', async (c) => {
           AND m.deleted_at IS NULL AND m.is_active = 1`,
     )
     .bind(body.menu_id, body.staff_id, accountId)
-    .first<{ duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; dur: number; price: number; is_offered: number | null }>();
+    .first<{ duration_minutes: number; buffer_after_minutes: number; auto_tag_id: string | null; concurrent_capacity: number; dur: number; price: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
     return c.json({ error: 'menu_not_offered' }, 422);
   }
@@ -399,12 +401,24 @@ booking.post('/api/liff/booking/requests', async (c) => {
          customer_note, price_at_booking, requested_at)
        SELECT ?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
+          -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
+          -- 1対1の施術とグループを同じ時間に入れることはできない。
           SELECT 1 FROM bookings
            WHERE staff_id = ?
              AND status IN ('requested','confirmed')
              AND starts_at < ?
              AND block_ends_at > ?
-        )`,
+             AND menu_id != ?
+        )
+        AND (
+          -- 同じメニューは同時受付数まで重ねられる。定員1なら従来と同じ判定になる。
+          SELECT COUNT(*) FROM bookings
+           WHERE staff_id = ?
+             AND status IN ('requested','confirmed')
+             AND starts_at < ?
+             AND block_ends_at > ?
+             AND menu_id = ?
+        ) < ?`,
     )
     .bind(
       bookingId,
@@ -419,10 +433,17 @@ booking.post('/api/liff/booking/requests', async (c) => {
       body.customer_note ?? null,
       menuRow.price,
       nowIso,
-      // NOT EXISTS subquery params
+      // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),
       startsAt.toISOString(),
+      body.menu_id,
+      // 同じメニューの件数を数える副問い合わせ
+      body.staff_id,
+      blockEndsAt.toISOString(),
+      startsAt.toISOString(),
+      body.menu_id,
+      Math.max(1, menuRow.concurrent_capacity ?? 1),
     )
     .run();
   if ((insertResult.meta?.changes ?? 0) === 0) {
@@ -448,6 +469,17 @@ booking.post('/api/liff/booking/requests', async (c) => {
       metadata: { bookingType: 'salon', menuId: body.menu_id, staffId: body.staff_id },
       occurredAt: nowIso,
     }),
+  );
+
+  // 予約をきっかけにするリマインダへ登録する。通知やタグ付与と同じく
+  // 予約成功は左右しない。リマインダが登録できなかったからといって
+  // 予約そのものを失敗させるのは筋が違う。
+  c.executionCtx.waitUntil(
+    enrollByTrigger(c.env.DB, {
+      triggerType: 'booking',
+      friendId,
+      startsAtIso: startsAt.toISOString(),
+    }).catch((err) => console.error('reminder enroll (booking) failed:', err)),
   );
 
   // Fire-and-forget notification — failures must not roll back the booking.
@@ -538,6 +570,75 @@ booking.get('/api/liff/booking/me', async (c) => {
 
 // ---- Menus CRUD ----
 
+/** 受付条件として画面から送られてくる項目。 */
+interface MenuBookingRuleBody {
+  concurrent_capacity?: unknown;
+  booking_window_days?: unknown;
+  cutoff_hours_before?: unknown;
+  cancel_deadline_hours_before?: unknown;
+  intake_question?: unknown;
+}
+
+/**
+ * 受付条件を検証して、DBの列名で返す。送られた項目だけを含める。
+ *
+ * 上限を置いているのは、桁を間違えた値がそのまま保存されると
+ * 「1年先まで予約できてしまう」「一度に999件受けてしまう」といった
+ * 形で表に出てくるため。0 や負の値もここで弾く。
+ */
+function readMenuBookingRules(
+  b: MenuBookingRuleBody,
+): { ok: true; value: Record<string, number | string | null> } | { ok: false; error: string } {
+  const out: Record<string, number | string | null> = {};
+
+  const positiveInt = (
+    key: keyof MenuBookingRuleBody,
+    column: string,
+    max: number,
+    { nullable }: { nullable: boolean },
+  ): string | null => {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) return null;
+    const raw = b[key];
+    if (raw === null || raw === '' || raw === undefined) {
+      if (!nullable) return `${key} must not be empty`;
+      out[column] = null;
+      return null;
+    }
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1 || n > max) {
+      return `${key} must be an integer between 1 and ${max}`;
+    }
+    out[column] = n;
+    return null;
+  };
+
+  // 同時受付数だけは NOT NULL。空にはできず、最低1。
+  const errors = [
+    positiveInt('concurrent_capacity', 'concurrent_capacity', 100, { nullable: false }),
+    positiveInt('booking_window_days', 'booking_window_days', 365, { nullable: true }),
+    positiveInt('cutoff_hours_before', 'cutoff_hours_before', 24 * 30, { nullable: true }),
+    positiveInt('cancel_deadline_hours_before', 'cancel_deadline_hours_before', 24 * 30, {
+      nullable: true,
+    }),
+  ].filter((e): e is string => e !== null);
+  if (errors.length > 0) return { ok: false, error: errors[0] };
+
+  if (Object.prototype.hasOwnProperty.call(b, 'intake_question')) {
+    const raw = b.intake_question;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.intake_question = null;
+    } else if (typeof raw !== 'string') {
+      return { ok: false, error: 'intake_question must be a string' };
+    } else if (raw.length > 200) {
+      return { ok: false, error: 'intake_question must be 200 characters or fewer' };
+    } else {
+      out.intake_question = raw.trim();
+    }
+  }
+
+  return { ok: true, value: out };
+}
+
 booking.get('/api/booking/admin/menus', async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
@@ -545,7 +646,9 @@ booking.get('/api/booking/admin/menus', async (c) => {
     .prepare(
       `SELECT id, name, category_label, description,
               duration_minutes, buffer_after_minutes,
-              base_price, sort_order, is_active, auto_tag_id
+              base_price, sort_order, is_active, auto_tag_id,
+              concurrent_capacity, booking_window_days, cutoff_hours_before,
+              cancel_deadline_hours_before, intake_question
          FROM menus
         WHERE line_account_id = ? AND deleted_at IS NULL
         ORDER BY sort_order ASC, id ASC`,
@@ -567,7 +670,9 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     base_price: number;
     sort_order?: number;
     auto_tag_id?: string | null;
-  }>();
+  } & MenuBookingRuleBody>();
+  const rules = readMenuBookingRules(b);
+  if (!rules.ok) return c.json({ error: rules.error }, 400);
   const autoTagId = (b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string);
   if (autoTagId) {
     const tagExists = await c.env.DB
@@ -577,12 +682,17 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
     if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
   }
   const id = crypto.randomUUID();
+  const ruleColumns = Object.keys(rules.value);
   await c.env.DB
     .prepare(
+      // 受付条件は送られたものだけを列に足す。送られなければ既定値
+      // （従来と同じ動き）が入る。
       `INSERT INTO menus
         (id, line_account_id, name, category_label, description,
-         duration_minutes, buffer_after_minutes, base_price, sort_order, auto_tag_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+         duration_minutes, buffer_after_minutes, base_price, sort_order, auto_tag_id${
+           ruleColumns.map((col) => `, ${col}`).join('')
+         })
+       VALUES (?,?,?,?,?,?,?,?,?,?${ruleColumns.map(() => ',?').join('')})`,
     )
     .bind(
       id,
@@ -595,6 +705,7 @@ booking.post('/api/booking/admin/menus', requireRole('owner', 'admin'), async (c
       b.base_price,
       b.sort_order ?? 0,
       autoTagId,
+      ...ruleColumns.map((col) => rules.value[col]),
     )
     .run();
   return c.json({ id }, 201);
@@ -614,10 +725,14 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
     sort_order?: number;
     is_active?: boolean;
     auto_tag_id?: string | null;
-  }>();
-  // PUT は古いクライアントが auto_tag_id フィールドを送らない場合がある。`undefined` を
-  // null として書き込むと既存設定を消してしまうため、key 存在チェックで「明示的に送られた
-  // ときだけ」更新する。
+  } & MenuBookingRuleBody>();
+
+  const rules = readMenuBookingRules(b);
+  if (!rules.ok) return c.json({ error: rules.error }, 400);
+
+  // 古いクライアントは新しい項目を送らない。`undefined` を null として
+  // 書き込むと既存設定を消してしまうので、明示的に送られたものだけ更新する。
+  // auto_tag_id が以前からこの扱いで、受付条件も同じにそろえた。
   const hasAutoTagId = Object.prototype.hasOwnProperty.call(b, 'auto_tag_id');
   const autoTagId = hasAutoTagId
     ? ((b.auto_tag_id ?? '').trim() === '' ? null : (b.auto_tag_id as string))
@@ -629,54 +744,46 @@ booking.put('/api/booking/admin/menus/:id', requireRole('owner', 'admin'), async
       .first<{ 1: number }>();
     if (!tagExists) return c.json({ error: 'tag_not_found' }, 400);
   }
+
+  // 常に書き込む項目（PUT なので、送られなければ既定値で上書きする）
+  const sets: string[] = [
+    'name = ?',
+    'category_label = ?',
+    'description = ?',
+    'duration_minutes = ?',
+    'buffer_after_minutes = ?',
+    'base_price = ?',
+    'sort_order = ?',
+    'is_active = ?',
+  ];
+  const values: unknown[] = [
+    b.name,
+    b.category_label ?? null,
+    b.description ?? null,
+    b.duration_minutes,
+    b.buffer_after_minutes ?? 0,
+    b.base_price,
+    b.sort_order ?? 0,
+    b.is_active === false ? 0 : 1,
+  ];
   if (hasAutoTagId) {
-    await c.env.DB
-      .prepare(
-        `UPDATE menus
-            SET name = ?, category_label = ?, description = ?,
-                duration_minutes = ?, buffer_after_minutes = ?,
-                base_price = ?, sort_order = ?, is_active = ?, auto_tag_id = ?,
-                updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-          WHERE id = ? AND line_account_id = ?`,
-      )
-      .bind(
-        b.name,
-        b.category_label ?? null,
-        b.description ?? null,
-        b.duration_minutes,
-        b.buffer_after_minutes ?? 0,
-        b.base_price,
-        b.sort_order ?? 0,
-        b.is_active === false ? 0 : 1,
-        autoTagId,
-        id,
-        accountId,
-      )
-      .run();
-  } else {
-    await c.env.DB
-      .prepare(
-        `UPDATE menus
-            SET name = ?, category_label = ?, description = ?,
-                duration_minutes = ?, buffer_after_minutes = ?,
-                base_price = ?, sort_order = ?, is_active = ?,
-                updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
-          WHERE id = ? AND line_account_id = ?`,
-      )
-      .bind(
-        b.name,
-        b.category_label ?? null,
-        b.description ?? null,
-        b.duration_minutes,
-        b.buffer_after_minutes ?? 0,
-        b.base_price,
-        b.sort_order ?? 0,
-        b.is_active === false ? 0 : 1,
-        id,
-        accountId,
-      )
-      .run();
+    sets.push('auto_tag_id = ?');
+    values.push(autoTagId);
   }
+  for (const [column, value] of Object.entries(rules.value)) {
+    sets.push(`${column} = ?`);
+    values.push(value);
+  }
+
+  await c.env.DB
+    .prepare(
+      `UPDATE menus
+          SET ${sets.join(', ')},
+              updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+        WHERE id = ? AND line_account_id = ?`,
+    )
+    .bind(...values, id, accountId)
+    .run();
   return c.json({ ok: true });
 });
 
@@ -784,6 +891,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   const menuRow = await c.env.DB
     .prepare(
       `SELECT m.id, m.duration_minutes, m.buffer_after_minutes, m.base_price,
+              m.concurrent_capacity,
               COALESCE(sm.override_duration_minutes, m.duration_minutes) AS dur,
               COALESCE(sm.override_price, m.base_price) AS price,
               sm.is_offered
@@ -793,7 +901,7 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
           AND m.deleted_at IS NULL AND m.is_active = 1`,
     )
     .bind(body.menu_id, body.staff_id, accountId)
-    .first<{ duration_minutes: number; buffer_after_minutes: number; dur: number; price: number; is_offered: number | null }>();
+    .first<{ duration_minutes: number; buffer_after_minutes: number; concurrent_capacity: number; dur: number; price: number; is_offered: number | null }>();
   if (!menuRow || menuRow.is_offered !== 1) {
     return c.json({ error: 'menu_not_offered' }, 422);
   }
@@ -837,12 +945,24 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
          customer_note, price_at_booking, requested_at, decided_at)
        SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
         WHERE NOT EXISTS (
+          -- 別メニューの予約は、定員に関係なく1件でも塞ぐ。
+          -- 1対1の施術とグループを同じ時間に入れることはできない。
           SELECT 1 FROM bookings
            WHERE staff_id = ?
              AND status IN ('requested','confirmed')
              AND starts_at < ?
              AND block_ends_at > ?
-        )`,
+             AND menu_id != ?
+        )
+        AND (
+          -- 同じメニューは同時受付数まで重ねられる。定員1なら従来と同じ判定になる。
+          SELECT COUNT(*) FROM bookings
+           WHERE staff_id = ?
+             AND status IN ('requested','confirmed')
+             AND starts_at < ?
+             AND block_ends_at > ?
+             AND menu_id = ?
+        ) < ?`,
     )
     .bind(
       bookingId,
@@ -858,10 +978,17 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       menuRow.price,
       nowIso,
       nowIso,
-      // NOT EXISTS subquery params
+      // 別メニューの重なりを見る副問い合わせ
       body.staff_id,
       blockEndsAt.toISOString(),
       startsAt.toISOString(),
+      body.menu_id,
+      // 同じメニューの件数を数える副問い合わせ
+      body.staff_id,
+      blockEndsAt.toISOString(),
+      startsAt.toISOString(),
+      body.menu_id,
+      Math.max(1, menuRow.concurrent_capacity ?? 1),
     )
     .run();
   if ((insertResult.meta?.changes ?? 0) === 0) {
@@ -873,6 +1000,13 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     startsAt,
     now: new Date(),
   });
+  c.executionCtx.waitUntil(
+    enrollByTrigger(c.env.DB, {
+      triggerType: 'booking',
+      friendId: body.friend_id,
+      startsAtIso: startsAt.toISOString(),
+    }).catch((err) => console.error('reminder enroll (proxy-create) failed:', err)),
+  );
   let calendarSync: 'not_configured' | 'synced' | 'failed' = 'not_configured';
   try {
     const synced = await syncConfirmedBookingToGoogle(

@@ -259,7 +259,7 @@ export default function ScenarioModePicker({ open, onClose, onCreate }: Props) {
                 onClick={handleCreate}
                 disabled={submitting}
                 className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 {submitting ? '作成中...' : '作成して編集へ'}
               </button>

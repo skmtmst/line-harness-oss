@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
@@ -52,7 +52,7 @@ function formatDatetime(iso: string | null): string {
   })
 }
 
-export default function BroadcastsPage() {
+function BroadcastsPageContent() {
   const searchParams = useSearchParams()
   const detailId = searchParams.get('id')
 
@@ -209,7 +209,7 @@ function BroadcastList() {
                   ? 'border-green-500 text-ink'
                   : 'border-transparent text-ink-faint hover:text-ink-secondary'
               }`}
-              style={activeTab === tab.id ? { borderColor: '#06C755' } : undefined}
+              style={activeTab === tab.id ? { borderColor: 'var(--color-accent)' } : undefined}
             >
               {tab.label}
               <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0 rounded-full bg-canvas-sunken text-xs text-ink-secondary min-w-[20px]">
@@ -395,5 +395,14 @@ function BroadcastList() {
       <CcPromptButton prompts={ccPrompts} />
       </>}
     </div>
+  )
+}
+
+// useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+export default function BroadcastsPage() {
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <BroadcastsPageContent />
+    </Suspense>
   )
 }

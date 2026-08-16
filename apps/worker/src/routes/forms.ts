@@ -30,6 +30,32 @@ import { awardActivityMileage } from '../services/activity-mileage.js';
 
 const forms = new Hono<Env>();
 
+/** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
+interface FormFieldDef {
+  id?: string;
+  name?: string;
+  label?: string;
+  type?: string;
+  /** 回答の登録先。友だち情報欄の項目ID。未設定なら情報欄には書かない */
+  friendFieldId?: string | null;
+}
+
+/**
+ * forms.fields を読む。
+ *
+ * 壊れていても空配列を返す。ここで例外を投げると、項目定義が1つ壊れた
+ * だけでフォームの送信そのものが失敗する。
+ */
+function parseFormFields(raw: string | null | undefined): FormFieldDef[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? (parsed as FormFieldDef[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefined {
   try {
     return c.executionCtx;
@@ -513,6 +539,43 @@ forms.post('/api/forms/:id/submit', async (c) => {
         );
       }
 
+      // 回答を友だち情報欄へ書く。
+      //
+      // フォームの項目に friendFieldId を持たせておくと、その項目の回答が
+      // 友だち情報欄に入る。ここが「フォーム → 情報欄 → 友だち詳細 →
+      // テンプレートの差し込み」の線をつなぐ一点。
+      //
+      // metadata への保存とは別に持つ。metadata は形が決まっていない
+      // 置き場で、情報欄は型と差し込み名を持つ。両方に入れておけば、
+      // 既存の {{metadata.KEY}} を使っているテンプレートも壊れない。
+      sideEffects.push(
+        (async () => {
+          const formFields = parseFormFields(form.fields);
+          const targets = formFields.filter((f) => f.friendFieldId);
+          if (targets.length === 0) return;
+          const { setFriendFieldValue, getFriendFieldById } = await import('@line-crm/db');
+          for (const field of targets) {
+            const answer = submissionData[field.name ?? field.id ?? ''];
+            if (answer === undefined) continue;
+            // ECが正の項目には書かない。フォームの回答で上書きすると、
+            // 次のEC同期で戻り、入れたはずの値が消えたように見える。
+            const target = await getFriendFieldById(db, field.friendFieldId!);
+            if (!target || target.ec_is_master === 1) continue;
+            await setFriendFieldValue(db, {
+              friendId: friendId!,
+              fieldId: field.friendFieldId!,
+              value:
+                answer == null
+                  ? null
+                  : Array.isArray(answer)
+                    ? answer.join(', ')
+                    : String(answer),
+              updatedBy: 'form',
+            });
+          }
+        })().catch((err) => console.error('form -> friend_fields failed:', err)),
+      );
+
       // Add tag — guarded attach so a tag_added-triggered scenario fires on
       // first-time submit (and never re-fires on duplicate submits).
       if (form.on_submit_tag_id) {
@@ -648,7 +711,9 @@ forms.post('/api/forms/:id/submit', async (c) => {
             messages.push(rewardFromTrackedLink as ReturnType<typeof buildMessage>);
           } else if (form.on_submit_message_type && form.on_submit_message_content) {
             // Custom form message replaces default diagnostic result
-            const expanded = expandVariables(form.on_submit_message_content, friendData, apiOrigin, form.on_submit_message_type);
+            const { resolveInterpolationExtra } = await import('../services/interpolation-context.js');
+            const extra = await resolveInterpolationExtra(db, friend.id, form.on_submit_message_content);
+            const expanded = expandVariables(form.on_submit_message_content, friendData, apiOrigin, form.on_submit_message_type, extra);
             // 1:1 push → /t リンクに f=<friendId> を焼き込み (LIFF 識別ホップ回避)
             const { appendFriendToTrackedLinks } = await import('../services/auto-track.js');
             const decorated = await appendFriendToTrackedLinks(db, expanded, apiOrigin, friend.id);
