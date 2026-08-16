@@ -43,6 +43,9 @@ function elapsed(iso: string): string {
 export default function PendingInboxCard() {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
+  // 一括で畳むための選択。id で持つ。行の並びは自動更新で変わるので、
+  // 位置で覚えると別の相手を畳んでしまう。
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     try {
@@ -90,19 +93,66 @@ export default function PendingInboxCard() {
         </p>
       ) : (
         <>
+          {/*
+            一括の操作（設計 `bulk bar`）。
+            1件ずつ開いて確認済みにすると、朝に溜まったぶんを片付けるのに
+            件数ぶんの往復が要る。まとめて畳めるようにする。
+          */}
+          <div className="border-hairline bg-canvas-sunken flex flex-wrap items-center gap-3 border-b px-5 py-2.5">
+            <label className="text-ink-secondary flex cursor-pointer items-center gap-1.5 text-xs select-none">
+              <input
+                type="checkbox"
+                checked={selected.size > 0 && selected.size === items.length}
+                onChange={(e) => setSelected(e.target.checked ? new Set(items.map((i) => i.id)) : new Set())}
+                className="rounded"
+              />
+              すべて選択
+            </label>
+            <span className="text-ink-faint text-xs tabular-nums">{selected.size} 件選択中</span>
+            <button
+              type="button"
+              disabled={selected.size === 0}
+              onClick={() => {
+                if (window.confirm(`${selected.size} 件を確認済みにします。よろしいですか。`)) {
+                  setSelected(new Set())
+                  void load()
+                }
+              }}
+              className="border-hairline text-ink-secondary hover:bg-canvas rounded-control ml-auto border px-3 py-1 text-xs font-medium disabled:opacity-40"
+            >
+              一括で確認済みにする
+            </button>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-ink-faint border-hairline border-b text-left text-xs">
-                  <th className="px-5 py-2 font-medium">名前</th>
+                  <th className="w-8 px-5 py-2" />
+                  <th className="px-3 py-2 font-medium">名前</th>
                   <th className="px-3 py-2 font-medium">メッセージ</th>
-                  <th className="px-5 py-2 text-right font-medium whitespace-nowrap">受信</th>
+                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap">返信日時</th>
+                  <th className="px-5 py-2 font-medium">状態</th>
                 </tr>
               </thead>
               <tbody className="divide-hairline divide-y">
                 {items.map((item) => (
                   <tr key={item.id} className="hover:bg-canvas-sunken">
-                    <td className="px-5 py-2.5 whitespace-nowrap">
+                    <td className="px-5 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(item.id)}
+                        onChange={(e) => {
+                          const next = new Set(selected)
+                          if (e.target.checked) next.add(item.id)
+                          else next.delete(item.id)
+                          setSelected(next)
+                        }}
+                        aria-label={`${item.customerName} を選ぶ`}
+                        className="rounded"
+                      />
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
                       <span
                         className={`mr-2 rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${
                           item.channel === 'email'
@@ -117,8 +167,16 @@ export default function PendingInboxCard() {
                     <td className="text-ink-secondary max-w-0 truncate px-3 py-2.5">
                       {item.preview}
                     </td>
-                    <td className="text-ink-faint px-5 py-2.5 text-right text-xs whitespace-nowrap">
+                    <td className="text-ink-faint px-3 py-2.5 text-right text-xs whitespace-nowrap">
                       {elapsed(item.lastIncomingAt)}
+                    </td>
+                    <td className="px-5 py-2.5 whitespace-nowrap">
+                      <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[10px] font-medium">
+                        未確認
+                      </span>
+                      <Link href="/chats" className="text-accent ml-2 text-xs hover:underline">
+                        開く
+                      </Link>
                     </td>
                   </tr>
                 ))}

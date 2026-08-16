@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { api, type DashboardOverview } from '@/lib/api'
 import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
-import SupportAlertPanel from '@/components/support/support-alert-panel'
+import PendingInboxCard from '@/components/support/pending-inbox-card'
 import ShipmentPanel from '@/components/dashboard/shipment-panel'
 import KpiCard from '@/components/dashboard/kpi-card'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
@@ -52,6 +52,18 @@ const PERIODS = [
 ] as const
 
 type PeriodKey = (typeof PERIODS)[number]['key']
+
+/**
+ * 次に送信枠が戻る日。LINEは毎月1日に戻す。
+ *
+ * JSTで数える。月末にUTCのまま出すと、日本ではまだ今月なのに
+ * 翌々月の1日が出る。
+ */
+function nextResetLabel(): string {
+  const now = new Date(Date.now() + 9 * 3600_000)
+  const month = now.getUTCMonth() + 2 > 12 ? 1 : now.getUTCMonth() + 2
+  return `${month}/1`
+}
 
 /**
  * 友だち追加リンク。
@@ -226,10 +238,18 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* 警告帯（設計 `Alert`）。中身は「ケアが必要な子」に置き換える予定。 */}
-      <div data-design="Alert">
-        <SupportAlertPanel />
-      </div>
+      {/*
+        警告帯（設計 `Alert`）。設計は「ケアが必要な子が3頭います」の1行。
+
+        以前はここに赤いグラデーションの大きな帯で未対応の問い合わせを
+        出していた。赤い帯は「いま壊れている」の強さで、常時1〜2件ある
+        問い合わせに使うと慣れてしまい、本当に見てほしいときに効かない。
+
+        問い合わせは下の「対応が必要な受信」に移した。この帯は
+        健康記録の連続検知（ケアが必要な子）に譲る。その仕組みが
+        入るまでは何も出さない。docs/v025-open-questions.md §1-3。
+      */}
+      <div data-design="Alert" />
 
       {/* KPI 4枚 */}
       <div data-design="KPIs" className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -267,11 +287,14 @@ export default function DashboardPage() {
           value={quotaRemaining}
           unit="通"
           loading={loading}
+          // LINEの送信枠は毎月1日に戻る。上限だけ出すと「いつ戻るのか」が
+          // 分からず、足りないときに増やすべきか待つべきか判断できない。
           detail={
             data && data.delivery.quotaLimit !== null
-              ? `上限 ${data.delivery.quotaLimit.toLocaleString('ja-JP')}`
+              ? `上限 ${data.delivery.quotaLimit.toLocaleString('ja-JP')} ・ リセット ${nextResetLabel()}`
               : 'LINE から取得できませんでした'
           }
+          action={{ label: 'アップグレードする', href: '/accounts' }}
         />
       </div>
 
@@ -282,6 +305,9 @@ export default function DashboardPage() {
 
       {/* 2カラム — 左が広い（設計は 1095 : 460） */}
       <div data-design="Body" className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-4">
+        <PendingInboxCard />
+
         <section className="bg-canvas rounded-card border-hairline border">
           <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
             <h2 className="text-ink text-sm font-semibold">友だち数の推移</h2>
@@ -291,6 +317,7 @@ export default function DashboardPage() {
           </div>
           <FriendTrendTable trend={data?.trend ?? []} loading={loading} />
         </section>
+        </div>
 
         <div className="space-y-4">
           {data && <InboxStatusCard inbox={data.inbox} />}
