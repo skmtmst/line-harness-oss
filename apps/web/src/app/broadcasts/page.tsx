@@ -74,6 +74,9 @@ function BroadcastList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
+  // 一覧が増えると、配信名を覚えていても探すのに時間がかかる。
+  const [titleQuery, setTitleQuery] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
@@ -147,6 +150,10 @@ function BroadcastList() {
   const dedupCount = broadcasts.filter((b) => b.targetType === 'multi-account-dedup').length
   const singleCount = broadcasts.length - dedupCount
   const visibleBroadcasts = broadcasts.filter((b) => {
+    // タイトルは手元で絞る。打つたびに取り直すと重い。
+    if (titleQuery.trim() && !b.title.toLowerCase().includes(titleQuery.trim().toLowerCase())) {
+      return false
+    }
     if (activeTab === 'all') return true
     if (activeTab === 'dedup') return b.targetType === 'multi-account-dedup'
     return b.targetType !== 'multi-account-dedup'
@@ -160,12 +167,39 @@ function BroadcastList() {
         title="一斉配信"
         description="条件を指定した友だちにメッセージをまとめて送ります。予約配信と開封の計測ができます。"
         action={activeSection === 'list' ? (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-          >
-            + 新規配信
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
+            <button
+              disabled
+              title="マニュアルは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            {/*
+              フォルダは 099 で folders 表が入っているが、broadcasts に
+              folder_id が無い。docs/v025-open-questions.md §4-3。
+            */}
+            <button
+              disabled
+              title="フォルダの追加は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              フォルダを追加
+            </button>
+            <a
+              href="/templates"
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+            >
+              テンプレートから配信
+            </a>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+            >
+              + 新規配信
+            </button>
+          </div>
         ) : undefined}
       />
       </div>
@@ -176,6 +210,61 @@ function BroadcastList() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
+      {activeSection === 'list' && (
+        <>
+          {/*
+            フォルダ（設計 `Body` の左）。099 で folders 表は入っているが、
+            broadcasts に folder_id が無いので絞り込めない。
+            何が来るかが見えている方がよいので、枠だけ置く。
+            docs/v025-open-questions.md §4-3。
+          */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-ink-faint text-xs">フォルダ</span>
+            {['すべて', '01_お知らせ', '02_キャンペーン', '未分類'].map((label, i) => (
+              <button
+                key={label}
+                disabled={i > 0}
+                title={i > 0 ? 'フォルダ分けは準備中です' : undefined}
+                className={`rounded-pill px-3 py-1 text-xs ${
+                  i === 0
+                    ? 'bg-accent text-on-accent'
+                    : 'border-hairline text-ink-faint border opacity-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* 検索と並び順（設計 `Body` の上）。 */}
+          <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+            <input
+              type="search"
+              placeholder="タイトルで検索"
+              aria-label="タイトルで検索"
+              value={titleQuery}
+              onChange={(e) => setTitleQuery(e.target.value)}
+              className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            />
+            <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+            <select
+              disabled
+              title="並び替えは準備中です"
+              className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+            >
+              <option>配信日が新しい順</option>
+            </select>
+            <button
+              disabled
+              title="保存した条件は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+            >
+              保存した条件
+            </button>
+          </div>
+        </>
+      )}
+
 
       <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2" aria-label="一斉配信メニュー">
         {([
@@ -263,22 +352,28 @@ function BroadcastList() {
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信タイトル
+                  タイトル
+                </th>
+                {/*
+                  列は設計 `V2 4-2 一斉配信` の並び。
+                  「予約日時」と「送信完了日時」を「配信日時」の1列にまとめている。
+                  予約中なら予約の時刻、送信済みなら送った時刻。どちらか一方しか
+                  意味を持たないので、2列に分けると常に片方が空になる。
+                */}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
+                  配信日時
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  ステータス
+                  配信条件
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信対象
+                  配信数
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  予約日時
+                  開封（率）
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  送信完了日時
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  実績
+                  状態
                 </th>
                 <th className="px-4 py-3" />
               </tr>
@@ -310,11 +405,14 @@ function BroadcastList() {
                       </div>
                     </td>
 
-                    {/* Status */}
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
-                        {statusInfo.label}
-                      </span>
+                    {/*
+                      配信日時。予約中なら予約の時刻、送信済みなら送った時刻。
+                      2列に分けると、どちらかが常に空になって読みにくい。
+                    */}
+                    <td className="px-4 py-3 text-sm text-ink-faint">
+                      {broadcast.status === 'sent'
+                        ? formatDatetime(broadcast.sentAt)
+                        : formatDatetime(broadcast.scheduledAt)}
                     </td>
 
                     {/* Target */}
@@ -328,16 +426,6 @@ function BroadcastList() {
                       ) : (
                         'タグ指定'
                       )}
-                    </td>
-
-                    {/* Scheduled */}
-                    <td className="px-4 py-3 text-sm text-ink-faint">
-                      {formatDatetime(broadcast.scheduledAt)}
-                    </td>
-
-                    {/* Sent */}
-                    <td className="px-4 py-3 text-sm text-ink-faint">
-                      {formatDatetime(broadcast.sentAt)}
                     </td>
 
                     {/* Stats & Insight */}
@@ -380,6 +468,13 @@ function BroadcastList() {
                       ) : (
                         '-'
                       )}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                        {statusInfo.label}
+                      </span>
                     </td>
 
                     {/* Actions */}
