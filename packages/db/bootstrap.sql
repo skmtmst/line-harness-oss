@@ -586,7 +586,7 @@ CREATE TABLE friend_fields (
   display_order  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-, field_type TEXT NOT NULL DEFAULT 'text');
+);
 
 CREATE TABLE friend_reminder_deliveries (
   id                TEXT PRIMARY KEY,
