@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
+import ListToolbar from '@/components/shared/list-toolbar'
 import CcPromptButton from '@/components/cc-prompt-button'
 
 interface Reminder {
@@ -111,6 +112,8 @@ const ccPrompts = [
 export default function RemindersPage() {
   const { selectedAccountId } = useAccount()
   const [reminders, setReminders] = useState<Reminder[]>([])
+  // 名前の絞り込み（設計 `Body` の検索）。手元で絞る。
+  const [nameQuery, setNameQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -295,6 +298,28 @@ export default function RemindersPage() {
         title="リマインダ"
         description="ゴール日時までのカウントダウン配信を作ります。誕生日や次回お届け日など、友だち情報欄の日付を起点にできます。"
         action={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              disabled
+              title="準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            <button
+              disabled
+              title="準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              並び替え
+            </button>
+            <button
+              disabled
+              title="準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              フォルダを追加
+            </button>
           <button
             onClick={() => setShowCreate(true)}
             className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
@@ -302,6 +327,7 @@ export default function RemindersPage() {
           >
             + 新規リマインダー
           </button>
+          </div>
         }
       />
       </div>
@@ -327,6 +353,14 @@ export default function RemindersPage() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
+      <ListToolbar
+        folders={['すべて', '01_誕生日', '02_定期便', '未分類']}
+        searchPlaceholder="リマインダ名で検索"
+        searchValue={nameQuery}
+        onSearchChange={setNameQuery}
+        sortLabel="配信待ちが多い順"
+      />
+
 
       {/* Error */}
       {error && (
@@ -482,7 +516,13 @@ export default function RemindersPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {reminders.map((reminder) => {
+          {reminders
+            .filter((r) =>
+              nameQuery.trim() === ''
+                ? true
+                : r.name.toLowerCase().includes(nameQuery.trim().toLowerCase()),
+            )
+            .map((reminder) => {
             const isExpanded = expandedId === reminder.id
 
             return (
