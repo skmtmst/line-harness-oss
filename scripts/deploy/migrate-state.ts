@@ -67,12 +67,25 @@ export function splitTopLevel(body: string): string[] {
 const TABLE_CONSTRAINTS = new Set(['primary', 'unique', 'check', 'foreign', 'constraint']);
 
 /**
+ * SQL のコメントを落とす。
+ *
+ * sqlite_master は CREATE 文を書かれたまま持つので、`-- HH:MM JST` のような
+ * 行末コメントも入っている。カンマで分けたあとの断片がコメントから始まると、
+ * 列名の取り出しに失敗して、その列が「無い」ことになる。
+ * 実際に staff_availability_rules の3列がこれで消えた。
+ */
+export function stripSqlComments(sql: string): string {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, '');
+}
+
+/**
  * `CREATE TABLE` 文から列名を取り出す。
  *
  * SQLite は `ALTER TABLE ADD COLUMN` で足した列を、括弧の内側の末尾に
  * 書き足す。だから最新の CREATE 文を読めば、後から足した列も込みで分かる。
  */
-export function columnsOf(createSql: string): Set<string> {
+export function columnsOf(rawSql: string): Set<string> {
+  const createSql = stripSqlComments(rawSql);
   const open = createSql.indexOf('(');
   if (open < 0) return new Set();
   let depth = 0;
