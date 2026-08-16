@@ -202,6 +202,49 @@ describe('受信箱の状態', () => {
   });
 });
 
+describe('初回返信の平均', () => {
+  test('記録が無ければ null', async () => {
+    // 0 を出すと「即答している」と読めてしまう。
+    const { inbox } = await getDashboardOverview(db, 'today', null);
+    expect(inbox.averageFirstReplyMinutes).toBeNull();
+  });
+
+  test('受信から返信までの分を平均する', async () => {
+    insertFriend('a');
+    insertFriend('b');
+    const day = jstDate(0);
+    // 30分 と 10分 → 平均 20分
+    for (const [id, incoming, replied] of [
+      ['a', `${day}T10:00:00.000+09:00`, `${day}T10:30:00.000+09:00`],
+      ['b', `${day}T11:00:00.000+09:00`, `${day}T11:10:00.000+09:00`],
+    ] as const) {
+      sqlite
+        .prepare(
+          `INSERT INTO chats (id, friend_id, status, created_at, updated_at, last_incoming_at, first_replied_at)
+           VALUES (?, ?, 'resolved', ?, ?, ?, ?)`,
+        )
+        .run(`chat-${id}`, id, day, day, incoming, replied);
+    }
+    const { inbox } = await getDashboardOverview(db, 'today', null);
+    expect(inbox.averageFirstReplyMinutes).toBe(20);
+  });
+
+  test('返信が受信より前の行は混ぜない', async () => {
+    // 時計のずれや手で入れた値で起こりうる。負の時間が混ざると
+    // 平均が実際より短く出て、放置に気づけなくなる。
+    insertFriend('a');
+    const day = jstDate(0);
+    sqlite
+      .prepare(
+        `INSERT INTO chats (id, friend_id, status, created_at, updated_at, last_incoming_at, first_replied_at)
+         VALUES ('c1', 'a', 'resolved', ?, ?, ?, ?)`,
+      )
+      .run(day, day, `${day}T12:00:00.000+09:00`, `${day}T11:00:00.000+09:00`);
+    const { inbox } = await getDashboardOverview(db, 'today', null);
+    expect(inbox.averageFirstReplyMinutes).toBeNull();
+  });
+});
+
 describe('全体', () => {
   test('集計した時刻を返す', async () => {
     // カードごとに基準時刻がずれていないことの手がかりになる。

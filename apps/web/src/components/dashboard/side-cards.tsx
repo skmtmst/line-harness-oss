@@ -75,16 +75,23 @@ export function InboxStatusCard({ inbox }: { inbox: DashboardOverview['inbox'] }
           </div>
         </div>
         <div className="border-hairline border-t pt-3">
-          <Figure
-            label="最も古い未対応"
-            value={inbox.oldestUnansweredMinutes}
-            unit="分前"
-          />
           {/*
-            設計は「平均の初回返信」を出しているが、返信までの時間を
-            記録していないので出せない。最も古い未対応の経過時間なら
-            いまのデータで出せて、意味も近い（放置に気づくための数）。
+            設計の「平均の初回返信」。107 で受信と初回返信の時刻を残す
+            ようにしたので出せるようになった。当てた日より前の往復は
+            記録が無いため平均に入らない。
           */}
+          <Figure
+            label="平均の初回返信"
+            value={inbox.averageFirstReplyMinutes}
+            unit="分"
+          />
+          <div className="mt-2">
+            <Figure
+              label="最も古い未対応"
+              value={inbox.oldestUnansweredMinutes}
+              unit="分前"
+            />
+          </div>
         </div>
       </div>
     </SideCard>
