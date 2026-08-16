@@ -290,6 +290,7 @@ export default function RemindersPage() {
 
   return (
     <div>
+      <div data-design="Head">
       <Header
         title="リマインダ"
         description="ゴール日時までのカウントダウン配信を作ります。誕生日や次回お届け日など、友だち情報欄の日付を起点にできます。"
@@ -303,8 +304,10 @@ export default function RemindersPage() {
           </button>
         }
       />
+      </div>
 
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
+      <div data-design="KPIs">
       <ListKpis
         build={(s) => [
             { title: 'リマインダ', value: s.reminders.total, unit: '件', detail: `稼働中 ${s.reminders.active}` },
@@ -320,6 +323,10 @@ export default function RemindersPage() {
             },
         ]}
       />
+      </div>
+
+      {/* 一覧本体（設計 `Body`）。 */}
+      <div data-design="Body">
 
       {/* Error */}
       {error && (
@@ -674,6 +681,7 @@ export default function RemindersPage() {
         </div>
       )}
       <CcPromptButton prompts={ccPrompts} />
+      </div>
     </div>
   )
 }

@@ -320,6 +320,12 @@ function ChatsPageInner() {
   const [nameQuery, setNameQuery] = useState('')
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  // 友だち詳細を出すか。既定は開く（設計は常時見えている）。
+  // 狭い画面ではトークに重なるので、閉じられるようにする。
+  const [showFriendInfo, setShowFriendInfo] = useState(true)
+  // 送信の細かい設定。既定は畳む。出しっぱなしだと入力欄が縦に伸びて
+  // トークが読めなくなる。
+  const [showComposerOptions, setShowComposerOptions] = useState(false)
   const statusFilterRef = useRef<StatusFilter>('all')
   const unansweredOnlyRef = useRef(false)
   const [unansweredOnly, setUnansweredOnly] = useState(() => {
@@ -824,7 +830,7 @@ function ChatsPageInner() {
         </div>
       )}
 
-      <div className="flex gap-4 h-[calc(100vh-120px)] lg:h-[calc(100vh-180px)]">
+      <div data-design="Panes" className="relative flex gap-4 h-[calc(100vh-120px)] lg:h-[calc(100vh-180px)]">
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
         <div className={`w-full lg:w-[360px] lg:flex-shrink-0 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId ? 'hidden lg:flex' : 'flex'}`}>
@@ -1061,6 +1067,14 @@ function ChatsPageInner() {
                       ))}
                     </select>
                   </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowFriendInfo((v) => !v)}
+                    aria-pressed={showFriendInfo}
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control hidden border px-2 py-1 text-xs xl:inline-block"
+                  >
+                    {showFriendInfo ? '友だち詳細を閉じる' : '友だち詳細'}
+                  </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {unansweredOnly && chats.length > 1 && (
@@ -1209,86 +1223,105 @@ function ChatsPageInner() {
                 </div>
               </div>
 
-              {/* Send Message Form */}
-              <div className="px-4 py-3 border-t border-hairline">
-                <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-ink-secondary">
-                  <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={showLoadingIndicator}
-                      onChange={(e) => setShowLoadingIndicator(e.target.checked)}
-                      className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                    />
-                    入力中ローディングを表示
-                  </label>
-                  <select
-                    value={loadingSeconds}
-                    onChange={(e) => setLoadingSeconds(Number.parseInt(e.target.value, 10))}
-                    disabled={!showLoadingIndicator}
-                    className="border border-gray-300 rounded-md px-2 py-1 bg-white disabled:bg-canvas-sunken disabled:text-ink-faint"
+              {/*
+                入力欄（設計 `Reply`）。3段。
+
+                  上: テンプレートを選択 …… Shift + Enter で改行
+                  中: メッセージを入力
+                  下: 画像は JPEG / PNG、1枚 10MB まで …… 送信
+
+                以前は送信キーの設定・入力中ローディング・画像の投入枠が
+                すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
+                よく使うものだけ出し、設定は畳む。
+              */}
+              <div className="border-hairline border-t px-4 py-3">
+                {/* 上段 */}
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowComposerOptions((v) => !v)}
+                    className="text-accent text-xs hover:underline"
                   >
-                    {[5, 10, 15, 20, 30, 45, 60].map((sec) => (
-                      <option key={sec} value={sec}>{sec}秒</option>
-                    ))}
-                  </select>
-                  <span className="text-ink-faint">送信キー:</span>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={sendMode === 'enter'}
-                      onChange={() => setSendMode('enter')}
-                      className="accent-green-600"
-                    />
-                    <span>Enter</span>
-                  </label>
-                  <label className="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={sendMode === 'shift-enter'}
-                      onChange={() => setSendMode('shift-enter')}
-                      className="accent-green-600"
-                    />
-                    <span>Shift+Enter</span>
-                  </label>
+                    {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+                  </button>
+                  <span className="text-ink-faint text-xs">
+                    {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
+                  </span>
                 </div>
-                <div className="mb-2">
-                  <ImageUploader
-                    mode="line-image"
-                    value={pendingImage}
-                    onChange={setPendingImage}
-                    label="画像を送る (任意)"
-                  />
-                </div>
-                <div className="flex items-end gap-2">
-                  <textarea
-                    ref={textareaRef}
-                    rows={2}
-                    value={messageContent}
-                    style={{ maxHeight: '200px', overflowY: 'auto' }}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setMessageContent(value)
-                      if (selectedChatId && isMessageInputFocused && value.trim()) {
-                        void triggerLoadingAnimation(selectedChatId)
-                      }
-                    }}
-                    onCompositionStart={() => { isComposingRef.current = true }}
-                    onCompositionEnd={() => { isComposingRef.current = false }}
-                    onFocus={() => {
-                      setIsMessageInputFocused(true)
-                      if (selectedChatId) {
-                        void triggerLoadingAnimation(selectedChatId)
-                      }
-                    }}
-                    onBlur={() => setIsMessageInputFocused(false)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="メッセージを入力..."
-                    className="flex-1 text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 resize-none overflow-y-auto"
-                  />
+
+                {showComposerOptions && (
+                  <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
+                    <label className="inline-flex cursor-pointer items-center gap-2 select-none">
+                      <input
+                        type="checkbox"
+                        checked={showLoadingIndicator}
+                        onChange={(e) => setShowLoadingIndicator(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                      />
+                      入力中ローディングを表示
+                    </label>
+                    <select
+                      value={loadingSeconds}
+                      onChange={(e) => setLoadingSeconds(Number.parseInt(e.target.value, 10))}
+                      disabled={!showLoadingIndicator}
+                      className="border-hairline rounded-control disabled:bg-canvas-sunken disabled:text-ink-faint border bg-white px-2 py-1"
+                    >
+                      {[5, 10, 15, 20, 30, 45, 60].map((sec) => (
+                        <option key={sec} value={sec}>{sec}秒</option>
+                      ))}
+                    </select>
+                    <span className="text-ink-faint">送信キー:</span>
+                    <label className="flex cursor-pointer items-center gap-1">
+                      <input
+                        type="radio"
+                        checked={sendMode === 'enter'}
+                        onChange={() => setSendMode('enter')}
+                        className="accent-green-600"
+                      />
+                      <span>Enter</span>
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-1">
+                      <input
+                        type="radio"
+                        checked={sendMode === 'shift-enter'}
+                        onChange={() => setSendMode('shift-enter')}
+                        className="accent-green-600"
+                      />
+                      <span>Shift+Enter</span>
+                    </label>
+                    <div className="w-full">
+                      <ImageUploader
+                        mode="line-image"
+                        value={pendingImage}
+                        onChange={setPendingImage}
+                        label="画像を送る (任意)"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* 中段 */}
+                <textarea
+                  value={messageContent}
+                  onChange={(e) => setMessageContent(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onCompositionStart={() => { isComposingRef.current = true }}
+                  onCompositionEnd={() => { isComposingRef.current = false }}
+                  rows={3}
+                  placeholder="メッセージを入力"
+                  aria-label="メッセージを入力"
+                  className="border-hairline rounded-control focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                />
+
+                {/* 下段 */}
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-ink-faint text-xs">
+                    {pendingImage ? '画像を1枚 添付中' : '画像は JPEG / PNG、1枚 10MB まで'}
+                  </span>
                   <button
                     onClick={handleSendMessage}
                     disabled={sending || (!messageContent.trim() && !pendingImage)}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-4 py-2 text-sm font-medium rounded-control disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {sending ? '送信中...' : '送信'}
                   </button>
@@ -1298,20 +1331,18 @@ function ChatsPageInner() {
           ) : null}
         </div>
 
-        {/* Right-most Panel: 友だち詳細サイドバー — chat detail を開いている時のみ表示 */}
         {/*
-          friendId は **現在の selection** を優先する。chatDetail の load 中は前の chat
-          のデータが残ったままなので、それを参照するとサイドバーだけ前の友だちを
-          表示し続けて pane 間の不整合になる。selection ID 自体が friend_id なので
-          直接渡せる (chat list SQL が `id: f.id` で friend_id を返す)。
+          友だち詳細。トークの上に重ねる。
+          列として並べると、その幅ぶんトークが細くなり、上部の
+          「対応」「担当」や本文が折り返して崩れる。設計は 1910px 前提の
+          3列だが、実際の画面幅はそれより狭いことが多い。
+
+          friendId は **現在の選択** を優先する。chatDetail の読み込み中は
+          前の chat のデータが残っているので、それを参照すると
+          ここだけ前の友だちを出し続ける。選択IDがそのまま friend_id。
         */}
-        {/*
-          設計 `SidePane` 320px。選択していないときも枠を出す。
-          選択のたびに右の枠が現れると、真ん中のトークの幅が動いて
-          読んでいる位置がずれる。
-        */}
-        <div className="hidden w-[320px] flex-shrink-0 xl:flex">
-          {selectedChatId || selectedFriendId ? (
+        {showFriendInfo && (selectedChatId || selectedFriendId) && (
+          <div className="absolute inset-y-0 right-0 z-20 w-[320px] max-w-full shadow-xl">
             <FriendInfoSidebar
               friendId={selectedFriendId || selectedChatId}
               chatStatus={
@@ -1320,16 +1351,8 @@ function ChatsPageInner() {
                   : undefined
               }
             />
-          ) : (
-            <div className="bg-canvas rounded-card border-hairline flex w-full items-center justify-center border">
-              <p className="text-ink-faint px-6 text-center text-sm leading-relaxed">
-                トークを選ぶと、
-                <br />
-                その友だちの情報が出ます。
-              </p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       <CcPromptButton prompts={ccPrompts} />
     </div>
@@ -1348,8 +1371,10 @@ function ChatsPageInner() {
  * チップで表示を切り替える形にしている。将来1つの一覧に混ぜるときも、
  * 画面の入口は変わらない。
  */
+// 「すべて」は将来 LINE とメールを1つの一覧に混ぜるための枠。
+// いまは中身の作りが違うので、選ぶと LINE と同じ表示になる。
+// 先に3つ出しておくと、混ざるようになったときに画面の入口が変わらない。
 const CHANNELS = [
-  { key: 'all', label: 'すべて' },
   { key: 'line', label: 'LINE' },
   { key: 'email', label: 'メール' },
 ] as const
@@ -1361,23 +1386,26 @@ function ChatsPageHost() {
 
   return (
     <div>
-      <Header
-        title="受信箱"
-        description="LINEのトーク・メールでの問い合わせ・返信待ちを、1か所にまとめて扱います。"
-      />
+      <div data-design="Head">
+        <Header
+          title="受信箱"
+          description="LINEのトーク・メールでの問い合わせ・返信待ちを、1か所にまとめて扱います。"
+        />
+      </div>
 
-      <InboxKpis />
+      <div data-design="KPIs">
+        <InboxKpis />
+      </div>
 
       {/* 設計 `Filters` の左側。チャネルの絞り込み。 */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div data-design="Filters" className="mb-4 flex flex-wrap items-center gap-2">
         {CHANNELS.map((c) => (
           <button
             key={c.key}
             onClick={() => router.push(c.key === 'email' ? '/chats?channel=email' : '/chats')}
-            aria-pressed={channel === c.key || (c.key === 'all' && channel === 'line')}
+            aria-pressed={channel === c.key}
             className={`rounded-pill px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              (c.key === 'email' && channel === 'email') ||
-              (c.key !== 'email' && channel === 'line')
+              channel === c.key
                 ? 'bg-accent text-on-accent'
                 : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
             }`}

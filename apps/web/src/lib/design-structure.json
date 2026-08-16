@@ -1,0 +1,14 @@
+{
+  "_comment": "Pen.dev の V2 設計から書き写した、各画面の Main 直下の並び。実装側は data-design 属性で同じ名前を付ける。ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。",
+  "_source": "docs/design-node-ids.md",
+  "screens": {
+    "/": { "node": "EgKGw", "name": "V2 1-1 ダッシュボード", "sections": ["Head", "Alert", "KPIs", "Shipment", "Body", "Bottom"] },
+    "/chats": { "node": "nR2FI", "name": "V2 2-1 受信箱", "sections": ["Head", "KPIs", "Filters", "Panes"] },
+    "/friends": { "node": "P2guNv", "name": "V2 2-2 友だち", "sections": ["Head", "KPIs", "Tabs", "SearchBar", "SavedChips", "BulkBar", "Table"] },
+    "/broadcasts": { "node": "Jv6hR", "name": "V2 4-2 一斉配信", "sections": ["Head", "KPIs", "Body"] },
+    "/tags": { "node": "IvqXE", "name": "V2 3-1 タグ管理", "sections": ["Head", "GroupTabs", "KPIs", "Body"] },
+    "/templates": { "node": "YTMBU", "name": "V2 4-3 テンプレート", "sections": ["Head", "KPIs", "Body"] },
+    "/scenarios": { "node": "o0oT6d", "name": "V2 4-1 シナリオ配信", "sections": ["Head", "KPIs", "Body"] },
+    "/reminders": { "node": "g4I4C", "name": "V2 4-4 リマインダ", "sections": ["Head", "KPIs", "Body"] }
+  }
+}

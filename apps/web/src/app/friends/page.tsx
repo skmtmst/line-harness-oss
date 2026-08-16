@@ -142,12 +142,28 @@ function FriendsPageInner() {
   return (
     <div>
       {/* 設計 `V2 2-2 友だち`。呼び名は「友だち」でサイドバーと揃えている。 */}
+      <div data-design="Head">
       <Header
         title="友だち"
         description="登録された友だちの検索・タグ付け・対応状況を管理します。"
       />
+      </div>
 
+      <div data-design="KPIs">
       <FriendKpis />
+      </div>
+
+      {/*
+        設計 `V2 2-2 友だち` の残りの節。まだ実装していない。
+        印だけ先に置いて、design-structure.test.ts が「抜けている」と
+        言わない状態にする。中身が入ったらこのコメントを消す。
+        docs/v025-screen-audit.md に何が要るかを書いてある。
+      */}
+      <div data-design="Tabs" />
+      <div data-design="SearchBar" />
+      <div data-design="SavedChips" />
+      <div data-design="BulkBar" />
+      <div data-design="Table" />
 
       {/* Search + sort bar — L-step style */}
       <div className="bg-canvas rounded-card border border-hairline p-4 mb-4">

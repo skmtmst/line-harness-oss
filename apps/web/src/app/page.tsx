@@ -184,7 +184,7 @@ export default function DashboardPage() {
   return (
     <div>
       {/* Head — 見出しと期間 */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div data-design="Head" className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-ink text-xl font-bold sm:text-2xl">ダッシュボード</h1>
           <p className="text-ink-faint mt-1 text-sm">
@@ -226,11 +226,13 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* 警告帯 — 対応が要るものに気づかせる */}
-      <SupportAlertPanel />
+      {/* 警告帯（設計 `Alert`）。中身は「ケアが必要な子」に置き換える予定。 */}
+      <div data-design="Alert">
+        <SupportAlertPanel />
+      </div>
 
       {/* KPI 4枚 */}
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div data-design="KPIs" className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="有効友だち"
           value={friends?.active ?? null}
@@ -274,12 +276,12 @@ export default function DashboardPage() {
       </div>
 
       {/* 出荷予定 — ec_events.payload から算出した予定日で並べる */}
-      <div className="mb-6">
+      <div data-design="Shipment" className="mb-6">
         <ShipmentPanel />
       </div>
 
       {/* 2カラム — 左が広い（設計は 1095 : 460） */}
-      <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div data-design="Body" className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <section className="bg-canvas rounded-card border-hairline border">
           <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
             <h2 className="text-ink text-sm font-semibold">友だち数の推移</h2>
@@ -298,7 +300,9 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom — 友だち追加リンク */}
-      <FriendAddLinkCard />
+      <div data-design="Bottom">
+        <FriendAddLinkCard />
+      </div>
 
       {data && (
         <p className="text-ink-faint mt-4 text-xs">
