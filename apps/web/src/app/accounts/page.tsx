@@ -16,6 +16,9 @@ import AccountSetupUrls from '@/components/accounts/account-setup-urls'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
 import LinkBaseUrlSetting from '@/components/accounts/link-base-url-setting'
 import FollowerImportButton from '@/components/accounts/follower-import-button'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import PoolsPage from '@/app/pools/page'
 
 interface LineAccountListItem {
   id: string
@@ -37,6 +40,9 @@ interface LineAccountListItem {
   ogSiteName: string | null
   ogDefaultDescription: string | null
   ogDefaultImageUrl: string | null
+  friendCapacity?: number | null
+  capacityWarnAt?: number | null
+  iconUrl?: string | null
 }
 
 const ccPrompts = [
@@ -58,7 +64,12 @@ const ccPrompts = [
   },
 ]
 
-export default function AccountsPage() {
+const MERGED_TABS = [
+  { key: 'accounts', label: 'アカウント' },
+  { key: 'pools', label: 'プール' },
+]
+
+function AccountsPageInner() {
   const [accounts, setAccounts] = useState<LineAccountListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -161,7 +172,7 @@ export default function AccountsPage() {
                 }
               }}
               className="px-4 py-2 rounded-lg text-white text-sm font-medium"
-              style={{ backgroundColor: '#06C755' }}
+              style={{ backgroundColor: 'var(--color-accent)' }}
             >
               {showCreate ? 'キャンセル' : '+ アカウント追加'}
             </button>
@@ -226,7 +237,7 @@ export default function AccountsPage() {
             type="submit"
             disabled={submitting}
             className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             {submitting ? '登録中...' : '登録'}
           </button>
@@ -255,7 +266,7 @@ export default function AccountsPage() {
                   ) : (
                     <div
                       className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                      style={{ backgroundColor: account.isActive ? '#06C755' : '#9CA3AF' }}
+                      style={{ backgroundColor: account.isActive ? 'var(--color-accent)' : '#9CA3AF' }}
                     >
                       {account.displayName?.charAt(0) || 'L'}
                     </div>
@@ -372,10 +383,33 @@ export default function AccountsPage() {
           initialOgSiteName={editing.ogSiteName}
           initialOgDefaultDescription={editing.ogDefaultDescription}
           initialOgDefaultImageUrl={editing.ogDefaultImageUrl}
+          initialFriendCapacity={editing.friendCapacity ?? null}
+          initialCapacityWarnAt={editing.capacityWarnAt ?? null}
+          initialIconUrl={editing.iconUrl ?? null}
           onClose={() => setEditing(null)}
           onSaved={load}
         />
       )}
     </div>
+  )
+}
+
+function AccountsPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'accounts' && <AccountsPageInner />}
+      {tab === 'pools' && <PoolsPage />}
+    </div>
+  )
+}
+
+export default function AccountsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <AccountsPageHost />
+    </Suspense>
   )
 }

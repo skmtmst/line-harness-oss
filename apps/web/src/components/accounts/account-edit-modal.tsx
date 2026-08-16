@@ -18,6 +18,9 @@ interface Props {
   initialOgSiteName?: string | null
   initialOgDefaultDescription?: string | null
   initialOgDefaultImageUrl?: string | null
+  initialFriendCapacity?: number | null
+  initialCapacityWarnAt?: number | null
+  initialIconUrl?: string | null
   onClose: () => void
   onSaved: () => void
 }
@@ -36,6 +39,9 @@ export default function AccountEditModal({
   initialOgSiteName = null,
   initialOgDefaultDescription = null,
   initialOgDefaultImageUrl = null,
+  initialFriendCapacity = null,
+  initialCapacityWarnAt = null,
+  initialIconUrl = null,
   onClose,
   onSaved,
 }: Props) {
@@ -49,6 +55,16 @@ export default function AccountEditModal({
     ogDefaultDescription: initialOgDefaultDescription,
     ogDefaultImageUrl: initialOgDefaultImageUrl,
   })
+  // 上限とアイコンは AccountFormState には持たせない。新規作成では使わず、
+  // 作成フォームと編集フォームで共有している型を広げると、作成側に
+  // 使わない欄が入り込む。
+  const [friendCapacity, setFriendCapacity] = useState(
+    initialFriendCapacity == null ? '' : String(initialFriendCapacity),
+  )
+  const [capacityWarnAt, setCapacityWarnAt] = useState(
+    initialCapacityWarnAt == null ? '' : String(initialCapacityWarnAt),
+  )
+  const [iconUrl, setIconUrl] = useState(initialIconUrl ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -111,6 +127,20 @@ export default function AccountEditModal({
     }
     if (state.ogDefaultImageUrl !== initialOgDefaultImageUrl) {
       payload.ogDefaultImageUrl = state.ogDefaultImageUrl
+    }
+
+    // 上限・警告値・アイコン。空欄は「管理しない／未設定」の意味で送る。
+    const capacityNext = friendCapacity.trim() === '' ? null : Number(friendCapacity)
+    if (capacityNext !== (initialFriendCapacity ?? null)) {
+      payload.friendCapacity = capacityNext
+    }
+    const warnNext = capacityWarnAt.trim() === '' ? null : Number(capacityWarnAt)
+    if (warnNext !== (initialCapacityWarnAt ?? null)) {
+      payload.capacityWarnAt = warnNext
+    }
+    const iconNext = iconUrl.trim() || null
+    if (iconNext !== (initialIconUrl ?? null)) {
+      payload.iconUrl = iconNext
     }
 
     if (Object.keys(payload).length === 0) {
@@ -180,6 +210,66 @@ export default function AccountEditModal({
             }}
           />
 
+          {/* 上限とアイコン。鍵ではないので、この画面に置いても閲覧権限で困らない。 */}
+          <div className="border-hairline space-y-3 rounded-lg border p-3">
+            <p className="text-ink-secondary text-sm font-semibold">友だち数とアイコン</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="acc-capacity" className="text-ink-faint mb-1 block text-xs font-medium">
+                  上限
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id="acc-capacity"
+                    type="number"
+                    min={1}
+                    value={friendCapacity}
+                    onChange={(e) => setFriendCapacity(e.target.value)}
+                    placeholder="管理しない"
+                    className="border-hairline rounded-control w-full border px-3 py-2 text-sm tabular-nums"
+                  />
+                  <span className="text-ink-faint whitespace-nowrap text-xs">人</span>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="acc-warn" className="text-ink-faint mb-1 block text-xs font-medium">
+                  警告を出す人数
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id="acc-warn"
+                    type="number"
+                    min={1}
+                    value={capacityWarnAt}
+                    onChange={(e) => setCapacityWarnAt(e.target.value)}
+                    placeholder="警告しない"
+                    className="border-hairline rounded-control w-full border px-3 py-2 text-sm tabular-nums"
+                  />
+                  <span className="text-ink-faint whitespace-nowrap text-xs">人</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-ink-faint text-xs">
+              警告を出す人数は上限以下にしてください。上限を超える値は永久に鳴りません。
+            </p>
+            <div>
+              <label htmlFor="acc-icon" className="text-ink-faint mb-1 block text-xs font-medium">
+                アイコンのURL
+              </label>
+              <input
+                id="acc-icon"
+                type="url"
+                value={iconUrl}
+                onChange={(e) => setIconUrl(e.target.value)}
+                placeholder="https://example.com/icon.png"
+                className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+              />
+              <p className="text-ink-faint mt-1 text-xs">
+                管理画面の一覧で使います。共有時に出る画像（OGP）とは別の欄です。
+              </p>
+            </div>
+          </div>
+
           <AccountSetupUrls
             liffId={state.liffId.trim() || initialLiffId || null}
             heading="このアカで使う URL（LINE Developers Console に貼る）"
@@ -203,7 +293,7 @@ export default function AccountEditModal({
               type="submit"
               disabled={saving}
               className="px-4 py-2 rounded-lg text-white text-sm font-medium disabled:opacity-50"
-              style={{ backgroundColor: '#06C755' }}
+              style={{ backgroundColor: 'var(--color-accent)' }}
             >
               {saving ? '保存中...' : '保存'}
             </button>

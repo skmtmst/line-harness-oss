@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import UpdatesPage from '@/app/updates/page'
 
 type ActionStatus = 'idle' | 'confirming' | 'executing' | 'done' | 'error'
 
@@ -34,7 +37,12 @@ const emergencyPrompts = [
   },
 ]
 
-export default function EmergencyPage() {
+const MERGED_TABS = [
+  { key: 'status', label: '運用状態' },
+  { key: 'history', label: '更新の履歴' },
+]
+
+function EmergencyPageInner() {
   const [actions, setActions] = useState<EmergencyAction[]>([
     {
       id: 'stop-broadcasts',
@@ -231,5 +239,25 @@ export default function EmergencyPage() {
 
       <CcPromptButton prompts={emergencyPrompts} />
     </div>
+  )
+}
+
+function EmergencyPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/emergency" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'status' && <EmergencyPageInner />}
+      {tab === 'history' && <UpdatesPage />}
+    </div>
+  )
+}
+
+export default function EmergencyPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <EmergencyPageHost />
+    </Suspense>
   )
 }

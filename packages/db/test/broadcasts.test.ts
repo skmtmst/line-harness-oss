@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createBroadcast } from '../src/broadcasts.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 function asD1(sqlite: Database.Database): D1Database {
   return {
@@ -34,11 +34,10 @@ describe('createBroadcast', () => {
 
   beforeEach(() => {
     sqlite = new Database(':memory:');
-    sqlite.exec(readFileSync(join(__dirname, '../schema.sql'), 'utf8'));
-    // schema.sql is the historical base schema; these production migrations
-    // add the columns createBroadcast writes atomically today.
-    sqlite.exec('ALTER TABLE broadcasts ADD COLUMN line_account_id TEXT');
-    sqlite.exec('ALTER TABLE broadcasts ADD COLUMN alt_text TEXT');
+    // bootstrap.sql = schema.sql + 全マイグレーション適用済みの現行スキーマ
+    // (同期は bootstrap.test.ts が保証)。schema.sql + 手書き ALTER だと
+    // message_bubbles_json のように後から入った列を取りこぼす。
+    sqlite.exec(readFileSync(join(packageRoot, 'bootstrap.sql'), 'utf8'));
     db = asD1(sqlite);
   });
 

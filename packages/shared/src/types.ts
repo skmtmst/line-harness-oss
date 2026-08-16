@@ -85,6 +85,8 @@ export interface Tag {
   name: string;
   /** 表示色 (HEX: #RRGGBB) */
   color: string;
+  /** 所属する親分類のID。null は未分類 */
+  groupId?: string | null;
   /** このタグを初めて獲得したときに付与するマイル */
   mileageReward?: number;
   /** 紹介された友だちがこのタグを獲得したとき、紹介者へ付与するマイル */
@@ -97,6 +99,149 @@ export interface Tag {
   createdAt: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
   friendCount?: number;
+}
+
+/** 友だち情報欄の種類 */
+export type FriendFieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "date"
+  | "select"
+  | "multi_select"
+  | "checkbox"
+  | "url"
+  | "tel"
+  | "email";
+
+/**
+ * 友だち情報欄の項目。
+ *
+ * フォームの回答 → 情報欄 → 友だち詳細 → テンプレートの差し込み、が
+ * 1本の線で繋がる。その起点。
+ */
+export interface FriendField {
+  id: string;
+  folderId: string | null;
+  /** 画面に出す名前 */
+  name: string;
+  /** 差し込み変数名。{{field.pet_name}} のように使う */
+  fieldKey: string;
+  type: FriendFieldType;
+  /** select / multi_select のときの選択肢 */
+  options: string[] | null;
+  defaultValue: string | null;
+  source: "manual" | "form" | "ec" | "automation";
+  ecFieldPath: string | null;
+  /** true ならEC側が正。管理画面からは変更できない */
+  ecIsMaster: boolean;
+  /** 本名・電話・住所など。閲覧を役割で絞る */
+  isPersonal: boolean;
+  isStarred: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  /** GET /api/friends/:id/fields のときだけ付く */
+  value?: string | null;
+  updatedBy?: string | null;
+  /** ?withUsage=1 のときだけ付く */
+  usageCount?: number;
+}
+
+/** 汎用フォルダ */
+export interface Folder {
+  id: string;
+  kind: string;
+  name: string;
+  parentId: string | null;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 対応マーク */
+export interface SupportMark {
+  id: string;
+  name: string;
+  color: string;
+  isDefault: boolean;
+  autoOnInbound: boolean;
+  displayOrder: number;
+  createdAt: string;
+}
+
+/** メディアライブラリの1件 */
+export interface MediaItem {
+  id: string;
+  folderId: string | null;
+  kind: "image" | "video" | "audio" | "file";
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  url: string;
+  uploadedBy: string | null;
+  createdAt: string;
+}
+
+/** メディアの使用箇所 */
+export interface MediaUsage {
+  refKind: string;
+  refId: string;
+  scannedAt: string;
+}
+
+/** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
+export interface CommonVar {
+  id: string;
+  folderId: string | null;
+  name: string;
+  varKey: string;
+  type: "text" | "url" | "image" | "number";
+  value: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 共通情報の日付での切り替え予約 */
+export interface CommonVarSchedule {
+  id: string;
+  varId: string;
+  effectiveFrom: string;
+  value: string;
+  appliedAt: string | null;
+}
+
+/** 保存した検索 */
+export interface SavedSearch {
+  id: string;
+  name: string;
+  scope: "friends" | "chats" | "bookings";
+  /** { all: [...], any: [...], visibility } の形 */
+  conditions: unknown;
+  createdBy: string | null;
+  isShared: boolean;
+  displayOrder: number;
+  createdAt: string;
+}
+
+/**
+ * タグの親分類。「お悩み」「ペット」のようにタグをまとめる。
+ * 入れ子にはしない（二段で足りる）。
+ */
+export interface TagGroup {
+  /** 主キー (UUIDv4) */
+  id: string;
+  /** 分類名 */
+  name: string;
+  /** 一覧での並び順。小さいほど上 */
+  sortOrder: number;
+  /** 作成日時 (ISO 8601) */
+  createdAt: string;
+  /** 更新日時 (ISO 8601) */
+  updatedAt: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -143,6 +288,11 @@ export interface Scenario {
   isActive: boolean;
   /** 配信モード (作成後の変更不可)。レスポンスでは常にセット、Create リクエストでは省略可 (default: 'relative') */
   deliveryMode?: DeliveryMode;
+  /**
+   * 他のシナリオと同時に動いてよいか。既定は true（並行を許す）。
+   * false にすると、他のシナリオが動いている人はこのシナリオに登録されない。
+   */
+  allowConcurrent?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */
@@ -394,6 +544,12 @@ export interface LineAccount {
   liffId: string | null;
   /** 有効/無効 */
   isActive: boolean;
+  /** 友だち数の上限。null なら上限を管理しない */
+  friendCapacity?: number | null;
+  /** 何人で警告を出すか。null なら警告しない */
+  capacityWarnAt?: number | null;
+  /** 管理画面の一覧やヘッダーで使うアイコン。OGP用の ogDefaultImageUrl とは用途が違う */
+  iconUrl?: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */
@@ -514,6 +670,9 @@ export interface LineFriend {
 // コンバージョンポイント (ConversionPoint) — CV計測
 // -----------------------------------------------------------------------------
 
+/** 成果をどうやって数えるか */
+export type ConversionMeasureMethod = "url_reach" | "webhook" | "manual";
+
 export interface ConversionPoint {
   /** 主キー (UUIDv4) */
   id: string;
@@ -523,6 +682,16 @@ export interface ConversionPoint {
   eventType: string;
   /** 金額 (任意) */
   value: number | null;
+  /** どうやって数えるか。既定は manual（人が記録する） */
+  measureMethod?: ConversionMeasureMethod;
+  /** url_reach のときの対象URL。前方一致で判定する */
+  targetUrl?: string | null;
+  /** 同じ人を何度でも数えるか。false なら一人一回 */
+  countRepeat?: boolean;
+  /** 成果を紐づける日数。null なら全体の既定（90日） */
+  attributionDays?: number | null;
+  /** 集計対象を1アカウントに絞る場合。null なら全アカウント */
+  lineAccountId?: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }
@@ -563,6 +732,14 @@ export interface Affiliate {
   commissionRate: number;
   /** 有効/無効 */
   isActive: boolean;
+  /** 連絡先。報酬の連絡に使う。null なら未登録 */
+  email?: string | null;
+  /** 成果が確定するまでの保留日数。null なら即確定 */
+  holdDays?: number | null;
+  /** 支払いサイクルの覚書。計算には使わない */
+  payoutCycle?: string | null;
+  /** 成果が出たときに本人へ知らせるか */
+  notifyOnConversion?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }
@@ -617,6 +794,12 @@ export interface OutgoingWebhook {
   eventTypes: string[];
   hasSecret: boolean;
   isActive: boolean;
+  /** 失敗したとき何回まで送り直すか。0 なら送り直さない */
+  maxRetries?: number;
+  /** 連続して失敗している回数。成功すると 0 に戻る */
+  consecutiveFailures?: number;
+  /** 最後に失敗した時刻。成功すると null に戻る */
+  lastFailedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -657,11 +840,22 @@ export interface CalendarBooking {
 // リマインダ (Reminder)
 // -----------------------------------------------------------------------------
 
+/** リマインダを動かすきっかけ */
+export type ReminderTriggerType = "manual" | "booking" | "event";
+
 export interface Reminder {
   id: string;
   name: string;
   description: string | null;
   isActive: boolean;
+  /** きっかけ。manual は従来どおり手で登録する */
+  triggerType?: ReminderTriggerType;
+  /** 起点を何分ずらすか。null ならずらさない。負の値も使える */
+  triggerOffsetMinutes?: number | null;
+  /** 起点の時刻を固定する JST の "HH:MM"。null なら予約時刻のまま */
+  sendAtTime?: string | null;
+  /** 対象を絞るタグ。null なら対象者全員 */
+  targetTagId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

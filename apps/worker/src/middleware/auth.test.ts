@@ -25,6 +25,9 @@ vi.mock('@line-crm/db', () => ({
   }),
   createAdminSession: vi.fn(async () => undefined),
   deleteAdminSession: vi.fn(async () => undefined),
+  // ログイン・ログアウト・失敗を記録する。本体では例外を握るので、
+  // ここでも何もしない実装で足りる。
+  recordLoginAudit: vi.fn(async () => undefined),
 }));
 
 const PAGES = 'https://your-admin.pages.dev';

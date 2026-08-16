@@ -26,7 +26,19 @@ import { requireRole } from '../middleware/role-guard.js';
 
 const affiliates = new Hono<Env>();
 
-function serializeAffiliate(row: { id: string; name: string; code: string; commission_rate: number; is_active: number; created_at: string; friend_id?: string | null }) {
+function serializeAffiliate(row: {
+  id: string;
+  name: string;
+  code: string;
+  commission_rate: number;
+  is_active: number;
+  created_at: string;
+  friend_id?: string | null;
+  email?: string | null;
+  hold_days?: number | null;
+  payout_cycle?: string | null;
+  notify_on_conversion?: number;
+}) {
   return {
     id: row.id,
     name: row.name,
@@ -35,7 +47,62 @@ function serializeAffiliate(row: { id: string; name: string; code: string; commi
     isActive: Boolean(row.is_active),
     createdAt: row.created_at,
     friendId: row.friend_id ?? null,
+    email: row.email ?? null,
+    holdDays: row.hold_days ?? null,
+    payoutCycle: row.payout_cycle ?? null,
+    notifyOnConversion: Boolean(row.notify_on_conversion),
   };
+}
+
+/**
+ * 支払いの取り決めを検証して取り出す。送られた項目だけを含める。
+ *
+ * メールアドレスの形は「@ が1つある」程度しか見ない。厳密に弾こうとすると
+ * 正しいアドレスまで弾く方が起きやすく、ここでの目的は打ち間違いに
+ * 気づかせることだから。
+ */
+function readAffiliateSettlement(
+  body: Record<string, unknown>,
+): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
+  const out: Record<string, unknown> = {};
+  const has = (k: string) => Object.prototype.hasOwnProperty.call(body, k);
+
+  if (has('email')) {
+    const raw = body.email;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.email = null;
+    } else if (typeof raw !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw.trim())) {
+      return { ok: false, error: 'email must be a valid address' };
+    } else {
+      out.email = raw.trim();
+    }
+  }
+  if (has('holdDays')) {
+    const raw = body.holdDays;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.hold_days = null;
+    } else {
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 0 || n > 365) {
+        return { ok: false, error: 'holdDays must be an integer between 0 and 365' };
+      }
+      out.hold_days = n;
+    }
+  }
+  if (has('payoutCycle')) {
+    const raw = body.payoutCycle;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.payout_cycle = null;
+    } else if (typeof raw !== 'string' || raw.length > 100) {
+      return { ok: false, error: 'payoutCycle must be 100 characters or fewer' };
+    } else {
+      out.payout_cycle = raw.trim();
+    }
+  }
+  if (has('notifyOnConversion')) {
+    out.notify_on_conversion = body.notifyOnConversion === true ? 1 : 0;
+  }
+  return { ok: true, value: out };
 }
 
 // GET /api/affiliates - list all
@@ -206,12 +273,16 @@ affiliates.put('/api/affiliates/:id', requireRole('owner', 'admin'), async (c) =
       name?: string;
       commissionRate?: number;
       isActive?: boolean;
-    }>();
+    } & Record<string, unknown>>();
+
+    const settlement = readAffiliateSettlement(body);
+    if (!settlement.ok) return c.json({ success: false, error: settlement.error }, 400);
 
     const updated = await updateAffiliate(c.env.DB, id, {
       name: body.name,
       commission_rate: body.commissionRate,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
+      ...settlement.value,
     });
 
     if (!updated) {

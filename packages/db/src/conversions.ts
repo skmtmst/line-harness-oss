@@ -4,11 +4,23 @@ import { resolveAffiliateAttribution } from './affiliate-attribution.js';
 // Conversion Points & Events — CV Tracking
 // =============================================================================
 
+export type ConversionMeasureMethod = 'url_reach' | 'webhook' | 'manual';
+
 export interface ConversionPoint {
   id: string;
   name: string;
   event_type: string;
   value: number | null;
+  /** どうやって数えるか。既定は manual（人が記録する） */
+  measure_method: ConversionMeasureMethod;
+  /** url_reach のときの対象URL。前方一致で判定する */
+  target_url: string | null;
+  /** 同じ人を何度でも数えるか（1）、一人一回だけか（0） */
+  count_repeat: number;
+  /** 成果を紐づける日数。NULL なら全体の既定（90日）を使う */
+  attribution_days: number | null;
+  /** 集計対象を1アカウントに絞る場合。NULL なら全アカウント */
+  line_account_id: string | null;
   created_at: string;
 }
 
@@ -46,7 +58,15 @@ export async function getConversionPointById(
     .first<ConversionPoint>();
 }
 
-export interface CreateConversionPointInput {
+export interface ConversionPointOptions {
+  measureMethod?: ConversionMeasureMethod;
+  targetUrl?: string | null;
+  countRepeat?: boolean;
+  attributionDays?: number | null;
+  lineAccountId?: string | null;
+}
+
+export interface CreateConversionPointInput extends ConversionPointOptions {
   name: string;
   eventType: string;
   value?: number | null;
@@ -61,13 +81,96 @@ export async function createConversionPoint(
 
   await db
     .prepare(
-      `INSERT INTO conversion_points (id, name, event_type, value, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO conversion_points
+         (id, name, event_type, value, measure_method, target_url,
+          count_repeat, attribution_days, line_account_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.eventType, input.value ?? null, now)
+    .bind(
+      id,
+      input.name,
+      input.eventType,
+      input.value ?? null,
+      input.measureMethod ?? 'manual',
+      input.targetUrl ?? null,
+      input.countRepeat === false ? 0 : 1,
+      input.attributionDays ?? null,
+      input.lineAccountId ?? null,
+      now,
+    )
     .run();
 
   return (await getConversionPointById(db, id))!;
+}
+
+export interface UpdateConversionPointInput extends ConversionPointOptions {
+  name?: string;
+  eventType?: string;
+  value?: number | null;
+}
+
+/**
+ * 成果地点を書き換える。送られた項目だけを触る。
+ *
+ * 全項目を上書きする形にしないのは、画面が「計測方法だけ変える」
+ * ような部分更新をするため。既存値を読んでから丸ごと書き戻すと、
+ * 同時に別の項目を変えた分を巻き戻してしまう。
+ */
+export async function updateConversionPoint(
+  db: D1Database,
+  id: string,
+  input: UpdateConversionPointInput,
+): Promise<ConversionPoint | null> {
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  const put = (column: string, value: unknown) => {
+    sets.push(`${column} = ?`);
+    values.push(value);
+  };
+  if (input.name !== undefined) put('name', input.name);
+  if (input.eventType !== undefined) put('event_type', input.eventType);
+  if ('value' in input) put('value', input.value ?? null);
+  if (input.measureMethod !== undefined) put('measure_method', input.measureMethod);
+  if ('targetUrl' in input) put('target_url', input.targetUrl ?? null);
+  if (input.countRepeat !== undefined) put('count_repeat', input.countRepeat ? 1 : 0);
+  if ('attributionDays' in input) put('attribution_days', input.attributionDays ?? null);
+  if ('lineAccountId' in input) put('line_account_id', input.lineAccountId ?? null);
+  if (sets.length === 0) return getConversionPointById(db, id);
+  values.push(id);
+  await db
+    .prepare(`UPDATE conversion_points SET ${sets.join(', ')} WHERE id = ?`)
+    .bind(...values)
+    .run();
+  return getConversionPointById(db, id);
+}
+
+/**
+ * このURLに到達したときに数える成果地点を探す。
+ *
+ * target_url の前方一致で見る。完全一致にすると、クエリ文字列
+ * （?utm_source=... など）が付いた瞬間に数えられなくなる。
+ * 逆に部分一致にすると、URLの途中にたまたま含まれるだけで数えてしまう。
+ *
+ * lineAccountId は「絞っていない地点（NULL）」と「このアカウントの地点」
+ * の両方を拾う。
+ */
+export async function getUrlReachConversionPoints(
+  db: D1Database,
+  url: string,
+  lineAccountId: string | null,
+): Promise<ConversionPoint[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM conversion_points
+        WHERE measure_method = 'url_reach'
+          AND target_url IS NOT NULL
+          AND target_url != ''
+          AND ? LIKE target_url || '%'
+          AND (line_account_id IS NULL OR line_account_id = ?)`,
+    )
+    .bind(url, lineAccountId)
+    .all<ConversionPoint>();
+  return result.results;
 }
 
 export async function deleteConversionPoint(
@@ -87,6 +190,15 @@ export interface TrackConversionInput {
   metadata?: string | null;
 }
 
+/**
+ * 成果を1件記録する。
+ *
+ * 成果地点の設定によって、記録せずに既存の1件を返すことがある
+ * （count_repeat = 0 のとき）。呼び出し側から見て「必ず新しい行が増える」
+ * とは限らない点に注意。重複を弾くのは呼び出し側ではなく、設定を持っている
+ * ここの責任にしている。呼び出し口が複数あるため、各所で同じ判定を
+ * 書くと必ずどこかで漏れる。
+ */
 export async function trackConversion(
   db: D1Database,
   input: TrackConversionInput,
@@ -94,8 +206,29 @@ export async function trackConversion(
   const id = crypto.randomUUID();
   const now = jstNow();
 
+  const point = await getConversionPointById(db, input.conversionPointId);
+
+  // 一人一回だけ数える地点で、すでに記録があるなら、それを返して終わる。
+  // 例外にしないのは、二重に踏むのは利用者にとって普通の行動で、
+  // 呼び出し側に異常として扱わせるとログが埋まるため。
+  if (point && point.count_repeat === 0) {
+    const existing = await db
+      .prepare(
+        `SELECT * FROM conversion_events
+          WHERE conversion_point_id = ? AND friend_id = ?
+          ORDER BY created_at ASC LIMIT 1`,
+      )
+      .bind(input.conversionPointId, input.friendId)
+      .first<ConversionEvent>();
+    if (existing) return existing;
+  }
+
   // Resolve last-touch affiliate attribution before inserting the event.
-  const attr = await resolveAffiliateAttribution(db, input.friendId);
+  // 地点ごとに期間を狭めたい場合があるので attribution_days を渡す
+  // （NULL なら全体の既定 90 日）。
+  const attr = await resolveAffiliateAttribution(db, input.friendId, undefined, {
+    windowDays: point?.attribution_days ?? undefined,
+  });
 
   // Affiliate-attributed CVs enter the approval queue as 'pending'; non-attributed
   // CVs leave approval_status NULL (the approval flow only applies to attributed rows).

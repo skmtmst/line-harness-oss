@@ -3,6 +3,7 @@ import {
   getConversionPoints,
   getConversionPointById,
   createConversionPoint,
+  updateConversionPoint,
   deleteConversionPoint,
   trackConversion,
   getConversionEvents,
@@ -18,7 +19,98 @@ import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
 
+import type { ConversionPoint, ConversionMeasureMethod } from '@line-crm/db';
+
 const conversions = new Hono<Env>();
+
+const MEASURE_METHODS: ConversionMeasureMethod[] = ['url_reach', 'webhook', 'manual'];
+
+function serializeConversionPoint(p: ConversionPoint) {
+  return {
+    id: p.id,
+    name: p.name,
+    eventType: p.event_type,
+    value: p.value,
+    measureMethod: p.measure_method,
+    targetUrl: p.target_url,
+    countRepeat: p.count_repeat !== 0,
+    attributionDays: p.attribution_days,
+    lineAccountId: p.line_account_id,
+    createdAt: p.created_at,
+  };
+}
+
+interface ConversionPointBody {
+  name?: unknown;
+  eventType?: unknown;
+  value?: unknown;
+  measureMethod?: unknown;
+  targetUrl?: unknown;
+  countRepeat?: unknown;
+  attributionDays?: unknown;
+  lineAccountId?: unknown;
+}
+
+/**
+ * 計測に関する項目を検証して取り出す。
+ *
+ * url_reach なのに対象URLが無い、という組み合わせを弾く。保存できてしまうと
+ * 「設定したのに1件も数えられない」という、気づきにくい壊れ方をする。
+ */
+function readMeasureOptions(
+  body: ConversionPointBody,
+  current?: ConversionPoint,
+): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {
+  const out: Record<string, unknown> = {};
+
+  let method = current?.measure_method ?? 'manual';
+  if (body.measureMethod !== undefined) {
+    if (!MEASURE_METHODS.includes(body.measureMethod as ConversionMeasureMethod)) {
+      return { ok: false, error: `measureMethod must be one of ${MEASURE_METHODS.join(', ')}` };
+    }
+    method = body.measureMethod as ConversionMeasureMethod;
+    out.measureMethod = method;
+  }
+
+  let targetUrl = current?.target_url ?? null;
+  if ('targetUrl' in body) {
+    const raw = body.targetUrl;
+    if (raw === null || raw === '' || raw === undefined) {
+      targetUrl = null;
+    } else if (typeof raw !== 'string' || !/^https?:\/\//.test(raw)) {
+      return { ok: false, error: 'targetUrl must start with http:// or https://' };
+    } else {
+      targetUrl = raw.trim();
+    }
+    out.targetUrl = targetUrl;
+  }
+
+  if (method === 'url_reach' && !targetUrl) {
+    return { ok: false, error: 'targetUrl is required when measureMethod is url_reach' };
+  }
+
+  if (body.countRepeat !== undefined) out.countRepeat = body.countRepeat !== false;
+
+  if ('attributionDays' in body) {
+    const raw = body.attributionDays;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.attributionDays = null;
+    } else {
+      const n = Number(raw);
+      if (!Number.isInteger(n) || n < 1 || n > 365) {
+        return { ok: false, error: 'attributionDays must be an integer between 1 and 365' };
+      }
+      out.attributionDays = n;
+    }
+  }
+
+  if ('lineAccountId' in body) {
+    const raw = body.lineAccountId;
+    out.lineAccountId = raw === null || raw === '' || raw === undefined ? null : String(raw);
+  }
+
+  return { ok: true, value: out };
+}
 
 // ── Conversion Points ───────────────────────────────────────────────────────
 
@@ -28,13 +120,7 @@ conversions.get('/api/conversions/points', async (c) => {
     const items = await getConversionPoints(c.env.DB);
     return c.json({
       success: true,
-      data: items.map((p) => ({
-        id: p.id,
-        name: p.name,
-        eventType: p.event_type,
-        value: p.value,
-        createdAt: p.created_at,
-      })),
+      data: items.map(serializeConversionPoint),
     });
   } catch (err) {
     console.error('GET /api/conversions/points error:', err);
@@ -45,29 +131,56 @@ conversions.get('/api/conversions/points', async (c) => {
 // POST /api/conversions/points - create
 conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{
-      name: string;
-      eventType: string;
-      value?: number | null;
-    }>();
+    const body = await c.req.json<ConversionPointBody>();
 
     if (!body.name || !body.eventType) {
       return c.json({ success: false, error: 'name and eventType are required' }, 400);
     }
 
-    const point = await createConversionPoint(c.env.DB, body);
-    return c.json({
-      success: true,
-      data: {
-        id: point.id,
-        name: point.name,
-        eventType: point.event_type,
-        value: point.value,
-        createdAt: point.created_at,
-      },
-    }, 201);
+    const options = readMeasureOptions(body);
+    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+
+    const point = await createConversionPoint(c.env.DB, {
+      name: String(body.name),
+      eventType: String(body.eventType),
+      value: body.value === null || body.value === undefined ? null : Number(body.value),
+      ...options.value,
+    });
+    return c.json({ success: true, data: serializeConversionPoint(point) }, 201);
   } catch (err) {
     console.error('POST /api/conversions/points error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// PUT /api/conversions/points/:id - update
+// 送られた項目だけを触る。画面が「計測方法だけ変える」ような部分更新をするため。
+conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const current = await getConversionPointById(c.env.DB, id);
+    if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+
+    const body = await c.req.json<ConversionPointBody>();
+    const options = readMeasureOptions(body, current);
+    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+
+    const patch: Record<string, unknown> = { ...options.value };
+    if (body.name !== undefined) {
+      const name = String(body.name).trim();
+      if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);
+      patch.name = name;
+    }
+    if (body.eventType !== undefined) patch.eventType = String(body.eventType);
+    if ('value' in body) {
+      patch.value = body.value === null || body.value === '' ? null : Number(body.value);
+    }
+
+    const point = await updateConversionPoint(c.env.DB, id, patch);
+    if (!point) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: serializeConversionPoint(point) });
+  } catch (err) {
+    console.error('PUT /api/conversions/points/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

@@ -43,6 +43,8 @@ function serializeScenario(row: DbScenario) {
     lineAccountId: (row as { line_account_id?: string | null }).line_account_id ?? null,
     isActive: Boolean(row.is_active),
     deliveryMode: (row.delivery_mode ?? 'relative') as DeliveryMode,
+    // 既定は「並行を許す」。104 で既存の行を 1 に寄せてある。
+    allowConcurrent: (row.allow_concurrent ?? 1) !== 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -244,6 +246,7 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
       isActive?: boolean;
       lineAccountId?: string | null;
       deliveryMode?: string;
+      allowConcurrent?: boolean;
     }>();
 
     if (!body.name || !body.triggerType) {
@@ -261,6 +264,9 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
       triggerType: body.triggerType,
       triggerTagId: body.triggerTagId ?? null,
       deliveryMode: deliveryMode as DeliveryMode,
+      // 省略時は「並行を許す」。ここを既定で塞ぐと、いま複数のシナリオに
+      // 入っている人への配信が止まる。
+      allowConcurrent: body.allowConcurrent !== false,
     });
 
     // Save line_account_id if provided
@@ -293,6 +299,7 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
       triggerTagId?: string | null;
       isActive?: boolean;
       deliveryMode?: DeliveryMode;
+      allowConcurrent?: boolean;
     }>();
 
     if (body.deliveryMode !== undefined) {
@@ -305,6 +312,8 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
       trigger_type: body.triggerType,
       trigger_tag_id: body.triggerTagId,
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
+      allow_concurrent:
+        body.allowConcurrent !== undefined ? (body.allowConcurrent ? 1 : 0) : undefined,
     });
 
     if (!updated) {

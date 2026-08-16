@@ -21,6 +21,7 @@ import {
   messageToLogPayload,
 } from './step-delivery.js';
 import { decorateForFriendPush } from './auto-track.js';
+import { resolveInterpolationExtra } from './interpolation-context.js';
 
 export interface ImmediatePushContext {
   defaultAccessToken: string;
@@ -290,11 +291,13 @@ export async function pushImmediateFirstStep(
       resolveStepContent(db, firstStep),
       ctx.accountChannelId ? getLineAccountByChannelId(db, ctx.accountChannelId) : null,
     ]);
+    const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent);
     const expanded = expandVariables(
       resolved.messageContent,
       { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1],
       ctx.workerUrl,
       resolved.messageType,
+      extra,
     );
     // Same decoration pipeline as the cron (processStepDeliveries) via the
     // shared helper. Link owner: the friend's own account, else the

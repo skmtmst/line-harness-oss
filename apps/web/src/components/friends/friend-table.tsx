@@ -235,7 +235,7 @@ export default function FriendTable({ friends, allTags, onRefresh }: FriendTable
                                 onClick={() => handleAddTag(friend.id)}
                                 disabled={!selectedTagId || loading}
                                 className="px-3 py-1 text-xs font-medium rounded-md text-white disabled:opacity-50 transition-opacity"
-                                style={{ backgroundColor: '#06C755' }}
+                                style={{ backgroundColor: 'var(--color-accent)' }}
                               >
                                 追加
                               </button>

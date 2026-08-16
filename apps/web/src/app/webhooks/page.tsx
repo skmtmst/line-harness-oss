@@ -5,6 +5,9 @@ import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import CcPromptButton from '@/components/cc-prompt-button'
 import type { IncomingWebhook, OutgoingWebhook } from '@line-crm/shared'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import NotificationsPage from '@/app/notifications/page'
 
 type Tab = 'incoming' | 'outgoing'
 
@@ -48,7 +51,12 @@ function isHttpsUrl(value: string): boolean {
   }
 }
 
-export default function WebhooksPage() {
+const MERGED_TABS = [
+  { key: 'webhooks', label: 'Webhook' },
+  { key: 'notify', label: '未対応の通知' },
+]
+
+function WebhooksPageInner() {
   const [tab, setTab] = useState<Tab>('incoming')
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
   const [outgoing, setOutgoing] = useState<OutgoingWebhook[]>([])
@@ -57,7 +65,7 @@ export default function WebhooksPage() {
   const [showCreate, setShowCreate] = useState(false)
 
   const [inForm, setInForm] = useState({ name: '', sourceType: '', secret: '' })
-  const [outForm, setOutForm] = useState({ name: '', url: '', eventTypes: '', secret: '' })
+  const [outForm, setOutForm] = useState({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
 
   // After a successful create the API returns the secret exactly once.
   // Show it to the operator with a copy affordance, then forget it.
@@ -181,6 +189,7 @@ export default function WebhooksPage() {
         url: outForm.url,
         eventTypes,
         secret: outForm.secret,
+        maxRetries: Number(outForm.maxRetries) || 0,
       })
       if (!res.success) {
         setError(res.error)
@@ -188,7 +197,7 @@ export default function WebhooksPage() {
       }
       setCreatedSecret({ name: res.data.name, secret: res.data.secret })
       setSecretCopied(false)
-      setOutForm({ name: '', url: '', eventTypes: '', secret: '' })
+      setOutForm({ name: '', url: '', eventTypes: '', secret: '', maxRetries: '0' })
       setShowCreate(false)
       load()
     } catch {
@@ -242,7 +251,7 @@ export default function WebhooksPage() {
           <button
             onClick={() => setShowCreate(!showCreate)}
             className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             {showCreate ? 'キャンセル' : '+ 新規Webhook'}
           </button>
@@ -293,7 +302,7 @@ export default function WebhooksPage() {
               <button
                 type="submit"
                 className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存
               </button>
@@ -330,7 +339,7 @@ export default function WebhooksPage() {
                   setSecretCopied(false)
                 }}
                 className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存しました
               </button>
@@ -423,7 +432,7 @@ export default function WebhooksPage() {
           <button
             type="submit"
             className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             作成
           </button>
@@ -490,11 +499,33 @@ export default function WebhooksPage() {
                 送信時に X-Webhook-Signature ヘッダで HMAC-SHA256 署名するために使われます。受信側で同じシークレットで検証してください。
               </p>
             </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="wh-retries" className="mb-1 block text-sm font-medium text-gray-700">
+                失敗したときの送り直し
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="wh-retries"
+                  type="number"
+                  min={0}
+                  max={5}
+                  value={outForm.maxRetries}
+                  onChange={(e) => setOutForm({ ...outForm, maxRetries: e.target.value })}
+                  className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
+                />
+                <span className="text-ink-faint text-xs">回まで</span>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                相手が 5xx を返したときや、つながらなかったときに送り直します。
+                0.5秒・1秒・2秒…と間隔を空け、上限は5回です。
+                相手が 4xx を返した場合は、同じものを送っても結果が変わらないので送り直しません。
+              </p>
+            </div>
           </div>
           <button
             type="submit"
             className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             作成
           </button>
@@ -612,7 +643,7 @@ export default function WebhooksPage() {
         ) : (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="w-full min-w-[880px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">名前</th>
@@ -620,6 +651,7 @@ export default function WebhooksPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">イベントタイプ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">シークレット</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ステータス</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">送信状況</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">作成日</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -685,6 +717,27 @@ export default function WebhooksPage() {
                         {wh.isActive ? '有効' : '無効'}
                       </button>
                     </td>
+                    <td className="px-4 py-3">
+                      {/* 連続失敗があるときだけ出す。自動では止めないので、
+                          ここで気づけないと送られていないことに気づけない。 */}
+                      {(wh.consecutiveFailures ?? 0) > 0 ? (
+                        <div>
+                          <span className="bg-danger-bg text-danger rounded-pill px-2 py-0.5 text-xs font-medium">
+                            {wh.consecutiveFailures}回連続で失敗
+                          </span>
+                          {wh.lastFailedAt && (
+                            <p className="text-ink-faint mt-1 text-[11px]">
+                              最終 {new Date(wh.lastFailedAt).toLocaleString('ja-JP')}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-ink-faint text-xs">—</span>
+                      )}
+                      <p className="text-ink-faint mt-1 text-[11px] tabular-nums">
+                        送り直し {wh.maxRetries ?? 0} 回
+                      </p>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(wh.createdAt).toLocaleDateString('ja-JP')}
                     </td>
@@ -721,5 +774,25 @@ export default function WebhooksPage() {
       )}
       <CcPromptButton prompts={ccPrompts} />
     </div>
+  )
+}
+
+function WebhooksPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/webhooks" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {tab === 'webhooks' && <WebhooksPageInner />}
+      {tab === 'notify' && <NotificationsPage />}
+    </div>
+  )
+}
+
+export default function WebhooksPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <WebhooksPageHost />
+    </Suspense>
   )
 }

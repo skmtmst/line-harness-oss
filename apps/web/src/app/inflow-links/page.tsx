@@ -10,6 +10,9 @@ import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@l
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import SiteScript from '@/components/inflow-links/site-script'
 
 interface MessageTemplate {
   id: string
@@ -72,7 +75,12 @@ function FolderIcon({ className = '' }: { className?: string }) {
   )
 }
 
-export default function InflowLinksPage() {
+const MERGED_TABS = [
+  { key: 'links', label: '流入経路' },
+  { key: 'script', label: 'サイトスクリプト' },
+]
+
+function InflowLinksPageInner() {
   const { selectedAccountId } = useAccount()
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
@@ -929,5 +937,25 @@ function ReferralQrModal({
         </div>
       </div>
     </div>
+  )
+}
+
+function InflowLinksPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/inflow-links" tabs={MERGED_TABS} active={tab} />
+      {tab === 'links' && <InflowLinksPageInner />}
+      {tab === 'script' && <SiteScript />}
+    </div>
+  )
+}
+
+export default function InflowLinksPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <InflowLinksPageHost />
+    </Suspense>
   )
 }

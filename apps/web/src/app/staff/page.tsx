@@ -4,6 +4,9 @@ import Header from '@/components/layout/header'
 import { fetchApi } from '@/lib/api'
 import type { ApiResponse, Friend, PaginatedResponse } from '@line-crm/shared'
 import type { StaffMember } from '@line-crm/shared'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import LoginAudit from '@/components/staff/login-audit'
 
 function RoleBadge({ role }: { role: string }) {
   const styles =
@@ -23,7 +26,12 @@ function RoleBadge({ role }: { role: string }) {
   )
 }
 
-export default function StaffPage() {
+const MERGED_TABS = [
+  { key: 'users', label: 'ユーザー' },
+  { key: 'audit', label: 'ログイン履歴' },
+]
+
+function StaffPageInner() {
   const [members, setMembers] = useState<StaffMember[]>([])
   const [friends, setFriends] = useState<Friend[]>([])
   const [loading, setLoading] = useState(true)
@@ -125,7 +133,7 @@ export default function StaffPage() {
           <button
             onClick={() => setShowForm(!showForm)}
             className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             + スタッフを追加
           </button>
@@ -200,7 +208,7 @@ export default function StaffPage() {
                 type="submit"
                 disabled={formLoading || !formName || !formFriendId}
                 className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 {formLoading ? '作成中...' : '作成'}
               </button>
@@ -301,5 +309,25 @@ export default function StaffPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function StaffPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/staff" tabs={MERGED_TABS} active={tab} />
+      {tab === 'users' && <StaffPageInner />}
+      {tab === 'audit' && <LoginAudit />}
+    </div>
+  )
+}
+
+export default function StaffPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <StaffPageHost />
+    </Suspense>
   )
 }

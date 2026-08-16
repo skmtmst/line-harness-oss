@@ -13,7 +13,30 @@ export interface AutoReplyDraft {
   templateId: string | null
   lineAccountId: string | null
   isActive: boolean
+  /** JST の "HH:MM"。null で時間帯を問わない */
+  activeFrom?: string | null
+  activeUntil?: string | null
+  /** この分数は同じ相手へ自動応答を返さない。null で抑制しない */
+  cooldownMinutes?: number | null
+  /** 担当者が対応中のトークでは返さない */
+  skipWhenOperatorActive?: boolean
+  /** 評価順。小さいほど先に見る */
+  priority?: number
+  /** 対象にするメッセージ種別。null / 空で全部 */
+  messageKinds?: string[] | null
 }
+
+/** 画面に出すメッセージ種別。LINE から届くもののうち、実務で使うものだけ。 */
+const MESSAGE_KIND_LABELS: Array<{ key: string; label: string }> = [
+  { key: 'text', label: 'テキスト' },
+  { key: 'image', label: '画像' },
+  { key: 'video', label: '動画' },
+  { key: 'audio', label: '音声' },
+  { key: 'file', label: 'ファイル' },
+  { key: 'location', label: '位置情報' },
+  { key: 'sticker', label: 'スタンプ' },
+  { key: 'postback', label: 'ボタンのタップ' },
+]
 
 interface Props {
   draft: AutoReplyDraft
@@ -39,6 +62,16 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   const [templateId, setTemplateId] = useState<string | null>(draft.templateId)
   const [responseContent, setResponseContent] = useState(draft.responseContent)
   const [isActive, setIsActive] = useState(draft.isActive)
+  const [activeFrom, setActiveFrom] = useState(draft.activeFrom ?? '')
+  const [activeUntil, setActiveUntil] = useState(draft.activeUntil ?? '')
+  const [cooldown, setCooldown] = useState(
+    draft.cooldownMinutes == null ? '' : String(draft.cooldownMinutes),
+  )
+  const [skipWhenOperatorActive, setSkipWhenOperatorActive] = useState(
+    draft.skipWhenOperatorActive ?? false,
+  )
+  const [priority, setPriority] = useState(String(draft.priority ?? 0))
+  const [messageKinds, setMessageKinds] = useState<string[]>(draft.messageKinds ?? [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -63,6 +96,12 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         templateId: string | null;
         lineAccountId: string | null;
         isActive: boolean;
+        activeFrom: string | null;
+        activeUntil: string | null;
+        cooldownMinutes: number | null;
+        skipWhenOperatorActive: boolean;
+        priority: number;
+        messageKinds: string[] | null;
       } = {
         keyword,
         matchType,
@@ -78,6 +117,16 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         templateId: mode === 'template' ? templateId : null,
         lineAccountId: draft.lineAccountId,
         isActive,
+        activeFrom: activeFrom || null,
+        activeUntil: activeUntil || null,
+        cooldownMinutes: cooldown.trim() === '' ? null : Number(cooldown),
+        skipWhenOperatorActive,
+        priority: Number(priority) || 0,
+        // 全部選ぶことと、1つも選ばないことは同じ意味。null に寄せる。
+        messageKinds:
+          messageKinds.length === 0 || messageKinds.length === MESSAGE_KIND_LABELS.length
+            ? null
+            : messageKinds,
       }
       if (mode === 'template' && templateId) {
         const tpl = templates.find((t) => t.id === templateId)
@@ -125,8 +174,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                 <button
                   key={mt}
                   onClick={() => setMatchType(mt)}
-                  className={`px-3 py-1.5 text-xs rounded-md ${matchType === mt ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  style={matchType === mt ? { backgroundColor: '#06C755' } : undefined}
+                  className={`rounded-control px-3 py-1.5 text-xs ${matchType === mt ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {mt === 'exact' ? '完全一致' : '包含'}
                 </button>
@@ -146,8 +194,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                 <button
                   key={key}
                   onClick={() => setMode(key)}
-                  className={`px-3 py-1.5 text-xs rounded-md ${mode === key ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  style={mode === key ? { backgroundColor: '#06C755' } : undefined}
+                  className={`rounded-control px-3 py-1.5 text-xs ${mode === key ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
                   {label}
                 </button>
@@ -234,6 +281,127 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
               label="返信画像"
             />
           )}
+          <div>
+            <label htmlFor="ar-priority" className="text-ink-faint mb-1 block text-xs">
+              評価順
+            </label>
+            <input
+              id="ar-priority"
+              type="number"
+              min={-9999}
+              max={9999}
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="border-hairline rounded-control w-24 border px-2 py-1.5 text-sm tabular-nums"
+            />
+            <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
+              小さいほど先に見ます。上から順に見て、最初に当てはまった1つだけが動きます。
+              間に挿し込めるよう、10・20・30 のように間を空けておくと後で楽です。
+            </p>
+          </div>
+
+          {/* 返す条件。キーワードが合っても、ここに当てはまらなければ返さない。 */}
+          <div className="border-hairline space-y-3 rounded-lg border p-3">
+            <p className="text-ink-secondary text-xs font-semibold">返す条件</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label htmlFor="ar-from" className="text-ink-faint mb-1 block text-xs">
+                  時間帯（JST）
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id="ar-from"
+                    type="time"
+                    value={activeFrom}
+                    onChange={(e) => setActiveFrom(e.target.value)}
+                    className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                  />
+                  <span className="text-ink-faint text-xs">〜</span>
+                  <input
+                    aria-label="時間帯の終わり"
+                    type="time"
+                    value={activeUntil}
+                    onChange={(e) => setActiveUntil(e.target.value)}
+                    className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="ar-cooldown" className="text-ink-faint mb-1 block text-xs">
+                  連投を防ぐ
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    id="ar-cooldown"
+                    type="number"
+                    min={0}
+                    max={10080}
+                    step={1}
+                    placeholder="なし"
+                    value={cooldown}
+                    onChange={(e) => setCooldown(e.target.value)}
+                    className="border-hairline rounded-control w-24 border px-2 py-1.5 text-sm tabular-nums"
+                  />
+                  <span className="text-ink-faint text-xs">分</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-ink-faint text-[11px] leading-relaxed">
+              時間帯を空にすると、いつでも返します。22:00〜06:00 のように日をまたぐ指定もできます
+              （開始を含み、終了は含みません）。<br />
+              「連投を防ぐ」は、その相手へ自動応答を返してからこの分数のあいだ、どのルールでも返さない設定です。
+            </p>
+            <div>
+              <p className="text-ink-faint mb-1.5 text-xs">対象にするメッセージ</p>
+              <div className="flex flex-wrap gap-1.5">
+                {MESSAGE_KIND_LABELS.map(({ key, label }) => {
+                  const on = messageKinds.length === 0 || messageKinds.includes(key)
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() =>
+                        setMessageKinds((prev) => {
+                          // 何も選んでいない状態は「全部」を意味する。そこから
+                          // 1つ外すには、いったん全部を入れてから外す。
+                          const base = prev.length === 0 ? MESSAGE_KIND_LABELS.map((m) => m.key) : prev
+                          return base.includes(key)
+                            ? base.filter((k) => k !== key)
+                            : [...base, key]
+                        })
+                      }
+                      className={`rounded-pill px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'bg-accent text-on-accent'
+                          : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-ink-faint mt-1 text-[11px]">
+                すべて選んだ状態と、1つも選ばない状態は同じ意味です（種別で絞りません）。
+              </p>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={skipWhenOperatorActive}
+                onChange={(e) => setSkipWhenOperatorActive(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
+              <span className="text-ink-secondary text-xs">
+                担当者が対応中のトークでは返さない
+                <span className="text-ink-faint block text-[11px]">
+                  「対応中」のときだけ止まります。未対応のまま放置されているトークには返します。
+                </span>
+              </span>
+            </label>
+          </div>
+
           <label className="inline-flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -250,8 +418,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-3 py-1.5 text-xs font-medium text-white rounded-md disabled:opacity-50"
-            style={{ backgroundColor: '#06C755' }}
+            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
           >
             {saving ? '保存中...' : '保存'}
           </button>

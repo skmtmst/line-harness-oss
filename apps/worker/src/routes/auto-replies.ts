@@ -12,6 +12,42 @@ import { requireRole } from '../middleware/role-guard.js';
 
 const autoReplies = new Hono<Env>();
 
+/** LINE から届くメッセージの種別。ここに無いものは対象にできない。 */
+const MESSAGE_KINDS = ['text', 'image', 'video', 'audio', 'file', 'location', 'sticker', 'postback'];
+
+function readPriority(raw: unknown): { ok: true; value: number } | { ok: false } {
+  const n = Number(raw);
+  // 上下に余裕を持たせる。間に挿し込めないと、並べ替えのたびに
+  // 全件を振り直すことになる。
+  if (!Number.isInteger(n) || n < -9999 || n > 9999) return { ok: false };
+  return { ok: true, value: n };
+}
+
+function readMessageKinds(raw: unknown): { ok: true; value: string[] | null } | { ok: false } {
+  if (raw === null || raw === undefined || (Array.isArray(raw) && raw.length === 0)) {
+    return { ok: true, value: null };
+  }
+  if (!Array.isArray(raw)) return { ok: false };
+  if (raw.some((v) => typeof v !== 'string' || !MESSAGE_KINDS.includes(v))) return { ok: false };
+  return { ok: true, value: raw as string[] };
+}
+
+
+/** "HH:MM"（24時間表記）かどうか。空文字と null は「指定なし」。 */
+function parseHhmm(value: unknown): { ok: true; value: string | null } | { ok: false } {
+  if (value === null || value === undefined || value === '') return { ok: true, value: null };
+  if (typeof value !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return { ok: false };
+  return { ok: true, value };
+}
+
+/** 分。0 は「抑制しない」なので null に寄せる。 */
+function parseCooldown(value: unknown): { ok: true; value: number | null } | { ok: false } {
+  if (value === null || value === undefined || value === '') return { ok: true, value: null };
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 0 || n > 10_080) return { ok: false };
+  return { ok: true, value: n === 0 ? null : n };
+}
+
 interface EffectiveAccount {
   accountId: string;
   accountName: string;
@@ -28,6 +64,12 @@ interface SerializedAutoReply {
   templateId: string | null;
   lineAccountId: string | null;
   isActive: boolean;
+  activeFrom: string | null;
+  activeUntil: string | null;
+  cooldownMinutes: number | null;
+  skipWhenOperatorActive: boolean;
+  priority: number;
+  messageKinds: string[] | null;
   createdAt: string;
   effectiveAccounts?: EffectiveAccount[];
 }
@@ -42,6 +84,14 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     templateId: row.template_id,
     lineAccountId: row.line_account_id,
     isActive: Boolean(row.is_active),
+    activeFrom: row.active_from,
+    activeUntil: row.active_until,
+    cooldownMinutes: row.cooldown_minutes,
+    skipWhenOperatorActive: Boolean(row.skip_when_operator_active),
+    priority: Number(row.priority ?? 0),
+    messageKinds: row.message_kinds_json
+      ? (JSON.parse(row.message_kinds_json) as string[])
+      : null,
     createdAt: row.created_at,
   };
 }
@@ -158,6 +208,12 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       responseContent?: string;
       templateId?: string | null;
       lineAccountId?: string | null;
+      activeFrom?: unknown;
+      activeUntil?: unknown;
+      cooldownMinutes?: unknown;
+      skipWhenOperatorActive?: unknown;
+      priority?: unknown;
+      messageKinds?: unknown;
     }>();
 
     if (!body.keyword) {
@@ -167,6 +223,30 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     // silent も content 不要。それ以外は inline content 必須。
     if (!body.templateId && !body.responseContent && body.responseType !== 'silent') {
       return c.json({ success: false, error: 'templateId or responseContent required (unless responseType=silent)' }, 400);
+    }
+
+    const activeFrom = parseHhmm(body.activeFrom);
+    const activeUntil = parseHhmm(body.activeUntil);
+    const cooldown = parseCooldown(body.cooldownMinutes);
+    if (!activeFrom.ok || !activeUntil.ok) {
+      return c.json({ success: false, error: 'activeFrom/activeUntil must be HH:MM' }, 400);
+    }
+    if (!cooldown.ok) {
+      return c.json(
+        { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
+        400,
+      );
+    }
+    const priority = body.priority === undefined ? { ok: true as const, value: 0 } : readPriority(body.priority);
+    if (!priority.ok) {
+      return c.json({ success: false, error: 'priority must be an integer between -9999 and 9999' }, 400);
+    }
+    const messageKinds = readMessageKinds(body.messageKinds);
+    if (!messageKinds.ok) {
+      return c.json(
+        { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` },
+        400,
+      );
     }
 
     // template_id が来てて content/type が空の場合、template の現在値を inline
@@ -190,6 +270,12 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       responseContent: resolvedResponseContent,
       templateId: body.templateId ?? null,
       lineAccountId: body.lineAccountId ?? null,
+      activeFrom: activeFrom.value,
+      activeUntil: activeUntil.value,
+      cooldownMinutes: cooldown.value,
+      skipWhenOperatorActive: body.skipWhenOperatorActive === true,
+      priority: priority.value,
+      messageKinds: messageKinds.value,
     });
 
     return c.json({ success: true, data: serializeAutoReply(item) }, 201);
@@ -211,6 +297,12 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
       templateId?: string | null;
       lineAccountId?: string | null;
       isActive?: boolean;
+      activeFrom?: unknown;
+      activeUntil?: unknown;
+      cooldownMinutes?: unknown;
+      skipWhenOperatorActive?: unknown;
+      priority?: unknown;
+      messageKinds?: unknown;
     }>();
 
     const input: Record<string, unknown> = {};
@@ -221,6 +313,46 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     if ('templateId' in body) input.templateId = body.templateId;
     if ('lineAccountId' in body) input.lineAccountId = body.lineAccountId;
     if (body.isActive !== undefined) input.isActive = body.isActive;
+    if ('activeFrom' in body) {
+      const parsed = parseHhmm(body.activeFrom);
+      if (!parsed.ok) return c.json({ success: false, error: 'activeFrom must be HH:MM' }, 400);
+      input.activeFrom = parsed.value;
+    }
+    if ('activeUntil' in body) {
+      const parsed = parseHhmm(body.activeUntil);
+      if (!parsed.ok) return c.json({ success: false, error: 'activeUntil must be HH:MM' }, 400);
+      input.activeUntil = parsed.value;
+    }
+    if ('cooldownMinutes' in body) {
+      const parsed = parseCooldown(body.cooldownMinutes);
+      if (!parsed.ok) {
+        return c.json(
+          { success: false, error: 'cooldownMinutes must be an integer between 0 and 10080' },
+          400,
+        );
+      }
+      input.cooldownMinutes = parsed.value;
+    }
+    if ('skipWhenOperatorActive' in body) {
+      input.skipWhenOperatorActive = body.skipWhenOperatorActive === true;
+    }
+    if ('priority' in body) {
+      const parsed = readPriority(body.priority);
+      if (!parsed.ok) {
+        return c.json({ success: false, error: 'priority must be an integer between -9999 and 9999' }, 400);
+      }
+      input.priority = parsed.value;
+    }
+    if ('messageKinds' in body) {
+      const parsed = readMessageKinds(body.messageKinds);
+      if (!parsed.ok) {
+        return c.json(
+          { success: false, error: `messageKinds must be an array of ${MESSAGE_KINDS.join(', ')}` },
+          400,
+        );
+      }
+      input.messageKinds = parsed.value;
+    }
 
     // templateId が新たに set されて responseContent が来てない場合は template の
     // 現在値を inline snapshot として書き込む (ON DELETE SET NULL の fallback 用)。

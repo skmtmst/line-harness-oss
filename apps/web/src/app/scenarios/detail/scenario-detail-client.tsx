@@ -143,7 +143,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   const [error, setError] = useState('')
 
   const [editing, setEditing] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true })
+  const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true })
   const [saving, setSaving] = useState(false)
 
   const [showStepForm, setShowStepForm] = useState(false)
@@ -172,6 +172,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           description: res.data.description ?? '',
           triggerType: res.data.triggerType,
           isActive: res.data.isActive,
+          allowConcurrent: res.data.allowConcurrent !== false,
         })
       } else {
         setError(res.error)
@@ -227,6 +228,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         description: editForm.description || null,
         triggerType: editForm.triggerType,
         isActive: editForm.isActive,
+        allowConcurrent: editForm.allowConcurrent,
       })
       if (res.success) {
         setEditing(false)
@@ -634,6 +636,24 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               />
               <label htmlFor="editIsActive" className="text-sm text-ink-secondary">有効</label>
             </div>
+            <div className="border-hairline rounded-lg border p-3">
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={!editForm.allowConcurrent}
+                  onChange={(e) => setEditForm({ ...editForm, allowConcurrent: !e.target.checked })}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <span className="text-ink-secondary text-sm">
+                  他のシナリオが動いている人は登録しない
+                  <span className="text-ink-faint block text-xs leading-relaxed">
+                    既定では、1人が複数のシナリオに同時に入れます。
+                    ここをチェックすると、他のシナリオが動いている人はこのシナリオに入りません。
+                    すでに入っている人には影響しません。
+                  </span>
+                </span>
+              </label>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={handleSaveScenario}
@@ -650,6 +670,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                     description: scenario.description ?? '',
                     triggerType: scenario.triggerType,
                     isActive: scenario.isActive,
+                    allowConcurrent: scenario.allowConcurrent !== false,
                   })
                 }}
                 className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors"

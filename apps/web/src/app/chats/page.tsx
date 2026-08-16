@@ -10,6 +10,9 @@ import CcPromptButton from '@/components/cc-prompt-button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import SupportPage from '@/app/support/page'
 
 interface Chat {
   id: string
@@ -222,7 +225,11 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-4 border-b border-hairline flex items-center gap-3">
-        <button onClick={onBack} className="lg:hidden text-ink-faint hover:text-ink-secondary">
+        <button
+          onClick={onBack}
+          aria-label="友だち一覧に戻る"
+          className="lg:hidden text-ink-faint hover:text-ink-secondary"
+        >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -293,7 +300,12 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   )
 }
 
-export default function ChatsPage() {
+const MERGED_TABS = [
+  { key: 'line', label: 'LINE' },
+  { key: 'email', label: 'お問い合わせ（メール）' },
+]
+
+function ChatsPageInner() {
   const { selectedAccountId } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   const [allFriends, setAllFriends] = useState<FriendItem[]>([])
@@ -1063,7 +1075,7 @@ export default function ChatsPage() {
                                   ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-white'
                                   : 'rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-white text-ink'
                               }`}
-                              style={isOutgoing ? { backgroundColor: '#06C755' } : undefined}
+                              style={isOutgoing ? { backgroundColor: 'var(--color-accent)' } : undefined}
                             >
                               {bubbleContent}
                             </div>
@@ -1210,5 +1222,25 @@ export default function ChatsPage() {
       </div>
       <CcPromptButton prompts={ccPrompts} />
     </div>
+  )
+}
+
+function ChatsPageHost() {
+  const tab = useMergedTab(MERGED_TABS, 'channel')
+  return (
+    <div>
+      <MergedTabs basePath="/chats" paramName="channel" tabs={MERGED_TABS} active={tab} />
+      {tab === 'line' && <ChatsPageInner />}
+      {tab === 'email' && <SupportPage />}
+    </div>
+  )
+}
+
+export default function ChatsPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <ChatsPageHost />
+    </Suspense>
   )
 }
