@@ -350,6 +350,14 @@ export type FriendListItem = FriendWithTags & Partial<{
 
 
 
+/** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
+export type ListStats = {
+  tags: { total: number; unused: number; taggedFriends: number; assignedThisMonth: number }
+  templates: { total: number; inUse: number; sentThisMonth: number; unused90d: number }
+  scenarios: { total: number; active: number; subscribers: number; completed: number }
+  reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
+}
+
 /** 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信`）。 */
 export type BroadcastStats = {
   thisMonth: number
@@ -1784,6 +1792,9 @@ export const api = {
   },
   chatStats: {
     get: () => fetchApi<ApiResponse<InboxStats>>('/api/chats/stats'),
+  },
+  listStats: {
+    get: () => fetchApi<ApiResponse<ListStats>>('/api/list-stats'),
   },
   broadcastStats: {
     get: () => fetchApi<ApiResponse<BroadcastStats>>('/api/broadcasts/stats'),

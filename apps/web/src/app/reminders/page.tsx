@@ -5,6 +5,7 @@ import type { ReminderTriggerType, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import ListKpis from '@/components/shared/list-kpis'
 import CcPromptButton from '@/components/cc-prompt-button'
 
 interface Reminder {
@@ -290,7 +291,8 @@ export default function RemindersPage() {
   return (
     <div>
       <Header
-        title="リマインダ配信"
+        title="リマインダ"
+        description="ゴール日時までのカウントダウン配信を作ります。誕生日や次回お届け日など、友だち情報欄の日付を起点にできます。"
         action={
           <button
             onClick={() => setShowCreate(true)}
@@ -300,6 +302,23 @@ export default function RemindersPage() {
             + 新規リマインダー
           </button>
         }
+      />
+
+      {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
+      <ListKpis
+        build={(s) => [
+            { title: 'リマインダ', value: s.reminders.total, unit: '件', detail: `稼働中 ${s.reminders.active}` },
+            { title: '配信待ち', value: s.reminders.waiting, unit: '人', detail: '登録済みで未完了' },
+            { title: '稼働中', value: s.reminders.active, unit: '件', detail: '止めているものを除く' },
+            // 設計は「起点になる項目」。友だち情報欄のうち日付型を数えるが、
+            // 型の区別を持っていない。止めている数のほうが、いま意味がある。
+            {
+              title: '止めている',
+              value: s.reminders.total - s.reminders.active,
+              unit: '件',
+              detail: '編集中・保留',
+            },
+        ]}
       />
 
       {/* Error */}
