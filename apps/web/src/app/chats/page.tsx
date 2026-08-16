@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, fetchApi } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
@@ -14,7 +14,7 @@ import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
-import SupportPage from '@/app/support/page'
+import SupportInbox from '@/components/support/support-inbox'
 
 interface Chat {
   id: string
@@ -1071,7 +1071,7 @@ function ChatsPageInner() {
                     type="button"
                     onClick={() => setShowFriendInfo((v) => !v)}
                     aria-pressed={showFriendInfo}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control hidden border px-2 py-1 text-xs xl:inline-block"
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2 py-1 text-xs whitespace-nowrap"
                   >
                     {showFriendInfo ? '友だち詳細を閉じる' : '友だち詳細'}
                   </button>
@@ -1343,6 +1343,19 @@ function ChatsPageInner() {
         */}
         {showFriendInfo && (selectedChatId || selectedFriendId) && (
           <div className="absolute inset-y-0 right-0 z-20 w-[320px] max-w-full shadow-xl">
+            {/*
+              重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
+              重なりが上部を覆っている画面幅で閉じられなくなる。
+              実際そうなっていた。
+            */}
+            <button
+              type="button"
+              onClick={() => setShowFriendInfo(false)}
+              aria-label="友だち詳細を閉じる"
+              className="bg-canvas border-hairline text-ink-secondary hover:bg-canvas-sunken absolute top-2 right-2 z-10 rounded-full border px-2 py-1 text-xs"
+            >
+              閉じる
+            </button>
             <FriendInfoSidebar
               friendId={selectedFriendId || selectedChatId}
               chatStatus={
@@ -1371,18 +1384,26 @@ function ChatsPageInner() {
  * チップで表示を切り替える形にしている。将来1つの一覧に混ぜるときも、
  * 画面の入口は変わらない。
  */
-// 「すべて」は将来 LINE とメールを1つの一覧に混ぜるための枠。
-// いまは中身の作りが違うので、選ぶと LINE と同じ表示になる。
-// 先に3つ出しておくと、混ざるようになったときに画面の入口が変わらない。
+// 受信箱のチャネル。
+//
+// /api/support/inbox は channel を 'all' | 'line' | 'email' で受け取り、
+// どちらの出どころも同じ形（id / channel / customerName / preview /
+// lastIncomingAt）で返す。つまり1つの一覧に混ぜられる。
 const CHANNELS = [
+  { key: 'all', label: 'すべて' },
   { key: 'line', label: 'LINE' },
   { key: 'email', label: 'メール' },
 ] as const
 
 function ChatsPageHost() {
-  const tab = useMergedTab(MERGED_TABS, 'channel')
   const router = useRouter()
-  const channel = tab === 'email' ? 'email' : 'line'
+  const params = useSearchParams()
+  // すべて / LINE / メール。既定はすべて。
+  // 出どころを気にせず「返信を待っている人」を見たいのが普通なので、
+  // 最初から絞った状態で出さない。
+  const raw = params.get('channel')
+  const channel: 'all' | 'line' | 'email' =
+    raw === 'line' || raw === 'email' ? raw : 'all'
 
   return (
     <div>
@@ -1402,7 +1423,7 @@ function ChatsPageHost() {
         {CHANNELS.map((c) => (
           <button
             key={c.key}
-            onClick={() => router.push(c.key === 'email' ? '/chats?channel=email' : '/chats')}
+            onClick={() => router.push(c.key === 'all' ? '/chats' : `/chats?channel=${c.key}`)}
             aria-pressed={channel === c.key}
             className={`rounded-pill px-3.5 py-1.5 text-xs font-medium transition-colors ${
               channel === c.key
@@ -1415,7 +1436,24 @@ function ChatsPageHost() {
         ))}
       </div>
 
-      {channel === 'line' ? <ChatsPageInner /> : <SupportPage />}
+      {/*
+        「すべて」は両方を縦に並べる。1つの一覧に混ぜるには、LINE の
+        トークとメールのスレッドで開いたあとの作りが違いすぎる
+        （片方はリアルタイムのトーク、片方はメールの往復）。
+        混ぜた一覧から開くと、選んだ相手によって右側が別物になる。
+
+        いまは「返信を待っている人がどこに何人いるか」を1画面で見られれば
+        用は足りるので、2つの受信箱を縦に置く。
+      */}
+      {channel !== 'email' && <ChatsPageInner />}
+      {channel !== 'line' && (
+        <div className={channel === 'all' ? 'mt-6' : undefined}>
+          {channel === 'all' && (
+            <h2 className="text-ink mb-3 text-sm font-semibold">メールでの問い合わせ</h2>
+          )}
+          <SupportInbox channel={channel === 'all' ? 'all' : 'email'} />
+        </div>
+      )}
     </div>
   )
 }
