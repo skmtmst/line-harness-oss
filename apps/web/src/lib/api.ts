@@ -353,9 +353,22 @@ export type FriendListItem = FriendWithTags & Partial<{
 /** 一覧画面の上部に出す数（タグ・テンプレート・シナリオ・リマインダ）。 */
 export type ListStats = {
   tags: { total: number; unused: number; taggedFriends: number; assignedThisMonth: number }
-  marks: { total: number; inUse: number; unanswered: number; inProgress: number; resolved: number }
+  marks: {
+    total: number
+    inUse: number
+    unanswered: number
+    inProgress: number
+    resolved: number
+    changedLast7: number
+  }
   searches: { total: number; limit: number }
-  templates: { total: number; inUse: number; sentThisMonth: number; unused90d: number }
+  templates: {
+    total: number
+    inUse: number
+    sentThisMonth: number
+    unused90d: number
+    clickRate: number | null
+  }
   scenarios: {
     total: number
     active: number

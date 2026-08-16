@@ -1,3 +1,4 @@
+import { recordOperation } from './operation-audit.js';
 import { jstNow } from './utils.js';
 
 /**
@@ -162,11 +163,22 @@ export async function setFriendSupportMark(
   db: D1Database,
   friendId: string,
   markId: string | null,
+  actorId?: string | null,
 ): Promise<void> {
   await db
     .prepare(`UPDATE friends SET support_mark_id = ? WHERE id = ?`)
     .bind(markId, friendId)
     .run();
+
+  // いつ変わったかを残す（110）。friends.support_mark_id は現在値しか
+  // 持たないので、これが無いと設計の「過去7日で対応済にした人数」が出せない。
+  await recordOperation(db, {
+    targetKind: 'support_mark',
+    targetId: markId,
+    action: 'changed',
+    actorId: actorId ?? null,
+    friendId,
+  });
 }
 
 /**

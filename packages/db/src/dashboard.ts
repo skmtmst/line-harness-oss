@@ -1,3 +1,4 @@
+import { countOperations } from './operation-audit.js';
 /**
  * ダッシュボードが1回で読む数。
  *
@@ -624,9 +625,24 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
  */
 export interface ListStats {
   tags: { total: number; unused: number; taggedFriends: number; assignedThisMonth: number };
-  marks: { total: number; inUse: number; unanswered: number; inProgress: number; resolved: number };
+  marks: {
+    total: number;
+    inUse: number;
+    unanswered: number;
+    inProgress: number;
+    resolved: number;
+    /** 過去7日でマークを変えた回数（110）。 */
+    changedLast7: number;
+  };
   searches: { total: number; limit: number };
-  templates: { total: number; inUse: number; sentThisMonth: number; unused90d: number };
+  templates: {
+    total: number;
+    inUse: number;
+    sentThisMonth: number;
+    unused90d: number;
+    /** テンプレート由来の短縮URLの平均クリック率（%）。取れなければ null。 */
+    clickRate: number | null;
+  };
   scenarios: {
     total: number;
     active: number;
@@ -680,14 +696,17 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
         )
         .first<{ total: number; in_use: number }>();
       const inbox = await inboxState(db);
+      // 設計の「対応済 26人・過去7日」。110 の操作記録から出す。
+      const changedLast7 = await countOperations(db, 'support_mark', 'changed', jstDate(-6));
       return {
         total: row?.total ?? 0,
         inUse: row?.in_use ?? 0,
         unanswered: inbox.unanswered,
         inProgress: inbox.inProgress,
         resolved: inbox.resolved,
+        changedLast7,
       };
-    }, { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0 }),
+    }, { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 }),
 
     safe(async () => {
       // 上限50は画面に出すためだけの値。DB側に制約は無い。
@@ -719,13 +738,31 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
            SELECT template_id FROM auto_replies WHERE template_id IS NOT NULL
          )`,
       );
+      // テンプレート由来の短縮URLのクリック率（110）。
+      //
+      // 分母は「そのテンプレートを含む送信の数」ではなく、
+      // 短縮URLが押された回数 ÷ テンプレート由来の送信数。
+      // 1通に複数のURLが入ると100%を超えうるので、上限を100にする。
+      let clickRate: number | null = null;
+      try {
+        const clicks = await count(
+          db,
+          `SELECT COALESCE(SUM(click_count), 0) AS n FROM tracked_links
+            WHERE template_id IS NOT NULL`,
+        );
+        const sent = row?.sent ?? 0;
+        clickRate = sent > 0 ? Math.min(100, Math.round((clicks / sent) * 1000) / 10) : null;
+      } catch {
+        // 110 がまだ当たっていない環境。クリック率だけ出ない。
+      }
       return {
         total: row?.total ?? 0,
         inUse: used,
         sentThisMonth: row?.sent ?? 0,
         unused90d: Math.max(0, (row?.total ?? 0) - used),
+        clickRate,
       };
-    }, { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0 }),
+    }, { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null }),
 
     safe(async () => {
       const row = await db

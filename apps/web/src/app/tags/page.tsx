@@ -365,7 +365,9 @@ function TagsPageInner() {
                       : '—',
                 },
                 { title: '対応中', value: s.marks.inProgress, unit: '人', detail: '担当者あり' },
-                { title: '対応済', value: s.marks.resolved, unit: '人', detail: '累計' },
+                // 設計の4枚目。110 の操作記録から出す。
+                // 当てた日より前の変更は記録が無いので入らない。
+                { title: 'マークの変更', value: s.marks.changedLast7, unit: '回', detail: '過去7日' },
               ]
             : tab === 'searches'
               ? [
