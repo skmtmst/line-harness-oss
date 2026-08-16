@@ -283,7 +283,7 @@ export default function EventsListPage() {
                     <td className="px-4 py-3 text-right text-sm tabular-nums">
                       {e.pending_count > 0 ? (
                         <Link
-                          href={`/events/bookings?event_id=${e.id}`}
+                          href={`/events/bookings?id=${e.id}`}
                           className="text-warning font-medium hover:underline"
                         >
                           {e.pending_count} 件
@@ -292,8 +292,9 @@ export default function EventsListPage() {
                         <span className="text-ink-faint">0 件</span>
                       )}
                     </td>
-                    {/* 申込条件（「定期便 契約中」など）を絞る仕組みが
-                        events にまだ無い。誰でも申し込めるのが実態。 */}
+                    {/* イベント側に visible_tag_id（このタグの人にだけ見せる）が
+                        あるが、一覧APIが返していない。返るまでは絞りの有無を
+                        判断できないので、編集画面で確かめる案内にしている。 */}
                     <td className="text-ink-secondary px-4 py-3 text-sm">全員</td>
                     <td className="px-4 py-3 text-sm">
                       {e.is_published !== 1 ? (
