@@ -40,6 +40,14 @@ export interface DashboardOverview {
   delivery: {
     /** 期間内に送った通数。 */
     sent: number;
+    /**
+     * こちらから送った数（プッシュ）と、受信への応答（リプライ）。
+     *
+     * LINEは課金の数え方が違うので、まとめると枠の減りを読み違える。
+     * source（028）で分かれる。auto_reply と manual が応答。
+     */
+    push: number;
+    reply: number;
     /** 期間内の一斉配信の件数。 */
     broadcasts: number;
     /** 今月の送信上限。LINE から取れないときは null。 */
@@ -370,12 +378,19 @@ export async function getDashboardOverview(
     })),
     friendTrend(db, period, accountId).catch(() => []),
     conversionSummary(db, period).catch(() => ({ total: 0, byPoint: [] })),
-    count(
-      db,
-      `SELECT COUNT(*) AS n FROM messages_log
-        WHERE direction = 'outgoing' AND substr(created_at, 1, 10) >= ?`,
-      start,
-    ).catch(() => 0),
+    // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
+    // source は 028 で入っている。auto_reply と manual が応答。
+    db
+      .prepare(
+        `SELECT
+           COUNT(*) AS sent,
+           SUM(CASE WHEN source IN ('auto_reply','manual') THEN 1 ELSE 0 END) AS reply
+         FROM messages_log
+          WHERE direction = 'outgoing' AND substr(created_at, 1, 10) >= ?`,
+      )
+      .bind(start)
+      .first<{ sent: number; reply: number }>()
+      .catch(() => null),
     count(
       db,
       `SELECT COUNT(*) AS n FROM broadcasts
@@ -390,7 +405,9 @@ export async function getDashboardOverview(
     friends,
     inbox,
     delivery: {
-      sent,
+      sent: sent?.sent ?? 0,
+      push: (sent?.sent ?? 0) - (sent?.reply ?? 0),
+      reply: sent?.reply ?? 0,
       broadcasts,
       // LINE の送信上限は Messaging API から取る。ここは DB だけを見る層なので
       // 触らない。呼び出し側（ルート）が埋める。
@@ -610,7 +627,14 @@ export interface ListStats {
   marks: { total: number; inUse: number; unanswered: number; inProgress: number; resolved: number };
   searches: { total: number; limit: number };
   templates: { total: number; inUse: number; sentThisMonth: number; unused90d: number };
-  scenarios: { total: number; active: number; subscribers: number; completed: number };
+  scenarios: {
+    total: number;
+    active: number;
+    subscribers: number;
+    completed: number;
+    /** 今週（過去7日）のシナリオ由来の送信。 */
+    sentThisWeek: number;
+  };
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number };
 }
 
@@ -677,8 +701,12 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
         .prepare(
           `SELECT
              (SELECT COUNT(*) FROM templates) AS total,
+             -- テンプレート由来だけを数える。template_id_at_send は 038 で入っている。
+             -- 全送信を出すと、テンプレートを使っていない手動返信まで混ざる。
              (SELECT COUNT(*) FROM messages_log
-               WHERE direction = 'outgoing' AND substr(created_at, 1, 7) = ?) AS sent`,
+               WHERE direction = 'outgoing'
+                 AND template_id_at_send IS NOT NULL
+                 AND substr(created_at, 1, 7) = ?) AS sent`,
         )
         .bind(monthStart)
         .first<{ total: number; sent: number }>();
@@ -709,13 +737,21 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
              (SELECT COUNT(*) FROM friend_scenarios WHERE status = 'completed') AS completed`,
         )
         .first<{ total: number; active: number; subscribers: number; completed: number }>();
+      // シナリオ由来の送信。source は 028 で入っている。
+      const sentThisWeek = await count(
+        db,
+        `SELECT COUNT(*) AS n FROM messages_log
+          WHERE source = 'scenario' AND substr(created_at, 1, 10) >= ?`,
+        jstDate(-6),
+      );
       return {
         total: row?.total ?? 0,
         active: row?.active ?? 0,
         subscribers: row?.subscribers ?? 0,
         completed: row?.completed ?? 0,
+        sentThisWeek,
       };
-    }, { total: 0, active: 0, subscribers: 0, completed: 0 }),
+    }, { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 }),
 
     safe(async () => {
       const row = await db
@@ -726,11 +762,18 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
              (SELECT COUNT(*) FROM friend_reminders WHERE status = 'active') AS waiting`,
         )
         .first<{ total: number; active: number; waiting: number }>();
+      // リマインダ由来の送信。source は 028 で入っている。
+      const sentThisMonth = await count(
+        db,
+        `SELECT COUNT(*) AS n FROM messages_log
+          WHERE source = 'reminder' AND substr(created_at, 1, 7) = ?`,
+        monthStart,
+      );
       return {
         total: row?.total ?? 0,
         active: row?.active ?? 0,
         waiting: row?.waiting ?? 0,
-        sentThisMonth: 0,
+        sentThisMonth,
       };
     }, { total: 0, active: 0, waiting: 0, sentThisMonth: 0 }),
   ]);

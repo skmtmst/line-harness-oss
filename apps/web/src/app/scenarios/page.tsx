@@ -183,7 +183,8 @@ export default function ScenariosPage() {
                   ? `完了率 ${Math.round((s.scenarios.completed / (s.scenarios.subscribers + s.scenarios.completed)) * 100)}%`
                   : '—',
             },
-            { title: '稼働中', value: s.scenarios.active, unit: '件', detail: '止めているものを除く' },
+            // 設計の4枚目。source='scenario'（028）で数えられる。
+            { title: '今週の配信', value: s.scenarios.sentThisWeek, unit: '通', detail: '過去7日' },
         ]}
       />
       </div>

@@ -108,16 +108,12 @@ export function MonthlyDeliveryCard({ delivery }: { delivery: DashboardOverview[
     <SideCard title="今月の配信" action={{ label: 'アクセス解析へ', href: '/analytics' }}>
       <div className="grid grid-cols-2 gap-4">
         {/*
-          設計は「プッシュ数 / リプライ数」。LINEは自発の送信（プッシュ）と
+          設計の「プッシュ数 / リプライ数」。LINEは自発の送信（プッシュ）と
           受信への応答（リプライ）で課金が違うので、まとめると枠の減りを
-          読み違える。
-
-          いまは messages_log にどちらかを示す印が無いので、区別できない。
-          出どころが分かるまで、送信の合計と一斉配信の件数を出す。
-          docs/v025-open-questions.md §A と同根。
+          読み違える。source（028）で分かれる。
         */}
-        <Figure label="送信数" value={delivery.sent} unit="通" />
-        <Figure label="一斉配信" value={delivery.broadcasts} unit="件" />
+        <Figure label="プッシュ数" value={delivery.push} unit="通" />
+        <Figure label="リプライ数" value={delivery.reply} unit="通" />
         <div className="col-span-2">
           <p className="text-ink-faint text-xs">残枠</p>
           <p className="text-ink mt-0.5 text-lg font-bold tabular-nums">
