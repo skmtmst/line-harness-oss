@@ -54,3 +54,4 @@ export * from './common-vars';
 export * from './site-tracking';
 export * from './funnels';
 export * from './login-audit';
+export * from './analytics';

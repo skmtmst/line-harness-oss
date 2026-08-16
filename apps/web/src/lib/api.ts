@@ -497,6 +497,15 @@ export type SearchConsoleSetup = {
   serviceAccountEmail: string | null
 }
 
+/** 集計の期間をクエリにする。省略時はサーバー側の既定（直近30日）に任せる。 */
+function rangeQuery(params?: { from?: string; to?: string }): string {
+  const q = new URLSearchParams()
+  if (params?.from) q.set('from', params.from)
+  if (params?.to) q.set('to', params.to)
+  const s = q.toString()
+  return s ? `?${s}` : ''
+}
+
 export const api = {
   searchConsole: {
     performance: (days: 7 | 28 | 90) =>
@@ -721,6 +730,69 @@ export const api = {
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),
+  },
+  /**
+   * 集計。新しいテーブルは作らず、既にあるデータをその場で数える。
+   * 外部APIを叩かないので、ここが外の障害で落ちることはない。
+   */
+  analytics: {
+    messages: (params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<Array<{ date: string; outgoing: number; incoming: number }>>>(
+        `/api/analytics/messages${rangeQuery(params)}`,
+      ),
+    linkClicks: (params?: { from?: string; to?: string }) =>
+      fetchApi<
+        ApiResponse<
+          Array<{ trackedLinkId: string; name: string; clicks: number; uniqueFriends: number }>
+        >
+      >(`/api/analytics/link-clicks${rangeQuery(params)}`),
+    broadcasts: (params?: { from?: string; to?: string }) =>
+      fetchApi<
+        ApiResponse<
+          Array<{
+            broadcastId: string
+            name: string
+            sentAt: string | null
+            delivered: number | null
+            uniqueImpression: number | null
+            uniqueClick: number | null
+            /** LINEの制約で20人未満は開封が取れない */
+            suppressedByAudienceSize: boolean
+          }>
+        >
+      >(`/api/analytics/broadcasts${rangeQuery(params)}`),
+    cross: (fieldId: string) =>
+      fetchApi<ApiResponse<Array<{ row: string; col: string; count: number }>>>(
+        `/api/analytics/cross?fieldId=${encodeURIComponent(fieldId)}`,
+      ),
+  },
+  funnels: {
+    list: () =>
+      fetchApi<ApiResponse<Array<{ id: string; name: string; windowDays: number; createdAt: string }>>>(
+        '/api/funnels',
+      ),
+    create: (data: {
+      name: string
+      windowDays?: number
+      steps: Array<{ label: string; kind: string; match: unknown }>
+    }) =>
+      fetchApi<ApiResponse<{ id: string }>>('/api/funnels', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) => fetchApi<ApiResponse<null>>(`/api/funnels/${id}`, { method: 'DELETE' }),
+    result: (id: string, params?: { from?: string; to?: string }) =>
+      fetchApi<
+        ApiResponse<{
+          funnel: { id: string; name: string }
+          steps: Array<{
+            stepOrder: number
+            label: string
+            reached: number
+            conversionFromPrevious: number
+          }>
+        }>
+      >(`/api/funnels/${id}/result${rangeQuery(params)}`),
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {
