@@ -14,7 +14,7 @@ import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
-import SupportInbox from '@/components/support/support-inbox'
+import EmailThread from '@/components/support/email-thread'
 
 interface Chat {
   id: string
@@ -331,7 +331,7 @@ const MERGED_TABS = [
   { key: 'email', label: 'お問い合わせ（メール）' },
 ]
 
-function ChatsPageInner() {
+function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const { selectedAccountId } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   /**
@@ -342,7 +342,8 @@ function ChatsPageInner() {
    * 返信を待っている人を2か所で探すことになる。
    */
   const [emailItems, setEmailItems] = useState<EmailInboxItem[]>([])
-  const router = useRouter()
+  // 中央ペインで開いているメール。LINEのトークと排他。
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
   const [allFriends, setAllFriends] = useState<FriendItem[]>([])
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null)
@@ -951,7 +952,7 @@ function ChatsPageInner() {
                   押したときの行き先だけは分ける。LINEはこの画面のトーク、
                   メールはメールの往復で、中央に出すものの作りが違う。
                 */}
-                {emailItems
+                {(channel === 'line' ? [] : emailItems)
                   .filter((item) =>
                     nameQuery.trim() === ''
                       ? true
@@ -961,7 +962,13 @@ function ChatsPageInner() {
                   .map((item) => (
                     <button
                       key={item.id}
-                      onClick={() => router.push(`/chats?channel=email&thread=${encodeURIComponent(item.threadId)}`)}
+                      onClick={() => {
+                        // LINEの選択を外す。両方開いていると中央に何を
+                        // 出すのか決まらない。
+                        setSelectedChatId(null)
+                        setSelectedFriendId(null)
+                        setSelectedThreadId(item.threadId)
+                      }}
                       className="border-hairline hover:bg-canvas-sunken w-full border-b px-4 py-3 text-left transition-colors"
                     >
                       <div className="flex items-start gap-3">
@@ -990,7 +997,7 @@ function ChatsPageInner() {
                     </button>
                   ))}
 
-                {chats
+                {(channel === 'email' ? [] : chats)
                   .filter((chat) =>
                     nameQuery.trim() === ''
                       ? true
@@ -1087,7 +1094,15 @@ function ChatsPageInner() {
 
         {/* Right Panel: Chat Detail */}
         <div className={`flex-1 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId || selectedFriendId ? 'flex' : 'hidden lg:flex'}`}>
-          {selectedFriendId && !selectedChatId ? (
+          {selectedThreadId ? (
+            /* メールの往復。LINEのトークと同じ場所に出す。 */
+            <EmailThread
+              threadId={selectedThreadId}
+              onChanged={() => {
+                void loadEmails()
+              }}
+            />
+          ) : selectedFriendId && !selectedChatId ? (
             /* Direct message to friend without existing chat */
             <DirectMessagePanel
               friendId={selectedFriendId}
@@ -1419,7 +1434,16 @@ function ChatsPageInner() {
           前の chat のデータが残っているので、それを参照すると
           ここだけ前の友だちを出し続ける。選択IDがそのまま friend_id。
         */}
-        {showFriendInfo && (selectedChatId || selectedFriendId) && (
+        {/*
+          友だち詳細。メールでも出したいが、メールのスレッドは友だちに
+          紐づいていない（support_email_threads は customer_email しか
+          持たない）。メールアドレスから友だちを引く口が要る。
+          docs/v025-open-questions.md に残している。
+
+          いまはメールを開いているときは案内を出す。空の枠を出すより、
+          なぜ出ないかが分かる方がよい。
+        */}
+        {showFriendInfo && (selectedChatId || selectedFriendId || selectedThreadId) && (
           <div className="absolute inset-y-0 right-0 z-20 w-[320px] max-w-full shadow-xl">
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
@@ -1434,6 +1458,15 @@ function ChatsPageInner() {
             >
               閉じる
             </button>
+            {selectedThreadId ? (
+              <div className="bg-canvas rounded-card border-hairline flex w-full items-center justify-center border">
+                <p className="text-ink-faint px-6 text-center text-sm leading-relaxed">
+                  メールの相手は、まだ友だちと
+                  <br />
+                  紐づいていません。
+                </p>
+              </div>
+            ) : (
             <FriendInfoSidebar
               friendId={selectedFriendId || selectedChatId}
               chatStatus={
@@ -1442,6 +1475,7 @@ function ChatsPageInner() {
                   : undefined
               }
             />
+            )}
           </div>
         )}
       </div>
@@ -1559,23 +1593,13 @@ function ChatsPageHost() {
       </div>
 
       {/*
-        「すべて」は両方を縦に並べる。1つの一覧に混ぜるには、LINE の
-        トークとメールのスレッドで開いたあとの作りが違いすぎる
-        （片方はリアルタイムのトーク、片方はメールの往復）。
-        混ぜた一覧から開くと、選んだ相手によって右側が別物になる。
+        1つの受信箱。LINEもメールも同じ一覧に並び、同じ場所で開く。
 
-        いまは「返信を待っている人がどこに何人いるか」を1画面で見られれば
-        用は足りるので、2つの受信箱を縦に置く。
+        以前はメールを下に別ブロックで積んでいたが、返信を待っている人を
+        2か所で探すことになっていた。設計 `V2 2-1 受信箱` の一覧も
+        「✉ 定期便の解約について」のように1本に混ざっている。
       */}
-      {channel !== 'email' && <ChatsPageInner />}
-      {channel !== 'line' && (
-        <div className={channel === 'all' ? 'mt-6' : undefined}>
-          {channel === 'all' && (
-            <h2 className="text-ink mb-3 text-sm font-semibold">メールでの問い合わせ</h2>
-          )}
-          <SupportInbox channel={channel === 'all' ? 'all' : 'email'} />
-        </div>
-      )}
+      <ChatsPageInner channel={channel} />
     </div>
   )
 }
