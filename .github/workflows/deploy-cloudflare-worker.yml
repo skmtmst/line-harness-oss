@@ -30,7 +30,16 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @line-crm/shared --filter @line-crm/line-sdk --filter @line-crm/db --filter @line-harness/update-engine build
 
-      - name: Run pending D1 migrations
+      # 当てる前の復元点を取っておく。
+      #
+      # 追加のみのポリシー（CONTRIBUTING.md §Migration Policy）で down
+      # マイグレーションを書けないので、戻る手段は Time Travel しかない。
+      # 事故ってから探すのでは遅いので、毎回ログとサマリーに残す。
+      #
+      # 未適用が無いときは取らない。取っても使い道が無く、
+      # 巻き戻し先として紛らわしいだけになる。
+      - name: Take a Time Travel bookmark before migrating
+        id: bookmark
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -43,6 +52,82 @@ jobs:
           npx wrangler d1 execute "$D1_DATABASE_NAME" --remote --command \
             "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
 
+          applied=$(npx wrangler d1 execute "$D1_DATABASE_NAME" --remote \
+            --command "SELECT name FROM _migrations" --json \
+            | node -e "
+              const d = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
+              console.log((d[0]?.results ?? []).map((r) => r.name).join('\n'));
+            ")
+
+          pending=''
+          count=0
+          for f in $(ls packages/db/migrations/*.sql | sort); do
+            name=$(basename "$f")
+            if ! printf '%s\n' "$applied" | grep -qxF "$name"; then
+              pending="${pending}${name}"$'\n'
+              count=$((count + 1))
+            fi
+          done
+
+          {
+            echo "## D1 マイグレーション"
+            echo
+            echo "未適用: ${count} 件"
+            if [ "$count" -gt 0 ]; then
+              echo
+              echo '```'
+              printf '%s' "$pending"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$count" = "0" ]; then
+            echo "未適用のものはありません。復元点は取りません。"
+            exit 0
+          fi
+
+          raw=$(npx wrangler d1 time-travel info "$D1_DATABASE_NAME" --json)
+          echo "$raw"
+
+          bookmark=$(printf '%s' "$raw" | node -e "
+            const text = require('fs').readFileSync('/dev/stdin', 'utf8');
+            let found = '';
+            try {
+              const d = JSON.parse(text);
+              found = d.bookmark ?? d.result?.bookmark ?? '';
+            } catch {
+              // wrangler が JSON 以外を混ぜることがあるので、拾えなければ次へ
+            }
+            if (!found) {
+              const m = text.match(/[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}/i);
+              found = m ? m[0] : '';
+            }
+            process.stdout.write(found);
+          ")
+
+          if [ -z "$bookmark" ]; then
+            echo "::error::Time Travel のブックマークを取れませんでした。戻る先が無いので中止します。"
+            exit 1
+          fi
+
+          {
+            echo
+            echo "### 復元点"
+            echo
+            echo '```bash'
+            echo "npx wrangler d1 time-travel restore $D1_DATABASE_NAME --bookmark=$bookmark"
+            echo '```'
+            echo
+            echo "この時点まで巻き戻すので、当てたあとに入った友だち・"
+            echo "メッセージ・予約も一緒に消えます。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run pending D1 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
+        run: |
           for f in $(ls packages/db/migrations/*.sql | sort); do
             name=$(basename "$f")
             applied=$(npx wrangler d1 execute "$D1_DATABASE_NAME" --remote \
