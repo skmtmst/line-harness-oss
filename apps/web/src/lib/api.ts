@@ -356,7 +356,13 @@ export type ListStats = {
   marks: { total: number; inUse: number; unanswered: number; inProgress: number; resolved: number }
   searches: { total: number; limit: number }
   templates: { total: number; inUse: number; sentThisMonth: number; unused90d: number }
-  scenarios: { total: number; active: number; subscribers: number; completed: number }
+  scenarios: {
+    total: number
+    active: number
+    subscribers: number
+    completed: number
+    sentThisWeek: number
+  }
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
 }
 
@@ -416,6 +422,9 @@ export type DashboardOverview = {
   }
   delivery: {
     sent: number
+    /** こちらから送った数と、受信への応答。LINEは課金の数え方が違う。 */
+    push: number
+    reply: number
     broadcasts: number
     quotaLimit: number | null
     quotaUsed: number | null

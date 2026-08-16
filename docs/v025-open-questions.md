@@ -197,17 +197,25 @@ EC連携で会員のメールアドレスは持っているので、そこを経
 
 個別に見ると19件あるが、原因は5つに集約される。
 
-### A. 送信の出どころを記録していない（6-2 / 7-1 / 8-2）— **108 で列を用意した**
+### A. 送信の出どころを記録していない（6-2 / 7-1 / 8-2）— **誤り。028 で既にあった**
 
-`messages_log` に「この送信は何由来か」（テンプレート／シナリオ／リマインダ／
-一斉配信）を持っていない。1列足せば3件まとめて解ける。
+`messages_log` は 028 の時点で `source` を持っている。
 
-```sql
-ALTER TABLE messages_log ADD COLUMN origin_kind TEXT;   -- 'template' | 'scenario' | 'reminder' | 'broadcast'
-ALTER TABLE messages_log ADD COLUMN origin_id TEXT;
-```
+  user / broadcast / scenario / auto_reply / reminder / manual
 
-**過去ぶんは埋まらない。** 入れた日から先だけ正しくなる。
+さらに 038 で `template_id_at_send`（送信時に使ったテンプレート）もある。
+
+**「記録していない」は私の思い込みだった。** 実物を確かめず決めつけていた。
+
+したがって次はすべて**読み出しを書くだけ**で済み、解決した。
+
+  テンプレートの「今月の送信」  template_id_at_send IS NOT NULL で絞る
+  シナリオの「今週の配信」      source = 'scenario'
+  リマインダの「今月の配信」    source = 'reminder'
+  プッシュ数 / リプライ数       source IN ('auto_reply','manual') が応答
+
+108 で origin_kind / origin_id を足してしまった。検証環境に入っており、
+追加のみのポリシーで消せない。**どこからも読み書きしない。**
 
 ### B. 初回返信の時間を記録していない（1-1 / 2-1）— **107 で解決済み**
 
@@ -249,7 +257,7 @@ select / multi_select / checkbox / url / tel / email）と `is_starred` を
 
 | | 根っこ | 列・表 | 書き込み | 読み出し |
 |---|---|---|---|---|
-| A | 送信の出どころ | 108 | **未** | 未 |
+| A | 送信の出どころ | **028 で既にあった** | 済 | **済**（4か所とも） |
 | B | 初回返信の時間 | 107 | **済** | **済**（平均の初回返信） |
 | C | 短縮URLとテンプレート | 110 | **未** | 未 |
 | D | 友だち情報欄の型 | **099 で既にあった** | 済 | **未** |

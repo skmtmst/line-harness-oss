@@ -339,14 +339,8 @@ export default function RemindersPage() {
             { title: 'リマインダ', value: s.reminders.total, unit: '件', detail: `稼働中 ${s.reminders.active}` },
             { title: '配信待ち', value: s.reminders.waiting, unit: '人', detail: '登録済みで未完了' },
             { title: '稼働中', value: s.reminders.active, unit: '件', detail: '止めているものを除く' },
-            // 設計は「起点になる項目」。友だち情報欄のうち日付型を数えるが、
-            // 型の区別を持っていない。止めている数のほうが、いま意味がある。
-            {
-              title: '止めている',
-              value: s.reminders.total - s.reminders.active,
-              unit: '件',
-              detail: '編集中・保留',
-            },
+            // 設計の4枚目。source='reminder'（028）で数えられる。
+            { title: '今月の配信', value: s.reminders.sentThisMonth, unit: '通', detail: '今月ぶん' },
         ]}
       />
       </div>
