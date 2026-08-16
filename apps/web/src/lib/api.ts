@@ -1003,6 +1003,27 @@ export const api = {
           : undefined,
         body: JSON.stringify(data),
       }),
+    /**
+     * 送る前の確認。何人に届くかと、気をつけることを返す。
+     * 送信は何もしない。
+     */
+    preflight: (data: {
+      targetType: string
+      targetTagId?: string | null
+      lineAccountId?: string | null
+      accountIds?: string[]
+      messageContent?: string
+    }) =>
+      fetchApi<
+        ApiResponse<{
+          audienceCount: number
+          hiddenExcluded: number
+          warnings: Array<{ level: 'info' | 'warning'; message: string }>
+        }>
+      >('/api/broadcasts/preflight', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     update: (
       id: string,
       data: {

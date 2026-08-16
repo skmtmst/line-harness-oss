@@ -21,6 +21,11 @@ import {
   hasRecipientVariables,
   renderBroadcastMessageContent,
 } from '../services/render-message.js';
+import {
+  countAudience,
+  buildWarnings,
+  hasRecentSimilarBroadcast,
+} from '../services/broadcast-preflight.js';
 
 const broadcasts = new Hono<Env>();
 
@@ -308,6 +313,51 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
 });
 
 // POST /api/broadcasts - create
+// POST /api/broadcasts/preflight — 送る前の確認
+//
+// 何人に届くかと、気をつけることを返す。送信は何もしない。
+// 一斉配信は取り消せないので、押す前に見せる。
+//
+// :id を使う経路より先に置く。後ろだと 'preflight' が :id として拾われる。
+broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{
+      targetType?: unknown;
+      targetTagId?: unknown;
+      lineAccountId?: unknown;
+      accountIds?: unknown;
+      messageContent?: unknown;
+    }>();
+
+    const targetType = String(body.targetType ?? 'all');
+    const audience = await countAudience(c.env.DB, {
+      targetType,
+      targetTagId: body.targetTagId ? String(body.targetTagId) : null,
+      lineAccountId: body.lineAccountId ? String(body.lineAccountId) : null,
+      accountIds: Array.isArray(body.accountIds) ? body.accountIds.map(String) : undefined,
+    });
+
+    // 同じ本文の配信が直近にあるかは、本文が渡されたときだけ見る。
+    // 下書きの段階では本文が空のこともある。
+    const content = typeof body.messageContent === 'string' ? body.messageContent : '';
+    const hasRecentSimilar = content
+      ? await hasRecentSimilarBroadcast(c.env.DB, content, new Date().toISOString())
+      : false;
+
+    return c.json({
+      success: true,
+      data: {
+        audienceCount: audience.total,
+        hiddenExcluded: audience.hiddenExcluded,
+        warnings: buildWarnings(audience, { hasRecentSimilar }),
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/broadcasts/preflight error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<CreateBroadcastBody>();

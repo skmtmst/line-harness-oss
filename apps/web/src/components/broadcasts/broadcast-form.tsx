@@ -114,6 +114,13 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
   const [filter, setFilter] = useState({ gender: '', age: '', area: '', tenure: '', reaction: '', tagId: '' })
   const [targetCount, setTargetCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
+  // 送る前の確認。押すまで走らせない。入力のたびに投げると、
+  // 書いている途中の本文で「二重送信では」と言われ続ける。
+  const [preflight, setPreflight] = useState<{
+    audienceCount: number
+    warnings: Array<{ level: 'info' | 'warning'; message: string }>
+  } | null>(null)
+  const [checking, setChecking] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -144,6 +151,27 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
     }
     return ''
   }
+  const runPreflight = async () => {
+    setChecking(true)
+    setError('')
+    try {
+      const first = bubbles[0]
+      const content = first?.type === 'text' ? String(first.content.text ?? '') : ''
+      const res = await api.broadcasts.preflight({
+        targetType: filter.tagId ? 'tag' : 'all',
+        targetTagId: filter.tagId || null,
+        lineAccountId: selectedAccountId || null,
+        messageContent: content,
+      })
+      if (res.success) setPreflight(res.data)
+      else setError(res.error)
+    } catch {
+      setError('確認できませんでした')
+    } finally {
+      setChecking(false)
+    }
+  }
+
   const save = async () => {
     const validationError = validate(); if (validationError) { setError(validationError); return }
     setSaving(true); setError('')
@@ -176,7 +204,28 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
         {bubbles.map((bubble, index) => <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />)}
         <button type="button" disabled={bubbles.length >= 3} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-2xl border-2 border-dashed border-emerald-300 py-4 text-sm font-bold text-emerald-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400">＋ 吹き出しを追加（{bubbles.length}/3）</button>
         {error && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-        <div className="flex justify-end gap-3"><button onClick={onCancel} className="rounded-xl border px-5 py-3 text-sm font-bold">キャンセル</button><button disabled={saving} onClick={() => void save()} className="rounded-xl bg-emerald-600 px-7 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? '保存中…' : '下書きを保存'}</button></div>
+        {preflight && (
+      <div className="border-hairline mb-3 rounded-xl border p-4">
+        <p className="text-ink-secondary text-sm font-bold">
+          送る前の確認：{preflight.audienceCount.toLocaleString('ja-JP')} 人に届きます
+        </p>
+        {preflight.warnings.length > 0 && (
+          <ul className="mt-2 space-y-1">
+            {preflight.warnings.map((w) => (
+              <li
+                key={w.message}
+                className={`rounded px-2 py-1 text-xs ${
+                  w.level === 'warning' ? 'bg-danger-bg text-danger' : 'bg-info-bg text-info'
+                }`}
+              >
+                {w.message}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )}
+    <div className="flex justify-end gap-3"><button onClick={onCancel} className="rounded-xl border px-5 py-3 text-sm font-bold">キャンセル</button><button disabled={checking} onClick={() => void runPreflight()} className="rounded-xl border px-5 py-3 text-sm font-bold disabled:opacity-50">{checking ? '確認中…' : '配信前チェック'}</button><button disabled={saving} onClick={() => void save()} className="rounded-xl bg-emerald-600 px-7 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? '保存中…' : '下書きを保存'}</button></div>
       </div>
       <aside className="xl:sticky xl:top-6 xl:h-fit"><div className="overflow-hidden rounded-[28px] border-[8px] border-slate-800 bg-[#8faed2] shadow-xl"><div className="bg-slate-800 px-4 py-2 text-center text-xs font-bold text-white">トークプレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className="mb-3 text-center text-[11px] text-white/80">今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="mt-3 text-center text-xs text-slate-500">編集内容がリアルタイムで反映されます</p></aside>
     </div>
