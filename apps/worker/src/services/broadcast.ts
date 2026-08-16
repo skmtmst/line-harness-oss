@@ -275,6 +275,29 @@ export async function processScheduledBroadcasts(
   }
 }
 
+
+/**
+ * 1回のCron実行で送る人数の上限。
+ *
+ * stealth_spread_minutes は「何分かけて配りきるか」。既定の 0 は
+ * 一気に送る（従来どおり）。
+ *
+ * Cron は1分ごとなので、全体を分数で割った人数を1回ぶんにする。
+ * 途中で止めても batch_offset がそこに残り、次の tick が続きから送る。
+ * この再開のしくみは元からあるもので、新しく二重送信の危険は増えない。
+ *
+ * 下限を1バッチにしているのは、0人になると永久に進まなくなるため。
+ */
+export function stealthChunkSize(
+  total: number,
+  spreadMinutes: number,
+  batchSize: number,
+): number {
+  if (spreadMinutes <= 0) return total;
+  const perMinute = Math.ceil(total / spreadMinutes);
+  return Math.max(batchSize, perMinute);
+}
+
 /**
  * Cronから呼ばれるキュー処理。status='queued' のブロードキャストを
  * batch_offset から500人ずつ処理する。1回のCron実行で全バッチを処理可能。
@@ -464,8 +487,13 @@ async function processQueuedBroadcastBatches(
   const deliveryBatchSize = personalized ? PERSONALIZED_PUSH_BATCH_SIZE : MULTICAST_BATCH_SIZE;
   const totalBatches = Math.ceil(friends.length / deliveryBatchSize);
 
-  // 1回のCron実行で全バッチを処理（タイムアウトしない範囲で）
-  while (currentOffset < friends.length) {
+  // 時間をかけて配る設定。0（既定）なら一気に送る。
+  const spreadMinutes = Number(raw.stealth_spread_minutes ?? 0) || 0;
+  const chunkLimit = stealthChunkSize(friends.length, spreadMinutes, deliveryBatchSize);
+  const stopAt = Math.min(friends.length, currentOffset + chunkLimit);
+
+  // 1回のCron実行で、上限まで処理する（タイムアウトしない範囲で）
+  while (currentOffset < stopAt) {
     const batch = friends.slice(currentOffset, currentOffset + deliveryBatchSize);
     const lineUserIds = batch.map(f => f.line_user_id);
     const batchIndex = Math.floor(currentOffset / deliveryBatchSize);
@@ -590,6 +618,13 @@ async function processQueuedBroadcastBatches(
     await db.prepare(
       `UPDATE broadcasts SET success_count = success_count + ? WHERE id = ?`,
     ).bind(batch.length, broadcast.id).run();
+  }
+
+  // まだ残っている（時間をかけて配る設定で途中まで送った）。
+  // ロックだけ外して、次の tick が続きから送る。完了にはしない。
+  if (currentOffset < friends.length) {
+    await updateBroadcastBatchProgress(db, broadcast.id, currentOffset, 0);
+    return;
   }
 
   // 全バッチ完了 — ロック解除 + 完了マーク

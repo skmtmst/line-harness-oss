@@ -92,6 +92,8 @@ export interface CreateBroadcastInput {
   trackLinks?: boolean;
   lineAccountId?: string | null;
   altText?: string | null;
+  /** 何分かけて配るか。0（既定）は一気に送る */
+  stealthSpreadMinutes?: number;
 }
 
 export async function createBroadcast(
@@ -106,8 +108,8 @@ export async function createBroadcast(
   await db
     .prepare(
       `INSERT INTO broadcasts
-         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?)`,
+         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -124,6 +126,8 @@ export async function createBroadcast(
       input.trackLinks === false ? 0 : 1,
       input.lineAccountId ?? null,
       input.altText ?? null,
+      // 何分かけて配るか。0（既定）は一気に送る。
+      input.stealthSpreadMinutes ?? 0,
       now,
     )
     .run();

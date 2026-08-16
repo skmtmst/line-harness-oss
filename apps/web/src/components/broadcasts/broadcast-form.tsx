@@ -121,6 +121,8 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
     warnings: Array<{ level: 'info' | 'warning'; message: string }>
   } | null>(null)
   const [checking, setChecking] = useState(false)
+  // 何分かけて配るか。0（既定）は一気に送る。
+  const [spreadMinutes, setSpreadMinutes] = useState('0')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -178,7 +180,7 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
     const first = bubbles[0]
     const legacyContent = first.type === 'text' ? String(first.content.text) : JSON.stringify(first.content)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: first.type === 'image' ? 'image' : first.type === 'rich_message' || first.type === 'card_message' ? 'flex' : 'text', messageContent: legacyContent, messageBubbles: bubbles, targetType: filter.tagId ? 'tag' : 'all', targetTagId: filter.tagId || null, lineAccountId: selectedAccountId || null, scheduledAt: null, trackLinks: true }, { idempotencyKey: createIdempotencyKey.current })
+      const res = await api.broadcasts.create({ title: title.trim(), messageType: first.type === 'image' ? 'image' : first.type === 'rich_message' || first.type === 'card_message' ? 'flex' : 'text', messageContent: legacyContent, messageBubbles: bubbles, targetType: filter.tagId ? 'tag' : 'all', targetTagId: filter.tagId || null, lineAccountId: selectedAccountId || null, scheduledAt: null, trackLinks: true, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
       if (res.success) onSuccess(); else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
@@ -204,7 +206,30 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
         {bubbles.map((bubble, index) => <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />)}
         <button type="button" disabled={bubbles.length >= 3} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-2xl border-2 border-dashed border-emerald-300 py-4 text-sm font-bold text-emerald-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400">＋ 吹き出しを追加（{bubbles.length}/3）</button>
         {error && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-        {preflight && (
+        <div className="border-hairline mb-3 rounded-xl border p-4">
+      <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-bold">
+        時間をかけて配る
+      </label>
+      <div className="flex items-center gap-1.5">
+        <input
+          id="bc-spread"
+          type="number"
+          min={0}
+          max={720}
+          value={spreadMinutes}
+          onChange={(e) => setSpreadMinutes(e.target.value)}
+          className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
+        />
+        <span className="text-ink-faint text-xs">分かけて</span>
+      </div>
+      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+        0 なら一気に送ります。分数を入れると、その時間に分けて少しずつ配ります。
+        一度に大量に届いてブロックされるのを避けたいときに使います。
+        途中で止まっても、続きから送り直します（同じ人に二度は届きません）。
+      </p>
+    </div>
+
+    {preflight && (
       <div className="border-hairline mb-3 rounded-xl border p-4">
         <p className="text-ink-secondary text-sm font-bold">
           送る前の確認：{preflight.audienceCount.toLocaleString('ja-JP')} 人に届きます

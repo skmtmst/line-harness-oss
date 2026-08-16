@@ -64,9 +64,19 @@ const FEATURE_GROUPS: Array<{
   },
 ]
 
+/**
+ * サイドバーの並び。
+ *
+ * ここに出す名前は sidebar.tsx のセクション名と合わせる。ずれると、
+ * 並び替えたのに反映されない（知らない名前は無視されるため）。
+ */
+const SIDEBAR_SECTIONS = ['メイン', '配信', '分析', 'EC', '予約', '設定']
+
 export default function SettingsPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [features, setFeatures] = useState<Record<string, boolean>>({})
+  const [order, setOrder] = useState<string[]>(SIDEBAR_SECTIONS)
+  const [savingOrder, setSavingOrder] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -80,7 +90,15 @@ export default function SettingsPage() {
     setError('')
     try {
       const res = await api.featureSettings.get(selectedAccountId)
-      if (res.success) setFeatures(res.data.features)
+      if (res.success) {
+        setFeatures(res.data.features)
+        if (res.data.sidebarOrder) {
+          // 保存に無いセクションは後ろに残す。機能が増えたときに
+          // 新しいセクションが消えないようにするため。
+          const saved = res.data.sidebarOrder.filter((s) => SIDEBAR_SECTIONS.includes(s))
+          setOrder([...saved, ...SIDEBAR_SECTIONS.filter((s) => !saved.includes(s))])
+        }
+      }
     } catch {
       setError('読み込みに失敗しました')
     } finally {
@@ -187,6 +205,90 @@ export default function SettingsPage() {
               ))}
             </div>
           )}
+
+          <section className="bg-canvas rounded-card border-hairline mt-5 border p-5">
+            <h2 className="text-ink mb-1 text-sm font-semibold">サイドバーの並び</h2>
+            <p className="text-ink-faint mb-3 text-xs">
+              よく使うまとまりを上に持ってこられます。
+            </p>
+            <ul className="divide-hairline divide-y">
+              {order.map((label, i) => (
+                <li key={label} className="flex items-center justify-between gap-3 py-2">
+                  <span className="text-ink text-sm">
+                    <span className="text-ink-faint mr-2 tabular-nums">{i + 1}.</span>
+                    {label}
+                  </span>
+                  <div className="flex gap-1">
+                    {/* 上下のボタンにしている。ドラッグは触れる範囲が小さく、
+                        タッチだと持ち上げにくい。 */}
+                    <button
+                      onClick={() =>
+                        setOrder((prev) => {
+                          const next = [...prev]
+                          ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
+                          return next
+                        })
+                      }
+                      disabled={i === 0}
+                      aria-label={`${label}を上へ`}
+                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() =>
+                        setOrder((prev) => {
+                          const next = [...prev]
+                          ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
+                          return next
+                        })
+                      }
+                      disabled={i === order.length - 1}
+                      aria-label={`${label}を下へ`}
+                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3 flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  if (!selectedAccountId) return
+                  setSavingOrder(true)
+                  setError('')
+                  try {
+                    const res = await api.featureSettings.save(selectedAccountId, {
+                      sidebarOrder: order,
+                    })
+                    if (!res.success) {
+                      setError(res.error)
+                      return
+                    }
+                    // サイドバーは読み込み時に並びを取るので、反映には
+                    // 画面の読み直しが要る。押した人に伝える。
+                    setNotice('保存しました。画面を読み直すと並びが変わります。')
+                  } catch {
+                    setError('保存に失敗しました')
+                  } finally {
+                    setSavingOrder(false)
+                  }
+                }}
+                disabled={savingOrder}
+                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
+              >
+                {savingOrder ? '保存中...' : '並びを保存'}
+              </button>
+              <button
+                onClick={() => setOrder(SIDEBAR_SECTIONS)}
+                className="text-ink-faint hover:text-ink-secondary px-2 py-2 text-sm"
+              >
+                元に戻す
+              </button>
+            </div>
+          </section>
 
           <p className="text-ink-faint mt-4 text-xs leading-relaxed">
             切っても、それまでに作ったデータは消えません。もう一度有効にすれば元どおり見えます。

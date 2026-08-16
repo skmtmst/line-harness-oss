@@ -74,7 +74,10 @@ export default function NewStaffPage() {
       </Field>
 
       <p className="text-ink-faint text-xs leading-relaxed">
-        作成すると、この画面に一度だけログイン用の鍵が出ます。あとから見返すことはできないので、
+        ユーザーの追加は<strong>オーナーだけ</strong>ができます。
+        管理者やスタッフの権限では保存できません。
+        <br />
+        作成すると、一度だけログイン用の鍵が返ります。あとから見返すことはできないので、
         その場で本人に渡してください。
       </p>
     </CreatePage>

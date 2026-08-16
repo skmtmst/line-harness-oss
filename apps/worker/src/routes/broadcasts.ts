@@ -70,6 +70,8 @@ type CreateBroadcastBody = {
   accountIds?: string[];
   dedupPriority?: string[];
   trackLinks?: boolean;
+  /** 何分かけて配るか。0（既定）は一気に送る */
+  stealthSpreadMinutes?: number;
 };
 
 function sameCreateRequest(existing: DbBroadcast, body: CreateBroadcastBody): boolean {
@@ -378,6 +380,18 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: 'messageBubbles must contain 1 to 3 items' }, 400);
     }
 
+    // 配る時間の指定。長すぎると送りきる前に日をまたぐので上限を置く。
+    if (body.stealthSpreadMinutes !== undefined) {
+      const n = Number(body.stealthSpreadMinutes);
+      if (!Number.isInteger(n) || n < 0 || n > 720) {
+        return c.json(
+          { success: false, error: 'stealthSpreadMinutes must be an integer between 0 and 720' },
+          400,
+        );
+      }
+      body.stealthSpreadMinutes = n;
+    }
+
     const variableError = unsupportedVariablesError(body.messageContent);
     if (variableError) {
       return c.json({ success: false, error: variableError }, 400);
@@ -418,6 +432,7 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
       broadcast = await createBroadcast(c.env.DB, {
         id: idempotencyKey,
         title: body.title,
+        stealthSpreadMinutes: body.stealthSpreadMinutes ?? 0,
         messageType: body.messageType,
         messageContent: body.messageContent,
         messageBubblesJson: body.messageBubbles ? JSON.stringify(body.messageBubbles) : null,

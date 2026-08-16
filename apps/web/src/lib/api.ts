@@ -1097,6 +1097,8 @@ export const api = {
       accountIds?: string[]
       dedupPriority?: string[]
       trackLinks?: boolean
+      /** 何分かけて配るか。0（既定）は一気に送る */
+      stealthSpreadMinutes?: number
     }, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',

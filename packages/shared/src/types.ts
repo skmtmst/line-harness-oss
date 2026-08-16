@@ -288,6 +288,11 @@ export interface Scenario {
   isActive: boolean;
   /** 配信モード (作成後の変更不可)。レスポンスでは常にセット、Create リクエストでは省略可 (default: 'relative') */
   deliveryMode?: DeliveryMode;
+  /**
+   * 他のシナリオと同時に動いてよいか。既定は true（並行を許す）。
+   * false にすると、他のシナリオが動いている人はこのシナリオに登録されない。
+   */
+  allowConcurrent?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */

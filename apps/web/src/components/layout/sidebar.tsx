@@ -209,6 +209,7 @@ function NavIcon({ d }: { d: string }) {
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const { selectedAccountId } = useAccount()
   const [isOpen, setIsOpen] = useState(false)
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
@@ -223,6 +224,41 @@ export default function Sidebar() {
   // チャット画面での status 変更・手動返信直後は UNANSWERED_REFRESH_EVENT で
   // 即時再取得する (ポーリング待ちだと操作してもバッジが減らないと感じるため)。
   const [unansweredCount, setUnansweredCount] = useState<number>(0)
+
+  // 並び順の設定。account_settings の 'sidebar.order' に、セクションの
+  // ラベルを並べて持つ。設定が無ければ menuSections のままの順で出す。
+  //
+  // 知らないラベルは無視し、設定に無いセクションは後ろに残す。こうしないと、
+  // 機能が増えたときに新しいセクションが消えてしまう。
+  const [sectionOrder, setSectionOrder] = useState<string[] | null>(null)
+
+  // 設定を読む。取れなくても既定の並びで出るので、失敗は握る。
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let cancelled = false
+    void import('@/lib/api')
+      .then(({ api }) => api.featureSettings.get(selectedAccountId))
+      .then((res) => {
+        if (!cancelled && res.success && res.data.sidebarOrder) {
+          setSectionOrder(res.data.sidebarOrder)
+        }
+      })
+      .catch(() => {
+        // 並び順が取れなくても、既定の並びで使える。
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId])
+  const orderedSections = sectionOrder
+    ? [
+        ...sectionOrder
+          .map((label) => menuSections.find((s) => (s.label ?? '') === label))
+          .filter((s): s is (typeof menuSections)[number] => Boolean(s)),
+        ...menuSections.filter((s) => !sectionOrder.includes(s.label ?? '')),
+      ]
+    : menuSections
+
   useEffect(() => {
     let cancelled = false
     // 連続操作で fetch が並走した際、遅い古いレスポンスが新しい値を上書きしない
@@ -267,7 +303,7 @@ export default function Sidebar() {
 
       {/* ナビゲーション */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {menuSections.map((section, si) => (
+        {orderedSections.map((section, si) => (
           <div key={si}>
             {section.label && (
               <div className="pt-5 pb-2 px-3">

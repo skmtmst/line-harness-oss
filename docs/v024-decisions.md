@@ -85,11 +85,12 @@ CHECK 制約を増やせないため、別テーブルが必要だった）。
 
 ---
 
-## 5. `scenarios.allow_concurrent` は実装しない（103の列は残す）
+## 5. `scenarios.allow_concurrent` → **実装した**（当初は保留にしていた）
 
-**決定**: 列は足したまま、**どこからも読まない**。画面にも出さない。
+**決定**: 「**他のシナリオが動いている人は登録しない**」という意味で実装した。
+画面はシナリオ詳細のチェックボックス。
 
-**理由**: 実装しようとして、成り立たないことが分かった。
+**保留にしていた理由と、その解き方**:
 
 `friend_scenarios` には既に部分UNIQUE索引がある。
 
@@ -99,33 +100,54 @@ CREATE UNIQUE INDEX idx_friend_scenarios_unique
 ```
 
 つまり**同じ友だちが同じシナリオに二重登録されることは、いまも起きない**。
-`allow_concurrent = 1` で重ねられるようにするには、この索引を落とす必要がある。
-追加のみポリシー（`CONTRIBUTING.md §Migration Policy`）で索引の削除は禁じている。
+なので「1人1シナリオ」を*同じシナリオの重複*と読むと、この列は何もすることが無い。
+索引を落とせば重ねられるが、追加のみポリシー（`CONTRIBUTING.md §Migration Policy`）で
+索引の削除は禁じている。
 
-一方、要件定義書の「既定は 0（Lステップと同じ『1人1シナリオ』）」を
-「**他のシナリオが動いていたら登録しない**」と読むなら、実装はできる。
-ただし**既定が 0 なので、入れた瞬間に全シナリオの挙動が変わる**。
-いまは1人が複数のシナリオに同時に入れるので、そこを既定で塞ぐと
-「昨日まで届いていた配信が届かない」という形で表に出る。
+そこで*シナリオをまたぐ排他*と読んだ。こちらは実装できる。
+問題は**列の既定が 0** で、そのまま入れると全シナリオが排他になり、
+「昨日まで届いていた配信が届かない」形で表に出ることだった。
 
-どちらの読み方でも、いま入れると壊す方が大きい。列だけ残して保留する。
+これを 104 で解いた。
 
-**再開するときに決めること**:
+```sql
+-- 104_scenario_concurrency_default.sql
+UPDATE scenarios SET allow_concurrent = 1 WHERE allow_concurrent = 0;
+```
 
-1. 「1人1シナリオ」は**同じシナリオの重複**か、**シナリオをまたぐ排他**か
-2. 後者なら、既定を 1（従来どおり並行を許す）にする移行が要る
-   —— 列の既定は 0 なので、既存行を 1 に更新するマイグレーションを別に足す
-3. 排他にした場合、あとから来たシナリオは「登録しない」のか「前のを止める」のか
+既存の行を全部「並行を許す」に倒すので、**入れても今日の挙動は1つも変わらない**。
+`createScenario` も既定で 1 を入れる（`allowConcurrent === false` のときだけ 0）。
+排他にしたい人が画面で明示的に切り替えたときだけ効く。
 
-## 6. `broadcasts.stealth_spread_minutes` も今回は使わない
+**あとから来たシナリオの扱い**: 「登録しない」。前のシナリオは止めない。
+止める側にすると、配信中のシナリオが外から消える事故が起きる。
+`enrollFriendInScenario` は例外ではなく `null` を返す —— 呼び出し口が
+友だち追加などの副作用の中にあり、`throw` すると本来の処理まで巻き添えになる。
 
-**決定**: 列は残し、読まない。
+検証は `packages/db/test/scenario-concurrency.test.ts`（7件）。
 
-**理由**: 既定 0（従来どおり一気に送る）なので入れても壊れないが、
-配信の分割送信は二重送信の危険に直に触れる部分で、
-`broadcasts-idempotency.test.ts` の拡張とセットでないと出せない。
-朝までの時間で、そこまで確かめきれない。
+## 6. `broadcasts.stealth_spread_minutes` → **実装した**（当初は保留にしていた）
 
-**再開するときに決めること**: 分割したバッチが `batch_offset` /
-`batch_lock_at` とどう噛み合うか。いまの再開処理は「次のオフセットから」で
-動いているので、時間で散らす場合の再開位置の決め方を先に決める。
+**決定**: 分数で割った人数だけを1回の cron で送り、残りは次の tick に回す。
+
+**保留にしていた理由**: 分割送信は二重送信の危険に直に触れる。
+
+**その解き方**: 新しい仕組みを足さず、**既にある `batch_offset` の再開経路に乗せた**。
+
+```ts
+const chunkLimit = stealthChunkSize(friends.length, spreadMinutes, deliveryBatchSize);
+const stopAt = Math.min(friends.length, currentOffset + chunkLimit);
+// ...送信ループ...
+if (currentOffset < friends.length) {
+  await updateBroadcastBatchProgress(db, broadcast.id, currentOffset, 0);
+  return;   // 次の cron で続きから
+}
+```
+
+`batch_offset` はもともと「1回で送りきれなかったとき」に使っていて、
+二重送信を防ぐ仕掛けはそこに入っている。上限を下げているだけなので、
+新しい危険は増えていない。0分（既定）なら `stealthChunkSize` が全員を返すので、
+従来どおり一気に送る。
+
+検証は `apps/worker/src/services/stealth-spread.test.ts`（7件）と、
+既存の `broadcasts-idempotency.test.ts`。
