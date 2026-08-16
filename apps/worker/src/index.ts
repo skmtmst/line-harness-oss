@@ -99,6 +99,7 @@ import { friendAttributes } from './routes/friend-attributes.js';
 import { featureSettings } from './routes/feature-settings.js';
 import { contents } from './routes/contents.js';
 import { analytics } from './routes/analytics.js';
+import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { receiveSupportEmail } from './services/support-email.js';
 import { qrResponseHeaders } from './lib/qr-response.js';
@@ -260,6 +261,7 @@ app.route('/', friendAttributes);
 app.route('/', featureSettings);
 app.route('/', contents);
 app.route('/', analytics);
+app.route('/', dashboard);
 app.route('/', siteTracking);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
@@ -1068,6 +1070,23 @@ async function scheduled(
       if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
     } catch (e) {
       console.error('nen-tag refresh error:', e);
+    }
+  }
+
+  // 友だち数を日次で記録する。
+  //
+  // 6時間ごとに同じ日を上書きするので、その日の最後の値が残る。
+  // ダッシュボードの「友だち数の推移」がこれを読む。
+  //
+  // 記録が無い日はいまの友だちからの逆算で埋まるが、退会して行ごと
+  // 消えた友だちは数に出ないので実態とずれる。今日から正しく残す。
+  if (event.cron === '0 */6 * * *') {
+    try {
+      const { recordFriendSnapshot } = await import('@line-crm/db');
+      await recordFriendSnapshot(env.DB, null);
+    } catch (e) {
+      // 記録が1周飛んでも、その日は逆算で埋まる。配信を止める理由にはならない。
+      console.error('friend snapshot error:', e);
     }
   }
 

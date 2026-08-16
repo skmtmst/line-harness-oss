@@ -348,6 +348,45 @@ export type FriendListItem = FriendWithTags & Partial<{
   handled: boolean
 }>
 
+
+/** ダッシュボードが1回で読む数（設計 `V2 1-1 ダッシュボード`）。 */
+export type DashboardOverview = {
+  period: 'today' | 'last7' | 'last28'
+  /** 集計した時刻。カードごとの基準がずれていないことの手がかり。 */
+  generatedAt: string
+  friends: {
+    active: number
+    total: number
+    blockedByThem: number
+    hiddenByUs: number
+    blockedBoth: number
+  }
+  inbox: {
+    unanswered: number
+    inProgress: number
+    resolved: number
+    oldestUnansweredMinutes: number | null
+  }
+  delivery: {
+    sent: number
+    broadcasts: number
+    quotaLimit: number | null
+    quotaUsed: number | null
+  }
+  trend: Array<{
+    date: string
+    added: number
+    blocked: number
+    active: number
+    /** 日次記録が無く、いまの友だちから逆算した日。 */
+    estimated: boolean
+  }>
+  conversions: {
+    total: number
+    byPoint: Array<{ name: string; count: number }>
+  }
+}
+
 export type EcCommerceOverview = {
   total: number
   processed: number
@@ -1709,6 +1748,15 @@ export const api = {
       fetchApi<ApiResponse<AutomationLog[]>>(
         `/api/automations/${id}/logs` + (limit ? `?limit=${limit}` : ''),
       ),
+  },
+  dashboard: {
+    overview: (params?: { period?: 'today' | 'last7' | 'last28'; accountId?: string }) => {
+      const query = new URLSearchParams()
+      if (params?.period) query.set('period', params.period)
+      if (params?.accountId) query.set('accountId', params.accountId)
+      const suffix = query.size ? `?${query}` : ''
+      return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/overview${suffix}`)
+    },
   },
   ecCommerce: {
     overview: () =>

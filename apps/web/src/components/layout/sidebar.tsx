@@ -9,82 +9,118 @@ import { countryFlag } from '@/lib/country-flag'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
 
-// ─── メニュー定義（ユーザー目線のカテゴリ） ───
+// ─── メニュー定義 ───
+//
+// Pen.dev の V2 設計（`V2 1-1 ダッシュボード` のサイドバー）に合わせている。
+// 区分・並び・呼び名は設計が出どころで、勝手に足したり並べ替えたりしない。
+//
+// 行き先（href）は実装側の都合で決まる。設計は画面の名前しか持たないので、
+// 「設計の名前 → 実装のルート」の対応をここで引き受けている。
+// 例: 設計の「受信箱」は実装の /chats、「友だち属性」は /tags。
+//
+// 設計に無い画面（重複検出、プール管理など）は、対応する画面のタブとして
+// 中に入っている。サイドバーから消しても行けなくならない。
 
-const menuSections = [
+/** サイドバーの1項目。 */
+interface MenuItem {
+  href: string
+  label: string
+  /** 24x24 の path。lucide 相当の形を手で写している。 */
+  icon: string
+  /** 出す数の種類（仕様 §5）。無ければバッジを出さない。 */
+  badge?: 'unanswered' | 'photos' | 'unmatched'
+  /** 赤で出す項目。 */
+  danger?: boolean
+}
+
+interface MenuSection {
+  /** 区分の見出し。null は見出しを付けない。 */
+  label: string | null
+  items: MenuItem[]
+}
+
+const menuSections: MenuSection[] = [
   {
-    label: null, // セクションラベルなし（メイン）
+    label: null, // 区分の見出しを付けない。設計でもここだけ見出しが無い
     items: [
       { href: '/', label: 'ダッシュボード', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-      { href: '/friends', label: '友だち管理', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-      { href: '/tags', label: 'タグ管理', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
-      { href: '/chats', label: '個別チャット', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
-      { href: '/support', label: 'お問い合わせ', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 9h18V7H3v10z' },
+    ],
+  },
+  {
+    label: '対応',
+    items: [
+      { href: '/chats', label: '受信箱', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5', badge: 'unanswered' },
+      { href: '/friends', label: '友だち', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+    ],
+  },
+  {
+    label: '友だち属性',
+    items: [
+      { href: '/tags', label: '友だち属性', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
     ],
   },
   {
     label: '配信',
     items: [
-      { href: '/friend-add-settings', label: '友だち追加時設定', icon: 'M12 6v6m0 0v6m0-6h6m-6 0H6' },
       { href: '/scenarios', label: 'シナリオ配信', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-      { href: '/broadcasts', label: '一斉配信', icon: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z' },
-      { href: '/contents', label: 'コンテンツ', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
-      { href: '/templates', label: 'テンプレート', icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
+      { href: '/broadcasts', label: '一斉配信', icon: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8' },
+      { href: '/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+      { href: '/reminders', label: 'リマインダ', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
+      { href: '/auto-replies', label: '自動応答', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
+      { href: '/friend-add-settings', label: '友だち追加時の配信', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' },
       { href: '/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z' },
-      { href: '/reminders', label: 'リマインダ', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
       { href: '/webinars', label: 'ウェビナー', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
     ],
   },
   {
-    label: '分析',
+    label: 'コンテンツ',
     items: [
-      { href: '/analytics', label: 'アクセス解析', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-      { href: '/search-console', label: 'Googleアナリティクス', icon: 'M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z' },
-      { href: '/inflow-links', label: 'リファラルリンク', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
-      { href: '/affiliates', label: 'アフィリエイト', icon: 'M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 12.632a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z' },
-      { href: '/conversions', label: 'CV計測', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-      { href: '/scoring', label: 'マイル', icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z' },
-      { href: '/form-submissions', label: 'フォーム回答', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-      { href: '/friends?tab=duplicates', label: '重複検出', icon: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z' },
+      { href: '/contents', label: 'コンテンツ', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
+    ],
+  },
+  {
+    label: '成果と分析',
+    items: [
+      { href: '/conversions', label: '成果とアフィリエイト', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
+      { href: '/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
+      { href: '/scoring', label: 'マイル', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
+      { href: '/inflow-links', label: '流入と計測', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
+      { href: '/analytics', label: '分析', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     ],
   },
   {
     label: '自動化',
     items: [
       { href: '/automations', label: 'オートメーション', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
-      { href: '/auto-replies', label: '自動返信ルール', icon: 'M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6' },
-      { href: '/webhooks', label: 'Webhook', icon: 'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-      { href: '/webhooks?tab=notify', label: '未対応', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
-    ],
-  },
-  {
-    label: 'EC',
-    items: [
-      { href: '/nen-campaigns', label: 'NEN配信', icon: 'M12 3v18m9-9H3m15.364-6.364L5.636 18.364m12.728 0L5.636 5.636' },
-      { href: '/nen-members', label: '写真審査', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
-      { href: '/ec-commerce', label: 'EC連携', icon: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.3 2.3c-.63.63-.18 1.7.7 1.7H17m0 0a2 2 0 110 4 2 2 0 010-4zm-10 0a2 2 0 110 4 2 2 0 010-4z' },
+      { href: '/webhooks', label: '外部連携', icon: 'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
     ],
   },
   {
     label: '予約',
     items: [
       { href: '/booking/bookings', label: '予約管理', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-      { href: '/booking/menus', label: 'メニュー', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
-      { href: '/booking/menus?tab=staff', label: 'スタッフ', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
+      { href: '/booking/menus', label: '予約設定', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
       { href: '/events', label: 'イベント予約', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' },
+    ],
+  },
+  {
+    label: '専用機能',
+    items: [
+      { href: '/nen-campaigns', label: 'NEN配信', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' },
+      // 仕様書 §2 は /health と書いているが、/health は「BAN検知ダッシュボード」で
+      // 写真審査ではない。写真審査の画面は /nen-members。
+      // §3-1 が BAN検知を「運用状態」へ統合すると書いているので、そちらに合わせた。
+      { href: '/nen-members', label: '写真審査', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', badge: 'photos' },
+      { href: '/ec-commerce', label: 'EC連携', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z', badge: 'unmatched' },
     ],
   },
   {
     label: '設定',
     items: [
-      { href: '/staff', label: 'スタッフ管理', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-      { href: '/accounts', label: 'LINEアカウント', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
-      { href: '/accounts?tab=pools', label: 'プール管理', icon: 'M3 7h18M3 12h18M3 17h18' },
-      { href: '/friends?tab=merged', label: 'ユーザー一覧', icon: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2' },
-      { href: '/emergency?tab=ban', label: 'BAN検知', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
-      { href: '/emergency?tab=history', label: 'アップデート履歴', icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15' },
-      { href: '/settings', label: '機能設定', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
-      { href: '/emergency', label: '緊急コントロール', icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z', danger: true },
+      { href: '/accounts', label: 'アカウント', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' },
+      { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+      { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' },
+      { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
     ],
   },
 ]
@@ -224,6 +260,11 @@ export default function Sidebar() {
   // チャット画面での status 変更・手動返信直後は UNANSWERED_REFRESH_EVENT で
   // 即時再取得する (ポーリング待ちだと操作してもバッジが減らないと感じるため)。
   const [unansweredCount, setUnansweredCount] = useState<number>(0)
+  const [pendingPhotoCount, setPendingPhotoCount] = useState<number>(0)
+  // 仕様 §5 の「EC連携＝未突合の会員数」は、それを返すAPIがまだ無い。
+  // overview が持つのは failed / skipped で、意味が違う。取り違えて
+  // 別の数を出すより、出さないほうがよい。API ができたらここを繋ぐ。
+  const unmatchedCount = 0
 
   // 並び順の設定。account_settings の 'sidebar.order' に、セクションの
   // ラベルを並べて持つ。設定が無ければ menuSections のままの順で出す。
@@ -268,8 +309,18 @@ export default function Sidebar() {
       const mySeq = ++seq
       try {
         const { api } = await import('@/lib/api')
-        const res = await api.inbox.unanswered.count()
-        if (!cancelled && mySeq === seq && res.success) setUnansweredCount(res.data.total)
+        const [unanswered, nen] = await Promise.allSettled([
+          api.inbox.unanswered.count(),
+          api.nenMembers.overview(),
+        ])
+        if (cancelled || mySeq !== seq) return
+        if (unanswered.status === 'fulfilled' && unanswered.value.success) {
+          setUnansweredCount(unanswered.value.data.total)
+        }
+        // 写真審査は機能を切っている環境があるので、失敗しても他を巻き込まない。
+        if (nen.status === 'fulfilled' && nen.value.success) {
+          setPendingPhotoCount(nen.value.data.pendingPhotos)
+        }
       } catch {
         // サイレント失敗
       }
@@ -291,12 +342,40 @@ export default function Sidebar() {
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
-  const isActive = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href)
+  /**
+   * 項目に出す数。0 のときは出さない（仕様 §5）。
+   *
+   * どの項目に何を出すかは menuSections の `badge` が決める。
+   * ここで href を見て分岐すると、行き先を変えたときにバッジだけ
+   * 取り残される。
+   */
+  const badgeCount = (item: MenuItem) => {
+    if (item.badge === 'unanswered') return unansweredCount
+    if (item.badge === 'photos') return pendingPhotoCount
+    if (item.badge === 'unmatched') return unmatchedCount
+    return 0
+  }
+
+  /**
+   * いまの画面が、この項目のものか。
+   *
+   * 仕様 §4「子画面は親の項目を選択状態にする」。
+   * /events/bookings を開いたら「イベント予約」が選ばれていてほしい。
+   *
+   * ダッシュボードだけ完全一致にする。'/' は全部の前方一致に当たるため。
+   * クエリ付きの行き先はパスだけで判定する。?tab= が変わっても
+   * 同じ画面にいることに変わりはない。
+   */
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/'
+    const path = href.split('?')[0]
+    return pathname === path || pathname.startsWith(path + '/')
+  }
 
   const sidebarContent = (
     <>
       {/* モバイルドロワーでは閉じるボタン分の余白だけ確保する */}
-      <div className="h-16 lg:hidden" aria-hidden="true" />
+      <div className="h-16 md:hidden" aria-hidden="true" />
 
       {/* アカウント切替 */}
       <AccountSwitcher />
@@ -306,7 +385,7 @@ export default function Sidebar() {
         {orderedSections.map((section, si) => (
           <div key={si}>
             {section.label && (
-              <div className="pt-5 pb-2 px-3">
+              <div className="pt-5 pb-2 px-3 hidden xl:block">
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{section.label}</p>
               </div>
             )}
@@ -321,7 +400,8 @@ export default function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  title={item.label}
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors justify-center xl:justify-start ${
                     active
                       ? 'text-white'
                       : isDanger
@@ -331,15 +411,23 @@ export default function Sidebar() {
                   style={active ? { backgroundColor: isDanger ? '#EF4444' : 'var(--color-accent)' } : {}}
                 >
                   <NavIcon d={item.icon} />
-                  <span className="flex-1">{item.label}</span>
-                  {item.href === '/webhooks?tab=notify' && unansweredCount > 0 && (
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                        active ? 'bg-white text-rose-600' : 'bg-rose-500 text-white'
-                      }`}
-                    >
-                      {unansweredCount > 99 ? '99+' : unansweredCount}
-                    </span>
+                  <span className="flex-1 hidden xl:inline">{item.label}</span>
+                  {badgeCount(item) > 0 && (
+                    <>
+                      {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
+                      <span
+                        aria-hidden="true"
+                        className="xl:hidden absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-amber-500"
+                      />
+                      <span
+                        className={`hidden xl:inline rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                          active ? 'bg-white text-amber-700' : 'bg-amber-500 text-white'
+                        }`}
+                      >
+                        {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
+                      </span>
+                      <span className="sr-only">{badgeCount(item)} 件</span>
+                    </>
                   )}
                 </Link>
               )
@@ -400,7 +488,7 @@ export default function Sidebar() {
   return (
     <>
       {/* モバイル: ハンバーガーヘッダー */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
@@ -420,10 +508,10 @@ export default function Sidebar() {
       </div>
 
       {/* モバイル: オーバーレイ */}
-      {isOpen && <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setIsOpen(false)} />}
+      {isOpen && <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setIsOpen(false)} />}
 
       {/* モバイル: スライドインサイドバー */}
-      <aside className={`lg:hidden fixed top-0 left-0 z-50 w-72 bg-white flex flex-col h-screen transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`md:hidden fixed top-0 left-0 z-50 w-72 bg-white flex flex-col h-screen transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="absolute top-4 right-4">
           <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100" aria-label="閉じる">
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -435,7 +523,12 @@ export default function Sidebar() {
       </aside>
 
       {/* デスクトップ: 常時表示 */}
-      <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0">
+      {/*
+        仕様 §6-5: タブレット幅（768〜1279px）は 64px のアイコンレール。
+        別のマークアップを用意すると中身が二重になり、片方だけ直す事故が起きる。
+        同じ木のまま幅と文字の出し分けだけを変える。
+      */}
+      <aside className="hidden md:flex w-16 xl:w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0 transition-[width] duration-200">
         {sidebarContent}
       </aside>
     </>

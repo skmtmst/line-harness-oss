@@ -67,10 +67,23 @@ const FEATURE_GROUPS: Array<{
 /**
  * サイドバーの並び。
  *
- * ここに出す名前は sidebar.tsx のセクション名と合わせる。ずれると、
+ * ここに出す名前は sidebar.tsx の区分名と合わせる。ずれると、
  * 並び替えたのに反映されない（知らない名前は無視されるため）。
+ *
+ * 区分は Pen.dev の V2 設計が出どころ。ダッシュボードは区分の見出しを
+ * 持たない位置にあるので、この一覧には出さない（動かせない）。
  */
-const SIDEBAR_SECTIONS = ['メイン', '配信', '分析', 'EC', '予約', '設定']
+const SIDEBAR_SECTIONS = [
+  '対応',
+  '友だち属性',
+  '配信',
+  'コンテンツ',
+  '成果と分析',
+  '自動化',
+  '予約',
+  '専用機能',
+  '設定',
+]
 
 export default function SettingsPage() {
   const { selectedAccountId, selectedAccount } = useAccount()

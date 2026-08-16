@@ -528,6 +528,30 @@ CREATE TABLE forms (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT);
 
+CREATE TABLE friend_daily_snapshots (
+  -- JST の日付（YYYY-MM-DD）。LINEアカウントごとに1行。
+  date              TEXT NOT NULL,
+  -- どのLINEアカウントぶんか。全体の合計は line_account_id = '' で持つ。
+  -- NULL にすると主キーに使えない（SQLite は NULL 同士を別物として扱う）。
+  line_account_id   TEXT NOT NULL DEFAULT '',
+
+  -- その日の終わりの状態。
+  active            INTEGER NOT NULL DEFAULT 0,
+  total             INTEGER NOT NULL DEFAULT 0,
+  blocked_by_them   INTEGER NOT NULL DEFAULT 0,
+  hidden_by_us      INTEGER NOT NULL DEFAULT 0,
+
+  -- その日に増えた／減った数。差分は active の引き算でも出せるが、
+  -- 記録が飛んだ日があると引き算が壊れるので、その日の実数も持つ。
+  added             INTEGER NOT NULL DEFAULT 0,
+  blocked           INTEGER NOT NULL DEFAULT 0,
+
+  created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+
+  PRIMARY KEY (date, line_account_id)
+);
+
 CREATE TABLE friend_field_values (
   friend_id   TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
   field_id    TEXT NOT NULL REFERENCES friend_fields(id) ON DELETE CASCADE,
@@ -1747,6 +1771,9 @@ CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
+
+CREATE INDEX idx_friend_daily_snapshots_date
+  ON friend_daily_snapshots (line_account_id, date);
 
 CREATE INDEX idx_friend_fields_order ON friend_fields(display_order, id);
 
