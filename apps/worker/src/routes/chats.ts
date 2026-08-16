@@ -184,6 +184,23 @@ chats.delete('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
 
 // ========== チャットCRUD ==========
 
+/**
+ * 受信箱の上部に出す数（設計 `V2 2-1 受信箱` の KPIs）。
+ *
+ * :id より先に置く。あとに置くと 'stats' が id として解釈される。
+ */
+chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const { getInboxStats } = await import('@line-crm/db');
+    const staff = c.get('staff');
+    const stats = await getInboxStats(c.env.DB, staff?.id ?? null);
+    return c.json({ success: true as const, data: stats });
+  } catch (err) {
+    console.error('GET /api/chats/stats error:', err);
+    return c.json({ success: false as const, error: '受信箱の集計を取得できませんでした' }, 500);
+  }
+});
+
 chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const status = c.req.query('status') ?? undefined;

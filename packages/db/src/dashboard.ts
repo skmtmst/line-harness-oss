@@ -372,3 +372,71 @@ export async function getDashboardOverview(
     conversions,
   };
 }
+
+/** 受信箱の上部に出す数（設計 `V2 2-1 受信箱` の KPIs）。 */
+export interface InboxStats {
+  /** 返信を待っている人。 */
+  waiting: number;
+  /** そのうち1時間以上待たせているもの。 */
+  waitingOverAnHour: number;
+  /** 自分が担当しているもの（対応中）。 */
+  mine: number;
+  /** 今日の受信。 */
+  todayInbound: number;
+  todayByChannel: { line: number; email: number };
+}
+
+/**
+ * 受信箱の集計。
+ *
+ * 設計の4枚目「平均の初回返信」は、返信までの時間を記録していないので出せない。
+ * 代わりに「1時間以上待たせている件数」を1枚目の内訳として出す。
+ * どちらも「放置に気づく」ための数で、役割は同じ。
+ */
+export async function getInboxStats(
+  db: D1Database,
+  operatorId: string | null,
+): Promise<InboxStats> {
+  const hourAgo = new Date(Date.now() - 3600_000).toISOString();
+  const today = jstDate(0);
+
+  const waiting = await db
+    .prepare(
+      `SELECT
+         COUNT(*) AS n,
+         SUM(CASE WHEN last_message_at < ? THEN 1 ELSE 0 END) AS over_hour
+       FROM chats WHERE status = 'unread'`,
+    )
+    .bind(hourAgo)
+    .first<{ n: number; over_hour: number }>();
+
+  const mine = operatorId
+    ? await count(
+        db,
+        `SELECT COUNT(*) AS n FROM chats WHERE status = 'in_progress' AND operator_id = ?`,
+        operatorId,
+      )
+    : await count(db, `SELECT COUNT(*) AS n FROM chats WHERE status = 'in_progress'`);
+
+  // source は 'line' 以外にメール由来などが入る。line 以外をまとめてメール扱いに
+  // すると、将来 source が増えたときに黙って混ざる。line と email だけを数える。
+  const byChannel = await db
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN source = 'line' OR source IS NULL THEN 1 ELSE 0 END) AS line_n,
+         SUM(CASE WHEN source = 'email' THEN 1 ELSE 0 END) AS email_n,
+         COUNT(*) AS total
+       FROM messages_log
+        WHERE direction = 'incoming' AND substr(created_at, 1, 10) = ?`,
+    )
+    .bind(today)
+    .first<{ line_n: number; email_n: number; total: number }>();
+
+  return {
+    waiting: waiting?.n ?? 0,
+    waitingOverAnHour: waiting?.over_hour ?? 0,
+    mine,
+    todayInbound: byChannel?.total ?? 0,
+    todayByChannel: { line: byChannel?.line_n ?? 0, email: byChannel?.email_n ?? 0 },
+  };
+}
