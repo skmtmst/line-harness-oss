@@ -75,6 +75,8 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
+  const [nameQuery, setNameQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
   const [saving, setSaving] = useState(false)
@@ -148,6 +150,10 @@ export default function TemplatesPage() {
   useEffect(() => { setEditContent(null); setEditName(null) }, [drawerId])
 
   const filteredTemplates = templates.filter((t) => {
+    // 名前は手元で絞る。打つたびに取り直すと重い。
+    if (nameQuery.trim() && !t.name.toLowerCase().includes(nameQuery.trim().toLowerCase())) {
+      return false
+    }
     if (typeFilter === 'all') return true
     if (typeFilter === 'unused') return t.usageCount === 0
     return t.messageType === typeFilter
@@ -223,12 +229,36 @@ export default function TemplatesPage() {
         title="テンプレート"
         description="配信で使うメッセージを管理します。友だち情報や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
         action={
-          <button
-            onClick={() => setShowCreate(true)}
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-          >
-            + 新規テンプレート
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              disabled
+              title="マニュアルは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            <button
+              disabled
+              title="並び替えは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              並び替え
+            </button>
+            {/* folders は 099 で入っているが templates.folder_id が無い。 */}
+            <button
+              disabled
+              title="フォルダの追加は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              フォルダを追加
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+            >
+              + 新規テンプレート
+            </button>
+          </div>
         }
       />
       </div>
@@ -254,6 +284,45 @@ export default function TemplatesPage() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
+      {/*
+        フォルダ（設計 `Body` の左）。folders は 099 で入っているが
+        templates.folder_id が無いので絞り込めない。枠だけ置く。
+      */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-ink-faint text-xs">フォルダ</span>
+        {['すべて', '01_定期便', '02_健康フォロー', '未分類'].map((label, i) => (
+          <button
+            key={label}
+            disabled={i > 0}
+            title={i > 0 ? 'フォルダ分けは準備中です' : undefined}
+            className={`rounded-pill px-3 py-1 text-xs ${
+              i === 0 ? 'bg-accent text-on-accent' : 'border-hairline text-ink-faint border opacity-50'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* 検索と並び順（設計 `Body` の上）。 */}
+      <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+        <input
+          type="search"
+          placeholder="テンプレート名で検索"
+          aria-label="テンプレート名で検索"
+          value={nameQuery}
+          onChange={(e) => setNameQuery(e.target.value)}
+          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <select disabled title="並び替えは準備中です" className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50">
+          <option>使用回数が多い順</option>
+        </select>
+        <button disabled title="保存した条件は準備中です" className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50">
+          保存した条件
+        </button>
+      </div>
+
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -407,11 +476,17 @@ export default function TemplatesPage() {
             <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タイプ</th>
+                  {/*
+                    列は設計 `V2 4-3 テンプレート` の並び。
+                    「カテゴリ」を「本文」に替えた。名前だけでは中身が
+                    分からず、開かないと選べない。冒頭が見えていれば
+                    一覧のまま選べる。
+                  */}
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">種別</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">カテゴリ</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">使用数</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">更新日</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">本文</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">使われている配信</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">登録日</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
