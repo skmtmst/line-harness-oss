@@ -48,6 +48,30 @@ interface ChatDetail extends Chat {
 
 type StatusFilter = 'all' | 'unread' | 'in_progress' | 'resolved'
 
+/** 受信箱に混ぜるメールの1件（/api/support/inbox の email ぶん）。 */
+interface EmailInboxItem {
+  id: string
+  threadId: string
+  customerName: string
+  subject: string
+  preview: string
+  status: 'unread' | 'in_progress' | 'resolved'
+  lastIncomingAt: string
+}
+
+/** 一覧の1行。LINEのトークとメールを同じ形にして並べる。 */
+interface InboxRow {
+  key: string
+  channel: 'line' | 'email'
+  name: string
+  preview: string
+  at: string | null
+  status: 'unread' | 'in_progress' | 'resolved'
+  pictureUrl: string | null
+  /** LINEなら chat の id（＝friendId）、メールなら threadId。 */
+  ref: string
+}
+
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
   unread: { label: '未読', className: 'bg-red-100 text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-yellow-700' },
@@ -56,7 +80,7 @@ const statusConfig: Record<Chat['status'], { label: string; className: string }>
 
 const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: '全て' },
-  { key: 'unread', label: '未読' },
+  { key: 'unread', label: '未対応' },
   { key: 'in_progress', label: '対応中' },
   { key: 'resolved', label: '解決済' },
 ]
@@ -310,6 +334,15 @@ const MERGED_TABS = [
 function ChatsPageInner() {
   const { selectedAccountId } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
+  /**
+   * メールの問い合わせ。LINEのトークと同じ一覧に混ぜる。
+   *
+   * 設計 `V2 2-1 受信箱` の一覧は「✉ 定期便の解約について」のように
+   * メールも同じ並びに入っている。出どころで場所を分けると、
+   * 返信を待っている人を2か所で探すことになる。
+   */
+  const [emailItems, setEmailItems] = useState<EmailInboxItem[]>([])
+  const router = useRouter()
   const [allFriends, setAllFriends] = useState<FriendItem[]>([])
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null)
@@ -407,6 +440,22 @@ function ChatsPageInner() {
     }
     return params
   }, [statusFilter, selectedAccountId, unansweredOnly])
+
+  /** メールの問い合わせを取る。LINEと同じ一覧に混ぜるため。 */
+  const loadEmails = useCallback(async () => {
+    try {
+      const res = await fetchApi<{ success: boolean; data: { items: EmailInboxItem[] } }>(
+        '/api/support/inbox?channel=email&status=all&limit=200',
+      )
+      if (res.success) setEmailItems(res.data.items)
+    } catch {
+      // メールが出ないだけ。LINEのトークは使える。
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadEmails()
+  }, [loadEmails])
 
   const loadChats = useCallback(async () => {
     setLoading(true)
@@ -871,7 +920,7 @@ function ChatsPageInner() {
                 onChange={(e) => setUnansweredOnly(e.target.checked)}
                 className="rounded"
               />
-              🔥 未対応のみ
+              返信待ちのみ
             </label>
           </div>
 
@@ -893,6 +942,54 @@ function ChatsPageInner() {
               </div>
             ) : (
               <>
+                {/*
+                  メールの問い合わせを同じ一覧の先頭に混ぜる。
+                  設計 `V2 2-1 受信箱` の一覧は「✉ 定期便の解約について」のように
+                  メールも同じ並びに入っている。出どころで場所を分けると、
+                  返信を待っている人を2か所で探すことになる。
+
+                  押したときの行き先だけは分ける。LINEはこの画面のトーク、
+                  メールはメールの往復で、中央に出すものの作りが違う。
+                */}
+                {emailItems
+                  .filter((item) =>
+                    nameQuery.trim() === ''
+                      ? true
+                      : item.customerName.toLowerCase().includes(nameQuery.trim().toLowerCase()),
+                  )
+                  .filter((item) => statusFilter === 'all' || item.status === statusFilter)
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => router.push(`/chats?channel=email&thread=${encodeURIComponent(item.threadId)}`)}
+                      className="border-hairline hover:bg-canvas-sunken w-full border-b px-4 py-3 text-left transition-colors"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="bg-canvas-sunken flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
+                          <span className="text-ink-faint text-sm">✉</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-ink truncate text-sm font-medium">{item.customerName}</p>
+                            <span className="text-ink-faint shrink-0 text-[10px]">
+                              {formatDatetime(item.lastIncomingAt)}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 flex items-center gap-1.5">
+                            <span
+                              className={`rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${statusConfig[item.status].className}`}
+                            >
+                              {statusConfig[item.status].label}
+                            </span>
+                          </div>
+                          <p className="text-ink-faint mt-0.5 truncate text-xs">
+                            ✉ {item.subject || item.preview}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+
                 {chats
                   .filter((chat) =>
                     nameQuery.trim() === ''
@@ -1096,30 +1193,11 @@ function ChatsPageInner() {
                       次の未対応 →
                     </button>
                   )}
-                  {chatDetail.status !== 'unread' && (
-                    <button
-                      onClick={() => handleStatusUpdate('unread')}
-                      className="px-3 py-1 min-h-[44px] lg:min-h-0 text-xs font-medium text-red-600 bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
-                    >
-                      未読に戻す
-                    </button>
-                  )}
-                  {chatDetail.status !== 'in_progress' && (
-                    <button
-                      onClick={() => handleStatusUpdate('in_progress')}
-                      className="px-3 py-1 min-h-[44px] lg:min-h-0 text-xs font-medium text-yellow-700 bg-yellow-50 hover:bg-warning-bg rounded-md transition-colors"
-                    >
-                      対応中にする
-                    </button>
-                  )}
-                  {chatDetail.status !== 'resolved' && (
-                    <button
-                      onClick={() => handleStatusUpdate('resolved')}
-                      className="px-3 py-1 min-h-[44px] lg:min-h-0 text-xs font-medium text-green-700 bg-green-50 hover:bg-success-bg rounded-md transition-colors"
-                    >
-                      解決済にする
-                    </button>
-                  )}
+                  {/*
+                    「未読に戻す」「対応中にする」「解決済にする」は
+                    上の「対応 ▾」と同じことをしていたので外した。
+                    同じ操作の入口が2つあると、どちらが正なのか分からない。
+                  */}
                 </div>
               </div>
 
@@ -1411,6 +1489,35 @@ function ChatsPageHost() {
         <Header
           title="受信箱"
           description="LINEのトーク・メールでの問い合わせ・返信待ちを、1か所にまとめて扱います。"
+          action={
+            <div className="flex items-center gap-2">
+              {/*
+                設計にあるボタン。行き先の文書がまだ無いので押せなくしている。
+                リンク先を仮置きすると行き止まりになる（route-integrity が落ちる）。
+              */}
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              {/*
+                すべて確認済みにする。押し間違えると未対応が全部消えるので、
+                確認を挟む。設計にも同じボタンがある。
+              */}
+              <button
+                onClick={() => {
+                  if (window.confirm('未対応をすべて確認済みにします。よろしいですか。')) {
+                    window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
+                  }
+                }}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+              >
+                すべて確認済みにする
+              </button>
+            </div>
+          }
         />
       </div>
 
@@ -1434,6 +1541,21 @@ function ChatsPageHost() {
             {c.label}
           </button>
         ))}
+
+        {/*
+          設計 `Filters` の右側。トークに何を出すかの切り替え。
+          いまは常に全部出しているので、選んでも表示は変わらない。
+          仕組みが入るまでの枠。docs/v025-open-questions.md に残している。
+        */}
+        <label className="text-ink-faint ml-auto flex items-center gap-1.5 text-xs">
+          表示
+          <select
+            disabled
+            className="border-hairline rounded-control border px-2 py-1 text-xs disabled:opacity-50"
+          >
+            <option>受信・送信・システム</option>
+          </select>
+        </label>
       </div>
 
       {/*

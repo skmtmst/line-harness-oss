@@ -9,6 +9,10 @@ interface FriendDetail {
   pictureUrl: string | null
   isFollowing: boolean
   metadata: Record<string, unknown>
+  /** 100 で足した列。LINEの表示名とは別に、こちらで付けた名前。 */
+  realName: string | null
+  /** 社内での呼び名。表示名が本名と違うときに使う。 */
+  systemDisplayName: string | null
   refCode: string | null
   createdAt: string
   tags: Array<{ id: string; name: string; color: string }>
@@ -187,6 +191,27 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               </div>
             </div>
 
+            {/*
+              名前（設計 `友だち詳細` の「名前」）。
+              LINEの表示名と、こちらで付けた本名は別物。取り違えると
+              別人に送ってしまうので、両方を並べて出す。
+            */}
+            <div className="p-4 space-y-2">
+              <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">名前</h4>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-[11px] text-gray-500 shrink-0">本名</span>
+                <span className="text-xs text-gray-700 truncate">
+                  {friend.realName || <span className="text-gray-400">未登録</span>}
+                </span>
+              </div>
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-[11px] text-gray-500 shrink-0">システム表示名</span>
+                <span className="text-xs text-gray-700 truncate">
+                  {friend.systemDisplayName || <span className="text-gray-400">未登録</span>}
+                </span>
+              </div>
+            </div>
+
             {/* Harness Mileage — canonical user identity across LINE accounts */}
             <div className="p-4">
               <h4 className="text-[11px] font-medium text-gray-500 mb-2">マイル</h4>
@@ -233,36 +258,44 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             </div>
 
             {/* Status / Operator */}
-            {(chatStatus?.status || operatorName) && (
-              <div className="p-4 space-y-2">
-                {chatStatus?.status && statusLabels[chatStatus.status] && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-gray-500">対応状況</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
-                      {statusLabels[chatStatus.status].label}
-                    </span>
-                  </div>
-                )}
-                {operatorName && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-gray-500">担当者</span>
-                    <span className="text-xs text-gray-700">{operatorName}</span>
-                  </div>
+            {/*
+              対応（設計 `友だち詳細` の「対応」）。
+              値が無くても節ごと出す。以前は空だと見出しごと消えていて、
+              「この画面には対応の情報が無い」ように見えていた。
+              設計は「未設定」「未割り当て」と書いて枠を残している。
+            */}
+            <div className="p-4 space-y-2">
+              <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">対応</h4>
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] text-gray-500">対応マーク</span>
+                {chatStatus?.status && statusLabels[chatStatus.status] ? (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
+                    {statusLabels[chatStatus.status].label}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400">未設定</span>
                 )}
               </div>
-            )}
-
-            {/* Notes */}
-            {chatStatus?.notes && (
-              <div className="p-4">
-                <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">個別メモ</h4>
-                <p className="text-xs text-gray-700 whitespace-pre-wrap break-words">{chatStatus.notes}</p>
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] text-gray-500">担当者</span>
+                <span className="text-xs text-gray-700">{operatorName || <span className="text-gray-400">未割り当て</span>}</span>
               </div>
-            )}
+              <div>
+                <span className="text-[11px] text-gray-500">個別メモ</span>
+                <p className="text-xs text-gray-700 whitespace-pre-wrap break-words mt-1">
+                  {chatStatus?.notes || <span className="text-gray-400">まだありません</span>}
+                </p>
+              </div>
+            </div>
 
             {/* Tags */}
             <div className="p-4">
-              <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">タグ</h4>
+              <div className="mb-1.5 flex items-center justify-between">
+                <h4 className="text-[11px] font-medium text-gray-500">タグ</h4>
+                <a href={`/friends/detail?id=${friend.id}`} className="text-accent text-[11px] hover:underline">
+                  ＋ 追加
+                </a>
+              </div>
               {friend.tags.length === 0 ? (
                 <p className="text-[11px] text-gray-400 italic">タグなし</p>
               ) : (
@@ -283,9 +316,37 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               )}
             </div>
 
+            {/*
+              ★つき友だち情報（設計 `友だち詳細`）。
+              friend_fields に「よく見る印」がまだ無いので、いまは
+              登録されている情報の先頭3件を出す。印が入ったら差し替える。
+              docs/v025-open-questions.md に残している。
+            */}
+            <div className="p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="text-[11px] font-medium text-gray-500">★つき友だち情報</h4>
+                <a href={`/friends/detail?id=${friend.id}`} className="text-accent text-[11px] hover:underline">
+                  すべて見る
+                </a>
+              </div>
+              {!friend.metadata || Object.keys(friend.metadata).length === 0 ? (
+                <p className="text-[11px] text-gray-400 italic">まだ登録がありません</p>
+              ) : (
+                <dl className="space-y-1.5 text-xs">
+                  {Object.entries(friend.metadata).slice(0, 3).map(([key, value]) => (
+                    <div key={key} className="flex justify-between gap-2">
+                      <dt className="text-[11px] text-gray-500 shrink-0">{key}</dt>
+                      <dd className="text-gray-700 truncate">{renderValue(value)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </div>
+
             {/* Rich Menu */}
             <div className="p-4">
               <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">リッチメニュー</h4>
+              <p className="text-[11px] text-gray-500 mb-1">現在の設定</p>
               {richMenu.kind === 'loading' ? (
                 <p className="text-[11px] text-gray-400 italic">読み込み中...</p>
               ) : richMenu.kind === 'error' ? (
@@ -305,9 +366,31 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             </div>
 
             {/* Metadata custom fields */}
-            {friend.metadata && Object.keys(friend.metadata).length > 0 && (
-              <div className="p-4">
-                <h4 className="text-[11px] font-medium text-gray-500 mb-2">友だち情報</h4>
+            <div className="p-4">
+              <h4 className="text-[11px] font-medium text-gray-500 mb-2">友だち情報</h4>
+              {/* 設計は追加日と流入元を必ず出す。どちらも既に持っている値。 */}
+              <dl className="mb-2 space-y-1 text-xs">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-[11px] text-gray-500">追加日</dt>
+                  <dd className="text-gray-700">{formatDate(friend.createdAt)}</dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-[11px] text-gray-500">流入元</dt>
+                  <dd className="text-gray-700">
+                    {/*
+                      流入経路の名前を友だち詳細で返す口がまだ無い。
+                      friends.first_tracked_link_id はあるが、この経路では
+                      引いていない。欄だけ出して、入ったら繋ぐ。
+                      docs/v025-open-questions.md に残す。
+                    */}
+                    <span className="text-gray-400">不明</span>
+                  </dd>
+                </div>
+              </dl>
+              {!friend.metadata || Object.keys(friend.metadata).length === 0 ? (
+                <p className="text-[11px] text-gray-400 italic">まだ登録がありません</p>
+              ) : (
+                <div>
                 <dl className="space-y-2 text-xs">
                   {Object.entries(friend.metadata).map(([key, value]) => (
                     <div key={key}>
@@ -316,13 +399,17 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                     </div>
                   ))}
                 </dl>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
 
             {/* Form answers — save_to_metadata の設定に関係なく回答履歴を表示 */}
-            {friend.formSubmissions?.length > 0 && (
-              <div className="p-4">
-                <h4 className="text-[11px] font-medium text-gray-500 mb-2">フォーム回答</h4>
+            <div className="p-4">
+              <h4 className="text-[11px] font-medium text-gray-500 mb-2">フォーム回答</h4>
+              {!friend.formSubmissions || friend.formSubmissions.length === 0 ? (
+                <p className="text-[11px] text-gray-400 italic">回答はまだありません</p>
+              ) : (
+                <div>
                 <div className="space-y-3">
                   {friend.formSubmissions.map((submission) => {
                     const labels = new Map(submission.fields.map((field) => [field.name, field.label]))
@@ -349,8 +436,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                     )
                   })}
                 </div>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
 
             {/*
               編集導線は将来追加予定 (現在の /friends は ?id= をハンドルしないため、

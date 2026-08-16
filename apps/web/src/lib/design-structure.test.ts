@@ -47,8 +47,31 @@ function designMarkers(source: string): string[] {
 }
 
 const SCREENS = Object.entries(structure.screens) as Array<
-  [string, { node: string; name: string; sections: string[] }]
+  [string, { node: string; name: string; sections: string[]; parts?: string[] }]
 >;
+
+/**
+ * その画面が読み込む部品も含めて、文字列を集める。
+ *
+ * 節を別ファイルに切り出していると、page.tsx を読むだけでは
+ * 中身の語が見つからない。import しているものを1段だけ辿る。
+ */
+function readWithParts(route: string): string {
+  const source = readScreen(route);
+  let combined = source;
+  for (const m of source.matchAll(/from '@\/(components|app)\/([^']+)'/g)) {
+    for (const ext of ['.tsx', '/page.tsx']) {
+      const file = join(dirname(fileURLToPath(import.meta.url)), '..', m[1], m[2] + ext);
+      try {
+        combined += readFileSync(file, 'utf8');
+        break;
+      } catch {
+        // その名前のファイルが無いだけ。次の拡張子を試す。
+      }
+    }
+  }
+  return combined;
+}
 
 describe('画面の骨格が設計と一致する', () => {
   it('対象の画面が登録されている', () => {
@@ -72,5 +95,30 @@ describe('画面の骨格が設計と一致する', () => {
         '設計そのものを変えたときは design-structure.json も直してください。',
       ].join('\n'),
     ).toEqual(expected);
+  });
+
+  /**
+   * 節の中身。
+   *
+   * 骨格が合っていても、中身が「データが無いと消える」作りだと
+   * 実際の画面からは節ごと無くなる。実際に友だち詳細で4節が消えていて、
+   * 人が見るまで気づけなかった。
+   *
+   * データが無いときも「未設定」「まだありません」と出す決まりにしたので、
+   * ここに書いた語が消えることは無い。
+   */
+  it.each(SCREENS.filter(([, s]) => s.parts?.length))('%s の節の中身', (route, spec) => {
+    const source = readWithParts(route);
+    const missing = (spec.parts ?? []).filter((part) => !source.includes(part));
+    expect(
+      missing,
+      [
+        `${spec.name}（node ${spec.node}）に、設計にある語が見つかりません。`,
+        `無い語: ${missing.join(', ')}`,
+        '',
+        'データが無いときも「未設定」「まだありません」と出してください。',
+        '節ごと消すと、画面にその機能が無いように見えます。',
+      ].join('\n'),
+    ).toEqual([]);
   });
 });
