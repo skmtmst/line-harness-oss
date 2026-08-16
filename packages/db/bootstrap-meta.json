@@ -110,7 +110,8 @@
     "103_ops_and_flags.sql",
     "104_scenario_concurrency_default.sql",
     "105_scenario_step_bubbles.sql",
-    "106_friend_daily_snapshots.sql"
+    "106_friend_daily_snapshots.sql",
+    "107_chat_first_reply.sql"
   ],
-  "migrationCount": 111
+  "migrationCount": 112
 }

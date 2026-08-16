@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, fetchApi } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
@@ -314,6 +315,11 @@ function ChatsPageInner() {
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null)
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
+  // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
+  const [nameQuery, setNameQuery] = useState('')
+  // 担当の選択肢（設計 `TalkPane` の「担当」）。
+  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   const statusFilterRef = useRef<StatusFilter>('all')
   const unansweredOnlyRef = useRef(false)
   const [unansweredOnly, setUnansweredOnly] = useState(() => {
@@ -741,6 +747,35 @@ function ChatsPageInner() {
     }
   }
 
+  /** 担当を付け替える（設計 `TalkPane` の「担当」）。 */
+  const handleOperatorUpdate = async (operatorId: string | null) => {
+    if (!selectedChatId) return
+    try {
+      await api.chats.update(selectedChatId, { operatorId })
+      loadChatDetail(selectedChatId)
+      loadChats()
+    } catch {
+      setError('担当の更新に失敗しました。')
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
+          '/api/operators',
+        )
+        if (!cancelled && res.success) setOperators(res.data)
+      } catch {
+        // 担当を選べないだけ。返信そのものは続けられる。
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const handleStatusUpdate = async (newStatus: Chat['status']) => {
     if (!selectedChatId) return
     try {
@@ -782,18 +817,6 @@ function ChatsPageInner() {
 
   return (
     <div>
-      {/*
-        設計 `V2 2-1 受信箱`。呼び名は「受信箱」で、サイドバーとも揃えている。
-        LINEのトーク・メールでの問い合わせ・返信待ちを1か所で扱う画面なので、
-        「オペレーターチャット」だと中身より狭く見える。
-      */}
-      <Header
-        title="受信箱"
-        description="LINEのトーク・メールでの問い合わせ・返信待ちを、1か所にまとめて扱います。"
-      />
-
-      <InboxKpis />
-
       {/* Error */}
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -803,8 +826,21 @@ function ChatsPageInner() {
 
       <div className="flex gap-4 h-[calc(100vh-120px)] lg:h-[calc(100vh-180px)]">
         {/* Left Panel: Chat List */}
-        <div className={`w-full lg:w-96 lg:flex-shrink-0 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId ? 'hidden lg:flex' : 'flex'}`}>
+        {/* 設計 `ListPane` 360px。 */}
+        <div className={`w-full lg:w-[360px] lg:flex-shrink-0 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId ? 'hidden lg:flex' : 'flex'}`}>
           {/* タブ (全て / 未読 / 対応中 / 解決済) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
+
+          {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
+          <div className="border-hairline border-b px-3 py-2">
+            <input
+              type="search"
+              value={nameQuery}
+              onChange={(e) => setNameQuery(e.target.value)}
+              placeholder="名前で検索"
+              aria-label="名前で検索"
+              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-1.5 text-xs focus:ring-2 focus:outline-none"
+            />
+          </div>
 
           {/* Filter row */}
           <div className="px-3 py-2 border-b border-hairline flex flex-wrap items-center gap-2">
@@ -851,7 +887,13 @@ function ChatsPageInner() {
               </div>
             ) : (
               <>
-                {chats.map((chat) => {
+                {chats
+                  .filter((chat) =>
+                    nameQuery.trim() === ''
+                      ? true
+                      : chat.friendName.toLowerCase().includes(nameQuery.trim().toLowerCase()),
+                  )
+                  .map((chat) => {
                   const isSelected = selectedChatId === chat.id
                   // 「真の自発（要対応）」= chat.status='unread'。webhook 側で auto_reply に
                   // マッチしなかった incoming のみ unread に設定される。auto_reply trigger
@@ -896,6 +938,17 @@ function ChatsPageInner() {
                               <p className="text-sm font-medium text-ink truncate">{chat.friendName}</p>
                             </div>
                             <span className="text-[10px] text-ink-faint flex-shrink-0">{formatDatetime(chat.lastMessageAt)}</span>
+                          </div>
+                          {/*
+                            設計は行ごとに状態を出す。色だけだと、赤い点が
+                            「未読」なのか「未対応」なのか区別が付かない。
+                          */}
+                          <div className="mt-0.5 flex items-center gap-1.5">
+                            <span
+                              className={`rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${statusConfig[chat.status].className}`}
+                            >
+                              {statusConfig[chat.status].label}
+                            </span>
                           </div>
                           <p
                             className={`text-xs mt-0.5 truncate ${
@@ -968,12 +1021,46 @@ function ChatsPageInner() {
                     <p className="text-sm font-medium text-ink truncate">
                       {chatDetail.friendName}
                     </p>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${statusConfig[chatDetail.status].className}`}
-                    >
-                      {statusConfig[chatDetail.status].label}
-                    </span>
+                    <p className="text-ink-faint mt-0.5 text-xs">
+                      最終受信 {formatDatetime(chatDetail.lastMessageAt)} ・ LINE
+                    </p>
                   </div>
+                </div>
+
+                {/*
+                  設計 `TalkPane` の上部。「対応」と「担当」をここで切り替える。
+                  以前は状態がバッジで出ているだけで、変えるには別の場所を
+                  探す必要があった。返信しながら状態を動かすので、
+                  同じ場所に置く。
+                */}
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-xs">
+                    <span className="text-ink-faint">対応</span>
+                    <select
+                      value={chatDetail.status}
+                      onChange={(e) => void handleStatusUpdate(e.target.value as Chat['status'])}
+                      className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
+                    >
+                      <option value="unread">未対応</option>
+                      <option value="in_progress">対応中</option>
+                      <option value="resolved">解決済</option>
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-xs">
+                    <span className="text-ink-faint">担当</span>
+                    <select
+                      value={chatDetail.operatorId ?? ''}
+                      onChange={(e) => void handleOperatorUpdate(e.target.value || null)}
+                      className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
+                    >
+                      <option value="">未割り当て</option>
+                      {operators.map((op) => (
+                        <option key={op.id} value={op.id}>
+                          {op.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {unansweredOnly && chats.length > 1 && (
@@ -1218,8 +1305,13 @@ function ChatsPageInner() {
           表示し続けて pane 間の不整合になる。selection ID 自体が friend_id なので
           直接渡せる (chat list SQL が `id: f.id` で friend_id を返す)。
         */}
-        {(selectedChatId || selectedFriendId) && (
-          <div className="hidden xl:flex">
+        {/*
+          設計 `SidePane` 320px。選択していないときも枠を出す。
+          選択のたびに右の枠が現れると、真ん中のトークの幅が動いて
+          読んでいる位置がずれる。
+        */}
+        <div className="hidden w-[320px] flex-shrink-0 xl:flex">
+          {selectedChatId || selectedFriendId ? (
             <FriendInfoSidebar
               friendId={selectedFriendId || selectedChatId}
               chatStatus={
@@ -1228,21 +1320,74 @@ function ChatsPageInner() {
                   : undefined
               }
             />
-          </div>
-        )}
+          ) : (
+            <div className="bg-canvas rounded-card border-hairline flex w-full items-center justify-center border">
+              <p className="text-ink-faint px-6 text-center text-sm leading-relaxed">
+                トークを選ぶと、
+                <br />
+                その友だちの情報が出ます。
+              </p>
+            </div>
+          )}
+        </div>
       </div>
       <CcPromptButton prompts={ccPrompts} />
     </div>
   )
 }
 
+/**
+ * 受信箱（設計 `V2 2-1 受信箱`）。
+ *
+ * 設計に上部タブは無い。チャネル（すべて / LINE / メール）は
+ * 画面内の絞り込みチップとして扱う。タブにすると「LINEの受信箱」と
+ * 「メールの受信箱」が別物に見えるが、実際は1つの受信箱で、
+ * 出どころが違うだけ。設計が1画面にまとめているのはそのため。
+ *
+ * ただし中身の作りが LINE とメールで大きく違うので、いまは
+ * チップで表示を切り替える形にしている。将来1つの一覧に混ぜるときも、
+ * 画面の入口は変わらない。
+ */
+const CHANNELS = [
+  { key: 'all', label: 'すべて' },
+  { key: 'line', label: 'LINE' },
+  { key: 'email', label: 'メール' },
+] as const
+
 function ChatsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'channel')
+  const router = useRouter()
+  const channel = tab === 'email' ? 'email' : 'line'
+
   return (
     <div>
-      <MergedTabs basePath="/chats" paramName="channel" tabs={MERGED_TABS} active={tab} />
-      {tab === 'line' && <ChatsPageInner />}
-      {tab === 'email' && <SupportPage />}
+      <Header
+        title="受信箱"
+        description="LINEのトーク・メールでの問い合わせ・返信待ちを、1か所にまとめて扱います。"
+      />
+
+      <InboxKpis />
+
+      {/* 設計 `Filters` の左側。チャネルの絞り込み。 */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        {CHANNELS.map((c) => (
+          <button
+            key={c.key}
+            onClick={() => router.push(c.key === 'email' ? '/chats?channel=email' : '/chats')}
+            aria-pressed={channel === c.key || (c.key === 'all' && channel === 'line')}
+            className={`rounded-pill px-3.5 py-1.5 text-xs font-medium transition-colors ${
+              (c.key === 'email' && channel === 'email') ||
+              (c.key !== 'email' && channel === 'line')
+                ? 'bg-accent text-on-accent'
+                : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
+            }`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {channel === 'line' ? <ChatsPageInner /> : <SupportPage />}
     </div>
   )
 }
