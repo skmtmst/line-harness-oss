@@ -586,7 +586,7 @@ CREATE TABLE friend_fields (
   display_order  INTEGER NOT NULL DEFAULT 0,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+, field_type TEXT NOT NULL DEFAULT 'text');
 
 CREATE TABLE friend_reminder_deliveries (
   id                TEXT PRIMARY KEY,
@@ -831,7 +831,7 @@ CREATE TABLE messages_log (
   source           TEXT,
   line_account_id  TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, origin_kind TEXT, origin_id TEXT);
 
 CREATE TABLE mileage_event_queue (
   engagement_event_id   TEXT PRIMARY KEY REFERENCES engagement_events(id) ON DELETE CASCADE,
@@ -1127,6 +1127,22 @@ CREATE TABLE notifications (
   status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
   metadata        TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE operation_audit (
+  id            TEXT PRIMARY KEY,
+  -- 何に対する操作か。'support_mark' | 'saved_search' | 'tag' など。
+  target_kind   TEXT NOT NULL,
+  target_id     TEXT,
+  -- 何をしたか。'changed' | 'used' | 'created' | 'deleted' など。
+  action        TEXT NOT NULL,
+  -- 誰が。自動なら NULL。
+  actor_id      TEXT,
+  -- 対象の友だち。友だちに紐づかない操作なら NULL。
+  friend_id     TEXT,
+  -- 補足。変更前後の値など。JSON。
+  detail_json   TEXT,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE TABLE operators (
@@ -1471,7 +1487,7 @@ CREATE TABLE tracked_links (
   click_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, reward_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, og_title TEXT, og_description TEXT, og_image_url TEXT, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, short_code TEXT, dedup_key TEXT);
+, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, reward_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, og_title TEXT, og_description TEXT, og_image_url TEXT, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, short_code TEXT, dedup_key TEXT, template_id TEXT);
 
 CREATE TABLE traffic_pools (
   id TEXT PRIMARY KEY,
@@ -1847,6 +1863,9 @@ CREATE INDEX idx_messages_log_friend_id ON messages_log (friend_id);
 
 CREATE INDEX idx_messages_log_friend_source ON messages_log (friend_id, source);
 
+CREATE INDEX idx_messages_log_origin
+  ON messages_log (origin_kind, created_at);
+
 CREATE INDEX idx_mileage_event_queue_due
   ON mileage_event_queue(status, available_at, created_at);
 
@@ -1909,6 +1928,9 @@ CREATE INDEX idx_nen_rich_menu_jobs_status
 CREATE INDEX idx_notifications_created ON notifications (created_at);
 
 CREATE INDEX idx_notifications_status ON notifications (status);
+
+CREATE INDEX idx_operation_audit_kind_date
+  ON operation_audit (target_kind, created_at);
 
 CREATE INDEX idx_ref_tracking_friend ON ref_tracking (friend_id);
 
@@ -1980,6 +2002,9 @@ CREATE UNIQUE INDEX idx_tracked_links_dedup_key
 
 CREATE UNIQUE INDEX idx_tracked_links_short_code
   ON tracked_links (short_code) WHERE short_code IS NOT NULL;
+
+CREATE INDEX idx_tracked_links_template
+  ON tracked_links (template_id);
 
 CREATE INDEX idx_update_history_started ON update_history(started_at DESC);
 

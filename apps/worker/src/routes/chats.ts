@@ -625,6 +625,25 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async 
     // チャットの最終メッセージ日時を更新（chat.id を直接使う — friend_id で呼ばれても resolveOrCreateChat 済み）
     await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: jstNow() });
 
+    // 初回返信の時刻を残す（107）。
+    //
+    // 受信してから最初に返すまでの時間を出すために要る。
+    // まだ入っていないときだけ入れる。2回目以降の返信で上書きすると、
+    // 「最初に返すまで」ではなく「最後に返したのはいつか」になる。
+    //
+    // 失敗しても送信そのものは成功しているので、握りつぶす。
+    try {
+      await c.env.DB
+        .prepare(
+          `UPDATE chats SET first_replied_at = ?
+            WHERE id = ? AND first_replied_at IS NULL`,
+        )
+        .bind(jstNow(), chat.id)
+        .run();
+    } catch (e) {
+      console.error('first_replied_at update error:', e);
+    }
+
     return c.json({ success: true, data: { sent: true, messageId: logId } });
   } catch (err) {
     console.error('POST /api/chats/:id/send error:', err);

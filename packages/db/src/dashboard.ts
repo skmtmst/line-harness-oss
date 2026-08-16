@@ -29,6 +29,13 @@ export interface DashboardOverview {
     resolved: number;
     /** 未対応のうち、最も古いものからの経過時間（分）。無ければ null。 */
     oldestUnansweredMinutes: number | null;
+    /**
+     * 受信してから最初に返すまでの平均（分）。過去7日ぶん。
+     *
+     * 107 を当てた日より前の往復は記録が無いので入らない。
+     * 記録が1件も無ければ null。0 を出すと「即答している」と読めてしまう。
+     */
+    averageFirstReplyMinutes: number | null;
   };
   delivery: {
     /** 期間内に送った通数。 */
@@ -148,6 +155,26 @@ async function inboxState(db: D1Database): Promise<DashboardOverview['inbox']> {
     )
     .first<{ unanswered: number; in_progress: number; resolved: number; oldest: string | null }>();
 
+  // 受信から初回返信までの平均。JSTの過去7日。
+  // 記録が無い往復（107より前）は WHERE で外れる。
+  let averageFirstReply: number | null = null;
+  try {
+    const avg = await db
+      .prepare(
+        `SELECT AVG((julianday(first_replied_at) - julianday(last_incoming_at)) * 24 * 60) AS m
+           FROM chats
+          WHERE first_replied_at IS NOT NULL
+            AND last_incoming_at IS NOT NULL
+            AND first_replied_at > last_incoming_at
+            AND substr(first_replied_at, 1, 10) >= ?`,
+      )
+      .bind(jstDate(-6))
+      .first<{ m: number | null }>();
+    averageFirstReply = avg?.m == null ? null : Math.round(avg.m);
+  } catch {
+    // 107 がまだ当たっていない環境。平均だけ出ない。
+  }
+
   let oldestMinutes: number | null = null;
   if (row?.oldest) {
     const diff = Date.now() - new Date(row.oldest).getTime();
@@ -159,6 +186,7 @@ async function inboxState(db: D1Database): Promise<DashboardOverview['inbox']> {
     inProgress: row?.in_progress ?? 0,
     resolved: row?.resolved ?? 0,
     oldestUnansweredMinutes: oldestMinutes,
+    averageFirstReplyMinutes: averageFirstReply,
   };
 }
 
@@ -338,6 +366,7 @@ export async function getDashboardOverview(
       inProgress: 0,
       resolved: 0,
       oldestUnansweredMinutes: null,
+      averageFirstReplyMinutes: null,
     })),
     friendTrend(db, period, accountId).catch(() => []),
     conversionSummary(db, period).catch(() => ({ total: 0, byPoint: [] })),
@@ -377,6 +406,8 @@ export async function getDashboardOverview(
 export interface InboxStats {
   /** 返信を待っている人。 */
   waiting: number;
+  /** 受信から初回返信までの平均（分）。記録が無ければ null。 */
+  averageFirstReplyMinutes: number | null;
   /** そのうち1時間以上待たせているもの。 */
   waitingOverAnHour: number;
   /** 自分が担当しているもの（対応中）。 */
@@ -432,7 +463,10 @@ export async function getInboxStats(
     .bind(today)
     .first<{ line_n: number; email_n: number; total: number }>();
 
+  const inbox = await inboxState(db);
+
   return {
+    averageFirstReplyMinutes: inbox.averageFirstReplyMinutes,
     waiting: waiting?.n ?? 0,
     waitingOverAnHour: waiting?.over_hour ?? 0,
     mine,

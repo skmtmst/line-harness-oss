@@ -111,7 +111,10 @@
     "104_scenario_concurrency_default.sql",
     "105_scenario_step_bubbles.sql",
     "106_friend_daily_snapshots.sql",
-    "107_chat_first_reply.sql"
+    "107_chat_first_reply.sql",
+    "108_message_origin.sql",
+    "109_field_type_and_star.sql",
+    "110_template_link_and_audit.sql"
   ],
-  "migrationCount": 112
+  "migrationCount": 115
 }
