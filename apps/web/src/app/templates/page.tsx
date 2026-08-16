@@ -218,6 +218,7 @@ export default function TemplatesPage() {
 
   return (
     <div>
+      <div data-design="Head">
       <Header
         title="テンプレート"
         description="配信で使うメッセージを管理します。友だち情報や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
@@ -230,8 +231,10 @@ export default function TemplatesPage() {
           </button>
         }
       />
+      </div>
 
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
+      <div data-design="KPIs">
       <ListKpis
         build={(s) => [
             { title: 'テンプレート', value: s.templates.total, unit: '件', detail: `使用中 ${s.templates.inUse}` },
@@ -247,6 +250,10 @@ export default function TemplatesPage() {
             { title: '使用中', value: s.templates.inUse, unit: '件', detail: 'シナリオ・自動応答から参照' },
         ]}
       />
+      </div>
+
+      {/* 一覧本体（設計 `Body`）。 */}
+      <div data-design="Body">
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -613,6 +620,7 @@ export default function TemplatesPage() {
       )}
 
       <CcPromptButton prompts={ccPrompts} />
+      </div>
     </div>
   )
 }

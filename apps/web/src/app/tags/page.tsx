@@ -304,6 +304,7 @@ function TagsPageInner() {
 
   return (
     <div>
+      <div data-design="Head">
       <Header
         title="友だち属性"
         description="友だちを分類するタグを管理します。タグはシナリオの開始条件、配信の絞り込み、自動応答の付与先として使えます。"
@@ -318,12 +319,14 @@ function TagsPageInner() {
           ) : undefined
         }
       />
+      </div>
 
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       {/*
         タブごとに出す数を変える。設計では4タブそれぞれに別のKPIが載っている。
         タブを切り替えたのに数字が前のままだと、どのタブの数か分からなくなる。
       */}
+      <div data-design="KPIs">
       <ListKpis
         key={tab}
         build={(s) =>
@@ -373,6 +376,12 @@ function TagsPageInner() {
                 ]
         }
       />
+      </div>
+
+      {/* タブ（設計 `GroupTabs`）。 */}
+      <div data-design="GroupTabs" />
+
+      <div data-design="Body">
 
       {/* タブはURLに出す。直リンクとブラウザバックが効くようにするため。 */}
       <div className="border-hairline mb-5 flex gap-1 border-b">
@@ -615,6 +624,7 @@ function TagsPageInner() {
       </div>
       </>
       )}
+      </div>
     </div>
   )
 }

@@ -155,6 +155,7 @@ function BroadcastList() {
   return (
     <div>
       {/* 設計 `V2 4-2 一斉配信` */}
+      <div data-design="Head">
       <Header
         title="一斉配信"
         description="条件を指定した友だちにメッセージをまとめて送ります。予約配信と開封の計測ができます。"
@@ -167,8 +168,14 @@ function BroadcastList() {
           </button>
         ) : undefined}
       />
+      </div>
 
+      <div data-design="KPIs">
       {activeSection === 'list' && <BroadcastKpis />}
+      </div>
+
+      {/* 一覧本体（設計 `Body`）。 */}
+      <div data-design="Body">
 
       <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2" aria-label="一斉配信メニュー">
         {([
@@ -399,6 +406,7 @@ function BroadcastList() {
 
       <CcPromptButton prompts={ccPrompts} />
       </>}
+      </div>
     </div>
   )
 }

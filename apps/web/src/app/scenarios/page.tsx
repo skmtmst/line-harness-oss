@@ -127,6 +127,7 @@ export default function ScenariosPage() {
 
   return (
     <div>
+      <div data-design="Head">
       <Header
         title="シナリオ配信"
         description="配信のタイミングを指定して複数のメッセージを順に送ります。友だちの反応に応じて分岐もできます。作成しただけでは配信されません。"
@@ -139,8 +140,10 @@ export default function ScenariosPage() {
           </button>
         }
       />
+      </div>
 
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
+      <div data-design="KPIs">
       <ListKpis
         build={(s) => [
             { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
@@ -157,6 +160,10 @@ export default function ScenariosPage() {
             { title: '稼働中', value: s.scenarios.active, unit: '件', detail: '止めているものを除く' },
         ]}
       />
+      </div>
+
+      {/* 一覧本体（設計 `Body`）。 */}
+      <div data-design="Body">
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -193,6 +200,7 @@ export default function ScenariosPage() {
       )}
 
       <CcPromptButton prompts={ccPrompts} />
+      </div>
     </div>
   )
 }
