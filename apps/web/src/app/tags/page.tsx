@@ -320,8 +320,39 @@ function TagsPageInner() {
       />
 
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
+      {/*
+        タブごとに出す数を変える。設計では4タブそれぞれに別のKPIが載っている。
+        タブを切り替えたのに数字が前のままだと、どのタブの数か分からなくなる。
+      */}
       <ListKpis
-        build={(s) => [
+        key={tab}
+        build={(s) =>
+          tab === 'marks'
+            ? [
+                { title: 'マークの種類', value: s.marks.total, unit: '件', detail: `使用中 ${s.marks.inUse}` },
+                {
+                  title: '未対応',
+                  value: s.marks.unanswered,
+                  unit: '人',
+                  detail:
+                    s.tags.taggedFriends > 0
+                      ? `全体の ${Math.round((s.marks.unanswered / s.tags.taggedFriends) * 1000) / 10}%`
+                      : '—',
+                },
+                { title: '対応中', value: s.marks.inProgress, unit: '人', detail: '担当者あり' },
+                { title: '対応済', value: s.marks.resolved, unit: '人', detail: '累計' },
+              ]
+            : tab === 'searches'
+              ? [
+                  { title: '保存した条件', value: s.searches.total, unit: '件', detail: `上限 ${s.searches.limit}` },
+                  // 設計の「配信で使用中」「該当者が0人」「今月の呼び出し」は、
+                  // 使われ方を記録していないので出せない。
+                  // docs/v025-open-questions.md に残している。
+                  { title: '空き', value: s.searches.limit - s.searches.total, unit: '件', detail: 'あと保存できる数' },
+                  { title: 'タグ数', value: s.tags.total, unit: '件', detail: '条件に使える' },
+                  { title: '友だち情報欄', value: null, unit: '件', detail: '条件に使える' },
+                ]
+              : [
             { title: 'タグ数', value: s.tags.total, unit: '件', detail: `うち未使用 ${s.tags.unused}` },
             {
               title: '付与済み友だち',
@@ -338,8 +369,9 @@ function TagsPageInner() {
             // 設計の4枚目は「自動付与ルール」。自動応答・フォーム由来の
             // 付与ルールを数える口がまだ無いので、未使用タグを出す。
             // どちらも「整理が要るか」を見るための数。
-            { title: '未使用のタグ', value: s.tags.unused, unit: '件', detail: '誰にもついていない' },
-        ]}
+                  { title: '未使用のタグ', value: s.tags.unused, unit: '件', detail: '誰にもついていない' },
+                ]
+        }
       />
 
       {/* タブはURLに出す。直リンクとブラウザバックが効くようにするため。 */}

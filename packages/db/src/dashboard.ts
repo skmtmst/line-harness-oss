@@ -573,6 +573,8 @@ export async function getBroadcastStats(db: D1Database): Promise<BroadcastStats>
  */
 export interface ListStats {
   tags: { total: number; unused: number; taggedFriends: number; assignedThisMonth: number };
+  marks: { total: number; inUse: number; unanswered: number; inProgress: number; resolved: number };
+  searches: { total: number; limit: number };
   templates: { total: number; inUse: number; sentThisMonth: number; unused90d: number };
   scenarios: { total: number; active: number; subscribers: number; completed: number };
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number };
@@ -591,7 +593,7 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
     }
   };
 
-  const [tags, templates, scenarios, reminders] = await Promise.all([
+  const [tags, marks, searches, templates, scenarios, reminders] = await Promise.all([
     safe(async () => {
       const row = await db
         .prepare(
@@ -610,6 +612,31 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
         assignedThisMonth: row?.this_month ?? 0,
       };
     }, { total: 0, unused: 0, taggedFriends: 0, assignedThisMonth: 0 }),
+
+    safe(async () => {
+      const row = await db
+        .prepare(
+          `SELECT
+             (SELECT COUNT(*) FROM support_marks) AS total,
+             (SELECT COUNT(DISTINCT support_mark_id) FROM friends WHERE support_mark_id IS NOT NULL) AS in_use`,
+        )
+        .first<{ total: number; in_use: number }>();
+      const inbox = await inboxState(db);
+      return {
+        total: row?.total ?? 0,
+        inUse: row?.in_use ?? 0,
+        unanswered: inbox.unanswered,
+        inProgress: inbox.inProgress,
+        resolved: inbox.resolved,
+      };
+    }, { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0 }),
+
+    safe(async () => {
+      // 上限50は画面に出すためだけの値。DB側に制約は無い。
+      // 実際に増えすぎたら、ここではなく保存時に止める話になる。
+      const total = await count(db, `SELECT COUNT(*) AS n FROM saved_searches`);
+      return { total, limit: 50 };
+    }, { total: 0, limit: 50 }),
 
     safe(async () => {
       const row = await db
@@ -675,5 +702,5 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
   ]);
 
   void ninetyDaysAgo;
-  return { tags, templates, scenarios, reminders };
+  return { tags, marks, searches, templates, scenarios, reminders };
 }
