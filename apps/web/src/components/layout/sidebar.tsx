@@ -104,7 +104,7 @@ function AccountAvatar({ account, size = 32 }: { account: AccountWithStats; size
   return (
     <div
       className="rounded-full flex items-center justify-center text-white font-bold shrink-0"
-      style={{ width: size, height: size, backgroundColor: '#06C755', fontSize: size * 0.4 }}
+      style={{ width: size, height: size, backgroundColor: 'var(--color-accent)', fontSize: size * 0.4 }}
     >
       {displayName.charAt(0)}
     </div>
@@ -328,7 +328,7 @@ export default function Sidebar() {
                         ? 'text-red-500 hover:bg-red-50'
                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
-                  style={active ? { backgroundColor: isDanger ? '#EF4444' : '#06C755' } : {}}
+                  style={active ? { backgroundColor: isDanger ? '#EF4444' : 'var(--color-accent)' } : {}}
                 >
                   <NavIcon d={item.icon} />
                   <span className="flex-1">{item.label}</span>
@@ -414,7 +414,7 @@ export default function Sidebar() {
           </svg>
         </button>
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: '#06C755' }}>N</div>
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>N</div>
           <p className="text-sm font-bold leading-tight text-gray-900">然-NEN- LINE管理システム TEST</p>
         </div>
       </div>

@@ -124,7 +124,7 @@ export default function ShipmentPanel() {
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                   bucket === key ? 'text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
-                style={bucket === key ? { backgroundColor: '#06C755' } : undefined}
+                style={bucket === key ? { backgroundColor: 'var(--color-accent)' } : undefined}
               >
                 {label}
                 <span

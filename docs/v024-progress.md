@@ -180,11 +180,18 @@
 | 経路の重複登録 | 無し |
 | `console.log` の消し忘れ | 無し |
 
-**残っている気になる点**（今回の変更が原因ではない、既存の画面）:
+**引き渡し前に直したもの**:
 
-- `useSearchParams` を `<Suspense>` で包んでいない画面が5つある
-  （`broadcasts` `scenarios/detail` `inflow-links/detail`
-  `booking/staff/shifts` `booking/menus/staff`）。
-  ビルドは通るが、その画面だけ初期表示がクライアント側に倒れる。
-- `app/page.tsx` がLINEの緑（`#06C755`）を直に書いている。
-  他の画面は `bg-accent` などのトークンを使っている。
+| 直したところ | 中身 |
+|---|---|
+| `useSearchParams` の Suspense | 包んでいなかった5画面（`broadcasts` `scenarios/detail` `inflow-links/detail` `booking/staff/shifts` `booking/menus/staff`）を、他の20画面と同じ形にそろえた。**書き出されるHTMLは変わらない** —— 画面全体がログイン確認の内側にあり、もともとクライアント側で描いているため。将来 Next が静的書き出しの扱いを厳しくしたときに、この5つだけ落ちるのを避ける |
+| LINEの緑の直書き | 26ファイル・61か所の `#06C755` を `--color-accent` に寄せた。値は同じなので見た目は変わらない。インライン `style` はクラスに変えず `var(--color-accent)` にしている —— クラスにすると指定の強さが変わり、他のクラスとの勝ち負けが入れ替わる場所があるため |
+| 名前の無いボタン | チャットの「戻る」が矢印だけで、読み上げで何のボタンか分からなかった。`aria-label` を付けた |
+| `/staff/new` の権限 | APIが `requireRole('owner')` なのに、画面にその案内が無かった |
+
+**直していないもの**:
+
+- 旧いTailwindのクラス（`bg-white` `text-gray-*` `border-gray-*`）が
+  多くの画面に残っている。ダークモードが無いのでトークンと同じ見た目になり、
+  置き換えても得るものが無い割に差分が大きい。触らない方がよいと判断した。
+- 二要素認証。列はあるが、認証の仕組みそのものが要る。単独で見積もる方がよい。

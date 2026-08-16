@@ -133,7 +133,7 @@ function StaffPageInner() {
           <button
             onClick={() => setShowForm(!showForm)}
             className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             + スタッフを追加
           </button>
@@ -208,7 +208,7 @@ function StaffPageInner() {
                 type="submit"
                 disabled={formLoading || !formName || !formFriendId}
                 className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 {formLoading ? '作成中...' : '作成'}
               </button>

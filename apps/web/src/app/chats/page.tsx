@@ -225,7 +225,11 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-4 border-b border-hairline flex items-center gap-3">
-        <button onClick={onBack} className="lg:hidden text-ink-faint hover:text-ink-secondary">
+        <button
+          onClick={onBack}
+          aria-label="友だち一覧に戻る"
+          className="lg:hidden text-ink-faint hover:text-ink-secondary"
+        >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -1071,7 +1075,7 @@ function ChatsPageInner() {
                                   ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-white'
                                   : 'rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-white text-ink'
                               }`}
-                              style={isOutgoing ? { backgroundColor: '#06C755' } : undefined}
+                              style={isOutgoing ? { backgroundColor: 'var(--color-accent)' } : undefined}
                             >
                               {bubbleContent}
                             </div>

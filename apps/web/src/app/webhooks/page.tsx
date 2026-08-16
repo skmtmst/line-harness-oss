@@ -251,7 +251,7 @@ function WebhooksPageInner() {
           <button
             onClick={() => setShowCreate(!showCreate)}
             className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             {showCreate ? 'キャンセル' : '+ 新規Webhook'}
           </button>
@@ -302,7 +302,7 @@ function WebhooksPageInner() {
               <button
                 type="submit"
                 className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存
               </button>
@@ -339,7 +339,7 @@ function WebhooksPageInner() {
                   setSecretCopied(false)
                 }}
                 className="px-4 py-2 text-sm rounded-lg text-white font-medium"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 保存しました
               </button>
@@ -432,7 +432,7 @@ function WebhooksPageInner() {
           <button
             type="submit"
             className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             作成
           </button>
@@ -525,7 +525,7 @@ function WebhooksPageInner() {
           <button
             type="submit"
             className="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             作成
           </button>

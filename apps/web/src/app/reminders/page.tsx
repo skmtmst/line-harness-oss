@@ -295,7 +295,7 @@ export default function RemindersPage() {
           <button
             onClick={() => setShowCreate(true)}
             className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: '#06C755' }}
+            style={{ backgroundColor: 'var(--color-accent)' }}
           >
             + 新規リマインダー
           </button>
@@ -421,7 +421,7 @@ export default function RemindersPage() {
                 onClick={handleCreate}
                 disabled={saving}
                 className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity"
-                style={{ backgroundColor: '#06C755' }}
+                style={{ backgroundColor: 'var(--color-accent)' }}
               >
                 {saving ? '作成中...' : '作成'}
               </button>
@@ -514,7 +514,7 @@ export default function RemindersPage() {
                             ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                             : 'text-white hover:opacity-90'
                         }`}
-                        style={!reminder.isActive ? { backgroundColor: '#06C755' } : undefined}
+                        style={!reminder.isActive ? { backgroundColor: 'var(--color-accent)' } : undefined}
                       >
                         {reminder.isActive ? '無効にする' : '有効にする'}
                       </button>
@@ -542,7 +542,7 @@ export default function RemindersPage() {
                           <button
                             onClick={() => { setShowStepForm(true); setStepFormError('') }}
                             className="px-3 py-1 min-h-[44px] text-xs font-medium text-white rounded-md transition-opacity hover:opacity-90"
-                            style={{ backgroundColor: '#06C755' }}
+                            style={{ backgroundColor: 'var(--color-accent)' }}
                           >
                             + ステップ追加
                           </button>
@@ -631,7 +631,7 @@ export default function RemindersPage() {
                                   onClick={handleAddStep}
                                   disabled={stepSaving}
                                   className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity"
-                                  style={{ backgroundColor: '#06C755' }}
+                                  style={{ backgroundColor: 'var(--color-accent)' }}
                                 >
                                   {stepSaving ? '追加中...' : '追加'}
                                 </button>
