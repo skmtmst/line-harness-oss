@@ -1,15 +1,22 @@
 name: Required PR gate
 
-# This workflow intentionally runs for every pull request targeting either
-# integration branch. Path-filtered workflows are useful for speed, but they
-# cannot be made a universal branch-protection requirement because GitHub
-# reports no check at all when their path filter does not match.
+# This workflow intentionally runs for every pull request. Path-filtered
+# workflows are useful for speed, but they cannot be made a universal
+# branch-protection requirement because GitHub reports no check at all when
+# their path filter does not match.
+#
+# The branch filter used to be `codex/development` and `main`. Stacked pull
+# requests — the ones whose base is another feature branch — therefore never
+# ran this gate at all. #57 added 24 admin screens and landed with zero status
+# checks, because its base was another feature branch rather than an
+# integration branch. A 15-deep stack could reach `codex/development` with
+# only its final pull request ever checked.
+#
+# There is no branch filter now: every pull request runs it, whatever it
+# targets.
 
 on:
   pull_request:
-    branches:
-      - codex/development
-      - main
   workflow_dispatch:
 
 permissions:
@@ -136,5 +143,6 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
         run: |
+          pnpm --filter web typecheck
           pnpm --filter web test
           pnpm --filter web build
