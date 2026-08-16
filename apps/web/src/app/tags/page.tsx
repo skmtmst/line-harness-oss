@@ -6,6 +6,7 @@ import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
+import ListToolbar from '@/components/shared/list-toolbar'
 import TagBadge from '@/components/friends/tag-badge'
 import FriendFieldList from '@/components/friend-fields/field-list'
 import SupportMarkList from '@/components/friend-fields/mark-list'
@@ -178,6 +179,8 @@ function TagsPageInner() {
   const [error, setError] = useState('')
 
   const [creating, setCreating] = useState(false)
+  // タグ名の絞り込み（設計 `Body` の「タグ名で検索」）。
+  const [tagQuery, setTagQuery] = useState('')
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState(PRESET_COLORS[0])
   const [newGroupId, setNewGroupId] = useState('')
@@ -212,10 +215,13 @@ function TagsPageInner() {
   useEffect(() => { load() }, [load])
 
   const visible = useMemo(() => {
-    if (filter === '') return items
-    if (filter === UNGROUPED) return items.filter((t) => !t.groupId)
-    return items.filter((t) => t.groupId === filter)
-  }, [items, filter])
+    // 名前は手元で絞る。打つたびに取り直すと重い。
+    const q = tagQuery.trim().toLowerCase()
+    const byName = q === '' ? items : items.filter((t) => t.name.toLowerCase().includes(q))
+    if (filter === '') return byName
+    if (filter === UNGROUPED) return byName.filter((t) => !t.groupId)
+    return byName.filter((t) => t.groupId === filter)
+  }, [items, filter, tagQuery])
 
   const ungroupedCount = useMemo(() => items.filter((t) => !t.groupId).length, [items])
 
@@ -310,12 +316,28 @@ function TagsPageInner() {
         description="友だちを分類するタグを管理します。タグはシナリオの開始条件、配信の絞り込み、自動応答の付与先として使えます。"
         action={
           tab === 'tags' ? (
-            <button
-              onClick={() => { setCreating(!creating); setError('') }}
-              className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
-            >
-              + 新規タグ
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {['マニュアル', 'CSVで一括登録', '並び替え', 'フォルダを追加'].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  title="準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                onClick={() => { setCreating(!creating); setError('') }}
+                className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
+              >
+                + 新規タグ
+              </button>
+            </div>
+          ) : tab === 'fields' ? (
+            <a href="/tags/fields/new" className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium hover:bg-accent-hover">
+              項目を追加
+            </a>
           ) : undefined
         }
       />
@@ -400,12 +422,73 @@ function TagsPageInner() {
         ))}
       </div>
 
-      {tab === 'fields' && <FriendFieldList />}
-      {tab === 'marks' && <SupportMarkList />}
-      {tab === 'searches' && <SavedSearchList />}
+      {/*
+        タブごとの説明（設計 `V2 3-1〜3-4`）。
+        設計はどのタブにも「この画面が何をする場所か」を最初に書いている。
+        タグ・情報欄・対応マーク・保存した検索は、名前だけでは
+        何のためのものか分からない。使う前に読む1文を置く。
+      */}
+      {tab === 'fields' && (
+        <>
+          <p className="text-ink-secondary rounded-card border-hairline bg-canvas mb-4 border p-4 text-sm leading-relaxed">
+            「愛犬のお名前」「便の状態」など、友だちごとに記録したい項目を定義します。
+            ここで作った項目が、<strong>回答フォームの登録先</strong>・
+            <strong>友だち詳細のタブ</strong>・<strong>テンプレートの差し込み</strong>に使えます。
+          </p>
+          <FriendFieldList />
+        </>
+      )}
+      {tab === 'marks' && (
+        <>
+          <p className="text-ink-secondary rounded-card border-hairline bg-canvas mb-4 border p-4 text-sm leading-relaxed">
+            問い合わせの状態を表すマークを作ります。ここで決めた選択肢が、
+            <strong>受信箱</strong>・<strong>友だち一覧</strong>・<strong>友だち詳細</strong>で使われます。
+          </p>
+          <SupportMarkList />
+          <div className="text-ink-faint rounded-card border-hairline bg-canvas-sunken mt-4 border p-4 text-xs leading-relaxed">
+            <p className="text-ink-secondary mb-1.5 font-medium">気をつけること</p>
+            <ul className="space-y-1">
+              <li>・使用中のマークを削除すると、そのマークが付いている友だちは「未対応」に戻ります</li>
+              <li>・初期値のマークは1つだけ選べます。新しい友だちにはこれが付きます</li>
+              <li>・並び順は、受信箱や一覧の絞り込みボタンの並びに反映されます</li>
+            </ul>
+          </div>
+        </>
+      )}
+      {tab === 'searches' && (
+        <>
+          <p className="text-ink-secondary rounded-card border-hairline bg-canvas mb-4 border p-4 text-sm leading-relaxed">
+            友だちの絞り込み条件に名前を付けて保存します。保存した条件は、
+            <strong>友だち一覧</strong>・<strong>配信の宛先</strong>・
+            <strong>オートメーションの対象</strong>から呼び出せます。
+          </p>
+          <SavedSearchList />
+          <div className="text-ink-faint rounded-card border-hairline bg-canvas-sunken mt-4 border p-4 text-xs leading-relaxed">
+            <p className="text-ink-secondary mb-1.5 font-medium">条件の組み方</p>
+            <ul className="space-y-1">
+              <li>・「すべて満たす」と「いずれか1つ以上満たす」の2つのグループに分けて指定します</li>
+              <li>・両方に条件を入れると、すべて満たす かつ いずれか1つ以上満たす、という意味になります</li>
+              <li>・保存できるのは50件までです</li>
+            </ul>
+            <p className="text-ink-secondary mt-3 mb-1.5 font-medium">使える条件</p>
+            <ul className="space-y-1">
+              <li>・タグ ／ 友だち情報欄 ／ 対応マーク ／ 流入経路 ／ 購読中のシナリオ</li>
+              <li>・最終接触日 ／ 友だち追加日 ／ 最終購入日 ／ 誕生日</li>
+              <li>・フォームの回答内容 ／ サイトの行動 ／ 購入履歴 ／ マイル残高</li>
+            </ul>
+          </div>
+        </>
+      )}
 
       {tab === 'tags' && (
       <>
+      <ListToolbar
+        folders={['すべて', '01_購入ステータス', '02_ペット属性', '03_健康の悩み']}
+        searchPlaceholder="タグ名で検索"
+        searchValue={tagQuery}
+        onSearchChange={setTagQuery}
+        sortLabel="付与人数が多い順"
+      />
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
