@@ -20,5 +20,6 @@ apps/web/out/
 apps/worker/dist/
 .worktrees/
 .claude/worktrees/
+.claude/settings.local.json
 .line-harness-setup.json
 .line-harness-config.json
