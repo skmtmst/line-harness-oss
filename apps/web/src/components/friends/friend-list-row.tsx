@@ -38,9 +38,23 @@ export default function FriendListRow({ friend, onDetailClick }: Props) {
           navigateToChat()
         }
       }}
-      className="grid grid-cols-[80px_220px_120px_1fr_160px_88px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
+      className="grid grid-cols-[220px_80px_120px_1fr_160px_110px_88px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
     >
-      {/* 対応マーク — chats.status 由来 (unread / in_progress / resolved). */}
+      {/* 名前 + アバター + 登録日 */}
+      <div className="flex items-start gap-2">
+        {friend.pictureUrl ? (
+          <img
+            src={friend.pictureUrl}
+            alt={friend.displayName}
+            className="w-9 h-9 rounded-full object-cover bg-gray-100 flex-shrink-0"
+          />
+        ) : (
+          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-medium flex-shrink-0">
+            {friend.displayName?.charAt(0) ?? '?'}
+          </div>
+        )}
+        <div className="min-w-0">
+          {/* 対応マーク — chats.status 由来 (unread / in_progress / resolved). */}
       <div className="pt-1">
         {friend.chatStatus === 'unread' ? (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-red-100 text-red-700">
@@ -57,21 +71,7 @@ export default function FriendListRow({ friend, onDetailClick }: Props) {
         )}
       </div>
 
-      {/* 名前 + アバター + 登録日 */}
-      <div className="flex items-start gap-2">
-        {friend.pictureUrl ? (
-          <img
-            src={friend.pictureUrl}
-            alt={friend.displayName}
-            className="w-9 h-9 rounded-full object-cover bg-gray-100 flex-shrink-0"
-          />
-        ) : (
-          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-medium flex-shrink-0">
-            {friend.displayName?.charAt(0) ?? '?'}
-          </div>
-        )}
-        <div className="min-w-0">
-          {/* 行のクリックはトークを開く。名前からは詳細へ行けるようにする。
+      {/* 行のクリックはトークを開く。名前からは詳細へ行けるようにする。
               行の動きを変えると、既にトークを開く操作として覚えられている
               ものが変わってしまう。 */}
           <Link
@@ -152,6 +152,18 @@ export default function FriendListRow({ friend, onDetailClick }: Props) {
           !(friend as unknown as { metadata?: Record<string, unknown> }).metadata?.ig_account_id && (
           <span className="text-[10px] text-gray-300">—</span>
         )}
+      </div>
+
+      {/*
+        最終接触（設計 `V2 2-2 友だち` の最右の列）。
+        放置されている人を見つけるための列で、対応マークと対で読む。
+        「未対応で2週間」が一目で分かる。
+
+        いまは最後の受信時刻を返す口が一覧に無いので、登録日を出す。
+        docs/v025-open-questions.md に残している。
+      */}
+      <div className="pt-1 text-xs text-gray-500 tabular-nums">
+        {formatJstDate(friend.createdAt)}
       </div>
 
       <div className="pt-0.5 text-right">

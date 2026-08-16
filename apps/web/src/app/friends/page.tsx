@@ -146,6 +146,30 @@ function FriendsPageInner() {
       <Header
         title="友だち"
         description="登録された友だちの検索・タグ付け・対応状況を管理します。"
+        action={
+          <div className="flex items-center gap-2">
+            {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
+            <button
+              disabled
+              title="マニュアルは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            <button
+              onClick={() => window.alert('CSVの書き出しは準備中です。')}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+            >
+              CSVで書き出す
+            </button>
+            <button
+              onClick={() => window.alert('友だちを選ぶと、まとめて実行できます。')}
+              className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+            >
+              一括アクション
+            </button>
+          </div>
+        }
       />
       </div>
 
@@ -159,22 +183,101 @@ function FriendsPageInner() {
         言わない状態にする。中身が入ったらこのコメントを消す。
         docs/v025-screen-audit.md に何が要るかを書いてある。
       */}
+      {/*
+        タブ（設計 `Tabs`）。設計は Head と KPI の下に置き、件数を添える。
+        呼び名も設計に合わせる（統合ユーザー → アカウント横断の名寄せ）。
+        いまは MergedTabs が画面の一番上にあるので、印だけここに置いて
+        位置を示す。並べ替えは MergedTabs の作りを変える必要がある。
+      */}
       <div data-design="Tabs" />
-      <div data-design="SearchBar" />
-      <div data-design="SavedChips" />
-      <div data-design="BulkBar" />
-      <div data-design="Table" />
 
-      {/* Search + sort bar — L-step style */}
-      <div className="bg-canvas rounded-card border border-hairline p-4 mb-4">
+      {/*
+        保存済みの検索条件（設計 `SavedChips`）。
+        saved_searches は 100 で入っているが、一覧から呼ぶ導線が無い。
+        よく使う条件を1押しで呼べると、毎回条件を組み直さずに済む。
+      */}
+      <div data-design="SavedChips" className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-ink-faint text-xs">保存済み</span>
+        {['未対応かつ7日以内', '定期便 契約中', 'ブロック解除者'].map((label) => (
+          <button
+            key={label}
+            disabled
+            title="保存した検索の呼び出しは準備中です"
+            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          disabled
+          title="条件の保存は準備中です"
+          className="text-accent rounded-pill px-3 py-1 text-xs opacity-50"
+        >
+          ＋ この条件を保存
+        </button>
+      </div>
+
+      {/*
+        一括操作（設計 `BulkBar`）。選んだときだけ出す。
+        設計は6種。どれも1人ずつやると人数ぶんの往復が要るもの。
+      */}
+      <div data-design="BulkBar" className="border-hairline bg-canvas-sunken rounded-card mb-3 border p-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink text-xs font-medium">0 人を選択中</span>
+          <span className="text-ink-faint text-xs">選んだ友だちにまとめて実行できます</span>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {[
+              '対応マークを変える',
+              'テンプレートを送る',
+              'シナリオを開始',
+              'タグを付ける・外す',
+              '友だち情報を書き換える',
+              'リマインダを開始',
+            ].map((label) => (
+              <button
+                key={label}
+                disabled
+                title="友だちを選ぶと使えます"
+                className="border-hairline bg-canvas text-ink-faint rounded-control border px-2.5 py-1 text-xs opacity-50"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 検索と並び順（設計 `SearchBar`）。 */}
+      <div data-design="SearchBar" className="bg-canvas rounded-card border border-hairline p-4 mb-4">
         <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <input
             type="text"
             value={searchInput}
             onChange={(e) => handleSearchInputChange(e.target.value)}
-            placeholder="友だち名を検索"
+            placeholder="友だち名で検索"
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
+          {/*
+            設計は「詳細検索」「保存した検索」も置く。条件が増えると
+            1行の検索では足りなくなる。仕組みが入るまで押せない状態で置く。
+          */}
+          <button
+            type="button"
+            disabled
+            title="詳細検索は準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+          >
+            詳細検索
+          </button>
+          <button
+            type="button"
+            disabled
+            title="保存した検索は準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+          >
+            保存した検索
+          </button>
+          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
           <select
             value={sortMode}
             onChange={(e) => handleSortChange(e.target.value as SortMode)}
@@ -249,7 +352,10 @@ function FriendsPageInner() {
           ))}
         </div>
       ) : (
-        <FriendListTable friends={friends} allTags={allTags} onRefresh={loadFriends} />
+        /* 一覧（設計 `Table`）。 */
+        <div data-design="Table">
+          <FriendListTable friends={friends} allTags={allTags} onRefresh={loadFriends} />
+        </div>
       )}
 
       {!loading && total > 0 && (
