@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   columnsOf,
+  stripSqlComments,
   judge,
   markersOf,
   schemaFromSqliteMaster,
@@ -42,6 +43,29 @@ describe('CREATE 文の分解', () => {
     // ここを読み落とすと、当たっている物を「未適用」と誤判定する。
     const cols = columnsOf(`CREATE TABLE friends (id TEXT, name TEXT, line_account_id TEXT)`);
     expect(cols.has('line_account_id')).toBe(true);
+  });
+
+  it('行末コメントの次の列を落とさない', () => {
+    // sqlite_master は CREATE 文を書かれたまま持つ。カンマで分けた断片が
+    // コメントから始まると列名を取り出せず、その列が「無い」ことになる。
+    // 実際に staff_availability_rules の start_time / end_time / is_active が
+    // これで消え、検証環境のスキーマが最終形と違うように見えた。
+    const cols = columnsOf(`CREATE TABLE t (
+      weekday    INTEGER NOT NULL, -- 0=Sun
+      start_time TEXT NOT NULL,    -- HH:MM JST
+      end_time   TEXT NOT NULL,
+      is_active  INTEGER NOT NULL DEFAULT 1
+    )`);
+    expect([...cols].sort()).toEqual(['end_time', 'is_active', 'start_time', 'weekday']);
+  });
+
+  it('ブロックコメントも落とす', () => {
+    const cols = columnsOf('CREATE TABLE t (a TEXT, /* 途中の説明, カンマ入り */ b TEXT)');
+    expect([...cols].sort()).toEqual(['a', 'b']);
+  });
+
+  it('コメントを外しても中身は壊さない', () => {
+    expect(stripSqlComments("SELECT 'a--b'").includes('SELECT')).toBe(true);
   });
 
   it('引用符つきの列名も読める', () => {

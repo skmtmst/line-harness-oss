@@ -108,7 +108,8 @@
     "101_content_library.sql",
     "102_analytics.sql",
     "103_ops_and_flags.sql",
-    "104_scenario_concurrency_default.sql"
+    "104_scenario_concurrency_default.sql",
+    "105_scenario_step_bubbles.sql"
   ],
-  "migrationCount": 109
+  "migrationCount": 110
 }
