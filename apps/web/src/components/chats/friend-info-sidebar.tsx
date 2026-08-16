@@ -233,32 +233,35 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             </div>
 
             {/* Status / Operator */}
-            {(chatStatus?.status || operatorName) && (
-              <div className="p-4 space-y-2">
-                {chatStatus?.status && statusLabels[chatStatus.status] && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-gray-500">対応状況</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
-                      {statusLabels[chatStatus.status].label}
-                    </span>
-                  </div>
-                )}
-                {operatorName && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] text-gray-500">担当者</span>
-                    <span className="text-xs text-gray-700">{operatorName}</span>
-                  </div>
+            {/*
+              対応（設計 `友だち詳細` の「対応」）。
+              値が無くても節ごと出す。以前は空だと見出しごと消えていて、
+              「この画面には対応の情報が無い」ように見えていた。
+              設計は「未設定」「未割り当て」と書いて枠を残している。
+            */}
+            <div className="p-4 space-y-2">
+              <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">対応</h4>
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] text-gray-500">対応マーク</span>
+                {chatStatus?.status && statusLabels[chatStatus.status] ? (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusLabels[chatStatus.status].className}`}>
+                    {statusLabels[chatStatus.status].label}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400">未設定</span>
                 )}
               </div>
-            )}
-
-            {/* Notes */}
-            {chatStatus?.notes && (
-              <div className="p-4">
-                <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">個別メモ</h4>
-                <p className="text-xs text-gray-700 whitespace-pre-wrap break-words">{chatStatus.notes}</p>
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] text-gray-500">担当者</span>
+                <span className="text-xs text-gray-700">{operatorName || <span className="text-gray-400">未割り当て</span>}</span>
               </div>
-            )}
+              <div>
+                <span className="text-[11px] text-gray-500">個別メモ</span>
+                <p className="text-xs text-gray-700 whitespace-pre-wrap break-words mt-1">
+                  {chatStatus?.notes || <span className="text-gray-400">まだありません</span>}
+                </p>
+              </div>
+            </div>
 
             {/* Tags */}
             <div className="p-4">
@@ -305,9 +308,12 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             </div>
 
             {/* Metadata custom fields */}
-            {friend.metadata && Object.keys(friend.metadata).length > 0 && (
-              <div className="p-4">
-                <h4 className="text-[11px] font-medium text-gray-500 mb-2">友だち情報</h4>
+            <div className="p-4">
+              <h4 className="text-[11px] font-medium text-gray-500 mb-2">友だち情報</h4>
+              {!friend.metadata || Object.keys(friend.metadata).length === 0 ? (
+                <p className="text-[11px] text-gray-400 italic">まだ登録がありません</p>
+              ) : (
+                <div>
                 <dl className="space-y-2 text-xs">
                   {Object.entries(friend.metadata).map(([key, value]) => (
                     <div key={key}>
@@ -316,13 +322,17 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                     </div>
                   ))}
                 </dl>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
 
             {/* Form answers — save_to_metadata の設定に関係なく回答履歴を表示 */}
-            {friend.formSubmissions?.length > 0 && (
-              <div className="p-4">
-                <h4 className="text-[11px] font-medium text-gray-500 mb-2">フォーム回答</h4>
+            <div className="p-4">
+              <h4 className="text-[11px] font-medium text-gray-500 mb-2">フォーム回答</h4>
+              {!friend.formSubmissions || friend.formSubmissions.length === 0 ? (
+                <p className="text-[11px] text-gray-400 italic">回答はまだありません</p>
+              ) : (
+                <div>
                 <div className="space-y-3">
                   {friend.formSubmissions.map((submission) => {
                     const labels = new Map(submission.fields.map((field) => [field.name, field.label]))
@@ -349,8 +359,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                     )
                   })}
                 </div>
-              </div>
-            )}
+                </div>
+              )}
+            </div>
 
             {/*
               編集導線は将来追加予定 (現在の /friends は ?id= をハンドルしないため、
