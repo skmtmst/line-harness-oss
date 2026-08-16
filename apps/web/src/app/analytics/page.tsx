@@ -433,6 +433,7 @@ function FunnelTab() {
     conversionFromPrevious: number
   }> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     void api.funnels
@@ -461,18 +462,38 @@ function FunnelTab() {
     )
   }
 
-  if (funnels.length === 0) {
-    return (
-      <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-        ファネルがまだありません。段を2つ以上つないで、どこで離れているかを見られます。
-      </p>
-    )
-  }
-
   const top = result?.[0]?.reached ?? 0
 
   return (
     <div>
+      {creating ? (
+        <FunnelForm
+          onCancel={() => setCreating(false)}
+          onCreated={(id) => {
+            setCreating(false)
+            void api.funnels.list().then((res) => {
+              if (res.success) setFunnels(res.data)
+            })
+            setSelected(id)
+          }}
+        />
+      ) : (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={() => setCreating(true)}
+            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+          >
+            ＋ ファネルを作成
+          </button>
+        </div>
+      )}
+
+      {funnels.length === 0 && !creating ? (
+        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
+          ファネルがまだありません。段を2つ以上つないで、どこで離れているかを見られます。
+        </p>
+      ) : funnels.length === 0 ? null : (
+      <>
       <div className="mb-4">
         <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-sm font-medium">
           ファネル
@@ -518,6 +539,192 @@ function FunnelTab() {
           ))}
         </div>
       )}
+      </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * ファネルの作成。
+ *
+ * 段は上から順に「次に進んだ人」を数える。作るときも上から並べる順で
+ * 入れてもらう。番号を振らせると、抜けや重複を毎回確かめることになる。
+ */
+function FunnelForm({
+  onCancel,
+  onCreated,
+}: {
+  onCancel: () => void
+  onCreated: (id: string) => void
+}) {
+  const KINDS = [
+    { key: 'tag', label: 'タグが付いた', hint: 'タグのID' },
+    { key: 'field', label: '情報欄に値が入った', hint: '項目のID' },
+    { key: 'form', label: 'フォームに答えた', hint: 'フォームのID' },
+    { key: 'site_event', label: 'サイトのページを見た', hint: 'パス（例: /thanks）' },
+    { key: 'link_click', label: 'リンクを踏んだ', hint: '計測リンクのID' },
+    { key: 'conversion', label: '成果が記録された', hint: '成果地点のID' },
+  ]
+
+  const [name, setName] = useState('')
+  const [steps, setSteps] = useState([
+    { label: '', kind: 'tag', value: '' },
+    { label: '', kind: 'conversion', value: '' },
+  ])
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const matchFor = (kind: string, value: string): Record<string, string> => {
+    if (kind === 'tag') return { tagId: value }
+    if (kind === 'field') return { fieldId: value }
+    if (kind === 'form') return { formId: value }
+    if (kind === 'site_event') return { eventType: 'page_view', path: value }
+    if (kind === 'link_click') return { trackedLinkId: value }
+    return { conversionPointId: value }
+  }
+
+  const save = async () => {
+    if (!name.trim()) {
+      setError('名前を入力してください')
+      return
+    }
+    if (steps.some((s) => !s.label.trim())) {
+      setError('すべての段に名前を付けてください')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await api.funnels.create({
+        name: name.trim(),
+        steps: steps.map((s) => ({
+          label: s.label.trim(),
+          kind: s.kind,
+          match: matchFor(s.kind, s.value.trim()),
+        })),
+      })
+      if (!res.success) {
+        setError(res.error)
+        return
+      }
+      onCreated(res.data.id)
+    } catch {
+      setError('保存に失敗しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-canvas rounded-card border-hairline mb-5 space-y-4 border p-5">
+      <div>
+        <label htmlFor="fn-name" className="text-ink-secondary mb-1 block text-sm font-medium">
+          名前
+        </label>
+        <input
+          id="fn-name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="例: 友だち追加から購入まで"
+          className="border-hairline rounded-control w-full max-w-md border px-3 py-2 text-sm"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-ink-secondary text-sm font-medium">段（上から順に見ます）</p>
+        {steps.map((step, i) => (
+          <div key={i} className="border-hairline flex flex-wrap items-end gap-2 rounded-lg border p-3">
+            <span className="text-ink-faint pb-2 text-sm tabular-nums">{i + 1}.</span>
+            <div className="min-w-[10rem] flex-1">
+              <label className="text-ink-faint mb-1 block text-xs">段の名前</label>
+              <input
+                type="text"
+                value={step.label}
+                onChange={(e) =>
+                  setSteps((prev) =>
+                    prev.map((s, j) => (i === j ? { ...s, label: e.target.value } : s)),
+                  )
+                }
+                placeholder="例: 友だち追加"
+                className="border-hairline rounded-control w-full border px-2 py-1.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-ink-faint mb-1 block text-xs">何をしたら</label>
+              <select
+                value={step.kind}
+                onChange={(e) =>
+                  setSteps((prev) =>
+                    prev.map((s, j) => (i === j ? { ...s, kind: e.target.value } : s)),
+                  )
+                }
+                className="border-hairline rounded-control border px-2 py-1.5 text-sm"
+              >
+                {KINDS.map((k) => (
+                  <option key={k.key} value={k.key}>
+                    {k.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-[10rem] flex-1">
+              <label className="text-ink-faint mb-1 block text-xs">
+                {KINDS.find((k) => k.key === step.kind)?.hint}
+              </label>
+              <input
+                type="text"
+                value={step.value}
+                onChange={(e) =>
+                  setSteps((prev) =>
+                    prev.map((s, j) => (i === j ? { ...s, value: e.target.value } : s)),
+                  )
+                }
+                className="border-hairline rounded-control w-full border px-2 py-1.5 text-sm"
+              />
+            </div>
+            {steps.length > 2 && (
+              <button
+                onClick={() => setSteps((prev) => prev.filter((_, j) => j !== i))}
+                className="text-danger hover:bg-danger-bg rounded px-2 py-1.5 text-xs"
+              >
+                外す
+              </button>
+            )}
+          </div>
+        ))}
+        {steps.length < 10 && (
+          <button
+            onClick={() => setSteps((prev) => [...prev, { label: '', kind: 'tag', value: '' }])}
+            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-sm"
+          >
+            ＋ 段を足す
+          </button>
+        )}
+      </div>
+
+      <p className="text-ink-faint text-xs">
+        段は2つ以上10個まで。1段だけだと「ただの件数」になり、どこで離れたかが分かりません。
+      </p>
+
+      {error && <p className="text-danger text-sm">{error}</p>}
+
+      <div className="flex gap-2">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+        >
+          {saving ? '保存中...' : '作成'}
+        </button>
+        <button
+          onClick={onCancel}
+          className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control px-4 py-2 text-sm font-medium"
+        >
+          キャンセル
+        </button>
+      </div>
     </div>
   )
 }

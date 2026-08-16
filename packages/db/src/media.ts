@@ -178,15 +178,28 @@ export async function recordMediaUsage(
 }
 
 /**
- * スキャンより古い記録を消す。
+ * 今回のスキャンで触らなかった記録を消す。
  *
  * 本文から画像が外されたとき、記録だけが残り続けると「使われている」
- * と言い続けることになる。今回のスキャンで触らなかった行を落とす。
+ * と言い続けることになる。
+ *
+ * 対象は「今回走査したメディア」だけに限る。走査していないメディアの
+ * 記録まで消すと、上限で外れたものが「どこでも使われていない」ことに
+ * なってしまい、削除前の警告が効かなくなる。
  */
-export async function pruneStaleMediaUsages(db: D1Database, scannedBefore: string): Promise<number> {
+export async function pruneStaleMediaUsages(
+  db: D1Database,
+  scannedBefore: string,
+  mediaIds: string[],
+): Promise<number> {
+  if (mediaIds.length === 0) return 0;
+  const placeholders = mediaIds.map(() => '?').join(',');
   const result = await db
-    .prepare(`DELETE FROM media_usages WHERE scanned_at < ?`)
-    .bind(scannedBefore)
+    .prepare(
+      `DELETE FROM media_usages
+        WHERE scanned_at < ? AND media_id IN (${placeholders})`,
+    )
+    .bind(scannedBefore, ...mediaIds)
     .run();
   return result.meta?.changes ?? 0;
 }

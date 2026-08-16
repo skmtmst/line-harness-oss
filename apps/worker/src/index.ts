@@ -99,6 +99,7 @@ import { friendAttributes } from './routes/friend-attributes.js';
 import { featureSettings } from './routes/feature-settings.js';
 import { contents } from './routes/contents.js';
 import { analytics } from './routes/analytics.js';
+import { siteTracking } from './routes/site-tracking.js';
 import { receiveSupportEmail } from './services/support-email.js';
 import { qrResponseHeaders } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -259,6 +260,7 @@ app.route('/', friendAttributes);
 app.route('/', featureSettings);
 app.route('/', contents);
 app.route('/', analytics);
+app.route('/', siteTracking);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -1066,6 +1068,23 @@ async function scheduled(
       if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
     } catch (e) {
       console.error('nen-tag refresh error:', e);
+    }
+  }
+
+  // メディアの使用箇所を数え直す。
+  //
+  // 6時間ごと。削除前の警告に使うだけなので、常に最新である必要はない。
+  // 毎分走らせると、本文の LIKE 検索がメディアの数だけ走って重い。
+  if (event.cron === '0 */6 * * *') {
+    try {
+      const { scanMediaUsage } = await import('./services/media-usage-scan.js');
+      const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
+      const result = await scanMediaUsage(env.DB, scanStartedAt);
+      if (result.matched > 0 || result.pruned > 0) {
+        console.log(JSON.stringify({ event: 'media_usage_scan', ...result }));
+      }
+    } catch (e) {
+      console.error('media usage scan error:', e);
     }
   }
 

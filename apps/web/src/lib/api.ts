@@ -766,6 +766,25 @@ export const api = {
         `/api/analytics/cross?fieldId=${encodeURIComponent(fieldId)}`,
       ),
   },
+  /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
+  siteTracking: {
+    pages: (params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<Array<{ path: string; views: number; visitors: number }>>>(
+        `/api/site/pages${rangeQuery(params)}`,
+      ),
+    friendEvents: (friendId: string) =>
+      fetchApi<
+        ApiResponse<
+          Array<{
+            id: string
+            eventType: string
+            path: string | null
+            label: string | null
+            occurredAt: string
+          }>
+        >
+      >(`/api/friends/${friendId}/site-events`),
+  },
   funnels: {
     list: () =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; windowDays: number; createdAt: string }>>>(
