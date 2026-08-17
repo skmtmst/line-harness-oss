@@ -148,8 +148,15 @@ export default function SettingsPage() {
     <div>
       <Header
         title="機能設定"
-        description="使わない機能を隠せます。設定はLINEアカウントごとに持ちます。"
+        description="使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。"
       />
+
+      <div className="bg-info-bg rounded-card mb-4 p-4">
+        <p className="text-ink-secondary text-xs leading-relaxed">
+          オフにしても、その機能で作ったデータ（タグ・配信履歴・予約など）は削除されません。API
+          も動いたままなので、管理画面から隠れるだけです。
+        </p>
+      </div>
 
       {!selectedAccountId ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
