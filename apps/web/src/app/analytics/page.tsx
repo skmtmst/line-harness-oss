@@ -942,6 +942,7 @@ function FunnelTab() {
   }> | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [picked, setPicked] = useState<number | null>(null)
 
   useEffect(() => {
     void api.funnels
@@ -957,10 +958,38 @@ function FunnelTab() {
 
   useEffect(() => {
     if (!selected) return
+    setPicked(null)
     void api.funnels.result(selected).then((res) => {
       if (res.success) setResult(res.data.steps)
     })
   }, [selected])
+
+  // いちばん落ちる段。人数の差ではなく、落ちた割合で選ぶ。母数の大きい段が
+  // いつも1位になってしまうため。
+  const worst = useMemo(() => {
+    if (!result || result.length < 2) return null
+    let found: { index: number; lost: number; rate: number } | null = null
+    for (let i = 1; i < result.length; i++) {
+      const prev = result[i - 1].reached
+      if (prev === 0) continue
+      const lost = prev - result[i].reached
+      const rate = lost / prev
+      if (!found || rate > found.rate) found = { index: i, lost, rate }
+    }
+    return found
+  }, [result])
+
+  const overall = useMemo(() => {
+    if (!result || result.length === 0) return null
+    const first = result[0]
+    const last = result[result.length - 1]
+    return {
+      entry: first.reached,
+      entryLabel: first.label,
+      last: last.reached,
+      rate: first.reached > 0 ? Math.round((last.reached / first.reached) * 1000) / 10 : null,
+    }
+  }, [result])
 
   if (loading) {
     return (
@@ -971,9 +1000,14 @@ function FunnelTab() {
   }
 
   const top = result?.[0]?.reached ?? 0
+  const selectedFunnel = funnels.find((f) => f.id === selected) ?? null
 
   return (
     <div>
+      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
+        友だちがどこまで進んで、どこで離れたかを段階ごとに見ます。段を自由に組み替えられるので、配信の流れでも購入の流れでも作れます。
+      </p>
+
       {creating ? (
         <FunnelForm
           onCancel={() => setCreating(false)}
@@ -985,69 +1019,219 @@ function FunnelTab() {
             setSelected(id)
           }}
         />
-      ) : (
-        <div className="mb-4 flex justify-end">
-          <button
-            onClick={() => setCreating(true)}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
-          >
-            ＋ ファネルを作成
-          </button>
-        </div>
-      )}
-
-      {funnels.length === 0 && !creating ? (
+      ) : funnels.length === 0 ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           ファネルがまだありません。段を2つ以上つないで、どこで離れているかを見られます。
+          <button
+            onClick={() => setCreating(true)}
+            className="text-accent ml-1 hover:underline"
+          >
+            ＋ 段を足す
+          </button>
         </p>
-      ) : funnels.length === 0 ? null : (
-      <>
-      <div className="mb-4">
-        <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-sm font-medium">
-          ファネル
-        </label>
-        <select
-          id="funnel-select"
-          value={selected}
-          onChange={(e) => setSelected(e.target.value)}
-          className="border-hairline rounded-control border px-3 py-2 text-sm"
-        >
-          {funnels.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {result && (
-        <div className="bg-canvas rounded-card border-hairline space-y-3 border p-5">
-          {result.map((step, i) => (
-            <div key={step.stepOrder}>
-              <div className="mb-1 flex items-baseline justify-between gap-2">
-                <p className="text-ink text-sm font-medium">
-                  {i + 1}. {step.label}
-                </p>
-                <p className="text-ink-secondary text-sm tabular-nums">
-                  {step.reached.toLocaleString('ja-JP')} 人
-                  {i > 0 && (
-                    <span className="text-ink-faint ml-2 text-xs">
-                      前の段から {Math.round(step.conversionFromPrevious * 100)}%
-                    </span>
-                  )}
+      ) : (
+        <>
+          <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-ink text-sm font-semibold">段の並び</h3>
+                <p className="text-ink-faint mt-0.5 text-xs">
+                  上から順に通った人だけを数えます。
                 </p>
               </div>
-              <div className="bg-canvas-sunken h-6 overflow-hidden rounded">
-                <div
-                  className="bg-accent h-full"
-                  style={{ width: top > 0 ? `${(step.reached / top) * 100}%` : '0%' }}
-                />
+              <div className="flex flex-wrap gap-2">
+                <button
+                  disabled
+                  title="並べ替えは準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
+                >
+                  並べ方を変える
+                </button>
+                <button
+                  disabled
+                  title="分析の保存は準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
+                >
+                  この分析を保存
+                </button>
+                <button
+                  onClick={() => setCreating(true)}
+                  className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
+                >
+                  ＋ 段を足す
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
-      </>
+
+            <div className="mt-3">
+              <label htmlFor="funnel-select" className="text-ink-secondary mb-1 block text-xs font-medium">
+                ファネル
+              </label>
+              <select
+                id="funnel-select"
+                value={selected}
+                onChange={(e) => setSelected(e.target.value)}
+                className="border-hairline rounded-control w-full border px-3 py-2 text-sm sm:w-72"
+              >
+                {funnels.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+              {selectedFunnel && (
+                <p className="text-ink-faint mt-1 text-xs">
+                  {selectedFunnel.windowDays}日以内に通った人を数えます。
+                </p>
+              )}
+            </div>
+
+            {result && result.length > 0 && (
+              <ol className="mt-3 flex flex-wrap gap-1.5">
+                {result.map((step) => (
+                  <li
+                    key={step.stepOrder}
+                    className="border-hairline text-ink-secondary rounded-pill border px-3 py-1 text-xs"
+                  >
+                    {step.label}
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {/* 条件ごとに通過率を並べる仕組みが無い。ファネルの定義が1本の
+                段の列だけで、条件で分ける口を持っていない。 */}
+            <p className="text-ink-faint mt-2 text-xs">
+              比較（条件ごとの通過率を並べる）は準備中です。
+            </p>
+          </section>
+
+          <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <KpiCard
+              title="入口"
+              value={overall?.entry ?? null}
+              unit="人"
+              detail={overall?.entryLabel ?? '—'}
+            />
+            <KpiCard
+              title="最後まで"
+              value={overall?.last ?? null}
+              unit="人"
+              detail={overall?.rate != null ? `通過率 ${overall.rate}%` : '—'}
+            />
+            <KpiCard
+              title="いちばん落ちる段"
+              value={worst ? Math.round(worst.rate * 100) : null}
+              unit="%"
+              detail={
+                worst && result
+                  ? `${result[worst.index - 1].label} → ${result[worst.index].label}`
+                  : '—'
+              }
+            />
+            {/* 段ごとの到達日時を持っていない。ファネルの集計は「通ったか」
+                だけを見ていて、いつ通ったかを残していない。 */}
+            <KpiCard title="平均の到達日数" value={null} unit="日" detail="入口から最後まで" />
+            <KpiCard title="比較で差が大きい段" value={null} unit="pt" detail="比較は準備中です" />
+          </div>
+
+          {result && (
+            <section className="bg-canvas rounded-card border-hairline border p-5">
+              <h3 className="text-ink text-sm font-semibold">全体の流れ</h3>
+              <p className="text-ink-faint mt-0.5 mb-3 text-xs">
+                かっこ内はひとつ前の段からの通過率
+              </p>
+              <div className="space-y-3">
+                {result.map((step, i) => {
+                  const prev = i > 0 ? result[i - 1].reached : null
+                  const lost = prev != null ? prev - step.reached : 0
+                  const isWorst = worst?.index === i
+                  return (
+                    <div key={step.stepOrder}>
+                      <div className="mb-1 flex items-baseline justify-between gap-2">
+                        <p className="text-ink text-sm font-medium">
+                          {i + 1}. {step.label}
+                        </p>
+                        <p className="text-ink-secondary text-sm tabular-nums">
+                          {step.reached.toLocaleString('ja-JP')} 人
+                          {i > 0 && (
+                            <span className="text-ink-faint ml-2 text-xs">
+                              （{Math.round(step.conversionFromPrevious * 1000) / 10}%）
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setPicked(lost > 0 ? i : null)}
+                        disabled={lost <= 0}
+                        className="bg-canvas-sunken block h-6 w-full overflow-hidden rounded text-left"
+                        aria-label={`${step.label}の段`}
+                      >
+                        <span
+                          className={`block h-full ${isWorst ? 'bg-warning' : 'bg-accent'}`}
+                          style={{ width: top > 0 ? `${(step.reached / top) * 100}%` : '0%' }}
+                        />
+                      </button>
+                      {/* 落ちた人数と割合は数えられる。「案内が届いていない
+                          可能性があります」のような原因は、運用を知らないと
+                          書けないので出さない。 */}
+                      {prev != null && lost > 0 && (
+                        <p className={`mt-1 text-xs ${isWorst ? 'text-warning' : 'text-ink-faint'}`}>
+                          {lost.toLocaleString('ja-JP')}人（
+                          {Math.round((lost / prev) * 1000) / 10}%）がここで止まっています。
+                          {isWorst && ' この分析でいちばん落ちる段です。'}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="border-hairline mt-4 border-t pt-3">
+                {picked != null && result[picked] ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-ink text-sm">
+                      「{result[picked - 1]?.label}まで進んで{result[picked].label}に至っていない{' '}
+                      {(result[picked - 1].reached - result[picked].reached).toLocaleString('ja-JP')}人」を選択中
+                    </p>
+                    <div className="flex gap-2">
+                      {/* 段の条件で友だちを絞る口が無い。ファネルの集計結果は
+                          人数しか返さず、誰が止まっているかを返さない。 */}
+                      <button
+                        disabled
+                        title="この段で止まっている人の抽出は準備中です"
+                        className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs font-medium opacity-50"
+                      >
+                        友だち一覧で見る
+                      </button>
+                      <button
+                        disabled
+                        title="この段で止まっている人への配信は準備中です"
+                        className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs font-medium opacity-50"
+                      >
+                        この人たちに配信する
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-ink-faint text-xs">
+                    段を押すと、そこで止まっている人を選べます。
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
+
+          <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+            <h3 className="text-ink text-sm font-semibold">段の作り方</h3>
+            <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
+              <li>・段には タグ・友だち情報・フォーム回答・サイトの行動・購入 を置けます</li>
+              <li>・順番どおりに通った人だけを数えます。飛ばした人は含みません</li>
+              <li>・「比較」を選ぶと、条件ごとの通過率を並べて見られます（準備中）</li>
+              <li>・段の並びは保存でき、ダッシュボードに出すこともできます（準備中）</li>
+            </ul>
+          </section>
+        </>
       )}
     </div>
   )
