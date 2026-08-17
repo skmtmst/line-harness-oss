@@ -245,18 +245,37 @@ function WebhooksPageInner() {
 
   return (
     <div>
-      <Header
-        title="Webhook管理"
-        action={
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: 'var(--color-accent)' }}
-          >
-            {showCreate ? 'キャンセル' : '+ 新規Webhook'}
-          </button>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="外部連携"
+          description="受信・送信のWebhookと、SlackやメールへのSlack通知をまとめて設定します。どれも「外部とやりとりする設定」です。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              {/* 通知先（Slack・メール）の設定はこの画面に無い。 */}
+              <button
+                disabled
+                title="通知先の追加は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                通知先を追加
+              </button>
+              <button
+                onClick={() => setShowCreate(!showCreate)}
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {showCreate ? 'キャンセル' : 'Webhookを追加'}
+              </button>
+            </div>
+          }
+        />
+      </div>
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (

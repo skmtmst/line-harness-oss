@@ -106,16 +106,16 @@ export default function SupportMarkList() {
           <thead>
             <tr className="bg-canvas-sunken border-hairline border-b">
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                マーク
+                マーク名
               </th>
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                付いている人
+                いまの人数
               </th>
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                新しい友だちの初期値
+                新規の初期値
               </th>
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                受信したら自動で付ける
+                自動で変わるとき
               </th>
               <th className="px-4 py-3" />
             </tr>

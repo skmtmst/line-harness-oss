@@ -6,7 +6,7 @@ import Link from 'next/link'
 import type { FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
-import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import { FIELD_TYPE_HINTS, FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
 
 const TYPES = Object.keys(FIELD_TYPE_LABELS) as FriendFieldType[]
 
@@ -107,7 +107,12 @@ function NewFriendFieldForm() {
 
   return (
     <div>
-      <Header title="項目を追加" description="友だちごとに持たせる情報の入れ物を作ります。" />
+      <div data-design="Head">
+        <Header
+          title="項目を追加する"
+          description="友だちごとに持たせる情報の入れ物を作ります。入力の形式と、どこで使うかを決めます。"
+        />
+      </div>
 
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/tags?tab=fields" className="hover:underline">
@@ -119,6 +124,7 @@ function NewFriendFieldForm() {
 
       <div className="bg-canvas rounded-card border-hairline max-w-2xl space-y-5 border p-6">
         <div>
+          <p className="text-ink mb-2 text-sm font-semibold">1. どの項目か</p>
           <label htmlFor="ff-name" className="text-ink-secondary mb-1 block text-sm font-medium">
             項目名 <span className="text-danger">*</span>
           </label>
@@ -167,6 +173,7 @@ function NewFriendFieldForm() {
         </div>
 
         <div>
+          <p className="text-ink mb-2 text-sm font-semibold">2. 入力の形式</p>
           <label htmlFor="ff-type" className="text-ink-secondary mb-1 block text-sm font-medium">
             種類 <span className="text-danger">*</span>
           </label>
@@ -178,7 +185,7 @@ function NewFriendFieldForm() {
           >
             {TYPES.map((t) => (
               <option key={t} value={t}>
-                {FIELD_TYPE_LABELS[t]}
+                {FIELD_TYPE_LABELS[t]} — {FIELD_TYPE_HINTS[t]}
               </option>
             ))}
           </select>

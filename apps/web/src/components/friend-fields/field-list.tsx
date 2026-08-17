@@ -6,6 +6,24 @@ import type { FriendField, FriendFieldType } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 
 /** 種類の表示名。運用者は 'multi_select' ではなく「複数選択」で考える。 */
+/**
+ * 形式ごとの用途。設計（3-2-1）は「数値 — 体重など」のように、何に使うかを
+ * 添えて選ばせている。形式名だけだと、選択（1つ）と選択（複数）の違いは
+ * 分かっても、日付を何に使うのかが分からない。
+ */
+export const FIELD_TYPE_HINTS: Record<FriendFieldType, string> = {
+  text: '短いテキスト',
+  textarea: '長い文章',
+  number: '体重など',
+  date: '誕生日など',
+  select: '決まった選択肢から選ぶ',
+  multi_select: '決まった選択肢から複数選ぶ',
+  checkbox: 'はい / いいえ',
+  url: 'リンク',
+  tel: '電話番号',
+  email: 'メールアドレス',
+}
+
 export const FIELD_TYPE_LABELS: Record<FriendFieldType, string> = {
   text: '1行テキスト',
   textarea: '長いテキスト',
