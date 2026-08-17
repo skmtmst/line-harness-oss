@@ -251,17 +251,61 @@ export default function AutomationsPage() {
 
   return (
     <div>
-      <Header
-        title="オートメーション"
-        action={
-          <button
-            onClick={() => setShowCreate(true)}
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 min-h-[44px] text-sm font-medium"
-          >
-            + 新規ルール
-          </button>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="オートメーション"
+          description="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              {['マニュアル', '並び替え', 'フォルダを追加'].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  title="準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                onClick={() => setShowCreate(true)}
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
+              >
+                ルールを作成
+              </button>
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">ルール</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {automations.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            稼働中 {automations.filter((a) => a.isActive).length}
+          </p>
+        </div>
+        {/* 実行の記録を残していない。何回動いたか、失敗したかが分からない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">今月の実行</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">実行の記録がありません</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">失敗</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">実行の記録がありません</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">手動実行</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">友だち一覧から</p>
+        </div>
+      </div>
 
       {/* Error */}
       {error && (
