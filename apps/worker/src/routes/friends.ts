@@ -3,6 +3,7 @@ import {
   getFriends,
   getFriendById,
   getFriendCount,
+  getFriendAddBreakdown,
   addTagToFriend,
   removeTagFromFriend,
   getFriendTags,
@@ -356,6 +357,25 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
 });
 
 // GET /api/friends/count - friend count (must be before /:id)
+// 友だち追加の内訳（設計 V2 4-6）。「はじめての人」と「以前からの友だち」を
+// 分けて数える。追加時の配信を1本しか持てないうちは、returning の人数が
+// そのまま「はじめまして」を誤って送った人数になる。
+friends.get('/api/friends/add-breakdown', async (c) => {
+  try {
+    const days = Number(c.req.query('days') ?? '30');
+    const lineAccountId = c.req.query('lineAccountId') ?? null;
+    const data = await getFriendAddBreakdown(
+      c.env.DB,
+      Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30,
+      lineAccountId,
+    );
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('GET /api/friends/add-breakdown error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 friends.get('/api/friends/count', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');

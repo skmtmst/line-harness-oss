@@ -16,6 +16,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 export interface MergedTab {
   key: string
   label: string
+  /**
+   * 別ルートに実体があるタブの行き先。
+   * 「検索からの流入」だけは /search-console に画面がある。
+   */
+  href?: string
 }
 
 export default function MergedTabs({
@@ -49,7 +54,9 @@ export default function MergedTabs({
           onClick={() =>
             // 既定のタブはクエリを付けずに素のパスへ戻す。
             // ?tab=xxx が residue として残ると、共有したURLが分かりにくい。
-            router.replace(t.key === home ? basePath : `${basePath}?${paramName}=${t.key}`)
+            router.replace(
+              t.href ?? (t.key === home ? basePath : `${basePath}?${paramName}=${t.key}`),
+            )
           }
           className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
             active === t.key

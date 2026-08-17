@@ -173,17 +173,37 @@ export default function MileagePage() {
 
   return (
     <div>
-      <Header
-        title="マイル"
-        action={
-          <button
-            onClick={() => void reloadAll()}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            再読み込み
-          </button>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="マイル"
+          description="購入や紹介でたまるマイルを管理します。付与ルールと、友だちごとの残高・履歴を確認できます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              {/* 残高の書き出しは無い。友だち単位の残高は画面で見るしかない。 */}
+              <button
+                disabled
+                title="残高のCSV出力は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                残高をCSV出力
+              </button>
+              <button
+                onClick={() => void reloadAll()}
+                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border bg-white px-4 py-2 text-sm font-medium"
+              >
+                再読み込み
+              </button>
+            </div>
+          }
+        />
+      </div>
 
       <div className="mb-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">

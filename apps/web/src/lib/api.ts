@@ -307,6 +307,8 @@ export type MileageRule = {
     uniquePerReferredFriendPerSubject?: boolean
   }
   isActive: boolean
+  validFrom: string | null
+  validUntil: string | null
   createdAt: string
   updatedAt: string
 }
@@ -579,6 +581,30 @@ export type NenFriendOverview = {
   ecEvents: Array<Record<string, unknown>>
 }
 
+export type AdPlatform = {
+  id: string
+  /** meta / x / google / tiktok */
+  name: string
+  displayName: string | null
+  /** 鍵は先頭と末尾だけ残して伏せてある。 */
+  config: Record<string, unknown>
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type AdConversionLog = {
+  id: string
+  adPlatformId: string
+  friendId: string
+  eventName: string
+  clickId: string | null
+  clickIdType: string | null
+  status: string
+  errorMessage: string | null
+  createdAt: string
+}
+
 export type SearchConsoleMetric = {
   clicks: number
   impressions: number
@@ -647,6 +673,19 @@ export const api = {
       fetchApi<ApiResponse<{ summary: MileageSummary; history: MileageHistoryItem[] }>>(
         `/api/friends/${id}/mileage?limit=${limit}`,
       ),
+    /**
+     * 友だち追加の内訳（設計 V2 4-6）。
+     * returning は「以前からのお客さまに『はじめまして』が届いた数」でもある。
+     */
+    addBreakdown: (params?: { days?: number; accountId?: string }) => {
+      const q = new URLSearchParams()
+      if (params?.days) q.set('days', String(params.days))
+      if (params?.accountId) q.set('lineAccountId', params.accountId)
+      const tail = q.toString() ? `?${q.toString()}` : ''
+      return fetchApi<
+        ApiResponse<{ days: number; firstTime: number; returning: number; unblocked: number }>
+      >(`/api/friends/add-breakdown${tail}`)
+    },
     count: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<{ count: number }>>('/api/friends/count' + query)
@@ -950,6 +989,7 @@ export const api = {
           onSubmitMessageType: string | null
           onSubmitMessageContent: string | null
           isActive: boolean
+          submitCount: number
         }>
       >(`/api/forms/${id}`),
     update: (
@@ -1447,6 +1487,15 @@ export const api = {
       fetchApi<ApiResponse<{ id: string; lineUserId: string; displayName: string | null; isFollowing: boolean }[]>>(
         `/api/users/${userId}/accounts`,
       ),
+  },
+  /**
+   * ログインする前に呼べるもの。認証を通さないので、置けるのは
+   * 「誰に見えても困らない値」に限る。
+   */
+  publicBrand: {
+    /** 公式アカウントの表示名とアイコン。ログイン画面とタブの題に使う。 */
+    get: () =>
+      fetchApi<ApiResponse<{ name: string | null; iconUrl: string | null }>>('/api/public/brand'),
   },
   lineAccounts: {
     list: () =>
@@ -2098,12 +2147,15 @@ export const api = {
       amount: number
       initialStatus?: 'pending' | 'available'
       conditions?: MileageRule['conditions'] | null
+      validFrom?: string | null
+      validUntil?: string | null
     }) => fetchApi<ApiResponse<MileageRule>>('/api/mileage/rules', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
     updateRule: (id: string, data: Partial<Pick<MileageRule,
       'name' | 'eventType' | 'source' | 'amount' | 'initialStatus' | 'conditions' | 'isActive'
+      | 'validFrom' | 'validUntil'
     >>) => fetchApi<ApiResponse<MileageRule>>(`/api/mileage/rules/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -2693,6 +2745,13 @@ export const api = {
         computedAt?: string;
       }>>(options?.forceRefresh ? '/api/duplicates/stats?refresh=1' : '/api/duplicates/stats'),
   },
+  /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
+  adPlatforms: {
+    list: () =>
+      fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
+    logs: (id: string, limit = 20) =>
+      fetchApi<ApiResponse<AdConversionLog[]>>(`/api/ad-platforms/${id}/logs?limit=${limit}`),
+  },
   uploads: {
     /**
      * 既存 /api/images エンドポイントを叩いて画像をアップロードする。
@@ -3035,6 +3094,18 @@ export interface EventBookingItem {
   friend_line_user_id: string | null;
 }
 
+export interface EventWaitlistItem {
+  id: string;
+  slot_id: string;
+  friend_id: string;
+  /** waiting = 並んでいる / invited = 声をかけた */
+  status: string;
+  notified_at: string | null;
+  created_at: string;
+  slot_starts_at: string;
+  friend_name: string | null;
+}
+
 export const eventsApi = {
   listEvents: (accountId: string) =>
     fetchApi<{ items: EventListItem[] }>(
@@ -3084,6 +3155,11 @@ export const eventsApi = {
       { method: 'DELETE' },
     ),
 
+  /** キャンセル待ち。自動では繰り上げない。誰を通すかは運用の判断。 */
+  listWaitlist: (accountId: string, eventId: string) =>
+    fetchApi<{ waitlist: EventWaitlistItem[] }>(
+      withAccount(`/api/events/admin/events/${eventId}/waitlist`, accountId),
+    ),
   listBookings: (
     accountId: string,
     eventId: string,

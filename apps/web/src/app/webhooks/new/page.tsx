@@ -23,7 +23,7 @@ export default function NewWebhookPage() {
   return (
     <CreatePage
       title="Webhookを追加する"
-      description="こちらで起きたことを、外のシステムへ知らせます。"
+      description="このツールのできごとを外部へ知らせます（送り出す向きのみ）。"
       parent={['外部連携', '/webhooks']}
       validate={() => {
         if (!name.trim()) return '名前を入力してください'
@@ -48,6 +48,15 @@ export default function NewWebhookPage() {
         return res.data.id
       }}
     >
+      {/* 設計は受け取る（Incoming）／送り出す（Outgoing）を選ばせるが、
+          この画面は送り出す専用。受け取る側は一覧の別の導線で作る。 */}
+      <p className="text-ink text-sm font-semibold">1. どちら向きの連携か</p>
+      <p className="text-ink-faint text-xs">
+        この画面で作れるのは「送り出す（Outgoing）」だけです。外部から受け取る場合は一覧から追加してください。
+      </p>
+
+      <p className="text-ink mt-2 text-sm font-semibold">2. 基本の設定</p>
+
       <Field label="名前" htmlFor="wh-name" required>
         <input
           id="wh-name"

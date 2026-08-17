@@ -340,3 +340,62 @@ export async function getFriendCount(db: D1Database): Promise<number> {
     .first<{ count: number }>();
   return row?.count ?? 0;
 }
+
+/**
+ * 直近N日に友だち追加された人を「はじめて」と「以前から」で分けて数える
+ * （設計 V2 4-6）。
+ *
+ * 分ける手がかりは `unfollow_count`。1回でもブロックされたことがあれば、
+ * 今回の追加は「以前からの友だち」による再追加。
+ *
+ * 設計は「初回フォロー日が未記録なら、はじめて」と書いているが、
+ * この基準はこのデータでは使えない。マイグレーション 065 が既存の行すべてに
+ * `first_followed_at = created_at` を埋めたので、未記録の人はもういない。
+ *
+ * これは「以前からのお客さまに『はじめまして』が届いた数」でもある。
+ * 追加時の配信を1本しか持てないうちは、returning の人数がそのまま
+ * 誤って挨拶を送った人数になる。
+ */
+export async function getFriendAddBreakdown(
+  db: D1Database,
+  days = 30,
+  lineAccountId?: string | null,
+): Promise<{ days: number; firstTime: number; returning: number; unblocked: number }> {
+  const accountClause = lineAccountId ? 'AND line_account_id = ?' : '';
+  const binds: unknown[] = [days];
+  if (lineAccountId) binds.push(lineAccountId);
+  const row = await db
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN COALESCE(unfollow_count, 0) = 0 THEN 1 ELSE 0 END) AS first_time,
+         SUM(CASE WHEN COALESCE(unfollow_count, 0) > 0 THEN 1 ELSE 0 END) AS returning
+       FROM friends
+       WHERE julianday('now', '+9 hours') - julianday(created_at) <= ?
+         ${accountClause}`,
+    )
+    .bind(...binds)
+    .first<{ first_time: number | null; returning: number | null }>();
+
+  // ブロック解除で戻ってきた人。いまフォロー中で、外れたことがある人。
+  const unblockBinds: unknown[] = [days];
+  if (lineAccountId) unblockBinds.push(lineAccountId);
+  const unblockRow = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+         FROM friends
+        WHERE is_following = 1
+          AND COALESCE(unfollow_count, 0) > 0
+          AND last_followed_at IS NOT NULL
+          AND julianday('now', '+9 hours') - julianday(last_followed_at) <= ?
+          ${accountClause}`,
+    )
+    .bind(...unblockBinds)
+    .first<{ count: number | null }>();
+
+  return {
+    days,
+    firstTime: Number(row?.first_time ?? 0),
+    returning: Number(row?.returning ?? 0),
+    unblocked: Number(unblockRow?.count ?? 0),
+  };
+}

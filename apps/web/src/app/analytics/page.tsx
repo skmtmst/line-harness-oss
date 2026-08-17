@@ -13,7 +13,8 @@ const TABS = [
   { key: 'funnel', label: 'ファネル' },
   { key: 'cross', label: 'クロス集計' },
   { key: 'clicks', label: 'URLクリック' },
-  { key: 'search', label: '検索からの流入' },
+  // 検索からの流入だけは実体が別ルートにある。タブから直に開く。
+  { key: 'search', label: '検索からの流入', href: '/search-console' },
 ]
 
 /** 期間の選択肢。日数で持つ。 */

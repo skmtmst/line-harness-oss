@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Header from '@/components/layout/header'
+import MergedTabs from '@/components/layout/merged-tabs'
 import { api } from '@/lib/api'
 import type {
   SearchConsoleMetric,
@@ -10,11 +11,34 @@ import type {
   SearchConsoleSetup,
 } from '@/lib/api'
 
+/**
+ * 検索からの流入（設計 V2 6-11）。
+ *
+ * 設計では「分析」の5タブのうちの1枚。実体だけ別ルートに残っているので、
+ * 同じタブの帯をここにも出して、行き来できるようにしてある。
+ */
+const ANALYTICS_TABS = [
+  { key: 'messages', label: '送信数' },
+  { key: 'funnel', label: 'ファネル' },
+  { key: 'cross', label: 'クロス集計' },
+  { key: 'clicks', label: 'URLクリック' },
+  { key: 'search', label: '検索からの流入', href: '/search-console' },
+]
+
 const ranges = [7, 28, 90] as const
 type RangeDays = typeof ranges[number]
 
 const number = new Intl.NumberFormat('ja-JP')
 const oneDecimal = new Intl.NumberFormat('ja-JP', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+
+/** プロパティのURLから、見出しに出すホスト名だけを取り出す。 */
+function siteLabel(siteUrl: string): string {
+  try {
+    return new URL(siteUrl.replace(/^sc-domain:/, 'https://')).host
+  } catch {
+    return siteUrl
+  }
+}
 
 function percentDelta(current: number, previous: number, lowerIsBetter = false) {
   if (previous === 0) return null
@@ -108,14 +132,15 @@ function RankingTable({ title, rows, kind }: { title: string; rows: SearchConsol
         <p className="p-8 text-center text-sm text-slate-400">データがありません</p>
       ) : (
         <table className="w-full table-fixed text-xs">
-          <colgroup><col className="w-[55%]" /><col className="w-[15%]" /><col className="w-[15%]" /><col className="w-[15%]" /></colgroup>
+          <colgroup><col className="w-[43%]" /><col className="w-[16%]" /><col className="w-[14%]" /><col className="w-[13%]" /><col className="w-[14%]" /></colgroup>
           <thead className="bg-slate-50 text-[11px] font-semibold text-slate-500">
-            <tr><th className="px-4 py-3 text-left">{kind === 'query' ? '検索キーワード' : 'ページ'}</th><th className="px-2 py-3 text-right">クリック</th><th className="px-2 py-3 text-right">CTR</th><th className="px-4 py-3 text-right">順位</th></tr>
+            <tr><th className="px-4 py-3 text-left">{kind === 'query' ? 'キーワード' : 'ページ'}</th><th className="px-2 py-3 text-right">表示回数</th><th className="px-2 py-3 text-right">クリック</th><th className="px-2 py-3 text-right">CTR</th><th className="px-4 py-3 text-right">掲載順位</th></tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((row) => (
               <tr key={row.key} className="hover:bg-slate-50/70">
                 <td className="px-4 py-3"><span className="block truncate whitespace-nowrap font-medium text-slate-800" title={row.key}>{displayKey(row.key)}</span></td>
+                <td className="whitespace-nowrap px-2 py-3 text-right text-slate-600">{number.format(row.impressions)}</td>
                 <td className="whitespace-nowrap px-2 py-3 text-right font-semibold text-slate-800">{number.format(row.clicks)}</td>
                 <td className="whitespace-nowrap px-2 py-3 text-right text-slate-600">{oneDecimal.format(row.ctr * 100)}%</td>
                 <td className="whitespace-nowrap px-4 py-3 text-right text-slate-600">{oneDecimal.format(row.position)}</td>
@@ -184,10 +209,36 @@ export default function SearchConsolePage() {
 
   return (
     <div>
-      <Header
-        title="Googleアナリティクス"
-        action={<div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">{ranges.map((range) => <button key={range} onClick={() => setDays(range)} className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>{range}日</button>)}</div>}
-      />
+      <div data-design="Head">
+        <Header
+          title="分析"
+          description="Google検索でサイトがどれだけ表示され、どれだけ押されたかを見ます。Search Console から取り込んでいます。"
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+                {ranges.map((range) => (
+                  <button
+                    key={range}
+                    onClick={() => setDays(range)}
+                    className={`whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition ${days === range ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                  >
+                    {range}日
+                  </button>
+                ))}
+              </div>
+              {/* 書き出しと連携の設定は、まだ受け口がない。 */}
+              <button disabled title="準備中です" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 opacity-60">
+                CSVで書き出す
+              </button>
+              <button disabled title="準備中です" className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-400 opacity-60">
+                連携を設定
+              </button>
+            </div>
+          }
+        />
+      </div>
+
+      <MergedTabs basePath="/analytics" tabs={ANALYTICS_TABS} active="search" />
 
       {loading ? (
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">{metrics.map((item) => <div key={item.label} className="h-36 animate-pulse rounded-2xl bg-slate-200/70" />)}</div>
@@ -195,11 +246,23 @@ export default function SearchConsolePage() {
         <SetupCard setup={setup} denied={denied} />
       ) : (
         <div className="space-y-5">
-          <div className="flex justify-end text-xs text-slate-400">
-            <p className="whitespace-nowrap">集計期間 {data.startDate.replaceAll('-', '/')}〜{data.endDate.replaceAll('-', '/')}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium text-slate-700">{siteLabel(data.siteUrl)}</span>
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">連携中</span>
+              <span className="text-slate-400">Search Console のデータは反映まで2〜3日かかります</span>
+            </div>
+            <p className="whitespace-nowrap text-slate-400">集計期間 {data.startDate.replaceAll('-', '/')} 〜 {data.endDate.replaceAll('-', '/')}</p>
           </div>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
             {metrics.map((item) => <MetricCard key={item.key} label={item.label} value={item.value} current={data.summary[item.key]} previous={data.previousSummary[item.key]} color={item.color} lowerIsBetter={item.lower} />)}
+            {/* 検索で来た人がそのまま友だちになったかは、サイトスクリプトの記録と
+                Search Console を突き合わせないと出ない。その突き合わせがまだ無い。 */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="whitespace-nowrap text-sm font-medium text-slate-500">検索から友だち追加</p>
+              <p className="mt-3 text-3xl font-bold tracking-tight text-slate-300">—</p>
+              <p className="mt-2 text-xs text-slate-400">サイトスクリプトとの突き合わせが未対応</p>
+            </div>
           </div>
           <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(260px,1fr)]">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -208,13 +271,21 @@ export default function SearchConsolePage() {
             </section>
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="whitespace-nowrap text-base font-bold text-slate-900">デバイス別</h2>
-              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'モバイル', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="whitespace-nowrap font-medium text-slate-700">{label}</span><span className="whitespace-nowrap text-slate-500">{number.format(device.clicks)}クリック</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="mt-1 text-right text-[11px] text-slate-400">{oneDecimal.format(ratio)}%</p></div> })}</div>
+              <div className="mt-5 space-y-5">{data.devices.map((device) => { const ratio = data.summary.clicks ? (device.clicks / data.summary.clicks) * 100 : 0; const label = { MOBILE: 'スマートフォン', DESKTOP: 'パソコン', TABLET: 'タブレット' }[device.key] ?? device.key; return <div key={device.key}><div className="flex items-center justify-between gap-3 text-sm"><span className="whitespace-nowrap font-medium text-slate-700">{label}</span><span className="whitespace-nowrap text-slate-500">{number.format(device.clicks)}クリック</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.min(ratio, 100)}%` }} /></div><p className="mt-1 text-right text-[11px] text-slate-400">{oneDecimal.format(ratio)}%</p></div> })}</div>
             </section>
           </div>
           <div className="grid gap-5 xl:grid-cols-2">
             <RankingTable title="検索キーワード 上位10件" rows={data.queries} kind="query" />
             <RankingTable title="検索流入ページ 上位10件" rows={data.pages} kind="page" />
           </div>
+          <section className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+            <h2 className="text-sm font-bold text-slate-800">見かたの注意</h2>
+            <ul className="mt-2 space-y-1 text-xs leading-relaxed text-slate-500">
+              <li>・Search Console のデータは反映まで2〜3日かかります。直近の数字は出ません</li>
+              <li>・掲載順位は平均値です。検索する人や場所によって実際の順位は変わります</li>
+              <li>・「検索から友だち追加」は、サイトスクリプトで結びついた分だけを数えるものですが、その突き合わせはまだありません</li>
+            </ul>
+          </section>
           <p className="text-right text-[11px] text-slate-400">Search Console APIから読み取り専用で取得・最終更新 {new Date(data.fetchedAt).toLocaleString('ja-JP')}</p>
         </div>
       )}

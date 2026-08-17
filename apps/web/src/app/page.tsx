@@ -8,6 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import PendingInboxCard from '@/components/support/pending-inbox-card'
 import ShipmentPanel from '@/components/dashboard/shipment-panel'
 import KpiCard from '@/components/dashboard/kpi-card'
+import QrDialog from '@/components/dashboard/qr-dialog'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
 import {
   InboxStatusCard,
@@ -115,10 +116,10 @@ function FriendAddLinkCard() {
           </Link>
           <button
             type="button"
-            onClick={() => setShowQr((v) => !v)}
+            onClick={() => setShowQr(true)}
             className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-1.5 text-xs font-medium"
           >
-            {showQr ? 'QRを隠す' : 'QRを表示'}
+            QRを表示
           </button>
         </div>
       </div>
@@ -143,18 +144,13 @@ function FriendAddLinkCard() {
         </button>
       </div>
 
-      {showQr && (
-        <div className="mt-3 flex justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
-          <img
-            src={`${base}/api/qr?data=${encodeURIComponent(link)}&size=240x240`}
-            alt="友だち追加QRコード"
-            width={240}
-            height={240}
-            className="border-hairline rounded-card border"
-          />
-        </div>
-      )}
+      {/* 設計 1-1-1。印刷に使う大きさを選べる形にした。 */}
+      <QrDialog
+        open={showQr}
+        onClose={() => setShowQr(false)}
+        accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
+        baseLink={link}
+      />
     </section>
   )
 }

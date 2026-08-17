@@ -28,6 +28,22 @@ export default function FriendAddSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [breakdown, setBreakdown] = useState<{
+    days: number
+    firstTime: number
+    returning: number
+    unblocked: number
+  } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.friends.addBreakdown({ days: 30 }).then((res) => {
+      if (!cancelled && res.success) setBreakdown(res.data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const load = async () => {
     setLoading(true)
@@ -202,6 +218,68 @@ export default function FriendAddSettingsPage() {
           <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
             この2つを分けないと、以前からのお客さまに「はじめまして」の挨拶が届きます。ブロックを解除しただけの人にも同じことが起きます。
             いまは友だち追加で動くシナリオが、相手によらず同じように配信されます。
+          </p>
+        </div>
+      </div>
+
+      {/* この1か月の実績（設計 4-6）。returning の人数が、そのまま
+          「はじめまして」を誤って送った人数になる。 */}
+      <div data-design="Stats" className="mx-auto max-w-5xl px-4 pt-4">
+        <h2 className="text-ink mb-2 text-sm font-bold">この1か月の実績</h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="bg-canvas rounded-card border-hairline border p-3">
+            <p className="text-ink-faint text-xs">はじめて友だち追加した人</p>
+            <p className="text-ink mt-0.5 text-2xl font-bold tabular-nums">
+              {breakdown ? breakdown.firstTime : '…'}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+          </div>
+          <div className="bg-canvas rounded-card border-hairline border p-3">
+            <p className="text-ink-faint text-xs">以前からの友だち</p>
+            <p className="text-ink mt-0.5 text-2xl font-bold tabular-nums">
+              {breakdown ? breakdown.returning : '…'}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+            <p className="text-warning mt-0.5 text-xs">この人たちにも「はじめまして」が届いています</p>
+          </div>
+          <div className="bg-canvas rounded-card border-hairline border p-3">
+            <p className="text-ink-faint text-xs">うちブロック解除</p>
+            <p className="text-ink mt-0.5 text-2xl font-bold tabular-nums">
+              {breakdown ? breakdown.unblocked : '…'}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* 判定の基準（設計 4-6）。どう分けるかは決まっているが、
+          分けたあとに別の配信を当てる仕組みがまだ無い。 */}
+      <div data-design="Rule" className="mx-auto max-w-5xl px-4 pt-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <h2 className="text-ink text-sm font-bold">判定の基準</h2>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            どちらに振り分けるかの判定方法です。列は前からあり、追加とブロック解除のたびに更新されています。
+            足りないのは、分けたあとに別の配信を当てる仕組みだけです。
+          </p>
+          <dl className="mt-3 space-y-1.5 text-xs">
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-ink-secondary w-40 shrink-0 font-medium">はじめての人の判定</dt>
+              <dd className="text-ink-faint">
+                ブロックされた回数が0回（friends.unfollow_count）
+              </dd>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <dt className="text-ink-secondary w-40 shrink-0 font-medium">ブロック解除の判定</dt>
+              <dd className="text-ink-faint">
+                いまフォロー中で、ブロックされた回数が1回以上
+              </dd>
+            </div>
+          </dl>
+          {/* 設計は「初回フォロー日が未記録」を基準にしているが、この
+              データでは使えない。065 が既存の行すべてに埋めてしまった。 */}
+          <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+            設計は「初回フォロー日が未記録なら、はじめて」と書いていますが、この基準は使えません。
+            マイグレーション 065 が既存の行すべてに初回フォロー日を埋めたため、未記録の人はもういません。
           </p>
         </div>
       </div>

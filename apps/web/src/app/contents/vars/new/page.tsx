@@ -87,7 +87,7 @@ export default function NewCommonVarPage() {
     <div>
       <Header
         title="共通情報を追加"
-        description="いくつものテンプレートに出る文字を1か所にまとめます。"
+        description="「ブランド名」「営業時間」など、何度も使う情報を1か所にまとめます。テンプレートに差し込めるので、変更は1か所で済みます。"
       />
 
       <nav className="text-ink-faint mb-4 text-xs">
@@ -99,9 +99,10 @@ export default function NewCommonVarPage() {
       </nav>
 
       <div className="bg-canvas rounded-card border-hairline max-w-2xl space-y-5 border p-6">
+        <p className="text-ink text-sm font-semibold">1. どの情報か</p>
         <div>
           <label htmlFor="cv-name" className="text-ink-secondary mb-1 block text-sm font-medium">
-            名前 <span className="text-danger">*</span>
+            共通情報名 <span className="text-danger">*</span>
           </label>
           <input
             id="cv-name"
@@ -119,7 +120,7 @@ export default function NewCommonVarPage() {
 
         <div>
           <label htmlFor="cv-key" className="text-ink-secondary mb-1 block text-sm font-medium">
-            差し込み名 <span className="text-danger">*</span>
+            差し込みキー <span className="text-danger">*</span>
           </label>
           <input
             id="cv-key"
@@ -209,6 +210,13 @@ export default function NewCommonVarPage() {
             キャンセル
           </Link>
         </div>
+        {/* 日付で値を切り替える仕組みが無い。値は1つだけ持つ。 */}
+        <section className="border-hairline rounded-card border p-4">
+          <p className="text-ink text-sm font-semibold">2. 日付で切り替える</p>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            決めた日から自動で値を変える設定は、いまはありません。値は1つだけ持ちます。切り替えたい日に、この画面から書き換えてください。
+          </p>
+        </section>
       </div>
     </div>
   )
