@@ -992,6 +992,19 @@ export const api = {
   },
   /** サイトスクリプト。自社サイトの行動を友だちに紐づける。 */
   siteTracking: {
+    /** 計測が動いているかと、その内訳 */
+    summary: () =>
+      fetchApi<
+        ApiResponse<{
+          todayEvents: number
+          todayPageViews: number
+          linkedEvents: number
+          unlinkedEvents: number
+          pathCount: number
+          eventTypeCount: number
+          lastEventAt: string | null
+        }>
+      >('/api/site/summary'),
     pages: (params?: { from?: string; to?: string }) =>
       fetchApi<ApiResponse<Array<{ path: string; views: number; visitors: number }>>>(
         `/api/site/pages${rangeQuery(params)}`,
