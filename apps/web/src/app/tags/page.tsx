@@ -172,6 +172,20 @@ const TABS = [
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
+/**
+ * タブごとの説明。設計は4タブそれぞれに別の説明を置いている。
+ * 1つに固定すると、開いているタブと説明が食い違う。
+ */
+const TAB_DESCRIPTIONS: Record<TabKey, string> = {
+  tags: '友だちを分類するタグを管理します。タグはシナリオの開始条件、配信の絞り込み、自動応答の付与先として使えます。',
+  fields:
+    '「愛犬のお名前」「便の状態」など、友だちごとに記録したい項目を定義します。ここで作った項目が、回答フォームの登録先・友だち詳細のタブ・テンプレートの差し込みに使えます。',
+  marks:
+    '問い合わせの状態を表すマークを作ります。ここで決めた選択肢が、受信箱・友だち一覧・友だち詳細で使われます。',
+  searches:
+    '友だちの絞り込み条件に名前を付けて保存します。保存した条件は、友だち一覧・配信の宛先・オートメーションの対象から呼び出せます。',
+}
+
 function TagsPageInner() {
   const [items, setItems] = useState<Tag[]>([])
   const [groups, setGroups] = useState<TagGroup[]>([])
@@ -313,7 +327,7 @@ function TagsPageInner() {
       <div data-design="Head">
       <Header
         title="友だち属性"
-        description="友だちを分類するタグを管理します。タグはシナリオの開始条件、配信の絞り込み、自動応答の付与先として使えます。"
+        description={TAB_DESCRIPTIONS[tab]}
         action={
           tab === 'tags' ? (
             <div className="flex flex-wrap items-center gap-2">
