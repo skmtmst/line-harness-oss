@@ -71,7 +71,11 @@ export type ConversionApprovalItem = {
   friendName: string | null
   affiliateId: string
   affiliateName: string | null
+  /** 案件ID。名前は同じものを作れるので、集計はこちらで結ぶ */
+  offerId: string | null
   offerName: string | null
+  /** 案件の付与マイル。案件に結びつかない成果は null */
+  offerRewardMiles: number | null
   conversionPointName: string | null
   value: number | null
   approvalStatus: 'pending' | 'approved' | 'rejected'

@@ -1486,6 +1486,8 @@ export function OffersTab() {
   const openCount = offers.filter((o) => o.isActive).length
   const confirmedCount = approvedThisMonth.length
   const confirmedYen = approvedThisMonth.reduce((sum, a) => sum + (a.value ?? 0), 0)
+  // 案件に結びつかない成果（ref から案件を辿れないもの）はマイルが付かない。
+  const confirmedMiles = approvedThisMonth.reduce((sum, a) => sum + (a.offerRewardMiles ?? 0), 0)
 
   return (
     <div>
@@ -1510,9 +1512,12 @@ export function OffersTab() {
         <KpiCard title="公開中の案件" value={openCount} unit="件" detail="紹介できる案件の数" />
         <KpiCard title="今月の成果" value={confirmedCount} unit="件" detail="確定した件数" />
         <KpiCard title="支払い予定" value={confirmedYen} unit="円" detail="確定した報酬の合計" />
-        {/* 承認の行は案件の名前しか持たず、案件IDが無い。同じ名前の案件を
-            作れてしまうので、名前で結ぶと別の案件のマイルを足しかねない。 */}
-        <KpiCard title="付与予定マイル" value={null} unit="mile" detail="報酬をマイルで払う分" />
+        <KpiCard
+          title="付与予定マイル"
+          value={confirmedMiles}
+          unit="mile"
+          detail="報酬をマイルで払う分"
+        />
       </div>
 
       <OffersList

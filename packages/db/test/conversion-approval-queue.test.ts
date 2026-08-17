@@ -106,12 +106,18 @@ function insertPoint(s: Database.Database, id: string, value: number): void {
 
 function insertOfferAndLink(
   s: Database.Database,
-  opts: { offerId: string; offerName: string; affiliateId: string; refCode: string },
+  opts: {
+    offerId: string;
+    offerName: string;
+    affiliateId: string;
+    refCode: string;
+    rewardMiles?: number;
+  },
 ): void {
   s.prepare(
-    `INSERT INTO affiliate_offers (id, name, description, reward_amount, line_account_id, tag_id, scenario_id, is_active, created_at)
-     VALUES (?, ?, NULL, 500, NULL, NULL, NULL, 1, '2026-01-01T00:00:00.000+09:00')`,
-  ).run(opts.offerId, opts.offerName);
+    `INSERT INTO affiliate_offers (id, name, description, reward_amount, reward_miles, line_account_id, tag_id, scenario_id, is_active, created_at)
+     VALUES (?, ?, NULL, 500, ?, NULL, NULL, NULL, 1, '2026-01-01T00:00:00.000+09:00')`,
+  ).run(opts.offerId, opts.offerName, opts.rewardMiles ?? 0);
   s.prepare(
     `INSERT INTO affiliate_links (id, affiliate_id, ref_code, label, line_account_id, offer_id, is_active, created_at, click_count)
      VALUES (?, ?, ?, NULL, NULL, ?, 1, '2026-01-01T00:00:00.000+09:00', 0)`,
@@ -178,6 +184,52 @@ describe('getConversionApprovalQueue', () => {
 
     const approved = await getConversionApprovalQueue(db, { status: 'approved', identityKeySql: IDENTITY_KEY_SQL });
     expect(approved.map((r) => r.eventId)).toEqual(['cv2']);
+  });
+
+  test('案件IDと付与マイルを返す。名前で結ぶと同名の案件を取り違える', async () => {
+    insertFriend(sqlite, 'f1', { userId: 'uid-a' });
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 800);
+    // 名前が同じで中身が違う案件を2つ。名前で突き合わせると区別できない。
+    insertOfferAndLink(sqlite, {
+      offerId: 'off1', offerName: '同じ名前', affiliateId: 'aff1', refCode: 'rc1', rewardMiles: 200,
+    });
+    insertOfferAndLink(sqlite, {
+      offerId: 'off2', offerName: '同じ名前', affiliateId: 'aff1', refCode: 'rc2', rewardMiles: 50,
+    });
+    insertConversion(sqlite, {
+      id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc1',
+      approvalStatus: 'approved', createdAt: '2026-02-01T00:00:00.000+09:00',
+    });
+    insertConversion(sqlite, {
+      id: 'cv2', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc2',
+      approvalStatus: 'approved', createdAt: '2026-02-02T00:00:00.000+09:00',
+    });
+
+    const rows = await getConversionApprovalQueue(db, {
+      status: 'approved',
+      identityKeySql: IDENTITY_KEY_SQL,
+    });
+    const byEvent = new Map(rows.map((r) => [r.eventId, r]));
+    expect(byEvent.get('cv1')).toMatchObject({ offerId: 'off1', offerRewardMiles: 200 });
+    expect(byEvent.get('cv2')).toMatchObject({ offerId: 'off2', offerRewardMiles: 50 });
+  });
+
+  test('案件に結びつかない成果は、案件IDもマイルも null', async () => {
+    insertFriend(sqlite, 'f1', { userId: 'uid-a' });
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'p1', 800);
+    // link が無い ref。外部が発行したコードなど。
+    insertConversion(sqlite, {
+      id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'unknown',
+      approvalStatus: 'pending', createdAt: '2026-02-01T00:00:00.000+09:00',
+    });
+
+    const rows = await getConversionApprovalQueue(db, {
+      status: 'pending',
+      identityKeySql: IDENTITY_KEY_SQL,
+    });
+    expect(rows[0]).toMatchObject({ offerId: null, offerName: null, offerRewardMiles: null });
   });
 
   test('duplicateFlag is true when two friends share an identity_key within the same affiliate', async () => {
