@@ -31,7 +31,7 @@ export default function NewTagPage() {
   return (
     <CreatePage
       title="タグを作る"
-      description="友だちを分けるための目印です。"
+      description="友だちを分けるための目印です。自動で付ける条件や、マイルの倍率も決められます。"
       parent={['友だち属性', '/tags']}
       validate={() => (name.trim() ? null : 'タグ名を入力してください')}
       onReset={() => setName('')}
@@ -45,6 +45,8 @@ export default function NewTagPage() {
         return res.data.id
       }}
     >
+      <p className="text-ink text-sm font-semibold">1. どのタグか</p>
+
       <Field label="タグ名" htmlFor="tag-name" required>
         <input
           id="tag-name"
@@ -74,9 +76,9 @@ export default function NewTagPage() {
       </Field>
 
       <Field
-        label="分類"
+        label="所属グループ"
         htmlFor="tag-group"
-        note="「お悩み」「ペット」のように、タグをまとめる入れ物です。あとから変えられます。"
+        note="どの分類に入れるかを選びます。未選択なら「未分類」になります。"
       >
         <select
           id="tag-group"
@@ -92,6 +94,23 @@ export default function NewTagPage() {
           ))}
         </select>
       </Field>
+      <section className="border-hairline rounded-card border p-4">
+        <p className="text-ink text-sm font-semibold">2. 自動で付ける条件</p>
+        {/* フォーム回答や購入をきっかけにタグを付ける仕組みは、タグ側では
+            なく回答フォームやオートメーション側に置かれている。 */}
+        <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+          いまは手動でのみ付けられます。フォームの回答や購入をきっかけに付けたい場合は、回答フォームやオートメーションの設定から指定してください。
+        </p>
+      </section>
+
+      <section className="border-hairline rounded-card border p-4">
+        <p className="text-ink text-sm font-semibold">3. マイルの倍率</p>
+        {/* tags.mileage_multiplier_bps と mileage_multiplier_priority の列は
+            あるが、この画面から編集できない。 */}
+        <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+          このタグを持つ人のマイル付与に倍率をかけられますが、いまはこの画面から設定できません。倍率と優先度の列は用意されています。
+        </p>
+      </section>
     </CreatePage>
   )
 }
