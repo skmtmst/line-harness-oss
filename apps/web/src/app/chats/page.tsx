@@ -7,6 +7,7 @@ import { api, fetchApi } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import TemplatePicker from '@/components/chats/template-picker'
 import InboxKpis from '@/components/chats/inbox-kpis'
 import CcPromptButton from '@/components/cc-prompt-button'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -360,6 +361,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 送信の細かい設定。既定は畳む。出しっぱなしだと入力欄が縦に伸びて
   // トークが読めなくなる。
   const [showComposerOptions, setShowComposerOptions] = useState(false)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const statusFilterRef = useRef<StatusFilter>('all')
   const unansweredOnlyRef = useRef(false)
   const [unansweredOnly, setUnansweredOnly] = useState(() => {
@@ -1330,13 +1332,23 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               <div className="border-hairline border-t px-4 py-3">
                 {/* 上段 */}
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowComposerOptions((v) => !v)}
-                    className="text-accent text-xs hover:underline"
-                  >
-                    {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
+                    <button
+                      type="button"
+                      onClick={() => setShowTemplatePicker(true)}
+                      className="text-accent text-xs hover:underline"
+                    >
+                      テンプレートを選択
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowComposerOptions((v) => !v)}
+                      className="text-accent text-xs hover:underline"
+                    >
+                      {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+                    </button>
+                  </div>
                   <span className="text-ink-faint text-xs">
                     {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
                   </span>
@@ -1418,6 +1430,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   >
                     {sending ? '送信中...' : '送信'}
                   </button>
+
+                  <TemplatePicker
+                    open={showTemplatePicker}
+                    onClose={() => setShowTemplatePicker(false)}
+                    onPick={(content) =>
+                      // 入力済みの文があれば消さずに続ける。書きかけを失わせない。
+                      setMessageContent((prev) => (prev.trim() ? `${prev}\n${content}` : content))
+                    }
+                  />
                 </div>
               </div>
             </>
