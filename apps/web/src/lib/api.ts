@@ -864,6 +864,23 @@ export const api = {
           }>
         >
       >(`/api/analytics/messages${rangeQuery(params)}`),
+    /** 測定中のURL。1回も押されていないものも返る */
+    trackedLinks: (params?: { from?: string; to?: string }) =>
+      fetchApi<
+        ApiResponse<
+          Array<{
+            trackedLinkId: string
+            name: string
+            originalUrl: string
+            shortCode: string | null
+            tagName: string | null
+            scenarioName: string | null
+            isActive: boolean
+            clicks: number
+            uniqueFriends: number
+          }>
+        >
+      >(`/api/analytics/tracked-links${rangeQuery(params)}`),
     linkClicks: (params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
