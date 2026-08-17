@@ -952,6 +952,7 @@ export const api = {
           onSubmitMessageType: string | null
           onSubmitMessageContent: string | null
           isActive: boolean
+          submitCount: number
         }>
       >(`/api/forms/${id}`),
     update: (
