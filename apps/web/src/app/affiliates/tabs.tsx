@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Header from '@/components/layout/header'
+import KpiCard from '@/components/dashboard/kpi-card'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 
@@ -1327,7 +1328,7 @@ function OffersList({
         </div>
       ) : offers.length === 0 ? (
         <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          案件がまだ登録されていません。右上の「+ 新規案件」から作成してください。
+          案件がまだ登録されていません。右上の「案件を作る」から作成してください。
         </div>
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
@@ -1336,11 +1337,11 @@ function OffersList({
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">案件名</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">説明</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">報酬額</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">付与マイル</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">LINEアカウント</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">タグ</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">シナリオ</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">報酬</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">マイル</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">対象アカウント</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">成果時のタグ</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">開始するシナリオ</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">状態</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">操作</th>
               </tr>
@@ -1359,23 +1360,25 @@ function OffersList({
                     {offer.rewardMiles.toLocaleString()} mile
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
-                    {offer.lineAccountId ? accountMap.get(offer.lineAccountId) ?? offer.lineAccountId : '—'}
+                    {offer.lineAccountId ? accountMap.get(offer.lineAccountId) ?? offer.lineAccountId : '（なし）'}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
                     {offer.tagId ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
                         {tagMap.get(offer.tagId) ?? offer.tagId}
                       </span>
-                    ) : '—'}
+                    ) : '（なし）'}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
-                    {offer.scenarioId ? scenarioMap.get(offer.scenarioId) ?? offer.scenarioId : '—'}
+                    {offer.scenarioId ? scenarioMap.get(offer.scenarioId) ?? offer.scenarioId : '（なし）'}
                   </td>
                   <td className="px-4 py-3 text-center">
+                    {/* 「有効 / 無効」だと何が有効なのか読めない。設計は
+                        アフィリエイターが紹介できる状態かどうかを書いている。 */}
                     {offer.isActive ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">有効</span>
+                      <span className="bg-success-bg text-success inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">公開中</span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500">無効</span>
+                      <span className="bg-canvas-sunken text-ink-faint inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium">下書き</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
@@ -1448,10 +1451,30 @@ export function OffersTab() {
     } catch { /* silent */ }
   }, [])
 
+  // 今月に確定した成果。KPIの「今月の成果」「支払い予定」に要る。
+  const [approvedThisMonth, setApprovedThisMonth] = useState<ConversionApprovalItem[]>([])
+
   useEffect(() => {
     void loadOffers()
     void loadOptions()
   }, [loadOffers, loadOptions])
+
+  useEffect(() => {
+    let cancelled = false
+    void api.conversionApprovals
+      .list({ status: 'approved', limit: 200 })
+      .then((res) => {
+        if (cancelled || !res.success) return
+        const month = new Date().toISOString().slice(0, 7)
+        setApprovedThisMonth(res.data.filter((a) => a.createdAt.slice(0, 7) === month))
+      })
+      .catch(() => {
+        // 承認が引けなくても、案件の一覧と作成は使える。
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleOpenCreate = () => {
     setEditTarget(null)
@@ -1463,15 +1486,35 @@ export function OffersTab() {
     setFormOpen(true)
   }
 
+  // 設計のKPI。案件そのものと、そこから出た成果の両方を見る。
+  const openCount = offers.filter((o) => o.isActive).length
+  const confirmedCount = approvedThisMonth.length
+  const confirmedYen = approvedThisMonth.reduce((sum, a) => sum + (a.value ?? 0), 0)
+
   return (
     <div>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-ink text-base font-semibold">案件</h2>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
+          </p>
+        </div>
         <button
           onClick={handleOpenCreate}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
         >
-          + 新規案件
+          案件を作る
         </button>
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard title="公開中の案件" value={openCount} unit="件" detail="紹介できる案件の数" />
+        <KpiCard title="今月の成果" value={confirmedCount} unit="件" detail="確定した件数" />
+        <KpiCard title="支払い予定" value={confirmedYen} unit="円" detail="確定した報酬の合計" />
+        {/* 承認の行は案件の名前しか持たず、案件IDが無い。同じ名前の案件を
+            作れてしまうので、名前で結ぶと別の案件のマイルを足しかねない。 */}
+        <KpiCard title="付与予定マイル" value={null} unit="mile" detail="報酬をマイルで払う分" />
       </div>
 
       <OffersList
@@ -1484,6 +1527,17 @@ export function OffersTab() {
         onEdit={handleEdit}
         onRefresh={loadOffers}
       />
+
+      <p className="text-ink-faint mt-3 text-right text-xs tabular-nums">全 {offers.length} 件</p>
+
+      <section className="bg-canvas rounded-card border-hairline mt-4 border p-4">
+        <h3 className="text-ink text-sm font-semibold">アフィリエイターと案件のちがい</h3>
+        <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
+          <li>・アフィリエイター＝紹介してくれる人。紹介コードを持ちます</li>
+          <li>・案件＝何を成果として、いくら払うか。1人のアフィリエイターが複数の案件を紹介できます</li>
+          <li>・成果が出たときのタグ付けとシナリオ開始は、案件ごとに決められます</li>
+        </ul>
+      </section>
 
       {formOpen && (
         <OfferFormModal
