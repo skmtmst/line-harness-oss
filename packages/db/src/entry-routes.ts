@@ -226,6 +226,73 @@ export async function getEntryRouteFunnel(
   );
 }
 
+export interface EntryRouteSource {
+  /** 画面に出す名前。utm_source か、参照元URLのホスト名 */
+  label: string;
+  count: number;
+}
+
+/**
+ * そのリンクのクリックが「どこから来ているか」。
+ *
+ * 優先するのは utm_source。広告やSNSの投稿ごとに付け分けられるので、
+ * 参照元URLより細かく分けられる（「Instagram アプリ」と
+ * 「Instagram ストーリーズ」を分けたいのはこの理由）。
+ *
+ * utm_source が無いときは参照元URLのホスト名を使う。どちらも無いクリックは
+ * 「直接アクセス」。QRコードや、紙に印刷したURLを打ち込んだ場合がこれになる。
+ */
+export async function getEntryRouteSources(
+  db: D1Database,
+  entryRouteId: string,
+  top = 5,
+): Promise<EntryRouteSource[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT
+         COALESCE(
+           NULLIF(TRIM(utm_source), ''),
+           NULLIF(TRIM(source_url), ''),
+           '直接アクセス'
+         ) AS label,
+         COUNT(*) AS count
+       FROM ref_tracking
+       WHERE entry_route_id = ?
+       GROUP BY label
+       ORDER BY count DESC, label ASC`,
+    )
+    .bind(entryRouteId)
+    .all<{ label: string; count: number }>();
+
+  // source_url はURLのまま入っている。画面に出すのはホスト名だけでよい。
+  // 同じホストが utm_source 有り・無しで別行になることがあるので、
+  // ホスト名にしてから足し直す。
+  const merged = new Map<string, number>();
+  for (const r of results ?? []) {
+    const label = hostOf(r.label);
+    merged.set(label, (merged.get(label) ?? 0) + r.count);
+  }
+  const sorted = [...merged.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => (b.count - a.count) || a.label.localeCompare(b.label));
+
+  // 上位だけ出して残りを黙って捨てると、合計が合わずに「どこから来たか
+  // 分からない分」が消える。残りは「その他」にまとめる。
+  if (sorted.length <= top) return sorted;
+  const rest = sorted.slice(top).reduce((sum, r) => sum + r.count, 0);
+  return [...sorted.slice(0, top), { label: 'その他', count: rest }];
+}
+
+/** URLならホスト名、そうでなければそのまま返す。 */
+function hostOf(value: string): string {
+  if (!value.includes('://')) return value;
+  try {
+    return new URL(value).host || value;
+  } catch {
+    return value;
+  }
+}
+
 export async function recordRefTracking(
   db: D1Database,
   opts: {

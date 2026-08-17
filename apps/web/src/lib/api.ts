@@ -71,7 +71,11 @@ export type ConversionApprovalItem = {
   friendName: string | null
   affiliateId: string
   affiliateName: string | null
+  /** 案件ID。名前は同じものを作れるので、集計はこちらで結ぶ */
+  offerId: string | null
   offerName: string | null
+  /** 案件の付与マイル。案件に結びつかない成果は null */
+  offerRewardMiles: number | null
   conversionPointName: string | null
   value: number | null
   approvalStatus: 'pending' | 'approved' | 'rejected'
@@ -2492,6 +2496,11 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
+    /** クリックがどこから来ているか。utm_source > 参照元のホスト > 直接アクセス */
+    sources: (id: string) =>
+      fetchApi<ApiResponse<Array<{ label: string; count: number }>>>(
+        `/api/entry-routes/${id}/sources`,
+      ),
   },
   entryRouteGenres: {
     list: () => fetchApi<ApiResponse<EntryRouteGenre[]>>('/api/entry-route-genres'),
