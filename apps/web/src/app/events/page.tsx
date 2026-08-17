@@ -292,10 +292,20 @@ export default function EventsListPage() {
                         <span className="text-ink-faint">0 件</span>
                       )}
                     </td>
-                    {/* イベント側に visible_tag_id（このタグの人にだけ見せる）が
-                        あるが、一覧APIが返していない。返るまでは絞りの有無を
-                        判断できないので、編集画面で確かめる案内にしている。 */}
-                    <td className="text-ink-secondary px-4 py-3 text-sm">全員</td>
+                    {/* 申込条件。visible_tag_id が入っていると、そのタグの人にしか
+                        LIFF の一覧に出ない。「全員」と見分けがつかないと、公開した
+                        つもりで誰にも見えていない状態に気づけない。
+                        タグを消しても events 側の ID は残るので、その場合は名前が
+                        引けない＝もう誰にも見えない、と分かるように別の文言を出す。 */}
+                    <td className="text-ink-secondary px-4 py-3 text-sm">
+                      {!e.visible_tag_id ? (
+                        '全員'
+                      ) : e.visible_tag_name ? (
+                        e.visible_tag_name
+                      ) : (
+                        <span className="text-warning">消えたタグ</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-sm">
                       {e.is_published !== 1 ? (
                         <span className="bg-canvas-sunken text-ink-faint rounded-pill px-2 py-0.5 text-xs">

@@ -2910,6 +2910,10 @@ export interface EventListItem {
   total_capacity: number | null;
   total_active: number;
   pending_count: number;
+  /** 申込条件。null なら友だち全員に見える（094） */
+  visible_tag_id: string | null;
+  /** visible_tag_id のタグ名。ID があっても消されたタグなら null */
+  visible_tag_name: string | null;
   // Multi-account fields (migration 040)
   target_type?: 'single' | 'multi-account-dedup';
   account_ids?: string | string[] | null;
