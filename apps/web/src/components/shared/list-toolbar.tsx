@@ -17,8 +17,14 @@ export default function ListToolbar({
   onSearchChange,
   sortLabel,
 }: {
-  /** フォルダの名前。先頭は「すべて」を想定し、それだけ押せる。 */
-  folders: string[]
+  /**
+   * フォルダの名前。先頭は「すべて」を想定し、それだけ押せる。
+   *
+   * 省略すると帯そのものを出さない。設計でフォルダを横の帯ではなく
+   * 左の縦パネルに置いている画面（友だち属性のタグ）は、そちらが
+   * 本物のフォルダなので、ここに空の帯が二重に並ばないようにする。
+   */
+  folders?: string[]
   searchPlaceholder: string
   searchValue: string
   onSearchChange: (value: string) => void
@@ -27,23 +33,25 @@ export default function ListToolbar({
 }) {
   return (
     <>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs">フォルダ</span>
-        {folders.map((label, i) => (
-          <button
-            key={label}
-            disabled={i > 0}
-            title={i > 0 ? 'フォルダ分けは準備中です' : undefined}
-            className={`rounded-pill px-3 py-1 text-xs ${
-              i === 0
-                ? 'bg-accent text-on-accent'
-                : 'border-hairline text-ink-faint border opacity-50'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {folders && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-ink-faint text-xs">フォルダ</span>
+          {folders.map((label, i) => (
+            <button
+              key={label}
+              disabled={i > 0}
+              title={i > 0 ? 'フォルダ分けは準備中です' : undefined}
+              className={`rounded-pill px-3 py-1 text-xs ${
+                i === 0
+                  ? 'bg-accent text-on-accent'
+                  : 'border-hairline text-ink-faint border opacity-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
         <input

@@ -3,11 +3,12 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import type { FriendField } from '@line-crm/shared'
+import type { FriendField, Folder } from '@line-crm/shared'
 import { api, type FriendDetail, type MileageSummary } from '@/lib/api'
 import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import FriendTimeline from '@/components/friends/friend-timeline'
 
 /**
  * 友だち詳細。
@@ -18,11 +19,31 @@ import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
  * /rich-menus/edit?id= と同じ形にそろえている。
  */
 
+/**
+ * 右カラムのタブ（設計 V2 2-2-1）。
+ *
+ * `pending` は、出す先のデータを取る口がまだ無いもの。タブそのものを
+ * 消すと設計と並びが変わるので、出したうえで何が足りないかを書く。
+ */
 const TABS = [
+  { key: 'timeline', label: 'タイムライン' },
+  { key: 'health', label: '健康記録', pending: '健康記録を残す仕組みがまだありません。' },
+  { key: 'reminders', label: 'リマインダ', pending: 'この友だちのリマインダを引く口がまだありません。' },
+  { key: 'actions', label: 'アクション', pending: '操作の履歴を残す仕組みがまだありません。' },
+  { key: 'forms', label: 'フォーム回答' },
+  { key: 'orders', label: '注文・定期便', pending: 'この友だちの注文を引く口がまだありません。' },
   { key: 'info', label: '情報欄' },
-  { key: 'forms', label: 'フォームの回答' },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
+
+/**
+ * 上に並ぶ情報欄のグループ。既定の「基本」だけ固定で、あとは
+ * 友だち情報欄のフォルダがそのまま並ぶ（飼い主情報・ペットプロフィール…）。
+ *
+ * 項目が増えると1枚の縦長なフォームになり、目的の項目まで
+ * 延々と巻かないと届かない。分類でまとめて出す。
+ */
+const BASIC_GROUP = 'basic'
 
 function FieldInput({
   field,
@@ -104,11 +125,52 @@ function FieldInput({
   )
 }
 
+/**
+ * 左の各節の見出し。右端に「編集」「すべて見る」「変更」が付く。
+ *
+ * 設計では節ごとに行き先が違う。ここで受けて、節の中身と離さない。
+ */
+function SectionHead({
+  label,
+  actionLabel,
+  href,
+}: {
+  label: string
+  actionLabel: string
+  href: string
+}) {
+  return (
+    <div className="mb-1.5 flex items-baseline justify-between gap-2">
+      <p className="text-ink-faint text-xs font-semibold">{label}</p>
+      <Link href={href} className="text-accent shrink-0 text-xs hover:underline">
+        {actionLabel}
+      </Link>
+    </div>
+  )
+}
+
+/** 対応マーク。やり取りがまだ無い友だちは、未対応でも対応済みでもない。 */
+function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'resolved' }) {
+  if (!status) return <span className="text-ink-faint text-xs">やり取りなし</span>
+  const map = {
+    unread: { label: '未対応', className: 'bg-warning-bg text-warning' },
+    in_progress: { label: '対応中', className: 'bg-info-bg text-info' },
+    resolved: { label: '対応済', className: 'bg-success-bg text-success' },
+  } as const
+  const s = map[status]
+  return (
+    <span className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${s.className}`}>
+      {s.label}
+    </span>
+  )
+}
+
 function FriendDetailInner() {
   const params = useSearchParams()
   const friendId = params.get('id') ?? ''
   const rawTab = params.get('tab')
-  const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'info') as TabKey
+  // 既定はタイムライン。設計でも最初に開くのはやり取り。
+  const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'timeline') as TabKey
 
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [fields, setFields] = useState<FriendField[]>([])
@@ -121,6 +183,8 @@ function FriendDetailInner() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
   const [richMenu, setRichMenu] = useState<{ name: string | null; isDefault: boolean } | null>(null)
+  const [groups, setGroups] = useState<Folder[]>([])
+  const group = params.get('group') ?? BASIC_GROUP
 
   const load = useCallback(async () => {
     if (!friendId) {
@@ -131,14 +195,16 @@ function FriendDetailInner() {
     setError('')
     try {
       // マイル・リッチメニュー・フォルダは、取れなくても詳細は出す。
-      const [friendRes, fieldsRes, mileageRes, menuRes] = await Promise.all([
+      const [friendRes, fieldsRes, mileageRes, menuRes, groupsRes] = await Promise.all([
         api.friends.get(friendId),
         api.friendFields.forFriend(friendId),
         api.friends.mileage(friendId, 1).catch(() => null),
         api.friends.richMenu(friendId).catch(() => null),
+        api.folders.list('friend_field').catch(() => null),
       ])
       if (mileageRes?.success) setMileage(mileageRes.data.summary)
       if (menuRes?.success) setRichMenu(menuRes.data)
+      if (groupsRes?.success) setGroups(groupsRes.data)
       if (friendRes.success) setFriend(friendRes.data)
       if (fieldsRes.success) {
         setFields(fieldsRes.data.items)
@@ -205,8 +271,16 @@ function FriendDetailInner() {
     )
   }
 
+  /*
+   * 上のタブで選んだグループの項目だけを編集の対象にする。「基本」は
+   * 分類のない項目。★つきは基本のときだけ先頭へ寄せる。グループを
+   * 開いているときは、その分類の中の並び順のほうが読みやすい。
+   */
+  const inGroup =
+    group === BASIC_GROUP ? fields.filter((f) => !f.folderId) : fields.filter((f) => f.folderId === group)
   const starred = fields.filter((f) => f.isStarred)
-  const rest = fields.filter((f) => !f.isStarred)
+  const groupStarred = group === BASIC_GROUP ? inGroup.filter((f) => f.isStarred) : []
+  const rest = group === BASIC_GROUP ? inGroup.filter((f) => !f.isStarred) : inGroup
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
 
@@ -264,6 +338,32 @@ function FriendDetailInner() {
         />
       </div>
 
+      {/*
+        情報欄のグループ（設計の上段タブ）。「基本」＋フォルダ。
+        右端は分類そのものを直す場所への行き先。
+      */}
+      <div className="border-hairline mb-4 flex flex-wrap items-center gap-1 border-b">
+        {[{ id: BASIC_GROUP, name: '基本' }, ...groups].map((g) => (
+          <Link
+            key={g.id}
+            href={`/friends/detail?id=${friendId}${g.id === BASIC_GROUP ? '' : `&group=${g.id}`}`}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              group === g.id
+                ? 'border-accent text-accent'
+                : 'text-ink-secondary hover:text-ink border-transparent'
+            }`}
+          >
+            {g.name}
+          </Link>
+        ))}
+        <Link
+          href="/tags?tab=fields"
+          className="text-ink-secondary hover:text-ink ml-auto px-3 py-2 text-xs"
+        >
+          タブを編集（友だち情報欄）
+        </Link>
+      </div>
+
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
@@ -278,48 +378,22 @@ function FriendDetailInner() {
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[20rem_1fr]">
           {/* 左：プロフィール（設計の並び：マイル → 対応 → 名前 → タグ →
               ★つき友だち情報 → リッチメニュー → 友だち情報 → フォーム回答） */}
-          <aside data-design="Left" className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
-            <div className="flex items-center gap-3">
-              {friend?.pictureUrl ? (
-                // 静的書き出しのため next/image の最適化は使えない。
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={friend.pictureUrl}
-                  alt=""
-                  className="h-14 w-14 rounded-full object-cover"
-                />
-              ) : (
-                <div className="bg-canvas-sunken text-ink-faint flex h-14 w-14 items-center justify-center rounded-full text-lg">
-                  {friend?.displayName?.slice(0, 1) ?? '?'}
-                </div>
-              )}
-              <div className="min-w-0">
-                <p className="text-ink truncate text-sm font-semibold">{friend?.displayName}</p>
-                <p className="text-ink-faint truncate text-xs">
-                  {friend?.isFollowing ? '友だち' : 'ブロック中・退会'}
-                </p>
-              </div>
+          <aside data-design="Left" className="bg-canvas rounded-card border-hairline overflow-hidden border">
+            <div className="border-hairline border-b px-5 py-3.5">
+              <h2 className="text-ink text-sm font-semibold">友だち詳細</h2>
             </div>
 
-            {friend?.tags && friend.tags.length > 0 && (
-              <div>
-                <p className="text-ink-faint mb-1.5 text-xs font-semibold">タグ</p>
-                <div className="flex flex-wrap gap-1">
-                  {friend.tags.map((t) => (
-                    <TagBadge key={t.id} tag={t} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ---- マイル ---- */}
-            <div className="border-hairline rounded-control border p-3">
-              <p className="text-ink-faint text-xs">マイル</p>
-              <p className="text-ink mt-0.5 text-xl font-bold tabular-nums">
+            {/*
+              マイル。設計ではここだけ地を黒く反転している。ほかの節と
+              同じ白地にすると、残高が並の情報に見える。
+            */}
+            <div className="bg-ink px-5 py-4">
+              <p className="text-xs text-white/60">マイル</p>
+              <p className="mt-0.5 text-2xl font-bold tabular-nums text-white">
                 {mileage ? mileage.available.toLocaleString('ja-JP') : '—'}
-                <span className="text-ink-faint ml-1 text-xs font-normal">mile</span>
+                <span className="ml-1 text-xs font-normal text-white/60">mile</span>
               </p>
-              <p className="text-ink-faint text-xs">
+              <p className="text-xs text-white/60">
                 利用可能
                 {mileage && mileage.pending > 0
                   ? ` ・ 確定待ち ${mileage.pending.toLocaleString('ja-JP')}`
@@ -327,104 +401,153 @@ function FriendDetailInner() {
               </p>
             </div>
 
-            {/* ---- 対応 ---- */}
-            {/* 対応マーク・担当者・個別メモは受信箱の側で持っている。
-                ここから読むための口が無いので、行き先だけ示す。 */}
-            <div>
-              <p className="text-ink-faint mb-1.5 text-xs font-semibold">対応</p>
-              <p className="text-ink-faint text-xs leading-relaxed">
-                対応マーク・担当者・個別メモは受信箱で扱っています。
-                <Link href={`/chats?friendId=${friendId}`} className="text-accent ml-1 hover:underline">
-                  受信箱で開く
-                </Link>
-              </p>
-            </div>
-
-            {/* ---- 名前 ---- */}
-            <div>
-              <p className="text-ink-faint mb-1.5 text-xs font-semibold">名前</p>
-              <dl className="space-y-1 text-xs">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-ink-faint">本名</dt>
-                  <dd className="text-ink-secondary truncate">{realName || '未登録'}</dd>
-                </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-ink-faint">システム表示名</dt>
-                  <dd className="text-ink-secondary truncate">{friend?.displayName ?? '未登録'}</dd>
-                </div>
-              </dl>
-            </div>
-
-            {/* ---- ★つき友だち情報 ---- */}
-            {starred.length > 0 && (
+            <div className="space-y-4 p-5">
+              {/* ---- 対応 ---- */}
               <div>
-                <p className="text-ink-faint mb-1.5 text-xs font-semibold">★つき友だち情報</p>
+                <SectionHead
+                  label="対応"
+                  actionLabel="編集"
+                  href={`/chats?friendId=${friendId}`}
+                />
                 <dl className="space-y-1 text-xs">
-                  {starred.map((f) => (
-                    <div key={f.id} className="flex justify-between gap-2">
-                      <dt className="text-ink-faint shrink-0">{f.name}</dt>
-                      <dd className="text-ink-secondary truncate text-right">
-                        {values[f.id] || '未入力'}
-                      </dd>
-                    </div>
-                  ))}
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">対応マーク</dt>
+                    <dd>
+                      <SupportMarkBadge status={friend?.support?.status} />
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">担当者</dt>
+                    <dd className="text-ink-secondary truncate">
+                      {friend?.support?.operatorName ?? '未割り当て'}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="text-ink-faint mt-2 mb-1 text-xs">個別メモ</p>
+                {/* 書き換えは受信箱側が持っている。ここは読むだけ。 */}
+                <p className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-h-[3.5rem] border px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap">
+                  {friend?.support?.notes || 'メモはありません'}
+                </p>
+              </div>
+
+              {/* ---- 名前 ---- */}
+              <div>
+                <SectionHead label="名前" actionLabel="編集" href={`/chats?friendId=${friendId}`} />
+                <dl className="space-y-1 text-xs">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">本名</dt>
+                    <dd className="text-ink-secondary truncate">{realName || '未登録'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">システム表示名</dt>
+                    <dd className="text-ink-secondary truncate">{friend?.displayName ?? '未登録'}</dd>
+                  </div>
                 </dl>
               </div>
-            )}
 
-            {/* ---- リッチメニュー ---- */}
-            <div>
-              <p className="text-ink-faint mb-1.5 text-xs font-semibold">リッチメニュー</p>
-              <p className="text-ink-secondary text-xs">
-                {richMenu?.name ?? '既定のメニュー'}
-                {richMenu?.isDefault && (
-                  <span className="text-ink-faint ml-1">（全員に出しているもの）</span>
-                )}
-              </p>
-              <Link href="/rich-menus" className="text-accent text-xs hover:underline">
-                リッチメニューを見る
-              </Link>
-            </div>
-
-            {/* ---- 友だち情報 ---- */}
-            <div>
-              <p className="text-ink-faint mb-1.5 text-xs font-semibold">友だち情報</p>
-              <dl className="space-y-1 text-xs">
-                <div className="flex justify-between gap-2">
-                  <dt className="text-ink-faint">追加日</dt>
-                  <dd className="text-ink-secondary">
-                    {friend?.createdAt
-                      ? new Date(friend.createdAt).toLocaleDateString('ja-JP')
-                      : '—'}
-                  </dd>
+              {/* ---- タグ ---- */}
+              {/* 設計では名前の下。以前はいちばん上にあり、名前より先に
+                  タグが目に入っていた。 */}
+              <div>
+                <SectionHead label="タグ" actionLabel="編集" href={`/chats?friendId=${friendId}`} />
+                <div className="flex flex-wrap items-center gap-1">
+                  {friend?.tags?.length ? (
+                    friend.tags.map((t) => <TagBadge key={t.id} tag={t} />)
+                  ) : (
+                    <span className="text-ink-faint text-xs">タグはありません</span>
+                  )}
+                  <Link
+                    href={`/chats?friendId=${friendId}`}
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border px-2 py-0.5 text-[11px]"
+                  >
+                    ＋ 追加
+                  </Link>
                 </div>
-                <div className="flex justify-between gap-2">
-                  <dt className="text-ink-faint">流入元</dt>
-                  <dd className="text-ink-secondary truncate">
-                    {friend?.firstTrackedLinkName ?? '不明'}
-                  </dd>
-                </div>
-              </dl>
-            </div>
+              </div>
 
-            {/* ---- フォーム回答 ---- */}
-            <div>
-              <p className="text-ink-faint mb-1.5 text-xs font-semibold">フォーム回答</p>
-              <p className="text-ink-secondary text-xs">
-                {friend?.formSubmissions?.length
-                  ? `${friend.formSubmissions.length}件`
-                  : '回答はまだありません'}
-              </p>
+              {/* ---- ★つき友だち情報 ---- */}
+              {starred.length > 0 && (
+                <div>
+                  <SectionHead
+                    label="★つき友だち情報"
+                    actionLabel="すべて見る"
+                    href={`/friends/detail?id=${friendId}&tab=info`}
+                  />
+                  <dl className="space-y-1 text-xs">
+                    {starred.map((f) => (
+                      <div key={f.id} className="flex justify-between gap-2">
+                        <dt className="text-ink-faint shrink-0">{f.name}</dt>
+                        <dd className="text-ink-secondary truncate text-right">
+                          {values[f.id] || '未入力'}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              )}
+
+              {/* ---- リッチメニュー ---- */}
+              <div>
+                <SectionHead label="リッチメニュー" actionLabel="変更" href="/rich-menus" />
+                <dl className="space-y-1 text-xs">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">現在の設定</dt>
+                    <dd className="text-ink-secondary truncate text-right">
+                      {richMenu?.name ?? '既定のメニュー'}
+                      {richMenu?.isDefault && (
+                        <span className="text-ink-faint ml-1">（全員に出しているもの）</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              {/* ---- 友だち情報 ---- */}
+              <div>
+                <p className="text-ink-faint mb-1.5 text-xs font-semibold">友だち情報</p>
+                <dl className="space-y-1 text-xs">
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">追加日</dt>
+                    <dd className="text-ink-secondary">
+                      {friend?.createdAt
+                        ? new Date(friend.createdAt).toLocaleDateString('ja-JP')
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <dt className="text-ink-faint">流入元</dt>
+                    <dd className="text-ink-secondary truncate">
+                      {friend?.firstTrackedLinkName ?? '不明'}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              {/* ---- フォーム回答 ---- */}
+              <div>
+                <SectionHead
+                  label="フォーム回答"
+                  actionLabel="すべて見る"
+                  href={`/friends/detail?id=${friendId}&tab=forms`}
+                />
+                <p className="text-ink-secondary text-xs">
+                  {friend?.formSubmissions?.length
+                    ? `${friend.formSubmissions.length}件`
+                    : '回答はまだありません'}
+                </p>
+              </div>
             </div>
           </aside>
 
           {/* 右：タブ */}
           <div data-design="Right">
-            <div className="border-hairline mb-4 flex gap-1 border-b">
+            <div className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
               {TABS.map((t) => (
                 <Link
                   key={t.key}
-                  href={`/friends/detail?id=${friendId}&tab=${t.key}`}
+                  href={`/friends/detail?id=${friendId}&tab=${t.key}${
+                    group === BASIC_GROUP ? '' : `&group=${group}`
+                  }`}
                   className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
                     tab === t.key
                       ? 'border-accent text-accent'
@@ -436,11 +559,27 @@ function FriendDetailInner() {
               ))}
             </div>
 
+            {tab === 'timeline' && <FriendTimeline friendId={friendId} />}
+
+            {/* 出す先のデータを取る口が無いもの。何が足りないかを書く。 */}
+            {TABS.map((t) =>
+              'pending' in t && t.pending && tab === t.key ? (
+                <div
+                  key={t.key}
+                  className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm"
+                >
+                  {t.pending}
+                </div>
+              ) : null,
+            )}
+
             {tab === 'info' && (
               <div className="bg-canvas rounded-card border-hairline border p-5">
-                {fields.length === 0 ? (
+                {inGroup.length === 0 ? (
                   <p className="text-ink-faint py-6 text-center text-sm">
-                    情報欄の項目がまだありません。
+                    {group === BASIC_GROUP
+                      ? '情報欄の項目がまだありません。'
+                      : 'この分類の項目はまだありません。'}
                     <Link
                       href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
                       className="text-accent ml-1 hover:underline"
@@ -450,7 +589,7 @@ function FriendDetailInner() {
                   </p>
                 ) : (
                   <>
-                    {[...starred, ...rest].map((field) => (
+                    {[...groupStarred, ...rest].map((field) => (
                       <div key={field.id} className="mb-4">
                         <label className="text-ink-secondary mb-1 block text-sm font-medium">
                           {field.isStarred && <span className="text-warning mr-1">★</span>}

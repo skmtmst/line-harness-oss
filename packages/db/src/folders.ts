@@ -26,6 +26,9 @@ export const FOLDER_KINDS = [
   'automation',
   'event',
   'entry_route',
+  // 友だち情報欄の分類。友だち詳細の上に並ぶタブ（飼い主情報・ペット
+  // プロフィールなど）がこれ。friend_fields.folder_id が指す先。
+  'friend_field',
 ] as const;
 
 export type FolderKind = (typeof FOLDER_KINDS)[number];

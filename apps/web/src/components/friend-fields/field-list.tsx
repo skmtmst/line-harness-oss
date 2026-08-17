@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import type { FriendField, FriendFieldType } from '@line-crm/shared'
+import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
+import FolderPanel from '@/components/shared/folder-panel'
+
+/** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
+const UNFILED = '__unfiled__'
 
 /** 種類の表示名。運用者は 'multi_select' ではなく「複数選択」で考える。 */
 /**
@@ -45,6 +49,9 @@ export const FIELD_TYPE_LABELS: Record<FriendFieldType, string> = {
  */
 export default function FriendFieldList() {
   const [items, setItems] = useState<FriendField[]>([])
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [folderId, setFolderId] = useState('')
+  const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
@@ -53,8 +60,13 @@ export default function FriendFieldList() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.friendFields.list({ withUsage: true })
+      // フォルダは取れなくても一覧は出す。分けられないだけ。
+      const [res, foldersRes] = await Promise.all([
+        api.friendFields.list({ withUsage: true }),
+        api.folders.list('friend_field').catch(() => null),
+      ])
       if (res.success) setItems(res.data)
+      if (foldersRes?.success) setFolders(foldersRes.data)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
@@ -97,19 +109,32 @@ export default function FriendFieldList() {
     }
   }
 
+  const inFolder =
+    folderId === ''
+      ? items
+      : folderId === UNFILED
+        ? items.filter((f) => !f.folderId)
+        : items.filter((f) => f.folderId === folderId)
+  const visible =
+    query.trim() === ''
+      ? inFolder
+      : inFolder.filter((f) => f.name.toLowerCase().includes(query.trim().toLowerCase()))
+  const folderLabel = folderId === '' ? 'すべて' : (folders.find((f) => f.id === folderId)?.name ?? '未分類')
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-ink-secondary text-sm">
-          友だちごとに持たせる項目です。フォームの回答をここに入れると、
-          友だち詳細に出て、テンプレートに差し込めるようになります。
-        </p>
-        <Link
-          href="/tags/fields/new"
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
-        >
-          ＋ 項目を追加
-        </Link>
+      {/*
+        ここで作った項目がどこへ効くかを、一覧の上に1行で置く。設計でも
+        同じ帯がある。名前だけ見ても、何のために作る場所なのかが分からない。
+      */}
+      <div className="bg-accent-soft rounded-card mb-4 flex flex-wrap items-center gap-2 px-4 py-3 text-sm">
+        <span className="text-ink-secondary">ここで定義した項目は</span>
+        <span className="text-accent font-medium">回答フォームの登録先</span>
+        <span className="text-ink-faint">→</span>
+        <span className="text-accent font-medium">友だち詳細のタブ</span>
+        <span className="text-ink-faint">→</span>
+        <span className="text-accent font-medium">テンプレートの差し込み</span>
+        <span className="text-ink-secondary">として使われます。</span>
       </div>
 
       {error && (
@@ -118,25 +143,69 @@ export default function FriendFieldList() {
         </div>
       )}
 
+      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <FolderPanel
+          total={`${items.length} 項目`}
+          activeId={folderId}
+          onSelect={setFolderId}
+          rows={[
+            { id: '', label: 'すべて', count: items.length },
+            ...folders.map((f) => ({
+              id: f.id,
+              label: f.name,
+              count: items.filter((i) => i.folderId === f.id).length,
+            })),
+            { id: UNFILED, label: '未分類', count: items.filter((i) => !i.folderId).length },
+          ]}
+        />
+
+        <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-baseline gap-2">
+          <p className="text-ink text-base font-bold">{folderLabel}</p>
+          <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
+            {visible.length} 項目
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="項目名で検索"
+            aria-label="項目名で検索"
+            className="border-hairline rounded-control focus:ring-accent border px-3 py-1.5 text-sm focus:ring-2 focus:outline-none"
+          />
+          <Link
+            href="/tags/fields/new"
+            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+          >
+            ＋ 項目を追加
+          </Link>
+        </div>
+      </div>
+
       <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="bg-canvas-sunken border-hairline border-b">
+                {/* 列は設計の絵の並び。差し込みの形は項目名の下に添える。
+                    列を1つ使うほどではないが、この画面で調べる人は多い。 */}
                 <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  項目名
+                  友だち情報欄名
                 </th>
                 <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  テンプレートに書く形
+                  種別
                 </th>
                 <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  種類
+                  既定値
                 </th>
                 <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  入っている人
+                  入力済み
                 </th>
                 <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  取り扱い
+                  表示
                 </th>
                 <th className="px-4 py-3" />
               </tr>
@@ -148,41 +217,49 @@ export default function FriendFieldList() {
                     読み込み中...
                   </td>
                 </tr>
-              ) : items.length === 0 ? (
+              ) : visible.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-ink-faint px-4 py-8 text-center text-sm">
-                    項目がまだありません。「項目を追加」から作ってください。
+                    {items.length === 0
+                      ? '項目がまだありません。「項目を追加」から作ってください。'
+                      : 'この絞り込みに当てはまる項目はありません。'}
                   </td>
                 </tr>
               ) : (
-                items.map((field) => (
+                visible.map((field) => (
                   <tr key={field.id} className="hover:bg-canvas-sunken">
-                    <td className="text-ink px-4 py-3 text-sm font-medium">
-                      {field.isStarred && (
-                        <span className="text-warning mr-1" title="よく使う項目">
-                          ★
-                        </span>
-                      )}
-                      {field.name}
-                    </td>
                     <td className="px-4 py-3">
+                      <p className="text-ink text-sm font-medium">{field.name}</p>
+                      {/* 差し込みの形は名前の下に添える。押すと写せる。 */}
                       <button
                         onClick={() => copyKey(field)}
                         title="クリックでコピー"
-                        className="bg-canvas-sunken text-ink-secondary rounded-control px-2 py-1 font-mono text-xs hover:bg-hairline"
+                        className="text-ink-faint hover:text-ink-secondary mt-0.5 font-mono text-[11px]"
                       >
                         {copied === field.id ? 'コピーしました' : `{{field.${field.fieldKey}}}`}
                       </button>
                     </td>
+                    <td className="px-4 py-3">
+                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px]">
+                        {FIELD_TYPE_LABELS[field.type] ?? field.type}
+                      </span>
+                    </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm">
-                      {FIELD_TYPE_LABELS[field.type] ?? field.type}
+                      {field.defaultValue || <span className="text-ink-faint">—</span>}
                     </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
                       {field.usageCount ?? 0}
                       <span className="text-ink-faint ml-0.5 text-xs">人</span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
+                        {field.isStarred ? (
+                          <span className="text-accent inline-flex items-center gap-1 text-xs">
+                            ★ 一覧に表示
+                          </span>
+                        ) : (
+                          <span className="text-ink-faint text-xs">—</span>
+                        )}
                         {field.isPersonal && (
                           <span
                             className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[11px]"
@@ -197,11 +274,6 @@ export default function FriendFieldList() {
                             title="EC側の値が正です。管理画面からは変更できません。"
                           >
                             EC側が正
-                          </span>
-                        )}
-                        {field.source === 'form' && (
-                          <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px]">
-                            フォームから
                           </span>
                         )}
                       </div>
@@ -227,6 +299,8 @@ export default function FriendFieldList() {
         種類を変えると入っている値の意味が変わり、差し込み名を変えるとテンプレートの差し込みが空になるためです。
         変えたいときは新しい項目を作ってください。
       </p>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, fetchApi } from '@/lib/api'
@@ -54,6 +55,8 @@ interface EmailInboxItem {
   id: string
   threadId: string
   customerName: string
+  /** 相手のメールアドレス。友だちを手で探すときの手がかりになる。 */
+  customerIdentifier?: string
   subject: string
   preview: string
   status: 'unread' | 'in_progress' | 'resolved'
@@ -655,6 +658,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId)
+    /*
+     * 開いていたメールを外す。
+     *
+     * 右側は「メールが選ばれていたらメール」を先に見るので、ここで
+     * 外さないと、LINEのトークを選んでも前のメールが出たままになる。
+     * メールを一度開くと、以後どのトークも開けなくなっていた。
+     * メール側は逆にLINEの選択を外していたので、片側だけ抜けていた。
+     */
+    setSelectedThreadId(null)
     setMessageContent('')
     setPendingImage(null)
   }
@@ -885,7 +897,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       <div data-design="Panes" className="relative flex gap-4 h-[calc(100vh-120px)] lg:h-[calc(100vh-180px)]">
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
-        <div className={`w-full lg:w-[360px] lg:flex-shrink-0 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId ? 'hidden lg:flex' : 'flex'}`}>
+        {/* 狭い画面では、開いている間は一覧を隠して中央を広く使う。
+            メールを開いたときも同じ。ここが LINE だけを見ていたので、
+            メールを開いても一覧が残って中央が半分のままだった。 */}
+        <div className={`w-full lg:w-[360px] lg:flex-shrink-0 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}>
           {/* タブ (全て / 未読 / 対応中 / 解決済) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
@@ -1480,13 +1495,53 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               閉じる
             </button>
             {selectedThreadId ? (
-              <div className="bg-canvas rounded-card border-hairline flex w-full items-center justify-center border">
-                <p className="text-ink-faint px-6 text-center text-sm leading-relaxed">
-                  メールの相手は、まだ友だちと
-                  <br />
-                  紐づいていません。
-                </p>
-              </div>
+              /*
+                メールの相手は友だちに結びついていない。
+                以前は「紐づいていません」の1行だけで、なぜなのか・
+                どうすればよいのかが分からなかった。誰との話かと、
+                いま何ができるかを出す。
+              */
+              (() => {
+                const mail = emailItems.find((e) => e.threadId === selectedThreadId)
+                return (
+                  <div className="bg-canvas rounded-card border-hairline h-full w-full overflow-y-auto border p-5">
+                    <p className="text-ink text-sm font-semibold">メールの相手</p>
+                    <p className="text-ink mt-3 text-sm">{mail?.customerName ?? '—'}</p>
+                    {mail?.customerIdentifier && (
+                      <p className="text-ink-secondary mt-0.5 font-mono text-xs break-all">
+                        {mail.customerIdentifier}
+                      </p>
+                    )}
+
+                    <div className="bg-canvas-sunken rounded-card mt-4 p-3">
+                      <p className="text-ink-secondary text-xs font-medium">
+                        この人はまだ友だちと結びついていません
+                      </p>
+                      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+                        メールは差出人のアドレスしか分かりません。LINEの友だちはアドレスを持っていないので、
+                        同じ人かどうかを自動で判断できません。タグ・マイル・購入履歴はこの画面には出ません。
+                      </p>
+                    </div>
+
+                    <p className="text-ink-secondary mt-4 text-xs font-medium">いまできること</p>
+                    <ul className="text-ink-faint mt-1 space-y-1.5 text-xs leading-relaxed">
+                      <li>
+                        ・
+                        <Link href="/friends" className="text-accent hover:underline">
+                          友だち一覧
+                        </Link>
+                        で名前を検索して、同じ人かどうかを確かめる
+                      </li>
+                      <li>・そのままメールで返信する（この画面の下から送れます）</li>
+                    </ul>
+
+                    <p className="text-ink-faint border-hairline mt-4 border-t pt-3 text-xs leading-relaxed">
+                      アドレスから友だちを自動で探す仕組みは、まだ入っていません。友だち情報欄に
+                      メールアドレスの項目を作って値を貯めておくと、入ったときにそのまま結びつけられます。
+                    </p>
+                  </div>
+                )
+              })()
             ) : (
             <FriendInfoSidebar
               friendId={selectedFriendId || selectedChatId}

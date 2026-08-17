@@ -15,6 +15,8 @@ export interface Tag {
   referral_mileage_reward: number;
   mileage_multiplier_bps: number | null;
   mileage_multiplier_priority: number;
+  /** 友だち一覧の「★つきタグ」列に出すか。0 / 1（111 で追加） */
+  is_starred: number;
   created_at: string;
 }
 
@@ -112,6 +114,47 @@ export async function assignTagToGroup(
   return (
     (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ??
     null
+  );
+}
+
+/**
+ * タグの名前と色を変える。
+ *
+ * 一覧の表からマイルの列を外して編集画面へ移したときに要るようになった。
+ * それまでは作るときにしか決められず、打ち間違えたタグは消して作り直す
+ * しかなかった。作り直すと、付いていた友だちの分がすべて外れる。
+ *
+ * 渡されたものだけ当てる。色だけ変えたいときに名前を送らせると、
+ * 呼ぶ側が現在値を読んでから書くことになり、その間に別の人が変えた
+ * 名前を上書きしてしまう。
+ */
+export async function updateTag(
+  db: D1Database,
+  id: string,
+  input: { name?: string; color?: string; isStarred?: boolean },
+): Promise<Tag | null> {
+  const sets: string[] = [];
+  const binds: unknown[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    binds.push(input.name);
+  }
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    binds.push(input.color);
+  }
+  if (input.isStarred !== undefined) {
+    sets.push('is_starred = ?');
+    binds.push(input.isStarred ? 1 : 0);
+  }
+  if (sets.length > 0) {
+    await db
+      .prepare(`UPDATE tags SET ${sets.join(', ')} WHERE id = ?`)
+      .bind(...binds, id)
+      .run();
+  }
+  return (
+    (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ?? null
   );
 }
 

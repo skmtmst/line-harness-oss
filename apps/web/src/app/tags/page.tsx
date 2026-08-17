@@ -1,123 +1,18 @@
 'use client'
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
+import FolderPanel from '@/components/shared/folder-panel'
 import TagBadge from '@/components/friends/tag-badge'
 import FriendFieldList from '@/components/friend-fields/field-list'
 import SupportMarkList from '@/components/friend-fields/mark-list'
 import SavedSearchList from '@/components/friend-fields/saved-search-list'
-
-const PRESET_COLORS = [
-  '#3B82F6', // blue (server default)
-  '#10B981', // green
-  '#F59E0B', // amber
-  '#EF4444', // red
-  '#8B5CF6', // purple
-  '#EC4899', // pink
-  '#06B6D4', // cyan
-  '#6B7280', // gray
-]
-
-function TagMileageEditor({ tag, onSaved }: { tag: Tag; onSaved: () => void }) {
-  const [reward, setReward] = useState(String(tag.mileageReward ?? 0))
-  const [referralReward, setReferralReward] = useState(String(tag.referralMileageReward ?? 0))
-  const [multiplier, setMultiplier] = useState(
-    tag.mileageMultiplierBps == null ? '' : String(tag.mileageMultiplierBps / 10000),
-  )
-  const [priority, setPriority] = useState(String(tag.mileageMultiplierPriority ?? 0))
-  const [saving, setSaving] = useState(false)
-
-  const save = async () => {
-    const rewardMiles = Number(reward)
-    const referralRewardMiles = Number(referralReward)
-    const multiplierBps = multiplier.trim() === '' ? null : Math.round(Number(multiplier) * 10000)
-    const multiplierPriority = Number(priority)
-    if (!Number.isInteger(rewardMiles) || rewardMiles < 0) return
-    if (!Number.isInteger(referralRewardMiles) || referralRewardMiles < 0) return
-    if (multiplierBps !== null && (!Number.isInteger(multiplierBps) || multiplierBps < 1000 || multiplierBps > 100000)) return
-    if (!Number.isInteger(multiplierPriority) || multiplierPriority < 0) return
-    setSaving(true)
-    try {
-      await api.tags.updateMileage(tag.id, {
-        rewardMiles,
-        referralRewardMiles,
-        multiplierBps,
-        multiplierPriority,
-      })
-      onSaved()
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <>
-      <td className="px-3 py-3">
-        <input
-          aria-label={`${tag.name}の獲得マイル`}
-          type="number"
-          min={0}
-          step={1}
-          value={reward}
-          onChange={(e) => setReward(e.target.value)}
-          className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
-        />
-      </td>
-      <td className="px-3 py-3">
-        <input
-          aria-label={`${tag.name}の紹介者マイル`}
-          type="number"
-          min={0}
-          step={1}
-          value={referralReward}
-          onChange={(e) => setReferralReward(e.target.value)}
-          className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
-        />
-      </td>
-      <td className="px-3 py-3">
-        <div className="flex items-center gap-1">
-          <input
-            aria-label={`${tag.name}の還元倍率`}
-            type="number"
-            min={0.1}
-            max={10}
-            step={0.1}
-            placeholder="なし"
-            value={multiplier}
-            onChange={(e) => setMultiplier(e.target.value)}
-            className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
-          />
-          <span className="text-xs text-ink-faint">倍</span>
-        </div>
-      </td>
-      <td className="px-3 py-3">
-        <input
-          aria-label={`${tag.name}の倍率優先度`}
-          type="number"
-          min={0}
-          max={1000}
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          className="w-16 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
-        />
-      </td>
-      <td className="px-3 py-3 text-right whitespace-nowrap">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 rounded-md disabled:opacity-40"
-        >
-          {saving ? '保存中' : 'マイル保存'}
-        </button>
-      </td>
-    </>
-  )
-}
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -192,13 +87,8 @@ function TagsPageInner() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const [creating, setCreating] = useState(false)
   // タグ名の絞り込み（設計 `Body` の「タグ名で検索」）。
   const [tagQuery, setTagQuery] = useState('')
-  const [newName, setNewName] = useState('')
-  const [newColor, setNewColor] = useState(PRESET_COLORS[0])
-  const [newGroupId, setNewGroupId] = useState('')
-  const [saving, setSaving] = useState(false)
 
   const router = useRouter()
   const params = useSearchParams()
@@ -206,6 +96,8 @@ function TagsPageInner() {
   const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'tags') as TabKey
 
   const [filter, setFilter] = useState<string>('')
+  /** よく使う絞り込み。いま数えられるのは「未使用のタグ」だけ。 */
+  const [quickFilter, setQuickFilter] = useState<'' | 'unused'>('')
   const [groupName, setGroupName] = useState('')
   const [addingGroup, setAddingGroup] = useState(false)
 
@@ -231,13 +123,28 @@ function TagsPageInner() {
   const visible = useMemo(() => {
     // 名前は手元で絞る。打つたびに取り直すと重い。
     const q = tagQuery.trim().toLowerCase()
-    const byName = q === '' ? items : items.filter((t) => t.name.toLowerCase().includes(q))
-    if (filter === '') return byName
-    if (filter === UNGROUPED) return byName.filter((t) => !t.groupId)
-    return byName.filter((t) => t.groupId === filter)
-  }, [items, filter, tagQuery])
+    let out = q === '' ? items : items.filter((t) => t.name.toLowerCase().includes(q))
+    // 誰にも付いていないタグ。整理するときに使う。
+    if (quickFilter === 'unused') out = out.filter((t) => (t.friendCount ?? 0) === 0)
+    if (filter === '') return out
+    if (filter === UNGROUPED) return out.filter((t) => !t.groupId)
+    return out.filter((t) => t.groupId === filter)
+  }, [items, filter, tagQuery, quickFilter])
 
   const ungroupedCount = useMemo(() => items.filter((t) => !t.groupId).length, [items])
+
+  /** 友だち一覧に出す・出さないを切り替える。 */
+  const toggleStar = async (tag: Tag) => {
+    setError('')
+    // 押した瞬間に見た目を変える。往復を待つと、押せたかどうか分からない。
+    setItems((prev) => prev.map((t) => (t.id === tag.id ? { ...t, isStarred: !t.isStarred } : t)))
+    try {
+      await api.tags.update(tag.id, { isStarred: !tag.isStarred })
+    } catch {
+      setError('表示の切り替えに失敗しました')
+      void load()
+    }
+  }
 
   const handleAddGroup = async () => {
     const name = groupName.trim()
@@ -273,33 +180,6 @@ function TagsPageInner() {
       load()
     } catch {
       setError('分類の削除に失敗しました')
-    }
-  }
-
-  const handleCreate = async () => {
-    if (saving) return
-    const name = newName.trim()
-    if (!name) return
-    if (items.some((t) => t.name === name)) {
-      setError(`タグ「${name}」は既に存在します`)
-      return
-    }
-    setSaving(true)
-    setError('')
-    try {
-      await api.tags.create({ name, color: newColor, groupId: newGroupId || null })
-      setNewName('')
-      setCreating(false)
-      load()
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
-        setError(`タグ「${name}」は既に存在します`)
-        load()
-      } else {
-        setError('作成に失敗しました')
-      }
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -341,12 +221,13 @@ function TagsPageInner() {
                   {label}
                 </button>
               ))}
-              <button
-                onClick={() => { setCreating(!creating); setError('') }}
+              {/* 設計の呼び名。作る場所も専用の画面（3-1-1）に寄せる。 */}
+              <Link
+                href="/tags/new"
                 className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
               >
-                + 新規タグ
-              </button>
+                ＋ タグを追加
+              </Link>
             </div>
           ) : tab === 'fields' ? (
             <a href="/tags/fields/new" className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium hover:bg-accent-hover">
@@ -498,75 +379,33 @@ function TagsPageInner() {
 
       {tab === 'tags' && (
       <>
-      <ListToolbar
-        folders={['すべて', '01_購入ステータス', '02_ペット属性', '03_健康の悩み']}
-        searchPlaceholder="タグ名で検索"
-        searchValue={tagQuery}
-        onSearchChange={setTagQuery}
-        sortLabel="付与人数が多い順"
-      />
-
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
         </div>
       )}
 
-      {/* 分類。一覧の上に置いて、ここで絞り込みと分類の追加の両方をする。
-          下に置くと、タグが増えたときにスクロールしないと分類を触れなくなる。 */}
-      <div className="bg-canvas rounded-card border-hairline mb-4 border p-4">
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="text-ink-faint mr-1 text-xs font-semibold">分類</span>
-          <button
-            onClick={() => setFilter('')}
-            className={`rounded-pill px-3 py-1 text-sm transition-colors ${
-              filter === ''
-                ? 'bg-accent text-on-accent'
-                : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-            }`}
-          >
-            すべて
-            <span className="ml-1.5 tabular-nums opacity-70">{items.length}</span>
-          </button>
-          {groups.map((g) => {
-            const count = items.filter((t) => t.groupId === g.id).length
-            return (
-              <span key={g.id} className="group inline-flex items-center">
-                <button
-                  onClick={() => setFilter(g.id)}
-                  className={`rounded-pill px-3 py-1 text-sm transition-colors ${
-                    filter === g.id
-                      ? 'bg-accent text-on-accent'
-                      : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                  }`}
-                >
-                  {g.name}
-                  <span className="ml-1.5 tabular-nums opacity-70">{count}</span>
-                </button>
-                <button
-                  onClick={() => handleDeleteGroup(g)}
-                  aria-label={`分類「${g.name}」を削除`}
-                  title={`分類「${g.name}」を削除（タグは残ります）`}
-                  className="text-ink-faint hover:text-danger ml-0.5 px-1 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-                >
-                  ×
-                </button>
-              </span>
-            )
-          })}
-          <button
-            onClick={() => setFilter(UNGROUPED)}
-            className={`rounded-pill px-3 py-1 text-sm transition-colors ${
-              filter === UNGROUPED
-                ? 'bg-accent text-on-accent'
-                : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-            }`}
-          >
-            未分類
-            <span className="ml-1.5 tabular-nums opacity-70">{ungroupedCount}</span>
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      {/*
+        設計はフォルダを左の縦パネルに置く。以前は一覧の上に横の帯として
+        並べていたが、分類が増えると折り返して2段3段になり、その下の
+        検索や表が押し下げられていた。縦なら増えても幅が変わらない。
+      */}
+      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <FolderPanel
+          total={`${items.length} 件`}
+          activeId={filter}
+          onSelect={setFilter}
+          rows={[
+            { id: '', label: 'すべて', count: items.length },
+            ...groups.map((g) => ({
+              id: g.id,
+              label: g.name,
+              count: items.filter((t) => t.groupId === g.id).length,
+              onDelete: () => handleDeleteGroup(g),
+            })),
+            { id: UNGROUPED, label: '未分類', count: ungroupedCount },
+          ]}
+        >
           <input
             type="text"
             value={groupName}
@@ -574,139 +413,129 @@ function TagsPageInner() {
             onKeyDown={(e) => { if (e.key === 'Enter') handleAddGroup() }}
             placeholder="例: お悩み"
             aria-label="新しい分類名"
-            className="border-hairline rounded-control focus:ring-accent w-48 border px-3 py-1.5 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
+            className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-1.5 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
           />
           <button
             onClick={handleAddGroup}
             disabled={addingGroup || !groupName.trim()}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken w-full border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
           >
-            {addingGroup ? '追加中...' : '分類を追加'}
+            {addingGroup ? '追加中...' : 'フォルダを追加'}
           </button>
-          <span className="text-ink-faint text-xs">
-            分類を削除しても、属していたタグは未分類として残ります。
-          </span>
-        </div>
-      </div>
+          <p className="text-ink-faint text-xs leading-relaxed">
+            フォルダを削除しても、属していたタグは未分類として残ります。
+          </p>
+        </FolderPanel>
 
-      {creating && (
-        <div className="mb-4 p-4 bg-canvas rounded-card border border-hairline">
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-semibold text-ink-faint mb-1.5">タグ名</label>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
-                placeholder="例: 見込み客"
-                autoFocus
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-ink-faint mb-1.5">色</label>
-              <div className="flex items-center gap-1.5">
-                {PRESET_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setNewColor(c)}
-                    className={`w-7 h-7 rounded-full transition-transform ${newColor === c ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-110'}`}
-                    style={{ backgroundColor: c }}
-                    aria-label={`色 ${c}`}
-                  />
-                ))}
-                <input
-                  type="color"
-                  value={newColor}
-                  onChange={(e) => setNewColor(e.target.value)}
-                  className="w-7 h-7 p-0 border border-gray-300 rounded cursor-pointer"
-                  title="カスタム色"
-                />
-              </div>
-            </div>
-            <div>
-              <label
-                htmlFor="new-tag-group"
-                className="block text-xs font-semibold text-ink-faint mb-1.5"
-              >
-                分類
-              </label>
-              <select
-                id="new-tag-group"
-                value={newGroupId}
-                onChange={(e) => setNewGroupId(e.target.value)}
-                className="border-hairline rounded-control border px-3 py-2 text-sm"
-              >
-                <option value="">未分類</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={saving || !newName.trim()}
-                className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-40"
-              >
-                {saving ? '作成中...' : '作成'}
-              </button>
-              <button
-                onClick={() => { setCreating(false); setNewName('') }}
-                className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
+        <div>
+        <ListToolbar
+          searchPlaceholder="タグ名で検索"
+          searchValue={tagQuery}
+          onSearchChange={setTagQuery}
+          sortLabel="付与人数が多い順"
+        />
+
+        {/*
+          よく使う絞り込み（設計の絵の帯）。数え方が決まっているのは
+          「未使用のタグ」だけ。ほかは何をもってそう呼ぶかを決める前に
+          出すと、押した人ごとに違うものを想像する。押せない形で置く。
+        */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-ink-faint text-xs">よく使う</span>
+          <button
+            onClick={() => setQuickFilter(quickFilter === 'unused' ? '' : 'unused')}
+            className={`rounded-pill px-3 py-1 text-xs transition-colors ${
+              quickFilter === 'unused'
+                ? 'bg-accent-soft text-accent'
+                : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
+            }`}
+          >
+            未使用のタグ
+          </button>
+          {['今月増えたタグ', '自動付与あり'].map((label) => (
+            <button
+              key={label}
+              disabled
+              title="この絞り込みはまだ数えられません"
+              className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+            >
+              {label}
+            </button>
+          ))}
         </div>
-      )}
 
       <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px]">
             <thead>
+              {/*
+                列は設計の絵の並び。以前は獲得マイル・紹介者マイル・行動倍率・
+                優先度の4列をここで直接いじれるようにしていたが、絵には無い。
+                倍率は「タグを作る」側にあるものなので、編集画面へ移した。
+                一覧は「どのタグが誰に何人付いているか」を見る場所に戻す。
+              */}
               <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ名</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち人数</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動付与のもと</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">分類</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち数</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">作成日</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">獲得マイル</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">紹介者マイル</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">行動倍率</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">優先度</th>
-                <th className="px-3 py-3" />
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">登録日</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">表示</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : visible.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-faint text-sm">
                   {items.length === 0 ? 'タグがありません' : 'この分類のタグはありません'}
                 </td></tr>
               ) : (
                 visible.map((t) => (
                   <tr key={t.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3">
-                      <TagBadge tag={t} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <TagGroupSelect tag={t} groups={groups} onChanged={load} />
+                      {/* 名前から編集へ入る。倍率もそちらにある。 */}
+                      <Link href={`/tags/edit?id=${t.id}`} className="hover:underline">
+                        <TagBadge tag={t} />
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {t.friendCount ?? 0}
                       <span className="text-xs text-ink-faint ml-0.5">人</span>
                     </td>
+                    {/*
+                      何をきっかけに自動で付いたタグかを出す列。きっかけは
+                      回答フォームやオートメーションの側に置かれていて、
+                      タグから引く口が無い。列だけ先に置く。
+                    */}
+                    <td className="px-4 py-3 text-xs text-ink-faint">—</td>
+                    <td className="px-4 py-3">
+                      <TagGroupSelect tag={t} groups={groups} onChanged={load} />
+                    </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">
                       {t.createdAt ? new Date(t.createdAt).toLocaleDateString('ja-JP') : ''}
                     </td>
-                    <TagMileageEditor tag={t} onSaved={load} />
+                    {/* 友だち一覧の「★つきタグ」列に出すか。ここから切り替える。
+                        タグは何十個も作るので、全部並べると狭い列でどれも読めない。 */}
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => toggleStar(t)}
+                        title={t.isStarred ? '友だち一覧に出さない' : '友だち一覧に出す'}
+                        className={`inline-flex items-center gap-1 text-xs ${
+                          t.isStarred ? 'text-accent' : 'text-ink-faint hover:text-ink-secondary'
+                        }`}
+                      >
+                        {t.isStarred ? '★ 一覧に表示' : '☆ —'}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <Link
+                        href={`/tags/edit?id=${t.id}`}
+                        className="text-accent mr-2 px-2.5 py-1 text-xs font-medium hover:underline"
+                      >
+                        編集
+                      </Link>
                       <button
                         onClick={() => handleDelete(t)}
                         className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
@@ -719,6 +548,8 @@ function TagsPageInner() {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
         </div>
       </div>
       </>

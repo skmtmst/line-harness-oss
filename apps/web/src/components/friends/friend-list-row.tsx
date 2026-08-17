@@ -7,6 +7,9 @@ import type { FriendListItem } from '@/lib/api'
 interface Props {
   friend: FriendListItem
   onDetailClick?: () => void
+  /** 選ばれているか。まとめて操作する帯は、1人以上選んだときだけ出る。 */
+  selected?: boolean
+  onToggleSelect?: () => void
 }
 
 // Single row of the L-step style friend list. Renders 6 columns:
@@ -15,7 +18,7 @@ interface Props {
 // `/chats?friend=<id>` so the operator can read history / reply / mark as
 // resolved without leaving the list. Tags are intentionally kept in the
 // detail drawer so a large number of automatic tags cannot stretch the row.
-export default function FriendListRow({ friend, onDetailClick }: Props) {
+export default function FriendListRow({ friend, onDetailClick, selected, onToggleSelect }: Props) {
   const router = useRouter()
   const navigateToChat = () => router.push(`/chats?friend=${friend.id}`)
   const incoming = friend.latestIncomingMessage
@@ -38,8 +41,22 @@ export default function FriendListRow({ friend, onDetailClick }: Props) {
           navigateToChat()
         }
       }}
-      className="grid grid-cols-[220px_80px_120px_1fr_160px_110px_88px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
+      className="grid grid-cols-[32px_220px_80px_120px_1fr_160px_110px_88px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
     >
+      {/*
+        選択。行そのものが個別トークへのリンクなので、ここでの操作は
+        行に伝えない。伝えると、選ぼうとしただけで画面が変わる。
+      */}
+      <div className="pt-1" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={selected ?? false}
+          onChange={() => onToggleSelect?.()}
+          aria-label={`${friend.displayName} を選ぶ`}
+          className="accent-accent h-4 w-4 cursor-pointer"
+        />
+      </div>
+
       {/* 名前 + アバター + 登録日 */}
       <div className="flex items-start gap-2">
         {friend.pictureUrl ? (

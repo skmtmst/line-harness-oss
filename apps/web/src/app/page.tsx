@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import type { EntryRoute } from '@line-crm/shared'
 import { api, type DashboardOverview } from '@/lib/api'
 import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
@@ -77,10 +78,27 @@ function FriendAddLinkCard() {
   const { selectedAccount } = useAccount()
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
+  const [routes, setRoutes] = useState<EntryRoute[]>([])
+  const [routeId, setRouteId] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    void api.entryRoutes.list().then((res) => {
+      // 止めた経路のリンクを配ると、踏んでも友だち追加にならない。
+      if (!cancelled && res.success) setRoutes(res.data.filter((r) => r.isActive))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const link = selectedAccount
+  const baseLink = selectedAccount
     ? `${base}/auth/line?account=${encodeURIComponent(selectedAccount.channelId)}`
     : `${base}/auth/line`
+  // 経路を選んだら、その経路の短縮リンクに差し替える。QRモーダルと同じ組み立て。
+  const route = routes.find((r) => r.id === routeId)
+  const link = route ? `${base}/r/${route.refCode}` : baseLink
 
   const onCopy = async () => {
     try {
@@ -95,32 +113,44 @@ function FriendAddLinkCard() {
 
   return (
     <section className="bg-canvas rounded-card border-hairline border p-5">
-      <div className="mb-3 flex items-start justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-ink text-sm font-semibold">友だち追加リンク</h2>
-            <span className="bg-accent-soft text-accent rounded-pill px-2 py-0.5 text-[10px] font-medium">
-              発行中
-            </span>
-          </div>
+          <h2 className="text-ink text-sm font-semibold">友だち追加リンク</h2>
           <p className="text-ink-faint mt-1 text-xs leading-relaxed">
             このURLから追加された友だちは、流入元を記録して計測できます。
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/*
+            「発行中」は札ではなく、どのリンクを出しているかの選択にした。
+            経路を分けて発行しても、ここから選べないと下のURLは基本の
+            ものから変わらず、分けた意味が画面に出てこない。
+          */}
+          <div className="border-hairline rounded-control flex items-center gap-1.5 border px-2 py-1">
+            <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
+            <label htmlFor="add-link-route" className="sr-only">
+              発行中の追加URL
+            </label>
+            <select
+              id="add-link-route"
+              value={routeId}
+              onChange={(e) => setRouteId(e.target.value)}
+              className="text-ink max-w-[180px] bg-transparent text-xs font-medium focus:outline-none"
+            >
+              <option value="">基本の追加URL</option>
+              {routes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <Link
             href="/inflow-links"
             className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-1.5 text-xs font-medium"
           >
             経路を分けて発行
           </Link>
-          <button
-            type="button"
-            onClick={() => setShowQr(true)}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-1.5 text-xs font-medium"
-          >
-            QRを表示
-          </button>
         </div>
       </div>
 
@@ -142,14 +172,25 @@ function FriendAddLinkCard() {
         >
           {copied ? 'コピーしました ✓' : 'コピー'}
         </button>
+        <button
+          type="button"
+          onClick={() => setShowQr(true)}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-4 text-xs font-medium"
+        >
+          QRを表示
+        </button>
       </div>
 
-      {/* 設計 1-1-1。印刷に使う大きさを選べる形にした。 */}
+      {/* 設計 1-1-1。印刷に使う大きさを選べる形にした。
+          ここで選んだ経路を持ち込む。開き直すたびに基本のURLへ戻ると、
+          分けて発行した経路のQRを出すのに毎回選び直すことになる。 */}
       <QrDialog
         open={showQr}
         onClose={() => setShowQr(false)}
         accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
-        baseLink={link}
+        accountBasicId={selectedAccount?.basicId ?? null}
+        baseLink={baseLink}
+        initialRouteId={routeId}
       />
     </section>
   )

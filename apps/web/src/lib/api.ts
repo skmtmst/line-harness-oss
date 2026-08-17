@@ -271,7 +271,15 @@ export type FriendFormSubmission = {
   data: Record<string, unknown>
   createdAt: string
 }
-export type FriendDetail = FriendWithTags & { formSubmissions: FriendFormSubmission[] }
+export type FriendDetail = FriendWithTags & {
+  formSubmissions: FriendFormSubmission[]
+  /** 対応の状況。やり取りがまだ無い友だちでは null。 */
+  support: {
+    status: 'unread' | 'in_progress' | 'resolved'
+    operatorName: string | null
+    notes: string | null
+  } | null
+}
 export type MileageSummary = {
   programId: string
   programName: string
@@ -711,6 +719,12 @@ export const api = {
     create: (data: { name: string; color: string; groupId?: string | null }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
         method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    /** 名前・色・一覧に出すかを変える。分類とマイルは別の受け口が持っている。 */
+    update: (id: string, data: { name?: string; color?: string; isStarred?: boolean }) =>
+      fetchApi<ApiResponse<Tag>>(`/api/tags/${id}`, {
+        method: 'PATCH',
         body: JSON.stringify(data),
       }),
     /** 所属する親分類を変える。null で未分類に戻す。 */
