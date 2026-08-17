@@ -307,6 +307,8 @@ export type MileageRule = {
     uniquePerReferredFriendPerSubject?: boolean
   }
   isActive: boolean
+  validFrom: string | null
+  validUntil: string | null
   createdAt: string
   updatedAt: string
 }
@@ -2098,12 +2100,15 @@ export const api = {
       amount: number
       initialStatus?: 'pending' | 'available'
       conditions?: MileageRule['conditions'] | null
+      validFrom?: string | null
+      validUntil?: string | null
     }) => fetchApi<ApiResponse<MileageRule>>('/api/mileage/rules', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
     updateRule: (id: string, data: Partial<Pick<MileageRule,
       'name' | 'eventType' | 'source' | 'amount' | 'initialStatus' | 'conditions' | 'isActive'
+      | 'validFrom' | 'validUntil'
     >>) => fetchApi<ApiResponse<MileageRule>>(`/api/mileage/rules/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

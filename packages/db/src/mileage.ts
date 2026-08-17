@@ -769,6 +769,8 @@ export interface MileageRuleRow {
   initial_status: 'pending' | 'available';
   conditions: string | null;
   is_active: number;
+  valid_from: string | null;
+  valid_until: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -822,6 +824,9 @@ export async function createMileageRule(
     amount: number;
     initialStatus?: 'pending' | 'available';
     conditions?: MileageRuleConditions | null;
+    /** 期間限定のキャンペーン。列も突き合わせも前からあったが、書き込む口が無かった。 */
+    validFrom?: string | null;
+    validUntil?: string | null;
   },
 ): Promise<MileageRuleRow> {
   if (!Number.isInteger(input.amount) || input.amount <= 0) {
@@ -834,8 +839,8 @@ export async function createMileageRule(
     .prepare(
       `INSERT INTO mileage_rules
          (id, program_id, name, event_type, source, amount, initial_status,
-          conditions, is_active, created_at, updated_at)
-       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+          conditions, is_active, valid_from, valid_until, created_at, updated_at)
+       VALUES (?, 'default', ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -845,6 +850,8 @@ export async function createMileageRule(
       input.amount,
       input.initialStatus ?? 'available',
       input.conditions ? JSON.stringify(input.conditions) : null,
+      input.validFrom ?? null,
+      input.validUntil ?? null,
       now,
       now,
     )
@@ -865,6 +872,8 @@ export async function updateMileageRule(
     initialStatus: 'pending' | 'available';
     conditions: MileageRuleConditions | null;
     isActive: boolean;
+    validFrom: string | null;
+    validUntil: string | null;
   }>,
 ): Promise<MileageRuleRow | null> {
   if (updates.amount !== undefined && (!Number.isInteger(updates.amount) || updates.amount <= 0)) {
@@ -882,6 +891,8 @@ export async function updateMileageRule(
     values.push(updates.conditions ? JSON.stringify(updates.conditions) : null);
   }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
+  if (updates.validFrom !== undefined) { sets.push('valid_from = ?'); values.push(updates.validFrom); }
+  if (updates.validUntil !== undefined) { sets.push('valid_until = ?'); values.push(updates.validUntil); }
   if (sets.length === 0) return getMileageRuleById(db, id);
   sets.push('updated_at = ?');
   values.push(jstNow(), id);

@@ -37,6 +37,8 @@ function serializeMileageRule(rule: MileageRuleRow) {
     initialStatus: rule.initial_status,
     conditions,
     isActive: Boolean(rule.is_active),
+    validFrom: rule.valid_from,
+    validUntil: rule.valid_until,
     createdAt: rule.created_at,
     updatedAt: rule.updated_at,
   };
@@ -138,6 +140,8 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
         uniquePerReferredFriend?: boolean;
         uniquePerReferredFriendPerSubject?: boolean;
       } | null;
+      validFrom?: string | null;
+      validUntil?: string | null;
     }>();
     if (!body.name?.trim() || !body.eventType?.trim() || !Number.isInteger(body.amount) || (body.amount ?? 0) <= 0) {
       return c.json({ success: false, error: 'name, eventType and a positive integer amount are required' }, 400);
@@ -149,6 +153,8 @@ scoring.post('/api/mileage/rules', requireRole('owner', 'admin'), async (c) => {
       amount: body.amount!,
       initialStatus: body.initialStatus,
       conditions: body.conditions,
+      validFrom: body.validFrom ?? null,
+      validUntil: body.validUntil ?? null,
     });
     return c.json({ success: true, data: serializeMileageRule(rule) }, 201);
   } catch (err) {

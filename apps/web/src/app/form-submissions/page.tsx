@@ -215,7 +215,56 @@ export default function FormSubmissionsPage() {
 
   return (
     <div>
-      <Header title="フォーム回答" description="送信されたフォームを件数・配信アカウント・回答内容まで一覧で確認" />
+      <div data-design="Head">
+        <Header
+          title="回答フォーム"
+          description="友だちに答えてもらうフォームを作ります。回答は指定した友だち情報欄にそのまま記録され、友だち詳細やテンプレートの差し込みで使えます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              {['マニュアル', '並び替え', 'フォルダを追加'].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  title="準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">フォーム</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {forms.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">作成済み</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">回答</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {submissions.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">読み込んだぶん</p>
+        </div>
+        {/* 月ごとの集計と、回答率（配ったうち何人が答えたか）を出す経路が無い。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">今月の回答</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">月ごとの集計は未対応</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">回答率</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">配った人数を持っていません</p>
+        </div>
+      </div>
 
       {/* Form cards */}
       <section className="mb-6">

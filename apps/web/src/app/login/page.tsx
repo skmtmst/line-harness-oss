@@ -14,6 +14,14 @@ export default function LoginPage() {
     }
   }, [])
 
+  const apiHost = (() => {
+    try {
+      return new URL(process.env.NEXT_PUBLIC_API_URL ?? '').host
+    } catch {
+      return ''
+    }
+  })()
+
   const handleLogin = () => {
     setLoading(true)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
@@ -29,9 +37,14 @@ export default function LoginPage() {
             N
           </div>
           <h1 className="mx-auto max-w-sm text-xl font-bold leading-snug text-gray-900 sm:text-2xl">
-            然-NEN- LINE管理システム TEST
+            然-NEN- LINE管理システム
           </h1>
           <p className="mt-2 text-sm text-gray-500 sm:text-base">管理画面にログイン</p>
+          {/* 商品名に「TEST」と足していたのをやめ、つなぎ先そのものを出す。
+              どの環境に入ろうとしているかは、こちらのほうが確かに分かる。 */}
+          {apiHost && (
+            <p className="mt-2 text-xs text-gray-400">つなぎ先 {apiHost}</p>
+          )}
         </div>
 
         <div>
@@ -54,9 +67,19 @@ export default function LoginPage() {
             <span>{loading ? 'LINEへ移動中…' : 'LINEでログイン'}</span>
           </button>
           <p className="mt-5 text-center text-xs leading-relaxed text-gray-500 sm:text-sm">
-            管理者または閲覧者として許可された<br className="sm:hidden" />LINEアカウントのみログインできます。
+            管理者または閲覧者として許可された<br className="sm:hidden" />LINEアカウントだけが
+            ログインできます。
           </p>
         </div>
+
+        <div className="mt-7 border-t border-gray-100 pt-5 text-center">
+          <p className="text-sm font-medium text-gray-700">ログインできない場合</p>
+          <p className="mt-1 text-xs leading-relaxed text-gray-500">
+            管理者にアカウントの登録を依頼してください。
+          </p>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-gray-400">© 然-NEN-</p>
       </section>
     </main>
   )
