@@ -271,7 +271,15 @@ export type FriendFormSubmission = {
   data: Record<string, unknown>
   createdAt: string
 }
-export type FriendDetail = FriendWithTags & { formSubmissions: FriendFormSubmission[] }
+export type FriendDetail = FriendWithTags & {
+  formSubmissions: FriendFormSubmission[]
+  /** 対応の状況。やり取りがまだ無い友だちでは null。 */
+  support: {
+    status: 'unread' | 'in_progress' | 'resolved'
+    operatorName: string | null
+    notes: string | null
+  } | null
+}
 export type MileageSummary = {
   programId: string
   programName: string

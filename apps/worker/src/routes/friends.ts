@@ -466,10 +466,32 @@ friends.get('/api/friends/:id', async (c) => {
     const id = c.req.param('id');
     const db = c.env.DB;
 
-    const [friend, tags, formSubmissions] = await Promise.all([
+    const [friend, tags, formSubmissions, support] = await Promise.all([
       getFriendById(db, id),
       getFriendTags(db, id),
       getFormSubmissionsByFriend(db, id, 10),
+      /*
+       * 対応の状況（対応マーク・担当者・個別メモ）。
+       *
+       * 詳細画面はこれを出す設計だが、これまで返していなかったので
+       * 「受信箱で扱っています」という案内文しか置けなかった。同じ人の
+       * 話を2画面に分けて見に行くことになる。
+       *
+       * chats に行が無い友だちもいる（一度も受信していない）。その場合は
+       * 未対応でも対応済みでもなく「やり取りがまだ無い」なので null を返し、
+       * 画面側で出し分ける。
+       */
+      db
+        .prepare(
+          `SELECT c.status, c.notes, o.name AS operator_name
+             FROM chats c
+             LEFT JOIN operators o ON o.id = c.operator_id
+            WHERE c.friend_id = ?
+            LIMIT 1`,
+        )
+        .bind(id)
+        .first<{ status: string; notes: string | null; operator_name: string | null }>()
+        .catch(() => null),
     ]);
 
     if (!friend) {
@@ -481,6 +503,13 @@ friends.get('/api/friends/:id', async (c) => {
       data: {
         ...serializeFriend(friend),
         tags: tags.map(serializeTag),
+        support: support
+          ? {
+              status: support.status,
+              operatorName: support.operator_name,
+              notes: support.notes,
+            }
+          : null,
         formSubmissions: formSubmissions.map((submission) => ({
           id: submission.id,
           formId: submission.form_id,
