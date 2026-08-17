@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
+import FolderPanel from '@/components/shared/folder-panel'
 import TagBadge from '@/components/friends/tag-badge'
 import FriendFieldList from '@/components/friend-fields/field-list'
 import SupportMarkList from '@/components/friend-fields/mark-list'
@@ -516,57 +517,41 @@ function TagsPageInner() {
         検索や表が押し下げられていた。縦なら増えても幅が変わらない。
       */}
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <aside className="bg-canvas rounded-card border-hairline h-fit overflow-hidden border">
-          <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
-            <p className="text-ink text-sm font-semibold">フォルダ</p>
-            <span className="text-ink-faint text-xs tabular-nums">{items.length} 件</span>
-          </div>
-          <nav className="p-2">
-            <FolderRow
-              label="すべて"
-              count={items.length}
-              active={filter === ''}
-              onClick={() => setFilter('')}
-            />
-            {groups.map((g) => (
-              <FolderRow
-                key={g.id}
-                label={g.name}
-                count={items.filter((t) => t.groupId === g.id).length}
-                active={filter === g.id}
-                onClick={() => setFilter(g.id)}
-                onDelete={() => handleDeleteGroup(g)}
-              />
-            ))}
-            <FolderRow
-              label="未分類"
-              count={ungroupedCount}
-              active={filter === UNGROUPED}
-              onClick={() => setFilter(UNGROUPED)}
-            />
-          </nav>
-          <div className="border-hairline space-y-2 border-t p-3">
-            <input
-              type="text"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAddGroup() }}
-              placeholder="例: お悩み"
-              aria-label="新しい分類名"
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-1.5 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
-            />
-            <button
-              onClick={handleAddGroup}
-              disabled={addingGroup || !groupName.trim()}
-              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken w-full border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
-            >
-              {addingGroup ? '追加中...' : 'フォルダを追加'}
-            </button>
-            <p className="text-ink-faint text-xs leading-relaxed">
-              フォルダを削除しても、属していたタグは未分類として残ります。
-            </p>
-          </div>
-        </aside>
+        <FolderPanel
+          total={`${items.length} 件`}
+          activeId={filter}
+          onSelect={setFilter}
+          rows={[
+            { id: '', label: 'すべて', count: items.length },
+            ...groups.map((g) => ({
+              id: g.id,
+              label: g.name,
+              count: items.filter((t) => t.groupId === g.id).length,
+              onDelete: () => handleDeleteGroup(g),
+            })),
+            { id: UNGROUPED, label: '未分類', count: ungroupedCount },
+          ]}
+        >
+          <input
+            type="text"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddGroup() }}
+            placeholder="例: お悩み"
+            aria-label="新しい分類名"
+            className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-1.5 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
+          />
+          <button
+            onClick={handleAddGroup}
+            disabled={addingGroup || !groupName.trim()}
+            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken w-full border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
+          >
+            {addingGroup ? '追加中...' : 'フォルダを追加'}
+          </button>
+          <p className="text-ink-faint text-xs leading-relaxed">
+            フォルダを削除しても、属していたタグは未分類として残ります。
+          </p>
+        </FolderPanel>
 
         <div>
         <ListToolbar
@@ -758,54 +743,6 @@ function TagsPageInner() {
       </>
       )}
       </div>
-    </div>
-  )
-}
-
-/**
- * 左のフォルダ1行。
- *
- * 削除は、その行にカーソルを置いたときだけ出す。常に出していると
- * 選ぶつもりで押し間違える。分類を消してもタグは残るが、
- * どのタグがどこにあったかは戻らない。
- */
-function FolderRow({
-  label,
-  count,
-  active,
-  onClick,
-  onDelete,
-}: {
-  label: string
-  count: number
-  active: boolean
-  onClick: () => void
-  onDelete?: () => void
-}) {
-  return (
-    <div className="group flex items-center">
-      <button
-        onClick={onClick}
-        className={`rounded-control flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-          active ? 'bg-accent-soft text-accent font-medium' : 'text-ink-secondary hover:bg-canvas-sunken'
-        }`}
-      >
-        <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
-        </svg>
-        <span className="min-w-0 flex-1 truncate">{label}</span>
-        <span className="text-ink-faint shrink-0 text-xs tabular-nums">{count}</span>
-      </button>
-      {onDelete && (
-        <button
-          onClick={onDelete}
-          aria-label={`フォルダ「${label}」を削除`}
-          title={`フォルダ「${label}」を削除（タグは残ります）`}
-          className="text-ink-faint hover:text-danger px-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
-        >
-          ×
-        </button>
-      )}
     </div>
   )
 }
