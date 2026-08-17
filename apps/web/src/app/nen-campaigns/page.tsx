@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { api, type NenCampaignSetting, type NenColumn, type NenPetProfile } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -351,6 +352,8 @@ export default function NenCampaignsPage() {
                     className={`rounded-xl border px-4 py-2 text-sm font-semibold ${previewCampaignKey === setting.campaignKey ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
                   >{previewCampaignKey === setting.campaignKey ? 'プレビューを隠す' : '配信プレビュー'}</button>
                   <button onClick={() => setExpanded(expanded === setting.campaignKey ? null : setting.campaignKey)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">{expanded === setting.campaignKey ? '編集を閉じる' : '内容を編集'}</button>
+                  {/* 設計 9-1-1。送り方まで含めて1画面で直す。 */}
+                  <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">送り方も編集</Link>
                 </div>
               </div>
               {previewCampaignKey === setting.campaignKey && <CampaignLinePreview setting={setting} onClose={() => setPreviewCampaignKey(null)} />}
