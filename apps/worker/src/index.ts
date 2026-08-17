@@ -103,7 +103,7 @@ import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { receiveSupportEmail } from './services/support-email.js';
-import { qrResponseHeaders } from './lib/qr-response.js';
+import { qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -281,7 +281,9 @@ app.get('/api/qr', async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
   const size = c.req.query('size') || '240x240';
-  const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&data=${encodeURIComponent(data)}`;
+  // 印刷に使うので svg も出せる。知らない値は png に丸める。
+  const format = normalizeQrFormat(c.req.query('format'));
+  const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&format=${format}&data=${encodeURIComponent(data)}`;
   const res = await fetch(upstream);
   if (!res.ok) return c.text('QR generation failed', 502);
   return new Response(res.body, {
@@ -289,6 +291,7 @@ app.get('/api/qr', async (c) => {
       res.headers.get('Content-Type'),
       c.req.query('download') === '1',
       c.req.query('filename') || 'referral-link-qr',
+      format,
     ),
   });
 });

@@ -20,16 +20,26 @@ const SIZES = [
   { value: '240x240', label: '小（240px）', note: '確認用' },
 ]
 
+/** Worker の /api/qr が受ける形式。順番はよく使うものから。 */
+const FORMATS = [
+  { value: 'png', label: 'PNG' },
+  { value: 'svg', label: 'SVG' },
+  { value: 'jpg', label: 'JPG' },
+]
+
 export default function QrDialog({
   open,
   onClose,
   accountName,
+  accountBasicId,
   baseLink,
   initialRouteId = '',
 }: {
   open: boolean
   onClose: () => void
   accountName: string
+  /** 公式アカウントのID（`@nen` など）。QRの下に出す案内先の組み立てに使う。 */
+  accountBasicId?: string | null
   baseLink: string
   /** 呼び出し元で選んでいた経路。開いたときの初期値になる。 */
   initialRouteId?: string
@@ -37,6 +47,7 @@ export default function QrDialog({
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [routeId, setRouteId] = useState(initialRouteId)
   const [size, setSize] = useState(SIZES[0].value)
+  const [format, setFormat] = useState(FORMATS[0].value)
   const [copied, setCopied] = useState(false)
 
   // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
@@ -62,10 +73,26 @@ export default function QrDialog({
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   const route = routes.find((r) => r.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
-  const qrSrc = `${base}/api/qr?size=${size}&data=${encodeURIComponent(link)}`
+  const qrSrc = `${base}/api/qr?size=${size}&format=${format}&data=${encodeURIComponent(link)}`
   const saveHref = `${qrSrc}&download=1&filename=${encodeURIComponent(
     route ? `qr-${route.refCode}` : 'qr-friend-add',
   )}`
+
+  /*
+   * QRの下に出す案内先。
+   *
+   * 経路を選んでいればその経路のリンク。経路ごとに分けて発行したのに
+   * ここが公式アカウントのままだと、どのQRを見ているのか分からない。
+   *
+   * 基本のときは公式アカウントのURL。LINE が配る lin.ee の短縮URLは
+   * API から取れないので、公式ID（basicId）から組み立てる。同じ場所に
+   * 着く。ID が無いアカウントでは何も出さない。
+   */
+  const profileUrl = route
+    ? link
+    : accountBasicId
+      ? `https://line.me/R/ti/p/${accountBasicId.startsWith('@') ? accountBasicId : `@${accountBasicId}`}`
+      : null
 
   const copy = async () => {
     try {
@@ -105,18 +132,30 @@ export default function QrDialog({
           </button>
         </div>
 
-        <p className="text-ink mb-3 text-sm font-medium">{accountName}</p>
-
         <div className="grid gap-5 sm:grid-cols-[auto_1fr]">
-          <div className="flex justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
-            <img
-              src={qrSrc}
-              alt="友だち追加QRコード"
-              width={220}
-              height={220}
-              className="border-hairline rounded-card h-[220px] w-[220px] border"
-            />
+          {/* 名前はQRの下。読み取る人が見るのは絵で、名前はその確認に使う。 */}
+          <div className="flex flex-col items-center">
+            <div className="bg-canvas-sunken rounded-card flex h-[240px] w-[240px] items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element -- Worker のQRプロキシ。静的アセットではない */}
+              <img
+                src={qrSrc}
+                alt="友だち追加QRコード"
+                width={200}
+                height={200}
+                className="h-[200px] w-[200px]"
+              />
+            </div>
+            <p className="text-ink mt-3 text-sm font-medium">{accountName}</p>
+            {profileUrl && (
+              <a
+                href={profileUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-info mt-1 max-w-[240px] truncate text-xs hover:underline"
+              >
+                {profileUrl}
+              </a>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -161,10 +200,21 @@ export default function QrDialog({
                 </select>
               </div>
               <div>
-                <label className="text-ink-secondary mb-1 block text-xs font-medium">形式</label>
-                <p className="border-hairline text-ink-secondary rounded-control border px-3 py-2 text-sm">
-                  PNG
-                </p>
+                <label htmlFor="qr-format" className="text-ink-secondary mb-1 block text-xs font-medium">
+                  形式
+                </label>
+                <select
+                  id="qr-format"
+                  value={format}
+                  onChange={(e) => setFormat(e.target.value)}
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                >
+                  {FORMATS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

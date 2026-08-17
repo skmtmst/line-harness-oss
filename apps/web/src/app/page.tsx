@@ -188,6 +188,7 @@ function FriendAddLinkCard() {
         open={showQr}
         onClose={() => setShowQr(false)}
         accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
+        accountBasicId={selectedAccount?.basicId ?? null}
         baseLink={baseLink}
         initialRouteId={routeId}
       />
