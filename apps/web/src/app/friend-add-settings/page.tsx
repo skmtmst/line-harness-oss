@@ -183,10 +183,28 @@ export default function FriendAddSettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header
-        title="友だち追加時設定"
-        description="各 LINE アカウントに友だち追加した瞬間に何が配信されるかを管理します。アクティブなシナリオが0件のアカウントは新規友だちに何も届きません。"
-      />
+      <div data-design="Head">
+        <Header
+          title="友だち追加時の配信"
+          description="友だちに追加されたときに何を配信するかを決めます。はじめての人と、以前からの友だち・ブロックを解除した人で分けられます。"
+        />
+      </div>
+
+      {/* 設計はこの2つを分ける画面。いまの実装はアカウントごとに、友だち追加で
+          動くシナリオを並べているだけで、相手が「はじめて」かどうかを見ていない。
+          分けられないことを画面に書いておかないと、既存のお客さまに
+          「はじめまして」が届いていることに気づけない。 */}
+      <div className="mx-auto max-w-5xl px-4 pt-4">
+        <div className="bg-warning-bg rounded-card p-4">
+          <p className="text-warning text-sm font-semibold">
+            いまは「はじめての人」と「以前からの友だち」を分けられません
+          </p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            この2つを分けないと、以前からのお客さまに「はじめまして」の挨拶が届きます。ブロックを解除しただけの人にも同じことが起きます。
+            いまは友だち追加で動くシナリオが、相手によらず同じように配信されます。
+          </p>
+        </div>
+      </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
         {error && (
