@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import type { FriendField } from '@line-crm/shared'
+import type { FriendField, Folder } from '@line-crm/shared'
 import { api, type FriendDetail, type MileageSummary } from '@/lib/api'
 import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
@@ -23,6 +23,15 @@ const TABS = [
   { key: 'forms', label: 'フォームの回答' },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
+
+/**
+ * 上に並ぶ情報欄のグループ。既定の「基本」だけ固定で、あとは
+ * 友だち情報欄のフォルダがそのまま並ぶ（飼い主情報・ペットプロフィール…）。
+ *
+ * 項目が増えると1枚の縦長なフォームになり、目的の項目まで
+ * 延々と巻かないと届かない。分類でまとめて出す。
+ */
+const BASIC_GROUP = 'basic'
 
 function FieldInput({
   field,
@@ -161,6 +170,8 @@ function FriendDetailInner() {
   const [warnings, setWarnings] = useState<string[]>([])
   const [mileage, setMileage] = useState<MileageSummary | null>(null)
   const [richMenu, setRichMenu] = useState<{ name: string | null; isDefault: boolean } | null>(null)
+  const [groups, setGroups] = useState<Folder[]>([])
+  const group = params.get('group') ?? BASIC_GROUP
 
   const load = useCallback(async () => {
     if (!friendId) {
@@ -171,14 +182,16 @@ function FriendDetailInner() {
     setError('')
     try {
       // マイル・リッチメニュー・フォルダは、取れなくても詳細は出す。
-      const [friendRes, fieldsRes, mileageRes, menuRes] = await Promise.all([
+      const [friendRes, fieldsRes, mileageRes, menuRes, groupsRes] = await Promise.all([
         api.friends.get(friendId),
         api.friendFields.forFriend(friendId),
         api.friends.mileage(friendId, 1).catch(() => null),
         api.friends.richMenu(friendId).catch(() => null),
+        api.folders.list('friend_field').catch(() => null),
       ])
       if (mileageRes?.success) setMileage(mileageRes.data.summary)
       if (menuRes?.success) setRichMenu(menuRes.data)
+      if (groupsRes?.success) setGroups(groupsRes.data)
       if (friendRes.success) setFriend(friendRes.data)
       if (fieldsRes.success) {
         setFields(fieldsRes.data.items)
@@ -245,8 +258,16 @@ function FriendDetailInner() {
     )
   }
 
+  /*
+   * 上のタブで選んだグループの項目だけを編集の対象にする。「基本」は
+   * 分類のない項目。★つきは基本のときだけ先頭へ寄せる。グループを
+   * 開いているときは、その分類の中の並び順のほうが読みやすい。
+   */
+  const inGroup =
+    group === BASIC_GROUP ? fields.filter((f) => !f.folderId) : fields.filter((f) => f.folderId === group)
   const starred = fields.filter((f) => f.isStarred)
-  const rest = fields.filter((f) => !f.isStarred)
+  const groupStarred = group === BASIC_GROUP ? inGroup.filter((f) => f.isStarred) : []
+  const rest = group === BASIC_GROUP ? inGroup.filter((f) => !f.isStarred) : inGroup
   /** 設計の「本名」。友だち情報欄に同じ名前の項目があればそれを使う。 */
   const realName = fields.find((f) => f.name === '本名')?.value ?? ''
 
@@ -302,6 +323,32 @@ function FriendDetailInner() {
             </div>
           }
         />
+      </div>
+
+      {/*
+        情報欄のグループ（設計の上段タブ）。「基本」＋フォルダ。
+        右端は分類そのものを直す場所への行き先。
+      */}
+      <div className="border-hairline mb-4 flex flex-wrap items-center gap-1 border-b">
+        {[{ id: BASIC_GROUP, name: '基本' }, ...groups].map((g) => (
+          <Link
+            key={g.id}
+            href={`/friends/detail?id=${friendId}${g.id === BASIC_GROUP ? '' : `&group=${g.id}`}`}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+              group === g.id
+                ? 'border-accent text-accent'
+                : 'text-ink-secondary hover:text-ink border-transparent'
+            }`}
+          >
+            {g.name}
+          </Link>
+        ))}
+        <Link
+          href="/tags?tab=fields"
+          className="text-ink-secondary hover:text-ink ml-auto px-3 py-2 text-xs"
+        >
+          タブを編集（友だち情報欄）
+        </Link>
       </div>
 
       {error && (
@@ -499,9 +546,11 @@ function FriendDetailInner() {
 
             {tab === 'info' && (
               <div className="bg-canvas rounded-card border-hairline border p-5">
-                {fields.length === 0 ? (
+                {inGroup.length === 0 ? (
                   <p className="text-ink-faint py-6 text-center text-sm">
-                    情報欄の項目がまだありません。
+                    {group === BASIC_GROUP
+                      ? '情報欄の項目がまだありません。'
+                      : 'この分類の項目はまだありません。'}
                     <Link
                       href={`/tags/fields/new?back=/friends/detail?id=${friendId}`}
                       className="text-accent ml-1 hover:underline"
@@ -511,7 +560,7 @@ function FriendDetailInner() {
                   </p>
                 ) : (
                   <>
-                    {[...starred, ...rest].map((field) => (
+                    {[...groupStarred, ...rest].map((field) => (
                       <div key={field.id} className="mb-4">
                         <label className="text-ink-secondary mb-1 block text-sm font-medium">
                           {field.isStarred && <span className="text-warning mr-1">★</span>}
