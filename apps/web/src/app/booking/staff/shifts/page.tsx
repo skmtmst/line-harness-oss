@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/header'
 import { bookingApi, type BookingShift, type BookingStaff } from '@/lib/api'
@@ -28,10 +29,20 @@ const DEFAULT_TEMPLATE: WeeklyTemplate = {
   sat: { start: '10:00', end: '19:00' },
 }
 
+/**
+ * 受付時間・カレンダー（設計 V2 8-2-3 / node uJ37b）。
+ *
+ * 以前は ?staff_id= が無いと何も出せず、「スタッフ一覧から選んでください」
+ * とだけ書いてあった。予約設定のタブからここへ来た人は、そこで詰まる。
+ * 設計どおり、画面の中でスタッフを選べるようにした。
+ */
 function StaffShiftsPageContent() {
   const sp = useSearchParams()
-  const staffId = sp.get('staff_id') ?? ''
   const { selectedAccountId } = useAccount()
+  /** URLで指定が無ければ、選んだ人を覚えておく。 */
+  const [pickedStaffId, setPickedStaffId] = useState('')
+  const staffId = sp.get('staff_id') || pickedStaffId
+  const [allStaff, setAllStaff] = useState<BookingStaff[]>([])
   const [staffMember, setStaffMember] = useState<BookingStaff | null>(null)
   const [shifts, setShifts] = useState<BookingShift[]>([])
   const [template, setTemplate] = useState<WeeklyTemplate>(DEFAULT_TEMPLATE)
@@ -44,6 +55,30 @@ function StaffShiftsPageContent() {
   const [savingCalendar, setSavingCalendar] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+
+  // スタッフの一覧は、誰も選ばれていないうちから要る。
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let alive = true
+    bookingApi
+      .listStaff(selectedAccountId)
+      .then((r) => {
+        if (!alive) return
+        setAllStaff(r.staff)
+        // 1人しかいなければ選ばせる意味が無い。そのまま開く。
+        if (!sp.get('staff_id') && !pickedStaffId && r.staff.length === 1) {
+          setPickedStaffId(r.staff[0].id)
+        }
+      })
+      .catch(() => {
+        // 一覧が出ないだけ。URLで指定して来た人はそのまま使える。
+      })
+    return () => {
+      alive = false
+    }
+    // pickedStaffId は初回だけ見る。選び直すたびに引き直す必要はない。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAccountId])
 
   const load = useCallback(async () => {
     if (!selectedAccountId || !staffId) return
@@ -134,10 +169,77 @@ function StaffShiftsPageContent() {
 
   return (
     <div>
-      <Header
-        title="受付時間・Googleカレンダー"
-        description={staffMember ? `「${staffMember.display_name}」の予約可能時間を自動管理` : '予約可能時間を自動管理'}
-      />
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+        <Link href="/booking/menus" className="hover:underline">
+          予約設定
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>受付時間</span>
+      </nav>
+
+      <div data-design="Head">
+        <Header
+          title="受付時間・カレンダー"
+          description="スタッフごとの受付時間を決めます。Googleカレンダーをつなぐと、そちらの予定が入っている時間は自動で受付を止めます。"
+        />
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <a
+            href="#special"
+            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
+          >
+            特別休業日を設定
+          </a>
+          <button
+            onClick={saveRules}
+            disabled={savingRules || !staffId}
+            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            {savingRules ? '保存中…' : '変更を保存'}
+          </button>
+        </div>
+      </div>
+
+      <div data-design="Picker" className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+        <p className="text-ink-faint mb-2 text-xs">受付時間を編集する人を選んでください。</p>
+        {allStaff.length === 0 ? (
+          <p className="text-ink-faint text-sm">
+            まだスタッフが登録されていません。
+            <Link href="/booking/staff/new" className="text-accent ml-1 hover:underline">
+              スタッフを登録する
+            </Link>
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {allStaff.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setPickedStaffId(s.id)}
+                className={`rounded-pill px-3 py-1.5 text-xs font-medium ${
+                  s.id === staffId
+                    ? 'bg-accent text-on-accent'
+                    : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
+                }`}
+              >
+                {s.display_name || s.name}
+                {s.is_designation_optional === 1 && (
+                  <span className="ml-1 opacity-70">指名なし</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        {staffMember && (
+          <p className="text-ink-faint mt-2 text-xs">
+            {staffMember.display_name || staffMember.name} の受付時間を編集しています。
+            {/* 「ほかのスタッフにコピー」は、上書き先を丸ごと置き換えるので
+                取り消せない。仕組みを入れる前に、何を上書きするかを
+                決める必要がある。v025-open-questions に残してある。 */}
+            <span className="ml-2 opacity-60">
+              まとめて反映（ほかのスタッフにコピー）は準備中です
+            </span>
+          </p>
+        )}
+      </div>
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
       {success && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">{success}</div>}
@@ -150,10 +252,31 @@ function StaffShiftsPageContent() {
         <div className="rounded-lg border border-gray-200 bg-white p-12 text-center text-sm text-gray-500">読み込み中…</div>
       ) : (
         <div className="space-y-4">
-          <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <section data-design="Week" className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-200 bg-gray-50 px-5 py-4">
-              <h2 className="font-semibold text-gray-900">毎週の受付時間</h2>
-              <p className="mt-1 text-sm text-gray-500">一度保存すれば、将来の日付にも自動で適用されます。週数や終了日はありません。</p>
+              <h2 className="font-semibold text-gray-900">
+                {staffMember ? `${staffMember.display_name || staffMember.name} の受付時間` : '受付時間'}
+              </h2>
+              <p className="mt-1 text-sm text-gray-500">毎週くり返します。一度保存すれば、将来の日付にも自動で適用されます。週数や終了日はありません。</p>
+              {/* 設計は30分きざみの升目で「受付可・休憩・予約済」を塗り分ける。
+                  休憩という考え方が availability_rules に無く、升目にすると
+                  持ち方から決める必要がある。いまは曜日ごとの開始と終了で受ける。
+                  v025-open-questions に残してある。 */}
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                <span>色の意味</span>
+                <span className="flex items-center gap-1">
+                  <span className="bg-success-bg inline-block h-3 w-3 rounded-sm" />
+                  受付可
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="bg-canvas-sunken inline-block h-3 w-3 rounded-sm" />
+                  受付なし
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="bg-warning-bg inline-block h-3 w-3 rounded-sm" />
+                  Googleカレンダーに予定あり
+                </span>
+              </div>
             </div>
             <div className="space-y-3 p-5">
               {DAYS.map((day) => {
@@ -231,12 +354,16 @@ function StaffShiftsPageContent() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <section
+            id="special"
+            data-design="Special"
+            className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+          >
             <div className="border-b border-gray-200 bg-gray-50 px-5 py-4">
-              <h2 className="font-semibold text-gray-900">日付別の応急枠 ({shifts.length}件)</h2>
-              <p className="mt-1 text-sm text-gray-500">以前に作成した枠です。同じ日付では毎週設定よりこちらを優先します。</p>
+              <h2 className="font-semibold text-gray-900">特別な休み・営業 ({shifts.length}件)</h2>
+              <p className="mt-1 text-sm text-gray-500">その日だけの受付時間です。同じ日付では毎週の設定よりこちらを優先します。</p>
             </div>
-            {shifts.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">応急枠はありません</div> : (
+            {shifts.length === 0 ? <div className="p-8 text-center text-sm text-gray-500">特別な休み・営業はまだありません</div> : (
               <div className="max-h-72 overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-white"><tr className="border-b"><th className="px-5 py-3 text-left">日付</th><th className="px-5 py-3 text-left">時間</th><th className="px-5 py-3 text-right">操作</th></tr></thead>
@@ -245,6 +372,16 @@ function StaffShiftsPageContent() {
               </div>
             )}
           </section>
+
+          <div data-design="note" className="bg-canvas-sunken rounded-card p-4">
+            <ul className="text-ink-secondary space-y-1.5 text-xs leading-5">
+              <li>
+                ・Googleカレンダーの予定は5分ごとに取り込みます。直前の予定は反映が間に合わないことがあります
+              </li>
+              <li>・受付時間を短くしても、すでに入っている予約は取り消されません</li>
+              <li>・「まとめて反映」は、上書き先の設定を置き換えます</li>
+            </ul>
+          </div>
         </div>
       )}
     </div>

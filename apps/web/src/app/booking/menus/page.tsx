@@ -1,14 +1,28 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
-import { api, bookingApi, type BookingMenu } from '@/lib/api'
+import {
+  api,
+  bookingApi,
+  type BookingMenu,
+  type BookingRequest,
+  type BookingStaff,
+} from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
-import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useMergedTab } from '@/components/layout/merged-tabs'
 import BookingStaffPage from '@/app/booking/staff/page'
+
+/**
+ * 予約設定（設計 V2 8-2 / node nFCBf）。
+ *
+ * 設計は1枚の画面をタブで切り替える形。メニューとスタッフはすでに
+ * ここに寄せてあったので、受付時間（8-2-3）とメニュー×スタッフ（8-2-4）
+ * への行き先をタブに並べた。別ページではあるが、探す場所は1か所になる。
+ */
 
 const EMPTY: Partial<BookingMenu> = {
   name: '',
@@ -24,8 +38,20 @@ const EMPTY: Partial<BookingMenu> = {
 
 const MERGED_TABS = [
   { key: 'menus', label: 'メニュー' },
-  { key: 'staff', label: 'スタッフ' },
+  { key: 'staff', label: '担当スタッフ' },
 ]
+
+/** JSTでの年月。今月の予約を数えるのに使う。 */
+function jstMonth(iso: string): string {
+  return new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 7)
+}
+
+function monthKey(offset: number): string {
+  const now = new Date(Date.now() + 9 * 3600_000)
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1))
+    .toISOString()
+    .slice(0, 7)
+}
 
 function MenusPageInner() {
   const { selectedAccountId, selectedAccount } = useAccount()
@@ -37,6 +63,11 @@ function MenusPageInner() {
   // 直近にコピーした行だけ「コピー済」が出る。
   const [copiedMenuId, setCopiedMenuId] = useState<string | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
+  const [staff, setStaff] = useState<BookingStaff[]>([])
+  /** メニューID → 担当できるスタッフの表示名。 */
+  const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
+  const [bookings, setBookings] = useState<BookingRequest[]>([])
+  const [query, setQuery] = useState('')
 
   const liffId = selectedAccount?.liffId ?? null
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -91,6 +122,46 @@ function MenusPageInner() {
     }
   }, [])
 
+  // スタッフ・割り当て・予約件数。表の右半分と上のKPIに要る。
+  // 割り当てはスタッフ単位でしか引けないので、人数ぶん引いて裏返す。
+  // 店のスタッフは数人なので、この回数で困ることはない。
+  useEffect(() => {
+    if (!selectedAccountId) return
+    let alive = true
+    void (async () => {
+      try {
+        const [staffRes, bookingRes] = await Promise.all([
+          bookingApi.listStaff(selectedAccountId),
+          bookingApi.listRequests(selectedAccountId, 'all'),
+        ])
+        if (!alive) return
+        setStaff(staffRes.staff)
+        setBookings(bookingRes.requests)
+
+        const map = new Map<string, string[]>()
+        await Promise.all(
+          staffRes.staff.map(async (s) => {
+            try {
+              const { matrix } = await bookingApi.getStaffMenus(selectedAccountId, s.id)
+              for (const row of matrix) {
+                if (!row.is_offered) continue
+                map.set(row.menu_id, [...(map.get(row.menu_id) ?? []), s.display_name || s.name])
+              }
+            } catch {
+              // 1人ぶん引けなくても、他の行は出せる。
+            }
+          }),
+        )
+        if (alive) setMenuStaff(map)
+      } catch {
+        // 付随情報が無いだけ。メニューの登録と編集はできる。
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [selectedAccountId])
+
   async function save(m: Partial<BookingMenu>) {
     if (!selectedAccountId) return
     if (m.id) {
@@ -109,21 +180,119 @@ function MenusPageInner() {
     await load()
   }
 
+  const thisMonth = monthKey(0)
+  const kpi = useMemo(() => {
+    const inThis = bookings.filter((b) => jstMonth(b.starts_at) === thisMonth).length
+    const inLast = bookings.filter((b) => jstMonth(b.starts_at) === monthKey(-1)).length
+    return { inThis, diff: inThis - inLast }
+  }, [bookings, thisMonth])
+
+  /** メニュー名 → 今月の予約件数。 */
+  const bookingCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const b of bookings) {
+      if (jstMonth(b.starts_at) !== thisMonth) continue
+      counts.set(b.menu_name, (counts.get(b.menu_name) ?? 0) + 1)
+    }
+    return counts
+  }, [bookings, thisMonth])
+
+  const shown = useMemo(() => {
+    const q = query.trim()
+    return q ? items.filter((m) => m.name.includes(q)) : items
+  }, [items, query])
+
   return (
     <div>
-      <Header
-        title="メニュー"
-        description="予約メニューの登録・編集"
-        action={
+      <div data-design="Head">
+        <Header
+          title="予約設定"
+          description="予約の受付内容をまとめて設定します。メニュー・担当スタッフ・受付時間を同じ画面のタブで切り替えます。"
+        />
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            disabled
+            title="操作マニュアルは準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+          >
+            マニュアル
+          </button>
+          <Link
+            href="/booking/staff/shifts"
+            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
+          >
+            受付時間をまとめて設定
+          </Link>
           <button
             onClick={() => setEditing(EMPTY)}
             disabled={!selectedAccountId}
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-50"
+            className="bg-accent text-on-accent rounded-control hover:bg-accent-hover px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
           >
-            + 新規メニュー
+            メニューを追加
           </button>
-        }
-      />
+        </div>
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Kpi
+          title="メニュー"
+          value={String(items.length)}
+          unit="件"
+          detail={`公開中 ${items.filter((m) => m.is_active).length}`}
+        />
+        <Kpi
+          title="担当スタッフ"
+          value={String(staff.length)}
+          unit="人"
+          detail={`稼働中 ${staff.filter((s) => s.is_active).length}`}
+        />
+        <Kpi
+          title="今月の予約"
+          value={String(kpi.inThis)}
+          unit="件"
+          detail={`前月比 ${kpi.diff >= 0 ? '+' : ''}${kpi.diff}`}
+        />
+        {/* 枠の稼働率は「公開している枠のうち何割が埋まったか」。
+            受付時間の総枠数を数える仕組みがまだ無いので出せない。 */}
+        <Kpi title="枠の稼働率" value="—" unit="%" detail="公開枠のうち" />
+      </div>
+
+      <div
+        data-design="Bar"
+        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+      >
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="メニュー名で検索"
+          aria-label="メニュー名で検索"
+          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <select
+          disabled
+          title="並び替えは準備中です"
+          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+        >
+          <option>予約が多い順</option>
+        </select>
+        <span className="text-ink-faint text-xs whitespace-nowrap">期間</span>
+        <select
+          disabled
+          title="期間の切り替えは準備中です"
+          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+        >
+          <option>今月</option>
+        </select>
+        <button
+          disabled
+          title="書き出しは準備中です"
+          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+        >
+          CSVで書き出す
+        </button>
+      </div>
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -139,66 +308,72 @@ function MenusPageInner() {
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
           読み込み中…
         </div>
-      ) : items.length === 0 ? (
+      ) : shown.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
-          まだメニューがありません。右上の「+ 新規メニュー」から追加してください。
+          {query
+            ? '検索に合うメニューはありません。'
+            : 'まだメニューがありません。上の「メニューを追加」から登録してください。'}
         </div>
       ) : (
-        <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
+        <div
+          data-design="Table"
+          className="bg-canvas rounded-card border border-hairline overflow-hidden"
+        >
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="w-full min-w-[880px]">
               <thead>
                 <tr className="bg-canvas-sunken border-b border-hairline">
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">カテゴリ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">所要</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">料金</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">並び順</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-ink-faint uppercase">有効</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint uppercase">操作</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">メニュー名</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">所要時間</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">料金</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">担当できるスタッフ</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">今月の予約</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">予約URL</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {items.map((m) => (
+                {shown.map((m) => (
                   <tr key={m.id} className="hover:bg-canvas-sunken">
-                    <td className="px-4 py-3 text-sm font-medium">{m.name}</td>
-                    <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {m.category_label ? (
-                        <span className="inline-block px-2 py-0.5 rounded bg-canvas-sunken text-xs">{m.category_label}</span>
-                      ) : (
-                        '-'
+                    <td className="px-4 py-3 text-sm font-medium">
+                      {m.name}
+                      {m.category_label && (
+                        <span className="bg-canvas-sunken text-ink-faint ml-2 inline-block rounded px-2 py-0.5 text-xs">
+                          {m.category_label}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
-                      {m.duration_minutes}分
+                      {m.duration_minutes} 分
                       {m.buffer_after_minutes > 0 && (
                         <span className="text-xs text-ink-faint ml-1">+{m.buffer_after_minutes}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm text-right tabular-nums">¥{m.base_price.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm text-right tabular-nums text-ink-faint">{m.sort_order}</td>
-                    <td className="px-4 py-3 text-center">
-                      {m.is_active ? (
-                        <span className="inline-block px-2 py-0.5 rounded bg-success-bg text-success text-xs">ON</span>
+                    <td className="px-4 py-3 text-sm text-ink-secondary">
+                      {(menuStaff.get(m.id) ?? []).length === 0 ? (
+                        // 担当が0人だと、公開していても予約フォームに枠が出ない。
+                        // 「-」だと設定漏れなのか読み取れないので、はっきり書く。
+                        <span className="text-warning text-xs">担当なし</span>
                       ) : (
-                        <span className="inline-block px-2 py-0.5 rounded bg-canvas-sunken text-ink-faint text-xs">OFF</span>
+                        <span className="text-xs">{(menuStaff.get(m.id) ?? []).join('・')}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right text-sm tabular-nums">
+                      {bookingCounts.get(m.name) ?? 0} 件
+                    </td>
+                    <td className="px-4 py-3 text-sm">
                       <div className="inline-flex gap-2 text-xs">
-                        <button onClick={() => setEditing(m)} className="text-blue-600 hover:underline">編集</button>
-                        <Link href={`/booking/menus/staff?menu_id=${m.id}`} className="text-blue-600 hover:underline">
-                          スタッフ割当
-                        </Link>
                         {!liffId ? (
-                          <span className="text-gray-300" title="LIFF ID 未設定">専用URL</span>
+                          <span className="text-gray-300" title="LIFF ID 未設定">コピー</span>
                         ) : !m.is_active ? (
                           // is_active=0 のメニューは /api/liff/booking/menus が
                           // 返さないので、URL を送っても LIFF は解決失敗して
                           // 通常のメニュー一覧に fallback する。間違って「指定メニュー
                           // 直通」のつもりで送って別メニュー予約されるのを防ぐため、
                           // 有効化されるまでコピー不可にする。
-                          <span className="text-gray-300" title="メニューを有効化するとコピーできます">専用URL</span>
+                          <span className="text-gray-300" title="メニューを有効化するとコピーできます">コピー</span>
                         ) : (
                           <button
                             type="button"
@@ -206,10 +381,36 @@ function MenusPageInner() {
                             className="text-blue-600 hover:underline"
                             title={`${workerBase}/o?liffId=${encodeURIComponent(liffId)}&page=salon-book&menu_id=${encodeURIComponent(m.id)}`}
                           >
-                            {copiedMenuId === m.id ? '✓ コピー済' : '専用URL'}
+                            {copiedMenuId === m.id ? '✓ コピー済' : 'コピー'}
                           </button>
                         )}
-                        <button onClick={() => remove(m.id)} className="text-red-600 hover:underline">削除</button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {m.is_active ? (
+                        <span className="bg-success-bg text-success rounded-pill inline-block px-2 py-0.5 text-xs">
+                          公開中
+                        </span>
+                      ) : (
+                        <span className="bg-canvas-sunken text-ink-faint rounded-pill inline-block px-2 py-0.5 text-xs">
+                          非公開
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex gap-2 text-xs">
+                        <button onClick={() => setEditing(m)} className="text-blue-600 hover:underline">
+                          編集
+                        </button>
+                        <Link
+                          href={`/booking/menus/staff?menu_id=${m.id}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          スタッフ割当
+                        </Link>
+                        <button onClick={() => remove(m.id)} className="text-red-600 hover:underline">
+                          削除
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -220,7 +421,40 @@ function MenusPageInner() {
         </div>
       )}
 
+      <div data-design="note" className="bg-canvas-sunken rounded-card mt-3 p-3">
+        <p className="text-ink-secondary text-xs leading-5">
+          旧デザインでは「メニュー」と「スタッフ」が別ページに分かれていました。どちらも予約枠を決める設定なので、担当の割り当てを1画面で完結できるようにまとめています。
+        </p>
+      </div>
+
+      <div className="mt-3">
+        <span className="text-ink-faint text-xs">全 {shown.length} 件</span>
+      </div>
+
       {editing && <Modal menu={editing} tags={tags} onSave={save} onClose={() => setEditing(null)} />}
+    </div>
+  )
+}
+
+function Kpi({
+  title,
+  value,
+  unit,
+  detail,
+}: {
+  title: string
+  value: string
+  unit: string
+  detail: string
+}) {
+  return (
+    <div className="bg-canvas rounded-card border-hairline border p-4">
+      <p className="text-ink-faint text-xs">{title}</p>
+      <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
+        {value}
+        <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
+      </p>
+      <p className="text-ink-faint mt-1 text-xs">{detail}</p>
     </div>
   )
 }
@@ -480,7 +714,44 @@ function MenusPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   return (
     <div>
-      <MergedTabs basePath="/booking/menus" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      {/* 設計の4タブ。前の2つはこの画面の中で切り替わり、
+          受付時間は 8-2-3、予約フォームはまだ画面が無い。
+          MergedTabs は「同じ画面の中で切り替わるもの」しか扱えないので
+          ここは手で並べている。 */}
+      <div data-design="Tabs" className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
+        <Link
+          href="/booking/menus?tab=menus"
+          className={`rounded-t-md px-4 py-2 text-sm ${
+            tab === 'menus'
+              ? 'border-accent text-ink border-b-2 font-medium'
+              : 'text-ink-faint hover:text-ink-secondary'
+          }`}
+        >
+          メニュー
+        </Link>
+        <Link
+          href="/booking/menus?tab=staff"
+          className={`rounded-t-md px-4 py-2 text-sm ${
+            tab === 'staff'
+              ? 'border-accent text-ink border-b-2 font-medium'
+              : 'text-ink-faint hover:text-ink-secondary'
+          }`}
+        >
+          担当スタッフ
+        </Link>
+        <Link
+          href="/booking/staff/shifts"
+          className="text-ink-faint hover:text-ink-secondary rounded-t-md px-4 py-2 text-sm"
+        >
+          受付時間
+        </Link>
+        <span
+          title="予約フォームの見た目を変える画面は準備中です"
+          className="text-ink-faint rounded-t-md px-4 py-2 text-sm opacity-50"
+        >
+          予約フォーム
+        </span>
+      </div>
       {tab === 'menus' && <MenusPageInner />}
       {tab === 'staff' && <BookingStaffPage />}
     </div>

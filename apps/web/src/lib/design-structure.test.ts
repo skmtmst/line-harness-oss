@@ -80,7 +80,10 @@ describe('画面の骨格が設計と一致する', () => {
   });
 
   it.each(SCREENS)('%s（%s）', (route, spec) => {
-    const markers = designMarkers(readScreen(route));
+    // 骨組みを共通の部品に出している画面がある（作成画面の Crumb / Head /
+    // Body / Left / Right は create-page.tsx にある）。page.tsx だけ見ると
+    // 「印が付いていない」ことになるので、読み込んでいる部品も一緒に見る。
+    const markers = designMarkers(readWithParts(route));
     const expected = [...spec.sections].sort();
     expect(
       markers,
