@@ -418,6 +418,7 @@ function CrossTab() {
   const [fieldId, setFieldId] = useState('')
   const [cells, setCells] = useState<Array<{ row: string; col: string; count: number }>>([])
   const [loading, setLoading] = useState(false)
+  const [picked, setPicked] = useState<{ row: string; col: string; count: number } | null>(null)
 
   useEffect(() => {
     void api.friendFields.list().then((res) => {
@@ -431,6 +432,7 @@ function CrossTab() {
   useEffect(() => {
     if (!fieldId) return
     setLoading(true)
+    setPicked(null)
     void api.analytics
       .cross(fieldId)
       .then((res) => {
@@ -443,9 +445,70 @@ function CrossTab() {
   const cols = useMemo(() => [...new Set(cells.map((c) => c.col))], [cells])
   const lookup = useMemo(() => {
     const map = new Map<string, number>()
-    for (const c of cells) map.set(`${c.row} ${c.col}`, c.count)
+    for (const c of cells) map.set(`${c.row} ${c.col}`, c.count)
     return map
   }, [cells])
+
+  const fieldName = fields.find((f) => f.id === fieldId)?.name ?? '友だち情報'
+
+  const summary = useMemo(() => {
+    if (cells.length === 0) return null
+    const top = cells.reduce((best, c) => (c.count > best.count ? c : best), cells[0])
+    // 行×列のうち、1人もいない組み合わせ。表に穴が多いなら、その掛け合わせは
+    // 見ても仕方がない、と分かる。
+    const empty = rows.length * cols.length - cells.filter((c) => c.count > 0).length
+    const max = top.count
+    return { top, empty, max }
+  }, [cells, rows.length, cols.length])
+
+  // 合計は延べ人数。1人が複数のタグを持つと、その人は行ごとに数えられる。
+  const rowTotals = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of cells) m.set(c.row, (m.get(c.row) ?? 0) + c.count)
+    return m
+  }, [cells])
+  const colTotals = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const c of cells) m.set(c.col, (m.get(c.col) ?? 0) + c.count)
+    return m
+  }, [cells])
+  const grandTotal = useMemo(() => cells.reduce((sum, c) => sum + c.count, 0), [cells])
+
+  /**
+   * 表から機械的に読めることだけを出す。
+   *
+   * 設計は「犬向けの食事案内が要りそうです」のような提案まで書いているが、
+   * それは商品や運用を知らないと書けない。ここで作り話をすると、根拠の無い
+   * 提案が数字と同じ重みで並ぶ。割合の事実だけに留める。
+   */
+  const readings = useMemo(() => {
+    if (!summary || cells.length === 0) return []
+    const out: string[] = []
+    const topRowTotal = rowTotals.get(summary.top.row) ?? 0
+    if (topRowTotal > 0) {
+      const pct = Math.round((summary.top.count / topRowTotal) * 100)
+      out.push(`「${summary.top.row}」の ${pct}% が「${summary.top.col}」です`)
+      // 同じ列で、ほかの行の割合と比べる。差があるほど、その掛け合わせに
+      // 意味がある可能性が高い。
+      const others = rows
+        .filter((r) => r !== summary.top.row)
+        .map((r) => {
+          const total = rowTotals.get(r) ?? 0
+          const n = lookup.get(`${r} ${summary.top.col}`) ?? 0
+          return { row: r, pct: total > 0 ? (n / total) * 100 : 0 }
+        })
+        .sort((a, b) => b.pct - a.pct)
+      if (others.length > 0 && others[0].pct > 0) {
+        out.push(
+          `同じ「${summary.top.col}」でも、「${others[0].row}」は ${Math.round(others[0].pct)}% です`,
+        )
+      }
+    }
+    if (summary.empty > 0) {
+      out.push(`${summary.empty}個のマスに該当者がいません。掛け合わせが細かすぎるかもしれません`)
+    }
+    return out
+  }, [summary, cells.length, rowTotals, rows, lookup])
 
   if (fields.length === 0) {
     return (
@@ -460,22 +523,68 @@ function CrossTab() {
 
   return (
     <div>
-      <div className="mb-4">
-        <label htmlFor="cross-field" className="text-ink-secondary mb-1 block text-sm font-medium">
-          タグ × この項目の値
-        </label>
-        <select
-          id="cross-field"
-          value={fieldId}
-          onChange={(e) => setFieldId(e.target.value)}
-          className="border-hairline rounded-control border px-3 py-2 text-sm"
-        >
-          {fields.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
+      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
+        タグや友だち情報を掛け合わせて、友だちが何人いるかを表にします。数字を押すとその人たちを抽出でき、そのまま配信できます。
+      </p>
+
+      <section className="bg-canvas rounded-card border-hairline mb-4 border p-4">
+        <h3 className="text-ink mb-3 text-sm font-semibold">何を掛け合わせるか</h3>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="text-ink-secondary mb-1 block text-xs font-medium">たての軸</label>
+            {/* 行はタグ固定。集計のSQLが tags を起点にしている。 */}
+            <select disabled className="border-hairline rounded-control w-full border px-3 py-2 text-sm opacity-50">
+              <option>タグ</option>
+            </select>
+          </div>
+          <div>
+            <label htmlFor="cross-field" className="text-ink-secondary mb-1 block text-xs font-medium">
+              よこの軸
+            </label>
+            <select
+              id="cross-field"
+              value={fieldId}
+              onChange={(e) => setFieldId(e.target.value)}
+              className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+            >
+              {fields.map((f) => (
+                <option key={f.id} value={f.id}>
+                  友だち情報 / {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-ink-secondary mb-1 block text-xs font-medium">さらに絞る</label>
+            <select disabled className="border-hairline rounded-control w-full border px-3 py-2 text-sm opacity-50">
+              <option>絞り込みは準備中です</option>
+            </select>
+          </div>
+        </div>
+        <p className="text-ink-faint mt-2 text-xs">
+          よこの軸を選ぶと、そのまま集計します。「集計する」を押す必要はありません。
+        </p>
+      </section>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {/* 表の合計は延べ人数で、実際の人数とは違う。人数として出すと嘘になる。 */}
+        <KpiCard title="集計対象" value={null} unit="人" detail="延べ数しか出せません" />
+        <KpiCard
+          title="いちばん多い組み合わせ"
+          value={summary?.top.count ?? null}
+          unit="人"
+          detail={summary ? `${summary.top.row} × ${summary.top.col}` : '—'}
+          loading={loading}
+        />
+        <KpiCard
+          title="空のマス"
+          value={summary?.empty ?? null}
+          unit="個"
+          detail="該当者なし"
+          loading={loading}
+        />
+        {/* その項目に値が入っていない人は、集計のSQLが数えていない。 */}
+        <KpiCard title="未入力" value={null} unit="人" detail={`${fieldName}が未記録`} />
       </div>
 
       {loading ? (
@@ -487,49 +596,132 @@ function CrossTab() {
           この項目に値が入っている人がいません。
         </div>
       ) : (
-        <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-          <table className="w-full min-w-[600px]">
-            <thead>
-              <tr className="bg-canvas-sunken border-hairline border-b">
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  タグ
-                </th>
-                {cols.map((col) => (
-                  <th
-                    key={col}
-                    className="text-ink-faint px-4 py-3 text-right text-xs font-semibold"
-                  >
-                    {col}
+        <>
+          <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+            <table className="w-full min-w-[600px]">
+              <thead>
+                <tr className="bg-canvas-sunken border-hairline border-b">
+                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                    タグ ＼ {fieldName}
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {rows.map((row) => (
-                <tr key={row} className="hover:bg-canvas-sunken">
-                  <td className="text-ink px-4 py-3 text-sm font-medium">{row}</td>
-                  {cols.map((col) => {
-                    const n = lookup.get(`${row} ${col}`) ?? 0
-                    return (
-                      <td
-                        key={col}
-                        className={`px-4 py-3 text-right text-sm tabular-nums ${
-                          n === 0 ? 'text-ink-faint' : 'text-ink-secondary'
-                        }`}
-                      >
-                        {n === 0 ? '—' : n.toLocaleString('ja-JP')}
-                      </td>
-                    )
-                  })}
+                  {cols.map((col) => (
+                    <th key={col} className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">
+                      {col}
+                    </th>
+                  ))}
+                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">合計</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-hairline divide-y">
+                {rows.map((row) => (
+                  <tr key={row} className="hover:bg-canvas-sunken">
+                    <td className="text-ink px-4 py-3 text-sm font-medium">{row}</td>
+                    {cols.map((col) => {
+                      const n = lookup.get(`${row} ${col}`) ?? 0
+                      const active = picked?.row === row && picked?.col === col
+                      // 濃さはその表の最大を基準にする。表ごとに数の桁が違うので、
+                      // 絶対値で色を決めると、少ない表が全部薄くなる。
+                      const strength = summary && summary.max > 0 ? n / summary.max : 0
+                      return (
+                        <td key={col} className="p-0 text-right">
+                          <button
+                            onClick={() => setPicked(n > 0 ? { row, col, count: n } : null)}
+                            disabled={n === 0}
+                            className={`w-full px-4 py-3 text-right text-sm tabular-nums transition-colors ${
+                              n === 0 ? 'text-ink-faint' : 'text-ink-secondary hover:bg-accent-bg'
+                            } ${active ? 'ring-accent ring-2 ring-inset' : ''}`}
+                            style={
+                              n > 0
+                                ? { backgroundColor: `rgb(var(--accent-rgb, 37 99 235) / ${0.04 + strength * 0.18})` }
+                                : undefined
+                            }
+                          >
+                            {n === 0 ? '—' : n.toLocaleString('ja-JP')}
+                          </button>
+                        </td>
+                      )
+                    })}
+                    <td className="text-ink px-4 py-3 text-right text-sm font-medium tabular-nums">
+                      {(rowTotals.get(row) ?? 0).toLocaleString('ja-JP')}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="bg-canvas-sunken">
+                  <td className="text-ink-secondary px-4 py-3 text-sm font-medium">合計</td>
+                  {cols.map((col) => (
+                    <td key={col} className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                      {(colTotals.get(col) ?? 0).toLocaleString('ja-JP')}
+                    </td>
+                  ))}
+                  <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+                    {grandTotal.toLocaleString('ja-JP')}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+            {picked ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-ink text-sm">
+                  「{picked.row} × {picked.col}」の {picked.count}人 を選択中
+                </p>
+                <div className="flex gap-2">
+                  <Link
+                    href={`/friends?tag=${encodeURIComponent(picked.row)}`}
+                    className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
+                  >
+                    友だち一覧で見る
+                  </Link>
+                  {/* 掛け合わせた条件をそのまま配信の宛先にする口が無い。
+                      タグだけで送ると、選んだマスより広い相手に届く。 */}
+                  <button
+                    disabled
+                    title="この条件のまま配信する仕組みは準備中です"
+                    className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs font-medium opacity-50"
+                  >
+                    この人たちに配信する
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-ink-faint text-xs">マスを押すと、その人たちを抽出できます</p>
+            )}
+          </div>
+
+          {readings.length > 0 && (
+            <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="text-ink text-sm font-semibold">この表から読めること</h3>
+                <button
+                  disabled
+                  title="条件の保存は準備中です"
+                  className="border-hairline text-ink-faint rounded-control shrink-0 border px-2 py-1 text-xs opacity-50"
+                >
+                  この条件を保存
+                </button>
+              </div>
+              <ul className="text-ink-secondary mt-2 space-y-1.5 text-xs leading-relaxed">
+                {readings.map((r) => (
+                  <li key={r}>・{r}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+            <h3 className="text-ink text-sm font-semibold">見かたの注意</h3>
+            <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
+              <li>
+                ・1人が複数のタグを持つ場合、それぞれの行に数えられます。合計が友だち数と一致しないことがあります
+              </li>
+              <li>・「未記録」は、その項目にまだ値が入っていない人です。いまは表に出ません</li>
+              <li>・マスの色は、その表の中でいちばん多い数を基準にした濃さです</li>
+            </ul>
+          </section>
+        </>
       )}
-      <p className="text-ink-faint mt-3 text-xs">
-        値が入っている人だけを数えます。空欄の人は表に出ません。
-      </p>
     </div>
   )
 }
