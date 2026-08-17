@@ -341,74 +341,277 @@ function MessagesTab() {
   )
 }
 
+type ClickFilter = 'all' | 'active' | 'zero'
+
 function ClicksTab() {
   const [days, setDays] = useState(28)
   const [rows, setRows] = useState<
-    Array<{ trackedLinkId: string; name: string; clicks: number; uniqueFriends: number }>
+    Array<{
+      trackedLinkId: string
+      name: string
+      originalUrl: string
+      shortCode: string | null
+      tagName: string | null
+      scenarioName: string | null
+      isActive: boolean
+      clicks: number
+      uniqueFriends: number
+    }>
   >([])
   const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<ClickFilter>('all')
+  const [query, setQuery] = useState('')
+  const [picked, setPicked] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
+    setPicked(null)
     void api.analytics
-      .linkClicks(rangeFor(days))
+      .trackedLinks(rangeFor(days))
       .then((res) => {
         if (res.success) setRows(res.data)
       })
       .finally(() => setLoading(false))
   }, [days])
 
+  const counts = useMemo(
+    () => ({
+      all: rows.length,
+      active: rows.filter((r) => r.isActive).length,
+      zero: rows.filter((r) => r.clicks === 0).length,
+    }),
+    [rows],
+  )
+
+  const totals = useMemo(
+    () => ({
+      clicks: rows.reduce((sum, r) => sum + r.clicks, 0),
+      friends: rows.reduce((sum, r) => sum + r.uniqueFriends, 0),
+      top: rows.reduce<(typeof rows)[number] | null>(
+        (best, r) => (best === null || r.clicks > best.clicks ? r : best),
+        null,
+      ),
+    }),
+    [rows],
+  )
+
+  const shown = useMemo(() => {
+    const q = query.trim()
+    return rows
+      .filter((r) => (filter === 'active' ? r.isActive : filter === 'zero' ? r.clicks === 0 : true))
+      .filter((r) => (q ? r.name.includes(q) || r.originalUrl.includes(q) : true))
+  }, [rows, filter, query])
+
+  const pickedRow = rows.find((r) => r.trackedLinkId === picked) ?? null
+  const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
+
   return (
     <div>
-      <RangePicker days={days} onChange={setDays} />
-      <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-        <table className="w-full min-w-[600px]">
+      <p className="text-ink-faint mb-4 text-xs leading-relaxed">
+        配信に入れたリンクが何回押されたかを測ります。押した人が分かるので、押した人だけに次の案内を送るといった使い方ができます。
+      </p>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <KpiCard
+          title="測定中のURL"
+          value={counts.all}
+          unit="件"
+          detail={`使用中 ${counts.active}`}
+          loading={loading}
+        />
+        <KpiCard
+          title="今月のクリック"
+          value={totals.clicks}
+          unit="回"
+          detail={`実人数 ${totals.friends}`}
+          loading={loading}
+        />
+        {/* クリック率には「そのURLを含む配信が届いた人数」が要る。配信と
+            リンクを結ぶ記録が無いので、リンク単位では出せない。 */}
+        <KpiCard title="平均クリック率" value={null} unit="%" detail="届いた数に対して" />
+        <KpiCard
+          title="いちばん押された"
+          value={totals.top?.clicks ?? null}
+          unit="回"
+          detail={totals.top?.name ?? '—'}
+          loading={loading}
+        />
+        {/* 作ったのに1回も押されていないURL。配信に入れ忘れているか、
+            入れても見られていないかを分けて考える手がかりになる。 */}
+        <KpiCard
+          title="0回のURL"
+          value={counts.zero}
+          unit="件"
+          detail="見直しを推奨"
+          loading={loading}
+        />
+      </div>
+
+      <div
+        data-design="Bar"
+        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+      >
+        {(
+          [
+            { key: 'all' as const, label: `すべて ${counts.all}` },
+            { key: 'active' as const, label: `使用中 ${counts.active}` },
+            { key: 'zero' as const, label: `0回 ${counts.zero}` },
+          ]
+        ).map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            aria-pressed={filter === f.key}
+            className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
+              filter === f.key
+                ? 'border-accent bg-accent-bg text-ink'
+                : 'border-hairline text-ink-faint hover:bg-canvas-sunken'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="URL名で検索"
+          aria-label="URL名で検索"
+          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+        <RangePicker days={days} onChange={setDays} />
+        <button
+          disabled
+          title="書き出しは準備中です"
+          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+        >
+          CSVで書き出す
+        </button>
+        {/* 短縮URLはテンプレートの編集で自動的に作られる。手で登録する
+            専用の画面はまだ無いので、押せる先が無い。 */}
+        <button
+          disabled
+          title="URLの手動登録は準備中です。短縮URLはテンプレート編集で自動的に作られます"
+          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+        >
+          URLを登録
+        </button>
+      </div>
+
+      <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+        <table className="w-full min-w-[880px]">
           <thead>
             <tr className="bg-canvas-sunken border-hairline border-b">
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                リンク
-              </th>
-              <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold uppercase">
-                クリック
-              </th>
-              <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold uppercase">
-                踏んだ人
-              </th>
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">URLの名前</th>
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">リンク先</th>
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">短縮URL</th>
+              <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">クリック</th>
+              <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">クリック率</th>
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">使われている配信</th>
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">押されたときの動作</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-hairline divide-y">
             {loading ? (
               <tr>
-                <td colSpan={3} className="text-ink-faint px-4 py-8 text-center text-sm">
+                <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
                   読み込み中...
                 </td>
               </tr>
-            ) : rows.length === 0 ? (
+            ) : shown.length === 0 ? (
               <tr>
-                <td colSpan={3} className="text-ink-faint px-4 py-8 text-center text-sm">
-                  この期間のクリックはありません。
+                <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
+                  {query || filter !== 'all'
+                    ? '条件に合うURLはありません。'
+                    : 'まだ測定中のURLがありません。'}
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
-                <tr key={r.trackedLinkId} className="hover:bg-canvas-sunken">
-                  <td className="text-ink px-4 py-3 text-sm">{r.name}</td>
-                  <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                    {r.clicks.toLocaleString('ja-JP')}
-                  </td>
-                  <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                    {r.uniqueFriends.toLocaleString('ja-JP')}
-                  </td>
-                </tr>
-              ))
+              shown.map((r) => {
+                const actions: string[] = []
+                if (r.tagName) actions.push('タグ付与')
+                if (r.scenarioName) actions.push('シナリオ開始')
+                return (
+                  <tr
+                    key={r.trackedLinkId}
+                    onClick={() => setPicked(r.clicks > 0 ? r.trackedLinkId : null)}
+                    className={`hover:bg-canvas-sunken ${r.clicks > 0 ? 'cursor-pointer' : ''} ${
+                      picked === r.trackedLinkId ? 'bg-accent-bg' : ''
+                    }`}
+                  >
+                    <td className="text-ink px-4 py-3 text-sm font-medium">
+                      {r.name}
+                      {!r.isActive && (
+                        <span className="bg-canvas-sunken text-ink-faint rounded-pill ml-2 px-2 py-0.5 text-[11px]">
+                          停止中
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-ink-secondary max-w-[16rem] truncate px-4 py-3 text-sm">
+                      {r.originalUrl}
+                    </td>
+                    <td className="text-ink-secondary px-4 py-3 font-mono text-xs">
+                      {r.shortCode ? `${workerBase}/t/${r.shortCode}` : '（未発行）'}
+                    </td>
+                    <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
+                      {r.clicks.toLocaleString('ja-JP')}
+                      {r.clicks > 0 && (
+                        <span className="text-ink-faint ml-1 text-xs">/ {r.uniqueFriends}人</span>
+                      )}
+                    </td>
+                    {/* 配信が届いた人数が分からないので割合を出せない。 */}
+                    <td className="text-ink-faint px-4 py-3 text-right text-sm">—</td>
+                    {/* どの配信に入っているかを辿る記録が無い（判断待ち 16-2 と同じ）。 */}
+                    <td className="text-ink-faint px-4 py-3 text-sm">—</td>
+                    <td className="text-ink-secondary px-4 py-3 text-sm">
+                      {actions.length > 0 ? actions.join(' ・ ') : '—'}
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>
       </div>
-      <p className="text-ink-faint mt-3 text-xs">
-        LINEの外から踏まれたクリックは、誰が踏んだか分かりません。
-        「クリック」には数えますが「踏んだ人」には入りません。
+
+      <div className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+        {pickedRow ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-ink text-sm">
+              「{pickedRow.name}」を押した人 {pickedRow.uniqueFriends} 人
+            </p>
+            {/* 押した人を配信の宛先にする仕組みが無い。タグが付く設定なら
+                そのタグで絞れるが、付かないリンクでは辿れない。 */}
+            <button
+              disabled
+              title="押した人を宛先にする仕組みは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs font-medium opacity-50"
+            >
+              この人たちに配信する
+            </button>
+          </div>
+        ) : (
+          <p className="text-ink-faint text-xs">
+            押した人／押していない人を、そのまま配信の絞り込み条件に使えます。「押したのに回答していない人」への追いかけにも使えます。
+          </p>
+        )}
+      </div>
+
+      <p className="text-ink-faint mt-3 text-xs leading-relaxed">
+        クリック率は「そのURLを含む配信が届いた人数」に対する割合です。同じ人が複数回押しても、実人数は1として数えます。
       </p>
+
+      <section className="bg-canvas rounded-card border-hairline mt-3 border p-4">
+        <h3 className="text-ink text-sm font-semibold">気をつけること</h3>
+        <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
+          <li>・短縮URLはテンプレート編集で自動的に作られます。手で登録することもできます</li>
+          <li>・LINEのプレビュー生成で1回カウントされることがあります。実人数のほうが正確です</li>
+          <li>・URLを変更すると、それまでのクリック数は前のリンク先の記録として残ります</li>
+          <li>
+            ・LINEの外から踏まれたクリックは、誰が踏んだか分かりません。「クリック」には数えますが実人数には入りません
+          </li>
+        </ul>
+      </section>
     </div>
   )
 }

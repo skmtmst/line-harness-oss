@@ -119,6 +119,83 @@ export async function getLinkClickSummary(
   }));
 }
 
+export interface TrackedLinkStat {
+  trackedLinkId: string;
+  name: string;
+  /** 飛び先。tracked_links.original_url */
+  originalUrl: string;
+  /** 短縮URLの末尾。未発行なら null */
+  shortCode: string | null;
+  /** 押されたときに付くタグの名前。無ければ null */
+  tagName: string | null;
+  /** 押されたときに始まるシナリオの名前。無ければ null */
+  scenarioName: string | null;
+  isActive: boolean;
+  clicks: number;
+  uniqueFriends: number;
+}
+
+/**
+ * 測定中のURLと、その期間のクリック数。
+ *
+ * `getLinkClickSummary` と違い、**1回も押されていないURLも返す**。
+ * 「作ったのに誰にも押されていない」ことが分からないと、配信に入れ忘れた
+ * のか、押されないのかを区別できない。
+ *
+ * 代わりに、消えた tracked_link に対するクリックはここには出ない。
+ * そちらは `getLinkClickSummary` が拾う。
+ */
+export async function getTrackedLinkStats(
+  db: D1Database,
+  range: DateRange,
+  limit = 200,
+): Promise<TrackedLinkStat[]> {
+  const result = await db
+    .prepare(
+      `SELECT l.id AS tracked_link_id,
+              l.name AS name,
+              l.original_url AS original_url,
+              l.short_code AS short_code,
+              t.name AS tag_name,
+              s.name AS scenario_name,
+              l.is_active AS is_active,
+              COUNT(c.id) AS clicks,
+              COUNT(DISTINCT c.friend_id) AS unique_friends
+         FROM tracked_links l
+         LEFT JOIN link_clicks c
+                ON c.tracked_link_id = l.id
+               AND c.clicked_at >= ? AND c.clicked_at <= ?
+         LEFT JOIN tags t ON t.id = l.tag_id
+         LEFT JOIN scenarios s ON s.id = l.scenario_id
+        GROUP BY l.id
+        ORDER BY clicks DESC, l.name ASC
+        LIMIT ?`,
+    )
+    .bind(range.from, range.to, limit)
+    .all<{
+      tracked_link_id: string;
+      name: string;
+      original_url: string;
+      short_code: string | null;
+      tag_name: string | null;
+      scenario_name: string | null;
+      is_active: number;
+      clicks: number;
+      unique_friends: number;
+    }>();
+  return result.results.map((r) => ({
+    trackedLinkId: r.tracked_link_id,
+    name: r.name,
+    originalUrl: r.original_url,
+    shortCode: r.short_code,
+    tagName: r.tag_name,
+    scenarioName: r.scenario_name,
+    isActive: r.is_active === 1,
+    clicks: Number(r.clicks ?? 0),
+    uniqueFriends: Number(r.unique_friends ?? 0),
+  }));
+}
+
 export interface BroadcastSummary {
   broadcastId: string;
   name: string;

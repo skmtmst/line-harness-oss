@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   getDailyMessageCounts,
   getLinkClickSummary,
+  getTrackedLinkStats,
   getBroadcastSummary,
   getTagFieldCross,
   buildFunnelResult,
@@ -77,6 +78,20 @@ analytics.get('/api/analytics/messages', async (c) => {
     return c.json({ success: true, data: items });
   } catch (err) {
     console.error('GET /api/analytics/messages error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/analytics/tracked-links — 測定中のURLと、その期間のクリック
+// link-clicks と違い、1回も押されていないURLも返す。
+analytics.get('/api/analytics/tracked-links', async (c) => {
+  try {
+    const range = readRange(c);
+    if (!range.ok) return c.json({ success: false, error: range.error }, 400);
+    const items = await getTrackedLinkStats(c.env.DB, range.value);
+    return c.json({ success: true, data: items });
+  } catch (err) {
+    console.error('GET /api/analytics/tracked-links error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
