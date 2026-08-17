@@ -70,6 +70,20 @@ function readWithParts(route: string): string {
       }
     }
   }
+  // 画面の中身を同じフォルダのファイルに出していることがある
+  // （scenarios/detail は page.tsx が薄く、実体は scenario-detail-client.tsx）。
+  // 相対 import も1段だけ辿る。
+  const dir = route === '/' ? APP : join(APP, route);
+  for (const m of source.matchAll(/from '\.\/([^']+)'/g)) {
+    for (const ext of ['.tsx', '.ts']) {
+      try {
+        combined += readFileSync(join(dir, m[1] + ext), 'utf8');
+        break;
+      } catch {
+        // その名前のファイルが無いだけ。次の拡張子を試す。
+      }
+    }
+  }
   return combined;
 }
 
