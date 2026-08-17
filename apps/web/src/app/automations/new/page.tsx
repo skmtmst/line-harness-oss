@@ -36,7 +36,7 @@ export default function NewAutomationPage() {
   return (
     <CreatePage
       title="ルールを作る"
-      description="「〜したら、〜する」を決めます。"
+      description="「こうなったら、こうする」を決めておくと、あとは自動で動きます。"
       parent={['オートメーション', '/automations']}
       validate={() => {
         if (!name.trim()) return 'ルール名を入力してください'
@@ -71,6 +71,9 @@ export default function NewAutomationPage() {
         return res.data.id
       }}
     >
+      <p className="text-ink text-sm font-semibold">1. どのルールか</p>
+      <p className="text-ink-faint text-xs">一覧に表示される名前です。</p>
+
       <Field label="ルール名" htmlFor="au-name" required>
         <input
           id="au-name"
@@ -81,6 +84,9 @@ export default function NewAutomationPage() {
           className={inputClass}
         />
       </Field>
+
+      <p className="text-ink mt-2 text-sm font-semibold">2. 何が起きたら動かすか</p>
+      <p className="text-ink-faint text-xs">ここで選んだ出来事が起きた人だけが対象になります。</p>
 
       <Field label="きっかけ" htmlFor="au-event" required>
         <select
@@ -113,6 +119,8 @@ export default function NewAutomationPage() {
           />
         </Field>
       )}
+
+      <p className="text-ink mt-2 text-sm font-semibold">3. 何をするか</p>
 
       <Field label="すること" htmlFor="au-action" required>
         <select
