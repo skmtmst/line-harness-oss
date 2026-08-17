@@ -95,6 +95,8 @@ export interface Tag {
   mileageMultiplierBps?: number | null;
   /** 複数の倍率タグがある場合の優先順位（大きい値を採用） */
   mileageMultiplierPriority?: number;
+  /** 友だち一覧の「★つきタグ」列に出すか */
+  isStarred?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */

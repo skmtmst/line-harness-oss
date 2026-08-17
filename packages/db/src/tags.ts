@@ -15,6 +15,8 @@ export interface Tag {
   referral_mileage_reward: number;
   mileage_multiplier_bps: number | null;
   mileage_multiplier_priority: number;
+  /** 友だち一覧の「★つきタグ」列に出すか。0 / 1（111 で追加） */
+  is_starred: number;
   created_at: string;
 }
 
@@ -129,7 +131,7 @@ export async function assignTagToGroup(
 export async function updateTag(
   db: D1Database,
   id: string,
-  input: { name?: string; color?: string },
+  input: { name?: string; color?: string; isStarred?: boolean },
 ): Promise<Tag | null> {
   const sets: string[] = [];
   const binds: unknown[] = [];
@@ -140,6 +142,10 @@ export async function updateTag(
   if (input.color !== undefined) {
     sets.push('color = ?');
     binds.push(input.color);
+  }
+  if (input.isStarred !== undefined) {
+    sets.push('is_starred = ?');
+    binds.push(input.isStarred ? 1 : 0);
   }
   if (sets.length > 0) {
     await db

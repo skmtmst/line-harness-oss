@@ -59,6 +59,7 @@ function EditTagInner() {
   const [referralReward, setReferralReward] = useState('0')
   const [multiplier, setMultiplier] = useState('')
   const [priority, setPriority] = useState('0')
+  const [isStarred, setIsStarred] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -87,6 +88,7 @@ function EditTagInner() {
           setReferralReward(String(found.referralMileageReward ?? 0))
           setMultiplier(found.mileageMultiplierBps == null ? '' : String(found.mileageMultiplierBps))
           setPriority(String(found.mileageMultiplierPriority ?? 0))
+          setIsStarred(found.isStarred ?? false)
         }
       }
     } catch {
@@ -111,7 +113,7 @@ function EditTagInner() {
     setNotice('')
     try {
       // 名前と色、所属、マイルで受け口が分かれている。順に当てる。
-      await api.tags.update(tagId, { name: name.trim(), color })
+      await api.tags.update(tagId, { name: name.trim(), color, isStarred })
       if ((tag?.groupId ?? '') !== groupId) {
         await api.tags.setGroup(tagId, groupId || null)
       }
@@ -336,6 +338,21 @@ function EditTagInner() {
                   />
                 </Field>
               </div>
+
+              <label className="border-hairline rounded-control mt-4 flex cursor-pointer items-start gap-3 border p-3">
+                <input
+                  type="checkbox"
+                  checked={isStarred}
+                  onChange={(e) => setIsStarred(e.target.checked)}
+                  className="accent-accent mt-0.5"
+                />
+                <span className="text-ink-secondary text-sm">
+                  友だち一覧に表示する
+                  <span className="text-ink-faint block text-xs">
+                    ★を付けると、友だち一覧の「★つきタグ」列に出ます。
+                  </span>
+                </span>
+              </label>
             </section>
           </div>
 

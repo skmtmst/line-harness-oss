@@ -31,6 +31,8 @@ function serializeTag(row: DbTag & { friend_count?: number }) {
       ? null
       : Number(row.mileage_multiplier_bps),
     mileageMultiplierPriority: Number(row.mileage_multiplier_priority ?? 0),
+    // 友だち一覧の「★つきタグ」列に出すか。列が無い環境でも 0 として返す。
+    isStarred: Number(row.is_starred ?? 0) === 1,
     createdAt: row.created_at,
     ...(row.friend_count !== undefined ? { friendCount: row.friend_count } : {}),
   };
@@ -178,8 +180,12 @@ tags.get('/api/tags', async (c) => {
  */
 tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name?: unknown; color?: unknown }>();
-    const patch: { name?: string; color?: string } = {};
+    const body = await c.req.json<{ name?: unknown; color?: unknown; isStarred?: unknown }>();
+    const patch: { name?: string; color?: string; isStarred?: boolean } = {};
+
+    if (body.isStarred !== undefined) {
+      patch.isStarred = body.isStarred === true || body.isStarred === 1;
+    }
 
     if (body.name !== undefined) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -195,7 +201,7 @@ tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
       patch.color = color;
     }
     if (Object.keys(patch).length === 0) {
-      return c.json({ success: false, error: 'name or color is required' }, 400);
+      return c.json({ success: false, error: 'name, color or isStarred is required' }, 400);
     }
 
     const tag = await updateTag(c.env.DB, c.req.param('id'), patch);

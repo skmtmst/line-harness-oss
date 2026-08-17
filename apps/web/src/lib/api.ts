@@ -721,8 +721,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    /** 名前と色を変える。分類とマイルは別の受け口が持っている。 */
-    update: (id: string, data: { name?: string; color?: string }) =>
+    /** 名前・色・一覧に出すかを変える。分類とマイルは別の受け口が持っている。 */
+    update: (id: string, data: { name?: string; color?: string; isStarred?: boolean }) =>
       fetchApi<ApiResponse<Tag>>(`/api/tags/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),

@@ -245,6 +245,19 @@ function TagsPageInner() {
 
   const ungroupedCount = useMemo(() => items.filter((t) => !t.groupId).length, [items])
 
+  /** 友だち一覧に出す・出さないを切り替える。 */
+  const toggleStar = async (tag: Tag) => {
+    setError('')
+    // 押した瞬間に見た目を変える。往復を待つと、押せたかどうか分からない。
+    setItems((prev) => prev.map((t) => (t.id === tag.id ? { ...t, isStarred: !t.isStarred } : t)))
+    try {
+      await api.tags.update(tag.id, { isStarred: !tag.isStarred })
+    } catch {
+      setError('表示の切り替えに失敗しました')
+      void load()
+    }
+  }
+
   const handleAddGroup = async () => {
     const name = groupName.trim()
     if (!name) return
@@ -682,6 +695,7 @@ function TagsPageInner() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動付与のもと</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">分類</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">登録日</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">表示</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -716,6 +730,19 @@ function TagsPageInner() {
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">
                       {t.createdAt ? new Date(t.createdAt).toLocaleDateString('ja-JP') : ''}
+                    </td>
+                    {/* 友だち一覧の「★つきタグ」列に出すか。ここから切り替える。
+                        タグは何十個も作るので、全部並べると狭い列でどれも読めない。 */}
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => toggleStar(t)}
+                        title={t.isStarred ? '友だち一覧に出さない' : '友だち一覧に出す'}
+                        className={`inline-flex items-center gap-1 text-xs ${
+                          t.isStarred ? 'text-accent' : 'text-ink-faint hover:text-ink-secondary'
+                        }`}
+                      >
+                        {t.isStarred ? '★ 一覧に表示' : '☆ —'}
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <Link

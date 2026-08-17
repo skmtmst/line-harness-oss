@@ -34,6 +34,7 @@ export default function NewTagPage() {
   const [groups, setGroups] = useState<TagGroup[]>([])
   const [multiplier, setMultiplier] = useState('')
   const [priority, setPriority] = useState('0')
+  const [isStarred, setIsStarred] = useState(false)
 
   useEffect(() => {
     void api.tagGroups.list().then((res) => {
@@ -58,6 +59,10 @@ export default function NewTagPage() {
           groupId: groupId || null,
         })
         if (!res.success) throw new Error(res.error)
+        // 一覧に出す印も作成の受け口に無い。倍率と一緒にあとで当てる。
+        if (isStarred) {
+          await api.tags.update(res.data.id, { isStarred: true })
+        }
         // 倍率は作成の受け口に無い。作ったあとに当てる。
         if (multiplier !== '' || priority !== '0') {
           await api.tags.updateMileage(res.data.id, {
@@ -231,6 +236,21 @@ export default function NewTagPage() {
             </select>
           </Field>
         </div>
+
+        <label className="border-hairline rounded-control mt-4 flex cursor-pointer items-start gap-3 border p-3">
+          <input
+            type="checkbox"
+            checked={isStarred}
+            onChange={(e) => setIsStarred(e.target.checked)}
+            className="accent-accent mt-0.5"
+          />
+          <span className="text-ink-secondary text-sm">
+            友だち一覧に表示する
+            <span className="text-ink-faint block text-xs">
+              ★を付けると、友だち一覧の「★つきタグ」列に出ます。
+            </span>
+          </span>
+        </label>
       </section>
     </CreatePage>
   )
