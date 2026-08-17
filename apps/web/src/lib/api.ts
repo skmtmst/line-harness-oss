@@ -3072,6 +3072,18 @@ export interface EventBookingItem {
   friend_line_user_id: string | null;
 }
 
+export interface EventWaitlistItem {
+  id: string;
+  slot_id: string;
+  friend_id: string;
+  /** waiting = 並んでいる / invited = 声をかけた */
+  status: string;
+  notified_at: string | null;
+  created_at: string;
+  slot_starts_at: string;
+  friend_name: string | null;
+}
+
 export const eventsApi = {
   listEvents: (accountId: string) =>
     fetchApi<{ items: EventListItem[] }>(
@@ -3121,6 +3133,11 @@ export const eventsApi = {
       { method: 'DELETE' },
     ),
 
+  /** キャンセル待ち。自動では繰り上げない。誰を通すかは運用の判断。 */
+  listWaitlist: (accountId: string, eventId: string) =>
+    fetchApi<{ waitlist: EventWaitlistItem[] }>(
+      withAccount(`/api/events/admin/events/${eventId}/waitlist`, accountId),
+    ),
   listBookings: (
     accountId: string,
     eventId: string,
