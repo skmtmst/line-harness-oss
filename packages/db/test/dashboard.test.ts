@@ -126,10 +126,20 @@ describe('友だち数の推移', () => {
     await recordFriendSnapshot(db, null);
 
     const { trend } = await getDashboardOverview(db, 'today', null);
-    expect(trend).toHaveLength(1);
-    expect(trend[0].date).toBe(jstDate(0));
-    expect(trend[0].estimated).toBe(false);
-    expect(trend[0].active).toBe(1);
+    const today = trend.find((d) => d.date === jstDate(0));
+    expect(today?.estimated).toBe(false);
+    expect(today?.active).toBe(1);
+  });
+
+  test('上の期間切り替えに関わらず、いつも7日ぶん出る', async () => {
+    // 推移は「直近どう動いたか」を見るもので、上の切り替えは KPI の集計期間。
+    // 連動させていた頃は「今日」を選ぶと1行だけになり、増減が読めなかった。
+    for (const period of ['today', 'last7', 'last28'] as const) {
+      const { trend } = await getDashboardOverview(db, period, null);
+      expect(trend).toHaveLength(7);
+      expect(trend[trend.length - 1].date).toBe(jstDate(0));
+      expect(trend[0].date).toBe(jstDate(-6));
+    }
   });
 
   test('記録が無い日は推定として印を付ける', async () => {
@@ -168,7 +178,7 @@ describe('友だち数の推移', () => {
     expect(rows.n).toBe(1);
     // 上書きなので、あとの値が残る。
     const { trend } = await getDashboardOverview(db, 'today', null);
-    expect(trend[0].active).toBe(2);
+    expect(trend.find((d) => d.date === jstDate(0))?.active).toBe(2);
   });
 });
 

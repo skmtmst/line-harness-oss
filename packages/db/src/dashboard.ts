@@ -259,7 +259,17 @@ export async function recordFriendSnapshot(
 }
 
 /**
- * 友だち数の推移。
+ * 推移に出す日数。上の期間切り替えとは連動させない。
+ *
+ * 以前は「今日 / 過去7日 / 過去28日」に合わせていた。すると「今日」を
+ * 選んだときに推移が1行だけになり、増えたのか減ったのかが読めない。
+ * 推移は「直近どう動いたか」を見るためのもので、上の切り替えは
+ * KPI の集計期間。別のものなので、ここは常に7日にする。
+ */
+const TREND_DAYS = 7;
+
+/**
+ * 友だち数の推移。今日から遡って7日ぶん。
  *
  * 日次記録（friend_daily_snapshots）があればそれを使う。無い日は、
  * いま残っている友だちの登録日から逆算して埋め、`estimated` を立てる。
@@ -271,11 +281,10 @@ export async function recordFriendSnapshot(
  */
 async function friendTrend(
   db: D1Database,
-  period: DashboardPeriod,
   accountId: string | null,
 ): Promise<DashboardOverview['trend']> {
-  const days = periodDays(period);
-  const start = periodStart(period);
+  const days = TREND_DAYS;
+  const start = jstDate(-(TREND_DAYS - 1));
   const key = accountId ?? '';
 
   const recorded = await db
@@ -377,7 +386,8 @@ export async function getDashboardOverview(
       oldestUnansweredMinutes: null,
       averageFirstReplyMinutes: null,
     })),
-    friendTrend(db, period, accountId).catch(() => []),
+    // 推移だけは period を渡さない。上の切り替えに関わらず直近7日で見る。
+    friendTrend(db, accountId).catch(() => []),
     conversionSummary(db, period).catch(() => ({ total: 0, byPoint: [] })),
     // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
     // source は 028 で入っている。auto_reply と manual が応答。
