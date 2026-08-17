@@ -276,6 +276,9 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path.match(/^\/api\/webhooks\/incoming\/[^/]+\/receive$/) ||
     path === '/api/meet-callback' || // Meet Harness completion callback
     path === '/api/qr' || // Public QR proxy — used by desktop landing pages
+    // ログイン画面の看板（公式アカウントの表示名とアイコン）。認証より手前の
+    // 画面が読むので通す。返すのは LINE 上で公開されている2つの値だけ。
+    path === '/api/public/brand' ||
     path === '/api/health' // Liveness probe (update CLI / self-update verify)
   ) {
     return next();

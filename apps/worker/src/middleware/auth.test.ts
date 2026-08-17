@@ -72,6 +72,7 @@ function app() {
   a.post('/api/forms/:id/submit', (c) => c.json({ success: true }));
   a.post('/api/forms/:id/partial', (c) => c.json({ success: true }));
   a.post('/api/forms/:id/opened', (c) => c.json({ success: true }));
+  a.get('/api/public/brand', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
   return a;
 }
 
@@ -314,6 +315,21 @@ describe('public form method boundaries', () => {
     const res = await app().request('/api/forms/form-1/submit', {
       method: 'DELETE',
     }, crossSiteEnv());
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('ログイン画面の看板', () => {
+  // ログイン画面は認証より手前にあるので、ここが通らないと名前もアイコンも
+  // 出せない。逆に通しすぎると認証の穴になるので、この1本で固定する。
+  test('認証なしで読める', async () => {
+    const res = await app().request('/api/public/brand', {}, crossSiteEnv());
+    expect(res.status).toBe(200);
+    expect((await res.json() as { staff: unknown }).staff).toBeNull();
+  });
+
+  test('似た名前の道は通さない', async () => {
+    const res = await app().request('/api/public/brands', {}, crossSiteEnv());
     expect(res.status).toBe(401);
   });
 });

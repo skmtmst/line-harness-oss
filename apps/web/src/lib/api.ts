@@ -1488,6 +1488,15 @@ export const api = {
         `/api/users/${userId}/accounts`,
       ),
   },
+  /**
+   * ログインする前に呼べるもの。認証を通さないので、置けるのは
+   * 「誰に見えても困らない値」に限る。
+   */
+  publicBrand: {
+    /** 公式アカウントの表示名とアイコン。ログイン画面とタブの題に使う。 */
+    get: () =>
+      fetchApi<ApiResponse<{ name: string | null; iconUrl: string | null }>>('/api/public/brand'),
+  },
   lineAccounts: {
     list: () =>
       fetchApi<ApiResponse<LineAccount[]>>('/api/line-accounts'),

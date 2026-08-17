@@ -11,6 +11,7 @@ import {
 } from '@line-crm/db';
 import type { LineAccount as DbLineAccount } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
+import { fetchBotProfile } from '../lib/bot-profile.js';
 import {
   detectFollowerImportCapability,
   getFollowerImportState,
@@ -99,20 +100,6 @@ function serializeLineAccountFull(row: DbLineAccount) {
     channelSecret: row.channel_secret,
     loginChannelSecret: row.login_channel_secret,
   };
-}
-
-// Fetch bot profile (displayName, pictureUrl) from LINE API
-async function fetchBotProfile(accessToken: string): Promise<{ displayName?: string; pictureUrl?: string; basicId?: string }> {
-  try {
-    const res = await fetch('https://api.line.me/v2/bot/info', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!res.ok) return {};
-    const data = await res.json() as { displayName?: string; pictureUrl?: string; basicId?: string };
-    return { displayName: data.displayName, pictureUrl: data.pictureUrl, basicId: data.basicId };
-  } catch {
-    return {};
-  }
 }
 
 // GET /api/line-accounts - list all (with LINE profile + stats)
