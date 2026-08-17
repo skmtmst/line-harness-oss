@@ -5,13 +5,15 @@ import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import KpiCard from '@/components/dashboard/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 
 const TABS = [
-  { key: 'messages', label: '配信' },
-  { key: 'clicks', label: 'URLクリック' },
-  { key: 'cross', label: 'クロス集計' },
+  { key: 'messages', label: '送信数' },
   { key: 'funnel', label: 'ファネル' },
+  { key: 'cross', label: 'クロス集計' },
+  { key: 'clicks', label: 'URLクリック' },
+  { key: 'search', label: '検索からの流入' },
 ]
 
 /** 期間の選択肢。日数で持つ。 */
@@ -75,9 +77,27 @@ function Bars({ items }: { items: Array<{ label: string; value: number }> }) {
   )
 }
 
+const WEEKDAY_JP = ['日', '月', '火', '水', '木', '金', '土']
+
+/** 「2026-08-12」→「水」。JST の日付文字列をそのまま曜日にする。 */
+function weekdayOf(date: string): string {
+  const [y, m, d] = date.split('-').map(Number)
+  return WEEKDAY_JP[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
+}
+
 function MessagesTab() {
   const [days, setDays] = useState(28)
-  const [rows, setRows] = useState<Array<{ date: string; outgoing: number; incoming: number }>>([])
+  const [rows, setRows] = useState<
+    Array<{
+      date: string
+      outgoing: number
+      incoming: number
+      reply: number
+      push: number
+      fromBroadcast: number
+      fromScenario: number
+    }>
+  >([])
   const [broadcasts, setBroadcasts] = useState<
     Array<{
       broadcastId: string
@@ -113,112 +133,205 @@ function MessagesTab() {
   const totals = useMemo(
     () =>
       rows.reduce(
-        (acc, r) => ({ outgoing: acc.outgoing + r.outgoing, incoming: acc.incoming + r.incoming }),
-        { outgoing: 0, incoming: 0 },
+        (acc, r) => ({
+          outgoing: acc.outgoing + r.outgoing,
+          incoming: acc.incoming + r.incoming,
+          reply: acc.reply + r.reply,
+          push: acc.push + r.push,
+        }),
+        { outgoing: 0, incoming: 0, reply: 0, push: 0 },
       ),
     [rows],
   )
 
+  // 開封・クリックは配信ごとにしか返らない。日ごとの表に出すため、送った日で
+  // まとめ直す。同じ日に複数の配信があれば足す。
+  const byDate = useMemo(() => {
+    const m = new Map<string, { delivered: number; impression: number; click: number }>()
+    for (const b of broadcasts) {
+      if (!b.sentAt) continue
+      const date = b.sentAt.slice(0, 10)
+      const cur = m.get(date) ?? { delivered: 0, impression: 0, click: 0 }
+      m.set(date, {
+        delivered: cur.delivered + (b.delivered ?? 0),
+        impression: cur.impression + (b.uniqueImpression ?? 0),
+        click: cur.click + (b.uniqueClick ?? 0),
+      })
+    }
+    return m
+  }, [broadcasts])
+
+  const rates = useMemo(() => {
+    const delivered = broadcasts.reduce((sum, b) => sum + (b.delivered ?? 0), 0)
+    if (delivered === 0) return { open: null as number | null, click: null as number | null }
+    const impression = broadcasts.reduce((sum, b) => sum + (b.uniqueImpression ?? 0), 0)
+    const click = broadcasts.reduce((sum, b) => sum + (b.uniqueClick ?? 0), 0)
+    return {
+      open: Math.round((impression / delivered) * 100),
+      click: Math.round((click / delivered) * 100),
+    }
+  }, [broadcasts])
+
+  // 設計は新しい日が上。API は古い順に返す。
+  const shown = useMemo(() => [...rows].reverse(), [rows])
+
   return (
     <div>
-      <RangePicker days={days} onChange={setDays} />
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          title="今月の送信"
+          value={totals.outgoing}
+          unit="通"
+          detail={`リプライ${totals.reply} ・ プッシュ${totals.push}`}
+          loading={loading}
+        />
+        {/* 月の上限を持つ設定が無い。数字を置くと、実際の契約と食い違ったまま
+            «あと何通送れるか» を読まれてしまう。 */}
+        <KpiCard title="残枠" value={null} unit="通" detail="上限が未設定です" />
+        <KpiCard
+          title="平均開封率"
+          value={rates.open}
+          unit="%"
+          detail="配信のうち"
+          loading={loading}
+        />
+        <KpiCard
+          title="平均クリック率"
+          value={rates.click}
+          unit="%"
+          detail="短縮URL経由"
+          loading={loading}
+        />
+      </div>
+
+      <div
+        data-design="Bar"
+        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+      >
+        <input
+          type="date"
+          disabled
+          title="日付での絞り込みは準備中です"
+          aria-label="日付で絞り込み"
+          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+        />
+        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <select
+          disabled
+          title="並び替えは準備中です"
+          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+        >
+          <option>日付が新しい順</option>
+        </select>
+        <span className="text-ink-faint text-xs whitespace-nowrap">期間</span>
+        <RangePicker days={days} onChange={setDays} />
+        <button
+          disabled
+          title="書き出しは準備中です"
+          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+        >
+          CSVで書き出す
+        </button>
+      </div>
+
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
       ) : (
         <>
-          <div className="mb-4 grid grid-cols-2 gap-4">
-            <div className="bg-canvas rounded-card border-hairline border p-4">
-              <p className="text-ink-faint text-xs">送信</p>
-              <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-                {totals.outgoing.toLocaleString('ja-JP')}
-              </p>
-            </div>
-            <div className="bg-canvas rounded-card border-hairline border p-4">
-              <p className="text-ink-faint text-xs">受信</p>
-              <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-                {totals.incoming.toLocaleString('ja-JP')}
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-canvas rounded-card border-hairline mb-4 border p-4">
-            <p className="text-ink-secondary mb-3 text-sm font-medium">日ごとの送信数</p>
-            {rows.length === 0 ? (
-              <p className="text-ink-faint py-8 text-center text-sm">この期間の記録はありません。</p>
-            ) : (
-              <Bars items={rows.map((r) => ({ label: r.date, value: r.outgoing }))} />
-            )}
-          </div>
-
-          <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-            <table className="w-full min-w-[720px]">
+          <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+            <table className="w-full min-w-[760px]">
               <thead>
                 <tr className="bg-canvas-sunken border-hairline border-b">
-                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                    一斉配信
-                  </th>
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold uppercase">
-                    届いた数
-                  </th>
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold uppercase">
-                    開封
-                  </th>
-                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold uppercase">
-                    クリック
-                  </th>
+                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">日付</th>
+                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">曜日</th>
+                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">リプライ数</th>
+                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">プッシュ数</th>
+                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">合計</th>
+                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">開封</th>
+                  <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">クリック</th>
+                  <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">備考</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {broadcasts.length === 0 ? (
+              <tbody className="divide-hairline divide-y">
+                {shown.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="text-ink-faint px-4 py-8 text-center text-sm">
-                      この期間の配信はありません。
+                    <td colSpan={8} className="text-ink-faint px-4 py-8 text-center text-sm">
+                      この期間の記録はありません。
                     </td>
                   </tr>
                 ) : (
-                  broadcasts.map((b) => (
-                    <tr key={b.broadcastId} className="hover:bg-canvas-sunken">
-                      <td className="text-ink px-4 py-3 text-sm">
-                        {b.name}
-                        <span className="text-ink-faint ml-2 text-xs">
-                          {b.sentAt ? new Date(b.sentAt).toLocaleDateString('ja-JP') : ''}
-                        </span>
-                      </td>
-                      <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                        {b.delivered?.toLocaleString('ja-JP') ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-sm tabular-nums">
-                        {b.uniqueImpression != null ? (
-                          <span className="text-ink-secondary">
-                            {b.uniqueImpression.toLocaleString('ja-JP')}
-                          </span>
-                        ) : (
-                          // 0 として描くと「誰も読んでいない」に見える。
-                          <span
-                            className="text-ink-faint"
-                            title={
-                              b.suppressedByAudienceSize
-                                ? '配信先が20人未満のため、LINEから開封数が返りません'
-                                : 'まだ集計されていません'
-                            }
-                          >
-                            —
-                          </span>
-                        )}
-                      </td>
-                      <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                        {b.uniqueClick?.toLocaleString('ja-JP') ?? '—'}
-                      </td>
-                    </tr>
-                  ))
+                  shown.map((r) => {
+                    const b = byDate.get(r.date)
+                    const notes: string[] = []
+                    if (r.fromBroadcast > 0) notes.push('一斉配信')
+                    if (r.fromScenario > 0) notes.push('シナリオ')
+                    return (
+                      <tr key={r.date} className="hover:bg-canvas-sunken">
+                        <td className="text-ink px-4 py-3 text-sm tabular-nums">{r.date}</td>
+                        <td className="text-ink-secondary px-4 py-3 text-sm">{weekdayOf(r.date)}</td>
+                        <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                          {r.reply}
+                        </td>
+                        <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                          {r.push}
+                        </td>
+                        <td className="text-ink px-4 py-3 text-right text-sm font-medium tabular-nums">
+                          {r.outgoing}
+                        </td>
+                        {/* 配信が無い日は開封もクリックも取りようがない。0 と
+                            書くと「送ったのに誰も読んでいない」に見える。 */}
+                        <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                          {b && b.delivered > 0
+                            ? `${b.impression}（${Math.round((b.impression / b.delivered) * 1000) / 10}%）`
+                            : '—'}
+                        </td>
+                        <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                          {b && b.delivered > 0 ? b.click : '—'}
+                        </td>
+                        <td className="text-ink-faint px-4 py-3 text-sm">
+                          {notes.length > 0 ? notes.join(' ・ ') : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
           </div>
 
+          <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-ink-faint text-xs tabular-nums">
+              合計 リプライ {totals.reply} ・ プッシュ {totals.push} ・ {totals.outgoing} 通
+            </p>
+            <div className="flex items-center gap-2 text-xs">
+              <button
+                disabled
+                title="ページの切り替えは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
+              >
+                前へ
+              </button>
+              <button
+                disabled
+                title="ページの切り替えは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
+              >
+                次へ
+              </button>
+            </div>
+          </div>
+
           <p className="text-ink-faint mt-3 text-xs leading-relaxed">
+            この集計は当システムが独自に数えたものです。LINEヤフー社から実際に課金される正確な送信数は
+            LINE Developers でご確認ください。
+          </p>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            リプライとプッシュを足しても合計に届かないことがあります。区分を記録する前に
+            送ったぶんと、テスト送信がどちらにも入らないためです。
+          </p>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
             配信先が20人未満のときは、LINEから開封数・クリック数が返りません（「—」と表示します）。
             0件という意味ではありません。
           </p>
@@ -733,12 +846,57 @@ function AnalyticsInner() {
   const tab = useMergedTab(TABS)
   return (
     <div>
-      <Header title="アクセス解析" description="配信・クリック・友だちの属性を数えます。" />
+      <div data-design="Head">
+        <Header
+          title="分析"
+          description="配信した数と、その反応をまとめて見ます。送信数はLINEの課金対象と直結するため、残枠と合わせて確認してください。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              <button
+                disabled
+                title="レポートの保存は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                レポートを保存
+              </button>
+              <button
+                disabled
+                title="書き出しは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                CSVで書き出す
+              </button>
+            </div>
+          }
+        />
+      </div>
       <MergedTabs basePath="/analytics" tabs={TABS} active={tab} />
       {tab === 'messages' && <MessagesTab />}
       {tab === 'clicks' && <ClicksTab />}
       {tab === 'cross' && <CrossTab />}
       {tab === 'funnel' && <FunnelTab />}
+      {/* 検索からの流入は設計 6-11。実装は /search-console にある。
+          タブごと隠すと、検索の流入を見られること自体が読み取れなくなる。 */}
+      {tab === 'search' && (
+        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+          <p className="text-ink-secondary text-sm">
+            検索からの流入は、いまは別の画面にあります。
+          </p>
+          <Link
+            href="/search-console"
+            className="text-accent mt-2 inline-block text-sm hover:underline"
+          >
+            検索からの流入を開く
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
