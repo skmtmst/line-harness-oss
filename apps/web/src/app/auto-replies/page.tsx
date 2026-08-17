@@ -62,6 +62,7 @@ function conditionChips(r: AutoReply) {
 export default function AutoRepliesPage() {
   const { selectedAccountId, accounts } = useAccount()
   const [items, setItems] = useState<AutoReply[]>([])
+  const [query, setQuery] = useState('')
   const [templates, setTemplates] = useState<TemplateLite[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -170,11 +171,45 @@ export default function AutoRepliesPage() {
     }
   }
 
+  // キーワードと返す本文の両方を見る。名前を付けていないルールは
+  // キーワードでしか探せない。
+  const q = query.trim()
+  const shown = q
+    ? items.filter(
+        (r) => r.keyword.includes(q) || (r.responseContent ?? '').includes(q),
+      )
+    : items
+
   return (
     <div>
+      <div data-design="Head">
       <Header
-        title="自動返信ルール"
+        title="自動応答"
+        description="受信したメッセージに自動で返します。キーワード・メッセージ種別・曜日や時間帯・友だち条件で出し分けできます。"
         action={
+          <div className="flex flex-wrap gap-2">
+          <button
+            disabled
+            title="マニュアルは準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+          >
+            マニュアル
+          </button>
+          <button
+            disabled
+            title="並び替えは準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+          >
+            並び替え
+          </button>
+          {/* 自動応答にフォルダを持たせる列が無い。 */}
+          <button
+            disabled
+            title="フォルダは準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+          >
+            フォルダを追加
+          </button>
           <button
             onClick={() => setEditing({
               keyword: '',
@@ -187,10 +222,42 @@ export default function AutoRepliesPage() {
             })}
             className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
           >
-            + 新規ルール
+            自動応答を作成
           </button>
+          </div>
         }
       />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">ルール</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {items.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            停止中 {items.filter((r) => !r.isActive).length}
+          </p>
+        </div>
+        {/* ルールが何回当たったかを記録していない。返信は messages_log に
+            残るが、どのルールが当てたかまでは持っていない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">今月のヒット</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">ヒット数は未集計</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">営業時間外の応答</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">時間帯ごとの集計は未対応</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">未ヒット</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">30日以上当たっていないルール</p>
+        </div>
+      </div>
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -211,17 +278,61 @@ export default function AutoRepliesPage() {
         <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-gray-300 line-through">アカ名</span> 適用外 (line_account_id が別アカに固定)</p>
       </div>
 
-      <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
+      <div
+        data-design="Bar"
+        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+      >
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="自動応答名で検索"
+          aria-label="自動応答名で検索"
+          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <select
+          disabled
+          title="並び替えは準備中です"
+          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+        >
+          <option>ヒット数が多い順</option>
+        </select>
+        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+        <select
+          disabled
+          title="表示件数の切り替えは準備中です"
+          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+        >
+          <option>20件</option>
+        </select>
+      </div>
+
+      <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+        {['よく使う', '停止中のみ', '時間帯あり', '未ヒット'].map((label) => (
+          <button
+            key={label}
+            disabled
+            title="保存した条件は準備中です"
+            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1080px]">
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">評価順</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">keyword</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">match</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">response</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動応答名</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">一致のしかた</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">実行するアクション</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">template</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">返す条件</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">応答条件</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">適用アカウント</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">状態</th>
                 <th className="px-4 py-3" />
@@ -230,10 +341,10 @@ export default function AutoRepliesPage() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
-              ) : items.length === 0 ? (
+              ) : shown.length === 0 ? (
                 <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
               ) : (
-                items.map((r) => (
+                shown.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">{r.priority}</td>
                     <td className="px-4 py-3 text-sm font-medium text-ink">{r.keyword}</td>
