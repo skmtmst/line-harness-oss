@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { api, eventsApi, type EventDetail, type EventSlot } from '@/lib/api'
 import ImageUploader from '@/components/shared/image-uploader'
-import { AsideCard, Field, FormSection, inputClass } from '@/components/shared/create-page'
+import { AsideCard, ChoiceCard, Field, FormSection, inputClass } from '@/components/shared/create-page'
 import { generateBulkSlots } from './bulk-slot-generator'
 import { formatSlotJp, jstHHMMToUtcIso, splitBand, todayJst } from './jst'
 
@@ -470,32 +470,6 @@ function OverviewStep({
       </div>
       </div>
     </div>
-  )
-}
-
-function ChoiceCard({
-  selected,
-  title,
-  note,
-  onClick,
-}: {
-  selected: boolean
-  title: string
-  note: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`rounded-card border p-3 text-left transition-colors ${
-        selected ? 'border-accent bg-accent-bg' : 'border-hairline hover:bg-canvas-sunken'
-      }`}
-    >
-      <div className="text-ink text-sm font-semibold">{title}</div>
-      <div className="text-ink-faint text-xs">{note}</div>
-    </button>
   )
 }
 
