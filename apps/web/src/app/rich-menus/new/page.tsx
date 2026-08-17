@@ -51,34 +51,44 @@ export default function NewRichMenuPage() {
 
   return (
     <main className="p-6 max-w-2xl mx-auto">
-      <Header
-        title="新規リッチメニュー"
-        description="作成後の編集画面で画像 upload や areas 編集ができます。"
-      />
-      <Link
-        href="/rich-menus"
-        className="text-sm text-gray-500 hover:underline mb-4 inline-block"
-      >
-        ← 一覧に戻る
-      </Link>
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+        <Link href="/rich-menus" className="hover:underline">
+          リッチメニュー
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>新規作成</span>
+      </nav>
+
+      <div data-design="Head">
+        <Header
+          title="リッチメニューを作る"
+          description="名前と土台のレイアウトを決めます。画像とタップ領域は、作成後の編集画面で設定します。"
+        />
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-5 bg-white border border-gray-200 rounded-lg shadow-sm p-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            名前 <span className="text-gray-400">(管理用)</span>
+            名前{' '}
+            <span className="bg-danger-bg text-danger rounded-pill ml-1 px-1.5 py-0.5 text-[10px]">
+              必須
+            </span>
           </label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
             className="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-            placeholder="例: メインメニュー"
+            placeholder="例：メインメニュー"
           />
+          <p className="text-ink-faint mt-1 text-xs">
+            管理画面での識別用です。友だちには表示されません。
+          </p>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            トーク画面下の文言 <span className="text-gray-400">(14 文字以内)</span>
+            トーク画面下の文言
           </label>
           <input
             value={chatBarText}
@@ -88,13 +98,13 @@ export default function NewRichMenuPage() {
             className="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
           <p className="mt-1 text-xs text-gray-500">
-            ユーザーがトーク画面でメニューを開く前に表示される文言。
+            14文字以内。メニューを開く前にトーク画面下に表示されます。
           </p>
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            初期テンプレート
+            土台のレイアウト
           </label>
           <div className="grid grid-cols-1 gap-2">
             {TEMPLATES.map((t) => (
@@ -118,7 +128,7 @@ export default function NewRichMenuPage() {
                   <div className="text-sm font-medium text-gray-900">
                     {t.label}
                     <span className="ml-2 text-xs text-gray-500 font-normal">
-                      {t.size === 'large' ? '2500×1686' : '2500×843'}
+                      {t.size === 'large' ? '2500 × 1686' : '2500 × 843'}
                     </span>
                   </div>
                   {t.description && (

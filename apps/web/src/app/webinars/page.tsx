@@ -46,6 +46,7 @@ function scheduleSummary(w: Webinar): string {
 
 export default function WebinarsPage() {
   const [items, setItems] = useState<Webinar[]>([])
+  const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -66,21 +67,125 @@ export default function WebinarsPage() {
     void refresh()
   }, [refresh])
 
+  // タイトルと slug の両方を見る。URLで探すこともあるため。
+  const q = query.trim()
+  const shown = q ? items.filter((w) => w.title.includes(q) || w.slug.includes(q)) : items
+
   return (
     <>
-      <Header
-        title="オートウェビナー"
-        description="録画を疑似ライブ配信し、視聴中の CTA クリックまで計測できます"
-        action={
-          <Link
-            href="/webinars/new"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-          >
-            ＋ 新しいウェビナー
-          </Link>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="ウェビナー"
+          description="動画セミナーの申込から視聴、視聴後のフォロー配信までを管理します。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              <button
+                disabled
+                title="並び替えは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                並び替え
+              </button>
+              {/* ウェビナーにフォルダを持たせる列が無い。 */}
+              <button
+                disabled
+                title="フォルダは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                フォルダを追加
+              </button>
+              <Link
+                href="/webinars/new"
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+              >
+                ウェビナーを作成
+              </Link>
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mx-auto mb-4 grid max-w-6xl grid-cols-1 gap-4 px-6 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">ウェビナー</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {items.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            公開中 {items.filter((w) => w.status === 'active').length}
+          </p>
+        </div>
+        {/* 申込・視聴の集計を返す口が無い。個別のウェビナーを開けば見られるが、
+            一覧でまとめて数える経路を持っていない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">申込</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">一覧では数えられません</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">平均視聴率</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">申込者のうち</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">平均視聴時間</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">視聴ログの集計は未対応</p>
+        </div>
+      </div>
       <div className="p-6 max-w-6xl mx-auto">
+        <div
+          data-design="Bar"
+          className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+        >
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="ウェビナー名で検索"
+            aria-label="ウェビナー名で検索"
+            className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          />
+          <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+          <select
+            disabled
+            title="並び替えは準備中です"
+            className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+          >
+            <option>申込が多い順</option>
+          </select>
+          <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+          <select
+            disabled
+            title="表示件数の切り替えは準備中です"
+            className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+          >
+            <option>20件</option>
+          </select>
+        </div>
+
+        <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+          {['よく使う', '公開中のみ', '下書きのみ'].map((label) => (
+            <button
+              key={label}
+              disabled
+              title="保存した条件は準備中です"
+              className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             {error}
@@ -91,7 +196,7 @@ export default function WebinarsPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
             読み込み中...
           </div>
-        ) : items.length === 0 ? (
+        ) : shown.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <div className="text-gray-700 font-medium mb-2">ウェビナーがまだありません</div>
             <p className="text-sm text-gray-500 mb-4">
@@ -106,7 +211,7 @@ export default function WebinarsPage() {
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
-            {items.map((w) => (
+            {shown.map((w) => (
               <Link
                 key={w.id}
                 href={`/webinars/edit?id=${w.id}`}

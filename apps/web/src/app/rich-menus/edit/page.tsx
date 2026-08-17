@@ -470,6 +470,12 @@ function Editor({
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         {/* 中央: キャンバス */}
         <section>
+          <div className="mb-3">
+            <h2 className="text-ink text-sm font-semibold">タップできる場所</h2>
+            <p className="text-ink-faint mt-0.5 text-xs">
+              エリアをクリックすると、右側で動きを設定できます。画像の上を区切って、タップしたときの動きをエリアごとに決めます。
+            </p>
+          </div>
           {activePage ? (
             <CanvasEditor
               areas={activePage.areas}
@@ -503,6 +509,11 @@ function Editor({
 
         {/* 右パネル */}
         <aside className="space-y-5">
+            {selectedAreaId && (
+              <p className="text-ink-faint text-xs">
+                タップしたときに何が起きるかを決めます。
+              </p>
+            )}
           {/* メニュー設定 */}
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
             <h2 className="text-ink text-sm font-semibold">基本設定</h2>
