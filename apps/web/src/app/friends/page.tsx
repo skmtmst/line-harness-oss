@@ -159,119 +159,9 @@ function FriendsPageInner() {
 
   return (
     <div>
-      {/* 設計 `V2 2-2 友だち`。呼び名は「友だち」でサイドバーと揃えている。 */}
-      <div data-design="Head">
-      <Header
-        title="友だち"
-        description="登録された友だちの検索・タグ付け・対応状況を管理します。"
-        action={
-          <div className="flex items-center gap-2">
-            {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-            <button
-              onClick={() => window.alert('CSVの書き出しは準備中です。')}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              CSVで書き出す
-            </button>
-            <button
-              onClick={() => window.alert('友だちを選ぶと、まとめて実行できます。')}
-              className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-            >
-              一括アクション
-            </button>
-          </div>
-        }
-      />
-      </div>
-
       <div data-design="KPIs">
       <FriendKpis />
       </div>
-
-      {/*
-        設計 `V2 2-2 友だち` の残りの節。まだ実装していない。
-        印だけ先に置いて、design-structure.test.ts が「抜けている」と
-        言わない状態にする。中身が入ったらこのコメントを消す。
-        docs/v025-screen-audit.md に何が要るかを書いてある。
-      */}
-      {/*
-        タブ（設計 `Tabs`）。設計は Head と KPI の下に置き、件数を添える。
-        呼び名も設計に合わせる（統合ユーザー → アカウント横断の名寄せ）。
-        いまは MergedTabs が画面の一番上にあるので、印だけここに置いて
-        位置を示す。並べ替えは MergedTabs の作りを変える必要がある。
-      */}
-      <div data-design="Tabs" />
-
-      {/*
-        保存済みの検索条件（設計 `SavedChips`）。
-        saved_searches は 100 で入っているが、一覧から呼ぶ導線が無い。
-        よく使う条件を1押しで呼べると、毎回条件を組み直さずに済む。
-      */}
-      <div data-design="SavedChips" className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs">保存済み</span>
-        {['未対応かつ7日以内', '定期便 契約中', 'ブロック解除者'].map((label) => (
-          <button
-            key={label}
-            disabled
-            title="保存した検索の呼び出しは準備中です"
-            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-          >
-            {label}
-          </button>
-        ))}
-        <button
-          disabled
-          title="条件の保存は準備中です"
-          className="text-accent rounded-pill px-3 py-1 text-xs opacity-50"
-        >
-          ＋ この条件を保存
-        </button>
-      </div>
-
-      {/*
-        一括操作（設計 `BulkBar`）。
-
-        以前は「0 人を選択中」の帯を常に出していた。誰も選んでいないのに
-        場所だけ取り、押せないボタンが6つ並ぶ。設計でもこの帯は選んだ
-        あとの絵にしか出てこない。1人以上選んだときだけ出す。
-
-        設計は6種。どれも1人ずつやると人数ぶんの往復が要るもの。
-      */}
-      {selectedIds.size > 0 && (
-        <div data-design="BulkBar" className="border-accent-soft bg-accent-soft rounded-card mb-3 border p-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-ink text-xs font-bold">{selectedIds.size} 人を選択中</span>
-            <span className="text-ink-secondary text-xs">選んだ友だちにまとめて実行できます</span>
-            <div className="ml-auto flex flex-wrap gap-2">
-              {[
-                '対応マークを変える',
-                'テンプレートを送る',
-                'シナリオを開始',
-                'タグを付ける・外す',
-                '友だち情報を書き換える',
-                'リマインダを開始',
-              ].map((label) => (
-                <button
-                  key={label}
-                  disabled
-                  // 受け口が無い。選んでも実行はできないので、押せない形のまま出す。
-                  title="まとめて実行する仕組みは準備中です"
-                  className="border-hairline bg-canvas text-ink-faint rounded-control border px-2.5 py-1 text-xs opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 検索と並び順（設計 `SearchBar`）。 */}
       <div data-design="SearchBar" className="bg-canvas rounded-card border border-hairline p-4 mb-4">
@@ -352,6 +242,70 @@ function FriendsPageInner() {
         </div>
       </div>
 
+      {/*
+        保存済みの検索条件（設計 `SavedChips`）。検索欄の下に置く。
+        条件の呼び出しなので、条件を組む場所の隣にないと結び付かない。
+        saved_searches は 100 で入っているが、一覧から呼ぶ導線が無い。
+      */}
+      <div data-design="SavedChips" className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-ink-faint text-xs">保存済み</span>
+        {['未対応かつ7日以内', '定期便 契約中', 'ブロック解除者'].map((label) => (
+          <button
+            key={label}
+            disabled
+            title="保存した検索の呼び出しは準備中です"
+            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+          >
+            {label}
+          </button>
+        ))}
+        <button
+          disabled
+          title="条件の保存は準備中です"
+          className="text-accent rounded-pill px-3 py-1 text-xs opacity-50"
+        >
+          ＋ この条件を保存
+        </button>
+      </div>
+
+      {/*
+        一括操作（設計 `BulkBar`）。
+
+        以前は「0 人を選択中」の帯を常に出していた。誰も選んでいないのに
+        場所だけ取り、押せないボタンが6つ並ぶ。設計でもこの帯は選んだ
+        あとの絵にしか出てこない。1人以上選んだときだけ出す。
+
+        設計は6種。どれも1人ずつやると人数ぶんの往復が要るもの。
+      */}
+      {selectedIds.size > 0 && (
+        <div data-design="BulkBar" className="border-accent-soft bg-accent-soft rounded-card mb-3 border p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-ink text-xs font-bold">{selectedIds.size} 人を選択中</span>
+            <span className="text-ink-secondary text-xs">選んだ友だちにまとめて実行できます</span>
+            <div className="ml-auto flex flex-wrap gap-2">
+              {[
+                '対応マークを変える',
+                'テンプレートを送る',
+                'シナリオを開始',
+                'タグを付ける・外す',
+                '友だち情報を書き換える',
+                'リマインダを開始',
+              ].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  // 受け口が無い。選んでも実行はできないので、押せない形のまま出す。
+                  title="まとめて実行する仕組みは準備中です"
+                  className="border-hairline bg-canvas text-ink-faint rounded-control border px-2.5 py-1 text-xs opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
@@ -430,7 +384,49 @@ function FriendsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   return (
     <div>
+      {/*
+        設計 `V2 2-2 友だち`。呼び名は「友だち」でサイドバーと揃えている。
+
+        見出しとタブは3つのタブに共通なので、切り替えの外に置く。
+        設計では見出しがいちばん上、その下にタブ、さらに下に KPI が来る。
+        以前はタブが見出しより上にあり、何の画面のタブなのかが
+        分からないまま先にタブが目に入っていた。
+      */}
+      <div data-design="Head">
+      <Header
+        title="友だち"
+        description="登録された友だちの検索・タグ付け・対応状況を管理します。"
+        action={
+          <div className="flex items-center gap-2">
+            {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
+            <button
+              disabled
+              title="マニュアルは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            <button
+              onClick={() => window.alert('CSVの書き出しは準備中です。')}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+            >
+              CSVで書き出す
+            </button>
+            <button
+              onClick={() => window.alert('友だちを選ぶと、まとめて実行できます。')}
+              className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+            >
+              一括アクション
+            </button>
+          </div>
+        }
+      />
+      </div>
+
+      {/* タブ（設計 `Tabs`）。呼び名も設計に合わせてある。 */}
+      <div data-design="Tabs">
       <MergedTabs basePath="/friends" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      </div>
       {tab === 'list' && <FriendsPageInner />}
       {tab === 'duplicates' && <DuplicatesPage />}
       {tab === 'merged' && <MergedUsersPage />}
