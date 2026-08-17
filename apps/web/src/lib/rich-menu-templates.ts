@@ -18,9 +18,9 @@ const COMPACT = { width: 2500, height: 843 };
 export const TEMPLATES: RichMenuTemplate[] = [
   {
     key: 'large-2x3',
-    label: '2x3 (大画像 6 ボタン)',
+    label: '2×3（大画像・6ボタン）',
     size: 'large',
-    description: '2 行 × 3 列の標準レイアウト',
+    description: '2行 × 3列の標準レイアウト',
     areas: Array.from({ length: 6 }, (_, i) => ({
       x: (i % 3) * (LARGE.width / 3),
       y: Math.floor(i / 3) * (LARGE.height / 2),
@@ -30,9 +30,9 @@ export const TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-3x1',
-    label: '3x1 (横 3 分割)',
+    label: '3×1（横3分割）',
     size: 'large',
-    description: '横並び 3 ボタン (画像全高)',
+    description: '横並び3ボタン（画像は全高）',
     areas: [0, 1, 2].map((i) => ({
       x: i * (LARGE.width / 3),
       y: 0,
@@ -42,9 +42,9 @@ export const TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-2x2',
-    label: '2x2',
+    label: '2×2',
     size: 'large',
-    description: '2 行 × 2 列',
+    description: '2行 × 2列',
     areas: Array.from({ length: 4 }, (_, i) => ({
       x: (i % 2) * (LARGE.width / 2),
       y: Math.floor(i / 2) * (LARGE.height / 2),
@@ -54,9 +54,9 @@ export const TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-1plus2',
-    label: '1+2 (上 1 / 下 2)',
+    label: '1＋2（上1・下2）',
     size: 'large',
-    description: '上段に大ボタン 1、下段に 2 ボタン',
+    description: '上段に大ボタン1、下段に2ボタン',
     areas: [
       { x: 0, y: 0, w: LARGE.width, h: LARGE.height / 2 },
       { x: 0, y: LARGE.height / 2, w: LARGE.width / 2, h: LARGE.height / 2 },
@@ -65,16 +65,16 @@ export const TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'large-empty',
-    label: '空白 (自由配置)',
+    label: '空白（自由配置）',
     size: 'large',
-    description: 'areas なしで開始 (エディタで自由に追加)',
+    description: '領域なしで開始し、編集画面で自由に追加',
     areas: [],
   },
   {
     key: 'compact-3x1',
-    label: 'Compact 3x1',
+    label: '横3分割（低画像）',
     size: 'compact',
-    description: '低高画像で横 3 分割',
+    description: '高さの低い画像で横3分割',
     areas: [0, 1, 2].map((i) => ({
       x: i * (COMPACT.width / 3),
       y: 0,
@@ -84,9 +84,9 @@ export const TEMPLATES: RichMenuTemplate[] = [
   },
   {
     key: 'compact-empty',
-    label: 'Compact 空白',
+    label: '空白（低画像）',
     size: 'compact',
-    description: '低高画像で areas なし',
+    description: '高さの低い画像で領域なし',
     areas: [],
   },
 ];

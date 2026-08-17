@@ -59,8 +59,10 @@ const SCREENS = Object.entries(structure.screens) as Array<
 function readWithParts(route: string): string {
   const source = readScreen(route);
   let combined = source;
-  for (const m of source.matchAll(/from '@\/(components|app)\/([^']+)'/g)) {
-    for (const ext of ['.tsx', '/page.tsx']) {
+  // lib も辿る。選択肢の定義（リッチメニューのレイアウトなど）を lib に
+  // 置いている画面があり、@/components と @/app だけでは中身を読めない。
+  for (const m of source.matchAll(/from '@\/(components|app|lib)\/([^']+)'/g)) {
+    for (const ext of ['.tsx', '.ts', '/page.tsx']) {
       const file = join(dirname(fileURLToPath(import.meta.url)), '..', m[1], m[2] + ext);
       try {
         combined += readFileSync(file, 'utf8');
