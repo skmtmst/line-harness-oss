@@ -2484,6 +2484,11 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/entry-routes/${id}`, { method: 'DELETE' }),
     funnel: (id: string) =>
       fetchApi<ApiResponse<EntryRouteFunnel>>(`/api/entry-routes/${id}/funnel`),
+    /** クリックがどこから来ているか。utm_source > 参照元のホスト > 直接アクセス */
+    sources: (id: string) =>
+      fetchApi<ApiResponse<Array<{ label: string; count: number }>>>(
+        `/api/entry-routes/${id}/sources`,
+      ),
   },
   entryRouteGenres: {
     list: () => fetchApi<ApiResponse<EntryRouteGenre[]>>('/api/entry-route-genres'),
