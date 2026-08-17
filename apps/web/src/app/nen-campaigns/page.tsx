@@ -255,7 +255,58 @@ export default function NenCampaignsPage() {
 
   return (
     <>
-      <Header title="NEN配信" />
+      <div data-design="Head">
+        <Header
+          title="NEN配信"
+          description="然-NEN- 専用の配信を管理します。健康コラム・誕生日クーポン・ケアフラグ連動のフォローなど、この事業に固有の配信をまとめています。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              {['マニュアル', '並び替え', 'フォルダを追加'].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  title="準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">配信ジョブ</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {settings.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            稼働中 {settings.filter((x) => x.isEnabled).length}
+          </p>
+        </div>
+        {/* 配信した通数・到達率・失敗を、この画面では集計していない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">今月の配信</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">この画面では集計していません</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">待機中</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {jobs.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">送信待ちのジョブ</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">失敗</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">失敗の記録がありません</p>
+        </div>
+      </div>
       <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
         <section className="rounded-3xl bg-gradient-to-br from-[#0d4a32] to-[#16815b] p-6 text-white shadow-lg sm:p-8">
           <p className="text-xs font-semibold tracking-[0.25em] text-emerald-100">NEN CUSTOMER JOURNEY</p>
