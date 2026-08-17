@@ -101,6 +101,13 @@ export interface CreateTrackedLinkInput {
   lineAccountId?: string | null;
   /** Auto-generated links only — see getOrCreateAutoTrackedLink. */
   dedupKey?: string | null;
+  /**
+   * この短縮URLが、どのテンプレートの本文から作られたか（110）。
+   *
+   * 無いとクリックをテンプレート単位で数えられず、
+   * テンプレート一覧の「平均クリック率」が出せない。
+   */
+  templateId?: string | null;
   ogTitle?: string | null;
   ogDescription?: string | null;
   ogImageUrl?: string | null;
@@ -120,8 +127,8 @@ export async function createTrackedLink(
     try {
       await db
         .prepare(
-          `INSERT INTO tracked_links (id, name, original_url, tag_id, scenario_id, intro_template_id, reward_template_id, line_account_id, short_code, dedup_key, is_active, click_count, og_title, og_description, og_image_url, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)`,
+          `INSERT INTO tracked_links (id, name, original_url, tag_id, scenario_id, intro_template_id, reward_template_id, line_account_id, short_code, dedup_key, template_id, is_active, click_count, og_title, og_description, og_image_url, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)`,
         )
         .bind(
           id,
@@ -134,6 +141,7 @@ export async function createTrackedLink(
           input.lineAccountId ?? null,
           shortCode,
           input.dedupKey ?? null,
+          input.templateId ?? null,
           input.ogTitle ?? null,
           input.ogDescription ?? null,
           input.ogImageUrl ?? null,
@@ -157,6 +165,17 @@ export async function createTrackedLink(
 export interface AutoTrackedLinkInput {
   originalUrl: string;
   lineAccountId?: string | null;
+  /**
+   * この短縮URLを含んでいたテンプレート（110）。
+   *
+   * dedup_key には入れない。同じURLがテンプレートAとBの両方に出ても
+   * 行は1つで、クリックはまとめて数える。dedup_key に入れると
+   * 同じURLの行がテンプレートの数だけ増え、集計が散る。
+   *
+   * したがって template_id は「最初にこのURLを載せたテンプレート」になる。
+   * 厳密な帰属ではないが、テンプレート単位のクリック率を出すには足りる。
+   */
+  templateId?: string | null;
 }
 
 function autoTrackedLinkDedupKey(input: AutoTrackedLinkInput): string {
@@ -194,6 +213,7 @@ export async function getOrCreateAutoTrackedLink(
       name: `auto: ${input.originalUrl.slice(0, 60)}`,
       originalUrl: input.originalUrl,
       lineAccountId: input.lineAccountId ?? null,
+      templateId: input.templateId ?? null,
       dedupKey,
     });
   } catch (err) {

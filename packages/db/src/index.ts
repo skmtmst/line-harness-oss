@@ -56,3 +56,4 @@ export * from './funnels';
 export * from './login-audit';
 export * from './analytics';
 export * from './dashboard';
+export * from './operation-audit';
