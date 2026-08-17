@@ -77,7 +77,10 @@ export function AreaProperties({ area, pages, onUpdate, onDelete }: Props) {
       </div>
 
       <label className="block">
-        <span className="text-xs text-gray-500">アクション</span>
+        <span className="text-ink-secondary text-xs">エリアの動き</span>
+        <span className="text-ink-faint block text-[11px]">
+          タップしたときに何が起きるかを決めます。
+        </span>
         <select
           value={area.actionType}
           onChange={(e) => {
@@ -86,10 +89,10 @@ export function AreaProperties({ area, pages, onUpdate, onDelete }: Props) {
           }}
           className="mt-0.5 block w-full border border-gray-300 rounded px-2 py-1 text-sm"
         >
-          <option value="uri">URL を開く (uri)</option>
-          <option value="message">テキスト送信 (message)</option>
-          <option value="postback">postback</option>
-          <option value="richmenuswitch">タブ切替 (richmenuswitch)</option>
+          <option value="uri">URLを開く</option>
+          <option value="message">メッセージを送る</option>
+          <option value="postback">こちらで処理する（postback）</option>
+          <option value="richmenuswitch">メニューを切り替える</option>
         </select>
       </label>
 
