@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
@@ -1476,11 +1477,6 @@ export function OffersTab() {
     }
   }, [])
 
-  const handleOpenCreate = () => {
-    setEditTarget(null)
-    setFormOpen(true)
-  }
-
   const handleEdit = (offer: AffiliateOffer) => {
     setEditTarget(offer)
     setFormOpen(true)
@@ -1500,12 +1496,14 @@ export function OffersTab() {
             「何をしたら成果になり、いくら払うか」の組み合わせです。アフィリエイターはこの案件を選んで紹介します。
           </p>
         </div>
-        <button
-          onClick={handleOpenCreate}
+        {/* 作るのは 6-1-3 の独立した画面。同じフォームがモーダルにもあると、
+            片方だけ直しても気づけない。モーダルは編集のときだけ開く。 */}
+        <Link
+          href="/affiliate-offers/new"
           className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
         >
           案件を作る
-        </button>
+        </Link>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
