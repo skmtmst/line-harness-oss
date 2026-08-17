@@ -556,17 +556,53 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
 
   return (
     <div>
-      <Header
-        title="シナリオ詳細"
-        action={
-          <Link
-            href="/scenarios"
-            className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors inline-flex items-center"
-          >
-            ← シナリオ一覧
-          </Link>
-        }
-      />
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+        <Link href="/scenarios" className="hover:underline">
+          シナリオ配信
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>{scenario.name}</span>
+      </nav>
+
+      <div data-design="Head">
+        <Header
+          title="シナリオ編集"
+          description="配信のタイミングと内容を並べます。作成しただけでは配信されません。開始するには友だち追加時の配信やアクションから呼び出します。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              <button
+                disabled
+                title="一括テスト送信は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                一括テスト送信
+              </button>
+              <Link
+                href="/scenarios"
+                className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium"
+              >
+                ← シナリオ一覧
+              </Link>
+            </div>
+          }
+        />
+      </div>
+
+      {/* 同時購読の決まりは、シナリオを組む前に知っておかないと設計を
+          間違える。1画面に1つしか流せないことを最初に書く。 */}
+      <section className="bg-info-bg rounded-card mb-4 p-4">
+        <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
+        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+          別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。
+        </p>
+      </section>
 
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -576,19 +612,42 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
 
       {/* Stats Header Bar */}
       {stats && stats.enrolledTotal > 0 && (
-        <div className="mb-4 bg-canvas rounded-card border border-hairline p-3 flex items-center gap-4 text-sm flex-wrap">
-          <span className="font-medium text-ink-secondary">📊 集計</span>
-          <span>登録 <span className="font-semibold">{stats.enrolledTotal}</span> 人</span>
-          <span className="text-ink-faint">/</span>
-          <span>進行中 <span className="font-semibold text-blue-700">{stats.activeNow}</span></span>
-          <span className="text-ink-faint">/</span>
-          <span>完了 <span className="font-semibold text-green-700">{stats.completed}</span></span>
-          {stats.paused > 0 && (
-            <>
-              <span className="text-ink-faint">/</span>
-              <span>一時停止 {stats.paused}</span>
-            </>
-          )}
+        <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="bg-canvas rounded-card border-hairline border p-4">
+            <p className="text-ink-faint text-xs">購読中</p>
+            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+              {stats.activeNow.toLocaleString('ja-JP')}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+            <p className="text-ink-faint mt-0.5 text-xs">登録 {stats.enrolledTotal} 人</p>
+          </div>
+          <div className="bg-canvas rounded-card border-hairline border p-4">
+            <p className="text-ink-faint text-xs">読了済</p>
+            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+              {stats.completed.toLocaleString('ja-JP')}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+            <p className="text-ink-faint mt-0.5 text-xs">
+              {stats.enrolledTotal > 0
+                ? `登録のうち ${Math.round((stats.completed / stats.enrolledTotal) * 100)}%`
+                : '—'}
+            </p>
+          </div>
+          <div className="bg-canvas rounded-card border-hairline border p-4">
+            <p className="text-ink-faint text-xs">一時停止</p>
+            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+              {stats.paused.toLocaleString('ja-JP')}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+            <p className="text-ink-faint mt-0.5 text-xs">別のシナリオに移った人など</p>
+          </div>
+          {/* ステップごとの到達人数を持っていないので、どこで落ちたかを
+              指せない。全体の登録と完了しか分からない。 */}
+          <div className="bg-canvas rounded-card border-hairline border p-4">
+            <p className="text-ink-faint text-xs">離脱が大きい地点</p>
+            <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+            <p className="text-ink-faint mt-0.5 text-xs">ステップごとの到達人数は未集計</p>
+          </div>
         </div>
       )}
 
@@ -705,11 +764,49 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             {scenario.description && (
               <p className="text-sm text-ink-faint mb-3">{scenario.description}</p>
             )}
-            <div className="flex items-center gap-4 text-xs text-ink-faint flex-wrap">
-              <span>トリガー: {triggerOptions.find(o => o.value === scenario.triggerType)?.label ?? scenario.triggerType}</span>
-              <span>ステップ数: {scenario.steps.length}</span>
-              <span>作成日: {new Date(scenario.createdAt).toLocaleDateString('ja-JP')}</span>
-            </div>
+            <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-faint">フォルダ</dt>
+                {/* シナリオにフォルダを持たせる列が無い。 */}
+                <dd className="text-ink-secondary">未分類</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-faint">配信方式</dt>
+                <dd className="text-ink-secondary">{modeBadge.label}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-faint">状態</dt>
+                <dd className="text-ink-secondary">{scenario.isActive ? '配信可' : '一時停止中'}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-faint">開始のきっかけ</dt>
+                <dd className="text-ink-secondary">
+                  {triggerOptions.find((o) => o.value === scenario.triggerType)?.label ??
+                    scenario.triggerType}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-faint">対象の絞り込み</dt>
+                {/* 購読を始める相手を絞る条件を持っていない。呼び出し側で
+                    絞ってから開始する形になっている。 */}
+                <dd className="text-ink-faint">呼び出し側で決まります</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-faint">最終ステップ後の処理</dt>
+                {/* 読み終わったあと次のシナリオへ、という設定が無い。 */}
+                <dd className="text-ink-faint">なし（読了で終わり）</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-faint">重複購読</dt>
+                <dd className="text-ink-faint">許可しない（同時に1つ）</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-faint">作成日</dt>
+                <dd className="text-ink-secondary">
+                  {new Date(scenario.createdAt).toLocaleDateString('ja-JP')}
+                </dd>
+              </div>
+            </dl>
           </div>
         )}
       </div>
@@ -717,7 +814,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       {/* Steps */}
       <div className="bg-canvas rounded-card border border-hairline p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-800">ステップ一覧</h3>
+          <h3 className="text-ink text-sm font-semibold">コンテンツ {sortedSteps.length} 通</h3>
           <div className="flex gap-2">
             <button
               onClick={() => setPreviewOpen(true)}
