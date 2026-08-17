@@ -189,3 +189,63 @@ export async function getFriendSiteEvents(
     .all<SiteEvent>();
   return result.results;
 }
+
+export interface SiteTrackingSummary {
+  /** 今日の記録件数（JST） */
+  todayEvents: number;
+  /** うちページ閲覧 */
+  todayPageViews: number;
+  /** 友だちと結びついた件数（全期間） */
+  linkedEvents: number;
+  /** 結びつかなかった件数（全期間） */
+  unlinkedEvents: number;
+  /** 記録があるパスの種類 */
+  pathCount: number;
+  /** 使われているイベント種別の数 */
+  eventTypeCount: number;
+  /** 最後に受け取った時刻。1件も無ければ null */
+  lastEventAt: string | null;
+}
+
+/**
+ * サイト計測が動いているかを、1回の問い合わせで見る。
+ *
+ * 「設置できているか」は、設定を見ても分からない。**最後にいつ受け取ったか**
+ * でしか判断できないので、それを主に返す。
+ *
+ * occurred_at は JST の文字列なので、先頭10文字が日付になる。
+ */
+export async function getSiteTrackingSummary(db: D1Database): Promise<SiteTrackingSummary> {
+  const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
+  const row = await db
+    .prepare(
+      `SELECT
+         SUM(CASE WHEN substr(occurred_at, 1, 10) = ?1 THEN 1 ELSE 0 END) AS today_events,
+         SUM(CASE WHEN substr(occurred_at, 1, 10) = ?1 AND event_type = 'page_view' THEN 1 ELSE 0 END) AS today_page_views,
+         SUM(CASE WHEN friend_id IS NOT NULL THEN 1 ELSE 0 END) AS linked_events,
+         SUM(CASE WHEN friend_id IS NULL THEN 1 ELSE 0 END) AS unlinked_events,
+         COUNT(DISTINCT path) AS path_count,
+         COUNT(DISTINCT event_type) AS event_type_count,
+         MAX(occurred_at) AS last_event_at
+       FROM site_events`,
+    )
+    .bind(today)
+    .first<{
+      today_events: number | null;
+      today_page_views: number | null;
+      linked_events: number | null;
+      unlinked_events: number | null;
+      path_count: number | null;
+      event_type_count: number | null;
+      last_event_at: string | null;
+    }>();
+  return {
+    todayEvents: Number(row?.today_events ?? 0),
+    todayPageViews: Number(row?.today_page_views ?? 0),
+    linkedEvents: Number(row?.linked_events ?? 0),
+    unlinkedEvents: Number(row?.unlinked_events ?? 0),
+    pathCount: Number(row?.path_count ?? 0),
+    eventTypeCount: Number(row?.event_type_count ?? 0),
+    lastEventAt: row?.last_event_at ?? null,
+  };
+}
