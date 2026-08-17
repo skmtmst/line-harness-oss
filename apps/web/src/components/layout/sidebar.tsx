@@ -8,6 +8,7 @@ import type { AccountWithStats } from '@/contexts/account-context'
 import { countryFlag } from '@/lib/country-flag'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
+import { useBrand } from '@/lib/use-brand'
 
 // ─── メニュー定義 ───
 //
@@ -246,6 +247,7 @@ function NavIcon({ d }: { d: string }) {
 export default function Sidebar() {
   const pathname = usePathname()
   const { selectedAccountId } = useAccount()
+  const brand = useBrand()
   const [isOpen, setIsOpen] = useState(false)
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
@@ -374,8 +376,11 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <>
-      {/* モバイルドロワーでは閉じるボタン分の余白だけ確保する */}
-      <div className="h-16 md:hidden" aria-hidden="true" />
+      {/*
+        上に 64px あける。ドロワーでは閉じるボタンの、アイコンレールでは
+        ハンバーガーの居場所になる。xl 以上（フル幅）では要らない。
+      */}
+      <div className="h-16 xl:hidden" aria-hidden="true" />
 
       {/* アカウント切替 */}
       <AccountSwitcher />
@@ -501,17 +506,32 @@ export default function Sidebar() {
             }
           </svg>
         </button>
+        {/* 名前とアイコンは公式アカウントのもの。ログイン画面と同じ扱い。 */}
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>N</div>
-          <p className="text-sm font-bold leading-tight text-gray-900">然-NEN- LINE管理システム TEST</p>
+          {brand.iconUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
+            <img src={brand.iconUrl} alt="" className="w-7 h-7 rounded-lg object-cover" />
+          ) : (
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+          )}
+          <p className="text-sm font-bold leading-tight text-gray-900 truncate">
+            {brand.name ?? '然-NEN- LINE管理システム'}
+          </p>
         </div>
       </div>
 
-      {/* モバイル: オーバーレイ */}
-      {isOpen && <div className="md:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setIsOpen(false)} />}
+      {/* オーバーレイ。ドロワーが開くのは xl 未満 */}
+      {isOpen && <div className="xl:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setIsOpen(false)} />}
 
-      {/* モバイル: スライドインサイドバー */}
-      <aside className={`md:hidden fixed top-0 left-0 z-50 w-72 bg-white flex flex-col h-screen transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      {/*
+        スライドインするメニュー。
+
+        以前は 768px 未満だけで使っていた。768〜1279px は 64px の
+        アイコンレールになるが、そこでは項目名もセクション見出しも
+        消えるので、初めて触る人には「メニューが無くなった」ように見える。
+        レールは残したまま、その幅でもここを開けるようにした。
+      */}
+      <aside className={`xl:hidden fixed top-0 left-0 z-50 w-72 bg-white flex flex-col h-screen transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="absolute top-4 right-4">
           <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100" aria-label="閉じる">
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -529,6 +549,19 @@ export default function Sidebar() {
         同じ木のまま幅と文字の出し分けだけを変える。
       */}
       <aside className="hidden md:flex w-16 xl:w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0 transition-[width] duration-200">
+        {/*
+          レール幅のときだけ出るハンバーガー。押すと上のドロワーが開いて
+          項目名が読める。sidebarContent の先頭に空けた 64px に重ねている。
+        */}
+        <button
+          onClick={() => setIsOpen(true)}
+          aria-label="メニューを開く"
+          className="hidden md:flex xl:hidden absolute top-0 left-0 h-16 w-16 items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
         {sidebarContent}
       </aside>
     </>
