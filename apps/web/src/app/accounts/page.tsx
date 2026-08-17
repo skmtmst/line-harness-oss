@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import AccountMigration from './migration'
 import CcPromptButton from '@/components/cc-prompt-button'
 import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
 import AccountSettingsSection from '@/components/accounts/account-settings-section'
@@ -66,8 +67,9 @@ const ccPrompts = [
 ]
 
 const MERGED_TABS = [
-  { key: 'accounts', label: 'アカウント' },
+  { key: 'accounts', label: 'LINEアカウント' },
   { key: 'pools', label: 'プール' },
+  { key: 'migration', label: 'データ移行' },
 ]
 
 function AccountsPageInner() {
@@ -475,6 +477,7 @@ function AccountsPageHost() {
       <MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} />
       {tab === 'accounts' && <AccountsPageInner />}
       {tab === 'pools' && <PoolsPage />}
+      {tab === 'migration' && <AccountMigration />}
     </div>
   )
 }
