@@ -673,6 +673,19 @@ export const api = {
       fetchApi<ApiResponse<{ summary: MileageSummary; history: MileageHistoryItem[] }>>(
         `/api/friends/${id}/mileage?limit=${limit}`,
       ),
+    /**
+     * 友だち追加の内訳（設計 V2 4-6）。
+     * returning は「以前からのお客さまに『はじめまして』が届いた数」でもある。
+     */
+    addBreakdown: (params?: { days?: number; accountId?: string }) => {
+      const q = new URLSearchParams()
+      if (params?.days) q.set('days', String(params.days))
+      if (params?.accountId) q.set('lineAccountId', params.accountId)
+      const tail = q.toString() ? `?${q.toString()}` : ''
+      return fetchApi<
+        ApiResponse<{ days: number; firstTime: number; returning: number; unblocked: number }>
+      >(`/api/friends/add-breakdown${tail}`)
+    },
     count: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<{ count: number }>>('/api/friends/count' + query)
