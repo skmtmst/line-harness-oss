@@ -55,7 +55,7 @@ import Header from '@/components/layout/header'
 import CcPromptButton from '@/components/cc-prompt-button'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
-import AffiliatesPage from '@/app/affiliates/page'
+import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 
 interface ConversionReportItem {
   conversionPointId: string
@@ -84,10 +84,23 @@ const ccPrompts = [
   },
 ]
 
+/**
+ * 設計 6-1 は1画面に5タブ。並びは設計のまま、素のURLでは主役の
+ * 「成果地点（CV）」を開く。
+ *
+ * これまでは /conversions が2タブ、その中に入れていた /affiliates が
+ * さらに3タブを持つ二重構造だった。同じ ?tab= が2つの意味を持つので、
+ * 「案件を開くURL」を人に送れなかった。
+ */
 const MERGED_TABS = [
-  { key: 'points', label: '成果地点' },
-  { key: 'affiliates', label: 'アフィリエイト' },
+  { key: 'affiliates', label: 'アフィリエイター' },
+  { key: 'offers', label: '案件' },
+  { key: 'approvals', label: '成果承認' },
+  { key: 'points', label: '成果地点（CV）' },
+  { key: 'report', label: 'レポート' },
 ]
+
+const DEFAULT_TAB = 'points'
 
 function ConversionsPageInner() {
   const [points, setPoints] = useState<ConversionPoint[]>([])
@@ -202,7 +215,7 @@ function ConversionsPageInner() {
                 マニュアル
               </button>
               <Link
-                href="/affiliates?tab=affiliates"
+                href="/conversions?tab=affiliates"
                 className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
               >
                 アフィリエイターを追加
@@ -231,7 +244,7 @@ function ConversionsPageInner() {
           value={kpi.pendingCount}
           unit="件"
           detail={`合計 ¥${kpi.pendingYen.toLocaleString()}`}
-          action={{ label: '成果承認', href: '/affiliates?tab=approvals' }}
+          action={{ label: '成果承認', href: '/conversions?tab=approvals' }}
           loading={loading}
         />
         {/* 設計は「確定報酬」。報酬そのものを持つ列が無いので、確定した成果の
@@ -248,7 +261,7 @@ function ConversionsPageInner() {
           value={openOffers}
           unit="件"
           detail="紹介できる案件"
-          action={{ label: '案件', href: '/affiliates?tab=offers' }}
+          action={{ label: '案件', href: '/conversions?tab=offers' }}
           loading={loading}
         />
       </div>
@@ -518,13 +531,107 @@ function ConversionsPageInner() {
   )
 }
 
+/**
+ * レポートのタブ。
+ *
+ * 成果地点ごとの件数と金額をそのまま出す。一覧の表にもCV数はあるが、
+ * あちらは「どう数えるか」を確かめる画面で、こちらは「いくらになったか」を
+ * 見る画面なので、金額を主にしている。
+ */
+function ReportTab() {
+  const [rows, setRows] = useState<ConversionReportItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    void api.conversions
+      .report()
+      .then((r) => {
+        if (!cancelled && r.success) setRows(r.data)
+      })
+      .catch(() => {
+        // レポートが引けなくても、他のタブは使える。
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const total = rows.reduce((s, r) => s + r.totalValue, 0)
+
+  if (loading) {
+    return (
+      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+        読み込み中...
+      </div>
+    )
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
+        まだ成果の記録がありません。成果地点を作って計測が始まると、ここに出ます。
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+      <table className="w-full min-w-[560px]">
+        <thead className="bg-canvas-sunken border-hairline border-b">
+          <tr>
+            <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">成果地点（CV）名</th>
+            <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">種別</th>
+            <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">CV数</th>
+            <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">金額</th>
+          </tr>
+        </thead>
+        <tbody className="divide-hairline divide-y">
+          {rows.map((r) => (
+            <tr key={r.conversionPointId} className="hover:bg-canvas-sunken">
+              <td className="text-ink px-4 py-3 text-sm font-medium">{r.conversionPointName}</td>
+              <td className="text-ink-secondary px-4 py-3 text-sm">
+                {EVENT_TYPE_LABELS[r.eventType] ?? r.eventType}
+              </td>
+              <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">{r.totalCount}</td>
+              <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
+                {r.totalValue > 0 ? `¥${r.totalValue.toLocaleString()}` : '—'}
+              </td>
+            </tr>
+          ))}
+          <tr className="bg-canvas-sunken">
+            <td className="text-ink-secondary px-4 py-3 text-sm font-medium" colSpan={3}>
+              合計
+            </td>
+            <td className="text-ink px-4 py-3 text-right text-sm font-semibold tabular-nums">
+              ¥{total.toLocaleString()}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function ConversionsPageHost() {
-  const tab = useMergedTab(MERGED_TABS)
+  const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
   return (
     <div>
-      <MergedTabs basePath="/conversions" paramName="tab" tabs={MERGED_TABS} active={tab} />
+      <MergedTabs
+        basePath="/conversions"
+        paramName="tab"
+        tabs={MERGED_TABS}
+        active={tab}
+        defaultKey={DEFAULT_TAB}
+      />
       {tab === 'points' && <ConversionsPageInner />}
-      {tab === 'affiliates' && <AffiliatesPage />}
+      {tab === 'affiliates' && <AffiliatorsTab />}
+      {tab === 'offers' && <OffersTab />}
+      {tab === 'approvals' && <ApprovalQueue />}
+      {tab === 'report' && <ReportTab />}
     </div>
   )
 }
