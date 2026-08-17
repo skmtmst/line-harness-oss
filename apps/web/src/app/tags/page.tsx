@@ -14,113 +14,6 @@ import FriendFieldList from '@/components/friend-fields/field-list'
 import SupportMarkList from '@/components/friend-fields/mark-list'
 import SavedSearchList from '@/components/friend-fields/saved-search-list'
 
-const PRESET_COLORS = [
-  '#3B82F6', // blue (server default)
-  '#10B981', // green
-  '#F59E0B', // amber
-  '#EF4444', // red
-  '#8B5CF6', // purple
-  '#EC4899', // pink
-  '#06B6D4', // cyan
-  '#6B7280', // gray
-]
-
-function TagMileageEditor({ tag, onSaved }: { tag: Tag; onSaved: () => void }) {
-  const [reward, setReward] = useState(String(tag.mileageReward ?? 0))
-  const [referralReward, setReferralReward] = useState(String(tag.referralMileageReward ?? 0))
-  const [multiplier, setMultiplier] = useState(
-    tag.mileageMultiplierBps == null ? '' : String(tag.mileageMultiplierBps / 10000),
-  )
-  const [priority, setPriority] = useState(String(tag.mileageMultiplierPriority ?? 0))
-  const [saving, setSaving] = useState(false)
-
-  const save = async () => {
-    const rewardMiles = Number(reward)
-    const referralRewardMiles = Number(referralReward)
-    const multiplierBps = multiplier.trim() === '' ? null : Math.round(Number(multiplier) * 10000)
-    const multiplierPriority = Number(priority)
-    if (!Number.isInteger(rewardMiles) || rewardMiles < 0) return
-    if (!Number.isInteger(referralRewardMiles) || referralRewardMiles < 0) return
-    if (multiplierBps !== null && (!Number.isInteger(multiplierBps) || multiplierBps < 1000 || multiplierBps > 100000)) return
-    if (!Number.isInteger(multiplierPriority) || multiplierPriority < 0) return
-    setSaving(true)
-    try {
-      await api.tags.updateMileage(tag.id, {
-        rewardMiles,
-        referralRewardMiles,
-        multiplierBps,
-        multiplierPriority,
-      })
-      onSaved()
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <>
-      <td className="px-3 py-3">
-        <input
-          aria-label={`${tag.name}の獲得マイル`}
-          type="number"
-          min={0}
-          step={1}
-          value={reward}
-          onChange={(e) => setReward(e.target.value)}
-          className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
-        />
-      </td>
-      <td className="px-3 py-3">
-        <input
-          aria-label={`${tag.name}の紹介者マイル`}
-          type="number"
-          min={0}
-          step={1}
-          value={referralReward}
-          onChange={(e) => setReferralReward(e.target.value)}
-          className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
-        />
-      </td>
-      <td className="px-3 py-3">
-        <div className="flex items-center gap-1">
-          <input
-            aria-label={`${tag.name}の還元倍率`}
-            type="number"
-            min={0.1}
-            max={10}
-            step={0.1}
-            placeholder="なし"
-            value={multiplier}
-            onChange={(e) => setMultiplier(e.target.value)}
-            className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
-          />
-          <span className="text-xs text-ink-faint">倍</span>
-        </div>
-      </td>
-      <td className="px-3 py-3">
-        <input
-          aria-label={`${tag.name}の倍率優先度`}
-          type="number"
-          min={0}
-          max={1000}
-          value={priority}
-          onChange={(e) => setPriority(e.target.value)}
-          className="w-16 px-2 py-1.5 text-sm border border-gray-300 rounded-md tabular-nums"
-        />
-      </td>
-      <td className="px-3 py-3 text-right whitespace-nowrap">
-        <button
-          onClick={save}
-          disabled={saving}
-          className="px-2.5 py-1 text-xs font-medium text-green-700 hover:bg-green-50 rounded-md disabled:opacity-40"
-        >
-          {saving ? '保存中' : 'マイル保存'}
-        </button>
-      </td>
-    </>
-  )
-}
-
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
 
@@ -194,13 +87,8 @@ function TagsPageInner() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  const [creating, setCreating] = useState(false)
   // タグ名の絞り込み（設計 `Body` の「タグ名で検索」）。
   const [tagQuery, setTagQuery] = useState('')
-  const [newName, setNewName] = useState('')
-  const [newColor, setNewColor] = useState(PRESET_COLORS[0])
-  const [newGroupId, setNewGroupId] = useState('')
-  const [saving, setSaving] = useState(false)
 
   const router = useRouter()
   const params = useSearchParams()
@@ -292,33 +180,6 @@ function TagsPageInner() {
       load()
     } catch {
       setError('分類の削除に失敗しました')
-    }
-  }
-
-  const handleCreate = async () => {
-    if (saving) return
-    const name = newName.trim()
-    if (!name) return
-    if (items.some((t) => t.name === name)) {
-      setError(`タグ「${name}」は既に存在します`)
-      return
-    }
-    setSaving(true)
-    setError('')
-    try {
-      await api.tags.create({ name, color: newColor, groupId: newGroupId || null })
-      setNewName('')
-      setCreating(false)
-      load()
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 409) {
-        setError(`タグ「${name}」は既に存在します`)
-        load()
-      } else {
-        setError('作成に失敗しました')
-      }
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -602,82 +463,6 @@ function TagsPageInner() {
             </button>
           ))}
         </div>
-
-      {creating && (
-        <div className="mb-4 p-4 bg-canvas rounded-card border border-hairline">
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-semibold text-ink-faint mb-1.5">タグ名</label>
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate() }}
-                placeholder="例: 見込み客"
-                autoFocus
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-ink-faint mb-1.5">色</label>
-              <div className="flex items-center gap-1.5">
-                {PRESET_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => setNewColor(c)}
-                    className={`w-7 h-7 rounded-full transition-transform ${newColor === c ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-110'}`}
-                    style={{ backgroundColor: c }}
-                    aria-label={`色 ${c}`}
-                  />
-                ))}
-                <input
-                  type="color"
-                  value={newColor}
-                  onChange={(e) => setNewColor(e.target.value)}
-                  className="w-7 h-7 p-0 border border-gray-300 rounded cursor-pointer"
-                  title="カスタム色"
-                />
-              </div>
-            </div>
-            <div>
-              <label
-                htmlFor="new-tag-group"
-                className="block text-xs font-semibold text-ink-faint mb-1.5"
-              >
-                分類
-              </label>
-              <select
-                id="new-tag-group"
-                value={newGroupId}
-                onChange={(e) => setNewGroupId(e.target.value)}
-                className="border-hairline rounded-control border px-3 py-2 text-sm"
-              >
-                <option value="">未分類</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={saving || !newName.trim()}
-                className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover disabled:opacity-40"
-              >
-                {saving ? '作成中...' : '作成'}
-              </button>
-              <button
-                onClick={() => { setCreating(false); setNewName('') }}
-                className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
         <div className="overflow-x-auto">
