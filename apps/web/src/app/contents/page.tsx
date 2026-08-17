@@ -234,10 +234,21 @@ function MediaTab() {
         </div>
       )}
 
-      <p className="text-ink-faint mt-4 text-xs leading-relaxed">
-        画像は10MB、動画は90MB、PDFは20MBまでです。
-        中身の形式とファイル名の拡張子が食い違うものは保存できません。
-      </p>
+      {/* 設計は種別ごとに上限を書き分けている。数字は実装の実際の制限を
+          使う（設計は動画200MB・PDF10MBだが、いまの実装は90MB・20MB）。
+          設計の数字に合わせると、通らないファイルを通ると言うことになる。 */}
+      <div className="border-hairline mt-4 rounded-lg border p-3">
+        <p className="text-ink-secondary text-xs font-medium">アップロードできるもの</p>
+        <ul className="text-ink-faint mt-1 space-y-0.5 text-xs">
+          <li>画像 10MB / jpg・png・gif</li>
+          <li>動画 90MB / mp4</li>
+          <li>PDF 20MB</li>
+        </ul>
+        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+          中身の形式とファイル名の拡張子が食い違うものは保存できません。
+          アップロードすると公開リンクが作られます。個人情報が写り込んだ画像は入れないでください。
+        </p>
+      </div>
     </div>
   )
 }
@@ -467,10 +478,30 @@ function ContentsInner() {
   const tab = useMergedTab(TABS)
   return (
     <div>
-      <Header
-        title="コンテンツ"
-        description="画像や動画、そして何度も使う文字を1か所にまとめます。"
-      />
+      <div data-design="Head">
+        <Header
+          title="コンテンツ"
+          description={
+            tab === 'vars'
+              ? '「ブランド名」「営業時間」など、アカウント内で共通して使う情報を登録します。テンプレートに差し込めるので、変更は1か所で済みます。'
+              : '配信やリッチメニューで使う画像・動画・PDFをここにまとめます。どこで使われているかも一緒に管理します。'
+          }
+          action={
+            <div className="flex flex-wrap gap-2">
+              {['マニュアル', 'フォルダを追加'].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  title="準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          }
+        />
+      </div>
       <MergedTabs basePath="/contents" tabs={TABS} active={tab} />
       {tab === 'media' && <MediaTab />}
       {tab === 'vars' && <VarsTab />}
