@@ -66,6 +66,8 @@ function MenusPageInner() {
   const [staff, setStaff] = useState<BookingStaff[]>([])
   /** メニューID → 担当できるスタッフの表示名。 */
   const [menuStaff, setMenuStaff] = useState<Map<string, string[]>>(new Map())
+  /** 担当を引けなかったスタッフの表示名。空でなければ「担当なし」は当てにならない。 */
+  const [staffReadFailed, setStaffReadFailed] = useState<string[]>([])
   const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [query, setQuery] = useState('')
 
@@ -139,6 +141,7 @@ function MenusPageInner() {
         setBookings(bookingRes.requests)
 
         const map = new Map<string, string[]>()
+        const failed: string[] = []
         await Promise.all(
           staffRes.staff.map(async (s) => {
             try {
@@ -148,11 +151,17 @@ function MenusPageInner() {
                 map.set(row.menu_id, [...(map.get(row.menu_id) ?? []), s.display_name || s.name])
               }
             } catch {
-              // 1人ぶん引けなくても、他の行は出せる。
+              // 1人ぶん引けなくても、他の行は出せる。ただし黙って捨てると、
+              // この人だけが担当のメニューが「担当なし」＝予約枠が出ない、と
+              // 誤って読める。名前を控えて表の上で断る。
+              failed.push(s.display_name || s.name)
             }
           }),
         )
-        if (alive) setMenuStaff(map)
+        if (alive) {
+          setMenuStaff(map)
+          setStaffReadFailed(failed)
+        }
       } catch {
         // 付随情報が無いだけ。メニューの登録と編集はできる。
       }
@@ -297,6 +306,14 @@ function MenusPageInner() {
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
+        </div>
+      )}
+
+      {staffReadFailed.length > 0 && (
+        <div className="bg-warning-bg text-warning rounded-card mb-3 px-4 py-3 text-xs">
+          {staffReadFailed.join('・')} の担当を読み取れませんでした。
+          この人だけが担当しているメニューは、実際には担当がいても「担当なし」と出ます。
+          時間をおいて開き直してください。
         </div>
       )}
 

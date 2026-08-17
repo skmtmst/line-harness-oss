@@ -112,6 +112,8 @@ function makeEventDb(state: {
   friends?: FriendRow[];
   /** [friendId, tagId] の組。公開対象の絞り込みで引かれる */
   friendTags?: Array<{ friend_id: string; tag_id: string }>;
+  /** タグの名前。一覧の「申込条件」が visible_tag_id から名前を引く */
+  tags?: Array<{ id: string; name: string }>;
   /** キャンセル待ちの行。INSERT がここへ積まれる */
   waitlist?: Array<Record<string, unknown>>;
 }): D1Database {
@@ -120,6 +122,7 @@ function makeEventDb(state: {
   state.accounts ??= [];
   state.friends ??= [];
   state.friendTags ??= [];
+  state.tags ??= [];
   state.waitlist ??= [];
   const db = {
     prepare(sql: string) {
@@ -511,12 +514,17 @@ function makeEventDb(state: {
                 const pending_count = (state.bookings ?? []).filter(
                   (b) => b.event_id === e.id && b.status === 'requested',
                 ).length;
+                // 消えたタグを指したままの行は名前が引けず null になる。
+                const visible_tag_name = e.visible_tag_id
+                  ? ((state.tags ?? []).find((t) => t.id === e.visible_tag_id)?.name ?? null)
+                  : null;
                 return {
                   ...e,
                   next_slot_starts_at,
                   total_capacity: cap,
                   total_active,
                   pending_count,
+                  visible_tag_name,
                 };
               })
               .sort((a, b) =>
@@ -1053,6 +1061,32 @@ describe('GET /api/events/admin/events', () => {
     const res = await app.request('/api/events/admin/events?account_id=la1');
     const body = (await res.json()) as { items: EventRow[] };
     expect(body.items.map((e) => e.id)).toEqual(['e2']);
+  });
+
+  test('returns the visible tag name for the 申込条件 column', async () => {
+    const state = {
+      events: [
+        baseEvent({ id: 'e1', line_account_id: 'la1', visible_tag_id: 't1' }),
+        baseEvent({ id: 'e2', line_account_id: 'la1', visible_tag_id: null }),
+        baseEvent({ id: 'e3', line_account_id: 'la1', visible_tag_id: 'gone' }),
+      ],
+      slots: [],
+      bookings: [],
+      tags: [{ id: 't1', name: '定期便 契約中' }],
+    };
+    const app = setupApp(state);
+    const res = await app.request('/api/events/admin/events?account_id=la1');
+    const body = (await res.json()) as {
+      items: Array<EventRow & { visible_tag_name: string | null }>;
+    };
+    const byId = new Map(body.items.map((e) => [e.id, e]));
+    expect(byId.get('e1')?.visible_tag_name).toBe('定期便 契約中');
+    // 絞り込み無しは名前も無い。一覧では「全員」と出る。
+    expect(byId.get('e2')?.visible_tag_name).toBeNull();
+    // タグを消しても events 側の ID は残る。名前が引けない状態＝もう誰にも
+    // 見えないので、「全員」と同じ扱いにしてはいけない。
+    expect(byId.get('e3')?.visible_tag_id).toBe('gone');
+    expect(byId.get('e3')?.visible_tag_name).toBeNull();
   });
 
   test('returns aggregate columns for each item', async () => {
