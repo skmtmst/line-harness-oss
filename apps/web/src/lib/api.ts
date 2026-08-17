@@ -581,6 +581,30 @@ export type NenFriendOverview = {
   ecEvents: Array<Record<string, unknown>>
 }
 
+export type AdPlatform = {
+  id: string
+  /** meta / x / google / tiktok */
+  name: string
+  displayName: string | null
+  /** 鍵は先頭と末尾だけ残して伏せてある。 */
+  config: Record<string, unknown>
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type AdConversionLog = {
+  id: string
+  adPlatformId: string
+  friendId: string
+  eventName: string
+  clickId: string | null
+  clickIdType: string | null
+  status: string
+  errorMessage: string | null
+  createdAt: string
+}
+
 export type SearchConsoleMetric = {
   clicks: number
   impressions: number
@@ -2698,6 +2722,13 @@ export const api = {
         // Optional during rolling deploys when an older worker is live.
         computedAt?: string;
       }>>(options?.forceRefresh ? '/api/duplicates/stats?refresh=1' : '/api/duplicates/stats'),
+  },
+  /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
+  adPlatforms: {
+    list: () =>
+      fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
+    logs: (id: string, limit = 20) =>
+      fetchApi<ApiResponse<AdConversionLog[]>>(`/api/ad-platforms/${id}/logs?limit=${limit}`),
   },
   uploads: {
     /**

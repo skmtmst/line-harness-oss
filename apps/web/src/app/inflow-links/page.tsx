@@ -13,6 +13,7 @@ import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import AdIntegration from './ad-integration'
 import SiteScript from '@/components/inflow-links/site-script'
 
 interface MessageTemplate {
@@ -1034,13 +1035,7 @@ function InflowLinksPageHost() {
       <MergedTabs basePath="/inflow-links" tabs={MERGED_TABS} active={tab} />
       {tab === 'links' && <InflowLinksPageInner />}
       {tab === 'script' && <SiteScript />}
-      {/* 設計 6-8。中身はまだ突き合わせていない。タブごと隠すと、広告と
-          つなげられること自体が画面から読み取れなくなる。 */}
-      {tab === 'ads' && (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-          広告連携は準備中です。
-        </div>
-      )}
+      {tab === 'ads' && <AdIntegration />}
     </div>
   )
 }
