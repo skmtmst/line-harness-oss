@@ -11,6 +11,7 @@ import {
   updateTagGroup,
   deleteTagGroup,
   assignTagToGroup,
+  updateTag,
 } from '@line-crm/db';
 import type { Tag as DbTag, TagGroup as DbTagGroup } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -161,6 +162,51 @@ tags.get('/api/tags', async (c) => {
     return c.json({ success: true, data: items.map(serializeTag) });
   } catch (err) {
     console.error('GET /api/tags error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * PATCH /api/tags/:id — 名前と色を変える。
+ *
+ * 一覧の表からマイルの列を外して編集画面へ移したときに要るようになった。
+ * それまでは作るときにしか決められず、打ち間違えたタグは消して作り直す
+ * しかなかった。作り直すと、付いていた友だちの分がすべて外れる。
+ *
+ * 分類の付け替えは /group、マイルは /mileage が持っている。ここでは
+ * 触らない。
+ */
+tags.patch('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ name?: unknown; color?: unknown }>();
+    const patch: { name?: string; color?: string } = {};
+
+    if (body.name !== undefined) {
+      const name = typeof body.name === 'string' ? body.name.trim() : '';
+      if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);
+      patch.name = name;
+    }
+    if (body.color !== undefined) {
+      const color = typeof body.color === 'string' ? body.color.trim() : '';
+      // 画面の色見本と自由入力の両方から来る。形だけ見て通す。
+      if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+        return c.json({ success: false, error: 'color must be #RRGGBB' }, 400);
+      }
+      patch.color = color;
+    }
+    if (Object.keys(patch).length === 0) {
+      return c.json({ success: false, error: 'name or color is required' }, 400);
+    }
+
+    const tag = await updateTag(c.env.DB, c.req.param('id'), patch);
+    if (!tag) return c.json({ success: false, error: 'tag not found' }, 404);
+    return c.json({ success: true, data: serializeTag(tag) });
+  } catch (err) {
+    // tags.name は UNIQUE。重複は 500 ではなく 409 で返す。
+    if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
+      return c.json({ success: false, error: 'tag name already exists' }, 409);
+    }
+    console.error('PATCH /api/tags/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

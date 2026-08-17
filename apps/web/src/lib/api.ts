@@ -721,6 +721,12 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    /** 名前と色を変える。分類とマイルは別の受け口が持っている。 */
+    update: (id: string, data: { name?: string; color?: string }) =>
+      fetchApi<ApiResponse<Tag>>(`/api/tags/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
     /** 所属する親分類を変える。null で未分類に戻す。 */
     setGroup: (id: string, groupId: string | null) =>
       fetchApi<ApiResponse<Tag>>(`/api/tags/${id}/group`, {

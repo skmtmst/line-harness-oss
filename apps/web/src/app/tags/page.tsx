@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
@@ -341,12 +342,13 @@ function TagsPageInner() {
                   {label}
                 </button>
               ))}
-              <button
-                onClick={() => { setCreating(!creating); setError('') }}
+              {/* 設計の呼び名。作る場所も専用の画面（3-1-1）に寄せる。 */}
+              <Link
+                href="/tags/new"
                 className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
               >
-                + 新規タグ
-              </button>
+                ＋ タグを追加
+              </Link>
             </div>
           ) : tab === 'fields' ? (
             <a href="/tags/fields/new" className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium hover:bg-accent-hover">
@@ -669,44 +671,60 @@ function TagsPageInner() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1180px]">
             <thead>
+              {/*
+                列は設計の絵の並び。以前は獲得マイル・紹介者マイル・行動倍率・
+                優先度の4列をここで直接いじれるようにしていたが、絵には無い。
+                倍率は「タグを作る」側にあるものなので、編集画面へ移した。
+                一覧は「どのタグが誰に何人付いているか」を見る場所に戻す。
+              */}
               <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ名</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち人数</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動付与のもと</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">分類</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち数</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">作成日</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">獲得マイル</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">紹介者マイル</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">行動倍率</th>
-                <th className="px-3 py-3 text-left text-xs font-semibold text-ink-faint uppercase">優先度</th>
-                <th className="px-3 py-3" />
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">登録日</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : visible.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-faint text-sm">
                   {items.length === 0 ? 'タグがありません' : 'この分類のタグはありません'}
                 </td></tr>
               ) : (
                 visible.map((t) => (
                   <tr key={t.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3">
-                      <TagBadge tag={t} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <TagGroupSelect tag={t} groups={groups} onChanged={load} />
+                      {/* 名前から編集へ入る。倍率もそちらにある。 */}
+                      <Link href={`/tags/edit?id=${t.id}`} className="hover:underline">
+                        <TagBadge tag={t} />
+                      </Link>
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">
                       {t.friendCount ?? 0}
                       <span className="text-xs text-ink-faint ml-0.5">人</span>
                     </td>
+                    {/*
+                      何をきっかけに自動で付いたタグかを出す列。きっかけは
+                      回答フォームやオートメーションの側に置かれていて、
+                      タグから引く口が無い。列だけ先に置く。
+                    */}
+                    <td className="px-4 py-3 text-xs text-ink-faint">—</td>
+                    <td className="px-4 py-3">
+                      <TagGroupSelect tag={t} groups={groups} onChanged={load} />
+                    </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">
                       {t.createdAt ? new Date(t.createdAt).toLocaleDateString('ja-JP') : ''}
                     </td>
-                    <TagMileageEditor tag={t} onSaved={load} />
                     <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <Link
+                        href={`/tags/edit?id=${t.id}`}
+                        className="text-accent mr-2 px-2.5 py-1 text-xs font-medium hover:underline"
+                      >
+                        編集
+                      </Link>
                       <button
                         onClick={() => handleDelete(t)}
                         className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"

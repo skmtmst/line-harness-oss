@@ -115,6 +115,43 @@ export async function assignTagToGroup(
   );
 }
 
+/**
+ * タグの名前と色を変える。
+ *
+ * 一覧の表からマイルの列を外して編集画面へ移したときに要るようになった。
+ * それまでは作るときにしか決められず、打ち間違えたタグは消して作り直す
+ * しかなかった。作り直すと、付いていた友だちの分がすべて外れる。
+ *
+ * 渡されたものだけ当てる。色だけ変えたいときに名前を送らせると、
+ * 呼ぶ側が現在値を読んでから書くことになり、その間に別の人が変えた
+ * 名前を上書きしてしまう。
+ */
+export async function updateTag(
+  db: D1Database,
+  id: string,
+  input: { name?: string; color?: string },
+): Promise<Tag | null> {
+  const sets: string[] = [];
+  const binds: unknown[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    binds.push(input.name);
+  }
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    binds.push(input.color);
+  }
+  if (sets.length > 0) {
+    await db
+      .prepare(`UPDATE tags SET ${sets.join(', ')} WHERE id = ?`)
+      .bind(...binds, id)
+      .run();
+  }
+  return (
+    (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ?? null
+  );
+}
+
 export async function deleteTag(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM tags WHERE id = ?`).bind(id).run();
 }
