@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
@@ -151,11 +152,25 @@ function AccountsPageInner() {
 
   return (
     <div>
+      <div data-design="Head">
       <Header
-        title="LINEアカウント管理"
-        description="マルチアカウント設定"
+        title="アカウント"
+        description="接続しているLINE公式アカウントと、その束ね方（プール）を管理します。チャネル設定とWebhookの状態も、この画面から確認できます。"
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              disabled
+              title="マニュアルは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-xs font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            <Link
+              href="/pools/new"
+              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-xs font-medium"
+            >
+              プールを作成
+            </Link>
             <button
               onClick={() => setShowReorder(true)}
               className="px-3 py-2 rounded-lg text-xs font-medium border border-gray-300 hover:bg-gray-50"
@@ -174,11 +189,70 @@ function AccountsPageInner() {
               className="px-4 py-2 rounded-lg text-white text-sm font-medium"
               style={{ backgroundColor: 'var(--color-accent)' }}
             >
-              {showCreate ? 'キャンセル' : '+ アカウント追加'}
+              {showCreate ? 'キャンセル' : 'アカウントを追加'}
             </button>
           </div>
         }
       />
+      </div>
+
+      {/* 設計はここに3タブ（LINEアカウント / プール / データ移行）。
+          プールは /pools、データ移行は画面そのものが無い。タブごと隠すと
+          プールを束ねられること自体が読み取れないので、行き先を出す。 */}
+      <div data-design="Tabs" className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
+        <span className="border-accent text-accent -mb-px border-b-2 px-4 py-2 text-sm font-medium">
+          LINEアカウント
+        </span>
+        <Link
+          href="/pools/new"
+          className="text-ink-secondary hover:text-ink -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium"
+        >
+          プール
+        </Link>
+        <button
+          disabled
+          title="データ移行の画面は準備中です"
+          className="text-ink-faint -mb-px cursor-not-allowed border-b-2 border-transparent px-4 py-2 text-sm font-medium opacity-50"
+        >
+          データ移行
+        </button>
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">接続アカウント</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {accounts.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            稼働中 {accounts.filter((a) => a.isActive).length}
+          </p>
+        </div>
+        {/* プールの数はこの画面では引いていない。プール一覧は別のAPI。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">プール</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">プールの一覧は別画面です</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">友だち合計</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {accounts.reduce((sum, a) => sum + (a.stats?.friendCount ?? 0), 0).toLocaleString('ja-JP')}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+          </p>
+          {/* 同じ人が複数アカウントを友だち追加していると二重に数える。
+              重複を除いた数は「重複」の画面でしか出せない。 */}
+          <p className="text-ink-faint mt-0.5 text-xs">重複を含む延べ数</p>
+        </div>
+        {/* 発行したWebhook URLと、LINE側の設定が一致しているかを確かめる
+            経路が無い。LINE の API を叩かないと分からない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">Webhook 一致</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">LINE側の設定は確認できません</p>
+        </div>
+      </div>
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">

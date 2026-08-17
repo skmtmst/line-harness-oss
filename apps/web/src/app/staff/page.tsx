@@ -127,18 +127,71 @@ function StaffPageInner() {
 
   return (
     <div>
-      <Header
-        title="スタッフ管理"
-        action={
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: 'var(--color-accent)' }}
-          >
-            + スタッフを追加
-          </button>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="ログインユーザー"
+          description="管理画面にログインできる人と、その権限を管理します。誰がいつ何をしたかの記録も残ります。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              <button
+                onClick={() => setShowForm(!showForm)}
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+              >
+                ユーザーを追加
+              </button>
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">管理スタッフ</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {members.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            管理者 {members.filter((m) => m.role === 'owner' || m.role === 'admin').length} ・ 運用者{' '}
+            {members.filter((m) => m.role === 'staff').length}
+          </p>
+        </div>
+        {/* admin_users.two_factor_enabled の列はあるが、認証の仕組みそのものが
+            無い（引き継ぎ文書の「触っていないもの」に挙がっている）。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">二要素認証</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">仕組みが未実装です</p>
+        </div>
+        {/* 誰がいつログインしたかを記録していない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">過去30日のログイン</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">ログイン履歴は未記録</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">最終ログイン</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">ログイン履歴は未記録</p>
+        </div>
+      </div>
+
+      {/* 設計はここにログイン履歴の表を置いている。設計側にも
+          「旧デザインには無かったが、顧客の連絡先や健康情報を扱う以上、
+          誰がいつどの画面を操作したかの記録は必要」と書かれている。 */}
+      <div className="bg-warning-bg rounded-card mb-4 p-4">
+        <p className="text-warning text-sm font-semibold">ログイン履歴を記録していません</p>
+        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+          誰がいつどの画面を操作したかの記録が残っていません。顧客の連絡先や健康情報を扱うため、記録を残すことを勧めます。操作の記録（`operation_audit`）は対応マークの変更だけを残しています。
+        </p>
+      </div>
 
       {/* Create form */}
       {showForm && (
