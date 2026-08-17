@@ -58,6 +58,22 @@ function FriendsPageInner() {
   const [responseFilter, setResponseFilter] = useState<ResponseFilter>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /**
+   * まとめて操作するために選んだ友だち。
+   *
+   * 絞り込みやページが変わったら空にする。見えていない人を選んだまま
+   * 「12人を選択中」と出ると、誰に対して実行するのか読めない。
+   */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
 
   const loadTags = useCallback(async () => {
     try {
@@ -86,6 +102,8 @@ function FriendsPageInner() {
         setFriends(res.data.items)
         setTotal(res.data.total)
         setHasNextPage(res.data.hasNextPage)
+        // 中身が入れ替わったので選択も外す。
+        setSelectedIds(new Set())
       } else {
         setError(res.error)
       }
@@ -218,34 +236,42 @@ function FriendsPageInner() {
       </div>
 
       {/*
-        一括操作（設計 `BulkBar`）。選んだときだけ出す。
+        一括操作（設計 `BulkBar`）。
+
+        以前は「0 人を選択中」の帯を常に出していた。誰も選んでいないのに
+        場所だけ取り、押せないボタンが6つ並ぶ。設計でもこの帯は選んだ
+        あとの絵にしか出てこない。1人以上選んだときだけ出す。
+
         設計は6種。どれも1人ずつやると人数ぶんの往復が要るもの。
       */}
-      <div data-design="BulkBar" className="border-hairline bg-canvas-sunken rounded-card mb-3 border p-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink text-xs font-medium">0 人を選択中</span>
-          <span className="text-ink-faint text-xs">選んだ友だちにまとめて実行できます</span>
-          <div className="ml-auto flex flex-wrap gap-2">
-            {[
-              '対応マークを変える',
-              'テンプレートを送る',
-              'シナリオを開始',
-              'タグを付ける・外す',
-              '友だち情報を書き換える',
-              'リマインダを開始',
-            ].map((label) => (
-              <button
-                key={label}
-                disabled
-                title="友だちを選ぶと使えます"
-                className="border-hairline bg-canvas text-ink-faint rounded-control border px-2.5 py-1 text-xs opacity-50"
-              >
-                {label}
-              </button>
-            ))}
+      {selectedIds.size > 0 && (
+        <div data-design="BulkBar" className="border-accent-soft bg-accent-soft rounded-card mb-3 border p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-ink text-xs font-bold">{selectedIds.size} 人を選択中</span>
+            <span className="text-ink-secondary text-xs">選んだ友だちにまとめて実行できます</span>
+            <div className="ml-auto flex flex-wrap gap-2">
+              {[
+                '対応マークを変える',
+                'テンプレートを送る',
+                'シナリオを開始',
+                'タグを付ける・外す',
+                '友だち情報を書き換える',
+                'リマインダを開始',
+              ].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  // 受け口が無い。選んでも実行はできないので、押せない形のまま出す。
+                  title="まとめて実行する仕組みは準備中です"
+                  className="border-hairline bg-canvas text-ink-faint rounded-control border px-2.5 py-1 text-xs opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 検索と並び順（設計 `SearchBar`）。 */}
       <div data-design="SearchBar" className="bg-canvas rounded-card border border-hairline p-4 mb-4">
@@ -354,14 +380,26 @@ function FriendsPageInner() {
       ) : (
         /* 一覧（設計 `Table`）。 */
         <div data-design="Table">
-          <FriendListTable friends={friends} allTags={allTags} onRefresh={loadFriends} />
+          <FriendListTable
+            friends={friends}
+            allTags={allTags}
+            onRefresh={loadFriends}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleAll={(select) =>
+              setSelectedIds(select ? new Set(friends.map((f) => f.id)) : new Set())
+            }
+          />
         </div>
       )}
 
       {!loading && total > 0 && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mt-4">
+          {/* 選んでいる間は、いま何件に効くのかを件数の場所で示す。 */}
           <p className="text-sm text-ink-faint">
-            {((page - 1) * PAGE_SIZE) + 1}〜{Math.min(page * PAGE_SIZE, total)} 件 / 全{total.toLocaleString('ja-JP')}件
+            {selectedIds.size > 0
+              ? `${selectedIds.size} 件を選択中 ・ 全 ${total.toLocaleString('ja-JP')} 件`
+              : `${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)} 件 / 全${total.toLocaleString('ja-JP')}件`}
           </p>
           <div className="flex items-center gap-2">
             <button
