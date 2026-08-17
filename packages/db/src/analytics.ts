@@ -18,6 +18,14 @@ export interface DailyMessageCount {
   date: string;
   outgoing: number;
   incoming: number;
+  /** 応答メッセージ。LINE の課金対象外 */
+  reply: number;
+  /** プッシュ。LINE の課金対象 */
+  push: number;
+  /** 一斉配信から出た送信 */
+  fromBroadcast: number;
+  /** シナリオから出た送信 */
+  fromScenario: number;
 }
 
 /**
@@ -25,6 +33,10 @@ export interface DailyMessageCount {
  *
  * created_at は JST の文字列なので、先頭10文字を取れば日付になる。
  * date() 関数を通すと UTC として解釈され、日本の朝9時より前が前日に寄る。
+ *
+ * reply と push は `delivery_type` から数える。**この2つを足しても outgoing に
+ * ならないことがある。** delivery_type が入る前に記録された行と、テスト送信
+ * （'test'）がどちらにも入らないため。画面の「合計」は outgoing を使うこと。
  */
 export async function getDailyMessageCounts(
   db: D1Database,
@@ -34,18 +46,34 @@ export async function getDailyMessageCounts(
     .prepare(
       `SELECT substr(created_at, 1, 10) AS date,
               SUM(CASE WHEN direction = 'outgoing' THEN 1 ELSE 0 END) AS outgoing,
-              SUM(CASE WHEN direction = 'incoming' THEN 1 ELSE 0 END) AS incoming
+              SUM(CASE WHEN direction = 'incoming' THEN 1 ELSE 0 END) AS incoming,
+              SUM(CASE WHEN direction = 'outgoing' AND delivery_type = 'reply' THEN 1 ELSE 0 END) AS reply,
+              SUM(CASE WHEN direction = 'outgoing' AND delivery_type = 'push' THEN 1 ELSE 0 END) AS push,
+              SUM(CASE WHEN direction = 'outgoing' AND broadcast_id IS NOT NULL THEN 1 ELSE 0 END) AS from_broadcast,
+              SUM(CASE WHEN direction = 'outgoing' AND scenario_step_id IS NOT NULL THEN 1 ELSE 0 END) AS from_scenario
          FROM messages_log
         WHERE created_at >= ? AND created_at <= ?
         GROUP BY substr(created_at, 1, 10)
         ORDER BY date ASC`,
     )
     .bind(range.from, range.to)
-    .all<{ date: string; outgoing: number; incoming: number }>();
+    .all<{
+      date: string;
+      outgoing: number;
+      incoming: number;
+      reply: number;
+      push: number;
+      from_broadcast: number;
+      from_scenario: number;
+    }>();
   return result.results.map((r) => ({
     date: r.date,
     outgoing: Number(r.outgoing ?? 0),
     incoming: Number(r.incoming ?? 0),
+    reply: Number(r.reply ?? 0),
+    push: Number(r.push ?? 0),
+    fromBroadcast: Number(r.from_broadcast ?? 0),
+    fromScenario: Number(r.from_scenario ?? 0),
   }));
 }
 

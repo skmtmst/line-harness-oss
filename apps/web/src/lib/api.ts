@@ -849,9 +849,21 @@ export const api = {
    */
   analytics: {
     messages: (params?: { from?: string; to?: string }) =>
-      fetchApi<ApiResponse<Array<{ date: string; outgoing: number; incoming: number }>>>(
-        `/api/analytics/messages${rangeQuery(params)}`,
-      ),
+      fetchApi<
+        ApiResponse<
+          Array<{
+            date: string
+            outgoing: number
+            incoming: number
+            /** 応答メッセージ。LINE の課金対象外 */
+            reply: number
+            /** プッシュ。LINE の課金対象 */
+            push: number
+            fromBroadcast: number
+            fromScenario: number
+          }>
+        >
+      >(`/api/analytics/messages${rangeQuery(params)}`),
     linkClicks: (params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
