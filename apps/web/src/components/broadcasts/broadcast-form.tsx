@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import {
@@ -122,7 +123,11 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
   } | null>(null)
   const [checking, setChecking] = useState(false)
   // 何分かけて配るか。0（既定）は一気に送る。
-  const [spreadMinutes, setSpreadMinutes] = useState('0')
+  const [spreadMinutes, setSpreadMinutes] = useState('30')
+  // 送る時間。設計は「今すぐ / 日時を指定 / 友だちごとの最適な時間」の3つ。
+  const [sendMode, setSendMode] = useState<'now' | 'scheduled' | 'optimal'>('now')
+  const [scheduledDate, setScheduledDate] = useState('')
+  const [scheduledTime, setScheduledTime] = useState('10:00')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -174,26 +179,80 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
     }
   }
 
+  // 1つ目の吹き出しの文字数。設計は「238 / 22,500 ・ 分割なし」と出すが、
+  // 実装の上限は1吹き出し500文字なので、そちらに合わせる。
+  const textLength = bubbles[0]?.type === 'text' ? String(bubbles[0].content.text ?? '').length : 0
+  // 本文に入っているURLの数。trackLinks: true で送るので、この数だけ
+  // 短縮されてクリックが記録される。
+  const urlCount = bubbles.reduce((sum, b) => {
+    if (b.type !== 'text') return sum
+    return sum + (String(b.content.text ?? '').match(/https?:\/\/\S+/g)?.length ?? 0)
+  }, 0)
+
+  /** 予約の日時。JST で入れてもらい、UTC に直して送る。 */
+  const scheduledAtIso = (): string | null => {
+    if (sendMode !== 'scheduled' || !scheduledDate) return null
+    const [h, m] = scheduledTime.split(':').map(Number)
+    const [y, mo, d] = scheduledDate.split('-').map(Number)
+    return new Date(Date.UTC(y, mo - 1, d, h - 9, m)).toISOString()
+  }
+
   const save = async () => {
     const validationError = validate(); if (validationError) { setError(validationError); return }
     setSaving(true); setError('')
     const first = bubbles[0]
     const legacyContent = first.type === 'text' ? String(first.content.text) : JSON.stringify(first.content)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: first.type === 'image' ? 'image' : first.type === 'rich_message' || first.type === 'card_message' ? 'flex' : 'text', messageContent: legacyContent, messageBubbles: bubbles, targetType: filter.tagId ? 'tag' : 'all', targetTagId: filter.tagId || null, lineAccountId: selectedAccountId || null, scheduledAt: null, trackLinks: true, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
+      const res = await api.broadcasts.create({ title: title.trim(), messageType: first.type === 'image' ? 'image' : first.type === 'rich_message' || first.type === 'card_message' ? 'flex' : 'text', messageContent: legacyContent, messageBubbles: bubbles, targetType: filter.tagId ? 'tag' : 'all', targetTagId: filter.tagId || null, lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks: true, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
       if (res.success) onSuccess(); else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
 
   return <div className="mb-8">
-    <div className="mb-4 flex items-start justify-between"><div><h2 className="text-2xl font-bold text-slate-900">メッセージを作成</h2><p className="mt-1 text-sm text-slate-500">最大3つの吹き出しを、実際の表示を見ながら作成できます。</p></div><button onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm">一覧に戻る</button></div>
+    <div data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 className="text-ink text-2xl font-bold">一斉配信の作成</h2>
+        <p className="text-ink-faint mt-1 text-sm leading-relaxed">
+          送る相手・送る時間・送る内容を決めます。配信する前に、右側のチェックがすべて緑になっているか確認してください。
+        </p>
+      </div>
+      <button onClick={onCancel} className="border-hairline text-ink-secondary rounded-control border px-4 py-2 text-sm">
+        一覧に戻る
+      </button>
+    </div>
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-5">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <label className="block text-sm font-bold text-slate-700">管理用タイトル</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" />
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-800">配信先</p><div className="mt-2 flex gap-2">{(['all','filter'] as const).map((mode) => <button key={mode} onClick={() => setTargetMode(mode)} className={`rounded-full px-4 py-2 text-sm font-semibold ${targetMode === mode ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{mode === 'all' ? 'すべての友だち' : '絞り込み'}</button>)}</div></div><div className="rounded-xl bg-emerald-50 px-5 py-3 text-right"><p className="text-xs font-bold text-emerald-700">送信対象</p><p className="text-2xl font-black text-emerald-700">{counting ? '…' : targetCount?.toLocaleString('ja-JP') ?? '-'}<span className="ml-1 text-sm">人</span></p></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-800">1. 送る相手</p><div className="mt-2 flex gap-2">{(['all','filter'] as const).map((mode) => <button key={mode} onClick={() => setTargetMode(mode)} className={`rounded-full px-4 py-2 text-sm font-semibold ${targetMode === mode ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{mode === 'all' ? 'すべての友だち' : '絞り込み'}</button>)}</div></div><div className="rounded-xl bg-emerald-50 px-5 py-3 text-right"><p className="text-xs font-bold text-emerald-700">送信対象</p><p className="text-2xl font-black text-emerald-700">{counting ? '…' : targetCount?.toLocaleString('ja-JP') ?? '-'}<span className="ml-1 text-sm">人</span></p></div></div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {/* ブロック中の人は countRules の is_following=true で外れている。
+                外していることを書かないと、人数が合わないように見える。 */}
+            <p className="text-ink-faint text-xs">ブロック中の友だちを自動で除外しています</p>
+            <Link
+              href="/friends"
+              className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1 text-xs"
+            >
+              対象を一覧で見る
+            </Link>
+            {/* 条件の保存先が無い（判断待ち 13-5 と同じ）。 */}
+            <button
+              disabled
+              title="条件の保存は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
+            >
+              この条件を保存
+            </button>
+            <button
+              disabled
+              title="保存した条件は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
+            >
+              保存した条件から選ぶ
+            </button>
+          </div>
           {targetMode === 'filter' && <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
             <select value={filter.tagId} onChange={(e) => setFilter({ ...filter, tagId: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">タグ：すべて</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select>
             <select value={filter.gender} onChange={(e) => setFilter({ ...filter, gender: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">性別：すべて</option><option value="female">女性</option><option value="male">男性</option><option value="unknown">未設定</option></select>
@@ -203,12 +262,96 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
             <select value={filter.reaction} onChange={(e) => setFilter({ ...filter, reaction: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">過去反応：すべて</option><option value="clicked">クリックあり</option><option value="replied">返信あり</option></select>
           </div>}
         </section>
+        <section className="border-hairline mb-3 rounded-2xl border bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-ink text-sm font-bold">3. 送る内容</p>
+            {/* テンプレートを本文に流し込む口が無い。テンプレート側からの
+                「この内容で配信」も無い。 */}
+            <button
+              disabled
+              title="テンプレートからの読み込みは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
+            >
+              テンプレートから選ぶ
+            </button>
+          </div>
+          <p className="text-ink-faint mt-1 text-xs">
+            {textLength} / 500{textLength > 500 ? '（上限を超えています）' : ' ・ 分割なし'}
+            {urlCount > 0 && ` ・ URL ${urlCount}件を短縮してクリックを計測します`}
+          </p>
+        </section>
         {bubbles.map((bubble, index) => <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />)}
         <button type="button" disabled={bubbles.length >= 3} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-2xl border-2 border-dashed border-emerald-300 py-4 text-sm font-bold text-emerald-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400">＋ 吹き出しを追加（{bubbles.length}/3）</button>
         {error && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-        <div className="border-hairline mb-3 rounded-xl border p-4">
+        <section className="border-hairline mb-3 rounded-2xl border bg-white p-5">
+          <p className="text-ink mb-3 text-sm font-bold">2. 送る時間</p>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => setSendMode('now')}
+              aria-pressed={sendMode === 'now'}
+              className={`rounded-card border p-3 text-left text-sm ${
+                sendMode === 'now' ? 'border-accent bg-accent-bg' : 'border-hairline'
+              }`}
+            >
+              今すぐ配信
+            </button>
+            <button
+              type="button"
+              onClick={() => setSendMode('scheduled')}
+              aria-pressed={sendMode === 'scheduled'}
+              className={`rounded-card border p-3 text-left text-sm ${
+                sendMode === 'scheduled' ? 'border-accent bg-accent-bg' : 'border-hairline'
+              }`}
+            >
+              日時を指定して予約
+            </button>
+            {/* 1人ずつ最適な時刻を出す仕組みが無い。開封の時間帯を持っていない。 */}
+            <button
+              type="button"
+              disabled
+              title="友だちごとの最適な時間は準備中です"
+              className="border-hairline rounded-card text-ink-faint border p-3 text-left text-sm opacity-50"
+            >
+              友だちごとの最適な時間
+            </button>
+          </div>
+
+          {sendMode === 'scheduled' && (
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="bc-date" className="text-ink-secondary mb-1 block text-xs font-medium">
+                  配信日
+                </label>
+                <input
+                  id="bc-date"
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(e) => setScheduledDate(e.target.value)}
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="bc-time" className="text-ink-secondary mb-1 block text-xs font-medium">
+                  時刻
+                </label>
+                <input
+                  id="bc-time"
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(e) => setScheduledTime(e.target.value)}
+                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="border-hairline mt-4 border-t pt-4">
       <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-bold">
-        時間をかけて配る
+        時間を分散して送る
+        <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-[11px] font-normal">
+          推奨
+        </span>
       </label>
       <div className="flex items-center gap-1.5">
         <input
@@ -223,36 +366,122 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
         <span className="text-ink-faint text-xs">分かけて</span>
       </div>
       <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-        0 なら一気に送ります。分数を入れると、その時間に分けて少しずつ配ります。
-        一度に大量に届いてブロックされるのを避けたいときに使います。
-        途中で止まっても、続きから送り直します（同じ人に二度は届きません）。
+        指定した時刻から、その分数をかけて少しずつ送ります。同時刻に大量送信するとLINE側で制限を受けることがあるため、通常はオンのままにしてください。
+        0 なら一気に送ります。途中で止まっても、続きから送り直します（同じ人に二度は届きません）。
       </p>
-    </div>
+          </div>
+        </section>
 
-    {preflight && (
-      <div className="border-hairline mb-3 rounded-xl border p-4">
-        <p className="text-ink-secondary text-sm font-bold">
-          送る前の確認：{preflight.audienceCount.toLocaleString('ja-JP')} 人に届きます
+    <section className="border-hairline mb-3 rounded-2xl border bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-ink text-sm font-bold">配信前チェック</p>
+        {preflight && (
+          <span
+            className={`rounded-pill px-2 py-0.5 text-xs ${
+              preflight.warnings.filter((w) => w.level === 'warning').length > 0
+                ? 'bg-warning-bg text-warning'
+                : 'bg-success-bg text-success'
+            }`}
+          >
+            {preflight.warnings.filter((w) => w.level === 'warning').length > 0
+              ? `${preflight.warnings.filter((w) => w.level === 'warning').length}件 未確認`
+              : '問題ありません'}
+          </span>
+        )}
+      </div>
+
+      {!preflight ? (
+        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+          「配信前チェック」を押すと、届く人数・文字数・送信枠・除外の状況をまとめて確かめます。
         </p>
-        {preflight.warnings.length > 0 && (
-          <ul className="mt-2 space-y-1">
+      ) : (
+        <>
+          <p className="text-ink-secondary mt-2 text-sm">
+            {preflight.audienceCount.toLocaleString('ja-JP')} 人に届きます
+          </p>
+          <ul className="mt-2 space-y-2">
+            <li className="border-hairline rounded-lg border p-2">
+              <p className="text-ink text-xs font-medium">
+                本文の文字数は{textLength > 500 ? '上限を超えています' : '問題ありません'}
+              </p>
+              <p className="text-ink-faint text-xs">
+                {textLength}文字。{textLength > 500 ? '500文字までに収めてください。' : '分割されずに1通で届きます。'}
+              </p>
+            </li>
             {preflight.warnings.map((w) => (
               <li
                 key={w.message}
-                className={`rounded px-2 py-1 text-xs ${
-                  w.level === 'warning' ? 'bg-danger-bg text-danger' : 'bg-info-bg text-info'
+                className={`rounded-lg border p-2 ${
+                  w.level === 'warning' ? 'border-warning-bg bg-warning-bg' : 'border-hairline'
                 }`}
               >
-                {w.message}
+                <p className={`text-xs ${w.level === 'warning' ? 'text-warning' : 'text-ink-secondary'}`}>
+                  {w.message}
+                </p>
               </li>
             ))}
+            <li className="border-hairline rounded-lg border p-2">
+              <p className="text-ink text-xs font-medium">
+                {urlCount > 0 ? 'URLの計測が有効です' : '本文にURLはありません'}
+              </p>
+              <p className="text-ink-faint text-xs">
+                {urlCount > 0
+                  ? `${urlCount}件を短縮し、クリックを記録します。`
+                  : 'URLを入れると自動で短縮し、クリックを記録します。'}
+              </p>
+            </li>
+            {/* 開封数は配信先が20人以上のときだけ LINE から返る。人数が
+                足りないと空欄になるので、送る前に伝える。 */}
+            <li className="border-hairline rounded-lg border p-2">
+              <p className="text-ink text-xs font-medium">
+                {preflight.audienceCount >= 20 ? '開封数を集計できます' : '開封数は集計されません'}
+              </p>
+              <p className="text-ink-faint text-xs">
+                対象{preflight.audienceCount}人。
+                {preflight.audienceCount >= 20
+                  ? '20人以上なので LINE 側で開封数が集計されます。'
+                  : '20人未満だと LINE 側から返りません。'}
+              </p>
+            </li>
           </ul>
-        )}
+        </>
+      )}
+    </section>
+    <div className="flex flex-wrap justify-end gap-3">
+      <button onClick={onCancel} className="border-hairline rounded-xl border px-5 py-3 text-sm font-bold">
+        キャンセル
+      </button>
+      {/* 自分宛に1通だけ送る口が無い。作ってから送るしかない。 */}
+      <button
+        disabled
+        title="テスト送信は準備中です"
+        className="border-hairline text-ink-faint rounded-xl border px-5 py-3 text-sm font-bold opacity-50"
+      >
+        テスト送信
+      </button>
+      <button
+        disabled={checking}
+        onClick={() => void runPreflight()}
+        className="border-hairline rounded-xl border px-5 py-3 text-sm font-bold disabled:opacity-50"
+      >
+        {checking ? '確認中…' : '配信前チェック'}
+      </button>
+      <button
+        disabled={saving}
+        onClick={() => void save()}
+        className="bg-accent text-on-accent hover:bg-accent-hover rounded-xl px-7 py-3 text-sm font-bold disabled:opacity-50"
+      >
+        {saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}
+      </button>
+    </div>
       </div>
-    )}
-    <div className="flex justify-end gap-3"><button onClick={onCancel} className="rounded-xl border px-5 py-3 text-sm font-bold">キャンセル</button><button disabled={checking} onClick={() => void runPreflight()} className="rounded-xl border px-5 py-3 text-sm font-bold disabled:opacity-50">{checking ? '確認中…' : '配信前チェック'}</button><button disabled={saving} onClick={() => void save()} className="rounded-xl bg-emerald-600 px-7 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? '保存中…' : '下書きを保存'}</button></div>
-      </div>
-      <aside className="xl:sticky xl:top-6 xl:h-fit"><div className="overflow-hidden rounded-[28px] border-[8px] border-slate-800 bg-[#8faed2] shadow-xl"><div className="bg-slate-800 px-4 py-2 text-center text-xs font-bold text-white">トークプレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className="mb-3 text-center text-[11px] text-white/80">今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="mt-3 text-center text-xs text-slate-500">編集内容がリアルタイムで反映されます</p></aside>
+      <aside className="xl:sticky xl:top-6 xl:h-fit"><div className="overflow-hidden rounded-[28px] border-[8px] border-slate-800 bg-[#8faed2] shadow-xl"><div className="bg-slate-800 px-4 py-2 text-center text-xs font-bold text-white">プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className="mb-3 text-center text-[11px] text-white/80">今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
+    {sendMode === 'scheduled' && scheduledDate && (
+      <p className="text-ink-faint mt-1 text-center text-xs">
+        {scheduledDate.replace(/-/g, '/')} {scheduledTime} から{' '}
+        {Number(spreadMinutes) > 0 ? `${spreadMinutes}分かけて配信` : '一度に配信'}
+      </p>
+    )}</aside>
     </div>
   </div>
 }

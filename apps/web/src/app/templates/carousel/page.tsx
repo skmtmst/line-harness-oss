@@ -129,18 +129,29 @@ function CarouselEditorInner() {
 
   return (
     <div>
-      <Header
-        title="カルーセルの編集"
-        description="横に並べて見せるメッセージです。左右に振って読んでもらいます。"
-      />
-
-      <nav className="text-ink-faint mb-4 text-xs">
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/templates" className="hover:underline">
           テンプレート
         </Link>
-        <span className="mx-1.5">›</span>
-        <span>カルーセル</span>
+        <span className="mx-1.5">/</span>
+        <span>{name || 'カルーセル'}</span>
       </nav>
+
+      <div data-design="Head">
+        <Header
+          title="カルーセルの編集"
+          description="画像とボタンの付いたパネルを横に並べて送ります。ボタンを押したときの動きは、アクションから選べます。"
+          action={
+            <button
+              disabled
+              title="テスト送信は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+            >
+              テスト送信
+            </button>
+          }
+        />
+      </div>
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -149,7 +160,7 @@ function CarouselEditorInner() {
       ) : (
         <div className="max-w-3xl space-y-4">
           <div className="bg-canvas rounded-card border-hairline border p-5">
-            <Field label="名前" htmlFor="cr-name" required>
+            <Field label="テンプレート名" htmlFor="cr-name" required>
               <input
                 id="cr-name"
                 type="text"
@@ -158,20 +169,64 @@ function CarouselEditorInner() {
                 className={inputClass}
               />
             </Field>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+              {/* カルーセルにフォルダを持たせる列が無い。テンプレート側の
+                  category は、この画面から編集できない。 */}
+              <span className="text-ink-faint">フォルダ：未分類</span>
+              <span className="text-ink-faint">種別：カルーセル</span>
+              <span className="text-ink tabular-nums">
+                {panels.length} / {MAX_COLUMNS} パネル
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-semibold">パネル</p>
+            {/* 並べ替えの操作が無い。追加した順のまま送られる。 */}
+            <p className="text-ink-faint mt-0.5 text-xs">
+              左から順に表示されます。並べ替えは準備中です。
+            </p>
+            <ol className="mt-2 flex flex-wrap gap-1.5">
+              {panels.map((panel, i) => (
+                <li
+                  key={i}
+                  className="border-hairline text-ink-secondary rounded-pill border px-3 py-1 text-xs"
+                >
+                  パネル {i + 1}
+                  {panel.title ? `：${panel.title}` : ''}
+                </li>
+              ))}
+            </ol>
           </div>
 
           {panels.map((panel, i) => (
             <div key={i} className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
               <div className="flex items-center justify-between">
-                <p className="text-ink text-sm font-semibold">{i + 1}枚目</p>
+                <p className="text-ink text-sm font-semibold">パネル {i + 1} の内容</p>
+                <div className="flex items-center gap-1">
+                <button
+                  onClick={() =>
+                    setPanels((prev) =>
+                      prev.length >= MAX_COLUMNS
+                        ? prev
+                        : [...prev.slice(0, i + 1), { ...prev[i], actions: [...prev[i].actions] }, ...prev.slice(i + 1)],
+                    )
+                  }
+                  disabled={panels.length >= MAX_COLUMNS}
+                  title={panels.length >= MAX_COLUMNS ? `パネルは${MAX_COLUMNS}枚までです` : undefined}
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                >
+                  複製
+                </button>
                 {panels.length > 1 && (
                   <button
                     onClick={() => setPanels((prev) => prev.filter((_, j) => j !== i))}
                     className="text-danger hover:bg-danger-bg rounded px-2 py-1 text-xs"
                   >
-                    この枚を外す
+                    削除
                   </button>
                 )}
+                </div>
               </div>
 
               <Field
@@ -187,7 +242,7 @@ function CarouselEditorInner() {
                 />
               </Field>
 
-              <Field label="タイトル" note={`${TITLE_MAX}文字まで`}>
+              <Field label="パネルタイトル" note={`${TITLE_MAX}文字まで`}>
                 <input
                   type="text"
                   value={panel.title}
@@ -202,7 +257,7 @@ function CarouselEditorInner() {
               </Field>
 
               <Field
-                label="本文"
+                label="パネル本文"
                 required
                 note={
                   anyImage
@@ -288,7 +343,7 @@ function CarouselEditorInner() {
               onClick={() => setPanels((prev) => [...prev, emptyPanel()])}
               className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
             >
-              ＋ 枚を足す（{panels.length} / {MAX_COLUMNS}）
+              パネルを追加（{panels.length} / {MAX_COLUMNS}）
             </button>
           )}
 
@@ -298,6 +353,68 @@ function CarouselEditorInner() {
             </div>
           )}
 
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-semibold">届き方</p>
+            <p className="text-ink-faint mt-0.5 mb-3 text-xs">横にスワイプして見えます</p>
+            <div className="bg-canvas-sunken rounded-card overflow-x-auto p-3">
+              <div className="flex gap-2">
+                {panels.map((panel, i) => (
+                  <div key={i} className="w-56 shrink-0 overflow-hidden rounded-2xl bg-white">
+                    {panel.thumbnailImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={panel.thumbnailImageUrl} alt="" className="h-28 w-full object-cover" />
+                    ) : (
+                      <div className="bg-canvas-sunken text-ink-faint flex h-28 items-center justify-center text-xs">
+                        画像なし
+                      </div>
+                    )}
+                    <div className="p-3">
+                      <p className="text-ink truncate text-sm font-medium">
+                        {panel.title || '（タイトル）'}
+                      </p>
+                      <p className="text-ink-faint mt-1 line-clamp-2 text-xs">{panel.text}</p>
+                      <div className="mt-2 space-y-1">
+                        {panel.actions.map((a, j) => (
+                          <p
+                            key={j}
+                            className="border-hairline text-accent rounded-control border px-2 py-1 text-center text-xs"
+                          >
+                            {a.label || '（ボタン）'}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <p className="text-ink-faint mt-2 text-xs">
+              {panels.length}枚のパネルを横に並べて送ります
+            </p>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-semibold">ボタン別のタップ数</p>
+            {/* どのボタンが押されたかを記録していない。カルーセルのアクションは
+                LINE 側で処理され、こちらに戻ってこない。 */}
+            <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+              ボタンごとのタップ数はまだ取れません。リンクを開くボタンなら、短縮URLのクリックとして「分析 → URLクリック」で見られます。
+            </p>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-semibold">気をつけること</p>
+            <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
+              <li>・パネルは{MAX_COLUMNS}枚まで。多いと最後まで見てもらえません</li>
+              <li>・ボタンは1パネルにつき{MAX_ACTIONS}つまでです（LINEの仕様）</li>
+              <li>・パネル本文は{TEXT_MAX_WITH_IMAGE}文字まで。超えると途中で切れて表示されます</li>
+              <li>
+                ・画像は横1024px以上を推奨。比率は 1.51:1 か 1:1 のどちらかに揃えてください
+              </li>
+              <li>・パネルごとに画像の比率が違うと、表示が崩れます</li>
+            </ul>
+          </section>
+
           <div className="flex flex-wrap gap-2">
             <button
               onClick={save}
@@ -305,6 +422,13 @@ function CarouselEditorInner() {
               className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
             >
               {saving ? '保存中...' : '保存'}
+            </button>
+            <button
+              disabled
+              title="下書き保存は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+            >
+              下書き保存
             </button>
             <Link
               href="/templates"
