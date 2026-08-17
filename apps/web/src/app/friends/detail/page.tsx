@@ -8,6 +8,7 @@ import { api, type FriendDetail, type MileageSummary } from '@/lib/api'
 import Header from '@/components/layout/header'
 import TagBadge from '@/components/friends/tag-badge'
 import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
+import FriendTimeline from '@/components/friends/friend-timeline'
 
 /**
  * 友だち詳細。
@@ -18,9 +19,20 @@ import { FIELD_TYPE_LABELS } from '@/components/friend-fields/field-list'
  * /rich-menus/edit?id= と同じ形にそろえている。
  */
 
+/**
+ * 右カラムのタブ（設計 V2 2-2-1）。
+ *
+ * `pending` は、出す先のデータを取る口がまだ無いもの。タブそのものを
+ * 消すと設計と並びが変わるので、出したうえで何が足りないかを書く。
+ */
 const TABS = [
+  { key: 'timeline', label: 'タイムライン' },
+  { key: 'health', label: '健康記録', pending: '健康記録を残す仕組みがまだありません。' },
+  { key: 'reminders', label: 'リマインダ', pending: 'この友だちのリマインダを引く口がまだありません。' },
+  { key: 'actions', label: 'アクション', pending: '操作の履歴を残す仕組みがまだありません。' },
+  { key: 'forms', label: 'フォーム回答' },
+  { key: 'orders', label: '注文・定期便', pending: 'この友だちの注文を引く口がまだありません。' },
   { key: 'info', label: '情報欄' },
-  { key: 'forms', label: 'フォームの回答' },
 ] as const
 type TabKey = (typeof TABS)[number]['key']
 
@@ -157,7 +169,8 @@ function FriendDetailInner() {
   const params = useSearchParams()
   const friendId = params.get('id') ?? ''
   const rawTab = params.get('tab')
-  const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'info') as TabKey
+  // 既定はタイムライン。設計でも最初に開くのはやり取り。
+  const tab: TabKey = (TABS.find((t) => t.key === rawTab)?.key ?? 'timeline') as TabKey
 
   const [friend, setFriend] = useState<FriendDetail | null>(null)
   const [fields, setFields] = useState<FriendField[]>([])
@@ -528,11 +541,13 @@ function FriendDetailInner() {
 
           {/* 右：タブ */}
           <div data-design="Right">
-            <div className="border-hairline mb-4 flex gap-1 border-b">
+            <div className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
               {TABS.map((t) => (
                 <Link
                   key={t.key}
-                  href={`/friends/detail?id=${friendId}&tab=${t.key}`}
+                  href={`/friends/detail?id=${friendId}&tab=${t.key}${
+                    group === BASIC_GROUP ? '' : `&group=${group}`
+                  }`}
                   className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
                     tab === t.key
                       ? 'border-accent text-accent'
@@ -543,6 +558,20 @@ function FriendDetailInner() {
                 </Link>
               ))}
             </div>
+
+            {tab === 'timeline' && <FriendTimeline friendId={friendId} />}
+
+            {/* 出す先のデータを取る口が無いもの。何が足りないかを書く。 */}
+            {TABS.map((t) =>
+              'pending' in t && t.pending && tab === t.key ? (
+                <div
+                  key={t.key}
+                  className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm"
+                >
+                  {t.pending}
+                </div>
+              ) : null,
+            )}
 
             {tab === 'info' && (
               <div className="bg-canvas rounded-card border-hairline border p-5">
