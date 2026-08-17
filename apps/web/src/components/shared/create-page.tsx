@@ -198,6 +198,39 @@ export function AsideCard({
   )
 }
 
+/**
+ * 択一の選択肢を、説明つきの札で出す。
+ *
+ * 設計の作成画面は「先着順で自動確定 / 承認制」のように、選択肢そのものより
+ * 「それを選ぶと何が起きるか」を並べて選ばせる。プルダウンにすると説明が
+ * 消えるので、選ぶ前に読める形で置く。
+ */
+export function ChoiceCard({
+  selected,
+  title,
+  note,
+  onClick,
+}: {
+  selected: boolean
+  title: string
+  note: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      className={`rounded-card border p-3 text-left transition-colors ${
+        selected ? 'border-accent bg-accent-bg' : 'border-hairline hover:bg-canvas-sunken'
+      }`}
+    >
+      <div className="text-ink text-sm font-semibold">{title}</div>
+      <div className="text-ink-faint text-xs">{note}</div>
+    </button>
+  )
+}
+
 /** 1行の入力欄。ラベルと説明の付け方を全画面でそろえる。 */
 export function Field({
   label,

@@ -6,16 +6,6 @@ import { api, type ConversionApprovalItem } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import KpiCard from '@/components/dashboard/kpi-card'
 
-const EMPTY_FORM = {
-  name: '',
-  eventType: '',
-  value: '',
-  measureMethod: 'manual' as 'url_reach' | 'webhook' | 'manual',
-  targetUrl: '',
-  countRepeat: true,
-  attributionDays: '',
-}
-
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
  *
@@ -39,6 +29,11 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   purchase: '購入',
   form_submit: '申込・登録',
   friend_add: '申込・登録',
+  visit: '来店・参加',
+  // 作る画面が以前に送っていた値。過去に作った行がこれで残っている。
+  signup: '申込・登録',
+  reserve: '来店・参加',
+  other: 'その他',
   scenario_step: 'シナリオ到達',
   rich_menu_tap: 'リッチメニュー',
   url_click: 'URLクリック',
@@ -106,8 +101,6 @@ function ConversionsPageInner() {
   const [points, setPoints] = useState<ConversionPoint[]>([])
   const [report, setReport] = useState<ConversionReportItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState(EMPTY_FORM)
   const [pending, setPending] = useState<ConversionApprovalItem[]>([])
   const [approved, setApproved] = useState<ConversionApprovalItem[]>([])
   const [openOffers, setOpenOffers] = useState(0)
@@ -138,44 +131,11 @@ function ConversionsPageInner() {
 
   useEffect(() => { load() }, [])
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form.name || !form.eventType) return
-    // サーバー側でも弾くが、押してからエラーで戻されるより、押す前に止める。
-    if (form.measureMethod === 'url_reach' && !form.targetUrl.trim()) return
-    try {
-      await api.conversions.createPoint({
-        name: form.name,
-        eventType: form.eventType,
-        value: form.value ? Number(form.value) : null,
-        measureMethod: form.measureMethod,
-        targetUrl: form.measureMethod === 'url_reach' ? form.targetUrl.trim() : null,
-        countRepeat: form.countRepeat,
-        attributionDays: form.attributionDays ? Number(form.attributionDays) : null,
-      })
-      setForm(EMPTY_FORM)
-      setShowCreate(false)
-      load()
-    } catch {}
-  }
-
   const handleDelete = async (id: string) => {
     if (!confirm('このCVポイントを削除しますか？')) return
     await api.conversions.deletePoint(id)
     load()
   }
-
-  const eventTypes = [
-    { value: 'friend_add', label: '友だち追加' },
-    { value: 'rich_menu_tap', label: 'リッチメニュータップ' },
-    { value: 'url_click', label: 'URLクリック' },
-    { value: 'form_submit', label: 'フォーム送信' },
-    { value: 'keyword_sent', label: 'キーワード送信' },
-    { value: 'scenario_step', label: 'シナリオステップ到達' },
-    { value: 'liff_view', label: 'LIFF閲覧' },
-    { value: 'purchase', label: '購入完了' },
-    { value: 'custom', label: 'カスタム' },
-  ]
 
   // 成果地点ごとのCV数。レポートは成果地点IDで返る。
   const countByPoint = useMemo(() => {
@@ -220,12 +180,12 @@ function ConversionsPageInner() {
               >
                 アフィリエイターを追加
               </Link>
-              <button
-                onClick={() => setShowCreate(!showCreate)}
+              <Link
+                href="/conversions/new"
                 className="bg-accent text-on-accent hover:bg-accent-hover rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
               >
-                {showCreate ? 'キャンセル' : '成果地点を追加'}
-              </button>
+                成果地点を追加
+              </Link>
             </div>
           }
         />
@@ -265,131 +225,6 @@ function ConversionsPageInner() {
           loading={loading}
         />
       </div>
-
-      {showCreate && (
-        <form onSubmit={handleCreate} className="bg-canvas rounded-card border border-hairline p-6 mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-ink-secondary mb-1">CV名</label>
-              <input
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="購入完了"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-secondary mb-1">イベントタイプ</label>
-              <select
-                value={form.eventType}
-                onChange={(e) => setForm({ ...form, eventType: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                required
-              >
-                <option value="">選択...</option>
-                {eventTypes.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-secondary mb-1">金額 (任意)</label>
-              <input
-                type="number"
-                value={form.value}
-                onChange={(e) => setForm({ ...form, value: e.target.value })}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="0"
-              />
-            </div>
-          </div>
-
-          {/* どうやって数えるか。ここを決めないと、作っただけで1件も増えない。 */}
-          <div className="border-hairline mt-4 space-y-4 rounded-lg border p-4">
-            <p className="text-ink-secondary text-sm font-semibold">数え方</p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <div>
-                <label htmlFor="cv-method" className="text-ink-secondary mb-1 block text-sm font-medium">
-                  計測方法
-                </label>
-                <select
-                  id="cv-method"
-                  value={form.measureMethod}
-                  onChange={(e) =>
-                    setForm({ ...form, measureMethod: e.target.value as typeof form.measureMethod })
-                  }
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                >
-                  <option value="manual">手動で記録する</option>
-                  <option value="url_reach">URLに到達したら数える</option>
-                  <option value="webhook">外部から通知を受けて数える</option>
-                </select>
-              </div>
-              {form.measureMethod === 'url_reach' && (
-                <div className="sm:col-span-2">
-                  <label htmlFor="cv-url" className="text-ink-secondary mb-1 block text-sm font-medium">
-                    対象URL
-                  </label>
-                  <input
-                    id="cv-url"
-                    type="url"
-                    value={form.targetUrl}
-                    onChange={(e) => setForm({ ...form, targetUrl: e.target.value })}
-                    className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                    placeholder="https://example.com/thanks"
-                    required
-                  />
-                  <p className="text-ink-faint mt-1 text-xs">
-                    前方一致で見ます。<code>?utm_source=...</code> のような文字が後ろに付いても数えます。
-                    計測リンク（/t/…）を踏んだ人だけが対象です。
-                  </p>
-                </div>
-              )}
-              <div>
-                <label htmlFor="cv-days" className="text-ink-secondary mb-1 block text-sm font-medium">
-                  紹介を紐づける期間
-                </label>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    id="cv-days"
-                    type="number"
-                    min={1}
-                    max={365}
-                    value={form.attributionDays}
-                    onChange={(e) => setForm({ ...form, attributionDays: e.target.value })}
-                    className="border-hairline rounded-control w-24 border px-3 py-2 text-sm tabular-nums"
-                    placeholder="90"
-                  />
-                  <span className="text-ink-faint text-xs">日</span>
-                </div>
-                <p className="text-ink-faint mt-1 text-xs">空欄なら既定の90日</p>
-              </div>
-            </div>
-            <label className="flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                checked={!form.countRepeat}
-                onChange={(e) => setForm({ ...form, countRepeat: !e.target.checked })}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span className="text-ink-secondary text-sm">
-                同じ人は一回だけ数える
-                <span className="text-ink-faint block text-xs">
-                  外すと、同じ人が何度でも数えられます（購入のように毎回数えたいとき）。
-                </span>
-              </span>
-            </label>
-          </div>
-
-          <button
-            type="submit"
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover mt-4 px-4 py-2 min-h-[44px] rounded-control text-sm font-medium"
-          >
-            作成
-          </button>
-        </form>
-      )}
 
       <div
         data-design="Bar"
@@ -436,7 +271,7 @@ function ConversionsPageInner() {
         </div>
       ) : shown.length === 0 ? (
         <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm text-ink-faint">
-          {query ? '検索に合う成果地点はありません。' : 'まだ成果地点がありません。上の「成果地点を追加」から登録してください。'}
+          {query ? '検索に合う成果地点はありません。' : 'まだ成果地点がありません。右上の「成果地点を追加」から登録してください。'}
         </div>
       ) : (
         <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
