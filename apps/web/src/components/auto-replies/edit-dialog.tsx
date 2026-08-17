@@ -154,11 +154,15 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="px-5 py-4 border-b">
-          <h3 className="text-base font-semibold">{draft.id ? '自動返信ルール 編集' : '新規 自動返信ルール'}</h3>
+          <h3 className="text-base font-semibold">{draft.id ? '自動応答編集' : '自動応答を作る'}</h3>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
+            受け取ったメッセージに自動で返します。曜日や時間帯、友だちの条件で出し分けできます。
+          </p>
         </div>
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-xs text-gray-600 mb-1">keyword</label>
+            <p className="text-ink mb-2 text-sm font-semibold">1. どのメッセージに反応するか</p>
+            <label className="text-ink-secondary mb-1 block text-xs">キーワード</label>
             <input
               type="text"
               value={keyword}
@@ -168,7 +172,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-600 mb-1">マッチ方法</label>
+            <label className="text-ink-secondary mb-1 block text-xs">一致のしかた</label>
             <div className="flex gap-2">
               {(['exact', 'contains'] as const).map((mt) => (
                 <button
@@ -176,20 +180,21 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                   onClick={() => setMatchType(mt)}
                   className={`rounded-control px-3 py-1.5 text-xs ${matchType === mt ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
                 >
-                  {mt === 'exact' ? '完全一致' : '包含'}
+                  {mt === 'exact' ? '完全一致' : '部分一致'}
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <label className="block text-xs text-gray-600 mb-1">応答方法</label>
+            <p className="text-ink mb-2 text-sm font-semibold">3. 何を返すか</p>
+            <label className="text-ink-secondary mb-1 block text-xs">返し方</label>
             <div className="flex flex-wrap gap-2">
               {([
-                { key: 'silent', label: 'silent (返信なし)' },
+                { key: 'silent', label: '返信しない' },
                 { key: 'template', label: 'テンプレートから' },
-                { key: 'inline-text', label: 'テキスト直書き' },
-                { key: 'inline-flex', label: 'Flex JSON 直書き' },
-                { key: 'inline-image', label: '画像 (image JSON)' },
+                { key: 'inline-text', label: 'この画面に直接書く' },
+                { key: 'inline-flex', label: 'Flex（JSONを直接書く）' },
+                { key: 'inline-image', label: '画像（JSONを直接書く）' },
               ] as const).map(({ key, label }) => (
                 <button
                   key={key}
@@ -203,7 +208,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
           </div>
           {mode === 'template' && (
             <div>
-              <label className="block text-xs text-gray-600 mb-1">template</label>
+              <label className="text-ink-secondary mb-1 block text-xs">テンプレート</label>
               <select
                 value={templateId ?? ''}
                 onChange={(e) => setTemplateId(e.target.value || null)}
@@ -302,7 +307,11 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
 
           {/* 返す条件。キーワードが合っても、ここに当てはまらなければ返さない。 */}
           <div className="border-hairline space-y-3 rounded-lg border p-3">
-            <p className="text-ink-secondary text-xs font-semibold">返す条件</p>
+            <p className="text-ink text-sm font-semibold">2. いつ・誰に反応するか</p>
+            {/* 曜日ごとの指定を持っていない。時間帯だけ。 */}
+            <p className="text-ink-faint text-xs">
+              曜日ごとの指定は準備中です。いまは毎日、決めた時間帯で反応します。
+            </p>
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label htmlFor="ar-from" className="text-ink-faint mb-1 block text-xs">
@@ -409,7 +418,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
               onChange={(e) => setIsActive(e.target.checked)}
               className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
             />
-            <span className="text-xs text-gray-600">有効</span>
+            <span className="text-ink-secondary text-xs">この応答をオンにする</span>
           </label>
           {error && <p className="text-xs text-red-600">{error}</p>}
         </div>

@@ -377,9 +377,17 @@ function Editor({
 
   return (
     <main className="p-6 max-w-7xl mx-auto">
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+        <Link href="/rich-menus" className="hover:underline">
+          リッチメニュー
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>{name || '(無名)'}</span>
+      </nav>
+
       <Header
-        title={name || '(無名)'}
-        description={`サイズ ${SIZE_LABEL[group.size]} • ${group.status === 'published' ? 'LINE 登録済み' : '下書き'}`}
+        title="リッチメニュー編集"
+        description="トーク画面の下に出るメニューを作ります。エリアを選んで、押したときの動きを設定してください。"
         action={
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-1.5 text-sm text-gray-600 mr-2 cursor-pointer">
@@ -497,9 +505,13 @@ function Editor({
         <aside className="space-y-5">
           {/* メニュー設定 */}
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-900">メニュー設定</h2>
+            <h2 className="text-ink text-sm font-semibold">基本設定</h2>
+            <p className="text-ink-faint text-xs">
+              サイズ {SIZE_LABEL[group.size]} ・{' '}
+              {group.status === 'published' ? 'LINE 登録済み' : '下書き'}
+            </p>
             <label className="block">
-              <span className="text-xs font-medium text-gray-600">名前</span>
+              <span className="text-ink-secondary text-xs font-medium">メニュー名</span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -508,7 +520,7 @@ function Editor({
               <p className="mt-1 text-[11px] text-gray-500">管理画面でだけ使う名前 (友だちには見えない)</p>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-600">トーク画面下の文言</span>
+              <span className="text-ink-secondary text-xs font-medium">メニューバーの文字</span>
               <input
                 value={chatBarText}
                 onChange={(e) => setChatBarText(e.target.value)}
@@ -522,7 +534,10 @@ function Editor({
           {/* ページ設定 (画像 upload 含む、常時表示) */}
           {activePage && (
             <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-gray-900">ページ設定</h2>
+              <h2 className="text-ink text-sm font-semibold">タブ（メニューの切り替え）</h2>
+              <p className="text-ink-faint text-xs leading-relaxed">
+                1つのメニューの中でタブを分けられます。タブのボタンを押すと別の面に切り替わります。タブは2〜3つまでを推奨します。多いと押されなくなります。
+              </p>
               <label className="block">
                 <span className="text-xs font-medium text-gray-600">ページ名</span>
                 <input

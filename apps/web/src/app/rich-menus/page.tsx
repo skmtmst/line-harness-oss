@@ -49,6 +49,7 @@ type LineMenu = {
 export default function RichMenusListPage() {
   const { selectedAccount } = useAccount()
   const [groups, setGroups] = useState<RichMenuGroupListItem[]>([])
+  const [query, setQuery] = useState('')
   const [external, setExternal] = useState<{
     currentDefault: string | null
     lineMenus: LineMenu[]
@@ -157,20 +158,130 @@ export default function RichMenusListPage() {
     }
   }
 
+  // メニュー名とトークバーの文言を見る。名前だけだと、画面に出ている
+  // 文言（chatBarText）で探せない。
+  const q = query.trim()
+  const shownGroups = q
+    ? groups.filter((g) => g.name.includes(q) || g.chatBarText.includes(q))
+    : groups
+
   return (
     <main className="p-6 max-w-7xl mx-auto">
-      <Header
-        title="リッチメニュー"
-        description="LINE トーク画面下に表示されるメニュー。タブ切替対応。"
-        action={
-          <Link
-            href="/rich-menus/new"
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover inline-flex items-center gap-1 rounded-control px-4 py-2 text-sm font-medium"
+      <div data-design="Head">
+        <Header
+          title="リッチメニュー"
+          description="トーク画面の下に表示されるメニューを作ります。友だちの状態ごとに出し分けでき、タップ数を計測できます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              <button
+                disabled
+                title="並び替えは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                並び替え
+              </button>
+              {/* リッチメニューにフォルダを持たせる列が無い。 */}
+              <button
+                disabled
+                title="フォルダは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                フォルダを追加
+              </button>
+              <Link
+                href="/rich-menus/new"
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
+              >
+                メニューを作成
+              </Link>
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">メニュー</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {groups.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            公開中 {groups.filter((g) => g.status === 'published').length}
+          </p>
+        </div>
+        {/* どのボタンが何回押されたかを記録していない。LINE 側で処理される
+            postback / message は webhook で来るが、メニューのどの領域かまでは
+            結びつけていない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">今月のタップ</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">タップ数は未集計</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">最多タップ</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">タップ数は未集計</p>
+        </div>
+        {/* 一覧はタグ条件を返していない。誰に出すかはメニューごとの設定に
+            あるが、一覧の型（RichMenuGroupListItem）に入っていない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">出し分け</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">タグ条件は一覧に出ません</p>
+        </div>
+      </div>
+
+      <div
+        data-design="Bar"
+        className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
+      >
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="メニュー名で検索"
+          aria-label="メニュー名で検索"
+          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+        />
+        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+        <select
+          disabled
+          title="並び替えは準備中です"
+          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+        >
+          <option>タップ数が多い順</option>
+        </select>
+        <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
+        <select
+          disabled
+          title="表示件数の切り替えは準備中です"
+          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+        >
+          <option>20件</option>
+        </select>
+      </div>
+
+      <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+        {['よく使う', '公開中のみ', '下書きのみ'].map((label) => (
+          <button
+            key={label}
+            disabled
+            title="保存した条件は準備中です"
+            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
           >
-            <span className="text-lg leading-none">+</span> 新規作成
-          </Link>
-        }
-      />
+            {label}
+          </button>
+        ))}
+      </div>
 
       {!selectedAccount && (
         <div className="text-sm text-ink-faint">
@@ -211,7 +322,7 @@ export default function RichMenusListPage() {
         </h2>
       )}
 
-      {selectedAccount && !loading && !error && groups.length === 0 && (
+      {selectedAccount && !loading && !error && shownGroups.length === 0 && (
         <div className="bg-white border border-hairline rounded-lg shadow-sm p-12 text-center">
           <p className="text-ink-faint mb-4">
             まだリッチメニューが作成されていません。
@@ -225,9 +336,9 @@ export default function RichMenusListPage() {
         </div>
       )}
 
-      {selectedAccount && !loading && !error && groups.length > 0 && (
+      {selectedAccount && !loading && !error && shownGroups.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {groups.map((g) => (
+          {shownGroups.map((g) => (
             <div
               key={g.id}
               className="bg-white border border-hairline rounded-lg shadow-sm hover:shadow-md transition-shadow flex flex-col"
