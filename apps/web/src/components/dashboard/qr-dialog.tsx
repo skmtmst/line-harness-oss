@@ -25,16 +25,25 @@ export default function QrDialog({
   onClose,
   accountName,
   baseLink,
+  initialRouteId = '',
 }: {
   open: boolean
   onClose: () => void
   accountName: string
   baseLink: string
+  /** 呼び出し元で選んでいた経路。開いたときの初期値になる。 */
+  initialRouteId?: string
 }) {
   const [routes, setRoutes] = useState<EntryRoute[]>([])
-  const [routeId, setRouteId] = useState('')
+  const [routeId, setRouteId] = useState(initialRouteId)
   const [size, setSize] = useState(SIZES[0].value)
   const [copied, setCopied] = useState(false)
+
+  // 開くたびに呼び出し元の選択に合わせる。閉じている間に向こうで
+  // 経路を変えていたら、次に開いたときはそちらが正。
+  useEffect(() => {
+    if (open) setRouteId(initialRouteId)
+  }, [open, initialRouteId])
 
   useEffect(() => {
     if (!open) return
