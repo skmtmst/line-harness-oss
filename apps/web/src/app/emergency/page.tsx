@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
@@ -144,7 +145,42 @@ function EmergencyPageInner() {
 
   return (
     <div>
-      <Header title="緊急コントロール" />
+      <div data-design="Head">
+        <Header
+          title="運用状態"
+          description="アカウントの健全性チェック、配信の緊急停止、システムの更新履歴をまとめています。異常を見て、止めて、記録を追うまでが1つの動線です。"
+          action={
+            <button
+              disabled
+              title="マニュアルは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+          }
+        />
+      </div>
+
+      {/* 設計は3タブ（健全性チェック / 緊急コントロール / 更新履歴）。
+          実装は緊急コントロールだけで、健全性チェックと更新履歴の画面が無い。 */}
+      <div data-design="Tabs" className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
+        <button
+          disabled
+          title="健全性チェックは準備中です"
+          className="text-ink-faint -mb-px cursor-not-allowed border-b-2 border-transparent px-4 py-2 text-sm font-medium opacity-50"
+        >
+          健全性チェック
+        </button>
+        <span className="border-accent text-accent -mb-px border-b-2 px-4 py-2 text-sm font-medium">
+          緊急コントロール
+        </span>
+        <Link
+          href="/updates"
+          className="text-ink-secondary hover:text-ink -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium"
+        >
+          更新履歴
+        </Link>
+      </div>
 
       {/* Warning banner */}
       <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">

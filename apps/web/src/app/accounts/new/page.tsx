@@ -16,7 +16,7 @@ export default function NewLineAccountPage() {
   return (
     <CreatePage
       title="LINEアカウントを追加する"
-      description="LINE Developers で作ったチャネルを、この管理画面につなぎます。"
+      description="LINE公式アカウントをこのツールにつなぎ、配信できるようにします。"
       parent={['LINEアカウント', '/accounts']}
       validate={() => {
         if (!name.trim()) return 'アカウント名を入力してください'
@@ -43,7 +43,9 @@ export default function NewLineAccountPage() {
         return res.data.id
       }}
     >
-      <Field label="アカウント名" htmlFor="ac-name" required note="この管理画面での呼び名です。">
+      <p className="text-ink text-sm font-semibold">1. アカウントの情報</p>
+
+      <Field label="表示名" htmlFor="ac-name" required note="この管理画面の中でだけ使う名前です。">
         <input
           id="ac-name"
           type="text"
@@ -58,7 +60,12 @@ export default function NewLineAccountPage() {
         <p className="text-ink-secondary text-sm font-semibold">
           Messaging API（メッセージの送受信に必要）
         </p>
-        <Field label="Channel ID" htmlFor="ac-channel-id" required>
+        <p className="text-ink mt-2 text-sm font-semibold">2. LINE Developers から転記する項目</p>
+      <p className="text-ink-faint text-xs">
+        チャネル基本設定とMessaging API設定の画面に記載されています。
+      </p>
+
+      <Field label="チャネルID" htmlFor="ac-channel-id" required>
           <input
             id="ac-channel-id"
             type="text"
@@ -67,7 +74,7 @@ export default function NewLineAccountPage() {
             className={`${inputClass} font-mono`}
           />
         </Field>
-        <Field label="Channel Access Token" htmlFor="ac-token" required>
+        <Field label="チャネルアクセストークン（長期）" htmlFor="ac-token" required>
           <input
             id="ac-token"
             type="password"
@@ -76,7 +83,7 @@ export default function NewLineAccountPage() {
             className={`${inputClass} font-mono`}
           />
         </Field>
-        <Field label="Channel Secret" htmlFor="ac-secret" required>
+        <Field label="チャネルシークレット" htmlFor="ac-secret" required>
           <input
             id="ac-secret"
             type="password"
