@@ -1270,7 +1270,8 @@ CREATE TABLE scenario_steps (
   delivery_time   TEXT,
   template_id     TEXT REFERENCES templates(id) ON DELETE SET NULL,
   on_reach_tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL,
-  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), condition_type TEXT, condition_value TEXT, next_step_on_false INTEGER,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), condition_type TEXT, condition_value TEXT, next_step_on_false INTEGER, after_send TEXT NOT NULL DEFAULT 'continue'
+  CHECK (after_send IN ('continue', 'pause')),
   UNIQUE (scenario_id, step_order)
 );
 
@@ -1953,6 +1954,8 @@ CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_ind
 CREATE INDEX idx_saved_searches_scope ON saved_searches(scope, display_order);
 
 CREATE INDEX idx_scenario_steps_scenario_id ON scenario_steps (scenario_id);
+
+CREATE INDEX idx_scenarios_order ON scenarios (display_order);
 
 CREATE INDEX idx_shifts_staff_date ON staff_shifts (staff_id, work_date);
 

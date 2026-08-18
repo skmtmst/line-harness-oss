@@ -1221,6 +1221,12 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Scenario & { steps: ScenarioStep[] }>>(`/api/scenarios/${id}`),
+    /** 並び順をまとめて書く。渡した順に 0,1,2… が振られる。 */
+    reorder: (ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/scenarios/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids }),
+      }),
     create: (data: Omit<Scenario, 'id' | 'createdAt' | 'updatedAt'>) =>
       fetchApi<ApiResponse<Scenario>>('/api/scenarios', {
         method: 'POST',
@@ -1245,6 +1251,7 @@ export const api = {
         deliveryTime?: string
         templateId?: string | null
         onReachTagId?: string | null
+        afterSend?: 'continue' | 'pause'
       },
     ) =>
       fetchApi<ApiResponse<ScenarioStep>>(`/api/scenarios/${id}/steps`, {
@@ -1264,6 +1271,7 @@ export const api = {
         deliveryTime?: string
         templateId?: string | null
         onReachTagId?: string | null
+        afterSend?: 'continue' | 'pause'
       },
     ) =>
       fetchApi<ApiResponse<ScenarioStep>>(`/api/scenarios/${id}/steps/${stepId}`, {

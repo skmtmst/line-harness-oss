@@ -16,6 +16,8 @@ export interface Scenario {
   delivery_mode: DeliveryMode;
   /** 他のシナリオと同時に動いてよいか。1 が既定（並行を許す） */
   allow_concurrent: number;
+  /** 一覧での並び順。小さいほど上（113 で追加） */
+  display_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +37,8 @@ export interface ScenarioStep {
   delivery_time: string | null;
   template_id: string | null;
   on_reach_tag_id: string | null;
+  /** この通を送ったあと。'continue' で次へ、'pause' で止める（113 で追加） */
+  after_send: string;
   created_at: string;
 }
 
@@ -58,6 +62,21 @@ export interface FriendScenario {
 // ============================================================
 
 export type ScenarioWithStepCount = Scenario & { step_count: number };
+
+/**
+ * 並び順をまとめて書く。
+ *
+ * 1件ずつ当てると、10件動かしたときに10往復する。その途中で誰かが一覧を
+ * 開くと、半分だけ入れ替わった並びが見える。渡された順に 0,1,2… を振る。
+ */
+export async function reorderScenarios(db: D1Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.batch(
+    ids.map((id, i) =>
+      db.prepare(`UPDATE scenarios SET display_order = ? WHERE id = ?`).bind(i, id),
+    ),
+  );
+}
 
 export async function getScenarios(db: D1Database): Promise<ScenarioWithStepCount[]> {
   const result = await db
@@ -222,6 +241,8 @@ export interface CreateScenarioStepInput {
   deliveryTime?: string | null;
   templateId?: string | null;
   onReachTagId?: string | null;
+  /** この通を送ったあと。'pause' なら次へ進めず止める。 */
+  afterSend?: 'continue' | 'pause';
 }
 
 export async function createScenarioStep(
@@ -237,9 +258,9 @@ export async function createScenarioStep(
        (id, scenario_id, step_order, delay_minutes, message_type, message_content,
         condition_type, condition_value, next_step_on_false,
         offset_days, offset_minutes, delivery_time,
-        template_id, on_reach_tag_id,
+        template_id, on_reach_tag_id, after_send,
         created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -256,6 +277,7 @@ export async function createScenarioStep(
       input.deliveryTime ?? null,
       input.templateId ?? null,
       input.onReachTagId ?? null,
+      input.afterSend ?? 'continue',
       now,
     )
     .run();
@@ -281,6 +303,7 @@ export type UpdateScenarioStepInput = Partial<
     | 'delivery_time'
     | 'template_id'
     | 'on_reach_tag_id'
+    | 'after_send'
   >
 >;
 
@@ -571,6 +594,32 @@ export async function advanceFriendScenario(
        WHERE id = ?`,
     )
     .bind(nextStepOrder, nextDeliveryAt ?? null, now, id)
+    .run();
+}
+
+/**
+ * 送ったところで止める。
+ *
+ * 「送信後 一時停止」が付いた通を送ったあとに呼ぶ。次の配信日時を消して
+ * status を paused にするので、時間が来ても勝手には進まない。人が再開すると
+ * 止まった続きから流れる（current_step_order はそのまま残す）。
+ */
+export async function pauseFriendScenario(
+  db: D1Database,
+  id: string,
+  atStepOrder: number,
+): Promise<void> {
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE friend_scenarios
+       SET status = 'paused',
+           current_step_order = ?,
+           next_delivery_at = NULL,
+           updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(atStepOrder, now, id)
     .run();
 }
 
