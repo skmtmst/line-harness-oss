@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
@@ -135,6 +136,42 @@ function ImagePreview({ content }: { content: string }) {
   }
 }
 
+/**
+ * 設定の札1枚。設計は5枚を横に並べ、直せるものだけ右上に入口を出す。
+ *
+ * 直す先が無いものに入口を付けると、押しても何も起きない札ができる。
+ * action を渡さなければ、読むだけの札になる。
+ */
+function SettingCard({
+  label,
+  action,
+  onAction,
+  children,
+}: {
+  label: string
+  action?: string
+  onAction?: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-canvas rounded-card border-hairline border p-4">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <p className="text-ink-faint text-xs">{label}</p>
+        {action && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="text-accent shrink-0 text-xs hover:underline"
+          >
+            {action}
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export default function ScenarioDetailClient({ scenarioId }: { scenarioId: string }) {
   const id = scenarioId
 
@@ -146,7 +183,11 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true })
   const [saving, setSaving] = useState(false)
 
+  const router = useRouter()
+  const [duplicating, setDuplicating] = useState(false)
   const [showStepForm, setShowStepForm] = useState(false)
+  /** 何通目のあとに差し込むか。末尾に足すときは null。 */
+  const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
   const [stepSaving, setStepSaving] = useState(false)
@@ -219,6 +260,84 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     api.scenarios.stats(id).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
   }, [id])
 
+  /**
+   * 重複購読の許可を切り替える。
+   *
+   * 編集モードに入らずその場で当てる。読むだけの説明の隣にあるものなので、
+   * 「編集 → 変更 → 保存」を挟むと、何を編集しているのか分からなくなる。
+   */
+  const handleConcurrentChange = async (allow: boolean) => {
+    if (!scenario || (scenario.allowConcurrent ?? true) === allow) return
+    setError('')
+    try {
+      const res = await api.scenarios.update(id, { allowConcurrent: allow })
+      if (res.success) loadScenario()
+      else setError(res.error)
+    } catch {
+      setError('重複購読の設定を変更できませんでした')
+    }
+  }
+
+  /**
+   * シナリオを丸ごと複製する。
+   *
+   * 似た流れをもう1本作るとき、通を1つずつ写すのは現実的でない。
+   * 中身だけ写して、名前に「のコピー」を付け、止めた状態で作る。
+   * 作った直後に配信が始まると、確かめる前に届いてしまう。
+   */
+  const handleDuplicate = async () => {
+    if (!scenario || duplicating) return
+    setDuplicating(true)
+    setError('')
+    try {
+      const created = await api.scenarios.create({
+        name: `${scenario.name} のコピー`,
+        description: scenario.description,
+        triggerType: scenario.triggerType,
+        triggerTagId: scenario.triggerTagId,
+        lineAccountId: scenario.lineAccountId,
+        isActive: false,
+        deliveryMode: scenario.deliveryMode,
+        allowConcurrent: scenario.allowConcurrent,
+      })
+      if (!created.success) throw new Error(created.error)
+      // 通は順に足す。まとめて入れる口が無い。
+      for (const step of sortedSteps) {
+        await api.scenarios.addStep(created.data.id, {
+          stepOrder: step.stepOrder,
+          offsetMinutes: step.offsetMinutes ?? 0,
+          messageType: step.messageType,
+          messageContent: step.messageContent,
+          templateId: step.templateId ?? null,
+          onReachTagId: step.onReachTagId ?? null,
+        })
+      }
+      router.push(`/scenarios/detail?id=${created.data.id}`)
+    } catch {
+      setError('複製に失敗しました')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
+  const handleDeleteScenario = async () => {
+    if (!scenario) return
+    const count = stats?.activeNow ?? 0
+    const message =
+      count > 0
+        ? `「${scenario.name}」はいま ${count} 人が購読中です。\n削除すると配信が止まり、途中の人は続きを受け取れません。よろしいですか？`
+        : `「${scenario.name}」を削除しますか？`
+    if (!confirm(message)) return
+    setError('')
+    try {
+      const res = await api.scenarios.delete(id)
+      if (!res.success) throw new Error(res.error)
+      router.push('/scenarios')
+    } catch {
+      setError('削除に失敗しました')
+    }
+  }
+
   const handleSaveScenario = async () => {
     if (!editForm.name.trim()) return
     setSaving(true)
@@ -248,6 +367,22 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     setStepForm(emptyStepForm(nextOrder))
     setEditingStepId(null)
     setShowStepForm(true)
+    setInsertAfter(null)
+    setStepError('')
+  }
+
+  /**
+   * 通と通のあいだに差し込む。
+   *
+   * 末尾にしか足せないと、3通目と4通目のあいだに1通入れたいときに、
+   * 後ろを全部作り直すことになる。あいだの「ここに挿入」から開くと、
+   * その位置の番号で新しい通を作る。
+   */
+  const openInsertStep = (afterOrder: number) => {
+    setStepForm(emptyStepForm(afterOrder + 1))
+    setEditingStepId(null)
+    setShowStepForm(true)
+    setInsertAfter(afterOrder)
     setStepError('')
   }
 
@@ -271,6 +406,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     setEditingStepId(step.id)
     // 編集はステップ行直下にインライン表示するので、上部の新規追加フォームは閉じる
     setShowStepForm(false)
+    setInsertAfter(null)
     setStepError('')
   }
 
@@ -341,6 +477,24 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           return
         }
       } else {
+        /*
+         * あいだに差し込むときは、後ろの通の番号を先に1つずつ送る。
+         * 送らずに同じ番号で足すと、並び順が重なってどちらが先か決まらない。
+         * 後ろから順に動かすのは、途中で番号がぶつからないようにするため。
+         */
+        if (insertAfter !== null) {
+          const moving = sortedSteps
+            .filter((st) => st.stepOrder > insertAfter)
+            .sort((a, b) => b.stepOrder - a.stepOrder)
+          if (moving.length > 0) {
+            const orders = moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 }))
+            const moved = await api.scenarios.reorderSteps(id, orders)
+            if (!moved.success) {
+              setStepError('あいだに入れるための並べ替えに失敗しました')
+              return
+            }
+          }
+        }
         const res = await api.scenarios.addStep(id, payload)
         if (!res.success) {
           setStepError(res.error)
@@ -552,6 +706,33 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   }
 
   const sortedSteps = [...scenario.steps].sort((a, b) => a.stepOrder - b.stepOrder)
+
+  /**
+   * 隣り合う通の間で、いちばん人が減ったところ。
+   *
+   * 到達人数はステップごとに集計済みだったが、画面はそれを表の中でしか
+   * 使っていなかった。「どこで読まれなくなるか」は1通ずつ見比べないと
+   * 分からず、通数が増えるほど気づけない。差がいちばん大きい1か所を出す。
+   *
+   * 減っていない（増えている）ときは出さない。分岐で人が分かれた場合など、
+   * 減少として読むと誤解になる。
+   */
+  const biggestDrop = (() => {
+    const steps = stats?.steps ?? []
+    if (steps.length < 2) return null
+    let worst: { fromOrder: number; toOrder: number; lost: number; rate: number } | null = null
+    for (let i = 0; i < steps.length - 1; i += 1) {
+      const from = steps[i]
+      const to = steps[i + 1]
+      const lost = from.reachedCount - to.reachedCount
+      if (lost <= 0 || from.reachedCount === 0) continue
+      const rate = lost / from.reachedCount
+      if (!worst || lost > worst.lost) {
+        worst = { fromOrder: from.stepOrder, toOrder: to.stepOrder, lost, rate }
+      }
+    }
+    return worst
+  })()
   const modeBadge = modeBadgeStyle[deliveryMode]
 
   return (
@@ -595,13 +776,41 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         />
       </div>
 
-      {/* 同時購読の決まりは、シナリオを組む前に知っておかないと設計を
-          間違える。1画面に1つしか流せないことを最初に書く。 */}
-      <section className="bg-info-bg rounded-card mb-4 p-4">
-        <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
-        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-          別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。
-        </p>
+      {/*
+        同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
+
+        右で切り替えられる。これまでは文だけ置いて「許可しない」と書いて
+        いたが、実際は列（allow_concurrent）で持っていて、作るときにしか
+        決められなかった。読むだけの説明の隣に、それを決める場所が無い。
+      */}
+      <section className="bg-info-bg rounded-card mb-4 flex flex-wrap items-start gap-4 p-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。
+          </p>
+        </div>
+        <div className="border-hairline bg-canvas rounded-control flex shrink-0 overflow-hidden border">
+          {[
+            { value: false, label: '重複を許可しない' },
+            { value: true, label: '許可する' },
+          ].map((opt) => {
+            const on = (scenario.allowConcurrent ?? true) === opt.value
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => void handleConcurrentChange(opt.value)}
+                aria-pressed={on}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  on ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
+                }`}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
       </section>
 
       {error && (
@@ -610,44 +819,45 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         </div>
       )}
 
-      {/* Stats Header Bar */}
+      {/*
+        統計。設計は1行。カード4枚に散らすと、購読中と読了済と離脱地点を
+        見比べるのに目が横に大きく動く。並べて読むものなので1本にまとめる。
+      */}
       {stats && stats.enrolledTotal > 0 && (
-        <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="bg-canvas rounded-card border-hairline border p-4">
+        <div
+          data-design="KPIs"
+          className="bg-canvas rounded-card border-hairline mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
+        >
+          <div>
             <p className="text-ink-faint text-xs">購読中</p>
-            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            <p className="text-ink text-xl font-bold tabular-nums">
               {stats.activeNow.toLocaleString('ja-JP')}
               <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
             </p>
-            <p className="text-ink-faint mt-0.5 text-xs">登録 {stats.enrolledTotal} 人</p>
           </div>
-          <div className="bg-canvas rounded-card border-hairline border p-4">
+          <div className="border-hairline border-l pl-8">
             <p className="text-ink-faint text-xs">読了済</p>
-            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            <p className="text-ink text-xl font-bold tabular-nums">
               {stats.completed.toLocaleString('ja-JP')}
               <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
             </p>
-            <p className="text-ink-faint mt-0.5 text-xs">
-              {stats.enrolledTotal > 0
-                ? `登録のうち ${Math.round((stats.completed / stats.enrolledTotal) * 100)}%`
-                : '—'}
-            </p>
           </div>
-          <div className="bg-canvas rounded-card border-hairline border p-4">
-            <p className="text-ink-faint text-xs">一時停止</p>
-            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-              {stats.paused.toLocaleString('ja-JP')}
-              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
-            </p>
-            <p className="text-ink-faint mt-0.5 text-xs">別のシナリオに移った人など</p>
-          </div>
-          {/* ステップごとの到達人数を持っていないので、どこで落ちたかを
-              指せない。全体の登録と完了しか分からない。 */}
-          <div className="bg-canvas rounded-card border-hairline border p-4">
+          <div className="border-hairline border-l pl-8">
             <p className="text-ink-faint text-xs">離脱が大きい地点</p>
-            <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-            <p className="text-ink-faint mt-0.5 text-xs">ステップごとの到達人数は未集計</p>
+            {biggestDrop ? (
+              <p className="text-warning text-xl font-bold">
+                {biggestDrop.fromOrder}通目 <span className="mx-1">→</span> {biggestDrop.toOrder}通目
+              </p>
+            ) : (
+              <p className="text-ink-faint text-xl font-bold">—</p>
+            )}
           </div>
+          {biggestDrop && (
+            <p className="text-warning ml-auto text-xs">
+              ↘ {biggestDrop.fromOrder}通目で {biggestDrop.lost.toLocaleString('ja-JP')}人（
+              {Math.round(biggestDrop.rate * 100)}%）が離脱しています
+            </p>
+          )}
         </div>
       )}
 
@@ -740,73 +950,52 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </div>
         ) : (
           <div>
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <h2 className="text-lg font-semibold text-ink">{scenario.name}</h2>
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${modeBadge.bg} ${modeBadge.text}`}>
-                  {modeBadge.label}
-                </span>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    scenario.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'
-                  }`}
-                >
-                  {scenario.isActive ? '有効' : '無効'}
-                </span>
-                <button
-                  onClick={() => setEditing(true)}
-                  className="text-xs font-medium text-green-600 hover:text-green-700 px-3 py-1.5 rounded-md hover:bg-green-50 transition-colors"
-                >
-                  編集
-                </button>
-              </div>
-            </div>
-            {scenario.description && (
-              <p className="text-sm text-ink-faint mb-3">{scenario.description}</p>
-            )}
-            <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">フォルダ</dt>
+            {/*
+              設計は5枚の札を横に並べ、それぞれに直す入口を付ける。
+              以前は名前と説明の下に定義リストを縦に置いていたが、
+              どれが直せてどれが読むだけなのかが見分けられなかった。
+            */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <SettingCard label="シナリオ名" action="編集" onAction={() => setEditing(true)}>
+                <p className="text-ink truncate text-sm font-bold">{scenario.name}</p>
                 {/* シナリオにフォルダを持たせる列が無い。 */}
-                <dd className="text-ink-secondary">未分類</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">配信方式</dt>
-                <dd className="text-ink-secondary">{modeBadge.label}</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">状態</dt>
-                <dd className="text-ink-secondary">{scenario.isActive ? '配信可' : '一時停止中'}</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">開始のきっかけ</dt>
-                <dd className="text-ink-secondary">
-                  {triggerOptions.find((o) => o.value === scenario.triggerType)?.label ??
-                    scenario.triggerType}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">対象の絞り込み</dt>
+                <p className="text-ink-faint mt-0.5 text-xs">フォルダ：未分類</p>
+              </SettingCard>
+
+              <SettingCard label="配信方式">
+                <p className="text-ink text-sm font-bold">{modeBadge.label}</p>
+                <p className="text-ink-faint mt-0.5 text-xs">作ったあとは変えられません</p>
+              </SettingCard>
+
+              <SettingCard label="状態" action="変更" onAction={() => setEditing(true)}>
+                <p className={`text-sm font-bold ${scenario.isActive ? 'text-ink' : 'text-warning'}`}>
+                  {scenario.isActive ? '配信可' : '一時停止中'}
+                </p>
+                <p className="text-ink-faint mt-0.5 text-xs">
+                  {scenario.isActive ? '配信を一時停止する' : '配信を再開する'}
+                </p>
+              </SettingCard>
+
+              <SettingCard label="対象の絞り込み">
                 {/* 購読を始める相手を絞る条件を持っていない。呼び出し側で
                     絞ってから開始する形になっている。 */}
-                <dd className="text-ink-faint">呼び出し側で決まります</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">最終ステップ後の処理</dt>
+                <p className="text-ink text-sm font-bold">
+                  {triggerOptions.find((o) => o.value === scenario.triggerType)?.label ??
+                    scenario.triggerType}
+                </p>
+                <p className="text-ink-faint mt-0.5 text-xs">条件は呼び出し側で決まります</p>
+              </SettingCard>
+
+              <SettingCard label="最終ステップ後の処理">
                 {/* 読み終わったあと次のシナリオへ、という設定が無い。 */}
-                <dd className="text-ink-faint">なし（読了で終わり）</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">重複購読</dt>
-                <dd className="text-ink-faint">許可しない（同時に1つ）</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">作成日</dt>
-                <dd className="text-ink-secondary">
-                  {new Date(scenario.createdAt).toLocaleDateString('ja-JP')}
-                </dd>
-              </div>
-            </dl>
+                <p className="text-ink text-sm font-bold">なし</p>
+                <p className="text-ink-faint mt-0.5 text-xs">読了で終わり</p>
+              </SettingCard>
+            </div>
+
+            {scenario.description && (
+              <p className="text-ink-faint mt-3 text-sm">{scenario.description}</p>
+            )}
           </div>
         )}
       </div>
@@ -843,8 +1032,26 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         ) : (
           <div className="space-y-3">
             {sortedSteps.map((step, idx) => (
+              <div key={step.id}>
+                {/*
+                  通と通のあいだに差し込む入口。末尾にしか足せないと、
+                  3通目と4通目のあいだに1通入れたいときに後ろを作り直す
+                  ことになる。ふだんは薄く、近づいたときだけ見えるようにする。
+                */}
+                {idx > 0 && (
+                  <div className="group flex items-center py-1">
+                    <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
+                    <button
+                      type="button"
+                      onClick={() => openInsertStep(sortedSteps[idx - 1].stepOrder)}
+                      className="text-ink-faint hover:text-accent px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
+                    >
+                      ＋ ここに挿入
+                    </button>
+                    <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
+                  </div>
+                )}
               <div
-                key={step.id}
                 className="border border-hairline rounded-lg p-4 hover:border-gray-300 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -865,11 +1072,24 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                       </span>
                       {(() => {
                         const stat = stats?.steps.find((s) => s.stepOrder === step.stepOrder)
-                        return stat ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700">
-                            📊 {stat.reachedCount}人到達 ({Math.round(stat.reachRate * 100)}%)
+                        if (!stat) return null
+                        const pct = Math.round(stat.reachRate * 100)
+                        return (
+                          /* 数字だけだと、通ごとの減り方が読めない。棒を添えて
+                             上から下へ短くなっていくのが見えるようにする。 */
+                          <span className="inline-flex items-center gap-2">
+                            <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                              <span
+                                className="bg-accent block h-full rounded-full"
+                                style={{ width: `${Math.min(100, pct)}%` }}
+                              />
+                            </span>
+                            <span className="text-ink-secondary text-xs tabular-nums">
+                              {stat.reachedCount}人
+                            </span>
+                            <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
                           </span>
-                        ) : null
+                        )
                       })()}
                     </div>
                     {(() => {
@@ -938,10 +1158,38 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 </div>
                 {/* インライン編集フォーム: 編集対象ステップの行直下に展開 */}
                 {editingStepId === step.id && renderStepForm()}
+                </div>
               </div>
             ))}
           </div>
         )}
+      </div>
+
+      {/*
+        画面のいちばん下。設計もこの位置。
+
+        削除は右端に離して置く。編集の流れの途中にあると、保存のつもりで
+        押し間違える。複製は左、戻るは中。
+      */}
+      <div className="border-hairline mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+        <button
+          type="button"
+          onClick={() => void handleDuplicate()}
+          disabled={duplicating}
+          className="text-ink-secondary hover:text-ink text-sm font-medium disabled:opacity-40"
+        >
+          {duplicating ? '複製中...' : '⧉ このシナリオを複製'}
+        </button>
+        <Link href="/scenarios" className="text-ink-secondary hover:text-ink ml-auto text-sm">
+          シナリオ一覧に戻る
+        </Link>
+        <button
+          type="button"
+          onClick={() => void handleDeleteScenario()}
+          className="text-danger hover:underline text-sm font-medium"
+        >
+          このシナリオを削除
+        </button>
       </div>
 
       <BulkPreviewModal
