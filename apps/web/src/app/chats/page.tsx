@@ -388,7 +388,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }
   const statusFilterRef = useRef<StatusFilter>('all')
   // Send mode: 'enter' = Enter sends, Shift+Enter = newline; 'shift-enter' = reverse
-  const [sendMode, setSendMode] = useState<'enter' | 'shift-enter'>('enter')
+  /*
+   * 送信キーの初期値は Shift + Enter。**選び直せる。**
+   *
+   * Enter 単体だと、書きかけで改行しようとして送ってしまう。取り消せない
+   * ものが相手へ飛ぶので、既定は事故の起きにくい方にする。
+   * 一度選ぶと chat.sendMode に残り、次からはその設定が使われる。
+   * メール側（email-thread.tsx）も同じ置き場・同じ既定。
+   */
+  const [sendMode, setSendMode] = useState<'enter' | 'shift-enter'>('shift-enter')
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMoreChats, setHasMoreChats] = useState(false)
