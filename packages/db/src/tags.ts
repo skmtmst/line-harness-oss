@@ -17,6 +17,8 @@ export interface Tag {
   mileage_multiplier_priority: number;
   /** 友だち一覧の「★つきタグ」列に出すか。0 / 1（111 で追加） */
   is_starred: number;
+  /** 一覧での並び順。小さいほど上（112 で追加） */
+  display_order: number;
   created_at: string;
 }
 
@@ -61,7 +63,9 @@ export async function getTagsWithCounts(
        FROM tags t
        LEFT JOIN friend_tags ft ON ft.tag_id = t.id
        GROUP BY t.id
-       ORDER BY t.name ASC`,
+       -- 入れ替えたものが先。触っていないものは全部 0 なので、
+       -- そのあとの付与人数と名前で並ぶ（設計の既定は付与人数が多い順）。
+       ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
     )
     .all<TagWithCount>();
   return result.results;
@@ -155,6 +159,24 @@ export async function updateTag(
   }
   return (
     (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ?? null
+  );
+}
+
+/**
+ * 並び順をまとめて書く。
+ *
+ * 1件ずつ当てると、10件動かしたときに10往復する。その途中で誰かが
+ * 一覧を開くと、半分だけ入れ替わった並びが見える。まとめて送る。
+ *
+ * 渡された順に 0,1,2… を振る。画面で見えている並びをそのまま写す形なので、
+ * 抜けや重複を気にしなくてよい。
+ */
+export async function reorderTags(db: D1Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.batch(
+    ids.map((id, i) =>
+      db.prepare(`UPDATE tags SET display_order = ? WHERE id = ?`).bind(i, id),
+    ),
   );
 }
 

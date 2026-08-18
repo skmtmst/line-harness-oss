@@ -1465,7 +1465,7 @@ CREATE TABLE tags (
   mileage_multiplier_bps      INTEGER CHECK (mileage_multiplier_bps IS NULL OR mileage_multiplier_bps BETWEEN 1000 AND 100000),
   mileage_multiplier_priority INTEGER NOT NULL DEFAULT 0,
   created_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, group_id TEXT REFERENCES tag_groups(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, is_starred INTEGER NOT NULL DEFAULT 0);
+, group_id TEXT REFERENCES tag_groups(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, is_starred INTEGER NOT NULL DEFAULT 0, display_order INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE templates (
   id              TEXT PRIMARY KEY,
@@ -1994,6 +1994,8 @@ CREATE INDEX idx_support_email_threads_status_last
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
 
 CREATE INDEX idx_tags_group ON tags(group_id, name);
+
+CREATE INDEX idx_tags_order ON tags (folder_id, display_order);
 
 CREATE INDEX idx_templates_category ON templates (category);
 

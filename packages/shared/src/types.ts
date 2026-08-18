@@ -97,6 +97,8 @@ export interface Tag {
   mileageMultiplierPriority?: number;
   /** 友だち一覧の「★つきタグ」列に出すか */
   isStarred?: boolean;
+  /** 一覧での並び順。小さいほど上 */
+  displayOrder?: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
