@@ -18,6 +18,14 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('absolute left-0.5 top-0.5')
   })
 
+  it('クリックできる操作は指、無効な操作は禁止カーソルで統一する', () => {
+    expect(source).toContain("group.id === 'basic' ? 'cursor-default' : 'cursor-pointer'")
+    expect(source).toContain('h-7 w-7 cursor-pointer')
+    expect(source).toContain('min-h-10 cursor-pointer rounded-lg')
+    expect(source).toContain('min-h-10 cursor-pointer items-center')
+    expect(source).toContain('disabled:cursor-not-allowed')
+  })
+
   it('サイドメニューの非表示表現と多店舗管理の最下部配置を保つ', () => {
     expect(source).toContain('この印はメニューに表示されません')
     expect(source).toContain('項目が非表示になります')

@@ -21,6 +21,7 @@ const mocks = {
   SAVED_SEARCH_LIMIT: 50,
   SAVED_SEARCH_SCOPES: ['friends', 'chats', 'bookings'],
   getLoginAudit: vi.fn(),
+  getStaffMembers: vi.fn(),
   LOGIN_AUDIT_ACTIONS: ['login', 'logout', 'fail', 'view_personal', 'export'],
   getFolders: vi.fn(),
   getFolderById: vi.fn(),
@@ -62,6 +63,7 @@ const ROW = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getLoginAudit.mockResolvedValue([ROW]);
+  mocks.getStaffMembers.mockResolvedValue([{ id: 'u-1', name: '山本', role: 'admin', access_level: 'full', line_user_id: 'line-1', is_active: 1 }]);
 });
 
 describe('ログイン履歴', () => {
@@ -99,11 +101,10 @@ describe('ログイン履歴', () => {
     expect(body.data[0].ip).toBeNull();
   });
 
-  it('User-Agent は返さない', async () => {
-    // 一覧に出す必要がない。出す量は少ない方がよい。
+  it('接続元はIPと短縮したUser-Agentを返す', async () => {
     const res = await get('/api/login-audit');
     const body = (await res.json()) as { data: Array<Record<string, unknown>> };
-    expect(body.data[0]).not.toHaveProperty('userAgent');
+    expect(body.data[0].connectionSource).toBe('203.0.113.*** / test');
   });
 
   it('知らない操作での絞り込みは無視する', async () => {

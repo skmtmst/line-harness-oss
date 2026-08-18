@@ -1031,9 +1031,14 @@ export const api = {
           Array<{
             id: string
             adminUserId: string | null
+            userName: string
+            role: 'admin' | 'staff' | 'viewer' | null
+            lineLinked: boolean
+            isActive: boolean
             action: string
             screen: string | null
             ip: string | null
+            connectionSource: string | null
             result: string
             createdAt: string
           }>
@@ -2391,8 +2396,8 @@ export const api = {
     get: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`),
     me: () =>
-      fetchApi<ApiResponse<{ id: string; name: string; role: string; email: string | null }>>('/api/staff/me'),
-    create: (data: { name: string; email?: string; role: 'admin' | 'staff' | 'viewer' }) =>
+      fetchApi<ApiResponse<{ id: string; name: string; role: string; email: string | null; permissionKeys: string[] }>>('/api/staff/me'),
+    create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }> }) =>
       fetchApi<ApiResponse<StaffMember>>('/api/staff', {
         method: 'POST',
         body: JSON.stringify(data),

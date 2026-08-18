@@ -19,7 +19,9 @@ import { recordLoginAudit } from '@line-crm/db';
 import {
   createAdminSession,
   deleteAdminSession,
+  getStaffByInviteTokenHash,
   getStaffByLineUserId,
+  updateStaffMember,
 } from '@line-crm/db';
 
 export const adminAuth = new Hono<Env>();
@@ -27,6 +29,7 @@ export const adminAuth = new Hono<Env>();
 const OAUTH_STATE_COOKIE = 'lh_line_state';
 const OAUTH_NONCE_COOKIE = 'lh_line_nonce';
 const OAUTH_VERIFIER_COOKIE = 'lh_line_verifier';
+const OAUTH_INVITE_COOKIE = 'lh_line_invite';
 const OAUTH_MAX_AGE = 600;
 
 function randomToken(bytes = 32): string {
@@ -89,6 +92,8 @@ adminAuth.get('/api/auth/line', async (c) => {
   c.header('Set-Cookie', oauthCookie(OAUTH_STATE_COOKIE, state), { append: true });
   c.header('Set-Cookie', oauthCookie(OAUTH_NONCE_COOKIE, nonce), { append: true });
   c.header('Set-Cookie', oauthCookie(OAUTH_VERIFIER_COOKIE, verifier), { append: true });
+  const invite = c.req.query('invite');
+  if (invite) c.header('Set-Cookie', oauthCookie(OAUTH_INVITE_COOKIE, invite), { append: true });
 
   const authorize = new URL('https://access.line.me/oauth2/v2.1/authorize');
   authorize.search = new URLSearchParams({
@@ -109,10 +114,11 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
   const expectedState = readCookie(cookies, OAUTH_STATE_COOKIE);
   const nonce = readCookie(cookies, OAUTH_NONCE_COOKIE);
   const verifier = readCookie(cookies, OAUTH_VERIFIER_COOKIE);
+  const invite = readCookie(cookies, OAUTH_INVITE_COOKIE);
   const state = c.req.query('state');
   const code = c.req.query('code');
 
-  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE]) {
+  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INVITE_COOKIE]) {
     c.header('Set-Cookie', oauthCookie(name, '', 0), { append: true });
   }
 
@@ -150,7 +156,24 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     const profile = await verifyResponse.json<{ sub?: string }>();
     if (!profile.sub) return c.redirect(adminLoginUrl(c, 'line_login_failed'));
 
-    const staff = await getStaffByLineUserId(c.env.DB, profile.sub);
+    let staff = await getStaffByLineUserId(c.env.DB, profile.sub);
+    if (!staff && invite) {
+      const invited = await getStaffByInviteTokenHash(c.env.DB, await sha256Hex(invite));
+      if (
+        invited?.invite_status === 'pending_line' &&
+        invited.invite_expires_at &&
+        Date.parse(invited.invite_expires_at) >= Date.now()
+      ) {
+        staff = await updateStaffMember(c.env.DB, invited.id, {
+          line_user_id: profile.sub,
+          is_active: 1,
+          invite_status: 'active',
+          invite_token_hash: null,
+          invite_expires_at: null,
+          line_linked_at: new Date().toISOString(),
+        });
+      }
+    }
     if (!staff) return c.redirect(adminLoginUrl(c, 'not_authorized'));
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
