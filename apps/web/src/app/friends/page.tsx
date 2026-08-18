@@ -7,6 +7,7 @@ import type { FriendListItem } from '@/lib/api'
 import Header from '@/components/layout/header'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
+import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
 import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
@@ -48,6 +49,10 @@ function FriendsPageInner() {
   const { selectedAccountId } = useAccount()
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  /** 詳細検索で決めた条件。null は「使っていない」。 */
+  const [advanced, setAdvanced] = useState<AdvancedSearchResult | null>(null)
+  const [fieldNames, setFieldNames] = useState<string[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [hasNextPage, setHasNextPage] = useState(false)
@@ -97,6 +102,8 @@ function FriendsPageInner() {
         includeChatStatus: true,
         sort: sortMode,
         handled: responseFilter === 'unhandled' ? 'unhandled' : undefined,
+        // 詳細検索で決めた条件。上の1行検索や絞り込みと足し算になる。
+        ...(advanced?.params ?? {}),
       })
       if (res.success) {
         setFriends(res.data.items)
@@ -112,7 +119,7 @@ function FriendsPageInner() {
     } finally {
       setLoading(false)
     }
-  }, [page, selectedTagId, selectedAccountId, searchSubmitted, sortMode, responseFilter])
+  }, [page, selectedTagId, selectedAccountId, searchSubmitted, sortMode, responseFilter, advanced])
 
   useEffect(() => {
     loadTags()
@@ -173,15 +180,13 @@ function FriendsPageInner() {
             placeholder="友だち名で検索"
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
           />
-          {/*
-            設計は「詳細検索」「保存した検索」も置く。条件が増えると
-            1行の検索では足りなくなる。仕組みが入るまで押せない状態で置く。
-          */}
+          {/* 条件が増えると1行の検索では足りない。組み立てる画面を開く。 */}
           <button
             type="button"
-            disabled
-            title="詳細検索は準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+            onClick={() => setAdvancedOpen(true)}
+            className={`rounded-control border px-3 py-2 text-sm ${
+              advanced ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+            }`}
           >
             詳細検索
           </button>
@@ -209,6 +214,32 @@ function FriendsPageInner() {
             検索
           </button>
         </form>
+
+        {/* 詳細検索で絞り込んでいるとき、何で絞っているかを出す。
+            出さないと「件数が合わない」に見える。 */}
+        {advanced && advanced.summary.length > 0 && (
+          <div className="bg-accent-soft rounded-card mt-3 flex flex-wrap items-center gap-2 px-3 py-2">
+            <span className="text-accent text-xs font-bold">絞り込み中</span>
+            {advanced.summary.map((line) => (
+              <span
+                key={line}
+                className="bg-canvas text-ink-secondary rounded-pill px-2 py-0.5 text-xs"
+              >
+                {line}
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                setAdvanced(null)
+                setPage(1)
+              }}
+              className="text-accent ml-auto text-xs hover:underline"
+            >
+              条件を外す
+            </button>
+          </div>
+        )}
 
         {/* Secondary filters — タグ + 対応マーク */}
         <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-hairline">
@@ -374,6 +405,18 @@ function FriendsPageInner() {
           </div>
         </div>
       )}
+
+      <AdvancedSearchDialog
+        open={advancedOpen}
+        tags={allTags}
+        fieldNames={fieldNames}
+        onClose={() => setAdvancedOpen(false)}
+        onApply={(result) => {
+          setAdvanced(result)
+          setAdvancedOpen(false)
+          setPage(1)
+        }}
+      />
 
       <CcPromptButton prompts={ccPrompts} />
     </div>

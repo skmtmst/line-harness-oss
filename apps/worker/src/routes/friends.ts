@@ -163,13 +163,97 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       );
     }
     // Metadata filters: ?metadata.key=value (e.g. ?metadata.monthly_cost=〜100万円)
+    // ?metadataNot.key=value is the「等しくない」side. 値を持たない人も含める
+    // （項目そのものが無い人を外すと、絞り込みの意味が変わる）。
     const url = new URL(c.req.url);
     for (const [key, value] of url.searchParams.entries()) {
       if (key.startsWith('metadata.')) {
         const metaKey = key.slice('metadata.'.length);
         conditions.push(`json_extract(f.metadata, '$.' || ?) = ?`);
         binds.push(metaKey, value);
+      } else if (key.startsWith('metadataNot.')) {
+        const metaKey = key.slice('metadataNot.'.length);
+        conditions.push(
+          `(json_extract(f.metadata, '$.' || ?) IS NULL OR json_extract(f.metadata, '$.' || ?) != ?)`,
+        );
+        binds.push(metaKey, metaKey, value);
       }
+    }
+
+    /*
+     * 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）の受け口。
+     *
+     * どれも足し算で、指定が無ければ何も起きない。既にある tagId / search /
+     * handled はそのまま残してある（一覧やオートコンプリートが使っている）。
+     */
+
+    /** タグを複数（すべて満たす）。`?tagIds=a,b` */
+    const tagIds = (c.req.query('tagIds') ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    for (const t of tagIds) {
+      conditions.push(
+        'EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)',
+      );
+      binds.push(t);
+    }
+
+    /** このタグが付いていない人。`?excludeTagIds=a,b` */
+    const excludeTagIds = (c.req.query('excludeTagIds') ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    for (const t of excludeTagIds) {
+      conditions.push(
+        'NOT EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)',
+      );
+      binds.push(t);
+    }
+
+    /** ステータスメッセージに含む。`?statusMessage=...` */
+    const statusMessage = c.req.query('statusMessage');
+    if (statusMessage) {
+      conditions.push('f.status_message LIKE ?');
+      binds.push(`%${statusMessage}%`);
+    }
+
+    /** 友だち登録日の範囲。`?createdFrom=YYYY-MM-DD&createdTo=YYYY-MM-DD` */
+    const createdFrom = c.req.query('createdFrom');
+    if (createdFrom) {
+      conditions.push('f.created_at >= ?');
+      binds.push(createdFrom);
+    }
+    const createdTo = c.req.query('createdTo');
+    if (createdTo) {
+      // その日の終わりまで含める。日付だけで比べると当日ぶんが落ちる。
+      conditions.push('f.created_at <= ?');
+      binds.push(`${createdTo}T23:59:59.999`);
+    }
+
+    /**
+     * 対応マーク。`?chatStatus=unread|in_progress|resolved`
+     * 既にある `?handled=unhandled` と同じ見方（最新の chats 行）をする。
+     */
+    const chatStatus = c.req.query('chatStatus');
+    if (chatStatus && ['unread', 'in_progress', 'resolved'].includes(chatStatus)) {
+      conditions.push(
+        `COALESCE(
+           (SELECT status FROM chats c
+            WHERE c.friend_id = f.id
+            ORDER BY c.created_at DESC LIMIT 1),
+           'resolved'
+         ) = ?`,
+      );
+      binds.push(chatStatus);
+    }
+
+    /** 表示設定。`?visibility=following|blocked` 既定は指定なし（全部） */
+    const visibility = c.req.query('visibility');
+    if (visibility === 'following') {
+      conditions.push('f.is_following = 1');
+    } else if (visibility === 'blocked') {
+      conditions.push('f.is_following = 0');
     }
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
