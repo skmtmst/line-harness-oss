@@ -281,7 +281,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // incoming が無い (broadcast push など outbound only) chat は最新 outbound にフォールバック。
     // text 以外 (flex/image/sticker 等) は content を NULL にして payload size を抑える
     // (フロントは type で 📋 Flex / 📷 画像 等のラベルを出すので content は不要)。
-    // any_agg / in_agg の bare column (content 等) は「単一 MAX() を含む集約は max 行の
+    // any_agg の bare column (content 等) は「単一 MAX() を含む集約は max 行の
     // 値を返す」という SQLite の documented 挙動で argmax として使っている。
     // 集約は page 確定後の friend に絞って実行する (全 friend 分の content を
     // materialize しない)。last_any は並び順決定専用のスリムな全走査 1 回のみ。
@@ -323,25 +323,23 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
           AND friend_id IN (SELECT friend_id FROM page)
         GROUP BY friend_id
       ),
-      in_agg AS (
-        SELECT friend_id,
-          CASE WHEN message_type = 'text' THEN SUBSTR(content, 1, 200) ELSE NULL END AS content,
-          message_type,
-          MAX(created_at) AS created_at
-        FROM messages_log
-        WHERE direction = 'incoming'
-          AND (delivery_type IS NULL OR delivery_type != 'test')
-          AND friend_id IN (SELECT friend_id FROM page)
-        GROUP BY friend_id
-      ),
+      /*
+       * 一覧に出す1行は「最後のメッセージ」。送信でも受信でも、いちばん新しいもの。
+       *
+       * 以前は受信を優先していた（incoming があればそちらを出す）。そのせいで、
+       * こちらが返信したあとも一覧には古い受信が出たままで、返したのかどうかが
+       * 一覧から読めなかった。
+       *
+       * 「返信を待っている人」の判定は unanswered-inbox サービスが別に持っている
+       * ので、ここを最新に変えても未対応の数え方は変わらない。
+       */
       recent_msg AS (
         SELECT a.friend_id,
-          COALESCE(i.content, a.content) AS content,
-          CASE WHEN i.friend_id IS NOT NULL THEN 'incoming' ELSE a.direction END AS direction,
-          COALESCE(i.message_type, a.message_type) AS message_type,
-          COALESCE(i.created_at, a.created_at) AS preview_at
+          a.content AS content,
+          a.direction AS direction,
+          a.message_type AS message_type,
+          a.created_at AS preview_at
         FROM any_agg a
-        LEFT JOIN in_agg i ON i.friend_id = a.friend_id
       )
       SELECT
         f.id AS id,
@@ -370,7 +368,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
 
     // placeholder 順 = SQL 出現順: last_any(account) → deduped 内 chats(account) →
     // page 条件 → cursor (beforeAt ×2 + beforeId) → LIMIT。
-    // any_agg / in_agg は page で friend が確定済みのため account filter 不要。
+    // any_agg は page で friend が確定済みのため account filter 不要。
     const allBindings: unknown[] = [];
     if (lineAccountId) allBindings.push(lineAccountId, lineAccountId);
     allBindings.push(...conditionBindings);

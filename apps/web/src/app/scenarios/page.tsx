@@ -11,27 +11,6 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
 import ScenarioList from '@/components/scenarios/scenario-list'
 import ScenarioModePicker from '@/components/scenarios/scenario-mode-picker'
-import CcPromptButton from '@/components/cc-prompt-button'
-
-const ccPrompts = [
-  {
-    title: '新しいシナリオを作成',
-    prompt: `新しいシナリオ配信を作成してください。
-1. ターゲット: [対象を指定]
-2. トリガー: 友だち追加 / タグ変更 / 手動
-3. ステップ数: [希望数]
-4. メッセージ内容の提案もお願いします
-各ステップの配信間隔も含めて構成してください。`,
-  },
-  {
-    title: 'シナリオの効果分析',
-    prompt: `現在のシナリオ配信の効果を分析してください。
-1. 各シナリオの配信実績を確認
-2. ステップごとの離脱率を分析
-3. 改善が必要なシナリオを特定
-具体的な改善案を提示してください。`,
-  },
-]
 
 type ScenarioWithCount = Scenario & { stepCount?: number }
 
@@ -320,8 +299,6 @@ export default function ScenariosPage() {
           loading={loading}
         />
       )}
-
-      <CcPromptButton prompts={ccPrompts} />
         </div>
       </div>
       </div>

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, type DashboardOverview } from '@/lib/api'
-import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
 import PendingInboxCard from '@/components/support/pending-inbox-card'
 import ShipmentPanel from '@/components/dashboard/shipment-panel'
@@ -27,25 +26,6 @@ import {
  * 「有効友だちは今朝の値、未対応は今の値」のように基準時刻がずれて、
  * 読んだ人が判断を誤る。
  */
-
-const ccPrompts = [
-  {
-    title: 'ダッシュボードのKPI分析',
-    prompt: `LINE CRM ダッシュボードのデータを分析してください。
-1. 友だち数の推移を確認
-2. アクティブシナリオの効果を評価
-3. 配信の開封率・クリック率を分析
-改善提案を含めてレポートしてください。`,
-  },
-  {
-    title: '新しいシナリオを提案',
-    prompt: `現在の友だちデータとタグ情報を元に、効果的なシナリオ配信を提案してください。
-1. ターゲットセグメントの特定
-2. メッセージ内容の提案
-3. 配信タイミングの最適化
-具体的なステップ配信の構成を含めてください。`,
-  },
-]
 
 const PERIODS = [
   { key: 'today', label: '今日' },
@@ -373,8 +353,6 @@ export default function DashboardPage() {
           {new Date(data.generatedAt).toLocaleString('ja-JP')} 時点の数字です。
         </p>
       )}
-
-      <CcPromptButton prompts={ccPrompts} />
     </div>
   )
 }
