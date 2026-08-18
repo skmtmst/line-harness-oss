@@ -362,8 +362,33 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
       allowConcurrent?: boolean;
     }>();
 
+    /*
+     * 配信方式は「通がまだ1つも無いとき」だけ変えられる。
+     *
+     * 設計（配信方式の選択）は、シナリオを作ってから方式を選ぶ流れ。
+     * 作った直後は通が0なので、ここを通る。
+     *
+     * 通があるときに変えると、通の予定（delay_minutes / offset_days /
+     * delivery_time）が方式と食い違ったまま残る。どれを配信時刻と
+     * みなすかが変わるので、黙って通すと配信の時刻がずれる。
+     * 消してから変えてもらう。
+     */
     if (body.deliveryMode !== undefined) {
-      return c.json({ success: false, error: 'deliveryMode cannot be changed after creation' }, 400);
+      const row = await c.env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM scenario_steps WHERE scenario_id = ?`,
+      )
+        .bind(id)
+        .first<{ n: number }>();
+      if ((row?.n ?? 0) > 0) {
+        return c.json(
+          {
+            success: false,
+            error:
+              '通がすでにあるため、配信方式を変えられません。通の予定の持ち方が方式ごとに違うためです。通を消してから変えてください。',
+          },
+          400,
+        );
+      }
     }
 
     const updated = await updateScenario(c.env.DB, id, {
@@ -374,6 +399,7 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
       is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
       allow_concurrent:
         body.allowConcurrent !== undefined ? (body.allowConcurrent ? 1 : 0) : undefined,
+      delivery_mode: body.deliveryMode,
     });
 
     if (!updated) {
