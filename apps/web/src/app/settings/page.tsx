@@ -5,16 +5,20 @@ import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import {
   DEFAULT_FEATURES,
+  DEFAULT_FEATURE_GROUP_ORDER,
   FEATURE_SETTINGS_UPDATED_EVENT,
   NEN_SHOW_MULTI_STORE,
   SIDEBAR_FEATURE_BY_HREF,
+  featureGroupOrderFromSidebarOrder,
   groupEnabledCount,
   groupFeatureCount,
   itemIsEnabled,
+  sidebarOrderFromFeatureGroupOrder,
   visibleFeatureGroups,
   type FeatureGroup,
   type FeatureItem,
   type FeatureKey,
+  type MovableFeatureGroupId,
 } from '@/lib/feature-settings'
 
 function Switch({
@@ -41,8 +45,8 @@ function Switch({
       } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-          checked ? 'translate-x-[1.125rem]' : 'translate-x-0.5'
+        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+          checked ? 'translate-x-4' : 'translate-x-0'
         }`}
       />
     </button>
@@ -117,15 +121,27 @@ function FeatureRow({ item, features, onToggle }: {
   )
 }
 
-function FeatureSection({ group, features, onItemToggle, onGroupToggle }: {
+function FeatureSection({
+  group,
+  features,
+  onItemToggle,
+  onGroupToggle,
+  canMoveUp,
+  canMoveDown,
+  onMove,
+}: {
   group: FeatureGroup
   features: Record<string, boolean>
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMove: (groupId: MovableFeatureGroupId, direction: -1 | 1) => void
 }) {
   const total = groupFeatureCount(group)
   const enabled = groupEnabledCount(group, features)
   const allEnabled = group.id === 'basic' || enabled === total
+  const movableGroupId: MovableFeatureGroupId | null = group.id === 'basic' ? null : group.id
   return (
     <section className="overflow-hidden rounded-[18px] border border-[#dedede] bg-white">
       <div className="flex min-h-[42px] items-center justify-between gap-4 border-b border-[#e5e5e5] bg-[#fafafa] px-4 py-2.5 sm:px-5">
@@ -133,14 +149,41 @@ function FeatureSection({ group, features, onItemToggle, onGroupToggle }: {
           <h2 className="text-sm font-bold text-[#202020]">{group.label}</h2>
           <p className="text-[10px] text-[#777]">{groupSummary(group, features)}</p>
         </div>
-        <button
-          type="button"
-          aria-disabled={group.id === 'basic'}
-          onClick={() => group.id !== 'basic' && onGroupToggle(group, !allEnabled)}
-          className="shrink-0 text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6]"
-        >
-          グループごと切替
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            aria-disabled={group.id === 'basic'}
+            onClick={() => group.id !== 'basic' && onGroupToggle(group, !allEnabled)}
+            className={`text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6] ${group.id === 'basic' ? 'cursor-default' : ''}`}
+          >
+            グループごと切替
+          </button>
+          {movableGroupId && (
+            <>
+              <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-[#dedede]" />
+              <button
+                type="button"
+                aria-label={`${group.label}を上へ`}
+                title="上へ移動"
+                disabled={!canMoveUp}
+                onClick={() => onMove(movableGroupId, -1)}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label={`${group.label}を下へ`}
+                title="下へ移動"
+                disabled={!canMoveDown}
+                onClick={() => onMove(movableGroupId, 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                ↓
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <ul className="divide-y divide-[#e8e8e8]">
         {group.items.map((item) => (
@@ -178,10 +221,11 @@ const PREVIEW_SECTIONS = [
   },
 ] as const
 
-function SidebarPreview({ features, specializedFeatureKeys, showMultiStore }: {
+function SidebarPreview({ features, specializedFeatureKeys, showMultiStore, groupOrder }: {
   features: Record<string, boolean>
   specializedFeatureKeys: string[]
   showMultiStore: boolean
+  groupOrder: MovableFeatureGroupId[]
 }) {
   const specialized = [
     { label: '健康記録', href: '/nen-campaigns', key: 'nen_campaigns' },
@@ -196,10 +240,16 @@ function SidebarPreview({ features, specializedFeatureKeys, showMultiStore }: {
         { label: 'Googleマップ連携', key: 'google_business_profile' },
       ]
     : []
+  const fixedSections = PREVIEW_SECTIONS.slice(0, 3)
+  const movableSections: Partial<Record<MovableFeatureGroupId, { label: string; items: ReadonlyArray<{ label: string; href?: string; key?: string }> }>> = {
+    delivery: PREVIEW_SECTIONS[3],
+    results: PREVIEW_SECTIONS[4],
+    specialized: specialized.length ? { label: '専用機能', items: specialized } : undefined,
+    'multi-store': multiStore.length ? { label: '多店舗管理', items: multiStore } : undefined,
+  }
   const sections = [
-    ...PREVIEW_SECTIONS,
-    ...(specialized.length ? [{ label: '専用機能', items: specialized }] : []),
-    ...(multiStore.length ? [{ label: '多店舗管理', items: multiStore }] : []),
+    ...fixedSections,
+    ...groupOrder.map((id) => movableSections[id]).filter((section): section is NonNullable<typeof section> => Boolean(section)),
   ]
   let hidden = 0
   for (const section of sections) {
@@ -258,6 +308,8 @@ export default function SettingsPage() {
   const { selectedAccountId } = useAccount()
   const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
   const [features, setFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
+  const [savedGroupOrder, setSavedGroupOrder] = useState<MovableFeatureGroupId[]>(DEFAULT_FEATURE_GROUP_ORDER)
+  const [groupOrder, setGroupOrder] = useState<MovableFeatureGroupId[]>(DEFAULT_FEATURE_GROUP_ORDER)
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -280,6 +332,9 @@ export default function SettingsPage() {
       const next = { ...DEFAULT_FEATURES, ...response.data.features }
       setSavedFeatures(next)
       setFeatures(next)
+      const nextGroupOrder = featureGroupOrderFromSidebarOrder(response.data.sidebarOrder)
+      setSavedGroupOrder(nextGroupOrder)
+      setGroupOrder(nextGroupOrder)
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
     } catch {
       setError('機能設定を読み込めませんでした。時間をおいてもう一度お試しください。')
@@ -292,11 +347,18 @@ export default function SettingsPage() {
 
   // 然では機能未実装の多店舗管理を、設計確認用として最下部へ常時仮置きする。
   const showMultiStore = NEN_SHOW_MULTI_STORE
-  const groups = useMemo(
-    () => visibleFeatureGroups({ showMultiStore, specializedFeatureKeys }),
-    [showMultiStore, specializedFeatureKeys],
-  )
-  const dirty = Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key])
+  const groups = useMemo(() => {
+    const visible = visibleFeatureGroups({ showMultiStore, specializedFeatureKeys })
+    const basic = visible.find((group) => group.id === 'basic')
+    const movable = new Map(visible.filter((group) => group.id !== 'basic').map((group) => [group.id, group]))
+    return [
+      ...(basic ? [basic] : []),
+      ...groupOrder.map((id) => movable.get(id)).filter((group): group is FeatureGroup => Boolean(group)),
+    ]
+  }, [groupOrder, showMultiStore, specializedFeatureKeys])
+  const dirty =
+    Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key]) ||
+    groupOrder.join('|') !== savedGroupOrder.join('|')
 
   const toggleItem = (item: FeatureItem, next: boolean) => {
     if (item.required) return
@@ -318,18 +380,34 @@ export default function SettingsPage() {
     setNotice('')
   }
 
+  const moveGroup = (groupId: MovableFeatureGroupId, direction: -1 | 1) => {
+    setGroupOrder((current) => {
+      const index = current.indexOf(groupId)
+      const target = index + direction
+      if (index < 0 || target < 0 || target >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+    setNotice('')
+  }
+
   const save = async () => {
     if (!selectedAccountId || !dirty) return
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const response = await api.featureSettings.save(selectedAccountId, { features })
+      const response = await api.featureSettings.save(selectedAccountId, {
+        features,
+        sidebarOrder: sidebarOrderFromFeatureGroupOrder(groupOrder),
+      })
       if (!response.success) {
         setError(response.error)
         return
       }
       setSavedFeatures({ ...features })
+      setSavedGroupOrder([...groupOrder])
       setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
     } catch {
@@ -351,18 +429,11 @@ export default function SettingsPage() {
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
-            aria-label="適用先：この契約全体"
-            className="flex min-h-10 min-w-[260px] items-center rounded-lg border border-[#d9d9d9] bg-white px-4 text-left"
-          >
-            <span className="mr-3 text-xs text-[#777]">適用先</span>
-            <span className="text-sm font-bold text-[#222]">この契約全体</span>
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="ml-auto h-4 w-4 text-[#555]">
-              <path d="m6 8 4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={() => { setFeatures({ ...DEFAULT_FEATURES }); setNotice('') }}
+            onClick={() => {
+              setFeatures({ ...DEFAULT_FEATURES })
+              setGroupOrder([...DEFAULT_FEATURE_GROUP_ORDER])
+              setNotice('')
+            }}
             disabled={loading || saving}
             className="min-h-10 rounded-lg border border-[#d9d9d9] bg-white px-4 text-sm font-bold text-[#444] hover:bg-[#fafafa] disabled:opacity-40"
           >
@@ -409,28 +480,28 @@ export default function SettingsPage() {
                 {groups.map((group) => (
                   group.id === 'basic' ? (
                     <div key={group.id} data-design="基本">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={false} canMoveDown={false} onMove={moveGroup} />
                     </div>
                   ) : group.id === 'delivery' ? (
                     <div key={group.id} data-design="配信">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
                     </div>
                   ) : group.id === 'results' ? (
                     <div key={group.id} data-design="成果と分析">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
                     </div>
                   ) : group.id === 'specialized' ? (
                     <div key={group.id} data-design="この契約の専用機能">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
                     </div>
                   ) : (
                     <div key={group.id} data-design="多店舗管理">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
                     </div>
                   )
                 ))}
               </div>
-              <SidebarPreview features={features} specializedFeatureKeys={specializedFeatureKeys} showMultiStore={showMultiStore} />
+              <SidebarPreview features={features} specializedFeatureKeys={specializedFeatureKeys} showMultiStore={showMultiStore} groupOrder={groupOrder} />
             </div>
           )}
         </>
