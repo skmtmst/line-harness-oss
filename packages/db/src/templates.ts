@@ -7,6 +7,8 @@ export interface TemplateRow {
   category: string;
   message_type: string;
   message_content: string;
+  /** テンプレートの置き場（099 で追加）。未分類は null。 */
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
 }
