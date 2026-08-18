@@ -79,14 +79,14 @@ interface InboxRow {
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
   unread: { label: '未読', className: 'bg-red-100 text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-yellow-700' },
-  resolved: { label: '解決済', className: 'bg-success-bg text-green-700' },
+  resolved: { label: '対応済', className: 'bg-success-bg text-success' },
 }
 
 const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: '全て' },
   { key: 'unread', label: '未対応' },
   { key: 'in_progress', label: '対応中' },
-  { key: 'resolved', label: '解決済' },
+  { key: 'resolved', label: '対応済' },
 ]
 
 const SHOW_LOADING_PREF_KEY = 'lh_chat_show_loading_indicator'
@@ -824,7 +824,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       await api.chats.update(selectedChatId, { status: newStatus })
       loadChatDetail(selectedChatId)
       loadChats()
-      // 解決済/未読の切替は未対応バッジに影響するので即時更新させる
+      // 対応済/未読の切替は未対応バッジに影響するので即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
     } catch {
       setError('ステータスの更新に失敗しました。')
@@ -873,7 +873,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             メールを開いたときも同じ。ここが LINE だけを見ていたので、
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <div className={`w-full lg:w-[360px] lg:flex-shrink-0 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}>
-          {/* タブ (全て / 未読 / 対応中 / 解決済) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
+          {/* タブ (全て / 未読 / 対応中 / 対応済) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
           <div className="border-hairline border-b px-3 py-2">
@@ -1141,7 +1141,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     >
                       <option value="unread">未対応</option>
                       <option value="in_progress">対応中</option>
-                      <option value="resolved">解決済</option>
+                      <option value="resolved">対応済</option>
                     </select>
                   </label>
                   <label className="flex items-center gap-1.5 text-xs">
@@ -1170,7 +1170,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {/*
-                    「未読に戻す」「対応中にする」「解決済にする」は
+                    「未読に戻す」「対応中にする」「対応済にする」は
                     上の「対応 ▾」と同じことをしていたので外した。
                     同じ操作の入口が2つあると、どちらが正なのか分からない。
                   */}
