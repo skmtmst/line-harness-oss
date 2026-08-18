@@ -912,12 +912,20 @@ CREATE TABLE IF NOT EXISTS staff_members (
   access_level TEXT NOT NULL DEFAULT 'full' CHECK (access_level IN ('full', 'read_only')),
   api_key    TEXT UNIQUE NOT NULL,
   is_active  INTEGER NOT NULL DEFAULT 1,
+  permission_keys TEXT NOT NULL DEFAULT '[]',
+  notification_preferences TEXT NOT NULL DEFAULT '{}',
+  invite_status TEXT NOT NULL DEFAULT 'active',
+  invite_token_hash TEXT,
+  invite_expires_at TEXT,
+  email_verified_at TEXT,
+  line_linked_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_members_api_key ON staff_members(api_key);
 CREATE INDEX IF NOT EXISTS idx_staff_members_role ON staff_members(role);
+CREATE INDEX IF NOT EXISTS idx_staff_members_invite_token ON staff_members(invite_token_hash);
 
 -- Reusable message templates (text or Flex) for reward messages in campaigns
 CREATE TABLE IF NOT EXISTS message_templates (

@@ -103,6 +103,7 @@ export type AuthenticatedStaff = {
   role: StaffRole;
   /** true なら役割にかかわらず更新・削除・設定変更をさせない。 */
   readOnly: boolean;
+  permissionKeys: string[];
 };
 
 function toAuthenticatedStaff(staff: {
@@ -110,13 +111,32 @@ function toAuthenticatedStaff(staff: {
   name: string;
   role: StaffRole;
   access_level?: 'full' | 'read_only';
+  permission_keys?: string;
 }): AuthenticatedStaff {
+  let permissionKeys: string[] = [];
+  try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
   return {
     id: staff.id,
     name: staff.name,
     role: staff.role,
     readOnly: staff.access_level === 'read_only',
+    permissionKeys,
   };
+}
+
+const STAFF_API_PERMISSIONS: Array<[string, string]> = [
+  ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
+  ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
+  ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
+  ['/api/auto-replies', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
+  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'],
+  ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
+  ['/api/automations', '/automations'], ['/api/webhooks', '/webhooks'], ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
+  ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
+];
+
+function permissionForApiPath(path: string): string | null {
+  return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
 }
 
 export async function sha256Hex(value: string): Promise<string> {
@@ -172,7 +192,7 @@ export async function authenticateApiToken(
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [] };
   }
 
   // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
@@ -186,7 +206,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     console.log('[auth] accept_via=LEGACY_API_KEY');
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [] };
   }
 
   return null;
@@ -268,6 +288,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/api/auth/logout' ||
     path === '/api/auth/line' ||
     path === '/api/auth/line/callback' ||
+    /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
@@ -295,6 +316,13 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
 
   if (staff.readOnly && !SAFE_METHODS.has(method)) {
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
+  }
+
+  if (staff.role === 'staff') {
+    const requiredPermission = permissionForApiPath(path);
+    if (requiredPermission && !staff.permissionKeys?.includes(requiredPermission)) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
   }
 
   // CSRF protection applies ONLY to cookie-authenticated, state-changing
