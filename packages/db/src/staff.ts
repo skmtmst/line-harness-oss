@@ -77,6 +77,23 @@ export async function getStaffByLineUserId(
     .first<StaffMember>();
 }
 
+/**
+ * 無効な人も含めて LINE ユーザーIDで引く。
+ *
+ * 招待からの連携では、無効化された古い行が同じLINEアカウントを握ったまま
+ * 残っていることがある。line_user_id にはユニーク制約があるので、先に
+ * 見つけて外さないと連携そのものが失敗する。ログイン判定には使わない。
+ */
+export async function getStaffByLineUserIdIncludingInactive(
+  db: D1Database,
+  lineUserId: string,
+): Promise<StaffMember | null> {
+  return db
+    .prepare('SELECT * FROM staff_members WHERE line_user_id = ?')
+    .bind(lineUserId)
+    .first<StaffMember>();
+}
+
 export async function getStaffMembers(db: D1Database): Promise<StaffMember[]> {
   const result = await db
     .prepare('SELECT * FROM staff_members ORDER BY created_at ASC')
