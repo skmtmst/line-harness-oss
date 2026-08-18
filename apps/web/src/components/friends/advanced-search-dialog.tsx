@@ -225,7 +225,7 @@ export default function AdvancedSearchDialog({
                   aria-label={`${BLOCK_LABEL[b.kind]}の条件を外す`}
                   className="text-ink-faint hover:text-danger text-sm"
                 >
-                  🗑
+                  外す
                 </button>
               </div>
 

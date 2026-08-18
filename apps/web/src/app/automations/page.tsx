@@ -462,7 +462,7 @@ export default function AutomationsPage() {
                     <span>アクション: {automation.actions.length}件</span>
                     {sendMsgWithTpl > 0 && (
                       <a href="/templates" className="text-blue-600 hover:underline" title="template_id 参照を含む send_message action あり">
-                        🔗 template×{sendMsgWithTpl}
+                        template×{sendMsgWithTpl}
                       </a>
                     )}
                     <span>優先度: {automation.priority}</span>

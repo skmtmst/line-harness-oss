@@ -774,7 +774,7 @@ function CtasTab({ webinarId }: { webinarId: string }) {
           <input
             value={c.title}
             onChange={(e) => update(i, { title: e.target.value })}
-            placeholder="カード見出し（例: 🎁 個別導入診断、受付中です）"
+            placeholder="カード見出し（例: 個別導入診断、受付中です）"
             className="w-full rounded border px-2 py-1 text-sm font-bold"
           />
           <input

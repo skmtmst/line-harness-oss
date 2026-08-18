@@ -1357,7 +1357,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                               aria-label="この通を複製する"
                               className="text-ink-faint hover:text-ink-secondary disabled:opacity-40"
                             >
-                              ⧉
+                              複製
                             </button>
                             <button
                               type="button"
@@ -1366,7 +1366,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                               aria-label="この通を削除する"
                               className="text-ink-faint hover:text-danger"
                             >
-                              🗑
+                              削除
                             </button>
                           </div>
                         </td>
@@ -1416,7 +1416,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           disabled={duplicating}
           className="text-ink-secondary hover:text-ink text-sm font-medium disabled:opacity-40"
         >
-          {duplicating ? '複製中...' : '⧉ このシナリオを複製'}
+          {duplicating ? '複製中...' : 'このシナリオを複製'}
         </button>
         <Link href="/scenarios" className="text-ink-secondary hover:text-ink ml-auto text-sm">
           シナリオ一覧に戻る

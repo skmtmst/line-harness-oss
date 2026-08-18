@@ -119,7 +119,6 @@ export default function SavedSearchList() {
                 className="bg-canvas rounded-card border-hairline border p-4"
               >
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="text-ink-faint text-sm">🔖</span>
                   <Link
                     href={`/friends?search=${search.id}`}
                     className="text-ink text-sm font-bold hover:underline"

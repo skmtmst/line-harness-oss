@@ -146,9 +146,9 @@ export default function AutoRepliesPage() {
 
   const renderResponseCell = (r: AutoReply) => {
     if (r.responseType === 'silent') return <span className="text-ink-faint text-xs">silent</span>
-    if (r.responseType === 'flex') return <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-medium">📋 flex</span>
-    if (r.responseType === 'image') return <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-medium">🖼️ image</span>
-    return <span className="px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium">📝 text</span>
+    if (r.responseType === 'flex') return <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-medium">flex</span>
+    if (r.responseType === 'image') return <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-medium">image</span>
+    return <span className="px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium">text</span>
   }
 
   const renderTemplateCell = (r: AutoReply) => {
@@ -156,7 +156,7 @@ export default function AutoRepliesPage() {
     const tpl = templateById.get(r.templateId)
     return (
       <a href="/templates" className="text-blue-600 hover:underline text-xs">
-        🔗 {tpl?.name ?? `(未知 ${r.templateId.slice(0, 6)})`}
+        {tpl?.name ?? `(未知 ${r.templateId.slice(0, 6)})`}
       </a>
     )
   }

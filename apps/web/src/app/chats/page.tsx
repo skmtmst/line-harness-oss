@@ -966,19 +966,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   // 「真の自発（要対応）」= chat.status='unread'。webhook 側で auto_reply に
                   // マッチしなかった incoming のみ unread に設定される。auto_reply trigger
                   // (キーワード "コスト比較" 等) は matched 扱いで unread 化しない。
-                  // bold / 🟥 の表示はこの status を使う。direction だけだと button 押下も
+                  // 太字と印の表示はこの status を使う。direction だけだと button 押下も
                   // 強調してしまって S/N 比が悪化する。
                   const needsAttention = chat.status === 'unread'
                   // 最新メッセージの本文 preview。flex/image は文字列で見せても意味が薄いので type 表記に置換。
                   const previewRaw = chat.lastMessageContent ?? ''
                   const preview = (() => {
-                    if (chat.lastMessageType === 'image') return '📷 画像'
-                    if (chat.lastMessageType === 'flex') return '📋 Flexメッセージ'
-                    if (chat.lastMessageType === 'sticker') return '🎨 スタンプ'
-                    if (chat.lastMessageType === 'video') return '🎥 動画'
-                    if (chat.lastMessageType === 'audio') return '🎤 音声'
-                    if (chat.lastMessageType === 'file') return '📎 ファイル'
-                    if (chat.lastMessageType === 'location') return '📍 位置情報'
+                    // 絵文字は付けない。言葉だけで何かは分かる。
+                    if (chat.lastMessageType === 'image') return '画像'
+                    if (chat.lastMessageType === 'flex') return 'Flexメッセージ'
+                    if (chat.lastMessageType === 'sticker') return 'スタンプ'
+                    if (chat.lastMessageType === 'video') return '動画'
+                    if (chat.lastMessageType === 'audio') return '音声'
+                    if (chat.lastMessageType === 'file') return 'ファイル'
+                    if (chat.lastMessageType === 'location') return '位置情報'
                     return previewRaw.replace(/\n+/g, ' ').slice(0, 60)
                   })()
                   const node = (
@@ -1189,7 +1190,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           <img src={parsed.originalContentUrl || parsed.previewImageUrl} alt="" className="max-w-[200px] rounded" />
                         )
                       } catch {
-                        bubbleContent = <span>🖼️ [画像]</span>
+                        bubbleContent = <span>[画像]</span>
                       }
                     } else if (msg.messageType === 'sticker') {
                       bubbleContent = <StickerMessageImage content={msg.content} />
@@ -1365,7 +1366,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       aria-label="画像を選ぶ"
                       className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2 py-1 text-sm disabled:opacity-50"
                     >
-                      {uploadingImage ? '…' : '📎'}
+                      {uploadingImage ? (
+                        '…'
+                      ) : (
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-2m0 0 4-4a2 2 0 0 1 3 0l5 5M14 10h.01" />
+                        </svg>
+                      )}
                     </button>
                     <span className="text-ink-faint text-xs">
                       {imageError
