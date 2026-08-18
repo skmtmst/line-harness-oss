@@ -1,16 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_FEATURES,
+  DEFAULT_FEATURE_GROUP_ORDER,
   FEATURE_GROUPS,
   NEN_SHOW_MULTI_STORE,
   SIDEBAR_FEATURE_BY_HREF,
+  featureGroupOrderFromSidebarOrder,
   groupEnabledCount,
   groupFeatureCount,
   itemIsEnabled,
+  sidebarOrderFromFeatureGroupOrder,
   visibleFeatureGroups,
 } from './feature-settings'
 
 describe('V2 10-3 機能設定', () => {
+  it('基本を固定し、ほかのグループ順を保存・復元する', () => {
+    const moved = ['specialized', 'delivery', 'results', 'multi-store'] as const
+    const sidebarOrder = sidebarOrderFromFeatureGroupOrder([...moved])
+    expect(sidebarOrder[0]).toBe('')
+    expect(featureGroupOrderFromSidebarOrder(sidebarOrder)).toEqual(moved)
+    expect(featureGroupOrderFromSidebarOrder(null)).toEqual(DEFAULT_FEATURE_GROUP_ORDER)
+  })
+
   it('V2どおりウェビナー・成果アフィリエイト・多店舗を初期オフにする', () => {
     expect(DEFAULT_FEATURES.webinars).toBe(false)
     expect(DEFAULT_FEATURES.affiliates).toBe(false)

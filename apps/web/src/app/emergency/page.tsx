@@ -114,6 +114,53 @@ function SummaryCard({ label, value, note }: { label: string; value: string; not
   )
 }
 
+const UI_REVIEW_STATES: Array<{
+  label: string
+  note: string
+  className: string
+  dot: string
+}> = [
+  { label: '正常', note: 'そのまま運用できます', className: 'border-emerald-200 bg-emerald-50 text-emerald-800', dot: 'bg-emerald-500' },
+  { label: '注意', note: '内容を確認してください', className: 'border-amber-200 bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
+  { label: 'エラー', note: '停止を検討してください', className: 'border-red-200 bg-red-50 text-red-800', dot: 'bg-red-500' },
+  { label: '未確認', note: '確認結果を待っています', className: 'border-gray-200 bg-gray-50 text-gray-700', dot: 'bg-gray-400' },
+  { label: '緊急停止中', note: '配信を停止しています', className: 'border-red-200 bg-red-50 text-red-800', dot: 'bg-red-600' },
+  { label: '復旧待ち', note: '確認後に再開できます', className: 'border-blue-200 bg-blue-50 text-blue-800', dot: 'bg-blue-500' },
+]
+
+/** 設計確認中だけ全状態を同時に見せる。実データの判定表示とは分離する。 */
+function OperationUiReviewPanel() {
+  return (
+    <section className="border-hairline rounded-card border bg-white p-5" data-design="全UI確認（仮表示）">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-ink text-sm font-bold">全UI確認（仮表示）</h2>
+          <p className="text-ink-faint mt-1 text-xs">状態ごとの色・文字・操作を確認するため、すべて同時に表示しています。</p>
+        </div>
+        <span className="rounded-pill bg-info-bg text-info px-2.5 py-1 text-[11px] font-bold">確認後に条件表示</span>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        {UI_REVIEW_STATES.map((state) => (
+          <div key={state.label} className={`rounded-control flex min-h-16 items-center gap-2 border px-3 py-2.5 ${state.className}`}>
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${state.dot}`} />
+            <span className="min-w-0">
+              <span className="block text-xs font-bold">{state.label}</span>
+              <span className="mt-0.5 block text-[10px] opacity-80">{state.note}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" disabled className="border-hairline rounded-control min-h-10 border bg-white px-4 text-xs font-bold text-gray-700 disabled:opacity-100">調査レポートを出力</button>
+        <button type="button" disabled className="rounded-control min-h-10 bg-red-600 px-4 text-xs font-bold text-white disabled:opacity-100">緊急停止の確認</button>
+        <button type="button" disabled className="border-hairline rounded-control min-h-10 border bg-white px-4 text-xs font-bold text-gray-700 disabled:opacity-100">復旧の確認</button>
+        <button type="button" disabled className="border-hairline rounded-control min-h-10 border bg-white px-4 text-xs font-bold text-gray-700 disabled:opacity-100">更新履歴を見る</button>
+        <button type="button" disabled className="border-hairline rounded-control min-h-10 border bg-white px-4 text-xs font-bold text-gray-500 opacity-40">再確認中…</button>
+      </div>
+    </section>
+  )
+}
+
 function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity) => void }) {
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [logsByAccount, setLogsByAccount] = useState<Record<string, AccountHealthLog[]>>({})
@@ -174,6 +221,10 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
   return (
     <div className="space-y-4" data-design="V3 Health">
       {loadError && <div className="rounded-card border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{loadError}</div>}
+      <div className="bg-info-bg text-info rounded-card flex flex-wrap items-center gap-3 px-4 py-3">
+        <span className="rounded-pill bg-white px-2.5 py-1 text-[11px] font-bold">UI確認モード（仮表示）</span>
+        <p className="min-w-0 flex-1 text-xs">上部はシステムの実データです。画面下部では、デザイン確認用に全状態を同時表示しています。</p>
+      </div>
       <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[severity].panel}`}>
         <StatusPill severity={severity} />
         <div className="min-w-0 flex-1">
@@ -212,6 +263,7 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
           <details className="border-hairline mt-5 rounded-control border bg-gray-50"><summary className="cursor-pointer px-4 py-3 text-sm font-bold text-gray-800">異常とする基準</summary><div className="space-y-3 border-t border-gray-200 px-4 py-4">{HEALTH_CRITERIA.map((criterion) => <div key={criterion.severity} className="grid grid-cols-[auto_1fr] gap-3 text-xs"><StatusPill severity={criterion.severity} /><div><p className="font-bold text-gray-800">{criterion.condition}</p><p className="mt-1 text-gray-500">{criterion.action}</p></div></div>)}</div></details>
         </section>
       </div>
+      <OperationUiReviewPanel />
     </div>
   )
 }
