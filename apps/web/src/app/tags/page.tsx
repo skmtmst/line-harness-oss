@@ -117,6 +117,52 @@ function TagsPageInner() {
   const [groupName, setGroupName] = useState('')
   const [addingGroup, setAddingGroup] = useState(false)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  /** 編集中のフォルダ。null なら「追加」。 */
+  const [editingFolder, setEditingFolder] = useState<TagGroup | null>(null)
+
+  /**
+   * 行に出す色。
+   *
+   * フォルダに色を付けていないもの（115 より前からあるもの）は null なので、
+   * **中に入っているタグの色**を出す。いちばん多い色を採る。
+   * 1つも入っていなければ灰色。
+   */
+  const folderColorOf = (g: TagGroup): string | null => {
+    if (g.color) return g.color
+    const inside = items.filter((t) => t.groupId === g.id && t.color)
+    if (inside.length === 0) return null
+    const count = new Map<string, number>()
+    for (const t of inside) count.set(t.color, (count.get(t.color) ?? 0) + 1)
+    return [...count.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  }
+
+  const openFolderEdit = (g: TagGroup) => {
+    setEditingFolder(g)
+    setGroupName(g.name)
+    setGroupColor(folderColorOf(g) ?? FOLDER_COLORS[0])
+    setFolderDialogOpen(true)
+  }
+
+  /** 名前と色を保存する。追加も編集も同じ窓から。 */
+  const handleSaveFolder = async () => {
+    const name = groupName.trim()
+    if (!name || addingGroup) return
+    setAddingGroup(true)
+    setError('')
+    const res = editingFolder
+      ? await api.tagGroups.update(editingFolder.id, { name, color: groupColor })
+      : await api.tagGroups.create({ name, sortOrder: groups.length, color: groupColor })
+    setAddingGroup(false)
+    if (!res.success) {
+      setError(res.error)
+      return
+    }
+    setGroupName('')
+    setGroupColor(FOLDER_COLORS[0])
+    setEditingFolder(null)
+    setFolderDialogOpen(false)
+    load()
+  }
   /** フォルダの色。ここで決めた色が、属するタグの印に出る。 */
   const [groupColor, setGroupColor] = useState<string>(FOLDER_COLORS[0])
 
@@ -201,27 +247,6 @@ function TagsPageInner() {
     }
   }
 
-  const handleAddGroup = async () => {
-    const name = groupName.trim()
-    if (!name) return
-    if (groups.some((g) => g.name === name)) {
-      setError(`分類「${name}」は既にあります`)
-      return
-    }
-    setAddingGroup(true)
-    setError('')
-    try {
-      await api.tagGroups.create({ name, sortOrder: groups.length, color: groupColor })
-      setGroupName('')
-      setGroupColor(FOLDER_COLORS[0])
-      setFolderDialogOpen(false)
-      load()
-    } catch {
-      setError('分類の作成に失敗しました')
-    } finally {
-      setAddingGroup(false)
-    }
-  }
 
   const handleDeleteGroup = async (group: TagGroup) => {
     const count = items.filter((t) => t.groupId === group.id).length
@@ -282,7 +307,12 @@ function TagsPageInner() {
                   押すと名前と色を決める窓が開く。 */}
               <button
                 type="button"
-                onClick={() => setFolderDialogOpen(true)}
+                onClick={() => {
+                  setEditingFolder(null)
+                  setGroupName('')
+                  setGroupColor(FOLDER_COLORS[0])
+                  setFolderDialogOpen(true)
+                }}
                 className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
                 フォルダを追加
@@ -452,7 +482,9 @@ function TagsPageInner() {
             className="bg-canvas rounded-card w-full max-w-sm p-5 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-ink text-base font-bold">フォルダを追加</h2>
+            <h2 className="text-ink text-base font-bold">
+              {editingFolder ? 'フォルダを編集' : 'フォルダを追加'}
+            </h2>
             <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
               ここで決めた色が、このフォルダに入れたタグの印に出ます。
             </p>
@@ -466,7 +498,7 @@ function TagsPageInner() {
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && groupName.trim()) void handleAddGroup()
+                  if (e.key === 'Enter' && groupName.trim()) void handleSaveFolder()
                 }}
                 placeholder="例: お悩み"
                 className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
@@ -490,21 +522,40 @@ function TagsPageInner() {
                 ))}
               </div>
             </div>
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              {/* 消すのはここに置く。一覧の行に × を出していたころは、
+                  選ぶつもりで押し間違えるうえ、名前も色も直せなかった。 */}
+              {editingFolder && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = editingFolder
+                    setFolderDialogOpen(false)
+                    setEditingFolder(null)
+                    void handleDeleteGroup(target)
+                  }}
+                  className="text-danger hover:underline text-sm"
+                >
+                  このフォルダを削除
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => setFolderDialogOpen(false)}
-                className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
+                onClick={() => {
+                  setFolderDialogOpen(false)
+                  setEditingFolder(null)
+                }}
+                className="text-ink-secondary hover:bg-canvas-sunken rounded-control ml-auto px-4 py-2 text-sm"
               >
                 やめる
               </button>
               <button
                 type="button"
-                onClick={() => void handleAddGroup()}
+                onClick={() => void handleSaveFolder()}
                 disabled={addingGroup || !groupName.trim()}
                 className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
               >
-                {addingGroup ? '追加中…' : '追加する'}
+                {addingGroup ? '保存中…' : editingFolder ? '保存する' : '追加する'}
               </button>
             </div>
           </div>
@@ -535,8 +586,8 @@ function TagsPageInner() {
               id: g.id,
               label: g.name,
               count: items.filter((t) => t.groupId === g.id).length,
-              color: g.color,
-              onDelete: () => handleDeleteGroup(g),
+              color: folderColorOf(g),
+              onEdit: () => openFolderEdit(g),
             })),
             { id: UNGROUPED, label: '未分類', count: ungroupedCount },
           ]}
