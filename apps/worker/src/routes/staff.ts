@@ -37,6 +37,45 @@ function serializeStaff(row: StaffMember) {
   };
 }
 
+/**
+ * 設定を変えられる管理者。
+ *
+ * 役割が管理者でも、閲覧のみ（read_only）の人は更新系を一切通せないので、
+ * 「最後の一人」を数えるときは頭数に入れない。無効化された人も同じ。
+ */
+function canAdminister(row: StaffMember): boolean {
+  return Boolean(row.is_active) && row.role !== 'staff' && row.access_level !== 'read_only';
+}
+
+/**
+ * 管理画面から誰も入れなくなる操作を止める。
+ *
+ * 一度これをやると、画面からは元に戻せない（無効な人は一覧に残るが、
+ * それを有効化できる人がもういない）。DBを直接触るしか復旧手段が
+ * なくなるので、サーバー側で断る。
+ *
+ * 戻り値はエラー文言。問題なければ null。
+ */
+async function guardLastAdmin(
+  db: D1Database,
+  target: StaffMember,
+  change: { isActive?: boolean; role?: 'admin' | 'staff' | 'viewer'; self: boolean },
+): Promise<string | null> {
+  if (!canAdminister(target)) return null;
+
+  const stillAdmin =
+    (change.isActive === undefined ? Boolean(target.is_active) : change.isActive) &&
+    (change.role === undefined ? target.role !== 'staff' : change.role === 'admin') &&
+    (change.role === undefined ? target.access_level !== 'read_only' : change.role !== 'viewer');
+  if (stillAdmin) return null;
+
+  if (change.self) return '自分自身の管理者権限は外せません。他の管理者に依頼してください。';
+
+  const others = (await getStaffMembers(db)).filter((row) => row.id !== target.id && canAdminister(row));
+  if (others.length > 0) return null;
+  return '管理者が一人もいなくなります。先に別の管理者を有効にしてください。';
+}
+
 function randomToken(bytes = 32): string {
   const value = new Uint8Array(bytes);
   crypto.getRandomValues(value);
@@ -134,15 +173,32 @@ staff.get('/api/staff/invitations/:token/verify', async (c) => {
 });
 
 staff.patch('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
+  const id = c.req.param('id');
   const body = await c.req.json<{
     name?: string; email?: string | null; role?: 'admin' | 'staff' | 'viewer'; isActive?: boolean;
+    lineLinked?: boolean;
     permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
   }>();
-  const updated = await updateStaffMember(c.env.DB, c.req.param('id'), {
+
+  const target = await getStaffById(c.env.DB, id);
+  if (!target) return c.json({ success: false, error: 'Staff member not found' }, 404);
+
+  const guard = await guardLastAdmin(c.env.DB, target, {
+    isActive: body.isActive,
+    role: body.role,
+    self: id === c.get('staff').id,
+  });
+  if (guard) return c.json({ success: false, error: guard }, 400);
+
+  const updated = await updateStaffMember(c.env.DB, id, {
     name: body.name, email: body.email,
     role: body.role === 'admin' ? 'admin' : body.role ? 'staff' : undefined,
     access_level: body.role === undefined ? undefined : body.role === 'viewer' ? 'read_only' : 'full',
     is_active: body.isActive === undefined ? undefined : body.isActive ? 1 : 0,
+    // 連携を外すだけ。付け直しはLINEログイン側でしか起こらないので、
+    // ここで受けるのは false（解除）のときだけにする。
+    line_user_id: body.lineLinked === false ? null : undefined,
+    line_linked_at: body.lineLinked === false ? null : undefined,
     permission_keys: body.permissionKeys,
     notification_preferences: body.notificationPreferences,
   });
@@ -152,7 +208,10 @@ staff.patch('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
 staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   const id = c.req.param('id');
   if (id === c.get('staff').id) return c.json({ success: false, error: '自分自身は削除できません' }, 400);
-  if (!await getStaffById(c.env.DB, id)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  const target = await getStaffById(c.env.DB, id);
+  if (!target) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  const guard = await guardLastAdmin(c.env.DB, target, { isActive: false, self: false });
+  if (guard) return c.json({ success: false, error: guard }, 400);
   await deleteStaffMember(c.env.DB, id);
   return c.json({ success: true, data: null });
 });
