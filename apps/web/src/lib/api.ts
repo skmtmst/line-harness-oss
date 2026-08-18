@@ -241,6 +241,27 @@ export type FriendListParams = {
   sort?: 'recent' | 'oldest'
   /** `unhandled` で「最新が未返信の incoming」だけに絞る (サーバ側 SQL filter). */
   handled?: 'unhandled'
+
+  // ── 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）─────────────────
+  // どれも足し算。指定が無ければ何も起きない。
+
+  /** タグ。**すべて満たす**（AND）。 */
+  tagIds?: string[]
+  /** このタグが付いていない人。 */
+  excludeTagIds?: string[]
+  /** 友だち情報が等しい。`{ 項目名: 値 }` */
+  metadata?: Record<string, string>
+  /** 友だち情報が等しくない。値を持たない人も含む。 */
+  metadataNot?: Record<string, string>
+  /** ステータスメッセージに含む。 */
+  statusMessage?: string
+  /** 友だち登録日（YYYY-MM-DD）。 */
+  createdFrom?: string
+  createdTo?: string
+  /** 対応マーク。 */
+  chatStatus?: 'unread' | 'in_progress' | 'resolved'
+  /** 表示設定。未指定は全部。 */
+  visibility?: 'following' | 'blocked'
 }
 
 export type FriendWithTags = Friend & { tags: Tag[] }
@@ -672,6 +693,19 @@ export const api = {
       if (params?.includeChatStatus) query.includeChatStatus = 'true'
       if (params?.sort) query.sort = params.sort
       if (params?.handled) query.handled = params.handled
+      if (params?.tagIds?.length) query.tagIds = params.tagIds.join(',')
+      if (params?.excludeTagIds?.length) query.excludeTagIds = params.excludeTagIds.join(',')
+      if (params?.statusMessage) query.statusMessage = params.statusMessage
+      if (params?.createdFrom) query.createdFrom = params.createdFrom
+      if (params?.createdTo) query.createdTo = params.createdTo
+      if (params?.chatStatus) query.chatStatus = params.chatStatus
+      if (params?.visibility) query.visibility = params.visibility
+      for (const [k, v] of Object.entries(params?.metadata ?? {})) {
+        if (k && v) query[`metadata.${k}`] = v
+      }
+      for (const [k, v] of Object.entries(params?.metadataNot ?? {})) {
+        if (k && v) query[`metadataNot.${k}`] = v
+      }
       return fetchApi<ApiResponse<PaginatedResponse<FriendListItem>>>(
         '/api/friends?' + new URLSearchParams(query)
       )
