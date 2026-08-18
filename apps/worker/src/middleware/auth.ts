@@ -288,6 +288,7 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/api/auth/logout' ||
     path === '/api/auth/line' ||
     path === '/api/auth/line/callback' ||
+    path === '/api/auth/two-factor/verify' ||
     /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
     path.startsWith('/auth/') ||
     path === '/setup' ||

@@ -11,7 +11,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    if (pathname === '/login') {
+    if (pathname === '/login' || pathname === '/login/two-factor') {
       setChecked(true)
       return () => { cancelled = true }
     }
