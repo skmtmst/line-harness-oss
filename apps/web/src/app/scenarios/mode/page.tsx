@@ -51,7 +51,8 @@ function ScenarioModeContent() {
       setSaving(null)
       return
     }
-    router.push(`/scenarios/detail?id=${encodeURIComponent(id)}`)
+    // 3段目へ。設計の帯が3段なので、2段で編集画面へ放り出さない。
+    router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
   }
 
   if (!id) {
@@ -159,7 +160,7 @@ function ScenarioModeContent() {
           {/* 1通だけ試しに送る受け口が無いので、テスト送信とは書かない。 */}
         </p>
         <Link
-          href={`/scenarios/detail?id=${encodeURIComponent(id)}`}
+          href={`/scenarios/first-step?id=${encodeURIComponent(id)}`}
           className="text-accent ml-auto text-sm font-medium hover:underline"
         >
           あとで決める（下書きとして保存）

@@ -106,7 +106,9 @@ export default function ScenariosPage() {
     setCreating(true)
     setError('')
     const res = await api.scenarios.create({
-      name: '新しいシナリオ',
+      // 仮の名前。3段目で必ず聞くが、そこを飛ばした人のぶんが一覧で
+      // 区別できるように日付を足す。
+      name: `新しいシナリオ ${new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}`,
       description: null,
       triggerType: 'friend_add',
       triggerTagId: null,
