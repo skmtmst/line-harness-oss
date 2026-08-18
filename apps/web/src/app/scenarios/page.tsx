@@ -107,7 +107,9 @@ export default function ScenariosPage() {
       deliveryMode: input.deliveryMode,
     })
     if (res.success) {
-      router.push(`/scenarios/detail?id=${res.data.id}`)
+      // 設計は「作ってから配信方式を選ぶ」流れ。作った直後は通が0なので、
+      // 次の画面で方式を決められる（通があると変えられない）。
+      router.push(`/scenarios/mode?id=${res.data.id}`)
     } else {
       throw new Error(res.error)
     }

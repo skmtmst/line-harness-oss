@@ -4,6 +4,16 @@ import { useEffect, useState } from 'react'
 import type { DeliveryMode, ScenarioTriggerType, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 
+/**
+ * ① シナリオ情報。設計の3段のうち最初の1つ。
+ *
+ * **配信方式はここでは決めない。** 作ったあとの「配信方式の選択」
+ * （`/scenarios/mode`）で選ぶ。以前はこのモーダルの中で方式も決めていたが、
+ * どちらを選ぶと何が変わるのかを並べて見せる場所が無く、読まずに押していた。
+ *
+ * 作るときは暫定で「時刻で指定」にしておく。設計でおすすめになっている方で、
+ * 次の画面で選び直せる（通がまだ0なので変えられる）。
+ */
 interface Props {
   open: boolean
   onClose: () => void
@@ -38,32 +48,27 @@ const triggerOptions: Array<{
 ]
 
 export default function ScenarioModePicker({ open, onClose, onCreate }: Props) {
-  const [stage, setStage] = useState<'pick' | 'name'>('pick')
-  const [mode, setMode] = useState<DeliveryMode>('elapsed')
   const [name, setName] = useState('')
   const [triggerType, setTriggerType] = useState<ScenarioTriggerType>('friend_add')
-  const [triggerTagId, setTriggerTagId] = useState<string>('')
+  const [triggerTagId, setTriggerTagId] = useState('')
   const [tags, setTags] = useState<Tag[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // tags 一覧を取得 (tag_added 選択時のドロップダウン用)
   useEffect(() => {
     if (!open) return
-    api.tags
+    void api.tags
       .list()
-      .then((res) => {
+      .then(res => {
         if (res.success) setTags(res.data)
       })
-      .catch(() => {})
+      .catch(() => undefined)
   }, [open])
 
   if (!open) return null
 
   const reset = () => {
-    setStage('pick')
     setName('')
-    setMode('elapsed')
     setTriggerType('friend_add')
     setTriggerTagId('')
     setError('')
@@ -90,7 +95,7 @@ export default function ScenarioModePicker({ open, onClose, onCreate }: Props) {
         name,
         triggerType,
         triggerTagId: triggerType === 'tag_added' ? triggerTagId : null,
-        deliveryMode: mode,
+        deliveryMode: 'absolute_time',
       })
       reset()
       onClose()
@@ -107,165 +112,105 @@ export default function ScenarioModePicker({ open, onClose, onCreate }: Props) {
       onClick={handleClose}
     >
       <div
-        className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6"
-        onClick={(e) => e.stopPropagation()}
+        className="bg-canvas rounded-card w-full max-w-lg p-6 shadow-xl"
+        onClick={e => e.stopPropagation()}
       >
-        {stage === 'pick' && (
-          <>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">配信方式を選択</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <button
-                onClick={() => {
-                  setMode('absolute_time')
-                  setStage('name')
-                }}
-                className="text-left border border-gray-200 rounded-lg p-5 hover:border-amber-500 hover:bg-amber-50 transition-colors"
-              >
-                <div className="text-2xl mb-2">🕐</div>
-                <h3 className="font-semibold text-gray-900 mb-1">毎日◯時に配信</h3>
-                <p className="text-sm text-gray-600 mb-2">例: 翌日 朝 9:00</p>
-                <p className="text-xs text-green-700">✅ 深夜配信なし</p>
-              </button>
-              <button
-                onClick={() => {
-                  setMode('elapsed')
-                  setStage('name')
-                }}
-                className="text-left border border-gray-200 rounded-lg p-5 hover:border-blue-500 hover:bg-blue-50 transition-colors"
-              >
-                <div className="text-2xl mb-2">⏱</div>
-                <h3 className="font-semibold text-gray-900 mb-1">追加◯時間後に配信</h3>
-                <p className="text-sm text-gray-600 mb-2">例: 追加から 5 時間後</p>
-                <p className="text-xs text-red-600">⚠ 深夜にも配信され得る</p>
-              </button>
-            </div>
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => {
-                  setMode('relative')
-                  setStage('name')
-                }}
-                className="text-xs text-gray-400 hover:text-gray-600 underline"
-              >
-                既存方式（前ステップから N 分後）で作成
-              </button>
-            </div>
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={handleClose}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
-              >
-                キャンセル
-              </button>
-            </div>
-          </>
-        )}
-        {stage === 'name' && (
-          <>
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">シナリオを作成</h2>
-            <p className="text-xs text-gray-500 mb-4">
-              配信方式:{' '}
-              <span className="font-medium">
-                {mode === 'absolute_time'
-                  ? '時刻で指定'
-                  : mode === 'elapsed'
-                    ? '経過時間で指定'
-                    : '既存方式 (relative)'}
-              </span>
-            </p>
+        <h2 className="text-ink text-lg font-bold">シナリオ情報</h2>
+        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+          名前と、いつ開始するかを決めます。配信方式はこのあとの画面で選びます。
+        </p>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  シナリオ名 <span className="text-red-500">*</span>
+        <div className="mt-4 space-y-4">
+          <label className="block">
+            <span className="text-ink-secondary mb-1 block text-xs font-medium">
+              シナリオ名 <span className="text-danger">*</span>
+            </span>
+            <input
+              type="text"
+              autoFocus
+              className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              placeholder="例: 友だち追加ウェルカム"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && triggerType !== 'tag_added' && !submitting) {
+                  void handleCreate()
+                }
+              }}
+            />
+          </label>
+
+          <div>
+            <span className="text-ink-secondary mb-1 block text-xs font-medium">いつ開始する？</span>
+            <div className="space-y-2">
+              {triggerOptions.map(opt => (
+                <label
+                  key={opt.value}
+                  className={`rounded-control flex cursor-pointer items-start gap-2 border p-2 transition-colors ${
+                    triggerType === opt.value
+                      ? 'border-accent bg-accent-soft'
+                      : 'border-hairline hover:bg-canvas-sunken'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="triggerType"
+                    value={opt.value}
+                    checked={triggerType === opt.value}
+                    onChange={() => setTriggerType(opt.value)}
+                    className="mt-0.5"
+                  />
+                  <span className="flex-1">
+                    <span className="text-ink block text-sm font-medium">{opt.label}</span>
+                    <span className="text-ink-faint block text-xs">{opt.description}</span>
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  autoFocus
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="例: 友だち追加ウェルカム"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && triggerType !== 'tag_added' && !submitting) handleCreate()
-                  }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">いつ開始する？</label>
-                <div className="space-y-2">
-                  {triggerOptions.map((opt) => (
-                    <label
-                      key={opt.value}
-                      className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                        triggerType === opt.value
-                          ? 'border-green-500 bg-green-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="triggerType"
-                        value={opt.value}
-                        checked={triggerType === opt.value}
-                        onChange={() => setTriggerType(opt.value)}
-                        className="mt-0.5"
-                      />
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">{opt.label}</div>
-                        <div className="text-xs text-gray-500">{opt.description}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {triggerType === 'tag_added' && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    トリガータグ <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
-                    value={triggerTagId}
-                    onChange={(e) => setTriggerTagId(e.target.value)}
-                  >
-                    <option value="">-- 選択してください --</option>
-                    {tags.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    このタグが友だちに付与されたら、自動でこのシナリオを開始します
-                  </p>
-                </div>
-              )}
+              ))}
             </div>
+          </div>
 
-            {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
+          {triggerType === 'tag_added' && (
+            <label className="block">
+              <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                トリガータグ <span className="text-danger">*</span>
+              </span>
+              <select
+                className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                value={triggerTagId}
+                onChange={e => setTriggerTagId(e.target.value)}
+              >
+                <option value="">-- 選択してください --</option>
+                {tags.map(t => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-ink-faint mt-0.5 block text-xs">
+                このタグが友だちに付与されたら、自動でこのシナリオを開始します
+              </span>
+            </label>
+          )}
+        </div>
 
-            <div className="mt-5 flex justify-between gap-2">
-              <button
-                onClick={() => setStage('pick')}
-                disabled={submitting}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50"
-              >
-                ← 戻る
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={submitting}
-                className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50"
-                style={{ backgroundColor: 'var(--color-accent)' }}
-              >
-                {submitting ? '作成中...' : '作成して編集へ'}
-              </button>
-            </div>
-          </>
-        )}
+        {error && <p className="text-danger mt-3 text-xs">{error}</p>}
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={handleClose}
+            disabled={submitting}
+            className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm disabled:opacity-50"
+          >
+            やめる
+          </button>
+          <button
+            onClick={() => void handleCreate()}
+            disabled={submitting}
+            className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+          >
+            {submitting ? '作成中…' : '次へ（配信方式の選択）'}
+          </button>
+        </div>
       </div>
     </div>
   )
