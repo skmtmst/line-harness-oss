@@ -120,7 +120,8 @@
     "113_scenario_display_order.sql",
     "114_support_email_thread_notes.sql",
     "115_folder_color.sql",
-    "115_staff_invitation_preferences.sql"
+    "115_staff_invitation_preferences.sql",
+    "116_folder_color_backfill.sql"
   ],
-  "migrationCount": 121
+  "migrationCount": 122
 }

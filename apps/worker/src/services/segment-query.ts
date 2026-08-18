@@ -1,5 +1,12 @@
 export interface SegmentRule {
-  type: 'tag_exists' | 'tag_not_exists' | 'metadata_equals' | 'metadata_not_equals' | 'ref_code' | 'is_following'
+  type:
+    | 'tag_exists'
+    | 'tag_not_exists'
+    | 'metadata_equals'
+    | 'metadata_not_equals'
+    | 'ref_code'
+    | 'is_following'
+    | 'scenario_subscribed'
   value: string | boolean | { key: string; value: string }
 }
 
@@ -72,6 +79,33 @@ export function buildSegmentQuery(condition: SegmentCondition): { sql: string; b
         }
         clauses.push(`f.ref_code = ?`)
         bindings.push(rule.value)
+        break
+      }
+
+      /*
+       * いまシナリオを購読している人。
+       *
+       * value が空文字なら「どれか1つでも購読していれば対象」。シナリオIDを
+       * 入れると、そのシナリオを購読している人だけになる。
+       *
+       * 'delivering' も購読中に数える。配信の処理中というだけの状態で、
+       * 外すと配信のタイミングによって対象人数が動く。'paused' と
+       * 'completed' は購読中ではないので入れない。
+       */
+      case 'scenario_subscribed': {
+        if (typeof rule.value !== 'string') {
+          throw new Error('scenario_subscribed rule requires a string scenario ID value')
+        }
+        if (rule.value === '') {
+          clauses.push(
+            `EXISTS (SELECT 1 FROM friend_scenarios fs WHERE fs.friend_id = f.id AND fs.status IN ('active','delivering'))`,
+          )
+        } else {
+          clauses.push(
+            `EXISTS (SELECT 1 FROM friend_scenarios fs WHERE fs.friend_id = f.id AND fs.status IN ('active','delivering') AND fs.scenario_id = ?)`,
+          )
+          bindings.push(rule.value)
+        }
         break
       }
 

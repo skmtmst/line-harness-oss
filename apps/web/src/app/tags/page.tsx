@@ -120,26 +120,19 @@ function TagsPageInner() {
   /** 編集中のフォルダ。null なら「追加」。 */
   const [editingFolder, setEditingFolder] = useState<TagGroup | null>(null)
 
-  /**
-   * 行に出す色。
+  /*
+   * 色はフォルダにだけ付く。中のタグの色から逆算しない。
    *
-   * フォルダに色を付けていないもの（115 より前からあるもの）は null なので、
-   * **中に入っているタグの色**を出す。いちばん多い色を採る。
-   * 1つも入っていなければ灰色。
+   * 逆算していた頃は、フォルダの丸が「中のタグでいちばん多い色」、タグの印が
+   * 「フォルダの色」を出していたので、同じフォルダなのに丸とタグで色が違って
+   * 見えていた。向きを1つに決めて、フォルダ → タグだけにする。
+   * 色を付けていない既存フォルダは 116 で色を入れてある。
    */
-  const folderColorOf = (g: TagGroup): string | null => {
-    if (g.color) return g.color
-    const inside = items.filter((t) => t.groupId === g.id && t.color)
-    if (inside.length === 0) return null
-    const count = new Map<string, number>()
-    for (const t of inside) count.set(t.color, (count.get(t.color) ?? 0) + 1)
-    return [...count.entries()].sort((a, b) => b[1] - a[1])[0][0]
-  }
 
   const openFolderEdit = (g: TagGroup) => {
     setEditingFolder(g)
     setGroupName(g.name)
-    setGroupColor(folderColorOf(g) ?? FOLDER_COLORS[0])
+    setGroupColor(g.color ?? FOLDER_COLORS[0])
     setFolderDialogOpen(true)
   }
 
@@ -586,7 +579,7 @@ function TagsPageInner() {
               id: g.id,
               label: g.name,
               count: items.filter((t) => t.groupId === g.id).length,
-              color: folderColorOf(g),
+              color: g.color,
               onEdit: () => openFolderEdit(g),
             })),
             { id: UNGROUPED, label: '未分類', count: ungroupedCount },

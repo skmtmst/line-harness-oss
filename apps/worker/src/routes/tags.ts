@@ -20,11 +20,26 @@ import { requireRole } from '../middleware/role-guard.js';
 
 const tags = new Hono<Env>();
 
+/**
+ * 色を持たないタグ・色を付けていないフォルダのタグに出す灰色。
+ *
+ * 画面側の `--color-ink-faint` と同じ値。ここで確定した色を返さないと、
+ * 受け取る側それぞれで「色が無いときどうするか」を決めることになり、
+ * 画面ごとに違う灰色が出る。
+ */
+const TAG_NEUTRAL_COLOR = '#8b938d';
+
 function serializeTag(row: DbTag & { friend_count?: number }) {
   return {
     id: row.id,
     name: row.name,
-    color: row.color,
+    /*
+     * 印の色は「属するフォルダの色」。tags.color は 115 以前の名残で、
+     * 読まない（画面からも書かない）。フォルダを JOIN していない読み方
+     * （作成・更新の戻り）では undefined になるので、そのときは灰色。
+     * 一覧を読み直した時点で正しい色に入れ替わる。
+     */
+    color: row.folder_color ?? TAG_NEUTRAL_COLOR,
     // 099以降はfoldersが正本。group_idは旧tag_groups時代の互換列で、
     // 新しい分類操作では更新されないため参照しない。
     groupId: row.folder_id ?? null,
