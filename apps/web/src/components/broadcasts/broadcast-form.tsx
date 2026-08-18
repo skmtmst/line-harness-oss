@@ -10,11 +10,25 @@ import {
   type BroadcastMessageAsset,
 } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import {
+  bubbleLegacyMessage,
+  contentTemplateToBubble,
+  isContentTemplateType,
+  messageTemplateToBubble,
+  type BroadcastTemplateOption,
+} from '@/lib/broadcast-template'
 
-interface BroadcastFormProps { tags: Tag[]; onSuccess: () => void; onCancel: () => void }
+interface BroadcastFormProps {
+  tags: Tag[]
+  onSuccess: () => void
+  onCancel: () => void
+  openTemplatePickerInitially?: boolean
+  initialTemplateId?: string | null
+  initialContentTemplateId?: string | null
+}
 
 const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
-  text: 'テキスト', sticker: 'スタンプ', image: '写真', rich_message: 'リッチメッセージ',
+  text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', rich_message: 'リッチメッセージ',
   rich_video: 'リッチビデオ', video: '動画', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
 }
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
@@ -23,6 +37,7 @@ function emptyBubble(type: BroadcastBubbleType = 'text'): BroadcastBubble {
   const content: Record<string, unknown> = type === 'text' ? { text: '' }
     : type === 'sticker' ? { packageId: 'placeholder', stickerId: 'placeholder' }
     : type === 'image' ? { originalContentUrl: '', previewImageUrl: '' }
+    : type === 'flex' ? { flexJson: '' }
     : type === 'video' ? { originalContentUrl: '', previewImageUrl: '' }
     : type === 'rich_video' ? { originalContentUrl: '', previewImageUrl: '', actionUrl: '' }
     : { assetId: '', assetName: '' }
@@ -64,6 +79,7 @@ function BubblePreview({ bubble }: { bubble: BroadcastBubble }) {
   if (bubble.type === 'text') return <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
   if (bubble.type === 'sticker') return <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-amber-100 text-4xl">😊</div>
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-2xl object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-2xl bg-slate-200 text-sm text-slate-500">写真</div>
+  if (bubble.type === 'flex') return <div className="w-[82%] rounded-2xl bg-white p-4 shadow-sm"><p className="text-xs font-bold text-purple-700">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-slate-500">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-2xl bg-slate-900 text-white"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
@@ -92,25 +108,39 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
         <textarea rows={6} maxLength={500} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm focus:border-emerald-500 focus:outline-none" />
         <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, 500) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-slate-500">{String(bubble.content.text ?? '').length}/500</span></div>
       </div>}
+      {bubble.type === 'flex' && <div>
+        <label className="mb-1 block text-xs font-bold text-slate-600">Flex JSON</label>
+        <textarea rows={8} value={String(bubble.content.flexJson ?? '')} onChange={(e) => onChange({ ...bubble, content: { ...bubble.content, flexJson: e.target.value, templateId: undefined, templateName: undefined } })} className="w-full resize-y rounded-xl border border-slate-200 p-3 font-mono text-xs focus:border-emerald-500 focus:outline-none" />
+      </div>}
       {bubble.type === 'sticker' && <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900"><p className="font-bold">スタンプ（準備中）</p><p className="mt-1 text-xs">packageId / stickerId を保持するデータ構造は実装済みです。現在はプレースホルダを表示します。</p></div>}
       {['image','video','rich_video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
-      {['rich_message','card_message','coupon','research'].includes(bubble.type) && <div>
-        <label className="mb-1 block text-xs font-bold text-slate-600">作成済み素材から選択</label>
+      {isContentTemplateType(bubble.type) && <div>
+        <label className="mb-1 block text-xs font-bold text-slate-600">コンテンツで作成したテンプレートから選択</label>
         <select value={String(bubble.content.assetId ?? '')} onChange={(e) => { const asset = availableAssets.find((item) => item.id === e.target.value); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
-          <option value="">素材を選択してください</option>{availableAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
+          <option value="">テンプレートを選択してください</option>{availableAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
         </select>
-        {availableAssets.length === 0 && <p className="mt-2 text-xs text-amber-700">先に上部の素材管理タブから作成してください。</p>}
+        {availableAssets.length === 0 && <p className="mt-2 text-xs text-amber-700">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
       </div>}
     </div>
   </section>
 }
 
-export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFormProps) {
+export default function BroadcastForm({
+  tags,
+  onSuccess,
+  onCancel,
+  openTemplatePickerInitially = false,
+  initialTemplateId = null,
+  initialContentTemplateId = null,
+}: BroadcastFormProps) {
   const { selectedAccountId } = useAccount()
   const createIdempotencyKey = useRef(crypto.randomUUID())
+  const appliedInitialTemplate = useRef(false)
   const [title, setTitle] = useState('')
   const [bubbles, setBubbles] = useState<BroadcastBubble[]>([emptyBubble()])
   const [assets, setAssets] = useState<BroadcastMessageAsset[]>([])
+  const [messageTemplates, setMessageTemplates] = useState<BroadcastTemplateOption[]>([])
+  const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
   const [targetMode, setTargetMode] = useState<'all' | 'filter'>('all')
   const [filter, setFilter] = useState({ gender: '', age: '', area: '', tenure: '', reaction: '', tagId: '' })
   const [targetCount, setTargetCount] = useState<number | null>(null)
@@ -131,7 +161,40 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => { api.broadcastMessageAssets.list({ accountId: selectedAccountId || undefined }).then((r) => { if (r.success) setAssets(r.data) }).catch(() => undefined) }, [selectedAccountId])
+  useEffect(() => {
+    if (openTemplatePickerInitially) setShowTemplatePicker(true)
+  }, [openTemplatePickerInitially])
+
+  useEffect(() => {
+    Promise.all([
+      api.broadcastMessageAssets.list({ accountId: selectedAccountId || undefined }),
+      api.templates.list(),
+    ]).then(([assetResult, templateResult]) => {
+      if (assetResult.success) setAssets(assetResult.data)
+      if (templateResult.success) {
+        setMessageTemplates(templateResult.data.filter((template) => ['text', 'image', 'flex'].includes(template.messageType)))
+      }
+      if (!appliedInitialTemplate.current) {
+        const template = templateResult.success
+          ? templateResult.data.find((item) => item.id === initialTemplateId)
+          : undefined
+        const contentTemplate = assetResult.success
+          ? assetResult.data.find((item) => item.id === initialContentTemplateId)
+          : undefined
+        const bubble = template
+          ? messageTemplateToBubble(template)
+          : contentTemplate
+            ? contentTemplateToBubble(contentTemplate)
+            : null
+        if (bubble) {
+          setBubbles([bubble])
+          setTitle(template?.name ?? contentTemplate?.name ?? '')
+          setShowTemplatePicker(false)
+        }
+        appliedInitialTemplate.current = true
+      }
+    }).catch(() => undefined)
+  }, [initialContentTemplateId, initialTemplateId, selectedAccountId])
   const countRules = useMemo(() => {
     const rules: Array<{ type: 'is_following' | 'tag_exists' | 'metadata_equals'; value: boolean | string | { key: string; value: string } }> = [{ type: 'is_following', value: true }]
     if (targetMode === 'filter') {
@@ -154,7 +217,10 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
     for (const [index, bubble] of bubbles.entries()) {
       if (bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) return `吹き出し${index + 1}のテキストを入力してください`
       if (['image','video','rich_video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
-      if (['rich_message','card_message','coupon','research'].includes(bubble.type) && !bubble.content.assetId) return `吹き出し${index + 1}の素材を選択してください`
+      if (bubble.type === 'flex') {
+        try { JSON.parse(String(bubble.content.flexJson ?? '')) } catch { return `吹き出し${index + 1}のFlex JSONを確認してください` }
+      }
+      if (isContentTemplateType(bubble.type) && !bubble.content.assetId) return `吹き出し${index + 1}のテンプレートを選択してください`
     }
     return ''
   }
@@ -201,9 +267,9 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
     const validationError = validate(); if (validationError) { setError(validationError); return }
     setSaving(true); setError('')
     const first = bubbles[0]
-    const legacyContent = first.type === 'text' ? String(first.content.text) : JSON.stringify(first.content)
+    const legacy = bubbleLegacyMessage(first)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: first.type === 'image' ? 'image' : first.type === 'rich_message' || first.type === 'card_message' ? 'flex' : 'text', messageContent: legacyContent, messageBubbles: bubbles, targetType: filter.tagId ? 'tag' : 'all', targetTagId: filter.tagId || null, lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks: true, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
+      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubbles, targetType: filter.tagId ? 'tag' : 'all', targetTagId: filter.tagId || null, lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks: true, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
       if (res.success) onSuccess(); else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
@@ -265,12 +331,10 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
         <section className="border-hairline mb-3 rounded-2xl border bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-ink text-sm font-bold">3. 送る内容</p>
-            {/* テンプレートを本文に流し込む口が無い。テンプレート側からの
-                「この内容で配信」も無い。 */}
             <button
-              disabled
-              title="テンプレートからの読み込みは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
+              type="button"
+              onClick={() => setShowTemplatePicker(true)}
+              className="border-accent text-accent rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-bg"
             >
               テンプレートから選ぶ
             </button>
@@ -280,6 +344,47 @@ export default function BroadcastForm({ tags, onSuccess, onCancel }: BroadcastFo
             {urlCount > 0 && ` ・ URL ${urlCount}件を短縮してクリックを計測します`}
           </p>
         </section>
+        {showTemplatePicker && (
+          <section className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">コンテンツのテンプレートを引用</h3>
+                <p className="mt-1 text-xs text-slate-600">選択した内容を新しい吹き出しとして読み込みます。読み込み後も配信側で編集できます。</p>
+              </div>
+              <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm text-slate-500">閉じる</button>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {messageTemplates.map((template) => (
+                <button key={template.id} type="button" onClick={() => {
+                  const bubble = messageTemplateToBubble(template)
+                  if (!bubble) { setError('このテンプレートの内容を読み込めませんでした'); return }
+                  setBubbles((items) => items.length === 1 && !String(items[0]?.content.text ?? '').trim() ? [bubble] : [...items.slice(0, 2), bubble])
+                  setShowTemplatePicker(false)
+                }} className="rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-400">
+                  <span className="text-[11px] font-bold text-emerald-700">{TYPE_LABELS[template.messageType as BroadcastBubbleType] ?? template.messageType}</span>
+                  <p className="mt-1 truncate text-sm font-bold text-slate-900">{template.name}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">{template.category}</p>
+                </button>
+              ))}
+              {assets.map((asset) => (
+                <button key={asset.id} type="button" onClick={() => {
+                  const bubble = contentTemplateToBubble(asset)
+                  setBubbles((items) => items.length === 1 && !String(items[0]?.content.text ?? '').trim() ? [bubble] : [...items.slice(0, 2), bubble])
+                  setShowTemplatePicker(false)
+                }} className="rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-400">
+                  <span className="text-[11px] font-bold text-emerald-700">{TYPE_LABELS[asset.kind]}</span>
+                  <p className="mt-1 truncate text-sm font-bold text-slate-900">{asset.name}</p>
+                  <p className="mt-1 text-xs text-slate-500">コンテンツテンプレート</p>
+                </button>
+              ))}
+              {messageTemplates.length === 0 && assets.length === 0 && (
+                <div className="md:col-span-2 rounded-xl border border-dashed bg-white p-8 text-center text-sm text-slate-500">
+                  テンプレートがありません。「コンテンツ ＞ テンプレート」で作成してください。
+                </div>
+              )}
+            </div>
+          </section>
+        )}
         {bubbles.map((bubble, index) => <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />)}
         <button type="button" disabled={bubbles.length >= 3} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-2xl border-2 border-dashed border-emerald-300 py-4 text-sm font-bold text-emerald-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400">＋ 吹き出しを追加（{bubbles.length}/3）</button>
         {error && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { api } from '@/lib/api'
+import { api, type BroadcastAssetKind } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
 import CcPromptButton from '@/components/cc-prompt-button'
 import ImageUploader from '@/components/shared/image-uploader'
+import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 
 interface Template {
   id: string
@@ -71,6 +72,7 @@ const ccPrompts = [
 ]
 
 export default function TemplatesPage() {
+  const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -228,7 +230,7 @@ export default function TemplatesPage() {
       <Header
         title="テンプレート"
         description="配信で使うメッセージを管理します。友だち情報や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
-        action={
+        action={activeSection === 'message' ? (
           <div className="flex flex-wrap items-center gap-2">
             <button
               disabled
@@ -259,13 +261,32 @@ export default function TemplatesPage() {
               + 新規テンプレート
             </button>
           </div>
-        }
+        ) : undefined}
       />
       </div>
 
+      <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2" aria-label="テンプレート種別">
+        {([
+          ['message', 'メッセージ'],
+          ['rich_message', 'リッチメッセージ'],
+          ['card_message', 'カードタイプ'],
+          ['coupon', 'クーポン'],
+          ['research', 'リサーチ'],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => { setActiveSection(id); setShowCreate(false) }}
+            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${activeSection === id ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       <div data-design="KPIs">
-      <ListKpis
+      {activeSection === 'message' && <ListKpis
         build={(s) => [
             { title: 'テンプレート', value: s.templates.total, unit: '件', detail: `使用中 ${s.templates.inUse}` },
             {
@@ -279,11 +300,12 @@ export default function TemplatesPage() {
             { title: '未使用', value: s.templates.unused90d, unit: '件', detail: 'どこからも参照されていない' },
             { title: '使用中', value: s.templates.inUse, unit: '件', detail: 'シナリオ・自動応答から参照' },
         ]}
-      />
+      />}
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
+      {activeSection === 'message' ? <>
       {/*
         フォルダ（設計 `Body` の左）。folders は 099 で入っているが
         templates.folder_id が無いので絞り込めない。枠だけ置く。
@@ -520,12 +542,21 @@ export default function TemplatesPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                      <a
+                        href={`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded-md border border-emerald-200 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+                      >
+                        一斉配信で使う
+                      </a>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.usageCount) }}
                         className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
                       >
                         削除
                       </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -695,6 +726,7 @@ export default function TemplatesPage() {
       )}
 
       <CcPromptButton prompts={ccPrompts} />
+      </> : <BroadcastAssetManager kind={activeSection} />}
       </div>
     </div>
   )
