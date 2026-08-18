@@ -7,6 +7,11 @@ import { useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
+import {
+  FEATURE_SETTINGS_UPDATED_EVENT,
+  SIDEBAR_FEATURE_BY_HREF,
+  SPECIALIZED_FEATURE_KEYS,
+} from '@/lib/feature-settings'
 
 // ─── メニュー定義 ───
 //
@@ -164,23 +169,41 @@ export default function Sidebar() {
   // 知らないラベルは無視し、設定に無いセクションは後ろに残す。こうしないと、
   // 機能が増えたときに新しいセクションが消えてしまう。
   const [sectionOrder, setSectionOrder] = useState<string[] | null>(null)
+  const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({})
+  const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
 
-  // 設定を読む。取れなくても既定の並びで出るので、失敗は握る。
+  // 設定を読む。取れなくても既定の並び・表示で使えるので、失敗は握る。
   useEffect(() => {
-    if (!selectedAccountId) return
+    if (!selectedAccountId) {
+      setSectionOrder(null)
+      setFeatureVisibility({})
+      setSpecializedFeatureKeys([])
+      return
+    }
     let cancelled = false
-    void import('@/lib/api')
-      .then(({ api }) => api.featureSettings.get(selectedAccountId))
-      .then((res) => {
-        if (!cancelled && res.success && res.data.sidebarOrder) {
-          setSectionOrder(res.data.sidebarOrder)
-        }
-      })
-      .catch(() => {
-        // 並び順が取れなくても、既定の並びで使える。
-      })
+    const loadSettings = () => {
+      void import('@/lib/api')
+        .then(({ api }) => api.featureSettings.get(selectedAccountId))
+        .then((res) => {
+          if (!cancelled && res.success) {
+            setSectionOrder(res.data.sidebarOrder)
+            setFeatureVisibility(res.data.features)
+            setSpecializedFeatureKeys(res.data.specializedFeatureKeys)
+          }
+        })
+        .catch(() => {
+          // 設定が取れなくても、既定の並び・表示で使える。
+        })
+    }
+    loadSettings()
+    const onSettingsUpdated = (event: Event) => {
+      const accountId = (event as CustomEvent<{ accountId?: string }>).detail?.accountId
+      if (!accountId || accountId === selectedAccountId) loadSettings()
+    }
+    window.addEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     return () => {
       cancelled = true
+      window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     }
   }, [selectedAccountId])
   const orderedSections = sectionOrder
@@ -191,6 +214,23 @@ export default function Sidebar() {
         ...menuSections.filter((s) => !sectionOrder.includes(s.label ?? '')),
       ]
     : menuSections
+
+  const visibleSections = orderedSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (item.href === '/staff' && staffRole !== 'owner') return false
+        if (item.href === '/accounts' && staffRole === 'staff') return false
+        const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
+        if (
+          featureKey &&
+          SPECIALIZED_FEATURE_KEYS.includes(featureKey) &&
+          !specializedFeatureKeys.includes(featureKey)
+        ) return false
+        return !featureKey || featureVisibility[featureKey] !== false
+      }),
+    }))
+    .filter((section) => section.items.length > 0)
 
   useEffect(() => {
     let cancelled = false
@@ -316,18 +356,14 @@ export default function Sidebar() {
 
       {/* ナビゲーション */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        {orderedSections.map((section, si) => (
+        {visibleSections.map((section, si) => (
           <div key={si}>
             {section.label && (
               <div className="px-3 pb-2 pt-5">
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{section.label}</p>
               </div>
             )}
-            {section.items.filter((item) => {
-              if (item.href === '/staff' && staffRole !== 'owner') return false
-              if (item.href === '/accounts' && staffRole === 'staff') return false
-              return true
-            }).map((item) => {
+            {section.items.map((item) => {
               const active = isActive(item.href)
               const isDanger = 'danger' in item && item.danger
               return (
