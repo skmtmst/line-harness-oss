@@ -64,6 +64,15 @@ CREATE TABLE admin_sessions (
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
+CREATE TABLE admin_two_factor_challenges (
+  token_hash TEXT PRIMARY KEY,
+  staff_id TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
+);
+
 CREATE TABLE admin_users (
   id            TEXT PRIMARY KEY,
   email         TEXT NOT NULL UNIQUE,
@@ -1366,7 +1375,7 @@ CREATE TABLE staff_members (
   line_linked_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_user_id TEXT);
+, line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -1684,6 +1693,12 @@ CREATE INDEX idx_ad_conversion_logs_status ON ad_conversion_logs (status);
 CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 
 CREATE INDEX idx_admin_sessions_staff_id ON admin_sessions(staff_id);
+
+CREATE INDEX idx_admin_two_factor_challenges_expires
+  ON admin_two_factor_challenges(expires_at);
+
+CREATE INDEX idx_admin_two_factor_challenges_staff
+  ON admin_two_factor_challenges(staff_id);
 
 CREATE INDEX idx_affiliate_clicks_affiliate ON affiliate_clicks (affiliate_id);
 

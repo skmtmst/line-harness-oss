@@ -16,6 +16,10 @@ export interface StaffMember {
   invite_expires_at: string | null;
   email_verified_at: string | null;
   line_linked_at: string | null;
+  totp_secret_enc: string | null;
+  totp_pending_secret_enc: string | null;
+  totp_enabled_at: string | null;
+  totp_last_used_step: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -48,6 +52,10 @@ export interface UpdateStaffInput {
   invite_expires_at?: string | null;
   email_verified_at?: string | null;
   line_linked_at?: string | null;
+  totp_secret_enc?: string | null;
+  totp_pending_secret_enc?: string | null;
+  totp_enabled_at?: string | null;
+  totp_last_used_step?: number | null;
 }
 
 function generateApiKey(): string {
@@ -164,6 +172,10 @@ export async function updateStaffMember(
   if (input.invite_expires_at !== undefined) { sets.push('invite_expires_at = ?'); values.push(input.invite_expires_at); }
   if (input.email_verified_at !== undefined) { sets.push('email_verified_at = ?'); values.push(input.email_verified_at); }
   if (input.line_linked_at !== undefined) { sets.push('line_linked_at = ?'); values.push(input.line_linked_at); }
+  if (input.totp_secret_enc !== undefined) { sets.push('totp_secret_enc = ?'); values.push(input.totp_secret_enc); }
+  if (input.totp_pending_secret_enc !== undefined) { sets.push('totp_pending_secret_enc = ?'); values.push(input.totp_pending_secret_enc); }
+  if (input.totp_enabled_at !== undefined) { sets.push('totp_enabled_at = ?'); values.push(input.totp_enabled_at); }
+  if (input.totp_last_used_step !== undefined) { sets.push('totp_last_used_step = ?'); values.push(input.totp_last_used_step); }
 
   values.push(id);
   await db
@@ -248,4 +260,58 @@ export async function deleteAdminSession(db: D1Database, tokenHash: string): Pro
 
 export async function deleteExpiredAdminSessions(db: D1Database, now: string): Promise<void> {
   await db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').bind(now).run();
+}
+
+export interface TwoFactorChallenge {
+  token_hash: string;
+  staff_id: string;
+  expires_at: string;
+  attempts: number;
+  created_at: string;
+}
+
+export async function createTwoFactorChallenge(
+  db: D1Database,
+  tokenHash: string,
+  staffId: string,
+  expiresAt: string,
+): Promise<void> {
+  await db.prepare('DELETE FROM admin_two_factor_challenges WHERE staff_id = ?').bind(staffId).run();
+  await db.prepare(
+    'INSERT INTO admin_two_factor_challenges (token_hash, staff_id, expires_at) VALUES (?, ?, ?)',
+  ).bind(tokenHash, staffId, expiresAt).run();
+}
+
+export async function getTwoFactorChallenge(
+  db: D1Database,
+  tokenHash: string,
+): Promise<TwoFactorChallenge | null> {
+  return db.prepare('SELECT * FROM admin_two_factor_challenges WHERE token_hash = ?')
+    .bind(tokenHash).first<TwoFactorChallenge>();
+}
+
+export async function incrementTwoFactorChallengeAttempts(
+  db: D1Database,
+  tokenHash: string,
+): Promise<void> {
+  await db.prepare('UPDATE admin_two_factor_challenges SET attempts = attempts + 1 WHERE token_hash = ?')
+    .bind(tokenHash).run();
+}
+
+export async function deleteTwoFactorChallenge(db: D1Database, tokenHash: string): Promise<void> {
+  await db.prepare('DELETE FROM admin_two_factor_challenges WHERE token_hash = ?').bind(tokenHash).run();
+}
+
+export async function deleteExpiredTwoFactorChallenges(db: D1Database, now: string): Promise<void> {
+  await db.prepare('DELETE FROM admin_two_factor_challenges WHERE expires_at <= ?').bind(now).run();
+}
+
+/** Atomically claims a TOTP time step so the same code cannot create two sessions. */
+export async function claimStaffTotpStep(db: D1Database, staffId: string, step: number): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE staff_members
+     SET totp_last_used_step = ?, updated_at = ?
+     WHERE id = ? AND (totp_last_used_step IS NULL OR totp_last_used_step < ?)`,
+  ).bind(step, jstNow(), staffId, step).run();
+  return result.meta.changes === 1;
 }
