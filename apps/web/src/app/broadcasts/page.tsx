@@ -10,6 +10,7 @@ import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import CcPromptButton from '@/components/cc-prompt-button'
+import FolderPanel from '@/components/shared/folder-panel'
 
 const ccPrompts = [
   {
@@ -71,6 +72,8 @@ function BroadcastList() {
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** よく使う絞り込み。いま数えられるのは「予約中のみ」だけ。 */
+  const [scheduledOnly, setScheduledOnly] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
   // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
@@ -152,6 +155,8 @@ function BroadcastList() {
     if (titleQuery.trim() && !b.title.toLowerCase().includes(titleQuery.trim().toLowerCase())) {
       return false
     }
+    // まだ送っていない予約だけを見る。送る前に中身を直せるのはこれだけ。
+    if (scheduledOnly && b.status !== 'scheduled') return false
     if (activeTab === 'all') return true
     if (activeTab === 'dedup') return b.targetType === 'multi-account-dedup'
     return b.targetType !== 'multi-account-dedup'
@@ -209,30 +214,26 @@ function BroadcastList() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-        <>
           {/*
-            フォルダ（設計 `Body` の左）。099 で folders 表は入っているが、
-            broadcasts に folder_id が無いので絞り込めない。
-            何が来るかが見えている方がよいので、枠だけ置く。
+            設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形に
+            そろえる。099 で folders 表は入っているが broadcasts に
+            folder_id が無いので、いまは「すべて」だけ。
             docs/v025-open-questions.md §4-3。
           */}
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs">フォルダ</span>
-            {['すべて', '01_お知らせ', '02_キャンペーン', '未分類'].map((label, i) => (
-              <button
-                key={label}
-                disabled={i > 0}
-                title={i > 0 ? 'フォルダ分けは準備中です' : undefined}
-                className={`rounded-pill px-3 py-1 text-xs ${
-                  i === 0
-                    ? 'bg-accent text-on-accent'
-                    : 'border-hairline text-ink-faint border opacity-50'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+            <FolderPanel
+              total={`${broadcasts.length} 件`}
+              activeId=""
+              onSelect={() => {}}
+              rows={[{ id: '', label: 'すべて', count: broadcasts.length }]}
+            >
+              <p className="text-ink-faint text-xs leading-relaxed">
+                配信の分類はまだ作れません。上の「フォルダを追加」から作れるように
+                なったら、ここに並びます。
+              </p>
+            </FolderPanel>
+
+            <div>
 
           {/* 検索と並び順（設計 `Body` の上）。 */}
           <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
@@ -260,7 +261,35 @@ function BroadcastList() {
               保存した条件
             </button>
           </div>
-        </>
+
+          {/*
+            よく使う絞り込み。数え方が決まっているのは「予約中のみ」だけ。
+            開封率の低さと今月分は、比べる相手や区切りを決める前に押せる
+            ようにすると、押した人ごとに違うものを想像する。
+          */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-ink-faint text-xs">よく使う</span>
+            <button
+              onClick={() => setScheduledOnly((v) => !v)}
+              className={`rounded-pill px-3 py-1 text-xs transition-colors ${
+                scheduledOnly
+                  ? 'bg-accent-soft text-accent'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
+              }`}
+            >
+              予約中のみ
+            </button>
+            {['開封率が低い', '今月分'].map((label) => (
+              <button
+                key={label}
+                disabled
+                title="この絞り込みはまだ数えられません"
+                className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
       {/* Error */}
       {error && (
@@ -485,6 +514,8 @@ function BroadcastList() {
       )}
 
       <CcPromptButton prompts={ccPrompts} />
+            </div>
+          </div>
       </div>
     </div>
   )
