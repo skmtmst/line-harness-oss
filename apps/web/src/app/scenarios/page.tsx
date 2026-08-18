@@ -10,7 +10,6 @@ import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
 import ScenarioList from '@/components/scenarios/scenario-list'
-import ScenarioModePicker from '@/components/scenarios/scenario-mode-picker'
 import CcPromptButton from '@/components/cc-prompt-button'
 
 const ccPrompts = [
@@ -45,7 +44,7 @@ export default function ScenariosPage() {
   const [stoppedOnly, setStoppedOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   const loadScenarios = useCallback(async () => {
     setLoading(true)
@@ -91,27 +90,35 @@ export default function ScenariosPage() {
     }
   }, [selectedAccountId, accountLoading])
 
-  const handleCreate = async (input: {
-    name: string
-    triggerType: ScenarioTriggerType
-    triggerTagId: string | null
-    deliveryMode: DeliveryMode
-  }) => {
+  /**
+   * シナリオを作って、配信方式の選択へ送る。
+   *
+   * **押した時点で作る。** 設計の次の画面に「◯◯を作成しました。続けて
+   * 配信方式を選んでください」と出ているので、そこへ着く前に行が要る。
+   * 名前を聞くモーダルは挟まない（設計にその画面が無い）。
+   *
+   * 名前と開始のきっかけは、この先の編集画面（設計③）で決める。
+   * 配信方式は暫定で「時刻で指定」にしておく。設計でおすすめになっている
+   * 方で、次の画面で選び直せる（通がまだ0なので変えられる）。
+   */
+  const handleCreate = async () => {
+    if (creating) return
+    setCreating(true)
+    setError('')
     const res = await api.scenarios.create({
-      name: input.name,
+      name: '新しいシナリオ',
       description: null,
-      triggerType: input.triggerType,
-      triggerTagId: input.triggerTagId,
+      triggerType: 'friend_add',
+      triggerTagId: null,
       lineAccountId: selectedAccountId,
       isActive: true,
-      deliveryMode: input.deliveryMode,
+      deliveryMode: 'absolute_time',
     })
     if (res.success) {
-      // 設計は「作ってから配信方式を選ぶ」流れ。作った直後は通が0なので、
-      // 次の画面で方式を決められる（通があると変えられない）。
       router.push(`/scenarios/mode?id=${res.data.id}`)
     } else {
-      throw new Error(res.error)
+      setError(res.error)
+      setCreating(false)
     }
   }
 
@@ -220,10 +227,11 @@ export default function ScenariosPage() {
           フォルダを追加
         </button>
         <button
-          onClick={() => setPickerOpen(true)}
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
+          onClick={() => void handleCreate()}
+          disabled={creating}
+          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
         >
-          ＋ シナリオを作成
+          {creating ? '作成中…' : '＋ シナリオを作成'}
         </button>
       </div>
       {/*
@@ -287,12 +295,6 @@ export default function ScenariosPage() {
           {error}
         </div>
       )}
-
-      <ScenarioModePicker
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onCreate={handleCreate}
-      />
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
