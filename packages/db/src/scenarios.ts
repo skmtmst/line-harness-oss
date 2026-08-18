@@ -159,7 +159,19 @@ export async function createScenario(
 export type UpdateScenarioInput = Partial<
   Pick<
     Scenario,
-    'name' | 'description' | 'trigger_type' | 'trigger_tag_id' | 'is_active' | 'allow_concurrent'
+    | 'name'
+    | 'description'
+    | 'trigger_type'
+    | 'trigger_tag_id'
+    | 'is_active'
+    | 'allow_concurrent'
+    /**
+     * 配信方式。**通が1つでもあるときは変えない。**
+     * 通の予定の持ち方（delay_minutes / offset_days / delivery_time）が
+     * 方式ごとに違うので、あとから変えると予定の意味が変わる。
+     * 呼ぶ側（worker）で通の数を見てから渡すこと。
+     */
+    | 'delivery_mode'
   >
 >;
 
@@ -195,6 +207,10 @@ export async function updateScenario(
   if (updates.is_active !== undefined) {
     fields.push('is_active = ?');
     values.push(updates.is_active);
+  }
+  if (updates.delivery_mode !== undefined) {
+    fields.push('delivery_mode = ?');
+    values.push(updates.delivery_mode);
   }
 
   if (fields.length === 0) {
