@@ -117,7 +117,8 @@
     "110_template_link_and_audit.sql",
     "111_tag_starred.sql",
     "112_tag_display_order.sql",
-    "113_scenario_display_order.sql"
+    "113_scenario_display_order.sql",
+    "114_support_email_thread_notes.sql"
   ],
-  "migrationCount": 118
+  "migrationCount": 119
 }

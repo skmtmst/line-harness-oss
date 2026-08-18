@@ -1435,7 +1435,7 @@ CREATE TABLE support_email_threads (
   resolved_at        TEXT,
   created_at         TEXT NOT NULL,
   updated_at         TEXT NOT NULL
-);
+, notes TEXT);
 
 CREATE TABLE support_marks (
   id              TEXT PRIMARY KEY,

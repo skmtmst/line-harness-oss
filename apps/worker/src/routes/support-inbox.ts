@@ -242,7 +242,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
 supportInbox.get('/api/support/email/threads/:id', async (c) => {
   const id = c.req.param('id');
   const thread = await c.env.DB.prepare(
-    `SELECT id, customer_email, customer_name, subject, status, assigned_staff_id,
+    `SELECT id, customer_email, customer_name, subject, status, assigned_staff_id, notes,
             last_message_at, last_incoming_at, last_outgoing_at, resolved_at
      FROM support_email_threads WHERE id = ?`,
   ).bind(id).first();
@@ -263,9 +263,17 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
   }
   const staff = c.get('staff');
   const now = new Date().toISOString();
+  // 担当は「まだ誰も付いていないとき」だけ、操作した人を入れる。
+  //
+  // 以前は毎回 staff.id で上書きしていた。担当を選べるようにすると、
+  // 対応を変えるたびに担当が勝手に別の人へ移ってしまう。
   const result = await c.env.DB.prepare(
     `UPDATE support_email_threads
-     SET status = ?, assigned_staff_id = ?, resolved_at = ?, updated_at = ? WHERE id = ?`,
+     SET status = ?,
+         assigned_staff_id = COALESCE(assigned_staff_id, ?),
+         resolved_at = ?,
+         updated_at = ?
+     WHERE id = ?`,
   ).bind(
     body.status,
     staff.id,
@@ -276,6 +284,62 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
   if (!result.meta.changes) return c.json({ success: false, error: 'Thread not found' }, 404);
   return c.json({ success: true });
 });
+
+/**
+ * 担当を付け替える。LINE のトーク（`/api/chats/:id/operator`）と揃える。
+ *
+ * `null` で未割り当てに戻せる。列（assigned_staff_id）は前からあるが、
+ * 画面から選ぶ口が無く、状態を変えた人が自動で入るだけだった。
+ */
+supportInbox.patch(
+  '/api/support/email/threads/:id/assignee',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const id = c.req.param('id');
+    const body: { staffId?: string | null } = await c.req
+      .json<{ staffId?: string | null }>()
+      .catch(() => ({}));
+    const staffId = body.staffId ? String(body.staffId) : null;
+
+    // 知らないIDを入れると、誰も見ていない担当になる。実在を確かめる。
+    if (staffId) {
+      const exists = await c.env.DB.prepare(`SELECT 1 FROM users WHERE id = ?`)
+        .bind(staffId)
+        .first();
+      if (!exists) return c.json({ success: false, error: '担当者が見つかりません' }, 400);
+    }
+
+    const result = await c.env.DB.prepare(
+      `UPDATE support_email_threads SET assigned_staff_id = ?, updated_at = ? WHERE id = ?`,
+    )
+      .bind(staffId, new Date().toISOString(), id)
+      .run();
+    if (!result.meta.changes) return c.json({ success: false, error: 'Thread not found' }, 404);
+    return c.json({ success: true });
+  },
+);
+
+/**
+ * メモ。LINE のトークにはあってメールに無かった（114 で列を足した）。
+ *
+ * 同じ受信箱の中で、相手がメールというだけで残せないのは扱いが揃っていない。
+ */
+supportInbox.patch(
+  '/api/support/email/threads/:id/notes',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const id = c.req.param('id');
+    const body: { notes?: string } = await c.req.json<{ notes?: string }>().catch(() => ({}));
+    const notes = (body.notes ?? '').slice(0, 10_000);
+    const result = await c.env.DB.prepare(
+      `UPDATE support_email_threads SET notes = ?, updated_at = ? WHERE id = ?`,
+    )
+      .bind(notes || null, new Date().toISOString(), id)
+      .run();
+    if (!result.meta.changes) return c.json({ success: false, error: 'Thread not found' }, 404);
+    return c.json({ success: true });
+  },
+);
 
 supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = c.req.param('id');
