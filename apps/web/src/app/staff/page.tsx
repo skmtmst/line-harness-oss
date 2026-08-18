@@ -44,11 +44,11 @@ function Members() {
   }
 
   return <>
-    <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       <Kpi label="管理スタッフ" value={`${members.length}人`} note={`管理者 ${admins}人・スタッフ ${members.length - admins}人`} />
-      <Kpi label="LINE連携済み" value={`${linked}人`} note={`未連携 ${members.length - linked}人`} />
-      <Kpi label="有効なユーザー" value={`${members.filter((m) => m.isActive).length}人`} note="現在ログインできます" />
-      <Kpi label="招待中" value={`${members.filter((m) => m.inviteStatus !== 'active').length}人`} note="メール確認・LINE連携待ち" />
+      <Kpi label="二要素認証" value={`${linked}人`} note={`LINE連携済み・未連携 ${members.length - linked}人`} />
+      <Kpi label="過去30日のログイン" value="—" note="ログイン履歴から確認できます" />
+      <Kpi label="最終ログイン" value="—" note="操作日時を確認してください" />
     </div>
     <div className="bg-canvas rounded-card border-hairline border">
       <div className="border-hairline flex flex-wrap items-center gap-3 border-b p-4">
@@ -83,7 +83,7 @@ function Permissions() {
 function PageContent() {
   const tab = useMergedTab(TABS, 'tab', 'audit')
   return <div>
-    <Header title="ログインユーザー" description="管理画面にログインできる人と権限、操作の履歴を管理します。" action={<div className="flex gap-2"><button disabled className="rounded-control border border-hairline px-4 py-2 text-sm text-ink-faint opacity-50">マニュアル</button><Link href="/staff/new" className="cursor-pointer rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover">＋ ユーザーを追加</Link></div>} />
+    <div data-design="Head"><Header title="ログインユーザー" description="管理画面にログインできる人と、その権限を管理します。誰がいつ何をしたかの記録も残ります。" action={<div className="flex gap-2"><button disabled className="rounded-control border border-hairline px-4 py-2 text-sm text-ink-faint opacity-50">マニュアル</button><Link href="/staff/new" className="cursor-pointer rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:bg-accent-hover">＋ ユーザーを追加</Link></div>} /></div>
     <MergedTabs basePath="/staff" tabs={TABS} active={tab} defaultKey="audit" />
     {tab === 'members' ? <Members /> : tab === 'permissions' ? <Permissions /> : <LoginAudit />}
   </div>
