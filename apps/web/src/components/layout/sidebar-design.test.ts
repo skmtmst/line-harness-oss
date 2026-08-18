@@ -147,3 +147,23 @@ describe('サイドバーが V2 設計と一致する', () => {
     expect(hrefs.length).toBe(new Set(hrefs).size);
   });
 });
+
+describe('レスポンシブのメニュー名を維持する', () => {
+  const source = readFileSync(SIDEBAR, 'utf8');
+
+  it('モバイルドロワーは展開表示、デスクトップレールは幅に応じた表示を使う', () => {
+    expect(source).toContain('{sidebarContent(true)}');
+    expect(source).toContain('{sidebarContent(false)}');
+  });
+
+  it('展開したドロワーでは区分名・項目名・件数を隠さない', () => {
+    expect(source).toContain("expanded ? 'block' : 'hidden xl:block'");
+    expect(source).toContain("expanded ? 'inline' : 'hidden xl:inline'");
+    expect(source).toContain("expanded ? 'inline-flex' : 'hidden xl:inline-flex'");
+  });
+
+  it('ドロワーに管理メニューの見出しがある', () => {
+    expect(source).toContain('管理メニュー');
+    expect(source).toContain('aria-label="管理メニュー"');
+  });
+});

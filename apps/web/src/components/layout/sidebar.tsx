@@ -375,13 +375,25 @@ export default function Sidebar() {
     return pathname === path || pathname.startsWith(path + '/')
   }
 
-  const sidebarContent = (
+  const sidebarContent = (expanded: boolean) => (
     <>
-      {/*
-        上に 64px あける。ドロワーでは閉じるボタンの、アイコンレールでは
-        ハンバーガーの居場所になる。xl 以上（フル幅）では要らない。
-      */}
-      <div className="h-16 xl:hidden" aria-hidden="true" />
+      {expanded ? (
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-4 pr-16">
+          {brand.iconUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
+            <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-xl object-cover" />
+          ) : (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-gray-900">{brand.name ?? '然-NEN- LINE管理システム'}</p>
+            <p className="mt-0.5 text-[11px] font-medium text-gray-400">管理メニュー</p>
+          </div>
+        </div>
+      ) : (
+        /* アイコンレールのハンバーガーと同じ 64px を空ける。 */
+        <div className="h-16 xl:hidden" aria-hidden="true" />
+      )}
 
       {/* アカウント切替 */}
       <AccountSwitcher />
@@ -391,7 +403,7 @@ export default function Sidebar() {
         {orderedSections.map((section, si) => (
           <div key={si}>
             {section.label && (
-              <div className="pt-5 pb-2 px-3 hidden xl:block">
+              <div className={`px-3 pb-2 pt-5 ${expanded ? 'block' : 'hidden xl:block'}`}>
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{section.label}</p>
               </div>
             )}
@@ -407,7 +419,7 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   title={item.label}
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors justify-center xl:justify-start ${
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${expanded ? 'justify-start' : 'justify-center xl:justify-start'} ${
                     active
                       ? 'text-white'
                       : isDanger
@@ -416,17 +428,17 @@ export default function Sidebar() {
                   }`}
                   style={active ? { backgroundColor: isDanger ? '#EF4444' : 'var(--color-accent)' } : {}}
                 >
-                  <NavIcon d={item.icon} />
-                  <span className="flex-1 hidden xl:inline">{item.label}</span>
+                  <span className="shrink-0"><NavIcon d={item.icon} /></span>
+                  <span className={`min-w-0 flex-1 truncate ${expanded ? 'inline' : 'hidden xl:inline'}`}>{item.label}</span>
                   {badgeCount(item) > 0 && (
                     <>
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
                       <span
                         aria-hidden="true"
-                        className="xl:hidden absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-amber-500"
+                        className={`${expanded ? 'hidden' : 'xl:hidden'} absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-amber-500`}
                       />
                       <span
-                        className={`hidden xl:inline rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                        className={`${expanded ? 'inline-flex' : 'hidden xl:inline-flex'} rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
                           active ? 'bg-white text-amber-700' : 'bg-amber-500 text-white'
                         }`}
                       >
@@ -445,7 +457,7 @@ export default function Sidebar() {
       {/* フッター */}
       <div className="border-t border-gray-200">
         {staffName && (
-          <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
+          <div className={`px-3 py-2 text-xs text-gray-500 border-t border-gray-100 ${expanded ? 'block' : 'hidden xl:block'}`}>
             <div className="font-medium text-gray-700">{staffName}</div>
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
               staffRole === 'owner' ? 'bg-yellow-100 text-yellow-800' :
@@ -457,7 +469,7 @@ export default function Sidebar() {
             </span>
           </div>
         )}
-        <div className="px-6 py-4">
+        <div className={expanded ? 'px-6 py-4' : 'px-3 py-4 xl:px-6'}>
           <button
             onClick={async () => {
               try {
@@ -479,12 +491,12 @@ export default function Sidebar() {
               clearAdminSession()
               window.location.href = '/login'
             }}
-            className="flex items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
+            className={`flex w-full items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors ${expanded ? 'justify-start' : 'justify-center xl:justify-start'}`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            ログアウト
+            <span className={expanded ? 'inline' : 'hidden xl:inline'}>ログアウト</span>
           </button>
         </div>
       </div>
@@ -532,15 +544,18 @@ export default function Sidebar() {
         消えるので、初めて触る人には「メニューが無くなった」ように見える。
         レールは残したまま、その幅でもここを開けるようにした。
       */}
-      <aside className={`xl:hidden fixed top-0 left-0 z-50 w-72 bg-white flex flex-col h-screen transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="absolute top-4 right-4">
+      <aside
+        aria-label="管理メニュー"
+        className={`xl:hidden fixed top-0 left-0 z-50 flex h-dvh w-[min(88vw,20rem)] flex-col border-r border-gray-200 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="absolute right-3 top-2.5 z-10">
           <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100" aria-label="閉じる">
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-        {sidebarContent}
+        {sidebarContent(true)}
       </aside>
 
       {/* デスクトップ: 常時表示 */}
@@ -563,7 +578,7 @@ export default function Sidebar() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        {sidebarContent}
+        {sidebarContent(false)}
       </aside>
     </>
   )
