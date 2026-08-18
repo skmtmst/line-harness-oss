@@ -151,15 +151,30 @@ describe('サイドバーが V2 設計と一致する', () => {
 describe('レスポンシブのメニュー名を維持する', () => {
   const source = readFileSync(SIDEBAR, 'utf8');
 
-  it('モバイルドロワーは展開表示、デスクトップレールは幅に応じた表示を使う', () => {
+  it('ドロワーと常時表示で同じ中身を出す', () => {
+    // 別のマークアップを2つ持つと、片方だけ直す事故が起きる。
     expect(source).toContain('{sidebarContent(true)}');
     expect(source).toContain('{sidebarContent(false)}');
   });
 
-  it('展開したドロワーでは区分名・項目名・件数を隠さない', () => {
-    expect(source).toContain("expanded ? 'block' : 'hidden xl:block'");
-    expect(source).toContain("expanded ? 'inline' : 'hidden xl:inline'");
-    expect(source).toContain("expanded ? 'inline-flex' : 'hidden xl:inline-flex'");
+  it('どの幅でも区分名・項目名・件数を隠さない', () => {
+    /*
+     * もとは「展開しているときだけ名前を出す」書き方（expanded ? ... :
+     * 'hidden xl:...'）が残っていることを見ていた。64px のアイコンレールが
+     * あり、その幅では名前を隠す必要があったため。
+     *
+     * レールをやめて 1280px 未満はドロワーだけにしたので、隠す幅が無くなった。
+     * 書き方ではなく「隠していないこと」を見る。ここに 'hidden xl:inline' が
+     * 戻ってきたら、また名前の読めない幅ができたということ。
+     */
+    expect(source).not.toContain("'hidden xl:inline'");
+    expect(source).not.toContain("'hidden xl:block'");
+    expect(source).not.toContain("'hidden xl:inline-flex'");
+  });
+
+  it('アイコンだけの帯を作らない', () => {
+    // w-16 の常時表示は、絵しか出ない帯。何の項目かを覚えている人しか使えない。
+    expect(source).not.toContain('w-16 xl:w-64');
   });
 
   it('ドロワーに管理メニューの見出しがある', () => {

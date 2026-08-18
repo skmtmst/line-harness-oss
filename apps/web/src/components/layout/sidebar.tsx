@@ -263,9 +263,18 @@ export default function Sidebar() {
     return pathname === path || pathname.startsWith(path + '/')
   }
 
-  const sidebarContent = (expanded: boolean) => (
+  /**
+   * 中身は1つ。ドロワーでも常時表示でも同じものを出す。
+   *
+   * 幅で文字を出し分けていたのは 64px のアイコンレールがあったから。
+   * レールをやめたので、出し分けも要らない。
+   *
+   * @param drawer ドロワーとして開いているか。先頭の見出しだけ変える
+   *   （ドロワーは公式アカウントの名前、常時表示は「管理メニュー」）。
+   */
+  const sidebarContent = (drawer: boolean) => (
     <>
-      {expanded ? (
+      {drawer ? (
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-4 pr-16">
           {brand.iconUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
@@ -279,17 +288,13 @@ export default function Sidebar() {
           </div>
         </div>
       ) : (
-        <>
-          {/* PCの先頭はアカウント切替ではなく、用途が分かる固定見出しにする。 */}
-          <div className="hidden h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-5 xl:flex">
-            <svg className="h-5 w-5 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-            <p className="text-sm font-bold text-gray-900">管理メニュー</p>
-          </div>
-          {/* アイコンレールのハンバーガーと同じ 64px を空ける。 */}
-          <div className="h-16 xl:hidden" aria-hidden="true" />
-        </>
+        /* PCの先頭はアカウント切替ではなく、用途が分かる固定見出しにする。 */
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-5">
+          <svg className="h-5 w-5 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          <p className="text-sm font-bold text-gray-900">管理メニュー</p>
+        </div>
       )}
 
       {/* ナビゲーション */}
@@ -297,7 +302,7 @@ export default function Sidebar() {
         {orderedSections.map((section, si) => (
           <div key={si}>
             {section.label && (
-              <div className={`px-3 pb-2 pt-5 ${expanded ? 'block' : 'hidden xl:block'}`}>
+              <div className="px-3 pb-2 pt-5">
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{section.label}</p>
               </div>
             )}
@@ -313,29 +318,30 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   title={item.label}
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${expanded ? 'justify-start' : 'justify-center xl:justify-start'} ${
+                  /*
+                    いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
+                    この形。緑で塗りつぶして白抜きにすると、色の面積が大きく
+                    なって一覧の中でそこだけ浮き、目が先にそこへ行く。
+                    印は「いまここ」を示せれば足りる。
+                  */
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     active
-                      ? 'text-white'
+                      ? isDanger
+                        ? 'bg-danger-bg text-danger'
+                        : 'bg-accent-soft text-accent'
                       : isDanger
                         ? 'text-red-500 hover:bg-red-50'
                         : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
-                  style={active ? { backgroundColor: isDanger ? '#EF4444' : 'var(--color-accent)' } : {}}
                 >
                   <span className="shrink-0"><NavIcon d={item.icon} /></span>
-                  <span className={`min-w-0 flex-1 truncate ${expanded ? 'inline' : 'hidden xl:inline'}`}>{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
                   {badgeCount(item) > 0 && (
                     <>
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
-                      <span
-                        aria-hidden="true"
-                        className={`${expanded ? 'hidden' : 'xl:hidden'} absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-amber-500`}
-                      />
-                      <span
-                        className={`${expanded ? 'inline-flex' : 'hidden xl:inline-flex'} rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
-                          active ? 'bg-white text-amber-700' : 'bg-amber-500 text-white'
-                        }`}
-                      >
+                      {/* 地が薄い緑になったので、選ばれていても札の色は変えない。
+                          緑ベタの上に置いていたころは白抜きにする必要があった。 */}
+                      <span className="bg-amber-500 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
                       <span className="sr-only">{badgeCount(item)} 件</span>
@@ -351,7 +357,7 @@ export default function Sidebar() {
       {/* フッター */}
       <div className="border-t border-gray-200">
         {staffName && (
-          <div className={`px-3 py-2 text-xs text-gray-500 border-t border-gray-100 ${expanded ? 'block' : 'hidden xl:block'}`}>
+          <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
             <div className="font-medium text-gray-700">{staffName}</div>
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
               staffRole === 'owner' ? 'bg-yellow-100 text-yellow-800' :
@@ -363,7 +369,7 @@ export default function Sidebar() {
             </span>
           </div>
         )}
-        <div className={expanded ? 'px-6 py-4' : 'px-3 py-4 xl:px-6'}>
+        <div className="px-6 py-4">
           <button
             onClick={async () => {
               try {
@@ -385,12 +391,12 @@ export default function Sidebar() {
               clearAdminSession()
               window.location.href = '/login'
             }}
-            className={`flex w-full items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors ${expanded ? 'justify-start' : 'justify-center xl:justify-start'}`}
+            className="flex w-full items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors justify-start"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            <span className={expanded ? 'inline' : 'hidden xl:inline'}>ログアウト</span>
+            <span>ログアウト</span>
           </button>
         </div>
       </div>
@@ -400,7 +406,7 @@ export default function Sidebar() {
   return (
     <>
       {/* モバイル: ハンバーガーヘッダー */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
@@ -452,26 +458,17 @@ export default function Sidebar() {
         {sidebarContent(true)}
       </aside>
 
-      {/* デスクトップ: 常時表示 */}
       {/*
-        仕様 §6-5: タブレット幅（768〜1279px）は 64px のアイコンレール。
-        別のマークアップを用意すると中身が二重になり、片方だけ直す事故が起きる。
-        同じ木のまま幅と文字の出し分けだけを変える。
+        常時出すのは 1280px 以上だけ。
+
+        768〜1279px を 64px のアイコンレールにしていたが、その幅では絵しか
+        残らず、何の項目かを覚えている人しか使えない。ハンバーガーから開けば
+        名前は読めるものの、閉じている間ずっと読めない帯が場所を取り続ける。
+        その幅は上のハンバーガーだけにそろえる。
+
+        中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside className="hidden md:flex w-16 xl:w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0 transition-[width] duration-200">
-        {/*
-          レール幅のときだけ出るハンバーガー。押すと上のドロワーが開いて
-          項目名が読める。sidebarContent の先頭に空けた 64px に重ねている。
-        */}
-        <button
-          onClick={() => setIsOpen(true)}
-          aria-label="メニューを開く"
-          className="hidden md:flex xl:hidden absolute top-0 left-0 h-16 w-16 items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+      <aside className="hidden xl:flex w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0">
         {sidebarContent(false)}
       </aside>
     </>
