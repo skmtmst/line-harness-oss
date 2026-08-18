@@ -47,6 +47,7 @@ function serializeScenario(row: DbScenario) {
     // 既定は「並行を許す」。104 で既存の行を 1 に寄せてある。
     allowConcurrent: (row.allow_concurrent ?? 1) !== 0,
     displayOrder: Number(row.display_order ?? 0),
+    folderId: row.folder_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -360,6 +361,7 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
       isActive?: boolean;
       deliveryMode?: DeliveryMode;
       allowConcurrent?: boolean;
+      folderId?: string | null;
     }>();
 
     /*
@@ -400,6 +402,7 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
       allow_concurrent:
         body.allowConcurrent !== undefined ? (body.allowConcurrent ? 1 : 0) : undefined,
       delivery_mode: body.deliveryMode,
+      folder_id: body.folderId === undefined ? undefined : (body.folderId || null),
     });
 
     if (!updated) {

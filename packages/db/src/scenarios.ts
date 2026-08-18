@@ -18,6 +18,8 @@ export interface Scenario {
   allow_concurrent: number;
   /** 一覧での並び順。小さいほど上（113 で追加） */
   display_order: number;
+  /** 置き場（099 で追加）。未分類は null。 */
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -165,6 +167,7 @@ export type UpdateScenarioInput = Partial<
     | 'trigger_tag_id'
     | 'is_active'
     | 'allow_concurrent'
+    | 'folder_id'
     /**
      * 配信方式。**通が1つでもあるときは変えない。**
      * 通の予定の持ち方（delay_minutes / offset_days / delivery_time）が
@@ -207,6 +210,10 @@ export async function updateScenario(
   if (updates.is_active !== undefined) {
     fields.push('is_active = ?');
     values.push(updates.is_active);
+  }
+  if (updates.folder_id !== undefined) {
+    fields.push('folder_id = ?');
+    values.push(updates.folder_id);
   }
   if (updates.delivery_mode !== undefined) {
     fields.push('delivery_mode = ?');
