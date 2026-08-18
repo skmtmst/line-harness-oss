@@ -35,8 +35,61 @@ export interface FeatureGroup {
   items: FeatureItem[]
 }
 
+export type MovableFeatureGroupId = Exclude<FeatureGroup['id'], 'basic'>
+
+export const DEFAULT_FEATURE_GROUP_ORDER: MovableFeatureGroupId[] = [
+  'delivery',
+  'results',
+  'specialized',
+  'multi-store',
+]
+
+const SIDEBAR_LABELS_BY_GROUP: Record<MovableFeatureGroupId, string[]> = {
+  delivery: ['配信', 'コンテンツ'],
+  results: ['成果と分析'],
+  specialized: ['専用機能'],
+  'multi-store': ['多店舗管理'],
+}
+
+/**
+ * 保存済みのサイドバー順から、機能設定の4グループ順を復元する。
+ *
+ * 基本グループは常に先頭へ固定する。古い保存値や、今後追加される未知の
+ * セクションがあっても、既知の4グループを欠落させない。
+ */
+export function featureGroupOrderFromSidebarOrder(
+  sidebarOrder: string[] | null | undefined,
+): MovableFeatureGroupId[] {
+  const byLabel = new Map<string, MovableFeatureGroupId>()
+  for (const id of DEFAULT_FEATURE_GROUP_ORDER) {
+    for (const label of SIDEBAR_LABELS_BY_GROUP[id]) byLabel.set(label, id)
+  }
+  const restored: MovableFeatureGroupId[] = []
+  for (const label of sidebarOrder ?? []) {
+    const id = byLabel.get(label)
+    if (id && !restored.includes(id)) restored.push(id)
+  }
+  return [...restored, ...DEFAULT_FEATURE_GROUP_ORDER.filter((id) => !restored.includes(id))]
+}
+
+/** サイドバーへ保存する順序。基本領域は空見出しのセクションとして先頭固定。 */
+export function sidebarOrderFromFeatureGroupOrder(order: MovableFeatureGroupId[]): string[] {
+  const normalized = featureGroupOrderFromSidebarOrder(
+    order.flatMap((id) => SIDEBAR_LABELS_BY_GROUP[id]),
+  )
+  return [
+    '',
+    ...normalized.flatMap((id) => SIDEBAR_LABELS_BY_GROUP[id]),
+    '自動化',
+    '予約',
+    '設定',
+  ]
+}
+
 export const FEATURE_SETTINGS_UPDATED_EVENT = 'line-harness:feature-settings-updated'
 export const SPECIALIZED_FEATURE_KEYS: FeatureKey[] = ['nen_campaigns', 'photo_review', 'ec_commerce']
+// 然の設計確認用。実機能の利用判定とは切り離し、最下部に仮置きする。
+export const NEN_SHOW_MULTI_STORE = true
 
 export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   scenarios: true,
