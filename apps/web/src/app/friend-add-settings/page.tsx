@@ -1,33 +1,27 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import type { Scenario, LineAccount } from '@line-crm/shared'
+import type { FriendAddRouting, FriendAddAction } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 
-type ScenarioWithCount = Scenario & {
-  stepCount?: number
-  /** Set when this scenario applies to all accounts (line_account_id = NULL in DB). */
-  isGlobal?: boolean
-}
-
-interface AccountRow {
-  account: LineAccount
-  scenarios: ScenarioWithCount[]
-  loadError: string | null
-}
+type Option = { id: string; name: string }
 
 export default function FriendAddSettingsPage() {
-  const router = useRouter()
-  const { setSelectedAccountId } = useAccount()
-  const [rows, setRows] = useState<AccountRow[]>([])
-  const [orphanScenarios, setOrphanScenarios] = useState<ScenarioWithCount[]>([])
+  const { selectedAccountId, accounts } = useAccount()
+  const accountId = selectedAccountId ?? accounts[0]?.id ?? null
+
+  const [routing, setRouting] = useState<FriendAddRouting | null>(null)
+  const [configured, setConfigured] = useState(false)
+  const [scenarios, setScenarios] = useState<Option[]>([])
+  const [tags, setTags] = useState<Option[]>([])
+  const [orphans, setOrphans] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [notice, setNotice] = useState('')
   const [breakdown, setBreakdown] = useState<{
     days: number
     firstTime: number
@@ -37,7 +31,7 @@ export default function FriendAddSettingsPage() {
 
   useEffect(() => {
     let cancelled = false
-    void api.friends.addBreakdown({ days: 30 }).then((res) => {
+    void api.friends.addBreakdown({ days: 30 }).then(res => {
       if (!cancelled && res.success) setBreakdown(res.data)
     })
     return () => {
@@ -45,433 +39,773 @@ export default function FriendAddSettingsPage() {
     }
   }, [])
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    if (!accountId) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError('')
-    try {
-      // Use Promise.allSettled so a single failing account fetch doesn't blank the whole page.
-      // Distinguish global scenarios (lineAccountId === null) from orphans (lineAccountId points
-      // to a deleted account); orphans are dropped instead of being shown under every account.
-      const accountsRes = await api.lineAccounts.list()
-      if (!accountsRes.success) {
-        setError('LINEアカウントの取得に失敗しました')
-        setLoading(false)
-        return
-      }
-      const accounts = accountsRes.data
-      const knownAccountIds = new Set(accounts.map(a => a.id))
-
-      const settled = await Promise.allSettled([
-        api.scenarios.list(),
-        ...accounts.map(a => api.scenarios.list({ accountId: a.id })),
-      ])
-
-      const allSettled = settled[0]
-      const allRes = allSettled.status === 'fulfilled' ? allSettled.value : null
-      if (allSettled.status === 'rejected' || (allRes && !allRes.success)) {
-        // Surface this as a banner — silent failure here would hide globals/orphans and
-        // make per-account active counts under-report.
-        setError(
-          'シナリオの全件取得に失敗しました。「全アカ共通」シナリオと孤児シナリオの検出が反映されていない可能性があります。',
-        )
-      }
-
-      const accountScopedByAccount = new Map<string, ScenarioWithCount[]>()
-      const accountErrors = new Map<string, string>()
-      accounts.forEach((account, i) => {
-        const slot = settled[i + 1]
-        if (slot.status === 'rejected') {
-          accountErrors.set(account.id, '読み込みに失敗しました')
-          return
-        }
-        const res = slot.value
-        if (!res.success) {
-          accountErrors.set(account.id, res.error)
-          return
-        }
-        // The API returns both account-bound and global (lineAccountId === null)
-        // rows for an account query (mirroring the engine match semantic in
-        // webhook.ts / liff.ts). Strip globals here so we can merge them once,
-        // labeled, after the per-account section — and so a failed per-account
-        // fetch still falls back to the independent allRes globals fetch.
-        accountScopedByAccount.set(
-          account.id,
-          res.data.filter(s => s.triggerType === 'friend_add' && s.lineAccountId !== null),
-        )
-      })
-
-      const globalFriendAdd: ScenarioWithCount[] = allRes?.success
-        ? allRes.data
-            .filter(s => s.triggerType === 'friend_add' && s.lineAccountId === null)
-            .map(s => ({ ...s, isGlobal: true }))
-        : []
-
-      // Orphans: account-bound scenarios whose owner account no longer exists.
-      // Surface them at the bottom under a synthetic group so operators can clean them up.
-      const orphans: ScenarioWithCount[] = allRes?.success
-        ? allRes.data.filter(
-            s =>
-              s.triggerType === 'friend_add' &&
-              s.lineAccountId !== null &&
-              !knownAccountIds.has(s.lineAccountId),
-          )
-        : []
-
-      const results: AccountRow[] = accounts.map(account => ({
-        account,
-        scenarios: [...(accountScopedByAccount.get(account.id) ?? []), ...globalFriendAdd],
-        loadError: accountErrors.get(account.id) ?? null,
-      }))
-      setRows(results)
-      setOrphanScenarios(orphans)
-    } catch {
-      setError('読み込みに失敗しました')
-    } finally {
+    const res = await api.friendAddRouting.get(accountId)
+    if (!res.success) {
+      setError(res.error)
       setLoading(false)
+      return
     }
-  }
-
-  const handleCreateForAccount = async (accountId: string, accountName: string) => {
-    const name = window.prompt(
-      `${accountName} の friend_add シナリオの名前を入力してください`,
-      `${accountName} ウェルカム`,
-    )
-    if (!name || !name.trim()) return
-
-    setError('')
-    try {
-      const res = await api.scenarios.create({
-        name: name.trim(),
-        description: null,
-        triggerType: 'friend_add',
-        triggerTagId: null,
-        isActive: false,
-        lineAccountId: accountId,
-      })
-      if (!res.success) {
-        setError(`シナリオ作成に失敗しました: ${res.error}`)
-        return
-      }
-      // Pre-select the account so the editor stays in the right context, then jump to the new scenario's editor.
-      setSelectedAccountId(accountId)
-      router.push(`/scenarios/detail?id=${res.data.id}`)
-    } catch {
-      setError('シナリオ作成に失敗しました')
-    }
-  }
+    setRouting(res.data.routing)
+    setConfigured(res.data.configured)
+    setScenarios(res.data.scenarios)
+    setTags(res.data.tags)
+    setLoading(false)
+  }, [accountId])
 
   useEffect(() => {
-    load()
-  }, [])
+    void load()
+  }, [load])
 
-  const toggleActive = async (scenarioId: string, current: boolean) => {
-    if (togglingId) return
-    setTogglingId(scenarioId)
-
-    // Optimistic update — patch the scenario in BOTH rows (per-account list) and
-    // orphanScenarios so the toggle reflects state regardless of which section it lives in.
-    const patch = (target: boolean) => {
-      setRows(prev =>
-        prev.map(row => ({
-          ...row,
-          scenarios: row.scenarios.map(s => (s.id === scenarioId ? { ...s, isActive: target } : s)),
-        })),
+  // 所属していた LINE アカウントが消えたシナリオ。設計の絵には無いが、
+  // これが残っていると「有効なのに一生配信されない」ので落とさずに出す。
+  useEffect(() => {
+    let cancelled = false
+    void api.scenarios.list().then(res => {
+      if (cancelled || !res.success) return
+      const known = new Set(accounts.map(a => a.id))
+      setOrphans(
+        res.data
+          .filter(s => s.triggerType === 'friend_add' && s.lineAccountId !== null && !known.has(s.lineAccountId))
+          .map(s => ({ id: s.id, name: s.name })),
       )
-      setOrphanScenarios(prev =>
-        prev.map(s => (s.id === scenarioId ? { ...s, isActive: target } : s)),
-      )
+    })
+    return () => {
+      cancelled = true
     }
+  }, [accounts])
 
-    patch(!current)
-    try {
-      const res = await api.scenarios.update(scenarioId, { isActive: !current })
-      if (!res.success) {
-        patch(current)
-        setError(`シナリオの更新に失敗しました: ${res.error}`)
-      }
-    } catch {
-      patch(current)
-      setError('シナリオの更新に失敗しました')
-    } finally {
-      setTogglingId(null)
+  const patch = (next: Partial<FriendAddRouting>) =>
+    setRouting(prev => (prev ? { ...prev, ...next } : prev))
+
+  const save = async () => {
+    if (!accountId || !routing) return
+    setSaving(true)
+    setError('')
+    setNotice('')
+    const res = await api.friendAddRouting.save(accountId, routing)
+    setSaving(false)
+    if (!res.success) {
+      setError(res.error)
+      return
     }
+    setConfigured(true)
+    setNotice('保存しました。次に友だち追加された人からこの振り分けになります。')
+  }
+
+  const scenarioName = (id: string | null) =>
+    (id && scenarios.find(s => s.id === id)?.name) || null
+
+  if (loading) {
+    return <div className="text-ink-faint py-12 text-center text-sm">読み込み中…</div>
+  }
+
+  if (!accountId || !routing) {
+    return (
+      <div className="text-ink-faint py-12 text-center text-sm">
+        LINE アカウントが登録されていません
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div>
       <div data-design="Head">
         <Header
           title="友だち追加時の配信"
           description="友だちに追加されたときに何を配信するかを決めます。はじめての人と、以前からの友だち・ブロックを解除した人で分けられます。"
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。
+                  他の画面（一斉配信・成果とアフィリエイトなど）と同じ扱い。 */}
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              <TestRunButton accountId={accountId} scenarioName={scenarioName} />
+              <button
+                type="button"
+                onClick={save}
+                disabled={saving}
+                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+              >
+                {saving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          }
         />
       </div>
 
-      {/* 設計はこの2つを分ける画面。いまの実装はアカウントごとに、友だち追加で
-          動くシナリオを並べているだけで、相手が「はじめて」かどうかを見ていない。
-          分けられないことを画面に書いておかないと、既存のお客さまに
-          「はじめまして」が届いていることに気づけない。 */}
-      <div className="mx-auto max-w-5xl px-4 pt-4">
-        <div className="bg-warning-bg rounded-card p-4">
-          <p className="text-warning text-sm font-semibold">
-            いまは「はじめての人」と「以前からの友だち」を分けられません
-          </p>
-          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+      <div data-design="Alert" className="space-y-2">
+        {!configured && (
+          <p className="bg-warning-bg text-warning rounded-card px-4 py-3 text-sm leading-relaxed">
             この2つを分けないと、以前からのお客さまに「はじめまして」の挨拶が届きます。ブロックを解除しただけの人にも同じことが起きます。
-            いまは友だち追加で動くシナリオが、相手によらず同じように配信されます。
+            <span className="text-ink-secondary">
+              {' '}
+              いまはまだ決めていないので、有効な友だち追加シナリオが相手によらず全部流れています。
+            </span>
           </p>
-        </div>
-      </div>
-
-      {/* この1か月の実績（設計 4-6）。returning の人数が、そのまま
-          「はじめまして」を誤って送った人数になる。 */}
-      <div data-design="Stats" className="mx-auto max-w-5xl px-4 pt-4">
-        <h2 className="text-ink mb-2 text-sm font-bold">この1か月の実績</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="bg-canvas rounded-card border-hairline border p-3">
-            <p className="text-ink-faint text-xs">はじめて友だち追加した人</p>
-            <p className="text-ink mt-0.5 text-2xl font-bold tabular-nums">
-              {breakdown ? breakdown.firstTime : '…'}
-              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
-            </p>
-          </div>
-          <div className="bg-canvas rounded-card border-hairline border p-3">
-            <p className="text-ink-faint text-xs">以前からの友だち</p>
-            <p className="text-ink mt-0.5 text-2xl font-bold tabular-nums">
-              {breakdown ? breakdown.returning : '…'}
-              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
-            </p>
-            <p className="text-warning mt-0.5 text-xs">この人たちにも「はじめまして」が届いています</p>
-          </div>
-          <div className="bg-canvas rounded-card border-hairline border p-3">
-            <p className="text-ink-faint text-xs">うちブロック解除</p>
-            <p className="text-ink mt-0.5 text-2xl font-bold tabular-nums">
-              {breakdown ? breakdown.unblocked : '…'}
-              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* 判定の基準（設計 4-6）。どう分けるかは決まっているが、
-          分けたあとに別の配信を当てる仕組みがまだ無い。 */}
-      <div data-design="Rule" className="mx-auto max-w-5xl px-4 pt-4">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <h2 className="text-ink text-sm font-bold">判定の基準</h2>
-          <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-            どちらに振り分けるかの判定方法です。列は前からあり、追加とブロック解除のたびに更新されています。
-            足りないのは、分けたあとに別の配信を当てる仕組みだけです。
-          </p>
-          <dl className="mt-3 space-y-1.5 text-xs">
-            <div className="flex flex-wrap gap-2">
-              <dt className="text-ink-secondary w-40 shrink-0 font-medium">はじめての人の判定</dt>
-              <dd className="text-ink-faint">
-                ブロックされた回数が0回（friends.unfollow_count）
-              </dd>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <dt className="text-ink-secondary w-40 shrink-0 font-medium">ブロック解除の判定</dt>
-              <dd className="text-ink-faint">
-                いまフォロー中で、ブロックされた回数が1回以上
-              </dd>
-            </div>
-          </dl>
-          {/* 設計は「初回フォロー日が未記録」を基準にしているが、この
-              データでは使えない。065 が既存の行すべてに埋めてしまった。 */}
-          <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-            設計は「初回フォロー日が未記録なら、はじめて」と書いていますが、この基準は使えません。
-            マイグレーション 065 が既存の行すべてに初回フォロー日を埋めたため、未記録の人はもういません。
-          </p>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-4">
+        )}
         {error && (
-          <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm">{error}</div>
+          <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>
         )}
-
-        {loading ? (
-          <div className="text-gray-500 text-center py-12">読み込み中…</div>
-        ) : rows.length === 0 && orphanScenarios.length === 0 ? (
-          <div className="text-gray-500 text-center py-12">LINE アカウントが登録されていません</div>
-        ) : (
-          <>
-            {rows.length === 0 ? (
-              <div className="text-gray-500 text-center py-6 text-sm">
-                LINE アカウントは登録されていませんが、孤児シナリオが残っています。下の一覧からクリーンアップしてください。
-              </div>
-            ) : (
-              rows.map(row => (
-                <AccountSection
-                  key={row.account.id}
-                  row={row}
-                  togglingId={togglingId}
-                  onToggle={toggleActive}
-                  onCreate={() => handleCreateForAccount(row.account.id, row.account.name)}
-                />
-              ))
-            )}
-            {orphanScenarios.length > 0 && (
-              <OrphanSection
-                scenarios={orphanScenarios}
-                togglingId={togglingId}
-                onToggle={toggleActive}
-              />
-            )}
-          </>
+        {notice && (
+          <p className="bg-success-bg text-success rounded-card px-4 py-3 text-sm">{notice}</p>
+        )}
+        {orphans.length > 0 && (
+          <div className="bg-warning-bg rounded-card px-4 py-3 text-sm">
+            <p className="text-warning font-semibold">
+              所属していた LINE アカウントが消えたシナリオが {orphans.length} 件あります
+            </p>
+            <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+              有効になっていても配信されません。残す理由が無ければ削除してください。
+            </p>
+            <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+              {orphans.map(o => (
+                <li key={o.id}>
+                  <Link href={`/scenarios/detail?id=${o.id}`} className="text-accent text-xs underline">
+                    {o.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
-    </div>
-  )
-}
 
-function OrphanSection({
-  scenarios,
-  togglingId,
-  onToggle,
-}: {
-  scenarios: ScenarioWithCount[]
-  togglingId: string | null
-  onToggle: (id: string, current: boolean) => void
-}) {
-  return (
-    <div className="bg-white border border-amber-200 rounded-lg overflow-hidden">
-      <div className="px-4 py-3 border-b border-amber-200 bg-amber-50">
-        <h2 className="font-semibold text-amber-900">⚠ 孤児シナリオ (削除済みアカウント所属)</h2>
-        <p className="text-xs text-amber-700 mt-1">
-          所属していた LINE アカウントが削除されたシナリオです。webhook は元の line_account_id でしか発火しないため実質配信されません。残しておく理由がなければ削除推奨。
-        </p>
-      </div>
-      <ul className="divide-y divide-gray-100">
-        {scenarios.map(scenario => (
-          <li key={scenario.id} className="px-4 py-3 flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <Link href={`/scenarios/detail?id=${scenario.id}`} className="block">
-                <div className="font-medium text-gray-900 truncate">{scenario.name}</div>
-                <div className="text-xs text-gray-400 mt-1">
-                  元 line_account_id: {scenario.lineAccountId} ・ 更新 {scenario.updatedAt.slice(0, 10)}
-                </div>
-              </Link>
-            </div>
-            <Toggle
-              value={scenario.isActive}
-              disabled={togglingId === scenario.id}
-              onClick={() => onToggle(scenario.id, scenario.isActive)}
+      <div className="mt-4 flex flex-col gap-4 xl:flex-row xl:items-start">
+        <div className="min-w-0 flex-1 space-y-4">
+          {/* ① はじめて友だち追加した人 */}
+          <section data-design="FirstTime" className="bg-canvas rounded-card border-hairline border p-5">
+            <SectionTitle
+              number={1}
+              tone="accent"
+              title="はじめて友だち追加した人"
+              description="このアカウントを一度も友だち追加したことがない人が対象です。"
             />
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="配信するシナリオ">
+                <Select
+                  value={routing.firstTime.scenarioId ?? ''}
+                  onChange={v =>
+                    patch({ firstTime: { ...routing.firstTime, scenarioId: v || null } })
+                  }
+                  options={scenarios}
+                  placeholder="決めていない（有効なシナリオを全部流す）"
+                />
+              </Field>
+              <Field label="開始のタイミング">
+                <Select
+                  value={routing.firstTime.timing}
+                  onChange={v =>
+                    patch({
+                      firstTime: { ...routing.firstTime, timing: v as FriendAddRouting['firstTime']['timing'] },
+                    })
+                  }
+                  options={[
+                    { id: 'immediate', name: 'すぐに配信' },
+                    { id: 'scenario', name: 'シナリオの設定どおり' },
+                  ]}
+                />
+              </Field>
+            </div>
+            <ActionChips
+              actions={routing.firstTime.actions}
+              tags={tags}
+              onChange={actions => patch({ firstTime: { ...routing.firstTime, actions } })}
+            />
+          </section>
 
-function AccountSection({
-  row,
-  togglingId,
-  onToggle,
-  onCreate,
-}: {
-  row: AccountRow
-  togglingId: string | null
-  onToggle: (id: string, current: boolean) => void
-  onCreate: () => void
-}) {
-  const activeCount = row.scenarios.filter(s => s.isActive).length
-  const isHealthy = activeCount > 0
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <div className={`px-4 py-3 flex items-center justify-between border-b ${isHealthy ? 'border-gray-200' : 'border-red-200 bg-red-50'}`}>
-        <div className="flex items-center gap-3">
-          <h2 className="font-semibold text-gray-900">{row.account.name}</h2>
-          <span className="text-xs text-gray-400">{row.account.channelId}</span>
-        </div>
-        {isHealthy ? (
-          <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">
-            アクティブ {activeCount} 件
-          </span>
-        ) : (
-          <span className="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">
-            ⚠ アクティブ 0 件 — 新規友だちに何も届きません
-          </span>
-        )}
-      </div>
-
-      {row.loadError && (
-        <div className="px-4 py-3 text-sm text-red-600">読み込みエラー: {row.loadError}</div>
-      )}
-
-      {row.scenarios.length === 0 && !row.loadError ? (
-        <div className="px-4 py-6 text-center text-sm text-gray-500">
-          このアカウントには friend_add トリガーのシナリオがありません。
-          <button
-            type="button"
-            onClick={onCreate}
-            className="ml-2 text-green-700 underline hover:text-green-800"
+          {/* ② 以前からの友だち・ブロックを解除した人 */}
+          <section
+            data-design="Returning"
+            className="bg-canvas rounded-card border-warning/40 border-2 p-5"
           >
-            このアカウントでシナリオを作成
-          </button>
-        </div>
-      ) : (
-        <ul className="divide-y divide-gray-100">
-          {row.scenarios.map(scenario => (
-            <li key={scenario.id} className="px-4 py-3 flex items-center justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <Link href={`/scenarios/detail?id=${scenario.id}`} className="block">
-                  <div className="font-medium text-gray-900 truncate flex items-center gap-2">
-                    {scenario.name}
-                    {scenario.isGlobal && (
-                      <span
-                        title="このシナリオは line_account_id=NULL のため全アカウント共通で発火します"
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium"
-                      >
-                        全アカ共通
-                      </span>
-                    )}
-                  </div>
-                  {scenario.description && (
-                    <div className="text-xs text-gray-500 truncate">{scenario.description}</div>
-                  )}
-                  <div className="text-xs text-gray-400 mt-1">
-                    {(scenario.stepCount ?? 0)} ステップ ・ 更新 {scenario.updatedAt.slice(0, 10)}
-                  </div>
-                </Link>
-              </div>
-              <Toggle
-                value={scenario.isActive}
-                disabled={togglingId === scenario.id}
-                onClick={() => onToggle(scenario.id, scenario.isActive)}
+            <SectionTitle
+              number={2}
+              tone="warning"
+              title="以前からの友だち・ブロックを解除した人"
+              description="システム導入より前から友だちだった人と、一度ブロックしてから解除した人が対象です。"
+            />
+            <div className="mt-4 space-y-2">
+              <RadioRow
+                selected={routing.returning.mode === 'none'}
+                onSelect={() => patch({ returning: { ...routing.returning, mode: 'none' } })}
+                title="配信しない"
+                description="何も送りません。既存のお客さまを驚かせたくない場合はこれが安全です。"
               />
-            </li>
-          ))}
-        </ul>
-      )}
+              <RadioRow
+                selected={routing.returning.mode === 'other'}
+                onSelect={() => patch({ returning: { ...routing.returning, mode: 'other' } })}
+                title="別のシナリオを配信する"
+                description="「はじめまして」ではない、再開のご案内などを送れます。"
+              />
+              <RadioRow
+                selected={routing.returning.mode === 'same'}
+                onSelect={() => patch({ returning: { ...routing.returning, mode: 'same' } })}
+                title="はじめての人と同じものを配信する"
+                description="以前からのお客さまにも「はじめまして」が届きます。"
+              />
+            </div>
+
+            {routing.returning.mode === 'other' && (
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="配信するシナリオ">
+                  <Select
+                    value={routing.returning.scenarioId ?? ''}
+                    onChange={v =>
+                      patch({ returning: { ...routing.returning, scenarioId: v || null } })
+                    }
+                    options={scenarios}
+                    placeholder="選んでください"
+                  />
+                </Field>
+                <Field label="開始位置">
+                  <Select
+                    value={routing.returning.startPosition}
+                    onChange={v =>
+                      patch({
+                        returning: {
+                          ...routing.returning,
+                          startPosition: v as FriendAddRouting['returning']['startPosition'],
+                        },
+                      })
+                    }
+                    options={[
+                      { id: 'resume', name: '前回読んだところから' },
+                      { id: 'beginning', name: '最初から' },
+                    ]}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {routing.returning.mode !== 'none' && (
+              <p className="text-ink-faint mt-3 text-xs leading-relaxed">
+                {routing.returning.startPosition === 'resume' && routing.returning.mode === 'other'
+                  ? '前回読んだところから再開したときは、1通目を送り直しません。続きの通から届きます。読み終えている人には最初から流れます。'
+                  : '選んだシナリオの1通目から届きます。'}
+              </p>
+            )}
+
+            <ActionChips
+              actions={routing.returning.actions}
+              tags={tags}
+              onChange={actions => patch({ returning: { ...routing.returning, actions } })}
+            />
+          </section>
+
+          {/* ③ 判定の基準 */}
+          <section data-design="Rule" className="bg-canvas rounded-card border-hairline border p-5">
+            <SectionTitle
+              number={3}
+              tone="accent"
+              title="判定の基準"
+              description="どちらに振り分けるかの判定方法です。通常は変更しません。"
+            />
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field label="はじめての人の判定">
+                <Select
+                  value={routing.criteria.firstTime}
+                  onChange={v =>
+                    patch({
+                      criteria: { firstTime: v as FriendAddRouting['criteria']['firstTime'] },
+                    })
+                  }
+                  options={[
+                    { id: 'unfollow_count_zero', name: 'ブロックされた回数が0回' },
+                    { id: 'first_followed_at_missing', name: '初回フォロー日が未記録' },
+                  ]}
+                />
+              </Field>
+              <Field label="ブロック解除の判定">
+                {/* 選択肢が1つしかない。ブロック解除は unfollow_count でしか
+                    見分けられず、他に材料が無い。押せる形にすると
+                    「他にも選べる」と誤解される。 */}
+                <div className="border-hairline text-ink-secondary rounded-control bg-canvas-sunken border px-3 py-2 text-sm">
+                  ブロック解除の回数が1回以上
+                </div>
+              </Field>
+            </div>
+            {routing.criteria.firstTime === 'first_followed_at_missing' && (
+              <p className="bg-warning-bg text-warning rounded-card mt-3 px-3 py-2 text-xs leading-relaxed">
+                この基準は、いまのデータでは使えません。マイグレーション 065
+                が既存の行すべてに初回フォロー日を埋めたため、未記録の人がもう居ません。
+                このままだと全員が「以前から」に振り分けられます。
+              </p>
+            )}
+          </section>
+        </div>
+
+        {/* どう振り分けられるか */}
+        <aside data-design="Flow" className="w-full shrink-0 xl:w-[380px]">
+          <div className="bg-canvas rounded-card border-hairline border p-5">
+            <h2 className="text-ink text-base font-bold">どう振り分けられるか</h2>
+            <div className="mt-4 space-y-2">
+              <FlowBox title="友だち追加された" note="LINEから追加の通知が届く" tone="accent" />
+              <FlowArrow />
+              <FlowBox
+                title={
+                  routing.criteria.firstTime === 'unfollow_count_zero'
+                    ? 'ブロックされたことがある？'
+                    : '初回フォロー日は記録済み？'
+                }
+                note={
+                  routing.criteria.firstTime === 'unfollow_count_zero'
+                    ? 'friends.unfollow_count を見る'
+                    : 'friends.first_followed_at を見る'
+                }
+              />
+              <FlowArrow />
+
+              <FlowBadge
+                label={routing.criteria.firstTime === 'unfollow_count_zero' ? '0回 = はじめて' : '未記録 = はじめて'}
+                count={breakdown?.firstTime}
+                tone="accent"
+              />
+              <FlowBox
+                title={
+                  scenarioName(routing.firstTime.scenarioId)
+                    ? `シナリオ「${scenarioName(routing.firstTime.scenarioId)}」`
+                    : '有効な友だち追加シナリオを全部'
+                }
+                note={
+                  routing.firstTime.timing === 'immediate'
+                    ? 'すぐに配信 ・ 最初から'
+                    : 'シナリオの設定どおり ・ 最初から'
+                }
+              />
+              <ActionSummary actions={routing.firstTime.actions} tags={tags} />
+
+              <FlowBadge
+                label={routing.criteria.firstTime === 'unfollow_count_zero' ? '1回以上 = 以前から' : '記録あり = 以前から'}
+                count={breakdown?.returning}
+                tone="warning"
+              />
+              {routing.returning.mode === 'none' ? (
+                <FlowBox title="何も配信しない" note="既存のお客さまには送らない" tone="muted" />
+              ) : routing.returning.mode === 'same' ? (
+                <FlowBox
+                  title="はじめての人と同じもの"
+                  note="以前からのお客さまにも「はじめまして」が届く"
+                  tone="warning"
+                />
+              ) : (
+                <FlowBox
+                  title={
+                    scenarioName(routing.returning.scenarioId)
+                      ? `シナリオ「${scenarioName(routing.returning.scenarioId)}」`
+                      : 'シナリオが未選択'
+                  }
+                  note={
+                    routing.returning.startPosition === 'resume'
+                      ? '前回読んだところから'
+                      : '最初から'
+                  }
+                  tone="warning"
+                />
+              )}
+              <ActionSummary actions={routing.returning.actions} tags={tags} />
+            </div>
+
+            <div className="border-hairline mt-4 border-t pt-3">
+              <p className="text-ink text-xs font-bold">この1か月の実績</p>
+              <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+                {breakdown
+                  ? `はじめて ${breakdown.firstTime}人 ・ 以前から ${breakdown.returning}人。うち${breakdown.unblocked}人はブロック解除でした。`
+                  : '読み込み中…'}
+              </p>
+            </div>
+          </div>
+        </aside>
+      </div>
     </div>
   )
 }
 
-function Toggle({
-  value,
-  disabled,
-  onClick,
+// ── 部品 ────────────────────────────────────────────────────────────────────
+
+function SectionTitle({
+  number,
+  title,
+  description,
+  tone,
 }: {
-  value: boolean
-  disabled: boolean
-  onClick: () => void
+  number: number
+  title: string
+  description: string
+  tone: 'accent' | 'warning'
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <span
+        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-pill text-xs font-bold text-white ${
+          tone === 'accent' ? 'bg-accent' : 'bg-warning'
+        }`}
+      >
+        {number}
+      </span>
+      <div className="min-w-0">
+        <h2 className="text-ink text-base font-bold">{title}</h2>
+        <p className="text-ink-secondary mt-0.5 text-xs leading-relaxed">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-ink-secondary mb-1 block text-xs font-medium">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+function Select({
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  value: string
+  onChange: (value: string) => void
+  options: Option[]
+  placeholder?: string
+}) {
+  return (
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+    >
+      {placeholder && <option value="">{placeholder}</option>}
+      {options.map(o => (
+        <option key={o.id} value={o.id}>
+          {o.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function RadioRow({
+  selected,
+  onSelect,
+  title,
+  description,
+}: {
+  selected: boolean
+  onSelect: () => void
+  title: string
+  description: string
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-        value ? 'bg-green-500' : 'bg-gray-300'
-      } ${disabled ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
-      aria-label={value ? '無効化' : '有効化'}
+      onClick={onSelect}
+      className={`rounded-control flex w-full items-start gap-3 border p-3 text-left transition-colors ${
+        selected ? 'border-accent bg-accent-soft' : 'border-hairline bg-canvas hover:bg-canvas-sunken'
+      }`}
     >
       <span
-        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-          value ? 'translate-x-5' : 'translate-x-0.5'
+        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border-2 ${
+          selected ? 'border-accent' : 'border-hairline'
         }`}
-      />
+      >
+        {selected && <span className="bg-accent h-2 w-2 rounded-pill" />}
+      </span>
+      <span className="min-w-0">
+        <span className="text-ink block text-sm font-bold">{title}</span>
+        <span className="text-ink-secondary mt-0.5 block text-xs leading-relaxed">{description}</span>
+      </span>
     </button>
+  )
+}
+
+/** 「あわせて実行すること」。受け口があるのはタグ付与とマイル付与だけ。 */
+function ActionChips({
+  actions,
+  tags,
+  onChange,
+}: {
+  actions: FriendAddAction[]
+  tags: Option[]
+  onChange: (actions: FriendAddAction[]) => void
+}) {
+  const [adding, setAdding] = useState(false)
+  const label = (a: FriendAddAction) =>
+    a.kind === 'tag'
+      ? `タグ「${tags.find(t => t.id === a.tagId)?.name ?? '?'}」を付ける`
+      : `マイル ${a.amount} を付与`
+
+  return (
+    <div className="mt-4">
+      <p className="text-ink-secondary mb-2 text-xs font-medium">あわせて実行すること</p>
+      <div className="flex flex-wrap items-center gap-2">
+        {actions.map((a, i) => (
+          <span
+            key={`${a.kind}-${i}`}
+            className="bg-accent-soft text-accent rounded-pill inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium"
+          >
+            {label(a)}
+            <button
+              type="button"
+              onClick={() => onChange(actions.filter((_, j) => j !== i))}
+              className="text-accent/70 hover:text-accent"
+              aria-label="外す"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        {!adding && (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-pill border border-dashed px-3 py-1 text-xs"
+          >
+            ＋ 追加
+          </button>
+        )}
+      </div>
+      {adding && (
+        <ActionEditor
+          tags={tags}
+          onCancel={() => setAdding(false)}
+          onAdd={a => {
+            onChange([...actions, a])
+            setAdding(false)
+          }}
+        />
+      )}
+      <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+        流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません。担当者への通知は受け口がまだありません。
+      </p>
+    </div>
+  )
+}
+
+function ActionEditor({
+  tags,
+  onAdd,
+  onCancel,
+}: {
+  tags: Option[]
+  onAdd: (action: FriendAddAction) => void
+  onCancel: () => void
+}) {
+  const [kind, setKind] = useState<'tag' | 'mile'>('tag')
+  const [tagId, setTagId] = useState(tags[0]?.id ?? '')
+  const [amount, setAmount] = useState(100)
+  const canAdd = kind === 'tag' ? Boolean(tagId) : amount > 0
+
+  return (
+    <div className="border-hairline rounded-control mt-2 flex flex-wrap items-end gap-2 border p-3">
+      <Field label="種類">
+        <Select
+          value={kind}
+          onChange={v => setKind(v as 'tag' | 'mile')}
+          options={[
+            { id: 'tag', name: 'タグを付ける' },
+            { id: 'mile', name: 'マイルを付与' },
+          ]}
+        />
+      </Field>
+      {kind === 'tag' ? (
+        <Field label="タグ">
+          <Select value={tagId} onChange={setTagId} options={tags} placeholder="選んでください" />
+        </Field>
+      ) : (
+        <Field label="マイル">
+          <input
+            type="number"
+            min={1}
+            value={amount}
+            onChange={e => setAmount(Number(e.target.value))}
+            className="border-hairline rounded-control bg-canvas text-ink w-28 border px-3 py-2 text-sm"
+          />
+        </Field>
+      )}
+      <button
+        type="button"
+        disabled={!canAdd}
+        onClick={() => onAdd(kind === 'tag' ? { kind: 'tag', tagId } : { kind: 'mile', amount })}
+        className="bg-accent text-on-accent rounded-control px-3 py-2 text-xs font-bold disabled:opacity-50"
+      >
+        入れる
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-ink-secondary rounded-control px-3 py-2 text-xs"
+      >
+        やめる
+      </button>
+    </div>
+  )
+}
+
+function ActionSummary({ actions, tags }: { actions: FriendAddAction[]; tags: Option[] }) {
+  if (actions.length === 0) return null
+  const text = actions
+    .map(a =>
+      a.kind === 'tag'
+        ? `タグ「${tags.find(t => t.id === a.tagId)?.name ?? '?'}」`
+        : `マイル${a.amount}`,
+    )
+    .join(' ・ ')
+  return (
+    <div className="border-hairline rounded-control bg-canvas-sunken text-ink-secondary border px-3 py-2 text-xs">
+      {text}
+    </div>
+  )
+}
+
+function FlowBox({
+  title,
+  note,
+  tone = 'plain',
+}: {
+  title: string
+  note: string
+  tone?: 'plain' | 'accent' | 'warning' | 'muted'
+}) {
+  const skin =
+    tone === 'accent'
+      ? 'border-accent/30 bg-accent-soft'
+      : tone === 'warning'
+        ? 'border-warning/30 bg-warning-bg'
+        : tone === 'muted'
+          ? 'border-hairline bg-canvas-sunken'
+          : 'border-hairline bg-canvas'
+  return (
+    <div className={`rounded-control border px-3 py-2 ${skin}`}>
+      <p className="text-ink text-xs font-bold">{title}</p>
+      <p className="text-ink-faint mt-0.5 text-[11px] leading-relaxed">{note}</p>
+    </div>
+  )
+}
+
+function FlowArrow() {
+  return <p className="text-ink-faint text-center text-xs">↓</p>
+}
+
+function FlowBadge({
+  label,
+  count,
+  tone,
+}: {
+  label: string
+  count: number | undefined
+  tone: 'accent' | 'warning'
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-2">
+      <span
+        className={`rounded-pill px-2 py-0.5 text-[11px] font-bold ${
+          tone === 'accent' ? 'bg-accent-soft text-accent' : 'bg-warning-bg text-warning'
+        }`}
+      >
+        {label}
+      </span>
+      <span className="text-ink-faint text-[11px]">
+        今月 {count === undefined ? '…' : `${count}人`}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * テスト実行。**登録も配信もしない。**
+ * 友だちを1人選んで、いまの設定でどちらに振り分けられるかだけを見る。
+ */
+function TestRunButton({
+  accountId,
+  scenarioName,
+}: {
+  accountId: string
+  scenarioName: (id: string | null) => string | null
+}) {
+  const [open, setOpen] = useState(false)
+  const [friendId, setFriendId] = useState('')
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<string | null>(null)
+
+  const run = async () => {
+    if (!friendId.trim()) return
+    setRunning(true)
+    setResult(null)
+    const res = await api.friendAddRouting.test(accountId, friendId.trim())
+    setRunning(false)
+    if (!res.success) {
+      setResult(res.error)
+      return
+    }
+    const d = res.data
+    const where = d.kind === 'first_time' ? 'はじめての人' : '以前からの友だち'
+    const to = d.suppressed
+      ? '何も配信されません'
+      : scenarioName(d.scenarioId)
+        ? `シナリオ「${scenarioName(d.scenarioId)}」が流れます`
+        : '有効な友だち追加シナリオが全部流れます'
+    setResult(
+      `${d.displayName ?? friendId} は「${where}」に振り分けられ、${to}。（ブロックされた回数 ${d.unfollowCount}）`,
+    )
+  }
+
+  const label = useMemo(() => (running ? '確認中…' : 'テスト実行'), [running])
+
+  return (
+    // パネルは絶対配置なので、基準になる relative をここに置く。
+    // 無いと body 基準になって、画面の左上に出る。
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm"
+      >
+        テスト実行
+      </button>
+      {open && (
+        <div className="border-hairline bg-canvas rounded-card absolute right-0 z-20 mt-2 w-[min(90vw,420px)] border p-4 shadow-lg">
+          <p className="text-ink text-sm font-bold">テスト実行</p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            友だちのIDを入れると、その人がどちらに振り分けられるかだけを返します。
+            <strong className="text-ink">登録も配信もしません。</strong>
+          </p>
+          <div className="mt-3 flex gap-2">
+            <input
+              value={friendId}
+              onChange={e => setFriendId(e.target.value)}
+              placeholder="友だちID"
+              className="border-hairline rounded-control bg-canvas text-ink min-w-0 flex-1 border px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={run}
+              disabled={running || !friendId.trim()}
+              className="bg-accent text-on-accent rounded-control px-3 py-2 text-xs font-bold disabled:opacity-50"
+            >
+              {label}
+            </button>
+          </div>
+          {result && (
+            <p className="bg-canvas-sunken text-ink-secondary rounded-control mt-3 px-3 py-2 text-xs leading-relaxed">
+              {result}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
