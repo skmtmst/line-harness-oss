@@ -7,7 +7,6 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
-import CcPromptButton from '@/components/cc-prompt-button'
 
 interface Reminder {
   id: string
@@ -89,25 +88,6 @@ const messageTypeLabels: Record<string, string> = {
   image: '画像',
   flex: 'Flex',
 }
-
-const ccPrompts = [
-  {
-    title: 'リマインダー作成',
-    prompt: `新しいリマインダーの作成をサポートしてください。
-1. リマインダーの用途別テンプレート（セミナー、予約、フォローアップ）を提案
-2. 効果的なリマインダー名と説明文の書き方
-3. 有効化タイミングと対象者設定のベストプラクティス
-手順を示してください。`,
-  },
-  {
-    title: 'リマインダーステップ設計',
-    prompt: `リマインダーのステップ配信を設計してください。
-1. オフセット時間の最適な設定（例: -24h, -1h, +30m）を提案
-2. 各ステップのメッセージ内容テンプレートを作成
-3. テキスト・画像・Flexメッセージの使い分けガイド
-手順を示してください。`,
-  },
-]
 
 export default function RemindersPage() {
   const { selectedAccountId } = useAccount()
@@ -714,7 +694,6 @@ export default function RemindersPage() {
           })}
         </div>
       )}
-      <CcPromptButton prompts={ccPrompts} />
       </div>
     </div>
   )

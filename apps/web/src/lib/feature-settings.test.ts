@@ -1,15 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_FEATURES,
+  DEFAULT_FEATURE_GROUP_ORDER,
   FEATURE_GROUPS,
+  NEN_SHOW_MULTI_STORE,
   SIDEBAR_FEATURE_BY_HREF,
+  featureGroupOrderFromSidebarOrder,
   groupEnabledCount,
   groupFeatureCount,
   itemIsEnabled,
+  sidebarOrderFromFeatureGroupOrder,
   visibleFeatureGroups,
 } from './feature-settings'
 
 describe('V2 10-3 機能設定', () => {
+  it('基本を固定し、ほかのグループ順を保存・復元する', () => {
+    const moved = ['specialized', 'delivery', 'results', 'multi-store'] as const
+    const sidebarOrder = sidebarOrderFromFeatureGroupOrder([...moved])
+    expect(sidebarOrder[0]).toBe('')
+    expect(featureGroupOrderFromSidebarOrder(sidebarOrder)).toEqual(moved)
+    expect(featureGroupOrderFromSidebarOrder(null)).toEqual(DEFAULT_FEATURE_GROUP_ORDER)
+  })
+
   it('V2どおりウェビナー・成果アフィリエイト・多店舗を初期オフにする', () => {
     expect(DEFAULT_FEATURES.webinars).toBe(false)
     expect(DEFAULT_FEATURES.affiliates).toBe(false)
@@ -27,15 +39,16 @@ describe('V2 10-3 機能設定', () => {
     expect(groupEnabledCount(delivery, DEFAULT_FEATURES)).toBe(6)
   })
 
-  it('多店舗管理は複数LINE・親子モード時だけ最下部に表示する', () => {
+  it('多店舗管理は然に仮置きし、常に最下部に表示する', () => {
     const hidden = visibleFeatureGroups({
       showMultiStore: false,
       specializedFeatureKeys: ['nen_campaigns', 'photo_review', 'ec_commerce'],
     })
     expect(hidden.some((group) => group.id === 'multi-store')).toBe(false)
 
+    expect(NEN_SHOW_MULTI_STORE).toBe(true)
     const shown = visibleFeatureGroups({
-      showMultiStore: true,
+      showMultiStore: NEN_SHOW_MULTI_STORE,
       specializedFeatureKeys: ['nen_campaigns', 'photo_review', 'ec_commerce'],
     })
     expect(shown.at(-1)?.id).toBe('multi-store')
