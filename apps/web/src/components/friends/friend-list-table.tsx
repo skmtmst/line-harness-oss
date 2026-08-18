@@ -1,15 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import type { Tag } from '@line-crm/shared'
 import type { FriendListItem } from '@/lib/api'
 import FriendListRow from './friend-list-row'
-import NenFriendDetailDrawer from './nen-friend-detail-drawer'
 
 interface Props {
   friends: FriendListItem[]
-  allTags: Tag[]
-  onRefresh: () => void
   /** 選ばれている友だちのID。まとめて操作する帯の出し分けに使う。 */
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
@@ -19,13 +15,10 @@ interface Props {
 
 export default function FriendListTable({
   friends,
-  allTags,
-  onRefresh,
   selectedIds,
   onToggleSelect,
   onToggleAll,
 }: Props) {
-  const [detailFriend, setDetailFriend] = useState<FriendListItem | null>(null)
   const selectedCount = friends.filter((f) => selectedIds?.has(f.id)).length
   const allSelected = friends.length > 0 && selectedCount === friends.length
 
@@ -53,7 +46,7 @@ export default function FriendListTable({
             最後の「最終接触」は、放置されている人を見つけるための列。
             設計では最も右にあり、対応マークと対で読む。
           */}
-          <div className="hidden lg:grid grid-cols-[32px_220px_80px_120px_1fr_160px_110px_88px] gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="hidden lg:grid grid-cols-[32px_220px_80px_120px_1fr_160px_110px] gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
             <div>
               <input
                 type="checkbox"
@@ -73,13 +66,11 @@ export default function FriendListTable({
             <div>受信メッセージ</div>
             <div>★つきタグ・友だち情報</div>
             <div>最終接触</div>
-            <div className="text-right">詳細</div>
           </div>
           {friends.map((friend) => (
               <div key={friend.id}>
                 <FriendListRow
                   friend={friend}
-                  onDetailClick={() => setDetailFriend(friend)}
                   selected={selectedIds?.has(friend.id)}
                   onToggleSelect={() => onToggleSelect?.(friend.id)}
                 />
@@ -87,7 +78,6 @@ export default function FriendListTable({
           ))}
         </div>
       </div>
-      {detailFriend && <NenFriendDetailDrawer friend={detailFriend} allTags={allTags} onTagsChanged={onRefresh} onClose={() => setDetailFriend(null)} />}
     </div>
   )
 }

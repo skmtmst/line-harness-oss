@@ -295,7 +295,7 @@ function FriendsPageInner() {
       {loading ? (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-hairline grid grid-cols-[80px_220px_120px_1fr_250px_88px] gap-3 animate-pulse">
+            <div key={i} className="px-4 py-4 border-b border-hairline grid grid-cols-[80px_220px_120px_1fr_250px] gap-3 animate-pulse">
               <div className="h-5 bg-canvas-sunken rounded w-16" />
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-full bg-gray-200" />
@@ -316,8 +316,6 @@ function FriendsPageInner() {
         <div data-design="Table">
           <FriendListTable
             friends={friends}
-            allTags={allTags}
-            onRefresh={loadFriends}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onToggleAll={(select) =>
