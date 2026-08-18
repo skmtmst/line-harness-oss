@@ -174,19 +174,6 @@ export default function ScenariosPage() {
             >
               並び替え
             </button>
-            <button
-              disabled
-              title="準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              フォルダを追加
-            </button>
-          <button
-            onClick={() => setPickerOpen(true)}
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 min-h-[44px] text-sm font-medium"
-          >
-            ＋ シナリオを作成
-          </button>
           </div>
         }
       />
@@ -217,6 +204,26 @@ export default function ScenariosPage() {
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
+      {/*
+        「フォルダを追加」と「＋ シナリオを作成」は、設計では KPI の下・
+        フォルダ欄と表の上に置く。見出しの操作欄に入れていたので、
+        絵と位置が違っていた。
+      */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          disabled
+          title="準備中です"
+          className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+        >
+          フォルダを追加
+        </button>
+        <button
+          onClick={() => setPickerOpen(true)}
+          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
+        >
+          ＋ シナリオを作成
+        </button>
+      </div>
       {/*
         設計はフォルダを左の縦パネルに置く。シナリオはフォルダを持って
         いないので（列が無い）、いまは「すべて」だけ。分類できるように
