@@ -145,10 +145,12 @@ export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false)
   const [staffName, setStaffName] = useState<string | null>(null)
   const [staffRole, setStaffRole] = useState<string | null>(null)
+  const [staffPermissions, setStaffPermissions] = useState<string[]>([])
 
   useEffect(() => {
     setStaffName(localStorage.getItem('lh_staff_name'))
     setStaffRole(localStorage.getItem('lh_staff_role'))
+    try { setStaffPermissions(JSON.parse(localStorage.getItem('lh_staff_permissions') || '[]')) } catch { setStaffPermissions([]) }
   }, [])
 
   // 未対応件数 polling — メニュー項目にバッジを出す。5 分間隔。
@@ -219,8 +221,9 @@ export default function Sidebar() {
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        if (item.href === '/staff' && staffRole !== 'owner') return false
+        if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
+        if (staffRole === 'staff' && !staffPermissions.includes(item.href)) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (
           featureKey &&
@@ -441,6 +444,7 @@ export default function Sidebar() {
               localStorage.removeItem('lh_csrf')
               localStorage.removeItem('lh_staff_name')
               localStorage.removeItem('lh_staff_role')
+              localStorage.removeItem('lh_staff_permissions')
               clearAdminSession()
               window.location.href = '/login'
             }}
