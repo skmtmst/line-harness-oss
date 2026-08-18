@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import LoginAudit from '@/components/staff/login-audit'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import type { StaffMember } from '@line-crm/shared'
 
 const TABS = [
@@ -16,6 +16,12 @@ const TABS = [
 
 const ROLE_LABEL: Record<string, string> = { owner: '管理者', admin: '管理者', staff: 'スタッフ', viewer: '閲覧のみ' }
 const INVITE_LABEL: Record<string, string> = { pending_email: 'メール確認待ち', pending_line: 'LINE連携待ち', active: '利用中', expired: '期限切れ' }
+
+/** 例外を、画面に出せる一文にする。 */
+function messageOf(e: unknown): string {
+  if (e instanceof ApiError) return `${e.message}（${e.status}）`
+  return e instanceof Error ? e.message : '通信に失敗しました'
+}
 
 function Kpi({ label, value, note }: { label: string; value: string; note: string }) {
   return <div className="bg-canvas rounded-card border-hairline border p-4"><p className="text-ink-secondary text-sm font-medium">{label}</p><p className="text-ink mt-2 text-3xl font-bold tabular-nums">{value}</p><p className="text-ink-faint mt-1 text-xs">{note}</p></div>
@@ -29,8 +35,12 @@ function Members() {
 
   const load = async () => {
     setLoading(true)
-    const res = await api.staff.list()
-    if (res.success) setMembers(res.data); else setError(res.error)
+    try {
+      const res = await api.staff.list()
+      if (res.success) setMembers(res.data); else setError(res.error)
+    } catch (e) {
+      setError(messageOf(e))
+    }
     setLoading(false)
   }
   useEffect(() => { void load() }, [])
@@ -38,9 +48,33 @@ function Members() {
   const admins = members.filter((m) => m.role === 'admin' || m.role === 'owner').length
   const linked = members.filter((m) => m.lineLinked).length
 
-  const toggle = async (member: StaffMember) => {
-    const res = await api.staff.update(member.id, { isActive: !member.isActive })
-    if (res.success) await load(); else setError(res.error)
+  /**
+   * 通信に失敗すると fetchApi は例外を投げる。受けずに放っておくと
+   * 「押しても何も起きない」画面になり、原因が誰にも分からなくなる。
+   * ここで必ず文字にして出す。
+   */
+  const run = async (action: () => Promise<{ success: boolean; error?: string }>) => {
+    setError('')
+    try {
+      const res = await action()
+      if (res.success) await load()
+      else setError(res.error ?? '操作できませんでした')
+    } catch (e) {
+      setError(messageOf(e))
+    }
+  }
+
+  const toggle = (member: StaffMember) =>
+    run(() => api.staff.update(member.id, { isActive: !member.isActive }))
+
+  const unlink = (member: StaffMember) => {
+    if (!confirm(`${member.name} のLINE連携を解除します。本人は招待メールから連携をやり直す必要があります。`)) return
+    return run(() => api.staff.update(member.id, { lineLinked: false }))
+  }
+
+  const remove = (member: StaffMember) => {
+    if (!confirm(`${member.name} を削除します。この操作は取り消せません。`)) return
+    return run(() => api.staff.delete(member.id))
   }
 
   return <>
@@ -63,7 +97,11 @@ function Members() {
           <td className="px-4 py-3"><span className="rounded-pill bg-accent-bg px-2 py-1 text-xs font-medium text-accent">{ROLE_LABEL[m.role] ?? 'スタッフ'}</span></td>
           <td className="px-4 py-3 text-ink-secondary">{m.lineLinked ? '連携済み' : '未連携'}</td>
           <td className="px-4 py-3"><span className={m.isActive ? 'text-success' : 'text-warning'}>{m.isActive ? '有効' : INVITE_LABEL[m.inviteStatus] ?? '無効'}</span></td>
-          <td className="px-4 py-3 text-right"><button onClick={() => void toggle(m)} className="cursor-pointer rounded-control border border-hairline px-3 py-1.5 text-xs text-ink-secondary hover:bg-canvas-sunken">{m.isActive ? '無効にする' : '有効にする'}</button></td>
+          <td className="px-4 py-3"><div className="flex justify-end gap-2">
+            <button onClick={() => void toggle(m)} className="cursor-pointer rounded-control border border-hairline px-3 py-1.5 text-xs text-ink-secondary hover:bg-canvas-sunken">{m.isActive ? '無効にする' : '有効にする'}</button>
+            {m.lineLinked && <button onClick={() => void unlink(m)} className="cursor-pointer rounded-control border border-hairline px-3 py-1.5 text-xs text-ink-secondary hover:bg-canvas-sunken">連携を解除</button>}
+            <button onClick={() => void remove(m)} className="cursor-pointer rounded-control border border-hairline px-3 py-1.5 text-xs text-danger hover:bg-danger-bg">削除</button>
+          </div></td>
         </tr>)}</tbody>
       </table></div>
     </div>
