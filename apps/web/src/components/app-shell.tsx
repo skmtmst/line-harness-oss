@@ -28,7 +28,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               768〜1024px では誰も居ない場所に72pxの空白が残っていた。
             */}
             <main className="flex-1 overflow-auto pt-[72px] md:pt-0">
-              <div className="px-4 pb-6 sm:px-6 lg:pt-8 lg:px-8 lg:pb-8">
+              {/*
+                本体の幅の上限。設計は1440pxのフレームで描かれていて、
+                サイドバー256pxを引いた1184px（= max-w-shell）が中身の幅。
+                上限が無いと、横に広いモニタで表が伸びきって絵と別物になる。
+              */}
+              <div className="mx-auto max-w-shell px-4 pb-6 sm:px-6 lg:pt-8 lg:px-8 lg:pb-8">
                 {children}
               </div>
             </main>
