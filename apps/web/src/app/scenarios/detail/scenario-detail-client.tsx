@@ -135,6 +135,42 @@ function ImagePreview({ content }: { content: string }) {
   }
 }
 
+/**
+ * 設定の札1枚。設計は5枚を横に並べ、直せるものだけ右上に入口を出す。
+ *
+ * 直す先が無いものに入口を付けると、押しても何も起きない札ができる。
+ * action を渡さなければ、読むだけの札になる。
+ */
+function SettingCard({
+  label,
+  action,
+  onAction,
+  children,
+}: {
+  label: string
+  action?: string
+  onAction?: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-canvas rounded-card border-hairline border p-4">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <p className="text-ink-faint text-xs">{label}</p>
+        {action && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="text-accent shrink-0 text-xs hover:underline"
+          >
+            {action}
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export default function ScenarioDetailClient({ scenarioId }: { scenarioId: string }) {
   const id = scenarioId
 
@@ -218,6 +254,24 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   const reloadStats = useCallback(() => {
     api.scenarios.stats(id).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
   }, [id])
+
+  /**
+   * 重複購読の許可を切り替える。
+   *
+   * 編集モードに入らずその場で当てる。読むだけの説明の隣にあるものなので、
+   * 「編集 → 変更 → 保存」を挟むと、何を編集しているのか分からなくなる。
+   */
+  const handleConcurrentChange = async (allow: boolean) => {
+    if (!scenario || (scenario.allowConcurrent ?? true) === allow) return
+    setError('')
+    try {
+      const res = await api.scenarios.update(id, { allowConcurrent: allow })
+      if (res.success) loadScenario()
+      else setError(res.error)
+    } catch {
+      setError('重複購読の設定を変更できませんでした')
+    }
+  }
 
   const handleSaveScenario = async () => {
     if (!editForm.name.trim()) return
@@ -552,6 +606,33 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   }
 
   const sortedSteps = [...scenario.steps].sort((a, b) => a.stepOrder - b.stepOrder)
+
+  /**
+   * 隣り合う通の間で、いちばん人が減ったところ。
+   *
+   * 到達人数はステップごとに集計済みだったが、画面はそれを表の中でしか
+   * 使っていなかった。「どこで読まれなくなるか」は1通ずつ見比べないと
+   * 分からず、通数が増えるほど気づけない。差がいちばん大きい1か所を出す。
+   *
+   * 減っていない（増えている）ときは出さない。分岐で人が分かれた場合など、
+   * 減少として読むと誤解になる。
+   */
+  const biggestDrop = (() => {
+    const steps = stats?.steps ?? []
+    if (steps.length < 2) return null
+    let worst: { fromOrder: number; toOrder: number; lost: number; rate: number } | null = null
+    for (let i = 0; i < steps.length - 1; i += 1) {
+      const from = steps[i]
+      const to = steps[i + 1]
+      const lost = from.reachedCount - to.reachedCount
+      if (lost <= 0 || from.reachedCount === 0) continue
+      const rate = lost / from.reachedCount
+      if (!worst || lost > worst.lost) {
+        worst = { fromOrder: from.stepOrder, toOrder: to.stepOrder, lost, rate }
+      }
+    }
+    return worst
+  })()
   const modeBadge = modeBadgeStyle[deliveryMode]
 
   return (
@@ -595,13 +676,41 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         />
       </div>
 
-      {/* 同時購読の決まりは、シナリオを組む前に知っておかないと設計を
-          間違える。1画面に1つしか流せないことを最初に書く。 */}
-      <section className="bg-info-bg rounded-card mb-4 p-4">
-        <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
-        <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-          別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。
-        </p>
+      {/*
+        同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
+
+        右で切り替えられる。これまでは文だけ置いて「許可しない」と書いて
+        いたが、実際は列（allow_concurrent）で持っていて、作るときにしか
+        決められなかった。読むだけの説明の隣に、それを決める場所が無い。
+      */}
+      <section className="bg-info-bg rounded-card mb-4 flex flex-wrap items-start gap-4 p-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。
+          </p>
+        </div>
+        <div className="border-hairline bg-canvas rounded-control flex shrink-0 overflow-hidden border">
+          {[
+            { value: false, label: '重複を許可しない' },
+            { value: true, label: '許可する' },
+          ].map((opt) => {
+            const on = (scenario.allowConcurrent ?? true) === opt.value
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => void handleConcurrentChange(opt.value)}
+                aria-pressed={on}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  on ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
+                }`}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
       </section>
 
       {error && (
@@ -610,44 +719,45 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         </div>
       )}
 
-      {/* Stats Header Bar */}
+      {/*
+        統計。設計は1行。カード4枚に散らすと、購読中と読了済と離脱地点を
+        見比べるのに目が横に大きく動く。並べて読むものなので1本にまとめる。
+      */}
       {stats && stats.enrolledTotal > 0 && (
-        <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="bg-canvas rounded-card border-hairline border p-4">
+        <div
+          data-design="KPIs"
+          className="bg-canvas rounded-card border-hairline mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
+        >
+          <div>
             <p className="text-ink-faint text-xs">購読中</p>
-            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            <p className="text-ink text-xl font-bold tabular-nums">
               {stats.activeNow.toLocaleString('ja-JP')}
               <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
             </p>
-            <p className="text-ink-faint mt-0.5 text-xs">登録 {stats.enrolledTotal} 人</p>
           </div>
-          <div className="bg-canvas rounded-card border-hairline border p-4">
+          <div className="border-hairline border-l pl-8">
             <p className="text-ink-faint text-xs">読了済</p>
-            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            <p className="text-ink text-xl font-bold tabular-nums">
               {stats.completed.toLocaleString('ja-JP')}
               <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
             </p>
-            <p className="text-ink-faint mt-0.5 text-xs">
-              {stats.enrolledTotal > 0
-                ? `登録のうち ${Math.round((stats.completed / stats.enrolledTotal) * 100)}%`
-                : '—'}
-            </p>
           </div>
-          <div className="bg-canvas rounded-card border-hairline border p-4">
-            <p className="text-ink-faint text-xs">一時停止</p>
-            <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-              {stats.paused.toLocaleString('ja-JP')}
-              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
-            </p>
-            <p className="text-ink-faint mt-0.5 text-xs">別のシナリオに移った人など</p>
-          </div>
-          {/* ステップごとの到達人数を持っていないので、どこで落ちたかを
-              指せない。全体の登録と完了しか分からない。 */}
-          <div className="bg-canvas rounded-card border-hairline border p-4">
+          <div className="border-hairline border-l pl-8">
             <p className="text-ink-faint text-xs">離脱が大きい地点</p>
-            <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-            <p className="text-ink-faint mt-0.5 text-xs">ステップごとの到達人数は未集計</p>
+            {biggestDrop ? (
+              <p className="text-warning text-xl font-bold">
+                {biggestDrop.fromOrder}通目 <span className="mx-1">→</span> {biggestDrop.toOrder}通目
+              </p>
+            ) : (
+              <p className="text-ink-faint text-xl font-bold">—</p>
+            )}
           </div>
+          {biggestDrop && (
+            <p className="text-warning ml-auto text-xs">
+              ↘ {biggestDrop.fromOrder}通目で {biggestDrop.lost.toLocaleString('ja-JP')}人（
+              {Math.round(biggestDrop.rate * 100)}%）が離脱しています
+            </p>
+          )}
         </div>
       )}
 
@@ -740,73 +850,52 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </div>
         ) : (
           <div>
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <h2 className="text-lg font-semibold text-ink">{scenario.name}</h2>
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${modeBadge.bg} ${modeBadge.text}`}>
-                  {modeBadge.label}
-                </span>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    scenario.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'
-                  }`}
-                >
-                  {scenario.isActive ? '有効' : '無効'}
-                </span>
-                <button
-                  onClick={() => setEditing(true)}
-                  className="text-xs font-medium text-green-600 hover:text-green-700 px-3 py-1.5 rounded-md hover:bg-green-50 transition-colors"
-                >
-                  編集
-                </button>
-              </div>
-            </div>
-            {scenario.description && (
-              <p className="text-sm text-ink-faint mb-3">{scenario.description}</p>
-            )}
-            <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs sm:grid-cols-2">
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">フォルダ</dt>
+            {/*
+              設計は5枚の札を横に並べ、それぞれに直す入口を付ける。
+              以前は名前と説明の下に定義リストを縦に置いていたが、
+              どれが直せてどれが読むだけなのかが見分けられなかった。
+            */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <SettingCard label="シナリオ名" action="編集" onAction={() => setEditing(true)}>
+                <p className="text-ink truncate text-sm font-bold">{scenario.name}</p>
                 {/* シナリオにフォルダを持たせる列が無い。 */}
-                <dd className="text-ink-secondary">未分類</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">配信方式</dt>
-                <dd className="text-ink-secondary">{modeBadge.label}</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">状態</dt>
-                <dd className="text-ink-secondary">{scenario.isActive ? '配信可' : '一時停止中'}</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">開始のきっかけ</dt>
-                <dd className="text-ink-secondary">
-                  {triggerOptions.find((o) => o.value === scenario.triggerType)?.label ??
-                    scenario.triggerType}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">対象の絞り込み</dt>
+                <p className="text-ink-faint mt-0.5 text-xs">フォルダ：未分類</p>
+              </SettingCard>
+
+              <SettingCard label="配信方式">
+                <p className="text-ink text-sm font-bold">{modeBadge.label}</p>
+                <p className="text-ink-faint mt-0.5 text-xs">作ったあとは変えられません</p>
+              </SettingCard>
+
+              <SettingCard label="状態" action="変更" onAction={() => setEditing(true)}>
+                <p className={`text-sm font-bold ${scenario.isActive ? 'text-ink' : 'text-warning'}`}>
+                  {scenario.isActive ? '配信可' : '一時停止中'}
+                </p>
+                <p className="text-ink-faint mt-0.5 text-xs">
+                  {scenario.isActive ? '配信を一時停止する' : '配信を再開する'}
+                </p>
+              </SettingCard>
+
+              <SettingCard label="対象の絞り込み">
                 {/* 購読を始める相手を絞る条件を持っていない。呼び出し側で
                     絞ってから開始する形になっている。 */}
-                <dd className="text-ink-faint">呼び出し側で決まります</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">最終ステップ後の処理</dt>
+                <p className="text-ink text-sm font-bold">
+                  {triggerOptions.find((o) => o.value === scenario.triggerType)?.label ??
+                    scenario.triggerType}
+                </p>
+                <p className="text-ink-faint mt-0.5 text-xs">条件は呼び出し側で決まります</p>
+              </SettingCard>
+
+              <SettingCard label="最終ステップ後の処理">
                 {/* 読み終わったあと次のシナリオへ、という設定が無い。 */}
-                <dd className="text-ink-faint">なし（読了で終わり）</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">重複購読</dt>
-                <dd className="text-ink-faint">許可しない（同時に1つ）</dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-ink-faint">作成日</dt>
-                <dd className="text-ink-secondary">
-                  {new Date(scenario.createdAt).toLocaleDateString('ja-JP')}
-                </dd>
-              </div>
-            </dl>
+                <p className="text-ink text-sm font-bold">なし</p>
+                <p className="text-ink-faint mt-0.5 text-xs">読了で終わり</p>
+              </SettingCard>
+            </div>
+
+            {scenario.description && (
+              <p className="text-ink-faint mt-3 text-sm">{scenario.description}</p>
+            )}
           </div>
         )}
       </div>
