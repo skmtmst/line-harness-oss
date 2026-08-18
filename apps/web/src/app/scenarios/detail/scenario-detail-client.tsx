@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
@@ -182,7 +183,11 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true })
   const [saving, setSaving] = useState(false)
 
+  const router = useRouter()
+  const [duplicating, setDuplicating] = useState(false)
   const [showStepForm, setShowStepForm] = useState(false)
+  /** 何通目のあとに差し込むか。末尾に足すときは null。 */
+  const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
   const [stepSaving, setStepSaving] = useState(false)
@@ -273,6 +278,66 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     }
   }
 
+  /**
+   * シナリオを丸ごと複製する。
+   *
+   * 似た流れをもう1本作るとき、通を1つずつ写すのは現実的でない。
+   * 中身だけ写して、名前に「のコピー」を付け、止めた状態で作る。
+   * 作った直後に配信が始まると、確かめる前に届いてしまう。
+   */
+  const handleDuplicate = async () => {
+    if (!scenario || duplicating) return
+    setDuplicating(true)
+    setError('')
+    try {
+      const created = await api.scenarios.create({
+        name: `${scenario.name} のコピー`,
+        description: scenario.description,
+        triggerType: scenario.triggerType,
+        triggerTagId: scenario.triggerTagId,
+        lineAccountId: scenario.lineAccountId,
+        isActive: false,
+        deliveryMode: scenario.deliveryMode,
+        allowConcurrent: scenario.allowConcurrent,
+      })
+      if (!created.success) throw new Error(created.error)
+      // 通は順に足す。まとめて入れる口が無い。
+      for (const step of sortedSteps) {
+        await api.scenarios.addStep(created.data.id, {
+          stepOrder: step.stepOrder,
+          offsetMinutes: step.offsetMinutes ?? 0,
+          messageType: step.messageType,
+          messageContent: step.messageContent,
+          templateId: step.templateId ?? null,
+          onReachTagId: step.onReachTagId ?? null,
+        })
+      }
+      router.push(`/scenarios/detail?id=${created.data.id}`)
+    } catch {
+      setError('複製に失敗しました')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
+  const handleDeleteScenario = async () => {
+    if (!scenario) return
+    const count = stats?.activeNow ?? 0
+    const message =
+      count > 0
+        ? `「${scenario.name}」はいま ${count} 人が購読中です。\n削除すると配信が止まり、途中の人は続きを受け取れません。よろしいですか？`
+        : `「${scenario.name}」を削除しますか？`
+    if (!confirm(message)) return
+    setError('')
+    try {
+      const res = await api.scenarios.delete(id)
+      if (!res.success) throw new Error(res.error)
+      router.push('/scenarios')
+    } catch {
+      setError('削除に失敗しました')
+    }
+  }
+
   const handleSaveScenario = async () => {
     if (!editForm.name.trim()) return
     setSaving(true)
@@ -302,6 +367,22 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     setStepForm(emptyStepForm(nextOrder))
     setEditingStepId(null)
     setShowStepForm(true)
+    setInsertAfter(null)
+    setStepError('')
+  }
+
+  /**
+   * 通と通のあいだに差し込む。
+   *
+   * 末尾にしか足せないと、3通目と4通目のあいだに1通入れたいときに、
+   * 後ろを全部作り直すことになる。あいだの「ここに挿入」から開くと、
+   * その位置の番号で新しい通を作る。
+   */
+  const openInsertStep = (afterOrder: number) => {
+    setStepForm(emptyStepForm(afterOrder + 1))
+    setEditingStepId(null)
+    setShowStepForm(true)
+    setInsertAfter(afterOrder)
     setStepError('')
   }
 
@@ -325,6 +406,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     setEditingStepId(step.id)
     // 編集はステップ行直下にインライン表示するので、上部の新規追加フォームは閉じる
     setShowStepForm(false)
+    setInsertAfter(null)
     setStepError('')
   }
 
@@ -395,6 +477,24 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           return
         }
       } else {
+        /*
+         * あいだに差し込むときは、後ろの通の番号を先に1つずつ送る。
+         * 送らずに同じ番号で足すと、並び順が重なってどちらが先か決まらない。
+         * 後ろから順に動かすのは、途中で番号がぶつからないようにするため。
+         */
+        if (insertAfter !== null) {
+          const moving = sortedSteps
+            .filter((st) => st.stepOrder > insertAfter)
+            .sort((a, b) => b.stepOrder - a.stepOrder)
+          if (moving.length > 0) {
+            const orders = moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 }))
+            const moved = await api.scenarios.reorderSteps(id, orders)
+            if (!moved.success) {
+              setStepError('あいだに入れるための並べ替えに失敗しました')
+              return
+            }
+          }
+        }
         const res = await api.scenarios.addStep(id, payload)
         if (!res.success) {
           setStepError(res.error)
@@ -932,8 +1032,26 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         ) : (
           <div className="space-y-3">
             {sortedSteps.map((step, idx) => (
+              <div key={step.id}>
+                {/*
+                  通と通のあいだに差し込む入口。末尾にしか足せないと、
+                  3通目と4通目のあいだに1通入れたいときに後ろを作り直す
+                  ことになる。ふだんは薄く、近づいたときだけ見えるようにする。
+                */}
+                {idx > 0 && (
+                  <div className="group flex items-center py-1">
+                    <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
+                    <button
+                      type="button"
+                      onClick={() => openInsertStep(sortedSteps[idx - 1].stepOrder)}
+                      className="text-ink-faint hover:text-accent px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
+                    >
+                      ＋ ここに挿入
+                    </button>
+                    <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
+                  </div>
+                )}
               <div
-                key={step.id}
                 className="border border-hairline rounded-lg p-4 hover:border-gray-300 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -954,11 +1072,24 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                       </span>
                       {(() => {
                         const stat = stats?.steps.find((s) => s.stepOrder === step.stepOrder)
-                        return stat ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700">
-                            📊 {stat.reachedCount}人到達 ({Math.round(stat.reachRate * 100)}%)
+                        if (!stat) return null
+                        const pct = Math.round(stat.reachRate * 100)
+                        return (
+                          /* 数字だけだと、通ごとの減り方が読めない。棒を添えて
+                             上から下へ短くなっていくのが見えるようにする。 */
+                          <span className="inline-flex items-center gap-2">
+                            <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                              <span
+                                className="bg-accent block h-full rounded-full"
+                                style={{ width: `${Math.min(100, pct)}%` }}
+                              />
+                            </span>
+                            <span className="text-ink-secondary text-xs tabular-nums">
+                              {stat.reachedCount}人
+                            </span>
+                            <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
                           </span>
-                        ) : null
+                        )
                       })()}
                     </div>
                     {(() => {
@@ -1027,10 +1158,38 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 </div>
                 {/* インライン編集フォーム: 編集対象ステップの行直下に展開 */}
                 {editingStepId === step.id && renderStepForm()}
+                </div>
               </div>
             ))}
           </div>
         )}
+      </div>
+
+      {/*
+        画面のいちばん下。設計もこの位置。
+
+        削除は右端に離して置く。編集の流れの途中にあると、保存のつもりで
+        押し間違える。複製は左、戻るは中。
+      */}
+      <div className="border-hairline mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+        <button
+          type="button"
+          onClick={() => void handleDuplicate()}
+          disabled={duplicating}
+          className="text-ink-secondary hover:text-ink text-sm font-medium disabled:opacity-40"
+        >
+          {duplicating ? '複製中...' : '⧉ このシナリオを複製'}
+        </button>
+        <Link href="/scenarios" className="text-ink-secondary hover:text-ink ml-auto text-sm">
+          シナリオ一覧に戻る
+        </Link>
+        <button
+          type="button"
+          onClick={() => void handleDeleteScenario()}
+          className="text-danger hover:underline text-sm font-medium"
+        >
+          このシナリオを削除
+        </button>
       </div>
 
       <BulkPreviewModal
