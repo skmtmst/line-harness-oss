@@ -151,7 +151,6 @@ export default function BroadcastForm({
     audienceCount: number
     warnings: Array<{ level: 'info' | 'warning'; message: string }>
   } | null>(null)
-  const [checking, setChecking] = useState(false)
   // 何分かけて配るか。0（既定）は一気に送る。
   const [spreadMinutes, setSpreadMinutes] = useState('30')
   // 送る時間。設計は「今すぐ / 日時を指定 / 友だちごとの最適な時間」の3つ。
@@ -159,6 +158,8 @@ export default function BroadcastForm({
   const [scheduledDate, setScheduledDate] = useState('')
   const [scheduledTime, setScheduledTime] = useState('10:00')
   const [saving, setSaving] = useState(false)
+  const [testSending, setTestSending] = useState(false)
+  const [testResult, setTestResult] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -210,6 +211,24 @@ export default function BroadcastForm({
   }, [countRules, selectedAccountId])
   useEffect(() => { const timer = setTimeout(() => void refreshCount(), 350); return () => clearTimeout(timer) }, [refreshCount])
 
+  /*
+   * 宛先か本文が変わったら、少し待ってから自動で確かめる。
+   *
+   * 打つたびに走らせると、1文字ごとに問い合わせが飛ぶ。打ち終わってから
+   * 1回で足りるので、手が止まって 600ms 経ってから走らせる。
+   */
+  useEffect(() => {
+    const first = bubbles[0]
+    const text = first?.type === 'text' ? String(first.content.text ?? '') : ''
+    // 本文が空のうちは走らせない。何も書いていない状態で「文字数が足りません」
+    // と出しても、直しようがない。
+    if (!text.trim()) return
+    const timer = setTimeout(() => void runPreflight(true), 600)
+    return () => clearTimeout(timer)
+    // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bubbles, filter.tagId, targetMode, selectedAccountId])
+
   const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => i === index ? { ...bubble, id: item.id } : item))
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
   const validate = () => {
@@ -224,9 +243,18 @@ export default function BroadcastForm({
     }
     return ''
   }
-  const runPreflight = async () => {
-    setChecking(true)
-    setError('')
+  /**
+   * 配信前チェック。
+   *
+   * 宛先と本文が決まっていれば、押されなくても勝手に確かめる。押して初めて
+   * 出る作りだと、押さないまま送れてしまう。設計でも右側に出しっぱなしで、
+   * 送る前に「全部緑か」を見るものになっている。
+   *
+   * @param silent 自動で走るとき。確認中の表示もエラーも出さない。打っている
+   *   最中に「確認中…」が点いたり、書きかけを直せと言われたりすると邪魔になる。
+   */
+  const runPreflight = async (silent = false) => {
+    if (!silent) setError('')
     try {
       const first = bubbles[0]
       const content = first?.type === 'text' ? String(first.content.text ?? '') : ''
@@ -237,11 +265,9 @@ export default function BroadcastForm({
         messageContent: content,
       })
       if (res.success) setPreflight(res.data)
-      else setError(res.error)
+      else if (!silent) setError(res.error)
     } catch {
-      setError('確認できませんでした')
-    } finally {
-      setChecking(false)
+      if (!silent) setError('確認できませんでした')
     }
   }
 
@@ -261,6 +287,53 @@ export default function BroadcastForm({
     const [h, m] = scheduledTime.split(':').map(Number)
     const [y, mo, d] = scheduledDate.split('-').map(Number)
     return new Date(Date.UTC(y, mo - 1, d, h - 9, m)).toISOString()
+  }
+
+  /**
+   * テスト送信。下書きを作って、そこから自分宛に送る。
+   *
+   * 作った下書きは残る。送って終わりにすると、確かめた内容と本番で送る
+   * 内容が別物になりうる。同じ下書きをそのまま予約に進められるようにする。
+   */
+  const handleTestSend = async () => {
+    const validationError = validate()
+    if (validationError) {
+      setError(validationError)
+      return
+    }
+    setTestSending(true)
+    setError('')
+    setTestResult('')
+    try {
+      const first = bubbles[0]
+      const legacy = bubbleLegacyMessage(first)
+      const created = await api.broadcasts.create(
+        {
+          title: title.trim() || '（テスト送信）',
+          messageType: legacy.messageType,
+          messageContent: legacy.messageContent,
+          messageBubbles: bubbles,
+          targetType: filter.tagId ? 'tag' : 'all',
+          targetTagId: filter.tagId || null,
+          lineAccountId: selectedAccountId || null,
+          scheduledAt: null,
+          trackLinks: true,
+          stealthSpreadMinutes: Number(spreadMinutes) || 0,
+        },
+        { idempotencyKey: crypto.randomUUID() },
+      )
+      if (!created.success) throw new Error(created.error)
+      const res = await api.broadcasts.testSend(created.data.id)
+      if (res.success) {
+        setTestResult(`テスト送信しました（${res.sent ?? 0}件）`)
+      } else {
+        setError(res.error ?? 'テスト送信できませんでした')
+      }
+    } catch {
+      setError('テスト送信できませんでした')
+    } finally {
+      setTestSending(false)
+    }
   }
 
   const save = async () => {
@@ -483,13 +556,13 @@ export default function BroadcastForm({
         {preflight && (
           <span
             className={`rounded-pill px-2 py-0.5 text-xs ${
-              preflight.warnings.filter((w) => w.level === 'warning').length > 0
+              preflight.warnings.filter((w) => w.level === 'warning').length > 0 || !testResult
                 ? 'bg-warning-bg text-warning'
                 : 'bg-success-bg text-success'
             }`}
           >
-            {preflight.warnings.filter((w) => w.level === 'warning').length > 0
-              ? `${preflight.warnings.filter((w) => w.level === 'warning').length}件 未確認`
+            {preflight.warnings.filter((w) => w.level === 'warning').length + (testResult ? 0 : 1) > 0
+              ? `${preflight.warnings.filter((w) => w.level === 'warning').length + (testResult ? 0 : 1)}件 未確認`
               : '問題ありません'}
           </span>
         )}
@@ -497,7 +570,7 @@ export default function BroadcastForm({
 
       {!preflight ? (
         <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-          「配信前チェック」を押すと、届く人数・文字数・送信枠・除外の状況をまとめて確かめます。
+          宛先と本文が決まると、届く人数・文字数・送信枠・除外の状況をここに出します。
         </p>
       ) : (
         <>
@@ -535,6 +608,23 @@ export default function BroadcastForm({
                   : 'URLを入れると自動で短縮し、クリックを記録します。'}
               </p>
             </li>
+            {/*
+              テスト送信を済ませたか。設計のチェックにある項目で、本番前に
+              自分の目で見え方を確かめてもらうためのもの。差し込みが崩れて
+              いても、送ってからでは戻せない。
+            */}
+            <li
+              className={`rounded-lg border p-2 ${
+                testResult ? 'border-hairline' : 'border-warning-bg bg-warning-bg'
+              }`}
+            >
+              <p className={`text-xs font-medium ${testResult ? 'text-ink' : 'text-warning'}`}>
+                {testResult ? 'テスト送信を済ませました' : 'テスト送信がまだです'}
+              </p>
+              <p className="text-ink-faint text-xs">
+                {testResult || '本番前に自分宛に1通送って、見え方を確認してください。'}
+              </p>
+            </li>
             {/* 開封数は配信先が20人以上のときだけ LINE から返る。人数が
                 足りないと空欄になるので、送る前に伝える。 */}
             <li className="border-hairline rounded-lg border p-2">
@@ -556,20 +646,19 @@ export default function BroadcastForm({
       <button onClick={onCancel} className="border-hairline rounded-xl border px-5 py-3 text-sm font-bold">
         キャンセル
       </button>
-      {/* 自分宛に1通だけ送る口が無い。作ってから送るしかない。 */}
+      {/*
+        テスト送信。宛先は「テスト送信先」に登録した人（アカウント設定）。
+
+        送る口は保存済みの配信にしか無いので、下書きを作ってから送る。
+        本番前に自分の目で見え方を確かめるためのもので、作らずに送る道を
+        別に用意すると、同じ組み立てが2か所に増える。
+      */}
       <button
-        disabled
-        title="テスト送信は準備中です"
-        className="border-hairline text-ink-faint rounded-xl border px-5 py-3 text-sm font-bold opacity-50"
-      >
-        テスト送信
-      </button>
-      <button
-        disabled={checking}
-        onClick={() => void runPreflight()}
+        disabled={testSending || saving}
+        onClick={() => void handleTestSend()}
         className="border-hairline rounded-xl border px-5 py-3 text-sm font-bold disabled:opacity-50"
       >
-        {checking ? '確認中…' : '配信前チェック'}
+        {testSending ? '送信中…' : 'テスト送信'}
       </button>
       <button
         disabled={saving}
