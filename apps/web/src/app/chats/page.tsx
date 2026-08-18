@@ -358,30 +358,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [nameQuery, setNameQuery] = useState('')
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
-  // 友だち詳細を出すか。既定は開く（設計は常時見えている）。
-  // 狭い画面ではトークに重なるので、閉じられるようにする。
-  const [showFriendInfo, setShowFriendInfo] = useState(true)
+  /*
+   * 友だち詳細を出すか。既定は閉じる。
+   *
+   * トークの上に重ねて出るので、開いたままだと本文が隠れる。開くのは
+   * 相手の素性を確かめたいときで、返信を書いている間ではない。
+   * 見たいときに「友だち詳細」から開く。
+   */
+  const [showFriendInfo, setShowFriendInfo] = useState(false)
   // 送信の細かい設定。既定は畳む。出しっぱなしだと入力欄が縦に伸びて
   // トークが読めなくなる。
   const [showComposerOptions, setShowComposerOptions] = useState(false)
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const statusFilterRef = useRef<StatusFilter>('all')
-  const unansweredOnlyRef = useRef(false)
-  const [unansweredOnly, setUnansweredOnly] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return new URLSearchParams(window.location.search).get('unanswered') === '1'
-  })
-
-  // unansweredOnly 変更時に URL を書き戻す
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const urlParams = new URLSearchParams(window.location.search)
-    if (unansweredOnly) urlParams.set('unanswered', '1')
-    else urlParams.delete('unanswered')
-    const qs = urlParams.toString()
-    const url = qs ? `${window.location.pathname}?${qs}` : window.location.pathname
-    window.history.replaceState(null, '', url)
-  }, [unansweredOnly])
   // Send mode: 'enter' = Enter sends, Shift+Enter = newline; 'shift-enter' = reverse
   const [sendMode, setSendMode] = useState<'enter' | 'shift-enter'>('enter')
   const [loading, setLoading] = useState(true)
@@ -433,19 +422,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const buildListParams = useCallback((cursor: { at: string; id: string } | null) => {
     const params: {
-      status?: string; accountId?: string; unansweredOnly?: boolean;
+      status?: string; accountId?: string;
       limit?: number; beforeAt?: string; beforeId?: string;
     } = {}
-    if (statusFilter !== 'all' && !unansweredOnly) params.status = statusFilter
+    if (statusFilter !== 'all') params.status = statusFilter
     if (selectedAccountId) params.accountId = selectedAccountId
-    if (unansweredOnly) params.unansweredOnly = true
-    else params.limit = CHAT_PAGE_SIZE
+    params.limit = CHAT_PAGE_SIZE
     if (cursor) {
       params.beforeAt = cursor.at
       params.beforeId = cursor.id
     }
     return params
-  }, [statusFilter, selectedAccountId, unansweredOnly])
+  }, [statusFilter, selectedAccountId])
 
   /** メールの問い合わせを取る。LINEと同じ一覧に混ぜるため。 */
   const loadEmails = useCallback(async () => {
@@ -473,15 +461,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setChats(rows)
         const last = rows[rows.length - 1]
         nextCursorRef.current = last?.lastMessageAt ? { at: last.lastMessageAt, id: last.id } : null
-        // ページ丁度いっぱい返ってきた = 続きがある可能性が高い (unansweredOnly は全件返る)
-        setHasMoreChats(!unansweredOnly && rows.length === CHAT_PAGE_SIZE)
+        // ページ丁度いっぱい返ってきた = 続きがある可能性が高い
+        setHasMoreChats(rows.length === CHAT_PAGE_SIZE)
       }
     } catch {
       setError('チャットの読み込みに失敗しました。もう一度お試しください。')
     } finally {
       setLoading(false)
     }
-  }, [buildListParams, unansweredOnly])
+  }, [buildListParams])
 
   // 「さらに読み込む」— サーバ由来カーソルの続きを取得して末尾に追加する。
   // 楽観更新との競合に備えて既存 id は除外し、重複表示を防ぐ。
@@ -527,7 +515,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   // Keep refs in sync so setChats updater can read the latest filter without stale closure
   useEffect(() => { statusFilterRef.current = statusFilter }, [statusFilter])
-  useEffect(() => { unansweredOnlyRef.current = unansweredOnly }, [unansweredOnly])
 
   // Load/save sendMode preference (guarded — privacy-restricted browsers throw)
   useEffect(() => {
@@ -726,7 +713,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           const exists = prev.some((c) => c.id === sendingChatId)
           if (!exists) return prev
           const currentFilter = statusFilterRef.current
-          const currentUnansweredOnly = unansweredOnlyRef.current
           const updated = prev.map((c) => c.id === sendingChatId ? {
             ...c,
             lastMessageAt: now,
@@ -735,15 +721,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             lastMessageDirection: 'outgoing' as const,
             lastMessageType: 'image' as const,
           } : c)
-          // 未対応モード時は status filter を skip (worker 側で status を絞ってないため
-          // 楽観更新で applied するとリストが歪む — Codex Round 1)
-          let filtered = currentUnansweredOnly
-            ? updated
-            : (currentFilter === 'all' ? updated : updated.filter((c) => c.status === currentFilter))
-          if (currentUnansweredOnly) {
-            // 未対応モードでは、自分が返信したばかりの chat はもう未対応ではないのでリストから除外
-            filtered = filtered.filter((c) => c.id !== sendingChatId)
-          }
+          // 返信すると対応中に変わるので、別の絞り込みを見ているときは一覧から外れる
+          const filtered =
+            currentFilter === 'all' ? updated : updated.filter((c) => c.status === currentFilter)
           return [...filtered].sort((a, b) => {
             const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0
             const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0
@@ -778,7 +758,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           const exists = prev.some((c) => c.id === sendingChatId)
           if (!exists) return prev
           const currentFilter = statusFilterRef.current
-          const currentUnansweredOnly = unansweredOnlyRef.current
           const updated = prev.map((c) => c.id === sendingChatId ? {
             ...c,
             lastMessageAt: now,
@@ -790,16 +769,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             lastMessageDirection: 'outgoing' as const,
             lastMessageType: 'text' as const,
           } : c)
-          // Drop rows that no longer match the current tab (e.g. replying from 未読 moves chat to in_progress)
-          // 未対応モード時は status filter を skip (worker 側で status を絞ってないため
-          // 楽観更新で applied するとリストが歪む — Codex Round 1)
-          let filtered = currentUnansweredOnly
-            ? updated
-            : (currentFilter === 'all' ? updated : updated.filter((c) => c.status === currentFilter))
-          if (currentUnansweredOnly) {
-            // 未対応モードでは、自分が返信したばかりの chat はもう未対応ではないのでリストから除外
-            filtered = filtered.filter((c) => c.id !== sendingChatId)
-          }
+          // 返信すると対応中に変わるので、別の絞り込みを見ているときは一覧から外れる
+          const filtered =
+            currentFilter === 'all' ? updated : updated.filter((c) => c.status === currentFilter)
           return [...filtered].sort((a, b) => {
             const at = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0
             const bt = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0
@@ -921,25 +893,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
-                disabled={unansweredOnly}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                   statusFilter === f.key
                     ? 'bg-green-500 text-white'
                     : 'bg-canvas-sunken text-ink-secondary hover:bg-gray-200'
-                } ${unansweredOnly ? 'opacity-40 cursor-not-allowed' : ''}`}
+                }`}
               >
                 {f.label}
               </button>
             ))}
-            <label className="flex items-center gap-1.5 text-xs font-medium whitespace-nowrap ml-auto cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={unansweredOnly}
-                onChange={(e) => setUnansweredOnly(e.target.checked)}
-                className="rounded"
-              />
-              返信待ちのみ
-            </label>
           </div>
 
           {/* Chat List */}
@@ -1095,7 +1057,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     </button>
                   )
                 })}
-                {hasMoreChats && !unansweredOnly && (
+                {hasMoreChats && (
                   <button
                     onClick={() => { void loadMoreChats() }}
                     disabled={loadingMore}
@@ -1168,7 +1130,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   探す必要があった。返信しながら状態を動かすので、
                   同じ場所に置く。
                 */}
-                <div className="flex items-center gap-3">
+                {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。 */}
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
                   <label className="flex items-center gap-1.5 text-xs">
                     <span className="text-ink-faint">対応</span>
                     <select
@@ -1206,25 +1169,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {unansweredOnly && chats.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const idx = chats.findIndex((c) => c.id === selectedChatId)
-                        // idx < 0 = current chat is no longer in the list (e.g. just sent a reply)
-                        // → fall back to the head of the list so the queue keeps moving
-                        const nextIdx = idx < 0 ? 0 : (idx + 1) % chats.length
-                        const next = chats[nextIdx]
-                        if (next && next.id !== selectedChatId) {
-                          setSelectedChatId(next.id)
-                        }
-                      }}
-                      className="rounded-md bg-emerald-600 px-3 py-1.5 min-h-[44px] lg:min-h-0 text-sm font-medium text-white hover:bg-emerald-700"
-                      title="次の未対応 friend に進む"
-                    >
-                      次の未対応 →
-                    </button>
-                  )}
                   {/*
                     「未読に戻す」「対応中にする」「解決済にする」は
                     上の「対応 ▾」と同じことをしていたので外した。
