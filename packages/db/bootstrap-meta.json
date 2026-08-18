@@ -115,7 +115,8 @@
     "108_message_origin.sql",
     "109_field_type_and_star.sql",
     "110_template_link_and_audit.sql",
-    "111_tag_starred.sql"
+    "111_tag_starred.sql",
+    "112_tag_display_order.sql"
   ],
-  "migrationCount": 116
+  "migrationCount": 117
 }

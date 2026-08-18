@@ -727,6 +727,12 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    /** 並び順をまとめて書く。渡した順に 0,1,2… が振られる。 */
+    reorder: (ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/tags/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids }),
+      }),
     /** 所属する親分類を変える。null で未分類に戻す。 */
     setGroup: (id: string, groupId: string | null) =>
       fetchApi<ApiResponse<Tag>>(`/api/tags/${id}/group`, {
@@ -1201,7 +1207,17 @@ export const api = {
   scenarios: {
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
-      return fetchApi<ApiResponse<(Scenario & { stepCount?: number })[]>>('/api/scenarios' + query)
+      return fetchApi<
+        ApiResponse<
+          (Scenario & {
+            stepCount?: number
+            /** いま流れている人 */
+            subscriberCount?: number
+            /** 最後まで届いた人 */
+            completedCount?: number
+          })[]
+        >
+      >('/api/scenarios' + query)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Scenario & { steps: ScenarioStep[] }>>(`/api/scenarios/${id}`),

@@ -9,7 +9,6 @@ import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
-import TagBadge from '@/components/friends/tag-badge'
 import FriendFieldList from '@/components/friend-fields/field-list'
 import SupportMarkList from '@/components/friend-fields/mark-list'
 import SavedSearchList from '@/components/friend-fields/saved-search-list'
@@ -98,6 +97,8 @@ function TagsPageInner() {
   const [filter, setFilter] = useState<string>('')
   /** よく使う絞り込み。いま数えられるのは「未使用のタグ」だけ。 */
   const [quickFilter, setQuickFilter] = useState<'' | 'unused'>('')
+  /** いま掴んでいるタグ。落とした先と入れ替える。 */
+  const [dragId, setDragId] = useState<string | null>(null)
   const [groupName, setGroupName] = useState('')
   const [addingGroup, setAddingGroup] = useState(false)
 
@@ -120,6 +121,11 @@ function TagsPageInner() {
 
   useEffect(() => { load() }, [load])
 
+  /*
+   * 出す行。絞るだけで、並べ替えはしない。並びはサーバーが
+   * display_order で返したものをそのまま使う。ここで並べ直すと、
+   * 掴んで入れ替えた並びが次の描き直しで元に戻る。
+   */
   const visible = useMemo(() => {
     // 名前は手元で絞る。打つたびに取り直すと重い。
     const q = tagQuery.trim().toLowerCase()
@@ -132,6 +138,37 @@ function TagsPageInner() {
   }, [items, filter, tagQuery, quickFilter])
 
   const ungroupedCount = useMemo(() => items.filter((t) => !t.groupId).length, [items])
+
+  /**
+   * 掴んだタグを、落とした先の位置へ動かす。
+   *
+   * 見えている並びをそのまま送る。絞り込みで隠れているタグの順番は
+   * 触らない。画面に無いものが勝手に動くと、戻すすべがない。
+   */
+  const dropOn = async (targetId: string) => {
+    const from = dragId
+    setDragId(null)
+    if (!from || from === targetId) return
+
+    const order = visible.map((t) => t.id)
+    const fromIdx = order.indexOf(from)
+    const toIdx = order.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) return
+    order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
+
+    // 画面はすぐ入れ替える。往復を待つと、掴んだ手応えが無い。
+    const rank = new Map(order.map((id, i) => [id, i]))
+    setItems((prev) =>
+      [...prev].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9)),
+    )
+    try {
+      const res = await api.tags.reorder(order)
+      if (!res.success) throw new Error(res.error)
+    } catch {
+      setError('並び順を保存できませんでした')
+      void load()
+    }
+  }
 
   /** 友だち一覧に出す・出さないを切り替える。 */
   const toggleStar = async (tag: Tag) => {
@@ -475,6 +512,7 @@ function TagsPageInner() {
                 一覧は「どのタグが誰に何人付いているか」を見る場所に戻す。
               */}
               <tr className="bg-canvas-sunken border-b border-hairline">
+                <th className="w-10 px-2 py-3" aria-label="並び替え" />
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ名</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち人数</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動付与のもと</th>
@@ -486,18 +524,45 @@ function TagsPageInner() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : visible.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-faint text-sm">
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-faint text-sm">
                   {items.length === 0 ? 'タグがありません' : 'この分類のタグはありません'}
                 </td></tr>
               ) : (
                 visible.map((t) => (
                   <tr key={t.id} className="hover:bg-canvas-sunken">
+                    {/*
+                      掴んで上下に入れ替える。並び替えできることは、掴める
+                      印が出ていないと気づけない。
+                    */}
+                    <td
+                      className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center select-none active:cursor-grabbing"
+                      draggable
+                      onDragStart={() => setDragId(t.id)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => void dropOn(t.id)}
+                      aria-label={`${t.name} を並び替える`}
+                      title="上下に動かして並び替え"
+                    >
+                      ⠿
+                    </td>
                     <td className="px-4 py-3">
-                      {/* 名前から編集へ入る。倍率もそちらにある。 */}
-                      <Link href={`/tags/edit?id=${t.id}`} className="hover:underline">
-                        <TagBadge tag={t} />
+                      {/*
+                        名前は文字で出す。色は左の点だけに使う。塗りつぶすと、
+                        タグの色が「状態を表す色」に見えて、未対応や警告と
+                        見分けがつかなくなる。設計も文字のリンクになっている。
+                      */}
+                      <Link
+                        href={`/tags/edit?id=${t.id}`}
+                        className="text-info inline-flex items-center gap-2 text-sm font-medium hover:underline"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: t.color }}
+                          aria-hidden="true"
+                        />
+                        {t.name}
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">

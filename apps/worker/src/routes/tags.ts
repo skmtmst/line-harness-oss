@@ -12,6 +12,7 @@ import {
   deleteTagGroup,
   assignTagToGroup,
   updateTag,
+  reorderTags,
 } from '@line-crm/db';
 import type { Tag as DbTag, TagGroup as DbTagGroup } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -35,6 +36,7 @@ function serializeTag(row: DbTag & { friend_count?: number }) {
     mileageMultiplierPriority: Number(row.mileage_multiplier_priority ?? 0),
     // 友だち一覧の「★つきタグ」列に出すか。列が無い環境でも 0 として返す。
     isStarred: Number(row.is_starred ?? 0) === 1,
+    displayOrder: Number(row.display_order ?? 0),
     createdAt: row.created_at,
     ...(row.friend_count !== undefined ? { friendCount: row.friend_count } : {}),
   };
@@ -166,6 +168,30 @@ tags.get('/api/tags', async (c) => {
     return c.json({ success: true, data: items.map(serializeTag) });
   } catch (err) {
     console.error('GET /api/tags error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * PATCH /api/tags/reorder — 並び順をまとめて書く。
+ *
+ * 経路が /api/tags/:id より前にあるのは、:id に "reorder" として
+ * 食われないようにするため。/api/tag-groups を分けているのと同じ理由。
+ */
+tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ ids?: unknown }>();
+    if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
+      return c.json({ success: false, error: 'ids must be an array of tag ids' }, 400);
+    }
+    // 画面に出ている数より極端に多い並びは受けない。取り違えか壊れた要求。
+    if (body.ids.length > 500) {
+      return c.json({ success: false, error: 'too many ids' }, 400);
+    }
+    await reorderTags(c.env.DB, body.ids as string[]);
+    return c.json({ success: true, data: { updated: body.ids.length } });
+  } catch (err) {
+    console.error('PATCH /api/tags/reorder error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
