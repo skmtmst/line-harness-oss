@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback } from 'react'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -188,6 +188,9 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
 
   const router = useRouter()
   const [duplicating, setDuplicating] = useState(false)
+  /** 表の行で開いている1通ぶんのプレビュー。設計の「プレビュー」。 */
+  const [previewStepId, setPreviewStepId] = useState<string | null>(null)
+  const [duplicatingStepId, setDuplicatingStepId] = useState<string | null>(null)
   const [showStepForm, setShowStepForm] = useState(false)
   /** 何通目のあとに差し込むか。末尾に足すときは null。 */
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
@@ -535,6 +538,37 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       setStepError('ステップの保存に失敗しました')
     } finally {
       setStepSaving(false)
+    }
+  }
+
+  /**
+   * この通を複製する（設計の行の操作）。
+   *
+   * 同じ中身の通を、すぐ下（stepOrder + 1）に作る。あいだに入れるので、
+   * 後ろの通は「ここに挿入」と同じ経路で押し出される。
+   */
+  const handleDuplicateStep = async (step: ScenarioStep) => {
+    if (duplicatingStepId) return
+    setDuplicatingStepId(step.id)
+    try {
+      await api.scenarios.addStep(id, {
+        stepOrder: step.stepOrder + 1,
+        messageType: step.messageType,
+        messageContent: step.messageContent,
+        delayMinutes: step.delayMinutes,
+        offsetDays: step.offsetDays ?? undefined,
+        offsetMinutes: step.offsetMinutes ?? undefined,
+        deliveryTime: step.deliveryTime ?? undefined,
+        templateId: step.templateId ?? null,
+        onReachTagId: step.onReachTagId ?? null,
+        afterSend: step.afterSend,
+      })
+      loadScenario()
+      reloadStats()
+    } catch {
+      setError('この通を複製できませんでした')
+    } finally {
+      setDuplicatingStepId(null)
     }
   }
 
@@ -1105,144 +1139,232 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             ステップがありません。「+ ステップ追加」から追加してください。
           </div>
         ) : (
-          <div className="space-y-3">
-            {sortedSteps.map((step, idx) => (
-              <div key={step.id}>
-                {/*
-                  通と通のあいだに差し込む入口。末尾にしか足せないと、
-                  3通目と4通目のあいだに1通入れたいときに後ろを作り直す
-                  ことになる。ふだんは薄く、近づいたときだけ見えるようにする。
-                */}
-                {idx > 0 && (
-                  <div className="group flex items-center py-1">
-                    <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
-                    <button
-                      type="button"
-                      onClick={() => openInsertStep(sortedSteps[idx - 1].stepOrder)}
-                      className="text-ink-faint hover:text-accent px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
-                    >
-                      ＋ ここに挿入
-                    </button>
-                    <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
-                  </div>
-                )}
-              <div
-                className="border-hairline rounded-card hover:border-ink-faint border p-4 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <span
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0"
-                      >
-                        {step.stepOrder}
-                      </span>
-                      <span className="text-xs text-ink-faint">{formatScheduleLabel(deliveryMode, step)}</span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        step.messageType === 'text' ? 'bg-blue-50 text-blue-600' :
-                        step.messageType === 'image' ? 'bg-purple-50 text-purple-600' :
-                        'bg-orange-50 text-orange-600'
-                      }`}>
-                        {messageTypeOptions.find(o => o.value === step.messageType)?.label ?? step.messageType}
-                      </span>
-                      {/* この通を送ったあと止まるかどうか。止まるものは、
-                          返事を待つ通なので目に留まる必要がある。 */}
-                      {step.afterSend === 'pause' && (
-                        <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[11px] font-medium">
-                          送信後 一時停止
-                        </span>
+          /*
+            設計は表。以前はカードを縦に積んでいたので、通ごとの
+            タイミング・種別・到達人数を上下で見比べられなかった。
+            桁をそろえると、上から下へ人数が減っていくのがそのまま見える。
+          */
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px]">
+              <thead>
+                <tr className="border-hairline border-b">
+                  <th className="w-16 px-2 py-2" aria-label="並び" />
+                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    タイミング
+                  </th>
+                  <th className="text-ink-faint w-full max-w-0 px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    内容
+                  </th>
+                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    種別
+                  </th>
+                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    到達人数
+                  </th>
+                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    配信後
+                  </th>
+                  <th className="px-3 py-2" aria-label="操作" />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedSteps.map((step, idx) => {
+                  const stat = stats?.steps.find((v) => v.stepOrder === step.stepOrder)
+                  const pct = stat ? Math.round(stat.reachRate * 100) : null
+                  const tpl = step.templateId
+                    ? templates.find((t) => t.id === step.templateId)
+                    : null
+                  const kindLabel = tpl
+                    ? 'テンプレート'
+                    : (messageTypeOptions.find((o) => o.value === step.messageType)?.label ??
+                      step.messageType)
+                  // 内容の桁は見出しだけ出す。中身はプレビューで開く。
+                  // 本文をそのまま桁に入れると、行の高さが通ごとに変わって
+                  // 上下の見比べができなくなる。
+                  const title =
+                    tpl?.name ??
+                    (step.messageContent || '').split('\n')[0].slice(0, 60) ??
+                    '（空）'
+                  return (
+                    <Fragment key={step.id}>
+                      {idx > 0 && (
+                        <tr className="group">
+                          <td colSpan={7} className="px-0 py-0">
+                            {/*
+                              通と通のあいだに差し込む入口。末尾にしか足せないと、
+                              3通目と4通目のあいだに1通入れたいときに後ろを
+                              作り直すことになる。ふだんは薄く、近づいたときだけ見える。
+                            */}
+                            <div className="flex items-center py-1">
+                              <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
+                              <button
+                                type="button"
+                                onClick={() => openInsertStep(sortedSteps[idx - 1].stepOrder)}
+                                className="text-ink-faint hover:text-accent px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
+                              >
+                                ＋ ここに挿入
+                              </button>
+                              <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
+                            </div>
+                          </td>
+                        </tr>
                       )}
-                      {(() => {
-                        const stat = stats?.steps.find((s) => s.stepOrder === step.stepOrder)
-                        if (!stat) return null
-                        const pct = Math.round(stat.reachRate * 100)
-                        return (
-                          /* 数字だけだと、通ごとの減り方が読めない。棒を添えて
-                             上から下へ短くなっていくのが見えるようにする。 */
-                          <span className="inline-flex items-center gap-2">
-                            <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
-                              <span
-                                className="bg-accent block h-full rounded-full"
-                                style={{ width: `${Math.min(100, pct)}%` }}
-                              />
+                      <tr className="border-hairline hover:bg-canvas-sunken border-b">
+                        <td className="px-2 py-3 align-top whitespace-nowrap">
+                          <div className="text-ink-faint flex items-center gap-1 text-xs">
+                            <span className="flex flex-col leading-none">
+                              <button
+                                type="button"
+                                onClick={() => void handleMoveStep(step.id, 'up')}
+                                disabled={idx === 0}
+                                aria-label="上へ"
+                                className="hover:text-ink-secondary disabled:opacity-30"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleMoveStep(step.id, 'down')}
+                                disabled={idx === sortedSteps.length - 1}
+                                aria-label="下へ"
+                                className="hover:text-ink-secondary disabled:opacity-30"
+                              >
+                                ↓
+                              </button>
                             </span>
-                            <span className="text-ink-secondary text-xs tabular-nums">
-                              {stat.reachedCount}人
-                            </span>
-                            <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
-                          </span>
-                        )
-                      })()}
-                    </div>
-                    {(() => {
-                      // テンプレ参照時は、表示も「現在のテンプレ内容」を見せる。
-                      // (templates state には list で取得済みの最新内容が入っている)
-                      const tpl = step.templateId ? templates.find((t) => t.id === step.templateId) : null
-                      const displayType = tpl ? tpl.messageType : step.messageType
-                      const displayContent = tpl ? tpl.messageContent : step.messageContent
-                      return (
-                        <div className="text-sm text-ink-secondary bg-canvas-sunken rounded-md px-3 py-2">
-                          {displayType === 'text' ? (
-                            <p className="whitespace-pre-wrap break-words">{displayContent}</p>
-                          ) : displayType === 'flex' ? (
-                            <FlexPreview content={displayContent} />
-                          ) : displayType === 'image' ? (
-                            <ImagePreview content={displayContent} />
-                          ) : (
-                            <p className="whitespace-pre-wrap break-words">{displayContent}</p>
+                            <span className="text-ink tabular-nums">{step.stepOrder}</span>
+                          </div>
+                        </td>
+                        <td className="text-ink px-3 py-3 align-top text-sm whitespace-nowrap">
+                          {formatScheduleLabel(deliveryMode, step)}
+                        </td>
+                        <td className="w-full max-w-0 px-3 py-3 align-top">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              editingStepId === step.id ? closeStepForm() : openEditStep(step)
+                            }
+                            className="text-info block w-full truncate text-left text-sm hover:underline"
+                            title={title}
+                          >
+                            {title}
+                          </button>
+                          {step.onReachTagId && (
+                            <p className="text-accent mt-0.5 truncate text-xs">
+                              到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}
+                            </p>
                           )}
-                        </div>
-                      )
-                    })()}
-                    {step.templateId && (
-                      <p className="mt-2 text-xs text-amber-700">
-                        📋 テンプレ: {templates.find((t) => t.id === step.templateId)?.name ?? step.templateId}
-                      </p>
-                    )}
-                    {step.onReachTagId && (
-                      <p className="text-accent mt-1 text-xs">
-                        🏷 到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-stretch gap-1 shrink-0">
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleMoveStep(step.id, 'up')}
-                        disabled={idx === 0}
-                        className="text-xs text-ink-faint hover:text-ink-secondary px-2 py-1 rounded hover:bg-canvas-sunken transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                        aria-label="上へ"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        onClick={() => handleMoveStep(step.id, 'down')}
-                        disabled={idx === sortedSteps.length - 1}
-                        className="text-xs text-ink-faint hover:text-ink-secondary px-2 py-1 rounded hover:bg-canvas-sunken transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                        aria-label="下へ"
-                      >
-                        ↓
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => (editingStepId === step.id ? closeStepForm() : openEditStep(step))}
-                      className="text-accent hover:bg-accent-soft rounded px-2 py-1 text-xs transition-colors"
-                    >
-                      {editingStepId === step.id ? '閉じる' : '編集'}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteStep(step.id)}
-                      className="text-xs text-red-500 hover:text-danger px-2 py-1 rounded hover:bg-danger-bg transition-colors"
-                    >
-                      削除
-                    </button>
-                  </div>
-                </div>
-                {/* インライン編集フォーム: 編集対象ステップの行直下に展開 */}
-                {editingStepId === step.id && renderStepForm()}
-                </div>
-              </div>
-            ))}
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                          <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
+                            {kindLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                          {stat ? (
+                            <span className="inline-flex items-center gap-2">
+                              <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                                <span
+                                  className="bg-accent block h-full rounded-full"
+                                  style={{ width: `${Math.min(100, pct ?? 0)}%` }}
+                                />
+                              </span>
+                              <span className="text-ink text-sm tabular-nums">
+                                {stat.reachedCount}人
+                              </span>
+                              <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
+                            </span>
+                          ) : (
+                            <span className="text-ink-faint text-sm">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                          {step.afterSend === 'pause' ? (
+                            <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs font-medium">
+                              送信後 一時停止
+                            </span>
+                          ) : (
+                            <span className="text-ink-faint text-sm">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2 text-xs">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                editingStepId === step.id ? closeStepForm() : openEditStep(step)
+                              }
+                              className="text-info hover:underline"
+                            >
+                              {editingStepId === step.id ? '閉じる' : '編集'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewStepId(previewStepId === step.id ? null : step.id)}
+                              className="text-info hover:underline"
+                            >
+                              プレビュー
+                            </button>
+                            {/* 1通だけ試しに送る受け口が無い。一斉配信の
+                                test-send にあたるものがシナリオには無い。 */}
+                            <button
+                              type="button"
+                              disabled
+                              title="1通だけ試しに送る受け口がまだありません"
+                              className="text-ink-faint opacity-50"
+                            >
+                              テスト
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDuplicateStep(step)}
+                              disabled={duplicatingStepId === step.id}
+                              title="この通を複製する"
+                              aria-label="この通を複製する"
+                              className="text-ink-faint hover:text-ink-secondary disabled:opacity-40"
+                            >
+                              ⧉
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteStep(step.id)}
+                              title="この通を削除する"
+                              aria-label="この通を削除する"
+                              className="text-ink-faint hover:text-danger"
+                            >
+                              🗑
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {previewStepId === step.id && (
+                        <tr className="border-hairline border-b">
+                          <td colSpan={7} className="px-3 pb-3">
+                            <div className="text-ink-secondary bg-canvas-sunken rounded-card px-3 py-2 text-sm">
+                              {(() => {
+                                // テンプレ参照時は「いまのテンプレの中身」を見せる。
+                                const t = tpl ? tpl.messageType : step.messageType
+                                const c = tpl ? tpl.messageContent : step.messageContent
+                                if (t === 'flex') return <FlexPreview content={c} />
+                                if (t === 'image') return <ImagePreview content={c} />
+                                return <p className="break-words whitespace-pre-wrap">{c}</p>
+                              })()}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {editingStepId === step.id && (
+                        <tr>
+                          <td colSpan={7} className="px-3 pb-3">
+                            {renderStepForm()}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
