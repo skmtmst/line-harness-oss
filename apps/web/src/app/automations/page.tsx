@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
-import CcPromptButton from '@/components/cc-prompt-button'
 
 type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
 
@@ -91,25 +90,6 @@ const initialForm: CreateFormState = {
   conditionsJson: '{}',
   priority: 0,
 }
-
-const ccPrompts = [
-  {
-    title: 'オートメーションルール作成',
-    prompt: `新しいオートメーションルールを作成するサポートをしてください。
-1. 利用可能なイベントタイプ（友だち追加、タグ変更、スコア閾値等）の説明
-2. アクション設定のJSON形式テンプレートを提供
-3. 条件設定と優先度の推奨値を提案
-手順を示してください。`,
-  },
-  {
-    title: 'オートメーション効果分析',
-    prompt: `現在のオートメーションルールの効果を分析してください。
-1. 各ルールの発火回数と成功率を確認
-2. イベントタイプ別の自動化カバレッジを評価
-3. 効果の低いルールの改善提案と新規ルールの推奨
-結果をレポートしてください。`,
-  },
-]
 
 export default function AutomationsPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
@@ -503,7 +483,6 @@ export default function AutomationsPage() {
           ))}
         </div>
       )}
-      <CcPromptButton prompts={ccPrompts} />
     </div>
   )
 }

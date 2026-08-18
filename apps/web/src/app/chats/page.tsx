@@ -10,7 +10,6 @@ import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import TemplatePicker from '@/components/chats/template-picker'
 import InboxKpis from '@/components/chats/inbox-kpis'
-import CcPromptButton from '@/components/cc-prompt-button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
@@ -89,11 +88,8 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'resolved', label: '対応済' },
 ]
 
-const SHOW_LOADING_PREF_KEY = 'lh_chat_show_loading_indicator'
 // 一覧の1ページ件数。worker 側 /api/chats のデフォルト LIMIT と揃える。
 const CHAT_PAGE_SIZE = 300
-const LOADING_SECONDS_PREF_KEY = 'lh_chat_loading_seconds'
-const LOADING_REFRESH_INTERVAL_MS = 4000
 
 function StickerMessageImage({ content }: { content: string }) {
   const [failed, setFailed] = useState(false)
@@ -138,25 +134,6 @@ function formatYmdSlash(iso: string): string {
   const d = new Date(iso)
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 }
-
-const ccPrompts = [
-  {
-    title: 'チャット対応テンプレート',
-    prompt: `チャット対応で使えるテンプレートメッセージを作成してください。
-1. よくある質問への回答テンプレート（挨拶、FAQ、サポート）
-2. クレーム対応用の丁寧な返信テンプレート
-3. フォローアップメッセージのテンプレート
-手順を示してください。`,
-  },
-  {
-    title: '未対応チャット確認',
-    prompt: `未対応のチャットを確認し、対応優先度を整理してください。
-1. 未読・対応中のチャット数を集計
-2. 最終メッセージからの経過時間で優先度を判定
-3. 長時間未対応のチャットへの対応アクションを提案
-結果をレポートしてください。`,
-  },
-]
 
 interface FriendItem {
   id: string
@@ -370,6 +347,45 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // トークが読めなくなる。
   const [showComposerOptions, setShowComposerOptions] = useState(false)
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imageError, setImageError] = useState('')
+
+  /**
+   * 画像を1枚選ぶ。
+   *
+   * **1MB まで。** LINE はプレビュー用の画像が1MBまでで、ここは元画像と
+   * プレビューに同じURLを渡している。10MB と書いてあった案内は、
+   * 実際には1MBで弾かれるので直した。
+   */
+  const handlePickImage = async (file: File) => {
+    if (!['image/jpeg', 'image/png'].includes(file.type)) {
+      setImageError('JPEG か PNG を選んでください')
+      return
+    }
+    if (file.size > 1024 * 1024) {
+      setImageError('1MB 以下にしてください')
+      return
+    }
+    setUploadingImage(true)
+    setImageError('')
+    try {
+      const res = await api.uploads.image(file)
+      if (!res.success) {
+        setImageError(res.error ?? '画像を送れませんでした')
+        return
+      }
+      setPendingImage({
+        mode: 'line-image',
+        originalContentUrl: res.data.url,
+        previewImageUrl: res.data.url,
+      })
+    } catch {
+      setImageError('画像を送れませんでした')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
   const statusFilterRef = useRef<StatusFilter>('all')
   // Send mode: 'enter' = Enter sends, Shift+Enter = newline; 'shift-enter' = reverse
   const [sendMode, setSendMode] = useState<'enter' | 'shift-enter'>('enter')
@@ -384,36 +400,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const sendLockRef = useRef(false)
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
-  const [showLoadingIndicator, setShowLoadingIndicator] = useState(false)
-  const [loadingSeconds, setLoadingSeconds] = useState(5)
-  const lastLoadingTriggerAtRef = useRef<Record<string, number>>({})
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false)
   const isComposingRef = useRef(false)
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    try {
-      const rawEnabled = localStorage.getItem(SHOW_LOADING_PREF_KEY)
-      const rawSeconds = localStorage.getItem(LOADING_SECONDS_PREF_KEY)
-      if (rawEnabled !== null) setShowLoadingIndicator(rawEnabled === '1')
-      if (rawSeconds) {
-        const n = Number.parseInt(rawSeconds, 10)
-        if (Number.isFinite(n) && n >= 5 && n <= 60) setLoadingSeconds(n)
-      }
-    } catch {
-      // localStorage unavailable
-    }
-  }, [])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SHOW_LOADING_PREF_KEY, showLoadingIndicator ? '1' : '0')
-      localStorage.setItem(LOADING_SECONDS_PREF_KEY, String(loadingSeconds))
-    } catch {
-      // localStorage unavailable
-    }
-  }, [showLoadingIndicator, loadingSeconds])
 
   // ページング用カーソル。表示リストは楽観更新で並び替わるため、
   // 「サーバから最後に受け取った行」を ref で保持して次ページの起点にする
@@ -657,25 +647,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setMessageContent('')
     setPendingImage(null)
   }
-
-  const triggerLoadingAnimation = useCallback(async (chatId: string) => {
-    if (!showLoadingIndicator) return
-
-    const now = Date.now()
-    const last = lastLoadingTriggerAtRef.current[chatId] ?? 0
-    if (now - last < LOADING_REFRESH_INTERVAL_MS) return
-    lastLoadingTriggerAtRef.current[chatId] = now
-
-    try {
-      await fetchApi<{ success: boolean }>(`/api/chats/${chatId}/loading`, {
-        method: 'POST',
-        body: JSON.stringify({ loadingSeconds }),
-      })
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : 'unknown'
-      setError(`ローディング表示の開始に失敗しました: ${detail}`)
-    }
-  }, [showLoadingIndicator, loadingSeconds])
 
   const handleSendMessage = async () => {
     if (!selectedChatId || sending || sendLockRef.current) return
@@ -1313,27 +1284,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </span>
                 </div>
 
+                {/* 送信の設定は送信キーだけ。入力中ローディングと画像の投入枠は
+                    ここから外した。画像は下の枠のアイコンから選ぶ。 */}
                 {showComposerOptions && (
                   <div className="bg-canvas-sunken rounded-card mb-2 flex flex-wrap items-center gap-x-3 gap-y-2 p-3 text-xs">
-                    <label className="inline-flex cursor-pointer items-center gap-2 select-none">
-                      <input
-                        type="checkbox"
-                        checked={showLoadingIndicator}
-                        onChange={(e) => setShowLoadingIndicator(e.target.checked)}
-                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                      />
-                      入力中ローディングを表示
-                    </label>
-                    <select
-                      value={loadingSeconds}
-                      onChange={(e) => setLoadingSeconds(Number.parseInt(e.target.value, 10))}
-                      disabled={!showLoadingIndicator}
-                      className="border-hairline rounded-control disabled:bg-canvas-sunken disabled:text-ink-faint border bg-white px-2 py-1"
-                    >
-                      {[5, 10, 15, 20, 30, 45, 60].map((sec) => (
-                        <option key={sec} value={sec}>{sec}秒</option>
-                      ))}
-                    </select>
                     <span className="text-ink-faint">送信キー:</span>
                     <label className="flex cursor-pointer items-center gap-1">
                       <input
@@ -1353,14 +1307,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       />
                       <span>Shift+Enter</span>
                     </label>
-                    <div className="w-full">
-                      <ImageUploader
-                        mode="line-image"
-                        value={pendingImage}
-                        onChange={setPendingImage}
-                        label="画像を送る (任意)"
-                      />
-                    </div>
                   </div>
                 )}
 
@@ -1379,8 +1325,50 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
                 {/* 下段 */}
                 <div className="mt-2 flex items-center justify-between gap-2">
-                  <span className="text-ink-faint text-xs">
-                    {pendingImage ? '画像を1枚 添付中' : '画像は JPEG / PNG、1枚 10MB まで'}
+                  {/*
+                    画像はここから。以前は「送信の設定」の中に投入枠を出しっぱなし
+                    にしていて、入力欄が縦に伸びてトークが読めなかった。
+                    アイコンを押すとファイルを選ぶ窓が開く。
+                  */}
+                  <span className="flex items-center gap-2">
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        // 同じ画像をもう一度選べるように値を戻す。
+                        e.target.value = ''
+                        if (file) void handlePickImage(file)
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      title="画像を選ぶ"
+                      aria-label="画像を選ぶ"
+                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2 py-1 text-sm disabled:opacity-50"
+                    >
+                      {uploadingImage ? '…' : '📎'}
+                    </button>
+                    <span className="text-ink-faint text-xs">
+                      {imageError
+                        ? imageError
+                        : pendingImage
+                          ? '画像を1枚 添付中'
+                          : '画像は JPEG / PNG、1枚 1MB まで'}
+                    </span>
+                    {pendingImage && (
+                      <button
+                        type="button"
+                        onClick={() => setPendingImage(null)}
+                        className="text-ink-faint hover:text-danger text-xs"
+                      >
+                        外す
+                      </button>
+                    )}
                   </span>
                   <button
                     onClick={handleSendMessage}
@@ -1499,7 +1487,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           </div>
         )}
       </div>
-      <CcPromptButton prompts={ccPrompts} />
     </div>
   )
 }
