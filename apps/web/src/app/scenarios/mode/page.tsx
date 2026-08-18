@@ -32,12 +32,25 @@ function ScenarioModeContent() {
   const [scenario, setScenario] = useState<Scenario | null>(null)
   const [saving, setSaving] = useState<DeliveryMode | null>(null)
   const [error, setError] = useState('')
+  const [name, setName] = useState('')
+
+  /** 名前だけ先に保存する。方式を選ぶ前に閉じても、名前は残る。 */
+  const saveName = async () => {
+    const trimmed = name.trim()
+    if (!id || !trimmed || trimmed === scenario?.name) return
+    const res = await api.scenarios.update(id, { name: trimmed })
+    if (!res.success) setError(res.error)
+  }
 
   useEffect(() => {
     if (!id) return
     void api.scenarios.get(id).then(res => {
-      if (res.success) setScenario(res.data)
-      else setError(res.error)
+      if (res.success) {
+        setScenario(res.data)
+        setName(res.data.name)
+      } else {
+        setError(res.error)
+      }
     })
   }, [id])
 
@@ -45,7 +58,14 @@ function ScenarioModeContent() {
     if (!id || saving) return
     setSaving(mode)
     setError('')
-    const res = await api.scenarios.update(id, { deliveryMode: mode })
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setError('シナリオ名を入力してください')
+      setSaving(null)
+      return
+    }
+    // 名前と方式は同じ受け口で一度に保存する。
+    const res = await api.scenarios.update(id, { name: trimmed, deliveryMode: mode })
     if (!res.success) {
       setError(res.error)
       setSaving(null)
@@ -109,13 +129,29 @@ function ScenarioModeContent() {
         {error && <p className="bg-danger-bg text-danger rounded-card px-4 py-3 text-sm">{error}</p>}
       </div>
 
-      <ol data-design="Steps" className="mt-4 mb-4 flex flex-wrap items-center gap-3 text-sm">
-        <StepMark n={1} label="シナリオ情報" state="done" />
-        <StepLine />
-        <StepMark n={2} label="配信方式の選択" state="current" />
-        <StepLine />
-        <StepMark n={3} label="ステップの作成" state="todo" />
-      </ol>
+      {/*
+        3段の帯はやめた。段の名前を並べても、いまどこに居るかは
+        画面の見出しで分かる。空いた場所に、いちばん必要なもの
+        （シナリオの名前）を置く。
+      */}
+      <div data-design="Name" className="bg-canvas rounded-card border-hairline mt-4 mb-4 border p-4">
+        <label className="block">
+          <span className="text-ink-secondary mb-1 block text-xs font-medium">
+            シナリオ名 <span className="text-danger">*</span>
+          </span>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => void saveName()}
+            placeholder="例: 友だち追加ウェルカム"
+            className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full max-w-md border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          />
+          <span className="text-ink-faint mt-1 block text-xs">
+            一覧に出る名前です。あとから変えられます。
+          </span>
+        </label>
+      </div>
 
       <div data-design="Choices" className="grid gap-4 xl:grid-cols-2">
         <ModeCard
@@ -233,7 +269,9 @@ function ModeCard({
   onChoose: (mode: DeliveryMode) => void
 }) {
   return (
-    <section className="bg-canvas rounded-card border-hairline flex flex-col border p-5">
+    // h-full と mt-auto の組み合わせで、2枚のカードの高さと下のボタンの位置が
+    // そろう。中身の長さが違うと、ボタンだけ上下にずれる。
+    <section className="bg-canvas rounded-card border-hairline flex h-full flex-col border p-5">
       <div className="flex items-start gap-3">
         <span className="bg-accent-soft text-accent rounded-card flex h-9 w-9 shrink-0 items-center justify-center text-lg">
           {mode === 'absolute_time' ? '🕐' : '⏱'}
@@ -301,7 +339,7 @@ function ModeCard({
         type="button"
         onClick={() => onChoose(mode)}
         disabled={saving !== null}
-        className="bg-accent hover:bg-accent-hover text-on-accent rounded-control mt-4 w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
+        className="bg-accent hover:bg-accent-hover text-on-accent rounded-control mt-auto w-full px-4 py-3 text-sm font-bold transition-colors disabled:opacity-50"
       >
         {saving === mode ? '作成中…' : `${cta} →`}
       </button>
