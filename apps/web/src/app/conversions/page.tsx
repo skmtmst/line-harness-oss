@@ -162,7 +162,7 @@ function ConversionsPageInner() {
               </Link>
               <Link
                 href="/conversions/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
               >
                 成果地点を追加
               </Link>
