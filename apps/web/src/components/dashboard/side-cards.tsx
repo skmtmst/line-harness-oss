@@ -44,36 +44,39 @@ function Figure({ label, value, unit }: { label: string; value: number | null; u
 }
 
 export function InboxStatusCard({ inbox }: { inbox: DashboardOverview['inbox'] }) {
-  const handled = inbox.inProgress + inbox.resolved
-  const total = inbox.unanswered + handled
-  // 0件のときに 0/0 で NaN にしない。棒は空のまま出す。
-  const ratio = total > 0 ? (inbox.unanswered / total) * 100 : 0
+  /*
+    設計は「未対応 / 対応中 / 対応済」の3本。
+    以前は対応中と対応済を足して「対応済」1本にしていたので、
+    **手をつけたが終わっていないもの（対応中）が画面から消えていた。**
+    未対応が減っても、それが片付いたのか手をつけただけなのかが読めない。
+  */
+  const rows = [
+    { label: '未対応', value: inbox.unanswered, bar: 'bg-warning' },
+    { label: '対応中', value: inbox.inProgress, bar: 'bg-info' },
+    { label: '対応済', value: inbox.resolved, bar: 'bg-success' },
+  ]
+  const total = rows.reduce((sum, r) => sum + r.value, 0)
 
   return (
     <SideCard title="対応状況" action={{ label: '受信箱へ', href: '/chats' }}>
       <div className="space-y-3">
-        <div>
-          <div className="mb-1 flex items-baseline justify-between">
-            <span className="text-ink-secondary text-xs">未対応</span>
-            <span className="text-ink text-sm font-bold tabular-nums">
-              {inbox.unanswered.toLocaleString('ja-JP')} 人
-            </span>
+        {rows.map((r) => (
+          <div key={r.label}>
+            <div className="mb-1 flex items-baseline justify-between">
+              <span className="text-ink-secondary text-xs">{r.label}</span>
+              <span className="text-ink text-sm font-bold tabular-nums">
+                {r.value.toLocaleString('ja-JP')} 人
+              </span>
+            </div>
+            <div className="bg-canvas-sunken h-1.5 overflow-hidden rounded-full">
+              {/* 0件のときに 0/0 で NaN にしない。棒は空のまま出す。 */}
+              <div
+                className={`${r.bar} h-full rounded-full`}
+                style={{ width: total > 0 ? `${(r.value / total) * 100}%` : '0%' }}
+              />
+            </div>
           </div>
-          <div className="bg-canvas-sunken h-1.5 overflow-hidden rounded-full">
-            <div className="bg-warning h-full rounded-full" style={{ width: `${ratio}%` }} />
-          </div>
-        </div>
-        <div>
-          <div className="mb-1 flex items-baseline justify-between">
-            <span className="text-ink-secondary text-xs">対応済</span>
-            <span className="text-ink text-sm font-bold tabular-nums">
-              {handled.toLocaleString('ja-JP')} 人
-            </span>
-          </div>
-          <div className="bg-canvas-sunken h-1.5 overflow-hidden rounded-full">
-            <div className="bg-success h-full rounded-full" style={{ width: `${100 - ratio}%` }} />
-          </div>
-        </div>
+        ))}
         <div className="border-hairline border-t pt-3">
           {/*
             設計の「平均の初回返信」。107 で受信と初回返信の時刻を残す

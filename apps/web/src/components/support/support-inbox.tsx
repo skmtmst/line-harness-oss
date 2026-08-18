@@ -49,7 +49,7 @@ type EmailDetail = {
 const statusLabel: Record<ThreadStatus, string> = {
   unread: '未対応',
   in_progress: '対応中',
-  resolved: '解決済み',
+  resolved: '対応済',
 }
 
 function elapsed(iso: string): string {
@@ -191,7 +191,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <option value="open">未解決</option>
                 <option value="unread">未対応</option>
                 <option value="in_progress">対応中</option>
-                <option value="resolved">解決済み</option>
+                <option value="resolved">対応済</option>
                 <option value="all">全て</option>
               </select>
             </div>
@@ -241,7 +241,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => void updateStatus('in_progress')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'in_progress' ? 'bg-amber-500 text-white' : 'bg-amber-50 text-amber-700'}`}>対応中</button>
-                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>✓ 解決済み</button>
+                  <button onClick={() => void updateStatus('resolved')} className={`rounded-lg px-3 py-2 text-xs font-bold ${detail.thread.status === 'resolved' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>✓ 対応済</button>
                   {detail.thread.status === 'resolved' && <button onClick={() => void updateStatus('unread')} className="rounded-lg bg-gray-100 px-3 py-2 text-xs font-bold text-gray-600">再オープン</button>}
                 </div>
               </div>
