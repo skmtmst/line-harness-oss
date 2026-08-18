@@ -21,6 +21,7 @@ import {
   deleteAdminSession,
   getStaffByInviteTokenHash,
   getStaffByLineUserId,
+  getStaffByLineUserIdIncludingInactive,
   updateStaffMember,
 } from '@line-crm/db';
 
@@ -164,6 +165,13 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         invited.invite_expires_at &&
         Date.parse(invited.invite_expires_at) >= Date.now()
       ) {
+        // 同じLINEアカウントを握ったままの古い行があると、line_user_id の
+        // ユニーク制約で連携が落ちる。招待の方が新しい意思なので、古い方の
+        // 連携を先に外す。行そのものは消さない（権限の記録は残す）。
+        const previous = await getStaffByLineUserIdIncludingInactive(c.env.DB, profile.sub);
+        if (previous && previous.id !== invited.id) {
+          await updateStaffMember(c.env.DB, previous.id, { line_user_id: null, line_linked_at: null });
+        }
         staff = await updateStaffMember(c.env.DB, invited.id, {
           line_user_id: profile.sub,
           is_active: 1,
