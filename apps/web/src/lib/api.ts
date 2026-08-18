@@ -733,6 +733,15 @@ export const api = {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<{ count: number }>>('/api/friends/count' + query)
     },
+    /**
+     * 友だち情報（metadata）を書き換える。
+     * 渡した項目だけ変わる。空文字を渡すと空で上書きする。
+     */
+    updateMetadata: (id: string, metadata: Record<string, string>) =>
+      fetchApi<ApiResponse<unknown>>(`/api/friends/${id}/metadata`, {
+        method: 'PUT',
+        body: JSON.stringify({ metadata }),
+      }),
     addTag: (friendId: string, tagId: string) =>
       fetchApi<ApiResponse<null>>(`/api/friends/${friendId}/tags`, {
         method: 'POST',
@@ -1340,6 +1349,12 @@ export const api = {
         }>
       }>>(`/api/scenarios/${id}/preview${q}`)
     },
+    /** この友だちをこのシナリオに登録する（1人ぶん）。 */
+    enroll: (scenarioId: string, friendId: string) =>
+      fetchApi<ApiResponse<unknown>>(
+        `/api/scenarios/${scenarioId}/enroll/${friendId}`,
+        { method: 'POST' },
+      ),
     stats: (id: string) =>
       fetchApi<ApiResponse<{
         enrolledTotal: number
@@ -2187,6 +2202,12 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Reminder & { steps: ReminderStep[] }>>(`/api/reminders/${id}`),
+    /** この友だちをこのリマインダに登録する（1人ぶん）。 */
+    enroll: (reminderId: string, friendId: string) =>
+      fetchApi<ApiResponse<unknown>>(
+        `/api/reminders/${reminderId}/enroll/${friendId}`,
+        { method: 'POST' },
+      ),
     create: (data: {
       name: string
       description?: string | null
