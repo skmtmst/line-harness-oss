@@ -1453,6 +1453,17 @@ export const api = {
   accountSettings: {
     getTestRecipients: (accountId: string) =>
       fetchApi<{ success: boolean; data: Array<{ id: string; displayName: string; pictureUrl: string | null }> }>(`/api/account-settings/test-recipients?accountId=${accountId}`),
+    getTestRecipientLoginUsers: (accountId: string) =>
+      fetchApi<{
+        success: boolean
+        data: Array<{
+          id: string
+          displayName: string
+          pictureUrl: string | null
+          staffName: string
+          sameAccount: boolean
+        }>
+      }>(`/api/account-settings/test-recipient-login-users?accountId=${accountId}`),
     updateTestRecipients: (accountId: string, friendIds: string[]) =>
       fetchApi<{ success: boolean }>('/api/account-settings/test-recipients', {
         method: 'PUT',
