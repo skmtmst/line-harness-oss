@@ -22,8 +22,13 @@ export interface FolderPanelRow {
    * 未設定は null。色はフォルダに付き、属するタグに出る。
    */
   color?: string | null
-  /** 消せる行だけ渡す。「すべて」「未分類」は消せない。 */
-  onDelete?: () => void
+  /**
+   * 直せる行だけ渡す。「すべて」「未分類」は直せない。
+   *
+   * 以前は × を出して消すだけだった。名前も色も変えられず、
+   * 直したいときに作り直すしかなかった。
+   */
+  onEdit?: () => void
 }
 
 export default function FolderPanel({
@@ -58,34 +63,42 @@ export default function FolderPanel({
                   : 'text-ink-secondary hover:bg-canvas-sunken'
               }`}
             >
-              {/* 色が付いているフォルダは、記号そのものをその色で塗る。
-                  丸を別に足すと、名前の前に記号が2つ並んで読みにくい。 */}
-              <svg
-                className="h-4 w-4 shrink-0"
-                fill={row.color ? row.color : 'none'}
-                stroke={row.color ? row.color : 'currentColor'}
-                strokeWidth={1.8}
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
+              {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
+                  色が面で乗って名前より目立ってしまう。 */}
+              {row.color ? (
+                <span
+                  className="rounded-pill h-3 w-3 shrink-0"
+                  style={{ backgroundColor: row.color }}
+                  aria-hidden="true"
                 />
-              </svg>
+              ) : (
+                <svg
+                  className="h-4 w-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={1.8}
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
+                  />
+                </svg>
+              )}
               <span className="min-w-0 flex-1 truncate">{row.label}</span>
               <span className="text-ink-faint shrink-0 text-xs tabular-nums">{row.count}</span>
             </button>
-            {/* 削除は行にカーソルを置いたときだけ。常に出していると、
-                選ぶつもりで押し間違える。 */}
-            {row.onDelete && (
+            {/* 直す入口は行にカーソルを置いたときだけ。常に出していると、
+                選ぶつもりで押し間違える。消すのは編集の中に置く。 */}
+            {row.onEdit && (
               <button
-                onClick={row.onDelete}
-                aria-label={`フォルダ「${row.label}」を削除`}
-                title={`フォルダ「${row.label}」を削除（中身は残ります）`}
-                className="text-ink-faint hover:text-danger px-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
+                onClick={row.onEdit}
+                aria-label={`フォルダ「${row.label}」を編集`}
+                title={`フォルダ「${row.label}」の名前と色を変える`}
+                className="text-ink-faint hover:text-accent px-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100"
               >
-                ×
+                編集
               </button>
             )}
           </div>
