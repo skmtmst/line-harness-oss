@@ -12,6 +12,7 @@ import {
   getFriendById,
   computeNextDeliveryAt,
 } from '@line-crm/db';
+import { reorderScenarios } from '@line-crm/db';
 import { computeScenarioStats } from '../services/scenario-stats.js';
 import { SUPPORTED_CONDITION_TYPES, isSupportedConditionType } from '../services/step-delivery.js';
 import { resolveStepContent } from '@line-crm/db';
@@ -45,6 +46,7 @@ function serializeScenario(row: DbScenario) {
     deliveryMode: (row.delivery_mode ?? 'relative') as DeliveryMode,
     // 既定は「並行を許す」。104 で既存の行を 1 に寄せてある。
     allowConcurrent: (row.allow_concurrent ?? 1) !== 0,
+    displayOrder: Number(row.display_order ?? 0),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -67,6 +69,9 @@ function serializeStep(row: DbScenarioStep) {
     nextStepOnFalse: row.next_step_on_false ?? null,
     templateId: row.template_id ?? null,
     onReachTagId: row.on_reach_tag_id ?? null,
+    // この通を送ったあと。'pause' なら次へ進めず止める。列が無い環境でも
+    // 'continue'（これまでの動き）として返す。
+    afterSend: (row.after_send ?? 'continue') as 'continue' | 'pause',
     createdAt: row.created_at,
   };
 }
@@ -175,6 +180,29 @@ function serializeFriendScenario(row: DbFriendScenario) {
     updatedAt: row.updated_at,
   };
 }
+
+/**
+ * PATCH /api/scenarios/reorder — 並び順をまとめて書く。
+ *
+ * 経路が /api/scenarios/:id より前にあるのは、:id に "reorder" として
+ * 食われないようにするため。
+ */
+scenarios.patch('/api/scenarios/reorder', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ ids?: unknown }>();
+    if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
+      return c.json({ success: false, error: 'ids must be an array of scenario ids' }, 400);
+    }
+    if (body.ids.length > 500) {
+      return c.json({ success: false, error: 'too many ids' }, 400);
+    }
+    await reorderScenarios(c.env.DB, body.ids as string[]);
+    return c.json({ success: true, data: { updated: body.ids.length } });
+  } catch (err) {
+    console.error('PATCH /api/scenarios/reorder error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 // GET /api/scenarios - list all
 scenarios.get('/api/scenarios', async (c) => {
@@ -388,6 +416,7 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
       nextStepOnFalse?: number | null;
       templateId?: string | null;
       onReachTagId?: string | null;
+      afterSend?: 'continue' | 'pause';
     }>();
 
     if (body.stepOrder === undefined || !body.messageType || !body.messageContent) {
@@ -441,6 +470,9 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
       deliveryTime: body.deliveryTime ?? null,
       templateId: body.templateId ?? null,
       onReachTagId: body.onReachTagId ?? null,
+      // 知らない値は 'continue'。列の CHECK に引っかかって 500 になるより、
+      // これまでの動き（次へ進む）に寄せる。
+      afterSend: body.afterSend === 'pause' ? 'pause' : 'continue',
     });
 
     return c.json({ success: true, data: serializeStep(step) }, 201);
@@ -468,6 +500,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
       nextStepOnFalse?: number | null;
       templateId?: string | null;
       onReachTagId?: string | null;
+      afterSend?: 'continue' | 'pause';
     }>();
 
     // conditionType / conditionValue の partial-update 検証（OSS issue #120 回帰防止）。
@@ -602,6 +635,8 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
       delivery_time: body.deliveryTime,
       template_id: body.templateId,
       on_reach_tag_id: body.onReachTagId,
+      after_send:
+        body.afterSend === undefined ? undefined : body.afterSend === 'pause' ? 'pause' : 'continue',
     });
 
     if (!updated) {

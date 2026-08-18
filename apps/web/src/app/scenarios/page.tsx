@@ -113,6 +113,27 @@ export default function ScenariosPage() {
     }
   }
 
+  /**
+   * 掴んで入れ替えた並びを保存する。
+   *
+   * 画面はすぐ入れ替える。往復を待つと、掴んだ手応えが無い。
+   * 失敗したときだけ読み直して、元の並びに戻す。
+   */
+  const handleReorder = async (ids: string[]) => {
+    setError('')
+    const rank = new Map(ids.map((id, i) => [id, i]))
+    setScenarios((prev) =>
+      [...prev].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9)),
+    )
+    try {
+      const res = await api.scenarios.reorder(ids)
+      if (!res.success) throw new Error(res.error)
+    } catch {
+      setError('並び順を保存できませんでした')
+      loadScenarios()
+    }
+  }
+
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
       await api.scenarios.update(id, { isActive: !current })
@@ -286,6 +307,7 @@ export default function ScenariosPage() {
                 : sc.name.toLowerCase().includes(nameQuery.trim().toLowerCase()),
             )
             .filter((sc) => (stoppedOnly ? !sc.isActive : true))}
+          onReorder={handleReorder}
           onToggleActive={handleToggleActive}
           onDelete={handleDelete}
           loading={loading}

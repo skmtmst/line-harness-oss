@@ -297,6 +297,8 @@ export interface Scenario {
    * false にすると、他のシナリオが動いている人はこのシナリオに登録されない。
    */
   allowConcurrent?: boolean;
+  /** 一覧での並び順。小さいほど上 */
+  displayOrder?: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */
@@ -329,6 +331,8 @@ export interface ScenarioStep {
   templateId?: string | null;
   /** このステップ到達時に付与するタグ ID */
   onReachTagId?: string | null;
+  /** この通を送ったあと。'pause' なら次へ進めず止める */
+  afterSend?: 'continue' | 'pause';
   /** メッセージ種別 */
   messageType: MessageType;
   /** メッセージ内容 (テキスト or JSONシリアライズ済みFlexメッセージ等) */

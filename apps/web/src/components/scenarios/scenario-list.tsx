@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Link from 'next/link'
 import type { Scenario, DeliveryMode } from '@line-crm/shared'
 
@@ -21,6 +22,8 @@ interface ScenarioListProps {
   scenarios: ScenarioRow[]
   onToggleActive: (id: string, current: boolean) => void
   onDelete: (id: string) => void
+  /** 掴んで並べ替えたときに、見えている順で呼ばれる。 */
+  onReorder?: (ids: string[]) => void
   loading?: boolean
 }
 
@@ -31,7 +34,28 @@ interface ScenarioListProps {
  * 縦に伸びて、購読中の人数どうしを見比べられなかった。数を並べて読む
  * 画面なので、列で揃える。
  */
-export default function ScenarioList({ scenarios, onToggleActive, onDelete, loading }: ScenarioListProps) {
+export default function ScenarioList({
+  scenarios,
+  onToggleActive,
+  onDelete,
+  onReorder,
+  loading,
+}: ScenarioListProps) {
+  /** いま掴んでいるシナリオ。落とした先と入れ替える。 */
+  const [dragId, setDragId] = useState<string | null>(null)
+
+  const dropOn = (targetId: string) => {
+    const from = dragId
+    setDragId(null)
+    if (!from || from === targetId || !onReorder) return
+    const order = scenarios.map((s) => s.id)
+    const fromIdx = order.indexOf(from)
+    const toIdx = order.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) return
+    order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
+    onReorder(order)
+  }
+
   if (scenarios.length === 0) {
     return (
       <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
@@ -48,6 +72,7 @@ export default function ScenarioList({ scenarios, onToggleActive, onDelete, load
         <table className="w-full min-w-[900px]">
           <thead>
             <tr className="bg-canvas-sunken border-hairline border-b">
+              <th className="w-10 px-2 py-3" aria-label="並び替え" />
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
                 シナリオ名
               </th>
@@ -72,6 +97,18 @@ export default function ScenarioList({ scenarios, onToggleActive, onDelete, load
           <tbody className="divide-hairline divide-y">
             {scenarios.map((s) => (
               <tr key={s.id} className="hover:bg-canvas-sunken">
+                {/* 掴んで上下に入れ替える。よく使うものを上に置くための操作。 */}
+                <td
+                  className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center select-none active:cursor-grabbing"
+                  draggable={Boolean(onReorder)}
+                  onDragStart={() => setDragId(s.id)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => dropOn(s.id)}
+                  aria-label={`${s.name} を並び替える`}
+                  title="上下に動かして並び替え"
+                >
+                  ⠿
+                </td>
                 <td className="px-4 py-3">
                   <Link
                     href={`/scenarios/detail?id=${s.id}`}

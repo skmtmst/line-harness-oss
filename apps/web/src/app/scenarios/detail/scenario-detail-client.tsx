@@ -77,6 +77,8 @@ interface StepFormState {
   messageContent: string
   templateId: string | null
   onReachTagId: string | null
+  /** この通を送ったあと。'pause' なら次へ進めず止める。 */
+  afterSend: 'continue' | 'pause'
   inputMode: 'direct' | 'template'
 }
 
@@ -88,6 +90,7 @@ function emptyStepForm(stepOrder: number): StepFormState {
     messageContent: '',
     templateId: null,
     onReachTagId: null,
+    afterSend: 'continue',
     inputMode: 'direct',
   }
 }
@@ -310,6 +313,8 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           messageContent: step.messageContent,
           templateId: step.templateId ?? null,
           onReachTagId: step.onReachTagId ?? null,
+          // 複製先でも同じところで止まる。止まる位置が変わると流れが別物になる。
+          afterSend: step.afterSend ?? 'continue',
         })
       }
       router.push(`/scenarios/detail?id=${created.data.id}`)
@@ -401,6 +406,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       messageContent: step.messageContent,
       templateId: step.templateId ?? null,
       onReachTagId: step.onReachTagId ?? null,
+      afterSend: step.afterSend ?? 'continue',
       inputMode: step.templateId ? 'template' : 'direct',
     })
     setEditingStepId(step.id)
@@ -469,6 +475,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         messageContent: payloadMessageContent,
         templateId: stepForm.inputMode === 'template' ? stepForm.templateId : null,
         onReachTagId: stepForm.onReachTagId,
+        afterSend: stepForm.afterSend,
       }
       if (editingStepId) {
         const res = await api.scenarios.updateStep(id, editingStepId, payload)
@@ -653,6 +660,28 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             </select>
             <p className="text-xs text-ink-faint mt-0.5">
               このステップが配信完了したら、選んだタグを友だちに付与します
+            </p>
+          </div>
+
+          {/*
+            送ったあと止めるかどうか。体調の記録をお願いして返事を待つ、と
+            いった流れで要る。止めておけば、返事が来てから人が再開できる。
+            以前は送ったら必ず次へ進み、返事を待つあいだにも次の通が届いていた。
+          */}
+          <div>
+            <label className="block text-xs font-medium text-ink-secondary mb-1">配信後</label>
+            <select
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              value={stepForm.afterSend}
+              onChange={(e) =>
+                setStepForm({ ...stepForm, afterSend: e.target.value as 'continue' | 'pause' })
+              }
+            >
+              <option value="continue">次の通へ進む</option>
+              <option value="pause">送信後 一時停止する</option>
+            </select>
+            <p className="text-xs text-ink-faint mt-0.5">
+              一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
             </p>
           </div>
         </div>
@@ -1070,6 +1099,13 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                       }`}>
                         {messageTypeOptions.find(o => o.value === step.messageType)?.label ?? step.messageType}
                       </span>
+                      {/* この通を送ったあと止まるかどうか。止まるものは、
+                          返事を待つ通なので目に留まる必要がある。 */}
+                      {step.afterSend === 'pause' && (
+                        <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[11px] font-medium">
+                          送信後 一時停止
+                        </span>
+                      )}
                       {(() => {
                         const stat = stats?.steps.find((s) => s.stepOrder === step.stepOrder)
                         if (!stat) return null

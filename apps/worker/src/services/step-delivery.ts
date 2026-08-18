@@ -5,6 +5,7 @@ import {
   getScenarioSteps,
   advanceFriendScenario,
   completeFriendScenario,
+  pauseFriendScenario,
   claimFriendScenarioForDelivery,
   recoverStuckDeliveries,
   pauseFriendScenarioDelivery,
@@ -401,7 +402,18 @@ async function processSingleDelivery(
   const currentIndex = steps.indexOf(currentStep);
   const nextStep = currentIndex + 1 < steps.length ? steps[currentIndex + 1] : null;
 
-  if (nextStep) {
+  /*
+   * この通に「送信後 一時停止」が付いていたら、次へ進めずに止める。
+   *
+   * 体調の記録をお願いして返事を待つ、といった流れで要る。止めておけば、
+   * 返事が来てから人が再開できる。列が無かったころは送ったら必ず次へ進み、
+   * 返事を待つあいだにも次の通が届いていた。
+   *
+   * 止めるのは送ったあと。送る前に止めると、この通そのものが届かない。
+   */
+  if ((currentStep.after_send ?? 'continue') === 'pause') {
+    await pauseFriendScenario(db, fs.id, currentStep.step_order);
+  } else if (nextStep) {
     const jitteredDate = jitterDeliveryTime(nextDeliveryFor(nextStep));
     await advanceFriendScenario(db, fs.id, currentStep.step_order, jitteredDate.toISOString().slice(0, -1) + '+09:00');
   } else {
