@@ -4,7 +4,7 @@ import { Fragment, useState, useEffect, useCallback } from 'react'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode } from '@line-crm/shared'
+import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -183,7 +183,18 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   const [error, setError] = useState('')
 
   const [editing, setEditing] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true })
+  const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true, folderId: '' })
+  const [folders, setFolders] = useState<Folder[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    void api.folders.list('scenario').then((res) => {
+      if (!cancelled && res.success) setFolders(res.data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [saving, setSaving] = useState(false)
 
   const router = useRouter()
@@ -220,6 +231,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           triggerType: res.data.triggerType,
           isActive: res.data.isActive,
           allowConcurrent: res.data.allowConcurrent !== false,
+          folderId: res.data.folderId ?? '',
         })
       } else {
         setError(res.error)
@@ -353,6 +365,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       const res = await api.scenarios.update(id, {
         name: editForm.name,
         description: editForm.description || null,
+        folderId: editForm.folderId || null,
         triggerType: editForm.triggerType,
         isActive: editForm.isActive,
         allowConcurrent: editForm.allowConcurrent,
@@ -940,6 +953,20 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               />
             </div>
             <div>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">フォルダ</label>
+              <select
+                className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full"
+                value={editForm.folderId}
+                onChange={(e) => setEditForm({ ...editForm, folderId: e.target.value })}
+              >
+                <option value="">未分類</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+              <p className="text-ink-faint mt-1 text-xs">一覧の左のパネルで、この分類ごとに絞り込めます。</p>
+            </div>
+            <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">トリガー</label>
               <select
                 className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
@@ -996,6 +1023,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                     triggerType: scenario.triggerType,
                     isActive: scenario.isActive,
                     allowConcurrent: scenario.allowConcurrent !== false,
+                    folderId: scenario.folderId ?? '',
                   })
                 }}
                 className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
@@ -1014,8 +1042,11 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
               <SettingCard label="シナリオ名" action="編集" onAction={() => setEditing(true)}>
                 <p className="text-ink truncate text-sm font-bold">{scenario.name}</p>
-                {/* シナリオにフォルダを持たせる列が無い。 */}
-                <p className="text-ink-faint mt-0.5 text-xs">フォルダ：未分類</p>
+                {/* 置き場は scenarios.folder_id（099）。一覧の左のパネルで
+                    絞り込む先になる。 */}
+                <p className="text-ink-faint mt-0.5 truncate text-xs">
+                  フォルダ：{folders.find((f) => f.id === scenario.folderId)?.name ?? '未分類'}
+                </p>
               </SettingCard>
 
               <SettingCard label="配信方式">

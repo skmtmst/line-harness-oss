@@ -318,6 +318,8 @@ export interface Scenario {
   createdAt: string;
   /** 更新日時 (ISO 8601) */
   updatedAt: string;
+  /** 置き場。未分類は null。 */
+  folderId?: string | null;
 }
 
 // -----------------------------------------------------------------------------

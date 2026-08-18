@@ -1228,7 +1228,8 @@ export const api = {
   folders: {
     list: (kind?: string) =>
       fetchApi<ApiResponse<Folder[]>>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
-    create: (data: { kind: string; name: string; parentId?: string | null }) =>
+    /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
+    create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {
         method: 'POST',
         body: JSON.stringify(data),
