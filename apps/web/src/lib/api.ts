@@ -1207,7 +1207,17 @@ export const api = {
   scenarios: {
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
-      return fetchApi<ApiResponse<(Scenario & { stepCount?: number })[]>>('/api/scenarios' + query)
+      return fetchApi<
+        ApiResponse<
+          (Scenario & {
+            stepCount?: number
+            /** いま流れている人 */
+            subscriberCount?: number
+            /** 最後まで届いた人 */
+            completedCount?: number
+          })[]
+        >
+      >('/api/scenarios' + query)
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Scenario & { steps: ScenarioStep[] }>>(`/api/scenarios/${id}`),

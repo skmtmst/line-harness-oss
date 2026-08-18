@@ -199,11 +199,43 @@ scenarios.get('/api/scenarios', async (c) => {
     } else {
       items = await getScenarios(c.env.DB);
     }
+
+    /*
+     * 購読中と読了済の人数。
+     *
+     * 設計の一覧はこの2つを列で出す。これまでは通数（ステップ数）しか
+     * 返しておらず、「作ったが誰も通っていない」シナリオを見分けられなかった。
+     *
+     * シナリオごとに数えると件数ぶん往復するので、1回で全部数えて配る。
+     */
+    const counts = new Map<string, { active: number; completed: number }>();
+    try {
+      const rows = await c.env.DB
+        .prepare(
+          `SELECT scenario_id,
+                  SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
+                  SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count
+             FROM friend_scenarios
+            GROUP BY scenario_id`,
+        )
+        .all<{ scenario_id: string; active_count: number; completed_count: number }>();
+      for (const r of rows.results) {
+        counts.set(r.scenario_id, {
+          active: Number(r.active_count ?? 0),
+          completed: Number(r.completed_count ?? 0),
+        });
+      }
+    } catch {
+      // 数えられなくても一覧は出す。人数だけ 0 になる。
+    }
+
     return c.json({
       success: true,
       data: items.map((row) => ({
         ...serializeScenario(row),
         stepCount: row.step_count,
+        subscriberCount: counts.get(row.id)?.active ?? 0,
+        completedCount: counts.get(row.id)?.completed ?? 0,
       })),
     });
   } catch (err) {
