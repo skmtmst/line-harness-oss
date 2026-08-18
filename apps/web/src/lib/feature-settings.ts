@@ -37,6 +37,8 @@ export interface FeatureGroup {
 
 export const FEATURE_SETTINGS_UPDATED_EVENT = 'line-harness:feature-settings-updated'
 export const SPECIALIZED_FEATURE_KEYS: FeatureKey[] = ['nen_campaigns', 'photo_review', 'ec_commerce']
+// 然の設計確認用。実機能の利用判定とは切り離し、最下部に仮置きする。
+export const NEN_SHOW_MULTI_STORE = true
 
 export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   scenarios: true,
