@@ -1080,9 +1080,11 @@ export interface StaffMember {
   name: string;
   email: string | null;
   role: 'owner' | 'admin' | 'staff' | 'viewer';
-  apiKey: string;
   lineLinked: boolean;
   isActive: boolean;
+  permissionKeys: string[];
+  notificationPreferences: Record<string, { email: boolean; line: boolean }>;
+  inviteStatus: 'pending_email' | 'pending_line' | 'active' | 'expired';
   createdAt: string;
   updatedAt: string;
 }

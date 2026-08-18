@@ -171,7 +171,7 @@ export type Env = {
   };
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
-    staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean };
+    staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; permissionKeys?: string[] };
   };
 };
 
