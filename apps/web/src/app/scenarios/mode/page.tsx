@@ -273,8 +273,17 @@ function ModeCard({
     // そろう。中身の長さが違うと、ボタンだけ上下にずれる。
     <section className="bg-canvas rounded-card border-hairline flex h-full flex-col border p-5">
       <div className="flex items-start gap-3">
-        <span className="bg-accent-soft text-accent rounded-card flex h-9 w-9 shrink-0 items-center justify-center text-lg">
-          {mode === 'absolute_time' ? '🕐' : '⏱'}
+        {/* 絵文字は使わない。端末やフォントで見た目が変わるうえ、
+            色が乗って見出しより目立つ。線の記号にする。 */}
+        <span className="bg-accent-soft text-accent rounded-card flex h-9 w-9 shrink-0 items-center justify-center">
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8} viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            {mode === 'absolute_time' ? (
+              <path strokeLinecap="round" d="M12 7v5l3 2" />
+            ) : (
+              <path strokeLinecap="round" d="M12 8v4M9 3h6" />
+            )}
+          </svg>
         </span>
         <div className="min-w-0">
           <h2 className="text-ink flex flex-wrap items-center gap-2 text-lg font-bold">

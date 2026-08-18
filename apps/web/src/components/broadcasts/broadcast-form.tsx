@@ -77,7 +77,7 @@ function BubblePreview({ bubble }: { bubble: BroadcastBubble }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
-  if (bubble.type === 'sticker') return <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-amber-100 text-4xl">😊</div>
+  if (bubble.type === 'sticker') return <div className="bg-warning-bg text-warning flex h-24 w-24 items-center justify-center rounded-2xl text-xs font-medium">スタンプ</div>
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-2xl object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-2xl bg-slate-200 text-sm text-slate-500">写真</div>
   if (bubble.type === 'flex') return <div className="w-[82%] rounded-2xl bg-white p-4 shadow-sm"><p className="text-xs font-bold text-purple-700">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-slate-500">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-2xl bg-slate-900 text-white"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>

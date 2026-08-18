@@ -330,7 +330,7 @@ export default function MileagePage() {
                   return (
                     <tr key={member.identityKey} className="hover:bg-gray-50/70">
                       <td className="px-4 py-4 text-center text-sm font-bold text-gray-500">
-                        {rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : rank}
+                        {rank}
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
@@ -364,16 +364,17 @@ export default function MileagePage() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                          <span>💬 {formatNumber(member.messageCount)}</span>
-                          <span>🔗 {formatNumber(member.linkClickCount)}</span>
-                          <span>📝 {formatNumber(member.formCount)}</span>
-                          <span>📅 {formatNumber(member.bookingCount)}</span>
-                          <span>🎬 {formatNumber(member.webinarCount)}</span>
-                          <span>📸 {formatNumber(member.instagramCount)}</span>
-                          <span>🌱 継続{formatNumber(member.followingDays)}日</span>
-                          {member.unfollowCount > 0 && <span>↩ 再フォロー{formatNumber(member.unfollowCount)}回</span>}
+                          {/* 絵文字だと何の数か読み取れない。言葉で書く。 */}
+                          <span>メッセージ {formatNumber(member.messageCount)}</span>
+                          <span>リンク {formatNumber(member.linkClickCount)}</span>
+                          <span>フォーム {formatNumber(member.formCount)}</span>
+                          <span>予約 {formatNumber(member.bookingCount)}</span>
+                          <span>ウェビナー {formatNumber(member.webinarCount)}</span>
+                          <span>Instagram {formatNumber(member.instagramCount)}</span>
+                          <span>継続 {formatNumber(member.followingDays)}日</span>
+                          {member.unfollowCount > 0 && <span>再フォロー {formatNumber(member.unfollowCount)}回</span>}
                           {member.qualityReferralCount > 0 && (
-                            <span>🤝 良質紹介{formatNumber(member.qualityReferralCount)}人・{formatNumber(member.referralMiles)}mile</span>
+                            <span>良質紹介 {formatNumber(member.qualityReferralCount)}人・{formatNumber(member.referralMiles)}mile</span>
                           )}
                         </div>
                       </td>

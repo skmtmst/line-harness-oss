@@ -197,7 +197,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
             </div>
           </div>
           <div className="max-h-[520px] divide-y divide-gray-100 overflow-y-auto lg:max-h-none lg:h-[calc(100%-116px)]">
-            {loading ? <div className="p-10 text-center text-sm text-gray-400">読み込み中...</div> : items.length === 0 ? <div className="p-10 text-center text-sm text-gray-400">対応待ちはありません 🎉</div> : items.map((item) => (
+            {loading ? <div className="p-10 text-center text-sm text-gray-400">読み込み中...</div> : items.length === 0 ? <div className="p-10 text-center text-sm text-gray-400">対応待ちはありません</div> : items.map((item) => (
               <button key={item.id} onClick={() => choose(item)} className={`w-full p-4 text-left transition-colors hover:bg-gray-50 ${selected?.id === item.id ? 'bg-emerald-50 ring-1 ring-inset ring-emerald-200' : ''}`}>
                 <div className="flex items-start gap-3">
                   <ChannelAvatar item={item} />
@@ -222,7 +222,12 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
         <main className="flex min-h-[560px] flex-col bg-[#f4f6f5]">
           {!selected ? (
             <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-gray-400">
-              <div><div className="mb-3 text-4xl">💬</div>対応するお問い合わせを選択してください</div>
+              <div>
+                <svg className="text-ink-faint mx-auto mb-3 h-10 w-10" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h8M8 14h5M21 12a8 8 0 0 1-11.4 7.2L3 21l1.8-6.1A8 8 0 1 1 21 12Z" />
+                </svg>
+                対応するお問い合わせを選択してください
+              </div>
             </div>
           ) : selected.channel === 'line' ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
