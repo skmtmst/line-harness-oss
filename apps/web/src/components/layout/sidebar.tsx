@@ -377,10 +377,8 @@ export default function Sidebar() {
 
   const sidebarContent = (
     <>
-      {/*
-        上に 64px あける。ドロワーでは閉じるボタンの、アイコンレールでは
-        ハンバーガーの居場所になる。xl 以上（フル幅）では要らない。
-      */}
+      {/* 上に 64px あける。ドロワーの閉じるボタンの居場所。
+          常時出す幅（xl 以上）にはそのボタンが無いので要らない。 */}
       <div className="h-16 xl:hidden" aria-hidden="true" />
 
       {/* アカウント切替 */}
@@ -391,7 +389,7 @@ export default function Sidebar() {
         {orderedSections.map((section, si) => (
           <div key={si}>
             {section.label && (
-              <div className="pt-5 pb-2 px-3 hidden xl:block">
+              <div className="pt-5 pb-2 px-3">
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{section.label}</p>
               </div>
             )}
@@ -417,16 +415,11 @@ export default function Sidebar() {
                   style={active ? { backgroundColor: isDanger ? '#EF4444' : 'var(--color-accent)' } : {}}
                 >
                   <NavIcon d={item.icon} />
-                  <span className="flex-1 hidden xl:inline">{item.label}</span>
+                  <span className="flex-1">{item.label}</span>
                   {badgeCount(item) > 0 && (
                     <>
-                      {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
                       <span
-                        aria-hidden="true"
-                        className="xl:hidden absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-amber-500"
-                      />
-                      <span
-                        className={`hidden xl:inline rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
                           active ? 'bg-white text-amber-700' : 'bg-amber-500 text-white'
                         }`}
                       >
@@ -494,7 +487,7 @@ export default function Sidebar() {
   return (
     <>
       {/* モバイル: ハンバーガーヘッダー */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <div className="xl:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
@@ -543,26 +536,15 @@ export default function Sidebar() {
         {sidebarContent}
       </aside>
 
-      {/* デスクトップ: 常時表示 */}
       {/*
-        仕様 §6-5: タブレット幅（768〜1279px）は 64px のアイコンレール。
-        別のマークアップを用意すると中身が二重になり、片方だけ直す事故が起きる。
-        同じ木のまま幅と文字の出し分けだけを変える。
+        常時出すのは 1280px 以上だけ。
+
+        以前は 768〜1279px を 64px のアイコンレールにしていた。ここでは
+        項目名もセクション見出しも消えるので、絵だけを見て探すことになる。
+        しかも当時のドロワーは項目名を隠す指定のままで、開いても読めなかった。
+        その幅は上のハンバーガーから開く形にそろえる。
       */}
-      <aside className="hidden md:flex w-16 xl:w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0 transition-[width] duration-200">
-        {/*
-          レール幅のときだけ出るハンバーガー。押すと上のドロワーが開いて
-          項目名が読める。sidebarContent の先頭に空けた 64px に重ねている。
-        */}
-        <button
-          onClick={() => setIsOpen(true)}
-          aria-label="メニューを開く"
-          className="hidden md:flex xl:hidden absolute top-0 left-0 h-16 w-16 items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+      <aside className="hidden xl:flex w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0">
         {sidebarContent}
       </aside>
     </>
