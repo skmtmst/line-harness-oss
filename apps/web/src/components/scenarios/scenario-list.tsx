@@ -73,19 +73,29 @@ export default function ScenarioList({
           <thead>
             <tr className="bg-canvas-sunken border-hairline border-b">
               <th className="w-10 px-2 py-3" aria-label="並び替え" />
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+              {/*
+                名前の桁だけ「余ったぶんを全部取る」形にする。
+                `w-full max-w-0` は表の桁でよく使う組み合わせで、
+                他の桁が中身ぶんの幅を取ったあと、残りをここが受け取る。
+                max-w-0 が無いと、中身の長さで桁が広がって表が横に伸びる。
+
+                以前は 22rem で固定していたが、それだと広い画面でも
+                説明が途中で切れ、狭い画面では他の桁が潰れて
+                「配信方 / 式」「読了 / 済」と縦になっていた。
+              */}
+              <th className="text-ink-faint w-full max-w-0 px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
                 シナリオ名
               </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
                 配信方式
               </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
                 購読中
               </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
                 読了済
               </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
                 通数
               </th>
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
@@ -114,8 +124,8 @@ export default function ScenarioList({
                   桁の幅に上限を付けて、はみ出すぶんは畳む。上限を付けずに
                   line-clamp だけ当てても、桁は中身に合わせて広がる。
                 */}
-                <td className="px-4 py-3">
-                  <div className="max-w-[22rem] min-w-0">
+                <td className="w-full max-w-0 px-4 py-3">
+                  <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <Link
                         href={`/scenarios/detail?id=${s.id}`}
@@ -142,18 +152,18 @@ export default function ScenarioList({
                     )}
                   </div>
                 </td>
-                <td className="text-ink-secondary px-4 py-3 text-sm">
+                <td className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
                   {deliveryModeLabels[s.deliveryMode ?? 'relative']}
                 </td>
-                <td className="text-ink px-4 py-3 text-sm tabular-nums">
+                <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
                   {(s.subscriberCount ?? 0).toLocaleString('ja-JP')}
                   <span className="text-ink-faint ml-0.5 text-xs">人</span>
                 </td>
-                <td className="text-ink px-4 py-3 text-sm tabular-nums">
+                <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
                   {(s.completedCount ?? 0).toLocaleString('ja-JP')}
                   <span className="text-ink-faint ml-0.5 text-xs">人</span>
                 </td>
-                <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
+                <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums whitespace-nowrap">
                   {s.stepCount ?? '—'}
                   {s.stepCount !== undefined && (
                     <span className="text-ink-faint ml-0.5 text-xs">通</span>
