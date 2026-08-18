@@ -51,7 +51,9 @@ const TAG = {
   id: 't-1',
   name: '腰痛',
   color: '#3B82F6',
-  group_id: 'g-1',
+  // group_idは旧互換列。APIはfoldersを正本とするfolder_idを返す。
+  group_id: null,
+  folder_id: 'g-1',
   mileage_reward: 0,
   referral_mileage_reward: 0,
   mileage_multiplier_bps: null,
@@ -116,7 +118,7 @@ describe('タグの所属', () => {
   });
 
   it('null を送ると未分類に戻る', async () => {
-    mocks.assignTagToGroup.mockResolvedValue({ ...TAG, group_id: null });
+    mocks.assignTagToGroup.mockResolvedValue({ ...TAG, folder_id: null });
     const res = await req('/api/tags/t-1/group', 'PATCH', { groupId: null });
     expect(mocks.assignTagToGroup).toHaveBeenCalledWith(env.DB, 't-1', null);
     const body = (await res.json()) as { data: { groupId: string | null } };
@@ -125,7 +127,7 @@ describe('タグの所属', () => {
 
   it('空文字も未分類として扱う', async () => {
     // 画面のプルダウンで「未分類」を選ぶと空文字が飛ぶ。null と同じ意味にする。
-    mocks.assignTagToGroup.mockResolvedValue({ ...TAG, group_id: null });
+    mocks.assignTagToGroup.mockResolvedValue({ ...TAG, folder_id: null });
     await req('/api/tags/t-1/group', 'PATCH', { groupId: '' });
     expect(mocks.assignTagToGroup).toHaveBeenCalledWith(env.DB, 't-1', null);
   });
@@ -150,7 +152,7 @@ describe('タグの所属', () => {
   });
 
   it('分類を指定せずに作ると未分類になる', async () => {
-    mocks.createTag.mockResolvedValue({ ...TAG, group_id: null });
+    mocks.createTag.mockResolvedValue({ ...TAG, folder_id: null });
     await req('/api/tags', 'POST', { name: '腰痛' });
     expect(mocks.createTag).toHaveBeenCalledWith(
       env.DB,
@@ -163,5 +165,12 @@ describe('タグの所属', () => {
     const res = await req('/api/tags', 'GET');
     const body = (await res.json()) as { data: Array<{ groupId: string | null }> };
     expect(body.data[0].groupId).toBe('g-1');
+  });
+
+  it('旧group_idに値が残っていてもfolder_idを正として返す', async () => {
+    mocks.getTags.mockResolvedValue([{ ...TAG, group_id: 'legacy-group', folder_id: 'folder-group' }]);
+    const res = await req('/api/tags', 'GET');
+    const body = (await res.json()) as { data: Array<{ groupId: string | null }> };
+    expect(body.data[0].groupId).toBe('folder-group');
   });
 });

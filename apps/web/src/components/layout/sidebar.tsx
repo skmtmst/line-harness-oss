@@ -1,11 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import type { AccountWithStats } from '@/contexts/account-context'
-import { countryFlag } from '@/lib/country-flag'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
@@ -126,116 +124,6 @@ const menuSections: MenuSection[] = [
     ],
   },
 ]
-
-function AccountAvatar({ account, size = 32 }: { account: AccountWithStats; size?: number }) {
-  const displayName = account.displayName || account.name
-  if (account.pictureUrl) {
-    return (
-      <img
-        src={account.pictureUrl}
-        alt={displayName}
-        className="rounded-full object-cover shrink-0"
-        style={{ width: size, height: size }}
-      />
-    )
-  }
-  return (
-    <div
-      className="rounded-full flex items-center justify-center text-white font-bold shrink-0"
-      style={{ width: size, height: size, backgroundColor: 'var(--color-accent)', fontSize: size * 0.4 }}
-    >
-      {displayName.charAt(0)}
-    </div>
-  )
-}
-
-function AccountSwitcher() {
-  const { accounts, selectedAccount, setSelectedAccountId, loading } = useAccount()
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  if (loading || accounts.length === 0) return null
-
-  const displayName = selectedAccount?.displayName || selectedAccount?.name || ''
-
-  return (
-    <div ref={ref} className="px-3 py-3 border-b border-gray-200">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-      >
-        {selectedAccount && <AccountAvatar account={selectedAccount} size={28} />}
-        <div className="flex-1 text-left min-w-0">
-          <p className="text-sm font-medium text-gray-900 truncate">
-            <span className="flex items-center gap-1.5">
-              {countryFlag(selectedAccount?.country) && (
-                <span className="text-base leading-none">{countryFlag(selectedAccount?.country)}</span>
-              )}
-              <span>{displayName}</span>
-            </span>
-          </p>
-        </div>
-        <svg
-          className={`w-4 h-4 text-gray-400 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {open && (
-        <div className="mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-          {accounts.map((account) => {
-            const isSelected = account.id === selectedAccount?.id
-            const name = account.displayName || account.name
-            return (
-              <button
-                key={account.id}
-                onClick={() => {
-                  setSelectedAccountId(account.id)
-                  setOpen(false)
-                }}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
-                  isSelected ? 'bg-green-50' : 'hover:bg-gray-50'
-                }`}
-              >
-                <AccountAvatar account={account} size={24} />
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${isSelected ? 'font-semibold text-green-700' : 'text-gray-700'}`}>
-                    <span className="flex items-center gap-1.5">
-                      {countryFlag(account.country) && (
-                        <span className="text-base leading-none">{countryFlag(account.country)}</span>
-                      )}
-                      <span>{name}</span>
-                    </span>
-                  </p>
-                  {account.basicId && (
-                    <p className="text-xs text-gray-400 truncate">{account.basicId}</p>
-                  )}
-                </div>
-                {isSelected && (
-                  <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function NavIcon({ d }: { d: string }) {
   return (
@@ -375,21 +263,41 @@ export default function Sidebar() {
     return pathname === path || pathname.startsWith(path + '/')
   }
 
-  const sidebarContent = (
+  const sidebarContent = (expanded: boolean) => (
     <>
-      {/* 上に 64px あける。ドロワーの閉じるボタンの居場所。
-          常時出す幅（xl 以上）にはそのボタンが無いので要らない。 */}
-      <div className="h-16 xl:hidden" aria-hidden="true" />
-
-      {/* アカウント切替 */}
-      <AccountSwitcher />
+      {expanded ? (
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-4 pr-16">
+          {brand.iconUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
+            <img src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-xl object-cover" />
+          ) : (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: 'var(--color-accent)' }}>然</div>
+          )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-gray-900">{brand.name ?? '然-NEN- LINE管理システム'}</p>
+            <p className="mt-0.5 text-[11px] font-medium text-gray-400">管理メニュー</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* PCの先頭はアカウント切替ではなく、用途が分かる固定見出しにする。 */}
+          <div className="hidden h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-5 xl:flex">
+            <svg className="h-5 w-5 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <p className="text-sm font-bold text-gray-900">管理メニュー</p>
+          </div>
+          {/* アイコンレールのハンバーガーと同じ 64px を空ける。 */}
+          <div className="h-16 xl:hidden" aria-hidden="true" />
+        </>
+      )}
 
       {/* ナビゲーション */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {orderedSections.map((section, si) => (
           <div key={si}>
             {section.label && (
-              <div className="pt-5 pb-2 px-3">
+              <div className={`px-3 pb-2 pt-5 ${expanded ? 'block' : 'hidden xl:block'}`}>
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{section.label}</p>
               </div>
             )}
@@ -405,7 +313,7 @@ export default function Sidebar() {
                   key={item.href}
                   href={item.href}
                   title={item.label}
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors justify-center xl:justify-start ${
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${expanded ? 'justify-start' : 'justify-center xl:justify-start'} ${
                     active
                       ? 'text-white'
                       : isDanger
@@ -414,12 +322,17 @@ export default function Sidebar() {
                   }`}
                   style={active ? { backgroundColor: isDanger ? '#EF4444' : 'var(--color-accent)' } : {}}
                 >
-                  <NavIcon d={item.icon} />
-                  <span className="flex-1">{item.label}</span>
+                  <span className="shrink-0"><NavIcon d={item.icon} /></span>
+                  <span className={`min-w-0 flex-1 truncate ${expanded ? 'inline' : 'hidden xl:inline'}`}>{item.label}</span>
                   {badgeCount(item) > 0 && (
                     <>
+                      {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
                       <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                        aria-hidden="true"
+                        className={`${expanded ? 'hidden' : 'xl:hidden'} absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-amber-500`}
+                      />
+                      <span
+                        className={`${expanded ? 'inline-flex' : 'hidden xl:inline-flex'} rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
                           active ? 'bg-white text-amber-700' : 'bg-amber-500 text-white'
                         }`}
                       >
@@ -438,7 +351,7 @@ export default function Sidebar() {
       {/* フッター */}
       <div className="border-t border-gray-200">
         {staffName && (
-          <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
+          <div className={`px-3 py-2 text-xs text-gray-500 border-t border-gray-100 ${expanded ? 'block' : 'hidden xl:block'}`}>
             <div className="font-medium text-gray-700">{staffName}</div>
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
               staffRole === 'owner' ? 'bg-yellow-100 text-yellow-800' :
@@ -450,7 +363,7 @@ export default function Sidebar() {
             </span>
           </div>
         )}
-        <div className="px-6 py-4">
+        <div className={expanded ? 'px-6 py-4' : 'px-3 py-4 xl:px-6'}>
           <button
             onClick={async () => {
               try {
@@ -472,12 +385,12 @@ export default function Sidebar() {
               clearAdminSession()
               window.location.href = '/login'
             }}
-            className="flex items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors"
+            className={`flex w-full items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors ${expanded ? 'justify-start' : 'justify-center xl:justify-start'}`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
-            ログアウト
+            <span className={expanded ? 'inline' : 'hidden xl:inline'}>ログアウト</span>
           </button>
         </div>
       </div>
@@ -487,7 +400,7 @@ export default function Sidebar() {
   return (
     <>
       {/* モバイル: ハンバーガーヘッダー */}
-      <div className="xl:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
@@ -525,27 +438,41 @@ export default function Sidebar() {
         消えるので、初めて触る人には「メニューが無くなった」ように見える。
         レールは残したまま、その幅でもここを開けるようにした。
       */}
-      <aside className={`xl:hidden fixed top-0 left-0 z-50 w-72 bg-white flex flex-col h-screen transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="absolute top-4 right-4">
+      <aside
+        aria-label="管理メニュー"
+        className={`xl:hidden fixed top-0 left-0 z-50 flex h-dvh w-[min(88vw,20rem)] flex-col border-r border-gray-200 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="absolute right-3 top-2.5 z-10">
           <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100" aria-label="閉じる">
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
-        {sidebarContent}
+        {sidebarContent(true)}
       </aside>
 
+      {/* デスクトップ: 常時表示 */}
       {/*
-        常時出すのは 1280px 以上だけ。
-
-        以前は 768〜1279px を 64px のアイコンレールにしていた。ここでは
-        項目名もセクション見出しも消えるので、絵だけを見て探すことになる。
-        しかも当時のドロワーは項目名を隠す指定のままで、開いても読めなかった。
-        その幅は上のハンバーガーから開く形にそろえる。
+        仕様 §6-5: タブレット幅（768〜1279px）は 64px のアイコンレール。
+        別のマークアップを用意すると中身が二重になり、片方だけ直す事故が起きる。
+        同じ木のまま幅と文字の出し分けだけを変える。
       */}
-      <aside className="hidden xl:flex w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0">
-        {sidebarContent}
+      <aside className="hidden md:flex w-16 xl:w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0 transition-[width] duration-200">
+        {/*
+          レール幅のときだけ出るハンバーガー。押すと上のドロワーが開いて
+          項目名が読める。sidebarContent の先頭に空けた 64px に重ねている。
+        */}
+        <button
+          onClick={() => setIsOpen(true)}
+          aria-label="メニューを開く"
+          className="hidden md:flex xl:hidden absolute top-0 left-0 h-16 w-16 items-center justify-center text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        {sidebarContent(false)}
       </aside>
     </>
   )

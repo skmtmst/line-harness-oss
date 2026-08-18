@@ -25,7 +25,9 @@ function serializeTag(row: DbTag & { friend_count?: number }) {
     id: row.id,
     name: row.name,
     color: row.color,
-    groupId: row.group_id ?? null,
+    // 099以降はfoldersが正本。group_idは旧tag_groups時代の互換列で、
+    // 新しい分類操作では更新されないため参照しない。
+    groupId: row.folder_id ?? null,
     mileageReward: Number(row.mileage_reward ?? 0),
     referralMileageReward: Number(row.referral_mileage_reward ?? 0),
     mileageMultiplierBps: row.mileage_multiplier_bps == null
@@ -124,7 +126,7 @@ tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
 });
 
 // DELETE /api/tag-groups/:id
-// 属していたタグは消えず「未分類」に戻る（tags.group_id は ON DELETE SET NULL）。
+// 属していたタグは消えず「未分類」に戻る（tags.folder_id は ON DELETE SET NULL）。
 tags.delete('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     await deleteTagGroup(c.env.DB, c.req.param('id'));

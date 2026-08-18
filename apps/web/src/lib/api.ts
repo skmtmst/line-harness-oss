@@ -92,7 +92,7 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   messageBubbles?: BroadcastBubble[] | null;
 };
 
-export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
+export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
 export type BroadcastBubble = { id: string; type: BroadcastBubbleType; content: Record<string, unknown> };
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
@@ -1469,6 +1469,17 @@ export const api = {
   accountSettings: {
     getTestRecipients: (accountId: string) =>
       fetchApi<{ success: boolean; data: Array<{ id: string; displayName: string; pictureUrl: string | null }> }>(`/api/account-settings/test-recipients?accountId=${accountId}`),
+    getTestRecipientLoginUsers: (accountId: string) =>
+      fetchApi<{
+        success: boolean
+        data: Array<{
+          id: string
+          displayName: string
+          pictureUrl: string | null
+          staffName: string
+          sameAccount: boolean
+        }>
+      }>(`/api/account-settings/test-recipient-login-users?accountId=${accountId}`),
     updateTestRecipients: (accountId: string, friendIds: string[]) =>
       fetchApi<{ success: boolean }>('/api/account-settings/test-recipients', {
         method: 'PUT',

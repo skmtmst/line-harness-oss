@@ -9,8 +9,6 @@ import Header from '@/components/layout/header'
 import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
-import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
-import type { BroadcastAssetKind } from '@/lib/api'
 import CcPromptButton from '@/components/cc-prompt-button'
 
 const ccPrompts = [
@@ -74,13 +72,13 @@ function BroadcastList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
   // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
   // 一覧が増えると、配信名を覚えていても探すのに時間がかかる。
   const [titleQuery, setTitleQuery] = useState('')
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
-  const [activeSection, setActiveSection] = useState<'list' | BroadcastAssetKind>('list')
 
   const loadInsight = async (id: string) => {
     try {
@@ -166,7 +164,7 @@ function BroadcastList() {
       <Header
         title="一斉配信"
         description="条件を指定した友だちにメッセージをまとめて送ります。予約配信と開封の計測ができます。"
-        action={activeSection === 'list' ? (
+        action={(
           <div className="flex flex-wrap items-center gap-2">
             {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
             <button
@@ -187,30 +185,30 @@ function BroadcastList() {
             >
               フォルダを追加
             </button>
-            <a
-              href="/templates"
+            <button
+              type="button"
+              onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
               className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
               テンプレートから配信
-            </a>
+            </button>
             <button
-              onClick={() => setShowCreate(true)}
+              onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
               className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
             >
               + 新規配信
             </button>
           </div>
-        ) : undefined}
+        )}
       />
       </div>
 
       <div data-design="KPIs">
-      {activeSection === 'list' && <BroadcastKpis />}
+      <BroadcastKpis />
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-      {activeSection === 'list' && (
         <>
           {/*
             フォルダ（設計 `Body` の左）。099 で folders 表は入っているが、
@@ -263,20 +261,6 @@ function BroadcastList() {
             </button>
           </div>
         </>
-      )}
-
-
-      <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2" aria-label="一斉配信メニュー">
-        {([
-          ['list', '配信一覧'],
-          ['rich_message', 'リッチメッセージ'],
-          ['card_message', 'カードタイプ'],
-          ['coupon', 'クーポン'],
-          ['research', 'リサーチ'],
-        ] as const).map(([id, label]) => <button key={id} onClick={() => { setActiveSection(id); setShowCreate(false) }} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${activeSection === id ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}
-      </nav>
-
-      {activeSection !== 'list' ? <BroadcastAssetManager kind={activeSection} /> : <>
 
       {/* Error */}
       {error && (
@@ -291,6 +275,7 @@ function BroadcastList() {
           tags={tags}
           onSuccess={() => { setShowCreate(false); load() }}
           onCancel={() => setShowCreate(false)}
+          openTemplatePickerInitially={openTemplatePicker}
         />
       )}
 
@@ -500,7 +485,6 @@ function BroadcastList() {
       )}
 
       <CcPromptButton prompts={ccPrompts} />
-      </>}
       </div>
     </div>
   )

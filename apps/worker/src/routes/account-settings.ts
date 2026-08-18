@@ -39,6 +39,48 @@ accountSettings.get('/api/account-settings/test-recipients', async (c) => {
   });
 });
 
+// GET /api/account-settings/test-recipient-login-users?accountId=xxx
+//
+// LINE連携済みのログインユーザーを、テスト送信先の候補として返す。
+// staff_membersはログイン権限、friendsは実際のLINE送信先なので、
+// line_user_idで両方が一致する有効な行だけを候補にする。
+accountSettings.get('/api/account-settings/test-recipient-login-users', async (c) => {
+  const accountId = c.req.query('accountId');
+  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+
+  const result = await c.env.DB.prepare(
+    `SELECT
+       f.id,
+       COALESCE(NULLIF(f.display_name, ''), sm.name) AS display_name,
+       f.picture_url,
+       sm.name AS staff_name,
+       CASE WHEN f.line_account_id = ? THEN 1 ELSE 0 END AS same_account
+     FROM staff_members sm
+     JOIN friends f ON f.line_user_id = sm.line_user_id
+     WHERE sm.is_active = 1
+       AND sm.line_user_id IS NOT NULL
+       AND f.is_following = 1
+     ORDER BY same_account DESC, sm.created_at ASC`
+  ).bind(accountId).all<{
+    id: string;
+    display_name: string | null;
+    picture_url: string | null;
+    staff_name: string;
+    same_account: number;
+  }>();
+
+  return c.json({
+    success: true,
+    data: result.results.map((row) => ({
+      id: row.id,
+      displayName: row.display_name || row.staff_name,
+      pictureUrl: row.picture_url,
+      staffName: row.staff_name,
+      sameAccount: row.same_account === 1,
+    })),
+  });
+});
+
 // PUT /api/account-settings/test-recipients
 accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'), async (c) => {
   const body = await c.req.json<{ accountId: string; friendIds: string[] }>();

@@ -167,11 +167,26 @@ export default function NenCampaignsPage() {
   useEffect(() => { void load() }, [load])
   useEffect(() => {
     if (!selectedAccountId) return
-    void api.friends.list({ accountId: selectedAccountId, limit: 100, includeTags: false }).then((res) => {
-      if (!res.success) return
-      const list = res.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
+    void Promise.allSettled([
+      api.friends.list({ accountId: selectedAccountId, limit: 100, includeTags: false }),
+      api.accountSettings.getTestRecipientLoginUsers(selectedAccountId),
+    ]).then(([friendResult, loginUserResult]) => {
+      if (friendResult.status !== 'fulfilled' || !friendResult.value.success) return
+      const friendResponse = friendResult.value
+      // 100件より古い友だちでも、LINE連携済みログインユーザーは先頭へ残す。
+      // NENテスト送信APIは同じLINEアカウントの友だちだけを受け付けるため、
+      // sameAccount=true の候補だけを混ぜる。
+      const loginUsers = loginUserResult.status === 'fulfilled' && loginUserResult.value.success
+        ? loginUserResult.value.data
+            .filter((candidate) => candidate.sameAccount)
+            .map((candidate) => ({ id: candidate.id, displayName: candidate.staffName }))
+        : []
+      const accountFriends = friendResponse.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
+      const list = [...new Map([...loginUsers, ...accountFriends].map((friend) => [friend.id, friend])).values()]
       setFriends(list)
-      setTestFriendId((current) => current || list[0]?.id || '')
+      setTestFriendId((current) =>
+        list.some((friend) => friend.id === current) ? current : list[0]?.id || '',
+      )
       setPetDraft((current) => ({ ...current, friendId: current.friendId || list[0]?.id || '' }))
     }).catch(() => undefined)
   }, [selectedAccountId])
