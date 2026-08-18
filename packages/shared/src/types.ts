@@ -920,6 +920,8 @@ export interface Template {
   category: string;
   messageType: string;
   messageContent: string;
+  /** 置き場。未分類は null。 */
+  folderId: string | null;
   createdAt: string;
   updatedAt: string;
 }

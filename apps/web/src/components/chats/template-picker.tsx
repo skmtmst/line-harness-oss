@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type { Template } from '@line-crm/shared'
+import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 
 /**
@@ -24,38 +24,64 @@ export default function TemplatePicker({
   onPick: (content: string) => void
 }) {
   const [templates, setTemplates] = useState<Template[]>([])
+  const [folders, setFolders] = useState<Folder[]>([])
   const [search, setSearch] = useState('')
-  const [category, setCategory] = useState('')
+  const [folderId, setFolderId] = useState('')
   const [selectedId, setSelectedId] = useState('')
 
   useEffect(() => {
     if (!open) return
     let cancelled = false
     void api.templates.list().then((res) => {
-      if (!cancelled && res.success) {
-        setTemplates((res.data as unknown as Template[]).filter((t) => t.messageType === 'text'))
-      }
+      if (!cancelled && res.success) setTemplates(res.data as unknown as Template[])
+    })
+    // 置き場（099 で templates.folder_id が入っている）。
+    void api.folders.list('template').then((res) => {
+      if (!cancelled && res.success) setFolders(res.data)
     })
     return () => {
       cancelled = true
     }
   }, [open])
 
-  const categories = useMemo(
-    () => [...new Set(templates.map((t) => t.category).filter(Boolean))],
+  /**
+   * 種別のタブ。設計にある5つを出す。
+   *
+   * **選べるのは「メッセージ」だけ。** ここは入力欄に本文を入れる場所で、
+   * リッチメッセージやカードタイプの中身は JSON なので、入れると文字として
+   * そのまま送られる。クーポンとリサーチは、持つ場所そのものが無い。
+   */
+  const KINDS: Array<{ key: string; label: string; why?: string }> = [
+    { key: 'text', label: 'メッセージ' },
+    { key: 'image', label: 'リッチメッセージ', why: '中身がJSONなので、入力欄に入れると文字として送られます' },
+    { key: 'flex', label: 'カードタイプ', why: '同上。カードは入力欄からは送れません' },
+    { key: 'coupon', label: 'クーポン', why: 'クーポンを持つ場所がまだありません' },
+    { key: 'research', label: 'リサーチ', why: 'リサーチを持つ場所がまだありません' },
+  ]
+
+  /** 文字のテンプレートだけが対象。種別タブは「メッセージ」で固定。 */
+  const textTemplates = useMemo(
+    () => templates.filter((t) => t.messageType === 'text'),
     [templates],
   )
 
+  /** 置き場ごとの件数。0件でも出す（空だと分かるほうがよい）。 */
+  const folderCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const t of textTemplates) map.set(t.folderId ?? '', (map.get(t.folderId ?? '') ?? 0) + 1)
+    return map
+  }, [textTemplates])
+
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return templates.filter((t) => {
-      if (category && t.category !== category) return false
+    return textTemplates.filter((t) => {
+      if (folderId === '__none__' ? t.folderId !== null : folderId && t.folderId !== folderId) {
+        return false
+      }
       if (!q) return true
-      return (
-        t.name.toLowerCase().includes(q) || t.messageContent.toLowerCase().includes(q)
-      )
+      return t.name.toLowerCase().includes(q) || t.messageContent.toLowerCase().includes(q)
     })
-  }, [templates, search, category])
+  }, [textTemplates, search, folderId])
 
   if (!open) return null
 
@@ -70,7 +96,7 @@ export default function TemplatePicker({
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-card flex max-h-[85vh] w-full max-w-lg flex-col p-5"
+        className="bg-canvas rounded-card flex max-h-[85vh] w-full max-w-2xl flex-col p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-start justify-between gap-3">
@@ -98,29 +124,54 @@ export default function TemplatePicker({
           className="border-hairline rounded-control mb-2 w-full border px-3 py-2 text-sm"
         />
 
-        {categories.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-1">
+        {/* 種別のタブ。選べるのは「メッセージ」だけ。理由は札に出す。 */}
+        <div className="border-hairline mb-3 flex flex-wrap gap-1 border-b">
+          {KINDS.map((k) => (
             <button
-              onClick={() => setCategory('')}
-              className={`rounded-pill px-3 py-1 text-xs font-medium ${
-                category === '' ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary'
+              key={k.key}
+              disabled={Boolean(k.why)}
+              title={k.why}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
+                k.why
+                  ? 'text-ink-faint border-transparent opacity-50'
+                  : 'border-accent text-accent'
               }`}
             >
-              すべて
+              {k.label}
             </button>
-            {categories.map((c) => (
-              <button
-                key={c}
-                onClick={() => setCategory(c)}
-                className={`rounded-pill px-3 py-1 text-xs font-medium ${
-                  category === c ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary'
-                }`}
-              >
-                {c}
-              </button>
-            ))}
+          ))}
+        </div>
+
+        {/* 置き場。テンプレートは folder_id を持っている（099）。 */}
+        <div className="border-hairline rounded-card mb-3 border p-3">
+          <div className="mb-2 flex items-baseline justify-between">
+            <span className="text-ink text-xs font-bold">フォルダ</span>
+            <span className="text-ink-faint text-xs">{textTemplates.length} 件</span>
           </div>
-        )}
+          <div className="flex flex-wrap gap-2">
+            <FolderChip
+              label="すべて"
+              count={textTemplates.length}
+              active={folderId === ''}
+              onClick={() => setFolderId('')}
+            />
+            {folders.map((f) => (
+              <FolderChip
+                key={f.id}
+                label={f.name}
+                count={folderCounts.get(f.id) ?? 0}
+                active={folderId === f.id}
+                onClick={() => setFolderId(f.id)}
+              />
+            ))}
+            <FolderChip
+              label="未分類"
+              count={folderCounts.get('') ?? 0}
+              active={folderId === '__none__'}
+              onClick={() => setFolderId('__none__')}
+            />
+          </div>
+        </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {shown.length === 0 ? (
@@ -172,5 +223,33 @@ export default function TemplatePicker({
         </div>
       </div>
     </div>
+  )
+}
+
+function FolderChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-control inline-flex items-center gap-2 border px-3 py-1.5 text-xs ${
+        active
+          ? 'border-accent bg-accent-soft text-accent font-bold'
+          : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+      }`}
+    >
+      <span>{label}</span>
+      <span className="tabular-nums opacity-70">{count}</span>
+    </button>
   )
 }
