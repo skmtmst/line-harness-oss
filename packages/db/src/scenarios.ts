@@ -639,3 +639,65 @@ export async function completeFriendScenario(
     .bind(now, id)
     .run();
 }
+
+/**
+ * 前回読んだところから、同じシナリオを再開する（設計 V2 4-6「開始位置」）。
+ *
+ * `enrollFriendInScenario` は必ず `current_step_order = -1` の新しい行を作るので、
+ * ブロックを解除した人にもう一度1通目から流れてしまう。ここは既にある行を
+ * 生かして、続きから配信する。
+ *
+ * 進める先が無い（最後まで読み終えている）ときは `null` を返す。呼ぶ側で
+ * 「送るものが無い」として扱う。既にある行が `active` のときも `null`
+ * （もう流れているので、触ると二重配信になる）。
+ */
+export async function resumeFriendScenario(
+  db: D1Database,
+  friendId: string,
+  scenarioId: string,
+): Promise<FriendScenario | null> {
+  const existing = await db
+    .prepare(
+      `SELECT * FROM friend_scenarios
+        WHERE friend_id = ? AND scenario_id = ?
+        ORDER BY started_at DESC
+        LIMIT 1`,
+    )
+    .bind(friendId, scenarioId)
+    .first<FriendScenario>();
+  if (!existing) return null;
+  if (existing.status === 'active' || existing.status === 'delivering') return null;
+
+  const scenarioRow = await db
+    .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
+    .bind(scenarioId)
+    .first<{ delivery_mode: DeliveryMode }>();
+  if (!scenarioRow) return null;
+
+  const steps = await getScenarioSteps(db, scenarioId);
+  const nextStep = steps.find(s => s.step_order > existing.current_step_order);
+  if (!nextStep) return null;
+
+  const nowDate = new Date(Date.now() + 9 * 60 * 60_000);
+  const nextDeliveryDate = computeNextDeliveryAt(
+    { delivery_mode: scenarioRow.delivery_mode },
+    nextStep,
+    { enrolledAt: nowDate, previousDeliveredAt: nowDate, now: nowDate },
+  );
+  const nextDeliveryAt = nextDeliveryDate.toISOString().slice(0, -1) + '+09:00';
+  const now = jstNow();
+
+  await db
+    .prepare(
+      `UPDATE friend_scenarios
+          SET status = 'active', next_delivery_at = ?, updated_at = ?
+        WHERE id = ?`,
+    )
+    .bind(nextDeliveryAt, now, existing.id)
+    .run();
+
+  return (await db
+    .prepare(`SELECT * FROM friend_scenarios WHERE id = ?`)
+    .bind(existing.id)
+    .first<FriendScenario>())!;
+}

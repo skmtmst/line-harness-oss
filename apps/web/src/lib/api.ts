@@ -1,6 +1,7 @@
 import { adminSessionHeaders } from './admin-session'
 import type {
   Friend,
+  FriendAddRouting,
   Tag,
   TagGroup,
   FriendField,
@@ -2016,6 +2017,40 @@ export const api = {
       const suffix = params?.limit === undefined ? '' : `?limit=${params.limit}`
       return fetchApi<ApiResponse<EcShipmentList>>(`/api/ec-commerce/shipments${suffix}`)
     },
+  },
+  /**
+   * 友だち追加時の配信の振り分け（設計 V2 4-6）。
+   *
+   * `configured: false` は「まだ決めていない」。このときは従来どおり
+   * 有効な friend_add シナリオが全部流れている。
+   */
+  friendAddRouting: {
+    get: (accountId: string) =>
+      fetchApi<ApiResponse<{
+        configured: boolean
+        routing: FriendAddRouting
+        scenarios: { id: string; name: string }[]
+        tags: { id: string; name: string }[]
+      }>>(`/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`),
+    save: (accountId: string, routing: FriendAddRouting) =>
+      fetchApi<ApiResponse<{ routing: FriendAddRouting }>>(
+        `/api/friend-add-routing?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'PUT', body: JSON.stringify({ routing }) },
+      ),
+    /** テスト実行。登録も配信もしない。振り分け先だけを返す。 */
+    test: (accountId: string, friendId: string) =>
+      fetchApi<ApiResponse<{
+        configured: boolean
+        kind: 'first_time' | 'returning'
+        scenarioId: string | null
+        suppressed: boolean
+        displayName: string | null
+        unfollowCount: number
+        firstFollowedAt: string | null
+      }>>(`/api/friend-add-routing/test?account_id=${encodeURIComponent(accountId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ friendId }),
+      }),
   },
   nenCampaigns: {
     overview: () => fetchApi<ApiResponse<{

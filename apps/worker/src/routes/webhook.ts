@@ -15,6 +15,7 @@ import {
   getMessageTemplateById,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
+import { applyFriendAddRouting } from '../services/friend-add-routing.js';
 import { fireEvent } from '../services/event-bus.js';
 import { matchAndReply } from '../services/auto-reply.js';
 import { buildMessage } from '../services/step-delivery.js';
@@ -254,9 +255,54 @@ async function handleEvent(
     const runAccountScenarios =
       !referralRoute || referralRoute.run_account_friend_add_scenarios !== 0;
 
+    // 友だち追加時の配信の振り分け（設計 V2 4-6）。
+    //
+    // 設定が保存されているアカウントは、相手が「はじめて」か「以前からの友だち・
+    // ブロックを解除した人」かを見て、流すシナリオを1本に絞る。
+    //
+    // **保存されていないアカウントは routed:false が返る。** そのときは下の
+    // いままでどおりの経路（有効な friend_add シナリオを全部流す）に落ちる。
+    // ここを既定で絞ると、設定していないアカウントで配信が止まる。
+    const routing = runAccountScenarios
+      ? await applyFriendAddRouting(db, lineAccountId, friend, {
+          defaultAccessToken: lineAccessToken,
+          workerUrl,
+        })
+      : null;
+
+    if (routing?.routed) {
+      for (const { scenarioId, enrollment, resumed } of routing.enrollments) {
+        try {
+          // 「前回読んだところから」で再開したぶんは、ここで1通目を出さない。
+          // 出すと続きではなく最初の1通がもう一度届く。次の通は
+          // next_delivery_at を見て cron が出す。
+          if (resumed) continue;
+          if (routing.timing !== 'immediate') continue;
+          const sent = await pushImmediateFirstStep(
+            db,
+            friend.id,
+            scenarioId,
+            { defaultAccessToken: lineAccessToken, workerUrl },
+            {
+              enrollment,
+              reply: { client: lineClient, replyToken: event.replyToken },
+              skipCooldown: true,
+            },
+          );
+          if (sent) console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1 to ${userId}`);
+        } catch (err) {
+          console.error('Failed immediate delivery for routed scenario', scenarioId, err);
+        }
+      }
+      if (routing.suppressed) {
+        console.log(`[friend-add-routing] suppressed for ${userId} (kind=${routing.kind})`);
+      }
+    }
+
     // friend_add シナリオに登録（このアカウントのシナリオのみ）
     // Skip entirely when a referral link explicitly overrides (run_account_friend_add_scenarios=0).
-    const scenarios = runAccountScenarios ? await getScenarios(db) : [];
+    // 振り分け設定があるアカウントはここを通らない（上で1本に絞ってある）。
+    const scenarios = runAccountScenarios && !routing?.routed ? await getScenarios(db) : [];
     for (const scenario of scenarios) {
       // Only trigger scenarios belonging to this account (or unassigned for backward compat)
       const scenarioAccountMatch = !scenario.line_account_id || !lineAccountId || scenario.line_account_id === lineAccountId;
