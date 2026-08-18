@@ -27,7 +27,7 @@ interface MenuItem {
   /** 24x24 の path。lucide 相当の形を手で写している。 */
   icon: string
   /** 出す数の種類（仕様 §5）。無ければバッジを出さない。 */
-  badge?: 'unanswered' | 'photos' | 'unmatched'
+  badge?: 'unanswered' | 'photos' | 'unmatched' | 'operations'
   /** 赤で出す項目。 */
   danger?: boolean
 }
@@ -120,7 +120,7 @@ const menuSections: MenuSection[] = [
       { href: '/accounts', label: 'アカウント', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' },
       { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
       { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' },
-      { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+      { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' },
     ],
   },
 ]
@@ -152,6 +152,7 @@ export default function Sidebar() {
   // 即時再取得する (ポーリング待ちだと操作してもバッジが減らないと感じるため)。
   const [unansweredCount, setUnansweredCount] = useState<number>(0)
   const [pendingPhotoCount, setPendingPhotoCount] = useState<number>(0)
+  const [operationIssueCount, setOperationIssueCount] = useState<number>(0)
   // 仕様 §5 の「EC連携＝未突合の会員数」は、それを返すAPIがまだ無い。
   // overview が持つのは failed / skipped で、意味が違う。取り違えて
   // 別の数を出すより、出さないほうがよい。API ができたらここを繋ぐ。
@@ -200,9 +201,10 @@ export default function Sidebar() {
       const mySeq = ++seq
       try {
         const { api } = await import('@/lib/api')
-        const [unanswered, nen] = await Promise.allSettled([
+        const [unanswered, nen, accounts] = await Promise.allSettled([
           api.inbox.unanswered.count(),
           api.nenMembers.overview(),
+          api.health.accounts(),
         ])
         if (cancelled || mySeq !== seq) return
         if (unanswered.status === 'fulfilled' && unanswered.value.success) {
@@ -211,6 +213,20 @@ export default function Sidebar() {
         // 写真審査は機能を切っている環境があるので、失敗しても他を巻き込まない。
         if (nen.status === 'fulfilled' && nen.value.success) {
           setPendingPhotoCount(nen.value.data.pendingPhotos)
+        }
+        if (accounts.status === 'fulfilled' && accounts.value.success) {
+          const health = await Promise.allSettled(
+            accounts.value.data.map((account) => api.health.getHealth(account.id)),
+          )
+          if (cancelled || mySeq !== seq) return
+          setOperationIssueCount(
+            health.filter(
+              (result) =>
+                result.status === 'fulfilled' &&
+                result.value.success &&
+                (result.value.data.riskLevel === 'danger' || result.value.data.riskLevel === 'warning'),
+            ).length,
+          )
         }
       } catch {
         // サイレント失敗
@@ -244,6 +260,7 @@ export default function Sidebar() {
     if (item.badge === 'unanswered') return unansweredCount
     if (item.badge === 'photos') return pendingPhotoCount
     if (item.badge === 'unmatched') return unmatchedCount
+    if (item.badge === 'operations') return operationIssueCount
     return 0
   }
 
