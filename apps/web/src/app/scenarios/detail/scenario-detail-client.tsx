@@ -917,48 +917,6 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         </div>
       )}
 
-      {/*
-        統計。設計は1行。カード4枚に散らすと、購読中と読了済と離脱地点を
-        見比べるのに目が横に大きく動く。並べて読むものなので1本にまとめる。
-      */}
-      {stats && stats.enrolledTotal > 0 && (
-        <div
-          data-design="KPIs"
-          className="bg-canvas rounded-card border-hairline mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
-        >
-          <div>
-            <p className="text-ink-faint text-xs">購読中</p>
-            <p className="text-ink text-xl font-bold tabular-nums">
-              {stats.activeNow.toLocaleString('ja-JP')}
-              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
-            </p>
-          </div>
-          <div className="border-hairline border-l pl-8">
-            <p className="text-ink-faint text-xs">読了済</p>
-            <p className="text-ink text-xl font-bold tabular-nums">
-              {stats.completed.toLocaleString('ja-JP')}
-              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
-            </p>
-          </div>
-          <div className="border-hairline border-l pl-8">
-            <p className="text-ink-faint text-xs">離脱が大きい地点</p>
-            {biggestDrop ? (
-              <p className="text-warning text-xl font-bold">
-                {biggestDrop.fromOrder}通目 <span className="mx-1">→</span> {biggestDrop.toOrder}通目
-              </p>
-            ) : (
-              <p className="text-ink-faint text-xl font-bold">—</p>
-            )}
-          </div>
-          {biggestDrop && (
-            <p className="text-warning ml-auto text-xs">
-              ↘ {biggestDrop.fromOrder}通目で {biggestDrop.lost.toLocaleString('ja-JP')}人（
-              {Math.round(biggestDrop.rate * 100)}%）が離脱しています
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Scenario Info */}
       <div className="bg-canvas rounded-card border border-hairline p-6 mb-6">
         {editing ? (
@@ -1091,12 +1049,57 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               </SettingCard>
             </div>
 
-            {scenario.description && (
-              <p className="text-ink-faint mt-3 text-sm">{scenario.description}</p>
-            )}
+            {/*
+              シナリオの説明はここに出さない。絵にこの段落が無い。
+              中身は「シナリオ名」の札の「編集」を開けば読める。
+            */}
           </div>
         )}
       </div>
+
+      {/*
+        統計。設計は1行。カード4枚に散らすと、購読中と読了済と離脱地点を
+        見比べるのに目が横に大きく動く。並べて読むものなので1本にまとめる。
+
+        位置は5枚の札の下。絵がその並びで、以前は逆に出していた。
+      */}
+      {stats && stats.enrolledTotal > 0 && (
+        <div
+          data-design="KPIs"
+          className="bg-canvas rounded-card border-hairline mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
+        >
+          <div>
+            <p className="text-ink-faint text-xs">購読中</p>
+            <p className="text-ink text-xl font-bold tabular-nums">
+              {stats.activeNow.toLocaleString('ja-JP')}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+          </div>
+          <div className="border-hairline border-l pl-8">
+            <p className="text-ink-faint text-xs">読了済</p>
+            <p className="text-ink text-xl font-bold tabular-nums">
+              {stats.completed.toLocaleString('ja-JP')}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+          </div>
+          <div className="border-hairline border-l pl-8">
+            <p className="text-ink-faint text-xs">離脱が大きい地点</p>
+            {biggestDrop ? (
+              <p className="text-warning text-xl font-bold">
+                {biggestDrop.fromOrder}通目 <span className="mx-1">→</span> {biggestDrop.toOrder}通目
+              </p>
+            ) : (
+              <p className="text-ink-faint text-xl font-bold">—</p>
+            )}
+          </div>
+          {biggestDrop && (
+            <p className="text-warning ml-auto text-xs">
+              ↘ {biggestDrop.fromOrder}通目で {biggestDrop.lost.toLocaleString('ja-JP')}人（
+              {Math.round(biggestDrop.rate * 100)}%）が離脱しています
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Steps */}
       <div className="bg-canvas rounded-card border border-hairline p-6">
@@ -1136,7 +1139,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         {/* Steps list */}
         {sortedSteps.length === 0 ? (
           <div className="text-center py-8 text-ink-faint text-sm">
-            ステップがありません。「+ ステップ追加」から追加してください。
+            まだ1通もありません。上の「＋ メッセージを追加」から足してください。
           </div>
         ) : (
           /*

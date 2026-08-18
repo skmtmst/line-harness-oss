@@ -10,28 +10,6 @@ import ListKpis from '@/components/shared/list-kpis'
 import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
 import ScenarioList from '@/components/scenarios/scenario-list'
-import ScenarioModePicker from '@/components/scenarios/scenario-mode-picker'
-import CcPromptButton from '@/components/cc-prompt-button'
-
-const ccPrompts = [
-  {
-    title: '新しいシナリオを作成',
-    prompt: `新しいシナリオ配信を作成してください。
-1. ターゲット: [対象を指定]
-2. トリガー: 友だち追加 / タグ変更 / 手動
-3. ステップ数: [希望数]
-4. メッセージ内容の提案もお願いします
-各ステップの配信間隔も含めて構成してください。`,
-  },
-  {
-    title: 'シナリオの効果分析',
-    prompt: `現在のシナリオ配信の効果を分析してください。
-1. 各シナリオの配信実績を確認
-2. ステップごとの離脱率を分析
-3. 改善が必要なシナリオを特定
-具体的な改善案を提示してください。`,
-  },
-]
 
 type ScenarioWithCount = Scenario & { stepCount?: number }
 
@@ -45,7 +23,7 @@ export default function ScenariosPage() {
   const [stoppedOnly, setStoppedOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
 
   const loadScenarios = useCallback(async () => {
     setLoading(true)
@@ -91,25 +69,37 @@ export default function ScenariosPage() {
     }
   }, [selectedAccountId, accountLoading])
 
-  const handleCreate = async (input: {
-    name: string
-    triggerType: ScenarioTriggerType
-    triggerTagId: string | null
-    deliveryMode: DeliveryMode
-  }) => {
+  /**
+   * シナリオを作って、配信方式の選択へ送る。
+   *
+   * **押した時点で作る。** 設計の次の画面に「◯◯を作成しました。続けて
+   * 配信方式を選んでください」と出ているので、そこへ着く前に行が要る。
+   * 名前を聞くモーダルは挟まない（設計にその画面が無い）。
+   *
+   * 名前と開始のきっかけは、この先の編集画面（設計③）で決める。
+   * 配信方式は暫定で「時刻で指定」にしておく。設計でおすすめになっている
+   * 方で、次の画面で選び直せる（通がまだ0なので変えられる）。
+   */
+  const handleCreate = async () => {
+    if (creating) return
+    setCreating(true)
+    setError('')
     const res = await api.scenarios.create({
-      name: input.name,
+      // 仮の名前。3段目で必ず聞くが、そこを飛ばした人のぶんが一覧で
+      // 区別できるように日付を足す。
+      name: `新しいシナリオ ${new Date().toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })}`,
       description: null,
-      triggerType: input.triggerType,
-      triggerTagId: input.triggerTagId,
+      triggerType: 'friend_add',
+      triggerTagId: null,
       lineAccountId: selectedAccountId,
       isActive: true,
-      deliveryMode: input.deliveryMode,
+      deliveryMode: 'absolute_time',
     })
     if (res.success) {
-      router.push(`/scenarios/detail?id=${res.data.id}`)
+      router.push(`/scenarios/mode?id=${res.data.id}`)
     } else {
-      throw new Error(res.error)
+      setError(res.error)
+      setCreating(false)
     }
   }
 
@@ -218,10 +208,11 @@ export default function ScenariosPage() {
           フォルダを追加
         </button>
         <button
-          onClick={() => setPickerOpen(true)}
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
+          onClick={() => void handleCreate()}
+          disabled={creating}
+          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
         >
-          ＋ シナリオを作成
+          {creating ? '作成中…' : '＋ シナリオを作成'}
         </button>
       </div>
       {/*
@@ -286,12 +277,6 @@ export default function ScenariosPage() {
         </div>
       )}
 
-      <ScenarioModePicker
-        open={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onCreate={handleCreate}
-      />
-
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
@@ -320,8 +305,6 @@ export default function ScenariosPage() {
           loading={loading}
         />
       )}
-
-      <CcPromptButton prompts={ccPrompts} />
         </div>
       </div>
       </div>

@@ -1,9 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { AccountHealthLog, LineAccount } from '@line-crm/shared'
-import Header from '@/components/layout/header'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { api, type DashboardOverview } from '@/lib/api'
 import {
@@ -12,7 +11,6 @@ import {
   formatOperationDate,
   HEALTH_CRITERIA,
   overallSeverity,
-  type OperationHealthRow,
   type OperationSeverity,
 } from '@/lib/operation-status'
 
@@ -62,7 +60,7 @@ interface UpdateHistoryRow {
 const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
   normal: { label: '正常', badge: 'bg-emerald-100 text-emerald-700', panel: 'border-emerald-200 bg-emerald-50' },
   warning: { label: '注意', badge: 'bg-amber-100 text-amber-800', panel: 'border-amber-200 bg-amber-50' },
-  danger: { label: '異常', badge: 'bg-red-100 text-red-700', panel: 'border-red-200 bg-red-50' },
+  danger: { label: 'エラー', badge: 'bg-red-100 text-red-700', panel: 'border-red-200 bg-red-50' },
   unknown: { label: '未確認', badge: 'bg-gray-100 text-gray-600', panel: 'border-gray-200 bg-gray-50' },
 }
 
@@ -101,25 +99,112 @@ function downloadText(filename: string, content: string): void {
 
 function StatusPill({ severity }: { severity: OperationSeverity }) {
   const style = severityStyle[severity]
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${style.badge}`}>{style.label}</span>
+  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${style.badge}`}>{style.label}</span>
 }
 
 function SummaryCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <div className="border-hairline rounded-card border bg-white p-4">
-      <p className="text-ink-faint text-xs font-semibold">{label}</p>
-      <p className="text-ink mt-1 text-xl font-bold">{value}</p>
-      <p className="text-ink-faint mt-1 text-xs">{note}</p>
+      <p className="text-ink-faint text-[11px] font-semibold">{label}</p>
+      <p className="text-ink mt-1 text-base font-bold">{value}</p>
+      <p className="text-ink-faint mt-1 text-[10px]">{note}</p>
     </div>
   )
 }
+
+/** PenのV3 10-4だけで使う文字階層。ほかの管理画面の共通Headerは変更しない。 */
+function OperationPageHeader({ description, action }: { description: string; action?: ReactNode }) {
+  return (
+    <div className="mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="text-ink text-xl leading-tight font-bold tracking-tight">運用状態</h1>
+          <p className="text-ink-secondary mt-1 text-xs">{description}</p>
+        </div>
+        {action && <div className="shrink-0">{action}</div>}
+      </div>
+    </div>
+  )
+}
+
+const UI_REVIEW_STATES: Array<{
+  label: string
+  note: string
+  className: string
+  dot: string
+}> = [
+  { label: '正常', note: 'そのまま運用できます', className: 'border-emerald-200 bg-emerald-50 text-emerald-800', dot: 'bg-emerald-500' },
+  { label: '注意', note: '内容を確認してください', className: 'border-amber-200 bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
+  { label: 'エラー', note: '停止を検討してください', className: 'border-red-200 bg-red-50 text-red-800', dot: 'bg-red-500' },
+  { label: '未確認', note: '確認結果を待っています', className: 'border-gray-200 bg-gray-50 text-gray-700', dot: 'bg-gray-400' },
+  { label: '緊急停止中', note: '配信を停止しています', className: 'border-red-200 bg-red-50 text-red-800', dot: 'bg-red-600' },
+  { label: '復旧待ち', note: '確認後に再開できます', className: 'border-blue-200 bg-blue-50 text-blue-800', dot: 'bg-blue-500' },
+]
+
+/** 設計確認中だけ全状態を同時に見せる。実データの判定表示とは分離する。 */
+function OperationUiReviewPanel() {
+  return (
+    <section className="border-hairline rounded-card border bg-white p-5" data-design="全UI確認（仮表示）">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-ink text-base font-bold">全UI確認（仮表示）</h2>
+          <p className="text-ink-faint mt-1 text-xs">状態ごとの色・文字・操作を確認するため、すべて同時に表示しています。</p>
+        </div>
+        <span className="rounded-pill bg-info-bg text-info px-2.5 py-1 text-[11px] font-bold">確認後に条件表示</span>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        {UI_REVIEW_STATES.map((state) => (
+          <div key={state.label} className={`rounded-control flex min-h-16 items-center gap-2 border px-3 py-2.5 ${state.className}`}>
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${state.dot}`} />
+            <span className="min-w-0">
+              <span className="block text-xs font-bold">{state.label}</span>
+              <span className="mt-0.5 block text-[10px] opacity-80">{state.note}</span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" disabled className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-700 disabled:opacity-100">調査レポートを出力</button>
+        <button type="button" disabled className="rounded-control min-h-9 bg-red-600 px-3 text-xs font-bold text-white disabled:opacity-100">緊急停止の確認</button>
+        <button type="button" disabled className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-700 disabled:opacity-100">復旧の確認</button>
+        <button type="button" disabled className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-700 disabled:opacity-100">更新履歴を見る</button>
+        <button type="button" disabled className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-500 opacity-40">再確認中…</button>
+      </div>
+    </section>
+  )
+}
+
+type ReviewCheckKey = 'line' | 'quota' | 'integration' | 'webhook' | 'delivery' | 'scheduler' | 'friends'
+
+interface ReviewCheckItem {
+  key: ReviewCheckKey
+  label: string
+  note: string
+  severity: OperationSeverity
+  title: string
+  summary: string
+  event: string
+  impact: string
+  next: string
+}
+
+/** Pen V3 10-4の確認用一覧。実データが0件でも画面検証できるよう、API結果とは分離して表示する。 */
+const UI_REVIEW_CHECKS: ReviewCheckItem[] = [
+  { key: 'line', label: 'LINE接続', note: 'LINEへ接続できません', severity: 'danger', title: 'LINEへ接続できません', summary: '発生日・対象アカウントを表示', event: 'LINEへの接続確認でエラーになりました。', impact: 'メッセージを送れない可能性があります。', next: '調査レポートを出力するか、配信を緊急停止します。' },
+  { key: 'quota', label: '月間配信残数', note: '残り15%です', severity: 'warning', title: '月間配信残数が少なくなっています', summary: '残数・上限・更新日を表示', event: '月間配信数が注意基準を下回りました。', impact: '上限に達するとメッセージを送れなくなります。', next: '残数と今後の配信予定を確認します。' },
+  { key: 'integration', label: '外部連携', note: 'まだ確認されていません', severity: 'unknown', title: '外部連携を確認できていません', summary: '連携先・最終確認日時を表示', event: '外部サービスの確認記録がありません。', impact: '連携を使う処理の状態を判断できません。', next: '連携設定を確認し、もう一度チェックします。' },
+  { key: 'webhook', label: 'Webhook', note: '正常に受信しています', severity: 'normal', title: 'Webhookは正常です', summary: '最終受信日時・応答状態を表示', event: 'Webhookを正常に受信しました。', impact: '受信処理への影響はありません。', next: 'そのまま運用できます。' },
+  { key: 'delivery', label: '配信処理', note: '遅れはありません', severity: 'normal', title: '配信処理は正常です', summary: '待機件数・遅延時間を表示', event: '配信処理は予定どおり動いています。', impact: '配信への影響はありません。', next: 'そのまま運用できます。' },
+  { key: 'scheduler', label: '定期処理', note: '予定どおり動いています', severity: 'normal', title: '定期処理は正常です', summary: '最終実行・次回予定を表示', event: '定期処理は予定どおり完了しました。', impact: '自動処理への影響はありません。', next: 'そのまま運用できます。' },
+  { key: 'friends', label: '友だちの変化', note: '急な増減はありません', severity: 'normal', title: '友だち数の変化は正常です', summary: '増減数・比較期間を表示', event: '友だち数に急な変化はありません。', impact: '運用への影響はありません。', next: 'そのまま運用できます。' },
+]
 
 function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity) => void }) {
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [logsByAccount, setLogsByAccount] = useState<Record<string, AccountHealthLog[]>>({})
   const [risksByAccount, setRisksByAccount] = useState<Record<string, string>>({})
   const [dashboard, setDashboard] = useState<DashboardOverview | null>(null)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedReviewKey, setSelectedReviewKey] = useState<ReviewCheckKey>('line')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
 
@@ -155,63 +240,71 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
   useEffect(() => { void load() }, [load])
   const rows = useMemo(() => buildHealthRows(accounts, logsByAccount, risksByAccount), [accounts, logsByAccount, risksByAccount])
   const severity = useMemo(() => overallSeverity(rows), [rows])
-  const abnormalRows = useMemo(() => rows.filter((row) => row.severity === 'danger' || row.severity === 'warning'), [rows])
-  const selected = rows.find((row) => row.accountId === selectedId) ?? abnormalRows[0] ?? rows[0] ?? null
+  const displayedSeverity: OperationSeverity = rows.length === 0 ? 'danger' : severity
+  const selectedReview = UI_REVIEW_CHECKS.find((item) => item.key === selectedReviewKey) ?? UI_REVIEW_CHECKS[0]
   const checkedDates = rows.map((row) => row.checkedAt).filter((value): value is string => Boolean(value)).sort((a, b) => Date.parse(b) - Date.parse(a))
   const quotaLimit = dashboard?.delivery.quotaLimit ?? null
   const quotaUsed = dashboard?.delivery.quotaUsed ?? null
   const quotaRemaining = quotaLimit == null || quotaUsed == null ? '取得できません' : Math.max(quotaLimit - quotaUsed, 0).toLocaleString('ja-JP')
 
-  useEffect(() => { onSeverity(severity) }, [onSeverity, severity])
+  useEffect(() => { onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
-  const exportReport = (row: OperationHealthRow) => {
-    const report = buildResearchReport({ generatedAt: new Date().toISOString(), overall: severity, rows: [row], quotaLimit, quotaUsed })
+  const exportReport = () => {
+    const actualReport = rows.length > 0
+      ? `\n\n${buildResearchReport({ generatedAt: new Date().toISOString(), overall: severity, rows, quotaLimit, quotaUsed })}`
+      : '\n\n## システム連携結果\n\n確認対象のアカウントを取得できませんでした。'
+    const report = `# 運用状態 調査レポート\n\n- 対象: ${selectedReview.label}\n- 状態: ${severityStyle[selectedReview.severity].label}\n- 概要: ${selectedReview.note}\n\n## 起きたこと\n\n${selectedReview.event}\n\n## 影響\n\n${selectedReview.impact}\n\n## 次にすること\n\n${selectedReview.next}${actualReport}`
     downloadText(`nen-operation-report-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`, report)
   }
-
-  if (loading) return <div className="border-hairline rounded-card border bg-white p-10 text-center text-sm text-gray-500">確認しています...</div>
 
   return (
     <div className="space-y-4" data-design="V3 Health">
       {loadError && <div className="rounded-card border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{loadError}</div>}
-      <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[severity].panel}`}>
-        <StatusPill severity={severity} />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-gray-900">{severity === 'normal' ? '現在、確認できる異常はありません' : severity === 'unknown' ? 'まだ確認できていない項目があります' : `${abnormalRows.length}件の確認が必要です`}</p>
-          <p className="mt-0.5 text-xs text-gray-600">異常を選ぶと、内容と次の行動を確認できます。</p>
-        </div>
-        <button onClick={() => void load()} className="rounded-control border-hairline min-h-10 border bg-white px-4 text-sm font-bold text-gray-700 hover:bg-gray-50">再読み込み</button>
+      <div className="bg-info-bg text-info rounded-card flex flex-wrap items-center gap-3 px-4 py-3">
+        <span className="rounded-pill bg-white px-2.5 py-1 text-xs font-bold">UI確認モード（仮表示）</span>
+        <p className="min-w-0 flex-1 text-xs">正常・注意・エラー・未確認・緊急停止・復旧のUIを、デザイン確認のため同時に表示しています。</p>
+        <span className="rounded-pill bg-white px-2.5 py-1 text-[10px] font-bold">設計確認用</span>
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <SummaryCard label="全体の状態" value={severityStyle[severity].label} note={`${rows.length}アカウントを確認`} />
-        <SummaryCard label="最後の確認" value={formatOperationDate(checkedDates[0] ?? null)} note="自動確認の最新記録" />
+      <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-red-600">!</span>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-bold text-red-700">{displayedSeverity === 'normal' ? '現在、確認できる異常はありません' : 'エラーがあります'}</p>
+          <p className="mt-0.5 text-xs text-gray-600">内容を確認してください。配信事故のおそれがある場合は緊急停止します。</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard label="全体の状態" value={severityStyle[displayedSeverity].label} note={loading ? '確認中' : '最新結果'} />
+        <SummaryCard label="最後の確認" value={formatOperationDate(checkedDates[0] ?? null)} note="5分ごとに自動確認" />
         <SummaryCard label="今月の配信残数" value={quotaRemaining} note={quotaLimit == null ? 'LINEから取得できたときだけ表示' : `上限 ${quotaLimit.toLocaleString('ja-JP')}通`} />
+        <SummaryCard label="緊急停止状態" value="通常運用" note="停止なし" />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
         <section className="border-hairline rounded-card overflow-hidden border bg-white">
-          <div className="border-hairline border-b px-4 py-3"><h2 className="text-sm font-bold text-gray-900">チェック結果</h2></div>
-          {rows.length === 0 ? <p className="p-6 text-center text-sm text-gray-500">確認対象のLINEアカウントがありません。</p> : (
-            <div className="divide-y divide-gray-100">{rows.map((row) => (
-              <button key={row.accountId} onClick={() => setSelectedId(row.accountId)} className={`flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 ${selected?.accountId === row.accountId ? 'bg-accent-soft' : ''}`}>
-                <StatusPill severity={row.severity} /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-gray-900">{row.accountName}</span><span className="block text-xs text-gray-500">{formatOperationDate(row.checkedAt)}</span></span>
+          <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-gray-900">チェック結果</h2><p className="mt-0.5 text-xs text-gray-500">問題がある項目を上に表示</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-[10px] font-bold">5分ごと</span></div>
+          <div className="divide-y divide-gray-100">{UI_REVIEW_CHECKS.map((item) => (
+              <button key={item.key} onClick={() => setSelectedReviewKey(item.key)} className={`flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 ${selectedReview.key === item.key ? 'bg-accent-soft' : ''}`}>
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${severityStyle[item.severity].badge}`}>{item.severity === 'normal' ? '✓' : item.severity === 'warning' ? '!' : item.severity === 'danger' ? '!' : '−'}</span>
+                <span className="min-w-0 flex-1"><span className={`block truncate text-sm font-bold ${selectedReview.key === item.key ? 'text-accent' : 'text-gray-900'}`}>{item.label}</span><span className="block text-xs text-gray-500">{item.note}</span></span>
+                <StatusPill severity={item.severity} />
+                <span className="text-xs text-gray-400">›</span>
               </button>
             ))}</div>
-          )}
+          <p className="px-4 py-3 text-xs text-gray-500">詳細な判定基準は必要なときだけ開けます。</p>
         </section>
-        <section className="border-hairline rounded-card border bg-white p-5">
-          <h2 className="text-sm font-bold text-gray-900">エラー内容</h2>
-          {!selected ? <p className="mt-5 text-sm text-gray-500">確認結果を選んでください。</p> : selected.severity === 'normal' ? <div className="mt-4 rounded-control bg-emerald-50 p-4 text-sm text-emerald-800">このアカウントに異常はありません。</div> : selected.severity === 'unknown' ? <div className="mt-4 rounded-control bg-gray-50 p-4 text-sm text-gray-700">確認記録がありません。次回の自動確認後に結果が表示されます。</div> : (
-            <div className="mt-4 space-y-4">
-              <div className="rounded-control border border-red-200 bg-red-50 p-4">
-                <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-red-800">{selected.accountName}</p><StatusPill severity={selected.severity} /></div>
-                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-gray-500">エラーコード</dt><dd className="mt-1 font-bold text-gray-900">{selected.errorCode ?? 'なし'}</dd></div><div><dt className="text-xs text-gray-500">発生回数</dt><dd className="mt-1 font-bold text-gray-900">{selected.errorCount}回</dd></div></dl>
-              </div>
-              <div className="flex flex-wrap gap-2"><button onClick={() => exportReport(selected)} className="rounded-control border-hairline min-h-11 border bg-white px-4 text-sm font-bold text-gray-700 hover:bg-gray-50">調査レポートを出力</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-11 items-center bg-red-600 px-4 text-sm font-bold text-white hover:bg-red-700">緊急停止する</Link></div>
-            </div>
-          )}
-          <details className="border-hairline mt-5 rounded-control border bg-gray-50"><summary className="cursor-pointer px-4 py-3 text-sm font-bold text-gray-800">異常とする基準</summary><div className="space-y-3 border-t border-gray-200 px-4 py-4">{HEALTH_CRITERIA.map((criterion) => <div key={criterion.severity} className="grid grid-cols-[auto_1fr] gap-3 text-xs"><StatusPill severity={criterion.severity} /><div><p className="font-bold text-gray-800">{criterion.condition}</p><p className="mt-1 text-gray-500">{criterion.action}</p></div></div>)}</div></details>
+        <section className="border-hairline rounded-card border bg-white p-4">
+          <div className="flex flex-wrap items-center gap-2"><StatusPill severity={selectedReview.severity} /><span className="text-xs text-gray-600">{selectedReview.label}</span></div>
+          <h2 className="mt-2 text-base font-bold text-gray-900">{selectedReview.title}</h2>
+          <p className="mt-1 text-xs text-gray-500">{selectedReview.summary}</p>
+          <div className="mt-4 space-y-3">
+            <div className="rounded-control bg-red-50 px-4 py-3"><p className="text-xs font-bold text-gray-900">起きたこと</p><p className="mt-1 text-xs text-gray-700">{selectedReview.event}</p></div>
+            <div className="rounded-control bg-amber-50 px-4 py-3"><p className="text-xs font-bold text-gray-900">影響</p><p className="mt-1 text-xs text-gray-700">{selectedReview.impact}</p></div>
+            <div className="rounded-control bg-blue-50 px-4 py-3"><p className="text-xs font-bold text-gray-900">次にすること</p><p className="mt-1 text-xs text-gray-700">{selectedReview.next}</p></div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2"><button onClick={exportReport} className="rounded-control min-h-9 bg-accent px-3 text-xs font-bold text-white hover:opacity-90">調査レポートを出力</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700">緊急停止する</Link></div>
+          <details className="border-hairline mt-4 rounded-control border bg-gray-50"><summary className="cursor-pointer px-4 py-3 text-xs font-bold text-gray-800">判定基準を見る</summary><div className="space-y-3 border-t border-gray-200 px-4 py-4">{HEALTH_CRITERIA.map((criterion) => <div key={criterion.severity} className="grid grid-cols-[auto_1fr] gap-3 text-xs"><StatusPill severity={criterion.severity} /><div><p className="font-bold text-gray-800">{criterion.condition}</p><p className="mt-1 text-gray-500">{criterion.action}</p></div></div>)}</div></details>
         </section>
       </div>
+      <OperationUiReviewPanel />
     </div>
   )
 }
@@ -287,16 +380,16 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
 
   return (
     <div className="space-y-4" data-design="V3 Emergency control">
-      <div className={`rounded-card border px-4 py-3 ${snapshot ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}><p className={`text-sm font-bold ${snapshot ? 'text-red-800' : 'text-emerald-800'}`}>{snapshot ? '緊急停止中です' : '配信は通常状態です'}</p><p className="mt-1 text-xs text-gray-600">{snapshot ? `${snapshot.accountName}・${formatOperationDate(snapshot.stoppedAt)}から停止中` : '対象と理由を選び、確認してから停止します。'}</p></div>
-      {message && <div className={`rounded-control px-4 py-3 text-sm font-bold ${message.tone === 'success' ? 'bg-emerald-50 text-emerald-800' : message.tone === 'warning' ? 'bg-amber-50 text-amber-800' : 'bg-red-50 text-red-800'}`}>{message.text}</div>}
-      <section className={`border-hairline rounded-card border bg-white p-5 ${snapshot ? 'pointer-events-none opacity-50' : ''}`}>
+      <div className={`rounded-card border px-4 py-3 ${snapshot ? 'border-red-200 bg-red-50' : 'border-emerald-200 bg-emerald-50'}`}><p className={`text-base font-bold ${snapshot ? 'text-red-800' : 'text-emerald-800'}`}>{snapshot ? '緊急停止中' : '通常運用中'}</p><p className="mt-1 text-xs text-gray-600">{snapshot ? `${snapshot.accountName}・${formatOperationDate(snapshot.stoppedAt)}から停止中` : '緊急停止は実行されていません。'}</p></div>
+      {message && <div className={`rounded-control px-4 py-3 text-xs font-bold ${message.tone === 'success' ? 'bg-emerald-50 text-emerald-800' : message.tone === 'warning' ? 'bg-amber-50 text-amber-800' : 'bg-red-50 text-red-800'}`}>{message.text}</div>}
+      <section className={`border-hairline rounded-card border bg-white p-4 ${snapshot ? 'pointer-events-none opacity-50' : ''}`}>
         <div><h2 className="text-base font-bold text-gray-900">緊急停止</h2><p className="mt-1 text-xs text-gray-500">停止対象を実行直前に取得します。</p></div>
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2"><div><label className="text-xs font-bold text-gray-700" htmlFor="emergency-account">対象アカウント</label><select id="emergency-account" value={targetAccountId} onChange={(event) => setTargetAccountId(event.target.value)} className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-white px-3 text-sm"><option value="all">すべてのアカウント</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select></div><div><label className="text-xs font-bold text-gray-700" htmlFor="emergency-reason">停止理由</label><select id="emergency-reason" value={reason} onChange={(event) => setReason(event.target.value)} className="border-hairline rounded-control mt-2 min-h-11 w-full border bg-white px-3 text-sm"><option>障害対応</option><option>誤配信の防止</option><option>アカウント異常</option><option>メンテナンス</option><option>その他</option></select></div></div>
         <div className="border-hairline mt-5 overflow-hidden rounded-control border">{(Object.keys(targetLabels) as StopTarget[]).map((key) => <label key={key} className="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-4 py-3 last:border-0 hover:bg-gray-50"><input type="checkbox" checked={targets[key]} onChange={(event) => setTargets((current) => ({ ...current, [key]: event.target.checked }))} className="h-4 w-4 accent-red-600" /><span className="min-w-0 flex-1"><span className="block text-sm font-bold text-gray-900">{targetLabels[key].label}</span><span className="block text-xs text-gray-500">{targetLabels[key].note}</span></span></label>)}</div>
         <div className="mt-5"><label className="text-xs font-bold text-gray-700" htmlFor="emergency-detail">補足（任意）</label><textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm" /></div>
-        <div className="mt-5 flex justify-end"><button onClick={openStopConfirm} disabled={running || Boolean(snapshot)} className="rounded-control min-h-11 bg-red-600 px-5 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-50">緊急停止する</button></div>
+        <div className="mt-5 flex justify-end"><button onClick={openStopConfirm} disabled={running || Boolean(snapshot)} className="rounded-control min-h-10 bg-red-600 px-4 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">緊急停止する</button></div>
       </section>
-      {snapshot && <section className="rounded-card border border-blue-200 bg-blue-50 p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-sm font-bold text-blue-900">停止前の状態へ戻す</h2><p className="mt-1 text-xs text-blue-800">期限を過ぎた予約配信は安全のため再開しません。</p></div><button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running} className="rounded-control border border-blue-300 bg-white px-4 py-2 text-sm font-bold text-blue-800 hover:bg-blue-100">復旧する</button></div></section>}
+      {snapshot && <section className="rounded-card border border-blue-200 bg-blue-50 p-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-base font-bold text-blue-900">復旧</h2><p className="mt-1 text-xs text-blue-800">期限を過ぎた予約配信は安全のため再開しません。</p></div><button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running} className="rounded-control border border-blue-300 bg-white px-4 py-2 text-xs font-bold text-blue-800 hover:bg-blue-100">復旧する</button></div></section>}
       {confirmMode && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-lg bg-white p-6 shadow-2xl"><h2 id="emergency-confirm-title" className="text-lg font-bold text-gray-900">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><div className={`mt-4 rounded-control p-4 text-sm ${confirmMode === 'stop' ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><p className="mt-1">{selectedTargets.map((key) => targetLabels[key].label).join('・')}</p><p className="mt-1">理由：{fullReason}</p></> : <><p className="font-bold">{snapshot?.accountName}</p><p className="mt-1">停止前に動いていた配信を再開します。</p></>}</div><label className="mt-4 block text-sm font-bold text-gray-800" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-sm" /><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control border-hairline min-h-11 border px-4 text-sm font-bold text-gray-700">キャンセル</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-white disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-red-600' : 'bg-blue-700'}`}>{running ? '実行中...' : '実行する'}</button></div></div></div>}
     </div>
   )
@@ -314,7 +407,7 @@ function HistoryPanel() {
     fetch(`${apiUrl}/admin/update/history`, { headers: { 'x-admin-api-key': adminKey } }).then(async (response) => { if (!response.ok) throw new Error(String(response.status)); return response.json() as Promise<{ history: UpdateHistoryRow[] }> }).then((body) => { setUpdates(body.history); setUpdateState('ready') }).catch(() => setUpdateState('error'))
   }, [])
   const entries = [...operations.map((item) => ({ id: `operation-${item.id}`, occurredAt: item.occurredAt, type: 'operation' as const, title: item.title, detail: item.detail, status: item.status })), ...updates.map((item) => ({ id: `update-${item.id}`, occurredAt: new Date(item.started_at).toISOString(), type: 'update' as const, title: `システム更新 ${item.from_version} → ${item.to_version}`, detail: item.error ? '更新に失敗しました' : 'システム更新の記録', status: item.status }))].filter((item) => filter === 'all' || item.type === filter).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
-  return <div className="space-y-4" data-design="V3 Update history"><div className="rounded-card border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-900">緊急操作とシステム更新は自動で記録されます。</div><div className="grid grid-cols-1 gap-3 md:grid-cols-3"><SummaryCard label="緊急操作" value={`${operations.length}件`} note="この端末に保存された履歴" /><SummaryCard label="システム更新" value={updateState === 'ready' ? `${updates.length}件` : '—'} note={updateState === 'unconfigured' ? '自動更新は未構成' : '取得できた更新履歴'} /><SummaryCard label="最後の緊急操作" value={formatOperationDate(operations[0]?.occurredAt ?? null)} note={operations[0]?.title ?? 'まだありません'} /></div><div className="border-hairline rounded-card overflow-hidden border bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3"><h2 className="text-sm font-bold text-gray-900">履歴</h2><select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} className="border-hairline rounded-control min-h-10 border bg-white px-3 text-sm"><option value="all">すべて</option><option value="operation">緊急操作</option><option value="update">システム更新</option></select></div>{updateState === 'error' && <p className="bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">システム更新の履歴を取得できませんでした。</p>}{entries.length === 0 ? <p className="p-8 text-center text-sm text-gray-500">履歴はまだありません。</p> : <div className="divide-y divide-gray-100">{entries.map((entry) => <div key={entry.id} className="grid gap-2 px-4 py-4 md:grid-cols-[150px_120px_1fr_auto] md:items-center"><time className="text-xs text-gray-500">{formatOperationDate(entry.occurredAt)}</time><span className="text-xs font-bold text-gray-600">{entry.type === 'operation' ? '緊急操作' : 'システム更新'}</span><div><p className="text-sm font-bold text-gray-900">{entry.title}</p><p className="mt-1 text-xs text-gray-500">{entry.detail}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-bold ${entry.status === 'success' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'success' ? '完了' : entry.status === 'failed' ? '失敗' : entry.status === 'partial' ? '一部失敗' : entry.status}</span></div>)}</div>}</div></div>
+  return <div className="space-y-4" data-design="V3 Update history"><div className="rounded-card border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-900">緊急操作とシステム更新は自動で記録されます。</div><div className="grid grid-cols-1 gap-3 md:grid-cols-3"><SummaryCard label="緊急操作" value={`${operations.length}件`} note="この端末に保存された履歴" /><SummaryCard label="システム更新" value={updateState === 'ready' ? `${updates.length}件` : '—'} note={updateState === 'unconfigured' ? '自動更新は未構成' : '取得できた更新履歴'} /><SummaryCard label="最後の緊急操作" value={formatOperationDate(operations[0]?.occurredAt ?? null)} note={operations[0]?.title ?? 'まだありません'} /></div><div className="border-hairline rounded-card overflow-hidden border bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-4 py-3"><h2 className="text-base font-bold text-gray-900">履歴</h2><select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs"><option value="all">すべて</option><option value="operation">緊急操作</option><option value="update">システム更新</option></select></div>{updateState === 'error' && <p className="bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">システム更新の履歴を取得できませんでした。</p>}{entries.length === 0 ? <p className="p-8 text-center text-xs text-gray-500">履歴はまだありません。</p> : <div className="divide-y divide-gray-100">{entries.map((entry) => <div key={entry.id} className="grid gap-2 px-4 py-4 md:grid-cols-[150px_120px_1fr_auto] md:items-center"><time className="text-xs text-gray-500">{formatOperationDate(entry.occurredAt)}</time><span className="text-xs font-bold text-gray-600">{entry.type === 'operation' ? '緊急操作' : 'システム更新'}</span><div><p className="text-sm font-bold text-gray-900">{entry.title}</p><p className="mt-1 text-xs text-gray-500">{entry.detail}</p></div><span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${entry.status === 'success' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>{entry.status === 'success' ? '完了' : entry.status === 'failed' ? '失敗' : entry.status === 'partial' ? '一部失敗' : entry.status}</span></div>)}</div>}</div></div>
 }
 
 function EmergencyPageInner() {
@@ -322,7 +415,15 @@ function EmergencyPageInner() {
   const [severity, setSeverity] = useState<OperationSeverity>('unknown')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   useEffect(() => { api.health.accounts().then((response) => { if (response.success) setAccounts(response.data) }).catch(() => undefined) }, [])
-  return <div><Header title="運用状態" description="問題を確認し、必要なときだけ配信を止めます。" action={severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+  const description = tab === 'health'
+    ? '問題がないか自動で確認し、エラーがあれば内容と次の行動を表示します。'
+    : tab === 'control'
+      ? '止める配信を選び、理由を入力して緊急停止します。'
+      : 'エラー、緊急停止、システム更新、設定変更を時間順に確認できます。'
+  const headerAction = tab === 'health'
+    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent px-3 text-xs font-bold text-white">↻ チェックを今すぐ実行</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">⊗ 配信をすべて緊急停止</Link></div>
+    : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
+  return <div><OperationPageHeader description={description} action={headerAction} /><MergedTabs basePath="/emergency" tabs={TABS} active={tab} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 export default function EmergencyPage() {

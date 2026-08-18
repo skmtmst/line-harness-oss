@@ -8,31 +8,11 @@ import Header from '@/components/layout/header'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
-import CcPromptButton from '@/components/cc-prompt-button'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
-
-const ccPrompts = [
-  {
-    title: '友だちのセグメント分析',
-    prompt: `友だち一覧のデータを分析してください。
-1. タグ別の友だち数を集計
-2. アクティブ率の高いセグメントを特定
-3. エンゲージメントが低い層への施策を提案
-レポート形式で出力してください。`,
-  },
-  {
-    title: 'タグ一括管理',
-    prompt: `友だちのタグを一括管理してください。
-1. 未タグの友だちを特定
-2. 行動履歴に基づいたタグ付け提案
-3. 不要タグの整理
-作業手順を示してください。`,
-  },
-]
 
 const PAGE_SIZE = 20
 
@@ -346,7 +326,7 @@ function FriendsPageInner() {
       {loading ? (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="px-4 py-4 border-b border-hairline grid grid-cols-[80px_220px_120px_1fr_250px_88px] gap-3 animate-pulse">
+            <div key={i} className="px-4 py-4 border-b border-hairline grid grid-cols-[80px_220px_120px_1fr_250px] gap-3 animate-pulse">
               <div className="h-5 bg-canvas-sunken rounded w-16" />
               <div className="flex items-center gap-2">
                 <div className="w-9 h-9 rounded-full bg-gray-200" />
@@ -367,8 +347,6 @@ function FriendsPageInner() {
         <div data-design="Table">
           <FriendListTable
             friends={friends}
-            allTags={allTags}
-            onRefresh={loadFriends}
             selectedIds={selectedIds}
             onToggleSelect={toggleSelect}
             onToggleAll={(select) =>
@@ -417,8 +395,6 @@ function FriendsPageInner() {
           setPage(1)
         }}
       />
-
-      <CcPromptButton prompts={ccPrompts} />
     </div>
   )
 }

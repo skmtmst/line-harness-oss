@@ -1,20 +1,24 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import {
   DEFAULT_FEATURES,
+  DEFAULT_FEATURE_GROUP_ORDER,
   FEATURE_SETTINGS_UPDATED_EVENT,
+  NEN_SHOW_MULTI_STORE,
   SIDEBAR_FEATURE_BY_HREF,
+  featureGroupOrderFromSidebarOrder,
   groupEnabledCount,
   groupFeatureCount,
   itemIsEnabled,
+  sidebarOrderFromFeatureGroupOrder,
   visibleFeatureGroups,
   type FeatureGroup,
   type FeatureItem,
   type FeatureKey,
+  type MovableFeatureGroupId,
 } from '@/lib/feature-settings'
 
 function Switch({
@@ -36,16 +40,32 @@ function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
-        checked ? 'bg-emerald-500' : 'bg-gray-200'
-      } ${disabled ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'}`}
+      className={`relative h-6 w-10 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06c755] ${
+        checked && !disabled ? 'bg-[#06c755]' : 'bg-[#dedede]'
+      } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
     >
       <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-[1.375rem]' : 'translate-x-0.5'
+        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
+          checked ? 'translate-x-4' : 'translate-x-0'
         }`}
       />
     </button>
+  )
+}
+
+function LockIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="h-5 w-5 text-[#7d7d7d]">
+      <path d="M7 10V7a5 5 0 0 1 10 0v3M6 10h12a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function EyeOffIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 4.25A10.5 10.5 0 0 1 12 4c5.5 0 9 5 9 5a15.8 15.8 0 0 1-2.2 2.6M6.6 6.6C4.3 8.1 3 10 3 10s3.5 5 9 5c1 0 1.9-.16 2.75-.44" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 
@@ -54,7 +74,9 @@ function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
   const total = groupFeatureCount(group)
   const enabled = groupEnabledCount(group, features)
   if (enabled === total) return `${total}機能すべて有効`
-  if (enabled === 0) return `${total}機能すべて無効`
+  if (enabled === 0) return group.id === 'multi-store'
+    ? `${total}機能すべて無効（この契約では使いません）`
+    : `${total}機能すべて無効`
   return `${total}機能中 ${enabled}つが有効`
 }
 
@@ -65,10 +87,10 @@ function FeatureRow({ item, features, onToggle }: {
 }) {
   const enabled = itemIsEnabled(item, features)
   return (
-    <li className="flex min-h-16 items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
+    <li className="flex min-h-[62px] items-center justify-between gap-4 px-4 py-3 sm:px-5">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-semibold text-gray-900">{item.label}</p>
+          <p className="text-sm font-bold text-[#565656]">{item.label}</p>
           {item.badge && (
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
               item.badge === '専用'
@@ -81,12 +103,13 @@ function FeatureRow({ item, features, onToggle }: {
             </span>
           )}
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.note}</p>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-[#777]">{item.note}</p>
       </div>
-      <div className="flex shrink-0 items-center gap-3">
-        <span className={`hidden text-xs font-semibold sm:inline ${enabled ? 'text-emerald-600' : 'text-gray-400'}`}>
+      <div className="flex shrink-0 items-center gap-2.5">
+        <span className={`text-xs font-bold ${enabled && !item.required ? 'text-[#00b84f]' : 'text-[#777]'}`}>
           {item.required ? '必須' : enabled ? 'オン' : 'オフ'}
         </span>
+        {item.required && <LockIcon />}
         <Switch
           checked={enabled}
           disabled={item.required}
@@ -98,33 +121,71 @@ function FeatureRow({ item, features, onToggle }: {
   )
 }
 
-function FeatureSection({ group, features, onItemToggle, onGroupToggle }: {
+function FeatureSection({
+  group,
+  features,
+  onItemToggle,
+  onGroupToggle,
+  canMoveUp,
+  canMoveDown,
+  onMove,
+}: {
   group: FeatureGroup
   features: Record<string, boolean>
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMove: (groupId: MovableFeatureGroupId, direction: -1 | 1) => void
 }) {
   const total = groupFeatureCount(group)
   const enabled = groupEnabledCount(group, features)
   const allEnabled = group.id === 'basic' || enabled === total
+  const movableGroupId: MovableFeatureGroupId | null = group.id === 'basic' ? null : group.id
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-4 border-b border-gray-100 bg-gray-50/70 px-5 py-3.5 sm:px-6">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <h2 className="text-base font-bold text-gray-900">{group.label}</h2>
-          <p className="text-xs text-gray-500">{groupSummary(group, features)}</p>
+    <section className="overflow-hidden rounded-[18px] border border-[#dedede] bg-white">
+      <div className="flex min-h-[42px] items-center justify-between gap-4 border-b border-[#e5e5e5] bg-[#fafafa] px-4 py-2.5 sm:px-5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <h2 className="text-sm font-bold text-[#202020]">{group.label}</h2>
+          <p className="text-[10px] text-[#777]">{groupSummary(group, features)}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="hidden text-[11px] font-medium text-gray-500 sm:inline">グループごと切替</span>
-          <Switch
-            checked={allEnabled}
-            disabled={group.id === 'basic'}
-            label={`${group.label}をまとめて${allEnabled ? 'オフ' : 'オン'}にする`}
-            onChange={(next) => onGroupToggle(group, next)}
-          />
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            aria-disabled={group.id === 'basic'}
+            onClick={() => group.id !== 'basic' && onGroupToggle(group, !allEnabled)}
+            className={`text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6] ${group.id === 'basic' ? 'cursor-default' : ''}`}
+          >
+            グループごと切替
+          </button>
+          {movableGroupId && (
+            <>
+              <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-[#dedede]" />
+              <button
+                type="button"
+                aria-label={`${group.label}を上へ`}
+                title="上へ移動"
+                disabled={!canMoveUp}
+                onClick={() => onMove(movableGroupId, -1)}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                aria-label={`${group.label}を下へ`}
+                title="下へ移動"
+                disabled={!canMoveDown}
+                onClick={() => onMove(movableGroupId, 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                ↓
+              </button>
+            </>
+          )}
         </div>
       </div>
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-[#e8e8e8]">
         {group.items.map((item) => (
           <FeatureRow key={item.id} item={item} features={features} onToggle={onItemToggle} />
         ))}
@@ -160,10 +221,11 @@ const PREVIEW_SECTIONS = [
   },
 ] as const
 
-function SidebarPreview({ features, specializedFeatureKeys, showMultiStore }: {
+function SidebarPreview({ features, specializedFeatureKeys, showMultiStore, groupOrder }: {
   features: Record<string, boolean>
   specializedFeatureKeys: string[]
   showMultiStore: boolean
+  groupOrder: MovableFeatureGroupId[]
 }) {
   const specialized = [
     { label: '健康記録', href: '/nen-campaigns', key: 'nen_campaigns' },
@@ -178,10 +240,16 @@ function SidebarPreview({ features, specializedFeatureKeys, showMultiStore }: {
         { label: 'Googleマップ連携', key: 'google_business_profile' },
       ]
     : []
+  const fixedSections = PREVIEW_SECTIONS.slice(0, 3)
+  const movableSections: Partial<Record<MovableFeatureGroupId, { label: string; items: ReadonlyArray<{ label: string; href?: string; key?: string }> }>> = {
+    delivery: PREVIEW_SECTIONS[3],
+    results: PREVIEW_SECTIONS[4],
+    specialized: specialized.length ? { label: '専用機能', items: specialized } : undefined,
+    'multi-store': multiStore.length ? { label: '多店舗管理', items: multiStore } : undefined,
+  }
   const sections = [
-    ...PREVIEW_SECTIONS,
-    ...(specialized.length ? [{ label: '専用機能', items: specialized }] : []),
-    ...(multiStore.length ? [{ label: '多店舗管理', items: multiStore }] : []),
+    ...fixedSections,
+    ...groupOrder.map((id) => movableSections[id]).filter((section): section is NonNullable<typeof section> => Boolean(section)),
   ]
   let hidden = 0
   for (const section of sections) {
@@ -194,16 +262,12 @@ function SidebarPreview({ features, specializedFeatureKeys, showMultiStore }: {
   }
   return (
     <aside data-design="サイドメニューの見え方" className="xl:sticky xl:top-6">
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h2 className="font-bold text-gray-900">サイドメニューの見え方</h2>
-          <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">保存前</span>
-        </div>
-        <div className="max-h-[calc(100vh-13rem)] space-y-4 overflow-y-auto px-5 py-4">
+      <div className="overflow-hidden rounded-[22px] border border-[#dedede] bg-white">
+        <div className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-6 pb-3 pt-6">
           {sections.map((section) => (
             <div key={section.label}>
-              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">{section.label}</p>
-              <div className="space-y-0.5">
+              <p className="mb-2 text-xs font-bold text-[#777]">{section.label}</p>
+              <div className="space-y-0.5 pl-3">
                 {section.items.map((item) => {
                   const key = 'href' in item && item.href
                     ? SIDEBAR_FEATURE_BY_HREF[item.href]
@@ -212,21 +276,28 @@ function SidebarPreview({ features, specializedFeatureKeys, showMultiStore }: {
                   return (
                     <div
                       key={item.label}
-                      className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs ${
-                        enabled ? 'text-gray-700' : 'bg-gray-50 text-gray-300 line-through'
+                      className={`flex min-h-7 items-center gap-2 text-[13px] font-medium ${
+                        enabled ? 'text-[#333]' : 'text-[#999]'
                       }`}
                     >
-                      <span className={`h-1.5 w-1.5 rounded-full ${enabled ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${enabled ? 'bg-[#06c755]' : 'bg-[#dedede]'}`} />
                       <span className="truncate">{item.label}</span>
+                      {!enabled && <EyeOffIcon className="ml-auto h-4 w-4 shrink-0 text-[#8b8b8b]" />}
                     </div>
                   )
                 })}
               </div>
             </div>
           ))}
-        </div>
-        <div className="border-t border-gray-100 bg-gray-50 px-5 py-3 text-xs text-gray-500">
-          {hidden > 0 ? `${hidden} 項目が非表示になります` : 'すべての項目が表示されます'}
+          <div className="border-t border-[#ededed] pb-1 pt-3 text-xs">
+            <p className="flex items-center gap-2 text-[#777]">
+              <EyeOffIcon className="h-4 w-4 shrink-0" />
+              この印はメニューに表示されません
+            </p>
+            <p className="mt-2 font-bold text-[#c94900]">
+              {hidden > 0 ? `${hidden} 項目が非表示になります` : 'すべての項目が表示されます'}
+            </p>
+          </div>
         </div>
       </div>
     </aside>
@@ -234,11 +305,12 @@ function SidebarPreview({ features, specializedFeatureKeys, showMultiStore }: {
 }
 
 export default function SettingsPage() {
-  const { accounts, selectedAccountId, selectedAccount } = useAccount()
+  const { selectedAccountId } = useAccount()
   const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
   const [features, setFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
+  const [savedGroupOrder, setSavedGroupOrder] = useState<MovableFeatureGroupId[]>(DEFAULT_FEATURE_GROUP_ORDER)
+  const [groupOrder, setGroupOrder] = useState<MovableFeatureGroupId[]>(DEFAULT_FEATURE_GROUP_ORDER)
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
-  const [parentChildMode, setParentChildMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -260,8 +332,10 @@ export default function SettingsPage() {
       const next = { ...DEFAULT_FEATURES, ...response.data.features }
       setSavedFeatures(next)
       setFeatures(next)
+      const nextGroupOrder = featureGroupOrderFromSidebarOrder(response.data.sidebarOrder)
+      setSavedGroupOrder(nextGroupOrder)
+      setGroupOrder(nextGroupOrder)
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
-      setParentChildMode(response.data.parentChildMode ?? false)
     } catch {
       setError('機能設定を読み込めませんでした。時間をおいてもう一度お試しください。')
     } finally {
@@ -271,12 +345,20 @@ export default function SettingsPage() {
 
   useEffect(() => { void load() }, [load])
 
-  const showMultiStore = accounts.length > 1 || parentChildMode
-  const groups = useMemo(
-    () => visibleFeatureGroups({ showMultiStore, specializedFeatureKeys }),
-    [showMultiStore, specializedFeatureKeys],
-  )
-  const dirty = Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key])
+  // 然では機能未実装の多店舗管理を、設計確認用として最下部へ常時仮置きする。
+  const showMultiStore = NEN_SHOW_MULTI_STORE
+  const groups = useMemo(() => {
+    const visible = visibleFeatureGroups({ showMultiStore, specializedFeatureKeys })
+    const basic = visible.find((group) => group.id === 'basic')
+    const movable = new Map(visible.filter((group) => group.id !== 'basic').map((group) => [group.id, group]))
+    return [
+      ...(basic ? [basic] : []),
+      ...groupOrder.map((id) => movable.get(id)).filter((group): group is FeatureGroup => Boolean(group)),
+    ]
+  }, [groupOrder, showMultiStore, specializedFeatureKeys])
+  const dirty =
+    Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key]) ||
+    groupOrder.join('|') !== savedGroupOrder.join('|')
 
   const toggleItem = (item: FeatureItem, next: boolean) => {
     if (item.required) return
@@ -298,18 +380,34 @@ export default function SettingsPage() {
     setNotice('')
   }
 
+  const moveGroup = (groupId: MovableFeatureGroupId, direction: -1 | 1) => {
+    setGroupOrder((current) => {
+      const index = current.indexOf(groupId)
+      const target = index + direction
+      if (index < 0 || target < 0 || target >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return next
+    })
+    setNotice('')
+  }
+
   const save = async () => {
     if (!selectedAccountId || !dirty) return
     setSaving(true)
     setError('')
     setNotice('')
     try {
-      const response = await api.featureSettings.save(selectedAccountId, { features })
+      const response = await api.featureSettings.save(selectedAccountId, {
+        features,
+        sidebarOrder: sidebarOrderFromFeatureGroupOrder(groupOrder),
+      })
       if (!response.success) {
         setError(response.error)
         return
       }
       setSavedFeatures({ ...features })
+      setSavedGroupOrder([...groupOrder])
       setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
     } catch {
@@ -321,10 +419,47 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <Header
-        title="機能設定"
-        description="使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。"
-      />
+      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-[30px] font-bold tracking-tight text-[#202020]">機能設定</h1>
+          <p className="mt-1 text-xs leading-relaxed text-[#777]">
+            使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFeatures({ ...DEFAULT_FEATURES })
+              setGroupOrder([...DEFAULT_FEATURE_GROUP_ORDER])
+              setNotice('')
+            }}
+            disabled={loading || saving}
+            className="min-h-10 rounded-lg border border-[#d9d9d9] bg-white px-4 text-sm font-bold text-[#444] hover:bg-[#fafafa] disabled:opacity-40"
+          >
+            初期値に戻す
+          </button>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={loading || saving}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#06c755] px-5 text-sm font-bold text-white hover:bg-[#05b34c] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+              <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {saving ? '保存中…' : '保存'}
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-5 flex items-start gap-3 rounded-[16px] bg-[#edf8ff] px-5 py-3.5 text-xs leading-relaxed text-[#3f4b53]">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-[#0066d6]">
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
+          <path d="M12 10.5v6M12 7.5h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
+        </svg>
+        <p>オフにしても、その機能で作ったデータ（タグ・配信履歴・予約など）は削除されません。APIも動いたままなので、管理画面から隠れるだけです。</p>
+      </div>
 
       {!selectedAccountId ? (
         <p className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
@@ -332,39 +467,6 @@ export default function SettingsPage() {
         </p>
       ) : (
         <>
-          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="text-xs font-medium text-gray-500">適用先</span>
-              <span className="truncate rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-800">この契約全体</span>
-              <span className="hidden truncate text-xs text-gray-400 md:inline">
-                {selectedAccount?.displayName ?? selectedAccount?.name ?? selectedAccountId}
-              </span>
-            </div>
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => { setFeatures({ ...DEFAULT_FEATURES }); setNotice('') }}
-                disabled={loading || saving}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
-              >
-                初期値に戻す
-              </button>
-              <button
-                type="button"
-                onClick={() => void save()}
-                disabled={loading || saving || !dirty}
-                className="min-w-24 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {saving ? '保存中…' : '保存'}
-              </button>
-            </div>
-          </div>
-
-          <div className="mb-5 flex items-start gap-3 rounded-xl bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-800">
-            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold">i</span>
-            <p>オフにしても、その機能で作ったデータ（タグ・配信履歴・予約など）は削除されません。APIも動いたままなので、管理画面から隠れるだけです。</p>
-          </div>
-
           <div aria-live="polite">
             {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
             {notice && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{notice}</div>}
@@ -378,28 +480,28 @@ export default function SettingsPage() {
                 {groups.map((group) => (
                   group.id === 'basic' ? (
                     <div key={group.id} data-design="基本">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={false} canMoveDown={false} onMove={moveGroup} />
                     </div>
                   ) : group.id === 'delivery' ? (
                     <div key={group.id} data-design="配信">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
                     </div>
                   ) : group.id === 'results' ? (
                     <div key={group.id} data-design="成果と分析">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
                     </div>
                   ) : group.id === 'specialized' ? (
                     <div key={group.id} data-design="この契約の専用機能">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
                     </div>
                   ) : (
                     <div key={group.id} data-design="多店舗管理">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
                     </div>
                   )
                 ))}
               </div>
-              <SidebarPreview features={features} specializedFeatureKeys={specializedFeatureKeys} showMultiStore={showMultiStore} />
+              <SidebarPreview features={features} specializedFeatureKeys={specializedFeatureKeys} showMultiStore={showMultiStore} groupOrder={groupOrder} />
             </div>
           )}
         </>

@@ -6,7 +6,6 @@ import type { FriendListItem } from '@/lib/api'
 
 interface Props {
   friend: FriendListItem
-  onDetailClick?: () => void
   /** 選ばれているか。まとめて操作する帯は、1人以上選んだときだけ出る。 */
   selected?: boolean
   onToggleSelect?: () => void
@@ -14,13 +13,13 @@ interface Props {
 
 // 一覧の1行。見出しと同じ8枠を並べる:
 // 選択 / 名前 / 対応マーク / シナリオ / 受信メッセージ / ★つきタグ・友だち情報 /
-// 最終接触 / 詳細
+// 最終接触
 // 枠の数が見出しと合っていないと、右の列だけが横にずれる。
 // Clicking the row navigates to the per-friend chat view at
 // `/chats?friend=<id>` so the operator can read history / reply / mark as
 // resolved without leaving the list. Tags are intentionally kept in the
 // detail drawer so a large number of automatic tags cannot stretch the row.
-export default function FriendListRow({ friend, onDetailClick, selected, onToggleSelect }: Props) {
+export default function FriendListRow({ friend, selected, onToggleSelect }: Props) {
   const router = useRouter()
   const navigateToChat = () => router.push(`/chats?friend=${friend.id}`)
   const incoming = friend.latestIncomingMessage
@@ -43,7 +42,7 @@ export default function FriendListRow({ friend, onDetailClick, selected, onToggl
           navigateToChat()
         }
       }}
-      className="grid grid-cols-[32px_220px_80px_120px_1fr_160px_110px_88px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
+      className="grid grid-cols-[32px_220px_80px_120px_1fr_160px_110px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
     >
       {/*
         選択。行そのものが個別トークへのリンクなので、ここでの操作は
@@ -73,9 +72,9 @@ export default function FriendListRow({ friend, onDetailClick, selected, onToggl
           </div>
         )}
         <div className="min-w-0">
-          {/* 行のクリックはトークを開く。名前からは詳細へ行けるようにする。
-              行の動きを変えると、既にトークを開く操作として覚えられている
-              ものが変わってしまう。 */}
+          {/* 行のクリックはトークを開く。名前からは詳細へ行く。
+              右端にあった「詳細」の桁は外した（設計に無い）。詳細へは
+              名前から行けるので、入口が消えるわけではない。 */}
           <Link
             href={`/friends/detail?id=${friend.id}`}
             onClick={(event) => event.stopPropagation()}
@@ -187,15 +186,6 @@ export default function FriendListRow({ friend, onDetailClick, selected, onToggl
         {formatJstDate(friend.createdAt)}
       </div>
 
-      <div className="pt-0.5 text-right">
-        <button
-          type="button"
-          onClick={(event) => { event.stopPropagation(); onDetailClick?.() }}
-          className="w-full rounded-lg border border-emerald-600 bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
-        >
-          詳細
-        </button>
-      </div>
     </div>
   )
 }
