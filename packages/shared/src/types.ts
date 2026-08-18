@@ -1129,3 +1129,90 @@ export interface PaginatedResponse<T> {
   /** 次ページが存在するか */
   hasNextPage: boolean;
 }
+
+// ============================================================
+// 友だち追加時の配信の振り分け（設計 V2 4-6）
+// ============================================================
+
+/**
+ * 「はじめての人」をどう見分けるか。
+ *
+ * 設計の絵は「初回フォロー日が未記録」を既定にしているが、**この環境では
+ * 使えない**。マイグレーション 065 が既存の行すべてに初回フォロー日を
+ * 埋めたため、未記録の人がもう居ない。既定は `unfollow_count_zero`。
+ */
+export type FriendAddFirstTimeCriterion =
+  | "unfollow_count_zero"
+  | "first_followed_at_missing";
+
+/** ①のシナリオをいつ流すか。 */
+export type FriendAddTiming =
+  /** すぐに配信（1通目が遅延0なら reply で即時に出す） */
+  | "immediate"
+  /** シナリオの設定どおり（1通目のタイミング指定に従う） */
+  | "scenario";
+
+/** ②で何を配信するか。 */
+export type FriendAddReturningMode =
+  /** 何も送らない */
+  | "none"
+  /** 別のシナリオを配信する */
+  | "other"
+  /** はじめての人と同じものを配信する */
+  | "same";
+
+/** ②をどこから流すか。 */
+export type FriendAddStartPosition =
+  /** 最初から */
+  | "beginning"
+  /** 前回読んだところから（friend_scenarios.current_step_order を引き継ぐ） */
+  | "resume";
+
+/**
+ * 振り分けと同時に実行すること。
+ *
+ * `tag` と `mile` だけ受け口がある（`attachTagAndFireSideEffects` /
+ * `enqueueMileageEvent`）。流入元の記録は友だち追加のたびに常に走るので
+ * ここでは持たない。担当者への通知は受け口が無い。
+ */
+export type FriendAddAction =
+  | { kind: "tag"; tagId: string }
+  | { kind: "mile"; amount: number };
+
+/** ①または②の設定。 */
+export interface FriendAddBranch {
+  /** 配信するシナリオ。null は「決めていない」。 */
+  scenarioId: string | null;
+  actions: FriendAddAction[];
+}
+
+/** 画面1枚ぶんの設定。`account_settings.friend_add_routing` に JSON で入る。 */
+export interface FriendAddRouting {
+  /** ① はじめて友だち追加した人 */
+  firstTime: FriendAddBranch & { timing: FriendAddTiming };
+  /** ② 以前からの友だち・ブロックを解除した人 */
+  returning: FriendAddBranch & {
+    mode: FriendAddReturningMode;
+    startPosition: FriendAddStartPosition;
+  };
+  /** ③ 判定の基準 */
+  criteria: { firstTime: FriendAddFirstTimeCriterion };
+}
+
+/**
+ * 既定値。**設定が無いアカウントはここに落ちる。**
+ *
+ * `returning.mode` を `same` にしてあるのは、**いまの挙動を変えないため**。
+ * 設定を入れる前は「相手によらず friend_add シナリオが全部動く」ので、
+ * 既定を `none` にすると、設定していないアカウントで配信が止まる。
+ */
+export const FRIEND_ADD_ROUTING_DEFAULT: FriendAddRouting = {
+  firstTime: { scenarioId: null, timing: "immediate", actions: [] },
+  returning: {
+    scenarioId: null,
+    mode: "same",
+    startPosition: "beginning",
+    actions: [],
+  },
+  criteria: { firstTime: "unfollow_count_zero" },
+};
