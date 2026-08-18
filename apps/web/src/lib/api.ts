@@ -894,7 +894,12 @@ export const api = {
    */
   featureSettings: {
     get: (accountId: string) =>
-      fetchApi<ApiResponse<{ features: Record<string, boolean>; sidebarOrder: string[] | null }>>(
+      fetchApi<ApiResponse<{
+        features: Record<string, boolean>
+        sidebarOrder: string[] | null
+        parentChildMode: boolean
+        specializedFeatureKeys: string[]
+      }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
       ),
     save: (accountId: string, data: { features?: Record<string, boolean>; sidebarOrder?: string[] }) =>

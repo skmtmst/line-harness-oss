@@ -1,96 +1,246 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
+import { api } from '@/lib/api'
+import {
+  DEFAULT_FEATURES,
+  FEATURE_SETTINGS_UPDATED_EVENT,
+  SIDEBAR_FEATURE_BY_HREF,
+  groupEnabledCount,
+  groupFeatureCount,
+  itemIsEnabled,
+  visibleFeatureGroups,
+  type FeatureGroup,
+  type FeatureItem,
+  type FeatureKey,
+} from '@/lib/feature-settings'
 
-/**
- * 機能のオン／オフ。
- *
- * 切ったものだけを記録している。機能を足したときに、既存の環境で
- * 勝手に消えないようにするため。
- */
-const FEATURE_GROUPS: Array<{
+function Switch({
+  checked,
+  disabled = false,
+  label,
+  onChange,
+}: {
+  checked: boolean
+  disabled?: boolean
   label: string
-  items: Array<{ key: string; label: string; note: string }>
-}> = [
-  {
-    label: '友だち',
-    items: [
-      {
-        key: 'friend_fields',
-        label: '友だち情報欄',
-        note: '友だちごとに持たせる項目。テンプレートに差し込めます',
-      },
-      { key: 'support_marks', label: '対応マーク', note: '友だちの対応状況を表す印' },
-      { key: 'saved_searches', label: '保存した検索', note: '絞り込みの条件を保存して呼び出す' },
-    ],
-  },
-  {
-    label: 'コンテンツ',
-    items: [
-      { key: 'media', label: 'メディアライブラリ', note: '画像や動画を1か所にまとめる' },
-      { key: 'common_vars', label: '共通情報', note: '営業時間などを1か所で直す' },
-    ],
-  },
-  {
-    label: '分析',
-    items: [
-      { key: 'analytics', label: 'アクセス解析', note: '配信数・クリック・ファネル' },
-      {
-        key: 'site_tracking',
-        label: 'サイトスクリプト',
-        note: '自社サイトの行動を友だちに紐づける',
-      },
-    ],
-  },
-  {
-    label: '予約・イベント',
-    items: [
-      { key: 'booking', label: '予約管理', note: 'メニューとスタッフの予約' },
-      { key: 'events', label: 'イベント予約', note: '定員つきの回を作る' },
-      { key: 'webinars', label: 'ウェビナー', note: '動画の視聴と追客' },
-    ],
-  },
-  {
-    label: '成果',
-    items: [
-      { key: 'affiliates', label: 'アフィリエイト', note: '紹介者と報酬の管理' },
-      { key: 'mileage', label: 'マイル', note: '行動に応じたポイント' },
-      { key: 'ec_commerce', label: 'EC連携', note: '購入データの取り込み' },
-      { key: 'nen_campaigns', label: 'NEN配信', note: 'コラムの配信' },
-    ],
-  },
-]
+  onChange?: (next: boolean) => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange?.(!checked)}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 ${
+        checked ? 'bg-emerald-500' : 'bg-gray-200'
+      } ${disabled ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'}`}
+    >
+      <span
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+          checked ? 'translate-x-[1.375rem]' : 'translate-x-0.5'
+        }`}
+      />
+    </button>
+  )
+}
 
-/**
- * サイドバーの並び。
- *
- * ここに出す名前は sidebar.tsx の区分名と合わせる。ずれると、
- * 並び替えたのに反映されない（知らない名前は無視されるため）。
- *
- * 区分は Pen.dev の V2 設計が出どころ。ダッシュボードは区分の見出しを
- * 持たない位置にあるので、この一覧には出さない（動かせない）。
- */
-const SIDEBAR_SECTIONS = [
-  '対応',
-  '友だち属性',
-  '配信',
-  'コンテンツ',
-  '成果と分析',
-  '自動化',
-  '予約',
-  '専用機能',
-  '設定',
-]
+function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
+  if (group.id === 'basic') return 'この3つは無効にできません'
+  const total = groupFeatureCount(group)
+  const enabled = groupEnabledCount(group, features)
+  if (enabled === total) return `${total}機能すべて有効`
+  if (enabled === 0) return `${total}機能すべて無効`
+  return `${total}機能中 ${enabled}つが有効`
+}
+
+function FeatureRow({ item, features, onToggle }: {
+  item: FeatureItem
+  features: Record<string, boolean>
+  onToggle: (item: FeatureItem, next: boolean) => void
+}) {
+  const enabled = itemIsEnabled(item, features)
+  return (
+    <li className="flex min-h-16 items-center justify-between gap-4 px-5 py-3.5 sm:px-6">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-gray-900">{item.label}</p>
+          {item.badge && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+              item.badge === '専用'
+                ? 'bg-emerald-50 text-emerald-700'
+                : item.badge === '要API申請'
+                  ? 'bg-amber-50 text-amber-700'
+                  : 'bg-blue-50 text-blue-700'
+            }`}>
+              {item.badge}
+            </span>
+          )}
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-gray-500">{item.note}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-3">
+        <span className={`hidden text-xs font-semibold sm:inline ${enabled ? 'text-emerald-600' : 'text-gray-400'}`}>
+          {item.required ? '必須' : enabled ? 'オン' : 'オフ'}
+        </span>
+        <Switch
+          checked={enabled}
+          disabled={item.required}
+          label={item.required ? `${item.label}は必須機能です` : `${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
+          onChange={(next) => onToggle(item, next)}
+        />
+      </div>
+    </li>
+  )
+}
+
+function FeatureSection({ group, features, onItemToggle, onGroupToggle }: {
+  group: FeatureGroup
+  features: Record<string, boolean>
+  onItemToggle: (item: FeatureItem, next: boolean) => void
+  onGroupToggle: (group: FeatureGroup, next: boolean) => void
+}) {
+  const total = groupFeatureCount(group)
+  const enabled = groupEnabledCount(group, features)
+  const allEnabled = group.id === 'basic' || enabled === total
+  return (
+    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between gap-4 border-b border-gray-100 bg-gray-50/70 px-5 py-3.5 sm:px-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <h2 className="text-base font-bold text-gray-900">{group.label}</h2>
+          <p className="text-xs text-gray-500">{groupSummary(group, features)}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <span className="hidden text-[11px] font-medium text-gray-500 sm:inline">グループごと切替</span>
+          <Switch
+            checked={allEnabled}
+            disabled={group.id === 'basic'}
+            label={`${group.label}をまとめて${allEnabled ? 'オフ' : 'オン'}にする`}
+            onChange={(next) => onGroupToggle(group, next)}
+          />
+        </div>
+      </div>
+      <ul className="divide-y divide-gray-100">
+        {group.items.map((item) => (
+          <FeatureRow key={item.id} item={item} features={features} onToggle={onItemToggle} />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+const PREVIEW_SECTIONS = [
+  { label: 'ホーム', items: [{ label: 'ダッシュボード' }] },
+  { label: '対応', items: [{ label: '受信箱' }, { label: '友だち' }] },
+  { label: '友だち属性', items: [{ label: 'タグ管理' }, { label: '友だち情報欄' }] },
+  {
+    label: '配信',
+    items: [
+      { label: 'シナリオ配信', href: '/scenarios' },
+      { label: '一斉配信', href: '/broadcasts' },
+      { label: 'テンプレート', href: '/templates' },
+      { label: 'リマインダ', href: '/reminders' },
+      { label: '自動応答', href: '/auto-replies' },
+      { label: 'リッチメニュー', href: '/rich-menus' },
+      { label: 'ウェビナー', href: '/webinars' },
+    ],
+  },
+  {
+    label: '成果と分析',
+    items: [
+      { label: '流入経路', href: '/inflow-links' },
+      { label: '回答フォーム', href: '/form-submissions' },
+      { label: 'マイル', href: '/scoring' },
+      { label: '成果とアフィリエイト', href: '/conversions' },
+    ],
+  },
+] as const
+
+function SidebarPreview({ features, specializedFeatureKeys, showMultiStore }: {
+  features: Record<string, boolean>
+  specializedFeatureKeys: string[]
+  showMultiStore: boolean
+}) {
+  const specialized = [
+    { label: '健康記録', href: '/nen-campaigns', key: 'nen_campaigns' },
+    { label: '写真審査', href: '/nen-members', key: 'photo_review' },
+    { label: 'EC連携', href: '/ec-commerce', key: 'ec_commerce' },
+  ].filter((item) => specializedFeatureKeys.includes(item.key))
+  const multiStore = showMultiStore
+    ? [
+        { label: '店舗一覧', key: 'multi_store_hierarchy' },
+        { label: '一括更新', key: 'multi_store_bulk_updates' },
+        { label: '予約台帳', key: 'reservation_ledger' },
+        { label: 'Googleマップ連携', key: 'google_business_profile' },
+      ]
+    : []
+  const sections = [
+    ...PREVIEW_SECTIONS,
+    ...(specialized.length ? [{ label: '専用機能', items: specialized }] : []),
+    ...(multiStore.length ? [{ label: '多店舗管理', items: multiStore }] : []),
+  ]
+  let hidden = 0
+  for (const section of sections) {
+    for (const item of section.items) {
+      const key = 'href' in item && item.href
+        ? SIDEBAR_FEATURE_BY_HREF[item.href]
+        : 'key' in item ? item.key as FeatureKey : undefined
+      if (key && features[key] === false) hidden += 1
+    }
+  }
+  return (
+    <aside data-design="サイドメニューの見え方" className="xl:sticky xl:top-6">
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+          <h2 className="font-bold text-gray-900">サイドメニューの見え方</h2>
+          <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">保存前</span>
+        </div>
+        <div className="max-h-[calc(100vh-13rem)] space-y-4 overflow-y-auto px-5 py-4">
+          {sections.map((section) => (
+            <div key={section.label}>
+              <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">{section.label}</p>
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const key = 'href' in item && item.href
+                    ? SIDEBAR_FEATURE_BY_HREF[item.href]
+                    : 'key' in item ? item.key as FeatureKey : undefined
+                  const enabled = !key || features[key] !== false
+                  return (
+                    <div
+                      key={item.label}
+                      className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs ${
+                        enabled ? 'text-gray-700' : 'bg-gray-50 text-gray-300 line-through'
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${enabled ? 'bg-emerald-400' : 'bg-gray-300'}`} />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-gray-100 bg-gray-50 px-5 py-3 text-xs text-gray-500">
+          {hidden > 0 ? `${hidden} 項目が非表示になります` : 'すべての項目が表示されます'}
+        </div>
+      </div>
+    </aside>
+  )
+}
 
 export default function SettingsPage() {
-  const { selectedAccountId, selectedAccount } = useAccount()
-  const [features, setFeatures] = useState<Record<string, boolean>>({})
-  const [order, setOrder] = useState<string[]>(SIDEBAR_SECTIONS)
-  const [savingOrder, setSavingOrder] = useState(false)
+  const { accounts, selectedAccountId, selectedAccount } = useAccount()
+  const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
+  const [features, setFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
+  const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
+  const [parentChildMode, setParentChildMode] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -102,45 +252,70 @@ export default function SettingsPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.featureSettings.get(selectedAccountId)
-      if (res.success) {
-        setFeatures(res.data.features)
-        if (res.data.sidebarOrder) {
-          // 保存に無いセクションは後ろに残す。機能が増えたときに
-          // 新しいセクションが消えないようにするため。
-          const saved = res.data.sidebarOrder.filter((s) => SIDEBAR_SECTIONS.includes(s))
-          setOrder([...saved, ...SIDEBAR_SECTIONS.filter((s) => !saved.includes(s))])
-        }
+      const response = await api.featureSettings.get(selectedAccountId)
+      if (!response.success) {
+        setError(response.error)
+        return
       }
+      const next = { ...DEFAULT_FEATURES, ...response.data.features }
+      setSavedFeatures(next)
+      setFeatures(next)
+      setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
+      setParentChildMode(response.data.parentChildMode ?? false)
     } catch {
-      setError('読み込みに失敗しました')
+      setError('機能設定を読み込めませんでした。時間をおいてもう一度お試しください。')
     } finally {
       setLoading(false)
     }
   }, [selectedAccountId])
 
-  useEffect(() => {
-    void load()
-  }, [load])
+  useEffect(() => { void load() }, [load])
 
-  const toggle = async (key: string, next: boolean) => {
-    if (!selectedAccountId) return
-    // 先に画面を変える。押した手応えが無いと、二度押しされる。
-    setFeatures((prev) => ({ ...prev, [key]: next }))
+  const showMultiStore = accounts.length > 1 || parentChildMode
+  const groups = useMemo(
+    () => visibleFeatureGroups({ showMultiStore, specializedFeatureKeys }),
+    [showMultiStore, specializedFeatureKeys],
+  )
+  const dirty = Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key])
+
+  const toggleItem = (item: FeatureItem, next: boolean) => {
+    if (item.required) return
+    setFeatures((current) => {
+      const changed = { ...current }
+      for (const key of item.keys) changed[key] = next
+      return changed
+    })
+    setNotice('')
+  }
+
+  const toggleGroup = (group: FeatureGroup, next: boolean) => {
+    if (group.id === 'basic') return
+    setFeatures((current) => {
+      const changed = { ...current }
+      for (const item of group.items) for (const key of item.keys) changed[key] = next
+      return changed
+    })
+    setNotice('')
+  }
+
+  const save = async () => {
+    if (!selectedAccountId || !dirty) return
+    setSaving(true)
     setError('')
     setNotice('')
     try {
-      const res = await api.featureSettings.save(selectedAccountId, { features: { [key]: next } })
-      if (!res.success) {
-        setError(res.error)
-        setFeatures((prev) => ({ ...prev, [key]: !next }))
+      const response = await api.featureSettings.save(selectedAccountId, { features })
+      if (!response.success) {
+        setError(response.error)
         return
       }
-      setNotice('保存しました')
-      setTimeout(() => setNotice(''), 2000)
+      setSavedFeatures({ ...features })
+      setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
+      window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
     } catch {
-      setError('保存に失敗しました')
-      setFeatures((prev) => ({ ...prev, [key]: !next }))
+      setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -151,170 +326,82 @@ export default function SettingsPage() {
         description="使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。"
       />
 
-      <div className="bg-info-bg rounded-card mb-4 p-4">
-        <p className="text-ink-secondary text-xs leading-relaxed">
-          オフにしても、その機能で作ったデータ（タグ・配信履歴・予約など）は削除されません。API
-          も動いたままなので、管理画面から隠れるだけです。
-        </p>
-      </div>
-
       {!selectedAccountId ? (
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
+        <p className="rounded-xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
           先に上部でLINEアカウントを選んでください。
         </p>
       ) : (
         <>
-          <p className="text-ink-secondary mb-4 text-sm">
-            いま設定しているアカウント：
-            <strong className="text-ink ml-1">
-              {selectedAccount?.displayName ?? selectedAccount?.name ?? selectedAccountId}
-            </strong>
-          </p>
-
-          {error && (
-            <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-              {error}
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="text-xs font-medium text-gray-500">適用先</span>
+              <span className="truncate rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-800">この契約全体</span>
+              <span className="hidden truncate text-xs text-gray-400 md:inline">
+                {selectedAccount?.displayName ?? selectedAccount?.name ?? selectedAccountId}
+              </span>
             </div>
-          )}
-          {notice && <p className="text-success mb-4 text-sm">{notice}</p>}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => { setFeatures({ ...DEFAULT_FEATURES }); setNotice('') }}
+                disabled={loading || saving}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+              >
+                初期値に戻す
+              </button>
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={loading || saving || !dirty}
+                className="min-w-24 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {saving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mb-5 flex items-start gap-3 rounded-xl bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-800">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 font-bold">i</span>
+            <p>オフにしても、その機能で作ったデータ（タグ・配信履歴・予約など）は削除されません。APIも動いたままなので、管理画面から隠れるだけです。</p>
+          </div>
+
+          <div aria-live="polite">
+            {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+            {notice && <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{notice}</div>}
+          </div>
 
           {loading ? (
-            <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-              読み込み中...
-            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">読み込み中…</div>
           ) : (
-            <div className="space-y-5">
-              {FEATURE_GROUPS.map((group) => (
-                <section
-                  key={group.label}
-                  className="bg-canvas rounded-card border-hairline border p-5"
-                >
-                  <h2 className="text-ink mb-3 text-sm font-semibold">{group.label}</h2>
-                  <ul className="divide-hairline divide-y">
-                    {group.items.map((item) => {
-                      const on = features[item.key] !== false
-                      return (
-                        <li
-                          key={item.key}
-                          className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-ink text-sm font-medium">{item.label}</p>
-                            <p className="text-ink-faint text-xs">{item.note}</p>
-                          </div>
-                          <button
-                            onClick={() => toggle(item.key, !on)}
-                            role="switch"
-                            aria-checked={on}
-                            aria-label={`${item.label}を${on ? '無効' : '有効'}にする`}
-                            className={`rounded-pill relative h-6 w-11 shrink-0 transition-colors ${
-                              on ? 'bg-accent' : 'bg-hairline'
-                            }`}
-                          >
-                            <span
-                              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-                                on ? 'translate-x-[1.375rem]' : 'translate-x-0.5'
-                              }`}
-                            />
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
-              ))}
+            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+              <div className="space-y-5">
+                {groups.map((group) => (
+                  group.id === 'basic' ? (
+                    <div key={group.id} data-design="基本">
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                    </div>
+                  ) : group.id === 'delivery' ? (
+                    <div key={group.id} data-design="配信">
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                    </div>
+                  ) : group.id === 'results' ? (
+                    <div key={group.id} data-design="成果と分析">
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                    </div>
+                  ) : group.id === 'specialized' ? (
+                    <div key={group.id} data-design="この契約の専用機能">
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                    </div>
+                  ) : (
+                    <div key={group.id} data-design="多店舗管理">
+                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} />
+                    </div>
+                  )
+                ))}
+              </div>
+              <SidebarPreview features={features} specializedFeatureKeys={specializedFeatureKeys} showMultiStore={showMultiStore} />
             </div>
           )}
-
-          <section className="bg-canvas rounded-card border-hairline mt-5 border p-5">
-            <h2 className="text-ink mb-1 text-sm font-semibold">サイドバーの並び</h2>
-            <p className="text-ink-faint mb-3 text-xs">
-              よく使うまとまりを上に持ってこられます。
-            </p>
-            <ul className="divide-hairline divide-y">
-              {order.map((label, i) => (
-                <li key={label} className="flex items-center justify-between gap-3 py-2">
-                  <span className="text-ink text-sm">
-                    <span className="text-ink-faint mr-2 tabular-nums">{i + 1}.</span>
-                    {label}
-                  </span>
-                  <div className="flex gap-1">
-                    {/* 上下のボタンにしている。ドラッグは触れる範囲が小さく、
-                        タッチだと持ち上げにくい。 */}
-                    <button
-                      onClick={() =>
-                        setOrder((prev) => {
-                          const next = [...prev]
-                          ;[next[i - 1], next[i]] = [next[i], next[i - 1]]
-                          return next
-                        })
-                      }
-                      disabled={i === 0}
-                      aria-label={`${label}を上へ`}
-                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs disabled:opacity-30"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={() =>
-                        setOrder((prev) => {
-                          const next = [...prev]
-                          ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
-                          return next
-                        })
-                      }
-                      disabled={i === order.length - 1}
-                      aria-label={`${label}を下へ`}
-                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded border px-2 py-1 text-xs disabled:opacity-30"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                onClick={async () => {
-                  if (!selectedAccountId) return
-                  setSavingOrder(true)
-                  setError('')
-                  try {
-                    const res = await api.featureSettings.save(selectedAccountId, {
-                      sidebarOrder: order,
-                    })
-                    if (!res.success) {
-                      setError(res.error)
-                      return
-                    }
-                    // サイドバーは読み込み時に並びを取るので、反映には
-                    // 画面の読み直しが要る。押した人に伝える。
-                    setNotice('保存しました。画面を読み直すと並びが変わります。')
-                  } catch {
-                    setError('保存に失敗しました')
-                  } finally {
-                    setSavingOrder(false)
-                  }
-                }}
-                disabled={savingOrder}
-                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-              >
-                {savingOrder ? '保存中...' : '並びを保存'}
-              </button>
-              <button
-                onClick={() => setOrder(SIDEBAR_SECTIONS)}
-                className="text-ink-faint hover:text-ink-secondary px-2 py-2 text-sm"
-              >
-                元に戻す
-              </button>
-            </div>
-          </section>
-
-          <p className="text-ink-faint mt-4 text-xs leading-relaxed">
-            切っても、それまでに作ったデータは消えません。もう一度有効にすれば元どおり見えます。
-            切った機能はサイドバーから消えますが、URLを直接開けば表示されます。
-            見せたくない相手がいる場合は、ログインユーザーの役割で設定してください。
-          </p>
         </>
       )}
     </div>

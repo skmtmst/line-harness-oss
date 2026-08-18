@@ -20,10 +20,24 @@ const featureSettings = new Hono<Env>();
  * 打ち間違いがそのまま保存され、「切ったはずなのに出ている」という
  * 形で表に出る。
  *
- * 既定はすべて有効。切ったものだけを記録するので、機能を足したときに
- * 既存の環境で勝手に消えることがない。
+ * V2 10-3 でオフと定義された機能だけ既定を無効にし、それ以外は有効。
+ * 保存済みの値がある場合は、そちらを優先する。
  */
 export const TOGGLEABLE_FEATURES = [
+  'scenarios',
+  'broadcasts',
+  'templates',
+  'reminders',
+  'auto_replies',
+  'rich_menus',
+  'inflow_tracking',
+  'forms',
+  'photo_review',
+  'multi_store_hierarchy',
+  'multi_store_bulk_updates',
+  'reservation_ledger',
+  'external_reservations',
+  'google_business_profile',
   'friend_fields',
   'support_marks',
   'saved_searches',
@@ -44,9 +58,62 @@ export type ToggleableFeature = (typeof TOGGLEABLE_FEATURES)[number];
 
 const SETTING_PREFIX = 'feature.';
 const SIDEBAR_ORDER_KEY = 'sidebar.order';
+const PARENT_CHILD_MODE_KEY = 'organization.parent_child_enabled';
+const SPECIALIZED_CATALOG_KEY = 'feature.specialized.catalog';
+
+/** V2 10-3 の初期表示。記録が無い契約ではこの状態から始める。 */
+export const DEFAULT_DISABLED_FEATURES = new Set<ToggleableFeature>([
+  'webinars',
+  'affiliates',
+  'multi_store_hierarchy',
+  'multi_store_bulk_updates',
+  'reservation_ledger',
+  'external_reservations',
+  'google_business_profile',
+]);
+
+/**
+ * このリポジトリで専門設計済みの然向け機能。
+ * 専門設計が無いサービスでは catalog 設定を空配列にすれば画面に出ない。
+ */
+export const NEN_SPECIALIZED_FEATURES: ToggleableFeature[] = [
+  'nen_campaigns',
+  'photo_review',
+  'ec_commerce',
+];
 
 function isToggleable(key: unknown): key is ToggleableFeature {
   return typeof key === 'string' && (TOGGLEABLE_FEATURES as readonly string[]).includes(key);
+}
+
+export function featureIsEnabled(raw: string | null, key: ToggleableFeature): boolean {
+  if (!raw) return !DEFAULT_DISABLED_FEATURES.has(key);
+  try {
+    return (JSON.parse(raw) as { enabled?: boolean }).enabled !== false;
+  } catch {
+    return !DEFAULT_DISABLED_FEATURES.has(key);
+  }
+}
+
+function settingIsEnabled(raw: string | null): boolean {
+  if (!raw) return false;
+  try {
+    const parsed = JSON.parse(raw) as boolean | { enabled?: boolean };
+    return typeof parsed === 'boolean' ? parsed : parsed.enabled === true;
+  } catch {
+    return false;
+  }
+}
+
+function specializedCatalog(raw: string | null): string[] {
+  if (!raw) return [...NEN_SPECIALIZED_FEATURES];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [...NEN_SPECIALIZED_FEATURES];
+    return parsed.map(String).filter((key) => NEN_SPECIALIZED_FEATURES.includes(key as ToggleableFeature));
+  } catch {
+    return [...NEN_SPECIALIZED_FEATURES];
+  }
 }
 
 /**
@@ -68,18 +135,7 @@ featureSettings.get('/api/settings/features', async (c) => {
     const features: Record<string, boolean> = {};
     for (const key of TOGGLEABLE_FEATURES) {
       const raw = await getAccountSetting(c.env.DB, accountId, `${SETTING_PREFIX}${key}`);
-      // 記録が無ければ有効。切ったものだけを記録する。
-      if (!raw) {
-        features[key] = true;
-        continue;
-      }
-      try {
-        features[key] = (JSON.parse(raw) as { enabled?: boolean }).enabled !== false;
-      } catch {
-        // 壊れた記録は有効として扱う。読めないから隠す、では
-        // 使えていた機能が黙って消える。
-        features[key] = true;
-      }
+      features[key] = featureIsEnabled(raw, key);
     }
 
     const orderRaw = await getAccountSetting(c.env.DB, accountId, SIDEBAR_ORDER_KEY);
@@ -93,7 +149,20 @@ featureSettings.get('/api/settings/features', async (c) => {
       }
     }
 
-    return c.json({ success: true, data: { features, sidebarOrder } });
+    const [parentChildRaw, specializedRaw] = await Promise.all([
+      getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
+      getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
+    ]);
+
+    return c.json({
+      success: true,
+      data: {
+        features,
+        sidebarOrder,
+        parentChildMode: settingIsEnabled(parentChildRaw),
+        specializedFeatureKeys: specializedCatalog(specializedRaw),
+      },
+    });
   } catch (err) {
     console.error('GET /api/settings/features error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
