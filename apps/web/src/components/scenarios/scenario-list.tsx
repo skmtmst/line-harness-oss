@@ -88,7 +88,7 @@ export default function ScenarioList({
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
                 通数
               </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
                 状態
               </th>
               <th className="px-4 py-3" />
@@ -109,26 +109,38 @@ export default function ScenarioList({
                 >
                   ⠿
                 </td>
+                {/*
+                  説明が長いと、表そのものが横に伸びて横スクロールが出る。
+                  桁の幅に上限を付けて、はみ出すぶんは畳む。上限を付けずに
+                  line-clamp だけ当てても、桁は中身に合わせて広がる。
+                */}
                 <td className="px-4 py-3">
-                  <Link
-                    href={`/scenarios/detail?id=${s.id}`}
-                    className="text-info text-sm font-medium hover:underline"
-                  >
-                    {s.name}
-                  </Link>
-                  {/* 全アカウント共通のものは、触ると他のアカウントにも効く。
-                      名前の隣に出して、開く前に分かるようにする。 */}
-                  {s.lineAccountId === null && (
-                    <span
-                      className="bg-warning-bg text-warning rounded-pill ml-2 px-2 py-0.5 text-[10px] font-medium"
-                      title="全アカウントに適用されるシナリオです"
-                    >
-                      全アカウント共通
-                    </span>
-                  )}
-                  {s.description && (
-                    <p className="text-ink-faint mt-0.5 line-clamp-1 text-xs">{s.description}</p>
-                  )}
+                  <div className="max-w-[22rem] min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Link
+                        href={`/scenarios/detail?id=${s.id}`}
+                        className="text-info min-w-0 truncate text-sm font-medium hover:underline"
+                      >
+                        {s.name}
+                      </Link>
+                      {/* 全アカウント共通のものは、触ると他のアカウントにも効く。
+                          名前の隣に出して、開く前に分かるようにする。
+                          名前が長くても、この札だけは縮めない。 */}
+                      {s.lineAccountId === null && (
+                        <span
+                          className="bg-warning-bg text-warning rounded-pill shrink-0 px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
+                          title="全アカウントに適用されるシナリオです"
+                        >
+                          全アカウント共通
+                        </span>
+                      )}
+                    </div>
+                    {s.description && (
+                      <p className="text-ink-faint mt-0.5 truncate text-xs" title={s.description}>
+                        {s.description}
+                      </p>
+                    )}
+                  </div>
                 </td>
                 <td className="text-ink-secondary px-4 py-3 text-sm">
                   {deliveryModeLabels[s.deliveryMode ?? 'relative']}
@@ -147,9 +159,11 @@ export default function ScenarioList({
                     <span className="text-ink-faint ml-0.5 text-xs">通</span>
                   )}
                 </td>
-                <td className="px-4 py-3">
+                {/* 列が狭いと「配信可」が「配信 / 可」の2行になる。
+                    札の中で折り返させない。 */}
+                <td className="px-4 py-3 whitespace-nowrap">
                   <span
-                    className={`rounded-pill px-2 py-0.5 text-[11px] font-medium ${
+                    className={`rounded-pill inline-block px-2 py-0.5 text-[11px] font-medium whitespace-nowrap ${
                       s.isActive ? 'bg-success-bg text-success' : 'bg-warning-bg text-warning'
                     }`}
                   >
