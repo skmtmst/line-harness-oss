@@ -71,7 +71,30 @@ describe('タグの親分類', () => {
     const body = (await res.json()) as { data: { name: string; sortOrder: number } };
     expect(body.data).toMatchObject({ name: 'お悩み', sortOrder: 0 });
     // 前後の空白は落とす。画面から貼り付けたときに空白付きの分類ができるのを防ぐ。
-    expect(mocks.createTagGroup).toHaveBeenCalledWith(env.DB, { name: 'お悩み', sortOrder: 0 });
+    // 色を指定しなければ null。色はフォルダに付く（115）。
+    expect(mocks.createTagGroup).toHaveBeenCalledWith(env.DB, {
+      name: 'お悩み',
+      sortOrder: 0,
+      color: null,
+    });
+  });
+
+  it('色を付けて作れる', async () => {
+    mocks.createTagGroup.mockResolvedValue({ ...GROUP, color: '#10B981' });
+    const res = await req('/api/tag-groups', 'POST', { name: 'お悩み', color: '#10B981' });
+    expect(res.status).toBe(201);
+    expect(mocks.createTagGroup).toHaveBeenCalledWith(env.DB, {
+      name: 'お悩み',
+      sortOrder: 0,
+      color: '#10B981',
+    });
+  });
+
+  it('色の形が違うと作れない', async () => {
+    // 名前付きの色を混ぜると、画面での見た目が揃わない。
+    const res = await req('/api/tag-groups', 'POST', { name: 'お悩み', color: 'red' });
+    expect(res.status).toBe(400);
+    expect(mocks.createTagGroup).not.toHaveBeenCalled();
   });
 
   it('名前が空の分類は作れない', async () => {

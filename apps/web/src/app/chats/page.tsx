@@ -62,19 +62,6 @@ interface EmailInboxItem {
   lastIncomingAt: string
 }
 
-/** 一覧の1行。LINEのトークとメールを同じ形にして並べる。 */
-interface InboxRow {
-  key: string
-  channel: 'line' | 'email'
-  name: string
-  preview: string
-  at: string | null
-  status: 'unread' | 'in_progress' | 'resolved'
-  pictureUrl: string | null
-  /** LINEなら chat の id（＝friendId）、メールなら threadId。 */
-  ref: string
-}
-
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
   unread: { label: '未読', className: 'bg-red-100 text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-yellow-700' },
@@ -910,14 +897,27 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   押したときの行き先だけは分ける。LINEはこの画面のトーク、
                   メールはメールの往復で、中央に出すものの作りが違う。
                 */}
-                {(channel === 'line' ? [] : emailItems)
+                {/*
+                  LINE とメールを1本に混ぜて、新しいものが上に来るように並べる。
+                  以前はメールを全部出してから LINE を出していたので、
+                  出どころで固まってしまい、返信を待っている人を2か所で
+                  探すことになっていた。
+
+                  行の中身の作りは出どころで違う（メールは件名、LINE は
+                  最後のメッセージと未対応の印）ので、描き方はそれぞれ
+                  残したまま、並びだけそろえる。
+                */}
+                {(() => {
+                  const mailRows = (channel === 'line' ? [] : emailItems)
                   .filter((item) =>
                     nameQuery.trim() === ''
                       ? true
                       : item.customerName.toLowerCase().includes(nameQuery.trim().toLowerCase()),
                   )
                   .filter((item) => statusFilter === 'all' || item.status === statusFilter)
-                  .map((item) => (
+                  .map((item) => ({
+                    at: item.lastIncomingAt,
+                    node: (
                     <button
                       key={item.id}
                       onClick={() => {
@@ -953,9 +953,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         </div>
                       </div>
                     </button>
-                  ))}
-
-                {(channel === 'email' ? [] : chats)
+                    ),
+                  }))
+                  const lineRows = (channel === 'email' ? [] : chats)
                   .filter((chat) =>
                     nameQuery.trim() === ''
                       ? true
@@ -981,7 +981,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     if (chat.lastMessageType === 'location') return '📍 位置情報'
                     return previewRaw.replace(/\n+/g, ' ').slice(0, 60)
                   })()
-                  return (
+                  const node = (
                     <button
                       key={chat.id}
                       onClick={() => { setSelectedFriendId(null); handleSelectChat(chat.id); }}
@@ -1035,7 +1035,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       </div>
                     </button>
                   )
-                })}
+                  return { at: chat.lastMessageAt ?? '', node }
+                })
+                  return [...mailRows, ...lineRows]
+                    .sort((a, b) => String(b.at).localeCompare(String(a.at)))
+                    .map((r) => r.node)
+                })()}
+
                 {hasMoreChats && (
                   <button
                     onClick={() => { void loadMoreChats() }}
