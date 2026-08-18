@@ -17,6 +17,11 @@ export interface FolderPanelRow {
   id: string
   label: string
   count: number
+  /**
+   * フォルダの色（#RRGGBB）。115 で folders.color を足した。
+   * 未設定は null。色はフォルダに付き、属するタグに出る。
+   */
+  color?: string | null
   /** 消せる行だけ渡す。「すべて」「未分類」は消せない。 */
   onDelete?: () => void
 }
@@ -53,10 +58,12 @@ export default function FolderPanel({
                   : 'text-ink-secondary hover:bg-canvas-sunken'
               }`}
             >
+              {/* 色が付いているフォルダは、記号そのものをその色で塗る。
+                  丸を別に足すと、名前の前に記号が2つ並んで読みにくい。 */}
               <svg
                 className="h-4 w-4 shrink-0"
-                fill="none"
-                stroke="currentColor"
+                fill={row.color ? row.color : 'none'}
+                stroke={row.color ? row.color : 'currentColor'}
                 strokeWidth={1.8}
                 viewBox="0 0 24 24"
               >

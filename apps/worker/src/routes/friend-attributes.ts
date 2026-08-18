@@ -75,6 +75,7 @@ function serializeFolder(row: Folder) {
     name: row.name,
     parentId: row.parent_id,
     displayOrder: row.display_order,
+    color: row.color ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -441,11 +442,22 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
       }
     }
 
+    // 色はフォルダに付く。既存の COLOR_PATTERN と同じ決まりで見る。
+    let color: string | null = null;
+    if (body.color !== undefined && body.color !== null && body.color !== '') {
+      const raw = String(body.color);
+      if (!COLOR_PATTERN.test(raw)) {
+        return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+      }
+      color = raw;
+    }
+
     const folder = await createFolder(c.env.DB, {
       kind: body.kind,
       name,
       parentId: body.parentId ? String(body.parentId) : null,
       displayOrder: Number(body.displayOrder ?? 0),
+      color,
     });
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
@@ -476,6 +488,18 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
       patch.parentId = parentId;
     }
     if (body.displayOrder !== undefined) patch.displayOrder = Number(body.displayOrder);
+    if ('color' in body) {
+      const raw = body.color;
+      if (raw === null || raw === '') {
+        patch.color = null;
+      } else {
+        const value = String(raw);
+        if (!COLOR_PATTERN.test(value)) {
+          return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+        }
+        patch.color = value;
+      }
+    }
 
     const folder = await updateFolder(c.env.DB, id, patch);
     return c.json({ success: true, data: serializeFolder(folder!) });

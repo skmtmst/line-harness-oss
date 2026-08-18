@@ -33,6 +33,8 @@ export interface TagGroup {
   id: string;
   name: string;
   sort_order: number;
+  /** #RRGGBB。未設定は null。115 で folders.color を足した。 */
+  color: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -192,7 +194,7 @@ export async function deleteTag(db: D1Database, id: string): Promise<void> {
 export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
   const result = await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, created_at, updated_at
+      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
          FROM folders WHERE kind = 'tag'
         ORDER BY display_order ASC, name ASC`,
     )
@@ -202,20 +204,20 @@ export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
 
 export async function createTagGroup(
   db: D1Database,
-  input: { name: string; sortOrder?: number },
+  input: { name: string; sortOrder?: number; color?: string | null },
 ): Promise<TagGroup> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
-       VALUES (?, 'tag', ?, ?, ?, ?)`,
+      `INSERT INTO folders (id, kind, name, display_order, color, created_at, updated_at)
+       VALUES (?, 'tag', ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.sortOrder ?? 0, now, now)
+    .bind(id, input.name, input.sortOrder ?? 0, input.color ?? null, now, now)
     .run();
   return (await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, created_at, updated_at
+      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
          FROM folders WHERE id = ?`,
     )
     .bind(id)
@@ -225,7 +227,7 @@ export async function createTagGroup(
 export async function updateTagGroup(
   db: D1Database,
   id: string,
-  input: { name?: string; sortOrder?: number },
+  input: { name?: string; sortOrder?: number; color?: string | null },
 ): Promise<TagGroup | null> {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -236,6 +238,10 @@ export async function updateTagGroup(
   if (input.sortOrder !== undefined) {
     sets.push('display_order = ?');
     values.push(input.sortOrder);
+  }
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    values.push(input.color);
   }
   if (sets.length > 0) {
     sets.push('updated_at = ?');
@@ -248,7 +254,7 @@ export async function updateTagGroup(
   return (
     (await db
       .prepare(
-        `SELECT id, name, display_order AS sort_order, created_at, updated_at
+        `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
            FROM folders WHERE id = ? AND kind = 'tag'`,
       )
       .bind(id)

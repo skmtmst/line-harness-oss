@@ -1230,12 +1230,13 @@ export const api = {
   },
   tagGroups: {
     list: () => fetchApi<ApiResponse<TagGroup[]>>('/api/tag-groups'),
-    create: (data: { name: string; sortOrder?: number }) =>
+    /** 色（#RRGGBB）はこのフォルダに付く。属するタグの印に出る。 */
+    create: (data: { name: string; sortOrder?: number; color?: string | null }) =>
       fetchApi<ApiResponse<TagGroup>>('/api/tag-groups', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; sortOrder?: number }) =>
+    update: (id: string, data: { name?: string; sortOrder?: number; color?: string | null }) =>
       fetchApi<ApiResponse<TagGroup>>(`/api/tag-groups/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),

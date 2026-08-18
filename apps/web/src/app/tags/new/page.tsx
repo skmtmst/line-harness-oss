@@ -31,10 +31,18 @@ export default function NewTagPage() {
   const [name, setName] = useState('')
   const [color, setColor] = useState(PRESET_COLORS[0])
   const [groupId, setGroupId] = useState('')
+
   const [groups, setGroups] = useState<TagGroup[]>([])
   const [multiplier, setMultiplier] = useState('')
   const [priority, setPriority] = useState('0')
   const [isStarred, setIsStarred] = useState(false)
+
+  /**
+   * 見た目に使う色。**タグ自身は色を持たない。**
+   * 選んだ分類（フォルダ）の色を出す。決めていなければ灰色。
+   */
+  const previewColor = groups.find((g) => g.id === groupId)?.color ?? '#8b938d'
+
 
   useEffect(() => {
     void api.tagGroups.list().then((res) => {
@@ -81,9 +89,11 @@ export default function NewTagPage() {
             <div className="flex items-center gap-2">
               <span
                 className="rounded-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
-                style={{ backgroundColor: `${color}1a`, color }}
+                // 見た目の色は、選んだ分類（フォルダ）の色。分類を決めて
+                // いない・色を付けていない分類なら灰色になる。
+                style={{ backgroundColor: `${previewColor}1a`, color: previewColor }}
               >
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: previewColor }} />
                 {name || 'タグ名'}
               </span>
               <span className="text-ink-faint text-xs">{groupName}</span>
@@ -151,23 +161,11 @@ export default function NewTagPage() {
             className={inputClass}
           />
         </Field>
-
-        <Field label="色" note="一覧やトーク画面での見分けに使います。">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setColor(c)}
-                aria-label={`色 ${c}`}
-                className={`h-8 w-8 rounded-control transition-transform ${
-                  color === c ? 'ring-ink scale-105 ring-2 ring-offset-1' : 'hover:scale-105'
-                }`}
-                style={{ backgroundColor: c }}
-              />
-            ))}
-          </div>
-        </Field>
+              {/*
+                色の選択は外した。色はフォルダ（分類）に付く。タグ1つずつに
+                色を決めさせると、100枚あるタグで色がばらけて一覧での区別に
+                使えない。下の「所属グループ」で決めた分類の色が出る。
+              */}
       </section>
 
       <section className="border-hairline rounded-card border p-5">

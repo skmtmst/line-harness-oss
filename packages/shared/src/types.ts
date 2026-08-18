@@ -159,6 +159,13 @@ export interface Folder {
   name: string;
   parentId: string | null;
   displayOrder: number;
+  /**
+   * #RRGGBB。未設定は null。
+   *
+   * 色はフォルダに付く。タグ1つずつに色を決めさせると、100枚あるタグで
+   * 色がばらけて一覧での区別に使えない。分類の色を、属するタグに出す。
+   */
+  color: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -242,6 +249,14 @@ export interface TagGroup {
   name: string;
   /** 一覧での並び順。小さいほど上 */
   sortOrder: number;
+  /**
+   * #RRGGBB。未設定は null。
+   *
+   * 色はこの分類（フォルダ）に付く。属するタグの印に出る。
+   * タグ1つずつに色を決めさせると、100枚あるタグで色がばらけて
+   * 一覧での区別に使えない。
+   */
+  color: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */

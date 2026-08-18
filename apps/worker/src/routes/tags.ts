@@ -47,10 +47,15 @@ function serializeTagGroup(row: DbTagGroup) {
     id: row.id,
     name: row.name,
     sortOrder: Number(row.sort_order ?? 0),
+    // 色はフォルダに付く。属するタグの印にこの色を出す。
+    color: row.color ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
+
+/** 色は #RRGGBB だけ。名前付きの色を混ぜると画面での見た目が揃わない。 */
+const GROUP_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 // --- タグの親分類 ---------------------------------------------------------
 //
@@ -72,9 +77,17 @@ tags.get('/api/tag-groups', async (c) => {
 // POST /api/tag-groups
 tags.post('/api/tag-groups', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name?: unknown; sortOrder?: unknown }>();
+    const body = await c.req.json<{ name?: unknown; sortOrder?: unknown; color?: unknown }>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'name is required' }, 400);
+    let color: string | null = null;
+    if (body.color !== undefined && body.color !== null && body.color !== '') {
+      const raw = String(body.color);
+      if (!GROUP_COLOR_PATTERN.test(raw)) {
+        return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+      }
+      color = raw;
+    }
     if (name.length > 60) {
       return c.json({ success: false, error: 'name must be 60 characters or fewer' }, 400);
     }
@@ -85,7 +98,7 @@ tags.post('/api/tag-groups', requireRole('owner', 'admin'), async (c) => {
         400,
       );
     }
-    const group = await createTagGroup(c.env.DB, { name, sortOrder });
+    const group = await createTagGroup(c.env.DB, { name, sortOrder, color });
     return c.json({ success: true, data: serializeTagGroup(group) }, 201);
   } catch (err) {
     console.error('POST /api/tag-groups error:', err);
@@ -96,8 +109,20 @@ tags.post('/api/tag-groups', requireRole('owner', 'admin'), async (c) => {
 // PATCH /api/tag-groups/:id
 tags.patch('/api/tag-groups/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name?: unknown; sortOrder?: unknown }>();
-    const patch: { name?: string; sortOrder?: number } = {};
+    const body = await c.req.json<{ name?: unknown; sortOrder?: unknown; color?: unknown }>();
+    const patch: { name?: string; sortOrder?: number; color?: string | null } = {};
+    if ('color' in body) {
+      const raw = body.color;
+      if (raw === null || raw === '') {
+        patch.color = null;
+      } else {
+        const value = String(raw);
+        if (!GROUP_COLOR_PATTERN.test(value)) {
+          return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+        }
+        patch.color = value;
+      }
+    }
     if (body.name !== undefined) {
       const name = typeof body.name === 'string' ? body.name.trim() : '';
       if (!name) return c.json({ success: false, error: 'name must not be empty' }, 400);

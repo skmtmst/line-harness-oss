@@ -80,6 +80,21 @@ const TAB_DESCRIPTIONS: Record<TabKey, string> = {
     '友だちの絞り込み条件に名前を付けて保存します。保存した条件は、友だち一覧・配信の宛先・オートメーションの対象から呼び出せます。',
 }
 
+/**
+ * フォルダの色。タグ編集にあった8色をそのまま使う。
+ * 色はフォルダに付き、属するタグの印に出る。
+ */
+const FOLDER_COLORS = [
+  '#3B82F6',
+  '#10B981',
+  '#F59E0B',
+  '#EF4444',
+  '#8B5CF6',
+  '#EC4899',
+  '#06B6D4',
+  '#6B7280',
+]
+
 function TagsPageInner() {
   const [items, setItems] = useState<Tag[]>([])
   const [groups, setGroups] = useState<TagGroup[]>([])
@@ -101,6 +116,9 @@ function TagsPageInner() {
   const [dragId, setDragId] = useState<string | null>(null)
   const [groupName, setGroupName] = useState('')
   const [addingGroup, setAddingGroup] = useState(false)
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  /** フォルダの色。ここで決めた色が、属するタグの印に出る。 */
+  const [groupColor, setGroupColor] = useState<string>(FOLDER_COLORS[0])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -193,8 +211,10 @@ function TagsPageInner() {
     setAddingGroup(true)
     setError('')
     try {
-      await api.tagGroups.create({ name, sortOrder: groups.length })
+      await api.tagGroups.create({ name, sortOrder: groups.length, color: groupColor })
       setGroupName('')
+      setGroupColor(FOLDER_COLORS[0])
+      setFolderDialogOpen(false)
       load()
     } catch {
       setError('分類の作成に失敗しました')
@@ -248,7 +268,7 @@ function TagsPageInner() {
         action={
           tab === 'tags' ? (
             <div className="flex flex-wrap items-center gap-2">
-              {['マニュアル', 'CSVで一括登録', '並び替え', 'フォルダを追加'].map((label) => (
+              {['マニュアル', 'CSVで一括登録', '並び替え'].map((label) => (
                 <button
                   key={label}
                   disabled
@@ -258,6 +278,15 @@ function TagsPageInner() {
                   {label}
                 </button>
               ))}
+              {/* 左のパネルの中に入力欄を出していたが、設計はここのボタン。
+                  押すと名前と色を決める窓が開く。 */}
+              <button
+                type="button"
+                onClick={() => setFolderDialogOpen(true)}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+              >
+                フォルダを追加
+              </button>
               {/* 設計の呼び名。作る場所も専用の画面（3-1-1）に寄せる。 */}
               <Link
                 href="/tags/new"
@@ -414,6 +443,74 @@ function TagsPageInner() {
         </>
       )}
 
+      {folderDialogOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setFolderDialogOpen(false)}
+        >
+          <div
+            className="bg-canvas rounded-card w-full max-w-sm p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-ink text-base font-bold">フォルダを追加</h2>
+            <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+              ここで決めた色が、このフォルダに入れたタグの印に出ます。
+            </p>
+            <label className="mt-4 block">
+              <span className="text-ink-secondary mb-1 block text-xs font-medium">
+                フォルダ名 <span className="text-danger">*</span>
+              </span>
+              <input
+                type="text"
+                autoFocus
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && groupName.trim()) void handleAddGroup()
+                }}
+                placeholder="例: お悩み"
+                className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              />
+            </label>
+            <div className="mt-3">
+              <span className="text-ink-secondary mb-1 block text-xs font-medium">色</span>
+              <div className="flex flex-wrap gap-2">
+                {FOLDER_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setGroupColor(c)}
+                    aria-label={`色 ${c}`}
+                    aria-pressed={groupColor === c}
+                    style={{ backgroundColor: c }}
+                    className={`h-7 w-7 rounded-pill ${
+                      groupColor === c ? 'ring-accent ring-2 ring-offset-2' : ''
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setFolderDialogOpen(false)}
+                className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-4 py-2 text-sm"
+              >
+                やめる
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleAddGroup()}
+                disabled={addingGroup || !groupName.trim()}
+                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+              >
+                {addingGroup ? '追加中…' : '追加する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === 'tags' && (
       <>
       {error && (
@@ -438,27 +535,14 @@ function TagsPageInner() {
               id: g.id,
               label: g.name,
               count: items.filter((t) => t.groupId === g.id).length,
+              color: g.color,
               onDelete: () => handleDeleteGroup(g),
             })),
             { id: UNGROUPED, label: '未分類', count: ungroupedCount },
           ]}
         >
-          <input
-            type="text"
-            value={groupName}
-            onChange={(e) => setGroupName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAddGroup() }}
-            placeholder="例: お悩み"
-            aria-label="新しい分類名"
-            className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-1.5 text-sm focus:border-transparent focus:ring-2 focus:outline-none"
-          />
-          <button
-            onClick={handleAddGroup}
-            disabled={addingGroup || !groupName.trim()}
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken w-full border px-3 py-1.5 text-sm font-medium disabled:opacity-40"
-          >
-            {addingGroup ? '追加中...' : 'フォルダを追加'}
-          </button>
+          {/* 追加は上の「フォルダを追加」から。ここに入力欄を置くと、
+              同じ操作の入口が2つになる。 */}
           <p className="text-ink-faint text-xs leading-relaxed">
             フォルダを削除しても、属していたタグは未分類として残ります。
           </p>
@@ -557,9 +641,18 @@ function TagsPageInner() {
                         href={`/tags/edit?id=${t.id}`}
                         className="text-info inline-flex items-center gap-2 text-sm font-medium hover:underline"
                       >
+                        {/*
+                          印の色は「属するフォルダの色」。タグ1つずつに色を
+                          決めさせると、100枚あるタグで色がばらけて一覧での
+                          区別に使えない。分類が決まっていない・色を付けて
+                          いないフォルダのタグは灰色。
+                        */}
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: t.color }}
+                          style={{
+                            backgroundColor:
+                              groups.find((g) => g.id === t.groupId)?.color ?? 'var(--color-ink-faint)',
+                          }}
                           aria-hidden="true"
                         />
                         {t.name}

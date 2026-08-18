@@ -39,6 +39,8 @@ export interface Folder {
   name: string;
   parent_id: string | null;
   display_order: number;
+  /** #RRGGBB。未設定は null（画面では灰色で出す）。115 で追加。 */
+  color: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,16 +71,31 @@ export async function getFolderById(db: D1Database, id: string): Promise<Folder 
 
 export async function createFolder(
   db: D1Database,
-  input: { kind: FolderKind; name: string; parentId?: string | null; displayOrder?: number },
+  input: {
+    kind: FolderKind;
+    name: string;
+    parentId?: string | null;
+    displayOrder?: number;
+    color?: string | null;
+  },
 ): Promise<Folder> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO folders (id, kind, name, parent_id, display_order, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO folders (id, kind, name, parent_id, display_order, color, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.kind, input.name, input.parentId ?? null, input.displayOrder ?? 0, now, now)
+    .bind(
+      id,
+      input.kind,
+      input.name,
+      input.parentId ?? null,
+      input.displayOrder ?? 0,
+      input.color ?? null,
+      now,
+      now,
+    )
     .run();
   return (await getFolderById(db, id))!;
 }
@@ -86,10 +103,14 @@ export async function createFolder(
 export async function updateFolder(
   db: D1Database,
   id: string,
-  input: { name?: string; parentId?: string | null; displayOrder?: number },
+  input: { name?: string; parentId?: string | null; displayOrder?: number; color?: string | null },
 ): Promise<Folder | null> {
   const sets: string[] = [];
   const values: unknown[] = [];
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    values.push(input.color);
+  }
   if (input.name !== undefined) {
     sets.push('name = ?');
     values.push(input.name);
