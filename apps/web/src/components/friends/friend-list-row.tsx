@@ -12,8 +12,10 @@ interface Props {
   onToggleSelect?: () => void
 }
 
-// Single row of the L-step style friend list. Renders 6 columns:
-// 対応マーク / 名前 / シナリオ / 受信メッセージ / 友だち情報 / 詳細
+// 一覧の1行。見出しと同じ8枠を並べる:
+// 選択 / 名前 / 対応マーク / シナリオ / 受信メッセージ / ★つきタグ・友だち情報 /
+// 最終接触 / 詳細
+// 枠の数が見出しと合っていないと、右の列だけが横にずれる。
 // Clicking the row navigates to the per-friend chat view at
 // `/chats?friend=<id>` so the operator can read history / reply / mark as
 // resolved without leaving the list. Tags are intentionally kept in the
@@ -71,24 +73,7 @@ export default function FriendListRow({ friend, onDetailClick, selected, onToggl
           </div>
         )}
         <div className="min-w-0">
-          {/* 対応マーク — chats.status 由来 (unread / in_progress / resolved). */}
-      <div className="pt-1">
-        {friend.chatStatus === 'unread' ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-red-100 text-red-700">
-            未対応
-          </span>
-        ) : friend.chatStatus === 'in_progress' ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-yellow-100 text-yellow-700">
-            対応中
-          </span>
-        ) : (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-500">
-            対応済み
-          </span>
-        )}
-      </div>
-
-      {/* 行のクリックはトークを開く。名前からは詳細へ行けるようにする。
+          {/* 行のクリックはトークを開く。名前からは詳細へ行けるようにする。
               行の動きを変えると、既にトークを開く操作として覚えられている
               ものが変わってしまう。 */}
           <Link
@@ -103,6 +88,25 @@ export default function FriendListRow({ friend, onDetailClick, selected, onToggl
             <p className="text-[10px] text-red-400 mt-0.5">ブロック / 退会</p>
           )}
         </div>
+      </div>
+
+      {/* 対応マーク — chats.status 由来 (unread / in_progress / resolved).
+          見出しと同じ数の枠を並べる。名前の中に入れていたころは、
+          行だけ1枠少なくなって右の3列が見出しとずれていた。 */}
+      <div className="pt-1">
+        {friend.chatStatus === 'unread' ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-red-100 text-red-700">
+            未対応
+          </span>
+        ) : friend.chatStatus === 'in_progress' ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-yellow-100 text-yellow-700">
+            対応中
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-500">
+            対応済み
+          </span>
+        )}
       </div>
 
       {/* シナリオ */}
