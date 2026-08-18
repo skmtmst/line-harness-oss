@@ -733,6 +733,15 @@ export const api = {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<{ count: number }>>('/api/friends/count' + query)
     },
+    /**
+     * 友だち情報（metadata）を書き換える。
+     * 渡した項目だけ変わる。空文字を渡すと空で上書きする。
+     */
+    updateMetadata: (id: string, metadata: Record<string, string>) =>
+      fetchApi<ApiResponse<unknown>>(`/api/friends/${id}/metadata`, {
+        method: 'PUT',
+        body: JSON.stringify({ metadata }),
+      }),
     addTag: (friendId: string, tagId: string) =>
       fetchApi<ApiResponse<null>>(`/api/friends/${friendId}/tags`, {
         method: 'POST',
@@ -1022,9 +1031,14 @@ export const api = {
           Array<{
             id: string
             adminUserId: string | null
+            userName: string
+            role: 'admin' | 'staff' | 'viewer' | null
+            lineLinked: boolean
+            isActive: boolean
             action: string
             screen: string | null
             ip: string | null
+            connectionSource: string | null
             result: string
             createdAt: string
           }>
@@ -1341,6 +1355,12 @@ export const api = {
         }>
       }>>(`/api/scenarios/${id}/preview${q}`)
     },
+    /** この友だちをこのシナリオに登録する（1人ぶん）。 */
+    enroll: (scenarioId: string, friendId: string) =>
+      fetchApi<ApiResponse<unknown>>(
+        `/api/scenarios/${scenarioId}/enroll/${friendId}`,
+        { method: 'POST' },
+      ),
     stats: (id: string) =>
       fetchApi<ApiResponse<{
         enrolledTotal: number
@@ -2188,6 +2208,12 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Reminder & { steps: ReminderStep[] }>>(`/api/reminders/${id}`),
+    /** この友だちをこのリマインダに登録する（1人ぶん）。 */
+    enroll: (reminderId: string, friendId: string) =>
+      fetchApi<ApiResponse<unknown>>(
+        `/api/reminders/${reminderId}/enroll/${friendId}`,
+        { method: 'POST' },
+      ),
     create: (data: {
       name: string
       description?: string | null
@@ -2371,8 +2397,8 @@ export const api = {
     get: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`),
     me: () =>
-      fetchApi<ApiResponse<{ id: string; name: string; role: string; email: string | null }>>('/api/staff/me'),
-    create: (data: { name: string; email?: string; role: 'admin' | 'staff' | 'viewer' }) =>
+      fetchApi<ApiResponse<{ id: string; name: string; role: string; email: string | null; permissionKeys: string[] }>>('/api/staff/me'),
+    create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }> }) =>
       fetchApi<ApiResponse<StaffMember>>('/api/staff', {
         method: 'POST',
         body: JSON.stringify(data),

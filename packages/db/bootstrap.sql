@@ -1357,6 +1357,13 @@ CREATE TABLE staff_members (
   access_level TEXT NOT NULL DEFAULT 'full' CHECK (access_level IN ('full', 'read_only')),
   api_key    TEXT UNIQUE NOT NULL,
   is_active  INTEGER NOT NULL DEFAULT 1,
+  permission_keys TEXT NOT NULL DEFAULT '[]',
+  notification_preferences TEXT NOT NULL DEFAULT '{}',
+  invite_status TEXT NOT NULL DEFAULT 'active',
+  invite_token_hash TEXT,
+  invite_expires_at TEXT,
+  email_verified_at TEXT,
+  line_linked_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_user_id TEXT);
@@ -1971,6 +1978,8 @@ CREATE INDEX idx_staff_availability_rules_staff
   ON staff_availability_rules (staff_id, weekday, is_active);
 
 CREATE UNIQUE INDEX idx_staff_members_api_key ON staff_members(api_key);
+
+CREATE INDEX idx_staff_members_invite_token ON staff_members(invite_token_hash);
 
 CREATE UNIQUE INDEX idx_staff_members_line_user_id
   ON staff_members(line_user_id)

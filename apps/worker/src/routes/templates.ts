@@ -54,6 +54,7 @@ templates.get('/api/templates', async (c) => {
         category: t.category,
         messageType: t.message_type,
         messageContent: t.message_content,
+        folderId: t.folder_id ?? null,
         usageCount: t.usage_count,
         createdAt: t.created_at,
         updatedAt: t.updated_at,

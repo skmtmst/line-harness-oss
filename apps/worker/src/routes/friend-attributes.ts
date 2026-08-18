@@ -18,6 +18,7 @@ import {
   SAVED_SEARCH_LIMIT,
   SAVED_SEARCH_SCOPES,
   getLoginAudit,
+  getStaffMembers,
   LOGIN_AUDIT_ACTIONS,
   type LoginAuditRow,
   type LoginAuditAction,
@@ -385,16 +386,26 @@ friendAttributes.get('/api/login-audit', requireRole('owner', 'admin'), async (c
       action,
       limit: Number(c.req.query('limit') ?? 100),
     });
+    const staffById = new Map((await getStaffMembers(c.env.DB)).map((member) => [member.id, member]));
     return c.json({
       success: true,
       data: items.map((row: LoginAuditRow) => ({
         id: row.id,
         adminUserId: row.admin_user_id,
+        userName: row.admin_user_id ? staffById.get(row.admin_user_id)?.name ?? '不明なユーザー' : '不明なユーザー',
+        role: row.admin_user_id
+          ? (staffById.get(row.admin_user_id)?.access_level === 'read_only'
+              ? 'viewer'
+              : staffById.get(row.admin_user_id)?.role === 'staff' ? 'staff' : 'admin')
+          : null,
+        lineLinked: row.admin_user_id ? Boolean(staffById.get(row.admin_user_id)?.line_user_id) : false,
+        isActive: row.admin_user_id ? Boolean(staffById.get(row.admin_user_id)?.is_active) : false,
         action: row.action,
         screen: row.screen,
         // IPは残すが、一覧では末尾を伏せる。監査に必要なのは
         // 「いつもと違うところから入っていないか」で、完全な値は要らない。
         ip: row.ip ? maskIp(row.ip) : null,
+        connectionSource: [row.ip ? maskIp(row.ip) : null, row.user_agent ? row.user_agent.slice(0, 42) : null].filter(Boolean).join(' / ') || null,
         result: row.result,
         createdAt: row.created_at,
       })),

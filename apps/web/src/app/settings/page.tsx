@@ -154,7 +154,7 @@ function FeatureSection({
             type="button"
             aria-disabled={group.id === 'basic'}
             onClick={() => group.id !== 'basic' && onGroupToggle(group, !allEnabled)}
-            className={`text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6] ${group.id === 'basic' ? 'cursor-default' : ''}`}
+            className={`text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6] ${group.id === 'basic' ? 'cursor-default' : 'cursor-pointer'}`}
           >
             グループごと切替
           </button>
@@ -167,7 +167,7 @@ function FeatureSection({
                 title="上へ移動"
                 disabled={!canMoveUp}
                 onClick={() => onMove(movableGroupId, -1)}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
               >
                 ↑
               </button>
@@ -177,7 +177,7 @@ function FeatureSection({
                 title="下へ移動"
                 disabled={!canMoveDown}
                 onClick={() => onMove(movableGroupId, 1)}
-                className="flex h-7 w-7 items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
               >
                 ↓
               </button>
@@ -435,7 +435,7 @@ export default function SettingsPage() {
               setNotice('')
             }}
             disabled={loading || saving}
-            className="min-h-10 rounded-lg border border-[#d9d9d9] bg-white px-4 text-sm font-bold text-[#444] hover:bg-[#fafafa] disabled:opacity-40"
+            className="min-h-10 cursor-pointer rounded-lg border border-[#d9d9d9] bg-white px-4 text-sm font-bold text-[#444] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-40"
           >
             初期値に戻す
           </button>
@@ -443,7 +443,7 @@ export default function SettingsPage() {
             type="button"
             onClick={() => void save()}
             disabled={loading || saving}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#06c755] px-5 text-sm font-bold text-white hover:bg-[#05b34c] disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-[#06c755] px-5 text-sm font-bold text-white hover:bg-[#05b34c] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
               <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />

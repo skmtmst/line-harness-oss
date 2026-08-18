@@ -8,6 +8,7 @@ import Header from '@/components/layout/header'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
+import SingleFriendActions from '@/components/friends/single-friend-actions'
 import { useAccount } from '@/contexts/account-context'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -293,27 +294,47 @@ function FriendsPageInner() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-ink text-xs font-bold">{selectedIds.size} 人を選択中</span>
             <span className="text-ink-secondary text-xs">選んだ友だちにまとめて実行できます</span>
-            <div className="ml-auto flex flex-wrap gap-2">
-              {[
-                '対応マークを変える',
-                'テンプレートを送る',
-                'シナリオを開始',
-                'タグを付ける・外す',
-                '友だち情報を書き換える',
-                'リマインダを開始',
-              ].map((label) => (
-                <button
-                  key={label}
-                  disabled
-                  // 受け口が無い。選んでも実行はできないので、押せない形のまま出す。
-                  title="まとめて実行する仕組みは準備中です"
-                  className="border-hairline bg-canvas text-ink-faint rounded-control border px-2.5 py-1 text-xs opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            {/*
+              6つとも「まとめて実行する口」が無いだけで、1人ぶんの口は全部ある。
+              1人だけ選んだときは実行できるようにする。
+
+              2人以上のときは押せないまま。1人ぶんの口を人数ぶん叩くと、
+              途中で失敗したときにどこまで終わったのか分からなくなる。
+            */}
+            {selectedIds.size > 1 && (
+              <div className="ml-auto flex flex-wrap gap-2">
+                {[
+                  '対応マークを変える',
+                  'テンプレートを送る',
+                  'シナリオを開始',
+                  'タグを付ける・外す',
+                  '友だち情報を書き換える',
+                  'リマインダを開始',
+                ].map((label) => (
+                  <button
+                    key={label}
+                    disabled
+                    title="まとめて実行する口がまだありません。1人だけ選ぶと実行できます"
+                    className="border-hairline bg-canvas text-ink-faint rounded-control border px-2.5 py-1 text-xs opacity-50"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+          {selectedIds.size === 1 && (
+            <div className="mt-2">
+              <SingleFriendActions
+                friendId={[...selectedIds][0]}
+                friendName={
+                  friends.find((f) => f.id === [...selectedIds][0])?.displayName ?? 'この友だち'
+                }
+                tags={allTags}
+                onDone={loadFriends}
+              />
+            </div>
+          )}
         </div>
       )}
 
