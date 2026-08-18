@@ -13,8 +13,8 @@ const TABS = [
   { key: 'funnel', label: 'ファネル' },
   { key: 'cross', label: 'クロス集計' },
   { key: 'clicks', label: 'URLクリック' },
-  // 検索からの流入だけは実体が別ルートにある。タブから直に開く。
-  { key: 'search', label: '検索からの流入', href: '/search-console' },
+  // 表示名は利用者指定の「Google Analytics」。実体は既存Search Console画面。
+  { key: 'search', label: 'Google Analytics', href: '/search-console' },
 ]
 
 /** 期間の選択肢。日数で持つ。 */
@@ -1462,18 +1462,17 @@ function AnalyticsInner() {
       {tab === 'clicks' && <ClicksTab />}
       {tab === 'cross' && <CrossTab />}
       {tab === 'funnel' && <FunnelTab />}
-      {/* 検索からの流入は設計 6-11。実装は /search-console にある。
-          タブごと隠すと、検索の流入を見られること自体が読み取れなくなる。 */}
+      {/* 表示名をGoogle Analyticsに統一した既存検索分析は /search-console にある。 */}
       {tab === 'search' && (
         <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
           <p className="text-ink-secondary text-sm">
-            検索からの流入は、いまは別の画面にあります。
+            Google Analyticsは、別の画面で表示します。
           </p>
           <Link
             href="/search-console"
             className="text-accent mt-2 inline-block text-sm hover:underline"
           >
-            検索からの流入を開く
+            Google Analyticsを開く
           </Link>
         </div>
       )}

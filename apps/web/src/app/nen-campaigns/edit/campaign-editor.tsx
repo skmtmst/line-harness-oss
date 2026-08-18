@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { api, type FriendListItem, type NenCampaignSetting } from '@/lib/api'
+import { api, type NenCampaignSetting } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { Field, inputClass } from '@/components/shared/form-controls'
@@ -34,7 +34,8 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [testSearch, setTestSearch] = useState('')
-  const [testCandidates, setTestCandidates] = useState<FriendListItem[]>([])
+  const [testCandidates, setTestCandidates] = useState<Array<{ id: string; displayName: string | null }>>([])
+  const [testLoginUsers, setTestLoginUsers] = useState<Array<{ id: string; displayName: string }>>([])
   const [testing, setTesting] = useState(false)
   const { selectedAccountId } = useAccount()
 
@@ -61,12 +62,35 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     }
   }, [campaignKey])
 
+  useEffect(() => {
+    setTestLoginUsers([])
+    setTestCandidates([])
+    if (!selectedAccountId) return
+    let cancelled = false
+    void api.accountSettings.getTestRecipientLoginUsers(selectedAccountId)
+      .then((response) => {
+        if (cancelled || !response.success) return
+        const candidates = response.data
+          .filter((candidate) => candidate.sameAccount)
+          .map((candidate) => ({ id: candidate.id, displayName: candidate.staffName }))
+        setTestLoginUsers(candidates)
+        setTestCandidates(candidates)
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [selectedAccountId])
+
   const merged = { ...setting, ...draft } as NenCampaignSetting
 
   /** テスト送信の相手を名前で探す。宛先を選ばないと送れない。 */
   const searchFriends = async () => {
-    const res = await api.friends.list({ search: testSearch.trim(), limit: 5 })
-    if (res.success) setTestCandidates(res.data.items)
+    const query = testSearch.trim()
+    const res = await api.friends.list({ search: query, accountId: selectedAccountId ?? undefined, limit: 5 })
+    if (res.success) {
+      const matchingLoginUsers = testLoginUsers.filter((candidate) => candidate.displayName.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
+      const found = res.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
+      setTestCandidates([...new Map([...matchingLoginUsers, ...found].map((candidate) => [candidate.id, candidate])).values()])
+    }
   }
 
   const sendTest = async (friendId: string) => {

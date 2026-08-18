@@ -49,7 +49,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
 function readSidebar(): Array<{ section: string | null; items: string[] }> {
   const source = readFileSync(SIDEBAR, 'utf8');
   const start = source.indexOf('const menuSections: MenuSection[] = [');
-  const end = source.indexOf('function AccountAvatar');
+  const end = source.indexOf('function NavIcon');
   const body = source.slice(start, end);
 
   const sections: Array<{ section: string | null; items: string[] }> = [];
@@ -129,7 +129,7 @@ describe('サイドバーが V2 設計と一致する', () => {
     const source = readFileSync(SIDEBAR, 'utf8');
     const body = source.slice(
       source.indexOf('const menuSections: MenuSection[] = ['),
-      source.indexOf('function AccountAvatar'),
+      source.indexOf('function NavIcon'),
     );
     const pairs = [...body.matchAll(/\{\s*href:\s*'([^']+)',\s*label:\s*'([^']+)'/g)];
     const actual = Object.fromEntries(pairs.map((m) => [m[2], m[1]]));
@@ -141,7 +141,7 @@ describe('サイドバーが V2 設計と一致する', () => {
     const source = readFileSync(SIDEBAR, 'utf8');
     const body = source.slice(
       source.indexOf('const menuSections: MenuSection[] = ['),
-      source.indexOf('function AccountAvatar'),
+      source.indexOf('function NavIcon'),
     );
     const hrefs = [...body.matchAll(/\{\s*href:\s*'([^']+)'/g)].map((m) => m[1]);
     expect(hrefs.length).toBe(new Set(hrefs).size);
@@ -165,5 +165,15 @@ describe('レスポンシブのメニュー名を維持する', () => {
   it('ドロワーに管理メニューの見出しがある', () => {
     expect(source).toContain('管理メニュー');
     expect(source).toContain('aria-label="管理メニュー"');
+  });
+
+  it('アカウント名・国旗を並べる切替行をサイドバーに表示しない', () => {
+    expect(source).not.toContain('AccountSwitcher');
+    expect(source).not.toContain('countryFlag');
+  });
+
+  it('PCの先頭に固定の管理メニュー見出しがある', () => {
+    expect(source).toContain('PCの先頭はアカウント切替ではなく');
+    expect(source).toContain('<p className="text-sm font-bold text-gray-900">管理メニュー</p>');
   });
 });
