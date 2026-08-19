@@ -1,94 +1,174 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
-import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import type { FriendField, Tag } from '@line-crm/shared'
-import { api } from '@/lib/api'
-import Header from '@/components/layout/header'
-import { Field, inputClass } from '@/components/shared/form-controls'
-
 /**
  * 回答フォーム編集（設計 V2 6-3-1）。
  *
- * 設計は「ブロックの一覧 → 選んだブロックの設定 → プレビュー」の3枚並び。
- * ブロックの中身は forms.fields のJSONにそのまま入るので、種類・タイトル・
- * 説明文・必須・登録先・並び順は本当に編集できる。
+ * 作りは「左に出来上がり・右に設定」。ブロックを足す・並べ替える作業は、
+ * 出来上がりを見ながらでないと決められないので、プレビューを常に横に置く。
  *
- * `name` は回答データの見出しになるので、作ったあとは変えない。ここを
- * 変えると、それまでの回答と結びつかなくなる。
+ * 上のタブは、共通ヘッダ（全ページの先頭に出る部分）と、ページ（セクション）。
+ * ページを分けると、選択肢に「この人はこっちのページへ」という分岐が付く。
+ *
+ * `name`（回答データの見出し）は作ったあと変えない。ここを変えると、
+ * それまでの回答と結びつかなくなる。画面には出すだけで、編集させない。
  */
 
-/** 設計に出ているブロックの種類。値は回答を受け取る側と合わせてある。 */
-const BLOCK_TYPES = [
-  { value: 'heading', label: '見出し', note: '区切りの文字だけを出します' },
-  { value: 'text', label: '単一行', note: '短い文字' },
-  { value: 'textarea', label: '複数行', note: '長い文章' },
-  { value: 'tel', label: '電話番号', note: '数字だけ' },
-  { value: 'email', label: 'メールアドレス', note: '' },
-  { value: 'number', label: '数値', note: '体重など' },
-  { value: 'date', label: '日付', note: 'カレンダーから選びます' },
-  { value: 'select', label: '選択', note: '用意した中から1つ' },
-]
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import {
+  emptyLayout,
+  newBlockId,
+  type FormBlock,
+  type FormInputType,
+  type FormLayout,
+  type FormOptions,
+  type FormSection,
+} from '@line-crm/shared'
+import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
+import Header from '@/components/layout/header'
+import { Field, inputClass } from '@/components/shared/form-controls'
+import BlockEditor, { BLOCK_MENU } from '@/components/forms/block-editor'
+import FormPreview from '@/components/forms/form-preview'
+import OptionsDialog from '@/components/forms/options-dialog'
+import { EMPTY_REFS, type FormRefs } from '@/components/forms/form-refs'
 
-interface FormFieldDef {
-  id?: string
-  /** 回答データの見出し。作ったあとは変えない。 */
-  name?: string
-  label?: string
-  type?: string
-  required?: boolean
-  hidden?: boolean
-  description?: string
-  defaultValue?: string
-  /** 選択のときの候補。改行区切りで持つ。 */
-  options?: string[]
-  /** 回答の登録先。友だち情報欄の項目ID */
-  friendFieldId?: string | null
-}
+/** 共通ヘッダを指す番号。セクションの添字と混ぜないために -1 を使う。 */
+const HEADER_TAB = -1
 
-const typeLabel = (t?: string) => BLOCK_TYPES.find((b) => b.value === t)?.label ?? (t ?? '単一行')
-
-/** 表示名から、回答データの見出しになる英数字のキーを作る。 */
-function suggestName(index: number): string {
-  return `field_${index + 1}_${Math.abs(index * 2654435761) % 1000}`
+function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
+  const id = newBlockId()
+  switch (kind) {
+    case 'heading':
+      return { id, kind: 'heading', text: '見出し', level: 2 }
+    case 'text':
+      return { id, kind: 'text', text: '' }
+    case 'image':
+      return { id, kind: 'image', mediaUrl: '', size: 'normal' }
+    case 'button':
+      return { id, kind: 'button', label: 'ボタン', url: '', style: 'default' }
+    default:
+      return {
+        id,
+        kind: 'input',
+        type: type ?? 'text',
+        // 回答データの見出しは英数字で作る。日本語のままだと、受け渡しの
+        // 途中で化けることがある。
+        name: `q${count + 1}_${id.slice(2)}`,
+        label: '',
+        required: false,
+        ...(type === 'radio' || type === 'checkbox' || type === 'select'
+          ? {
+              choiceMode: 'tag' as const,
+              choices: [
+                { id: newBlockId('c'), label: '選択肢1' },
+                { id: newBlockId('c'), label: '選択肢2' },
+              ],
+            }
+          : {}),
+      }
+  }
 }
 
 function FormEditInner() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
+  const { selectedAccount } = useAccount()
+
+  /**
+   * 友だちに配るURL。
+   *
+   * LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。回答画面は
+   * `/forms/:id` に置いてあるので、この形でそのまま開く。
+   * アカウントに LIFF を登録していないと作れないため、そのときは案内を出す。
+   */
+  const liffId = selectedAccount?.liffId ?? null
+  const answerUrl = liffId ? `https://liff.line.me/${liffId}/forms/${id}` : null
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [fields, setFields] = useState<FormFieldDef[]>([])
-  const [selected, setSelected] = useState(0)
-  const [onSubmitTagId, setOnSubmitTagId] = useState('')
   const [isActive, setIsActive] = useState(true)
   const [submitCount, setSubmitCount] = useState(0)
-  const [tags, setTags] = useState<Tag[]>([])
-  const [friendFields, setFriendFields] = useState<FriendField[]>([])
+  const [onSubmitTagId, setOnSubmitTagId] = useState('')
+  const [layout, setLayoutState] = useState<FormLayout>(emptyLayout)
+  const [tab, setTab] = useState(0)
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  const [refs, setRefs] = useState<FormRefs>(EMPTY_REFS)
+  const [showOptions, setShowOptions] = useState(false)
+  const [showAddMenu, setShowAddMenu] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
+  // 元に戻す / やり直す。並べ替えは失敗しても取り返せるようにする。
+  const undoStack = useRef<FormLayout[]>([])
+  const redoStack = useRef<FormLayout[]>([])
+
+  const setLayout = useCallback((next: FormLayout | ((prev: FormLayout) => FormLayout)) => {
+    setLayoutState((prev) => {
+      const resolved = typeof next === 'function' ? next(prev) : next
+      undoStack.current = [...undoStack.current.slice(-49), prev]
+      redoStack.current = []
+      return resolved
+    })
+  }, [])
+
+  const undo = () => {
+    const prev = undoStack.current.pop()
+    if (!prev) return
+    setLayoutState((current) => {
+      redoStack.current = [...redoStack.current, current]
+      return prev
+    })
+  }
+
+  const redo = () => {
+    const next = redoStack.current.pop()
+    if (!next) return
+    setLayoutState((current) => {
+      undoStack.current = [...undoStack.current, current]
+      return next
+    })
+  }
+
   useEffect(() => {
     void (async () => {
       try {
-        const [tagRes, ffRes] = await Promise.all([api.tags.list(), api.friendFields.list()])
-        if (tagRes.success) setTags(tagRes.data)
-        if (ffRes.success) setFriendFields(ffRes.data)
+        const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
+          api.tags.list(),
+          api.friendFields.list(),
+          api.scenarios.list(),
+          api.reminders.list(),
+          api.templates.list(),
+        ])
+        setRefs({
+          tags: tagRes.success ? tagRes.data.map((t) => ({ id: t.id, name: t.name })) : [],
+          friendFields: ffRes.success
+            ? ffRes.data.map((f) => ({ id: f.id, name: f.name, ecIsMaster: f.ecIsMaster }))
+            : [],
+          scenarios: scenarioRes.success
+            ? scenarioRes.data.map((s) => ({ id: s.id, name: s.name }))
+            : [],
+          reminders: reminderRes.success
+            ? reminderRes.data.map((r) => ({ id: r.id, name: r.name }))
+            : [],
+          templates: templateRes.success
+            ? templateRes.data.map((t) => ({ id: t.id, name: t.name, type: t.messageType }))
+            : [],
+        })
+
         if (!id) return
         const res = await api.forms.get(id)
         if (res.success) {
           setName(res.data.name)
           setDescription(res.data.description ?? '')
-          setOnSubmitTagId(res.data.onSubmitTagId ?? '')
           setIsActive(res.data.isActive)
           setSubmitCount(res.data.submitCount ?? 0)
-          const raw = res.data.fields
-          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-          setFields(Array.isArray(parsed) ? (parsed as FormFieldDef[]) : [])
+          setOnSubmitTagId(res.data.onSubmitTagId ?? '')
+          // layout はサーバ側が必ず作って返す（古いフォームは fields から）
+          setLayoutState(res.data.layout ?? emptyLayout())
         }
       } catch {
         setError('読み込みに失敗しました')
@@ -98,42 +178,147 @@ function FormEditInner() {
     })()
   }, [id])
 
-  const patch = (i: number, updates: Partial<FormFieldDef>) =>
-    setFields((prev) => prev.map((f, j) => (j === i ? { ...f, ...updates } : f)))
+  // いま編集している並び（共通ヘッダ か セクション）
+  const blocks = useMemo(
+    () => (tab === HEADER_TAB ? layout.header : (layout.sections[tab]?.blocks ?? [])),
+    [layout, tab],
+  )
 
-  const move = (i: number, delta: number) =>
-    setFields((prev) => {
-      const to = i + delta
-      if (to < 0 || to >= prev.length) return prev
-      const next = [...prev]
-      const [row] = next.splice(i, 1)
-      next.splice(to, 0, row)
-      setSelected(to)
-      return next
-    })
+  const setBlocks = (next: FormBlock[]) =>
+    setLayout((prev) =>
+      tab === HEADER_TAB
+        ? { ...prev, header: next }
+        : {
+            ...prev,
+            sections: prev.sections.map((s, i) => (i === tab ? { ...s, blocks: next } : s)),
+          },
+    )
 
-  const addBlock = () =>
-    setFields((prev) => {
-      const next = [
-        ...prev,
-        { name: suggestName(prev.length), label: '新しい項目', type: 'text' as const },
-      ]
-      setSelected(next.length - 1)
-      return next
-    })
+  const selectedIndex = blocks.findIndex((b) => b.id === selectedBlockId)
 
-  const removeBlock = (i: number) =>
-    setFields((prev) => {
-      const next = prev.filter((_, j) => j !== i)
-      setSelected(Math.max(0, Math.min(i, next.length - 1)))
-      return next
-    })
+  const addBlock = (kind: string, type?: FormInputType) => {
+    const inputCount = layout.sections.reduce(
+      (n, s) => n + s.blocks.filter((b) => b.kind === 'input').length,
+      layout.header.filter((b) => b.kind === 'input').length,
+    )
+    const block = makeBlock(kind, type, inputCount)
+    setBlocks([...blocks, block])
+    setSelectedBlockId(block.id)
+    setShowAddMenu(false)
+  }
+
+  const patchBlock = (blockId: string, patch: Partial<FormBlock>) =>
+    setBlocks(blocks.map((b) => (b.id === blockId ? ({ ...b, ...patch } as FormBlock) : b)))
+
+  const moveBlock = (delta: number) => {
+    if (selectedIndex < 0) return
+    const to = selectedIndex + delta
+    if (to < 0 || to >= blocks.length) return
+    const next = [...blocks]
+    const [row] = next.splice(selectedIndex, 1)
+    next.splice(to, 0, row)
+    setBlocks(next)
+  }
+
+  const duplicateBlock = () => {
+    if (selectedIndex < 0) return
+    const source = blocks[selectedIndex]
+    const copy: FormBlock =
+      source.kind === 'input'
+        ? { ...source, id: newBlockId(), name: `${source.name}_copy` }
+        : { ...source, id: newBlockId() }
+    const next = [...blocks]
+    next.splice(selectedIndex + 1, 0, copy)
+    setBlocks(next)
+    setSelectedBlockId(copy.id)
+  }
+
+  const removeBlock = () => {
+    if (selectedIndex < 0) return
+    setBlocks(blocks.filter((_, i) => i !== selectedIndex))
+    setSelectedBlockId(null)
+  }
+
+  // ---- ページ（セクション） ----
+  const addSection = () => {
+    const section: FormSection = {
+      id: newBlockId('s'),
+      name: `セクション${layout.sections.length + 1}`,
+      blocks: [],
+    }
+    setLayout((prev) => ({ ...prev, sections: [...prev.sections, section] }))
+    setTab(layout.sections.length)
+  }
+
+  const renameSection = (index: number) => {
+    const current = layout.sections[index]
+    const next = window.prompt('ページの名前', current.name)
+    if (next === null) return
+    setLayout((prev) => ({
+      ...prev,
+      sections: prev.sections.map((s, i) => (i === index ? { ...s, name: next } : s)),
+    }))
+  }
+
+  const duplicateSection = (index: number) => {
+    const source = layout.sections[index]
+    const copy: FormSection = {
+      id: newBlockId('s'),
+      name: `${source.name}のコピー`,
+      blocks: source.blocks.map((b) =>
+        b.kind === 'input'
+          ? { ...b, id: newBlockId(), name: `${b.name}_copy` }
+          : { ...b, id: newBlockId() },
+      ),
+    }
+    setLayout((prev) => ({
+      ...prev,
+      sections: [...prev.sections.slice(0, index + 1), copy, ...prev.sections.slice(index + 1)],
+    }))
+    setTab(index + 1)
+  }
+
+  const removeSection = (index: number) => {
+    if (layout.sections.length <= 1) return
+    const target = layout.sections[index]
+    if (target.blocks.length > 0 && !window.confirm(`「${target.name}」を中身ごと削除します。`)) {
+      return
+    }
+    setLayout((prev) => ({
+      ...prev,
+      // 消えるページへ飛ばしていた選択肢は、行き先を外して「次へ進む」に戻す
+      sections: prev.sections
+        .filter((_, i) => i !== index)
+        .map((s) => ({
+          ...s,
+          blocks: s.blocks.map((b) =>
+            b.kind === 'input' && b.choices
+              ? {
+                  ...b,
+                  choices: b.choices.map((c) =>
+                    c.jumpToSectionId === target.id ? { ...c, jumpToSectionId: null } : c,
+                  ),
+                }
+              : b,
+          ),
+        })),
+    }))
+    setTab(Math.max(0, index - 1))
+  }
 
   const save = async () => {
     if (!name.trim()) {
       setError('フォーム名を入力してください')
       return
     }
+    const unnamed = layout.header
+      .concat(layout.sections.flatMap((s) => s.blocks))
+      .find((b) => b.kind === 'input' && !b.label.trim())
+    if (unnamed) {
+      setError('タイトルが空のブロックがあります')
+      return
+    }
+
     setSaving(true)
     setError('')
     setNotice('')
@@ -141,7 +326,7 @@ function FormEditInner() {
       const res = await api.forms.update(id, {
         name: name.trim(),
         description: description.trim() || null,
-        fields,
+        layout,
         onSubmitTagId: onSubmitTagId || null,
         isActive,
       })
@@ -171,8 +356,6 @@ function FormEditInner() {
     )
   }
 
-  const current = fields[selected]
-
   return (
     <div>
       <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
@@ -186,9 +369,13 @@ function FormEditInner() {
       <div data-design="Head">
         <Header
           title="回答フォーム編集"
-          description="ブロックを積んでフォームを作ります。各項目の回答は、指定した友だち情報欄にそのまま記録されます。"
+          description="ブロックを積んでフォームを作ります。選択肢ごとにタグを付けたり、答えを友だち情報へ入れたりできます。"
           action={
             <div className="flex flex-wrap gap-2">
+              {/* 設計にあるが、まだ作っていないもの。並びから消すと「この画面には
+                  その機能が無い」ように見えるので、押せない状態で置いておく。
+                  デザイン設定は、フォームの見た目をこのアプリのデザインに
+                  そろえる方針にしたため、色やフォントを選ぶ画面は作っていない。 */}
               {['マニュアル', '下書き保存', 'デザイン設定'].map((label) => (
                 <button
                   key={label}
@@ -199,6 +386,12 @@ function FormEditInner() {
                   {label}
                 </button>
               ))}
+              <button
+                onClick={() => setShowOptions(true)}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+              >
+                オプション設定
+              </button>
               <button
                 onClick={save}
                 disabled={saving}
@@ -231,13 +424,6 @@ function FormEditInner() {
               />
             </Field>
 
-            {/* forms にフォルダを持つ列が無い。 */}
-            <Field label="フォルダ" note="フォルダ分けは、まだ保存する場所がありません。">
-              <select disabled className={`${inputClass} opacity-50`}>
-                <option>未分類</option>
-              </select>
-            </Field>
-
             <Field label="公開状態" htmlFor="fm-active">
               <select
                 id="fm-active"
@@ -250,11 +436,59 @@ function FormEditInner() {
               </select>
             </Field>
 
-            {/* 友だちが入力する画面がこの中に無い。URLを出すと、開けないものを配ることになる。 */}
-            <Field label="回答用URL" note="友だちが入力する画面が、この管理システムの中にありません。">
-              <p className="text-ink-faint rounded-control border-hairline border px-3 py-2 text-sm">
-                —
-              </p>
+            <Field
+              label="回答したときに付けるタグ"
+              htmlFor="fm-tag"
+              note="このフォームに答えた人を、あとから絞り込めます。"
+            >
+              <select
+                id="fm-tag"
+                value={onSubmitTagId}
+                onChange={(e) => setOnSubmitTagId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">— 付けない —</option>
+                {refs.tags.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field
+              label="回答用URL"
+              note={
+                answerUrl
+                  ? '友だちに配るURLです。LINEの中で開きます。'
+                  : 'このアカウントに LIFF を登録すると、配れるURLが出ます。'
+              }
+            >
+              {answerUrl ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    readOnly
+                    value={answerUrl}
+                    onFocus={(e) => e.currentTarget.select()}
+                    className={`${inputClass} text-xs`}
+                  />
+                  <button
+                    onClick={() => {
+                      void navigator.clipboard
+                        .writeText(answerUrl)
+                        .then(() => setNotice('URLをコピーしました'))
+                        .catch(() => window.prompt('コピーしてください:', answerUrl))
+                    }}
+                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-2 py-2 text-xs whitespace-nowrap"
+                  >
+                    コピー
+                  </button>
+                </div>
+              ) : (
+                <p className="text-ink-faint rounded-control border-hairline border px-3 py-2 text-sm">
+                  —
+                </p>
+              )}
             </Field>
 
             <div>
@@ -266,295 +500,214 @@ function FormEditInner() {
             </div>
           </div>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(220px,1fr)_minmax(0,1.4fr)_minmax(240px,1fr)]">
-            {/* ---- ブロックの一覧 ---- */}
-            <section data-design="Blocks" className="bg-canvas rounded-card border-hairline border">
-              <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
-                <h2 className="text-ink text-sm font-bold">ブロック</h2>
-                <span className="text-ink-faint text-xs tabular-nums">{fields.length}</span>
-              </div>
-              <ol className="divide-hairline divide-y">
-                {fields.map((f, i) => (
-                  <li key={f.id ?? i}>
-                    <div
-                      className={`flex items-center gap-2 px-3 py-2 ${
-                        i === selected ? 'bg-accent-soft' : ''
+          <div className="grid gap-4 xl:grid-cols-[minmax(320px,26rem)_minmax(0,1fr)]">
+            {/* ---- 出来上がり ---- */}
+            <section data-design="Preview" className="xl:sticky xl:top-4 xl:self-start">
+              <h2 className="text-ink-secondary mb-2 text-xs font-medium">出来上がり</h2>
+              <FormPreview layout={layout} sectionIndex={tab === HEADER_TAB ? 0 : tab} />
+            </section>
+
+            {/* ---- 設定 ---- */}
+            <section className="min-w-0">
+              {/* タブ */}
+              <div className="border-hairline flex flex-wrap items-center gap-1 border-b pb-2">
+                <button
+                  onClick={() => setTab(HEADER_TAB)}
+                  className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
+                    tab === HEADER_TAB
+                      ? 'bg-accent-soft text-accent'
+                      : 'text-ink-secondary hover:bg-canvas-sunken'
+                  }`}
+                >
+                  共通ヘッダ
+                </button>
+
+                {layout.sections.map((section, i) => (
+                  <span key={section.id} className="flex items-center">
+                    <button
+                      onClick={() => setTab(i)}
+                      onDoubleClick={() => renameSection(i)}
+                      title="ダブルクリックで名前を変えられます"
+                      className={`rounded-control px-3 py-1.5 text-sm font-medium whitespace-nowrap ${
+                        tab === i
+                          ? 'bg-accent-soft text-accent'
+                          : 'text-ink-secondary hover:bg-canvas-sunken'
                       }`}
                     >
-                      <button
-                        onClick={() => setSelected(i)}
-                        className="min-w-0 flex-1 text-left"
-                        aria-current={i === selected}
-                      >
-                        <span className="text-ink-faint mr-2 text-xs tabular-nums">{i + 1}</span>
-                        <span className="text-ink-faint text-xs">{typeLabel(f.type)}</span>
-                        <span className="text-ink block truncate text-sm font-medium">
-                          {f.label ?? f.name ?? `項目${i + 1}`}
-                        </span>
-                      </button>
-                      <div className="flex shrink-0 flex-col">
+                      {section.name}
+                    </button>
+                    {tab === i && (
+                      <span className="flex items-center">
                         <button
-                          onClick={() => move(i, -1)}
-                          disabled={i === 0}
-                          aria-label="上へ"
-                          className="text-ink-faint hover:text-ink px-1 text-xs disabled:opacity-30"
+                          onClick={() => duplicateSection(i)}
+                          className="text-ink-faint hover:text-ink px-1 text-xs"
+                          title="このページを複製"
                         >
-                          ↑
+                          複製
                         </button>
-                        <button
-                          onClick={() => move(i, 1)}
-                          disabled={i === fields.length - 1}
-                          aria-label="下へ"
-                          className="text-ink-faint hover:text-ink px-1 text-xs disabled:opacity-30"
-                        >
-                          ↓
-                        </button>
-                      </div>
-                    </div>
-                  </li>
+                        {layout.sections.length > 1 && (
+                          <button
+                            onClick={() => removeSection(i)}
+                            className="text-danger px-1 text-xs"
+                            title="このページを削除"
+                          >
+                            削除
+                          </button>
+                        )}
+                      </span>
+                    )}
+                  </span>
                 ))}
-              </ol>
-              <div className="border-hairline border-t p-3">
+
                 <button
-                  onClick={addBlock}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control w-full border border-dashed px-3 py-2 text-sm font-medium"
+                  onClick={addSection}
+                  className="text-accent hover:bg-accent-soft rounded-control px-2 py-1.5 text-sm font-bold"
+                  title="ページを足す"
                 >
-                  ブロックを追加
+                  ＋
                 </button>
               </div>
-            </section>
 
-            {/* ---- 選んだブロックの設定 ---- */}
-            <section
-              data-design="Inspector"
-              className="bg-canvas rounded-card border-hairline space-y-4 border p-4"
-            >
-              {!current ? (
-                <p className="text-ink-faint text-sm">
-                  ブロックがありません。「ブロックを追加」から作れます。
-                </p>
-              ) : (
-                <>
-                  <Field label="タイプ" htmlFor="bk-type">
-                    <select
-                      id="bk-type"
-                      value={current.type ?? 'text'}
-                      onChange={(e) => patch(selected, { type: e.target.value })}
-                      className={inputClass}
-                    >
-                      {BLOCK_TYPES.map((b) => (
-                        <option key={b.value} value={b.value}>
-                          {b.label}
-                          {b.note ? ` — ${b.note}` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
+              {/* ツールバー */}
+              <div
+                data-design="Blocks"
+                className="flex flex-wrap items-center justify-between gap-2 py-2"
+              >
+                <span className="text-ink text-sm font-bold">ブロック設定</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  <button
+                    onClick={undo}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs"
+                  >
+                    元に戻す
+                  </button>
+                  <button
+                    onClick={redo}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs"
+                  >
+                    やり直す
+                  </button>
+                  <button
+                    onClick={() => moveBlock(-1)}
+                    disabled={selectedIndex < 0}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs disabled:opacity-40"
+                  >
+                    上に移動
+                  </button>
+                  <button
+                    onClick={() => moveBlock(1)}
+                    disabled={selectedIndex < 0}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs disabled:opacity-40"
+                  >
+                    下に移動
+                  </button>
+                  <button
+                    onClick={duplicateBlock}
+                    disabled={selectedIndex < 0}
+                    className="text-ink-secondary hover:bg-canvas-sunken rounded-control px-2 py-1 text-xs disabled:opacity-40"
+                  >
+                    複製
+                  </button>
+                  <button
+                    onClick={removeBlock}
+                    disabled={selectedIndex < 0}
+                    className="text-danger hover:bg-danger-bg rounded-control px-2 py-1 text-xs disabled:opacity-40"
+                  >
+                    削除
+                  </button>
 
-                  <Field label="タイトル" htmlFor="bk-label" required>
-                    <input
-                      id="bk-label"
-                      type="text"
-                      value={current.label ?? ''}
-                      onChange={(e) => patch(selected, { label: e.target.value })}
-                      className={inputClass}
-                    />
-                  </Field>
-
-                  <Field label="説明文" htmlFor="bk-desc" note="入力欄の下に小さく出ます。">
-                    <input
-                      id="bk-desc"
-                      type="text"
-                      value={current.description ?? ''}
-                      onChange={(e) => patch(selected, { description: e.target.value })}
-                      placeholder="例：西暦でご入力ください"
-                      className={inputClass}
-                    />
-                  </Field>
-
-                  {current.type === 'select' && (
-                    <Field label="選べるもの" htmlFor="bk-options" note="1行に1つ書きます。">
-                      <textarea
-                        id="bk-options"
-                        rows={4}
-                        value={(current.options ?? []).join('\n')}
-                        onChange={(e) =>
-                          patch(selected, {
-                            options: e.target.value.split('\n').filter((v) => v.trim() !== ''),
-                          })
-                        }
-                        placeholder={'犬\n猫\nその他'}
-                        className={`${inputClass} resize-y`}
-                      />
-                    </Field>
-                  )}
-
-                  {current.type !== 'heading' && (
-                    <>
-                      <Field label="初期値" htmlFor="bk-default">
-                        <input
-                          id="bk-default"
-                          type="text"
-                          value={current.defaultValue ?? ''}
-                          onChange={(e) => patch(selected, { defaultValue: e.target.value })}
-                          className={inputClass}
-                        />
-                      </Field>
-
-                      <Field
-                        label="回答の登録先"
-                        htmlFor="bk-ff"
-                        note="友だち情報欄で定義した項目から選びます。決めると、友だち詳細に出てテンプレートで差し込めます。"
-                      >
-                        <select
-                          id="bk-ff"
-                          value={current.friendFieldId ?? ''}
-                          onChange={(e) =>
-                            patch(selected, { friendFieldId: e.target.value || null })
-                          }
-                          className={inputClass}
-                        >
-                          <option value="">— 情報欄に入れない —</option>
-                          {friendFields.map((ff) => (
-                            <option key={ff.id} value={ff.id}>
-                              {ff.name}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      {/* 設計は「複数可」。いまは項目ひとつにつき登録先ひとつ。 */}
-                      <p className="text-ink-faint text-xs leading-relaxed">
-                        登録先はひとつだけ選べます。ECが正になっている項目には書き込まれません（次のEC同期で戻ってしまうため）。
-                      </p>
-
-                      <div className="flex flex-wrap gap-4">
-                        <label className="text-ink-secondary flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={current.required ?? false}
-                            onChange={(e) => patch(selected, { required: e.target.checked })}
-                          />
-                          必須
-                        </label>
-                        <label className="text-ink-secondary flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={current.hidden ?? false}
-                            onChange={(e) => patch(selected, { hidden: e.target.checked })}
-                          />
-                          非表示
-                        </label>
-                      </div>
-                    </>
-                  )}
-
-                  {/* リマインダを日付から起こす結び付けが無い。 */}
-                  {current.type === 'date' && (
-                    <label className="text-ink-faint flex items-start gap-2 text-sm">
-                      <input type="checkbox" disabled className="mt-0.5" />
-                      <span>
-                        この日付からリマインダを起動する
-                        <span className="block text-xs">
-                          誕生日クーポンなどに使う設定ですが、フォームの日付とリマインダを結ぶ場所がまだありません。
-                        </span>
-                      </span>
-                    </label>
-                  )}
-
-                  <div className="border-hairline flex items-center justify-between border-t pt-3">
-                    <span className="text-ink-faint text-xs">
-                      回答データの見出し：{current.name ?? '（未設定）'}
-                    </span>
+                  <div className="relative">
                     <button
-                      onClick={() => removeBlock(selected)}
-                      className="text-danger text-xs hover:underline"
+                      onClick={() => setShowAddMenu((v) => !v)}
+                      className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-3 py-1.5 text-xs font-medium"
                     >
-                      このブロックを削除
+                      ＋ ブロックを追加
                     </button>
-                  </div>
-                </>
-              )}
-            </section>
-
-            {/* ---- プレビュー ---- */}
-            <section
-              data-design="Preview"
-              className="bg-canvas rounded-card border-hairline border p-4"
-            >
-              <h2 className="text-ink mb-3 text-sm font-bold">プレビュー</h2>
-              <div className="border-hairline rounded-card space-y-3 border p-3">
-                <p className="text-ink text-sm font-bold">{name || '（名前なし）'}</p>
-                {description && (
-                  <p className="text-ink-secondary text-xs leading-relaxed">{description}</p>
-                )}
-                {fields
-                  .filter((f) => !f.hidden)
-                  .map((f, i) =>
-                    f.type === 'heading' ? (
-                      <p key={i} className="text-ink border-hairline border-t pt-3 text-sm font-bold">
-                        {f.label}
-                      </p>
-                    ) : (
-                      <div key={i}>
-                        <p className="text-ink-secondary text-xs font-medium">
-                          {f.label}
-                          {f.required && (
-                            <span className="text-danger ml-1 text-[10px]">必須</span>
-                          )}
-                        </p>
-                        <div className="border-hairline text-ink-faint rounded-control mt-1 border px-2 py-1.5 text-xs">
-                          {f.defaultValue ||
-                            (f.type === 'select'
-                              ? (f.options ?? []).join(' / ') || '選んでください'
-                              : f.type === 'date'
-                                ? '日付を選択'
-                                : '　')}
+                    {showAddMenu && (
+                      <>
+                        {/* 外を押したら閉じる */}
+                        <button
+                          className="fixed inset-0 z-10 cursor-default"
+                          onClick={() => setShowAddMenu(false)}
+                          aria-label="閉じる"
+                        />
+                        <div className="bg-canvas rounded-card border-hairline absolute right-0 z-20 mt-1 w-48 border py-1 shadow-lg">
+                          {['飾り', '入力'].map((group) => (
+                            <div key={group}>
+                              <p className="text-ink-faint px-3 py-1 text-[11px]">{group}</p>
+                              {BLOCK_MENU.filter((m) => m.group === group).map((m) => (
+                                <button
+                                  key={`${m.kind}-${m.type ?? ''}`}
+                                  onClick={() => addBlock(m.kind, m.type)}
+                                  className="text-ink hover:bg-canvas-sunken block w-full px-3 py-1.5 text-left text-sm"
+                                >
+                                  {m.label}
+                                </button>
+                              ))}
+                            </div>
+                          ))}
                         </div>
-                        {f.description && (
-                          <p className="text-ink-faint mt-0.5 text-[11px]">{f.description}</p>
-                        )}
-                      </div>
-                    ),
-                  )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ブロック。設計では「一覧」と「選んだものの設定」が別の枠だが、
+                  ここでは1枚のブロックに設定をそのまま出している。1つずつ
+                  選び直さないと中身が見えないと、2つの質問の差（片方だけ
+                  タグを付ける等）を見比べられないため。 */}
+              <div data-design="Inspector" className="space-y-3">
+                {blocks.length === 0 ? (
+                  <p className="text-ink-faint bg-canvas rounded-card border-hairline border border-dashed p-8 text-center text-sm">
+                    「ブロックを追加」から作ってください
+                  </p>
+                ) : (
+                  blocks.map((block, index) => (
+                    <BlockEditor
+                      key={block.id}
+                      block={block}
+                      index={index}
+                      sections={layout.sections}
+                      refs={refs}
+                      selected={block.id === selectedBlockId}
+                      onSelect={() => setSelectedBlockId(block.id)}
+                      onChange={(patch) => patchBlock(block.id, patch)}
+                    />
+                  ))
+                )}
+              </div>
+
+              <div className="bg-canvas rounded-card border-hairline mt-4 space-y-4 border p-4">
+                <Field
+                  label="説明"
+                  htmlFor="fm-desc"
+                  note="回答の一覧で、フォームの覚え書きに使います。"
+                >
+                  <textarea
+                    id="fm-desc"
+                    rows={2}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className={`${inputClass} resize-y`}
+                  />
+                </Field>
+
+                {error && <p className="text-danger text-sm">{error}</p>}
+                {notice && <p className="text-success text-sm">{notice}</p>}
               </div>
             </section>
           </div>
-
-          <div className="bg-canvas rounded-card border-hairline mt-4 max-w-3xl space-y-4 border p-4">
-            <Field label="説明" htmlFor="fm-desc" note="フォームの冒頭に出ます。">
-              <textarea
-                id="fm-desc"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className={`${inputClass} resize-y`}
-              />
-            </Field>
-
-            <Field
-              label="回答したときに付けるタグ"
-              htmlFor="fm-tag"
-              note="このフォームに答えた人を、あとから絞り込めるようになります。"
-            >
-              <select
-                id="fm-tag"
-                value={onSubmitTagId}
-                onChange={(e) => setOnSubmitTagId(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">— 付けない —</option>
-                {tags.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            {error && <p className="text-danger text-sm">{error}</p>}
-            {notice && <p className="text-success text-sm">{notice}</p>}
-          </div>
         </>
+      )}
+
+      {showOptions && (
+        <OptionsDialog
+          value={layout.options}
+          refs={refs}
+          onChange={(options: FormOptions) => setLayout((prev) => ({ ...prev, options }))}
+          onClose={() => setShowOptions(false)}
+        />
       )}
     </div>
   )
