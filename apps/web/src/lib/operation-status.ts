@@ -2,6 +2,30 @@ import type { AccountHealthLog, LineAccount } from '@line-crm/shared'
 
 export type OperationSeverity = 'normal' | 'warning' | 'danger' | 'unknown'
 
+export interface MonthlyQuotaStatus {
+  severity: Exclude<OperationSeverity, 'unknown'>
+  remaining: number | null
+  remainingPercent: number | null
+}
+
+/**
+ * 月間配信枠は、残り0通だけをエラー、残り15%未満を注意として扱う。
+ * 上限なし・取得不能は、それ自体を異常とは決めつけない。
+ */
+export function monthlyQuotaStatus(limit: number | null, used: number | null): MonthlyQuotaStatus {
+  if (limit == null || used == null) {
+    return { severity: 'normal', remaining: null, remainingPercent: null }
+  }
+
+  const safeLimit = Math.max(limit, 0)
+  const remaining = Math.max(safeLimit - Math.max(used, 0), 0)
+  const remainingPercent = safeLimit === 0 ? 0 : (remaining / safeLimit) * 100
+
+  if (remaining === 0) return { severity: 'danger', remaining, remainingPercent }
+  if (remainingPercent < 15) return { severity: 'warning', remaining, remainingPercent }
+  return { severity: 'normal', remaining, remainingPercent }
+}
+
 export const HEALTH_CRITERIA = [
   {
     severity: 'danger' as const,

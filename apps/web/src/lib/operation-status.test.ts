@@ -4,6 +4,7 @@ import {
   buildHealthRows,
   buildResearchReport,
   HEALTH_CRITERIA,
+  monthlyQuotaStatus,
   overallSeverity,
 } from './operation-status'
 
@@ -19,6 +20,16 @@ const log = {
 } satisfies AccountHealthLog
 
 describe('operation status', () => {
+  test.each([
+    { limit: 1000, used: 850, severity: 'normal', remaining: 150 },
+    { limit: 1000, used: 851, severity: 'warning', remaining: 149 },
+    { limit: 1000, used: 1000, severity: 'danger', remaining: 0 },
+    { limit: 1000, used: 1200, severity: 'danger', remaining: 0 },
+    { limit: null, used: null, severity: 'normal', remaining: null },
+  ])('月間配信残数を $severity と判定する', ({ limit, used, severity, remaining }) => {
+    expect(monthlyQuotaStatus(limit, used)).toMatchObject({ severity, remaining })
+  })
+
   test('最新の実データから異常状態を組み立てる', () => {
     const rows = buildHealthRows([account], { [account.id]: [log] }, { [account.id]: 'danger' })
     expect(rows[0]).toMatchObject({ accountName: '然-NEN- 公式', severity: 'danger', errorCode: 403 })
