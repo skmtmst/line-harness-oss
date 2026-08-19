@@ -1728,6 +1728,8 @@ export const api = {
       ogSiteName?: string | null;
       ogDefaultImageUrl?: string | null;
       ogDefaultDescription?: string | null;
+      copyFromAccountId?: string | null;
+      copyItems?: Array<'accountSettings' | 'scenarios' | 'autoReplies'>;
     }) =>
       fetchApi<ApiResponse<LineAccount>>('/api/line-accounts', {
         method: 'POST',
@@ -1779,6 +1781,26 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ ordered }),
       }),
+    updateHierarchy: (relationships: Array<{ id: string; parentLineAccountId: string | null }>) =>
+      fetchApi<ApiResponse<Array<{ id: string; parentLineAccountId: string | null }>>>(
+        '/api/line-accounts/hierarchy',
+        { method: 'PATCH', body: JSON.stringify({ relationships }) },
+      ),
+    verifyConnection: (data: {
+      channelAccessToken: string;
+      loginChannelId: string;
+      loginChannelSecret: string;
+      liffId: string;
+    }) => fetchApi<ApiResponse<{
+      messagingApi: boolean;
+      webhook: boolean;
+      lineLogin: boolean;
+      liff: boolean;
+      webhookUrl: string | null;
+      errors: string[];
+    }>>('/api/line-accounts/verify-connection', {
+      method: 'POST', body: JSON.stringify(data),
+    }),
     followerImportState: (id: string) =>
       fetchApi<ApiResponse<FollowerImportState>>(`/api/line-accounts/${id}/follower-import`),
     detectFollowerImport: (id: string) =>
@@ -2502,12 +2524,12 @@ export const api = {
     get: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`),
     me: () => fetchApi<ApiResponse<StaffMember>>('/api/staff/me'),
-    create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }> }) =>
+    create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId: string; canAccessDescendantAccounts?: boolean }) =>
       fetchApi<ApiResponse<StaffMember>>('/api/staff', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }> }) =>
+    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean }) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
