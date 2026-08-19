@@ -941,12 +941,18 @@ export const api = {
       fetchApi<ApiResponse<{
         features: Record<string, boolean>
         sidebarOrder: string[] | null
+        /** 区分ごとの項目の並び。区分の目印 → 項目の目印の並び。 */
+        sidebarItemOrder: Record<string, string[]> | null
         parentChildMode: boolean
         specializedFeatureKeys: string[]
       }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
       ),
-    save: (accountId: string, data: { features?: Record<string, boolean>; sidebarOrder?: string[] }) =>
+    save: (accountId: string, data: {
+      features?: Record<string, boolean>
+      sidebarOrder?: string[]
+      sidebarItemOrder?: Record<string, string[]>
+    }) =>
       fetchApi<ApiResponse<null>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },

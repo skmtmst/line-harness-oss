@@ -18,18 +18,34 @@ describe('機能設定の添付デザイン', () => {
     expect(source).toContain('absolute left-0.5 top-0.5')
   })
 
+  it('並べ替えは項目ごとで、区分をまたがない', () => {
+    // 点は「この行は並べ替えの対象」という印。
+    expect(source).toContain('function GripIcon()')
+    // ↑↓ は行に付く。区分の見出しには付けない。
+    expect(source).toContain('aria-label={`${item.label}を上へ`}')
+    expect(source).toContain('aria-label={`${item.label}を下へ`}')
+    expect(source).not.toContain('aria-label={`${group.label}を上へ`}')
+    // 端では押せない。
+    expect(source).toContain('canMoveUp={index > 0}')
+    expect(source).toContain('canMoveDown={index < group.items.length - 1}')
+    // 保存は区分ごとの並びとして送る。
+    expect(source).toContain('sidebarItemOrder: currentOrder')
+  })
+
   it('クリックできる操作は指、無効な操作は禁止カーソルで統一する', () => {
-    expect(source).toContain("group.id === 'basic' ? 'cursor-default' : 'cursor-pointer'")
+    expect(source).toContain("total === 0 ? 'cursor-default' : 'cursor-pointer'")
     expect(source).toContain('h-7 w-7 cursor-pointer')
     expect(source).toContain('min-h-10 cursor-pointer rounded-lg')
     expect(source).toContain('min-h-10 cursor-pointer items-center')
     expect(source).toContain('disabled:cursor-not-allowed')
   })
 
-  it('サイドメニューの非表示表現と多店舗管理の最下部配置を保つ', () => {
+  it('サイドメニューの見え方は、左で決めた並びをそのまま出す', () => {
     expect(source).toContain('この印はメニューに表示されません')
     expect(source).toContain('項目が非表示になります')
-    expect(source.indexOf("label: '専用機能'")).toBeLessThan(source.indexOf("label: '多店舗管理'"))
+    // 別に並べ直さない。保存前と保存後で姿が変わらないようにする。
+    expect(source).toContain('<SidebarPreview groups={groups} features={features} />')
+    expect(source).not.toContain('PREVIEW_SECTIONS')
     expect(source).not.toContain('サイドメニューの見え方</h2>')
     expect(source).not.toContain('保存前</span>')
   })

@@ -5,20 +5,16 @@ import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import {
   DEFAULT_FEATURES,
-  DEFAULT_FEATURE_GROUP_ORDER,
   FEATURE_SETTINGS_UPDATED_EVENT,
-  NEN_SHOW_MULTI_STORE,
-  SIDEBAR_FEATURE_BY_HREF,
-  featureGroupOrderFromSidebarOrder,
   groupEnabledCount,
   groupFeatureCount,
   itemIsEnabled,
-  sidebarOrderFromFeatureGroupOrder,
+  itemOrderFromGroups,
+  moveItemWithinGroup,
   visibleFeatureGroups,
   type FeatureGroup,
   type FeatureItem,
-  type FeatureKey,
-  type MovableFeatureGroupId,
+  type MenuItemOrder,
 } from '@/lib/feature-settings'
 
 function Switch({
@@ -69,43 +65,81 @@ function EyeOffIcon({ className = 'h-4 w-4' }: { className?: string }) {
   )
 }
 
+/**
+ * 行の先頭に出す点。動かせる行の目印。
+ *
+ * 点だけでは動かせない（ドラッグは受けない）。実際に動かすのは右の↑↓で、
+ * 点は「この行は並べ替えの対象」という印として置く。
+ */
+function GripIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 12 20" className="h-5 w-3 shrink-0 text-[#c4c4c4]">
+      {[6, 10, 14].map((y) => (
+        <g key={y}>
+          <circle cx="4" cy={y} r="1.4" fill="currentColor" />
+          <circle cx="8" cy={y} r="1.4" fill="currentColor" />
+        </g>
+      ))}
+    </svg>
+  )
+}
+
 function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
-  if (group.id === 'basic') return 'この3つは無効にできません'
   const total = groupFeatureCount(group)
+  if (total === 0) return 'この区分の項目は消せません（並び順だけ変えられます）'
   const enabled = groupEnabledCount(group, features)
   if (enabled === total) return `${total}機能すべて有効`
-  if (enabled === 0) return group.id === 'multi-store'
-    ? `${total}機能すべて無効（この契約では使いません）`
-    : `${total}機能すべて無効`
+  if (enabled === 0) return `${total}機能すべて無効`
   return `${total}機能中 ${enabled}つが有効`
 }
 
-function FeatureRow({ item, features, onToggle }: {
+function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMove: (itemId: string, direction: -1 | 1) => void
   onToggle: (item: FeatureItem, next: boolean) => void
 }) {
   const enabled = itemIsEnabled(item, features)
   return (
     <li className="flex min-h-[62px] items-center justify-between gap-4 px-4 py-3 sm:px-5">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-bold text-[#565656]">{item.label}</p>
-          {item.badge && (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-              item.badge === '専用'
-                ? 'bg-emerald-50 text-emerald-700'
-                : item.badge === '要API申請'
-                  ? 'bg-amber-50 text-amber-700'
-                  : 'bg-blue-50 text-blue-700'
-            }`}>
-              {item.badge}
-            </span>
-          )}
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span className="mt-0.5"><GripIcon /></span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-bold text-[#565656]">{item.label}</p>
+            {item.badge && (
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                {item.badge}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-[#777]">{item.note}</p>
         </div>
-        <p className="mt-0.5 text-[11px] leading-relaxed text-[#777]">{item.note}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
+        <button
+          type="button"
+          aria-label={`${item.label}を上へ`}
+          title="上へ移動"
+          disabled={!canMoveUp}
+          onClick={() => onMove(item.id, -1)}
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          aria-label={`${item.label}を下へ`}
+          title="下へ移動"
+          disabled={!canMoveDown}
+          onClick={() => onMove(item.id, 1)}
+          className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          ↓
+        </button>
+        <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-[#dedede]" />
         <span className={`text-xs font-bold ${enabled && !item.required ? 'text-[#00b84f]' : 'text-[#777]'}`}>
           {item.required ? '必須' : enabled ? 'オン' : 'オフ'}
         </span>
@@ -121,27 +155,15 @@ function FeatureRow({ item, features, onToggle }: {
   )
 }
 
-function FeatureSection({
-  group,
-  features,
-  onItemToggle,
-  onGroupToggle,
-  canMoveUp,
-  canMoveDown,
-  onMove,
-}: {
+function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }: {
   group: FeatureGroup
   features: Record<string, boolean>
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
-  canMoveUp: boolean
-  canMoveDown: boolean
-  onMove: (groupId: MovableFeatureGroupId, direction: -1 | 1) => void
+  onMove: (groupId: string, itemId: string, direction: -1 | 1) => void
 }) {
   const total = groupFeatureCount(group)
-  const enabled = groupEnabledCount(group, features)
-  const allEnabled = group.id === 'basic' || enabled === total
-  const movableGroupId: MovableFeatureGroupId | null = group.id === 'basic' ? null : group.id
+  const allEnabled = total === 0 || groupEnabledCount(group, features) === total
   return (
     <section className="overflow-hidden rounded-[18px] border border-[#dedede] bg-white">
       <div className="flex min-h-[42px] items-center justify-between gap-4 border-b border-[#e5e5e5] bg-[#fafafa] px-4 py-2.5 sm:px-5">
@@ -152,130 +174,58 @@ function FeatureSection({
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            aria-disabled={group.id === 'basic'}
-            onClick={() => group.id !== 'basic' && onGroupToggle(group, !allEnabled)}
-            className={`text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6] ${group.id === 'basic' ? 'cursor-default' : 'cursor-pointer'}`}
+            aria-disabled={total === 0}
+            onClick={() => total > 0 && onGroupToggle(group, !allEnabled)}
+            className={`text-[11px] font-bold text-[#0066d6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0066d6] ${total === 0 ? 'cursor-default' : 'cursor-pointer'}`}
           >
             グループごと切替
           </button>
-          {movableGroupId && (
-            <>
-              <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-[#dedede]" />
-              <button
-                type="button"
-                aria-label={`${group.label}を上へ`}
-                title="上へ移動"
-                disabled={!canMoveUp}
-                onClick={() => onMove(movableGroupId, -1)}
-                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                aria-label={`${group.label}を下へ`}
-                title="下へ移動"
-                disabled={!canMoveDown}
-                onClick={() => onMove(movableGroupId, 1)}
-                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-[#dedede] bg-white text-xs font-bold text-[#565656] hover:bg-[#f7f7f5] disabled:cursor-not-allowed disabled:opacity-30"
-              >
-                ↓
-              </button>
-            </>
-          )}
         </div>
       </div>
       <ul className="divide-y divide-[#e8e8e8]">
-        {group.items.map((item) => (
-          <FeatureRow key={item.id} item={item} features={features} onToggle={onItemToggle} />
+        {group.items.map((item, index) => (
+          <FeatureRow
+            key={item.id}
+            item={item}
+            features={features}
+            canMoveUp={index > 0}
+            canMoveDown={index < group.items.length - 1}
+            onMove={(itemId, direction) => onMove(group.id, itemId, direction)}
+            onToggle={onItemToggle}
+          />
         ))}
       </ul>
     </section>
   )
 }
 
-const PREVIEW_SECTIONS = [
-  { label: 'ホーム', items: [{ label: 'ダッシュボード' }] },
-  { label: '対応', items: [{ label: '受信箱' }, { label: '友だち' }] },
-  { label: '友だち属性', items: [{ label: 'タグ管理' }, { label: '友だち情報欄' }] },
-  {
-    label: '配信',
-    items: [
-      { label: 'シナリオ配信', href: '/scenarios' },
-      { label: '一斉配信', href: '/broadcasts' },
-      { label: 'テンプレート', href: '/templates' },
-      { label: 'リマインダ', href: '/reminders' },
-      { label: '自動応答', href: '/auto-replies' },
-      { label: 'リッチメニュー', href: '/rich-menus' },
-      { label: 'ウェビナー', href: '/webinars' },
-    ],
-  },
-  {
-    label: '成果と分析',
-    items: [
-      { label: '流入経路', href: '/inflow-links' },
-      { label: '回答フォーム', href: '/form-submissions' },
-      { label: 'マイル', href: '/scoring' },
-      { label: '成果とアフィリエイト', href: '/conversions' },
-    ],
-  },
-] as const
-
-function SidebarPreview({ features, specializedFeatureKeys, showMultiStore, groupOrder }: {
+/**
+ * サイドメニューの見え方。
+ *
+ * 左で決めた並びと表示を、そのまま同じ順で出す。別に並べ直すと、保存する前に
+ * 出ている姿と、保存したあとの姿が違ってしまう。
+ */
+function SidebarPreview({ groups, features }: {
+  groups: FeatureGroup[]
   features: Record<string, boolean>
-  specializedFeatureKeys: string[]
-  showMultiStore: boolean
-  groupOrder: MovableFeatureGroupId[]
 }) {
-  const specialized = [
-    { label: '健康記録', href: '/nen-campaigns', key: 'nen_campaigns' },
-    { label: '写真審査', href: '/nen-members', key: 'photo_review' },
-    { label: 'EC連携', href: '/ec-commerce', key: 'ec_commerce' },
-  ].filter((item) => specializedFeatureKeys.includes(item.key))
-  const multiStore = showMultiStore
-    ? [
-        { label: '店舗一覧', key: 'multi_store_hierarchy' },
-        { label: '一括更新', key: 'multi_store_bulk_updates' },
-        { label: '予約台帳', key: 'reservation_ledger' },
-        { label: 'Googleマップ連携', key: 'google_business_profile' },
-      ]
-    : []
-  const fixedSections = PREVIEW_SECTIONS.slice(0, 3)
-  const movableSections: Partial<Record<MovableFeatureGroupId, { label: string; items: ReadonlyArray<{ label: string; href?: string; key?: string }> }>> = {
-    delivery: PREVIEW_SECTIONS[3],
-    results: PREVIEW_SECTIONS[4],
-    specialized: specialized.length ? { label: '専用機能', items: specialized } : undefined,
-    'multi-store': multiStore.length ? { label: '多店舗管理', items: multiStore } : undefined,
-  }
-  const sections = [
-    ...fixedSections,
-    ...groupOrder.map((id) => movableSections[id]).filter((section): section is NonNullable<typeof section> => Boolean(section)),
-  ]
   let hidden = 0
-  for (const section of sections) {
-    for (const item of section.items) {
-      const key = 'href' in item && item.href
-        ? SIDEBAR_FEATURE_BY_HREF[item.href]
-        : 'key' in item ? item.key as FeatureKey : undefined
-      if (key && features[key] === false) hidden += 1
-    }
+  for (const group of groups) {
+    for (const item of group.items) if (!itemIsEnabled(item, features)) hidden += 1
   }
   return (
     <aside data-design="サイドメニューの見え方" className="xl:sticky xl:top-6">
       <div className="overflow-hidden rounded-[22px] border border-[#dedede] bg-white">
         <div className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto px-6 pb-3 pt-6">
-          {sections.map((section) => (
-            <div key={section.label}>
-              <p className="mb-2 text-xs font-bold text-[#777]">{section.label}</p>
+          {groups.map((group) => (
+            <div key={group.id}>
+              <p className="mb-2 text-xs font-bold text-[#777]">{group.label}</p>
               <div className="space-y-0.5 pl-3">
-                {section.items.map((item) => {
-                  const key = 'href' in item && item.href
-                    ? SIDEBAR_FEATURE_BY_HREF[item.href]
-                    : 'key' in item ? item.key as FeatureKey : undefined
-                  const enabled = !key || features[key] !== false
+                {group.items.map((item) => {
+                  const enabled = itemIsEnabled(item, features)
                   return (
                     <div
-                      key={item.label}
+                      key={item.id}
                       className={`flex min-h-7 items-center gap-2 text-[13px] font-medium ${
                         enabled ? 'text-[#333]' : 'text-[#999]'
                       }`}
@@ -308,8 +258,8 @@ export default function SettingsPage() {
   const { selectedAccountId } = useAccount()
   const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
   const [features, setFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
-  const [savedGroupOrder, setSavedGroupOrder] = useState<MovableFeatureGroupId[]>(DEFAULT_FEATURE_GROUP_ORDER)
-  const [groupOrder, setGroupOrder] = useState<MovableFeatureGroupId[]>(DEFAULT_FEATURE_GROUP_ORDER)
+  const [savedItemOrder, setSavedItemOrder] = useState<MenuItemOrder>({})
+  const [itemOrder, setItemOrder] = useState<MenuItemOrder>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -332,9 +282,9 @@ export default function SettingsPage() {
       const next = { ...DEFAULT_FEATURES, ...response.data.features }
       setSavedFeatures(next)
       setFeatures(next)
-      const nextGroupOrder = featureGroupOrderFromSidebarOrder(response.data.sidebarOrder)
-      setSavedGroupOrder(nextGroupOrder)
-      setGroupOrder(nextGroupOrder)
+      const nextOrder = response.data.sidebarItemOrder ?? {}
+      setSavedItemOrder(nextOrder)
+      setItemOrder(nextOrder)
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
     } catch {
       setError('機能設定を読み込めませんでした。時間をおいてもう一度お試しください。')
@@ -345,23 +295,40 @@ export default function SettingsPage() {
 
   useEffect(() => { void load() }, [load])
 
-  // 然では機能未実装の多店舗管理を、設計確認用として最下部へ常時仮置きする。
-  const showMultiStore = NEN_SHOW_MULTI_STORE
+  /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
   const groups = useMemo(() => {
-    const visible = visibleFeatureGroups({ showMultiStore, specializedFeatureKeys })
-    const basic = visible.find((group) => group.id === 'basic')
-    const movable = new Map(visible.filter((group) => group.id !== 'basic').map((group) => [group.id, group]))
-    return [
-      ...(basic ? [basic] : []),
-      ...groupOrder.map((id) => movable.get(id)).filter((group): group is FeatureGroup => Boolean(group)),
-    ]
-  }, [groupOrder, showMultiStore, specializedFeatureKeys])
+    return visibleFeatureGroups({ specializedFeatureKeys }).map((group) => {
+      const order = itemOrder[group.id]
+      if (!order || order.length === 0) return group
+      const byId = new Map(group.items.map((item) => [item.id, item]))
+      const sorted: FeatureItem[] = []
+      for (const id of order) {
+        const item = byId.get(id)
+        if (item && !sorted.includes(item)) sorted.push(item)
+      }
+      return { ...group, items: [...sorted, ...group.items.filter((item) => !sorted.includes(item))] }
+    })
+  }, [itemOrder, specializedFeatureKeys])
+
+  const currentOrder = useMemo(() => itemOrderFromGroups(groups), [groups])
   const dirty =
     Object.keys(DEFAULT_FEATURES).some((key) => features[key] !== savedFeatures[key]) ||
-    groupOrder.join('|') !== savedGroupOrder.join('|')
+    JSON.stringify(currentOrder) !== JSON.stringify(itemOrderFromGroups(
+      visibleFeatureGroups({ specializedFeatureKeys }).map((group) => {
+        const order = savedItemOrder[group.id]
+        if (!order || order.length === 0) return group
+        const byId = new Map(group.items.map((item) => [item.id, item]))
+        const sorted: FeatureItem[] = []
+        for (const id of order) {
+          const item = byId.get(id)
+          if (item && !sorted.includes(item)) sorted.push(item)
+        }
+        return { ...group, items: [...sorted, ...group.items.filter((item) => !sorted.includes(item))] }
+      }),
+    ))
 
   const toggleItem = (item: FeatureItem, next: boolean) => {
-    if (item.required) return
+    if (item.required || item.keys.length === 0) return
     setFeatures((current) => {
       const changed = { ...current }
       for (const key of item.keys) changed[key] = next
@@ -371,24 +338,28 @@ export default function SettingsPage() {
   }
 
   const toggleGroup = (group: FeatureGroup, next: boolean) => {
-    if (group.id === 'basic') return
     setFeatures((current) => {
       const changed = { ...current }
-      for (const item of group.items) for (const key of item.keys) changed[key] = next
+      for (const item of group.items) {
+        if (item.required) continue
+        for (const key of item.keys) changed[key] = next
+      }
       return changed
     })
     setNotice('')
   }
 
-  const moveGroup = (groupId: MovableFeatureGroupId, direction: -1 | 1) => {
-    setGroupOrder((current) => {
-      const index = current.indexOf(groupId)
-      const target = index + direction
-      if (index < 0 || target < 0 || target >= current.length) return current
-      const next = [...current]
-      ;[next[index], next[target]] = [next[target], next[index]]
-      return next
-    })
+  /**
+   * 1つ上／下へ動かす。**区分をまたいでは動かせない。**
+   *
+   * またげるようにすると「受信箱を配信の中へ」といった並びが作れてしまい、
+   * サイドバーの見出しと中身が合わなくなる。
+   */
+  const moveItem = (groupId: string, itemId: string, direction: -1 | 1) => {
+    const group = groups.find((item) => item.id === groupId)
+    if (!group) return
+    const ids = group.items.map((item) => item.id)
+    setItemOrder((current) => ({ ...current, [groupId]: moveItemWithinGroup(ids, itemId, direction) }))
     setNotice('')
   }
 
@@ -400,14 +371,15 @@ export default function SettingsPage() {
     try {
       const response = await api.featureSettings.save(selectedAccountId, {
         features,
-        sidebarOrder: sidebarOrderFromFeatureGroupOrder(groupOrder),
+        sidebarItemOrder: currentOrder,
       })
       if (!response.success) {
         setError(response.error)
         return
       }
       setSavedFeatures({ ...features })
-      setSavedGroupOrder([...groupOrder])
+      setSavedItemOrder(currentOrder)
+      setItemOrder(currentOrder)
       setNotice('機能設定を保存しました。サイドメニューにも反映されています。')
       window.dispatchEvent(new CustomEvent(FEATURE_SETTINGS_UPDATED_EVENT, { detail: { accountId: selectedAccountId } }))
     } catch {
@@ -423,7 +395,7 @@ export default function SettingsPage() {
         <div className="min-w-0">
           <h1 className="text-[30px] font-bold tracking-tight text-[#202020]">機能設定</h1>
           <p className="mt-1 text-xs leading-relaxed text-[#777]">
-            使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。
+            使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。並び順は↑↓で、同じ区分の中だけ入れ替えられます。
           </p>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -431,7 +403,7 @@ export default function SettingsPage() {
             type="button"
             onClick={() => {
               setFeatures({ ...DEFAULT_FEATURES })
-              setGroupOrder([...DEFAULT_FEATURE_GROUP_ORDER])
+              setItemOrder({})
               setNotice('')
             }}
             disabled={loading || saving}
@@ -476,32 +448,26 @@ export default function SettingsPage() {
             <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">読み込み中…</div>
           ) : (
             <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
-              <div className="space-y-5">
+              {/*
+                区分ごとの印は付けない。区分と項目はサイドメニューと同じ一覧
+                （src/lib/menu.ts）から作るので、並びと顔ぶれは
+                sidebar-design.test.ts が見ている。ここで二重に縛ると、
+                項目を1つ足すたびに2か所直すことになる。
+              */}
+              <div data-design="機能の一覧" className="space-y-5">
                 {groups.map((group) => (
-                  group.id === 'basic' ? (
-                    <div key={group.id} data-design="基本">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={false} canMoveDown={false} onMove={moveGroup} />
-                    </div>
-                  ) : group.id === 'delivery' ? (
-                    <div key={group.id} data-design="配信">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
-                    </div>
-                  ) : group.id === 'results' ? (
-                    <div key={group.id} data-design="成果と分析">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
-                    </div>
-                  ) : group.id === 'specialized' ? (
-                    <div key={group.id} data-design="この契約の専用機能">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
-                    </div>
-                  ) : (
-                    <div key={group.id} data-design="多店舗管理">
-                      <FeatureSection group={group} features={features} onItemToggle={toggleItem} onGroupToggle={toggleGroup} canMoveUp={groupOrder.indexOf(group.id) > 0} canMoveDown={groupOrder.indexOf(group.id) < groupOrder.length - 1} onMove={moveGroup} />
-                    </div>
-                  )
+                  <div key={group.id}>
+                    <FeatureSection
+                      group={group}
+                      features={features}
+                      onItemToggle={toggleItem}
+                      onGroupToggle={toggleGroup}
+                      onMove={moveItem}
+                    />
+                  </div>
                 ))}
               </div>
-              <SidebarPreview features={features} specializedFeatureKeys={specializedFeatureKeys} showMultiStore={showMultiStore} groupOrder={groupOrder} />
+              <SidebarPreview groups={groups} features={features} />
             </div>
           )}
         </>

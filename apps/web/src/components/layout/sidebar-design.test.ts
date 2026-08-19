@@ -15,6 +15,13 @@ import { describe, expect, it } from 'vitest';
  */
 
 const SIDEBAR = join(dirname(fileURLToPath(import.meta.url)), 'sidebar.tsx');
+/**
+ * 項目そのものは `src/lib/menu.ts` に置いてある。サイドバーと機能設定が
+ * 同じ一覧を読むようにしたので、区分と項目はそちらを見る。
+ */
+const MENU = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'lib', 'menu.ts');
+const MENU_START = 'export const MENU_SECTIONS: MenuSection[] = [';
+const MENU_END = '/** 区分の目印から中身を引く。 */';
 
 /** Pen.dev の V2 設計から書き写した区分と項目。並びも設計どおり。 */
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
@@ -45,12 +52,10 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   { section: '設定', items: ['アカウント', 'ログインユーザー', '機能設定', '運用状態'] },
 ];
 
-/** sidebar.tsx の menuSections から、区分と項目を順序どおりに読む。 */
+/** menu.ts の MENU_SECTIONS から、区分と項目を順序どおりに読む。 */
 function readSidebar(): Array<{ section: string | null; items: string[] }> {
-  const source = readFileSync(SIDEBAR, 'utf8');
-  const start = source.indexOf('const menuSections: MenuSection[] = [');
-  const end = source.indexOf('function NavIcon');
-  const body = source.slice(start, end);
+  const source = readFileSync(MENU, 'utf8');
+  const body = source.slice(source.indexOf(MENU_START), source.indexOf(MENU_END));
 
   const sections: Array<{ section: string | null; items: string[] }> = [];
   // `label: '配信',` / `label: null,` が区分の頭。`{ href: ..., label: '...' }` が項目。
@@ -126,11 +131,8 @@ describe('サイドバーが V2 設計と一致する', () => {
   });
 
   it('項目の行き先が仕様どおり', () => {
-    const source = readFileSync(SIDEBAR, 'utf8');
-    const body = source.slice(
-      source.indexOf('const menuSections: MenuSection[] = ['),
-      source.indexOf('function NavIcon'),
-    );
+    const source = readFileSync(MENU, 'utf8');
+    const body = source.slice(source.indexOf(MENU_START), source.indexOf(MENU_END));
     const pairs = [...body.matchAll(/\{\s*href:\s*'([^']+)',\s*label:\s*'([^']+)'/g)];
     const actual = Object.fromEntries(pairs.map((m) => [m[2], m[1]]));
     expect(actual).toEqual(ROUTES);
@@ -138,11 +140,8 @@ describe('サイドバーが V2 設計と一致する', () => {
 
   it('同じ画面を2か所から出していない', () => {
     // 同じ行き先が2つの区分にあると、いまどこにいるのかが分からなくなる。
-    const source = readFileSync(SIDEBAR, 'utf8');
-    const body = source.slice(
-      source.indexOf('const menuSections: MenuSection[] = ['),
-      source.indexOf('function NavIcon'),
-    );
+    const source = readFileSync(MENU, 'utf8');
+    const body = source.slice(source.indexOf(MENU_START), source.indexOf(MENU_END));
     const hrefs = [...body.matchAll(/\{\s*href:\s*'([^']+)'/g)].map((m) => m[1]);
     expect(hrefs.length).toBe(new Set(hrefs).size);
   });

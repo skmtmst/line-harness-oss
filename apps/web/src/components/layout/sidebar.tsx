@@ -7,6 +7,7 @@ import { useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
+import { orderedMenuSections, type MenuItem } from '@/lib/menu'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
@@ -25,111 +26,11 @@ import {
 // 設計に無い画面（重複検出、プール管理など）は、対応する画面のタブとして
 // 中に入っている。サイドバーから消しても行けなくならない。
 
-/** サイドバーの1項目。 */
-interface MenuItem {
-  href: string
-  label: string
-  /** 24x24 の path。lucide 相当の形を手で写している。 */
-  icon: string
-  /** 出す数の種類（仕様 §5）。無ければバッジを出さない。 */
-  badge?: 'unanswered' | 'photos' | 'unmatched' | 'operations'
-  /** 赤で出す項目。 */
-  danger?: boolean
-}
-
-interface MenuSection {
-  /** 区分の見出し。null は見出しを付けない。 */
-  label: string | null
-  items: MenuItem[]
-}
-
-const menuSections: MenuSection[] = [
-  {
-    /*
-     * 見出しを付けない。毎日開くものが、ここに見出し無しでひとかたまりに
-     * なっている。以前は「対応」「友だち属性」と2つ見出しを挟んでいたが、
-     * 項目が1〜2個の区分に見出しを付けると、行数のわりに縦が伸びる。
-     */
-    label: null,
-    items: [
-      { href: '/', label: 'ダッシュボード', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-      { href: '/chats', label: '受信箱', icon: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5', badge: 'unanswered' },
-      { href: '/friends', label: '友だち', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
-      { href: '/tags', label: '友だち属性', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
-    ],
-  },
-  {
-    label: '配信',
-    items: [
-      { href: '/scenarios', label: 'シナリオ配信', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
-      { href: '/broadcasts', label: '一斉配信', icon: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8' },
-      { href: '/reminders', label: 'リマインダ', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
-      { href: '/auto-replies', label: '自動応答', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
-      { href: '/friend-add-settings', label: '友だち追加時の配信', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' },
-      { href: '/webinars', label: 'ウェビナー', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' },
-    ],
-  },
-  {
-    /*
-     * 作って置いておくもの。テンプレート・リッチメニュー・回答フォームは
-     * 配信そのものではなく、配信や画面から呼ばれる材料なのでここに集める。
-     * 以前はテンプレートとリッチメニューが「配信」、回答フォームが
-     * 「成果と分析」にあり、同じ性格のものが3か所に散っていた。
-     */
-    label: 'コンテンツ',
-    items: [
-      { href: '/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-      { href: '/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z' },
-      { href: '/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-      { href: '/contents', label: 'コンテンツ', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' },
-    ],
-  },
-  {
-    label: '成果と分析',
-    items: [
-      { href: '/conversions', label: '成果とアフィリエイト', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
-      { href: '/scoring', label: 'マイル', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
-      { href: '/inflow-links', label: '流入と計測', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
-      { href: '/analytics', label: '分析', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-    ],
-  },
-  {
-    label: '自動化',
-    items: [
-      { href: '/automations', label: 'オートメーション', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
-      { href: '/webhooks', label: '外部連携', icon: 'M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-    ],
-  },
-  {
-    label: '予約',
-    items: [
-      { href: '/booking/bookings', label: '予約管理', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-      { href: '/booking/menus', label: '予約設定', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
-      { href: '/events', label: 'イベント予約', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' },
-    ],
-  },
-  {
-    label: '専用機能',
-    items: [
-      { href: '/nen-campaigns', label: 'NEN配信', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' },
-      // /health は「BAN検知ダッシュボード」で写真審査ではない。写真審査の画面は
-      // /nen-members。§3-1 が BAN検知を「運用状態」へ統合すると書いているので
-      // そちらに合わせた。仕様書 §2 もこのルートに直してある（2026-08-18）。
-      { href: '/nen-members', label: '写真審査', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', badge: 'photos' },
-      { href: '/ec-commerce', label: 'EC連携', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z', badge: 'unmatched' },
-    ],
-  },
-  {
-    label: '設定',
-    items: [
-      { href: '/accounts', label: 'アカウント', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' },
-      { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
-      { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' },
-      { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' },
-    ],
-  },
-]
-
+/*
+ * 項目そのものは `@/lib/menu` に置いてある。機能設定と同じものを読む。
+ * ここに別で並べていた頃は、メニューにしか無い項目・機能設定にしか無い
+ * 項目が双方にできて、切り替えても消えない項目があった。
+ */
 function NavIcon({ d }: { d: string }) {
   return (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,11 +67,13 @@ export default function Sidebar() {
   const unmatchedCount = 0
 
   // 並び順の設定。account_settings の 'sidebar.order' に、セクションの
-  // ラベルを並べて持つ。設定が無ければ menuSections のままの順で出す。
+  // ラベルを並べて持つ。設定が無ければ MENU_SECTIONS のままの順で出す。
   //
   // 知らないラベルは無視し、設定に無いセクションは後ろに残す。こうしないと、
   // 機能が増えたときに新しいセクションが消えてしまう。
   const [sectionOrder, setSectionOrder] = useState<string[] | null>(null)
+  /** 区分の中の項目の並び。機能設定の↑↓で決めたもの。 */
+  const [itemOrder, setItemOrder] = useState<Record<string, string[]> | null>(null)
   const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
 
@@ -178,6 +81,7 @@ export default function Sidebar() {
   useEffect(() => {
     if (!selectedAccountId) {
       setSectionOrder(null)
+      setItemOrder(null)
       setFeatureVisibility({})
       setSpecializedFeatureKeys([])
       return
@@ -189,6 +93,7 @@ export default function Sidebar() {
         .then((res) => {
           if (!cancelled && res.success) {
             setSectionOrder(res.data.sidebarOrder)
+            setItemOrder(res.data.sidebarItemOrder)
             setFeatureVisibility(res.data.features)
             setSpecializedFeatureKeys(res.data.specializedFeatureKeys)
           }
@@ -208,14 +113,16 @@ export default function Sidebar() {
       window.removeEventListener(FEATURE_SETTINGS_UPDATED_EVENT, onSettingsUpdated)
     }
   }, [selectedAccountId])
+  // 区分の中の並びを当ててから、区分そのものの並びを当てる。
+  const sections = orderedMenuSections(itemOrder)
   const orderedSections = sectionOrder
     ? [
         ...sectionOrder
-          .map((label) => menuSections.find((s) => (s.label ?? '') === label))
-          .filter((s): s is (typeof menuSections)[number] => Boolean(s)),
-        ...menuSections.filter((s) => !sectionOrder.includes(s.label ?? '')),
+          .map((label) => sections.find((s) => (s.label ?? '') === label))
+          .filter((s): s is (typeof sections)[number] => Boolean(s)),
+        ...sections.filter((s) => !sectionOrder.includes(s.label ?? '')),
       ]
-    : menuSections
+    : sections
 
   const visibleSections = orderedSections
     .map((section) => ({
@@ -295,7 +202,7 @@ export default function Sidebar() {
   /**
    * 項目に出す数。0 のときは出さない（仕様 §5）。
    *
-   * どの項目に何を出すかは menuSections の `badge` が決める。
+   * どの項目に何を出すかは MENU_SECTIONS の `badge` が決める。
    * ここで href を見て分岐すると、行き先を変えたときにバッジだけ
    * 取り残される。
    */
