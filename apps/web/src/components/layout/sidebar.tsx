@@ -225,10 +225,27 @@ export default function Sidebar() {
    * クエリ付きの行き先はパスだけで判定する。?tab= が変わっても
    * 同じ画面にいることに変わりはない。
    */
+  /*
+   * 前方一致だと、片方が他方の下にある2項目で両方が光る。
+   * 「共通情報」(/contents/vars) を開くと「登録メディア一覧」(/contents) も
+   * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
+   */
+  const activeHref = (() => {
+    let best: string | null = null
+    for (const section of sections) {
+      for (const item of section.items) {
+        if (item.href === '/') continue
+        const path = item.href.split('?')[0]
+        if (pathname !== path && !pathname.startsWith(path + '/')) continue
+        if (best === null || path.length > best.length) best = path
+      }
+    }
+    return best
+  })()
+
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
-    const path = href.split('?')[0]
-    return pathname === path || pathname.startsWith(path + '/')
+    return href.split('?')[0] === activeHref
   }
 
   /**
