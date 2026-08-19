@@ -10,6 +10,18 @@ import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
+import MessageKindFields, {
+  emptyMessageKindState,
+  parseMessageKind,
+  serializeMessageKind,
+  type MessageKind,
+  type MessageKindState,
+} from '@/components/scenarios/message-kind-fields'
+
+/** 専用の入力欄で書く種別か。 */
+function isStructuredKind(type: MessageType): boolean {
+  return type === 'location' || type === 'video' || type === 'audio' || type === 'sticker'
+}
 import QuestionEditor, {
   emptyQuestion,
   type ScenarioQuestion,
@@ -39,10 +51,20 @@ const triggerOptions: { value: ScenarioTriggerType; label: string }[] = [
   { value: 'manual', label: '手動' },
 ]
 
+/*
+ * 送れる種別（132 で拡張）。
+ *
+ * Flex はLステップのタブには無いが、こちらには前からある。カードタイプの
+ * メッセージを直に書くための口なので残す。
+ */
 const messageTypeOptions: { value: MessageType; label: string }[] = [
   { value: 'text', label: 'テキスト' },
   { value: 'image', label: '画像' },
-  { value: 'flex', label: 'Flex' },
+  { value: 'flex', label: 'Flex（カードタイプ）' },
+  { value: 'sticker', label: 'スタンプ' },
+  { value: 'location', label: '位置情報' },
+  { value: 'video', label: '動画' },
+  { value: 'audio', label: '音声' },
 ]
 
 const modeBadgeStyle: Record<DeliveryMode, { bg: string; text: string; label: string }> = {
@@ -255,6 +277,8 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   /** 開始のきっかけ。窓の開閉と、札に出す件数。 */
   const [triggerOpen, setTriggerOpen] = useState(false)
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
+  /** 位置情報・動画・音声・スタンプの入力。 */
+  const [kindState, setKindState] = useState<MessageKindState>(() => emptyMessageKindState())
 
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -547,6 +571,12 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       question: (step.question as ScenarioQuestion | null) ?? null,
       isDraft: step.isDraft === true,
     })
+    // 専用の欄で書く種別は、保存されている JSON を欄の形に戻す。
+    setKindState(
+      isStructuredKind(step.messageType)
+        ? parseMessageKind(step.messageType as MessageKind, step.messageContent)
+        : emptyMessageKindState(),
+    )
     setEditingStepId(step.id)
     // 編集はステップ行直下にインライン表示するので、上部の新規追加フォームは閉じる
     setShowStepForm(false)
@@ -851,16 +881,32 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-danger">*</span></label>
-              <textarea
-                className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-                rows={4}
-                placeholder="メッセージ内容を入力..."
-                value={stepForm.messageContent}
-                onChange={(e) => setStepForm({ ...stepForm, messageContent: e.target.value })}
+            {/*
+              位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
+              中身は JSON なので、生のまま書かせると必ず壊れる。
+            */}
+            {isStructuredKind(stepForm.messageType) ? (
+              <MessageKindFields
+                kind={stepForm.messageType as MessageKind}
+                value={kindState}
+                onChange={(next) => {
+                  setKindState(next)
+                  const json = serializeMessageKind(stepForm.messageType as MessageKind, next)
+                  setStepForm((prev) => ({ ...prev, messageContent: json ?? '' }))
+                }}
               />
-            </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-danger">*</span></label>
+                <textarea
+                  className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                  rows={4}
+                  placeholder="メッセージ内容を入力..."
+                  value={stepForm.messageContent}
+                  onChange={(e) => setStepForm({ ...stepForm, messageContent: e.target.value })}
+                />
+              </div>
+            )}
           </>
         )}
 

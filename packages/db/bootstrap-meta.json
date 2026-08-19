@@ -137,7 +137,12 @@
     "128_scenario_triggers.sql",
     "129_scenario_trigger_indexes.sql",
     "130_scenario_trigger_lookup_index.sql",
-    "131_scenario_triggers_backfill.sql"
+    "131_scenario_triggers_backfill.sql",
+    "132_step_message_kinds.sql",
+    "133_step_message_kinds_copy.sql",
+    "134_step_message_kinds_swap.sql",
+    "135_step_message_kinds_rename.sql",
+    "136_step_message_kinds_index.sql"
   ],
-  "migrationCount": 138
+  "migrationCount": 143
 }
