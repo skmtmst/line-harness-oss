@@ -179,6 +179,29 @@ export type Env = {
 
 const app = new Hono<Env>();
 
+/**
+ * 管理画面から送られてくるヘッダ。
+ *
+ * ここに無いヘッダを1つでも付けると、ブラウザは**preflight の段階で**
+ * 止める。サーバーには何も届かないので worker のログにも残らず、
+ * 画面には「保存できませんでした」とだけ出る。
+ *
+ * 実際に起きた: 一斉配信の作成が `Idempotency-Key` を送るのに、ここに
+ * 無かった。下書き保存・テスト送信・配信予約はすべてこの1本の POST を
+ * 通るので、**管理画面から一斉配信を1つも作れない**状態だった。
+ *
+ * 追加するときは `cors-headers.test.ts` の一覧にも足す。
+ */
+export const ADMIN_REQUEST_HEADERS = [
+  'Content-Type',
+  'Authorization',
+  'X-CSRF-Token',
+  'x-admin-api-key',
+  'X-Filename',
+  'Idempotency-Key',
+  'X-Confirm-Irreversible',
+] as const;
+
 // CORS — credentialed cookie auth cannot use a wildcard origin. Reflect only
 // same-origin requests and origins on the ADMIN_ORIGIN allowlist; everything
 // else gets no Access-Control-Allow-Origin header (browser blocks it). Bearer
@@ -187,7 +210,7 @@ app.use('*', cors({
   origin: (origin, c) => resolveCorsOrigin(c.env, origin, c.req.url),
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'x-admin-api-key', 'X-Filename'],
+  allowHeaders: [...ADMIN_REQUEST_HEADERS],
   maxAge: 600,
 }));
 
