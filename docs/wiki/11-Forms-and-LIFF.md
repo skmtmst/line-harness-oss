@@ -6,6 +6,82 @@ LINE Harnessのフォーム機能は、LINE内で動作するアンケート・�
 
 L社の「回答フォーム」に相当する機能。
 
+## レイアウト（forms.layout）
+
+2026-08 に、平らな項目配列だけでは表せなかった3つを持てるようにした。
+
+1. ページ分け（セクション）と、選択肢による分岐
+2. 選択肢ごとの動作（タグを付ける／友だち情報に書く／動作を実行する）
+3. 入力欄ではないブロック（画像・見出し・テキスト・ボタン）
+
+中身は `forms.layout` に JSON で入る。型と、読み書き・検証の関数は
+`packages/shared/src/form-layout.ts` にあり、**管理画面・回答画面・保存側の
+3か所が同じものを使う**。ここが分かれると「画面では通ったのに保存で弾かれる」
+が起きる。
+
+```
+FormLayout
+├─ header   : FormBlock[]   共通ヘッダ（全ページの先頭に出る）
+├─ sections : FormSection[] ページ。1枚ごとに blocks を持つ
+└─ options  : FormOptions   フォーム全体の設定
+```
+
+### ブロックの種類
+
+| kind / type | 何を出すか | 固有の設定 |
+|---|---|---|
+| `image` | 画像 | URL・幅・押したときに開くURL |
+| `heading` | 見出し | 大きさ（1〜3） |
+| `text` | 本文 | — |
+| `button` | ボタン | 文字・URL・見た目 |
+| `input` / `text` | 単一行 | 入力制限（形式・文字数） |
+| `input` / `textarea` | 複数行 | 入力制限（文字数） |
+| `input` / `radio` | ラジオボタン | 選択肢・横並び |
+| `input` / `checkbox` | チェックボックス | 選択肢・横並び・選択数制限 |
+| `input` / `select` | プルダウン | 選択肢 |
+| `input` / `file` | ファイル添付 | **回答画面は未対応**（置き場が無い） |
+| `input` / `date` | 日付 | カレンダー／年月日・リマインダ起動 |
+| `input` / `prefecture` | 都道府県 | 47都道府県で固定 |
+
+### 選択肢の作り方
+
+選択肢を持つブロックは `choiceMode` で、選んだときの動きが変わる。
+
+| choiceMode | 選択肢ごとに持つもの | 使いどころ |
+|---|---|---|
+| `tag` | `tagId` | 「犬を選んだ人にだけ犬タグ」 |
+| `friendField` | `value`（空ならラベル） | 回答をそのまま情報欄へ |
+| `action` | `actions[]` | 送る・開始する・停止するを組む |
+
+選択肢ごとに `capacity`（定員。埋まると受け付けない）と
+`jumpToSectionId`（選んだ人だけ別のページへ）も持てる。
+
+### 回答の登録先（destinations）
+
+入力ブロックの回答は、複数の先へ同時に入れられる。
+
+| 指定 | 入る先 |
+|---|---|
+| `friendFieldIds[]` | 友だち情報欄（複数可）。**EC側が正の項目には書かない** |
+| `realName` | `friends.real_name` |
+| `displayName` | `friends.system_display_name` |
+| `note` | `friends.private_memo` |
+
+### オプション設定（options）
+
+回答期限 / 1人1回 / 全体の受付数 / 送信前の確認 / 送信後の案内（URL・文面） /
+前回の回答を出しておく / ボタンの文字 / ページ見出しの出し方 / 回答後の動作。
+
+**期限は日本時間で読む。** 管理画面の日時入力は時差を持たないので、そのまま
+`new Date()` に渡すと Workers（UTC）で9時間ずれる。
+
+### fields との関係
+
+`fields` は捨てていない。**保存のたびに layout の入力欄から作り直して書き戻す。**
+送信時の必須チェック・回答一覧の見出し・友だち詳細は、これまでどおり `fields`
+を読んで動く。layout がまだ無いフォームは、編集画面で開いたときに `fields`
+から持ち上げる（開いただけではDBは変わらない）。
+
 ## データモデル
 
 ### forms テーブル
@@ -15,7 +91,8 @@ CREATE TABLE forms (
   id TEXT PRIMARY KEY,                                                 -- UUID
   name TEXT NOT NULL,                                                  -- フォーム名
   description TEXT,                                                    -- 説明文
-  fields TEXT NOT NULL DEFAULT '[]',                                   -- JSON: フィールド定義の配列
+  fields TEXT NOT NULL DEFAULT '[]',                                   -- JSON: フィールド定義の配列（layout から自動生成）
+  layout TEXT,                                                         -- JSON: FormLayout。NULL なら fields だけのフォーム
   on_submit_tag_id TEXT REFERENCES tags (id) ON DELETE SET NULL,       -- 送信時に付与するタグ
   on_submit_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL, -- 送信時に登録するシナリオ
   save_to_metadata INTEGER NOT NULL DEFAULT 1,                         -- 回答をfriends.metadataに保存するか
@@ -106,11 +183,14 @@ LIFF (LINE Front-end Framework) は、LINEアプリ内でWebアプリを開く�
 
 ### フォーム表示URL
 
-LIFFアプリ内のフォーム表示URLは以下の形式:
+回答画面は `apps/liff/src/pages/Form.tsx`（ルートは `/forms/:id`）。
+LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。
 
 ```
-https://liff.line.me/{LIFF_ID}?formId={FORM_UUID}
+https://liff.line.me/{LIFF_ID}/forms/{FORM_UUID}
 ```
+
+このURLは管理画面の回答フォーム編集にも「回答用URL」として出る（コピーできる）。
 
 LIFF SDKがユーザーのプロフィール（`lineUserId`）を取得し、フォーム送信時に自動的に付与する。
 
