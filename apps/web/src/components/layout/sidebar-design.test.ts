@@ -181,8 +181,8 @@ describe('レスポンシブのメニュー名を維持する', () => {
     expect(source).toContain('aria-label="管理メニュー"');
   });
 
-  it('アカウント名・国旗を並べる切替行をサイドバーに表示しない', () => {
-    expect(source).not.toContain('AccountSwitcher');
+  it('固定見出しの下に現在のLINEアカウント切替を表示し、国旗は表示しない', () => {
+    expect(source).toContain('AccountSwitcher');
     expect(source).not.toContain('countryFlag');
   });
 

@@ -8,6 +8,7 @@ import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 import { orderedMenuSections, type MenuItem } from '@/lib/menu'
+import AccountSwitcher from '@/components/accounts/account-switcher'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
@@ -263,6 +264,8 @@ export default function Sidebar() {
           <p className="text-sm font-bold text-gray-900">管理メニュー</p>
         </div>
       )}
+
+      <AccountSwitcher />
 
       {/* ナビゲーション */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
