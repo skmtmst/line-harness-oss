@@ -6,7 +6,26 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
-import { AreaProperties } from '@/components/rich-menus/area-properties'
+import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
+import type { RichMenuAreaTapCount } from '@/lib/api'
+import ConditionBuilder from '@/components/shared/condition-builder'
+import type { SegmentCondition } from '@/lib/segment-condition'
+
+/**
+ * 保存されている条件を読む。
+ *
+ * 壊れた JSON は「条件なし」として扱う。ここで落とすと編集画面が開かなくなり、
+ * 直すこともできなくなる。画面には「条件なし」に見えるが、保存し直すまで
+ * 元の値は消えない。
+ */
+function parseStoredCondition(raw: string | null): SegmentCondition | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as SegmentCondition
+  } catch {
+    return null
+  }
+}
 
 type Page = {
   id: string
@@ -29,8 +48,14 @@ type Group = {
   isDefaultForAll: boolean
   status: 'draft' | 'published'
   publishingAt: string | null
+  targetingCondition: string | null
+  targetingPriority: number
+  targetingEnabled: boolean
   pages: Page[]
 }
+
+/** 右パネルのプルダウンに出す選択肢。 */
+type PickerOption = { id: string; name: string }
 
 const SIZE_LABEL: Record<Group['size'], string> = {
   large: '2500×1686',
@@ -90,6 +115,19 @@ function Editor({
   // isDefaultForAll はこの画面では編集しない (ON/OFF は「友だちに表示」モーダルから)。
   // ただし persistDraft で送信値を一致させるため、現在値を保持する。
   const [isDefaultForAll, setIsDefaultForAll] = useState(false)
+  // 出し分け（149）。条件の形は一斉配信・シナリオと同じもの。
+  const [targetingEnabled, setTargetingEnabled] = useState(false)
+  const [targetingPriority, setTargetingPriority] = useState(0)
+  const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
+
+  // ボタンの設定で選ぶもの（タグ・テンプレート・回答フォーム・計測リンク）。
+  // メニュー本体とは別に、開いたとき1回だけ読む。
+  const [tags, setTags] = useState<PickerOption[]>([])
+  const [templates, setTemplates] = useState<PickerOption[]>([])
+  const [forms, setForms] = useState<PickerOption[]>([])
+  const [trackedLinks, setTrackedLinks] = useState<PickerOption[]>([])
+  // ボタンごとに押された回数。取れなくても編集はできるので、失敗しても止めない。
+  const [tapsByArea, setTapsByArea] = useState<Map<string, RichMenuAreaTapCount>>(new Map())
 
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -110,7 +148,20 @@ function Editor({
       setName(g.name)
       setChatBarText(g.chatBarText)
       setIsDefaultForAll(g.isDefaultForAll)
+      setTargetingEnabled(g.targetingEnabled)
+      setTargetingPriority(g.targetingPriority)
+      setTargetingCondition(parseStoredCondition(g.targetingCondition))
       setPages(g.pages)
+      void api.richMenuGroups
+        .tapStats(g.accountId)
+        .then((res) => {
+          if (res.success) {
+            setTapsByArea(new Map(res.data.byArea.map((a) => [a.areaId, a])))
+          }
+        })
+        .catch(() => {
+          // 数が出ないだけ。編集は続けられる。
+        })
       setActivePageId((prev) =>
         prev && g.pages.some((p) => p.id === prev) ? prev : (g.pages[0]?.id ?? null),
       )
@@ -125,6 +176,35 @@ function Editor({
   useEffect(() => {
     reload()
   }, [reload])
+
+  // 選択肢は片方が落ちても残りを出す。1つ取れなくても編集自体は続けられる。
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const [tagRes, tplRes, formRes, linkRes] = await Promise.allSettled([
+        api.tags.list(),
+        api.templates.list(),
+        api.forms.list(),
+        api.trackedLinks.list(),
+      ])
+      if (cancelled) return
+      if (tagRes.status === 'fulfilled' && tagRes.value.success) {
+        setTags(tagRes.value.data.map((t) => ({ id: t.id, name: t.name })))
+      }
+      if (tplRes.status === 'fulfilled' && tplRes.value.success) {
+        setTemplates(tplRes.value.data.map((t) => ({ id: t.id, name: t.name })))
+      }
+      if (formRes.status === 'fulfilled' && formRes.value.success) {
+        setForms(formRes.value.data.map((f) => ({ id: f.id, name: f.name })))
+      }
+      if (linkRes.status === 'fulfilled' && linkRes.value.success) {
+        setTrackedLinks(linkRes.value.data.map((l) => ({ id: l.id, name: l.name })))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const activePage = pages.find((p) => p.id === activePageId) ?? pages[0] ?? null
   const selectedArea =
@@ -218,6 +298,9 @@ function Editor({
       name,
       chatBarText,
       isDefaultForAll,
+      targetingEnabled,
+      targetingPriority,
+      targetingCondition: targetingCondition ? JSON.stringify(targetingCondition) : null,
       pages: pages.map((p, i) => ({
         // 既存 page (UUID) は id を渡す。新規 page (`tmp-*` プレフィックス) は
         // id を渡さず Worker 側で新 UUID を発行させる。
@@ -225,12 +308,22 @@ function Editor({
         name: p.name,
         orderIndex: i,
         areas: p.areas.map((a) => ({
+          // id を渡すと、そのボタンの記録（押された回数）が保存後も続く。
+          // まだ保存されていない id は、サーバー側で新しく振り直される。
+          id: a.id,
           boundsX: a.boundsX,
           boundsY: a.boundsY,
           boundsWidth: a.boundsWidth,
           boundsHeight: a.boundsHeight,
           actionType: a.actionType,
           actionData: a.actionData,
+          intent: a.intent ?? null,
+          label: a.label ?? null,
+          tagIds: a.tagIds ?? null,
+          scoreChange: a.scoreChange ?? null,
+          templateId: a.templateId ?? null,
+          formId: a.formId ?? null,
+          trackedLinkId: a.trackedLinkId ?? null,
         })),
       })),
     })
@@ -488,17 +581,50 @@ function Editor({
               onDeleteArea={(id) => deleteArea(activePage.id, id)}
               preview={preview}
               onPreviewAction={(area) => {
-                if (area.actionType === 'uri') {
-                  const uri = (area.actionData as { uri?: string }).uri
-                  if (uri) window.open(uri, '_blank')
-                } else if (area.actionType === 'richmenuswitch') {
-                  const targetId = (area.actionData as { targetPageId?: string }).targetPageId
-                  if (targetId && pages.some((p) => p.id === targetId)) {
-                    setActivePageId(targetId)
-                    setSelectedAreaId(null)
+                // プレビューは「押すと何が起きるか」を確かめるためのもの。
+                // 実際に送ったり電話をかけたりはせず、起きることを文で見せる。
+                const data = area.actionData as {
+                  uri?: string
+                  tel?: string
+                  text?: string
+                  targetPageId?: string
+                }
+                const nameOf = (list: PickerOption[], id: string | null | undefined) =>
+                  list.find((o) => o.id === id)?.name ?? '(未選択)'
+                switch (intentOf(area)) {
+                  case 'url':
+                    if (area.trackedLinkId) {
+                      alert(`計測リンクを開きます: ${nameOf(trackedLinks, area.trackedLinkId)}`)
+                    } else if (data.uri) {
+                      window.open(data.uri, '_blank')
+                    } else {
+                      alert('URLが未設定です')
+                    }
+                    break
+                  case 'tel':
+                    alert(`電話をかけます: ${data.tel || '(未設定)'}`)
+                    break
+                  case 'text':
+                    alert(`「${data.text || '(未設定)'}」を送ったことになります`)
+                    break
+                  case 'template':
+                    alert(`テンプレートを送ります: ${nameOf(templates, area.templateId)}`)
+                    break
+                  case 'form':
+                    alert(`回答フォームを開きます: ${nameOf(forms, area.formId)}`)
+                    break
+                  case 'switch': {
+                    const targetId = data.targetPageId
+                    if (targetId && pages.some((p) => p.id === targetId)) {
+                      setActivePageId(targetId)
+                      setSelectedAreaId(null)
+                    } else {
+                      alert('切り替え先のページが未設定です')
+                    }
+                    break
                   }
-                } else {
-                  alert(`action: ${area.actionType}\n${JSON.stringify(area.actionData)}`)
+                  default:
+                    alert(`合図を送ります: ${JSON.stringify(area.actionData)}`)
                 }
               }}
             />
@@ -599,12 +725,87 @@ function Editor({
             </section>
           )}
 
+          {/* 誰に出すか（149） */}
+          <section className="bg-white border border-hairline rounded-lg shadow-sm p-5 space-y-4">
+            <div>
+              <h2 className="text-ink text-sm font-semibold">誰に出すか</h2>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                条件に当てはまった友だちに、このメニューを自動で出します。タグが付いた時点で
+                切り替わるので、あとから当てはまった人にも出ます。
+              </p>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={targetingEnabled}
+                onChange={(e) => setTargetingEnabled(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                条件で出し分ける
+                <span className="text-ink-faint block text-[11px]">
+                  切ると、このメニューは条件で配られなくなります。すでに見えている人からは
+                  すぐには消えません。
+                </span>
+              </span>
+            </label>
+
+            {targetingEnabled && (
+              <>
+                {group.status !== 'published' && (
+                  <p className="rounded-control bg-amber-50 p-2 text-[11px] text-amber-700">
+                    このメニューはまだ LINE に登録されていません。登録するまで、条件に
+                    当てはまっても出せません。
+                  </p>
+                )}
+
+                <label className="block">
+                  <span className="text-ink-secondary text-xs font-medium">順番</span>
+                  <span className="text-ink-faint block text-[11px]">
+                    複数のメニューの条件に当てはまったとき、数が小さいほうが先に出ます。
+                  </span>
+                  <input
+                    type="number"
+                    value={targetingPriority}
+                    onChange={(e) => setTargetingPriority(parseInt(e.target.value, 10) || 0)}
+                    className="border-hairline rounded-control focus:ring-accent mt-1 block w-24 border px-2 py-1 text-sm focus:ring-2 focus:outline-none"
+                  />
+                </label>
+
+                <ConditionBuilder
+                  value={targetingCondition}
+                  onChange={setTargetingCondition}
+                  label="このメニューを出す友だち"
+                />
+
+                {!targetingCondition && (
+                  <p className="text-[11px] text-amber-600">
+                    条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。
+                  </p>
+                )}
+              </>
+            )}
+          </section>
+
           {/* 選択中エリア (area が選択されている時のみ追加表示) */}
           {selectedArea && activePage && (
             <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
               <AreaProperties
                 area={selectedArea}
                 pages={pagesForSelect}
+                tags={tags}
+                templates={templates}
+                forms={forms}
+                trackedLinks={trackedLinks}
+                taps={
+                  tapsByArea.has(selectedArea.id)
+                    ? {
+                        count: tapsByArea.get(selectedArea.id)!.taps,
+                        viaTrackedLink: tapsByArea.get(selectedArea.id)!.viaTrackedLink,
+                      }
+                    : null
+                }
                 onUpdate={(patch) =>
                   updateArea(activePage.id, selectedArea.id, patch)
                 }

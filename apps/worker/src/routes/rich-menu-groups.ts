@@ -16,16 +16,22 @@ import {
   markRichMenuGroupUnpublished,
   getLineAccountById,
   getFollowingLineUserIdsByTag,
+  getTrackedLinkById,
+  getRichMenuTapStats,
+  jstNow,
   type RichMenuGroup,
   type RichMenuGroupWithPages,
   type RichMenuPageInput,
   type RichMenuAreaInput,
+  type RichMenuAreaIntent,
   type CreateRichMenuGroupInput,
   type UpdateRichMenuGroupMetaInput,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { validateRichMenuImage } from '../lib/image-validator.js';
+import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
+import { currentMonthRange } from '../lib/rich-menu-tap.js';
 import {
   publishRichMenuGroup,
   unpublishRichMenuGroup,
@@ -51,6 +57,9 @@ function serializeGroup(row: RichMenuGroup) {
     isDefaultForAll: row.is_default_for_all === 1,
     status: row.status,
     publishingAt: row.publishing_at,
+    targetingCondition: row.targeting_condition,
+    targetingPriority: row.targeting_priority,
+    targetingEnabled: row.targeting_enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -75,6 +84,13 @@ function serializeGroupWithPages(row: RichMenuGroupWithPages) {
         boundsHeight: a.bounds_height,
         actionType: a.action_type,
         actionData: a.actionData,
+        intent: a.intent,
+        label: a.label,
+        tagIds: a.tagIds,
+        scoreChange: a.score_change,
+        templateId: a.template_id,
+        formId: a.form_id,
+        trackedLinkId: a.tracked_link_id,
       })),
     })),
   };
@@ -84,6 +100,20 @@ function serializeGroupWithPages(row: RichMenuGroupWithPages) {
 
 const VALID_SIZES = new Set(['large', 'compact']);
 const VALID_ACTION_TYPES = new Set(['uri', 'message', 'postback', 'richmenuswitch']);
+// intent が決まれば、LINE に登録するときの種類も決まる。
+// 取りこぼしがあればここでコンパイルが落ちる。
+// （db 側の定数をそのまま使わないのは、この経路を試験するとき db 全体を
+//   差し替えることがあり、実行時の値が消えるため）
+const ACTION_TYPE_BY_INTENT: Record<RichMenuAreaIntent, RichMenuAreaInput['actionType']> = {
+  url: 'uri',
+  tel: 'uri',
+  form: 'uri',
+  text: 'message',
+  template: 'postback',
+  switch: 'richmenuswitch',
+  postback: 'postback',
+};
+const VALID_INTENTS = new Set<string>(Object.keys(ACTION_TYPE_BY_INTENT));
 
 type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -105,15 +135,68 @@ function parseAreaInput(raw: unknown): Parsed<RichMenuAreaInput> {
   if (!r.actionData || typeof r.actionData !== 'object') {
     return { ok: false, error: 'area.actionData must be object' };
   }
+  if (r.id !== undefined && r.id !== null && (typeof r.id !== 'string' || r.id.length === 0)) {
+    return { ok: false, error: 'area.id must be non-empty string when present' };
+  }
+  if (
+    r.intent !== undefined &&
+    r.intent !== null &&
+    (typeof r.intent !== 'string' || !VALID_INTENTS.has(r.intent))
+  ) {
+    return { ok: false, error: `area.intent must be one of ${[...VALID_INTENTS].join('/')}` };
+  }
+  if (r.label !== undefined && r.label !== null && typeof r.label !== 'string') {
+    return { ok: false, error: 'area.label must be string' };
+  }
+  if (typeof r.label === 'string' && [...r.label].length > 60) {
+    return { ok: false, error: 'area.label must be 60 characters or fewer' };
+  }
+  if (r.tagIds !== undefined && r.tagIds !== null) {
+    if (!Array.isArray(r.tagIds) || r.tagIds.some((t) => typeof t !== 'string' || t.length === 0)) {
+      return { ok: false, error: 'area.tagIds must be an array of non-empty strings' };
+    }
+    if (r.tagIds.length > 20) {
+      return { ok: false, error: 'area.tagIds must be 20 items or fewer' };
+    }
+  }
+  if (
+    r.scoreChange !== undefined &&
+    r.scoreChange !== null &&
+    (typeof r.scoreChange !== 'number' || !Number.isInteger(r.scoreChange))
+  ) {
+    return { ok: false, error: 'area.scoreChange must be an integer' };
+  }
+  for (const key of ['templateId', 'formId', 'trackedLinkId'] as const) {
+    const v = r[key];
+    if (v !== undefined && v !== null && (typeof v !== 'string' || v.length === 0)) {
+      return { ok: false, error: `area.${key} must be non-empty string when present` };
+    }
+  }
+  // intent が来ているなら、LINE に登録するときの種類は intent から決め直す。
+  // 画面が送ってくる actionType とずれていると、publish の途中で
+  // 「切り替え先の解決」などが素通りして LINE 側が 400 を返す。
+  const intent = (typeof r.intent === 'string' ? r.intent : null) as RichMenuAreaIntent | null;
+  const actionType = intent
+    ? ACTION_TYPE_BY_INTENT[intent]
+    : (r.actionType as RichMenuAreaInput['actionType']);
+
   return {
     ok: true,
     value: {
+      id: typeof r.id === 'string' ? r.id : undefined,
       boundsX: r.boundsX as number,
       boundsY: r.boundsY as number,
       boundsWidth: r.boundsWidth as number,
       boundsHeight: r.boundsHeight as number,
-      actionType: r.actionType as RichMenuAreaInput['actionType'],
+      actionType,
       actionData: r.actionData as Record<string, unknown>,
+      intent,
+      label: typeof r.label === 'string' ? r.label : null,
+      tagIds: Array.isArray(r.tagIds) ? (r.tagIds as string[]) : null,
+      scoreChange: typeof r.scoreChange === 'number' ? r.scoreChange : null,
+      templateId: typeof r.templateId === 'string' ? r.templateId : null,
+      formId: typeof r.formId === 'string' ? r.formId : null,
+      trackedLinkId: typeof r.trackedLinkId === 'string' ? r.trackedLinkId : null,
     },
   };
 }
@@ -229,6 +312,34 @@ function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroupMetaInp
   if (r.isDefaultForAll !== undefined) {
     if (typeof r.isDefaultForAll !== 'boolean') return { ok: false, error: 'isDefaultForAll must be boolean' };
     meta.isDefaultForAll = r.isDefaultForAll;
+  }
+  if (r.targetingCondition !== undefined) {
+    if (r.targetingCondition === null) {
+      meta.targetingCondition = null;
+    } else if (typeof r.targetingCondition !== 'string') {
+      return { ok: false, error: 'targetingCondition must be a JSON string or null' };
+    } else {
+      // 読めない JSON をそのまま保存すると、出し分けのたびに黙って飛ばされる。
+      // 入り口で断る。
+      try {
+        JSON.parse(r.targetingCondition);
+      } catch {
+        return { ok: false, error: 'targetingCondition must be valid JSON' };
+      }
+      meta.targetingCondition = r.targetingCondition;
+    }
+  }
+  if (r.targetingPriority !== undefined) {
+    if (typeof r.targetingPriority !== 'number' || !Number.isInteger(r.targetingPriority)) {
+      return { ok: false, error: 'targetingPriority must be an integer' };
+    }
+    meta.targetingPriority = r.targetingPriority;
+  }
+  if (r.targetingEnabled !== undefined) {
+    if (typeof r.targetingEnabled !== 'boolean') {
+      return { ok: false, error: 'targetingEnabled must be boolean' };
+    }
+    meta.targetingEnabled = r.targetingEnabled;
   }
   let pages: RichMenuPageInput[] | undefined;
   if (r.pages !== undefined) {
@@ -580,6 +691,23 @@ richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', requireRole(
   return c.json({ success: true });
 });
 
+// 押された回数。既定はその月（日本時間）。from / to を渡せば任意の期間。
+// ルートの並び順に注意 — `/:groupId` より前に置かないと "tap-stats" が
+// リッチメニューの id として拾われる。
+richMenuGroups.get('/api/rich-menu-groups/tap-stats', async (c) => {
+  const accountId = c.req.query('accountId');
+  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  const range = currentMonthRange(jstNow());
+  const from = c.req.query('from') || range.from;
+  const to = c.req.query('to') || range.to;
+  try {
+    const stats = await getRichMenuTapStats(c.env.DB, accountId, from, to);
+    return c.json({ success: true, data: stats });
+  } catch (e) {
+    return c.json({ success: false, error: e instanceof Error ? e.message : String(e) }, 500);
+  }
+});
+
 richMenuGroups.get('/api/rich-menu-groups', async (c) => {
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
@@ -748,6 +876,36 @@ richMenuGroups.get('/api/rich-menu-images/:key{.+}', async (c) => {
 
 // ----- Publish -----
 
+/**
+ * 「URLを開く」で計測リンクを選んだボタンの、実際の飛び先を引く。
+ *
+ * 計測リンクは押された回数を数え、設定されていればタグ付けやシナリオ開始まで
+ * やってくれる。リッチメニュー側で同じ仕組みを作り直さず、そのまま乗せる。
+ */
+async function resolveTrackedLinkUrls(
+  db: D1Database,
+  resolveBaseUrl: () => Promise<string>,
+  group: RichMenuGroupWithPages,
+): Promise<Map<string, string>> {
+  const ids = new Set<string>();
+  for (const page of group.pages) {
+    for (const area of page.areas) {
+      if (area.tracked_link_id) ids.add(area.tracked_link_id);
+    }
+  }
+  const urls = new Map<string, string>();
+  // 計測リンクを使うボタンが1つも無ければ、ベースURLを引く必要もない。
+  if (ids.size === 0) return urls;
+  const baseUrl = await resolveBaseUrl();
+  for (const id of ids) {
+    const link = await getTrackedLinkById(db, id);
+    if (!link) continue;
+    // 短縮コードがあればそちらを使う (baseUrl が独自の短縮ドメインのことがある)。
+    urls.set(id, `${baseUrl}/t/${link.short_code ?? link.id}`);
+  }
+  return urls;
+}
+
 function createLineClient(channelAccessToken: string): LineRichMenuClient {
   const auth = `Bearer ${channelAccessToken}`;
   return {
@@ -859,11 +1017,25 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
         return { body: obj.body as ReadableStream };
       },
     };
+    // 「URLを開く」で計測リンクを選んでいるボタンの、実際の飛び先をまとめて引く。
+    const trackedLinkUrls = await resolveTrackedLinkUrls(
+      c.env.DB,
+      () =>
+        resolveTrackedLinkBaseUrl(c.env.DB, c.env.WORKER_URL || new URL(c.req.url).origin),
+      group,
+    );
+    // 「回答フォームを開く」の飛び先。アカウント固有の LIFF を優先する
+    // (共通 LIFF に飛ばすと、未同意のチャネルで同意画面が出てしまう)。
+    const formBaseUrl = account.liff_id
+      ? `https://liff.line.me/${account.liff_id}`
+      : (c.env.LIFF_URL ?? null);
+
     const groupInput: GroupInput = {
       id: group.id,
       size: group.size,
       chatBarText: group.chat_bar_text,
       isDefaultForAll: group.is_default_for_all === 1,
+      formBaseUrl,
       pages: group.pages.map((p) => ({
         id: p.id,
         orderIndex: p.order_index,
@@ -872,9 +1044,19 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
         imageContentType: p.image_content_type,
         lineRichMenuId: p.line_richmenu_id,
         areas: p.areas.map((a) => ({
+          id: a.id,
           bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height },
           actionType: a.action_type,
           actionData: a.actionData,
+          intent: a.intent,
+          label: a.label,
+          tagIds: a.tagIds,
+          scoreChange: a.score_change,
+          templateId: a.template_id,
+          formId: a.form_id,
+          trackedLinkUrl: a.tracked_link_id
+            ? (trackedLinkUrls.get(a.tracked_link_id) ?? null)
+            : null,
         })),
       })),
     };

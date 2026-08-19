@@ -1122,6 +1122,12 @@ CREATE TABLE IF NOT EXISTS rich_menu_groups (
   is_default_for_all INTEGER NOT NULL DEFAULT 0,
   status             TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
   publishing_at      TEXT,
+  -- 149: 友だちごとの出し分け。条件の形は一斉配信・シナリオと同じ
+  -- （SegmentCondition の JSON）。priority は当てはまったときの順番で、
+  -- 小さいほうが先。
+  targeting_condition TEXT,
+  targeting_priority  INTEGER NOT NULL DEFAULT 0,
+  targeting_enabled   INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -1149,6 +1155,16 @@ CREATE TABLE IF NOT EXISTS rich_menu_areas (
   bounds_height   INTEGER NOT NULL,
   action_type     TEXT NOT NULL CHECK (action_type IN ('uri','message','postback','richmenuswitch')),
   action_data     TEXT NOT NULL,
+  -- 146: 運用者から見た「何をするボタンか」。LINE の action_type 4種の上に乗せる
+  -- 言い換え（url / tel / text / template / form / switch / postback）。空なら
+  -- action_type から推測する。
+  intent          TEXT,
+  label           TEXT,
+  tag_ids         TEXT,
+  score_change    INTEGER,
+  template_id     TEXT,
+  form_id         TEXT,
+  tracked_link_id TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -1156,6 +1172,23 @@ CREATE TABLE IF NOT EXISTS rich_menu_areas (
 CREATE INDEX IF NOT EXISTS idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_rich_menu_areas_page     ON rich_menu_areas(page_id);
 CREATE INDEX IF NOT EXISTS idx_rich_menu_groups_account ON rich_menu_groups(account_id, status);
+
+-- 148: リッチメニューのボタンが押された記録。
+-- 外部キーは張らない。ボタンやページを消しても、数えた事実は残す。
+-- 押された時点のボタン名を写しておくのも同じ理由（消えた後も名前が出る）。
+CREATE TABLE IF NOT EXISTS rich_menu_area_taps (
+  id              TEXT PRIMARY KEY,
+  area_id         TEXT NOT NULL,
+  page_id         TEXT NOT NULL,
+  group_id        TEXT NOT NULL,
+  area_label      TEXT,
+  friend_id       TEXT,
+  line_account_id TEXT,
+  tapped_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_rich_menu_area_taps_group ON rich_menu_area_taps(group_id, tapped_at);
+CREATE INDEX IF NOT EXISTS idx_rich_menu_area_taps_area  ON rich_menu_area_taps(area_id, tapped_at);
 
 -- =============================================================================
 -- Unified customer support inbox: email threads and messages (migration 072)

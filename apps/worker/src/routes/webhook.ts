@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
+import { parseTapPostbackData } from '../lib/rich-menu-tap.js';
+import { handleRichMenuTap } from '../services/rich-menu-tap.js';
 import type { WebhookRequestBody, WebhookEvent, TextEventMessage } from '@line-crm/line-sdk';
 import { createStickerMessageContent } from '@line-crm/shared';
 import {
@@ -412,7 +414,41 @@ async function handleEvent(
     const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
     if (!friend) return;
 
-    const postbackData = (event as unknown as { postback: { data: string } }).postback.data;
+    const rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
+
+    /*
+     * リッチメニューのボタン。
+     *
+     * どのボタンが押されたかを知るために、publish のときに data の先頭へ area の
+     * id を付けている。ここで剥がして、運用者が設定した本来の data だけを下流へ流す。
+     * 自動応答やオートメーションは「data がこの文字列と一致したら」で判定しているので、
+     * こちらの都合で付けた目印を混ぜたままにすると、今まで当たっていた条件に
+     * 当たらなくなる。
+     *
+     * 剥がすついでに、そのボタンに設定された動き（タグ付け・スコア加算・
+     * テンプレート送信）をここで実行する。
+     */
+    const tap = parseTapPostbackData(rawPostbackData);
+    let postbackReplyToken: string | undefined = event.replyToken;
+    let tapLabel: string | null = null;
+    if (tap) {
+      try {
+        const tapResult = await handleRichMenuTap(db, lineClient, friend, tap.areaId, {
+          lineAccountId,
+          replyToken: postbackReplyToken,
+        });
+        if (tapResult.replyTokenConsumed) postbackReplyToken = undefined;
+        tapLabel = tapResult.target?.label ?? null;
+      } catch (err) {
+        // ボタンの動きが失敗しても、下の自動応答までは止めない。
+        console.error('Failed to handle rich menu tap', err);
+      }
+    }
+    const postbackData = tap ? (tap.inner ?? '') : rawPostbackData;
+    // 押されたボタンに本来の data が無い（テンプレートを送るだけ等）ときは、
+    // トーク履歴に空行を残さないようボタン名を出す。
+    const postbackLogText =
+      postbackData || (tapLabel ? `[メニュー] ${tapLabel}` : '[メニュー]');
 
     /*
      * シナリオの質問メッセージの選択肢。
@@ -431,13 +467,13 @@ async function handleEvent(
         lineClient,
         friend,
         { ...questionHit, lineAccountId },
-        event.replyToken,
+        postbackReplyToken,
       );
       if (answered.handled) {
         await fireEvent(db, 'postback_received', {
           friendId: friend.id,
           eventData: { text: postbackData, matched: true },
-          replyToken: answered.replyTokenConsumed ? undefined : event.replyToken,
+          replyToken: answered.replyTokenConsumed ? undefined : postbackReplyToken,
         }, lineAccessToken, lineAccountId);
         return;
       }
@@ -453,7 +489,7 @@ async function handleEvent(
           `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
            VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?)`,
         )
-        .bind(crypto.randomUUID(), friend.id, postbackData, lineAccountId ?? null, jstNow())
+        .bind(crypto.randomUUID(), friend.id, postbackLogText, lineAccountId ?? null, jstNow())
         .run();
     } catch (err) {
       console.error('Failed to log incoming postback', err);
@@ -461,13 +497,19 @@ async function handleEvent(
 
     // postback data を auto_replies にマッチさせて返信 (テキスト経路と共通)。
     // silent + automation で「返信なしでタグだけ付ける」構成もここで成立する。
+    // 本来の data が無いボタン（テンプレートを送るだけ等）は、自動応答の
+    // キーワード照合に回さない。空文字はどのキーワードとも照らし合わせようがない。
+    // 返信の権利（replyToken）を先にテンプレート送信で使い切っている場合も回さない。
+    // 自動応答は reply でしか返せないので、使い切った後に呼ぶと送信が失敗する。
     const { matched: postbackMatched, replyTokenConsumed: postbackReplyTokenConsumed } =
-      await matchAndReply(db, lineClient, friend, postbackData, event.replyToken, {
-        lineAccountId,
-        workerUrl,
-        logContext: 'postback',
-        messageKind: 'postback',
-      });
+      postbackData && postbackReplyToken
+        ? await matchAndReply(db, lineClient, friend, postbackData, postbackReplyToken, {
+            lineAccountId,
+            workerUrl,
+            logContext: 'postback',
+            messageKind: 'postback',
+          })
+        : { matched: false, replyTokenConsumed: false };
 
     // イベントバス発火: 専用イベント postback_received。
     // postback.data を text に載せることで、IF-THEN 自動化の keyword /
@@ -479,8 +521,9 @@ async function handleEvent(
     // ないので、未対応 inbox を汚さないのが正しい (テキスト経路との意図的な差分)。
     await fireEvent(db, 'postback_received', {
       friendId: friend.id,
-      eventData: { text: postbackData, matched: postbackMatched },
-      replyToken: postbackReplyTokenConsumed ? undefined : event.replyToken,
+      // data が無いボタンでも、ボタン名でオートメーションを組めるようにする。
+      eventData: { text: postbackData || tapLabel || '', matched: postbackMatched },
+      replyToken: postbackReplyTokenConsumed ? undefined : postbackReplyToken,
     }, lineAccessToken, lineAccountId);
 
     return;

@@ -443,6 +443,84 @@ export type ListStats = {
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
 }
 
+/* ---- リッチメニューのボタン（147） ---- */
+
+/**
+ * ボタンが「何をするか」。
+ *
+ * LINE が持てる動きは uri / message / postback / richmenuswitch の4つだけ。
+ * 「電話をかける」「テンプレートを送る」「回答フォームを開く」はその上に乗せた
+ * 言い換えで、LINE に登録するときに4つのどれかへ変換される。
+ */
+export type RichMenuAreaIntent =
+  | 'url'
+  | 'tel'
+  | 'text'
+  | 'template'
+  | 'form'
+  | 'switch'
+  | 'postback'
+
+/** 押された回数（148）。 */
+export type RichMenuAreaTapCount = {
+  areaId: string
+  groupId: string
+  pageId: string
+  /** ボタン名。消されたボタンは、押された時点の名前が出る。 */
+  label: string | null
+  taps: number
+  /** そのうち、計測リンク経由で数えた分。 */
+  viaTrackedLink: number
+}
+
+export type RichMenuTapStats = {
+  from: string
+  to: string
+  byArea: RichMenuAreaTapCount[]
+  byGroup: { groupId: string; taps: number }[]
+  total: number
+}
+
+/** 保存するときに送るボタン1つぶん。 */
+export type RichMenuAreaPayload = {
+  /** 既存ボタンの id。渡すと引き継がれる（押された回数の集計が途切れない）。 */
+  id?: string
+  boundsX: number
+  boundsY: number
+  boundsWidth: number
+  boundsHeight: number
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  actionData: Record<string, unknown>
+  intent?: RichMenuAreaIntent | null
+  /** 管理用のボタン名。 */
+  label?: string | null
+  /** 押されたときに付けるタグ。 */
+  tagIds?: string[] | null
+  /** 押されたときに足すスコア。 */
+  scoreChange?: number | null
+  templateId?: string | null
+  formId?: string | null
+  trackedLinkId?: string | null
+}
+
+/** 読み出したときのボタン1つぶん。 */
+export type RichMenuAreaResponse = {
+  id: string
+  boundsX: number
+  boundsY: number
+  boundsWidth: number
+  boundsHeight: number
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  actionData: Record<string, unknown>
+  intent: RichMenuAreaIntent | null
+  label: string | null
+  tagIds: string[]
+  scoreChange: number | null
+  templateId: string | null
+  formId: string | null
+  trackedLinkId: string | null
+}
+
 /** シナリオの開始のきっかけ（128）。1本に複数持てる。 */
 export type ScenarioTriggerItem = {
   id: string
@@ -2729,6 +2807,9 @@ export const api = {
         isDefaultForAll: boolean;
         status: 'draft' | 'published';
         publishingAt: string | null;
+        targetingCondition: string | null;
+        targetingPriority: number;
+        targetingEnabled: boolean;
         thumbnailR2Key: string | null;
         createdAt: string;
         updatedAt: string;
@@ -2745,6 +2826,9 @@ export const api = {
         isDefaultForAll: boolean;
         status: 'draft' | 'published';
         publishingAt: string | null;
+        targetingCondition: string | null;
+        targetingPriority: number;
+        targetingEnabled: boolean;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -2755,15 +2839,7 @@ export const api = {
           lineRichmenuId: string | null;
           imageR2Key: string | null;
           imageContentType: string | null;
-          areas: Array<{
-            id: string;
-            boundsX: number;
-            boundsY: number;
-            boundsWidth: number;
-            boundsHeight: number;
-            actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-            actionData: Record<string, unknown>;
-          }>;
+          areas: RichMenuAreaResponse[];
         }>;
       }>>(`/api/rich-menu-groups/${groupId}`),
 
@@ -2776,14 +2852,7 @@ export const api = {
         id?: string;
         name: string;
         orderIndex: number;
-        areas: Array<{
-          boundsX: number;
-          boundsY: number;
-          boundsWidth: number;
-          boundsHeight: number;
-          actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-          actionData: Record<string, unknown>;
-        }>;
+        areas: RichMenuAreaPayload[];
       }>;
     }) =>
       fetchApi<ApiResponse<{ id: string; pages: Array<{ id: string }> }>>('/api/rich-menu-groups', {
@@ -2795,24 +2864,31 @@ export const api = {
       name?: string;
       chatBarText?: string;
       isDefaultForAll?: boolean;
+      /** 出し分けの条件（SegmentCondition の JSON）。null で解除。 */
+      targetingCondition?: string | null;
+      targetingPriority?: number;
+      targetingEnabled?: boolean;
       pages?: Array<{
         id?: string;
         name: string;
         orderIndex: number;
-        areas: Array<{
-          boundsX: number;
-          boundsY: number;
-          boundsWidth: number;
-          boundsHeight: number;
-          actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-          actionData: Record<string, unknown>;
-        }>;
+        areas: RichMenuAreaPayload[];
       }>;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/rich-menu-groups/${groupId}`, {
         method: 'PATCH',
         body: JSON.stringify(input),
       }),
+
+    /** 押された回数。期間を省くとその月（日本時間）。 */
+    tapStats: (accountId: string, range?: { from?: string; to?: string }) => {
+      const params = new URLSearchParams({ accountId })
+      if (range?.from) params.set('from', range.from)
+      if (range?.to) params.set('to', range.to)
+      return fetchApi<ApiResponse<RichMenuTapStats>>(
+        `/api/rich-menu-groups/tap-stats?${params.toString()}`,
+      )
+    },
 
     delete: (groupId: string, opts?: { force?: boolean }) =>
       fetchApi<ApiResponse<null>>(

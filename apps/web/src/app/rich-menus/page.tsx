@@ -6,6 +6,7 @@ import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
+import type { RichMenuTapStats } from '@/lib/api'
 
 type RichMenuGroupListItem = {
   id: string
@@ -14,6 +15,8 @@ type RichMenuGroupListItem = {
   size: 'large' | 'compact'
   status: 'draft' | 'published'
   isDefaultForAll: boolean
+  targetingEnabled: boolean
+  targetingCondition: string | null
   thumbnailR2Key: string | null
   updatedAt: string
 }
@@ -58,6 +61,7 @@ export default function RichMenusListPage() {
   const [externalError, setExternalError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [applyTo, setApplyTo] = useState<RichMenuGroupListItem | null>(null)
+  const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
 
   const reload = useCallback(async () => {
     if (!selectedAccount?.id) return
@@ -66,10 +70,15 @@ export default function RichMenusListPage() {
     setExternalError(null)
     try {
       // 並列に: D1 管理 group の一覧と、LINE 上の現状
-      const [groupsRes, externalRes] = await Promise.allSettled([
+      const [groupsRes, externalRes, tapRes] = await Promise.allSettled([
         api.richMenuGroups.list(selectedAccount.id),
         api.richMenuGroups.external(selectedAccount.id),
+        api.richMenuGroups.tapStats(selectedAccount.id),
       ])
+      // 数が取れなくても一覧は出す。集計は付随情報なので、落ちても本体は止めない。
+      setTapStats(
+        tapRes.status === 'fulfilled' && tapRes.value.success ? tapRes.value.data : null,
+      )
       if (groupsRes.status === 'fulfilled') {
         if (!groupsRes.value.success) throw new Error(groupsRes.value.error ?? '取得失敗')
         setGroups(groupsRes.value.data)
@@ -160,6 +169,11 @@ export default function RichMenusListPage() {
 
   // メニュー名とトークバーの文言を見る。名前だけだと、画面に出ている
   // 文言（chatBarText）で探せない。
+  // 集計は多い順に並んでいる。先頭がいちばん押されたボタン。
+  const topArea = tapStats?.byArea[0] ?? null
+  const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
+  const targetingCount = groups.filter((g) => g.targetingEnabled && g.targetingCondition).length
+
   const q = query.trim()
   const shownGroups = q
     ? groups.filter((g) => g.name.includes(q) || g.chatBarText.includes(q))
@@ -217,25 +231,41 @@ export default function RichMenusListPage() {
             公開中 {groups.filter((g) => g.status === 'published').length}
           </p>
         </div>
-        {/* どのボタンが何回押されたかを記録していない。LINE 側で処理される
-            postback / message は webhook で来るが、メニューのどの領域かまでは
-            結びつけていない。 */}
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のタップ</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">タップ数は未集計</p>
+          <p className={`mt-1 text-2xl font-bold tabular-nums ${tapStats ? 'text-ink' : 'text-ink-faint'}`}>
+            {tapStats ? tapStats.total : '—'}
+            {tapStats && <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>}
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            {tapStats ? 'ボタンが押された回数' : '集計を取れませんでした'}
+          </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">最多タップ</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">タップ数は未集計</p>
+          <p
+            className={`mt-1 truncate text-2xl font-bold ${topArea ? 'text-ink' : 'text-ink-faint'}`}
+            title={topArea?.label ?? undefined}
+          >
+            {topArea ? (topArea.label || '名前のないボタン') : '—'}
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            {topArea
+              ? `${topArea.taps}回・タップ数の内訳は編集画面で見られます`
+              : 'まだ押されていません'}
+          </p>
         </div>
-        {/* 一覧はタグ条件を返していない。誰に出すかはメニューごとの設定に
-            あるが、一覧の型（RichMenuGroupListItem）に入っていない。 */}
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">出し分け</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">タグ条件は一覧に出ません</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {targetingCount}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            {targetingCount > 0
+              ? 'タグ条件で自動的に切り替わります'
+              : 'タグ条件で出し分けているメニューはありません'}
+          </p>
         </div>
       </div>
 
@@ -375,10 +405,24 @@ export default function RichMenusListPage() {
                   <p className="text-sm text-ink-faint truncate">
                     トーク表示: <span className="text-ink-secondary">{g.chatBarText}</span>
                   </p>
-                  <div className="mt-3 flex items-center gap-2 text-xs text-ink-faint">
-                    <span>サイズ: {g.size === 'large' ? '2500×1686' : '2500×843'}</span>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-faint">
+                    <span className="whitespace-nowrap">
+                      サイズ: {g.size === 'large' ? '2500×1686' : '2500×843'}
+                    </span>
+                    {tapStats && (
+                      <span className="whitespace-nowrap">
+                        今月 <span className="text-ink-secondary tabular-nums">
+                          {tapsByGroup.get(g.id) ?? 0}
+                        </span> 回
+                      </span>
+                    )}
+                    {g.targetingEnabled && g.targetingCondition && (
+                      <span className="text-accent font-medium whitespace-nowrap">条件で出し分け</span>
+                    )}
                     {g.isDefaultForAll && (
-                      <span className="text-blue-600 font-medium">★ 全員のデフォルト</span>
+                      <span className="text-blue-600 font-medium whitespace-nowrap">
+                        ★ 全員のデフォルト
+                      </span>
                     )}
                   </div>
                 </div>
