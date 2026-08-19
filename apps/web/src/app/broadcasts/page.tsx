@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import type { Tag } from '@line-crm/shared'
+import type { Folder, Tag } from '@line-crm/shared'
 import { api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
@@ -10,6 +10,8 @@ import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel from '@/components/shared/folder-panel'
+import { audienceSummary, contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -46,6 +48,9 @@ function BroadcastsPageContent() {
 
 type BroadcastTab = 'single' | 'dedup' | 'all'
 
+/** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
+const UNFILED = '__unfiled__'
+
 function BroadcastList() {
   const { selectedAccountId } = useAccount()
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
@@ -59,6 +64,18 @@ function BroadcastList() {
   // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
   // 一覧が増えると、配信名を覚えていても探すのに時間がかかる。
   const [titleQuery, setTitleQuery] = useState('')
+  /*
+   * 配信日で絞る。
+   *
+   * 一覧が伸びると、「先月の配信を見たい」だけのために延々とめくることになる。
+   * 見るのは予約中なら予約の日、送信済みなら送った日。列と同じ日付を見る。
+   */
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [folders, setFolders] = useState<Folder[]>([])
+  /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
+  const [folderFilter, setFolderFilter] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
@@ -85,6 +102,13 @@ function BroadcastList() {
       setFetchingInsight(null)
     }
   }
+
+  const loadFolders = useCallback(async () => {
+    const res = await api.folders.list('broadcast')
+    if (res.success) setFolders(res.data)
+  }, [])
+
+  useEffect(() => { void loadFolders() }, [loadFolders])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -137,6 +161,20 @@ function BroadcastList() {
     }
     // まだ送っていない予約だけを見る。送る前に中身を直せるのはこれだけ。
     if (scheduledOnly && b.status !== 'scheduled') return false
+    if (folderFilter === UNFILED) {
+      if (b.folderId) return false
+    } else if (folderFilter && b.folderId !== folderFilter) {
+      return false
+    }
+    if (dateFrom || dateTo) {
+      // 一覧の「配信日時」列と同じものを見る。送信済みは送った日、それ以外は予約日。
+      const iso = b.status === 'sent' ? b.sentAt : b.scheduledAt
+      if (!iso) return false
+      // JST の日付で比べる。UTC のまま切ると、夜の配信が前日に入る。
+      const ymd = new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+      if (dateFrom && ymd < dateFrom) return false
+      if (dateTo && ymd > dateTo) return false
+    }
     if (activeTab === 'all') return true
     if (activeTab === 'dedup') return b.targetType === 'multi-account-dedup'
     return b.targetType !== 'multi-account-dedup'
@@ -159,14 +197,10 @@ function BroadcastList() {
             >
               マニュアル
             </button>
-            {/*
-              フォルダは 099 で folders 表が入っているが、broadcasts に
-              folder_id が無い。docs/v025-open-questions.md §4-3。
-            */}
             <button
-              disabled
-              title="フォルダの追加は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              type="button"
+              onClick={() => setFolderDialogOpen(true)}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
               フォルダを追加
             </button>
@@ -188,28 +222,45 @@ function BroadcastList() {
       />
       </div>
 
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="broadcast"
+          note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
+          placeholder="例: 01_キャンペーン"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadFolders()}
+        />
+      )}
+
       <div data-design="KPIs">
       <BroadcastKpis />
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-          {/*
-            設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形に
-            そろえる。099 で folders 表は入っているが broadcasts に
-            folder_id が無いので、いまは「すべて」だけ。
-            docs/v025-open-questions.md §4-3。
-          */}
+          {/* 設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。 */}
           <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
             <FolderPanel
               total={`${broadcasts.length} 件`}
-              activeId=""
-              onSelect={() => {}}
-              rows={[{ id: '', label: 'すべて', count: broadcasts.length }]}
+              activeId={folderFilter}
+              onSelect={setFolderFilter}
+              rows={[
+                { id: '', label: 'すべて', count: broadcasts.length },
+                ...folders.map((f) => ({
+                  id: f.id,
+                  label: f.name,
+                  count: broadcasts.filter((b) => b.folderId === f.id).length,
+                  color: f.color,
+                })),
+                {
+                  id: UNFILED,
+                  label: '未分類',
+                  count: broadcasts.filter((b) => !b.folderId).length,
+                },
+              ]}
             >
               <p className="text-ink-faint text-xs leading-relaxed">
-                配信の分類はまだ作れません。上の「フォルダを追加」から作れるように
-                なったら、ここに並びます。
+                フォルダを消しても、入っていた配信は未分類として残ります。
               </p>
             </FolderPanel>
 
@@ -233,6 +284,31 @@ function BroadcastList() {
             >
               <option>配信日が新しい順</option>
             </select>
+            <span className="text-ink-faint text-xs whitespace-nowrap">配信日</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="配信日（開始）"
+              className="border-hairline rounded-control border px-2 py-2 text-sm"
+            />
+            <span className="text-ink-faint text-xs">〜</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              aria-label="配信日（終了）"
+              className="border-hairline rounded-control border px-2 py-2 text-sm"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => { setDateFrom(''); setDateTo('') }}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm"
+              >
+                日付を外す
+              </button>
+            )}
             <button
               disabled
               title="保存した条件は準備中です"
@@ -361,6 +437,9 @@ function BroadcastList() {
                   配信条件
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
+                  内容
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
                   配信数
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
@@ -393,8 +472,13 @@ function BroadcastList() {
                             </span>
                           )}
                         </div>
+                        {/*
+                          前は text / image 以外をすべて「Flex」と出していた。
+                          スタンプもカルーセルも位置情報も「Flex」に見えるので、
+                          一覧で中身を確かめられなかった。
+                        */}
                         <p className="text-xs text-ink-faint mt-0.5">
-                          {broadcast.messageType === 'text' ? 'テキスト' : broadcast.messageType === 'image' ? '画像' : 'Flex'}
+                          {messageTypeLabel(broadcast.messageType)}
                         </p>
                       </div>
                     </td>
@@ -409,17 +493,20 @@ function BroadcastList() {
                         : formatDatetime(broadcast.scheduledAt)}
                     </td>
 
-                    {/* Target */}
+                    {/*
+                      配信条件。前は「全員」か「タグ指定」の2つしか見ていなかったので、
+                      詳細条件で絞った配信も「タグ指定」と出ていた。送った相手を
+                      後から確かめられないので、監査にならなかった。
+                    */}
                     <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {isDedup ? (
-                        <span className="text-purple-700">重複除外{tagName ? `: ${tagName}` : ''}</span>
-                      ) : broadcast.targetType === 'all' ? (
-                        '全員'
-                      ) : tagName ? (
-                        <span>タグ: {tagName}</span>
-                      ) : (
-                        'タグ指定'
-                      )}
+                      {audienceSummary(broadcast, getTagName)}
+                    </td>
+
+                    {/* 内容。一覧から中身を思い出せるように、本文の頭を出す。 */}
+                    <td className="px-4 py-3 text-sm text-ink-secondary">
+                      <span className="line-clamp-2 break-all">
+                        {contentExcerpt(broadcast.messageType, broadcast.messageContent) || '—'}
+                      </span>
                     </td>
 
                     {/* Stats & Insight */}

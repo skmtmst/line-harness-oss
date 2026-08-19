@@ -147,7 +147,12 @@
     "138_step_carousel_copy.sql",
     "139_step_carousel_swap.sql",
     "140_step_carousel_rename.sql",
-    "141_step_carousel_index.sql"
+    "141_step_carousel_index.sql",
+    "142_broadcast_message_kinds.sql",
+    "143_broadcast_message_kinds_copy.sql",
+    "144_broadcast_message_kinds_swap.sql",
+    "145_broadcast_message_kinds_index.sql",
+    "150_broadcast_folder.sql"
   ],
-  "migrationCount": 148
+  "migrationCount": 153
 }
