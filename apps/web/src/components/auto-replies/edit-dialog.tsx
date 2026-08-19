@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import ConditionBuilder from '@/components/shared/condition-builder'
+import InlineActionList, { useActionOptions } from './inline-action-list'
 import {
   readKeywordRules,
   readInlineActions,
@@ -110,6 +112,8 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
+  const actionOptions = useActionOptions()
 
   const flexTemplates = templates.filter((t) => t.messageType === 'flex')
   const textTemplates = templates.filter((t) => t.messageType === 'text')
@@ -517,6 +521,71 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                 </span>
               </span>
             </label>
+
+            <div>
+              <p className="text-ink-faint mb-1.5 text-xs">応答する回数</p>
+              <div className="space-y-1">
+                <label className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="radio"
+                    name="ar-once"
+                    checked={!oncePerFriend}
+                    onChange={() => setOncePerFriend(false)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm">何度でも応答する</span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="radio"
+                    name="ar-once"
+                    checked={oncePerFriend}
+                    onChange={() => setOncePerFriend(true)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm">
+                    1人につき1回だけ応答する
+                    <span className="text-ink-faint block text-[11px]">
+                      このルールで一度応答した人には、以後どのキーワードでも応答しません。
+                      上の「連投を防ぐ」は時間をあけるだけですが、こちらは二度と応答しません。
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-ink-faint mb-1.5 text-xs">応答する相手</p>
+              <ConditionBuilder
+                value={friendConditions}
+                onChange={setFriendConditions}
+                label="この応答を返す友だち"
+                showCount={false}
+              />
+              <p className="text-ink-faint mt-1 text-[11px]">
+                条件を入れないと、全員に応答します。
+              </p>
+            </div>
+          </div>
+
+          {/* 応答したときに、あわせて行うこと */}
+          <div className="border-hairline space-y-3 rounded-lg border p-3">
+            <div>
+              <p className="text-ink text-sm font-semibold">4. 応答したときに行うこと</p>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                並べた順に実行します。タグを付けてから、そのタグを条件にした次の動きを置く、
+                という書き方ができます。
+              </p>
+            </div>
+            <InlineActionList
+              actions={actions}
+              onChange={setActions}
+              tags={actionOptions.tags}
+              fields={actionOptions.fields}
+              marks={actionOptions.marks}
+              scenarios={actionOptions.scenarios}
+              vars={actionOptions.vars}
+            />
           </div>
 
           <label className="inline-flex items-center gap-2 cursor-pointer">

@@ -2209,6 +2209,14 @@ export const api = {
         skipWhenOperatorActive: boolean;
         priority: number;
         messageKinds: string[] | null;
+        actions: unknown[] | null;
+        responseWeekdays: number[] | null;
+        responseHolidayRule: string | null;
+        oncePerFriend: boolean;
+        keywords: unknown[] | null;
+        friendConditions: unknown | null;
+        /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
+        hits?: { period: number; total: number };
         createdAt: string;
         effectiveAccounts?: Array<{
           accountId: string;
@@ -2234,6 +2242,12 @@ export const api = {
         skipWhenOperatorActive: boolean;
         priority: number;
         messageKinds: string[] | null;
+        actions: unknown[] | null;
+        responseWeekdays: number[] | null;
+        responseHolidayRule: string | null;
+        oncePerFriend: boolean;
+        keywords: unknown[] | null;
+        friendConditions: unknown | null;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {
@@ -2254,6 +2268,18 @@ export const api = {
       priority?: number;
       /** 対象にするメッセージ種別。null で全部 */
       messageKinds?: string[] | null;
+      /** 151: 応答したときに順に実行すること。 */
+      actions?: unknown[] | null;
+      /** 151: 応答する曜日（0=日 … 6=土）。null で曜日を問わない */
+      responseWeekdays?: number[] | null;
+      /** 151: 'ignore' | 'include' | 'exclude' */
+      responseHolidayRule?: string | null;
+      /** 151: 1人につき1回だけ応答する */
+      oncePerFriend?: boolean;
+      /** 151: キーワードの複数行 */
+      keywords?: unknown[] | null;
+      /** 友だちの絞り込み（一斉配信・シナリオと同じ形） */
+      friendConditions?: unknown | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -2273,6 +2299,18 @@ export const api = {
       skipWhenOperatorActive?: boolean;
       priority?: number;
       messageKinds?: string[] | null;
+      /** 151: 応答したときに順に実行すること。 */
+      actions?: unknown[] | null;
+      /** 151: 応答する曜日（0=日 … 6=土）。null で曜日を問わない */
+      responseWeekdays?: number[] | null;
+      /** 151: 'ignore' | 'include' | 'exclude' */
+      responseHolidayRule?: string | null;
+      /** 151: 1人につき1回だけ応答する */
+      oncePerFriend?: boolean;
+      /** 151: キーワードの複数行 */
+      keywords?: unknown[] | null;
+      /** 友だちの絞り込み（一斉配信・シナリオと同じ形） */
+      friendConditions?: unknown | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',
