@@ -1,18 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { AccountHealthLog, LineAccount } from '@line-crm/shared'
+import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
+import type { LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { api, type DashboardOverview } from '@/lib/api'
-import {
-  buildHealthRows,
-  buildResearchReport,
-  formatOperationDate,
-  HEALTH_CRITERIA,
-  overallSeverity,
-  type OperationSeverity,
-} from '@/lib/operation-status'
+import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
@@ -58,7 +51,7 @@ interface UpdateHistoryRow {
 }
 
 const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
-  normal: { label: '正常', badge: 'bg-emerald-100 text-emerald-700', panel: 'border-emerald-200 bg-emerald-50' },
+  normal: { label: '異常なし', badge: 'bg-emerald-100 text-emerald-700', panel: 'border-emerald-200 bg-emerald-50' },
   warning: { label: '注意', badge: 'bg-amber-100 text-amber-800', panel: 'border-amber-200 bg-amber-50' },
   danger: { label: 'エラー', badge: 'bg-red-100 text-red-700', panel: 'border-red-200 bg-red-50' },
   unknown: { label: '未確認', badge: 'bg-gray-100 text-gray-600', panel: 'border-gray-200 bg-gray-50' },
@@ -85,16 +78,6 @@ function readOperationHistory(): OperationHistoryEntry[] {
 function addOperationHistory(entry: OperationHistoryEntry): void {
   localStorage.setItem(OPERATION_HISTORY_KEY, JSON.stringify([entry, ...readOperationHistory()].slice(0, 100)))
   window.dispatchEvent(new Event('nen-operation-history-updated'))
-}
-
-function downloadText(filename: string, content: string): void {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = filename
-  anchor.click()
-  URL.revokeObjectURL(url)
 }
 
 function StatusPill({ severity }: { severity: OperationSeverity }) {
@@ -127,109 +110,20 @@ function OperationPageHeader({ description, action }: { description: string; act
   )
 }
 
-const UI_REVIEW_STATES: Array<{
-  label: string
-  note: string
-  className: string
-  dot: string
-}> = [
-  { label: '正常', note: 'そのまま運用できます', className: 'border-emerald-200 bg-emerald-50 text-emerald-800', dot: 'bg-emerald-500' },
-  { label: '注意', note: '内容を確認してください', className: 'border-amber-200 bg-amber-50 text-amber-800', dot: 'bg-amber-500' },
-  { label: 'エラー', note: '停止を検討してください', className: 'border-red-200 bg-red-50 text-red-800', dot: 'bg-red-500' },
-  { label: '未確認', note: '確認結果を待っています', className: 'border-gray-200 bg-gray-50 text-gray-700', dot: 'bg-gray-400' },
-  { label: '緊急停止中', note: '配信を停止しています', className: 'border-red-200 bg-red-50 text-red-800', dot: 'bg-red-600' },
-  { label: '復旧待ち', note: '確認後に再開できます', className: 'border-blue-200 bg-blue-50 text-blue-800', dot: 'bg-blue-500' },
-]
-
-/** 設計確認中だけ全状態を同時に見せる。実データの判定表示とは分離する。 */
-function OperationUiReviewPanel() {
-  return (
-    <section className="border-hairline rounded-card border bg-white p-5" data-design="全UI確認（仮表示）">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 className="text-ink text-base font-bold">全UI確認（仮表示）</h2>
-          <p className="text-ink-faint mt-1 text-xs">状態ごとの色・文字・操作を確認するため、すべて同時に表示しています。</p>
-        </div>
-        <span className="rounded-pill bg-info-bg text-info px-2.5 py-1 text-[11px] font-bold">確認後に条件表示</span>
-      </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-        {UI_REVIEW_STATES.map((state) => (
-          <div key={state.label} className={`rounded-control flex min-h-16 items-center gap-2 border px-3 py-2.5 ${state.className}`}>
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${state.dot}`} />
-            <span className="min-w-0">
-              <span className="block text-xs font-bold">{state.label}</span>
-              <span className="mt-0.5 block text-[10px] opacity-80">{state.note}</span>
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" disabled className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-700 disabled:opacity-100">調査レポートを出力</button>
-        <button type="button" disabled className="rounded-control min-h-9 bg-red-600 px-3 text-xs font-bold text-white disabled:opacity-100">緊急停止の確認</button>
-        <button type="button" disabled className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-700 disabled:opacity-100">復旧の確認</button>
-        <button type="button" disabled className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-700 disabled:opacity-100">更新履歴を見る</button>
-        <button type="button" disabled className="border-hairline rounded-control min-h-9 border bg-white px-3 text-xs font-bold text-gray-500 opacity-40">再確認中…</button>
-      </div>
-    </section>
-  )
-}
-
-type ReviewCheckKey = 'line' | 'quota' | 'integration' | 'webhook' | 'delivery' | 'scheduler' | 'friends'
-
-interface ReviewCheckItem {
-  key: ReviewCheckKey
-  label: string
-  note: string
-  severity: OperationSeverity
-  title: string
-  summary: string
-  event: string
-  impact: string
-  next: string
-}
-
-/** Pen V3 10-4の確認用一覧。実データが0件でも画面検証できるよう、API結果とは分離して表示する。 */
-const UI_REVIEW_CHECKS: ReviewCheckItem[] = [
-  { key: 'line', label: 'LINE接続', note: 'LINEへ接続できません', severity: 'danger', title: 'LINEへ接続できません', summary: '発生日・対象アカウントを表示', event: 'LINEへの接続確認でエラーになりました。', impact: 'メッセージを送れない可能性があります。', next: '調査レポートを出力するか、配信を緊急停止します。' },
-  { key: 'quota', label: '月間配信残数', note: '残り15%です', severity: 'warning', title: '月間配信残数が少なくなっています', summary: '残数・上限・更新日を表示', event: '月間配信数が注意基準を下回りました。', impact: '上限に達するとメッセージを送れなくなります。', next: '残数と今後の配信予定を確認します。' },
-  { key: 'integration', label: '外部連携', note: 'まだ確認されていません', severity: 'unknown', title: '外部連携を確認できていません', summary: '連携先・最終確認日時を表示', event: '外部サービスの確認記録がありません。', impact: '連携を使う処理の状態を判断できません。', next: '連携設定を確認し、もう一度チェックします。' },
-  { key: 'webhook', label: 'Webhook', note: '正常に受信しています', severity: 'normal', title: 'Webhookは正常です', summary: '最終受信日時・応答状態を表示', event: 'Webhookを正常に受信しました。', impact: '受信処理への影響はありません。', next: 'そのまま運用できます。' },
-  { key: 'delivery', label: '配信処理', note: '遅れはありません', severity: 'normal', title: '配信処理は正常です', summary: '待機件数・遅延時間を表示', event: '配信処理は予定どおり動いています。', impact: '配信への影響はありません。', next: 'そのまま運用できます。' },
-  { key: 'scheduler', label: '定期処理', note: '予定どおり動いています', severity: 'normal', title: '定期処理は正常です', summary: '最終実行・次回予定を表示', event: '定期処理は予定どおり完了しました。', impact: '自動処理への影響はありません。', next: 'そのまま運用できます。' },
-  { key: 'friends', label: '友だちの変化', note: '急な増減はありません', severity: 'normal', title: '友だち数の変化は正常です', summary: '増減数・比較期間を表示', event: '友だち数に急な変化はありません。', impact: '運用への影響はありません。', next: 'そのまま運用できます。' },
-]
-
 function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity) => void }) {
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
-  const [logsByAccount, setLogsByAccount] = useState<Record<string, AccountHealthLog[]>>({})
-  const [risksByAccount, setRisksByAccount] = useState<Record<string, string>>({})
   const [dashboard, setDashboard] = useState<DashboardOverview | null>(null)
-  const [selectedReviewKey, setSelectedReviewKey] = useState<ReviewCheckKey>('line')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [checkedAt, setCheckedAt] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setLoadError('')
     try {
-      const accountResponse = await api.health.accounts()
-      if (!accountResponse.success) throw new Error(accountResponse.error)
-      const nextLogs: Record<string, AccountHealthLog[]> = {}
-      const nextRisks: Record<string, string> = {}
-      const results = await Promise.allSettled(
-        accountResponse.data.map(async (account) => ({ account, response: await api.health.getHealth(account.id) })),
-      )
-      for (const result of results) {
-        if (result.status === 'fulfilled' && result.value.response.success) {
-          nextLogs[result.value.account.id] = result.value.response.data.logs ?? []
-          nextRisks[result.value.account.id] = result.value.response.data.riskLevel
-        }
-      }
-      setAccounts(accountResponse.data)
-      setLogsByAccount(nextLogs)
-      setRisksByAccount(nextRisks)
       const dashboardResponse = await api.dashboard.overview({ period: 'today' })
-      if (dashboardResponse.success) setDashboard(dashboardResponse.data)
+      if (!dashboardResponse.success) throw new Error(dashboardResponse.error)
+      setDashboard(dashboardResponse.data)
+      setCheckedAt(dashboardResponse.data.generatedAt ?? new Date().toISOString())
     } catch {
       setLoadError('運用状態を取得できませんでした。時間をおいて再読み込みしてください。')
     } finally {
@@ -237,74 +131,55 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
     }
   }, [])
 
-  useEffect(() => { void load() }, [load])
-  const rows = useMemo(() => buildHealthRows(accounts, logsByAccount, risksByAccount), [accounts, logsByAccount, risksByAccount])
-  const severity = useMemo(() => overallSeverity(rows), [rows])
-  const displayedSeverity: OperationSeverity = rows.length === 0 ? 'danger' : severity
-  const selectedReview = UI_REVIEW_CHECKS.find((item) => item.key === selectedReviewKey) ?? UI_REVIEW_CHECKS[0]
-  const checkedDates = rows.map((row) => row.checkedAt).filter((value): value is string => Boolean(value)).sort((a, b) => Date.parse(b) - Date.parse(a))
+  useEffect(() => {
+    void load()
+    const timer = window.setInterval(() => { void load() }, 5 * 60 * 1000)
+    return () => window.clearInterval(timer)
+  }, [load])
+
   const quotaLimit = dashboard?.delivery.quotaLimit ?? null
   const quotaUsed = dashboard?.delivery.quotaUsed ?? null
-  const quotaRemaining = quotaLimit == null || quotaUsed == null ? '取得できません' : Math.max(quotaLimit - quotaUsed, 0).toLocaleString('ja-JP')
+  const quota = monthlyQuotaStatus(quotaLimit, quotaUsed)
+  const displayedSeverity = quota.severity
+  const isNormal = displayedSeverity === 'normal'
+  const resultTitle = isNormal ? '異常なし' : displayedSeverity === 'warning' ? '注意' : 'エラー'
+  const resultDescription = isNormal
+    ? '現在、確認できる異常はありません。'
+    : displayedSeverity === 'warning'
+      ? `月間配信残数が15%未満です（残り${quota.remaining?.toLocaleString('ja-JP')}通）。`
+      : '月間配信残数が0通です。これ以上配信できません。'
+  const statusIcon = isNormal ? '✓' : '!'
+  const statusIconClass = isNormal ? 'text-emerald-700' : displayedSeverity === 'warning' ? 'text-amber-700' : 'text-red-700'
 
   useEffect(() => { onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
-
-  const exportReport = () => {
-    const actualReport = rows.length > 0
-      ? `\n\n${buildResearchReport({ generatedAt: new Date().toISOString(), overall: severity, rows, quotaLimit, quotaUsed })}`
-      : '\n\n## システム連携結果\n\n確認対象のアカウントを取得できませんでした。'
-    const report = `# 運用状態 調査レポート\n\n- 対象: ${selectedReview.label}\n- 状態: ${severityStyle[selectedReview.severity].label}\n- 概要: ${selectedReview.note}\n\n## 起きたこと\n\n${selectedReview.event}\n\n## 影響\n\n${selectedReview.impact}\n\n## 次にすること\n\n${selectedReview.next}${actualReport}`
-    downloadText(`nen-operation-report-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.md`, report)
-  }
 
   return (
     <div className="space-y-4" data-design="V3 Health">
       {loadError && <div className="rounded-card border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{loadError}</div>}
-      <div className="bg-info-bg text-info rounded-card flex flex-wrap items-center gap-3 px-4 py-3">
-        <span className="rounded-pill bg-white px-2.5 py-1 text-xs font-bold">UI確認モード（仮表示）</span>
-        <p className="min-w-0 flex-1 text-xs">正常・注意・エラー・未確認・緊急停止・復旧のUIを、デザイン確認のため同時に表示しています。</p>
-        <span className="rounded-pill bg-white px-2.5 py-1 text-[10px] font-bold">設計確認用</span>
-      </div>
       <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold text-red-600">!</span>
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
         <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-red-700">{displayedSeverity === 'normal' ? '現在、確認できる異常はありません' : 'エラーがあります'}</p>
-          <p className="mt-0.5 text-xs text-gray-600">内容を確認してください。配信事故のおそれがある場合は緊急停止します。</p>
+          <p className="text-base font-bold text-gray-900">{resultTitle}</p>
+          <p className="mt-0.5 text-xs text-gray-600">{loading ? '確認しています…' : resultDescription}</p>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="全体の状態" value={severityStyle[displayedSeverity].label} note={loading ? '確認中' : '最新結果'} />
-        <SummaryCard label="最後の確認" value={formatOperationDate(checkedDates[0] ?? null)} note="5分ごとに自動確認" />
-        <SummaryCard label="今月の配信残数" value={quotaRemaining} note={quotaLimit == null ? 'LINEから取得できたときだけ表示' : `上限 ${quotaLimit.toLocaleString('ja-JP')}通`} />
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <SummaryCard label="全体の状態" value={resultTitle} note={loading ? '確認中' : '最新結果'} />
+        <SummaryCard label="最後の確認" value={formatOperationDate(checkedAt)} note="5分ごとに自動確認" />
         <SummaryCard label="緊急停止状態" value="通常運用" note="停止なし" />
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)]">
-        <section className="border-hairline rounded-card overflow-hidden border bg-white">
-          <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-gray-900">チェック結果</h2><p className="mt-0.5 text-xs text-gray-500">問題がある項目を上に表示</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-[10px] font-bold">5分ごと</span></div>
-          <div className="divide-y divide-gray-100">{UI_REVIEW_CHECKS.map((item) => (
-              <button key={item.key} onClick={() => setSelectedReviewKey(item.key)} className={`flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 ${selectedReview.key === item.key ? 'bg-accent-soft' : ''}`}>
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${severityStyle[item.severity].badge}`}>{item.severity === 'normal' ? '✓' : item.severity === 'warning' ? '!' : item.severity === 'danger' ? '!' : '−'}</span>
-                <span className="min-w-0 flex-1"><span className={`block truncate text-sm font-bold ${selectedReview.key === item.key ? 'text-accent' : 'text-gray-900'}`}>{item.label}</span><span className="block text-xs text-gray-500">{item.note}</span></span>
-                <StatusPill severity={item.severity} />
-                <span className="text-xs text-gray-400">›</span>
-              </button>
-            ))}</div>
-          <p className="px-4 py-3 text-xs text-gray-500">詳細な判定基準は必要なときだけ開けます。</p>
-        </section>
-        <section className="border-hairline rounded-card border bg-white p-4">
-          <div className="flex flex-wrap items-center gap-2"><StatusPill severity={selectedReview.severity} /><span className="text-xs text-gray-600">{selectedReview.label}</span></div>
-          <h2 className="mt-2 text-base font-bold text-gray-900">{selectedReview.title}</h2>
-          <p className="mt-1 text-xs text-gray-500">{selectedReview.summary}</p>
-          <div className="mt-4 space-y-3">
-            <div className="rounded-control bg-red-50 px-4 py-3"><p className="text-xs font-bold text-gray-900">起きたこと</p><p className="mt-1 text-xs text-gray-700">{selectedReview.event}</p></div>
-            <div className="rounded-control bg-amber-50 px-4 py-3"><p className="text-xs font-bold text-gray-900">影響</p><p className="mt-1 text-xs text-gray-700">{selectedReview.impact}</p></div>
-            <div className="rounded-control bg-blue-50 px-4 py-3"><p className="text-xs font-bold text-gray-900">次にすること</p><p className="mt-1 text-xs text-gray-700">{selectedReview.next}</p></div>
+      <section className="border-hairline rounded-card overflow-hidden border bg-white">
+        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-gray-900">チェック結果</h2><p className="mt-0.5 text-xs text-gray-500">注意・エラーがあるときだけ内容を表示します</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-[10px] font-bold">5分ごと</span></div>
+        <div className={`flex items-center gap-3 px-4 py-5 ${severityStyle[displayedSeverity].panel}`}>
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-gray-900">{resultTitle}</p>
+            <p className="mt-1 text-xs text-gray-600">{loading ? '確認しています…' : resultDescription}</p>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2"><button onClick={exportReport} className="rounded-control min-h-9 bg-accent px-3 text-xs font-bold text-white hover:opacity-90">調査レポートを出力</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700">緊急停止する</Link></div>
-          <details className="border-hairline mt-4 rounded-control border bg-gray-50"><summary className="cursor-pointer px-4 py-3 text-xs font-bold text-gray-800">判定基準を見る</summary><div className="space-y-3 border-t border-gray-200 px-4 py-4">{HEALTH_CRITERIA.map((criterion) => <div key={criterion.severity} className="grid grid-cols-[auto_1fr] gap-3 text-xs"><StatusPill severity={criterion.severity} /><div><p className="font-bold text-gray-800">{criterion.condition}</p><p className="mt-1 text-gray-500">{criterion.action}</p></div></div>)}</div></details>
-        </section>
-      </div>
-      <OperationUiReviewPanel />
+          <StatusPill severity={displayedSeverity} />
+        </div>
+        {!isNormal && <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3"><p className="text-xs text-gray-600">配信予定を確認し、必要な場合だけ配信を停止してください。</p><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700">緊急停止を確認</Link></div>}
+      </section>
     </div>
   )
 }
