@@ -62,7 +62,7 @@ export default function AccountHierarchy() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`rounded-pill px-2 py-1 text-xs ${account.isActive ? 'bg-accent-bg text-accent' : 'bg-canvas-sunken text-ink-faint'}`}>
+          <span className={`rounded-pill px-2 py-1 text-xs ${account.isActive ? 'bg-accent-soft text-accent' : 'bg-canvas-sunken text-ink-faint'}`}>
             {account.isActive ? '接続済み' : '停止中'}
           </span>
           <span className="cursor-grab text-ink-faint" aria-label="ドラッグして移動">⋮⋮</span>

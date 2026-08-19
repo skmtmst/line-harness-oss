@@ -60,9 +60,16 @@ export function emptyQuestion(): ScenarioQuestion {
   }
 }
 
-const inputClass = 'border-line rounded-control text-ink h-9 w-full border px-3 text-sm'
-const selectClass = 'border-line rounded-control text-ink h-9 border bg-white px-2 text-sm'
-const areaClass = 'border-line rounded-control text-ink w-full resize-y border p-3 text-sm'
+/*
+ * 入力欄の見た目は、他の画面（友だち属性・シナリオ編集）と同じにそろえる。
+ * この画面だけ枠や余白が違うと、同じアプリに見えない。
+ */
+const inputClass =
+  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+const selectClass =
+  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+const areaClass =
+  'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-y border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
 
 /** 上限に対する残りを出す。超えた時点で赤くする。 */
 function CharCount({ value, max }: { value: string; max: number }) {
@@ -110,10 +117,10 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
     <div className="space-y-5">
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <label className="text-ink text-sm font-bold">前文</label>
+          <span className="text-ink-secondary text-xs font-medium">前文</span>
           <CharCount value={value.intro ?? ''} max={4500} />
         </div>
-        <p className="text-ink-secondary mt-0.5 mb-1.5 text-xs">
+        <p className="text-ink-faint mt-0.5 mb-1.5 text-xs leading-relaxed">
           質問の前に、ふつうのテキストメッセージとして流れます。空なら送りません。差し込み（
           <code className="text-ink-faint">{'{{name}}'}</code> など）が使えます。
         </p>
@@ -127,9 +134,9 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
 
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <label className="text-ink text-sm font-bold">
-            質問文 <span className="text-danger text-xs">必須</span>
-          </label>
+          <span className="text-ink-secondary text-xs font-medium">
+            質問文 <span className="text-danger">*</span>
+          </span>
           <CharCount value={value.text} max={160} />
         </div>
         <input
@@ -141,7 +148,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="text-ink text-sm font-bold">質問の回答は</label>
+        <span className="text-ink-secondary text-xs font-medium">質問の回答は</span>
         <select
           value={value.tapMode}
           onChange={(e) => onChange({ ...value, tapMode: e.target.value as 'single' | 'multiple' })}
@@ -154,8 +161,8 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
 
       <div className="space-y-3">
         {value.choices.map((choice, index) => (
-          <div key={index} className="border-line rounded-card border">
-            <div className="border-line bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+          <div key={index} className="border-hairline rounded-card border">
+            <div className="border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
               <button
                 type="button"
                 onClick={() => setOpenChoice(openChoice === index ? null : index)}
@@ -171,7 +178,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
                   <button
                     type="button"
                     onClick={() => onOpenChoiceActions(index)}
-                    className="border-line text-ink-secondary rounded-control h-9 border px-3 text-xs"
+                    className="border-hairline text-ink-secondary rounded-control h-9 border px-3 text-xs"
                   >
                     アクション
                   </button>
@@ -182,7 +189,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
                     onChange({ ...value, choices: value.choices.filter((_, i) => i !== index) })
                   }
                   disabled={value.choices.length <= 1}
-                  className="border-line text-danger rounded-control h-9 border px-3 text-xs disabled:opacity-40"
+                  className="text-ink-faint hover:text-danger text-xs disabled:opacity-40"
                 >
                   削除
                 </button>
@@ -193,9 +200,9 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
               <div className="space-y-4 px-4 py-4">
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <label className="text-ink text-sm font-medium">
-                      ボタンの文字 <span className="text-danger text-xs">必須</span>
-                    </label>
+                    <span className="text-ink-secondary text-xs font-medium">
+                      ボタンの文字 <span className="text-danger">*</span>
+                    </span>
                     <CharCount value={choice.label} max={20} />
                   </div>
                   <input
@@ -203,13 +210,13 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
                     onChange={(e) => setChoice(index, { label: e.target.value })}
                     className={`${inputClass} mt-1.5`}
                   />
-                  <p className="text-ink-faint mt-1 text-xs">
+                  <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                     10文字を超えると、機種によっては途中で切れて表示されます。
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-ink text-sm font-medium">選択後の挙動</label>
+                  <span className="text-ink-secondary text-xs font-medium">選択後の挙動</span>
                   <select
                     value={choice.behavior}
                     onChange={(e) => setChoice(index, { behavior: e.target.value as ChoiceBehavior })}
@@ -333,7 +340,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
 
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <label className="text-ink text-sm font-medium">ユーザーメッセージ</label>
+                    <span className="text-ink-secondary text-xs font-medium">ユーザーメッセージ</span>
                     <CharCount value={choice.userMessage ?? ''} max={60} />
                   </div>
                   <input
@@ -343,7 +350,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
                     disabled={choice.hideUserMessage === true}
                     className={`${inputClass} mt-1.5 disabled:opacity-50`}
                   />
-                  <p className="text-ink-faint mt-1 text-xs">
+                  <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                     ボタンを押したときに、友だちの発言としてトークに残る文です。
                   </p>
                   <label className="text-ink-secondary mt-1.5 flex items-center gap-1.5 text-xs">
@@ -358,7 +365,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
 
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <label className="text-ink text-sm font-medium">選択時の返信</label>
+                    <span className="text-ink-secondary text-xs font-medium">選択時の返信</span>
                     <CharCount value={choice.reply ?? ''} max={4500} />
                   </div>
                   <textarea
@@ -372,7 +379,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
 
                 <div>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <label className="text-ink text-sm font-medium">二度押し時の返信</label>
+                    <span className="text-ink-secondary text-xs font-medium">二度押し時の返信</span>
                     <CharCount value={choice.repeatReply ?? ''} max={4500} />
                   </div>
                   <textarea
@@ -382,7 +389,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
                     placeholder="すでに押されています！"
                     className={`${areaClass} mt-1.5`}
                   />
-                  <p className="text-ink-faint mt-1 text-xs">
+                  <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                     空欄なら「すでに押されています！」を返します。2度目はタグもシナリオも動かしません。
                   </p>
                 </div>
@@ -401,7 +408,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
                 />
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-ink text-sm font-medium">友だち情報欄</label>
+                  <span className="text-ink-secondary text-xs font-medium">友だち情報欄</span>
                   <select
                     value={choice.field?.fieldId ?? ''}
                     onChange={(e) =>
@@ -429,7 +436,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
                         })
                       }
                       placeholder="セットする値（既存の値は上書き）"
-                      className="border-line rounded-control text-ink h-9 min-w-0 flex-1 border px-3 text-sm"
+                      className="border-hairline rounded-control text-ink h-9 min-w-0 flex-1 border px-3 text-sm"
                     />
                   )}
                 </div>
@@ -447,7 +454,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
             })
           }
           disabled={value.choices.length >= 13}
-          className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-card h-10 w-full border border-dashed text-sm disabled:opacity-40"
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-card h-10 w-full border border-dashed text-sm disabled:opacity-40"
         >
           ＋ 選択肢を追加
         </button>
@@ -455,7 +462,7 @@ export default function QuestionEditor({ value, onChange, onOpenChoiceActions }:
 
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <label className="text-ink text-sm font-medium">PC版・通知欄での代替テキスト</label>
+          <span className="text-ink-secondary text-xs font-medium">PC版・通知欄での代替テキスト</span>
           <CharCount value={value.altText ?? ''} max={400} />
         </div>
         <input
@@ -482,7 +489,7 @@ function TagPicker({
 }) {
   return (
     <div>
-      <label className="text-ink text-sm font-medium">{label}</label>
+      <span className="text-ink-secondary text-xs font-medium">{label}</span>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {tags.map((tag) => {
           const on = selected.includes(tag.id)
@@ -494,7 +501,7 @@ function TagPicker({
                 onChange(on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id])
               }
               className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                on ? 'bg-accent text-on-accent' : 'border-line text-ink-secondary border'
+                on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary border'
               }`}
             >
               {tag.name}

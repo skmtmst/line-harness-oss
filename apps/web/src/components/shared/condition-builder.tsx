@@ -269,12 +269,12 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
       {rules.map((rule, i) => (
         <div
           key={`${groupIndex ?? 'root'}-${i}`}
-          className="border-line bg-canvas rounded-card flex flex-wrap items-start gap-2 border p-3"
+          className="border-hairline bg-canvas rounded-card flex flex-wrap items-start gap-2 border p-3"
         >
           <button
             type="button"
             onClick={() => removeRule(i, groupIndex)}
-            className="text-ink-faint hover:text-danger rounded-control border-line h-9 shrink-0 border px-2 text-xs"
+            className="text-ink-faint hover:text-danger rounded-control border-hairline h-9 shrink-0 border px-2 text-xs"
             aria-label="この条件を外す"
           >
             外す
@@ -301,7 +301,7 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
           key={kind.type}
           type="button"
           onClick={() => addRule(kind, groupIndex)}
-          className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-3 text-xs"
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-3 text-xs"
         >
           {kind.label}
         </button>
@@ -311,7 +311,7 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
 
   return (
     <div className="space-y-4">
-      <div className="border-line rounded-card border p-4">
+      <div className="border-hairline rounded-card border p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-ink text-sm font-bold">
             「すべて満たす」必要がある条件<span className="text-ink-faint ml-1 font-normal">(and条件)</span>
@@ -324,7 +324,7 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
       </div>
 
       {(condition.groups ?? []).map((group, gi) => (
-        <div key={gi} className="border-line rounded-card border p-4">
+        <div key={gi} className="border-hairline rounded-card border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-ink text-sm font-bold">
               「いずれか1つ以上を満たす」必要がある条件
@@ -335,7 +335,7 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
               onClick={() =>
                 update({ ...condition, groups: (condition.groups ?? []).filter((_, i) => i !== gi) })
               }
-              className="text-ink-faint hover:text-danger rounded-control border-line h-9 border px-3 text-xs"
+              className="text-ink-faint hover:text-danger rounded-control border-hairline h-9 border px-3 text-xs"
             >
               このかたまりを外す
             </button>
@@ -353,7 +353,7 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],
           })
         }
-        className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-card h-10 w-full border border-dashed text-sm"
+        className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-card h-10 w-full border border-dashed text-sm"
       >
         ＋「いずれか1つ以上を満たす」必要がある条件(or条件)を追加
       </button>
@@ -386,9 +386,9 @@ interface RuleEditorProps {
 }
 
 const selectClass =
-  'border-line rounded-control text-ink h-9 border bg-white px-2 text-sm min-w-0'
+  'border-hairline rounded-control text-ink h-9 border bg-white px-2 text-sm min-w-0'
 const inputClass =
-  'border-line rounded-control text-ink h-9 border px-3 text-sm min-w-0 flex-1'
+  'border-hairline rounded-control text-ink h-9 border px-3 text-sm min-w-0 flex-1'
 
 function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEditorProps) {
   const v = rule.value as Record<string, unknown>
@@ -436,7 +436,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
                   onChange({ type: rule.type, value: isMulti ? next : (next[next.length - 1] ?? '') })
                 }}
                 className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                  on ? 'bg-accent text-on-accent' : 'border-line text-ink-secondary border'
+                  on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary border'
                 }`}
               >
                 {tag.name}
@@ -567,7 +567,7 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
                     })
                   }
                   className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent text-on-accent' : 'border-line text-ink-secondary border'
+                    on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary border'
                   }`}
                 >
                   {mark.name}
