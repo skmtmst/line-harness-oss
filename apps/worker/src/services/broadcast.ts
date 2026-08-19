@@ -21,6 +21,7 @@ import {
   renderBroadcastMessageContent,
   type BroadcastRenderContext,
 } from './render-message.js';
+import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 
@@ -245,7 +246,8 @@ export async function processBroadcastSend(
       // Send in batches with stealth delays to mimic human patterns
       const now = jstNow();
       const totalBatches = Math.ceil(followingFriends.length / MULTICAST_BATCH_SIZE);
-      const unit = `bcast_${broadcast.id.slice(0, 8)}`;
+      // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
+      const unit = aggregationUnitFor(broadcast);
       for (let i = 0; i < followingFriends.length; i += MULTICAST_BATCH_SIZE) {
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
@@ -270,7 +272,7 @@ export async function processBroadcastSend(
             ...batch.map((f) => f.id),
             JSON.stringify(batchMessage),
           );
-          await lineClient.multicast(lineUserIds, [batchMessage], [unit], retryKey);
+          await lineClient.multicast(lineUserIds, [batchMessage], aggregationUnits(unit), retryKey);
           successCount += batch.length;
 
           // Log only successfully sent messages (batch insert for performance)
@@ -544,7 +546,8 @@ async function processQueuedBroadcastBatches(
   }
 
   const now = jstNow();
-  const unit = `bcast_${broadcast.id.slice(0, 8).replace(/[^a-zA-Z0-9_]/g, '_')}`;
+  // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
+  const unit = aggregationUnitFor(broadcast);
   let currentOffset = batchOffset;
   const personalized = hasRecipientVariables(finalContent);
   const unsupportedVariables = getUnsupportedBroadcastVariables(finalContent);
@@ -606,7 +609,7 @@ async function processQueuedBroadcastBatches(
             finalType,
             renderedContent,
           );
-          await lineClient.pushMessage(friend.line_user_id, [personalizedMessage], retryKey, [unit]);
+          await lineClient.pushMessage(friend.line_user_id, [personalizedMessage], retryKey, aggregationUnits(unit));
 
           await db.prepare(
             `INSERT INTO messages_log
@@ -671,7 +674,7 @@ async function processQueuedBroadcastBatches(
         ...batch.map((f) => f.id),
         JSON.stringify(batchMessage),
       );
-      await lineClient.multicast(lineUserIds, [batchMessage], [unit], retryKey);
+      await lineClient.multicast(lineUserIds, [batchMessage], aggregationUnits(unit), retryKey);
     } catch (err) {
       console.error(`Queued broadcast batch ${batchIndex} send failed:`, err);
       // 送信失敗: ロック解除 + offsetを保存して次のCronで再開
