@@ -257,8 +257,14 @@ export default function FriendAddSettingsPage() {
               />
             </div>
 
-            {routing.returning.mode === 'other' && (
+            {/*
+              開始位置は「別のシナリオ」だけでなく「同じもの」でも要る。
+              ブロック中は購読が止まったまま残るので、「最初から」だと
+              その人には何も届かない（止まった購読が邪魔をする）。
+            */}
+            {routing.returning.mode !== 'none' && (
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {routing.returning.mode === 'other' && (
                 <Field label="配信するシナリオ">
                   <Select
                     value={routing.returning.scenarioId ?? ''}
@@ -269,6 +275,7 @@ export default function FriendAddSettingsPage() {
                     placeholder="選んでください"
                   />
                 </Field>
+                )}
                 <Field label="開始位置">
                   <Select
                     value={routing.returning.startPosition}
@@ -291,9 +298,9 @@ export default function FriendAddSettingsPage() {
 
             {routing.returning.mode !== 'none' && (
               <p className="text-ink-faint mt-3 text-xs leading-relaxed">
-                {routing.returning.startPosition === 'resume' && routing.returning.mode === 'other'
-                  ? '前回読んだところから再開したときは、1通目を送り直しません。続きの通から届きます。読み終えている人には最初から流れます。'
-                  : '選んだシナリオの1通目から届きます。'}
+                {routing.returning.startPosition === 'resume'
+                  ? '前回読んだところから再開します。1通目は送り直しません。読み終えている人には最初から流れます。ブロックを解除した人は、ここが「最初から」だと止まった購読が残っていて何も届きません。'
+                  : '1通目から届きます。ブロックを解除した人で、その配信が途中で止まっていた場合は、止まったまま何も届きません。「前回読んだところから」を選んでください。'}
               </p>
             )}
 
