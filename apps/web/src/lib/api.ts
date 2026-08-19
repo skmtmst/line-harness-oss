@@ -760,7 +760,8 @@ export const api = {
     /** withCounts で friendCount 付き (JOIN 集計 — タグ管理ページ用)。 */
     list: (params?: { withCounts?: boolean }) =>
       fetchApi<ApiResponse<Tag[]>>(`/api/tags${params?.withCounts ? '?withCounts=1' : ''}`),
-    create: (data: { name: string; color: string; groupId?: string | null }) =>
+    // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
+    create: (data: { name: string; groupId?: string | null }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {
         method: 'POST',
         body: JSON.stringify(data),
@@ -940,12 +941,18 @@ export const api = {
       fetchApi<ApiResponse<{
         features: Record<string, boolean>
         sidebarOrder: string[] | null
+        /** 区分ごとの項目の並び。区分の目印 → 項目の目印の並び。 */
+        sidebarItemOrder: Record<string, string[]> | null
         parentChildMode: boolean
         specializedFeatureKeys: string[]
       }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
       ),
-    save: (accountId: string, data: { features?: Record<string, boolean>; sidebarOrder?: string[] }) =>
+    save: (accountId: string, data: {
+      features?: Record<string, boolean>
+      sidebarOrder?: string[]
+      sidebarItemOrder?: Record<string, string[]>
+    }) =>
       fetchApi<ApiResponse<null>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
@@ -1393,6 +1400,14 @@ export const api = {
       trackLinks?: boolean
       /** 何分かけて配るか。0（既定）は一気に送る */
       stealthSpreadMinutes?: number
+      /**
+       * 絞り込み条件。targetType が 'segment' のときに必須。
+       * 下書きに保存され、送信のときにこの条件で宛先を出す。
+       */
+      segmentConditions?: {
+        operator: 'AND' | 'OR'
+        rules: Array<{ type: string; value: boolean | string | { key: string; value: string } }>
+      }
     }, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',

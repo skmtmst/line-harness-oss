@@ -20,17 +20,6 @@ import { Field, inputClass } from '@/components/shared/create-page'
  * 静的書き出しだから。ほかの編集画面と同じ形。
  */
 
-const PRESET_COLORS = [
-  '#3B82F6',
-  '#10B981',
-  '#F59E0B',
-  '#EF4444',
-  '#8B5CF6',
-  '#EC4899',
-  '#06B6D4',
-  '#6B7280',
-]
-
 /**
  * 倍率の選択肢。内部は bps（10000 = 1.0倍）で持つ。
  *
@@ -53,7 +42,6 @@ function EditTagInner() {
   const [tag, setTag] = useState<Tag | null>(null)
   const [groups, setGroups] = useState<TagGroup[]>([])
   const [name, setName] = useState('')
-  const [color, setColor] = useState(PRESET_COLORS[0])
   const [groupId, setGroupId] = useState('')
 
   /**
@@ -88,7 +76,6 @@ function EditTagInner() {
         setTag(found)
         if (found) {
           setName(found.name)
-          setColor(found.color)
           setGroupId(found.groupId ?? '')
           setReward(String(found.mileageReward ?? 0))
           setReferralReward(String(found.referralMileageReward ?? 0))
@@ -118,8 +105,9 @@ function EditTagInner() {
     setError('')
     setNotice('')
     try {
-      // 名前と色、所属、マイルで受け口が分かれている。順に当てる。
-      await api.tags.update(tagId, { name: name.trim(), color, isStarred })
+      // 名前と所属、マイルで受け口が分かれている。順に当てる。
+      // 色は送らない。印の色はフォルダに付いていて、タグ側は持たない。
+      await api.tags.update(tagId, { name: name.trim(), isStarred })
       if ((tag?.groupId ?? '') !== groupId) {
         await api.tags.setGroup(tagId, groupId || null)
       }

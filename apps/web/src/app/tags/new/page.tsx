@@ -6,15 +6,6 @@ import type { TagGroup } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
 
-const PRESET_COLORS = [
-  '#10B981',
-  '#3B82F6',
-  '#C2410C',
-  '#B91C1C',
-  '#8B5CF6',
-  '#6B7280',
-]
-
 /**
  * 倍率の選択肢。内部は bps（10000 = 1.0倍）で持つ。
  * 編集画面（/tags/edit）と同じ段にそろえる。
@@ -29,7 +20,6 @@ const MULTIPLIERS = [
 
 export default function NewTagPage() {
   const [name, setName] = useState('')
-  const [color, setColor] = useState(PRESET_COLORS[0])
   const [groupId, setGroupId] = useState('')
 
   const [groups, setGroups] = useState<TagGroup[]>([])
@@ -61,9 +51,9 @@ export default function NewTagPage() {
       validate={() => (name.trim() ? null : 'タグ名を入力してください')}
       onReset={() => setName('')}
       onSave={async () => {
+        // 色は送らない。印の色はフォルダに付いていて、タグ側は持たない。
         const res = await api.tags.create({
           name: name.trim(),
-          color,
           groupId: groupId || null,
         })
         if (!res.success) throw new Error(res.error)

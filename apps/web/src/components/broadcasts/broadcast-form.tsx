@@ -33,6 +33,31 @@ const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
 }
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
 
+/**
+ * 送る相手の決め方。3つのうち1つを選ぶ。
+ *
+ * どれを選んでも、ブロック中の友だちは常に外れる（is_following）。
+ */
+type TargetMode = 'scenario' | 'tag' | 'advanced'
+
+const TARGET_MODES: Array<{ value: TargetMode; label: string; description: string }> = [
+  {
+    value: 'scenario',
+    label: 'シナリオ購読中の全員に配信する',
+    description: 'いまシナリオが流れている人。止まっている人・配信し終わった人は入りません',
+  },
+  {
+    value: 'tag',
+    label: 'タグで絞り込んで配信する',
+    description: '選んだタグが付いている人',
+  },
+  {
+    value: 'advanced',
+    label: '詳細条件で絞り込んで配信する',
+    description: '性別・年代・エリア・友だち期間・過去の反応で絞ります',
+  },
+]
+
 function emptyBubble(type: BroadcastBubbleType = 'text'): BroadcastBubble {
   const content: Record<string, unknown> = type === 'text' ? { text: '' }
     : type === 'sticker' ? { packageId: 'placeholder', stickerId: 'placeholder' }
@@ -141,7 +166,10 @@ export default function BroadcastForm({
   const [assets, setAssets] = useState<BroadcastMessageAsset[]>([])
   const [messageTemplates, setMessageTemplates] = useState<BroadcastTemplateOption[]>([])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
-  const [targetMode, setTargetMode] = useState<'all' | 'filter'>('all')
+  const [targetMode, setTargetMode] = useState<TargetMode>('scenario')
+  /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
+  const [scenarioId, setScenarioId] = useState('')
+  const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
   const [filter, setFilter] = useState({ gender: '', age: '', area: '', tenure: '', reaction: '', tagId: '' })
   const [targetCount, setTargetCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
@@ -165,6 +193,13 @@ export default function BroadcastForm({
   useEffect(() => {
     if (openTemplatePickerInitially) setShowTemplatePicker(true)
   }, [openTemplatePickerInitially])
+
+  // 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
+  useEffect(() => {
+    api.scenarios.list({ accountId: selectedAccountId || undefined })
+      .then((res) => { if (res.success) setScenarios(res.data.map((item) => ({ id: item.id, name: item.name }))) })
+      .catch(() => undefined)
+  }, [selectedAccountId])
 
   useEffect(() => {
     Promise.all([
@@ -196,14 +231,41 @@ export default function BroadcastForm({
       }
     }).catch(() => undefined)
   }, [initialContentTemplateId, initialTemplateId, selectedAccountId])
+  /*
+   * 送る相手を、そのまま送信に使える条件の形で組み立てる。
+   *
+   * 人数を数えるのと実際に送るのとで別々に組み立てていた頃は、詳細条件で
+   * 絞った人数が出るのに、送信は全員へ行っていた（条件が送信側に渡って
+   * いなかった）。1か所で作って両方に渡す。
+   */
   const countRules = useMemo(() => {
-    const rules: Array<{ type: 'is_following' | 'tag_exists' | 'metadata_equals'; value: boolean | string | { key: string; value: string } }> = [{ type: 'is_following', value: true }]
-    if (targetMode === 'filter') {
+    const rules: Array<{ type: 'is_following' | 'tag_exists' | 'metadata_equals' | 'scenario_subscribed'; value: boolean | string | { key: string; value: string } }> = [{ type: 'is_following', value: true }]
+    if (targetMode === 'scenario') {
+      rules.push({ type: 'scenario_subscribed', value: scenarioId })
+    } else if (targetMode === 'tag') {
       if (filter.tagId) rules.push({ type: 'tag_exists', value: filter.tagId })
+    } else {
       for (const [key, value] of Object.entries(filter)) if (key !== 'tagId' && value) rules.push({ type: 'metadata_equals', value: { key, value } })
     }
     return rules
-  }, [filter, targetMode])
+  }, [filter, scenarioId, targetMode])
+
+  /**
+   * 作成・テスト送信・事前確認に渡す宛先。
+   *
+   * タグ1つだけの絞り込みは、前からある targetType='tag' をそのまま使う。
+   * 送信の経路が別（キューに載せずにその場で送る）で、少人数のときに速い。
+   */
+  const targetPayload = useCallback(() => {
+    if (targetMode === 'tag' && filter.tagId) {
+      return { targetType: 'tag' as const, targetTagId: filter.tagId, segmentConditions: undefined }
+    }
+    return {
+      targetType: 'segment' as const,
+      targetTagId: null,
+      segmentConditions: { operator: 'AND' as const, rules: countRules },
+    }
+  }, [countRules, filter.tagId, targetMode])
   const refreshCount = useCallback(async () => {
     setCounting(true)
     try { const res = await api.segments.count({ operator: 'AND', rules: countRules }, selectedAccountId || undefined); setTargetCount(res.success ? (res.count ?? 0) : null) }
@@ -227,7 +289,7 @@ export default function BroadcastForm({
     return () => clearTimeout(timer)
     // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bubbles, filter.tagId, targetMode, selectedAccountId])
+  }, [bubbles, filter.tagId, scenarioId, targetMode, selectedAccountId])
 
   const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => i === index ? { ...bubble, id: item.id } : item))
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
@@ -258,9 +320,10 @@ export default function BroadcastForm({
     try {
       const first = bubbles[0]
       const content = first?.type === 'text' ? String(first.content.text ?? '') : ''
+      const target = targetPayload()
       const res = await api.broadcasts.preflight({
-        targetType: filter.tagId ? 'tag' : 'all',
-        targetTagId: filter.tagId || null,
+        targetType: target.targetType,
+        targetTagId: target.targetTagId,
         lineAccountId: selectedAccountId || null,
         messageContent: content,
       })
@@ -313,8 +376,7 @@ export default function BroadcastForm({
           messageType: legacy.messageType,
           messageContent: legacy.messageContent,
           messageBubbles: bubbles,
-          targetType: filter.tagId ? 'tag' : 'all',
-          targetTagId: filter.tagId || null,
+          ...targetPayload(),
           lineAccountId: selectedAccountId || null,
           scheduledAt: null,
           trackLinks: true,
@@ -342,7 +404,7 @@ export default function BroadcastForm({
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubbles, targetType: filter.tagId ? 'tag' : 'all', targetTagId: filter.tagId || null, lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks: true, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
+      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubbles, ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks: true, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
       if (res.success) onSuccess(); else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
@@ -365,7 +427,45 @@ export default function BroadcastForm({
           <label className="block text-sm font-bold text-slate-700">管理用タイトル</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" />
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-bold text-slate-800">1. 送る相手</p><div className="mt-2 flex gap-2">{(['all','filter'] as const).map((mode) => <button key={mode} onClick={() => setTargetMode(mode)} className={`rounded-full px-4 py-2 text-sm font-semibold ${targetMode === mode ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{mode === 'all' ? 'すべての友だち' : '絞り込み'}</button>)}</div></div><div className="rounded-xl bg-emerald-50 px-5 py-3 text-right"><p className="text-xs font-bold text-emerald-700">送信対象</p><p className="text-2xl font-black text-emerald-700">{counting ? '…' : targetCount?.toLocaleString('ja-JP') ?? '-'}<span className="ml-1 text-sm">人</span></p></div></div>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="text-sm font-bold text-slate-800">1. 送る相手</p>
+            <div className="rounded-xl bg-emerald-50 px-5 py-3 text-right">
+              <p className="text-xs font-bold text-emerald-700">送信対象</p>
+              <p className="text-2xl font-black text-emerald-700">
+                {counting ? '…' : targetCount?.toLocaleString('ja-JP') ?? '-'}
+                <span className="ml-1 text-sm">人</span>
+              </p>
+            </div>
+          </div>
+          {/*
+            3つのうち1つを選ぶ。丸ボタンを横に並べていた頃は、選んでいない側に
+            何が入るのか読めなかった。シナリオの「いつ開始する？」と同じ形に
+            そろえて、それぞれに説明を付ける。
+          */}
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {TARGET_MODES.map((mode) => (
+              <label
+                key={mode.value}
+                className={`flex h-full cursor-pointer flex-col gap-1 rounded-xl border p-3 transition-colors ${
+                  targetMode === mode.value
+                    ? 'border-accent bg-accent-subtle'
+                    : 'border-hairline hover:bg-canvas-sunken'
+                }`}
+              >
+                <span className="flex items-start gap-2">
+                  <input
+                    type="radio"
+                    name="broadcast-target-mode"
+                    checked={targetMode === mode.value}
+                    onChange={() => setTargetMode(mode.value)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-ink text-sm font-semibold">{mode.label}</span>
+                </span>
+                <span className="text-ink-faint pl-6 text-xs leading-relaxed">{mode.description}</span>
+              </label>
+            ))}
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {/* ブロック中の人は countRules の is_following=true で外れている。
                 外していることを書かないと、人数が合わないように見える。 */}
@@ -392,8 +492,22 @@ export default function BroadcastForm({
               保存した条件から選ぶ
             </button>
           </div>
-          {targetMode === 'filter' && <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
-            <select value={filter.tagId} onChange={(e) => setFilter({ ...filter, tagId: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">タグ：すべて</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select>
+          {targetMode === 'scenario' && <div className="mt-4 border-t pt-4">
+            <label className="text-ink-secondary block text-xs font-semibold">どのシナリオ</label>
+            <select
+              value={scenarioId}
+              onChange={(e) => setScenarioId(e.target.value)}
+              className="border-hairline mt-1 w-full rounded-lg border px-3 py-2 text-sm sm:max-w-sm"
+            >
+              <option value="">すべてのシナリオ（どれか1つでも購読中）</option>
+              {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}
+            </select>
+          </div>}
+          {targetMode === 'tag' && <div className="mt-4 border-t pt-4">
+            <label className="text-ink-secondary block text-xs font-semibold">どのタグ</label>
+            <select value={filter.tagId} onChange={(e) => setFilter({ ...filter, tagId: e.target.value })} className="border-hairline mt-1 w-full rounded-lg border px-3 py-2 text-sm sm:max-w-sm"><option value="">タグ：すべて</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select>
+          </div>}
+          {targetMode === 'advanced' && <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
             <select value={filter.gender} onChange={(e) => setFilter({ ...filter, gender: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">性別：すべて</option><option value="female">女性</option><option value="male">男性</option><option value="unknown">未設定</option></select>
             <select value={filter.age} onChange={(e) => setFilter({ ...filter, age: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">年代：すべて</option>{['20代','30代','40代','50代','60代以上'].map((v) => <option key={v}>{v}</option>)}</select>
             <input value={filter.area} onChange={(e) => setFilter({ ...filter, area: e.target.value })} placeholder="エリア（例：東京都）" className="rounded-lg border px-3 py-2 text-sm" />
