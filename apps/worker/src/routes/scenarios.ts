@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   getScenarios,
   getScenarioById,
@@ -15,6 +16,8 @@ import {
 import { reorderScenarios } from '@line-crm/db';
 import { computeScenarioStats } from '../services/scenario-stats.js';
 import { SUPPORTED_CONDITION_TYPES, isSupportedConditionType } from '../services/step-delivery.js';
+import { buildSegmentWhere, type SegmentCondition } from '../services/segment-query.js';
+import { parseQuestion } from '../services/scenario-question.js';
 import { resolveStepContent } from '@line-crm/db';
 import type {
   Scenario as DbScenario,
@@ -48,9 +51,24 @@ function serializeScenario(row: DbScenario) {
     allowConcurrent: (row.allow_concurrent ?? 1) !== 0,
     displayOrder: Number(row.display_order ?? 0),
     folderId: row.folder_id ?? null,
+    // シナリオ全体の配信対象。null は条件なし。
+    audienceCondition: parseJson(row.audience_condition_json),
+    // 最終コンテンツ配信後の処理。列が無い環境でも 'pause'（これまでの動き）。
+    onCompleteMode: (row.on_complete_mode ?? 'pause') as 'pause' | 'resume_previous' | 'move',
+    onCompleteScenarioId: row.on_complete_scenario_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** 保存されている JSON を素の値に戻す。壊れていれば null。 */
+function parseJson(raw: string | null | undefined): unknown {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 /** Convert D1 snake_case ScenarioStep row to shared camelCase shape */
@@ -73,8 +91,70 @@ function serializeStep(row: DbScenarioStep) {
     // この通を送ったあと。'pause' なら次へ進めず止める。列が無い環境でも
     // 'continue'（これまでの動き）として返す。
     afterSend: (row.after_send ?? 'continue') as 'continue' | 'pause',
+    // 1通ごとの配信対象。null は「購読中の全員に配信する」。
+    targetCondition: parseJson(row.target_condition_json),
+    // 質問メッセージ。null ならふつうの通。
+    question: parseJson(row.question_json),
+    isDraft: Number(row.is_draft ?? 0) !== 0,
     createdAt: row.created_at,
   };
+}
+
+/**
+ * 条件ビルダーの結果を保存してよいか見る。
+ *
+ * 組み立てを実際に走らせて、例外が出なければ通す。形だけ見る検証を別に書くと、
+ * 保存はできるのに配信時に落ちる条件が作れてしまう。**保存時と配信時で同じ
+ * 関数を通す**のがここの要点。
+ *
+ * @returns 保存する JSON 文字列。条件なしなら null。
+ */
+function validateConditionForStorage(
+  value: unknown,
+  label: string,
+): { ok: true; json: string | null } | { ok: false; error: string } {
+  if (value === null || value === undefined) return { ok: true, json: null };
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: `${label}の条件の形が不正です。` };
+  }
+  const condition = value as SegmentCondition;
+  if (condition.operator !== 'AND' && condition.operator !== 'OR') {
+    return { ok: false, error: `${label}の条件は operator に AND / OR が要ります。` };
+  }
+  if (!Array.isArray(condition.rules)) {
+    return { ok: false, error: `${label}の条件は rules の配列が要ります。` };
+  }
+  // 中身が空なら「条件なし」として保存する。空の条件を持たせておくと、
+  // 画面上は絞り込んでいるように見えて全員に届く。
+  const empty = condition.rules.length === 0 && (condition.groups?.length ?? 0) === 0;
+  if (empty) return { ok: true, json: null };
+  try {
+    buildSegmentWhere(condition);
+  } catch (err) {
+    return { ok: false, error: `${label}の条件を読めません: ${(err as Error).message}` };
+  }
+  return { ok: true, json: JSON.stringify(condition) };
+}
+
+/** 質問メッセージの中身を見る。 */
+function validateQuestionForStorage(
+  value: unknown,
+): { ok: true; json: string | null } | { ok: false; error: string } {
+  if (value === null || value === undefined) return { ok: true, json: null };
+  const question = parseQuestion(JSON.stringify(value));
+  if (!question) {
+    return { ok: false, error: '質問には質問文と、選択肢が1つ以上要ります。' };
+  }
+  if (question.choices.length > 13) {
+    // LINE の Flex は縦に積めるが、実用上これ以上はスマホで押せない。
+    return { ok: false, error: '選択肢は13個までにしてください。' };
+  }
+  for (const [i, choice] of question.choices.entries()) {
+    if (!choice.label || choice.label.trim() === '') {
+      return { ok: false, error: `選択肢${i + 1}の文字が空です。` };
+    }
+  }
+  return { ok: true, json: JSON.stringify(question) };
 }
 
 const VALID_DELIVERY_MODES: readonly DeliveryMode[] = ['relative', 'elapsed', 'absolute_time'];
@@ -362,6 +442,11 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
       deliveryMode?: DeliveryMode;
       allowConcurrent?: boolean;
       folderId?: string | null;
+      /** シナリオ全体の配信対象。null を渡すと条件なしに戻す。 */
+      audienceCondition?: unknown;
+      /** 最終コンテンツ配信後の処理。 */
+      onCompleteMode?: 'pause' | 'resume_previous' | 'move';
+      onCompleteScenarioId?: string | null;
     }>();
 
     /*
@@ -393,6 +478,31 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
       }
     }
 
+    let audienceJson: string | null | undefined;
+    if (body.audienceCondition !== undefined) {
+      const checked = validateConditionForStorage(body.audienceCondition, 'シナリオの配信対象');
+      if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
+      audienceJson = checked.json;
+    }
+
+    /*
+     * 「別のシナリオへ移動」は、移動先が要る。移動先が無いまま保存すると、
+     * 配り終えた人がどこにも行けずに黙って止まる。
+     */
+    if (body.onCompleteMode === 'move' && !body.onCompleteScenarioId) {
+      return c.json(
+        { success: false, error: '「別のシナリオへ移動」には移動先のシナリオが要ります。' },
+        400,
+      );
+    }
+    // 自分自身へは移せない。配り終えた直後にまた最初から始まって止まらなくなる。
+    if (body.onCompleteScenarioId && body.onCompleteScenarioId === id) {
+      return c.json(
+        { success: false, error: '移動先に自分自身は選べません。配信が終わらなくなります。' },
+        400,
+      );
+    }
+
     const updated = await updateScenario(c.env.DB, id, {
       name: body.name,
       description: body.description,
@@ -403,6 +513,10 @@ scenarios.put('/api/scenarios/:id', requireRole('owner', 'admin'), async (c) => 
         body.allowConcurrent !== undefined ? (body.allowConcurrent ? 1 : 0) : undefined,
       delivery_mode: body.deliveryMode,
       folder_id: body.folderId === undefined ? undefined : (body.folderId || null),
+      audience_condition_json: audienceJson,
+      on_complete_mode: body.onCompleteMode,
+      on_complete_scenario_id:
+        body.onCompleteScenarioId === undefined ? undefined : (body.onCompleteScenarioId || null),
     });
 
     if (!updated) {
@@ -446,6 +560,11 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
       templateId?: string | null;
       onReachTagId?: string | null;
       afterSend?: 'continue' | 'pause';
+      /** 1通ごとの配信対象。null は「購読中の全員に配信する」。 */
+      targetCondition?: unknown;
+      /** 質問メッセージ。 */
+      question?: unknown;
+      isDraft?: boolean;
     }>();
 
     if (body.stepOrder === undefined || !body.messageType || !body.messageContent) {
@@ -485,6 +604,11 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
       if (!tag) return c.json({ success: false, error: 'onReachTagId not found' }, 400);
     }
 
+    const stepTarget = validateConditionForStorage(body.targetCondition, 'この通の配信対象');
+    if (!stepTarget.ok) return c.json({ success: false, error: stepTarget.error }, 400);
+    const stepQuestion = validateQuestionForStorage(body.question);
+    if (!stepQuestion.ok) return c.json({ success: false, error: stepQuestion.error }, 400);
+
     const step = await createScenarioStep(c.env.DB, {
       scenarioId,
       stepOrder: body.stepOrder,
@@ -502,6 +626,9 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
       // 知らない値は 'continue'。列の CHECK に引っかかって 500 になるより、
       // これまでの動き（次へ進む）に寄せる。
       afterSend: body.afterSend === 'pause' ? 'pause' : 'continue',
+      targetConditionJson: stepTarget.json,
+      questionJson: stepQuestion.json,
+      isDraft: body.isDraft === true,
     });
 
     return c.json({ success: true, data: serializeStep(step) }, 201);
@@ -530,6 +657,11 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
       templateId?: string | null;
       onReachTagId?: string | null;
       afterSend?: 'continue' | 'pause';
+      /** 1通ごとの配信対象。null は「購読中の全員に配信する」。 */
+      targetCondition?: unknown;
+      /** 質問メッセージ。 */
+      question?: unknown;
+      isDraft?: boolean;
     }>();
 
     // conditionType / conditionValue の partial-update 検証（OSS issue #120 回帰防止）。
@@ -651,6 +783,19 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
       ? templateSnapshot.message_content
       : body.messageContent;
 
+    let targetJson: string | null | undefined;
+    if (body.targetCondition !== undefined) {
+      const checked = validateConditionForStorage(body.targetCondition, 'この通の配信対象');
+      if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
+      targetJson = checked.json;
+    }
+    let questionJson: string | null | undefined;
+    if (body.question !== undefined) {
+      const checked = validateQuestionForStorage(body.question);
+      if (!checked.ok) return c.json({ success: false, error: checked.error }, 400);
+      questionJson = checked.json;
+    }
+
     const updated = await updateScenarioStep(c.env.DB, stepId, {
       step_order: body.stepOrder,
       delay_minutes: body.delayMinutes,
@@ -666,6 +811,9 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
       on_reach_tag_id: body.onReachTagId,
       after_send:
         body.afterSend === undefined ? undefined : body.afterSend === 'pause' ? 'pause' : 'continue',
+      target_condition_json: targetJson,
+      question_json: questionJson,
+      is_draft: body.isDraft === undefined ? undefined : body.isDraft ? 1 : 0,
     });
 
     if (!updated) {
@@ -908,5 +1056,367 @@ scenarios.post('/api/scenarios/:id/enroll/:friendId', requireRole('owner', 'admi
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+// ============================================================
+// アクション（Lステップの「アクション設定」にあたる）
+// ============================================================
+
+const VALID_ACTION_HOOKS = ['step_sent', 'scenario_completed', 'choice_selected'] as const;
+const VALID_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var'] as const;
+
+interface ActionBody {
+  hook?: string;
+  stepId?: string | null;
+  choiceIndex?: number | null;
+  actionType?: string;
+  config?: unknown;
+  condition?: unknown;
+  repeatOnRefire?: boolean;
+  sortOrder?: number;
+}
+
+function serializeAction(row: {
+  id: string;
+  scenario_id: string;
+  hook: string;
+  step_id: string | null;
+  choice_index: number | null;
+  sort_order: number;
+  action_type: string;
+  config_json: string;
+  condition_json: string | null;
+  repeat_on_refire: number;
+}) {
+  return {
+    id: row.id,
+    scenarioId: row.scenario_id,
+    hook: row.hook,
+    stepId: row.step_id,
+    choiceIndex: row.choice_index,
+    sortOrder: row.sort_order,
+    actionType: row.action_type,
+    config: parseJson(row.config_json),
+    condition: parseJson(row.condition_json),
+    repeatOnRefire: row.repeat_on_refire !== 0,
+  };
+}
+
+/**
+ * アクションの中身を種別ごとに見る。
+ *
+ * ここを緩くすると、保存はできるのに配信時に例外が出るアクションが作れる。
+ * 配信は夜間に走ることが多く、そこで初めて気づくのでは遅い。
+ */
+function validateActionConfig(
+  actionType: string,
+  config: unknown,
+): { ok: true } | { ok: false; error: string } {
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+    return { ok: false, error: 'アクションの設定が空です。' };
+  }
+  const c = config as Record<string, unknown>;
+  switch (actionType) {
+    case 'tag': {
+      if (c.op !== 'add' && c.op !== 'remove') {
+        return { ok: false, error: 'タグ操作は「タグを追加」「タグをはずす」のどちらかです。' };
+      }
+      const hasTags = Array.isArray(c.tagIds) && c.tagIds.length > 0;
+      if (!hasTags && !c.folderId) {
+        return { ok: false, error: 'タグかタグフォルダのどちらかを選んでください。' };
+      }
+      return { ok: true };
+    }
+    case 'friend_field': {
+      if (typeof c.fieldId !== 'string' || c.fieldId === '') {
+        return { ok: false, error: '友だち情報欄を選んでください。' };
+      }
+      if (!['set', 'add', 'sub', 'clear'].includes(String(c.op))) {
+        return { ok: false, error: '操作内容が不正です。' };
+      }
+      return { ok: true };
+    }
+    case 'support_mark':
+      // null は「対応マークを外す」。明示的に許す。
+      if (c.markId !== null && typeof c.markId !== 'string') {
+        return { ok: false, error: '対応マークの指定が不正です。' };
+      }
+      return { ok: true };
+    case 'scenario': {
+      if (!['start', 'stop', 'resume_previous'].includes(String(c.op))) {
+        return { ok: false, error: 'シナリオ操作の種別が不正です。' };
+      }
+      if (c.op === 'start' && (typeof c.scenarioId !== 'string' || c.scenarioId === '')) {
+        return { ok: false, error: '購読を始めるシナリオを選んでください。' };
+      }
+      return { ok: true };
+    }
+    case 'common_var': {
+      if (typeof c.varKey !== 'string' || c.varKey === '') {
+        return { ok: false, error: '共通情報を選んでください。' };
+      }
+      if (c.op !== 'add' && c.op !== 'sub') {
+        return { ok: false, error: '共通情報の操作は加算か減算です。' };
+      }
+      return { ok: true };
+    }
+    default:
+      return { ok: false, error: `知らないアクション種別です: ${actionType}` };
+  }
+}
+
+// GET /api/scenarios/:id/actions — シナリオのアクションを全部返す
+scenarios.get('/api/scenarios/:id/actions', async (c) => {
+  try {
+    const rows = await c.env.DB.prepare(
+      `SELECT id, scenario_id, hook, step_id, choice_index, sort_order,
+              action_type, config_json, condition_json, repeat_on_refire
+         FROM scenario_actions WHERE scenario_id = ?
+        ORDER BY hook ASC, step_id ASC, choice_index ASC, sort_order ASC`,
+    )
+      .bind(c.req.param('id'))
+      .all<Parameters<typeof serializeAction>[0]>();
+    return c.json({ success: true, data: (rows.results ?? []).map(serializeAction) });
+  } catch (err) {
+    console.error('GET /api/scenarios/:id/actions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/scenarios/:id/actions — アクションを1つ足す
+scenarios.post('/api/scenarios/:id/actions', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const scenarioId = c.req.param('id');
+    const body = await c.req.json<ActionBody>();
+
+    const hook = String(body.hook ?? '');
+    if (!(VALID_ACTION_HOOKS as readonly string[]).includes(hook)) {
+      return c.json({ success: false, error: 'アクションの発火点が不正です。' }, 400);
+    }
+    const actionType = String(body.actionType ?? '');
+    if (!(VALID_ACTION_TYPES as readonly string[]).includes(actionType)) {
+      return c.json({ success: false, error: 'アクションの種別が不正です。' }, 400);
+    }
+
+    // 発火点ごとに、要る／要らない参照が違う。ここでそろえておかないと
+    // loadScenarioActions の IS 比較に引っかからず、永遠に発火しない行ができる。
+    const stepId = hook === 'scenario_completed' ? null : (body.stepId || null);
+    const choiceIndex = hook === 'choice_selected' ? Number(body.choiceIndex ?? 0) : null;
+    if (hook !== 'scenario_completed' && !stepId) {
+      return c.json({ success: false, error: 'この発火点には通の指定が要ります。' }, 400);
+    }
+    if (hook === 'choice_selected' && (!Number.isInteger(choiceIndex) || (choiceIndex ?? -1) < 0)) {
+      return c.json({ success: false, error: '選択肢の番号が不正です。' }, 400);
+    }
+    if (stepId) {
+      const step = await c.env.DB.prepare(
+        `SELECT id FROM scenario_steps WHERE id = ? AND scenario_id = ?`,
+      )
+        .bind(stepId, scenarioId)
+        .first<{ id: string }>();
+      if (!step) return c.json({ success: false, error: '通が見つかりません。' }, 400);
+    }
+
+    const configCheck = validateActionConfig(actionType, body.config);
+    if (!configCheck.ok) return c.json({ success: false, error: configCheck.error }, 400);
+    const conditionCheck = validateConditionForStorage(body.condition, 'アクションの実行');
+    if (!conditionCheck.ok) return c.json({ success: false, error: conditionCheck.error }, 400);
+
+    // 並び順を渡されなければ、同じ発火点の末尾に置く。
+    let sortOrder = body.sortOrder;
+    if (sortOrder === undefined) {
+      const last = await c.env.DB.prepare(
+        `SELECT COALESCE(MAX(sort_order), -1) AS n FROM scenario_actions
+          WHERE scenario_id = ? AND hook = ? AND step_id IS ? AND choice_index IS ?`,
+      )
+        .bind(scenarioId, hook, stepId, choiceIndex)
+        .first<{ n: number }>();
+      sortOrder = (last?.n ?? -1) + 1;
+    }
+
+    const id = crypto.randomUUID();
+    await c.env.DB.prepare(
+      `INSERT INTO scenario_actions
+         (id, scenario_id, hook, step_id, choice_index, sort_order,
+          action_type, config_json, condition_json, repeat_on_refire)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        id,
+        scenarioId,
+        hook,
+        stepId,
+        choiceIndex,
+        sortOrder,
+        actionType,
+        JSON.stringify(body.config),
+        conditionCheck.json,
+        body.repeatOnRefire === false ? 0 : 1,
+      )
+      .run();
+
+    const row = await c.env.DB.prepare(
+      `SELECT id, scenario_id, hook, step_id, choice_index, sort_order,
+              action_type, config_json, condition_json, repeat_on_refire
+         FROM scenario_actions WHERE id = ?`,
+    )
+      .bind(id)
+      .first<Parameters<typeof serializeAction>[0]>();
+    return c.json({ success: true, data: row ? serializeAction(row) : null });
+  } catch (err) {
+    console.error('POST /api/scenarios/:id/actions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// PUT /api/scenarios/:id/actions/:actionId — 中身と並び順を変える
+scenarios.put('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const scenarioId = c.req.param('id');
+    const actionId = c.req.param('actionId');
+    const body = await c.req.json<ActionBody>();
+
+    const existing = await c.env.DB.prepare(
+      `SELECT action_type FROM scenario_actions WHERE id = ? AND scenario_id = ?`,
+    )
+      .bind(actionId, scenarioId)
+      .first<{ action_type: string }>();
+    if (!existing) return c.json({ success: false, error: 'アクションが見つかりません。' }, 404);
+
+    const fields: string[] = [];
+    const values: unknown[] = [];
+
+    if (body.config !== undefined) {
+      const check = validateActionConfig(existing.action_type, body.config);
+      if (!check.ok) return c.json({ success: false, error: check.error }, 400);
+      fields.push('config_json = ?');
+      values.push(JSON.stringify(body.config));
+    }
+    if (body.condition !== undefined) {
+      const check = validateConditionForStorage(body.condition, 'アクションの実行');
+      if (!check.ok) return c.json({ success: false, error: check.error }, 400);
+      fields.push('condition_json = ?');
+      values.push(check.json);
+    }
+    if (body.repeatOnRefire !== undefined) {
+      fields.push('repeat_on_refire = ?');
+      values.push(body.repeatOnRefire ? 1 : 0);
+    }
+    if (body.sortOrder !== undefined) {
+      fields.push('sort_order = ?');
+      values.push(body.sortOrder);
+    }
+    if (fields.length === 0) {
+      return c.json({ success: false, error: '変えるものがありません。' }, 400);
+    }
+
+    values.push(actionId);
+    await c.env.DB.prepare(
+      `UPDATE scenario_actions SET ${fields.join(', ')} WHERE id = ?`,
+    )
+      .bind(...values)
+      .run();
+
+    const row = await c.env.DB.prepare(
+      `SELECT id, scenario_id, hook, step_id, choice_index, sort_order,
+              action_type, config_json, condition_json, repeat_on_refire
+         FROM scenario_actions WHERE id = ?`,
+    )
+      .bind(actionId)
+      .first<Parameters<typeof serializeAction>[0]>();
+    return c.json({ success: true, data: row ? serializeAction(row) : null });
+  } catch (err) {
+    console.error('PUT /api/scenarios/:id/actions/:actionId error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// DELETE /api/scenarios/:id/actions/:actionId
+scenarios.delete('/api/scenarios/:id/actions/:actionId', requireRole('owner', 'admin'), async (c) => {
+  try {
+    await c.env.DB.prepare(`DELETE FROM scenario_actions WHERE id = ? AND scenario_id = ?`)
+      .bind(c.req.param('actionId'), c.req.param('id'))
+      .run();
+    return c.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/scenarios/:id/actions/:actionId error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// ============================================================
+// テスト送信
+// ============================================================
+
+/*
+ * POST /api/scenarios/:id/test-send        … 全通
+ * POST /api/scenarios/:id/steps/:stepId/test-send … 1通
+ *
+ * どちらも購読の状態は触らない。下書きの通も、テストでは送る。
+ * 書きかけを確かめるための機能なので、ここで除くと用を成さない。
+ */
+async function runTestSend(
+  c: Context<Env>,
+  scenarioId: string,
+  stepId: string | null,
+) {
+  const body = await c.req.json<{ friendId?: string }>().catch(() => ({ friendId: undefined }));
+  const friendId = body.friendId;
+  if (!friendId) {
+    return c.json({ success: false, error: '送り先の友だちを選んでください。' }, 400);
+  }
+
+  const scenario = await c.env.DB.prepare(
+    `SELECT id, line_account_id FROM scenarios WHERE id = ?`,
+  )
+    .bind(scenarioId)
+    .first<{ id: string; line_account_id: string | null }>();
+  if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
+
+  const rows = stepId
+    ? await c.env.DB.prepare(`SELECT * FROM scenario_steps WHERE id = ? AND scenario_id = ?`)
+        .bind(stepId, scenarioId)
+        .all<DbScenarioStep>()
+    : await c.env.DB.prepare(
+        `SELECT * FROM scenario_steps WHERE scenario_id = ? ORDER BY step_order ASC`,
+      )
+        .bind(scenarioId)
+        .all<DbScenarioStep>();
+  const steps = rows.results ?? [];
+  if (steps.length === 0) {
+    return c.json({ success: false, error: '送る通がありません。' }, 400);
+  }
+
+  const token = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+  const { LineClient } = await import('@line-crm/line-sdk');
+  const { testSendSteps } = await import('../services/scenario-test-send.js');
+  try {
+    const result = await testSendSteps(
+      c.env.DB,
+      new LineClient(token),
+      steps,
+      friendId,
+      scenario.line_account_id,
+      c.env.WORKER_URL || new URL(c.req.url).origin,
+    );
+    if (!result.ok) return c.json({ success: false, error: result.error }, 400);
+    return c.json({ success: true, data: { sent: result.sent } });
+  } catch (err) {
+    console.error('scenario test-send error:', err);
+    return c.json(
+      { success: false, error: `テスト送信に失敗しました: ${(err as Error).message}` },
+      502,
+    );
+  }
+}
+
+scenarios.post('/api/scenarios/:id/test-send', requireRole('owner', 'admin'), async (c) =>
+  runTestSend(c, c.req.param('id'), null),
+);
+
+scenarios.post(
+  '/api/scenarios/:id/steps/:stepId/test-send',
+  requireRole('owner', 'admin'),
+  async (c) => runTestSend(c, c.req.param('id'), c.req.param('stepId')),
+);
 
 export { scenarios };

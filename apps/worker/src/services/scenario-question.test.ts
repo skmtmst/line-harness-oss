@@ -1,0 +1,192 @@
+/*
+ * 質問メッセージ（分岐）。
+ *
+ * 押された選択肢を取り違えると、まったく別のシナリオへ移してしまう。
+ * postback の往復と、2度押しの扱いを重点的に見る。
+ */
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import type Database from 'better-sqlite3'
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js'
+import {
+  parseQuestion,
+  buildQuestionMessages,
+  buildQuestionPostbackData,
+  parseQuestionPostback,
+  hasAnsweredBefore,
+  type ScenarioQuestion,
+} from './scenario-question.js'
+import { handleQuestionAnswer } from './scenario-question-answer.js'
+import type { LineClient } from '@line-crm/line-sdk'
+
+const QUESTION: ScenarioQuestion = {
+  intro: '{{name}}様、確認です。',
+  text: '体調はいかがですか？',
+  tapMode: 'single',
+  choices: [
+    { label: 'よい', behavior: 'none', reply: 'ありがとうございます！', addTagIds: ['t1'] },
+    { label: 'わるい', behavior: 'none', reply: 'お大事に。', addTagIds: ['t2'] },
+  ],
+}
+
+describe('postback の往復', () => {
+  it('組み立てた data をそのまま読み戻せる', () => {
+    const data = buildQuestionPostbackData('step-abc', 3)
+    expect(parseQuestionPostback(data)).toEqual({ stepId: 'step-abc', choiceIndex: 3 })
+  })
+
+  it('関係のない postback は拾わない', () => {
+    expect(parseQuestionPostback('menu:compare')).toBeNull()
+    expect(parseQuestionPostback('sq:only-two-parts')).toBeNull()
+    expect(parseQuestionPostback('sq:step:notanumber')).toBeNull()
+    expect(parseQuestionPostback('sq::0')).toBeNull()
+  })
+
+  it('LINE の 300 文字制限に収まる', () => {
+    expect(buildQuestionPostbackData(crypto.randomUUID(), 12).length).toBeLessThan(300)
+  })
+})
+
+describe('組み立て', () => {
+  it('前文があると2通になる', () => {
+    const messages = buildQuestionMessages(QUESTION, 'st1')
+    expect(messages).toHaveLength(2)
+    expect(messages[0].type).toBe('text')
+    expect(messages[1].type).toBe('flex')
+  })
+
+  it('前文が無ければ1通', () => {
+    const messages = buildQuestionMessages({ ...QUESTION, intro: undefined }, 'st1')
+    expect(messages).toHaveLength(1)
+  })
+
+  it('選択肢は postback になり、押した文がトークに残る', () => {
+    const flex = buildQuestionMessages({ ...QUESTION, intro: undefined }, 'st1')[0] as unknown as {
+      contents: { body: { contents: Array<{ contents?: Array<{ action: Record<string, unknown> }> }> } }
+    }
+    const buttons = flex.contents.body.contents[1].contents!
+    expect(buttons[0].action).toMatchObject({
+      type: 'postback',
+      data: 'sq:st1:0',
+      displayText: 'よい',
+    })
+  })
+
+  it('URLを開く選択肢は uri になる（postback にしない）', () => {
+    const q: ScenarioQuestion = {
+      text: 'どうぞ',
+      tapMode: 'single',
+      choices: [{ label: '見る', behavior: 'url', url: 'https://example.com' }],
+    }
+    const flex = buildQuestionMessages(q, 'st1')[0] as unknown as {
+      contents: { body: { contents: Array<{ contents?: Array<{ action: Record<string, unknown> }> }> } }
+    }
+    expect(flex.contents.body.contents[1].contents![0].action).toMatchObject({
+      type: 'uri',
+      uri: 'https://example.com',
+    })
+  })
+
+  it('URLが空なら uri にせず postback に落とす（押せないボタンを作らない）', () => {
+    const q: ScenarioQuestion = {
+      text: 'どうぞ',
+      tapMode: 'single',
+      choices: [{ label: '見る', behavior: 'url' }],
+    }
+    const flex = buildQuestionMessages(q, 'st1')[0] as unknown as {
+      contents: { body: { contents: Array<{ contents?: Array<{ action: Record<string, unknown> }> }> } }
+    }
+    expect(flex.contents.body.contents[1].contents![0].action.type).toBe('postback')
+  })
+})
+
+describe('parseQuestion', () => {
+  it('質問文が空、選択肢が空なら質問として扱わない', () => {
+    expect(parseQuestion(JSON.stringify({ text: '', choices: [{ label: 'a' }] }))).toBeNull()
+    expect(parseQuestion(JSON.stringify({ text: 'あ', choices: [] }))).toBeNull()
+    expect(parseQuestion('{壊れ')).toBeNull()
+    expect(parseQuestion(null)).toBeNull()
+  })
+})
+
+describe('押されたとき', () => {
+  let db: D1Database
+  let raw: Database.Database
+  let pushed: string[]
+  let client: LineClient
+
+  beforeEach(() => {
+    const created = createTestD1()
+    db = created.db
+    raw = created.raw
+    pushed = []
+    client = {
+      replyMessage: vi.fn(async (_token: string, messages: Array<{ text?: string }>) => {
+        pushed.push(messages[0]?.text ?? '')
+      }),
+      pushMessage: vi.fn(async (_to: string, messages: Array<{ text?: string }>) => {
+        pushed.push(messages[0]?.text ?? '')
+      }),
+    } as unknown as LineClient
+
+    insertFriend(raw, 'f1')
+    raw
+      .prepare(`INSERT INTO scenarios (id, name, trigger_type, delivery_mode) VALUES ('s1','テスト','manual','relative')`)
+      .run()
+    raw
+      .prepare(
+        `INSERT INTO scenario_steps (id, scenario_id, step_order, delay_minutes, message_type, message_content, question_json)
+         VALUES ('st1','s1',1,0,'text','', ?)`,
+      )
+      .run(JSON.stringify(QUESTION))
+    raw.prepare(`INSERT INTO tags (id, name, color) VALUES ('t1','よい','#000'), ('t2','わるい','#000')`).run()
+  })
+
+  const friend = { id: 'f1', line_user_id: 'Uf1' }
+
+  it('選んだ選択肢のタグだけが付き、返信が返る', async () => {
+    const result = await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
+    expect(result.handled).toBe(true)
+    expect(result.repeat).toBe(false)
+    expect(pushed).toEqual(['ありがとうございます！'])
+    const tags = raw.prepare(`SELECT tag_id FROM friend_tags WHERE friend_id = 'f1'`).all()
+    expect(tags).toEqual([{ tag_id: 't1' }])
+  })
+
+  it('2度目は二度押しの返事になり、タグは増えない', async () => {
+    await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
+    const second = await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 1 }, 'tok')
+    expect(second.repeat).toBe(true)
+    expect(pushed[1]).toBe('すでに押されています！')
+    const tags = raw.prepare(`SELECT tag_id FROM friend_tags WHERE friend_id = 'f1'`).all()
+    expect(tags).toEqual([{ tag_id: 't1' }])
+  })
+
+  it('両方タップ可能なら、別の選択肢は1度目として扱う', async () => {
+    raw
+      .prepare(`UPDATE scenario_steps SET question_json = ? WHERE id = 'st1'`)
+      .run(JSON.stringify({ ...QUESTION, tapMode: 'multiple' }))
+
+    await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
+    const second = await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 1 }, 'tok')
+    expect(second.repeat).toBe(false)
+    const tags = raw
+      .prepare(`SELECT tag_id FROM friend_tags WHERE friend_id = 'f1' ORDER BY tag_id`)
+      .all()
+    expect(tags).toEqual([{ tag_id: 't1' }, { tag_id: 't2' }])
+  })
+
+  it('質問ではない通、無い選択肢は触らない', async () => {
+    raw.prepare(`UPDATE scenario_steps SET question_json = NULL WHERE id = 'st1'`).run()
+    expect((await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')).handled).toBe(false)
+
+    raw.prepare(`UPDATE scenario_steps SET question_json = ? WHERE id = 'st1'`).run(JSON.stringify(QUESTION))
+    expect((await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 9 }, 'tok')).handled).toBe(false)
+  })
+
+  it('押した記録が残る（あとから集計できる）', async () => {
+    expect(await hasAnsweredBefore(db, 'f1', 'st1', 0)).toBe(false)
+    await handleQuestionAnswer(db, client, friend, { stepId: 'st1', choiceIndex: 0 }, 'tok')
+    expect(await hasAnsweredBefore(db, 'f1', 'st1', 0)).toBe(true)
+    expect(await hasAnsweredBefore(db, 'f1', 'st1', 1)).toBe(false)
+  })
+})

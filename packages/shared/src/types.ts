@@ -320,6 +320,12 @@ export interface Scenario {
   updatedAt: string;
   /** 置き場。未分類は null。 */
   folderId?: string | null;
+  /** シナリオ全体の配信対象 (120)。SegmentCondition。null は条件なし。 */
+  audienceCondition?: unknown;
+  /** 最終コンテンツを配り終えたあとどうするか (121)。 */
+  onCompleteMode?: 'pause' | 'resume_previous' | 'move';
+  /** onCompleteMode が 'move' のときの移動先 (122)。 */
+  onCompleteScenarioId?: string | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -354,6 +360,17 @@ export interface ScenarioStep {
   messageType: MessageType;
   /** メッセージ内容 (テキスト or JSONシリアライズ済みFlexメッセージ等) */
   messageContent: string;
+  /**
+   * 1通ごとの配信対象 (124)。SegmentCondition。null は「購読中の全員に配信する」。
+   *
+   * ステップの条件 (condition_type) とは意味が違う。あちらは「満たさなければ
+   * 次へ飛ばす」、こちらは「対象でなければこの通だけ送らない」。
+   */
+  targetCondition?: unknown;
+  /** 質問メッセージ (125)。ScenarioQuestion。null ならふつうの通。 */
+  question?: unknown;
+  /** 下書き (126)。true なら配信の対象から外れる。 */
+  isDraft?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }

@@ -415,6 +415,35 @@ export type ListStats = {
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
 }
 
+/* ---- シナリオのアクション（Lステップの「アクション設定」にあたる） ---- */
+
+/** どこで発火するか。 */
+export type ScenarioActionHook = 'step_sent' | 'scenario_completed' | 'choice_selected'
+
+/** 何をするか。 */
+export type ScenarioActionType =
+  | 'tag'
+  | 'friend_field'
+  | 'support_mark'
+  | 'scenario'
+  | 'common_var'
+
+export type ScenarioAction = {
+  id: string
+  scenarioId: string
+  hook: ScenarioActionHook
+  stepId: string | null
+  choiceIndex: number | null
+  sortOrder: number
+  actionType: ScenarioActionType
+  /** 種別ごとに形が違う。worker の services/scenario-actions.ts に定義がある。 */
+  config: unknown
+  /** 実行条件。null なら無条件。 */
+  condition: unknown
+  /** false なら、同じ友だちには1度しか実行しない。 */
+  repeatOnRefire: boolean
+}
+
 /** 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信`）。 */
 export type BroadcastStats = {
   thisMonth: number
@@ -1315,6 +1344,11 @@ export const api = {
         templateId?: string | null
         onReachTagId?: string | null
         afterSend?: 'continue' | 'pause'
+        /** 1通ごとの配信対象。null は「購読中の全員に配信する」。 */
+        targetCondition?: unknown
+        /** 質問メッセージ（分岐）。 */
+        question?: unknown
+        isDraft?: boolean
       },
     ) =>
       fetchApi<ApiResponse<ScenarioStep>>(`/api/scenarios/${id}/steps`, {
@@ -1335,6 +1369,9 @@ export const api = {
         templateId?: string | null
         onReachTagId?: string | null
         afterSend?: 'continue' | 'pause'
+        targetCondition?: unknown
+        question?: unknown
+        isDraft?: boolean
       },
     ) =>
       fetchApi<ApiResponse<ScenarioStep>>(`/api/scenarios/${id}/steps/${stepId}`, {
@@ -1377,6 +1414,54 @@ export const api = {
         paused: number
         steps: Array<{ stepOrder: number; reachedCount: number; reachRate: number }>
       }>>(`/api/scenarios/${id}/stats`),
+
+    /* ---- アクション（Lステップの「アクション設定」にあたる） ---- */
+    actions: {
+      list: (scenarioId: string) =>
+        fetchApi<ApiResponse<ScenarioAction[]>>(`/api/scenarios/${scenarioId}/actions`),
+      create: (
+        scenarioId: string,
+        data: {
+          hook: ScenarioActionHook
+          stepId?: string | null
+          choiceIndex?: number | null
+          actionType: ScenarioActionType
+          config: unknown
+          condition?: unknown
+          repeatOnRefire?: boolean
+          sortOrder?: number
+        },
+      ) =>
+        fetchApi<ApiResponse<ScenarioAction>>(`/api/scenarios/${scenarioId}/actions`, {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      update: (
+        scenarioId: string,
+        actionId: string,
+        data: { config?: unknown; condition?: unknown; repeatOnRefire?: boolean; sortOrder?: number },
+      ) =>
+        fetchApi<ApiResponse<ScenarioAction>>(`/api/scenarios/${scenarioId}/actions/${actionId}`, {
+          method: 'PUT',
+          body: JSON.stringify(data),
+        }),
+      remove: (scenarioId: string, actionId: string) =>
+        fetchApi<ApiResponse<null>>(`/api/scenarios/${scenarioId}/actions/${actionId}`, {
+          method: 'DELETE',
+        }),
+    },
+
+    /* ---- テスト送信。購読の状態は動かさない ---- */
+    testSend: (scenarioId: string, friendId: string) =>
+      fetchApi<ApiResponse<{ sent: number }>>(`/api/scenarios/${scenarioId}/test-send`, {
+        method: 'POST',
+        body: JSON.stringify({ friendId }),
+      }),
+    testSendStep: (scenarioId: string, stepId: string, friendId: string) =>
+      fetchApi<ApiResponse<{ sent: number }>>(
+        `/api/scenarios/${scenarioId}/steps/${stepId}/test-send`,
+        { method: 'POST', body: JSON.stringify({ friendId }) },
+      ),
   },
   broadcasts: {
     list: (params?: { accountId?: string }) => {

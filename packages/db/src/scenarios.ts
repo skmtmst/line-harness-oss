@@ -20,6 +20,12 @@ export interface Scenario {
   display_order: number;
   /** 置き場（099 で追加）。未分類は null。 */
   folder_id: string | null;
+  /** シナリオ全体の配信対象（120）。SegmentCondition の JSON。null は条件なし。 */
+  audience_condition_json: string | null;
+  /** 最終コンテンツを配り終えたあと（121）。'pause' | 'resume_previous' | 'move' */
+  on_complete_mode: string;
+  /** on_complete_mode が 'move' のときの移動先（122）。 */
+  on_complete_scenario_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +47,12 @@ export interface ScenarioStep {
   on_reach_tag_id: string | null;
   /** この通を送ったあと。'continue' で次へ、'pause' で止める（113 で追加） */
   after_send: string;
+  /** 1通ごとの配信対象（124）。SegmentCondition の JSON。null は購読中の全員。 */
+  target_condition_json: string | null;
+  /** 質問メッセージ（125）。ScenarioQuestion の JSON。null なら質問ではない。 */
+  question_json: string | null;
+  /** 下書き（126）。1 なら配信しない。 */
+  is_draft: number;
   created_at: string;
 }
 
@@ -56,6 +68,8 @@ export interface FriendScenario {
   status: FriendScenarioStatus;
   started_at: string;
   next_delivery_at: string | null;
+  /** 割り込む前に読んでいたシナリオ（123）。「1つ前のシナリオを再開」で使う。 */
+  previous_scenario_id: string | null;
   updated_at: string;
 }
 
@@ -175,6 +189,11 @@ export type UpdateScenarioInput = Partial<
      * 呼ぶ側（worker）で通の数を見てから渡すこと。
      */
     | 'delivery_mode'
+    /** シナリオ全体の配信対象（120）。 */
+    | 'audience_condition_json'
+    /** 最終コンテンツ配信後の処理（121/122）。 */
+    | 'on_complete_mode'
+    | 'on_complete_scenario_id'
   >
 >;
 
@@ -218,6 +237,18 @@ export async function updateScenario(
   if (updates.delivery_mode !== undefined) {
     fields.push('delivery_mode = ?');
     values.push(updates.delivery_mode);
+  }
+  if (updates.audience_condition_json !== undefined) {
+    fields.push('audience_condition_json = ?');
+    values.push(updates.audience_condition_json);
+  }
+  if (updates.on_complete_mode !== undefined) {
+    fields.push('on_complete_mode = ?');
+    values.push(updates.on_complete_mode);
+  }
+  if (updates.on_complete_scenario_id !== undefined) {
+    fields.push('on_complete_scenario_id = ?');
+    values.push(updates.on_complete_scenario_id);
   }
 
   if (fields.length === 0) {
@@ -266,6 +297,12 @@ export interface CreateScenarioStepInput {
   onReachTagId?: string | null;
   /** この通を送ったあと。'pause' なら次へ進めず止める。 */
   afterSend?: 'continue' | 'pause';
+  /** 1通ごとの配信対象（124）。SegmentCondition の JSON。 */
+  targetConditionJson?: string | null;
+  /** 質問メッセージ（125）。ScenarioQuestion の JSON。 */
+  questionJson?: string | null;
+  /** 下書き（126）。 */
+  isDraft?: boolean;
 }
 
 export async function createScenarioStep(
@@ -282,8 +319,9 @@ export async function createScenarioStep(
         condition_type, condition_value, next_step_on_false,
         offset_days, offset_minutes, delivery_time,
         template_id, on_reach_tag_id, after_send,
+        target_condition_json, question_json, is_draft,
         created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -301,6 +339,9 @@ export async function createScenarioStep(
       input.templateId ?? null,
       input.onReachTagId ?? null,
       input.afterSend ?? 'continue',
+      input.targetConditionJson ?? null,
+      input.questionJson ?? null,
+      input.isDraft ? 1 : 0,
       now,
     )
     .run();
@@ -327,6 +368,9 @@ export type UpdateScenarioStepInput = Partial<
     | 'template_id'
     | 'on_reach_tag_id'
     | 'after_send'
+    | 'target_condition_json'
+    | 'question_json'
+    | 'is_draft'
   >
 >;
 
@@ -385,6 +429,27 @@ export async function updateScenarioStep(
   if (updates.on_reach_tag_id !== undefined) {
     fields.push('on_reach_tag_id = ?');
     values.push(updates.on_reach_tag_id);
+  }
+  /*
+   * after_send は型には並んでいたが、ここで拾っていなかった。
+   * 作成時だけ効いて、編集では黙って捨てられていた（＝画面で
+   * 「送信後に一時停止」を外しても元に戻らない）。
+   */
+  if (updates.after_send !== undefined) {
+    fields.push('after_send = ?');
+    values.push(updates.after_send);
+  }
+  if (updates.target_condition_json !== undefined) {
+    fields.push('target_condition_json = ?');
+    values.push(updates.target_condition_json);
+  }
+  if (updates.question_json !== undefined) {
+    fields.push('question_json = ?');
+    values.push(updates.question_json);
+  }
+  if (updates.is_draft !== undefined) {
+    fields.push('is_draft = ?');
+    values.push(updates.is_draft);
   }
 
   if (fields.length > 0) {

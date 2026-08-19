@@ -122,7 +122,17 @@
     "115_folder_color.sql",
     "115_staff_invitation_preferences.sql",
     "116_folder_color_backfill.sql",
-    "116_staff_totp.sql"
+    "116_staff_totp.sql",
+    "117_scenario_actions.sql",
+    "118_scenario_action_indexes.sql",
+    "119_scenario_action_fires.sql",
+    "120_scenario_audience.sql",
+    "121_scenario_on_complete_mode.sql",
+    "122_scenario_on_complete_target.sql",
+    "123_friend_scenario_previous.sql",
+    "124_step_target_condition.sql",
+    "125_step_question.sql",
+    "126_step_draft.sql"
   ],
-  "migrationCount": 123
+  "migrationCount": 133
 }

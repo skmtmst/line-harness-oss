@@ -20,6 +20,8 @@ import { fireEvent } from '../services/event-bus.js';
 import { matchAndReply } from '../services/auto-reply.js';
 import { buildMessage } from '../services/step-delivery.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
+import { parseQuestionPostback } from '../services/scenario-question.js';
+import { handleQuestionAnswer } from '../services/scenario-question-answer.js';
 import type { Env } from '../index.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 
@@ -404,6 +406,35 @@ async function handleEvent(
     if (!friend) return;
 
     const postbackData = (event as unknown as { postback: { data: string } }).postback.data;
+
+    /*
+     * シナリオの質問メッセージの選択肢。
+     *
+     * data が `sq:<stepId>:<index>` の形なら、こちらで処理して抜ける。
+     * auto_replies のキーワード照合には回さない。`sq:...` は利用者が
+     * 打った言葉ではないので、キーワードに当たっても意味がない。
+     *
+     * 記録も向こうで取る（押した回数を数えるのに、記録より先に読む必要が
+     * あるため）。
+     */
+    const questionHit = parseQuestionPostback(postbackData);
+    if (questionHit) {
+      const answered = await handleQuestionAnswer(
+        db,
+        lineClient,
+        friend,
+        { ...questionHit, lineAccountId },
+        event.replyToken,
+      );
+      if (answered.handled) {
+        await fireEvent(db, 'postback_received', {
+          friendId: friend.id,
+          eventData: { text: postbackData, matched: true },
+          replyToken: answered.replyTokenConsumed ? undefined : event.replyToken,
+        }, lineAccessToken, lineAccountId);
+        return;
+      }
+    }
 
     // postback の incoming 自体を messages_log に記録する。Rich Menu のタップで
     // 利用者が "コスト比較" などのアクションを起こした事実を chat 履歴で可視化する。

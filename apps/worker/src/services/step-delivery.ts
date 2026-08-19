@@ -20,6 +20,9 @@ import {
 import type { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
+import { matchesCondition, parseCondition } from './segment-query.js';
+import { runScenarioActions, resumePreviousScenario, runScenarioOp } from './scenario-actions.js';
+import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
 
 /**
  * Replace template variables in message content.
@@ -267,9 +270,19 @@ async function processSingleDelivery(
   // Fetch scenario account together with delivery_mode. Account-bound
   // scenarios must use that account's friend identity and token.
   const scenarioRow = await db
-    .prepare(`SELECT delivery_mode, line_account_id FROM scenarios WHERE id = ?`)
+    .prepare(
+      `SELECT delivery_mode, line_account_id, audience_condition_json,
+              on_complete_mode, on_complete_scenario_id
+         FROM scenarios WHERE id = ?`,
+    )
     .bind(fs.scenario_id)
-    .first<{ delivery_mode: DeliveryMode; line_account_id: string | null }>();
+    .first<{
+      delivery_mode: DeliveryMode;
+      line_account_id: string | null;
+      audience_condition_json: string | null;
+      on_complete_mode: string | null;
+      on_complete_scenario_id: string | null;
+    }>();
   if (!scenarioRow) {
     await completeFriendScenario(db, fs.id);
     return false;
@@ -292,10 +305,34 @@ async function processSingleDelivery(
     return false;
   }
 
-  // Get all steps for this scenario
-  const steps = await getScenarioSteps(db, fs.scenario_id);
+  // Get all steps for this scenario.
+  //
+  // 下書き (is_draft) はここで落とす。落としておけば「次の通」を探す処理が
+  // そのまま次の公開ぶんを選ぶ。あとから条件で弾く作りにすると、下書きに
+  // 到達した時点で止まって見える。
+  const steps = (await getScenarioSteps(db, fs.scenario_id)).filter((s) => (s.is_draft ?? 0) === 0);
   if (steps.length === 0) {
     await completeFriendScenario(db, fs.id);
+    return false;
+  }
+
+  /*
+   * シナリオ全体の配信対象。
+   *
+   * 購読したあとに条件から外れることがある（タグを外した、対応マークが
+   * 変わった等）。外れた人には**送らずに止める**。完了にしないのは、
+   * 条件に戻ったときに人が再開できるようにするため。
+   */
+  const audience = parseCondition(scenarioRow.audience_condition_json);
+  if (scenarioRow.audience_condition_json && !audience) {
+    console.error(
+      `[step-delivery] unreadable audience condition scenario=${fs.scenario_id} — paused enrollment=${fs.id}`,
+    );
+    await pauseFriendScenarioDelivery(db, fs.id);
+    return false;
+  }
+  if (audience && !(await matchesCondition(db, fs.friend_id, audience))) {
+    await pauseFriendScenarioDelivery(db, fs.id);
     return false;
   }
 
@@ -317,7 +354,7 @@ async function processSingleDelivery(
   const currentStep = steps.find((s) => s.step_order > fs.current_step_order);
 
   if (!currentStep) {
-    await completeFriendScenario(db, fs.id);
+    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
     return false;
   }
 
@@ -349,6 +386,40 @@ async function processSingleDelivery(
     }
   }
 
+  /*
+   * 1通ごとの配信対象。
+   *
+   * 対象から外れている人には、この通だけ送らずに次へ進める。止めないのは、
+   * 「今回はこの人向けではない」だけであって、シナリオそのものを降りた
+   * わけではないため。Lステップの「配信対象の絞り込み」と同じ扱い。
+   */
+  const stepTarget = parseCondition(currentStep.target_condition_json);
+  if (currentStep.target_condition_json && !stepTarget) {
+    console.error(
+      `[step-delivery] unreadable target condition step=${currentStep.id} — skipping this step`,
+    );
+  }
+  const stepTargeted = currentStep.target_condition_json
+    ? stepTarget
+      ? await matchesCondition(db, fs.friend_id, stepTarget)
+      : false
+    : true;
+  if (!stepTargeted) {
+    const skipIndex = steps.indexOf(currentStep) + 1;
+    if (skipIndex < steps.length) {
+      const jitteredDate = jitterDeliveryTime(nextDeliveryFor(steps[skipIndex]));
+      await advanceFriendScenario(
+        db,
+        fs.id,
+        currentStep.step_order,
+        jitteredDate.toISOString().slice(0, -1) + '+09:00',
+      );
+    } else {
+      await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
+    }
+    return false;
+  }
+
   // Resolve template_id → templates table (参照型). template_id 未設定なら step 値そのまま。
   const resolved = await resolveStepContent(db, currentStep);
 
@@ -367,7 +438,25 @@ async function processSingleDelivery(
     lineAccountId: deliveryAccountId ?? null,
     friendId: friend.id,
   });
-  const message = buildMessage(tracked.messageType, tracked.content);
+  /*
+   * 質問メッセージなら、本文の代わりに選択肢つきのメッセージを組み立てる。
+   *
+   * 前文があるぶん複数通になるので、以降は配列で扱う。差し込みは前文にも
+   * 効かせたいので、質問の組み立ては差し込みのあとに置いている。
+   */
+  const question = parseQuestion(currentStep.question_json);
+  const messages: Message[] = question
+    ? buildQuestionMessages(
+        {
+          ...question,
+          intro: question.intro
+            ? expandVariables(question.intro, friendWithMeta, workerUrl, 'text', extra)
+            : question.intro,
+          text: expandVariables(question.text, friendWithMeta, workerUrl, 'text', extra),
+        },
+        currentStep.id,
+      )
+    : [buildMessage(tracked.messageType, tracked.content)];
   // Resolve the correct LINE client for this friend's account
   let deliveryClient = lineClient;
   if (deliveryAccountId) {
@@ -383,20 +472,24 @@ async function processSingleDelivery(
     const { LineClient: LC } = await import('@line-crm/line-sdk');
     deliveryClient = new LC(account.channel_access_token);
   }
-  await deliveryClient.pushMessage(friend.line_user_id, [message]);
+  await deliveryClient.pushMessage(friend.line_user_id, messages);
 
   // Log what we actually pushed: variables expanded, URLs auto-tracked, AND
   // any cleanEmptyNodes() mutation or parse-failure text fallback applied by
   // buildMessage(). Use scenario_step_id to recover the original template.
-  const logId = crypto.randomUUID();
-  const logPayload = messageToLogPayload(message);
-  await db
-    .prepare(
-      `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, template_id_at_send, line_account_id, created_at)
-       VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, 'scenario', ?, ?, ?)`,
-    )
-    .bind(logId, friend.id, logPayload.messageType, logPayload.content, currentStep.id, resolved.templateIdAtSend, deliveryAccountId, jstNow())
-    .run();
+  //
+  // 質問は前文と本体で2通になることがある。押した記録と突き合わせられるよう、
+  // 送った通ぶんすべて残す。
+  for (const sent of messages) {
+    const logPayload = messageToLogPayload(sent);
+    await db
+      .prepare(
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, template_id_at_send, line_account_id, created_at)
+         VALUES (?, ?, 'outgoing', ?, ?, NULL, ?, 'scenario', ?, ?, ?)`,
+      )
+      .bind(crypto.randomUUID(), friend.id, logPayload.messageType, logPayload.content, currentStep.id, resolved.templateIdAtSend, deliveryAccountId, jstNow())
+      .run();
+  }
 
   // Determine next step (find the step after currentStep in the sorted list)
   const currentIndex = steps.indexOf(currentStep);
@@ -418,7 +511,7 @@ async function processSingleDelivery(
     await advanceFriendScenario(db, fs.id, currentStep.step_order, jitteredDate.toISOString().slice(0, -1) + '+09:00');
   } else {
     // This was the last step
-    await completeFriendScenario(db, fs.id);
+    await finishScenario(db, fs.id, fs.scenario_id, fs.friend_id, scenarioRow);
   }
 
   // 到達タグ付与 (advance / complete の後 = 再送が起きてもタグ付与は影響しない順序)
@@ -430,7 +523,67 @@ async function processSingleDelivery(
       console.error(`[scenario] tag attach failed step=${currentStep.id}:`, err);
     }
   }
+
+  /*
+   * この通に紐づくアクション。
+   *
+   * 進行を決めたあとに動かす。先に動かすと、アクションが購読を止めたのに
+   * そのあとの advance が起こして、止めたつもりが進む。
+   *
+   * 失敗しても配信フローは止めない（runScenarioActions が中で握りつぶす）。
+   */
+  await runScenarioActions(db, {
+    scenarioId: fs.scenario_id,
+    hook: 'step_sent',
+    friendId: friend.id,
+    stepId: currentStep.id,
+  });
+
   return true;
+}
+
+/**
+ * 最終コンテンツを配り終えたあとの処理。
+ *
+ * Lステップの「最終コンテンツ配信後の処理」にあたる。
+ *   pause           … 止める（これまでと同じ）
+ *   resume_previous … 割り込む前に読んでいたシナリオへ戻す
+ *   move            … 別のシナリオへ移す
+ *
+ * どれを選んでいても、まず完了にしてからアクションを動かす。完了にする前に
+ * 別シナリオへ移すと、並行を許さない設定のときに「まだ読んでいる」と見なされて
+ * 移動そのものが弾かれる。
+ */
+export async function finishScenario(
+  db: D1Database,
+  enrollmentId: string,
+  scenarioId: string,
+  friendId: string,
+  scenario: { on_complete_mode: string | null; on_complete_scenario_id: string | null },
+): Promise<void> {
+  const mode = scenario.on_complete_mode ?? 'pause';
+
+  await completeFriendScenario(db, enrollmentId);
+
+  try {
+    if (mode === 'resume_previous') {
+      await resumePreviousScenario(db, friendId, scenarioId);
+    } else if (mode === 'move' && scenario.on_complete_scenario_id) {
+      await runScenarioOp(db, friendId, scenarioId, {
+        op: 'start',
+        scenarioId: scenario.on_complete_scenario_id,
+        restart: 'from_start',
+      });
+    }
+  } catch (err) {
+    console.error(`[step-delivery] on-complete (${mode}) failed scenario=${scenarioId}`, err);
+  }
+
+  await runScenarioActions(db, {
+    scenarioId,
+    hook: 'scenario_completed',
+    friendId,
+  });
 }
 
 /** Supported scenario step condition_type values evaluated at delivery time. */
