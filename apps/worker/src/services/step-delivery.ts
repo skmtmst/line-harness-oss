@@ -766,4 +766,3 @@ export function messageToLogPayload(message: Message): { messageType: string; co
   }
   return { messageType: message.type, content: JSON.stringify(message) };
 }
-
