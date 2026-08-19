@@ -154,6 +154,44 @@ describe('and と or の入れ子', () => {
   })
 })
 
+describe('書きかけの条件を断る', () => {
+  /*
+   * 空のまま通すと「誰にも一致しない条件」が保存できてしまう。
+   * タグで絞ったのに1人も届かない、という形で出るので原因に辿りつきにくい。
+   */
+  it('タグIDが空なら組み立てを断る', () => {
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'tag_exists', value: '' }] }),
+    ).toThrow()
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'tag_not_exists', value: '' }] }),
+    ).toThrow()
+  })
+
+  it('紹介コードが空なら組み立てを断る', () => {
+    expect(() =>
+      buildSegmentQuery({ operator: 'AND', rules: [{ type: 'ref_code', value: '' }] }),
+    ).toThrow()
+  })
+
+  it('シナリオ購読中だけは空文字に意味がある（どれか1つでも購読中）', async () => {
+    raw
+      .prepare(
+        `INSERT INTO scenarios (id, name, trigger_type, delivery_mode) VALUES ('s1','x','manual','relative')`,
+      )
+      .run()
+    raw
+      .prepare(
+        `INSERT INTO friend_scenarios (id, friend_id, scenario_id, current_step_order, status, started_at)
+         VALUES ('e1','a','s1',0,'active','2026-01-01T00:00:00.000')`,
+      )
+      .run()
+    expect(
+      await idsMatching({ operator: 'AND', rules: [{ type: 'scenario_subscribed', value: '' }] }),
+    ).toEqual(['a'])
+  })
+})
+
 describe('matchesCondition', () => {
   it('一覧に出る人と、1人ずつの判定が一致する', async () => {
     const condition: SegmentCondition = {
