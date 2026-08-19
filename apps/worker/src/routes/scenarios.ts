@@ -610,6 +610,29 @@ scenarios.post('/api/scenarios/:id/steps', requireRole('owner', 'admin'), async 
       if (!tag) return c.json({ success: false, error: 'onReachTagId not found' }, 400);
     }
 
+    /*
+     * 同じ番号の通が既にあると、UNIQUE(scenario_id, step_order) に当たって
+     * 500 になる。「Internal server error」とだけ返ると、何が悪いのか
+     * 分からないまま同じ操作を繰り返すことになるので、先に見て理由を返す。
+     *
+     * 実際に踏んだ: 通が2つあるシナリオで「ステップの作成」を開き直すと、
+     * その画面は必ず1通目を作るので、毎回500になっていた。
+     */
+    const duplicate = await c.env.DB.prepare(
+      `SELECT id FROM scenario_steps WHERE scenario_id = ? AND step_order = ?`,
+    )
+      .bind(scenarioId, body.stepOrder)
+      .first<{ id: string }>();
+    if (duplicate) {
+      return c.json(
+        {
+          success: false,
+          error: `${body.stepOrder}通目はすでにあります。シナリオ編集の「ここに挿入」から足すか、番号を変えてください。`,
+        },
+        409,
+      );
+    }
+
     const stepTarget = validateConditionForStorage(body.targetCondition, 'この通の配信対象');
     if (!stepTarget.ok) return c.json({ success: false, error: stepTarget.error }, 400);
     const stepQuestion = validateQuestionForStorage(body.question);
