@@ -48,4 +48,13 @@ describe('V2 10-1 Pen準拠のアカウントUI', () => {
     expect(hierarchySource).toContain('親・子・孫はすべてLINE公式アカウントです')
     expect(hierarchySource).toContain('api.lineAccounts.updateHierarchy')
   })
+
+  it('空の構成にも確実にドラッグ元を渡して親候補として表示する', () => {
+    expect(hierarchySource).toContain("event.dataTransfer.setData(ACCOUNT_DRAG_TYPE, accountId)")
+    expect(hierarchySource).toContain("event.dataTransfer.getData(ACCOUNT_DRAG_TYPE)")
+    expect(hierarchySource).toContain('draggedIdRef.current')
+    expect(hierarchySource).toContain('draftRootIds.has(account.id)')
+    expect(hierarchySource).toContain('data-hierarchy-root-drop')
+    expect(hierarchySource).toContain('dropOn(event, null)')
+  })
 })
