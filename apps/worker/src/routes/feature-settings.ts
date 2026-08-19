@@ -33,6 +33,11 @@ export const TOGGLEABLE_FEATURES = [
   'inflow_tracking',
   'forms',
   'photo_review',
+  // サイドメニューにあってオン／オフの受け口が無かったもの。
+  // 受け口が無いと、機能設定に並べてもスイッチが保存されない。
+  'automations',
+  'external_integrations',
+  'friend_add_routing',
   'multi_store_hierarchy',
   'multi_store_bulk_updates',
   'reservation_ledger',
@@ -58,6 +63,14 @@ export type ToggleableFeature = (typeof TOGGLEABLE_FEATURES)[number];
 
 const SETTING_PREFIX = 'feature.';
 const SIDEBAR_ORDER_KEY = 'sidebar.order';
+/**
+ * 区分の中の項目の並び。`{ 区分の目印: [項目の目印, ...] }`。
+ *
+ * 区分の並び（sidebar.order）とは別に持つ。1つにまとめると、項目を1つ
+ * 動かすたびに区分の並びまで書き直すことになり、片方の保存が古いときに
+ * もう片方まで巻き戻る。
+ */
+const SIDEBAR_ITEM_ORDER_KEY = 'sidebar.item_order';
 const PARENT_CHILD_MODE_KEY = 'organization.parent_child_enabled';
 const SPECIALIZED_CATALOG_KEY = 'feature.specialized.catalog';
 
@@ -149,6 +162,24 @@ featureSettings.get('/api/settings/features', async (c) => {
       }
     }
 
+    const itemOrderRaw = await getAccountSetting(c.env.DB, accountId, SIDEBAR_ITEM_ORDER_KEY);
+    let sidebarItemOrder: Record<string, string[]> | null = null;
+    if (itemOrderRaw) {
+      try {
+        const parsed = JSON.parse(itemOrderRaw) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const cleaned: Record<string, string[]> = {};
+          for (const [sectionId, ids] of Object.entries(parsed as Record<string, unknown>)) {
+            if (Array.isArray(ids)) cleaned[sectionId] = ids.map(String);
+          }
+          sidebarItemOrder = cleaned;
+        }
+      } catch {
+        // 壊れていたら既定の並びで出す。読めない値で画面を落とさない。
+        sidebarItemOrder = null;
+      }
+    }
+
     const [parentChildRaw, specializedRaw] = await Promise.all([
       getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
       getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
@@ -159,6 +190,7 @@ featureSettings.get('/api/settings/features', async (c) => {
       data: {
         features,
         sidebarOrder,
+        sidebarItemOrder,
         parentChildMode: settingIsEnabled(parentChildRaw),
         specializedFeatureKeys: specializedCatalog(specializedRaw),
       },
@@ -177,6 +209,7 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
     const body = await c.req.json<{
       features?: Record<string, unknown>;
       sidebarOrder?: unknown;
+      sidebarItemOrder?: unknown;
     }>();
 
     const unknownKeys = Object.keys(body.features ?? {}).filter((k) => !isToggleable(k));
@@ -205,6 +238,26 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         accountId,
         SIDEBAR_ORDER_KEY,
         JSON.stringify(body.sidebarOrder.map(String)),
+      );
+    }
+
+    if (body.sidebarItemOrder !== undefined) {
+      const raw = body.sidebarItemOrder;
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return c.json({ success: false, error: 'sidebarItemOrder はオブジェクトで指定してください' }, 400);
+      }
+      const cleaned: Record<string, string[]> = {};
+      for (const [sectionId, ids] of Object.entries(raw as Record<string, unknown>)) {
+        if (!Array.isArray(ids)) {
+          return c.json({ success: false, error: `sidebarItemOrder.${sectionId} は配列で指定してください` }, 400);
+        }
+        cleaned[sectionId] = ids.map(String);
+      }
+      await setAccountSetting(
+        c.env.DB,
+        accountId,
+        SIDEBAR_ITEM_ORDER_KEY,
+        JSON.stringify(cleaned),
       );
     }
 

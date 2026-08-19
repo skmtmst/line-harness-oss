@@ -20,6 +20,15 @@ export interface Tag {
   /** 一覧での並び順。小さいほど上（112 で追加） */
   display_order: number;
   created_at: string;
+  /**
+   * 属するフォルダの色（#RRGGBB）。folders.color を読んだもので、tags 側に
+   * 保存はしない。
+   *
+   * 画面に出す印の色はこれ。タグ1つずつに色を持たせると、100枚あるタグで
+   * 色がばらけて一覧での区別に使えなくなる。色はフォルダに1つだけ付けて、
+   * 中のタグはそれを写す。JOIN していない読み方では undefined になる。
+   */
+  folder_color?: string | null;
 }
 
 /**
@@ -47,7 +56,12 @@ export interface FriendTag {
 
 export async function getTags(db: D1Database): Promise<Tag[]> {
   const result = await db
-    .prepare(`SELECT * FROM tags ORDER BY name ASC`)
+    .prepare(
+      `SELECT t.*, fo.color AS folder_color
+       FROM tags t
+       LEFT JOIN folders fo ON fo.id = t.folder_id
+       ORDER BY t.name ASC`,
+    )
     .all<Tag>();
   return result.results;
 }
@@ -61,9 +75,10 @@ export async function getTagsWithCounts(
 ): Promise<TagWithCount[]> {
   const result = await db
     .prepare(
-      `SELECT t.*, COUNT(ft.friend_id) AS friend_count
+      `SELECT t.*, fo.color AS folder_color, COUNT(ft.friend_id) AS friend_count
        FROM tags t
        LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+       LEFT JOIN folders fo ON fo.id = t.folder_id
        GROUP BY t.id
        -- 入れ替えたものが先。触っていないものは全部 0 なので、
        -- そのあとの付与人数と名前で並ぶ（設計の既定は付与人数が多い順）。
@@ -425,9 +440,10 @@ export async function getFriendTags(
 ): Promise<Tag[]> {
   const result = await db
     .prepare(
-      `SELECT t.*
+      `SELECT t.*, fo.color AS folder_color
        FROM tags t
        INNER JOIN friend_tags ft ON ft.tag_id = t.id
+       LEFT JOIN folders fo ON fo.id = t.folder_id
        WHERE ft.friend_id = ?
        ORDER BY t.name ASC`,
     )

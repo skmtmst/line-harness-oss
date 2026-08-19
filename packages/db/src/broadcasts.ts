@@ -1,5 +1,7 @@
 import { jstNow } from './utils.js';
-export type BroadcastTargetType = 'all' | 'tag' | 'multi-account-dedup';
+// 'segment' は 029 の CHECK では前から許されていたが、型だけ落ちていた。
+// 絞り込み条件（segment_conditions）で宛先を決める配信で使う。
+export type BroadcastTargetType = 'all' | 'tag' | 'segment' | 'multi-account-dedup';
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent';
 export type BroadcastMessageType = 'text' | 'image' | 'flex';
 
@@ -94,6 +96,13 @@ export interface CreateBroadcastInput {
   altText?: string | null;
   /** 何分かけて配るか。0（既定）は一気に送る */
   stealthSpreadMinutes?: number;
+  /**
+   * 絞り込み条件（JSON文字列）。targetType が 'segment' のときだけ使う。
+   *
+   * 下書きの時点で入れておく。送るときに渡す作りだと、下書きを開き直して
+   * 送った人と、作った人の条件が別物になりうる。
+   */
+  segmentConditions?: string | null;
 }
 
 export async function createBroadcast(
@@ -108,8 +117,8 @@ export async function createBroadcast(
   await db
     .prepare(
       `INSERT INTO broadcasts
-         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, segment_conditions, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -128,6 +137,7 @@ export async function createBroadcast(
       input.altText ?? null,
       // 何分かけて配るか。0（既定）は一気に送る。
       input.stealthSpreadMinutes ?? 0,
+      input.segmentConditions ?? null,
       now,
     )
     .run();
