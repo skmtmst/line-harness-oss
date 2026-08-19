@@ -12,6 +12,7 @@ import {
 import { useAccount } from '@/contexts/account-context'
 import {
   bubbleLegacyMessage,
+  bubblesForSave,
   contentTemplateToBubble,
   isContentTemplateType,
   messageTemplateToBubble,
@@ -39,6 +40,27 @@ interface BroadcastFormProps {
 const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
   text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', rich_message: 'リッチメッセージ',
   rich_video: 'リッチビデオ', video: '動画', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
+}
+
+/*
+ * まだ送れない種別と、その理由。
+ *
+ * 一斉配信が LINE へ渡せるのは text / image / flex の3つだけ。それ以外は
+ * `bubbleLegacyMessage` が「テキストに JSON を入れたもの」に落とすので、
+ * **中身の JSON がそのまま相手のトークに届く**。選べてしまうと、送って
+ * 初めて分かることになるので、選ばせない。
+ *
+ * シナリオ側は種別ごとに組み立てられるようになっている（スタンプ・
+ * カルーセル・位置情報・音声・動画）。一斉配信も同じところまで持っていく
+ * のが次の作業。
+ */
+const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
+  sticker: 'スタンプはシナリオでは送れます。一斉配信は準備中です',
+  video: '動画はシナリオでは送れます。一斉配信は準備中です',
+  rich_video: 'リッチビデオは準備中です',
+  card_message: 'カードタイプは準備中です。いまはFlexで作れます',
+  coupon: 'クーポンは準備中です',
+  research: 'リサーチは準備中です',
 }
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
 
@@ -108,7 +130,14 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
     <div className="flex items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
       <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">{index + 1}</span>
       <select value={bubble.type} onChange={(e) => onChange(emptyBubble(e.target.value as BroadcastBubbleType))} className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-semibold">
-        {Object.entries(TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        {Object.entries(TYPE_LABELS).map(([value, label]) => {
+          const reason = UNSENDABLE_TYPES[value as BroadcastBubbleType]
+          return (
+            <option key={value} value={value} disabled={Boolean(reason)}>
+              {reason ? `${label}（準備中）` : label}
+            </option>
+          )
+        })}
       </select>
       <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
       <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
@@ -379,7 +408,7 @@ export default function BroadcastForm({
           title: title.trim() || '（テスト送信）',
           messageType: legacy.messageType,
           messageContent: legacy.messageContent,
-          messageBubbles: bubbles,
+          messageBubbles: bubblesForSave(bubbles),
           ...targetPayload(),
           lineAccountId: selectedAccountId || null,
           scheduledAt: null,
@@ -408,7 +437,7 @@ export default function BroadcastForm({
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubbles, ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
+      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
       if (res.success) onSuccess(); else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
@@ -610,6 +639,17 @@ export default function BroadcastForm({
         )}
         {bubbles.map((bubble, index) => <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />)}
         <button type="button" disabled={bubbles.length >= 3} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-card border-2 border-dashed border-accent py-4 text-sm font-bold text-accent disabled:cursor-not-allowed disabled:border-hairline disabled:text-ink-faint">＋ 吹き出しを追加（{bubbles.length}/3）</button>
+        {/*
+          2通目以降はまだ実際には送れない（送信が「複数吹き出しの実配信は
+          次フェーズです」で断る）。押した時点で分かるようにする。保存して
+          予約まで進んでから、配信の時刻に断られるのがいちばん困る。
+        */}
+        {bubbles.length > 1 && (
+          <p className="rounded-card bg-warning-bg text-warning p-3 text-sm leading-relaxed">
+            2通目以降はまだ配信できません。下書きとして残せますが、送信・予約はできません。
+            いまは1通にまとめるか、配信を分けてください。
+          </p>
+        )}
         {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         <section className="border-hairline mb-3 rounded-card border bg-canvas p-5">
           <p className="text-ink mb-3 text-sm font-bold">2. 送る時間</p>

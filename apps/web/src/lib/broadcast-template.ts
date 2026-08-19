@@ -97,3 +97,17 @@ export function bubbleLegacyMessage(bubble: BroadcastBubble): {
 export function isContentTemplateType(type: BroadcastBubbleType): boolean {
   return ['rich_message', 'card_message', 'coupon', 'research'].includes(type)
 }
+
+/**
+ * 保存に渡す吹き出し。1つだけなら渡さない。
+ *
+ * `message_bubbles_json` が入っている配信は、送信が「複数吹き出しの実配信は
+ * 次フェーズです」で断る。画面は1つしか書いていなくても常に配列を渡して
+ * いたので、**作れるのに送れない**配信ができていた。1つのときは前からある
+ * messageType / messageContent だけで足りる。
+ *
+ * 2通目以降が本当に送れるようになったら、この関数ごと消してよい。
+ */
+export function bubblesForSave(bubbles: BroadcastBubble[]): BroadcastBubble[] | undefined {
+  return bubbles.length > 1 ? bubbles : undefined
+}

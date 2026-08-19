@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   bubbleLegacyMessage,
+  bubblesForSave,
   contentTemplateToBubble,
   messageTemplateToBubble,
 } from './broadcast-template'
@@ -52,5 +53,28 @@ describe('broadcast template conversion', () => {
       messageType: 'image',
       messageContent: 'not-json',
     })).toBeNull()
+  })
+})
+
+/*
+ * 保存に渡す吹き出し。
+ *
+ * ここを間違えると、**作れるのに送れない配信**ができる。しかも作った時点では
+ * 何も起きず、送信を押した時点で「複数吹き出しの実配信は次フェーズです」と
+ * 出る。予約配信なら、断られるのは配信の時刻——直せる人が見ていない時刻になる。
+ */
+describe('保存に渡す吹き出し', () => {
+  const bubble = (text: string) => ({ id: text, type: 'text' as const, content: { text } })
+
+  it('1つだけなら渡さない', () => {
+    expect(bubblesForSave([bubble('a')])).toBeUndefined()
+  })
+
+  it('2つ以上なら渡す', () => {
+    expect(bubblesForSave([bubble('a'), bubble('b')])).toHaveLength(2)
+  })
+
+  it('空でも渡さない', () => {
+    expect(bubblesForSave([])).toBeUndefined()
   })
 })
