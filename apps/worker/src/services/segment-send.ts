@@ -11,6 +11,7 @@ import { calculateStaggerDelay, sleep, addMessageVariation } from './stealth.js'
 import { buildSegmentQuery } from './segment-query.js';
 import type { SegmentCondition } from './segment-query.js';
 import { buildMessage } from './broadcast.js';
+import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
 
 const MULTICAST_BATCH_SIZE = 500;
 
@@ -58,7 +59,8 @@ export async function processSegmentSend(
 
     const now = jstNow();
     const totalBatches = Math.ceil(friends.length / MULTICAST_BATCH_SIZE);
-    const unit = `bcast_${broadcast.id.slice(0, 8)}`;
+    // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
+    const unit = aggregationUnitFor(broadcast);
 
     for (let i = 0; i < friends.length; i += MULTICAST_BATCH_SIZE) {
       const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
@@ -78,7 +80,7 @@ export async function processSegmentSend(
       }
 
       try {
-        await lineClient.multicast(lineUserIds, [batchMessage], [unit]);
+        await lineClient.multicast(lineUserIds, [batchMessage], aggregationUnits(unit));
         successCount += batch.length;
 
         // Log successfully sent messages (batch insert for performance)

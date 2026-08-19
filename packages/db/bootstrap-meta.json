@@ -154,7 +154,8 @@
     "145_broadcast_message_kinds_index.sql",
     "146_rich_menu_area_actions.sql",
     "148_rich_menu_area_taps.sql",
-    "149_rich_menu_targeting.sql"
+    "149_rich_menu_targeting.sql",
+    "150_broadcast_folder.sql"
   ],
-  "migrationCount": 155
+  "migrationCount": 156
 }

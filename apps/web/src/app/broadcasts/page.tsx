@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import type { Tag } from '@line-crm/shared'
+import type { Folder, Tag } from '@line-crm/shared'
 import { api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
@@ -11,6 +11,7 @@ import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
 import FolderPanel from '@/components/shared/folder-panel'
 import { audienceSummary, contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
@@ -47,6 +48,9 @@ function BroadcastsPageContent() {
 
 type BroadcastTab = 'single' | 'dedup' | 'all'
 
+/** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
+const UNFILED = '__unfiled__'
+
 function BroadcastList() {
   const { selectedAccountId } = useAccount()
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
@@ -68,6 +72,10 @@ function BroadcastList() {
    */
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [folders, setFolders] = useState<Folder[]>([])
+  /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
+  const [folderFilter, setFolderFilter] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
@@ -94,6 +102,13 @@ function BroadcastList() {
       setFetchingInsight(null)
     }
   }
+
+  const loadFolders = useCallback(async () => {
+    const res = await api.folders.list('broadcast')
+    if (res.success) setFolders(res.data)
+  }, [])
+
+  useEffect(() => { void loadFolders() }, [loadFolders])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -146,6 +161,11 @@ function BroadcastList() {
     }
     // まだ送っていない予約だけを見る。送る前に中身を直せるのはこれだけ。
     if (scheduledOnly && b.status !== 'scheduled') return false
+    if (folderFilter === UNFILED) {
+      if (b.folderId) return false
+    } else if (folderFilter && b.folderId !== folderFilter) {
+      return false
+    }
     if (dateFrom || dateTo) {
       // 一覧の「配信日時」列と同じものを見る。送信済みは送った日、それ以外は予約日。
       const iso = b.status === 'sent' ? b.sentAt : b.scheduledAt
@@ -177,14 +197,10 @@ function BroadcastList() {
             >
               マニュアル
             </button>
-            {/*
-              フォルダは 099 で folders 表が入っているが、broadcasts に
-              folder_id が無い。docs/v025-open-questions.md §4-3。
-            */}
             <button
-              disabled
-              title="フォルダの追加は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              type="button"
+              onClick={() => setFolderDialogOpen(true)}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
               フォルダを追加
             </button>
@@ -206,28 +222,45 @@ function BroadcastList() {
       />
       </div>
 
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="broadcast"
+          note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
+          placeholder="例: 01_キャンペーン"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadFolders()}
+        />
+      )}
+
       <div data-design="KPIs">
       <BroadcastKpis />
       </div>
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
-          {/*
-            設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形に
-            そろえる。099 で folders 表は入っているが broadcasts に
-            folder_id が無いので、いまは「すべて」だけ。
-            docs/v025-open-questions.md §4-3。
-          */}
+          {/* 設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。 */}
           <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
             <FolderPanel
               total={`${broadcasts.length} 件`}
-              activeId=""
-              onSelect={() => {}}
-              rows={[{ id: '', label: 'すべて', count: broadcasts.length }]}
+              activeId={folderFilter}
+              onSelect={setFolderFilter}
+              rows={[
+                { id: '', label: 'すべて', count: broadcasts.length },
+                ...folders.map((f) => ({
+                  id: f.id,
+                  label: f.name,
+                  count: broadcasts.filter((b) => b.folderId === f.id).length,
+                  color: f.color,
+                })),
+                {
+                  id: UNFILED,
+                  label: '未分類',
+                  count: broadcasts.filter((b) => !b.folderId).length,
+                },
+              ]}
             >
               <p className="text-ink-faint text-xs leading-relaxed">
-                配信の分類はまだ作れません。上の「フォルダを追加」から作れるように
-                なったら、ここに並びます。
+                フォルダを消しても、入っていた配信は未分類として残ります。
               </p>
             </FolderPanel>
 
