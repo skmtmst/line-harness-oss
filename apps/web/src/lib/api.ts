@@ -48,6 +48,7 @@ import type {
   EntryRouteFunnel,
   TrafficPool,
   PoolAccount,
+  FormLayout,
 } from '@line-crm/shared'
 
 /** Affiliate offer (案件) as returned by the worker. */
@@ -1134,6 +1135,8 @@ export const api = {
           name: string
           description: string | null
           fields: unknown
+          /** ブロック・セクション・オプションの入れ物。古いフォームでも必ず入る */
+          layout: FormLayout
           onSubmitTagId: string | null
           onSubmitMessageType: string | null
           onSubmitMessageContent: string | null
@@ -1141,12 +1144,19 @@ export const api = {
           submitCount: number
         }>
       >(`/api/forms/${id}`),
+    create: (data: { name: string; description?: string | null; layout?: FormLayout }) =>
+      fetchApi<ApiResponse<{ id: string }>>('/api/forms', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
     update: (
       id: string,
       data: {
         name?: string
         description?: string | null
         fields?: unknown
+        /** 送ると fields もこちらから作り直される */
+        layout?: FormLayout
         onSubmitTagId?: string | null
         onSubmitMessageType?: string | null
         onSubmitMessageContent?: string | null
@@ -1157,6 +1167,8 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
+    remove: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/forms/${id}`, { method: 'DELETE' }),
   },
   /** NENコラム。 */
   nenColumns: {
