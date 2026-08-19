@@ -69,9 +69,9 @@
         },
         {
           "kind": "fixed",
-          "text": "LINEアカウントの追加と階層構成をPenと同じ画面構成に作り直した @masato #TBD",
-          "by": null,
-          "pr": null,
+          "text": "LINEアカウントの追加と階層構成をPenと同じ画面構成に作り直した",
+          "by": "masato",
+          "pr": 165,
           "at": "2026-08-19T16:15"
         }
       ]
