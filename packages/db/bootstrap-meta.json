@@ -151,8 +151,7 @@
     "142_broadcast_message_kinds.sql",
     "143_broadcast_message_kinds_copy.sql",
     "144_broadcast_message_kinds_swap.sql",
-    "145_broadcast_message_kinds_rename.sql",
-    "146_broadcast_message_kinds_index.sql"
+    "145_broadcast_message_kinds_index.sql"
   ],
-  "migrationCount": 153
+  "migrationCount": 152
 }
