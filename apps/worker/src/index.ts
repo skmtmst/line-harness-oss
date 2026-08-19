@@ -17,6 +17,8 @@ import {
 import { processStepDeliveries } from './services/step-delivery.js';
 import { processScheduledBroadcasts, processQueuedBroadcasts } from './services/broadcast.js';
 import { processReminderDeliveries } from './services/reminder-delivery.js';
+import { processFriendFieldReminders } from './services/friend-field-reminders.js';
+import { toJstParts } from '@line-crm/shared';
 import { checkAccountHealth } from './services/ban-monitor.js';
 import { refreshLineAccessTokens } from './services/token-refresh.js';
 import { processInsightFetch } from './services/insight-fetcher.js';
@@ -1195,6 +1197,32 @@ async function scheduled(
   );
   jobs.push(processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL));
   jobs.push(checkAccountHealth(env.DB));
+
+  /*
+   * 友だち情報欄の日付から、リマインダのゴール日を立てる（154）。
+   *
+   * 1日1回でよい。日本時間の 0:05 に動かす。日付が変わった直後に、その日から
+   * 先のぶんを立てる。**送るのはここではない。** リマインダ配信が、立った
+   * ゴール日から逆算して送る。分けているのは、「3日前に送る」通を届けるには
+   * ゴール日がその3日以上前に立っている必要があるため。
+   *
+   * 毎分の cron に相乗りしている。専用の Cron Trigger を増やさずに済む
+   * （マイルの処理と同じやり方）。
+   */
+  if (event.cron === '* * * * *') {
+    const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
+    if (jstMinutes === 5) {
+      jobs.push(
+        processFriendFieldReminders(env.DB).then((result) => {
+          if (result.enrolled > 0) {
+            console.log(
+              `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped}`,
+            );
+          }
+        }),
+      );
+    }
+  }
 
   // Mileage is an eventually-consistent projection. Reuse the existing
   // minute cron invocation, but drain only every five minutes and at most 100

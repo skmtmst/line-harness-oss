@@ -18,6 +18,10 @@ export interface ReminderRow {
   updated_at: string;
   /** 153: 'time'（○日前の●時）か 'countdown'（何分ずらすか）。作成後は変えない。 */
   delivery_mode: string;
+  /** 154: 友だち情報欄の日付を起点にするとき、見る欄。 */
+  trigger_field_id: string | null;
+  /** 154: 毎年くり返すか。 */
+  repeat_yearly: number;
 }
 
 export interface ReminderStepRow {
@@ -57,7 +61,13 @@ export async function getReminderById(db: D1Database, id: string): Promise<Remin
 }
 
 export interface ReminderTriggerInput {
-  triggerType?: 'manual' | 'booking' | 'event';
+  triggerType?: 'manual' | 'booking' | 'event' | 'friend_field';
+  /** 153: 'time'（ゴールの○日前の●時）か 'countdown'（何分ずらすか）。作成後は変えない。 */
+  deliveryMode?: 'time' | 'countdown';
+  /** 154: 友だち情報欄の日付を起点にするとき、どの欄を見るか。 */
+  triggerFieldId?: string | null;
+  /** 154: 毎年くり返すか（誕生日なら true）。 */
+  repeatYearly?: boolean;
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;
@@ -72,8 +82,9 @@ export async function createReminder(
   await db.prepare(
     `INSERT INTO reminders
        (id, name, description, trigger_type, trigger_offset_minutes,
-        send_at_time, target_tag_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        send_at_time, target_tag_id, delivery_mode,
+        trigger_field_id, repeat_yearly, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -83,6 +94,11 @@ export async function createReminder(
       input.triggerOffsetMinutes ?? null,
       input.sendAtTime ?? null,
       input.targetTagId ?? null,
+      // 配信方式は作成時にだけ決める。あとから変えると、登録済みの配信予定が
+      // すべて変わってしまう（153）。
+      input.deliveryMode ?? 'countdown',
+      input.triggerFieldId ?? null,
+      input.repeatYearly ? 1 : 0,
       now,
       now,
     )
@@ -101,6 +117,10 @@ export async function updateReminder(
   if (updates.description !== undefined) { sets.push('description = ?'); values.push(updates.description); }
   if (updates.isActive !== undefined) { sets.push('is_active = ?'); values.push(updates.isActive ? 1 : 0); }
   if (updates.triggerType !== undefined) { sets.push('trigger_type = ?'); values.push(updates.triggerType); }
+  if (updates.triggerFieldId !== undefined) { sets.push('trigger_field_id = ?'); values.push(updates.triggerFieldId); }
+  if (updates.repeatYearly !== undefined) { sets.push('repeat_yearly = ?'); values.push(updates.repeatYearly ? 1 : 0); }
+  // delivery_mode はここで変えない。作成時に決めたものを守る（153）。
+  // 途中で変えると、すでに登録済みの友だちの配信予定がすべて変わる。
   if ('triggerOffsetMinutes' in updates) { sets.push('trigger_offset_minutes = ?'); values.push(updates.triggerOffsetMinutes ?? null); }
   if ('sendAtTime' in updates) { sets.push('send_at_time = ?'); values.push(updates.sendAtTime ?? null); }
   if ('targetTagId' in updates) { sets.push('target_tag_id = ?'); values.push(updates.targetTagId ?? null); }
@@ -224,4 +244,73 @@ export async function completeReminderIfDone(db: D1Database, friendReminderId: s
     await db.prepare(`UPDATE friend_reminders SET status = 'completed', updated_at = ? WHERE id = ?`)
       .bind(jstNow(), friendReminderId).run();
   }
+}
+
+// =============================================================================
+// 友だち情報欄の日付を起点にする（154）
+// =============================================================================
+
+export interface FriendFieldReminderRow {
+  id: string;
+  name: string;
+  trigger_field_id: string | null;
+  repeat_yearly: number;
+  line_account_id: string | null;
+}
+
+/** 友だち情報欄の日付を起点にする、動いているリマインダ。 */
+export async function getFriendFieldReminders(
+  db: D1Database,
+): Promise<FriendFieldReminderRow[]> {
+  const rows = await db
+    .prepare(
+      `SELECT id, name, trigger_field_id, repeat_yearly, line_account_id
+         FROM reminders
+        WHERE is_active = 1
+          AND trigger_type = 'friend_field'
+          AND trigger_field_id IS NOT NULL`,
+    )
+    .all<FriendFieldReminderRow>();
+  return rows.results ?? [];
+}
+
+/** その欄に値を入れている友だちを、値と一緒に返す。 */
+export async function getFriendsWithFieldValue(
+  db: D1Database,
+  fieldId: string,
+): Promise<Array<{ friend_id: string; value: string }>> {
+  const rows = await db
+    .prepare(
+      `SELECT v.friend_id AS friend_id, v.value AS value
+         FROM friend_field_values v
+         JOIN friends f ON f.id = v.friend_id
+        WHERE v.field_id = ?
+          AND v.value IS NOT NULL AND v.value != ''
+          AND f.is_following = 1`,
+    )
+    .bind(fieldId)
+    .all<{ friend_id: string; value: string }>();
+  return rows.results ?? [];
+}
+
+/**
+ * その人・そのリマインダ・そのゴール日での登録が、もうあるか。
+ *
+ * 毎年くり返すリマインダは、年ごとに別のゴール日になる。だから
+ * 「去年立てたから今年は立てない」にはならない。同じ年に二重に立つのだけを防ぐ。
+ */
+export async function hasReminderEnrollment(
+  db: D1Database,
+  friendId: string,
+  reminderId: string,
+  targetDate: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS hit FROM friend_reminders
+        WHERE friend_id = ? AND reminder_id = ? AND target_date = ? LIMIT 1`,
+    )
+    .bind(friendId, reminderId, targetDate)
+    .first<{ hit: number }>();
+  return row != null;
 }

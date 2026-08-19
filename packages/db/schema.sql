@@ -654,6 +654,10 @@ CREATE TABLE IF NOT EXISTS reminders (
   -- 153: 配信方式。作成後は変えられない（登録済みの配信予定が全部変わるため）。
   -- 'time' … ゴールの○日前の●時 / 'countdown' … ゴールから何分ずらすか
   delivery_mode TEXT NOT NULL DEFAULT 'countdown',
+  -- 154: 友だち情報欄の日付をゴールにする（誕生日・次回お届け日・契約更新日）。
+  trigger_field_id TEXT,
+  -- 154: 毎年くり返すか。誕生日は 1、契約更新日は 0。
+  repeat_yearly INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );

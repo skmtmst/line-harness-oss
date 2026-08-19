@@ -17,7 +17,8 @@ import { requireRole } from '../middleware/role-guard.js';
 
 const reminders = new Hono<Env>();
 
-const TRIGGER_TYPES = ['manual', 'booking', 'event'] as const;
+const TRIGGER_TYPES = ['manual', 'booking', 'event', 'friend_field'] as const;
+const DELIVERY_MODES = ['time', 'countdown'] as const;
 type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 /**
@@ -37,6 +38,28 @@ function readTriggerInput(
       return { ok: false, error: `triggerType must be one of ${TRIGGER_TYPES.join(', ')}` };
     }
     out.triggerType = body.triggerType;
+  }
+  if (has('triggerFieldId')) {
+    const raw = body.triggerFieldId;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.triggerFieldId = null;
+    } else if (typeof raw !== 'string') {
+      return { ok: false, error: 'triggerFieldId must be a string' };
+    } else {
+      out.triggerFieldId = raw;
+    }
+  }
+  if (has('repeatYearly')) {
+    if (typeof body.repeatYearly !== 'boolean') {
+      return { ok: false, error: 'repeatYearly must be boolean' };
+    }
+    out.repeatYearly = body.repeatYearly;
+  }
+  if (has('deliveryMode')) {
+    if (!DELIVERY_MODES.includes(body.deliveryMode as (typeof DELIVERY_MODES)[number])) {
+      return { ok: false, error: `deliveryMode must be one of ${DELIVERY_MODES.join(', ')}` };
+    }
+    out.deliveryMode = body.deliveryMode;
   }
   if (has('triggerOffsetMinutes')) {
     const raw = body.triggerOffsetMinutes;
@@ -92,6 +115,9 @@ reminders.get('/api/reminders', async (c) => {
         description: r.description,
         isActive: Boolean(r.is_active),
         triggerType: r.trigger_type ?? 'manual',
+        deliveryMode: r.delivery_mode ?? 'countdown',
+        triggerFieldId: r.trigger_field_id ?? null,
+        repeatYearly: r.repeat_yearly === 1,
         triggerOffsetMinutes: r.trigger_offset_minutes ?? null,
         sendAtTime: r.send_at_time ?? null,
         targetTagId: r.target_tag_id ?? null,
@@ -121,6 +147,9 @@ reminders.get('/api/reminders/:id', async (c) => {
         description: reminder.description,
         isActive: Boolean(reminder.is_active),
         triggerType: reminder.trigger_type ?? 'manual',
+        deliveryMode: reminder.delivery_mode ?? 'countdown',
+        triggerFieldId: reminder.trigger_field_id ?? null,
+        repeatYearly: reminder.repeat_yearly === 1,
         triggerOffsetMinutes: reminder.trigger_offset_minutes ?? null,
         sendAtTime: reminder.send_at_time ?? null,
         targetTagId: reminder.target_tag_id ?? null,
