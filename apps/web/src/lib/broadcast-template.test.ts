@@ -5,6 +5,7 @@ import {
   contentTemplateToBubble,
   messageTemplateToBubble,
 } from './broadcast-template'
+import { emptyMessageKindState } from '@/components/scenarios/message-kind-fields'
 
 vi.stubGlobal('crypto', { randomUUID: () => 'bubble-id' })
 
@@ -76,5 +77,67 @@ describe('保存に渡す吹き出し', () => {
 
   it('空でも渡さない', () => {
     expect(bubblesForSave([])).toBeUndefined()
+  })
+})
+
+/*
+ * 吹き出し → 配信の中身。
+ *
+ * ここが間違うと、**中身の JSON がそのまま相手のトークに届く**。
+ * 前はスタンプも動画も「テキストに JSON を入れたもの」に落ちていて、
+ * 選べるのに送ると壊れる状態だった。
+ */
+describe('吹き出しを配信の中身に直す', () => {
+  it('位置情報は種別ごと渡す（テキストに落とさない）', () => {
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'location',
+      content: { state: { ...emptyMessageKindState(), location: { title: '店舗', address: '東京都', latitude: '35.6', longitude: '139.7' } } },
+    })
+    expect(out.messageType).toBe('location')
+    expect(JSON.parse(out.messageContent)).toMatchObject({ title: '店舗', latitude: 35.6, longitude: 139.7 })
+  })
+
+  it('スタンプは packageId / stickerId を渡す', () => {
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'sticker',
+      content: { state: { ...emptyMessageKindState(), sticker: { packageId: '446', stickerId: '1988' } } },
+    })
+    expect(out.messageType).toBe('sticker')
+    expect(JSON.parse(out.messageContent)).toEqual({ packageId: '446', stickerId: '1988' })
+  })
+
+  it('音声は秒をミリ秒に直す', () => {
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'audio',
+      content: { state: { ...emptyMessageKindState(), audio: { originalContentUrl: 'https://e.com/a.m4a', duration: '12' } } },
+    })
+    expect(JSON.parse(out.messageContent).duration).toBe(12000)
+  })
+
+  it('カルーセルは控えた中身そのものを渡す（テンプレートIDではない）', () => {
+    // テンプレートを消したあとも、この配信は送れないといけない。
+    const columns = JSON.stringify([{ title: '然-NEN- チキン', text: '国産むね肉', actions: [] }])
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'carousel',
+      content: { templateId: 'tpl-1', templateName: 'チキン', columnsJson: columns },
+    })
+    expect(out.messageType).toBe('carousel')
+    expect(out.messageContent).toBe(columns)
+  })
+
+  it('動画は種別ごと渡す', () => {
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'video',
+      content: { originalContentUrl: 'https://e.com/v.mp4', previewImageUrl: 'https://e.com/v.jpg' },
+    })
+    expect(out.messageType).toBe('video')
+  })
+
+  it('書けていない位置情報は空を返す（保存前に画面が止める）', () => {
+    const out = bubbleLegacyMessage({
+      id: 'b', type: 'location',
+      content: { state: emptyMessageKindState() },
+    })
+    expect(out.messageContent).toBe('')
   })
 })

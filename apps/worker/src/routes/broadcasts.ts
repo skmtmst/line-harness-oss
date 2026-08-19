@@ -74,6 +74,10 @@ type CreateBroadcastBody = {
   stealthSpreadMinutes?: number;
   /** 絞り込み条件。targetType が 'segment' のときに使う */
   segmentConditions?: unknown;
+  /** 分類。null なら「未分類」 */
+  folderId?: string | null;
+  /** 開封数を取るか。既定は取る */
+  measureOpens?: boolean;
 };
 
 function sameCreateRequest(existing: DbBroadcast, body: CreateBroadcastBody): boolean {
@@ -116,6 +120,15 @@ function serializeBroadcast(row: DbBroadcast) {
     failedAccountIds: parseJsonArray(r.failed_account_ids),
     // 046 以前の行/未マイグレーション環境では undefined → 従来挙動 (ON) 扱い
     trackLinks: row.track_links === undefined ? true : row.track_links !== 0,
+    /*
+     * 宛先の条件。一覧で「何で絞ったか」を出すために返す。
+     *
+     * これが無いと、詳細条件で絞った配信も一覧では「タグ指定」と出る。
+     * 送った相手を後から確かめられないので、監査にならない。
+     */
+    segmentConditions: r.segment_conditions
+      ? (() => { try { return JSON.parse(String(r.segment_conditions)) as unknown } catch { return null } })()
+      : null,
     createdAt: row.created_at,
   };
 }
@@ -543,6 +556,8 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
         lineAccountId: body.lineAccountId ?? null,
         altText: body.altText ?? null,
         segmentConditions,
+        folderId: body.folderId ?? null,
+        measureOpens: body.measureOpens,
       });
     } catch (createError) {
       // Concurrent retries may both pass the SELECT above. The primary key makes
@@ -587,6 +602,8 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       targetTagId?: string | null;
       scheduledAt?: string | null;
       trackLinks?: boolean;
+      folderId?: string | null;
+      measureOpens?: boolean;
     }>();
 
     if (body.messageContent !== undefined) {
@@ -610,6 +627,8 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       target_tag_id: body.targetTagId,
       scheduled_at: body.scheduledAt,
       ...(body.trackLinks !== undefined ? { track_links: body.trackLinks ? 1 : 0 } : {}),
+      ...(body.folderId !== undefined ? { folder_id: body.folderId } : {}),
+      ...(body.measureOpens !== undefined ? { measure_opens: body.measureOpens ? 1 : 0 } : {}),
       ...(statusUpdate !== undefined ? { status: statusUpdate } : {}),
     });
 

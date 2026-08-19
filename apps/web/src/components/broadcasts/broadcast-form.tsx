@@ -27,6 +27,13 @@ import {
 import type { SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import MessageKindFields, {
+  emptyMessageKindState,
+  serializeMessageKind,
+  type MessageKind,
+  type MessageKindState,
+} from '@/components/scenarios/message-kind-fields'
+import CarouselPicker from '@/components/scenarios/carousel-picker'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -38,38 +45,42 @@ interface BroadcastFormProps {
 }
 
 const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
-  text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', rich_message: 'リッチメッセージ',
-  rich_video: 'リッチビデオ', video: '動画', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
+  text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', location: '位置情報',
+  audio: '音声', carousel: 'カルーセル', video: '動画', rich_message: 'リッチメッセージ',
+  rich_video: 'リッチビデオ', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
 }
 
 /*
  * まだ送れない種別と、その理由。
  *
- * 一斉配信が LINE へ渡せるのは text / image / flex の3つだけ。それ以外は
- * `bubbleLegacyMessage` が「テキストに JSON を入れたもの」に落とすので、
- * **中身の JSON がそのまま相手のトークに届く**。選べてしまうと、送って
- * 初めて分かることになるので、選ばせない。
+ * ここに無い種別は、シナリオと同じ組み立て（`line-message.ts`）を通って
+ * そのまま LINE へ渡る。ここに載っているものは `bubbleLegacyMessage` が
+ * 「テキストに JSON を入れたもの」に落とすので、**中身の JSON がそのまま
+ * 相手のトークに届く**。送って初めて分かる壊れ方なので、選ばせない。
  *
- * シナリオ側は種別ごとに組み立てられるようになっている（スタンプ・
- * カルーセル・位置情報・音声・動画）。一斉配信も同じところまで持っていく
- * のが次の作業。
+ * リッチメッセージ・カードタイプ・クーポン・リサーチは、こちらで作った
+ * 独自の型で、LINE に対応する種別が無い。Flex かカルーセルへ組み立て直す
+ * 必要があるので、まだ蓋をしてある。
  */
 const UNSENDABLE_TYPES: Partial<Record<BroadcastBubbleType, string>> = {
-  sticker: 'スタンプはシナリオでは送れます。一斉配信は準備中です',
-  video: '動画はシナリオでは送れます。一斉配信は準備中です',
-  rich_video: 'リッチビデオは準備中です',
-  card_message: 'カードタイプは準備中です。いまはFlexで作れます',
+  rich_message: 'リッチメッセージは準備中です。いまは写真かFlexで作れます',
+  rich_video: 'リッチビデオは準備中です。いまは動画で送れます',
+  card_message: 'カードタイプは準備中です。いまはカルーセルで作れます',
   coupon: 'クーポンは準備中です',
   research: 'リサーチは準備中です',
 }
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
 
+/** 位置情報・音声・スタンプは、シナリオと同じ入力欄をそのまま使う。 */
+const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sticker'])
+
 function emptyBubble(type: BroadcastBubbleType = 'text'): BroadcastBubble {
   const content: Record<string, unknown> = type === 'text' ? { text: '' }
-    : type === 'sticker' ? { packageId: 'placeholder', stickerId: 'placeholder' }
     : type === 'image' ? { originalContentUrl: '', previewImageUrl: '' }
     : type === 'flex' ? { flexJson: '' }
     : type === 'video' ? { originalContentUrl: '', previewImageUrl: '' }
+    : type === 'carousel' ? { templateId: '', templateName: '', columnsJson: '' }
+    : KIND_FIELD_TYPES.has(type) ? { state: emptyMessageKindState() }
     : type === 'rich_video' ? { originalContentUrl: '', previewImageUrl: '', actionUrl: '' }
     : { assetId: '', assetName: '' }
   return { id: crypto.randomUUID(), type, content }
@@ -108,7 +119,35 @@ function BubblePreview({ bubble }: { bubble: BroadcastBubble }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
   if (bubble.type === 'text') return <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
-  if (bubble.type === 'sticker') return <div className="bg-warning-bg text-warning flex h-24 w-24 items-center justify-center rounded-card text-xs font-medium">スタンプ</div>
+  if (bubble.type === 'sticker') {
+    const st = (bubble.content.state as MessageKindState | undefined)?.sticker
+    return st?.packageId && st?.stickerId
+      ? <img src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${st.stickerId}/android/sticker.png`} alt="スタンプ" className="h-24 w-24 object-contain" />
+      : <div className="bg-canvas-sunken text-ink-faint flex h-24 w-24 items-center justify-center rounded-card text-xs">スタンプ</div>
+  }
+  if (bubble.type === 'location') {
+    const loc = (bubble.content.state as MessageKindState | undefined)?.location
+    return <div className="bg-canvas w-[82%] rounded-card p-3 text-[13px] shadow-sm">
+      <p className="text-ink font-bold">{loc?.title || '場所'}</p>
+      <p className="text-ink-faint mt-0.5 text-[11px]">{loc?.address || '住所を入れると出ます'}</p>
+    </div>
+  }
+  if (bubble.type === 'audio') {
+    const au = (bubble.content.state as MessageKindState | undefined)?.audio
+    return <div className="bg-canvas flex w-[82%] items-center gap-2 rounded-card p-3 text-[13px] shadow-sm">
+      <span className="text-lg">▶</span>
+      <span className="text-ink-faint text-[11px]">{au?.duration ? `${au.duration} 秒` : '音声'}</span>
+    </div>
+  }
+  if (bubble.type === 'carousel') {
+    const name = String(bubble.content.templateName ?? '')
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">
+      {[0, 1].map((i) => <div key={i} className="bg-canvas w-36 shrink-0 rounded-card p-2 shadow">
+        <div className="bg-canvas-sunken h-20 rounded-control" />
+        <p className="text-ink mt-2 truncate text-xs font-bold">{i === 0 ? (name || 'カルーセル') : '…'}</p>
+      </div>)}
+    </div>
+  }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
   if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-sm"><p className="text-xs font-bold text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
   if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-white"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
@@ -163,7 +202,32 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
         <label className="mb-1 block text-xs font-bold text-ink-secondary">Flex JSON</label>
         <textarea rows={8} value={String(bubble.content.flexJson ?? '')} onChange={(e) => onChange({ ...bubble, content: { ...bubble.content, flexJson: e.target.value, templateId: undefined, templateName: undefined } })} className="w-full resize-y rounded-card border border-hairline p-3 font-mono text-xs focus:border-accent focus:outline-none" />
       </div>}
-      {bubble.type === 'sticker' && <div className="rounded-card bg-warning-bg p-4 text-sm text-warning"><p className="font-bold">スタンプ（準備中）</p><p className="mt-1 text-xs">packageId / stickerId を保持するデータ構造は実装済みです。現在はプレースホルダを表示します。</p></div>}
+      {/*
+        位置情報・音声・スタンプは、シナリオと同じ入力欄をそのまま使う。
+        別の入力欄を作ると、同じものを2か所で直すことになり、必ずどちらかが
+        ずれる（一斉配信だけスタンプが「準備中」のまま残っていたのがそれ）。
+      */}
+      {KIND_FIELD_TYPES.has(bubble.type) && (
+        <MessageKindFields
+          kind={bubble.type as MessageKind}
+          value={(bubble.content.state as MessageKindState | undefined) ?? emptyMessageKindState()}
+          onChange={(next) => onChange({ ...bubble, content: { state: next } })}
+        />
+      )}
+      {bubble.type === 'carousel' && (
+        <CarouselPicker
+          value={String(bubble.content.templateId ?? '')}
+          onChange={(templateId, template) => onChange({
+            ...bubble,
+            content: {
+              templateId,
+              templateName: template?.name ?? '',
+              // テンプレートを消したあとも送れるように、中身そのものを控える。
+              columnsJson: template?.messageContent ?? '',
+            },
+          })}
+        />
+      )}
       {['image','video','rich_video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
       {isContentTemplateType(bubble.type) && <div>
         <label className="mb-1 block text-xs font-bold text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
@@ -206,6 +270,18 @@ export default function BroadcastForm({
    * 変わるので、ドメインを見せたい配信では切れるようにしておく。
    */
   const [trackLinks, setTrackLinks] = useState(true)
+  /** 分類。空なら未分類。 */
+  const [folderId, setFolderId] = useState('')
+  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
+  /*
+   * 開封数を取るか。既定は取る。
+   *
+   * LINE の集計ユニットはアカウントあたり**月1,000**まで。1配信＝1ユニット
+   * なので、全部の配信で取ると月1,000配信で頭打ちになる。しかも上限に
+   * 当たったことは送信のエラーにならず、あとから数字が出ないだけなので
+   * 気づけない。取らなくてよい配信では切れるようにしておく。
+   */
+  const [measureOpens, setMeasureOpens] = useState(true)
   const [targetCount, setTargetCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
   // 送る前の確認。押すまで走らせない。入力のたびに投げると、
@@ -228,6 +304,12 @@ export default function BroadcastForm({
   useEffect(() => {
     if (openTemplatePickerInitially) setShowTemplatePicker(true)
   }, [openTemplatePickerInitially])
+
+  useEffect(() => {
+    api.folders.list('broadcast')
+      .then((res) => { if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name }))) })
+      .catch(() => undefined)
+  }, [])
 
   // 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
   useEffect(() => {
@@ -329,6 +411,20 @@ export default function BroadcastForm({
     for (const [index, bubble] of bubbles.entries()) {
       if (bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) return `吹き出し${index + 1}のテキストを入力してください`
       if (['image','video','rich_video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
+      /*
+        位置情報・音声・スタンプは、足りない項目があると送る形にできない。
+        空のまま保存すると、本文が空文字の配信になって、相手には**何も
+        書かれていないメッセージ**が届く。
+      */
+      if (KIND_FIELD_TYPES.has(bubble.type)) {
+        const state = bubble.content.state as MessageKindState | undefined
+        if (!state || !serializeMessageKind(bubble.type as MessageKind, state)) {
+          return `吹き出し${index + 1}の${TYPE_LABELS[bubble.type]}を入力してください`
+        }
+      }
+      if (bubble.type === 'carousel' && !String(bubble.content.columnsJson ?? '').trim()) {
+        return `吹き出し${index + 1}のカルーセルを選択してください`
+      }
       if (bubble.type === 'flex') {
         try { JSON.parse(String(bubble.content.flexJson ?? '')) } catch { return `吹き出し${index + 1}のFlex JSONを確認してください` }
       }
@@ -413,6 +509,8 @@ export default function BroadcastForm({
           lineAccountId: selectedAccountId || null,
           scheduledAt: null,
           trackLinks,
+          folderId: folderId || null,
+          measureOpens,
           stealthSpreadMinutes: Number(spreadMinutes) || 0,
         },
         { idempotencyKey: crypto.randomUUID() },
@@ -437,7 +535,7 @@ export default function BroadcastForm({
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
+      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, folderId: folderId || null, measureOpens, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
       if (res.success) onSuccess(); else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
@@ -457,7 +555,23 @@ export default function BroadcastForm({
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-5">
         <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
-          <label className="block text-sm font-bold text-ink">管理用タイトル</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="mt-2 w-full rounded-card border border-hairline px-4 py-3 text-sm" />
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
+            <label className="block">
+              <span className="text-ink block text-sm font-bold">管理用タイトル</span>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="border-hairline rounded-card mt-2 w-full border px-4 py-3 text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-ink block text-sm font-bold">フォルダ</span>
+              <select
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                className="border-hairline rounded-card mt-2 w-full border px-4 py-3 text-sm"
+              >
+                <option value="">未分類</option>
+                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </label>
+          </div>
         </section>
         <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -592,6 +706,28 @@ export default function BroadcastForm({
               この配信ではURLを短縮しない
               <span className="text-ink-faint block">
                 届く文面のURLがそのままになります。クリック数は数えられません。
+              </span>
+            </span>
+          </label>
+          {/*
+            開封数を取るか。LINEの集計は**アカウントあたり月1,000配信**まで。
+            全部で取ると上限に当たるが、当たったことは送信のエラーにならず
+            「あとから数字が出ない」だけなので気づけない。
+          */}
+          <label className="text-ink-secondary mt-2 flex items-start gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={!measureOpens}
+              onChange={(e) => setMeasureOpens(!e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              この配信の開封数は取らない
+              <span className="text-ink-faint block">
+                LINEの集計はアカウントあたり月1,000配信までです。数えなくてよい配信で切っておくと、
+                見たい配信のぶんを残せます。
+                {targetCount !== null && targetCount > 0 && targetCount < 20
+                  && ` なお今回は${targetCount}人なので、取る設定にしてもLINEからは返りません（20人未満）。`}
               </span>
             </span>
           </label>

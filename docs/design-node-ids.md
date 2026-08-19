@@ -94,9 +94,9 @@ mcp__pencil__export_nodes    { filePath: "<上記パス>", nodeIds: ["<ID>"] }
 | V2 4-8 ウェビナー | `hEIbM` | `/webinars` |
 | V2 4-8-1 ウェビナーの編集 | `L6dey8` | `/webinars/edit` |
 | V2 4-8-2 ウェビナーを作る | `K4wp0` | `/webinars/new` |
-| V2 5-1 メディアライブラリ | `AfRgY` | `/contents` |
-| V2 5-2 共通情報 | `S20UY` | `/contents?tab=vars` |
-| V2 5-2-1 共通情報を追加する | `lMWil` | `/contents/vars/new` |
+| V2 5-1 登録メディア一覧 | `AfRgY` | `/contents` |
+| V2 5-2 共通情報 | `S20UY` | `/contents/vars` |
+| V2 5-2-1 共通情報登録 | `lMWil` | `/contents/vars/new` |
 | V2 6-1 成果とアフィリエイト | `K9ZuPP` | `/conversions` |
 | V2 6-1-1 成果地点を作る | `BhTq4` | `/conversions/new` |
 | V2 6-1-2 案件 | `Z50laP` | `/affiliate-offers` |

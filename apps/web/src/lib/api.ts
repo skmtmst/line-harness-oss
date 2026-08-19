@@ -93,9 +93,15 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   failedAccountIds: string[] | null;
   trackLinks: boolean;
   messageBubbles?: BroadcastBubble[] | null;
+  /** 宛先の条件。一覧で「何で絞ったか」を出すのに使う。 */
+  segmentConditions?: SegmentCondition | null;
+  /** 分類。null なら未分類。 */
+  folderId?: string | null;
+  /** 開封数を取るか。 */
+  measureOpens?: boolean;
 };
 
-export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
+export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'location' | 'audio' | 'carousel' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
 export type BroadcastBubble = { id: string; type: BroadcastBubbleType; content: Record<string, unknown> };
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
@@ -1285,14 +1291,23 @@ export const api = {
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
-    list: () => fetchApi<ApiResponse<CommonVar[]>>('/api/common-vars'),
-    create: (data: { name: string; varKey: string; type?: string; value?: string }) =>
+    list: (params?: { folderId?: string }) =>
+      fetchApi<ApiResponse<CommonVar[]>>(
+        `/api/common-vars${params?.folderId ? `?folderId=${encodeURIComponent(params.folderId)}` : ''}`,
+      ),
+    create: (data: {
+      name: string
+      varKey: string
+      type?: string
+      value?: string
+      folderId?: string | null
+    }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
-    update: (id: string, data: { name?: string; value?: string }) =>
+    update: (id: string, data: { name?: string; value?: string; folderId?: string | null }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -1562,6 +1577,8 @@ export const api = {
        * 直し忘れたぶんが**画面では作れるのに保存できない条件**になる。
        */
       segmentConditions?: SegmentCondition
+      folderId?: string | null
+      measureOpens?: boolean
     }, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',

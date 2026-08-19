@@ -3,7 +3,23 @@ import { jstNow } from './utils.js';
 // 絞り込み条件（segment_conditions）で宛先を決める配信で使う。
 export type BroadcastTargetType = 'all' | 'tag' | 'segment' | 'multi-account-dedup';
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent';
-export type BroadcastMessageType = 'text' | 'image' | 'flex';
+/*
+ * 一斉配信で送れる種別。
+ *
+ * シナリオ（`MessageType`）と同じ並びにそろえてある。別々にしていたときは
+ * 一斉配信だけ text / image / flex の3つで、それ以外を選ぶと
+ * 「テキストに JSON を入れたもの」に落ちて、**中身の JSON がそのまま
+ * 相手のトークに届いた**。増やすときは 142〜145 と同じ手順で表を作り直す。
+ */
+export type BroadcastMessageType =
+  | 'text'
+  | 'image'
+  | 'flex'
+  | 'location'
+  | 'video'
+  | 'audio'
+  | 'sticker'
+  | 'carousel';
 
 export interface Broadcast {
   id: string;
@@ -25,6 +41,9 @@ export interface Broadcast {
   dedup_progress: string | null;
   batch_lock_at: string | null;
   track_links: number;
+  folder_id?: string | null;
+  /** 開封数を取るか。1 = 取る（既定）。 */
+  measure_opens?: number;
   line_account_id?: string | null;
   alt_text?: string | null;
 }
@@ -103,6 +122,16 @@ export interface CreateBroadcastInput {
    * 送った人と、作った人の条件が別物になりうる。
    */
   segmentConditions?: string | null;
+  /** 分類。null なら「未分類」。 */
+  folderId?: string | null;
+  /**
+   * 開封数を取るか。既定は取る。
+   *
+   * LINE の集計ユニットはアカウントあたり月1,000までなので、全部の配信で
+   * 取ると上限に当たる。少人数への配信では 20人未満だとどのみち返って
+   * こないので、そこで切れるようにしてある。
+   */
+  measureOpens?: boolean;
 }
 
 export async function createBroadcast(
@@ -117,8 +146,8 @@ export async function createBroadcast(
   await db
     .prepare(
       `INSERT INTO broadcasts
-         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, segment_conditions, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, title, message_type, message_content, message_bubbles_json, target_type, target_tag_id, status, scheduled_at, sent_at, total_count, success_count, account_ids, dedup_priority, track_links, line_account_id, alt_text, stealth_spread_minutes, segment_conditions, folder_id, measure_opens, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -138,6 +167,8 @@ export async function createBroadcast(
       // 何分かけて配るか。0（既定）は一気に送る。
       input.stealthSpreadMinutes ?? 0,
       input.segmentConditions ?? null,
+      input.folderId ?? null,
+      input.measureOpens === false ? 0 : 1,
       now,
     )
     .run();
@@ -153,6 +184,8 @@ export type UpdateBroadcastInput = Partial<
     | 'message_content'
     | 'target_type'
     | 'target_tag_id'
+    | 'folder_id'
+    | 'measure_opens'
     | 'status'
     | 'scheduled_at'
     | 'track_links'
@@ -186,6 +219,14 @@ export async function updateBroadcast(
   if (updates.target_tag_id !== undefined) {
     fields.push('target_tag_id = ?');
     values.push(updates.target_tag_id);
+  }
+  if (updates.folder_id !== undefined) {
+    fields.push('folder_id = ?');
+    values.push(updates.folder_id);
+  }
+  if (updates.measure_opens !== undefined) {
+    fields.push('measure_opens = ?');
+    values.push(updates.measure_opens);
   }
   if (updates.status !== undefined) {
     fields.push('status = ?');
