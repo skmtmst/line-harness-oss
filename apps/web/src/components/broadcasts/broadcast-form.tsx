@@ -446,7 +446,8 @@ export default function BroadcastForm({
             何が入るのか読めなかった。シナリオの「いつ開始する？」と同じ形に
             そろえて、それぞれに説明を付ける。
           */}
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          {/* 4つある。3列だと3+1で折り返して最後の1つだけ浮くので、2列と4列で切り替える。 */}
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {TARGET_MODES.map((mode) => (
               <label
                 key={mode.value}
