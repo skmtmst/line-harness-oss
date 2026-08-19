@@ -222,8 +222,17 @@ export default function ActionEditor({
                 {actions.map((action, index) => (
                   <div key={action.id} className="border-line rounded-card border">
                     <div className="border-line bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
-                      <p className="text-ink text-sm font-bold">
-                        {index + 1}. {KIND_LABEL[action.actionType]}
+                      <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
+                        <span>
+                          {index + 1}. {KIND_LABEL[action.actionType]}
+                        </span>
+                        {/* 埋まっていないアクションは配信で実行されない。
+                            黙って何もしないと、効いていないことに気づけない。 */}
+                        {action.complete === false && (
+                          <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[10px] font-medium">
+                            未完成 — 配信では実行されません
+                          </span>
+                        )}
                       </p>
                       <div className="flex shrink-0 items-center gap-1.5">
                         <button

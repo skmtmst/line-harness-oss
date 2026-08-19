@@ -18,6 +18,7 @@ import { computeScenarioStats } from '../services/scenario-stats.js';
 import { SUPPORTED_CONDITION_TYPES, isSupportedConditionType } from '../services/step-delivery.js';
 import { buildSegmentWhere, type SegmentCondition } from '../services/segment-query.js';
 import { parseQuestion } from '../services/scenario-question.js';
+import { isScenarioActionComplete } from '../services/scenario-actions.js';
 import { resolveStepContent } from '@line-crm/db';
 import type {
   Scenario as DbScenario,
@@ -1098,14 +1099,23 @@ function serializeAction(row: {
     config: parseJson(row.config_json),
     condition: parseJson(row.condition_json),
     repeatOnRefire: row.repeat_on_refire !== 0,
+    /*
+     * 中身がまだ埋まっていないか。画面に「未完成」と出して、
+     * 配信では実行されないことを伝えるために返す。
+     */
+    complete: isScenarioActionComplete(row.action_type, parseJson(row.config_json)),
   };
 }
 
 /**
- * アクションの中身を種別ごとに見る。
+ * アクションの設定の「形」を見る。
  *
- * ここを緩くすると、保存はできるのに配信時に例外が出るアクションが作れる。
- * 配信は夜間に走ることが多く、そこで初めて気づくのでは遅い。
+ * 画面はカードを1枚置いてから中身を埋める作りなので、**まだ埋まっていない
+ * ことは通す**。埋まっていないアクションは配信時に実行されず、画面にも
+ * 「未完成」と出る（isScenarioActionComplete）。
+ *
+ * ここで見るのは、埋まっている値が壊れていないかだけ。たとえば op に
+ * 知らない値が入っていれば断る。通してしまうと、配信時に例外になる。
  */
 function validateActionConfig(
   actionType: string,
@@ -1116,49 +1126,32 @@ function validateActionConfig(
   }
   const c = config as Record<string, unknown>;
   switch (actionType) {
-    case 'tag': {
-      if (c.op !== 'add' && c.op !== 'remove') {
+    case 'tag':
+      if (c.op !== undefined && c.op !== 'add' && c.op !== 'remove') {
         return { ok: false, error: 'タグ操作は「タグを追加」「タグをはずす」のどちらかです。' };
       }
-      const hasTags = Array.isArray(c.tagIds) && c.tagIds.length > 0;
-      if (!hasTags && !c.folderId) {
-        return { ok: false, error: 'タグかタグフォルダのどちらかを選んでください。' };
-      }
       return { ok: true };
-    }
-    case 'friend_field': {
-      if (typeof c.fieldId !== 'string' || c.fieldId === '') {
-        return { ok: false, error: '友だち情報欄を選んでください。' };
-      }
-      if (!['set', 'add', 'sub', 'clear'].includes(String(c.op))) {
+    case 'friend_field':
+      if (c.op !== undefined && !['set', 'add', 'sub', 'clear'].includes(String(c.op))) {
         return { ok: false, error: '操作内容が不正です。' };
       }
       return { ok: true };
-    }
     case 'support_mark':
       // null は「対応マークを外す」。明示的に許す。
-      if (c.markId !== null && typeof c.markId !== 'string') {
+      if (c.markId !== null && c.markId !== undefined && typeof c.markId !== 'string') {
         return { ok: false, error: '対応マークの指定が不正です。' };
       }
       return { ok: true };
-    case 'scenario': {
-      if (!['start', 'stop', 'resume_previous'].includes(String(c.op))) {
+    case 'scenario':
+      if (c.op !== undefined && !['start', 'stop', 'resume_previous'].includes(String(c.op))) {
         return { ok: false, error: 'シナリオ操作の種別が不正です。' };
       }
-      if (c.op === 'start' && (typeof c.scenarioId !== 'string' || c.scenarioId === '')) {
-        return { ok: false, error: '購読を始めるシナリオを選んでください。' };
-      }
       return { ok: true };
-    }
-    case 'common_var': {
-      if (typeof c.varKey !== 'string' || c.varKey === '') {
-        return { ok: false, error: '共通情報を選んでください。' };
-      }
-      if (c.op !== 'add' && c.op !== 'sub') {
+    case 'common_var':
+      if (c.op !== undefined && c.op !== 'add' && c.op !== 'sub') {
         return { ok: false, error: '共通情報の操作は加算か減算です。' };
       }
       return { ok: true };
-    }
     default:
       return { ok: false, error: `知らないアクション種別です: ${actionType}` };
   }
