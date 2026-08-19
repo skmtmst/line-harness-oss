@@ -24,6 +24,7 @@ import {
   getScenarios,
   enrollFriendInScenario,
   jstNow,
+  getFriendAddScenarioIds,
 } from '@line-crm/db';
 import { buildIntroMessage } from '../services/intro-message.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -892,9 +893,12 @@ liffRoutes.get('/auth/callback', async (c) => {
         : null;
 
       const scenarios = runAccountScenariosLiff ? await getScenarios(db) : [];
+      // きっかけは scenario_triggers から引く（webhook と同じ扱い）。
+      const liffFriendAddIds =
+        scenarios.length > 0 ? new Set(await getFriendAddScenarioIds(db)) : new Set<string>();
       for (const scenario of scenarios) {
         const scenarioAccountMatch = !scenario.line_account_id || !matchedAccountId || scenario.line_account_id === matchedAccountId;
-        if (scenario.trigger_type !== 'friend_add' || !scenario.is_active || !scenarioAccountMatch) {
+        if (!liffFriendAddIds.has(scenario.id) || !scenarioAccountMatch) {
           continue;
         }
         // Per-scenario isolation (matching the follow webhook's loop): one

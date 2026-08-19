@@ -435,6 +435,15 @@ export type ListStats = {
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
 }
 
+/** シナリオの開始のきっかけ（128）。1本に複数持てる。 */
+export type ScenarioTriggerItem = {
+  id: string
+  /** friend_add … 友だち追加時 / tag_added … 決めたタグが付いたとき */
+  kind: 'friend_add' | 'tag_added'
+  /** kind が tag_added のときだけ入る。 */
+  tagId: string | null
+}
+
 /* ---- シナリオのアクション（Lステップの「アクション設定」にあたる） ---- */
 
 /** どこで発火するか。 */
@@ -1476,6 +1485,21 @@ export const api = {
         }),
       remove: (scenarioId: string, actionId: string) =>
         fetchApi<ApiResponse<null>>(`/api/scenarios/${scenarioId}/actions/${actionId}`, {
+          method: 'DELETE',
+        }),
+    },
+
+    /* ---- 開始のきっかけ。1本に複数持てる ---- */
+    triggers: {
+      list: (scenarioId: string) =>
+        fetchApi<ApiResponse<ScenarioTriggerItem[]>>(`/api/scenarios/${scenarioId}/triggers`),
+      add: (scenarioId: string, kind: 'friend_add' | 'tag_added', tagId?: string | null) =>
+        fetchApi<ApiResponse<ScenarioTriggerItem[]>>(`/api/scenarios/${scenarioId}/triggers`, {
+          method: 'POST',
+          body: JSON.stringify({ kind, tagId: tagId ?? null }),
+        }),
+      remove: (scenarioId: string, triggerId: string) =>
+        fetchApi<ApiResponse<null>>(`/api/scenarios/${scenarioId}/triggers/${triggerId}`, {
           method: 'DELETE',
         }),
     },

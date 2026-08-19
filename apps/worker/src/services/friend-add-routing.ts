@@ -328,12 +328,17 @@ export async function listFriendAddScenarios(
   db: D1Database,
   accountId: string | null,
 ): Promise<{ id: string; name: string }[]> {
+  /*
+   * 候補は**すべてのシナリオ**にする。
+   *
+   * これまで trigger_type === 'friend_add' のものだけを出していたので、
+   * 「このシナリオを友だち追加で流したい」と思っても、シナリオ側の設定を
+   * 先に変えないと選べなかった。呼ぶ側で選ぶのが自然なので、ここで絞らない。
+   *
+   * アカウント違いだけは外す。他のアカウントのシナリオを選んでも配れない。
+   */
   const scenarios = await getScenarios(db);
   return scenarios
-    .filter(
-      s =>
-        s.trigger_type === 'friend_add' &&
-        (!s.line_account_id || !accountId || s.line_account_id === accountId),
-    )
+    .filter(s => !s.line_account_id || !accountId || s.line_account_id === accountId)
     .map(s => ({ id: s.id, name: s.name }));
 }

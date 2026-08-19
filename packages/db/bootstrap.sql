@@ -1313,6 +1313,15 @@ CREATE TABLE scenario_steps (
   UNIQUE (scenario_id, step_order)
 );
 
+CREATE TABLE scenario_triggers (
+  id          TEXT PRIMARY KEY,
+  scenario_id TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+  kind        TEXT NOT NULL CHECK (kind IN ('friend_add', 'tag_added')),
+  -- kind が 'tag_added' のときだけ入る。
+  tag_id      TEXT REFERENCES tags (id) ON DELETE CASCADE,
+  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE scenarios (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -2011,6 +2020,12 @@ CREATE INDEX idx_scenario_actions_lookup
   ON scenario_actions (scenario_id, hook, step_id, choice_index, sort_order);
 
 CREATE INDEX idx_scenario_steps_scenario_id ON scenario_steps (scenario_id);
+
+CREATE INDEX idx_scenario_triggers_lookup
+  ON scenario_triggers (kind, tag_id);
+
+CREATE UNIQUE INDEX idx_scenario_triggers_unique
+  ON scenario_triggers (scenario_id, kind, COALESCE(tag_id, ''));
 
 CREATE INDEX idx_scenarios_order ON scenarios (display_order);
 

@@ -13,6 +13,7 @@ import {
   jstNow,
   getEntryRouteByRefCode,
   getMessageTemplateById,
+  getFriendAddScenarioIds,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
 import { applyFriendAddRouting } from '../services/friend-add-routing.js';
@@ -305,10 +306,16 @@ async function handleEvent(
     // Skip entirely when a referral link explicitly overrides (run_account_friend_add_scenarios=0).
     // 振り分け設定があるアカウントはここを通らない（上で1本に絞ってある）。
     const scenarios = runAccountScenarios && !routing?.routed ? await getScenarios(db) : [];
+    /*
+     * 「友だち追加で始まる」は scenario_triggers から引く（128）。
+     * 1本のシナリオに複数のきっかけを持たせられるようにしたため、
+     * scenarios.trigger_type は判断に使わない。
+     */
+    const friendAddIds = scenarios.length > 0 ? new Set(await getFriendAddScenarioIds(db)) : new Set<string>();
     for (const scenario of scenarios) {
       // Only trigger scenarios belonging to this account (or unassigned for backward compat)
       const scenarioAccountMatch = !scenario.line_account_id || !lineAccountId || scenario.line_account_id === lineAccountId;
-      if (scenario.trigger_type === 'friend_add' && scenario.is_active && scenarioAccountMatch) {
+      if (friendAddIds.has(scenario.id) && scenarioAccountMatch) {
         try {
           // INSERT OR IGNORE handles dedup via UNIQUE(friend_id, scenario_id)
           const friendScenario = await enrollFriendInScenario(db, friend.id, scenario.id);
