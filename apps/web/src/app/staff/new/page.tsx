@@ -56,8 +56,8 @@ export default function NewStaffPage() {
   >
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="名前" htmlFor="staff-name" required><input id="staff-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} placeholder="山本 恭平" /></Field>
-        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><input id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} placeholder="yamamoto@example.com" /></Field>
+        <Field label="名前" htmlFor="staff-name" required><input id="staff-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} /></Field>
+        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><input id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} /></Field>
       </div>
     </FormSection>
 
