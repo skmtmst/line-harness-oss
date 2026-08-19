@@ -1300,7 +1300,7 @@ CREATE TABLE "scenario_steps" (
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
   step_order      INTEGER NOT NULL,
   delay_minutes   INTEGER NOT NULL DEFAULT 0,
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker')),
+  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel')),
   message_content TEXT NOT NULL,
   message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
   offset_days     INTEGER,
@@ -2025,7 +2025,7 @@ CREATE INDEX idx_saved_searches_scope ON saved_searches(scope, display_order);
 CREATE INDEX idx_scenario_actions_lookup
   ON scenario_actions (scenario_id, hook, step_id, choice_index, sort_order);
 
-CREATE INDEX idx_scenario_steps_by_scenario ON scenario_steps (scenario_id);
+CREATE INDEX idx_scenario_steps_scenario_lookup ON scenario_steps (scenario_id);
 
 CREATE INDEX idx_scenario_triggers_lookup
   ON scenario_triggers (kind, tag_id);

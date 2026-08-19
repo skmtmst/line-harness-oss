@@ -19,6 +19,7 @@ import QuestionEditor, {
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import { ConditionDialog, describeCondition } from '@/components/scenarios/scenario-dialogs'
+import CarouselPicker from '@/components/scenarios/carousel-picker'
 import StepPreview from '@/components/scenarios/step-preview'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 
@@ -147,7 +148,9 @@ function FirstStepContent() {
             ? image !== null
             : kind === 'question'
               ? question.text.trim() !== ''
-              : serializeMessageKind(kind as MessageKind, kindState) !== null
+              : kind === 'carousel'
+                ? templateId !== ''
+                : serializeMessageKind(kind as MessageKind, kindState) !== null
     if (hasContent) {
       // 予定の欄は方式ごとに違う。余計な欄を送ると worker が弾く。
       const schedule =
@@ -160,8 +163,15 @@ function FirstStepContent() {
       //   テンプレート … templateId を渡す。本文は参照先が持つ
       //   画像         … LINE が要る2つのURLをJSONで入れる
       const picked = templates.find((t) => t.id === templateId)
+      const carouselTpl = kind === 'carousel' ? templates.find((t) => t.id === templateId) : undefined
       const payload =
-        contentMode === 'template'
+        kind === 'carousel' && contentMode === 'compose'
+          ? {
+              messageType: 'carousel' as const,
+              messageContent: carouselTpl?.messageContent ?? '[]',
+              templateId,
+            }
+          : contentMode === 'template'
           ? {
               messageType: (picked?.messageType ?? 'text') as 'text' | 'image' | 'flex',
               messageContent: picked?.messageContent ?? '',
@@ -445,6 +455,14 @@ function FirstStepContent() {
                 {(kind === 'location' || kind === 'video' || kind === 'audio' || kind === 'sticker') && (
                   <MessageKindFields kind={kind} value={kindState} onChange={setKindState} />
                 )}
+
+                {/*
+                  カルーセルはテンプレートを指す形で持つ。この画面では作らない
+                  （組み立てが重く、編集画面を2つ持つと片方だけ直して食い違う）。
+                */}
+                {kind === 'carousel' && (
+                  <CarouselPicker value={templateId} onChange={(id) => setTemplateId(id)} />
+                )}
               </MessageTypeTabs>
             ) : (
               <div>
@@ -486,7 +504,8 @@ function FirstStepContent() {
             offsetHours={offsetHours}
             kind={contentMode === 'template' ? 'text' : kind}
             templateName={
-              contentMode === 'template'
+              // テンプレート参照（テンプレートから選ぶ／カルーセル）のときだけ名前を出す。
+              contentMode === 'template' || kind === 'carousel'
                 ? (templates.find(t => t.id === templateId)?.name ?? null)
                 : null
             }

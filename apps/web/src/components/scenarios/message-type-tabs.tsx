@@ -31,24 +31,20 @@ interface KindDef {
 }
 
 /**
- * 132 で列を広げ、位置情報・動画・音声・スタンプも送れるようにした。
+ * 132 / 137 で列を広げ、位置情報・動画・音声・スタンプ・カルーセルを
+ * 送れるようにした。
  *
- * 残るのはカルーセルと紹介。カルーセルはテンプレート側に作成画面があるので、
- * そちらから選ぶ。紹介は LINE に該当する種別が無い。
+ * 残るのは紹介だけ。LINE に該当するメッセージの種別が無い。
+ *
+ * カルーセルは組み立てが重いので、この画面では作らずテンプレートから選ぶ。
+ * 同じ編集画面を2つ持つと、片方だけ直して食い違う。
  */
 export const STEP_MESSAGE_KINDS: KindDef[] = [
   { value: 'text', label: 'テキスト' },
   { value: 'sticker', label: 'スタンプ' },
   { value: 'image', label: '画像' },
   { value: 'question', label: '質問' },
-  {
-    value: 'carousel',
-    label: 'カルーセル',
-    // テンプレート側にはカルーセルの作成画面がある（/templates/carousel）。
-    // 「作れない」ではなく「別の場所で作って選ぶ」なので、そう書く。
-    disabledReason:
-      'この画面では作れません。「テンプレートから選ぶ」で、カルーセルのテンプレートを選べば送れます。',
-  },
+  { value: 'carousel', label: 'カルーセル' },
   { value: 'location', label: '位置情報' },
   {
     value: 'intro',

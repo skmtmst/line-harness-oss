@@ -346,7 +346,8 @@ export type MessageType =
   | "location"
   | "video"
   | "audio"
-  | "sticker";
+  | "sticker"
+  | "carousel";
 
 export interface ScenarioStep {
   /** 主キー (UUIDv4) */
