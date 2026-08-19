@@ -105,13 +105,24 @@ describe('並び替え', () => {
       .toEqual(delivery.items.map((item) => item.id))
   })
 
-  it('保存に無い項目は消さずに後ろへ残す', () => {
+  it('保存に無い項目は消さずに、定義の並びの位置へ残す', () => {
+    /*
+     * 以前は「保存に無い項目は末尾へ」だったが、そうすると**これから足す
+     * メニューが全部いちばん下に落ちる**。並び順を保存したことがある人には、
+     * 新しい機能が毎回下に現れて気づかれない。定義で前にいた項目のうしろへ
+     * 入れる形に変えた（menu-order.test.ts に詳しい試験がある）。
+     *
+     * ここでは「消えないこと」と「保存された項目の位置が保たれること」を見る。
+     */
     const basic = MENU_SECTIONS.find((section) => section.id === 'basic')!
-    const partial = [basic.items[2].id]
-    const applied = orderedMenuSections({ basic: partial })
+    const saved = basic.items[2].id
+    const applied = orderedMenuSections({ basic: [saved] })
     const ids = applied.find((section) => section.id === 'basic')!.items.map((item) => item.id)
-    expect(ids[0]).toBe(basic.items[2].id)
     expect(ids).toHaveLength(basic.items.length)
+    expect(ids).toContain(saved)
+    // 定義で前にいた2つは、保存された項目の前に残る。
+    expect(ids.indexOf(basic.items[0].id)).toBeLessThan(ids.indexOf(saved))
+    expect(ids.indexOf(basic.items[1].id)).toBeLessThan(ids.indexOf(saved))
   })
 
   it('いまの並びをそのまま保存の形にできる', () => {

@@ -153,11 +153,12 @@
     "144_broadcast_message_kinds_swap.sql",
     "145_broadcast_message_kinds_index.sql",
     "146_rich_menu_area_actions.sql",
+    "147_forms_layout.sql",
     "148_rich_menu_area_taps.sql",
     "149_rich_menu_targeting.sql",
     "150_broadcast_folder.sql",
     "151_auto_reply_actions.sql",
     "152_auto_reply_hits.sql"
   ],
-  "migrationCount": 158
+  "migrationCount": 159
 }

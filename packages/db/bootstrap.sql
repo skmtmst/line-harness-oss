@@ -559,7 +559,7 @@ CREATE TABLE forms (
   submit_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-, on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT);
+, on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, layout TEXT);
 
 CREATE TABLE friend_daily_snapshots (
   -- JST の日付（YYYY-MM-DD）。LINEアカウントごとに1行。
@@ -1907,6 +1907,9 @@ CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
 CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
+
+CREATE INDEX idx_form_submissions_form_friend
+  ON form_submissions (form_id, friend_id);
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
 
