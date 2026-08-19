@@ -16,6 +16,8 @@ export interface ReminderRow {
   target_tag_id: string | null;
   created_at: string;
   updated_at: string;
+  /** 153: 'time'（○日前の●時）か 'countdown'（何分ずらすか）。作成後は変えない。 */
+  delivery_mode: string;
 }
 
 export interface ReminderStepRow {
@@ -25,6 +27,12 @@ export interface ReminderStepRow {
   message_type: string;
   message_content: string;
   created_at: string;
+  /** 153: ゴールから何日前（負）／何日後（正）。delivery_mode='time' のとき見る。 */
+  offset_days: number | null;
+  /** 153: その日の何時（日本時間の "HH:MM"）。 */
+  send_at_time: string | null;
+  /** 153: 送る中身をテンプレートから選ぶ。 */
+  template_id: string | null;
 }
 
 export interface FriendReminderRow {
@@ -155,15 +163,31 @@ export async function cancelFriendReminder(db: D1Database, id: string): Promise<
 }
 
 /** リマインダ配信処理用: 配信が必要な友だちリマインダを取得 */
-export async function getDueReminderDeliveries(db: D1Database, now: string): Promise<Array<FriendReminderRow & { steps: ReminderStepRow[] }>> {
+/**
+ * まだ配信していない通を、登録ごとに返す。
+ *
+ * **「配信時刻が来たか」はここでは見ない。** 時刻の決め方（153 の配信方式）は
+ * 日本時間の暦の計算が要り、そのための部品は packages/shared にある。
+ * db パッケージは shared に依存していないので、絞り込みは呼び出し側で行う。
+ *
+ * 以前はここで `target_date + offset_minutes` を計算していたが、方式が
+ * 2つになった時点で、この場所では決められなくなった。
+ */
+export async function getPendingReminderDeliveries(
+  db: D1Database,
+): Promise<Array<FriendReminderRow & { delivery_mode: string; steps: ReminderStepRow[] }>> {
   // activeなリマインダ登録を取得
+  // 配信方式（153）も一緒に引く。通ごとに引き直すと、通の数だけ問い合わせが増える。
   const activeReminders = await db
-    .prepare(`SELECT fr.* FROM friend_reminders fr
-              INNER JOIN reminders r ON r.id = fr.reminder_id
-              WHERE fr.status = 'active' AND r.is_active = 1`)
-    .all<FriendReminderRow>();
+    .prepare(`SELECT fr.*, r.delivery_mode AS delivery_mode
+                FROM friend_reminders fr
+                INNER JOIN reminders r ON r.id = fr.reminder_id
+               WHERE fr.status = 'active' AND r.is_active = 1`)
+    .all<FriendReminderRow & { delivery_mode: string }>();
 
-  const results: Array<FriendReminderRow & { steps: ReminderStepRow[] }> = [];
+  const results: Array<
+    FriendReminderRow & { delivery_mode: string; steps: ReminderStepRow[] }
+  > = [];
   for (const fr of activeReminders.results) {
     const steps = await getReminderSteps(db, fr.reminder_id);
     // 配信済みステップを取得
@@ -174,14 +198,9 @@ export async function getDueReminderDeliveries(db: D1Database, now: string): Pro
     const deliveredIds = new Set(delivered.results.map((d) => d.reminder_step_id));
 
     // 未配信で配信時刻が到来しているステップをフィルタ
-    const dueSteps = steps.filter((step) => {
-      if (deliveredIds.has(step.id)) return false;
-      const targetTime = new Date(fr.target_date).getTime() + step.offset_minutes * 60_000;
-      return targetTime <= new Date(now).getTime();
-    });
-
-    if (dueSteps.length > 0) {
-      results.push({ ...fr, steps: dueSteps });
+    const pending = steps.filter((step) => !deliveredIds.has(step.id));
+    if (pending.length > 0) {
+      results.push({ ...fr, steps: pending });
     }
   }
   return results;

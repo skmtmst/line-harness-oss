@@ -651,6 +651,9 @@ CREATE TABLE IF NOT EXISTS reminders (
   name        TEXT NOT NULL,
   description TEXT,
   is_active   INTEGER NOT NULL DEFAULT 1,
+  -- 153: 配信方式。作成後は変えられない（登録済みの配信予定が全部変わるため）。
+  -- 'time' … ゴールの○日前の●時 / 'countdown' … ゴールから何分ずらすか
+  delivery_mode TEXT NOT NULL DEFAULT 'countdown',
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -661,6 +664,12 @@ CREATE TABLE IF NOT EXISTS reminder_steps (
   offset_minutes  INTEGER NOT NULL,
   message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
   message_content TEXT NOT NULL,
+  -- 153: 「ゴールの○日前の●時」で指定する。offset_minutes より優先する。
+  offset_days     INTEGER,
+  send_at_time    TEXT,
+  -- 153: 送る中身をテンプレートから選ぶ。外部キーは張らない
+  -- （テンプレートを消したときにリマインダごと消えないように）。
+  template_id     TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 

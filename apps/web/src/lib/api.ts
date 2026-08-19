@@ -2538,10 +2538,17 @@ export const api = {
     get: (id: string) =>
       fetchApi<ApiResponse<Reminder & { steps: ReminderStep[] }>>(`/api/reminders/${id}`),
     /** この友だちをこのリマインダに登録する（1人ぶん）。 */
-    enroll: (reminderId: string, friendId: string) =>
+    /**
+     * 友だちをリマインダに登録する。
+     *
+     * targetDate はゴール日時（予約日・開催日）。**これが無いと登録できない。**
+     * 以前は本文を送っておらず、worker 側が「targetDate is required」の手前で
+     * 落ちて 500 を返していた。画面から一度も登録できていなかった。
+     */
+    enroll: (reminderId: string, friendId: string, targetDate: string) =>
       fetchApi<ApiResponse<unknown>>(
         `/api/reminders/${reminderId}/enroll/${friendId}`,
-        { method: 'POST' },
+        { method: 'POST', body: JSON.stringify({ targetDate }) },
       ),
     create: (data: {
       name: string
