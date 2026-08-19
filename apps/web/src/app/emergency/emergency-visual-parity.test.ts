@@ -23,17 +23,21 @@ describe('V3 10-4 運用状態の表示確認', () => {
 
   it('仮表示を解除し、異常がないときは異常なしと表示する', () => {
     expect(source).toContain("const resultTitle = isNormal ? '異常なし'")
-    expect(source).toContain('現在、確認できる異常はありません。')
+    expect(source).toContain('6項目を確認し、現在、確認できる異常はありません。')
     expect(source).not.toContain('UI確認モード（仮表示）')
     expect(source).not.toContain('全UI確認（仮表示）')
   })
 
-  it('意味のない固定チェック項目を表示しない', () => {
-    expect(source).not.toContain('UI_REVIEW_CHECKS')
-    for (const label of ['LINE接続', '外部連携', 'Webhook', '配信処理', '定期処理', '友だちの変化']) {
-      expect(source).not.toContain(`label: '${label}'`)
+  it('実データを使う6つのチェック項目を常に表示する', () => {
+    for (const label of ['LINE接続', '月間配信数', 'API・外部連携', 'Webhook', '配信処理', '友だち変化']) {
+      expect(source).toContain(`label: '${label}'`)
     }
-    expect(source).toContain('注意・エラーがあるときだけ内容を表示します')
+    expect(source).not.toContain("label: '定期処理'")
+    expect(source).toContain('6項目を常に表示し、確認内容と最新結果を示します')
+    expect(source).toContain('api.health.getHealth')
+    expect(source).toContain('api.system.health')
+    expect(source).toContain('api.webhooks.incoming.list')
+    expect(source).toContain('api.broadcasts.list')
   })
 
   it('3つの概要カードと上部の主要操作を表示する', () => {

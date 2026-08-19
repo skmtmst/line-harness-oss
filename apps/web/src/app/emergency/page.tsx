@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
-import type { LineAccount } from '@line-crm/shared'
+import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { api, type DashboardOverview } from '@/lib/api'
 import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
@@ -50,8 +50,27 @@ interface UpdateHistoryRow {
   error: string | null
 }
 
+type HealthCheckId = 'line' | 'quota' | 'api' | 'webhook' | 'delivery' | 'friends'
+
+interface HealthCheckItem {
+  id: HealthCheckId
+  label: string
+  detail: string
+  severity: OperationSeverity
+  icon: string
+}
+
+const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'label' | 'icon'>> = [
+  { id: 'line', label: 'LINE接続', icon: 'L' },
+  { id: 'quota', label: '月間配信数', icon: '↗' },
+  { id: 'api', label: 'API・外部連携', icon: '↔' },
+  { id: 'webhook', label: 'Webhook', icon: 'W' },
+  { id: 'delivery', label: '配信処理', icon: '▷' },
+  { id: 'friends', label: '友だち変化', icon: '人' },
+]
+
 const severityStyle: Record<OperationSeverity, { label: string; badge: string; panel: string }> = {
-  normal: { label: '異常なし', badge: 'bg-emerald-100 text-emerald-700', panel: 'border-emerald-200 bg-emerald-50' },
+  normal: { label: '正常', badge: 'bg-emerald-100 text-emerald-700', panel: 'border-emerald-200 bg-emerald-50' },
   warning: { label: '注意', badge: 'bg-amber-100 text-amber-800', panel: 'border-amber-200 bg-amber-50' },
   danger: { label: 'エラー', badge: 'bg-red-100 text-red-700', panel: 'border-red-200 bg-red-50' },
   unknown: { label: '未確認', badge: 'bg-gray-100 text-gray-600', panel: 'border-gray-200 bg-gray-50' },
@@ -85,6 +104,19 @@ function StatusPill({ severity }: { severity: OperationSeverity }) {
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${style.badge}`}>{style.label}</span>
 }
 
+async function apiData<T>(request: Promise<ApiResponse<T>>): Promise<T> {
+  const response = await request
+  if (!response.success) throw new Error(response.error)
+  return response.data
+}
+
+function mostSevere(items: HealthCheckItem[]): OperationSeverity {
+  if (items.some((item) => item.severity === 'danger')) return 'danger'
+  if (items.some((item) => item.severity === 'warning')) return 'warning'
+  if (items.some((item) => item.severity === 'unknown')) return 'unknown'
+  return 'normal'
+}
+
 function SummaryCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
     <div className="border-hairline rounded-card border bg-white p-4">
@@ -111,24 +143,136 @@ function OperationPageHeader({ description, action }: { description: string; act
 }
 
 function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity) => void }) {
-  const [dashboard, setDashboard] = useState<DashboardOverview | null>(null)
+  const [checks, setChecks] = useState<HealthCheckItem[]>(() =>
+    CHECK_DEFINITIONS.map((item) => ({ ...item, detail: '確認しています…', severity: 'unknown' })),
+  )
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
-    setLoadError('')
-    try {
-      const dashboardResponse = await api.dashboard.overview({ period: 'today' })
-      if (!dashboardResponse.success) throw new Error(dashboardResponse.error)
-      setDashboard(dashboardResponse.data)
-      setCheckedAt(dashboardResponse.data.generatedAt ?? new Date().toISOString())
-    } catch {
-      setLoadError('運用状態を取得できませんでした。時間をおいて再読み込みしてください。')
-    } finally {
-      setLoading(false)
+    const dashboardRequest = apiData(api.dashboard.overview({ period: 'today' }))
+    const lineRequest = apiData(api.health.accounts()).then(async (accounts) => {
+      const activeAccounts = accounts.filter((account) => account.isActive)
+      const health = await Promise.all(
+        activeAccounts.map((account) => apiData(api.health.getHealth(account.id))),
+      )
+      return { activeAccounts, health }
+    })
+    const apiRequest = Promise.all([
+      apiData(api.system.health()),
+      apiData(api.ecCommerce.overview()),
+    ])
+    const webhookRequest = Promise.all([
+      apiData(api.webhooks.incoming.list()),
+      apiData(api.webhooks.outgoing.list()),
+    ])
+    const deliveryRequest = apiData(api.broadcasts.list())
+
+    const [dashboardResult, lineResult, apiResult, webhookResult, deliveryResult] =
+      await Promise.allSettled([
+        dashboardRequest,
+        lineRequest,
+        apiRequest,
+        webhookRequest,
+        deliveryRequest,
+      ])
+
+    const nextChecks: HealthCheckItem[] = []
+
+    if (lineResult.status === 'fulfilled') {
+      const { activeAccounts, health } = lineResult.value
+      const risks = health.map((item) => item.riskLevel)
+      const lineSeverity: OperationSeverity = activeAccounts.length === 0
+        ? 'unknown'
+        : risks.some((risk) => risk === 'danger')
+          ? 'danger'
+          : risks.some((risk) => risk === 'warning')
+            ? 'warning'
+            : risks.some((risk) => risk !== 'normal')
+              ? 'unknown'
+              : 'normal'
+      nextChecks.push({
+        id: 'line',
+        label: 'LINE接続',
+        icon: 'L',
+        severity: lineSeverity,
+        detail: activeAccounts.length === 0
+          ? '有効なLINEアカウントが登録されていません'
+          : `LINE APIの認証エラーと接続状態を確認しました（${activeAccounts.length}アカウント）`,
+      })
+    } else {
+      nextChecks.push({ id: 'line', label: 'LINE接続', icon: 'L', severity: 'unknown', detail: 'LINE接続状態を取得できませんでした' })
     }
+
+    if (dashboardResult.status === 'fulfilled') {
+      const dashboard = dashboardResult.value as DashboardOverview
+      const quota = monthlyQuotaStatus(dashboard.delivery.quotaLimit, dashboard.delivery.quotaUsed)
+      const quotaDetail = quota.remaining == null || dashboard.delivery.quotaLimit == null
+        ? '配信上限なしとして、今月の配信数を確認しました'
+        : `残り${quota.remaining.toLocaleString('ja-JP')}通 / 上限${dashboard.delivery.quotaLimit.toLocaleString('ja-JP')}通（残り${Math.floor(quota.remainingPercent ?? 0)}%）`
+      nextChecks.push({ id: 'quota', label: '月間配信数', icon: '↗', severity: quota.severity, detail: quotaDetail })
+      const today = dashboard.trend.at(-1)
+      nextChecks.push({
+        id: 'friends',
+        label: '友だち変化',
+        icon: '人',
+        severity: 'normal',
+        detail: today
+          ? `直近日の追加${today.added.toLocaleString('ja-JP')}人・ブロック${today.blocked.toLocaleString('ja-JP')}人を確認しました`
+          : '友だち数と日次変化を確認しました（変化なし）',
+      })
+      setCheckedAt(dashboard.generatedAt ?? new Date().toISOString())
+    } else {
+      nextChecks.push({ id: 'quota', label: '月間配信数', icon: '↗', severity: 'unknown', detail: '月間配信数を取得できませんでした' })
+      nextChecks.push({ id: 'friends', label: '友だち変化', icon: '人', severity: 'unknown', detail: '友だちの日次変化を取得できませんでした' })
+      setCheckedAt(new Date().toISOString())
+    }
+
+    if (apiResult.status === 'fulfilled') {
+      const [, commerce] = apiResult.value
+      nextChecks.push({
+        id: 'api',
+        label: 'API・外部連携',
+        icon: '↔',
+        severity: 'normal',
+        detail: `管理APIとEC連携データを確認しました（24時間以内の受信${commerce.last24h.toLocaleString('ja-JP')}件）`,
+      })
+    } else {
+      nextChecks.push({ id: 'api', label: 'API・外部連携', icon: '↔', severity: 'unknown', detail: '管理APIまたはEC連携データを取得できませんでした' })
+    }
+
+    if (webhookResult.status === 'fulfilled') {
+      const [incoming, outgoing] = webhookResult.value
+      const invalidSecrets = [...incoming, ...outgoing].filter((item) => item.isActive && !item.hasSecret).length
+      const failedOutgoing = outgoing.filter((item) => item.isActive && (item.consecutiveFailures ?? 0) > 0)
+      const webhookSeverity: OperationSeverity = invalidSecrets > 0 ? 'danger' : failedOutgoing.length > 0 ? 'warning' : 'normal'
+      const webhookDetail = invalidSecrets > 0
+        ? `有効なWebhookの署名設定不足が${invalidSecrets}件あります`
+        : failedOutgoing.length > 0
+          ? `送信に連続失敗しているWebhookが${failedOutgoing.length}件あります`
+          : `受信${incoming.length}件・送信${outgoing.length}件の設定と送信失敗を確認しました`
+      nextChecks.push({ id: 'webhook', label: 'Webhook', icon: 'W', severity: webhookSeverity, detail: webhookDetail })
+    } else {
+      nextChecks.push({ id: 'webhook', label: 'Webhook', icon: 'W', severity: 'unknown', detail: 'Webhook設定と送信失敗を取得できませんでした' })
+    }
+
+    if (deliveryResult.status === 'fulfilled') {
+      const scheduled = deliveryResult.value.filter((item) => item.status === 'scheduled').length
+      const sending = deliveryResult.value.filter((item) => item.status === 'sending').length
+      nextChecks.push({
+        id: 'delivery',
+        label: '配信処理',
+        icon: '▷',
+        severity: 'normal',
+        detail: `配信処理を確認しました（予約${scheduled}件・送信中${sending}件）`,
+      })
+    } else {
+      nextChecks.push({ id: 'delivery', label: '配信処理', icon: '▷', severity: 'unknown', detail: '配信処理の状態を取得できませんでした' })
+    }
+
+    setChecks(CHECK_DEFINITIONS.map((definition) => nextChecks.find((item) => item.id === definition.id) ?? { ...definition, detail: '確認できませんでした', severity: 'unknown' }))
+    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -137,25 +281,23 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
     return () => window.clearInterval(timer)
   }, [load])
 
-  const quotaLimit = dashboard?.delivery.quotaLimit ?? null
-  const quotaUsed = dashboard?.delivery.quotaUsed ?? null
-  const quota = monthlyQuotaStatus(quotaLimit, quotaUsed)
-  const displayedSeverity = quota.severity
+  const displayedSeverity = loading ? 'unknown' : mostSevere(checks)
   const isNormal = displayedSeverity === 'normal'
-  const resultTitle = isNormal ? '異常なし' : displayedSeverity === 'warning' ? '注意' : 'エラー'
+  const resultTitle = isNormal ? '異常なし' : displayedSeverity === 'warning' ? '注意' : displayedSeverity === 'danger' ? 'エラー' : '確認できない項目があります'
   const resultDescription = isNormal
-    ? '現在、確認できる異常はありません。'
+    ? '6項目を確認し、現在、確認できる異常はありません。'
     : displayedSeverity === 'warning'
-      ? `月間配信残数が15%未満です（残り${quota.remaining?.toLocaleString('ja-JP')}通）。`
-      : '月間配信残数が0通です。これ以上配信できません。'
+      ? '注意が必要な項目があります。チェック結果を確認してください。'
+      : displayedSeverity === 'danger'
+        ? '対応が必要な項目があります。チェック結果を確認してください。'
+        : '取得できない項目があります。時間をおいて再確認してください。'
   const statusIcon = isNormal ? '✓' : '!'
-  const statusIconClass = isNormal ? 'text-emerald-700' : displayedSeverity === 'warning' ? 'text-amber-700' : 'text-red-700'
+  const statusIconClass = isNormal ? 'text-emerald-700' : displayedSeverity === 'warning' ? 'text-amber-700' : displayedSeverity === 'danger' ? 'text-red-700' : 'text-gray-600'
 
   useEffect(() => { onSeverity(displayedSeverity) }, [displayedSeverity, onSeverity])
 
   return (
     <div className="space-y-4" data-design="V3 Health">
-      {loadError && <div className="rounded-card border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{loadError}</div>}
       <div className={`rounded-card flex flex-wrap items-center gap-3 border px-4 py-3 ${severityStyle[displayedSeverity].panel}`}>
         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
         <div className="min-w-0 flex-1">
@@ -169,14 +311,22 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
         <SummaryCard label="緊急停止状態" value="通常運用" note="停止なし" />
       </div>
       <section className="border-hairline rounded-card overflow-hidden border bg-white">
-        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-gray-900">チェック結果</h2><p className="mt-0.5 text-xs text-gray-500">注意・エラーがあるときだけ内容を表示します</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-[10px] font-bold">5分ごと</span></div>
-        <div className={`flex items-center gap-3 px-4 py-5 ${severityStyle[displayedSeverity].panel}`}>
-          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sm font-bold ${statusIconClass}`}>{statusIcon}</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-gray-900">{resultTitle}</p>
-            <p className="mt-1 text-xs text-gray-600">{loading ? '確認しています…' : resultDescription}</p>
-          </div>
-          <StatusPill severity={displayedSeverity} />
+        <div className="border-hairline flex items-start justify-between gap-3 border-b px-4 py-3"><div><h2 className="text-base font-bold text-gray-900">チェック結果</h2><p className="mt-0.5 text-xs text-gray-500">6項目を常に表示し、確認内容と最新結果を示します</p></div><span className="rounded-pill bg-info-bg text-info px-2 py-1 text-[10px] font-bold">5分ごと</span></div>
+        <div className="divide-y divide-gray-100">
+          {checks.map((check) => {
+            const style = severityStyle[check.severity]
+            const iconClass = check.severity === 'normal' ? 'bg-emerald-100 text-emerald-700' : check.severity === 'warning' ? 'bg-amber-100 text-amber-800' : check.severity === 'danger' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+            return (
+              <div key={check.id} className={`flex items-center gap-3 px-4 py-4 ${check.severity === 'normal' ? 'bg-emerald-50/50' : style.panel}`}>
+                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${iconClass}`}>{check.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-gray-900">{check.label}</p>
+                  <p className="mt-1 text-xs text-gray-600">{check.detail}</p>
+                </div>
+                <StatusPill severity={check.severity} />
+              </div>
+            )
+          })}
         </div>
         {!isNormal && <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3"><p className="text-xs text-gray-600">配信予定を確認し、必要な場合だけ配信を停止してください。</p><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700">緊急停止を確認</Link></div>}
       </section>
