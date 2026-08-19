@@ -140,6 +140,15 @@ const IRREVERSIBLE_BROADCAST_HEADERS = { 'X-Confirm-Irreversible': 'broadcast-se
 
 export const CSRF_STORAGE_KEY = 'lh_csrf'
 
+/**
+ * セッションがサーバーに届かなかったときに投げる合図。
+ *
+ * 401 のたびに出る。受け手（SessionLostNotice）が、ログインの跡が
+ * 残っているかどうかを見て、案内を出すか、ただの未ログインとして
+ * 見送るかを決める。
+ */
+export const SESSION_LOST_EVENT = 'lh-session-lost'
+
 export function getCsrfToken(): string {
   if (typeof window === 'undefined') return ''
   return localStorage.getItem(CSRF_STORAGE_KEY) || ''
@@ -216,6 +225,17 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
       ...options?.headers,
     },
   })
+  /*
+   * 401 は「セッションがサーバーに届いていない」。
+   *
+   * 管理画面とAPIは別サイトなので、ブラウザがサイトをまたぐCookieを
+   * 止めると全部のAPIがこれになる。各画面がそれぞれ「エラー」と出すだけ
+   * だと、全画面が同時に壊れているのに理由がどこにも出ない。
+   * 1か所で受けられるように知らせる（受け手は SessionLostNotice）。
+   */
+  if (res.status === 401 && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
+  }
   if (!res.ok) throw new ApiError(res.status, extractApiErrorMessage(await res.text(), res.status))
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>

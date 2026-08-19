@@ -227,14 +227,16 @@ function Kpi({ label, value, unit, note, warning = false }: { label: string; val
 
 function AccountsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const tabs = <div data-design="Tabs"><MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} /></div>
+  if (tab === 'hierarchy') return <AccountHierarchy tabs={tabs} />
   return <div>
     <div data-design="Head"><Header
       title="アカウント"
       description="接続しているLINE公式アカウントと、アカウント同士の階層構成を管理します。チャネル設定とWebhookの状態も、この画面から確認できます。"
       action={<div className="flex items-center gap-3"><button disabled title="マニュアルは準備中です" className="whitespace-nowrap text-xs text-ink-faint opacity-70">▫ マニュアル</button><Link href="/accounts/new" className="cursor-pointer whitespace-nowrap rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent">＋ アカウントを追加</Link></div>}
     /></div>
-    <div data-design="Tabs"><MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} /></div>
-    {tab === 'accounts' && <AccountsPageInner />}{tab === 'hierarchy' && <AccountHierarchy />}
+    {tabs}
+    <AccountsPageInner />
   </div>
 }
 

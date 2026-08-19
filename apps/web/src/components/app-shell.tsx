@@ -4,6 +4,7 @@ import Sidebar from './layout/sidebar'
 import { UpdateBanner } from './update/update-banner'
 import AuthGuard from './auth-guard'
 import { AccountProvider } from '@/contexts/account-context'
+import SessionLostNotice from './session-lost-notice'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -16,6 +17,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <AuthGuard>
       <AccountProvider>
         <div className="flex min-h-screen flex-col">
+          {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
+          <SessionLostNotice />
           {/* Phase 6: banner above sidebar+header so it pins to the top of the
               admin shell. Renders nothing while loading; one of latest/fork/
               upgrade once /admin/version + manifest resolve. */}
