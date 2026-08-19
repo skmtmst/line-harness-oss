@@ -158,13 +158,40 @@ export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [sectio
  */
 export function applyItemOrder(section: MenuSection, order: string[] | undefined): MenuSection {
   if (!order || order.length === 0) return section
+
   const byId = new Map(section.items.map((item) => [item.id, item]))
-  const sorted: MenuItem[] = []
+  const saved: MenuItem[] = []
   for (const id of order) {
     const item = byId.get(id)
-    if (item && !sorted.includes(item)) sorted.push(item)
+    if (item && !saved.includes(item)) saved.push(item)
   }
-  return { ...section, items: [...sorted, ...section.items.filter((item) => !sorted.includes(item))] }
+  if (saved.length === 0) return section
+
+  /*
+   * 保存に無い項目を、**定義の並びで隣にいる項目の横**に入れる。
+   *
+   * 以前は末尾にまとめていた。そうすると、**これから足すメニューが
+   * 全部いちばん下に落ちる**。並び順を一度でも保存したことがある人には、
+   * 新しい機能が毎回下に現れることになり、気づかない人が出る。
+   * 実際、「共通情報」を足したときに「登録メディア一覧」の下に回った。
+   *
+   * 保存された並びは動かさない。動かすと、わざわざ並べ替えた人の
+   * 意図を壊す。新しい項目だけを、定義で前にいた項目のうしろへ差し込む。
+   */
+  const savedSet = new Set(saved)
+  const result = [...saved]
+  let previous: MenuItem | null = null
+  for (const item of section.items) {
+    if (savedSet.has(item)) {
+      previous = item
+      continue
+    }
+    // 定義で前にいた「保存済みの項目」のうしろへ。前がいなければ先頭へ。
+    const at = previous ? result.indexOf(previous) + 1 : 0
+    result.splice(at, 0, item)
+    previous = item
+  }
+  return { ...section, items: result }
 }
 
 /** 保存された並び順をまとめて当てる。 */
