@@ -189,7 +189,7 @@ function AccountsPageInner() {
                 <td className="hidden whitespace-nowrap px-2 py-3 font-medium lg:table-cell">—</td>
                 <td className="whitespace-nowrap px-2 py-3 font-semibold tabular-nums">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')} 人</td>
                 <td className={`truncate whitespace-nowrap px-2 py-3 text-xs ${account.webhook?.status === 'matched' ? 'text-success' : account.webhook?.status === 'unknown' ? 'text-ink-faint' : 'text-warning'}`} title={`${webhookLabel(account.webhook?.status)}${account.webhook?.actualUrl ? `: ${account.webhook.actualUrl}` : ''}`}>{webhookLabel(account.webhook?.status)}</td>
-                <td className="px-2 py-3"><span className={`inline-flex whitespace-nowrap rounded-pill px-2 py-1 text-xs font-medium ${account.isActive ? 'bg-accent-bg text-success' : 'bg-warning-bg text-warning'}`}>{account.isActive ? '稼働中' : '停止中'}</span></td>
+                <td className="px-2 py-3"><span className={`inline-flex whitespace-nowrap rounded-pill px-2 py-1 text-xs font-medium ${account.isActive ? 'bg-accent-soft text-success' : 'bg-warning-bg text-warning'}`}>{account.isActive ? '稼働中' : '停止中'}</span></td>
                 <td className="px-2 py-3 text-center"><button onClick={() => setEditing(account)} aria-label={`${account.displayName}の設定を開く`} className="h-7 w-7 cursor-pointer rounded-full border border-hairline text-ink-secondary hover:border-accent hover:text-accent">→</button></td>
               </tr>
             ))}
@@ -199,7 +199,7 @@ function AccountsPageInner() {
         <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
           <span>全 {shown.length} 件</span><div className="flex items-center gap-2">
             <button onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1} className="cursor-pointer rounded-control border border-hairline px-3 py-1.5 text-ink disabled:cursor-not-allowed disabled:opacity-40">前へ</button>
-            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-accent-bg font-medium text-success">{page}</span>
+            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-accent-soft font-medium text-success">{page}</span>
             <button onClick={() => setPage((value) => Math.min(pageCount, value + 1))} disabled={page === pageCount} className="cursor-pointer rounded-control border border-hairline px-3 py-1.5 text-ink disabled:cursor-not-allowed disabled:opacity-40">次へ</button>
           </div>
         </div>
