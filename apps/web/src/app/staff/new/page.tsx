@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { api } from '@/lib/api'
 import CreatePage, { AsideCard, FormSection, Field, inputClass } from '@/components/shared/create-page'
+import NotificationSwitch from '@/components/ui/notification-switch'
 
 type Role = 'admin' | 'staff' | 'viewer'
 type Channel = { email: boolean; line: boolean }
@@ -28,10 +29,6 @@ const NOTIFICATIONS = [
   ['security', 'ログイン・権限変更', 'ログインや権限が変わったとき'],
   ['updates', 'システム更新', '更新が完了したとき'],
 ] as const
-
-function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
-  return <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={onChange} className={`relative h-6 w-11 cursor-pointer rounded-full transition-colors ${checked ? 'bg-accent' : 'bg-hairline'}`}><span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} /></button>
-}
 
 export default function NewStaffPage() {
   const [name, setName] = useState('')
@@ -73,7 +70,7 @@ export default function NewStaffPage() {
     </FormSection>}
 
     <FormSection step={role === 'staff' ? 4 : 3} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
-      <div className="divide-hairline overflow-hidden rounded-card border border-hairline divide-y">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 px-4 py-3"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>メール</span><Switch checked={notifications[key].email} onChange={() => toggleChannel(key, 'email')} label={`${label}をメールで通知`} /></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>LINE</span><Switch checked={notifications[key].line} onChange={() => toggleChannel(key, 'line')} label={`${label}をLINEで通知`} /></div></div>)}</div>
+      <div className="divide-hairline overflow-hidden rounded-card border border-hairline divide-y">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 px-4 py-3"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>メール</span><NotificationSwitch checked={notifications[key].email} onChange={() => toggleChannel(key, 'email')} label={`${label}をメールで通知`} /></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>LINE</span><NotificationSwitch checked={notifications[key].line} onChange={() => toggleChannel(key, 'line')} label={`${label}をLINEで通知`} /></div></div>)}</div>
     </FormSection>
   </CreatePage>
 }
