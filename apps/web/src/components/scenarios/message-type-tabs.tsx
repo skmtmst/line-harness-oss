@@ -31,19 +31,14 @@ interface KindDef {
 }
 
 /**
- * 作れるのは テキスト・画像・質問 の3つ。
+ * 132 で列を広げ、位置情報・動画・音声・スタンプも送れるようにした。
  *
- * scenario_steps.message_type は ('text','image','flex') しか受け付けない。
- * スタンプ・音声・動画・位置情報・紹介は、列にも配信側にも入り口が無い。
+ * 残るのはカルーセルと紹介。カルーセルはテンプレート側に作成画面があるので、
+ * そちらから選ぶ。紹介は LINE に該当する種別が無い。
  */
 export const STEP_MESSAGE_KINDS: KindDef[] = [
   { value: 'text', label: 'テキスト' },
-  {
-    value: 'sticker',
-    label: 'スタンプ',
-    disabledReason:
-      'スタンプはまだ送れません。受け取ったスタンプを表示する仕組みはありますが、こちらから送る口がありません。',
-  },
+  { value: 'sticker', label: 'スタンプ' },
   { value: 'image', label: '画像' },
   { value: 'question', label: '質問' },
   {
@@ -54,18 +49,15 @@ export const STEP_MESSAGE_KINDS: KindDef[] = [
     disabledReason:
       'この画面では作れません。「テンプレートから選ぶ」で、カルーセルのテンプレートを選べば送れます。',
   },
-  {
-    value: 'location',
-    label: '位置情報',
-    disabledReason: '位置情報はまだ送れません。',
-  },
+  { value: 'location', label: '位置情報' },
   {
     value: 'intro',
     label: '紹介',
-    disabledReason: '他のLINEアカウントの紹介はまだ送れません。',
+    disabledReason:
+      '他のLINEアカウントの紹介は、LINE側に該当するメッセージの種別がありません。テキストに友だち追加のURLを書くか、カードタイプのテンプレートにボタンを置いてください。',
   },
-  { value: 'audio', label: '音声', disabledReason: '音声はまだ送れません。' },
-  { value: 'video', label: '動画', disabledReason: '動画はまだ送れません。' },
+  { value: 'audio', label: '音声' },
+  { value: 'video', label: '動画' },
 ]
 
 export function isStepMessageKindAvailable(kind: StepMessageKind): boolean {

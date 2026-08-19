@@ -804,6 +804,73 @@ export function buildMessage(messageType: string, messageContent: string, altTex
     }
   }
 
+  /*
+   * 位置情報・動画・音声・スタンプ。
+   *
+   * どれも中身は JSON。読めなければテキストに落とす（既存の image/flex と
+   * 同じ扱い）。**送れないものを送ろうとして配信全体を止めない**のが要点。
+   * 1通の中身が壊れているだけで、その人の以降の配信まで止まると困る。
+   */
+  if (messageType === 'location') {
+    try {
+      const p = JSON.parse(messageContent) as {
+        title?: string; address?: string; latitude?: number; longitude?: number;
+      };
+      if (typeof p.latitude !== 'number' || typeof p.longitude !== 'number') {
+        return { type: 'text', text: messageContent };
+      }
+      return {
+        type: 'location',
+        title: p.title || '場所',
+        address: p.address || '',
+        latitude: p.latitude,
+        longitude: p.longitude,
+      };
+    } catch {
+      return { type: 'text', text: messageContent };
+    }
+  }
+
+  if (messageType === 'video') {
+    try {
+      const p = JSON.parse(messageContent) as {
+        originalContentUrl?: string; previewImageUrl?: string;
+      };
+      if (!p.originalContentUrl || !p.previewImageUrl) {
+        return { type: 'text', text: messageContent };
+      }
+      return {
+        type: 'video',
+        originalContentUrl: p.originalContentUrl,
+        previewImageUrl: p.previewImageUrl,
+      };
+    } catch {
+      return { type: 'text', text: messageContent };
+    }
+  }
+
+  if (messageType === 'audio') {
+    try {
+      const p = JSON.parse(messageContent) as { originalContentUrl?: string; duration?: number };
+      if (!p.originalContentUrl || typeof p.duration !== 'number' || p.duration <= 0) {
+        return { type: 'text', text: messageContent };
+      }
+      return { type: 'audio', originalContentUrl: p.originalContentUrl, duration: p.duration };
+    } catch {
+      return { type: 'text', text: messageContent };
+    }
+  }
+
+  if (messageType === 'sticker') {
+    try {
+      const p = JSON.parse(messageContent) as { packageId?: string; stickerId?: string };
+      if (!p.packageId || !p.stickerId) return { type: 'text', text: messageContent };
+      return { type: 'sticker', packageId: String(p.packageId), stickerId: String(p.stickerId) };
+    } catch {
+      return { type: 'text', text: messageContent };
+    }
+  }
+
   // Fallback
   return { type: 'text', text: messageContent };
 }
