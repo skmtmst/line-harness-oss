@@ -1212,6 +1212,17 @@ CREATE TABLE reminders (
 , line_account_id TEXT, trigger_type TEXT NOT NULL DEFAULT 'manual'
   CHECK (trigger_type IN ('manual', 'booking', 'event')), trigger_offset_minutes INTEGER, send_at_time TEXT, target_tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
 
+CREATE TABLE rich_menu_area_taps (
+  id              TEXT PRIMARY KEY,
+  area_id         TEXT NOT NULL,
+  page_id         TEXT NOT NULL,
+  group_id        TEXT NOT NULL,
+  area_label      TEXT,
+  friend_id       TEXT,
+  line_account_id TEXT,
+  tapped_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE rich_menu_areas (
   id              TEXT PRIMARY KEY,
   page_id         TEXT NOT NULL REFERENCES rich_menu_pages(id) ON DELETE CASCADE,
@@ -2023,6 +2034,10 @@ CREATE INDEX idx_ref_tracking_ref_created ON ref_tracking(ref_code, created_at);
 CREATE INDEX idx_reminder_steps_reminder ON reminder_steps (reminder_id);
 
 CREATE INDEX idx_reminders_status_scheduled ON booking_reminders (status, scheduled_at);
+
+CREATE INDEX idx_rich_menu_area_taps_area  ON rich_menu_area_taps(area_id, tapped_at);
+
+CREATE INDEX idx_rich_menu_area_taps_group ON rich_menu_area_taps(group_id, tapped_at);
 
 CREATE INDEX idx_rich_menu_areas_page     ON rich_menu_areas(page_id);
 

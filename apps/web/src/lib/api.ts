@@ -454,6 +454,26 @@ export type RichMenuAreaIntent =
   | 'switch'
   | 'postback'
 
+/** 押された回数（148）。 */
+export type RichMenuAreaTapCount = {
+  areaId: string
+  groupId: string
+  pageId: string
+  /** ボタン名。消されたボタンは、押された時点の名前が出る。 */
+  label: string | null
+  taps: number
+  /** そのうち、計測リンク経由で数えた分。 */
+  viaTrackedLink: number
+}
+
+export type RichMenuTapStats = {
+  from: string
+  to: string
+  byArea: RichMenuAreaTapCount[]
+  byGroup: { groupId: string; taps: number }[]
+  total: number
+}
+
 /** 保存するときに送るボタン1つぶん。 */
 export type RichMenuAreaPayload = {
   /** 既存ボタンの id。渡すと引き継がれる（押された回数の集計が途切れない）。 */
@@ -2820,6 +2840,16 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(input),
       }),
+
+    /** 押された回数。期間を省くとその月（日本時間）。 */
+    tapStats: (accountId: string, range?: { from?: string; to?: string }) => {
+      const params = new URLSearchParams({ accountId })
+      if (range?.from) params.set('from', range.from)
+      if (range?.to) params.set('to', range.to)
+      return fetchApi<ApiResponse<RichMenuTapStats>>(
+        `/api/rich-menu-groups/tap-stats?${params.toString()}`,
+      )
+    },
 
     delete: (groupId: string, opts?: { force?: boolean }) =>
       fetchApi<ApiResponse<null>>(

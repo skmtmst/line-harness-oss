@@ -17,6 +17,8 @@ import {
   getLineAccountById,
   getFollowingLineUserIdsByTag,
   getTrackedLinkById,
+  getRichMenuTapStats,
+  jstNow,
   type RichMenuGroup,
   type RichMenuGroupWithPages,
   type RichMenuPageInput,
@@ -29,6 +31,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { validateRichMenuImage } from '../lib/image-validator.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
+import { currentMonthRange } from '../lib/rich-menu-tap.js';
 import {
   publishRichMenuGroup,
   unpublishRichMenuGroup,
@@ -655,6 +658,23 @@ richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', requireRole(
     );
   }
   return c.json({ success: true });
+});
+
+// 押された回数。既定はその月（日本時間）。from / to を渡せば任意の期間。
+// ルートの並び順に注意 — `/:groupId` より前に置かないと "tap-stats" が
+// リッチメニューの id として拾われる。
+richMenuGroups.get('/api/rich-menu-groups/tap-stats', async (c) => {
+  const accountId = c.req.query('accountId');
+  if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  const range = currentMonthRange(jstNow());
+  const from = c.req.query('from') || range.from;
+  const to = c.req.query('to') || range.to;
+  try {
+    const stats = await getRichMenuTapStats(c.env.DB, accountId, from, to);
+    return c.json({ success: true, data: stats });
+  } catch (e) {
+    return c.json({ success: false, error: e instanceof Error ? e.message : String(e) }, 500);
+  }
 });
 
 richMenuGroups.get('/api/rich-menu-groups', async (c) => {

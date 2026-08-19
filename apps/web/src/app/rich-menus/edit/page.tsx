@@ -7,6 +7,7 @@ import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
+import type { RichMenuAreaTapCount } from '@/lib/api'
 
 type Page = {
   id: string
@@ -100,6 +101,8 @@ function Editor({
   const [templates, setTemplates] = useState<PickerOption[]>([])
   const [forms, setForms] = useState<PickerOption[]>([])
   const [trackedLinks, setTrackedLinks] = useState<PickerOption[]>([])
+  // ボタンごとに押された回数。取れなくても編集はできるので、失敗しても止めない。
+  const [tapsByArea, setTapsByArea] = useState<Map<string, RichMenuAreaTapCount>>(new Map())
 
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -121,6 +124,16 @@ function Editor({
       setChatBarText(g.chatBarText)
       setIsDefaultForAll(g.isDefaultForAll)
       setPages(g.pages)
+      void api.richMenuGroups
+        .tapStats(g.accountId)
+        .then((res) => {
+          if (res.success) {
+            setTapsByArea(new Map(res.data.byArea.map((a) => [a.areaId, a])))
+          }
+        })
+        .catch(() => {
+          // 数が出ないだけ。編集は続けられる。
+        })
       setActivePageId((prev) =>
         prev && g.pages.some((p) => p.id === prev) ? prev : (g.pages[0]?.id ?? null),
       )
@@ -691,6 +704,14 @@ function Editor({
                 templates={templates}
                 forms={forms}
                 trackedLinks={trackedLinks}
+                taps={
+                  tapsByArea.has(selectedArea.id)
+                    ? {
+                        count: tapsByArea.get(selectedArea.id)!.taps,
+                        viaTrackedLink: tapsByArea.get(selectedArea.id)!.viaTrackedLink,
+                      }
+                    : null
+                }
                 onUpdate={(patch) =>
                   updateArea(activePage.id, selectedArea.id, patch)
                 }

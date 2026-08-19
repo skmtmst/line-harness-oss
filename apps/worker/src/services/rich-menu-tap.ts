@@ -2,6 +2,7 @@ import {
   getRichMenuAreaTapTarget,
   getTemplateById,
   addScore,
+  recordRichMenuAreaTap,
   type RichMenuAreaTapTarget,
 } from '@line-crm/db';
 import type { LineClient, Message } from '@line-crm/line-sdk';
@@ -87,6 +88,22 @@ export async function handleRichMenuTap(
   if (!target) return { target: null, replyTokenConsumed: false };
 
   const lineAccountId = options.lineAccountId ?? null;
+
+  // 押された記録。一覧の「今月のタップ」「最多タップ」はこれを数えている。
+  // 記録に失敗しても、下のタグ付けやメッセージ送信は続ける。
+  // 数え損ねるより、押した人への反応が返らないほうが困る。
+  try {
+    await recordRichMenuAreaTap(db, {
+      areaId: target.areaId,
+      pageId: target.pageId,
+      groupId: target.groupId,
+      areaLabel: target.label,
+      friendId: friend.id,
+      lineAccountId,
+    });
+  } catch (err) {
+    console.error('[richMenuTap] failed to record tap', err);
+  }
 
   for (const tagId of target.tagIds) {
     try {

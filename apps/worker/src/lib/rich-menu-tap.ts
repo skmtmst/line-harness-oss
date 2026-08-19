@@ -53,3 +53,21 @@ export function parseTapPostbackData(data: string): RichMenuTapPostback | null {
   }
   return { areaId, inner: inner.length > 0 ? inner : null };
 }
+
+/**
+ * 日本時間で「その月の1日」と「翌月の1日」を返す。押された回数の既定の集計期間。
+ *
+ * 文字列のまま比べる（辞書順＝時系列順）ので、月の 0 詰めを外すと 9月と 10月の
+ * 大小が逆転する。ここが1日ずれると「今月のタップ」が前月ぶんを混ぜる。
+ */
+export function currentMonthRange(nowJst: string): { from: string; to: string } {
+  const year = Number(nowJst.slice(0, 4));
+  const month = Number(nowJst.slice(5, 7));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  return {
+    from: `${year}-${pad(month)}-01T00:00:00.000`,
+    to: `${nextYear}-${pad(nextMonth)}-01T00:00:00.000`,
+  };
+}

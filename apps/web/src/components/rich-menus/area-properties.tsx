@@ -13,8 +13,23 @@ type Props = {
   templates: Option[]
   forms: Option[]
   trackedLinks: Option[]
+  /** このボタンが今月押された回数。数えられない種類なら null。 */
+  taps: { count: number; viaTrackedLink: number } | null
   onUpdate: (patch: Partial<Area>) => void
   onDelete: () => void
+}
+
+/**
+ * 押された回数を数えられる種類か。
+ *
+ * URLを開く（計測リンクなし）・電話・回答フォームは、LINE の中や外で完結して
+ * しまい、押されたことがこちらに届かない。数えられないものを「0回」と出すと
+ * 「誰も押していない」と読めてしまうので、種類で分けて扱う。
+ */
+export function isTapCountable(area: Area): boolean {
+  const intent = intentOf(area)
+  if (intent === 'url') return Boolean(area.trackedLinkId)
+  return intent !== 'tel' && intent !== 'form'
 }
 
 /** 運用者に見せる選択肢。並びは使う頻度の順。 */
@@ -130,6 +145,7 @@ export function AreaProperties({
   templates,
   forms,
   trackedLinks,
+  taps,
   onUpdate,
   onDelete,
 }: Props) {
@@ -178,6 +194,31 @@ export function AreaProperties({
           className={inputClass}
         />
       </Field>
+
+      <div className="border-hairline bg-canvas-sunken rounded-control border px-3 py-2">
+        <div className="text-ink-faint text-[11px]">今月押された回数</div>
+        {isTapCountable(area) ? (
+          <>
+            <div className="text-ink text-lg font-bold tabular-nums">
+              {taps?.count ?? 0}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>
+            </div>
+            {taps && taps.viaTrackedLink > 0 && (
+              <p className="text-ink-faint text-[11px]">
+                うち {taps.viaTrackedLink} 回は計測リンクで数えた分です。
+                同じ計測リンクを他でも使っていると、その分も入ります。
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="text-ink-faint text-[11px] leading-snug">
+            この動きは数えられません。
+            {intent === 'url'
+              ? '上の「計測リンクを使う」を選ぶと数えられます。'
+              : 'LINE の中で完結するため、押されたことがこちらに届きません。'}
+          </p>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <NumField label="x" value={area.boundsX} onChange={(v) => onUpdate({ boundsX: v })} />
