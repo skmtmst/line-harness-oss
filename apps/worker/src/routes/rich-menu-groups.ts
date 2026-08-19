@@ -57,6 +57,9 @@ function serializeGroup(row: RichMenuGroup) {
     isDefaultForAll: row.is_default_for_all === 1,
     status: row.status,
     publishingAt: row.publishing_at,
+    targetingCondition: row.targeting_condition,
+    targetingPriority: row.targeting_priority,
+    targetingEnabled: row.targeting_enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -309,6 +312,34 @@ function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroupMetaInp
   if (r.isDefaultForAll !== undefined) {
     if (typeof r.isDefaultForAll !== 'boolean') return { ok: false, error: 'isDefaultForAll must be boolean' };
     meta.isDefaultForAll = r.isDefaultForAll;
+  }
+  if (r.targetingCondition !== undefined) {
+    if (r.targetingCondition === null) {
+      meta.targetingCondition = null;
+    } else if (typeof r.targetingCondition !== 'string') {
+      return { ok: false, error: 'targetingCondition must be a JSON string or null' };
+    } else {
+      // 読めない JSON をそのまま保存すると、出し分けのたびに黙って飛ばされる。
+      // 入り口で断る。
+      try {
+        JSON.parse(r.targetingCondition);
+      } catch {
+        return { ok: false, error: 'targetingCondition must be valid JSON' };
+      }
+      meta.targetingCondition = r.targetingCondition;
+    }
+  }
+  if (r.targetingPriority !== undefined) {
+    if (typeof r.targetingPriority !== 'number' || !Number.isInteger(r.targetingPriority)) {
+      return { ok: false, error: 'targetingPriority must be an integer' };
+    }
+    meta.targetingPriority = r.targetingPriority;
+  }
+  if (r.targetingEnabled !== undefined) {
+    if (typeof r.targetingEnabled !== 'boolean') {
+      return { ok: false, error: 'targetingEnabled must be boolean' };
+    }
+    meta.targetingEnabled = r.targetingEnabled;
   }
   let pages: RichMenuPageInput[] | undefined;
   if (r.pages !== undefined) {

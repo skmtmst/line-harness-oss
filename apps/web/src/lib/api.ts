@@ -2778,6 +2778,9 @@ export const api = {
         isDefaultForAll: boolean;
         status: 'draft' | 'published';
         publishingAt: string | null;
+        targetingCondition: string | null;
+        targetingPriority: number;
+        targetingEnabled: boolean;
         thumbnailR2Key: string | null;
         createdAt: string;
         updatedAt: string;
@@ -2794,6 +2797,9 @@ export const api = {
         isDefaultForAll: boolean;
         status: 'draft' | 'published';
         publishingAt: string | null;
+        targetingCondition: string | null;
+        targetingPriority: number;
+        targetingEnabled: boolean;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -2829,6 +2835,10 @@ export const api = {
       name?: string;
       chatBarText?: string;
       isDefaultForAll?: boolean;
+      /** 出し分けの条件（SegmentCondition の JSON）。null で解除。 */
+      targetingCondition?: string | null;
+      targetingPriority?: number;
+      targetingEnabled?: boolean;
       pages?: Array<{
         id?: string;
         name: string;

@@ -15,6 +15,8 @@ type RichMenuGroupListItem = {
   size: 'large' | 'compact'
   status: 'draft' | 'published'
   isDefaultForAll: boolean
+  targetingEnabled: boolean
+  targetingCondition: string | null
   thumbnailR2Key: string | null
   updatedAt: string
 }
@@ -170,6 +172,7 @@ export default function RichMenusListPage() {
   // 集計は多い順に並んでいる。先頭がいちばん押されたボタン。
   const topArea = tapStats?.byArea[0] ?? null
   const tapsByGroup = new Map((tapStats?.byGroup ?? []).map((g) => [g.groupId, g.taps]))
+  const targetingCount = groups.filter((g) => g.targetingEnabled && g.targetingCondition).length
 
   const q = query.trim()
   const shownGroups = q
@@ -252,12 +255,17 @@ export default function RichMenusListPage() {
               : 'まだ押されていません'}
           </p>
         </div>
-        {/* 一覧はタグ条件を返していない。誰に出すかはメニューごとの設定に
-            あるが、一覧の型（RichMenuGroupListItem）に入っていない。 */}
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">出し分け</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">タグ条件は一覧に出ません</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {targetingCount}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            {targetingCount > 0
+              ? 'タグ条件で自動的に切り替わります'
+              : 'タグ条件で出し分けているメニューはありません'}
+          </p>
         </div>
       </div>
 
@@ -407,6 +415,9 @@ export default function RichMenusListPage() {
                           {tapsByGroup.get(g.id) ?? 0}
                         </span> 回
                       </span>
+                    )}
+                    {g.targetingEnabled && g.targetingCondition && (
+                      <span className="text-accent font-medium whitespace-nowrap">条件で出し分け</span>
                     )}
                     {g.isDefaultForAll && (
                       <span className="text-blue-600 font-medium whitespace-nowrap">

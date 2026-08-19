@@ -25,6 +25,11 @@ import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
 
+import {
+  applyRichMenuTargeting,
+  isTargetingTrigger,
+} from './rich-menu-targeting.js';
+
 export interface EventPayload {
   friendId?: string;
   eventData?: Record<string, unknown>;
@@ -74,6 +79,35 @@ export async function fireEvent(
 
   // Phase 2: evaluate automations.
   await processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+
+  // Phase 3: リッチメニューの出し分けを見直す。
+  //
+  // オートメーションの後に置くのは、オートメーションでタグを付ける構成が
+  // 多いため。先に見直すと、いま付いたばかりのタグが条件に反映されない。
+  await reevaluateRichMenuTargeting(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+}
+
+/**
+ * 友だちごとに出すメニューを選び直す。
+ *
+ * 失敗しても呼び出し元には投げ返さない。メニューの出し分けは、そのとき
+ * 起きていること（メッセージへの返信やタグ付け）の付随処理なので、
+ * ここで転ぶと本体まで巻き添えになる。
+ */
+async function reevaluateRichMenuTargeting(
+  db: D1Database,
+  eventType: string,
+  payload: EventPayload,
+  lineAccessToken?: string,
+  lineAccountId?: string | null,
+): Promise<void> {
+  if (!isTargetingTrigger(eventType)) return;
+  if (!payload.friendId || !lineAccessToken || !lineAccountId) return;
+  try {
+    await applyRichMenuTargeting(db, payload.friendId, lineAccountId, lineAccessToken);
+  } catch (err) {
+    console.error('[eventBus] rich menu targeting failed:', err);
+  }
 }
 
 /** 送信Webhookへの通知 */

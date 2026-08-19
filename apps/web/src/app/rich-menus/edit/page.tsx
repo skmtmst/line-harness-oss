@@ -8,6 +8,24 @@ import { api } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
 import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
 import type { RichMenuAreaTapCount } from '@/lib/api'
+import ConditionBuilder from '@/components/shared/condition-builder'
+import type { SegmentCondition } from '@/lib/segment-condition'
+
+/**
+ * 保存されている条件を読む。
+ *
+ * 壊れた JSON は「条件なし」として扱う。ここで落とすと編集画面が開かなくなり、
+ * 直すこともできなくなる。画面には「条件なし」に見えるが、保存し直すまで
+ * 元の値は消えない。
+ */
+function parseStoredCondition(raw: string | null): SegmentCondition | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as SegmentCondition
+  } catch {
+    return null
+  }
+}
 
 type Page = {
   id: string
@@ -30,6 +48,9 @@ type Group = {
   isDefaultForAll: boolean
   status: 'draft' | 'published'
   publishingAt: string | null
+  targetingCondition: string | null
+  targetingPriority: number
+  targetingEnabled: boolean
   pages: Page[]
 }
 
@@ -94,6 +115,10 @@ function Editor({
   // isDefaultForAll はこの画面では編集しない (ON/OFF は「友だちに表示」モーダルから)。
   // ただし persistDraft で送信値を一致させるため、現在値を保持する。
   const [isDefaultForAll, setIsDefaultForAll] = useState(false)
+  // 出し分け（149）。条件の形は一斉配信・シナリオと同じもの。
+  const [targetingEnabled, setTargetingEnabled] = useState(false)
+  const [targetingPriority, setTargetingPriority] = useState(0)
+  const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
 
   // ボタンの設定で選ぶもの（タグ・テンプレート・回答フォーム・計測リンク）。
   // メニュー本体とは別に、開いたとき1回だけ読む。
@@ -123,6 +148,9 @@ function Editor({
       setName(g.name)
       setChatBarText(g.chatBarText)
       setIsDefaultForAll(g.isDefaultForAll)
+      setTargetingEnabled(g.targetingEnabled)
+      setTargetingPriority(g.targetingPriority)
+      setTargetingCondition(parseStoredCondition(g.targetingCondition))
       setPages(g.pages)
       void api.richMenuGroups
         .tapStats(g.accountId)
@@ -270,6 +298,9 @@ function Editor({
       name,
       chatBarText,
       isDefaultForAll,
+      targetingEnabled,
+      targetingPriority,
+      targetingCondition: targetingCondition ? JSON.stringify(targetingCondition) : null,
       pages: pages.map((p, i) => ({
         // 既存 page (UUID) は id を渡す。新規 page (`tmp-*` プレフィックス) は
         // id を渡さず Worker 側で新 UUID を発行させる。
@@ -693,6 +724,69 @@ function Editor({
               </p>
             </section>
           )}
+
+          {/* 誰に出すか（149） */}
+          <section className="bg-white border border-hairline rounded-lg shadow-sm p-5 space-y-4">
+            <div>
+              <h2 className="text-ink text-sm font-semibold">誰に出すか</h2>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                条件に当てはまった友だちに、このメニューを自動で出します。タグが付いた時点で
+                切り替わるので、あとから当てはまった人にも出ます。
+              </p>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={targetingEnabled}
+                onChange={(e) => setTargetingEnabled(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                条件で出し分ける
+                <span className="text-ink-faint block text-[11px]">
+                  切ると、このメニューは条件で配られなくなります。すでに見えている人からは
+                  すぐには消えません。
+                </span>
+              </span>
+            </label>
+
+            {targetingEnabled && (
+              <>
+                {group.status !== 'published' && (
+                  <p className="rounded-control bg-amber-50 p-2 text-[11px] text-amber-700">
+                    このメニューはまだ LINE に登録されていません。登録するまで、条件に
+                    当てはまっても出せません。
+                  </p>
+                )}
+
+                <label className="block">
+                  <span className="text-ink-secondary text-xs font-medium">順番</span>
+                  <span className="text-ink-faint block text-[11px]">
+                    複数のメニューの条件に当てはまったとき、数が小さいほうが先に出ます。
+                  </span>
+                  <input
+                    type="number"
+                    value={targetingPriority}
+                    onChange={(e) => setTargetingPriority(parseInt(e.target.value, 10) || 0)}
+                    className="border-hairline rounded-control focus:ring-accent mt-1 block w-24 border px-2 py-1 text-sm focus:ring-2 focus:outline-none"
+                  />
+                </label>
+
+                <ConditionBuilder
+                  value={targetingCondition}
+                  onChange={setTargetingCondition}
+                  label="このメニューを出す友だち"
+                />
+
+                {!targetingCondition && (
+                  <p className="text-[11px] text-amber-600">
+                    条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。
+                  </p>
+                )}
+              </>
+            )}
+          </section>
 
           {/* 選択中エリア (area が選択されている時のみ追加表示) */}
           {selectedArea && activePage && (

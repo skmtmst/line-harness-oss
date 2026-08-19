@@ -22,6 +22,11 @@ export interface RichMenuGroup {
   is_default_for_all: number;
   status: 'draft' | 'published';
   publishing_at: string | null;
+  /** 出し分けの条件（SegmentCondition の JSON）。未設定なら null。 */
+  targeting_condition: string | null;
+  /** 複数のメニューに当てはまったときの順番。小さいほうが先。 */
+  targeting_priority: number;
+  targeting_enabled: number;
   created_at: string;
   updated_at: string;
 }
@@ -114,6 +119,10 @@ export interface UpdateRichMenuGroupMetaInput {
   name?: string;
   chatBarText?: string;
   isDefaultForAll?: boolean;
+  /** null を渡すと条件を消す。 */
+  targetingCondition?: string | null;
+  targetingPriority?: number;
+  targetingEnabled?: boolean;
 }
 
 export type RichMenuAreaWithParsed = RichMenuArea & {
@@ -328,6 +337,18 @@ export async function updateRichMenuGroupMeta(
   if (patch.isDefaultForAll !== undefined) {
     sets.push('is_default_for_all = ?');
     vals.push(patch.isDefaultForAll ? 1 : 0);
+  }
+  if (patch.targetingCondition !== undefined) {
+    sets.push('targeting_condition = ?');
+    vals.push(patch.targetingCondition);
+  }
+  if (patch.targetingPriority !== undefined) {
+    sets.push('targeting_priority = ?');
+    vals.push(patch.targetingPriority);
+  }
+  if (patch.targetingEnabled !== undefined) {
+    sets.push('targeting_enabled = ?');
+    vals.push(patch.targetingEnabled ? 1 : 0);
   }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');
@@ -849,4 +870,78 @@ export async function getRichMenuTapStats(
       .sort((a, b) => b.taps - a.taps),
     total: byArea.reduce((sum, a) => sum + a.taps, 0),
   };
+}
+
+// =============================================================================
+// 出し分け（149）
+// =============================================================================
+
+export interface RichMenuTargetingCandidate {
+  groupId: string;
+  name: string;
+  priority: number;
+  /** SegmentCondition の JSON。 */
+  condition: string;
+  /** 友だちに出すのは 1 ページ目の richmenu。 */
+  lineRichMenuId: string | null;
+}
+
+/**
+ * 出し分けの候補を、見る順に返す。
+ *
+ * 条件が入っていて、有効で、LINE に登録済み（1ページ目の richmenu がある）
+ * ものだけ。下書きのメニューを出そうとしても LINE 側に実体が無いので、
+ * ここで落としておく。
+ */
+export async function getRichMenuTargetingCandidates(
+  db: D1Database,
+  accountId: string,
+): Promise<RichMenuTargetingCandidate[]> {
+  const rows = await db
+    .prepare(
+      `SELECT g.id                 AS group_id,
+              g.name               AS name,
+              g.targeting_priority AS priority,
+              g.targeting_condition AS condition,
+              p.line_richmenu_id   AS line_richmenu_id
+         FROM rich_menu_groups g
+         JOIN rich_menu_pages  p ON p.group_id = g.id AND p.order_index = 0
+        WHERE g.account_id = ?
+          AND g.targeting_enabled = 1
+          AND g.targeting_condition IS NOT NULL
+          AND g.status = 'published'
+          AND p.line_richmenu_id IS NOT NULL
+        ORDER BY g.targeting_priority ASC, g.created_at ASC`,
+    )
+    .bind(accountId)
+    .all<{
+      group_id: string;
+      name: string;
+      priority: number;
+      condition: string;
+      line_richmenu_id: string | null;
+    }>();
+  return (rows.results ?? []).map((r) => ({
+    groupId: r.group_id,
+    name: r.name,
+    priority: r.priority,
+    condition: r.condition,
+    lineRichMenuId: r.line_richmenu_id,
+  }));
+}
+
+/** 出し分けの条件を持つメニューの数。一覧の見出しに出す。 */
+export async function countRichMenuTargetingRules(
+  db: D1Database,
+  accountId: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n
+         FROM rich_menu_groups
+        WHERE account_id = ? AND targeting_enabled = 1 AND targeting_condition IS NOT NULL`,
+    )
+    .bind(accountId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
 }

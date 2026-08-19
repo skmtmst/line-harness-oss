@@ -149,7 +149,8 @@
     "140_step_carousel_rename.sql",
     "141_step_carousel_index.sql",
     "146_rich_menu_area_actions.sql",
-    "148_rich_menu_area_taps.sql"
+    "148_rich_menu_area_taps.sql",
+    "149_rich_menu_targeting.sql"
   ],
-  "migrationCount": 150
+  "migrationCount": 151
 }
