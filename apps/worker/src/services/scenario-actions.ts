@@ -70,6 +70,48 @@ export interface CommonVarActionConfig {
   value: string
 }
 
+/**
+ * 中身が埋まっているか。
+ *
+ * 画面はカードを1枚置いてから埋める作りなので、**埋まっていない状態でも
+ * 保存できる**。そのまま実行すると「タグを1つも指定していないタグ操作」が
+ * 黙って何もしないだけになり、設定したつもりで効いていないことに
+ * 気づけない。実行の直前でここを見て、飛ばしたことをログに残す。
+ *
+ * 画面側もこれと同じ判定で「未完成」と出す（API が complete を返す）。
+ */
+export function isScenarioActionComplete(actionType: string, config: unknown): boolean {
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) return false
+  const c = config as Record<string, unknown>
+  switch (actionType) {
+    case 'tag':
+      return (
+        (c.op === 'add' || c.op === 'remove') &&
+        ((Array.isArray(c.tagIds) && c.tagIds.length > 0) ||
+          (typeof c.folderId === 'string' && c.folderId !== ''))
+      )
+    case 'friend_field':
+      return (
+        typeof c.fieldId === 'string' &&
+        c.fieldId !== '' &&
+        ['set', 'add', 'sub', 'clear'].includes(String(c.op))
+      )
+    case 'support_mark':
+      // null は「対応マークを外す」という意味のある指定。
+      return c.markId === null || (typeof c.markId === 'string' && c.markId !== '')
+    case 'scenario':
+      if (c.op === 'resume_previous') return true
+      if (c.op === 'stop') return true
+      return c.op === 'start' && typeof c.scenarioId === 'string' && c.scenarioId !== ''
+    case 'common_var':
+      return (
+        typeof c.varKey === 'string' && c.varKey !== '' && (c.op === 'add' || c.op === 'sub')
+      )
+    default:
+      return false
+  }
+}
+
 export interface RunActionsInput {
   scenarioId: string
   hook: ScenarioActionHook
@@ -87,6 +129,8 @@ export interface RunActionsResult {
   skippedByOnce: number
   /** 失敗した数。失敗しても配信は続ける。 */
   failed: number
+  /** 中身が埋まっていないため飛ばした数。 */
+  skippedIncomplete: number
   /**
    * このアクションでシナリオの購読状態を触ったか。
    * 呼び出し側（step-delivery）が、そのあとの進行判断に使う。
@@ -133,6 +177,7 @@ export async function runScenarioActions(
     skippedByCondition: 0,
     skippedByOnce: 0,
     failed: 0,
+    skippedIncomplete: 0,
     scenarioTouched: false,
   }
 
@@ -147,6 +192,29 @@ export async function runScenarioActions(
 
   for (const action of actions) {
     try {
+      /*
+       * 中身が埋まっていないアクションは実行しない。
+       *
+       * 「タグを1つも選んでいないタグ操作」を実行しても何も起きないが、
+       * 設定したつもりで効いていないことに気づけない。飛ばしたことを
+       * 残しておけば、あとから追える。
+       */
+      let parsedConfig: unknown
+      try {
+        parsedConfig = JSON.parse(action.config_json)
+      } catch {
+        console.error(`[scenario-actions] unreadable config action=${action.id} — skipped`)
+        result.failed++
+        continue
+      }
+      if (!isScenarioActionComplete(action.action_type, parsedConfig)) {
+        console.warn(
+          `[scenario-actions] incomplete action=${action.id} type=${action.action_type} — skipped`,
+        )
+        result.skippedIncomplete++
+        continue
+      }
+
       if (action.repeat_on_refire === 0) {
         const fired = await db
           .prepare(`SELECT 1 AS ok FROM scenario_action_fires WHERE action_id = ? AND friend_id = ?`)

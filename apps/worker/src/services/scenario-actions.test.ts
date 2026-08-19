@@ -239,6 +239,68 @@ describe('並び順と失敗', () => {
   })
 })
 
+describe('中身が埋まっていないアクション', () => {
+  /*
+   * 画面はカードを1枚置いてから埋める作り。埋まっていない状態でも保存
+   * できるが、実行はしない。実行しても何も起きないだけだが、設定した
+   * つもりで効いていないことに気づけないため。
+   */
+  it('タグを1つも選んでいないタグ操作は実行しない', async () => {
+    addAction('a1', 'tag', { op: 'add', tagIds: [] })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.skippedIncomplete).toBe(1)
+    expect(result.executed).toBe(0)
+    expect(tagsOf('f1')).toEqual([])
+  })
+
+  it('項目を選んでいない友だち情報操作は実行しない', async () => {
+    addAction('a1', 'friend_field', { fieldId: '', op: 'set', value: '5' })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.skippedIncomplete).toBe(1)
+  })
+
+  it('埋まっていないものだけ飛ばして、埋まっているものは動く', async () => {
+    addAction('a1', 'tag', { op: 'add', tagIds: [] }, { sortOrder: 0 })
+    addAction('a2', 'tag', { op: 'add', tagIds: ['t1'] }, { sortOrder: 1 })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.skippedIncomplete).toBe(1)
+    expect(result.executed).toBe(1)
+    expect(tagsOf('f1')).toEqual(['t1'])
+  })
+
+  it('対応マークの null は「外す」なので実行する', async () => {
+    raw.prepare(`INSERT INTO support_marks (id, name, color) VALUES ('m1','未対応','#000')`).run()
+    raw.prepare(`UPDATE friends SET support_mark_id = 'm1' WHERE id = 'f1'`).run()
+    addAction('a1', 'support_mark', { markId: null })
+    const result = await runScenarioActions(db, {
+      scenarioId: SCENARIO,
+      hook: 'step_sent',
+      friendId: 'f1',
+      stepId: STEP,
+    })
+    expect(result.executed).toBe(1)
+    const row = raw.prepare(`SELECT support_mark_id FROM friends WHERE id = 'f1'`).get() as {
+      support_mark_id: string | null
+    }
+    expect(row.support_mark_id).toBeNull()
+  })
+})
+
 describe('発火点', () => {
   it('シナリオ完了時のアクションは、通のアクションと混ざらない', async () => {
     addAction('a1', 'tag', { op: 'add', tagIds: ['t1'] }, { hook: 'step_sent' })
