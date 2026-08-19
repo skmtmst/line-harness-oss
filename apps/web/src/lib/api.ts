@@ -94,6 +94,10 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   messageBubbles?: BroadcastBubble[] | null;
   /** 宛先の条件。一覧で「何で絞ったか」を出すのに使う。 */
   segmentConditions?: SegmentCondition | null;
+  /** 分類。null なら未分類。 */
+  folderId?: string | null;
+  /** 開封数を取るか。 */
+  measureOpens?: boolean;
 };
 
 export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'location' | 'audio' | 'carousel' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
@@ -1552,6 +1556,8 @@ export const api = {
        * 直し忘れたぶんが**画面では作れるのに保存できない条件**になる。
        */
       segmentConditions?: SegmentCondition
+      folderId?: string | null
+      measureOpens?: boolean
     }, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',

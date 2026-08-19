@@ -270,6 +270,18 @@ export default function BroadcastForm({
    * 変わるので、ドメインを見せたい配信では切れるようにしておく。
    */
   const [trackLinks, setTrackLinks] = useState(true)
+  /** 分類。空なら未分類。 */
+  const [folderId, setFolderId] = useState('')
+  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
+  /*
+   * 開封数を取るか。既定は取る。
+   *
+   * LINE の集計ユニットはアカウントあたり**月1,000**まで。1配信＝1ユニット
+   * なので、全部の配信で取ると月1,000配信で頭打ちになる。しかも上限に
+   * 当たったことは送信のエラーにならず、あとから数字が出ないだけなので
+   * 気づけない。取らなくてよい配信では切れるようにしておく。
+   */
+  const [measureOpens, setMeasureOpens] = useState(true)
   const [targetCount, setTargetCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
   // 送る前の確認。押すまで走らせない。入力のたびに投げると、
@@ -292,6 +304,12 @@ export default function BroadcastForm({
   useEffect(() => {
     if (openTemplatePickerInitially) setShowTemplatePicker(true)
   }, [openTemplatePickerInitially])
+
+  useEffect(() => {
+    api.folders.list('broadcast')
+      .then((res) => { if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name }))) })
+      .catch(() => undefined)
+  }, [])
 
   // 「シナリオ購読中の全員」で選ぶ相手。名前だけ使う。
   useEffect(() => {
@@ -491,6 +509,8 @@ export default function BroadcastForm({
           lineAccountId: selectedAccountId || null,
           scheduledAt: null,
           trackLinks,
+          folderId: folderId || null,
+          measureOpens,
           stealthSpreadMinutes: Number(spreadMinutes) || 0,
         },
         { idempotencyKey: crypto.randomUUID() },
@@ -515,7 +535,7 @@ export default function BroadcastForm({
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
+      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, folderId: folderId || null, measureOpens, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
       if (res.success) onSuccess(); else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
@@ -535,7 +555,23 @@ export default function BroadcastForm({
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-5">
         <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
-          <label className="block text-sm font-bold text-ink">管理用タイトル</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="mt-2 w-full rounded-card border border-hairline px-4 py-3 text-sm" />
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_14rem]">
+            <label className="block">
+              <span className="text-ink block text-sm font-bold">管理用タイトル</span>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="border-hairline rounded-card mt-2 w-full border px-4 py-3 text-sm" />
+            </label>
+            <label className="block">
+              <span className="text-ink block text-sm font-bold">フォルダ</span>
+              <select
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                className="border-hairline rounded-card mt-2 w-full border px-4 py-3 text-sm"
+              >
+                <option value="">未分類</option>
+                {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </label>
+          </div>
         </section>
         <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -670,6 +706,28 @@ export default function BroadcastForm({
               この配信ではURLを短縮しない
               <span className="text-ink-faint block">
                 届く文面のURLがそのままになります。クリック数は数えられません。
+              </span>
+            </span>
+          </label>
+          {/*
+            開封数を取るか。LINEの集計は**アカウントあたり月1,000配信**まで。
+            全部で取ると上限に当たるが、当たったことは送信のエラーにならず
+            「あとから数字が出ない」だけなので気づけない。
+          */}
+          <label className="text-ink-secondary mt-2 flex items-start gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={!measureOpens}
+              onChange={(e) => setMeasureOpens(!e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              この配信の開封数は取らない
+              <span className="text-ink-faint block">
+                LINEの集計はアカウントあたり月1,000配信までです。数えなくてよい配信で切っておくと、
+                見たい配信のぶんを残せます。
+                {targetCount !== null && targetCount > 0 && targetCount < 20
+                  && ` なお今回は${targetCount}人なので、取る設定にしてもLINEからは返りません（20人未満）。`}
               </span>
             </span>
           </label>
