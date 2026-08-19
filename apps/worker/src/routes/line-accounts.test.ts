@@ -277,6 +277,42 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
   });
 });
 
+describe('GET /api/line-accounts', () => {
+  test('Webhook URLの照合結果を秘密情報なしで返す', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([fakeAccount]);
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts');
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: Array<{ webhook: { status: string; expectedUrl: string }; channelAccessToken?: string }>;
+    };
+    expect(body.data[0].webhook).toMatchObject({
+      status: 'matched',
+      expectedUrl: 'http://localhost/webhook',
+    });
+    expect(body.data[0].channelAccessToken).toBeUndefined();
+  });
+});
+
+describe('GET /api/line-accounts/summary', () => {
+  test('閲覧できる稼働中アカウントの友だちを重複除外して集計する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([fakeAccount]);
+    const first = vi.fn().mockResolvedValue({ count: 37 });
+    const bind = vi.fn(() => ({ first }));
+    const db = { prepare: vi.fn(() => ({ bind })) } as unknown as D1Database;
+    const app = setupApp('owner', db);
+    const res = await app.request('/api/line-accounts/summary');
+
+    expect(res.status).toBe(200);
+    expect(bind).toHaveBeenCalledWith('acc-1');
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: { uniqueFriendCount: 37 },
+    });
+  });
+});
+
 describe('PATCH /api/line-accounts/:id', () => {
   test('updates loginChannelId / loginChannelSecret / liffId via metadata path', async () => {
     dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);

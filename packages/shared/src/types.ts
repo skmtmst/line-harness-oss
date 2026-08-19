@@ -610,6 +610,13 @@ export interface LineAccount {
   ogDefaultImageUrl: string | null;
   /** LINE公式アカウント構成の上位アカウント。null は未設定（ルート）。 */
   parentLineAccountId: string | null;
+  /** 管理画面の一覧で表示する Webhook URL の照合結果。 */
+  webhook?: {
+    expectedUrl: string;
+    actualUrl: string | null;
+    active: boolean | null;
+    status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
+  };
 }
 
 // -----------------------------------------------------------------------------
