@@ -1,3 +1,4 @@
+import type { FormLayout } from '@line-crm/shared';
 import { getIdToken, getLiffId } from './liff-auth.js';
 
 const BASE = import.meta.env.VITE_API_BASE ?? '';
@@ -151,6 +152,20 @@ export type WebinarState =
     }
   | { live: false; title: string; nextSessionAt: number | null };
 
+
+// ============================================================
+// 回答フォーム
+// ============================================================
+
+/** 公開して良い範囲だけを返した回答フォーム。 */
+export interface PublicForm {
+  id: string;
+  name: string;
+  description: string | null;
+  layout: FormLayout;
+  isActive: boolean;
+}
+
 export const api = {
   menus: () => get<{ menus: MenuItem[] }>('/api/liff/booking/menus'),
   staffOf: (menuId: string) =>
@@ -189,6 +204,18 @@ export const api = {
     get<{ items: EventBookingMine[] }>(`/api/liff/events/me?tab=${tab}`),
   cancelMyEventBooking: (bookingId: string) =>
     post<{ ok: true }>(`/api/liff/events/me/${bookingId}/cancel`, {}),
+
+  // ===== 回答フォーム =====
+  getForm: (id: string) => get<PublicForm>(`/api/forms/${id}`),
+  /** 前回の自分の回答。「前回の回答を出しておく」設定のときだけ中身が返る */
+  getMyLatestFormAnswer: (id: string) =>
+    get<{ answers: Record<string, unknown>; createdAt: string } | null>(
+      `/api/forms/${id}/my-latest`,
+    ),
+  submitForm: (
+    id: string,
+    body: { data: Record<string, unknown>; trackedLinkId?: string },
+  ) => post<{ id: string }>(`/api/forms/${id}/submit`, body),
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),
