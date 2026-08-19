@@ -62,6 +62,9 @@ function formatWhen(value: string | null, opts: { fallback?: string } = {}): str
   const date = new Date(hasTime ? `${iso}:00+09:00` : `${iso}T00:00:00+09:00`)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('ja-JP', {
+    // 必ず日本時間で出す。端末の時計に合わせると、海外から見た人と
+    // 日本にいる人で違う時刻が出て、「何時に入ったのか」が食い違う。
+    timeZone: 'Asia/Tokyo',
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -81,6 +84,7 @@ function formatEntryWhen(value: string | null): string {
   const date = new Date(hasTime ? `${iso}:00+09:00` : `${iso}T00:00:00+09:00`)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('ja-JP', {
+    timeZone: 'Asia/Tokyo',
     month: 'long',
     day: 'numeric',
     ...(hasTime ? { hour: '2-digit', minute: '2-digit' } : {}),
