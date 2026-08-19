@@ -26,6 +26,12 @@
   --color-accent-soft: #e8f8ee;
   --color-on-accent: #ffffff;
 
+  /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
+  --color-action: #0b63ce;
+  --color-action-hover: #0957b7;
+  --color-action-soft: #eaf4ff;
+  --color-on-action: #ffffff;
+
   /* 文字。ink が本文、ink-secondary が補足、ink-faint がラベル。
    * 実測で最も多かった text-gray-500 / 400 / 900 に対応する。 */
   --color-ink: #1a1c1a;
