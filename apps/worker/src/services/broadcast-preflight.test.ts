@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildWarnings, countAudience } from './broadcast-preflight.js';
-import { buildSegmentQuery } from './segment-query.js';
+import { buildSegmentQuery, type SegmentCondition } from './segment-query.js';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 /** first だけを返す最小のモック。SQLとバインドも見られるようにする。 */
@@ -121,6 +121,14 @@ describe('注意の組み立て', () => {
  * いちばん危ない間違い方になる。
  */
 describe('詳細条件で絞ったときの人数', () => {
+  const VIP_CONDITION: SegmentCondition = {
+    operator: 'AND',
+    rules: [
+      { type: 'is_following', value: true },
+      { type: 'tag_exists', value: 't-vip' },
+    ],
+  }
+
   function setup() {
     const { db, raw } = createTestD1()
     insertFriend(raw, 'f1')
@@ -139,13 +147,7 @@ describe('詳細条件で絞ったときの人数', () => {
     const { db } = setup()
     const result = await countAudience(db, {
       targetType: 'segment',
-      segmentConditions: {
-        operator: 'AND',
-        rules: [
-          { type: 'is_following', value: true },
-          { type: 'tag_exists', value: 't-vip' },
-        ],
-      },
+      segmentConditions: VIP_CONDITION,
     })
     // VIP は f1 / f4 / f5。f4 はブロック中で条件から外れ、
     // f5 は非表示なので届く人数には入らず、除外として数える。
@@ -163,15 +165,8 @@ describe('詳細条件で絞ったときの人数', () => {
   it('数えた人数と、実際に送る相手が同じ組み立てで決まる', async () => {
     // 別々に書くと、条件を1つ足したときにどちらかだけ直して食い違う。
     const { db, raw } = setup()
-    const condition = {
-      operator: 'AND' as const,
-      rules: [
-        { type: 'is_following', value: true },
-        { type: 'tag_exists', value: 't-vip' },
-      ],
-    }
-    const counted = await countAudience(db, { targetType: 'segment', segmentConditions: condition })
-    const query = buildSegmentQuery(condition)
+    const counted = await countAudience(db, { targetType: 'segment', segmentConditions: VIP_CONDITION })
+    const query = buildSegmentQuery(VIP_CONDITION)
     const sent = raw.prepare(query.sql).all(...(query.bindings as never[])) as Array<{ id: string }>
     // 送信側は非表示の人も含むので、その差だけがずれの許される範囲。
     expect(sent.length).toBe(counted.total + counted.hiddenExcluded)
