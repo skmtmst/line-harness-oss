@@ -7,6 +7,7 @@ import {
   updateForm,
   deleteForm,
   getFormSubmissions,
+  getLatestFormSubmission,
   createFormSubmission,
   getFriendByLineUserId,
   getFriendById,
@@ -27,6 +28,16 @@ import type {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import {
+  applyFormLayoutEffects,
+  checkFormGates,
+} from '../services/form-layout-effects.js';
+import {
+  layoutToFields,
+  normalizeLayout,
+  parseLayout,
+  type FormLayout,
+} from '@line-crm/shared';
 
 const forms = new Hono<Env>();
 
@@ -85,6 +96,7 @@ function serializeForm(
     name: row.name,
     description: row.description,
     fields: JSON.parse(row.fields || '[]') as unknown[],
+    layout: parseLayout(row.layout, row.fields),
     onSubmitTagId: row.on_submit_tag_id,
     onSubmitScenarioId: row.on_submit_scenario_id,
     onSubmitMessageType: row.on_submit_message_type,
@@ -135,6 +147,7 @@ function serializePublicForm(row: DbForm) {
     name: row.name,
     description: row.description,
     fields: JSON.parse(row.fields || '[]') as unknown[],
+    layout: parseLayout(row.layout, row.fields),
     isActive: Boolean(row.is_active),
     onSubmitMessageContent: row.on_submit_message_content,
     onSubmitWebhookFailMessage: row.on_submit_webhook_fail_message,
@@ -150,6 +163,22 @@ function serializeSubmission(row: DbFormSubmission & { friend_name?: string | nu
     friendName: row.friend_name || null,
     data: JSON.parse(row.data || '{}') as Record<string, unknown>,
     createdAt: row.created_at,
+  };
+}
+
+/**
+ * 受け取った layout を、保存できる形にそろえる。
+ *
+ * 外から来た JSON をそのまま入れない。形を正した上で、互換用の `fields`
+ * も同時に作り直す。`fields` はいまも送信時の必須チェックと回答一覧の
+ * 見出しが読んでいて、layout だけ更新すると両者がずれる。
+ */
+function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } | null {
+  const layout = normalizeLayout(raw);
+  if (!layout) return null;
+  return {
+    layout: JSON.stringify(layout),
+    fields: JSON.stringify(layoutToFields(layout)),
   };
 }
 
@@ -195,6 +224,7 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
       name: string;
       description?: string | null;
       fields?: unknown[];
+      layout?: unknown;
       onSubmitTagId?: string | null;
       onSubmitScenarioId?: string | null;
       onSubmitMessageType?: 'text' | 'flex' | null;
@@ -212,10 +242,13 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: 'name is required' }, 400);
     }
 
+    const normalized = body.layout !== undefined ? normalizeLayoutInput(body.layout) : null;
+
     const form = await createForm(c.env.DB, {
       name: body.name,
       description: body.description ?? null,
-      fields: JSON.stringify(body.fields ?? []),
+      fields: normalized ? normalized.fields : JSON.stringify(body.fields ?? []),
+      layout: normalized ? normalized.layout : null,
       onSubmitTagId: body.onSubmitTagId ?? null,
       onSubmitScenarioId: body.onSubmitScenarioId ?? null,
       onSubmitMessageType: body.onSubmitMessageType ?? null,
@@ -244,6 +277,7 @@ forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
       name?: string;
       description?: string | null;
       fields?: unknown[];
+      layout?: unknown;
       onSubmitTagId?: string | null;
       onSubmitScenarioId?: string | null;
       onSubmitMessageType?: 'text' | 'flex' | null;
@@ -263,6 +297,16 @@ forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
     if (body.name !== undefined) updates.name = body.name;
     if (body.description !== undefined) updates.description = body.description;
     if (body.fields !== undefined) updates.fields = JSON.stringify(body.fields);
+    // layout を受け取ったときは、fields もそこから作り直す。片方だけ新しい
+    // 状態にすると、送信時の必須チェックが古い項目を見に行く。
+    if (body.layout !== undefined) {
+      const normalized = normalizeLayoutInput(body.layout);
+      if (!normalized) {
+        return c.json({ success: false, error: 'layout の形が正しくありません' }, 400);
+      }
+      updates.layout = normalized.layout;
+      updates.fields = normalized.fields;
+    }
     if (body.onSubmitTagId !== undefined) updates.onSubmitTagId = body.onSubmitTagId;
     if (body.onSubmitScenarioId !== undefined) updates.onSubmitScenarioId = body.onSubmitScenarioId;
     if (body.onSubmitMessageType !== undefined) updates.onSubmitMessageType = body.onSubmitMessageType;
@@ -380,6 +424,53 @@ forms.post('/api/forms/:id/partial', async (c) => {
   }
 });
 
+/**
+ * GET /api/forms/:id/my-latest — 前回の自分の回答（回答画面から使う）
+ *
+ * オプションの「前回の回答を復元する」を入れているフォームだけが返す。
+ * 入れていないフォームで前の回答を返すと、本人が消したつもりの値が
+ * 別の端末で復活して見える。
+ */
+forms.get('/api/forms/:id/my-latest', async (c) => {
+  try {
+    const formId = c.req.param('id');
+    const form = await getFormById(c.env.DB, formId);
+    if (!form) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+
+    const layout = parseLayout(form.layout, form.fields);
+    if (!layout.options?.restorePrevious) {
+      return c.json({ success: true, data: null });
+    }
+
+    const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+    if (!lineUserId) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+    if (!friend) {
+      return c.json({ success: true, data: null });
+    }
+
+    const latest = await getLatestFormSubmission(c.env.DB, formId, friend.id);
+    if (!latest) {
+      return c.json({ success: true, data: null });
+    }
+
+    let answers: Record<string, unknown> = {};
+    try {
+      answers = JSON.parse(latest.data || '{}') as Record<string, unknown>;
+    } catch {
+      answers = {};
+    }
+    return c.json({ success: true, data: { answers, createdAt: latest.created_at } });
+  } catch (err) {
+    console.error('GET /api/forms/:id/my-latest error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // POST /api/forms/:id/submit — submit form (public, used by LIFF)
 forms.post('/api/forms/:id/submit', async (c) => {
   try {
@@ -409,22 +500,45 @@ forms.post('/api/forms/:id/submit', async (c) => {
     }
     const friendId = friend.id;
 
-    // Validate required fields
-    const fields = JSON.parse(form.fields || '[]') as Array<{
-      name: string;
-      label: string;
-      type: string;
-      required?: boolean;
-    }>;
+    // 受け付けてよいかを見る。
+    //
+    // layout を持つフォームは、必須だけでなく入力制限・選択数・回答期限・
+    // 1人1回・総数・選択肢の定員まで、ここで断る。断る理由はそのまま
+    // 回答画面に出るので、日本語で返す。
+    //
+    // layout が無い（昔のまま編集していない）フォームは、これまでどおり
+    // fields の必須だけを見る。
+    const layout: FormLayout | null = form.layout ? parseLayout(form.layout) : null;
 
-    for (const field of fields) {
-      if (field.required) {
-        const val = submissionData[field.name];
-        if (val === undefined || val === null || val === '') {
-          return c.json(
-            { success: false, error: `${field.label} は必須項目です` },
-            400,
-          );
+    if (layout) {
+      const rejected = await checkFormGates({
+        db: c.env.DB,
+        formId,
+        layout,
+        friendId,
+        submitCount: form.submit_count ?? 0,
+        answers: submissionData,
+      });
+      if (rejected) {
+        return c.json({ success: false, error: rejected }, 400);
+      }
+    } else {
+      const fields = JSON.parse(form.fields || '[]') as Array<{
+        name: string;
+        label: string;
+        type: string;
+        required?: boolean;
+      }>;
+
+      for (const field of fields) {
+        if (field.required) {
+          const val = submissionData[field.name];
+          if (val === undefined || val === null || val === '') {
+            return c.json(
+              { success: false, error: `${field.label} は必須項目です` },
+              400,
+            );
+          }
         }
       }
     }
@@ -539,6 +653,43 @@ forms.post('/api/forms/:id/submit', async (c) => {
         );
       }
 
+      // layout を持つフォームは、こちらで回答を配る。
+      //
+      // 登録先（情報欄・本名・システム表示名・個別メモ）、選択肢ごとの
+      // タグ／情報欄／動作、日付から動かすリマインダ、回答後の動作までを
+      // まとめて実行する。失敗しても送信は成功のまま（保存は済んでいる）。
+      if (layout) {
+        sideEffects.push(
+          applyFormLayoutEffects({
+            db,
+            layout,
+            friendId: friendId!,
+            answers: submissionData,
+            push: {
+              defaultAccessToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+              workerUrl: c.env.WORKER_URL,
+            },
+            pushText: async (text: string) => {
+              const target = await getFriendById(db, friendId!);
+              if (!target?.line_user_id) return;
+              const accessToken = await resolveFriendAccessToken(
+                db,
+                target,
+                c.env.LINE_CHANNEL_ACCESS_TOKEN,
+              );
+              await pushViaHarnessProxy(
+                new URL(c.req.url).origin,
+                accessToken,
+                target.line_user_id,
+                [{ type: 'text', text }],
+                crypto.randomUUID(),
+                (request) => dispatchLineProxyLocally(request, c.env, optionalExecutionCtx(c)),
+              );
+            },
+          }).catch((err) => console.error('form layout effects failed:', err)),
+        );
+      }
+
       // 回答を友だち情報欄へ書く。
       //
       // フォームの項目に friendFieldId を持たせておくと、その項目の回答が
@@ -550,6 +701,10 @@ forms.post('/api/forms/:id/submit', async (c) => {
       // 既存の {{metadata.KEY}} を使っているテンプレートも壊れない。
       sideEffects.push(
         (async () => {
+          // layout があるときは applyFormLayoutEffects が書くので、ここは
+          // 動かさない。同じ値を2回書いても結果は同じだが、ECが正かどうかの
+          // 判定を2度走らせるだけ無駄になる。
+          if (layout) return;
           const formFields = parseFormFields(form.fields);
           const targets = formFields.filter((f) => f.friendFieldId);
           if (targets.length === 0) return;
