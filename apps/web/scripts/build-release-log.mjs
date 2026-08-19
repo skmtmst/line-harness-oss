@@ -35,26 +35,38 @@ function parseFrontMatter(text) {
 /**
  * 1行を項目にする。
  *
- *   - 予約した絞り込み配信が全員に届いていたのを直した @kenta #151
+ *   - 予約した絞り込み配信が全員に届いていたのを直した @kenta #151 2026-08-19 10:22
  *
- * 行末の `@名前` と `#番号` を拾って、本文からは外す。どちらも省略できる。
+ * 行末に付いている `@名前` `#番号` `YYYY-MM-DD HH:MM` を拾って、本文からは外す。
+ * どれも省略でき、順番も問わない。書く人が並びを覚えなくて済むように、
+ * **末尾から1つずつ剥がす**形にしてある。
  */
+const TRAILING = [
+  { key: 'at', re: /\s(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2})?)\s*$/, take: (m) => m[1].replace(' ', 'T') },
+  { key: 'pr', re: /\s#(\d+)\s*$/, take: (m) => Number(m[1]) },
+  { key: 'by', re: /\s@([A-Za-z0-9_-]+)\s*$/, take: (m) => m[1] },
+]
+
 function parseEntry(line) {
   let text = line.replace(/^[-*]\s+/, '').trim()
-  let by = null
-  let pr = null
+  const out = { text: '', by: null, pr: null, at: null }
 
-  const prMatch = text.match(/\s#(\d+)\s*$/)
-  if (prMatch) {
-    pr = Number(prMatch[1])
-    text = text.slice(0, prMatch.index).trim()
+  // 1周で1つも剥がせなくなったら終わり。
+  let peeled = true
+  while (peeled) {
+    peeled = false
+    for (const token of TRAILING) {
+      if (out[token.key] !== null) continue
+      const m = text.match(token.re)
+      if (!m) continue
+      out[token.key] = token.take(m)
+      text = text.slice(0, m.index).trim()
+      peeled = true
+    }
   }
-  const byMatch = text.match(/\s@([A-Za-z0-9_-]+)\s*$/)
-  if (byMatch) {
-    by = byMatch[1]
-    text = text.slice(0, byMatch.index).trim()
-  }
-  return { text, by, pr }
+
+  out.text = text
+  return out
 }
 
 function parseFile(name) {

@@ -25,6 +25,8 @@ interface ReleaseEntry {
   text: string
   by: string | null
   pr: number | null
+  /** いつ変えたか。JSTの "YYYY-MM-DDTHH:MM"。省略できる。 */
+  at: string | null
 }
 
 interface Release {
@@ -47,11 +49,42 @@ const BY_LABEL: Record<string, string> = { kenta: 'kenta', masato: 'masato' }
 
 const REPO_URL = 'https://github.com/skmtmst/line-harness-oss'
 
+/**
+ * 日時を出す。時刻まで書かれていれば時刻も出す。
+ *
+ * すべてJSTとして読む。運用しているのが日本の1拠点なので、時差を持たせると
+ * 「この14:30は誰の14:30か」を毎回考えることになる。
+ */
+function formatWhen(value: string | null, opts: { fallback?: string } = {}): string {
+  if (!value) return opts.fallback ?? ''
+  const hasTime = /[ T]\d{2}:\d{2}/.test(value)
+  const iso = value.replace(' ', 'T')
+  const date = new Date(hasTime ? `${iso}:00+09:00` : `${iso}T00:00:00+09:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    ...(hasTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+  })
+}
+
 function formatReleased(released: string | null): string {
-  if (!released) return '次回反映予定'
-  const date = new Date(`${released}T00:00:00+09:00`)
-  if (Number.isNaN(date.getTime())) return released
-  return date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
+  return formatWhen(released, { fallback: '次回反映予定' })
+}
+
+/** 一覧の行に出す短い形。「8月19日 14:07」。 */
+function formatEntryWhen(value: string | null): string {
+  if (!value) return ''
+  const hasTime = /[ T]\d{2}:\d{2}/.test(value)
+  const iso = value.replace(' ', 'T')
+  const date = new Date(hasTime ? `${iso}:00+09:00` : `${iso}T00:00:00+09:00`)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('ja-JP', {
+    month: 'long',
+    day: 'numeric',
+    ...(hasTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+  })
 }
 
 export default function ReleaseLogPanel() {
@@ -168,7 +201,7 @@ export default function ReleaseLogPanel() {
                     {entries.map((entry, i) => (
                       <li
                         key={`${release.version}-${i}`}
-                        className="grid gap-2 md:grid-cols-[64px_1fr_auto] md:items-start"
+                        className="grid gap-2 md:grid-cols-[64px_150px_1fr_auto] md:items-start"
                       >
                         <span
                           className={`w-fit rounded-full px-2.5 py-1 text-center text-[11px] font-bold ${
@@ -177,6 +210,9 @@ export default function ReleaseLogPanel() {
                         >
                           {KIND_LABEL[entry.kind as Kind] ?? entry.kind}
                         </span>
+                        <time className="text-xs text-gray-500">
+                          {formatEntryWhen(entry.at) || '—'}
+                        </time>
                         <p className="text-sm leading-relaxed text-gray-800">{entry.text}</p>
                         <span className="flex shrink-0 items-center gap-2 text-xs text-gray-500">
                           {entry.by && (
