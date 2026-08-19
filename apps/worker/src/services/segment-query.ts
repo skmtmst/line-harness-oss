@@ -166,8 +166,18 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
   const bindings: unknown[] = []
 
   switch (rule.type) {
+    /*
+     * タグIDが空のまま通すと、誰にも一致しない条件が黙って保存される。
+     * 「タグで絞ったのに1人も届かない」という形で出るので、原因に辿り
+     * つきにくい。書けない条件として断る。
+     *
+     * scenario_subscribed は空文字に「どれか1つでも」という意味があるので、
+     * そちらは別扱い（下）。
+     */
     case 'tag_exists': {
-      bindings.push(asString(rule.value, 'tag_exists'))
+      const tagId = asString(rule.value, 'tag_exists')
+      if (tagId === '') throw new Error('tag_exists rule requires a tag ID')
+      bindings.push(tagId)
       return {
         sql: `EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)`,
         bindings,
@@ -175,7 +185,9 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     }
 
     case 'tag_not_exists': {
-      bindings.push(asString(rule.value, 'tag_not_exists'))
+      const tagId = asString(rule.value, 'tag_not_exists')
+      if (tagId === '') throw new Error('tag_not_exists rule requires a tag ID')
+      bindings.push(tagId)
       return {
         sql: `NOT EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)`,
         bindings,
@@ -223,7 +235,9 @@ function buildRuleClause(rule: SegmentRule): { sql: string; bindings: unknown[] 
     }
 
     case 'ref_code': {
-      bindings.push(asString(rule.value, 'ref_code'))
+      const code = asString(rule.value, 'ref_code')
+      if (code === '') throw new Error('ref_code rule requires a value')
+      bindings.push(code)
       return { sql: `f.ref_code = ?`, bindings }
     }
 

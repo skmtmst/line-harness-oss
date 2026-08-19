@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import ConditionBuilder, {
   isEmptyCondition,
+  pruneCondition,
   type SegmentCondition,
 } from '@/components/shared/condition-builder'
 
@@ -87,7 +88,9 @@ export function ConditionDialog({
             disabled={saving}
             onClick={async () => {
               setSaving(true)
-              await onSave(draft)
+              // 書きかけの行は落として保存する。残すと、誰にも一致しない
+              // 条件になって配信が黙って止まる。
+              await onSave(pruneCondition(draft))
               setSaving(false)
               onClose()
             }}

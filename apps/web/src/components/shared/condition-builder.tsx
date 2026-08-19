@@ -105,6 +105,58 @@ export interface ConditionBuilderProps {
   label?: string
 }
 
+/**
+ * まだ書きかけの行か。
+ *
+ * タグを選ぶ前、項目を選ぶ前の行を数え上げに送ると、worker が
+ * 「読めない条件」として断る。件数が出ないだけならまだしも、そのまま
+ * 保存すると**誰にも届かない条件**が出来上がる。書けている行だけを使う。
+ */
+export function isRuleComplete(rule: SegmentRule): boolean {
+  const v = rule.value as Record<string, unknown>
+  switch (rule.type) {
+    case 'tag_exists':
+    case 'tag_not_exists':
+      return typeof rule.value === 'string' && rule.value !== ''
+    case 'tag_all':
+    case 'tag_not_all':
+      return Array.isArray(rule.value) && rule.value.length > 0
+    case 'name':
+      return typeof v?.text === 'string' && v.text.trim() !== ''
+    case 'private_memo':
+    case 'status_message':
+    case 'ref_code':
+      return typeof rule.value === 'string' && rule.value.trim() !== ''
+    case 'registered_at':
+    case 'last_reaction_at':
+      return (
+        (typeof v?.from === 'string' && v.from !== '') ||
+        (typeof v?.to === 'string' && v.to !== '')
+      )
+    case 'support_mark':
+      return Array.isArray(v?.markIds) && (v.markIds as unknown[]).length > 0
+    case 'friend_field':
+      return typeof v?.fieldId === 'string' && v.fieldId !== ''
+    case 'scenario_state':
+      return typeof v?.scenarioId === 'string' && v.scenarioId !== ''
+    default:
+      // form_answered は空で「どれかに回答した人」、is_following /
+      // is_hidden / reaction_state は常に値が入っている。
+      return true
+  }
+}
+
+/** 書きかけの行を落とす。保存にも数え上げにも同じものを使う。 */
+export function pruneCondition(condition: SegmentCondition | null): SegmentCondition | null {
+  if (!condition) return null
+  const rules = (condition.rules ?? []).filter(isRuleComplete)
+  const groups = (condition.groups ?? [])
+    .map((g) => pruneCondition(g))
+    .filter((g): g is SegmentCondition => g !== null)
+  if (rules.length === 0 && groups.length === 0) return null
+  return { operator: condition.operator, rules, groups }
+}
+
 /** 条件が実質空か。空なら null として保存し、「絞り込みなし」の意味にする。 */
 export function isEmptyCondition(condition: SegmentCondition | null): boolean {
   if (!condition) return true
@@ -149,7 +201,8 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
    * 気づけない。打つたびに叩くと重いので、少し待ってから数える。
    */
   useEffect(() => {
-    if (isEmptyCondition(condition)) {
+    const usable = pruneCondition(condition)
+    if (!usable) {
       setCount(null)
       return
     }
@@ -157,7 +210,7 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
       void (async () => {
         setCounting(true)
         try {
-          const res = await api.segments.count(condition as never)
+          const res = await api.segments.count(usable as never)
           setCount(res.success ? (res.count ?? 0) : null)
         } catch {
           setCount(null)
@@ -310,11 +363,13 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
         <span className="text-ink text-lg font-bold tabular-nums">
           {isEmptyCondition(condition)
             ? '絞り込みなし'
-            : counting
-              ? '…'
-              : count === null
-                ? '—'
-                : `${count.toLocaleString('ja-JP')} 人`}
+            : !pruneCondition(condition)
+              ? '入力するとここに出ます'
+              : counting
+                ? '…'
+                : count === null
+                  ? '—'
+                  : `${count.toLocaleString('ja-JP')} 人`}
         </span>
       </div>
     </div>

@@ -13,7 +13,10 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { api, type ScenarioAction, type ScenarioActionHook, type ScenarioActionType } from '@/lib/api'
-import ConditionBuilder, { type SegmentCondition } from '@/components/shared/condition-builder'
+import ConditionBuilder, {
+  pruneCondition,
+  type SegmentCondition,
+} from '@/components/shared/condition-builder'
 
 const ACTION_KINDS: { type: ScenarioActionType; label: string; make: () => unknown }[] = [
   { type: 'tag', label: 'タグ操作', make: () => ({ op: 'add', tagIds: [] }) },
@@ -204,7 +207,7 @@ export default function ActionEditor({
             </p>
             <ConditionBuilder
               value={(editing.condition as SegmentCondition | null) ?? null}
-              onChange={(next) => void save(editing, { condition: next })}
+              onChange={(next) => void save(editing, { condition: pruneCondition(next) })}
             />
           </div>
         ) : (
