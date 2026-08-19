@@ -624,7 +624,7 @@ CREATE TABLE "friend_scenarios" (
   started_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   next_delivery_at   TEXT,
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, previous_scenario_id TEXT);
 
 CREATE TABLE friend_scores (
   id              TEXT PRIMARY KEY,
@@ -1266,6 +1266,35 @@ CREATE TABLE saved_searches (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
 );
 
+CREATE TABLE scenario_action_fires (
+  action_id TEXT NOT NULL REFERENCES scenario_actions (id) ON DELETE CASCADE,
+  friend_id TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+  fired_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (action_id, friend_id)
+);
+
+CREATE TABLE scenario_actions (
+  id               TEXT PRIMARY KEY,
+  scenario_id      TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
+  -- どこで発火するか。
+  --   step_sent          … その通を送ったあと
+  --   scenario_completed … 最終コンテンツを配り終えたあと
+  --   choice_selected    … 質問の選択肢が押されたとき
+  hook             TEXT NOT NULL CHECK (hook IN ('step_sent', 'scenario_completed', 'choice_selected')),
+  -- hook が step_sent / choice_selected のときだけ入る。
+  step_id          TEXT REFERENCES scenario_steps (id) ON DELETE CASCADE,
+  -- hook が choice_selected のときだけ入る。0 始まり。
+  choice_index     INTEGER,
+  sort_order       INTEGER NOT NULL DEFAULT 0,
+  action_type      TEXT NOT NULL CHECK (action_type IN ('tag', 'friend_field', 'support_mark', 'scenario', 'common_var')),
+  config_json      TEXT NOT NULL CHECK (json_valid(config_json)),
+  -- 条件ビルダーの結果 (SegmentCondition)。NULL なら無条件。
+  condition_json   TEXT CHECK (condition_json IS NULL OR json_valid(condition_json)),
+  -- 0 なら、同じ友だちに対して1度しか実行しない。
+  repeat_on_refire INTEGER NOT NULL DEFAULT 1,
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE scenario_steps (
   id              TEXT PRIMARY KEY,
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
@@ -1280,7 +1309,7 @@ CREATE TABLE scenario_steps (
   template_id     TEXT REFERENCES templates(id) ON DELETE SET NULL,
   on_reach_tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), condition_type TEXT, condition_value TEXT, next_step_on_false INTEGER, after_send TEXT NOT NULL DEFAULT 'continue'
-  CHECK (after_send IN ('continue', 'pause')),
+  CHECK (after_send IN ('continue', 'pause')), target_condition_json TEXT, question_json TEXT, is_draft INTEGER NOT NULL DEFAULT 0,
   UNIQUE (scenario_id, step_order)
 );
 
@@ -1294,7 +1323,7 @@ CREATE TABLE scenarios (
   delivery_mode   TEXT NOT NULL DEFAULT 'relative' CHECK (delivery_mode IN ('relative', 'elapsed', 'absolute_time')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0);
+, line_account_id TEXT, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, allow_concurrent INTEGER NOT NULL DEFAULT 0, audience_condition_json TEXT, on_complete_mode TEXT NOT NULL DEFAULT 'pause', on_complete_scenario_id TEXT REFERENCES scenarios (id) ON DELETE SET NULL);
 
 CREATE TABLE scoring_rules (
   id          TEXT PRIMARY KEY,
@@ -1974,6 +2003,9 @@ CREATE INDEX idx_rich_menu_groups_account ON rich_menu_groups(account_id, status
 CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_index);
 
 CREATE INDEX idx_saved_searches_scope ON saved_searches(scope, display_order);
+
+CREATE INDEX idx_scenario_actions_lookup
+  ON scenario_actions (scenario_id, hook, step_id, choice_index, sort_order);
 
 CREATE INDEX idx_scenario_steps_scenario_id ON scenario_steps (scenario_id);
 

@@ -8,6 +8,20 @@ import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, Delivery
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
+import ActionEditor from '@/components/scenarios/action-editor'
+import QuestionEditor, {
+  emptyQuestion,
+  type ScenarioQuestion,
+} from '@/components/scenarios/question-editor'
+import {
+  ConditionDialog,
+  OnCompleteDialog,
+  TestSendDialog,
+  ON_COMPLETE_LABEL,
+  describeCondition,
+  type OnCompleteMode,
+} from '@/components/scenarios/scenario-dialogs'
+import type { SegmentCondition } from '@/components/shared/condition-builder'
 import ScheduleInput, {
   emptySchedule,
   buildSchedulePayload,
@@ -80,6 +94,12 @@ interface StepFormState {
   /** この通を送ったあと。'pause' なら次へ進めず止める。 */
   afterSend: 'continue' | 'pause'
   inputMode: 'direct' | 'template'
+  /** 1通ごとの配信対象。null は「購読中の全員に配信する」。 */
+  targetCondition: SegmentCondition | null
+  /** 質問メッセージ。null ならふつうの通。 */
+  question: ScenarioQuestion | null
+  /** 下書き。1 なら配信しない。 */
+  isDraft: boolean
 }
 
 function emptyStepForm(stepOrder: number): StepFormState {
@@ -92,6 +112,9 @@ function emptyStepForm(stepOrder: number): StepFormState {
     onReachTagId: null,
     afterSend: 'continue',
     inputMode: 'direct',
+    targetCondition: null,
+    question: null,
+    isDraft: false,
   }
 }
 
@@ -210,6 +233,25 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
 
+  /* --- 追加した窓。開いているものだけ描く --- */
+  /** シナリオ全体の配信対象。 */
+  const [audienceOpen, setAudienceOpen] = useState(false)
+  /** 最終コンテンツ配信後の処理。 */
+  const [onCompleteOpen, setOnCompleteOpen] = useState(false)
+  /** 1通ごとの配信対象。編集中のフォームに対して開く。 */
+  const [stepTargetOpen, setStepTargetOpen] = useState(false)
+  /** テスト送信。null なら閉じている。stepId が null なら全通。 */
+  const [testSend, setTestSend] = useState<{ stepId: string | null; label: string } | null>(null)
+  /** アクション設定。 */
+  const [actionTarget, setActionTarget] = useState<{
+    hook: 'step_sent' | 'scenario_completed' | 'choice_selected'
+    stepId: string | null
+    choiceIndex: number | null
+    title: string
+  } | null>(null)
+  /** 通ごとのアクション件数。バッジに出す。 */
+  const [actionCounts, setActionCounts] = useState<Record<string, number>>({})
+
   const [previewOpen, setPreviewOpen] = useState(false)
 
   const [stats, setStats] = useState<ScenarioStats | null>(null)
@@ -273,6 +315,30 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     })
     return () => { cancelled = true }
   }, [id])
+
+  /**
+   * 通ごとのアクション件数。行に「アクション 2」と出すために引く。
+   * 件数が見えないと、設定したことを忘れて二重に足す。
+   */
+  const reloadActionCounts = useCallback(() => {
+    api.scenarios.actions
+      .list(id)
+      .then((res) => {
+        if (!res.success) return
+        const counts: Record<string, number> = {}
+        for (const action of res.data) {
+          const key = action.hook === 'scenario_completed' ? '__complete__' : (action.stepId ?? '')
+          if (!key) continue
+          counts[key] = (counts[key] ?? 0) + 1
+        }
+        setActionCounts(counts)
+      })
+      .catch(() => {})
+  }, [id])
+
+  useEffect(() => {
+    if (id) reloadActionCounts()
+  }, [id, reloadActionCounts])
 
   const reloadStats = useCallback(() => {
     api.scenarios.stats(id).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
@@ -399,6 +465,25 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
    * 開くだけ。別のフォームを作ると、あとから入力欄が片方にしか
    * 足されない形でずれていく。
    */
+  /**
+   * 質問（分岐）の通を新しく足す。
+   *
+   * 質問は本文を持たないので、messageContent は空のまま。配信側は
+   * question_json があればそちらを組み立てる。
+   */
+  const openAddQuestionStep = () => {
+    const nextOrder = scenario
+      ? scenario.steps.length > 0
+        ? Math.max(...scenario.steps.map((s) => s.stepOrder)) + 1
+        : 1
+      : 1
+    setStepForm({ ...emptyStepForm(nextOrder), question: emptyQuestion() })
+    setEditingStepId(null)
+    setShowStepForm(true)
+    setInsertAfter(null)
+    setStepError('')
+  }
+
   const openAddTemplateStep = () => {
     const nextOrder = scenario
       ? scenario.steps.length > 0
@@ -444,6 +529,9 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       onReachTagId: step.onReachTagId ?? null,
       afterSend: step.afterSend ?? 'continue',
       inputMode: step.templateId ? 'template' : 'direct',
+      targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
+      question: (step.question as ScenarioQuestion | null) ?? null,
+      isDraft: step.isDraft === true,
     })
     setEditingStepId(step.id)
     // 編集はステップ行直下にインライン表示するので、上部の新規追加フォームは閉じる
@@ -512,6 +600,11 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         templateId: stepForm.inputMode === 'template' ? stepForm.templateId : null,
         onReachTagId: stepForm.onReachTagId,
         afterSend: stepForm.afterSend,
+        // null を渡すと「絞り込みなし」に戻る。undefined だと据え置きになるので、
+        // 外したつもりが残るのを防ぐために必ず値を送る。
+        targetCondition: stepForm.targetCondition,
+        question: stepForm.question,
+        isDraft: stepForm.isDraft,
       }
       if (editingStepId) {
         const res = await api.scenarios.updateStep(id, editingStepId, payload)
@@ -664,7 +757,54 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </div>
         </div>
 
-        {stepForm.inputMode === 'template' && (
+        {/*
+          質問（分岐）の通。本文の代わりに選択肢を組み立てる。ふつうの通と
+          行き来できるように、切り替えのボタンをここに置く。
+        */}
+        {stepForm.question ? (
+          <div className="border-hairline rounded-card border p-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-ink text-sm font-bold">質問（分岐）</h4>
+              <button
+                type="button"
+                onClick={() => setStepForm({ ...stepForm, question: null })}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-3 text-xs"
+              >
+                ふつうの通に戻す
+              </button>
+            </div>
+            <QuestionEditor
+              value={stepForm.question}
+              onChange={(next) => setStepForm({ ...stepForm, question: next })}
+              onOpenChoiceActions={
+                editingStepId
+                  ? (choiceIndex) =>
+                      setActionTarget({
+                        hook: 'choice_selected',
+                        stepId: editingStepId,
+                        choiceIndex,
+                        title: `選択肢${choiceIndex + 1}が押されたとき`,
+                      })
+                  : undefined
+              }
+            />
+            {!editingStepId && (
+              <p className="text-ink-faint mt-3 text-xs">
+                選択肢ごとのアクションは、この通を保存してから設定できます。
+              </p>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setStepForm({ ...stepForm, question: emptyQuestion() })}
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 self-start border px-3 text-xs"
+          >
+            この通を質問（分岐）にする
+          </button>
+        )}
+
+        {!stepForm.question && stepForm.inputMode === 'template' && (
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></label>
             <select
@@ -683,7 +823,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </div>
         )}
 
-        {stepForm.inputMode === 'direct' && (
+        {!stepForm.question && stepForm.inputMode === 'direct' && (
           <>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージタイプ</label>
@@ -751,6 +891,36 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
             </p>
           </div>
+
+          {/*
+            1通ごとの配信対象。シナリオ全体の絞り込みとは別。対象から外れた人は
+            この通だけ飛ばして次へ進む（止めない）。
+          */}
+          <div>
+            <label className="block text-xs font-medium text-ink-secondary mb-1">配信対象の絞り込み</label>
+            <button
+              type="button"
+              onClick={() => setStepTargetOpen(true)}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 w-full border px-3 text-left text-sm"
+            >
+              {stepForm.targetCondition
+                ? describeCondition(stepForm.targetCondition)
+                : 'シナリオ購読中の全員に配信する'}
+            </button>
+            <p className="text-xs text-ink-faint mt-0.5">
+              条件に合わない人には、この通だけ送りません。次の通へはそのまま進みます。
+            </p>
+          </div>
+
+          {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
+          <label className="text-ink-secondary flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={stepForm.isDraft}
+              onChange={(e) => setStepForm({ ...stepForm, isDraft: e.target.checked })}
+            />
+            下書きにする（配信されません。テスト送信では送れます）
+          </label>
         </div>
 
         {stepError && <p className="text-xs text-red-600">{stepError}</p>}
@@ -1063,20 +1233,36 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 </p>
               </SettingCard>
 
+              {/*
+                シナリオ全体の配信対象。購読したあとに条件から外れた人には
+                送らずに止める（完了にはしない）。条件に戻れば人が再開できる。
+              */}
               <SettingCard label="対象の絞り込み">
-                {/* 購読を始める相手を絞る条件を持っていない。呼び出し側で
-                    絞ってから開始する形になっている。 */}
-                <p className="text-ink text-sm font-bold">
-                  {triggerOptions.find((o) => o.value === scenario.triggerType)?.label ??
-                    scenario.triggerType}
-                </p>
-                <p className="text-ink-faint mt-0.5 text-xs">条件は呼び出し側で決まります</p>
+                <button
+                  type="button"
+                  onClick={() => setAudienceOpen(true)}
+                  className="text-left"
+                >
+                  <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
+                    {describeCondition((scenario.audienceCondition as SegmentCondition | null) ?? null)}
+                  </span>
+                  <span className="text-ink-faint mt-0.5 block text-xs">
+                    押すと条件を組み立てられます
+                  </span>
+                </button>
               </SettingCard>
 
               <SettingCard label="最終ステップ後の処理">
-                {/* 読み終わったあと次のシナリオへ、という設定が無い。 */}
-                <p className="text-ink text-sm font-bold">なし</p>
-                <p className="text-ink-faint mt-0.5 text-xs">読了で終わり</p>
+                <button type="button" onClick={() => setOnCompleteOpen(true)} className="text-left">
+                  <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
+                    {ON_COMPLETE_LABEL[(scenario.onCompleteMode ?? 'pause') as OnCompleteMode]}
+                  </span>
+                  <span className="text-ink-faint mt-0.5 block text-xs">
+                    {actionCounts['__complete__']
+                      ? `アクション ${actionCounts['__complete__']} 件`
+                      : '読み終えた人を次のシナリオへ送ることもできます'}
+                  </span>
+                </button>
               </SettingCard>
             </div>
 
@@ -1152,14 +1338,21 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             >
               テンプレートを追加
             </button>
-            {/* 分岐は受け口が無い。scenario_steps に条件を持つ列が無く、
-                配信側にも分けて進める仕組みが無い。 */}
+            {/* 質問メッセージ。選択肢ごとにタグ・友だち情報・シナリオを動かせる。
+                押されたことは postback で戻ってくる（sq:<stepId>:<index>）。 */}
             <button
-              disabled
-              title="分岐はまだ作れません。ステップに条件を持たせる列がありません"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              onClick={openAddQuestionStep}
+              title="質問メッセージを足します。選択肢ごとにタグ・友だち情報・シナリオを動かせます"
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
               分岐を追加
+            </button>
+            <button
+              onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
+              disabled={sortedSteps.length === 0}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
+            >
+              一括テスト送信
             </button>
           </div>
         </div>
@@ -1339,15 +1532,31 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                             >
                               プレビュー
                             </button>
-                            {/* 1通だけ試しに送る受け口が無い。一斉配信の
-                                test-send にあたるものがシナリオには無い。 */}
                             <button
                               type="button"
-                              disabled
-                              title="1通だけ試しに送る受け口がまだありません"
-                              className="text-ink-faint opacity-50"
+                              onClick={() =>
+                                setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` })
+                              }
+                              className="text-info hover:underline"
                             >
                               テスト
+                            </button>
+                            {/* この通を送ったあとに動かすアクション。件数を出すのは、
+                                設定済みを忘れて二重に足すのを防ぐため。 */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setActionTarget({
+                                  hook: 'step_sent',
+                                  stepId: step.id,
+                                  choiceIndex: null,
+                                  title: `${step.stepOrder}通目を送ったあと`,
+                                })
+                              }
+                              className="text-info hover:underline"
+                            >
+                              アクション
+                              {actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}
                             </button>
                             <button
                               type="button"
@@ -1435,6 +1644,85 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         scenarioId={id}
         onClose={() => setPreviewOpen(false)}
       />
+
+      {/* シナリオ全体の配信対象 */}
+      {audienceOpen && scenario && (
+        <ConditionDialog
+          title="対象の絞り込み"
+          description="このシナリオを配る相手を絞ります。購読したあとに条件から外れた人は、送らずに止まります。"
+          value={(scenario.audienceCondition as SegmentCondition | null) ?? null}
+          onSave={async (next) => {
+            const res = await api.scenarios.update(id, { audienceCondition: next } as never)
+            if (res.success) await loadScenario()
+          }}
+          onClose={() => setAudienceOpen(false)}
+        />
+      )}
+
+      {/* 最終コンテンツ配信後の処理 */}
+      {onCompleteOpen && scenario && (
+        <OnCompleteDialog
+          scenarioId={id}
+          mode={(scenario.onCompleteMode ?? 'pause') as OnCompleteMode}
+          targetScenarioId={scenario.onCompleteScenarioId ?? null}
+          onSave={async (mode, target) => {
+            const res = await api.scenarios.update(id, {
+              onCompleteMode: mode,
+              onCompleteScenarioId: target,
+            } as never)
+            if (!res.success) return res.error
+            await loadScenario()
+            return null
+          }}
+          onClose={() => setOnCompleteOpen(false)}
+          actionCount={actionCounts['__complete__'] ?? 0}
+          onOpenActions={() => {
+            setOnCompleteOpen(false)
+            setActionTarget({
+              hook: 'scenario_completed',
+              stepId: null,
+              choiceIndex: null,
+              title: '最終コンテンツを配り終えたあと',
+            })
+          }}
+        />
+      )}
+
+      {/* 1通ごとの配信対象。保存はフォームの「保存」でまとめて行う。 */}
+      {stepTargetOpen && (
+        <ConditionDialog
+          title="この通の配信対象"
+          description="条件に合わない人には、この通だけ送りません。次の通へはそのまま進みます。"
+          value={stepForm.targetCondition}
+          onSave={async (next) => {
+            setStepForm((prev) => ({ ...prev, targetCondition: next }))
+          }}
+          onClose={() => setStepTargetOpen(false)}
+        />
+      )}
+
+      {/* テスト送信 */}
+      {testSend && (
+        <TestSendDialog
+          scenarioId={id}
+          stepId={testSend.stepId}
+          stepLabel={testSend.label}
+          onClose={() => setTestSend(null)}
+        />
+      )}
+
+      {/* アクション設定 */}
+      {actionTarget && (
+        <ActionEditor
+          scenarioId={id}
+          hook={actionTarget.hook}
+          stepId={actionTarget.stepId}
+          choiceIndex={actionTarget.choiceIndex}
+          title={actionTarget.title}
+          onClose={() => setActionTarget(null)}
+          onChanged={reloadActionCounts}
+        />
+      )}
     </div>
   )
 }

@@ -18,6 +18,13 @@ const deliveryModeLabels: Record<DeliveryMode, string> = {
   absolute_time: '時刻',
 }
 
+/** 最終コンテンツを配り終えたあとどうするか（121）。 */
+const ON_COMPLETE_LABELS: Record<string, string> = {
+  pause: '一時停止',
+  resume_previous: '1つ前を再開',
+  move: '別のシナリオへ',
+}
+
 interface ScenarioListProps {
   scenarios: ScenarioRow[]
   onToggleActive: (id: string, current: boolean) => void
@@ -98,6 +105,11 @@ export default function ScenarioList({
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
                 通数
               </th>
+              {/* 配り終えた人をどうするか。一覧で見えないと、シナリオを
+                  つないだつもりが繋がっていないことに気づけない。 */}
+              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
+                終了後
+              </th>
               <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
                 状態
               </th>
@@ -158,6 +170,18 @@ export default function ScenarioList({
                 <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
                   {(s.subscriberCount ?? 0).toLocaleString('ja-JP')}
                   <span className="text-ink-faint ml-0.5 text-xs">人</span>
+                  {/*
+                    0人のとき、作っただけでは配信されないことに気づけない。
+                    始め方への導線をその場に出す。
+                  */}
+                  {(s.subscriberCount ?? 0) === 0 && (
+                    <Link
+                      href={`/scenarios/detail?id=${s.id}`}
+                      className="text-info mt-0.5 block text-xs font-normal hover:underline"
+                    >
+                      配信を始める方法
+                    </Link>
+                  )}
                 </td>
                 <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
                   {(s.completedCount ?? 0).toLocaleString('ja-JP')}
@@ -168,6 +192,9 @@ export default function ScenarioList({
                   {s.stepCount !== undefined && (
                     <span className="text-ink-faint ml-0.5 text-xs">通</span>
                   )}
+                </td>
+                <td className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
+                  {ON_COMPLETE_LABELS[s.onCompleteMode ?? 'pause']}
                 </td>
                 {/* 列が狭いと「配信可」が「配信 / 可」の2行になる。
                     札の中で折り返させない。 */}
