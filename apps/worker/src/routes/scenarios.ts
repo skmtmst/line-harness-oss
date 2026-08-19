@@ -806,7 +806,7 @@ scenarios.put('/api/scenarios/:id/steps/:stepId', requireRole('owner', 'admin'),
     // body 内容 (UI の templates state が古い等) が保存されるのを防ぐ。
     // templateId が指定されていない場合は body の値をそのまま使う (直接入力モード)。
     const effectiveMessageType = templateSnapshot
-      ? ((templateSnapshot.message_type === 'carousel' ? 'flex' : templateSnapshot.message_type) as MessageType)
+      ? (templateSnapshot.message_type as MessageType)
       : body.messageType;
     const effectiveMessageContent = templateSnapshot
       ? templateSnapshot.message_content

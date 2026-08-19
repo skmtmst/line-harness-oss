@@ -871,6 +871,45 @@ export function buildMessage(messageType: string, messageContent: string, altTex
     }
   }
 
+  /*
+   * カルーセル。
+   *
+   * 中身は columns の配列。LINE では Flex ではなく **template メッセージ**。
+   *   { type: 'template', altText, template: { type: 'carousel', columns } }
+   * Flex として送ると 400 になり、400 は永続エラー扱いなのでその人の
+   * 購読ごと止まる。
+   */
+  if (messageType === 'carousel') {
+    try {
+      const columns = JSON.parse(messageContent) as unknown;
+      if (!Array.isArray(columns) || columns.length === 0) {
+        return { type: 'text', text: messageContent };
+      }
+      return {
+        type: 'template',
+        altText: altText || extractCarouselAltText(columns),
+        template: { type: 'carousel', columns },
+      };
+    } catch {
+      return { type: 'text', text: messageContent };
+    }
+  }
+
   // Fallback
   return { type: 'text', text: messageContent };
+}
+
+/**
+ * 通知欄に出る文。1枚目の題か本文を使う。
+ *
+ * 空のままにすると、通知に何も出ずに「1件のメッセージ」だけになる。
+ */
+function extractCarouselAltText(columns: unknown[]): string {
+  const first = columns[0];
+  if (first && typeof first === 'object') {
+    const c = first as { title?: unknown; text?: unknown };
+    if (typeof c.title === 'string' && c.title.trim()) return c.title.slice(0, 400);
+    if (typeof c.text === 'string' && c.text.trim()) return c.text.slice(0, 400);
+  }
+  return 'カルーセル';
 }

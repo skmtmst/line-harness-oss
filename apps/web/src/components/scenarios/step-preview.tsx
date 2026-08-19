@@ -220,6 +220,18 @@ export default function StepPreview({
                 </span>
               </Bubble>
             </>
+          ) : kind === 'carousel' ? (
+            templateName ? (
+              <Bubble>
+                <span className="text-ink-faint text-xs">カルーセル</span>
+                <span className="text-ink mt-0.5 block text-sm font-bold">{templateName}</span>
+                <span className="text-ink-faint mt-1 block text-xs">
+                  実際の見た目は、カルーセルの編集画面で確かめられます。
+                </span>
+              </Bubble>
+            ) : (
+              <Placeholder>カルーセルを選ぶと、ここに出ます</Placeholder>
+            )
           ) : kind === 'location' ? (
             kindState?.location.latitude && kindState.location.longitude ? (
               <Bubble>

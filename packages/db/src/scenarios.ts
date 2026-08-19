@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 import { computeNextDeliveryAt } from './scenario-schedule.js';
 export type ScenarioTriggerType = 'friend_add' | 'tag_added' | 'manual';
-export type MessageType = 'text' | 'image' | 'flex' | 'location' | 'video' | 'audio' | 'sticker';
+export type MessageType = 'text' | 'image' | 'flex' | 'location' | 'video' | 'audio' | 'sticker' | 'carousel';
 export type FriendScenarioStatus = 'active' | 'paused' | 'completed' | 'delivering';
 export type DeliveryMode = 'relative' | 'elapsed' | 'absolute_time';
 

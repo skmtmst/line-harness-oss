@@ -18,6 +18,7 @@ const messageTypeLabels: Record<MessageType, string> = {
   video: '動画',
   audio: '音声',
   sticker: 'スタンプ',
+  carousel: 'カルーセル',
 }
 
 function minutesToDisplay(minutes: number): { days: number; hours: number; mins: number } {

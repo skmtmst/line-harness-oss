@@ -10,6 +10,7 @@ import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
+import CarouselPicker from '@/components/scenarios/carousel-picker'
 import MessageKindFields, {
   emptyMessageKindState,
   parseMessageKind,
@@ -65,6 +66,7 @@ const messageTypeOptions: { value: MessageType; label: string }[] = [
   { value: 'location', label: '位置情報' },
   { value: 'video', label: '動画' },
   { value: 'audio', label: '音声' },
+  { value: 'carousel', label: 'カルーセル' },
 ]
 
 const modeBadgeStyle: Record<DeliveryMode, { bg: string; text: string; label: string }> = {
@@ -885,7 +887,21 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
               中身は JSON なので、生のまま書かせると必ず壊れる。
             */}
-            {isStructuredKind(stepForm.messageType) ? (
+            {stepForm.messageType === 'carousel' ? (
+              // カルーセルはテンプレートを指す形。中身はそちらが持つ。
+              <CarouselPicker
+                value={stepForm.templateId ?? ''}
+                onChange={(id, tpl) =>
+                  setStepForm((prev) => ({
+                    ...prev,
+                    templateId: id || null,
+                    // 控えは実物を入れる。テンプレートを消したときに
+                    // これが使われるので、要約では送れなくなる。
+                    messageContent: tpl?.messageContent ?? '',
+                  }))
+                }
+              />
+            ) : isStructuredKind(stepForm.messageType) ? (
               <MessageKindFields
                 kind={stepForm.messageType as MessageKind}
                 value={kindState}

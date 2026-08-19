@@ -142,7 +142,12 @@
     "133_step_message_kinds_copy.sql",
     "134_step_message_kinds_swap.sql",
     "135_step_message_kinds_rename.sql",
-    "136_step_message_kinds_index.sql"
+    "136_step_message_kinds_index.sql",
+    "137_step_carousel_kind.sql",
+    "138_step_carousel_copy.sql",
+    "139_step_carousel_swap.sql",
+    "140_step_carousel_rename.sql",
+    "141_step_carousel_index.sql"
   ],
-  "migrationCount": 143
+  "migrationCount": 148
 }
