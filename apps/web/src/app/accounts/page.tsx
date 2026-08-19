@@ -1,18 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
-import TestRecipientsSetting from '@/components/accounts/test-recipients-setting'
-import AccountSettingsSection from '@/components/accounts/account-settings-section'
-import ReorderMode from '@/components/accounts/reorder-mode'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
-import LinkBaseUrlSetting from '@/components/accounts/link-base-url-setting'
-import FollowerImportButton from '@/components/accounts/follower-import-button'
-import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AccountHierarchy from './account-hierarchy'
+
+type WebhookStatus = 'matched' | 'mismatched' | 'unconfigured' | 'unknown'
 
 interface LineAccountListItem {
   id: string
@@ -26,11 +22,8 @@ interface LineAccountListItem {
   liffId: string | null
   createdAt: string
   updatedAt: string
-  stats: {
-    friendCount: number
-    activeScenarios: number
-    messagesThisMonth: number
-  }
+  stats: { friendCount: number; activeScenarios: number; messagesThisMonth: number }
+  webhook?: { expectedUrl: string; actualUrl: string | null; active: boolean | null; status: WebhookStatus }
   ogSiteName: string | null
   ogDefaultDescription: string | null
   ogDefaultImageUrl: string | null
@@ -44,272 +37,207 @@ const MERGED_TABS = [
   { key: 'accounts', label: 'アカウント一覧' },
   { key: 'hierarchy', label: 'LINEアカウント構成' },
 ]
+const PAGE_SIZE = 20
+
+function webhookLabel(status: WebhookStatus | undefined) {
+  if (status === 'matched') return '一致（正常）'
+  if (status === 'mismatched') return '不一致'
+  if (status === 'unconfigured') return '未設定（不一致）'
+  return '未確認'
+}
 
 function AccountsPageInner() {
   const [accounts, setAccounts] = useState<LineAccountListItem[]>([])
+  const [uniqueFriendCount, setUniqueFriendCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showReorder, setShowReorder] = useState(false)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<'friends' | 'name' | 'status'>('friends')
+  const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<LineAccountListItem | null>(null)
 
   const load = async () => {
     setLoading(true)
     setError('')
-    try {
-      const res = await api.lineAccounts.list()
-      if (res.success) {
-        setAccounts(res.data as unknown as LineAccountListItem[])
-      } else {
-        setError('アカウント情報の取得に失敗しました')
-      }
-    } catch {
-      setError('APIに接続できませんでした。サーバーが起動しているか確認してください。')
+    const [accountsResult, summaryResult] = await Promise.allSettled([
+      api.lineAccounts.list(),
+      api.lineAccounts.summary(),
+    ])
+    if (accountsResult.status === 'fulfilled' && accountsResult.value.success) {
+      setAccounts(accountsResult.value.data as unknown as LineAccountListItem[])
+    } else {
+      setError('アカウント情報の取得に失敗しました')
+    }
+    if (summaryResult.status === 'fulfilled' && summaryResult.value.success) {
+      setUniqueFriendCount(summaryResult.value.data.uniqueFriendCount)
+    } else {
+      setUniqueFriendCount(null)
     }
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { void load() }, [])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('このLINEアカウントを削除しますか？')) return
-    await api.lineAccounts.delete(id)
-    load()
-  }
+  const shown = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase('ja-JP')
+    const filtered = accounts.filter((account) =>
+      !needle || [account.name, account.displayName, account.basicId, account.channelId]
+        .some((value) => value?.toLocaleLowerCase('ja-JP').includes(needle)),
+    )
+    return [...filtered].sort((a, b) => {
+      if (sort === 'name') return a.displayName.localeCompare(b.displayName, 'ja')
+      if (sort === 'status') return Number(b.isActive) - Number(a.isActive)
+      return (b.stats?.friendCount ?? 0) - (a.stats?.friendCount ?? 0)
+    })
+  }, [accounts, query, sort])
 
-  const handleToggle = async (id: string, currentActive: boolean) => {
-    await api.lineAccounts.update(id, { isActive: !currentActive })
-    load()
+  useEffect(() => { setPage(1) }, [query, sort])
+
+  const pageCount = Math.max(1, Math.ceil(shown.length / PAGE_SIZE))
+  const pageItems = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const matchedCount = accounts.filter((account) => account.webhook?.status === 'matched').length
+  const warningAccount = accounts.find((account) =>
+    account.webhook?.status === 'mismatched' || account.webhook?.status === 'unconfigured',
+  )
+
+  const exportCsv = () => {
+    const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`
+    const rows = [
+      ['アカウント名', 'LINE ID', '友だち', 'Webhook', '状態'],
+      ...shown.map((account) => [
+        account.displayName,
+        account.basicId ?? '',
+        account.stats?.friendCount ?? 0,
+        webhookLabel(account.webhook?.status),
+        account.isActive ? '稼働中' : '停止中',
+      ]),
+    ]
+    const csv = `\uFEFF${rows.map((row) => row.map(quote).join(',')).join('\n')}`
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `line-accounts-${new Date().toISOString().slice(0, 10)}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
     <div>
-      <div data-design="Head">
-      <Header
-        title="アカウント"
-        description="接続しているLINE公式アカウントを管理します。"
-        action={
-          <div className="flex flex-wrap gap-2">
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-xs font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-            <button
-              onClick={() => setShowReorder(true)}
-              className="px-3 py-2 rounded-lg text-xs font-medium border border-gray-300 hover:bg-gray-50"
-            >
-              並び替えモード
-            </button>
-            <Link
-              href="/accounts/new"
-              className="px-4 py-2 rounded-lg text-white text-sm font-medium"
-              style={{ backgroundColor: 'var(--color-accent)' }}
-            >
-              アカウントを追加
-            </Link>
+      {warningAccount && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card bg-warning-bg px-4 py-3 text-sm text-ink">
+          <p className="min-w-0 flex-1 leading-5">
+            <span className="mr-2 text-warning">⚠</span>
+            <strong>「{warningAccount.displayName}」のWebhook URLが{warningAccount.webhook?.status === 'unconfigured' ? '設定されていません' : '一致していません'}</strong>
+            <span className="ml-3 text-xs text-ink-secondary">当システムが発行したURLと、LINE公式アカウント側のURLを確認してください。</span>
+          </p>
+          <button onClick={() => setEditing(warningAccount)} className="cursor-pointer whitespace-nowrap rounded-control border border-hairline bg-canvas px-3 py-2 text-xs font-medium hover:bg-canvas-sunken">
+            → 設定を確認する
+          </button>
+        </div>
+      )}
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Kpi label="接続アカウント" value={accounts.length} unit="件" note={`稼働中 ${accounts.filter((account) => account.isActive).length}`} />
+        <Kpi label="友だち合計" value={uniqueFriendCount ?? accounts.reduce((sum, account) => sum + (account.stats?.friendCount ?? 0), 0)} unit="人" note={uniqueFriendCount == null ? '重複判定は未確認' : '重複を除く'} />
+        <Kpi label="Webhook 一致" value={`${matchedCount} / ${accounts.length}`} warning={matchedCount !== accounts.length} note={`要確認 ${Math.max(0, accounts.length - matchedCount)}件`} />
+      </div>
+
+      {error && <div className="mb-4 rounded-card border border-danger/20 bg-danger-bg p-4 text-sm text-danger">{error}</div>}
+
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <label className="flex min-w-[240px] flex-1 items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink-secondary focus-within:border-accent">
+          <span aria-hidden>⌕</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="アカウント名で検索" className="min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-ink-faint" />
+        </label>
+        <label className="flex items-center gap-2 text-xs text-ink-faint">
+          <span className="whitespace-nowrap">並び順</span>
+          <select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink outline-none">
+            <option value="friends">友だちが多い順</option>
+            <option value="name">アカウント名順</option>
+            <option value="status">稼働中を先に表示</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 text-xs text-ink-faint">
+          <span className="whitespace-nowrap">期間</span>
+          <select aria-label="集計期間" className="rounded-control border border-hairline bg-canvas px-3 py-2 text-sm text-ink outline-none"><option>過去30日</option></select>
+        </label>
+        <button onClick={exportCsv} disabled={shown.length === 0} className="ml-auto cursor-pointer whitespace-nowrap px-2 py-2 text-xs font-medium text-accent disabled:cursor-not-allowed disabled:opacity-40">⇩ CSVで書き出す</button>
+      </div>
+
+      <div className="min-h-[560px] overflow-hidden rounded-card border border-hairline bg-canvas">
+        <table className="w-full table-fixed text-left text-sm">
+          <colgroup>
+            <col className="w-8" /><col className="w-[24%]" /><col className="w-[15%]" /><col className="w-[10%]" />
+            <col className="w-[11%]" /><col className="w-[18%]" /><col className="w-[13%]" /><col className="w-12" />
+          </colgroup>
+          <thead><tr className="border-b border-hairline bg-canvas-sunken text-xs text-ink-faint">
+            <th aria-label="並び替え" /><th className="px-2 py-3 font-medium">アカウント名</th>
+            <th className="hidden px-2 py-3 font-medium lg:table-cell">LINE ID</th><th className="hidden px-2 py-3 font-medium lg:table-cell">プラン</th>
+            <th className="px-2 py-3 font-medium">友だち</th><th className="px-2 py-3 font-medium">Webhook の一致</th>
+            <th className="px-2 py-3 font-medium">状態</th><th aria-label="詳細" />
+          </tr></thead>
+          <tbody className="divide-y divide-hairline">
+            {loading ? (
+              <tr><td colSpan={8} className="p-10 text-center text-ink-faint">読み込み中…</td></tr>
+            ) : pageItems.length === 0 ? (
+              <tr><td colSpan={8} className="p-10 text-center text-ink-faint">{accounts.length === 0 ? '未設定のアカウントはありません' : '検索条件に一致するアカウントはありません'}</td></tr>
+            ) : pageItems.map((account) => (
+              <tr key={account.id} className="hover:bg-canvas-sunken">
+                <td className="px-2 py-3 text-center text-ink-faint" title="並び替えはLINEアカウント構成から行えます">⠇</td>
+                <td className="px-2 py-3"><button onClick={() => setEditing(account)} title={account.displayName} className="block max-w-full cursor-pointer truncate whitespace-nowrap font-semibold text-accent hover:underline">{account.displayName}</button></td>
+                <td className="hidden truncate whitespace-nowrap px-2 py-3 text-xs text-ink-secondary lg:table-cell" title={account.basicId ?? account.channelId}>{account.basicId ?? account.channelId}</td>
+                <td className="hidden whitespace-nowrap px-2 py-3 font-medium lg:table-cell">—</td>
+                <td className="whitespace-nowrap px-2 py-3 font-semibold tabular-nums">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')} 人</td>
+                <td className={`truncate whitespace-nowrap px-2 py-3 text-xs ${account.webhook?.status === 'matched' ? 'text-success' : account.webhook?.status === 'unknown' ? 'text-ink-faint' : 'text-warning'}`} title={`${webhookLabel(account.webhook?.status)}${account.webhook?.actualUrl ? `: ${account.webhook.actualUrl}` : ''}`}>{webhookLabel(account.webhook?.status)}</td>
+                <td className="px-2 py-3"><span className={`inline-flex whitespace-nowrap rounded-pill px-2 py-1 text-xs font-medium ${account.isActive ? 'bg-accent-bg text-success' : 'bg-warning-bg text-warning'}`}>{account.isActive ? '稼働中' : '停止中'}</span></td>
+                <td className="px-2 py-3 text-center"><button onClick={() => setEditing(account)} aria-label={`${account.displayName}の設定を開く`} className="h-7 w-7 cursor-pointer rounded-full border border-hairline text-ink-secondary hover:border-accent hover:text-accent">→</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!loading && accounts.length > 0 && <p className="border-t border-hairline bg-info-bg px-4 py-3 text-xs leading-5 text-ink-secondary">ⓘ 「当システムが発行したWebhook URL」と「LINE公式アカウント側に実際に設定されているURL」をすべて照合しています。</p>}
+        <div className="flex items-center justify-between border-t border-hairline px-4 py-3 text-xs text-ink-faint">
+          <span>全 {shown.length} 件</span><div className="flex items-center gap-2">
+            <button onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={page === 1} className="cursor-pointer rounded-control border border-hairline px-3 py-1.5 text-ink disabled:cursor-not-allowed disabled:opacity-40">前へ</button>
+            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-accent-bg font-medium text-success">{page}</span>
+            <button onClick={() => setPage((value) => Math.min(pageCount, value + 1))} disabled={page === pageCount} className="cursor-pointer rounded-control border border-hairline px-3 py-1.5 text-ink disabled:cursor-not-allowed disabled:opacity-40">次へ</button>
           </div>
-        }
-      />
-      </div>
-
-      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">接続アカウント</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {accounts.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
-          </p>
-          <p className="text-ink-faint mt-0.5 text-xs">
-            稼働中 {accounts.filter((a) => a.isActive).length}
-          </p>
-        </div>
-        <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">友だち合計</p>
-          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {accounts.reduce((sum, a) => sum + (a.stats?.friendCount ?? 0), 0).toLocaleString('ja-JP')}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
-          </p>
-          {/* 同じ人が複数アカウントを友だち追加していると二重に数える。
-              重複を除いた数は「重複」の画面でしか出せない。 */}
-          <p className="text-ink-faint mt-0.5 text-xs">重複を含む延べ数</p>
         </div>
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">読み込み中...</div>
-      ) : accounts.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          <p className="mb-2">LINEアカウントが登録されていません</p>
-          <p className="text-xs text-gray-300">LINE Developers Console からChannel情報を取得して登録してください</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {accounts.map((account) => (
-            <div key={account.id} className="bg-white rounded-lg border border-gray-200 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  {account.pictureUrl ? (
-                    <img
-                      src={account.pictureUrl}
-                      alt={account.displayName}
-                      className="w-10 h-10 rounded-lg object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-                      style={{ backgroundColor: account.isActive ? 'var(--color-accent)' : '#9CA3AF' }}
-                    >
-                      {account.displayName?.charAt(0) || 'L'}
-                    </div>
-                  )}
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">{account.displayName}</h3>
-                    <p className="text-xs text-gray-400 font-mono">
-                      {account.basicId ? `${account.basicId} · ` : ''}Channel: {account.channelId}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleToggle(account.id, account.isActive)}
-                  className={`text-xs px-2 py-0.5 rounded-full ${account.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}
-                >
-                  {account.isActive ? '有効' : '無効'}
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-3 mb-4 py-3 border-t border-b border-gray-100">
-                <div className="text-center">
-                  <p className="text-lg font-bold text-gray-900">{account.stats.friendCount}</p>
-                  <p className="text-xs text-gray-400">友だち</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-lg font-bold text-blue-600">{account.stats.activeScenarios}</p>
-                  <p className="text-xs text-gray-400">配信中</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-lg font-bold text-green-600">{account.stats.messagesThisMonth}</p>
-                  <p className="text-xs text-gray-400">今月送信</p>
-                </div>
-              </div>
-
-              {/* Login/LIFF status badges — at-a-glance signal that an account
-                  is fully wired. Important because SQL-only setup historically
-                  left rows half-configured (Login/LIFF blank). */}
-              <div className="flex gap-2 mb-3 text-[11px]">
-                <span
-                  className={`px-2 py-0.5 rounded-full ${
-                    account.loginChannelId
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'bg-gray-100 text-gray-400'
-                  }`}
-                >
-                  Login: {account.loginChannelId ? '設定済' : '未設定'}
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded-full ${
-                    account.liffId
-                      ? 'bg-purple-50 text-purple-700'
-                      : 'bg-gray-100 text-gray-400'
-                  }`}
-                >
-                  LIFF: {account.liffId ? '設定済' : '未設定'}
-                </span>
-              </div>
-
-              <AccountSettingsSection
-                accountId={account.id}
-                initialCountry={(account as { country?: string | null }).country ?? null}
-                initialRole={(account as { role?: string | null }).role ?? null}
-                onUpdated={load}
-              />
-              <TestRecipientsSetting accountId={account.id} />
-              <FollowerImportButton accountId={account.id} onImported={load} />
-
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                <p className="text-xs text-gray-400">
-                  登録: {new Date(account.createdAt).toLocaleDateString('ja-JP')}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setEditing(account)}
-                    className="text-xs text-blue-600 hover:text-blue-800"
-                  >
-                    編集
-                  </button>
-                  <button
-                    onClick={() => handleDelete(account.id)}
-                    className="text-red-500 hover:text-red-700 text-xs"
-                  >
-                    削除
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="mt-8">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">グローバル設定</h2>
-        <LinkBaseUrlSetting />
-      </div>
-      {showReorder && (
-        <ReorderMode
-          accounts={accounts.map((a) => ({
-            id: a.id,
-            name: a.name,
-            displayName: a.displayName,
-            country: (a as { country?: string | null }).country ?? null,
-          }))}
-          onClose={() => setShowReorder(false)}
-          onSaved={load}
-        />
-      )}
-      {editing && (
-        <AccountEditModal
-          accountId={editing.id}
-          initialName={editing.name}
-          initialChannelId={editing.channelId}
-          initialLoginChannelId={editing.loginChannelId}
-          initialLiffId={editing.liffId}
-          initialOgSiteName={editing.ogSiteName}
-          initialOgDefaultDescription={editing.ogDefaultDescription}
-          initialOgDefaultImageUrl={editing.ogDefaultImageUrl}
-          initialFriendCapacity={editing.friendCapacity ?? null}
-          initialCapacityWarnAt={editing.capacityWarnAt ?? null}
-          initialIconUrl={editing.iconUrl ?? null}
-          onClose={() => setEditing(null)}
-          onSaved={load}
-        />
-      )}
+      {editing && <AccountEditModal
+        accountId={editing.id} initialName={editing.name} initialChannelId={editing.channelId}
+        initialLoginChannelId={editing.loginChannelId} initialLiffId={editing.liffId}
+        initialOgSiteName={editing.ogSiteName} initialOgDefaultDescription={editing.ogDefaultDescription}
+        initialOgDefaultImageUrl={editing.ogDefaultImageUrl} initialFriendCapacity={editing.friendCapacity ?? null}
+        initialCapacityWarnAt={editing.capacityWarnAt ?? null} initialIconUrl={editing.iconUrl ?? null}
+        onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await load() }}
+      />}
     </div>
   )
+}
+
+function Kpi({ label, value, unit, note, warning = false }: { label: string; value: string | number; unit?: string; note: string; warning?: boolean }) {
+  return <div className="rounded-card border border-hairline bg-canvas p-4">
+    <p className="text-xs font-medium text-ink-faint">{label}</p>
+    <p className={`mt-1 text-2xl font-bold tabular-nums ${warning ? 'text-warning' : 'text-ink'}`}>{typeof value === 'number' ? value.toLocaleString('ja-JP') : value}{unit && <span className="ml-1 text-xs font-normal text-ink-faint">{unit}</span>}</p>
+    <p className="mt-1 text-xs text-ink-faint">{note}</p>
+  </div>
 }
 
 function AccountsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
-  return (
-    <div>
-      <div data-design="Tabs">
-        <MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} />
-      </div>
-      {tab === 'accounts' && <AccountsPageInner />}
-      {tab === 'hierarchy' && <AccountHierarchy />}
-    </div>
-  )
+  return <div>
+    <div data-design="Head"><Header
+      title="アカウント"
+      description="接続しているLINE公式アカウントと、アカウント同士の階層構成を管理します。チャネル設定とWebhookの状態も、この画面から確認できます。"
+      action={<div className="flex items-center gap-3"><button disabled title="マニュアルは準備中です" className="whitespace-nowrap text-xs text-ink-faint opacity-70">▫ マニュアル</button><Link href="/accounts/new" className="cursor-pointer whitespace-nowrap rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent">＋ アカウントを追加</Link></div>}
+    /></div>
+    <div data-design="Tabs"><MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} /></div>
+    {tab === 'accounts' && <AccountsPageInner />}{tab === 'hierarchy' && <AccountHierarchy />}
+  </div>
 }
 
 export default function AccountsPage() {
-  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
-  return (
-    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
-      <AccountsPageHost />
-    </Suspense>
-  )
+  return <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}><AccountsPageHost /></Suspense>
 }
