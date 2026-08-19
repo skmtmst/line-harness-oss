@@ -103,7 +103,9 @@ export type AuthenticatedStaff = {
   role: StaffRole;
   /** true なら役割にかかわらず更新・削除・設定変更をさせない。 */
   readOnly: boolean;
-  permissionKeys: string[];
+  permissionKeys?: string[];
+  assignedLineAccountId?: string | null;
+  canAccessDescendantAccounts?: boolean;
 };
 
 function toAuthenticatedStaff(staff: {
@@ -112,6 +114,8 @@ function toAuthenticatedStaff(staff: {
   role: StaffRole;
   access_level?: 'full' | 'read_only';
   permission_keys?: string;
+  assigned_line_account_id?: string | null;
+  can_access_descendant_accounts?: number;
 }): AuthenticatedStaff {
   let permissionKeys: string[] = [];
   try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
@@ -121,6 +125,8 @@ function toAuthenticatedStaff(staff: {
     role: staff.role,
     readOnly: staff.access_level === 'read_only',
     permissionKeys,
+    assignedLineAccountId: staff.assigned_line_account_id ?? null,
+    canAccessDescendantAccounts: Boolean(staff.can_access_descendant_accounts),
   };
 }
 
@@ -192,7 +198,7 @@ export async function authenticateApiToken(
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [] };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true };
   }
 
   // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
@@ -206,7 +212,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     console.log('[auth] accept_via=LEGACY_API_KEY');
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [] };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true };
   }
 
   return null;
