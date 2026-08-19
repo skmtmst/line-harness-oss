@@ -87,7 +87,8 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/templates', label: 'テンプレート', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' , id: 'templates', note: '差し込み変数付きの文面', featureKey: 'templates' },
       { href: '/rich-menus', label: 'リッチメニュー', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z' , id: 'rich-menus', note: 'トーク下部のメニューと出し分け', featureKey: 'rich_menus' },
       { href: '/form-submissions', label: '回答フォーム', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' , id: 'forms', note: 'フォームの作成と、友だち情報欄への記録', featureKey: 'forms' },
-      { href: '/contents', label: 'コンテンツ', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' , id: 'contents', note: '配信で使う画像・動画・ファイルの置き場', featureKey: 'media' },
+      { href: '/contents/vars', label: '共通情報', icon: 'M4 7V4h16v3M9 20h6M12 4v16' , id: 'common-vars', note: '会社名・営業時間など、アカウント内で共通に使う文字。テンプレートに差し込める', featureKey: 'media' },
+      { href: '/contents', label: '登録メディア一覧', icon: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z' , id: 'contents', note: '配信で使う画像・動画・ファイルの置き場', featureKey: 'media' },
     ],
   },
   {

@@ -436,6 +436,64 @@ export type ListStats = {
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number }
 }
 
+/* ---- リッチメニューのボタン（147） ---- */
+
+/**
+ * ボタンが「何をするか」。
+ *
+ * LINE が持てる動きは uri / message / postback / richmenuswitch の4つだけ。
+ * 「電話をかける」「テンプレートを送る」「回答フォームを開く」はその上に乗せた
+ * 言い換えで、LINE に登録するときに4つのどれかへ変換される。
+ */
+export type RichMenuAreaIntent =
+  | 'url'
+  | 'tel'
+  | 'text'
+  | 'template'
+  | 'form'
+  | 'switch'
+  | 'postback'
+
+/** 保存するときに送るボタン1つぶん。 */
+export type RichMenuAreaPayload = {
+  /** 既存ボタンの id。渡すと引き継がれる（押された回数の集計が途切れない）。 */
+  id?: string
+  boundsX: number
+  boundsY: number
+  boundsWidth: number
+  boundsHeight: number
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  actionData: Record<string, unknown>
+  intent?: RichMenuAreaIntent | null
+  /** 管理用のボタン名。 */
+  label?: string | null
+  /** 押されたときに付けるタグ。 */
+  tagIds?: string[] | null
+  /** 押されたときに足すスコア。 */
+  scoreChange?: number | null
+  templateId?: string | null
+  formId?: string | null
+  trackedLinkId?: string | null
+}
+
+/** 読み出したときのボタン1つぶん。 */
+export type RichMenuAreaResponse = {
+  id: string
+  boundsX: number
+  boundsY: number
+  boundsWidth: number
+  boundsHeight: number
+  actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
+  actionData: Record<string, unknown>
+  intent: RichMenuAreaIntent | null
+  label: string | null
+  tagIds: string[]
+  scoreChange: number | null
+  templateId: string | null
+  formId: string | null
+  trackedLinkId: string | null
+}
+
 /** シナリオの開始のきっかけ（128）。1本に複数持てる。 */
 export type ScenarioTriggerItem = {
   id: string
@@ -1273,14 +1331,23 @@ export const api = {
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
-    list: () => fetchApi<ApiResponse<CommonVar[]>>('/api/common-vars'),
-    create: (data: { name: string; varKey: string; type?: string; value?: string }) =>
+    list: (params?: { folderId?: string }) =>
+      fetchApi<ApiResponse<CommonVar[]>>(
+        `/api/common-vars${params?.folderId ? `?folderId=${encodeURIComponent(params.folderId)}` : ''}`,
+      ),
+    create: (data: {
+      name: string
+      varKey: string
+      type?: string
+      value?: string
+      folderId?: string | null
+    }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
-    update: (id: string, data: { name?: string; value?: string }) =>
+    update: (id: string, data: { name?: string; value?: string; folderId?: string | null }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -2726,15 +2793,7 @@ export const api = {
           lineRichmenuId: string | null;
           imageR2Key: string | null;
           imageContentType: string | null;
-          areas: Array<{
-            id: string;
-            boundsX: number;
-            boundsY: number;
-            boundsWidth: number;
-            boundsHeight: number;
-            actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-            actionData: Record<string, unknown>;
-          }>;
+          areas: RichMenuAreaResponse[];
         }>;
       }>>(`/api/rich-menu-groups/${groupId}`),
 
@@ -2747,14 +2806,7 @@ export const api = {
         id?: string;
         name: string;
         orderIndex: number;
-        areas: Array<{
-          boundsX: number;
-          boundsY: number;
-          boundsWidth: number;
-          boundsHeight: number;
-          actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-          actionData: Record<string, unknown>;
-        }>;
+        areas: RichMenuAreaPayload[];
       }>;
     }) =>
       fetchApi<ApiResponse<{ id: string; pages: Array<{ id: string }> }>>('/api/rich-menu-groups', {
@@ -2770,14 +2822,7 @@ export const api = {
         id?: string;
         name: string;
         orderIndex: number;
-        areas: Array<{
-          boundsX: number;
-          boundsY: number;
-          boundsWidth: number;
-          boundsHeight: number;
-          actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
-          actionData: Record<string, unknown>;
-        }>;
+        areas: RichMenuAreaPayload[];
       }>;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/rich-menu-groups/${groupId}`, {
