@@ -3,6 +3,11 @@ import type {
   BroadcastBubbleType,
   BroadcastMessageAsset,
 } from '@/lib/api'
+import {
+  serializeMessageKind,
+  type MessageKind,
+  type MessageKindState,
+} from '@/components/scenarios/message-kind-fields'
 
 export interface BroadcastTemplateOption {
   id: string
@@ -76,7 +81,7 @@ export function contentTemplateToBubble(asset: BroadcastMessageAsset): Broadcast
 }
 
 export function bubbleLegacyMessage(bubble: BroadcastBubble): {
-  messageType: 'text' | 'image' | 'flex'
+  messageType: BroadcastMessageKind
   messageContent: string
 } {
   if (bubble.type === 'text') {
@@ -88,11 +93,38 @@ export function bubbleLegacyMessage(bubble: BroadcastBubble): {
   if (bubble.type === 'flex') {
     return { messageType: 'flex', messageContent: String(bubble.content.flexJson ?? '') }
   }
+  if (bubble.type === 'video') {
+    return { messageType: 'video', messageContent: JSON.stringify(bubble.content) }
+  }
+  if (bubble.type === 'carousel') {
+    // 中身そのもの（columns の配列）を渡す。テンプレートを消したあとも送れる。
+    return { messageType: 'carousel', messageContent: String(bubble.content.columnsJson ?? '') }
+  }
+  if (KIND_FIELD_TYPES.has(bubble.type)) {
+    // シナリオと同じ並べ方に直す。書けていなければ空（保存前に validate が止める）。
+    const state = bubble.content.state as MessageKindState | undefined
+    const json = state ? serializeMessageKind(bubble.type as MessageKind, state) : null
+    return { messageType: bubble.type as BroadcastMessageKind, messageContent: json ?? '' }
+  }
   if (bubble.type === 'rich_message' || bubble.type === 'card_message') {
     return { messageType: 'flex', messageContent: JSON.stringify(bubble.content) }
   }
   return { messageType: 'text', messageContent: JSON.stringify(bubble.content) }
 }
+
+/** 一斉配信が LINE へ渡せる種別。worker の `BroadcastMessageType` と同じ。 */
+export type BroadcastMessageKind =
+  | 'text'
+  | 'image'
+  | 'flex'
+  | 'location'
+  | 'video'
+  | 'audio'
+  | 'sticker'
+  | 'carousel'
+
+/** 位置情報・音声・スタンプ。シナリオと同じ入力欄・同じ並べ方を使う。 */
+const KIND_FIELD_TYPES = new Set<BroadcastBubbleType>(['location', 'audio', 'sticker'])
 
 export function isContentTemplateType(type: BroadcastBubbleType): boolean {
   return ['rich_message', 'card_message', 'coupon', 'research'].includes(type)

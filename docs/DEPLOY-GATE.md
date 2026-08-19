@@ -191,6 +191,35 @@ pnpm deploy:preflight production \
 なお `scripts/check-migrations.ts` が additive-only ポリシー（`DROP TABLE` /
 `DROP COLUMN` / `RENAME` / `DEFAULT` なし `NOT NULL` などの禁止）を静的検査します。
 
+### 表の作り直し（CHECK 制約を変えるとき）
+
+SQLite は CHECK を後から変えられません。種別を1つ増やすだけでも、
+**新しい表を作る → 中身を写す → 古い表を落とす → 名前を付け替える**しか手がなく、
+途中に `DROP TABLE` と `RENAME TO` が必ず入ります。
+
+そのため、ファイルに次の1行を書いた場合だけ、この2つを見逃します。
+
+```sql
+-- migration-policy: table-rebuild
+```
+
+書けば何でも通るわけではありません。
+
+- `<表名>_new` を作って、同じ `<表名>` を落として、`<表名>_new` を `<表名>` へ改名する、
+  という**組になっていないと通りません**
+- 作り直しと関係ない禁止事項（`DROP COLUMN` など）は、印があっても止まります
+- 意図した作り直しは `grep 'table-rebuild' packages/db/migrations/` で全部数えられます
+
+**落とすのと改名するのは、必ず同じファイルに書いてください。** 当てる仕組みは
+ファイルごとに `wrangler d1 execute --file` を呼ぶので、ファイルの境目が
+そのまま「その表が存在しない時間」になります。同じファイルなら1回の呼び出しで
+済み、その隙間が消えます。
+
+**索引は貼り直しになるので、名前を毎回変えてください。** 適用の要否を
+「いま索引があるか」で判定する仕組みは、表を落とす前の状態を見て「もうある」と
+判断し、その行を飛ばします。飛ばされると索引が消えたまま戻りません
+（136 で実際に踏みました）。
+
 ## CI
 
 `.github/workflows/deploy-scripts-ci.yml` が、`scripts/**`・`package.json`・
