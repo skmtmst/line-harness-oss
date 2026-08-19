@@ -238,7 +238,7 @@ CREATE TABLE broadcast_message_assets (
 CREATE TABLE "broadcasts" (
   id                 TEXT PRIMARY KEY,
   title              TEXT NOT NULL,
-  message_type       TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
+  message_type       TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel')),
   message_content    TEXT NOT NULL,
   target_type        TEXT NOT NULL CHECK (target_type IN ('all', 'tag', 'segment', 'multi-account-dedup')) DEFAULT 'all',
   target_tag_id      TEXT REFERENCES tags (id) ON DELETE SET NULL,
@@ -256,9 +256,13 @@ CREATE TABLE "broadcasts" (
   segment_conditions TEXT,
   account_ids        TEXT CHECK (account_ids IS NULL OR json_valid(account_ids)),
   dedup_priority     TEXT CHECK (dedup_priority IS NULL OR json_valid(dedup_priority)),
-  failed_account_ids TEXT CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids))
-, dedup_progress TEXT, batch_lock_at TEXT, track_links INTEGER NOT NULL DEFAULT 1, message_bubbles_json TEXT
-  CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)), stealth_spread_minutes INTEGER NOT NULL DEFAULT 0);
+  failed_account_ids TEXT CHECK (failed_account_ids IS NULL OR json_valid(failed_account_ids)),
+  dedup_progress     TEXT,
+  batch_lock_at      TEXT,
+  track_links        INTEGER NOT NULL DEFAULT 1,
+  message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
+  stealth_spread_minutes INTEGER NOT NULL DEFAULT 0
+);
 
 CREATE TABLE calendar_bookings (
   id             TEXT PRIMARY KEY,
@@ -1773,7 +1777,7 @@ CREATE INDEX idx_broadcast_insights_status ON broadcast_insights(status);
 CREATE INDEX idx_broadcast_message_assets_account_kind
   ON broadcast_message_assets(line_account_id, kind, updated_at DESC);
 
-CREATE INDEX idx_broadcasts_status ON broadcasts (status);
+CREATE INDEX idx_broadcasts_status_lookup ON broadcasts (status);
 
 CREATE INDEX idx_calendar_bookings_friend ON calendar_bookings (friend_id);
 

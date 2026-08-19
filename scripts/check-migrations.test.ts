@@ -159,3 +159,69 @@ describe('filterMigrationsByPolicy', () => {
     expect(filterMigrationsByPolicy(['001_a.sql', '010_b.sql'])).toEqual([]);
   });
 });
+
+/*
+ * 表の作り直し。
+ *
+ * SQLite は CHECK を後から変えられないので、
+ *   新しい表を作る → 中身を写す → 古い表を落とす → 名前を付け替える
+ * しか手が無い。この途中に DROP TABLE と RENAME TO が必ず入るので、
+ * additive-only の規則と真正面からぶつかる。
+ *
+ * 禁止を外すと、うっかりの DROP TABLE まで通る。**印を書いた場合だけ**
+ * 通し、しかも印を書けば何でも落とせる、にはしない。
+ */
+describe('表の作り直し', () => {
+  const REBUILD = `-- migration-policy: table-rebuild
+DROP TABLE broadcasts;
+ALTER TABLE broadcasts_new RENAME TO broadcasts;`;
+
+  it('印があって、形が合っていれば通す', () => {
+    expect(checkMigration(REBUILD).ok).toBe(true);
+  });
+
+  it('印が無ければ、これまでどおり止める', () => {
+    const without = REBUILD.split('\n').slice(1).join('\n');
+    const result = checkMigration(without);
+    expect(result.ok).toBe(false);
+  });
+
+  it('印を書いても、落とすだけなら通さない', () => {
+    // 印さえ書けば何でも落とせる、では印の意味が無い。
+    const result = checkMigration(`-- migration-policy: table-rebuild
+DROP TABLE broadcasts;`);
+    expect(result.ok).toBe(false);
+  });
+
+  it('印を書いても、別の表へ改名するなら通さない', () => {
+    const result = checkMigration(`-- migration-policy: table-rebuild
+DROP TABLE broadcasts;
+ALTER TABLE something_else RENAME TO broadcasts;`);
+    expect(result.ok).toBe(false);
+  });
+
+  it('印だけ書いて何もしないのは通さない', () => {
+    expect(checkMigration('-- migration-policy: table-rebuild').ok).toBe(false);
+  });
+
+  it('印があっても、作り直しと関係ない禁止事項は止める', () => {
+    // 作り直しのファイルに、ついでに危ないことを混ぜられないように。
+    const result = checkMigration(`-- migration-policy: table-rebuild
+DROP TABLE broadcasts;
+ALTER TABLE broadcasts_new RENAME TO broadcasts;
+ALTER TABLE friends DROP COLUMN metadata;`);
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('印が付く前に当ててしまった作り直し', () => {
+  it('名前で通す（適用済みは書き換えない決まりのため）', () => {
+    const sql = 'DROP TABLE scenario_steps;';
+    expect(checkMigration(sql).ok).toBe(false);
+    expect(checkMigration(sql, '134_step_message_kinds_swap.sql').ok).toBe(true);
+  });
+
+  it('一覧に無いファイル名では通さない', () => {
+    expect(checkMigration('DROP TABLE friends;', '999_whatever.sql').ok).toBe(false);
+  });
+});
