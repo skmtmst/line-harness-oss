@@ -280,8 +280,22 @@ export async function applyFriendAddRouting(
   // シナリオを決めていない＝いままでどおり全部流す
   if (!branch.scenarioId) return none;
 
-  // 「前回読んだところから」は ② の別シナリオを選んだときだけ意味がある
-  const wantResume = !useFirst && routing.returning.startPosition === 'resume';
+  /*
+   * 「前回読んだところから」は、**②に当たる人すべて**で意味がある。
+   *
+   * 以前は「別のシナリオを選んだとき」だけに絞っていたが、
+   * 「はじめての人と同じものを配信する」を選んでいるアカウントで、
+   * **ブロックを解除した人に何も届かない**という壊れ方をしていた。
+   *
+   * ブロック中に購読が止まっている（status='paused'）と、
+   * `enrollFriendInScenario` は部分UNIQUE索引（status != 'completed'）に
+   * 弾かれて null を返す。resume も呼ばれないので、止まったまま何も起きない。
+   * 解除した本人にも、設定した人にも、何が起きていないのか分からない。
+   *
+   * ①（はじめての人）では効かせない。履歴が無いので resume は必ず空振りし、
+   * 呼ぶだけ1クエリ増える。
+   */
+  const wantResume = kind === 'returning' && routing.returning.startPosition === 'resume';
 
   const enrollments: FriendAddEnrollment[] = [];
   let record: FriendScenario | null = null;
