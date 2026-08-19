@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -11,6 +11,7 @@ import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
   emptyMessageKindState,
   parseMessageKind,
@@ -281,6 +282,8 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   const [triggerCount, setTriggerCount] = useState<number | null>(null)
   /** 位置情報・動画・音声・スタンプの入力。 */
   const [kindState, setKindState] = useState<MessageKindState>(() => emptyMessageKindState())
+  /** 差し込みをカーソルの位置に入れるために、本文の入力欄を持つ。 */
+  const stepBodyRef = useRef<HTMLTextAreaElement>(null)
 
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -914,7 +917,19 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             ) : (
               <div>
                 <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-danger">*</span></label>
+                {/* 差し込みは本文のときだけ。Flex は JSON なので、入れる位置を
+                    間違えると本文が壊れる。 */}
+                {stepForm.messageType === 'text' && (
+                  <div className="mb-2">
+                    <InsertToolbar
+                      targetRef={stepBodyRef}
+                      value={stepForm.messageContent}
+                      onChange={(next) => setStepForm((prev) => ({ ...prev, messageContent: next }))}
+                    />
+                  </div>
+                )}
                 <textarea
+                  ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
                   placeholder="メッセージ内容を入力..."

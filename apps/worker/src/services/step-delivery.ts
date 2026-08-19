@@ -23,6 +23,7 @@ import { jitterDeliveryTime, addJitter, sleep } from './stealth.js';
 import { matchesCondition, parseCondition } from './segment-query.js';
 import { runScenarioActions, resumePreviousScenario, runScenarioOp } from './scenario-actions.js';
 import { parseQuestion, buildQuestionMessages } from './scenario-question.js';
+import { expandDateVariables } from './interpolation-date.js';
 
 /**
  * Replace template variables in message content.
@@ -54,9 +55,23 @@ export function expandVariables(
     fields?: Record<string, string>;
     /** 共通情報。var_key => 値 */
     vars?: Record<string, string>;
+    /**
+     * この通が届く日時。{{date}} や {{days_until:…}} の起点。
+     * 省略したら「いま」。テスト送信やプレビューはそれでよい。
+     */
+    deliveredAt?: Date;
   },
 ): string {
   let result = content;
+
+  /*
+   * 日付の差し込みを先に処理する。
+   *
+   * 後にすると、{{field.x}} に入っていた文字列が偶然 {{date}} の形を
+   * していた場合に二重に置き換わる。差し込みの値は利用者が入れたもので、
+   * それが差し込みとして解釈されるのは事故のもと。
+   */
+  result = expandDateVariables(result, extra?.deliveredAt ?? new Date());
   result = result.replace(/\{\{name\}\}/g, friend.display_name || '');
   result = result.replace(/\{\{uid\}\}/g, friend.user_id || '');
   result = result.replace(/\{\{friend_id\}\}/g, friend.id);
@@ -427,7 +442,20 @@ async function processSingleDelivery(
   const resolvedMeta = await resolveMetadata(db, { user_id: (friend as unknown as Record<string, string | null>).user_id, metadata: (friend as unknown as Record<string, string | null>).metadata });
   const friendWithMeta = { ...friend, metadata: resolvedMeta } as Parameters<typeof expandVariables>[1];
   const extra = await resolveInterpolationExtra(db, friend.id, resolved.messageContent);
-  const expandedContent = expandVariables(resolved.messageContent, friendWithMeta, workerUrl, resolved.messageType, extra);
+  /*
+   * 日付の差し込みの起点は「いま」。
+   *
+   * 予定時刻ではなく実際に配る時刻を使う。cron は5分刻みなので予定から
+   * 数分ずれることがあり、深夜0時前後の配信で予定と実際の日付が割れる。
+   * 相手が受け取った日と、本文に書かれた日は合っていないといけない。
+   */
+  const expandedContent = expandVariables(
+    resolved.messageContent,
+    friendWithMeta,
+    workerUrl,
+    resolved.messageType,
+    { ...extra, deliveredAt: new Date() },
+  );
   // Auto-wrap URLs with tracking links + bake f=<friendId> into /t links —
   // shared pipeline with the instant first-step push (immediate-first-step.ts).
   // リンクの所有アカウントは実際に配信するアカウント (= friend の account) に合わせる
