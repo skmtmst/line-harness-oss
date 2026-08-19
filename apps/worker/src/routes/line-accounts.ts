@@ -25,6 +25,7 @@ import {
   validateAccountHierarchy,
 } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
+import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import type { Env } from '../index.js';
 
 const lineAccounts = new Hono<Env>();
@@ -109,18 +110,58 @@ function serializeLineAccountFull(row: DbLineAccount) {
   };
 }
 
+type WebhookEndpointState = {
+  expectedUrl: string;
+  actualUrl: string | null;
+  active: boolean | null;
+  status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
+};
+
+/**
+ * LINE Developers に登録されている Webhook URL を読み取る。
+ * 一覧の表示用なので設定変更や接続テストは行わない。
+ * LINE API が一時的に応答できない場合は unknown とし、正常と誤判定しない。
+ */
+async function fetchWebhookEndpointState(
+  channelAccessToken: string,
+  expectedUrl: string,
+): Promise<WebhookEndpointState> {
+  try {
+    const response = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', {
+      headers: { Authorization: `Bearer ${channelAccessToken}` },
+    });
+    if (!response.ok) {
+      return { expectedUrl, actualUrl: null, active: null, status: 'unknown' };
+    }
+    const endpoint = await response.json<{ endpoint?: string; active?: boolean }>();
+    const actualUrl = endpoint.endpoint?.trim() || null;
+    const active = endpoint.active === true;
+    const status: WebhookEndpointState['status'] = !actualUrl
+      ? 'unconfigured'
+      : actualUrl === expectedUrl && active
+        ? 'matched'
+        : 'mismatched';
+    return { expectedUrl, actualUrl, active, status };
+  } catch {
+    return { expectedUrl, actualUrl: null, active: null, status: 'unknown' };
+  }
+}
+
 // GET /api/line-accounts - list all (with LINE profile + stats)
 lineAccounts.get('/api/line-accounts', async (c) => {
   try {
     const db = c.env.DB;
     const allItems = await getLineAccounts(db);
     const items = filterVisibleLineAccounts(allItems, c.get('staff'));
+    const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+    const expectedWebhookUrl = `${base}/webhook`;
 
     // Get stats for all accounts in parallel
     const results = await Promise.all(
       items.map(async (item) => {
-        const [profile, friendCount, scenarioCount, msgCount] = await Promise.all([
+        const [profile, webhook, friendCount, scenarioCount, msgCount] = await Promise.all([
           fetchBotProfile(item.channel_access_token),
+          fetchWebhookEndpointState(item.channel_access_token, expectedWebhookUrl),
           db.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?`).bind(item.id).first<{ count: number }>(),
           db.prepare(
             `SELECT COUNT(*) as count FROM friend_scenarios fs
@@ -143,6 +184,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
           displayName: profile.displayName || item.name,
           pictureUrl: profile.pictureUrl || null,
           basicId: profile.basicId || null,
+          webhook,
           stats: {
             friendCount: friendCount?.count ?? 0,
             activeScenarios: scenarioCount?.count ?? 0,
@@ -154,6 +196,31 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     return c.json({ success: true, data: results });
   } catch (err) {
     console.error('GET /api/line-accounts error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/line-accounts/summary - visible accounts only
+lineAccounts.get('/api/line-accounts/summary', async (c) => {
+  try {
+    const db = c.env.DB;
+    const allItems = await getLineAccounts(db);
+    const visibleActiveIds = filterVisibleLineAccounts(allItems, c.get('staff'))
+      .filter((item) => Boolean(item.is_active))
+      .map((item) => item.id);
+    if (visibleActiveIds.length === 0) {
+      return c.json({ success: true, data: { uniqueFriendCount: 0 } });
+    }
+    const placeholders = visibleActiveIds.map(() => '?').join(', ');
+    const row = await db.prepare(
+      `SELECT COUNT(DISTINCT (${IDENTITY_KEY_SQL})) AS count
+       FROM friends
+       WHERE friends.is_following = 1
+         AND friends.line_account_id IN (${placeholders})`,
+    ).bind(...visibleActiveIds).first<{ count: number }>();
+    return c.json({ success: true, data: { uniqueFriendCount: row?.count ?? 0 } });
+  } catch (err) {
+    console.error('GET /api/line-accounts/summary error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
