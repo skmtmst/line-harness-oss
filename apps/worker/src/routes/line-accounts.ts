@@ -26,6 +26,7 @@ import {
 } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
+import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import type { Env } from '../index.js';
 
 const lineAccounts = new Hono<Env>();
@@ -159,9 +160,10 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     // Get stats for all accounts in parallel
     const results = await Promise.all(
       items.map(async (item) => {
-        const [profile, webhook, friendCount, scenarioCount, msgCount] = await Promise.all([
+        const [profile, webhook, plan, friendCount, scenarioCount, msgCount] = await Promise.all([
           fetchBotProfile(item.channel_access_token),
           fetchWebhookEndpointState(item.channel_access_token, expectedWebhookUrl),
+          fetchLineMonthlyPlan(item.channel_access_token),
           db.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?`).bind(item.id).first<{ count: number }>(),
           db.prepare(
             `SELECT COUNT(*) as count FROM friend_scenarios fs
@@ -185,6 +187,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
           pictureUrl: profile.pictureUrl || null,
           basicId: profile.basicId || null,
           webhook,
+          plan,
           stats: {
             friendCount: friendCount?.count ?? 0,
             activeScenarios: scenarioCount?.count ?? 0,

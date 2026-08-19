@@ -5,7 +5,9 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
+import { AccountSwitchDialog } from '@/components/accounts/account-switcher'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import { useAccount } from '@/contexts/account-context'
 import AccountHierarchy from './account-hierarchy'
 
 type WebhookStatus = 'matched' | 'mismatched' | 'unconfigured' | 'unknown'
@@ -31,6 +33,12 @@ interface LineAccountListItem {
   capacityWarnAt?: number | null
   iconUrl?: string | null
   parentLineAccountId: string | null
+  plan?: {
+    key: 'communication' | 'light' | 'standard' | 'unknown'
+    label: string
+    monthlyMessageLimit: number | null
+    source: 'messaging-api-quota'
+  }
 }
 
 const MERGED_TABS = [
@@ -47,6 +55,7 @@ function webhookLabel(status: WebhookStatus | undefined) {
 }
 
 function AccountsPageInner() {
+  const { selectedAccountId, selectedAccount, setSelectedAccountId, refreshAccounts } = useAccount()
   const [accounts, setAccounts] = useState<LineAccountListItem[]>([])
   const [uniqueFriendCount, setUniqueFriendCount] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
@@ -55,6 +64,7 @@ function AccountsPageInner() {
   const [sort, setSort] = useState<'friends' | 'name' | 'status'>('friends')
   const [page, setPage] = useState(1)
   const [editing, setEditing] = useState<LineAccountListItem | null>(null)
+  const [switching, setSwitching] = useState<LineAccountListItem | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -103,10 +113,11 @@ function AccountsPageInner() {
   const exportCsv = () => {
     const quote = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`
     const rows = [
-      ['アカウント名', 'LINE ID', '友だち', 'Webhook', '状態'],
+      ['アカウント名', 'LINE ID', 'プラン', '友だち', 'Webhook', '状態'],
       ...shown.map((account) => [
         account.displayName,
         account.basicId ?? '',
+        account.plan?.label ?? '取得できません',
         account.stats?.friendCount ?? 0,
         webhookLabel(account.webhook?.status),
         account.isActive ? '稼働中' : '停止中',
@@ -119,6 +130,13 @@ function AccountsPageInner() {
     anchor.download = `line-accounts-${new Date().toISOString().slice(0, 10)}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
+  }
+
+  const confirmSwitch = () => {
+    if (!switching) return
+    setSelectedAccountId(switching.id)
+    setSwitching(null)
+    window.location.assign('/')
   }
 
   return (
@@ -167,8 +185,8 @@ function AccountsPageInner() {
       <div className="min-h-[560px] overflow-hidden rounded-card border border-hairline bg-canvas">
         <table className="w-full table-fixed text-left text-sm">
           <colgroup>
-            <col className="w-8" /><col className="w-[24%]" /><col className="w-[15%]" /><col className="w-[10%]" />
-            <col className="w-[11%]" /><col className="w-[18%]" /><col className="w-[13%]" /><col className="w-12" />
+            <col className="w-8" /><col className="w-[22%]" /><col className="w-[14%]" /><col className="w-[14%]" />
+            <col className="w-[10%]" /><col className="w-[18%]" /><col className="w-[13%]" /><col className="w-12" />
           </colgroup>
           <thead><tr className="border-b border-hairline bg-canvas-sunken text-xs text-ink-faint">
             <th aria-label="並び替え" /><th className="px-2 py-3 font-medium">アカウント名</th>
@@ -184,9 +202,9 @@ function AccountsPageInner() {
             ) : pageItems.map((account) => (
               <tr key={account.id} className="hover:bg-canvas-sunken">
                 <td className="px-2 py-3 text-center text-ink-faint" title="並び替えはLINEアカウント構成から行えます">⠇</td>
-                <td className="px-2 py-3"><button onClick={() => setEditing(account)} title={account.displayName} className="block max-w-full cursor-pointer truncate whitespace-nowrap font-semibold text-accent hover:underline">{account.displayName}</button></td>
+                <td className="px-2 py-3"><div className="flex min-w-0 items-center gap-2"><button onClick={() => account.id === selectedAccountId ? setEditing(account) : setSwitching(account)} title={account.id === selectedAccountId ? `${account.displayName}の設定を開く` : `${account.displayName}へ切り替える`} className="min-w-0 max-w-full cursor-pointer truncate whitespace-nowrap font-semibold text-accent hover:underline">{account.displayName}</button>{account.id === selectedAccountId && <span className="shrink-0 rounded-pill bg-accent-soft px-2 py-1 text-[10px] font-semibold text-success">表示中</span>}</div></td>
                 <td className="hidden truncate whitespace-nowrap px-2 py-3 text-xs text-ink-secondary lg:table-cell" title={account.basicId ?? account.channelId}>{account.basicId ?? account.channelId}</td>
-                <td className="hidden whitespace-nowrap px-2 py-3 font-medium lg:table-cell">—</td>
+                <td className={`hidden truncate whitespace-nowrap px-2 py-3 text-xs font-medium lg:table-cell ${account.plan?.key === 'unknown' || !account.plan ? 'text-ink-faint' : 'text-ink'}`} title={account.plan?.monthlyMessageLimit == null ? 'LINEからプラン判定情報を取得できませんでした' : `LINE APIの当月送信上限 ${account.plan.monthlyMessageLimit.toLocaleString('ja-JP')}通から自動判定`}>{account.plan?.label ?? '取得できません'}</td>
                 <td className="whitespace-nowrap px-2 py-3 font-semibold tabular-nums">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')} 人</td>
                 <td className={`truncate whitespace-nowrap px-2 py-3 text-xs ${account.webhook?.status === 'matched' ? 'text-success' : account.webhook?.status === 'unknown' ? 'text-ink-faint' : 'text-warning'}`} title={`${webhookLabel(account.webhook?.status)}${account.webhook?.actualUrl ? `: ${account.webhook.actualUrl}` : ''}`}>{webhookLabel(account.webhook?.status)}</td>
                 <td className="px-2 py-3"><span className={`inline-flex whitespace-nowrap rounded-pill px-2 py-1 text-xs font-medium ${account.isActive ? 'bg-accent-soft text-success' : 'bg-warning-bg text-warning'}`}>{account.isActive ? '稼働中' : '停止中'}</span></td>
@@ -211,8 +229,9 @@ function AccountsPageInner() {
         initialOgSiteName={editing.ogSiteName} initialOgDefaultDescription={editing.ogDefaultDescription}
         initialOgDefaultImageUrl={editing.ogDefaultImageUrl} initialFriendCapacity={editing.friendCapacity ?? null}
         initialCapacityWarnAt={editing.capacityWarnAt ?? null} initialIconUrl={editing.iconUrl ?? null}
-        onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await load() }}
+        onClose={() => setEditing(null)} onSaved={async () => { setEditing(null); await Promise.all([load(), refreshAccounts()]) }}
       />}
+      {switching && <AccountSwitchDialog current={selectedAccount} target={switching} onClose={() => setSwitching(null)} onConfirm={confirmSwitch} />}
     </div>
   )
 }
