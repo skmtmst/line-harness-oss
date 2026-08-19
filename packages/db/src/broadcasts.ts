@@ -3,7 +3,23 @@ import { jstNow } from './utils.js';
 // 絞り込み条件（segment_conditions）で宛先を決める配信で使う。
 export type BroadcastTargetType = 'all' | 'tag' | 'segment' | 'multi-account-dedup';
 export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'sent';
-export type BroadcastMessageType = 'text' | 'image' | 'flex';
+/*
+ * 一斉配信で送れる種別。
+ *
+ * シナリオ（`MessageType`）と同じ並びにそろえてある。別々にしていたときは
+ * 一斉配信だけ text / image / flex の3つで、それ以外を選ぶと
+ * 「テキストに JSON を入れたもの」に落ちて、**中身の JSON がそのまま
+ * 相手のトークに届いた**。増やすときは 142〜146 と同じ手順で表を作り直す。
+ */
+export type BroadcastMessageType =
+  | 'text'
+  | 'image'
+  | 'flex'
+  | 'location'
+  | 'video'
+  | 'audio'
+  | 'sticker'
+  | 'carousel';
 
 export interface Broadcast {
   id: string;

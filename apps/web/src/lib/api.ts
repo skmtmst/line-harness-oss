@@ -94,7 +94,7 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   messageBubbles?: BroadcastBubble[] | null;
 };
 
-export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
+export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'location' | 'audio' | 'carousel' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
 export type BroadcastBubble = { id: string; type: BroadcastBubbleType; content: Record<string, unknown> };
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 export type BroadcastMessageAsset = {
