@@ -95,6 +95,24 @@ function scheduleWords(
   return parts.length === 0 ? 'すぐに' : `${parts.join('と')}後`
 }
 
+/**
+ * その日の配信時刻を過ぎていて、翌日送りになったか。
+ *
+ * 「当日の10:00」と書いてあるのに日付が翌日になると、設定を間違えたのかと
+ * 疑うことになる。理由をその場に出す。
+ */
+function rolledToNextDay(
+  start: Date,
+  at: Date,
+  mode: DeliveryMode,
+  offsetDays: number,
+): boolean {
+  if (mode !== 'absolute_time') return false
+  const expected = new Date(start.getTime())
+  expected.setDate(expected.getDate() + offsetDays)
+  return at.getDate() !== expected.getDate() || at.getMonth() !== expected.getMonth()
+}
+
 export default function StepPreview({
   deliveryMode,
   offsetDays,
@@ -110,6 +128,7 @@ export default function StepPreview({
   const start = nowJst()
   const at = computeDeliveryAt(start, deliveryMode, offsetDays, deliveryTime, offsetHours)
   const words = scheduleWords(deliveryMode, offsetDays, deliveryTime, offsetHours)
+  const rolled = rolledToNextDay(start, at, deliveryMode, offsetDays)
 
   return (
     <aside className="space-y-3" aria-label="プレビュー">
@@ -136,6 +155,12 @@ export default function StepPreview({
             <span className="min-w-0">
               <span className="text-ink-secondary block text-xs">1通目（{words}）</span>
               <span className="text-ink block text-sm font-bold">{formatJst(at)}</span>
+              {rolled && (
+                <span className="text-warning bg-warning-bg rounded-control mt-1.5 block px-2 py-1 text-xs leading-relaxed">
+                  いまはもう {deliveryTime} を過ぎているため、翌日になります。
+                  購読開始が {deliveryTime} より前なら、その日のうちに届きます。
+                </span>
+              )}
             </span>
           </li>
         </ol>
