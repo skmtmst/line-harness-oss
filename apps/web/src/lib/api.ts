@@ -442,6 +442,11 @@ export type ScenarioAction = {
   condition: unknown
   /** false なら、同じ友だちには1度しか実行しない。 */
   repeatOnRefire: boolean
+  /**
+   * 中身が埋まっているか。false のあいだは配信で実行されない。
+   * 画面はカードを1枚置いてから埋める作りなので、途中の状態がありうる。
+   */
+  complete?: boolean
 }
 
 /** 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信`）。 */
