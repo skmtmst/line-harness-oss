@@ -8,6 +8,12 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import MessageTypeTabs, { type StepMessageKind } from '@/components/scenarios/message-type-tabs'
+import MessageKindFields, {
+  emptyMessageKindState,
+  serializeMessageKind,
+  type MessageKind,
+  type MessageKindState,
+} from '@/components/scenarios/message-kind-fields'
 import QuestionEditor, {
   emptyQuestion,
   type ScenarioQuestion,
@@ -74,6 +80,8 @@ function FirstStepContent() {
   /** 送るものの種別。作れないものはタブ側で押せなくしてある。 */
   const [kind, setKind] = useState<StepMessageKind>('text')
   const [question, setQuestion] = useState<ScenarioQuestion>(() => emptyQuestion())
+  /** 位置情報・動画・音声・スタンプの入力。種別ごとに別々に覚えておく。 */
+  const [kindState, setKindState] = useState<MessageKindState>(() => emptyMessageKindState())
   const [templates, setTemplates] = useState<Template[]>([])
   const [templateId, setTemplateId] = useState('')
   const [image, setImage] = useState<ImageUploaderValue | null>(null)
@@ -137,7 +145,9 @@ function FirstStepContent() {
           ? body.trim() !== ''
           : kind === 'image'
             ? image !== null
-            : question.text.trim() !== ''
+            : kind === 'question'
+              ? question.text.trim() !== ''
+              : serializeMessageKind(kind as MessageKind, kindState) !== null
     if (hasContent) {
       // 予定の欄は方式ごとに違う。余計な欄を送ると worker が弾く。
       const schedule =
@@ -168,7 +178,13 @@ function FirstStepContent() {
             : kind === 'question'
               // 質問は本文を持たない。中身は question に入る。
               ? { messageType: 'text' as const, messageContent: '' }
-              : { messageType: 'text' as const, messageContent: body.trim() }
+              : kind === 'text'
+                ? { messageType: 'text' as const, messageContent: body.trim() }
+                : {
+                    // 位置情報・動画・音声・スタンプ。中身は JSON 1つ。
+                    messageType: kind as 'location' | 'video' | 'audio' | 'sticker',
+                    messageContent: serializeMessageKind(kind as MessageKind, kindState) ?? '',
+                  }
 
       const res = await api.scenarios.addStep(id, {
         stepOrder: 1,
@@ -424,6 +440,10 @@ function FirstStepContent() {
 
                 {kind === 'question' && (
                   <QuestionEditor value={question} onChange={setQuestion} />
+                )}
+
+                {(kind === 'location' || kind === 'video' || kind === 'audio' || kind === 'sticker') && (
+                  <MessageKindFields kind={kind} value={kindState} onChange={setKindState} />
                 )}
               </MessageTypeTabs>
             ) : (

@@ -333,7 +333,20 @@ export interface Scenario {
 // -----------------------------------------------------------------------------
 
 /** メッセージ種別 */
-export type MessageType = "text" | "image" | "flex";
+/**
+ * シナリオの通で送れる種別（132 で拡張）。
+ *
+ * カルーセルは含めない。LINE のカルーセルは Flex の一種なので flex として
+ * 送る。別の種別にすると、配信側で同じものを2通りに扱うことになる。
+ */
+export type MessageType =
+  | "text"
+  | "image"
+  | "flex"
+  | "location"
+  | "video"
+  | "audio"
+  | "sticker";
 
 export interface ScenarioStep {
   /** 主キー (UUIDv4) */
