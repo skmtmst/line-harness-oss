@@ -1,4 +1,4 @@
-import { extractFlexAltText } from '../utils/flex-alt-text.js';
+import { buildMessage } from './line-message.js';
 import {
   getBroadcastById,
   getBroadcasts,
@@ -715,35 +715,12 @@ async function processQueuedBroadcastBatches(
   await updateBroadcastStatus(db, broadcast.id, 'sent');
 }
 
-export function buildMessage(messageType: string, messageContent: string, altText?: string): Message {
-  if (messageType === 'text') {
-    return { type: 'text', text: messageContent };
-  }
-
-  if (messageType === 'image') {
-    try {
-      const parsed = JSON.parse(messageContent) as {
-        originalContentUrl: string;
-        previewImageUrl: string;
-      };
-      return {
-        type: 'image',
-        originalContentUrl: parsed.originalContentUrl,
-        previewImageUrl: parsed.previewImageUrl,
-      };
-    } catch {
-      return { type: 'text', text: messageContent };
-    }
-  }
-
-  if (messageType === 'flex') {
-    try {
-      const contents = JSON.parse(messageContent);
-      return { type: 'flex', altText: altText || extractFlexAltText(contents), contents };
-    } catch {
-      return { type: 'text', text: messageContent };
-    }
-  }
-
-  return { type: 'text', text: messageContent };
-}
+/*
+ * メッセージの組み立ては、シナリオと同じものを使う。
+ *
+ * ここに別実装を持っていたときは、text / image / flex の3つしか
+ * 組み立てられなかった。それ以外の種別を渡すと「テキストに JSON を
+ * 入れたもの」に落ちるので、**中身の JSON がそのまま相手のトークに届く**。
+ * 呼び出し側が多いので、ここからも取れるようにしておく。
+ */
+export { buildMessage };
