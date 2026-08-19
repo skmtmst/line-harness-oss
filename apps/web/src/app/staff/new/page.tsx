@@ -71,7 +71,7 @@ export default function NewStaffPage() {
     </FormSection>
 
     <FormSection step={2} label="役割" note="役割を選ぶと、できることの範囲が決まります。">
-      <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-bg' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-full border-2 ${role === item.value ? 'border-accent bg-accent shadow-[inset_0_0_0_3px_white]' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block whitespace-nowrap text-xs text-ink-secondary">{item.note}</span></button>)}</div>
+      <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-full border-2 ${role === item.value ? 'border-accent bg-accent shadow-[inset_0_0_0_3px_white]' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block whitespace-nowrap text-xs text-ink-secondary">{item.note}</span></button>)}</div>
     </FormSection>
 
     <FormSection step={3} label="担当LINEアカウント" note="このユーザーがログインしたときの基準となるLINE公式アカウントです。">
@@ -81,14 +81,14 @@ export default function NewStaffPage() {
           {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
         </select>
       </Field>
-      {role === 'admin' && <label className={`mt-3 flex cursor-pointer items-start gap-3 rounded-card border p-4 ${canAccessDescendantAccounts ? 'border-accent bg-accent-bg' : 'border-hairline'}`}>
+      {role === 'admin' && <label className={`mt-3 flex cursor-pointer items-start gap-3 rounded-card border p-4 ${canAccessDescendantAccounts ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
         <input type="checkbox" checked={canAccessDescendantAccounts} onChange={(event) => setCanAccessDescendantAccounts(event.target.checked)} className="mt-0.5 accent-green-500" />
         <span><span className="block text-sm font-semibold text-ink">他アカウント権限を付与</span><span className="mt-1 block text-xs text-ink-faint">担当アカウントより下に紐づく子・孫アカウントも表示・操作できます。</span></span>
       </label>}
     </FormSection>
 
     {role === 'staff' && <FormSection step={4} label="スタッフに表示する機能" note="選択した機能だけが左のメニューに表示され、操作できます。">
-      <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-control border p-2.5 text-sm ${permissionKeys.includes(key) ? 'border-accent bg-accent-bg text-accent' : 'border-hairline text-ink-secondary'}`}><input type="checkbox" checked={permissionKeys.includes(key)} onChange={() => togglePermission(key)} className="accent-green-500" />{label}</label>)}</div></div>)}</div>
+      <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-control border p-2.5 text-sm ${permissionKeys.includes(key) ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}><input type="checkbox" checked={permissionKeys.includes(key)} onChange={() => togglePermission(key)} className="accent-green-500" />{label}</label>)}</div></div>)}</div>
     </FormSection>}
 
     <FormSection step={role === 'staff' ? 5 : 4} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">

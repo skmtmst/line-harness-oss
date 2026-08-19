@@ -109,11 +109,11 @@ export default function NewLineAccountPage() {
     >
       <FormSection step={1} label="追加方法を選ぶ">
         <div className="grid gap-3 md:grid-cols-2">
-          <button type="button" onClick={() => { setCopyMode(false); setCopyFromAccountId(''); setCopyItems([]) }} className={`rounded-card border p-4 text-left ${!copyMode ? 'border-accent bg-accent-bg' : 'border-hairline'}`}>
+          <button type="button" onClick={() => { setCopyMode(false); setCopyFromAccountId(''); setCopyItems([]) }} className={`rounded-card border p-4 text-left ${!copyMode ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
             <span className="text-sm font-semibold text-ink">新しく設定して追加</span>
             <span className="mt-1 block text-xs text-ink-faint">設定をコピーせず、空のアカウントとして追加します。</span>
           </button>
-          <button type="button" onClick={() => setCopyMode(true)} className={`rounded-card border p-4 text-left ${copyMode ? 'border-accent bg-accent-bg' : 'border-hairline'}`}>
+          <button type="button" onClick={() => setCopyMode(true)} className={`rounded-card border p-4 text-left ${copyMode ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
             <span className="text-sm font-semibold text-ink">既存設定から追加</span>
             <span className="mt-1 block text-xs text-ink-faint">権限上見える接続済みアカウントから設定を選んでコピーします。</span>
           </button>
@@ -124,7 +124,7 @@ export default function NewLineAccountPage() {
             <p className="text-sm font-semibold text-ink">コピー元</p>
             <div className="mt-2 divide-y divide-hairline overflow-hidden rounded-control border border-hairline">
               {connectedSources.length === 0 ? <p className="p-4 text-sm text-ink-faint">選択できる接続済みアカウントはありません。</p> : connectedSources.map((account) => (
-                <label key={account.id} className={`flex cursor-pointer items-center gap-3 px-4 py-3 ${copyFromAccountId === account.id ? 'bg-accent-bg text-accent' : 'bg-canvas text-ink'}`}>
+                <label key={account.id} className={`flex cursor-pointer items-center gap-3 px-4 py-3 ${copyFromAccountId === account.id ? 'bg-accent-soft text-accent' : 'bg-canvas text-ink'}`}>
                   <input type="radio" name="copy-source" checked={copyFromAccountId === account.id} onChange={() => setCopyFromAccountId(account.id)} className="accent-green-500" />
                   <span className="text-sm font-medium">{account.name}</span>
                   <span className="ml-auto text-xs text-accent">接続済み</span>
@@ -135,7 +135,7 @@ export default function NewLineAccountPage() {
           <div>
             <p className="text-sm font-semibold text-ink">コピー項目</p>
             <div className="mt-2 grid gap-2 md:grid-cols-3">
-              {COPY_ITEMS.map((item) => <label key={item.key} className={`cursor-pointer rounded-control border p-3 ${copyItems.includes(item.key) ? 'border-accent bg-accent-bg' : 'border-hairline'}`}><span className="flex items-center gap-2 text-sm font-medium text-ink"><input type="checkbox" checked={copyItems.includes(item.key)} onChange={() => toggleCopyItem(item.key)} className="accent-green-500" />{item.label}</span><span className="mt-1 block pl-6 text-xs text-ink-faint">{item.note}</span></label>)}
+              {COPY_ITEMS.map((item) => <label key={item.key} className={`cursor-pointer rounded-control border p-3 ${copyItems.includes(item.key) ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><span className="flex items-center gap-2 text-sm font-medium text-ink"><input type="checkbox" checked={copyItems.includes(item.key)} onChange={() => toggleCopyItem(item.key)} className="accent-green-500" />{item.label}</span><span className="mt-1 block pl-6 text-xs text-ink-faint">{item.note}</span></label>)}
             </div>
             <p className="mt-2 text-xs text-ink-faint">認証情報、Webhook、LINE Login、LIFF、友だち、履歴、配信実績はコピーしません。</p>
           </div>
@@ -149,7 +149,7 @@ export default function NewLineAccountPage() {
           <Field label="Channel Access Token（長期）" htmlFor="channel-token" required><input id="channel-token" type="password" value={channelAccessToken} onChange={(event) => setChannelAccessToken(event.target.value)} className={`${inputClass} font-mono`} /></Field>
           <Field label="Messaging API Channel Secret" htmlFor="channel-secret" required><input id="channel-secret" type="password" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} className={`${inputClass} font-mono`} /></Field>
         </div>
-        <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-control border border-hairline px-3 py-2 text-xs font-medium text-accent hover:bg-accent-bg">LINE Developersのチャネル設定を開く ↗</a>
+        <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-control border border-hairline px-3 py-2 text-xs font-medium text-accent hover:bg-accent-soft">LINE Developersのチャネル設定を開く ↗</a>
       </FormSection>
 
       <fieldset disabled={!messagingReady} className="disabled:opacity-45">
@@ -165,7 +165,7 @@ export default function NewLineAccountPage() {
             <Field label="LINE Login Channel ID" htmlFor="login-id" required><input id="login-id" value={loginChannelId} onChange={(event) => setLoginChannelId(event.target.value)} className={`${inputClass} font-mono`} /></Field>
             <Field label="LINE Login Channel Secret" htmlFor="login-secret" required><input id="login-secret" type="password" value={loginChannelSecret} onChange={(event) => setLoginChannelSecret(event.target.value)} className={`${inputClass} font-mono`} /></Field>
           </div>
-          <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-control border border-hairline px-3 py-2 text-xs font-medium text-accent hover:bg-accent-bg">LINE Loginのチャネル設定を開く ↗</a>
+          <a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-control border border-hairline px-3 py-2 text-xs font-medium text-accent hover:bg-accent-soft">LINE Loginのチャネル設定を開く ↗</a>
         </FormSection>
       </fieldset>
 
@@ -173,14 +173,14 @@ export default function NewLineAccountPage() {
         <FormSection step={5} label="LIFFを設定" note="同じLINE LoginチャネルへLIFFアプリを追加し、Endpoint URLを登録します。">
           <Field label="LIFF ID" htmlFor="liff-id" required><input id="liff-id" value={liffId} onChange={(event) => { setLiffId(event.target.value); setLiffConfigured(false) }} className={`${inputClass} font-mono`} /></Field>
           <AccountSetupUrls liffId={liffId.trim() || null} />
-          <div className="mt-3 flex flex-wrap items-center gap-3"><a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="inline-flex rounded-control border border-hairline px-3 py-2 text-xs font-medium text-accent hover:bg-accent-bg">LIFF設定を開く ↗</a><label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={liffConfigured} onChange={(event) => setLiffConfigured(event.target.checked)} className="accent-green-500" />LIFF IDとEndpoint URLを設定しました</label></div>
+          <div className="mt-3 flex flex-wrap items-center gap-3"><a href="https://developers.line.biz/console/" target="_blank" rel="noreferrer" className="inline-flex rounded-control border border-hairline px-3 py-2 text-xs font-medium text-accent hover:bg-accent-soft">LIFF設定を開く ↗</a><label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={liffConfigured} onChange={(event) => setLiffConfigured(event.target.checked)} className="accent-green-500" />LIFF IDとEndpoint URLを設定しました</label></div>
         </FormSection>
       </fieldset>
 
       <fieldset disabled={!liffReady} className="disabled:opacity-45">
         <FormSection step={6} label="すべての接続を確認">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {([['messagingApi', 'Messaging API'], ['webhook', 'Webhook'], ['lineLogin', 'LINE Login'], ['liff', 'LIFF']] as const).map(([key, label]) => <div key={key} className={`rounded-control border px-3 py-3 text-sm ${verification?.[key] ? 'border-accent bg-accent-bg text-accent' : 'border-hairline text-ink-faint'}`}>{verification?.[key] ? '✓ ' : '— '}{label}</div>)}
+            {([['messagingApi', 'Messaging API'], ['webhook', 'Webhook'], ['lineLogin', 'LINE Login'], ['liff', 'LIFF']] as const).map(([key, label]) => <div key={key} className={`rounded-control border px-3 py-3 text-sm ${verification?.[key] ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-faint'}`}>{verification?.[key] ? '✓ ' : '— '}{label}</div>)}
           </div>
           {verification && verification.errors.length > 0 && <ul className="mt-3 rounded-control border border-danger bg-danger-bg px-4 py-3 text-xs text-danger">{verification.errors.map((error) => <li key={error}>・{error}</li>)}</ul>}
           <button type="button" disabled={verifying} onClick={() => void verify()} className="mt-4 rounded-control bg-accent px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{verifying ? '接続確認中...' : 'Messaging API・Webhook・Login・LIFFを確認'}</button>

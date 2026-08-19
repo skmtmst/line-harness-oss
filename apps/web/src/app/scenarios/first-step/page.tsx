@@ -13,6 +13,7 @@ import QuestionEditor, {
   type ScenarioQuestion,
 } from '@/components/scenarios/question-editor'
 import { ConditionDialog, describeCondition } from '@/components/scenarios/scenario-dialogs'
+import StepPreview from '@/components/scenarios/step-preview'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 
 /**
@@ -243,6 +244,12 @@ function FirstStepContent() {
       </div>
 
 
+      {/*
+        左に入力、右にプレビュー。プレビューは付いてくる（sticky）ので、
+        下の選択肢を書いているあいだも、届く形と時刻が視界に残る。
+        狭い画面では縦に積む。
+      */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
       <div data-design="Form" className="space-y-4">
         {/*
           配信対象の絞り込み。Lステップの「配信対象の絞り込み」と同じ3つ。
@@ -449,6 +456,36 @@ function FirstStepContent() {
             )}
           </div>
         </section>
+      </div>
+
+        <div className="xl:sticky xl:top-4">
+          <StepPreview
+            deliveryMode={mode}
+            offsetDays={offsetDays}
+            deliveryTime={deliveryTime}
+            offsetHours={offsetHours}
+            kind={contentMode === 'template' ? 'text' : kind}
+            templateName={
+              contentMode === 'template'
+                ? (templates.find(t => t.id === templateId)?.name ?? null)
+                : null
+            }
+            body={body}
+            imageUrl={image?.mode === 'line-image' ? image.previewImageUrl : null}
+            question={contentMode === 'compose' && kind === 'question' ? question : null}
+            audienceLabel={
+              targetMode === 'all'
+                ? 'シナリオ購読中の全員'
+                : targetMode === 'tag'
+                  ? (tags.find(t => t.id === targetTagId)?.name
+                      ? `タグ「${tags.find(t => t.id === targetTagId)!.name}」がある人`
+                      : 'タグで絞り込む（未選択）')
+                  : targetCondition
+                    ? describeCondition(targetCondition)
+                    : '詳細条件で絞り込む（未設定）'
+            }
+          />
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">

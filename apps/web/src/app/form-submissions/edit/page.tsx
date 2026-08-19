@@ -278,7 +278,7 @@ function FormEditInner() {
                   <li key={f.id ?? i}>
                     <div
                       className={`flex items-center gap-2 px-3 py-2 ${
-                        i === selected ? 'bg-accent-bg' : ''
+                        i === selected ? 'bg-accent-soft' : ''
                       }`}
                     >
                       <button

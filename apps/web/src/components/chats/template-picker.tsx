@@ -188,7 +188,7 @@ export default function TemplatePicker({
                     onClick={() => setSelectedId(t.id)}
                     aria-pressed={selectedId === t.id}
                     className={`w-full px-3 py-2.5 text-left ${
-                      selectedId === t.id ? 'bg-accent-bg' : 'hover:bg-canvas-sunken'
+                      selectedId === t.id ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'
                     }`}
                   >
                     <p className="text-ink text-sm font-medium">{t.name}</p>

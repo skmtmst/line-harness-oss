@@ -682,7 +682,7 @@ function SlotsStep({
                       )
                     }
                     className={`rounded-control border px-3 py-1.5 text-sm ${
-                      on ? 'border-accent bg-accent-bg text-ink' : 'border-hairline text-ink-faint'
+                      on ? 'border-accent bg-accent-soft text-ink' : 'border-hairline text-ink-faint'
                     }`}
                   >
                     {w}

@@ -194,7 +194,7 @@ function InflowLinkDetailPageContent() {
                     <button
                       onClick={() => router.replace(`/inflow-links/detail?id=${r.id}`)}
                       className={`rounded-control w-full px-3 py-2 text-left transition-colors ${
-                        active ? 'bg-accent-bg' : 'hover:bg-canvas-sunken'
+                        active ? 'bg-accent-soft' : 'hover:bg-canvas-sunken'
                       }`}
                     >
                       <span className="text-ink block text-sm">{r.name}</span>

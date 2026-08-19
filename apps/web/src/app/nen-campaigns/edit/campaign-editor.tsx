@@ -257,7 +257,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           {/* ---- 1 ---- */}
           <section className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
             <h2 className="text-ink text-sm font-bold">
-              <span className="bg-accent-bg text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
+              <span className="bg-accent-soft text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
                 1
               </span>
               どの配信か
@@ -281,7 +281,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           {/* ---- 2 ---- */}
           <section className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
             <h2 className="text-ink text-sm font-bold">
-              <span className="bg-accent-bg text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
+              <span className="bg-accent-soft text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
                 2
               </span>
               いつ届けるか
@@ -321,7 +321,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           {/* ---- 3 ---- */}
           <section className="bg-canvas rounded-card border-hairline space-y-3 border p-5">
             <h2 className="text-ink text-sm font-bold">
-              <span className="bg-accent-bg text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
+              <span className="bg-accent-soft text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
                 3
               </span>
               誰に届けるか
@@ -335,7 +335,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
           {/* ---- 4 ---- */}
           <section className="bg-canvas rounded-card border-hairline space-y-4 border p-5">
             <h2 className="text-ink text-sm font-bold">
-              <span className="bg-accent-bg text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
+              <span className="bg-accent-soft text-accent rounded-pill mr-2 px-2 py-0.5 text-xs">
                 4
               </span>
               今回の内容

@@ -448,7 +448,7 @@ export default function BroadcastForm({
                 key={mode.value}
                 className={`flex h-full cursor-pointer flex-col gap-1 rounded-xl border p-3 transition-colors ${
                   targetMode === mode.value
-                    ? 'border-accent bg-accent-subtle'
+                    ? 'border-accent bg-accent-soft'
                     : 'border-hairline hover:bg-canvas-sunken'
                 }`}
               >
@@ -521,7 +521,7 @@ export default function BroadcastForm({
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className="border-accent text-accent rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-bg"
+              className="border-accent text-accent rounded-control border px-3 py-1 text-xs font-bold hover:bg-accent-soft"
             >
               テンプレートから選ぶ
             </button>
@@ -583,7 +583,7 @@ export default function BroadcastForm({
               onClick={() => setSendMode('now')}
               aria-pressed={sendMode === 'now'}
               className={`rounded-card border p-3 text-left text-sm ${
-                sendMode === 'now' ? 'border-accent bg-accent-bg' : 'border-hairline'
+                sendMode === 'now' ? 'border-accent bg-accent-soft' : 'border-hairline'
               }`}
             >
               今すぐ配信
@@ -593,7 +593,7 @@ export default function BroadcastForm({
               onClick={() => setSendMode('scheduled')}
               aria-pressed={sendMode === 'scheduled'}
               className={`rounded-card border p-3 text-left text-sm ${
-                sendMode === 'scheduled' ? 'border-accent bg-accent-bg' : 'border-hairline'
+                sendMode === 'scheduled' ? 'border-accent bg-accent-soft' : 'border-hairline'
               }`}
             >
               日時を指定して予約

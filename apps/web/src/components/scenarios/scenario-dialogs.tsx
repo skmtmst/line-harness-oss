@@ -31,7 +31,7 @@ function Shell({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
       <div className="rounded-card w-full max-w-3xl bg-white shadow-lg">
-        <div className="border-line flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
+        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
           <div className="min-w-0">
             <h2 className="text-ink text-lg font-bold">{title}</h2>
             {description && <p className="text-ink-secondary mt-0.5 text-sm">{description}</p>}
@@ -39,13 +39,13 @@ function Shell({
           <button
             type="button"
             onClick={onClose}
-            className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm"
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm"
           >
             閉じる
           </button>
         </div>
         <div className="px-6 py-5">{children}</div>
-        {footer && <div className="border-line flex justify-end gap-2 border-t px-6 py-4">{footer}</div>}
+        {footer && <div className="border-hairline flex justify-end gap-2 border-t px-6 py-4">{footer}</div>}
       </div>
     </div>
   )
@@ -79,7 +79,7 @@ export function ConditionDialog({
           <button
             type="button"
             onClick={onClose}
-            className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
           >
             やめる
           </button>
@@ -159,7 +159,7 @@ export function OnCompleteDialog({
           <button
             type="button"
             onClick={onClose}
-            className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
           >
             やめる
           </button>
@@ -183,7 +183,7 @@ export function OnCompleteDialog({
         </>
       }
     >
-      {error && <p className="rounded-card bg-danger-soft text-danger mb-4 px-4 py-3 text-sm">{error}</p>}
+      {error && <p className="rounded-card bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>}
       <div className="space-y-3">
         {(
           [
@@ -204,7 +204,7 @@ export function OnCompleteDialog({
           <label
             key={opt.value}
             className={`rounded-card flex cursor-pointer gap-3 border p-4 ${
-              draftMode === opt.value ? 'border-accent bg-accent-soft' : 'border-line'
+              draftMode === opt.value ? 'border-accent bg-accent-soft' : 'border-hairline'
             }`}
           >
             <input
@@ -221,7 +221,7 @@ export function OnCompleteDialog({
         ))}
       </div>
 
-      <div className="border-line mt-5 border-t pt-5">
+      <div className="border-hairline mt-5 border-t pt-5">
         <p className="text-ink text-sm font-bold">その他のアクション</p>
         <p className="text-ink-secondary mt-0.5 mb-2 text-xs">
           配り終えた人に対して、タグ・友だち情報・対応マークなどを動かします。
@@ -229,7 +229,7 @@ export function OnCompleteDialog({
         <button
           type="button"
           onClick={onOpenActions}
-          className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-4 text-sm"
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-4 text-sm"
         >
           アクション設定{actionCount > 0 ? `（${actionCount} 件）` : ''}
         </button>
@@ -241,7 +241,7 @@ export function OnCompleteDialog({
           <select
             value={draftTarget ?? ''}
             onChange={(e) => setDraftTarget(e.target.value || null)}
-            className="border-line rounded-control text-ink mt-1.5 h-10 w-full border bg-white px-3 text-sm"
+            className="border-hairline rounded-control text-ink mt-1.5 h-10 w-full border bg-white px-3 text-sm"
           >
             <option value="">選んでください</option>
             {scenarios.map((s) => (
@@ -298,7 +298,7 @@ export function TestSendDialog({
           <button
             type="button"
             onClick={onClose}
-            className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-10 border px-5 text-sm"
           >
             閉じる
           </button>
@@ -326,22 +326,22 @@ export function TestSendDialog({
         </>
       }
     >
-      <p className="rounded-card bg-warning-soft text-ink-secondary mb-4 px-4 py-3 text-xs">
+      <p className="rounded-card bg-warning-bg text-ink-secondary mb-4 px-4 py-3 text-xs">
         本物のLINEメッセージが届きます。相手を間違えないでください。下書きの通もテストでは送ります。
       </p>
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="名前で探す"
-        className="border-line rounded-control text-ink h-10 w-full border px-3 text-sm"
+        className="border-hairline rounded-control text-ink h-10 w-full border px-3 text-sm"
       />
-      <div className="border-line rounded-card mt-3 max-h-64 overflow-y-auto border">
+      <div className="border-hairline rounded-card mt-3 max-h-64 overflow-y-auto border">
         {friends.map((friend) => (
           <button
             key={friend.id}
             type="button"
             onClick={() => setSelected(friend.id)}
-            className={`border-line flex w-full items-center gap-2 border-b px-4 py-2.5 text-left text-sm last:border-b-0 ${
+            className={`border-hairline flex w-full items-center gap-2 border-b px-4 py-2.5 text-left text-sm last:border-b-0 ${
               selected === friend.id ? 'bg-accent-soft text-accent font-medium' : 'text-ink'
             }`}
           >
@@ -355,7 +355,7 @@ export function TestSendDialog({
       {result && (
         <p
           className={`rounded-card mt-3 px-4 py-3 text-sm ${
-            result.ok ? 'bg-success-soft text-success' : 'bg-danger-soft text-danger'
+            result.ok ? 'bg-success-bg text-success' : 'bg-danger-bg text-danger'
           }`}
         >
           {result.message}
