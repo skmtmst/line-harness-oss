@@ -70,12 +70,20 @@ describe('isWithinWindow', () => {
     expect(isWithinWindow(w, jst('2026-08-21T12:00'))).toBe(false); // 金
   });
 
-  it('時間帯の端は両方とも含む', () => {
+  it('始まりは含み、終わりは含まない（既にある自動応答の判定と同じ規則）', () => {
     const w = windowOf({ ranges: [{ start: '9:00', end: '18:00' }] });
     expect(isWithinWindow(w, jst('2026-08-20T09:00'))).toBe(true);
-    expect(isWithinWindow(w, jst('2026-08-20T18:00'))).toBe(true);
+    expect(isWithinWindow(w, jst('2026-08-20T17:59'))).toBe(true);
+    expect(isWithinWindow(w, jst('2026-08-20T18:00'))).toBe(false);
     expect(isWithinWindow(w, jst('2026-08-20T08:59'))).toBe(false);
-    expect(isWithinWindow(w, jst('2026-08-20T18:01'))).toBe(false);
+  });
+
+  it('隣り合う帯を並べても、境目の時刻が両方に入ることはない', () => {
+    const morning = windowOf({ ranges: [{ start: '9:00', end: '18:00' }] });
+    const evening = windowOf({ ranges: [{ start: '18:00', end: '22:00' }] });
+    const at18 = jst('2026-08-20T18:00');
+    expect(isWithinWindow(morning, at18)).toBe(false);
+    expect(isWithinWindow(evening, at18)).toBe(true);
   });
 
   it('曜日と時間帯は「どちらも満たす」', () => {
@@ -93,7 +101,8 @@ describe('isWithinWindow', () => {
       ],
     });
     expect(isWithinWindow(w, jst('2026-08-20T10:00'))).toBe(true);
-    expect(isWithinWindow(w, jst('2026-08-20T12:30'))).toBe(false); // 昼休み
+    expect(isWithinWindow(w, jst('2026-08-20T12:00'))).toBe(false); // 昼休みの始まり
+    expect(isWithinWindow(w, jst('2026-08-20T12:30'))).toBe(false);
     expect(isWithinWindow(w, jst('2026-08-20T15:00'))).toBe(true);
   });
 
@@ -118,11 +127,11 @@ describe('isWithinWindow', () => {
 
     it('土曜の未明も「金曜の夜」として応答する', () => {
       expect(isWithinWindow(w, jst('2026-08-22T00:30'))).toBe(true);
-      expect(isWithinWindow(w, jst('2026-08-22T02:00'))).toBe(true);
+      expect(isWithinWindow(w, jst('2026-08-22T01:59'))).toBe(true);
     });
 
     it('土曜の未明でも、帯を過ぎれば応答しない', () => {
-      expect(isWithinWindow(w, jst('2026-08-22T02:01'))).toBe(false);
+      expect(isWithinWindow(w, jst('2026-08-22T02:00'))).toBe(false); // 終わりは含まない
       expect(isWithinWindow(w, jst('2026-08-22T22:00'))).toBe(false); // 土曜の夜は対象外
     });
 

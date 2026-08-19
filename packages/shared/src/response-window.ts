@@ -24,11 +24,19 @@ export interface TimeRange {
   /** 日本時間の "HH:MM"。 */
   start: string;
   /**
-   * 日本時間の "HH:MM"。**この時刻を含む。**
+   * 日本時間の "HH:MM"。**この時刻は含まない。**
    *
-   * 「18:00まで応答」と設定した人が 18:00 ちょうどに応答しないのは驚くので、
-   * 端を含める。隣り合う帯（9:00-18:00 と 18:00-22:00）が 18:00 で重なるが、
-   * 判定は「どれかに入っていれば応答する」なので実害がない。
+   * 既にある自動応答の時間帯判定（auto-reply-conditions.ts の
+   * isWithinActiveWindow）が「終わりを含まない」で動いているので、そちらに
+   * そろえる。同じアプリの中に2つの規則があると、運用者が「18:00まで」の
+   * 意味を画面ごとに覚え直すことになる。
+   *
+   * この決め方だと「18:00まで応答」と書いた人が 18:00 ちょうどに応答しない。
+   * そこは画面側の言葉で補う（終わりの時刻は「その直前まで」と読める書き方に
+   * する）。判定の規則をそろえることを優先した。
+   *
+   * 隣り合う帯（9:00-18:00 と 18:00-22:00）を並べたとき、18:00 が両方に
+   * 入らないという利点もある。
    */
   end: string;
 }
@@ -107,7 +115,7 @@ export function isWithinWindow(window: ResponseWindow, at: Date): boolean {
     if (start <= end) {
       if (
         today.minutes >= start &&
-        today.minutes <= end &&
+        today.minutes < end &&
         dayMatches(window, today.date, today.weekday)
       ) {
         return true;
@@ -117,7 +125,7 @@ export function isWithinWindow(window: ResponseWindow, at: Date): boolean {
 
     // 日をまたぐ。今日の start 以降か、昨日から続いている end までか。
     if (today.minutes >= start && dayMatches(window, today.date, today.weekday)) return true;
-    if (today.minutes <= end && dayMatches(window, yesterday.date, yesterday.weekday)) return true;
+    if (today.minutes < end && dayMatches(window, yesterday.date, yesterday.weekday)) return true;
   }
 
   return false;
