@@ -1221,6 +1221,16 @@ CREATE TABLE rich_menu_areas (
   bounds_height   INTEGER NOT NULL,
   action_type     TEXT NOT NULL CHECK (action_type IN ('uri','message','postback','richmenuswitch')),
   action_data     TEXT NOT NULL,
+  -- 146: 運用者から見た「何をするボタンか」。LINE の action_type 4種の上に乗せる
+  -- 言い換え（url / tel / text / template / form / switch / postback）。空なら
+  -- action_type から推測する。
+  intent          TEXT,
+  label           TEXT,
+  tag_ids         TEXT,
+  score_change    INTEGER,
+  template_id     TEXT,
+  form_id         TEXT,
+  tracked_link_id TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );

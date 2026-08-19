@@ -39,6 +39,19 @@ export interface RichMenuPage {
   updated_at: string;
 }
 
+// 運用者から見た「何をするボタンか」。LINE が持てる action は uri / message /
+// postback / richmenuswitch の4つだけなので、「電話をかける」「テンプレートを送る」
+// 「回答フォームを開く」はその上に乗せた言い換えとして intent で持つ。
+// publish 時に rich-menu-publisher が LINE の action へ変換する。
+export type RichMenuAreaIntent =
+  | 'url'      // URLを開く       → uri
+  | 'tel'      // 電話をかける     → uri (tel:)
+  | 'text'     // テキストを送る   → message
+  | 'template' // テンプレートを送る → postback (こちらから送る)
+  | 'form'     // 回答フォームを開く → uri (LIFF)
+  | 'switch'   // メニューを切り替える → richmenuswitch
+  | 'postback';
+
 export interface RichMenuArea {
   id: string;
   page_id: string;
@@ -48,17 +61,34 @@ export interface RichMenuArea {
   bounds_height: number;
   action_type: 'uri' | 'message' | 'postback' | 'richmenuswitch';
   action_data: string; // JSON serialized
+  intent: RichMenuAreaIntent | null;
+  label: string | null;
+  tag_ids: string | null; // JSON serialized string[]
+  score_change: number | null;
+  template_id: string | null;
+  form_id: string | null;
+  tracked_link_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface RichMenuAreaInput {
+  // 保存のたびに新しい id を振ると、押された回数の集計がボタン単位で切れる。
+  // 既存 area の id を渡せば、そのまま引き継ぐ (page と同じ流儀)。
+  id?: string;
   boundsX: number;
   boundsY: number;
   boundsWidth: number;
   boundsHeight: number;
   actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch';
   actionData: Record<string, unknown>;
+  intent?: RichMenuAreaIntent | null;
+  label?: string | null;
+  tagIds?: string[] | null;
+  scoreChange?: number | null;
+  templateId?: string | null;
+  formId?: string | null;
+  trackedLinkId?: string | null;
 }
 
 export interface RichMenuPageInput {
@@ -86,8 +116,13 @@ export interface UpdateRichMenuGroupMetaInput {
   isDefaultForAll?: boolean;
 }
 
+export type RichMenuAreaWithParsed = RichMenuArea & {
+  actionData: Record<string, unknown>;
+  tagIds: string[];
+};
+
 export interface RichMenuPageWithAreas extends RichMenuPage {
-  areas: (RichMenuArea & { actionData: Record<string, unknown> })[];
+  areas: RichMenuAreaWithParsed[];
 }
 
 export interface RichMenuGroupWithPages extends RichMenuGroup {
@@ -97,6 +132,57 @@ export interface RichMenuGroupWithPages extends RichMenuGroup {
 // alias は決定論的命名: 同 group 内で order_index ごとに一意、再 publish も idempotent。
 export function buildRichMenuAliasId(groupId: string, orderIndex: number): string {
   return `lhx-${groupId.slice(0, 8)}-${orderIndex}`;
+}
+
+// tag_ids は JSON 文字列で持つ。壊れた値が入っていても画面を落とさない。
+export function parseRichMenuTagIds(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((v): v is string => typeof v === 'string' && v.length > 0);
+  } catch {
+    return [];
+  }
+}
+
+// area の INSERT は作成時と全置換時の2か所から呼ばれる。列が増えるたびに
+// 2か所直すのを避けるため、ここに集約する。
+function buildAreaInsert(
+  db: D1Database,
+  areaId: string,
+  pageId: string,
+  a: RichMenuAreaInput,
+  now: string,
+): D1PreparedStatement {
+  const tagIds = a.tagIds && a.tagIds.length > 0 ? JSON.stringify(a.tagIds) : null;
+  return db
+    .prepare(
+      `INSERT INTO rich_menu_areas
+         (id, page_id, bounds_x, bounds_y, bounds_width, bounds_height,
+          action_type, action_data, intent, label, tag_ids, score_change,
+          template_id, form_id, tracked_link_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      areaId,
+      pageId,
+      a.boundsX,
+      a.boundsY,
+      a.boundsWidth,
+      a.boundsHeight,
+      a.actionType,
+      JSON.stringify(a.actionData),
+      a.intent ?? null,
+      a.label ?? null,
+      tagIds,
+      a.scoreChange ?? null,
+      a.templateId ?? null,
+      a.formId ?? null,
+      a.trackedLinkId ?? null,
+      now,
+      now,
+    );
 }
 
 export async function getRichMenuGroups(
@@ -146,10 +232,14 @@ export async function getRichMenuGroupWithPages(
     .bind(...pages.map((p) => p.id))
     .all<RichMenuArea>();
   const areas = areasResult.results ?? [];
-  const areasByPage = new Map<string, (RichMenuArea & { actionData: Record<string, unknown> })[]>();
+  const areasByPage = new Map<string, RichMenuAreaWithParsed[]>();
   for (const a of areas) {
     const list = areasByPage.get(a.page_id) ?? [];
-    list.push({ ...a, actionData: JSON.parse(a.action_data) });
+    list.push({
+      ...a,
+      actionData: JSON.parse(a.action_data),
+      tagIds: parseRichMenuTagIds(a.tag_ids),
+    });
     areasByPage.set(a.page_id, list);
   }
   return {
@@ -210,27 +300,7 @@ export async function createRichMenuGroup(
         .bind(p.id, groupId, p.orderIndex, p.name, p.aliasId, now, now),
     );
     for (const a of p.areas) {
-      stmts.push(
-        db
-          .prepare(
-            `INSERT INTO rich_menu_areas
-               (id, page_id, bounds_x, bounds_y, bounds_width, bounds_height,
-                action_type, action_data, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .bind(
-            crypto.randomUUID(),
-            p.id,
-            a.boundsX,
-            a.boundsY,
-            a.boundsWidth,
-            a.boundsHeight,
-            a.actionType,
-            JSON.stringify(a.actionData),
-            now,
-            now,
-          ),
-      );
+      stmts.push(buildAreaInsert(db, crypto.randomUUID(), p.id, a, now));
     }
   }
   await db.batch(stmts);
@@ -305,6 +375,34 @@ export async function replaceRichMenuPages(
   );
   const existingMap = new Map(existing.map((p) => [p.id, p]));
 
+  // area の id も引き継ぐ。押された回数はこの id を軸に数えるので、保存のたびに
+  // 振り直すと、同じボタンの記録がそこで途切れてしまう。
+  // 引き継ぐのは「この group に今ある id」だけ。別 group の id や消えた id を
+  // そのまま挿すと PK が衝突する (page 側と同じ考え方)。
+  const existingAreaIds = new Set(
+    (
+      (
+        await db
+          .prepare(
+            `SELECT a.id AS id
+               FROM rich_menu_areas a
+               JOIN rich_menu_pages p ON p.id = a.page_id
+              WHERE p.group_id = ?`,
+          )
+          .bind(groupId)
+          .all<{ id: string }>()
+      ).results ?? []
+    ).map((r) => r.id),
+  );
+  const claimedAreaIds = new Set<string>();
+  const resolveAreaId = (a: RichMenuAreaInput): string => {
+    if (a.id && existingAreaIds.has(a.id) && !claimedAreaIds.has(a.id)) {
+      claimedAreaIds.add(a.id);
+      return a.id;
+    }
+    return crypto.randomUUID();
+  };
+
   // 入力を「保持 vs 新規」に振り分けつつメタを復元。
   // 重要: p.id を流用するのは「current group の existingMap に一致した時だけ」。
   // それ以外 (別 group の id / stale id / undefined) は新 UUID を割り当てる。
@@ -360,27 +458,7 @@ export async function replaceRichMenuPages(
         ),
     );
     for (const a of p.areas) {
-      stmts.push(
-        db
-          .prepare(
-            `INSERT INTO rich_menu_areas
-               (id, page_id, bounds_x, bounds_y, bounds_width, bounds_height,
-                action_type, action_data, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .bind(
-            crypto.randomUUID(),
-            p.id,
-            a.boundsX,
-            a.boundsY,
-            a.boundsWidth,
-            a.boundsHeight,
-            a.actionType,
-            JSON.stringify(a.actionData),
-            now,
-            now,
-          ),
-      );
+      stmts.push(buildAreaInsert(db, resolveAreaId(a), p.id, a, now));
     }
   }
 
@@ -515,4 +593,74 @@ export async function markRichMenuGroupUnpublished(
       )
       .bind(now, groupId),
   ]);
+}
+
+// =============================================================================
+// タップされたボタンを引く
+// =============================================================================
+//
+// リッチメニューのボタンを押すと、LINE から postback が飛んでくる。その data に
+// 忍ばせた area の id から、「どのボタンが押されたか」と「押されたら何をするか」
+// をまとめて引く。webhook から使う。
+
+export interface RichMenuAreaTapTarget {
+  areaId: string;
+  pageId: string;
+  groupId: string;
+  accountId: string;
+  intent: RichMenuAreaIntent | null;
+  label: string | null;
+  tagIds: string[];
+  scoreChange: number | null;
+  templateId: string | null;
+  formId: string | null;
+}
+
+export async function getRichMenuAreaTapTarget(
+  db: D1Database,
+  areaId: string,
+): Promise<RichMenuAreaTapTarget | null> {
+  const row = await db
+    .prepare(
+      `SELECT a.id            AS area_id,
+              a.page_id       AS page_id,
+              a.intent        AS intent,
+              a.label         AS label,
+              a.tag_ids       AS tag_ids,
+              a.score_change  AS score_change,
+              a.template_id   AS template_id,
+              a.form_id       AS form_id,
+              p.group_id      AS group_id,
+              g.account_id    AS account_id
+         FROM rich_menu_areas a
+         JOIN rich_menu_pages p  ON p.id = a.page_id
+         JOIN rich_menu_groups g ON g.id = p.group_id
+        WHERE a.id = ?`,
+    )
+    .bind(areaId)
+    .first<{
+      area_id: string;
+      page_id: string;
+      intent: RichMenuAreaIntent | null;
+      label: string | null;
+      tag_ids: string | null;
+      score_change: number | null;
+      template_id: string | null;
+      form_id: string | null;
+      group_id: string;
+      account_id: string;
+    }>();
+  if (!row) return null;
+  return {
+    areaId: row.area_id,
+    pageId: row.page_id,
+    groupId: row.group_id,
+    accountId: row.account_id,
+    intent: row.intent,
+    label: row.label,
+    tagIds: parseRichMenuTagIds(row.tag_ids),
+    scoreChange: row.score_change,
+    templateId: row.template_id,
+    formId: row.form_id,
+  };
 }

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
-import { AreaProperties } from '@/components/rich-menus/area-properties'
+import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
 
 type Page = {
   id: string
@@ -31,6 +31,9 @@ type Group = {
   publishingAt: string | null
   pages: Page[]
 }
+
+/** 右パネルのプルダウンに出す選択肢。 */
+type PickerOption = { id: string; name: string }
 
 const SIZE_LABEL: Record<Group['size'], string> = {
   large: '2500×1686',
@@ -91,6 +94,13 @@ function Editor({
   // ただし persistDraft で送信値を一致させるため、現在値を保持する。
   const [isDefaultForAll, setIsDefaultForAll] = useState(false)
 
+  // ボタンの設定で選ぶもの（タグ・テンプレート・回答フォーム・計測リンク）。
+  // メニュー本体とは別に、開いたとき1回だけ読む。
+  const [tags, setTags] = useState<PickerOption[]>([])
+  const [templates, setTemplates] = useState<PickerOption[]>([])
+  const [forms, setForms] = useState<PickerOption[]>([])
+  const [trackedLinks, setTrackedLinks] = useState<PickerOption[]>([])
+
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [unpublishing, setUnpublishing] = useState(false)
@@ -125,6 +135,35 @@ function Editor({
   useEffect(() => {
     reload()
   }, [reload])
+
+  // 選択肢は片方が落ちても残りを出す。1つ取れなくても編集自体は続けられる。
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const [tagRes, tplRes, formRes, linkRes] = await Promise.allSettled([
+        api.tags.list(),
+        api.templates.list(),
+        api.forms.list(),
+        api.trackedLinks.list(),
+      ])
+      if (cancelled) return
+      if (tagRes.status === 'fulfilled' && tagRes.value.success) {
+        setTags(tagRes.value.data.map((t) => ({ id: t.id, name: t.name })))
+      }
+      if (tplRes.status === 'fulfilled' && tplRes.value.success) {
+        setTemplates(tplRes.value.data.map((t) => ({ id: t.id, name: t.name })))
+      }
+      if (formRes.status === 'fulfilled' && formRes.value.success) {
+        setForms(formRes.value.data.map((f) => ({ id: f.id, name: f.name })))
+      }
+      if (linkRes.status === 'fulfilled' && linkRes.value.success) {
+        setTrackedLinks(linkRes.value.data.map((l) => ({ id: l.id, name: l.name })))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const activePage = pages.find((p) => p.id === activePageId) ?? pages[0] ?? null
   const selectedArea =
@@ -225,12 +264,22 @@ function Editor({
         name: p.name,
         orderIndex: i,
         areas: p.areas.map((a) => ({
+          // id を渡すと、そのボタンの記録（押された回数）が保存後も続く。
+          // まだ保存されていない id は、サーバー側で新しく振り直される。
+          id: a.id,
           boundsX: a.boundsX,
           boundsY: a.boundsY,
           boundsWidth: a.boundsWidth,
           boundsHeight: a.boundsHeight,
           actionType: a.actionType,
           actionData: a.actionData,
+          intent: a.intent ?? null,
+          label: a.label ?? null,
+          tagIds: a.tagIds ?? null,
+          scoreChange: a.scoreChange ?? null,
+          templateId: a.templateId ?? null,
+          formId: a.formId ?? null,
+          trackedLinkId: a.trackedLinkId ?? null,
         })),
       })),
     })
@@ -488,17 +537,50 @@ function Editor({
               onDeleteArea={(id) => deleteArea(activePage.id, id)}
               preview={preview}
               onPreviewAction={(area) => {
-                if (area.actionType === 'uri') {
-                  const uri = (area.actionData as { uri?: string }).uri
-                  if (uri) window.open(uri, '_blank')
-                } else if (area.actionType === 'richmenuswitch') {
-                  const targetId = (area.actionData as { targetPageId?: string }).targetPageId
-                  if (targetId && pages.some((p) => p.id === targetId)) {
-                    setActivePageId(targetId)
-                    setSelectedAreaId(null)
+                // プレビューは「押すと何が起きるか」を確かめるためのもの。
+                // 実際に送ったり電話をかけたりはせず、起きることを文で見せる。
+                const data = area.actionData as {
+                  uri?: string
+                  tel?: string
+                  text?: string
+                  targetPageId?: string
+                }
+                const nameOf = (list: PickerOption[], id: string | null | undefined) =>
+                  list.find((o) => o.id === id)?.name ?? '(未選択)'
+                switch (intentOf(area)) {
+                  case 'url':
+                    if (area.trackedLinkId) {
+                      alert(`計測リンクを開きます: ${nameOf(trackedLinks, area.trackedLinkId)}`)
+                    } else if (data.uri) {
+                      window.open(data.uri, '_blank')
+                    } else {
+                      alert('URLが未設定です')
+                    }
+                    break
+                  case 'tel':
+                    alert(`電話をかけます: ${data.tel || '(未設定)'}`)
+                    break
+                  case 'text':
+                    alert(`「${data.text || '(未設定)'}」を送ったことになります`)
+                    break
+                  case 'template':
+                    alert(`テンプレートを送ります: ${nameOf(templates, area.templateId)}`)
+                    break
+                  case 'form':
+                    alert(`回答フォームを開きます: ${nameOf(forms, area.formId)}`)
+                    break
+                  case 'switch': {
+                    const targetId = data.targetPageId
+                    if (targetId && pages.some((p) => p.id === targetId)) {
+                      setActivePageId(targetId)
+                      setSelectedAreaId(null)
+                    } else {
+                      alert('切り替え先のページが未設定です')
+                    }
+                    break
                   }
-                } else {
-                  alert(`action: ${area.actionType}\n${JSON.stringify(area.actionData)}`)
+                  default:
+                    alert(`合図を送ります: ${JSON.stringify(area.actionData)}`)
                 }
               }}
             />
@@ -605,6 +687,10 @@ function Editor({
               <AreaProperties
                 area={selectedArea}
                 pages={pagesForSelect}
+                tags={tags}
+                templates={templates}
+                forms={forms}
+                trackedLinks={trackedLinks}
                 onUpdate={(patch) =>
                   updateArea(activePage.id, selectedArea.id, patch)
                 }

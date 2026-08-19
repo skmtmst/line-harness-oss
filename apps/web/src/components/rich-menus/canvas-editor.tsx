@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { RichMenuAreaIntent } from '@/lib/api'
 
 export type Area = {
   id: string
@@ -8,8 +9,20 @@ export type Area = {
   boundsY: number
   boundsWidth: number
   boundsHeight: number
+  /** LINE に登録するときの動きの種類。intent から決まる。 */
   actionType: 'uri' | 'message' | 'postback' | 'richmenuswitch'
   actionData: Record<string, unknown>
+  /** 運用者から見た「何をするボタンか」。 */
+  intent?: RichMenuAreaIntent | null
+  /** 管理用のボタン名。 */
+  label?: string | null
+  /** 押されたときに付けるタグ。 */
+  tagIds?: string[]
+  /** 押されたときに足すスコア。 */
+  scoreChange?: number | null
+  templateId?: string | null
+  formId?: string | null
+  trackedLinkId?: string | null
 }
 
 const SIZE_DIMS = {
@@ -210,6 +223,10 @@ export function CanvasEditor({
               boundsHeight: h,
               actionType: 'message',
               actionData: { text: '' },
+              intent: 'text',
+              label: '',
+              tagIds: [],
+              scoreChange: null,
             })
           }
         }

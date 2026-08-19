@@ -1,28 +1,105 @@
 'use client'
 
 import type { Area } from './canvas-editor'
+import type { RichMenuAreaIntent } from '@/lib/api'
 
-type PageOption = { id: string; name: string }
+type Option = { id: string; name: string }
 
 type Props = {
   area: Area
-  pages: PageOption[]
+  /** 同じメニュー内の他ページ。「メニューを切り替える」の行き先。 */
+  pages: Option[]
+  tags: Option[]
+  templates: Option[]
+  forms: Option[]
+  trackedLinks: Option[]
   onUpdate: (patch: Partial<Area>) => void
   onDelete: () => void
 }
 
-function defaultActionData(type: Area['actionType']): Record<string, unknown> {
-  switch (type) {
-    case 'uri':
-      return { uri: '' }
-    case 'message':
-      return { text: '' }
+/** 運用者に見せる選択肢。並びは使う頻度の順。 */
+const INTENT_OPTIONS: { value: RichMenuAreaIntent; label: string; hint: string }[] = [
+  { value: 'url', label: 'URLを開く', hint: 'ホームページや申し込みページに飛ばす' },
+  { value: 'text', label: 'メッセージを送る', hint: '押した人がその言葉を送ったことにする' },
+  { value: 'template', label: 'テンプレートを送る', hint: '作ってあるメッセージをこちらから送る' },
+  { value: 'form', label: '回答フォームを開く', hint: 'アンケートや申し込みフォームを開く' },
+  { value: 'tel', label: '電話をかける', hint: 'スマホの電話アプリが立ち上がる' },
+  { value: 'switch', label: 'メニューを切り替える', hint: 'タブのように別ページを出す' },
+  { value: 'postback', label: 'こちらで処理する', hint: '自動応答やオートメーションの合図を送る（上級）' },
+]
+
+/** intent から、LINE に登録するときの種類を決める。 */
+export function actionTypeForIntent(intent: RichMenuAreaIntent): Area['actionType'] {
+  switch (intent) {
+    case 'url':
+    case 'tel':
+    case 'form':
+      return 'uri'
+    case 'text':
+      return 'message'
+    case 'switch':
+      return 'richmenuswitch'
+    case 'template':
     case 'postback':
-      return { data: '', displayText: '' }
-    case 'richmenuswitch':
-      return { targetPageId: '' }
+      return 'postback'
   }
 }
+
+/** 種類を変えたときの、入力欄の初期値。 */
+function defaultActionData(intent: RichMenuAreaIntent): Record<string, unknown> {
+  switch (intent) {
+    case 'url':
+      return { uri: '' }
+    case 'tel':
+      return { tel: '' }
+    case 'text':
+      return { text: '' }
+    case 'form':
+      return {}
+    case 'template':
+      return {}
+    case 'switch':
+      return { targetPageId: '' }
+    case 'postback':
+      return { data: '', displayText: '' }
+  }
+}
+
+/** 昔つくったボタン（intent なし）を、いまの言い方に読み替える。 */
+export function intentOf(area: Area): RichMenuAreaIntent {
+  if (area.intent) return area.intent
+  switch (area.actionType) {
+    case 'uri':
+      return 'url'
+    case 'message':
+      return 'text'
+    case 'richmenuswitch':
+      return 'switch'
+    case 'postback':
+      return 'postback'
+  }
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <label className="block">
+      <span className="text-ink-secondary text-xs font-medium">{label}</span>
+      {hint && <span className="text-ink-faint block text-[11px]">{hint}</span>}
+      <div className="mt-1">{children}</div>
+    </label>
+  )
+}
+
+const inputClass =
+  'border-hairline rounded-control focus:ring-accent block w-full border px-2 py-1 text-sm focus:ring-2 focus:outline-none'
 
 function NumField({
   label,
@@ -35,31 +112,72 @@ function NumField({
 }) {
   return (
     <label className="block">
-      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-ink-faint text-xs">{label}</span>
       <input
         type="number"
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
-        className="mt-0.5 block w-full border border-gray-300 rounded px-2 py-1 text-sm"
+        className={`mt-0.5 ${inputClass}`}
       />
     </label>
   )
 }
 
-export function AreaProperties({ area, pages, onUpdate, onDelete }: Props) {
+export function AreaProperties({
+  area,
+  pages,
+  tags,
+  templates,
+  forms,
+  trackedLinks,
+  onUpdate,
+  onDelete,
+}: Props) {
   const data = (area.actionData ?? {}) as Record<string, unknown>
+  const intent = intentOf(area)
+  const selectedTagIds = area.tagIds ?? []
+
+  function changeIntent(next: RichMenuAreaIntent) {
+    onUpdate({
+      intent: next,
+      actionType: actionTypeForIntent(next),
+      actionData: defaultActionData(next),
+      // 種類が変わると使わなくなる設定は消す。残すと保存時に紛れ込む。
+      templateId: next === 'template' ? area.templateId : null,
+      formId: next === 'form' ? area.formId : null,
+      trackedLinkId: next === 'url' ? area.trackedLinkId : null,
+    })
+  }
+
+  function toggleTag(tagId: string) {
+    const next = selectedTagIds.includes(tagId)
+      ? selectedTagIds.filter((t) => t !== tagId)
+      : [...selectedTagIds, tagId]
+    onUpdate({ tagIds: next })
+  }
+
+  // タグ付けとスコアは、押されたことがこちらに届くボタンでしか使えない。
+  // URL・電話・フォームは LINE の中で完結してしまい、押されたことが分からない。
+  const sideEffectsAvailable = intent === 'text' || intent === 'template' || intent === 'postback'
 
   return (
     <div className="space-y-3 text-sm">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-700">選択中エリア</h3>
-        <button
-          onClick={onDelete}
-          className="text-xs text-red-600 hover:underline"
-        >
+        <h3 className="text-ink-secondary font-semibold">選択中のボタン</h3>
+        <button onClick={onDelete} className="text-xs text-red-600 hover:underline">
           削除
         </button>
       </div>
+
+      <Field label="ボタン名" hint="管理用の呼び名。友だちには表示されません。">
+        <input
+          value={area.label ?? ''}
+          onChange={(e) => onUpdate({ label: e.target.value })}
+          maxLength={60}
+          placeholder="例：予約する"
+          className={inputClass}
+        />
+      </Field>
 
       <div className="grid grid-cols-2 gap-2">
         <NumField label="x" value={area.boundsX} onChange={(v) => onUpdate({ boundsX: v })} />
@@ -76,85 +194,136 @@ export function AreaProperties({ area, pages, onUpdate, onDelete }: Props) {
         />
       </div>
 
-      <label className="block">
-        <span className="text-ink-secondary text-xs">エリアの動き</span>
-        <span className="text-ink-faint block text-[11px]">
-          タップしたときに何が起きるかを決めます。
-        </span>
+      <Field label="押したときの動き" hint="タップしたときに何が起きるかを決めます。">
         <select
-          value={area.actionType}
-          onChange={(e) => {
-            const next = e.target.value as Area['actionType']
-            onUpdate({ actionType: next, actionData: defaultActionData(next) })
-          }}
-          className="mt-0.5 block w-full border border-gray-300 rounded px-2 py-1 text-sm"
+          value={intent}
+          onChange={(e) => changeIntent(e.target.value as RichMenuAreaIntent)}
+          className={inputClass}
         >
-          <option value="uri">URLを開く</option>
-          <option value="message">メッセージを送る</option>
-          <option value="postback">こちらで処理する（postback）</option>
-          <option value="richmenuswitch">メニューを切り替える</option>
+          {INTENT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
         </select>
-      </label>
+        <p className="text-ink-faint mt-1 text-[11px]">
+          {INTENT_OPTIONS.find((o) => o.value === intent)?.hint}
+        </p>
+      </Field>
 
-      {area.actionType === 'uri' && (
-        <label className="block">
-          <span className="text-xs text-gray-500">URL</span>
-          <input
-            type="url"
-            value={(data.uri as string) ?? ''}
-            onChange={(e) => onUpdate({ actionData: { ...data, uri: e.target.value } })}
-            placeholder="https://..."
-            className="mt-0.5 block w-full border border-gray-300 rounded px-2 py-1 text-sm"
-          />
-          <p className="mt-1 text-[11px] text-gray-500">
-            LINE 配信用 URL は tracked link (短縮 URL) 経由を推奨。
-          </p>
-        </label>
-      )}
-
-      {area.actionType === 'message' && (
-        <label className="block">
-          <span className="text-xs text-gray-500">送信テキスト</span>
-          <input
-            value={(data.text as string) ?? ''}
-            onChange={(e) => onUpdate({ actionData: { ...data, text: e.target.value } })}
-            className="mt-0.5 block w-full border border-gray-300 rounded px-2 py-1 text-sm"
-          />
-        </label>
-      )}
-
-      {area.actionType === 'postback' && (
+      {intent === 'url' && (
         <>
-          <label className="block">
-            <span className="text-xs text-gray-500">postback data</span>
-            <input
-              value={(data.data as string) ?? ''}
-              onChange={(e) => onUpdate({ actionData: { ...data, data: e.target.value } })}
-              className="mt-0.5 block w-full border border-gray-300 rounded px-2 py-1 text-sm"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs text-gray-500">displayText (任意)</span>
-            <input
-              value={(data.displayText as string) ?? ''}
-              onChange={(e) =>
-                onUpdate({ actionData: { ...data, displayText: e.target.value } })
-              }
-              className="mt-0.5 block w-full border border-gray-300 rounded px-2 py-1 text-sm"
-            />
-          </label>
+          <Field
+            label="計測リンクを使う"
+            hint="選ぶと、押された回数が数えられます。計測リンク側にタグを設定していれば、それも付きます。"
+          >
+            <select
+              value={area.trackedLinkId ?? ''}
+              onChange={(e) => onUpdate({ trackedLinkId: e.target.value || null })}
+              className={inputClass}
+            >
+              <option value="">使わない（下のURLをそのまま開く）</option>
+              {trackedLinks.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          {area.trackedLinkId ? (
+            // 計測リンクを選んだら、飛び先はそちらの設定が使われる。
+            // URL 欄を残すと「どっちが使われるのか」が分からなくなる。
+            <p className="text-ink-faint text-[11px]">
+              飛び先は、選んだ計測リンクの設定が使われます。変えるときは「計測リンク」の画面で編集してください。
+            </p>
+          ) : (
+            <Field label="URL">
+              <input
+                type="url"
+                value={(data.uri as string) ?? ''}
+                onChange={(e) => onUpdate({ actionData: { ...data, uri: e.target.value } })}
+                placeholder="https://..."
+                className={inputClass}
+              />
+            </Field>
+          )}
         </>
       )}
 
-      {area.actionType === 'richmenuswitch' && (
-        <label className="block">
-          <span className="text-xs text-gray-500">遷移先ページ</span>
+      {intent === 'tel' && (
+        <Field label="電話番号" hint="ハイフンはあってもなくても構いません。">
+          <input
+            type="tel"
+            value={(data.tel as string) ?? ''}
+            onChange={(e) => onUpdate({ actionData: { ...data, tel: e.target.value } })}
+            placeholder="0312345678"
+            className={inputClass}
+          />
+        </Field>
+      )}
+
+      {intent === 'text' && (
+        <Field label="送るテキスト" hint="押した人が、この言葉を送ったことになります。">
+          <input
+            value={(data.text as string) ?? ''}
+            onChange={(e) => onUpdate({ actionData: { ...data, text: e.target.value } })}
+            maxLength={300}
+            className={inputClass}
+          />
+        </Field>
+      )}
+
+      {intent === 'template' && (
+        <Field label="送るテンプレート" hint="押されたら、こちらからこのメッセージを送ります。">
+          <select
+            value={area.templateId ?? ''}
+            onChange={(e) => onUpdate({ templateId: e.target.value || null })}
+            className={inputClass}
+          >
+            <option value="">選択...</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+          {templates.length === 0 && (
+            <p className="mt-1 text-[11px] text-amber-600">
+              テンプレートがまだありません。先に「テンプレート」で作ってください。
+            </p>
+          )}
+        </Field>
+      )}
+
+      {intent === 'form' && (
+        <Field label="開く回答フォーム">
+          <select
+            value={area.formId ?? ''}
+            onChange={(e) => onUpdate({ formId: e.target.value || null })}
+            className={inputClass}
+          >
+            <option value="">選択...</option>
+            {forms.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+          {forms.length === 0 && (
+            <p className="mt-1 text-[11px] text-amber-600">
+              回答フォームがまだありません。先に「回答フォーム」で作ってください。
+            </p>
+          )}
+        </Field>
+      )}
+
+      {intent === 'switch' && (
+        <Field label="切り替え先のページ">
           <select
             value={(data.targetPageId as string) ?? ''}
-            onChange={(e) =>
-              onUpdate({ actionData: { ...data, targetPageId: e.target.value } })
-            }
-            className="mt-0.5 block w-full border border-gray-300 rounded px-2 py-1 text-sm"
+            onChange={(e) => onUpdate({ actionData: { ...data, targetPageId: e.target.value } })}
+            className={inputClass}
           >
             <option value="">選択...</option>
             {pages.map((p) => (
@@ -165,11 +334,87 @@ export function AreaProperties({ area, pages, onUpdate, onDelete }: Props) {
           </select>
           {pages.length < 2 && (
             <p className="mt-1 text-[11px] text-amber-600">
-              タブ切替には複数ページが必要です。先にページを追加してください。
+              タブの切り替えには2ページ以上必要です。先にページを追加してください。
             </p>
           )}
-        </label>
+        </Field>
       )}
+
+      {intent === 'postback' && (
+        <>
+          <Field label="合図の文字列（postback data）">
+            <input
+              value={(data.data as string) ?? ''}
+              onChange={(e) => onUpdate({ actionData: { ...data, data: e.target.value } })}
+              maxLength={200}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="トークに残す文言（任意）">
+            <input
+              value={(data.displayText as string) ?? ''}
+              onChange={(e) => onUpdate({ actionData: { ...data, displayText: e.target.value } })}
+              maxLength={300}
+              className={inputClass}
+            />
+          </Field>
+        </>
+      )}
+
+      {/* 押されたときの追加の動き */}
+      <div className="border-hairline space-y-3 border-t pt-3">
+        <p className="text-ink-secondary text-xs font-medium">押されたときに、あわせて行うこと</p>
+
+        {!sideEffectsAvailable ? (
+          <p className="text-ink-faint text-[11px]">
+            {intent === 'url'
+              ? 'URLを開くボタンでタグを付けたいときは、上の「計測リンクを使う」を選んでください。計測リンク側でタグを設定できます。'
+              : 'この動きは LINE の中で完結するため、押されたことがこちらに届きません。タグ付けやスコアは設定できません。'}
+          </p>
+        ) : (
+          <>
+            <Field label="タグを付ける">
+              {tags.length === 0 ? (
+                <p className="text-ink-faint text-[11px]">タグがまだありません。</p>
+              ) : (
+                <div className="border-hairline max-h-32 space-y-1 overflow-y-auto rounded border p-2">
+                  {tags.map((t) => (
+                    <label key={t.id} className="flex cursor-pointer items-center gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={selectedTagIds.includes(t.id)}
+                        onChange={() => toggleTag(t.id)}
+                      />
+                      <span className="truncate">{t.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </Field>
+
+            <Field label="スコアを足す" hint="マイナスを入れると減ります。空欄なら何もしません。">
+              <input
+                type="number"
+                value={area.scoreChange ?? ''}
+                onChange={(e) =>
+                  onUpdate({
+                    scoreChange: e.target.value === '' ? null : parseInt(e.target.value, 10) || 0,
+                  })
+                }
+                placeholder="例：10"
+                className={inputClass}
+              />
+            </Field>
+
+            {intent === 'text' && (area.tagIds?.length || area.scoreChange) ? (
+              <p className="text-ink-faint text-[11px]">
+                タグかスコアを設定すると、押されたことを受け取るしくみに切り替わります。
+                トークの見え方は変わりません。
+              </p>
+            ) : null}
+          </>
+        )}
+      </div>
     </div>
   )
 }

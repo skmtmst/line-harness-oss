@@ -147,7 +147,8 @@
     "138_step_carousel_copy.sql",
     "139_step_carousel_swap.sql",
     "140_step_carousel_rename.sql",
-    "141_step_carousel_index.sql"
+    "141_step_carousel_index.sql",
+    "146_rich_menu_area_actions.sql"
   ],
-  "migrationCount": 148
+  "migrationCount": 149
 }
