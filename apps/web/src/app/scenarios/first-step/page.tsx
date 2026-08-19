@@ -493,6 +493,7 @@ function FirstStepContent() {
             body={body}
             imageUrl={image?.mode === 'line-image' ? image.previewImageUrl : null}
             question={contentMode === 'compose' && kind === 'question' ? question : null}
+            kindState={kindState}
             audienceLabel={
               targetMode === 'all'
                 ? 'シナリオ購読中の全員'
