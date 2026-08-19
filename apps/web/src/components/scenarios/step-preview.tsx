@@ -15,6 +15,7 @@
 import type { DeliveryMode } from '@line-crm/shared'
 import type { ScenarioQuestion } from './question-editor'
 import type { StepMessageKind } from './message-type-tabs'
+import type { MessageKindState } from './message-kind-fields'
 
 export interface StepPreviewProps {
   deliveryMode: DeliveryMode
@@ -29,6 +30,8 @@ export interface StepPreviewProps {
   body: string
   imageUrl?: string | null
   question: ScenarioQuestion | null
+  /** 位置情報・動画・音声・スタンプの入力。 */
+  kindState?: MessageKindState
   /** 誰に送るか。札に出す。 */
   audienceLabel: string
 }
@@ -123,6 +126,7 @@ export default function StepPreview({
   body,
   imageUrl,
   question,
+  kindState,
   audienceLabel,
 }: StepPreviewProps) {
   const start = nowJst()
@@ -216,6 +220,65 @@ export default function StepPreview({
                 </span>
               </Bubble>
             </>
+          ) : kind === 'location' ? (
+            kindState?.location.latitude && kindState.location.longitude ? (
+              <Bubble>
+                <span className="text-ink block text-sm font-bold">
+                  {kindState.location.title.trim() || '場所'}
+                </span>
+                {kindState.location.address.trim() && (
+                  <span className="text-ink-secondary mt-0.5 block text-xs">
+                    {kindState.location.address}
+                  </span>
+                )}
+                {/* 地図そのものは出さない。ここで別の地図を出すと、
+                    実際にLINEで開く地図と違うものを見せることになる。 */}
+                <span className="bg-canvas-sunken text-ink-faint rounded-control mt-2 block px-3 py-4 text-center text-xs">
+                  地図（{kindState.location.latitude}, {kindState.location.longitude}）
+                </span>
+              </Bubble>
+            ) : (
+              <Placeholder>緯度と経度を入れると、ここに出ます</Placeholder>
+            )
+          ) : kind === 'sticker' ? (
+            kindState?.sticker.stickerId ? (
+              <Bubble>
+                {/* 目印なので次の最適化には載せない。 */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${kindState.sticker.stickerId}/android/sticker.png`}
+                  alt="スタンプ"
+                  className="h-20 w-20"
+                />
+              </Bubble>
+            ) : (
+              <Placeholder>スタンプを選ぶと、ここに出ます</Placeholder>
+            )
+          ) : kind === 'video' ? (
+            kindState?.video.previewImageUrl ? (
+              <Bubble>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={kindState.video.previewImageUrl}
+                  alt="動画のサムネイル"
+                  className="rounded-card max-h-40 w-auto max-w-full object-contain"
+                />
+                <span className="text-ink-faint mt-1 block text-xs">動画</span>
+              </Bubble>
+            ) : (
+              <Placeholder>動画とサムネイルのURLを入れると、ここに出ます</Placeholder>
+            )
+          ) : kind === 'audio' ? (
+            kindState?.audio.originalContentUrl ? (
+              <Bubble>
+                <span className="text-ink block text-sm">音声</span>
+                <span className="text-ink-faint mt-0.5 block text-xs">
+                  {kindState.audio.duration ? `${kindState.audio.duration} 秒` : '長さが未設定'}
+                </span>
+              </Bubble>
+            ) : (
+              <Placeholder>音声のURLを入れると、ここに出ます</Placeholder>
+            )
           ) : body.trim() ? (
             <Bubble>{body}</Bubble>
           ) : (
