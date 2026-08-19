@@ -66,6 +66,37 @@ function formatDateTime(iso: string): string {
   })
 }
 
+/**
+ * 添付された画像の回答か。
+ *
+ * 回答に入るのはURLだけで、中身は R2 にある。文字として出すと
+ * `https://.../images/form-uploads/...` の長い1行になり、何が送られたのか
+ * 分からない。ここだけ絵で出す。
+ */
+function isUploadedImage(v: unknown): v is string {
+  return typeof v === 'string' && /^https?:\/\/[^\s]+\/images\/form-uploads\//.test(v)
+}
+
+/** 回答1つを描く。画像なら小さく出し、押すと元の大きさで開く。 */
+function AnswerValue({ value, thumb }: { value: unknown; thumb?: boolean }) {
+  if (isUploadedImage(value)) {
+    return (
+      <a href={value} target="_blank" rel="noreferrer" className="inline-block">
+        {/* R2 に置いた画像をそのまま出すため next/image は使わない */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={value}
+          alt="送られた画像"
+          className={`rounded-control border-hairline border object-cover ${
+            thumb ? 'h-10 w-10' : 'max-h-60'
+          }`}
+        />
+      </a>
+    )
+  }
+  return <>{formatValue(value)}</>
+}
+
 function formatValue(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—'
   if (Array.isArray(v)) return v.length === 0 ? '—' : v.join(', ')
@@ -476,7 +507,7 @@ export default function FormSubmissionsPage() {
                         </td>
                         {fieldKeys.slice(0, 4).map((key) => (
                           <td key={key} className="px-4 py-3 text-sm text-gray-700 max-w-[200px] truncate">
-                            {formatValue(sub.data[key])}
+                            <AnswerValue value={sub.data[key]} thumb />
                           </td>
                         ))}
                         {fieldKeys.length > 4 && (
@@ -568,7 +599,7 @@ export default function FormSubmissionsPage() {
                       <div key={key} className="grid grid-cols-1 gap-1">
                         <dt className="text-[11px] text-gray-500">{fieldLabels[key] || key}</dt>
                         <dd className="text-sm text-gray-900 break-words whitespace-pre-wrap">
-                          {formatValue(detailSubmission.data[key])}
+                          <AnswerValue value={detailSubmission.data[key]} />
                         </dd>
                       </div>
                     ))
