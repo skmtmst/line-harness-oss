@@ -75,6 +75,12 @@ export async function getAutoReplyById(
     .first<AutoReply>();
 }
 
+/** 空の配列は保存しない。「設定あり・中身なし」と「未設定」を分けないため。 */
+function jsonOrNull(value: unknown[] | null | undefined): string | null {
+  if (!value || value.length === 0) return null;
+  return JSON.stringify(value);
+}
+
 export interface CreateAutoReplyInput {
   keyword: string;
   matchType?: 'exact' | 'contains';
@@ -88,6 +94,18 @@ export interface CreateAutoReplyInput {
   skipWhenOperatorActive?: boolean;
   priority?: number;
   messageKinds?: string[] | null;
+  /** 151: 応答したときに順に実行すること。 */
+  actions?: unknown[] | null;
+  /** 151: 応答する曜日（0=日 … 6=土）。 */
+  responseWeekdays?: number[] | null;
+  /** 151: 'ignore' | 'include' | 'exclude' */
+  responseHolidayRule?: string | null;
+  /** 151: 1人につき1回だけ応答する。 */
+  oncePerFriend?: boolean;
+  /** 151: キーワードの複数行。 */
+  keywords?: unknown[] | null;
+  /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
+  friendConditions?: unknown | null;
 }
 
 export async function createAutoReply(
@@ -103,8 +121,11 @@ export async function createAutoReply(
          (id, keyword, match_type, response_type, response_content,
           template_id, line_account_id, is_active,
           active_from, active_until, cooldown_minutes, skip_when_operator_active,
-          priority, message_kinds_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+          priority, message_kinds_json,
+          actions_json, response_weekdays_json, response_holiday_rule,
+          once_per_friend, keywords_json, friend_conditions_json,
+          created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -122,6 +143,12 @@ export async function createAutoReply(
       input.messageKinds && input.messageKinds.length > 0
         ? JSON.stringify(input.messageKinds)
         : null,
+      jsonOrNull(input.actions),
+      jsonOrNull(input.responseWeekdays),
+      input.responseHolidayRule ?? null,
+      input.oncePerFriend ? 1 : 0,
+      jsonOrNull(input.keywords),
+      input.friendConditions ? JSON.stringify(input.friendConditions) : null,
       now,
     )
     .run();
@@ -143,6 +170,18 @@ export interface UpdateAutoReplyInput {
   skipWhenOperatorActive?: boolean;
   priority?: number;
   messageKinds?: string[] | null;
+  /** 151: 応答したときに順に実行すること。 */
+  actions?: unknown[] | null;
+  /** 151: 応答する曜日（0=日 … 6=土）。 */
+  responseWeekdays?: number[] | null;
+  /** 151: 'ignore' | 'include' | 'exclude' */
+  responseHolidayRule?: string | null;
+  /** 151: 1人につき1回だけ応答する。 */
+  oncePerFriend?: boolean;
+  /** 151: キーワードの複数行。 */
+  keywords?: unknown[] | null;
+  /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
+  friendConditions?: unknown | null;
 }
 
 export async function updateAutoReply(
@@ -171,6 +210,12 @@ export async function updateAutoReply(
            skip_when_operator_active = ?,
            priority = ?,
            message_kinds_json = ?,
+           actions_json = ?,
+           response_weekdays_json = ?,
+           response_holiday_rule = ?,
+           once_per_friend = ?,
+           keywords_json = ?,
+           friend_conditions_json = ?,
            created_at = ?
        WHERE id = ?`,
     )
@@ -194,6 +239,22 @@ export async function updateAutoReply(
             ? JSON.stringify(input.messageKinds)
             : null)
         : existing.message_kinds_json,
+      // 配列や条件は「空なら NULL」に寄せる。空配列を保存すると、読む側で
+      // 「設定あり・中身なし」と「未設定」を区別する必要が出る。
+      'actions' in input ? jsonOrNull(input.actions) : existing.actions_json,
+      'responseWeekdays' in input
+        ? jsonOrNull(input.responseWeekdays)
+        : existing.response_weekdays_json,
+      'responseHolidayRule' in input
+        ? (input.responseHolidayRule ?? null)
+        : existing.response_holiday_rule,
+      'oncePerFriend' in input
+        ? (input.oncePerFriend ? 1 : 0)
+        : existing.once_per_friend,
+      'keywords' in input ? jsonOrNull(input.keywords) : existing.keywords_json,
+      'friendConditions' in input
+        ? (input.friendConditions ? JSON.stringify(input.friendConditions) : null)
+        : existing.friend_conditions_json,
       existing.created_at,
       id,
     )
