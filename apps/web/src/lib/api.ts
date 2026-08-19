@@ -1,4 +1,5 @@
 import { adminSessionHeaders } from './admin-session'
+import type { SegmentCondition } from './segment-condition'
 import type {
   Friend,
   FriendAddRouting,
@@ -1542,10 +1543,13 @@ export const api = {
        * 絞り込み条件。targetType が 'segment' のときに必須。
        * 下書きに保存され、送信のときにこの条件で宛先を出す。
        */
-      segmentConditions?: {
-        operator: 'AND' | 'OR'
-        rules: Array<{ type: string; value: boolean | string | { key: string; value: string } }>
-      }
+      /*
+       * 宛先の条件。形は worker の `SegmentCondition` と同じ。
+       * 値の型はルールごとに違う（真偽・文字列・日付の範囲・ID の配列）ので
+       * ここでは絞らない。絞ると、条件を1つ増やすたびにここも直すことになり、
+       * 直し忘れたぶんが**画面では作れるのに保存できない条件**になる。
+       */
+      segmentConditions?: SegmentCondition
     }, options?: { idempotencyKey?: string }) =>
       fetchApi<ApiResponse<ApiBroadcast>>('/api/broadcasts', {
         method: 'POST',
@@ -1564,6 +1568,8 @@ export const api = {
       lineAccountId?: string | null
       accountIds?: string[]
       messageContent?: string
+      /** 詳細条件。渡さないと条件を無視した人数（＝全員）が返る。 */
+      segmentConditions?: SegmentCondition | null
     }) =>
       fetchApi<
         ApiResponse<{

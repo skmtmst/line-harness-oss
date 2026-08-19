@@ -17,6 +17,15 @@ import {
   messageTemplateToBubble,
   type BroadcastTemplateOption,
 } from '@/lib/broadcast-template'
+import {
+  TARGET_MODES,
+  audienceError,
+  buildAudienceCondition,
+  type TargetMode,
+} from '@/lib/broadcast-audience'
+import type { SegmentCondition } from '@/lib/segment-condition'
+import ConditionBuilder from '@/components/shared/condition-builder'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
 
 interface BroadcastFormProps {
   tags: Tag[]
@@ -32,31 +41,6 @@ const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
   rich_video: 'リッチビデオ', video: '動画', card_message: 'カードタイプ', coupon: 'クーポン', research: 'リサーチ',
 }
 const EMOJIS = ['😊', '✨', '🎉', '🐕', '🐈', '🌿', '❤️', '👍']
-
-/**
- * 送る相手の決め方。3つのうち1つを選ぶ。
- *
- * どれを選んでも、ブロック中の友だちは常に外れる（is_following）。
- */
-type TargetMode = 'scenario' | 'tag' | 'advanced'
-
-const TARGET_MODES: Array<{ value: TargetMode; label: string; description: string }> = [
-  {
-    value: 'scenario',
-    label: 'シナリオ購読中の全員に配信する',
-    description: 'いまシナリオが流れている人。止まっている人・配信し終わった人は入りません',
-  },
-  {
-    value: 'tag',
-    label: 'タグで絞り込んで配信する',
-    description: '選んだタグが付いている人',
-  },
-  {
-    value: 'advanced',
-    label: '詳細条件で絞り込んで配信する',
-    description: '性別・年代・エリア・友だち期間・過去の反応で絞ります',
-  },
-]
 
 function emptyBubble(type: BroadcastBubbleType = 'text'): BroadcastBubble {
   const content: Record<string, unknown> = type === 'text' ? { text: '' }
@@ -86,31 +70,31 @@ function MediaUpload({ bubble, onChange }: { bubble: BroadcastBubble; onChange: 
     } catch { setError('アップロードに失敗しました') } finally { setBusy(false) }
   }
   return <div className="space-y-3">
-    <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500 hover:border-emerald-400">
-      <span className="font-semibold text-slate-700">{busy ? 'アップロード中…' : `${isVideo ? 'MP4動画' : 'JPEG / PNG画像'}を選択`}</span>
+    <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-card border-2 border-dashed border-hairline bg-canvas-sunken text-sm text-ink-faint hover:border-accent">
+      <span className="font-semibold text-ink">{busy ? 'アップロード中…' : `${isVideo ? 'MP4動画' : 'JPEG / PNG画像'}を選択`}</span>
       <span className="mt-1 text-xs">上限 {isVideo ? '200MB' : '10MB'}</span>
       <input type="file" className="hidden" disabled={busy} accept={isVideo ? 'video/mp4' : 'image/jpeg,image/png'} onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f) }} />
     </label>
-    {typeof bubble.content.originalContentUrl === 'string' && bubble.content.originalContentUrl && <p className="truncate text-xs text-emerald-700">アップロード済み：{bubble.content.originalContentUrl}</p>}
-    {isVideo && <input value={String(bubble.content.previewImageUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, previewImageUrl: e.target.value })} placeholder="プレビュー画像URL（任意）" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />}
-    {bubble.type === 'rich_video' && <input value={String(bubble.content.actionUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />}
-    {error && <p className="text-xs text-rose-600">{error}</p>}
+    {typeof bubble.content.originalContentUrl === 'string' && bubble.content.originalContentUrl && <p className="truncate text-xs text-accent">アップロード済み：{bubble.content.originalContentUrl}</p>}
+    {isVideo && <input value={String(bubble.content.previewImageUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, previewImageUrl: e.target.value })} placeholder="プレビュー画像URL（任意）" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
+    {bubble.type === 'rich_video' && <input value={String(bubble.content.actionUrl ?? '')} onChange={(e) => onChange({ ...bubble.content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" />}
+    {error && <p className="text-xs text-danger">{error}</p>}
   </div>
 }
 
 function BubblePreview({ bubble }: { bubble: BroadcastBubble }) {
   const text = String(bubble.content.text ?? '')
   const imageUrl = String(bubble.content.previewImageUrl ?? bubble.content.imageUrl ?? '')
-  if (bubble.type === 'text') return <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-2xl rounded-tl-sm bg-white px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
-  if (bubble.type === 'sticker') return <div className="bg-warning-bg text-warning flex h-24 w-24 items-center justify-center rounded-2xl text-xs font-medium">スタンプ</div>
-  if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-2xl object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-2xl bg-slate-200 text-sm text-slate-500">写真</div>
-  if (bubble.type === 'flex') return <div className="w-[82%] rounded-2xl bg-white p-4 shadow-sm"><p className="text-xs font-bold text-purple-700">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-slate-500">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
-  if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-2xl bg-slate-900 text-white"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
+  if (bubble.type === 'text') return <div className="max-w-[82%] whitespace-pre-wrap break-words rounded-card rounded-tl-sm bg-canvas px-3 py-2 text-[13px] shadow-sm">{text || 'テキストを入力すると表示されます'}</div>
+  if (bubble.type === 'sticker') return <div className="bg-warning-bg text-warning flex h-24 w-24 items-center justify-center rounded-card text-xs font-medium">スタンプ</div>
+  if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
+  if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-sm"><p className="text-xs font-bold text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
+  if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-white"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-xl bg-white p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-lg object-cover" /> : <div className="h-20 rounded-lg bg-slate-200"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-emerald-500 py-1 text-[10px] text-white">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent py-1 text-[10px] text-white">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
   }
-  return <div className="w-[82%] overflow-hidden rounded-2xl bg-white shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-slate-500">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
+  return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
 
 function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete }: {
@@ -118,33 +102,46 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
   onChange: (bubble: BroadcastBubble) => void; onMove: (direction: -1 | 1) => void; onDelete: () => void
 }) {
   const availableAssets = assets.filter((asset) => asset.kind === bubble.type)
-  return <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <div className="flex items-center gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">{index + 1}</span>
-      <select value={bubble.type} onChange={(e) => onChange(emptyBubble(e.target.value as BroadcastBubbleType))} className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold">
+  // 差し込みをカーソルの位置に入れるために、入力欄そのものを渡す。
+  const textRef = useRef<HTMLTextAreaElement>(null)
+  return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
+    <div className="flex items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">{index + 1}</span>
+      <select value={bubble.type} onChange={(e) => onChange(emptyBubble(e.target.value as BroadcastBubbleType))} className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-semibold">
         {Object.entries(TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select>
-      <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-lg border disabled:opacity-30" aria-label="上へ移動">↑</button>
-      <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-lg border disabled:opacity-30" aria-label="下へ移動">↓</button>
-      <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-lg border border-rose-200 px-3 text-xs font-semibold text-rose-600 disabled:opacity-30">削除</button>
+      <button type="button" disabled={index === 0} onClick={() => onMove(-1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="上へ移動">↑</button>
+      <button type="button" disabled={index === total - 1} onClick={() => onMove(1)} className="h-9 w-9 rounded-control border disabled:opacity-30" aria-label="下へ移動">↓</button>
+      <button type="button" disabled={total === 1} onClick={onDelete} className="h-9 rounded-control border border-danger-bg px-3 text-xs font-semibold text-danger disabled:opacity-30">削除</button>
     </div>
     <div className="p-4">
       {bubble.type === 'text' && <div>
-        <textarea rows={6} maxLength={500} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="w-full resize-none rounded-xl border border-slate-200 p-3 text-sm focus:border-emerald-500 focus:outline-none" />
-        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, 500) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-slate-500">{String(bubble.content.text ?? '').length}/500</span></div>
+        {/*
+          差し込み。シナリオの本文と同じ部品を使う。記法を覚えないと
+          使えない状態だと、使えるのに誰も使わない機能になる。
+        */}
+        <div className="mb-2">
+          <InsertToolbar
+            targetRef={textRef}
+            value={String(bubble.content.text ?? '')}
+            onChange={(next) => onChange({ ...bubble, content: { text: next.slice(0, 500) } })}
+          />
+        </div>
+        <textarea ref={textRef} rows={6} maxLength={500} value={String(bubble.content.text ?? '')} onChange={(e) => onChange({ ...bubble, content: { text: e.target.value } })} placeholder="テキストを入力" className="border-hairline focus:border-accent rounded-card w-full resize-none border p-3 text-sm focus:outline-none" />
+        <div className="mt-2 flex items-center justify-between"><div className="flex gap-1">{EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => onChange({ ...bubble, content: { text: `${String(bubble.content.text ?? '')}${emoji}`.slice(0, 500) } })} className="rounded border px-1.5 py-1 text-sm">{emoji}</button>)}</div><span className="text-xs font-semibold text-ink-faint">{String(bubble.content.text ?? '').length}/500</span></div>
       </div>}
       {bubble.type === 'flex' && <div>
-        <label className="mb-1 block text-xs font-bold text-slate-600">Flex JSON</label>
-        <textarea rows={8} value={String(bubble.content.flexJson ?? '')} onChange={(e) => onChange({ ...bubble, content: { ...bubble.content, flexJson: e.target.value, templateId: undefined, templateName: undefined } })} className="w-full resize-y rounded-xl border border-slate-200 p-3 font-mono text-xs focus:border-emerald-500 focus:outline-none" />
+        <label className="mb-1 block text-xs font-bold text-ink-secondary">Flex JSON</label>
+        <textarea rows={8} value={String(bubble.content.flexJson ?? '')} onChange={(e) => onChange({ ...bubble, content: { ...bubble.content, flexJson: e.target.value, templateId: undefined, templateName: undefined } })} className="w-full resize-y rounded-card border border-hairline p-3 font-mono text-xs focus:border-accent focus:outline-none" />
       </div>}
-      {bubble.type === 'sticker' && <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900"><p className="font-bold">スタンプ（準備中）</p><p className="mt-1 text-xs">packageId / stickerId を保持するデータ構造は実装済みです。現在はプレースホルダを表示します。</p></div>}
+      {bubble.type === 'sticker' && <div className="rounded-card bg-warning-bg p-4 text-sm text-warning"><p className="font-bold">スタンプ（準備中）</p><p className="mt-1 text-xs">packageId / stickerId を保持するデータ構造は実装済みです。現在はプレースホルダを表示します。</p></div>}
       {['image','video','rich_video'].includes(bubble.type) && <MediaUpload bubble={bubble} onChange={(content) => onChange({ ...bubble, content })} />}
       {isContentTemplateType(bubble.type) && <div>
-        <label className="mb-1 block text-xs font-bold text-slate-600">コンテンツで作成したテンプレートから選択</label>
-        <select value={String(bubble.content.assetId ?? '')} onChange={(e) => { const asset = availableAssets.find((item) => item.id === e.target.value); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm">
+        <label className="mb-1 block text-xs font-bold text-ink-secondary">コンテンツで作成したテンプレートから選択</label>
+        <select value={String(bubble.content.assetId ?? '')} onChange={(e) => { const asset = availableAssets.find((item) => item.id === e.target.value); onChange({ ...bubble, content: asset ? { assetId: asset.id, assetName: asset.name, ...asset.payload } : { assetId: '', assetName: '' } }) }} className="w-full rounded-card border border-hairline px-3 py-2.5 text-sm">
           <option value="">テンプレートを選択してください</option>{availableAssets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}
         </select>
-        {availableAssets.length === 0 && <p className="mt-2 text-xs text-amber-700">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
+        {availableAssets.length === 0 && <p className="mt-2 text-xs text-warning">先に「コンテンツ ＞ テンプレート」で作成してください。</p>}
       </div>}
     </div>
   </section>
@@ -170,7 +167,16 @@ export default function BroadcastForm({
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
-  const [filter, setFilter] = useState({ gender: '', age: '', area: '', tenure: '', reaction: '', tagId: '' })
+  const [tagId, setTagId] = useState('')
+  /** 「詳細条件」で組み立てた絞り込み。シナリオと同じ部品で作る。 */
+  const [condition, setCondition] = useState<SegmentCondition | null>(null)
+  /*
+   * 本文のURLを短くしてクリックを数えるか。
+   *
+   * 既定は数える。ただし短縮すると届く文面のURLが `https://.../r/xxxx` に
+   * 変わるので、ドメインを見せたい配信では切れるようにしておく。
+   */
+  const [trackLinks, setTrackLinks] = useState(true)
   const [targetCount, setTargetCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
   // 送る前の確認。押すまで走らせない。入力のたびに投げると、
@@ -238,17 +244,10 @@ export default function BroadcastForm({
    * 絞った人数が出るのに、送信は全員へ行っていた（条件が送信側に渡って
    * いなかった）。1か所で作って両方に渡す。
    */
-  const countRules = useMemo(() => {
-    const rules: Array<{ type: 'is_following' | 'tag_exists' | 'metadata_equals' | 'scenario_subscribed'; value: boolean | string | { key: string; value: string } }> = [{ type: 'is_following', value: true }]
-    if (targetMode === 'scenario') {
-      rules.push({ type: 'scenario_subscribed', value: scenarioId })
-    } else if (targetMode === 'tag') {
-      if (filter.tagId) rules.push({ type: 'tag_exists', value: filter.tagId })
-    } else {
-      for (const [key, value] of Object.entries(filter)) if (key !== 'tagId' && value) rules.push({ type: 'metadata_equals', value: { key, value } })
-    }
-    return rules
-  }, [filter, scenarioId, targetMode])
+  const audience = useMemo(
+    () => buildAudienceCondition(targetMode, { scenarioId, tagId, condition }),
+    [condition, scenarioId, tagId, targetMode],
+  )
 
   /**
    * 作成・テスト送信・事前確認に渡す宛先。
@@ -257,20 +256,20 @@ export default function BroadcastForm({
    * 送信の経路が別（キューに載せずにその場で送る）で、少人数のときに速い。
    */
   const targetPayload = useCallback(() => {
-    if (targetMode === 'tag' && filter.tagId) {
-      return { targetType: 'tag' as const, targetTagId: filter.tagId, segmentConditions: undefined }
+    if (targetMode === 'tag' && tagId) {
+      return { targetType: 'tag' as const, targetTagId: tagId, segmentConditions: undefined }
     }
     return {
       targetType: 'segment' as const,
       targetTagId: null,
-      segmentConditions: { operator: 'AND' as const, rules: countRules },
+      segmentConditions: audience,
     }
-  }, [countRules, filter.tagId, targetMode])
+  }, [audience, tagId, targetMode])
   const refreshCount = useCallback(async () => {
     setCounting(true)
-    try { const res = await api.segments.count({ operator: 'AND', rules: countRules }, selectedAccountId || undefined); setTargetCount(res.success ? (res.count ?? 0) : null) }
+    try { const res = await api.segments.count(audience, selectedAccountId || undefined); setTargetCount(res.success ? (res.count ?? 0) : null) }
     catch { setTargetCount(null) } finally { setCounting(false) }
-  }, [countRules, selectedAccountId])
+  }, [audience, selectedAccountId])
   useEffect(() => { const timer = setTimeout(() => void refreshCount(), 350); return () => clearTimeout(timer) }, [refreshCount])
 
   /*
@@ -289,12 +288,15 @@ export default function BroadcastForm({
     return () => clearTimeout(timer)
     // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bubbles, filter.tagId, scenarioId, targetMode, selectedAccountId])
+  }, [bubbles, tagId, condition, scenarioId, targetMode, selectedAccountId])
 
   const updateBubble = (index: number, bubble: BroadcastBubble) => setBubbles((items) => items.map((item, i) => i === index ? { ...bubble, id: item.id } : item))
   const moveBubble = (index: number, direction: -1 | 1) => setBubbles((items) => { const next = [...items]; const [item] = next.splice(index, 1); next.splice(index + direction, 0, item); return next })
   const validate = () => {
     if (!title.trim()) return '管理用タイトルを入力してください'
+    // 宛先が空のまま保存すると、絞ったつもりで全員に届く。
+    const audienceProblem = audienceError(targetMode, { scenarioId, tagId, condition })
+    if (audienceProblem) return audienceProblem
     for (const [index, bubble] of bubbles.entries()) {
       if (bubble.type === 'text' && !String(bubble.content.text ?? '').trim()) return `吹き出し${index + 1}のテキストを入力してください`
       if (['image','video','rich_video'].includes(bubble.type) && !bubble.content.originalContentUrl) return `吹き出し${index + 1}のファイルをアップロードしてください`
@@ -324,6 +326,8 @@ export default function BroadcastForm({
       const res = await api.broadcasts.preflight({
         targetType: target.targetType,
         targetTagId: target.targetTagId,
+        // 条件を渡さないと、絞り込みを無視した人数（＝全員）が返る。
+        segmentConditions: target.segmentConditions ?? null,
         lineAccountId: selectedAccountId || null,
         messageContent: content,
       })
@@ -379,7 +383,7 @@ export default function BroadcastForm({
           ...targetPayload(),
           lineAccountId: selectedAccountId || null,
           scheduledAt: null,
-          trackLinks: true,
+          trackLinks,
           stealthSpreadMinutes: Number(spreadMinutes) || 0,
         },
         { idempotencyKey: crypto.randomUUID() },
@@ -404,7 +408,7 @@ export default function BroadcastForm({
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubbles, ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks: true, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
+      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubbles, ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
       if (res.success) onSuccess(); else setError(res.error)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
@@ -423,15 +427,15 @@ export default function BroadcastForm({
     </div>
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div className="space-y-5">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <label className="block text-sm font-bold text-slate-700">管理用タイトル</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm" />
+        <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+          <label className="block text-sm font-bold text-ink">管理用タイトル</label><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：8月キャンペーンのお知らせ" className="mt-2 w-full rounded-card border border-hairline px-4 py-3 text-sm" />
         </section>
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-card border border-hairline bg-canvas p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <p className="text-sm font-bold text-slate-800">1. 送る相手</p>
-            <div className="rounded-xl bg-emerald-50 px-5 py-3 text-right">
-              <p className="text-xs font-bold text-emerald-700">送信対象</p>
-              <p className="text-2xl font-black text-emerald-700">
+            <p className="text-sm font-bold text-ink">1. 送る相手</p>
+            <div className="rounded-card bg-accent-soft px-5 py-3 text-right">
+              <p className="text-xs font-bold text-accent">送信対象</p>
+              <p className="text-2xl font-black text-accent">
                 {counting ? '…' : targetCount?.toLocaleString('ja-JP') ?? '-'}
                 <span className="ml-1 text-sm">人</span>
               </p>
@@ -446,7 +450,7 @@ export default function BroadcastForm({
             {TARGET_MODES.map((mode) => (
               <label
                 key={mode.value}
-                className={`flex h-full cursor-pointer flex-col gap-1 rounded-xl border p-3 transition-colors ${
+                className={`flex h-full cursor-pointer flex-col gap-1 rounded-card border p-3 transition-colors ${
                   targetMode === mode.value
                     ? 'border-accent bg-accent-soft'
                     : 'border-hairline hover:bg-canvas-sunken'
@@ -497,25 +501,35 @@ export default function BroadcastForm({
             <select
               value={scenarioId}
               onChange={(e) => setScenarioId(e.target.value)}
-              className="border-hairline mt-1 w-full rounded-lg border px-3 py-2 text-sm sm:max-w-sm"
+              className="border-hairline mt-1 w-full rounded-control border px-3 py-2 text-sm sm:max-w-sm"
             >
               <option value="">すべてのシナリオ（どれか1つでも購読中）</option>
               {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}
             </select>
           </div>}
-          {targetMode === 'tag' && <div className="mt-4 border-t pt-4">
+          {targetMode === 'tag' && <div className="border-hairline mt-4 border-t pt-4">
             <label className="text-ink-secondary block text-xs font-semibold">どのタグ</label>
-            <select value={filter.tagId} onChange={(e) => setFilter({ ...filter, tagId: e.target.value })} className="border-hairline mt-1 w-full rounded-lg border px-3 py-2 text-sm sm:max-w-sm"><option value="">タグ：すべて</option>{tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}</select>
+            {/*
+              「すべて」は置かない。タグを選ばないままだと絞り込みが消えて
+              全員に届く。全員に送るなら上の「友だち全員に配信する」を選ぶ。
+            */}
+            <select value={tagId} onChange={(e) => setTagId(e.target.value)} className="border-hairline rounded-control mt-1 w-full border px-3 py-2 text-sm sm:max-w-sm">
+              <option value="">タグを選んでください</option>
+              {tags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
+            </select>
           </div>}
-          {targetMode === 'advanced' && <div className="mt-4 grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
-            <select value={filter.gender} onChange={(e) => setFilter({ ...filter, gender: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">性別：すべて</option><option value="female">女性</option><option value="male">男性</option><option value="unknown">未設定</option></select>
-            <select value={filter.age} onChange={(e) => setFilter({ ...filter, age: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">年代：すべて</option>{['20代','30代','40代','50代','60代以上'].map((v) => <option key={v}>{v}</option>)}</select>
-            <input value={filter.area} onChange={(e) => setFilter({ ...filter, area: e.target.value })} placeholder="エリア（例：東京都）" className="rounded-lg border px-3 py-2 text-sm" />
-            <select value={filter.tenure} onChange={(e) => setFilter({ ...filter, tenure: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">友だち期間：すべて</option><option value="0-30">30日以内</option><option value="31-180">31〜180日</option><option value="181+">181日以上</option></select>
-            <select value={filter.reaction} onChange={(e) => setFilter({ ...filter, reaction: e.target.value })} className="rounded-lg border px-3 py-2 text-sm"><option value="">過去反応：すべて</option><option value="clicked">クリックあり</option><option value="replied">返信あり</option></select>
+          {targetMode === 'advanced' && <div className="border-hairline mt-4 border-t pt-4">
+            {/*
+              シナリオ・1通ごとの配信対象・アクションの実行条件と同じ部品。
+              一斉配信だけ別の項目にしていたときは、性別・年代・エリアなどを
+              `friends.metadata` から読んでいたが、そこへ値を書く経路が
+              どこにも無く、**選んでも常に0人**だった。
+              人数はこの節の右上（送信対象）に出るので、部品側の件数は出さない。
+            */}
+            <ConditionBuilder value={condition} onChange={setCondition} showCount={false} />
           </div>}
         </section>
-        <section className="border-hairline mb-3 rounded-2xl border bg-white p-5">
+        <section className="border-hairline mb-3 rounded-card border bg-canvas p-5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-ink text-sm font-bold">3. 送る内容</p>
             <button
@@ -528,17 +542,38 @@ export default function BroadcastForm({
           </div>
           <p className="text-ink-faint mt-1 text-xs">
             {textLength} / 500{textLength > 500 ? '（上限を超えています）' : ' ・ 分割なし'}
-            {urlCount > 0 && ` ・ URL ${urlCount}件を短縮してクリックを計測します`}
+            {urlCount > 0 && (trackLinks
+              ? ` ・ URL ${urlCount}件を短縮してクリックを計測します`
+              : ` ・ URL ${urlCount}件はそのまま送ります（クリックは数えません）`)}
           </p>
+          {/*
+            短縮すると、届く文面のURLが自分のドメインではなくなる。
+            ドメインを見せたい配信（採用・公式の案内など）では切れるようにする。
+            切ると、この配信のクリック数は出ない。
+          */}
+          <label className="text-ink-secondary mt-3 flex items-start gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={!trackLinks}
+              onChange={(e) => setTrackLinks(!e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              この配信ではURLを短縮しない
+              <span className="text-ink-faint block">
+                届く文面のURLがそのままになります。クリック数は数えられません。
+              </span>
+            </span>
+          </label>
         </section>
         {showTemplatePicker && (
-          <section className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-5">
+          <section className="rounded-card border-2 border-accent bg-accent-soft p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-sm font-bold text-slate-900">コンテンツのテンプレートを引用</h3>
-                <p className="mt-1 text-xs text-slate-600">選択した内容を新しい吹き出しとして読み込みます。読み込み後も配信側で編集できます。</p>
+                <h3 className="text-sm font-bold text-ink">コンテンツのテンプレートを引用</h3>
+                <p className="mt-1 text-xs text-ink-secondary">選択した内容を新しい吹き出しとして読み込みます。読み込み後も配信側で編集できます。</p>
               </div>
-              <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm text-slate-500">閉じる</button>
+              <button type="button" onClick={() => setShowTemplatePicker(false)} className="text-sm text-ink-faint">閉じる</button>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {messageTemplates.map((template) => (
@@ -547,10 +582,10 @@ export default function BroadcastForm({
                   if (!bubble) { setError('このテンプレートの内容を読み込めませんでした'); return }
                   setBubbles((items) => items.length === 1 && !String(items[0]?.content.text ?? '').trim() ? [bubble] : [...items.slice(0, 2), bubble])
                   setShowTemplatePicker(false)
-                }} className="rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-400">
-                  <span className="text-[11px] font-bold text-emerald-700">{TYPE_LABELS[template.messageType as BroadcastBubbleType] ?? template.messageType}</span>
-                  <p className="mt-1 truncate text-sm font-bold text-slate-900">{template.name}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">{template.category}</p>
+                }} className="rounded-card border border-hairline bg-canvas p-4 text-left hover:border-accent">
+                  <span className="text-[11px] font-bold text-accent">{TYPE_LABELS[template.messageType as BroadcastBubbleType] ?? template.messageType}</span>
+                  <p className="mt-1 truncate text-sm font-bold text-ink">{template.name}</p>
+                  <p className="mt-1 truncate text-xs text-ink-faint">{template.category}</p>
                 </button>
               ))}
               {assets.map((asset) => (
@@ -558,14 +593,14 @@ export default function BroadcastForm({
                   const bubble = contentTemplateToBubble(asset)
                   setBubbles((items) => items.length === 1 && !String(items[0]?.content.text ?? '').trim() ? [bubble] : [...items.slice(0, 2), bubble])
                   setShowTemplatePicker(false)
-                }} className="rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-emerald-400">
-                  <span className="text-[11px] font-bold text-emerald-700">{TYPE_LABELS[asset.kind]}</span>
-                  <p className="mt-1 truncate text-sm font-bold text-slate-900">{asset.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">コンテンツテンプレート</p>
+                }} className="rounded-card border border-hairline bg-canvas p-4 text-left hover:border-accent">
+                  <span className="text-[11px] font-bold text-accent">{TYPE_LABELS[asset.kind]}</span>
+                  <p className="mt-1 truncate text-sm font-bold text-ink">{asset.name}</p>
+                  <p className="mt-1 text-xs text-ink-faint">コンテンツテンプレート</p>
                 </button>
               ))}
               {messageTemplates.length === 0 && assets.length === 0 && (
-                <div className="md:col-span-2 rounded-xl border border-dashed bg-white p-8 text-center text-sm text-slate-500">
+                <div className="md:col-span-2 rounded-card border border-dashed bg-canvas p-8 text-center text-sm text-ink-faint">
                   テンプレートがありません。「コンテンツ ＞ テンプレート」で作成してください。
                 </div>
               )}
@@ -573,9 +608,9 @@ export default function BroadcastForm({
           </section>
         )}
         {bubbles.map((bubble, index) => <BubbleEditor key={bubble.id} bubble={bubble} index={index} total={bubbles.length} assets={assets} onChange={(next) => updateBubble(index, next)} onMove={(direction) => moveBubble(index, direction)} onDelete={() => setBubbles((items) => items.filter((_, i) => i !== index))} />)}
-        <button type="button" disabled={bubbles.length >= 3} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-2xl border-2 border-dashed border-emerald-300 py-4 text-sm font-bold text-emerald-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400">＋ 吹き出しを追加（{bubbles.length}/3）</button>
-        {error && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
-        <section className="border-hairline mb-3 rounded-2xl border bg-white p-5">
+        <button type="button" disabled={bubbles.length >= 3} onClick={() => setBubbles((items) => [...items, emptyBubble()])} className="w-full rounded-card border-2 border-dashed border-accent py-4 text-sm font-bold text-accent disabled:cursor-not-allowed disabled:border-hairline disabled:text-ink-faint">＋ 吹き出しを追加（{bubbles.length}/3）</button>
+        {error && <p className="rounded-card bg-danger-bg p-3 text-sm text-danger">{error}</p>}
+        <section className="border-hairline mb-3 rounded-card border bg-canvas p-5">
           <p className="text-ink mb-3 text-sm font-bold">2. 送る時間</p>
           <div className="grid gap-2 sm:grid-cols-3">
             <button
@@ -664,7 +699,7 @@ export default function BroadcastForm({
           </div>
         </section>
 
-    <section className="border-hairline mb-3 rounded-2xl border bg-white p-5">
+    <section className="border-hairline mb-3 rounded-card border bg-canvas p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink text-sm font-bold">配信前チェック</p>
         {preflight && (
@@ -692,7 +727,7 @@ export default function BroadcastForm({
             {preflight.audienceCount.toLocaleString('ja-JP')} 人に届きます
           </p>
           <ul className="mt-2 space-y-2">
-            <li className="border-hairline rounded-lg border p-2">
+            <li className="border-hairline rounded-control border p-2">
               <p className="text-ink text-xs font-medium">
                 本文の文字数は{textLength > 500 ? '上限を超えています' : '問題ありません'}
               </p>
@@ -703,7 +738,7 @@ export default function BroadcastForm({
             {preflight.warnings.map((w) => (
               <li
                 key={w.message}
-                className={`rounded-lg border p-2 ${
+                className={`rounded-control border p-2 ${
                   w.level === 'warning' ? 'border-warning-bg bg-warning-bg' : 'border-hairline'
                 }`}
               >
@@ -712,7 +747,7 @@ export default function BroadcastForm({
                 </p>
               </li>
             ))}
-            <li className="border-hairline rounded-lg border p-2">
+            <li className="border-hairline rounded-control border p-2">
               <p className="text-ink text-xs font-medium">
                 {urlCount > 0 ? 'URLの計測が有効です' : '本文にURLはありません'}
               </p>
@@ -728,7 +763,7 @@ export default function BroadcastForm({
               いても、送ってからでは戻せない。
             */}
             <li
-              className={`rounded-lg border p-2 ${
+              className={`rounded-control border p-2 ${
                 testResult ? 'border-hairline' : 'border-warning-bg bg-warning-bg'
               }`}
             >
@@ -741,7 +776,7 @@ export default function BroadcastForm({
             </li>
             {/* 開封数は配信先が20人以上のときだけ LINE から返る。人数が
                 足りないと空欄になるので、送る前に伝える。 */}
-            <li className="border-hairline rounded-lg border p-2">
+            <li className="border-hairline rounded-control border p-2">
               <p className="text-ink text-xs font-medium">
                 {preflight.audienceCount >= 20 ? '開封数を集計できます' : '開封数は集計されません'}
               </p>
@@ -757,7 +792,7 @@ export default function BroadcastForm({
       )}
     </section>
     <div className="flex flex-wrap justify-end gap-3">
-      <button onClick={onCancel} className="border-hairline rounded-xl border px-5 py-3 text-sm font-bold">
+      <button onClick={onCancel} className="border-hairline rounded-card border px-5 py-3 text-sm font-bold">
         キャンセル
       </button>
       {/*
@@ -770,14 +805,14 @@ export default function BroadcastForm({
       <button
         disabled={testSending || saving}
         onClick={() => void handleTestSend()}
-        className="border-hairline rounded-xl border px-5 py-3 text-sm font-bold disabled:opacity-50"
+        className="border-hairline rounded-card border px-5 py-3 text-sm font-bold disabled:opacity-50"
       >
         {testSending ? '送信中…' : 'テスト送信'}
       </button>
       <button
         disabled={saving}
         onClick={() => void save()}
-        className="bg-accent text-on-accent hover:bg-accent-hover rounded-xl px-7 py-3 text-sm font-bold disabled:opacity-50"
+        className="bg-accent text-on-accent hover:bg-accent-hover rounded-card px-7 py-3 text-sm font-bold disabled:opacity-50"
       >
         {saving ? '保存中…' : sendMode === 'scheduled' ? '配信を予約する' : '下書き保存'}
       </button>

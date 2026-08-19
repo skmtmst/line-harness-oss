@@ -1,25 +1,42 @@
-// Broadcast template variables are expanded by LINE Harness before calling
-// the Messaging API. LINE's official textV2.substitution supports mentions
-// and LINE emoji only; it does not provide arbitrary recipient-name strings.
-export const SUPPORTED_BROADCAST_VARIABLES = new Set(['name', 'liff_id']);
-
-const BROADCAST_VARIABLE_RE = /\{\{\s*([^{}]+?)\s*\}\}/g;
+/*
+ * 一斉配信の本文の差し込みを置き換える。
+ *
+ * LINE 側の textV2.substitution はメンションと絵文字しか置き換えられない
+ * ので、送る前にこちらで置き換えてから渡す。
+ *
+ * どの差し込みを置き換えられるか・どれが相手ごとに変わるかは
+ * `@line-crm/shared` に置いてある。画面と同じものを見ないと、
+ * 画面では入れられるのに配信時刻になって初めて弾かれる、という壊れ方をする。
+ */
+import {
+  findUnsupportedInterpolations,
+  listInterpolations,
+  needsPerRecipientDelivery,
+} from '@line-crm/shared';
+import { expandDateVariables } from './interpolation-date.js';
 
 export function getBroadcastVariables(content: string): string[] {
-  return [...new Set([...content.matchAll(BROADCAST_VARIABLE_RE)].map((m) => m[1].trim()))];
+  return listInterpolations(content);
 }
 
 export function getUnsupportedBroadcastVariables(content: string): string[] {
-  return getBroadcastVariables(content).filter((name) => !SUPPORTED_BROADCAST_VARIABLES.has(name));
+  return findUnsupportedInterpolations(content);
 }
 
+/** 1人ずつ送らないといけないか（相手ごとに変わる差し込みがあるか）。 */
 export function hasRecipientVariables(content: string): boolean {
-  return getBroadcastVariables(content).includes('name');
+  return needsPerRecipientDelivery(content);
 }
 
 export interface BroadcastRenderContext {
   liffId?: string | null;
   displayName?: string | null;
+  /** 友だち情報欄。field_key => 値 */
+  fields?: Record<string, string>;
+  /** 共通情報。var_key => 値 */
+  vars?: Record<string, string>;
+  /** 配信日の起点。省略したら「いま」。 */
+  deliveredAt?: Date;
 }
 
 export function renderMessageContent(
@@ -30,9 +47,33 @@ export function renderMessageContent(
     ? liffIdOrContext ?? {}
     : { liffId: liffIdOrContext };
 
-  let result = content;
+  /*
+   * 日付を先に置き換える。
+   *
+   * 後にすると、友だち情報欄に入っていた値が偶然 `{{date}}` の形をして
+   * いた場合に二重に置き換わる。差し込みの値は利用者が入れたもので、
+   * それが差し込みとして解釈されるのは事故のもと。
+   */
+  let result = expandDateVariables(content, context.deliveredAt ?? new Date());
+
   if (context.liffId) result = result.replace(/\{\{\s*liff_id\s*\}\}/g, context.liffId);
   if (context.displayName) result = result.replace(/\{\{\s*name\s*\}\}/g, context.displayName);
+
+  /*
+   * 未設定の項目は空文字にする。
+   *
+   * 「未設定」と書くとそのまま相手に届く。空にしておけば、文として
+   * 不格好でも意味は壊れない。差し込みを本文に残すのがいちばん困る。
+   */
+  const fields = context.fields;
+  if (fields) {
+    result = result.replace(/\{\{\s*field\.([a-z][a-z0-9_]*)\s*\}\}/g, (_m, key: string) => fields[key] ?? '');
+  }
+  const vars = context.vars;
+  if (vars) {
+    result = result.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g, (_m, key: string) => vars[key] ?? '');
+  }
+
   return result;
 }
 

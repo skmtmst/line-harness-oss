@@ -368,14 +368,36 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
       lineAccountId?: unknown;
       accountIds?: unknown;
       messageContent?: unknown;
+      segmentConditions?: unknown;
     }>();
 
     const targetType = String(body.targetType ?? 'all');
+    /*
+     * 条件が読めないときは数えない。
+     *
+     * 読めない条件を捨てて数えると、絞り込みが無い状態＝全員の人数が出る。
+     * 取り消せない操作の直前に、実際より多い数字を出すのがいちばん困る。
+     */
+    let segmentConditions: SegmentCondition | null = null;
+    if (targetType === 'segment' && body.segmentConditions) {
+      const raw = body.segmentConditions as SegmentCondition;
+      try {
+        const { buildSegmentWhere } = await import('../services/segment-query.js');
+        buildSegmentWhere(raw);
+        segmentConditions = raw;
+      } catch (segmentError) {
+        return c.json(
+          { success: false, error: segmentError instanceof Error ? segmentError.message : 'invalid segmentConditions' },
+          400,
+        );
+      }
+    }
     const audience = await countAudience(c.env.DB, {
       targetType,
       targetTagId: body.targetTagId ? String(body.targetTagId) : null,
       lineAccountId: body.lineAccountId ? String(body.lineAccountId) : null,
       accountIds: Array.isArray(body.accountIds) ? body.accountIds.map(String) : undefined,
+      segmentConditions,
     });
 
     // 同じ本文の配信が直近にあるかは、本文が渡されたときだけ見る。

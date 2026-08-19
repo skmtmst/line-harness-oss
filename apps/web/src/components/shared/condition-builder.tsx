@@ -18,29 +18,21 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import {
+  isEmptyCondition,
+  pruneCondition,
+  type FieldOperator,
+  type SegmentCondition,
+  type SegmentRule,
+} from '@/lib/segment-condition'
 
-export type FieldOperator =
-  | 'equals'
-  | 'contains'
-  | 'exists'
-  | 'not_exists'
-  | 'not_equals'
-  | 'not_contains'
-  | 'gte'
-  | 'gt'
-  | 'lte'
-  | 'lt'
-
-export interface SegmentRule {
-  type: string
-  value: unknown
-}
-
-export interface SegmentCondition {
-  operator: 'AND' | 'OR'
-  rules: SegmentRule[]
-  groups?: SegmentCondition[]
-}
+// これまでどおりこのファイルからも取れるようにしておく。呼び出し側が多い。
+export {
+  isRuleComplete,
+  isEmptyCondition,
+  pruneCondition,
+} from '@/lib/segment-condition'
+export type { FieldOperator, SegmentCondition, SegmentRule } from '@/lib/segment-condition'
 
 /** 追加できる絞り込みの種類。並びは Lステップの並びに合わせてある。 */
 const RULE_KINDS: { type: string; label: string; make: () => SegmentRule }[] = [
@@ -103,70 +95,18 @@ export interface ConditionBuilderProps {
   onChange: (next: SegmentCondition | null) => void
   /** 見出しに出す言葉。「この通の配信対象」など。 */
   label?: string
+  /**
+   * 該当件数を出すか。既定は出す。
+   *
+   * 呼び出し側が自分で人数を出している場合は消す。一斉配信の作成画面は
+   * 節の右上に「送信対象 ◯人」を出していて、そちらはアカウントの絞り込みも
+   * 掛かっている。並べると**違う数字が2つ**見え、どちらが送られるのか
+   * 分からなくなる。
+   */
+  showCount?: boolean
 }
 
-/**
- * まだ書きかけの行か。
- *
- * タグを選ぶ前、項目を選ぶ前の行を数え上げに送ると、worker が
- * 「読めない条件」として断る。件数が出ないだけならまだしも、そのまま
- * 保存すると**誰にも届かない条件**が出来上がる。書けている行だけを使う。
- */
-export function isRuleComplete(rule: SegmentRule): boolean {
-  const v = rule.value as Record<string, unknown>
-  switch (rule.type) {
-    case 'tag_exists':
-    case 'tag_not_exists':
-      return typeof rule.value === 'string' && rule.value !== ''
-    case 'tag_all':
-    case 'tag_not_all':
-      return Array.isArray(rule.value) && rule.value.length > 0
-    case 'name':
-      return typeof v?.text === 'string' && v.text.trim() !== ''
-    case 'private_memo':
-    case 'status_message':
-    case 'ref_code':
-      return typeof rule.value === 'string' && rule.value.trim() !== ''
-    case 'registered_at':
-    case 'last_reaction_at':
-      return (
-        (typeof v?.from === 'string' && v.from !== '') ||
-        (typeof v?.to === 'string' && v.to !== '')
-      )
-    case 'support_mark':
-      return Array.isArray(v?.markIds) && (v.markIds as unknown[]).length > 0
-    case 'friend_field':
-      return typeof v?.fieldId === 'string' && v.fieldId !== ''
-    case 'scenario_state':
-      return typeof v?.scenarioId === 'string' && v.scenarioId !== ''
-    default:
-      // form_answered は空で「どれかに回答した人」、is_following /
-      // is_hidden / reaction_state は常に値が入っている。
-      return true
-  }
-}
-
-/** 書きかけの行を落とす。保存にも数え上げにも同じものを使う。 */
-export function pruneCondition(condition: SegmentCondition | null): SegmentCondition | null {
-  if (!condition) return null
-  const rules = (condition.rules ?? []).filter(isRuleComplete)
-  const groups = (condition.groups ?? [])
-    .map((g) => pruneCondition(g))
-    .filter((g): g is SegmentCondition => g !== null)
-  if (rules.length === 0 && groups.length === 0) return null
-  return { operator: condition.operator, rules, groups }
-}
-
-/** 条件が実質空か。空なら null として保存し、「絞り込みなし」の意味にする。 */
-export function isEmptyCondition(condition: SegmentCondition | null): boolean {
-  if (!condition) return true
-  const groupCount = (condition.groups ?? []).filter(
-    (g) => g.rules.length > 0 || (g.groups?.length ?? 0) > 0,
-  ).length
-  return condition.rules.length === 0 && groupCount === 0
-}
-
-export default function ConditionBuilder({ value, onChange, label }: ConditionBuilderProps) {
+export default function ConditionBuilder({ value, onChange, label, showCount = true }: ConditionBuilderProps) {
   const [tags, setTags] = useState<Option[]>([])
   const [fields, setFields] = useState<Option[]>([])
   const [marks, setMarks] = useState<Option[]>([])
@@ -201,6 +141,8 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
    * 気づけない。打つたびに叩くと重いので、少し待ってから数える。
    */
   useEffect(() => {
+    // 出さないなら数えない。打つたびに使われない問い合わせが飛ぶ。
+    if (!showCount) return
     const usable = pruneCondition(condition)
     if (!usable) {
       setCount(null)
@@ -221,7 +163,7 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
     }, 400)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(condition)])
+  }, [JSON.stringify(condition), showCount])
 
   const update = (next: SegmentCondition) => {
     onChange(isEmptyCondition(next) ? null : next)
@@ -358,20 +300,22 @@ export default function ConditionBuilder({ value, onChange, label }: ConditionBu
         ＋「いずれか1つ以上を満たす」必要がある条件(or条件)を追加
       </button>
 
-      <div className="bg-canvas-sunken rounded-card flex items-baseline justify-between px-4 py-3">
-        <span className="text-ink-secondary text-xs">該当件数</span>
-        <span className="text-ink text-lg font-bold tabular-nums">
-          {isEmptyCondition(condition)
-            ? '絞り込みなし'
-            : !pruneCondition(condition)
-              ? '入力するとここに出ます'
-              : counting
-                ? '…'
-                : count === null
-                  ? '—'
-                  : `${count.toLocaleString('ja-JP')} 人`}
-        </span>
-      </div>
+      {showCount && (
+        <div className="bg-canvas-sunken rounded-card flex items-baseline justify-between px-4 py-3">
+          <span className="text-ink-secondary text-xs">該当件数</span>
+          <span className="text-ink text-lg font-bold tabular-nums">
+            {isEmptyCondition(condition)
+              ? '絞り込みなし'
+              : !pruneCondition(condition)
+                ? '入力するとここに出ます'
+                : counting
+                  ? '…'
+                  : count === null
+                    ? '—'
+                    : `${count.toLocaleString('ja-JP')} 人`}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

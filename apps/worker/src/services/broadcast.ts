@@ -19,11 +19,42 @@ import {
   getUnsupportedBroadcastVariables,
   hasRecipientVariables,
   renderBroadcastMessageContent,
+  type BroadcastRenderContext,
 } from './render-message.js';
+import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 
 const MULTICAST_BATCH_SIZE = 500;
 const PERSONALIZED_PUSH_BATCH_SIZE = 10;
+
+/**
+ * 配信全体で1つに決まる差し込みの値。
+ *
+ * 共通情報（営業時間など）と配信日は、誰に送っても同じ値になる。
+ * 1人ずつ引くと人数分クエリが増えるので、送る前に1回だけ用意する。
+ *
+ * 配信日の起点は**実際に送る時刻**。予約時刻ではない。cron は5分刻みで
+ * 動くので、深夜0時前後の配信では予約時刻と実際の日付が割れる。
+ * 相手が受け取った日と、本文に書かれた日が食い違うのがいちばん困る。
+ */
+async function broadcastWideContext(
+  db: D1Database,
+  accountId: string | null,
+  content: string,
+): Promise<BroadcastRenderContext> {
+  const context: BroadcastRenderContext = { deliveredAt: new Date() };
+  if (accountId) {
+    const { getLineAccountById: getLA } = await import('@line-crm/db');
+    const acct = await getLA(db, accountId);
+    context.liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
+  }
+  // 共通情報は本文で使っているときだけ引く。使わない配信で毎回1クエリ増やさない。
+  if (/\{\{\s*var\./.test(content)) {
+    const { getCommonVarMap } = await import('@line-crm/db');
+    context.vars = await getCommonVarMap(db);
+  }
+  return context;
+}
 
 export async function processBroadcastSend(
   db: D1Database,
@@ -171,16 +202,17 @@ export async function processBroadcastSend(
     finalType = tracked.messageType;
     finalContent = tracked.content;
   }
-  // {{liff_id}} 置換: broadcast の line_account_id に紐付く LIFF ID で替える。
-  // ここは tag / all 系の単一 account 経路のみ (multi-account-dedup は冒頭で queue に
-  // 委譲済みで到達しない。dedup の {{liff_id}} 置換は dedup-broadcast.ts 側で per-account
-  // に行う)。
-  if (broadcastAccountId) {
-    const { getLineAccountById: getLA } = await import('@line-crm/db');
-    const acct = await getLA(db, broadcastAccountId);
-    const liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
-    finalContent = renderBroadcastMessageContent(finalType, finalContent, { liffId });
-  }
+  /*
+   * 配信全体で決まる差し込みを、ここで置き換える。
+   *   {{liff_id}} … この配信のアカウントの LIFF ID
+   *   {{var.…}}   … 共通情報
+   *   {{date…}}   … 配信日・目標日までの日数
+   * ここは tag / all 系の単一 account 経路のみ (multi-account-dedup は冒頭で
+   * queue に委譲済みで到達しない。dedup の置換は dedup-broadcast.ts 側で
+   * per-account に行う)。
+   */
+  const wideContext = await broadcastWideContext(db, broadcastAccountId, finalContent);
+  finalContent = renderBroadcastMessageContent(finalType, finalContent, wideContext);
   assertNoUnresolvedBroadcastVariables(finalContent);
   const altText = (broadcast as unknown as Record<string, unknown>).alt_text as string | undefined;
   const message = buildMessage(finalType, finalContent, altText || undefined);
@@ -426,13 +458,12 @@ async function processQueuedBroadcastBatches(
     }
   }
 
-  // {{liff_id}} 置換 (single account 経路のみ; multi は dedup 側で per-account 置換)。
+  // 配信全体で決まる差し込み（{{liff_id}} / {{var.…}} / {{date…}}）を先に置き換える。
+  // single account 経路のみ; multi は dedup 側で per-account に置換する。
   const queuedAccountId = raw.line_account_id as string | null;
-  if (queuedAccountId && broadcast.target_type !== 'multi-account-dedup') {
-    const { getLineAccountById: getLA } = await import('@line-crm/db');
-    const acct = await getLA(db, queuedAccountId);
-    const liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
-    finalContent = renderBroadcastMessageContent(finalType, finalContent, { liffId });
+  if (broadcast.target_type !== 'multi-account-dedup') {
+    const wide = await broadcastWideContext(db, queuedAccountId, finalContent);
+    finalContent = renderBroadcastMessageContent(finalType, finalContent, wide);
   }
   const altText = raw.alt_text as string | undefined;
   const message = buildMessage(finalType, finalContent, altText || undefined);
@@ -559,8 +590,12 @@ async function processQueuedBroadcastBatches(
         }
 
         try {
+          // 友だち情報欄は人ごとに違うので、ここで引く。本文で使っていなければ
+          // 引かない（resolveInterpolationExtra が中で判断する）。
+          const extra = await resolveInterpolationExtra(db, friend.id, finalContent);
           const renderedContent = renderBroadcastMessageContent(finalType, finalContent, {
             displayName: friend.display_name,
+            fields: extra.fields,
           });
           assertNoUnresolvedBroadcastVariables(renderedContent);
           const personalizedMessage = buildMessage(finalType, renderedContent, altText || undefined);

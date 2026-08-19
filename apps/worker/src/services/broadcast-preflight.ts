@@ -1,4 +1,5 @@
 import { INSIGHT_MIN_AUDIENCE } from '@line-crm/db';
+import { buildSegmentWhere, type SegmentCondition } from './segment-query.js';
 
 /**
  * 配信前チェック。
@@ -28,6 +29,15 @@ export interface PreflightInput {
   lineAccountId?: string | null;
   /** multi-account-dedup のときの対象アカウント */
   accountIds?: string[];
+  /**
+   * 詳細条件で絞ったときの条件。
+   *
+   * 渡さないと、条件を無視して**そのアカウントの全員**を数える。
+   * 12人に送るつもりで「312人に届きます」と出たまま送信ボタンを押す、
+   * という取り違えが起きる。取り消せない操作の直前に出る数字なので、
+   * 送信と同じ条件で数える。
+   */
+  segmentConditions?: SegmentCondition | null;
 }
 
 /**
@@ -57,6 +67,14 @@ export async function countAudience(
     if (!input.targetTagId) return { total: 0, hiddenExcluded: 0 };
     where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
     binds.push(input.targetTagId);
+  }
+
+  if (input.targetType === 'segment' && input.segmentConditions) {
+    // 送信と同じ組み立てを使う。別々に書くと、条件を1つ足したときに
+    // 「一覧に出る人」と「実際に届く人」がずれる。
+    const segment = buildSegmentWhere(input.segmentConditions);
+    where.push(`(${segment.sql})`);
+    binds.push(...segment.bindings);
   }
 
   const row = await db
