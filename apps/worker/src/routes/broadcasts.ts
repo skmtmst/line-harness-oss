@@ -116,6 +116,15 @@ function serializeBroadcast(row: DbBroadcast) {
     failedAccountIds: parseJsonArray(r.failed_account_ids),
     // 046 以前の行/未マイグレーション環境では undefined → 従来挙動 (ON) 扱い
     trackLinks: row.track_links === undefined ? true : row.track_links !== 0,
+    /*
+     * 宛先の条件。一覧で「何で絞ったか」を出すために返す。
+     *
+     * これが無いと、詳細条件で絞った配信も一覧では「タグ指定」と出る。
+     * 送った相手を後から確かめられないので、監査にならない。
+     */
+    segmentConditions: r.segment_conditions
+      ? (() => { try { return JSON.parse(String(r.segment_conditions)) as unknown } catch { return null } })()
+      : null,
     createdAt: row.created_at,
   };
 }

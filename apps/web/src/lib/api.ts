@@ -92,6 +92,8 @@ export type ApiBroadcast = Omit<Broadcast, 'targetType'> & {
   failedAccountIds: string[] | null;
   trackLinks: boolean;
   messageBubbles?: BroadcastBubble[] | null;
+  /** 宛先の条件。一覧で「何で絞ったか」を出すのに使う。 */
+  segmentConditions?: SegmentCondition | null;
 };
 
 export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
