@@ -2025,7 +2025,7 @@ CREATE INDEX idx_saved_searches_scope ON saved_searches(scope, display_order);
 CREATE INDEX idx_scenario_actions_lookup
   ON scenario_actions (scenario_id, hook, step_id, choice_index, sort_order);
 
-CREATE INDEX idx_scenario_steps_scenario_id ON scenario_steps (scenario_id);
+CREATE INDEX idx_scenario_steps_by_scenario ON scenario_steps (scenario_id);
 
 CREATE INDEX idx_scenario_triggers_lookup
   ON scenario_triggers (kind, tag_id);
