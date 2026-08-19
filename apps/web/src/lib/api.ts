@@ -675,6 +675,10 @@ function rangeQuery(params?: { from?: string; to?: string }): string {
 }
 
 export const api = {
+  system: {
+    health: () =>
+      fetchApi<ApiResponse<{ status: 'ok' }>>('/api/health'),
+  },
   searchConsole: {
     performance: (days: 7 | 28 | 90) =>
       fetchApi<ApiResponse<SearchConsolePerformance | SearchConsoleSetup>>(
