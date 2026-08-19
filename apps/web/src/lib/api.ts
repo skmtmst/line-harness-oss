@@ -1279,14 +1279,23 @@ export const api = {
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
-    list: () => fetchApi<ApiResponse<CommonVar[]>>('/api/common-vars'),
-    create: (data: { name: string; varKey: string; type?: string; value?: string }) =>
+    list: (params?: { folderId?: string }) =>
+      fetchApi<ApiResponse<CommonVar[]>>(
+        `/api/common-vars${params?.folderId ? `?folderId=${encodeURIComponent(params.folderId)}` : ''}`,
+      ),
+    create: (data: {
+      name: string
+      varKey: string
+      type?: string
+      value?: string
+      folderId?: string | null
+    }) =>
       fetchApi<ApiResponse<CommonVar>>('/api/common-vars', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
-    update: (id: string, data: { name?: string; value?: string }) =>
+    update: (id: string, data: { name?: string; value?: string; folderId?: string | null }) =>
       fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
