@@ -227,10 +227,36 @@ CREATE TABLE IF NOT EXISTS auto_replies (
   template_id      TEXT REFERENCES templates(id) ON DELETE SET NULL,
   line_account_id  TEXT DEFAULT NULL,
   is_active        INTEGER NOT NULL DEFAULT 1,
-  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  -- 151: 応答したときに順に実行することの並び（シナリオのアクションと同じ形）。
+  actions_json           TEXT,
+  -- 151: 応答する曜日（0=日 … 6=土）。時間帯は active_from / active_until が持つ。
+  response_weekdays_json TEXT,
+  -- 151: 'ignore' | 'include' | 'exclude'
+  response_holiday_rule  TEXT,
+  -- 151: 1人につき1回だけ応答する。cooldown_minutes（N分空ける）とは別。
+  once_per_friend        INTEGER NOT NULL DEFAULT 0,
+  -- 151: キーワードを複数行持つ。未設定なら keyword / match_type を見る。
+  keywords_json          TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_auto_replies_template_id ON auto_replies(template_id);
+
+-- =============================================================================
+-- 152: 自動応答が当たった記録
+-- =============================================================================
+-- 外部キーは張らない。ルールを消しても、当たった事実は残す。
+CREATE TABLE IF NOT EXISTS auto_reply_hits (
+  id              TEXT PRIMARY KEY,
+  auto_reply_id   TEXT NOT NULL,
+  friend_id       TEXT,
+  line_account_id TEXT,
+  matched_keyword TEXT,
+  hit_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_auto_reply_hits_rule   ON auto_reply_hits(auto_reply_id, hit_at);
+CREATE INDEX IF NOT EXISTS idx_auto_reply_hits_friend ON auto_reply_hits(auto_reply_id, friend_id);
 
 -- ============================================================
 -- Admin Users
