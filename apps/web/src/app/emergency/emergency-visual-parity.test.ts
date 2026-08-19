@@ -21,37 +21,36 @@ describe('V3 10-4 運用状態の表示確認', () => {
     expect(source).toContain('エラー、緊急停止、システム更新、設定変更を時間順に確認できます。')
   })
 
-  it('実データ表示と全UI確認を分離する', () => {
-    expect(source).toContain('UI確認モード（仮表示）')
-    expect(source).toContain('API結果とは分離して表示する')
-    expect(source).toContain('全UI確認（仮表示）')
-    expect(source).toContain('確認後に条件表示')
+  it('仮表示を解除し、異常がないときは異常なしと表示する', () => {
+    expect(source).toContain("const resultTitle = isNormal ? '異常なし'")
+    expect(source).toContain('6項目を確認し、現在、確認できる異常はありません。')
+    expect(source).not.toContain('UI確認モード（仮表示）')
+    expect(source).not.toContain('全UI確認（仮表示）')
   })
 
-  it('APIのアカウントが0件でも7項目のチェック結果を表示する', () => {
-    expect(source).toContain('UI_REVIEW_CHECKS.map')
-    for (const label of ['LINE接続', '月間配信残数', '外部連携', 'Webhook', '配信処理', '定期処理', '友だちの変化']) {
+  it('実データを使う6つのチェック項目を常に表示する', () => {
+    for (const label of ['LINE接続', '月間配信数', 'API・外部連携', 'Webhook', '配信処理', '友だち変化']) {
       expect(source).toContain(`label: '${label}'`)
     }
-    expect(source).toContain('判定基準を見る')
-    expect(source).toContain('起きたこと')
-    expect(source).toContain('次にすること')
+    expect(source).not.toContain("label: '定期処理'")
+    expect(source).toContain('6項目を常に表示し、確認内容と最新結果を示します')
+    expect(source).toContain('api.health.getHealth')
+    expect(source).toContain('api.system.health')
+    expect(source).toContain('api.webhooks.incoming.list')
+    expect(source).toContain('api.broadcasts.list')
   })
 
-  it('4つの概要カードと上部の主要操作を表示する', () => {
-    for (const label of ['全体の状態', '最後の確認', '今月の配信残数', '緊急停止状態']) {
+  it('3つの概要カードと上部の主要操作を表示する', () => {
+    for (const label of ['全体の状態', '最後の確認', '緊急停止状態']) {
       expect(source).toContain(`label="${label}"`)
     }
+    expect(source).not.toContain('label="今月の配信残数"')
     expect(source).toContain('チェックを今すぐ実行')
     expect(source).toContain('配信をすべて緊急停止')
   })
 
-  it('運用で必要な6状態と主要操作を確認できる', () => {
-    for (const label of ['正常', '注意', 'エラー', '未確認', '緊急停止中', '復旧待ち']) {
-      expect(source).toContain(`label: '${label}'`)
-    }
-    for (const action of ['調査レポートを出力', '緊急停止の確認', '復旧の確認', '更新履歴を見る', '再確認中…']) {
-      expect(source).toContain(action)
-    }
+  it('5分ごとに実データを再確認する', () => {
+    expect(source).toContain('window.setInterval')
+    expect(source).toContain('5 * 60 * 1000')
   })
 })

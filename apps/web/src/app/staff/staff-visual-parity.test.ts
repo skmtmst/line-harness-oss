@@ -26,4 +26,11 @@ describe('V2 10-2 ログインユーザーのPen表示', () => {
     expect(switchSource).toContain("translate-x-[14px]")
     expect(switchSource).toContain('overflow-hidden')
   })
+
+  it('不要な導線と追加画面の記入例を表示しない', () => {
+    expect(staffSource).not.toContain('権限を編集')
+    expect(staffSource).not.toContain('設定を促す')
+    expect(newStaffSource).not.toContain('山本 恭平')
+    expect(newStaffSource).not.toContain('yamamoto@example.com')
+  })
 })
