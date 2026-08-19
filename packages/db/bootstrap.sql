@@ -724,7 +724,7 @@ CREATE TABLE line_accounts (
   og_default_description TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT);
+, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
 
 CREATE TABLE link_clicks (
   id TEXT PRIMARY KEY,
@@ -1404,7 +1404,7 @@ CREATE TABLE staff_members (
   line_linked_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER);
+, line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -1888,6 +1888,9 @@ CREATE INDEX idx_idempotency_expires ON booking_idempotency_keys (expires_at);
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
 
+CREATE INDEX idx_line_accounts_parent
+  ON line_accounts(parent_line_account_id);
+
 CREATE INDEX idx_link_clicks_friend ON link_clicks (friend_id);
 
 CREATE INDEX idx_link_clicks_link ON link_clicks (tracked_link_id);
@@ -2025,6 +2028,9 @@ CREATE INDEX idx_staff_availability_rules_staff
   ON staff_availability_rules (staff_id, weekday, is_active);
 
 CREATE UNIQUE INDEX idx_staff_members_api_key ON staff_members(api_key);
+
+CREATE INDEX idx_staff_members_assigned_line_account
+  ON staff_members(assigned_line_account_id);
 
 CREATE INDEX idx_staff_members_invite_token ON staff_members(invite_token_hash);
 

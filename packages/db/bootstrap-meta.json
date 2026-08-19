@@ -132,7 +132,8 @@
     "123_friend_scenario_previous.sql",
     "124_step_target_condition.sql",
     "125_step_question.sql",
-    "126_step_draft.sql"
+    "126_step_draft.sql",
+    "127_account_hierarchy_and_staff_scope.sql"
   ],
-  "migrationCount": 133
+  "migrationCount": 134
 }

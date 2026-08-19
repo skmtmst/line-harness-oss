@@ -20,6 +20,8 @@ export interface StaffMember {
   totp_pending_secret_enc: string | null;
   totp_enabled_at: string | null;
   totp_last_used_step: number | null;
+  assigned_line_account_id?: string | null;
+  can_access_descendant_accounts?: number;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +38,8 @@ export interface CreateStaffInput {
   invite_status?: StaffMember['invite_status'];
   invite_token_hash?: string | null;
   invite_expires_at?: string | null;
+  assigned_line_account_id?: string | null;
+  can_access_descendant_accounts?: boolean;
 }
 
 export interface UpdateStaffInput {
@@ -56,6 +60,8 @@ export interface UpdateStaffInput {
   totp_pending_secret_enc?: string | null;
   totp_enabled_at?: string | null;
   totp_last_used_step?: number | null;
+  assigned_line_account_id?: string | null;
+  can_access_descendant_accounts?: boolean;
 }
 
 function generateApiKey(): string {
@@ -132,15 +138,17 @@ export async function createStaffMember(
       `INSERT INTO staff_members
        (id, name, email, role, access_level, api_key, line_user_id, is_active,
         permission_keys, notification_preferences, invite_status, invite_token_hash,
-        invite_expires_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        invite_expires_at, assigned_line_account_id, can_access_descendant_accounts,
+        created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id, input.name, input.email ?? null, input.role, input.access_level ?? 'full', apiKey,
       input.line_user_id ?? null, input.is_active ?? 1,
       JSON.stringify(input.permission_keys ?? []), JSON.stringify(input.notification_preferences ?? {}),
       input.invite_status ?? 'active', input.invite_token_hash ?? null,
-      input.invite_expires_at ?? null, now, now,
+      input.invite_expires_at ?? null, input.assigned_line_account_id ?? null,
+      input.can_access_descendant_accounts ? 1 : 0, now, now,
     )
     .run();
 
@@ -176,6 +184,8 @@ export async function updateStaffMember(
   if (input.totp_pending_secret_enc !== undefined) { sets.push('totp_pending_secret_enc = ?'); values.push(input.totp_pending_secret_enc); }
   if (input.totp_enabled_at !== undefined) { sets.push('totp_enabled_at = ?'); values.push(input.totp_enabled_at); }
   if (input.totp_last_used_step !== undefined) { sets.push('totp_last_used_step = ?'); values.push(input.totp_last_used_step); }
+  if (input.assigned_line_account_id !== undefined) { sets.push('assigned_line_account_id = ?'); values.push(input.assigned_line_account_id); }
+  if (input.can_access_descendant_accounts !== undefined) { sets.push('can_access_descendant_accounts = ?'); values.push(input.can_access_descendant_accounts ? 1 : 0); }
 
   values.push(id);
   await db

@@ -85,9 +85,19 @@ beforeEach(() => {
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
+  dbMocks.getLineAccounts.mockResolvedValue([]);
   dbMocks.setAccountSetting.mockResolvedValue(undefined);
   dbMocks.jstNow.mockReturnValue('2026-08-10T12:00:00.000+09:00');
   lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith('/v2/bot/info')) return Response.json({ displayName: 'テスト' });
+    if (url.endsWith('/v2/bot/channel/webhook/endpoint')) {
+      return Response.json({ endpoint: 'http://localhost/webhook', active: true });
+    }
+    if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
+    return new Response(null, { status: 404 });
+  }));
 });
 
 describe('GET /api/line-accounts/:id/follower-insight', () => {
@@ -180,7 +190,7 @@ describe('POST /api/line-accounts', () => {
     expect(body.data.loginChannelSecret).toBe('login-secret');
   });
 
-  test('omits loginChannelId/etc when not provided (stores null)', async () => {
+  test('LINE LoginとLIFFがない場合は登録しない', async () => {
     dbMocks.createLineAccount.mockResolvedValue(fakeAccount);
 
     const app = setupApp('owner');
@@ -195,21 +205,17 @@ describe('POST /api/line-accounts', () => {
       }),
     });
 
-    expect(res.status).toBe(201);
-    expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
-      loginChannelId: null,
-      loginChannelSecret: null,
-      liffId: null,
-    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
   });
 
-  test('trims whitespace and treats empty string as null for optional fields', async () => {
+  test('LIFF IDが空なら登録しない', async () => {
     dbMocks.createLineAccount.mockResolvedValue(fakeAccount);
 
     // Use a complete login pair (both id+secret present) to focus on the
     // trim/empty-string normalization behavior. liffId is independent.
     const app = setupApp('owner');
-    await app.request('/api/line-accounts', {
+    const res = await app.request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -223,11 +229,51 @@ describe('POST /api/line-accounts', () => {
       }),
     });
 
-    expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
-      loginChannelId: '2009624792',
-      loginChannelSecret: 'login-secret',
-      liffId: null,
+    expect(res.status).toBe(400);
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+
+  test('Messaging API接続確認が失敗した場合は登録しない', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 401 })));
+    const app = setupApp('owner');
+    const res = await app.request('/api/line-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channelId: '123456789',
+        name: 'メイン',
+        channelAccessToken: 'invalid-token',
+        channelSecret: 'secret',
+        loginChannelId: '2009624792',
+        loginChannelSecret: 'login-secret',
+        liffId: '2009624792-XXXX',
+      }),
     });
+
+    expect(res.status).toBe(400);
+    expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
+  });
+});
+
+describe('PATCH /api/line-accounts/hierarchy', () => {
+  test('親子関係を検証して一括保存する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, id: 'parent', parent_line_account_id: null },
+      { ...fakeAccount, id: 'child', parent_line_account_id: null },
+    ]);
+    const batch = vi.fn().mockResolvedValue([]);
+    const db = Object.assign(makeDbStub(), { batch });
+    const app = setupApp('owner', db);
+
+    const res = await app.request('/api/line-accounts/hierarchy', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ relationships: [{ id: 'child', parentLineAccountId: 'parent' }] }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect(batch.mock.calls[0][0]).toHaveLength(1);
   });
 });
 
@@ -350,6 +396,8 @@ describe('Login pair / uniqueness validation', () => {
         name: 'メイン',
         channelAccessToken: 'token',
         channelSecret: 'secret',
+        loginChannelId: '2009624792',
+        loginChannelSecret: 'login-secret',
         liffId: '2009624792-DUPLICATE',
       }),
     });
