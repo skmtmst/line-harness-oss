@@ -174,7 +174,7 @@ export default function ActionEditor({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4">
       <div className="rounded-card w-full max-w-4xl bg-white shadow-lg">
-        <div className="border-line flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
+        <div className="border-hairline flex flex-wrap items-start justify-between gap-3 border-b px-6 py-4">
           <div className="min-w-0">
             <h2 className="text-ink text-lg font-bold">アクション設定</h2>
             <p className="text-ink-secondary mt-0.5 text-sm">{title}</p>
@@ -182,7 +182,7 @@ export default function ActionEditor({
           <button
             type="button"
             onClick={onClose}
-            className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm"
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 shrink-0 border px-4 text-sm"
           >
             閉じる
           </button>
@@ -197,7 +197,7 @@ export default function ActionEditor({
               <button
                 type="button"
                 onClick={() => setConditionFor(null)}
-                className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-4 text-sm"
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-4 text-sm"
               >
                 戻る
               </button>
@@ -213,15 +213,15 @@ export default function ActionEditor({
         ) : (
           <div className="px-6 py-5">
             {error && (
-              <p className="rounded-card bg-danger-soft text-danger mb-4 px-4 py-3 text-sm">{error}</p>
+              <p className="rounded-card bg-danger-bg text-danger mb-4 px-4 py-3 text-sm">{error}</p>
             )}
             {loading ? (
               <p className="text-ink-faint py-8 text-center text-sm">読み込み中…</p>
             ) : (
               <div className="space-y-3">
                 {actions.map((action, index) => (
-                  <div key={action.id} className="border-line rounded-card border">
-                    <div className="border-line bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
+                  <div key={action.id} className="border-hairline rounded-card border">
+                    <div className="border-hairline bg-canvas-sunken flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
                       <p className="text-ink flex flex-wrap items-center gap-2 text-sm font-bold">
                         <span>
                           {index + 1}. {KIND_LABEL[action.actionType]}
@@ -241,7 +241,7 @@ export default function ActionEditor({
                           className={`rounded-control h-9 border px-3 text-xs ${
                             action.condition
                               ? 'border-accent text-accent bg-accent-soft'
-                              : 'border-line text-ink-secondary'
+                              : 'border-hairline text-ink-secondary'
                           }`}
                         >
                           {action.condition ? '条件ON' : '条件OFF'}
@@ -251,7 +251,7 @@ export default function ActionEditor({
                           onClick={() => void move(index, -1)}
                           disabled={index === 0}
                           aria-label="1つ上へ"
-                          className="border-line text-ink-secondary rounded-control h-9 border px-3 text-xs disabled:opacity-40"
+                          className="border-hairline text-ink-secondary rounded-control h-9 border px-3 text-xs disabled:opacity-40"
                         >
                           上へ
                         </button>
@@ -260,14 +260,14 @@ export default function ActionEditor({
                           onClick={() => void move(index, 1)}
                           disabled={index === actions.length - 1}
                           aria-label="1つ下へ"
-                          className="border-line text-ink-secondary rounded-control h-9 border px-3 text-xs disabled:opacity-40"
+                          className="border-hairline text-ink-secondary rounded-control h-9 border px-3 text-xs disabled:opacity-40"
                         >
                           下へ
                         </button>
                         <button
                           type="button"
                           onClick={() => void remove(action)}
-                          className="border-line text-danger rounded-control h-9 border px-3 text-xs"
+                          className="border-hairline text-danger rounded-control h-9 border px-3 text-xs"
                         >
                           削除
                         </button>
@@ -296,7 +296,7 @@ export default function ActionEditor({
                 ))}
 
                 {actions.length === 0 && (
-                  <p className="text-ink-faint rounded-card border-line border border-dashed py-8 text-center text-sm">
+                  <p className="text-ink-faint rounded-card border-hairline border border-dashed py-8 text-center text-sm">
                     まだ動作がありません。下から選んで追加してください。
                   </p>
                 )}
@@ -308,7 +308,7 @@ export default function ActionEditor({
                       key={kind.type}
                       type="button"
                       onClick={() => void add(kind)}
-                      className="border-line text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-3 text-xs"
+                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-3 text-xs"
                     >
                       {kind.label}
                     </button>
@@ -323,8 +323,8 @@ export default function ActionEditor({
   )
 }
 
-const selectClass = 'border-line rounded-control text-ink h-9 border bg-white px-2 text-sm min-w-0'
-const inputClass = 'border-line rounded-control text-ink h-9 border px-3 text-sm min-w-0 flex-1'
+const selectClass = 'border-hairline rounded-control text-ink h-9 border bg-white px-2 text-sm min-w-0'
+const inputClass = 'border-hairline rounded-control text-ink h-9 border px-3 text-sm min-w-0 flex-1'
 
 function ActionConfigEditor({
   action,
@@ -376,7 +376,7 @@ function ActionConfigEditor({
                     })
                   }
                   className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                    on ? 'bg-accent text-on-accent' : 'border-line text-ink-secondary border'
+                    on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary border'
                   }`}
                 >
                   {tag.name}

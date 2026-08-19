@@ -465,7 +465,7 @@ function ClicksTab() {
             aria-pressed={filter === f.key}
             className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
               filter === f.key
-                ? 'border-accent bg-accent-bg text-ink'
+                ? 'border-accent bg-accent-soft text-ink'
                 : 'border-hairline text-ink-faint hover:bg-canvas-sunken'
             }`}
           >
@@ -537,7 +537,7 @@ function ClicksTab() {
                     key={r.trackedLinkId}
                     onClick={() => setPicked(r.clicks > 0 ? r.trackedLinkId : null)}
                     className={`hover:bg-canvas-sunken ${r.clicks > 0 ? 'cursor-pointer' : ''} ${
-                      picked === r.trackedLinkId ? 'bg-accent-bg' : ''
+                      picked === r.trackedLinkId ? 'bg-accent-soft' : ''
                     }`}
                   >
                     <td className="text-ink px-4 py-3 text-sm font-medium">
@@ -832,7 +832,7 @@ function CrossTab() {
                             onClick={() => setPicked(n > 0 ? { row, col, count: n } : null)}
                             disabled={n === 0}
                             className={`w-full px-4 py-3 text-right text-sm tabular-nums transition-colors ${
-                              n === 0 ? 'text-ink-faint' : 'text-ink-secondary hover:bg-accent-bg'
+                              n === 0 ? 'text-ink-faint' : 'text-ink-secondary hover:bg-accent-soft'
                             } ${active ? 'ring-accent ring-2 ring-inset' : ''}`}
                             style={
                               n > 0

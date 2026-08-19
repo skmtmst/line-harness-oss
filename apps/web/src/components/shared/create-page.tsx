@@ -222,7 +222,7 @@ export function ChoiceCard({
       onClick={onClick}
       aria-pressed={selected}
       className={`rounded-card border p-3 text-left transition-colors ${
-        selected ? 'border-accent bg-accent-bg' : 'border-hairline hover:bg-canvas-sunken'
+        selected ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
       }`}
     >
       <div className="text-ink text-sm font-semibold">{title}</div>
