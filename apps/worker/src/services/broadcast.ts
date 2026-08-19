@@ -86,6 +86,53 @@ export async function processBroadcastSend(
     return (await getBroadcastById(db, broadcastId))!;
   }
 
+  /*
+   * 絞り込み配信は、この関数では送らずキューへ渡す。
+   *
+   * ここを通さないと、下のふつうの経路（LINE の broadcast/multicast）へ
+   * 落ちて**全員に届く**。予約した絞り込み配信が全員に飛ぶ形で表に出る。
+   * 条件は下書きの segment_conditions に入っているので、
+   * status='sending' に移せば processQueuedBroadcasts が拾う。
+   */
+  if (broadcast.target_type === 'segment') {
+    const raw = broadcast as unknown as Record<string, unknown>;
+    const stored = raw.segment_conditions as string | null;
+    if (!stored) {
+      throw new Error('segment_conditions is required for segment broadcast');
+    }
+    const conditions = JSON.parse(stored) as { operator: 'AND' | 'OR'; rules: unknown[] };
+    if (!conditions || !Array.isArray(conditions.rules)) {
+      throw new Error('segment_conditions is malformed');
+    }
+    const { buildSegmentQuery } = await import('./segment-query.js');
+    const { sql, bindings } = buildSegmentQuery(conditions as Parameters<typeof buildSegmentQuery>[0]);
+    const accountId = raw.line_account_id as string | null;
+    const countSql = accountId
+      ? `SELECT COUNT(*) AS cnt FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
+      : `SELECT COUNT(*) AS cnt FROM (${sql}) q`;
+    const binds = accountId ? [accountId, ...bindings] : bindings;
+    const row = await db.prepare(countSql).bind(...binds).first<{ cnt: number }>();
+
+    // 名前を差し込む本文は、名前の無い人がいると差し込めない。送る前に止める。
+    if (hasRecipientVariables(broadcast.message_content)) {
+      const nameSql = accountId
+        ? `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+             FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
+        : `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+             FROM (${sql}) q`;
+      const missing = await db.prepare(nameSql).bind(...binds).first<{ missing_name: number | null }>();
+      if (Number(missing?.missing_name ?? 0) > 0) {
+        throw new Error(`Cannot personalize broadcast: ${missing!.missing_name} recipient(s) have no display name`);
+      }
+    }
+
+    await db
+      .prepare(`UPDATE broadcasts SET status = 'sending', batch_offset = 0, total_count = ? WHERE id = ?`)
+      .bind(Number(row?.cnt ?? 0), broadcast.id)
+      .run();
+    return (await getBroadcastById(db, broadcastId))!;
+  }
+
   // multi-account-dedup は inline 送信せず cron queue (processQueuedBroadcasts) に委譲する。
   // この関数は scheduled / 即時の単一 account 経路用で、毎回 auto-track を実行する。dedup を
   // ここで送ると (1) auto-track がここと queue 側で二重実行されて tracked link が重複し、
