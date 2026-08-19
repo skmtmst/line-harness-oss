@@ -104,9 +104,45 @@ const BASIC_STICKERS: { packageId: string; stickerId: string; label: string }[] 
   { packageId: '789', stickerId: '10877', label: 'おつかれさま' },
 ]
 
-/** LINE が配っているスタンプ画像。選ぶときの目印に使う。 */
-function stickerImageUrl(stickerId: string): string {
-  return `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/iPhone/sticker@2x.png`
+/*
+ * LINE が配っているスタンプ画像。選ぶときの目印に使う。
+ *
+ * **スタンプによって置き場所が違う。** 446 番台は android/sticker.png、
+ * 789 番台は iPhone/sticker@2x.png でしか取れない（検証環境で1枚ずつ
+ * 確かめた）。どちらか片方に決め打つと、半分が壊れた画像になる。
+ *
+ * 片方で取れなければもう片方に切り替える。それでも取れなければ、
+ * 壊れた画像ではなく文字を出す（下の StickerThumb）。
+ */
+const STICKER_IMAGE_PATHS = ['android/sticker.png', 'iPhone/sticker@2x.png'] as const
+
+function stickerImageUrl(stickerId: string, attempt: number): string {
+  const path = STICKER_IMAGE_PATHS[attempt] ?? STICKER_IMAGE_PATHS[0]
+  return `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/${path}`
+}
+
+/** スタンプ1枚の絵。取れなければ名前だけ出す。 */
+function StickerThumb({ stickerId, label }: { stickerId: string; label: string }) {
+  const [attempt, setAttempt] = useState(0)
+  const failed = attempt >= STICKER_IMAGE_PATHS.length
+
+  if (failed) {
+    return (
+      <span className="text-ink-secondary flex h-12 w-12 items-center justify-center text-center text-[10px] leading-tight">
+        {label}
+      </span>
+    )
+  }
+  return (
+    // 目印なので次の最適化には載せない。
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={stickerImageUrl(stickerId, attempt)}
+      alt={label}
+      className="h-12 w-12"
+      onError={() => setAttempt((n) => n + 1)}
+    />
+  )
 }
 
 const inputClass =
@@ -353,9 +389,7 @@ export default function MessageKindFields({ kind, value, onChange }: MessageKind
                   on ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
                 }`}
               >
-                {/* 目印なので次の最適化には載せない。 */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={stickerImageUrl(s.stickerId)} alt={s.label} className="h-12 w-12" />
+                <StickerThumb stickerId={s.stickerId} label={s.label} />
               </button>
             )
           })}
