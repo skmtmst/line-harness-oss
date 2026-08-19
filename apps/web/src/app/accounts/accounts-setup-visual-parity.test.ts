@@ -8,13 +8,25 @@ const setupSource = readFileSync(join(directory, 'new/page.tsx'), 'utf8')
 const hierarchySource = readFileSync(join(directory, 'account-hierarchy.tsx'), 'utf8')
 
 describe('V2 10-1 Pen準拠のアカウントUI', () => {
-  it('追加画面を5ステップの3カラム構成にする', () => {
+  it('追加画面を公式アカウント作成から始まる6ステップの3カラム構成にする', () => {
     expect(setupSource).toContain("xl:grid-cols-[265px_minmax(0,1fr)_290px]")
     for (const label of ['設定の進み具合', 'このステップの完了条件', 'アカウント追加まで', '設定に迷ったとき']) {
       expect(setupSource).toContain(label)
     }
     expect(setupSource).toContain('すべての接続確認が完了するまでアカウントは追加されません')
     expect(setupSource).toContain('disabled={!allVerified || saving}')
+    expect(setupSource).toContain('LINE公式アカウントを作成する')
+    expect(setupSource).toContain('公式アカウントの作成・確認を完了してください')
+    expect(setupSource.indexOf("'LINE公式アカウントを作成'")).toBeLessThan(setupSource.indexOf("'所属店舗・アカウント情報'"))
+    expect(setupSource).toContain('completedCount * (100 / 6)')
+  })
+
+  it('Penと同じアウトライン鍵と青い操作色を使う', () => {
+    expect(setupSource).toContain('function LockIcon')
+    expect(setupSource).not.toContain('🔒')
+    expect(setupSource).toContain('bg-action')
+    expect(setupSource).toContain('text-action')
+    expect(setupSource).toContain('text-on-action')
   })
 
   it('LINE LoginとLIFFの設定場所へ直接進める', () => {

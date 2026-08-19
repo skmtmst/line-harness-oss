@@ -47,6 +47,7 @@ function tsxFiles(dir: string): string[] {
  */
 const OWN_FAMILIES = [
   'accent',
+  'action',
   'ink',
   'canvas',
   'hairline',
@@ -55,6 +56,7 @@ const OWN_FAMILIES = [
   'danger',
   'info',
   'on-accent',
+  'on-action',
 ]
 
 /**
