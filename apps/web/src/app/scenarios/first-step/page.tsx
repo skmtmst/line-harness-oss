@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { DeliveryMode, Scenario, Tag, Template } from '@line-crm/shared'
@@ -20,6 +20,7 @@ import QuestionEditor, {
 } from '@/components/scenarios/question-editor'
 import { ConditionDialog, describeCondition } from '@/components/scenarios/scenario-dialogs'
 import CarouselPicker from '@/components/scenarios/carousel-picker'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import StepPreview from '@/components/scenarios/step-preview'
 import type { SegmentCondition } from '@/components/shared/condition-builder'
 
@@ -58,6 +59,8 @@ function FirstStepContent() {
   const [scenario, setScenario] = useState<Scenario | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [body, setBody] = useState('')
+  /** 差し込みをカーソルの位置に入れるために、入力欄そのものを持つ。 */
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
   /*
    * 1通目の配信対象。Lステップの「配信対象の絞り込み」と同じ3つ。
    *
@@ -425,16 +428,20 @@ function FirstStepContent() {
             {contentMode === 'compose' ? (
               <MessageTypeTabs value={kind} onChange={setKind}>
                 {kind === 'text' && (
-                  <label className="block">
+                  <div>
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">本文</span>
+                    <div className="mb-2">
+                      <InsertToolbar targetRef={bodyRef} value={body} onChange={setBody} />
+                    </div>
                     <textarea
+                      ref={bodyRef}
                       value={body}
                       onChange={e => setBody(e.target.value)}
                       rows={4}
                       placeholder="はじめまして。友だち追加ありがとうございます。"
                       className="border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                     />
-                  </label>
+                  </div>
                 )}
 
                 {kind === 'image' && (
