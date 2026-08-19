@@ -21,12 +21,15 @@ describe('V2 10-1 Pen準拠のアカウントUI', () => {
     expect(setupSource).toContain('completedCount * (100 / 6)')
   })
 
-  it('Penと同じアウトライン鍵と青い操作色を使う', () => {
+  it('Penと同じアウトライン鍵と用途別の配色を使う', () => {
     expect(setupSource).toContain('function LockIcon')
     expect(setupSource).not.toContain('🔒')
-    expect(setupSource).toContain('bg-action')
+    expect(setupSource).toContain('bg-accent px-5 py-2.5')
+    expect(setupSource).toContain('bg-accent p-4 text-on-accent')
+    expect(setupSource).toContain('bg-canvas-sunken px-4 py-3 text-sm text-ink')
+    expect(setupSource).toContain('bg-info-bg p-4')
     expect(setupSource).toContain('text-action')
-    expect(setupSource).toContain('text-on-action')
+    expect(setupSource).not.toContain('bg-action px-5 py-2.5')
   })
 
   it('LINE LoginとLIFFの設定場所へ直接進める', () => {
