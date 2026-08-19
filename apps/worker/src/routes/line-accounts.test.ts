@@ -96,6 +96,7 @@ beforeEach(() => {
       return Response.json({ endpoint: 'http://localhost/webhook', active: true });
     }
     if (url.endsWith('/v2/bot/channel/webhook/test')) return Response.json({ success: true });
+    if (url.endsWith('/v2/bot/message/quota')) return Response.json({ type: 'limited', value: 200 });
     return new Response(null, { status: 404 });
   }));
 });
@@ -285,13 +286,18 @@ describe('GET /api/line-accounts', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      data: Array<{ webhook: { status: string; expectedUrl: string }; channelAccessToken?: string }>;
+      data: Array<{ webhook: { status: string; expectedUrl: string }; plan: { key: string; label: string; monthlyMessageLimit: number }; channelAccessToken?: string }>;
     };
     expect(body.data[0].webhook).toMatchObject({
       status: 'matched',
       expectedUrl: 'http://localhost/webhook',
     });
     expect(body.data[0].channelAccessToken).toBeUndefined();
+    expect(body.data[0].plan).toMatchObject({
+      key: 'communication',
+      label: 'コミュニケーション',
+      monthlyMessageLimit: 200,
+    });
   });
 });
 

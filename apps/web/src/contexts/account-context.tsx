@@ -11,13 +11,19 @@ export interface AccountWithStats {
   channelId: string
   name: string
   displayName?: string
-  pictureUrl?: string
-  basicId?: string
+  pictureUrl?: string | null
+  basicId?: string | null
   isActive: boolean
   country: string | null
   role: string | null
   displayOrder: number
   liffId?: string | null
+  plan?: {
+    key: 'communication' | 'light' | 'standard' | 'unknown'
+    label: string
+    monthlyMessageLimit: number | null
+    source: 'messaging-api-quota'
+  }
   stats?: {
     friendCount: number
     activeScenarios: number
