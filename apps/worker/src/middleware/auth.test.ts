@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { authMiddleware } from './auth.js';
 import { resolveCorsOrigin } from './admin-auth-config.js';
 import { adminAuth } from '../routes/admin-auth.js';
+import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import type { Env } from '../index.js';
 
 vi.mock('@line-crm/db', () => ({
@@ -24,6 +25,14 @@ vi.mock('@line-crm/db', () => ({
     return { id: 'staff-1', name: 'Staff One', role: 'admin', is_active: 1 };
   }),
   createAdminSession: vi.fn(async () => undefined),
+  createTwoFactorChallenge: vi.fn(async () => undefined),
+  deleteExpiredTwoFactorChallenges: vi.fn(async () => undefined),
+  getTwoFactorChallenge: vi.fn(async () => null),
+  getStaffById: vi.fn(async () => null),
+  incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
+  deleteTwoFactorChallenge: vi.fn(async () => undefined),
+  claimStaffTotpStep: vi.fn(async () => true),
+  updateStaffMember: vi.fn(async () => null),
   deleteAdminSession: vi.fn(async () => undefined),
   // ログイン・ログアウト・失敗を記録する。本体では例外を握るので、
   // ここでも何もしない実装で足りる。
@@ -189,6 +198,35 @@ describe('LINE admin login', () => {
     expect(res.headers.get('Location')).toContain('/login?error=not_authorized');
     expect(cookieFor(res, 'lh_admin_session')).toBeUndefined();
     fetchSpy.mockRestore();
+  });
+});
+
+describe('Authenticator verification', () => {
+  test('valid code exchanges a short-lived challenge for a cross-site admin session', async () => {
+    const db = await import('@line-crm/db');
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+    const masterKey = 'test-master-key-which-is-longer-than-32-characters';
+    vi.mocked(db.getTwoFactorChallenge).mockResolvedValueOnce({
+      token_hash: 'hash', staff_id: 'staff-1', expires_at: new Date(Date.now() + 60_000).toISOString(), attempts: 0, created_at: new Date().toISOString(),
+    });
+    vi.mocked(db.getStaffById).mockResolvedValueOnce({
+      id: 'staff-1', name: 'Staff One', email: 'staff@example.com', role: 'admin', access_level: 'full', api_key: 'hidden', line_user_id: 'U1', is_active: 1,
+      permission_keys: '[]', notification_preferences: '{}', invite_status: 'active', invite_token_hash: null, invite_expires_at: null, email_verified_at: null, line_linked_at: null,
+      totp_secret_enc: await encryptTotpSecret(secret, masterKey), totp_pending_secret_enc: null, totp_enabled_at: new Date().toISOString(), totp_last_used_step: null,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+    const step = Math.floor(Date.now() / 30_000);
+    const response = await app().request('/api/auth/two-factor/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeToken: 'challenge', code: await totpAtStep(secret, step) }),
+    }, { ...crossSiteEnv(), TOTP_ENCRYPTION_KEY: masterKey });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { success: boolean; data: { sessionToken?: string }; csrfToken: string };
+    expect(body.success).toBe(true);
+    expect(body.data.sessionToken).toBeTruthy();
+    expect(body.csrfToken).toBeTruthy();
+    expect(cookieFor(response, 'lh_admin_session')).toBeTruthy();
+    expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
   });
 });
 

@@ -1098,6 +1098,7 @@ export interface StaffMember {
   email: string | null;
   role: 'owner' | 'admin' | 'staff' | 'viewer';
   lineLinked: boolean;
+  twoFactorEnabled: boolean;
   isActive: boolean;
   permissionKeys: string[];
   notificationPreferences: Record<string, { email: boolean; line: boolean }>;

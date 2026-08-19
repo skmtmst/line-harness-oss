@@ -2412,14 +2412,13 @@ export const api = {
       fetchApi<ApiResponse<StaffMember[]>>('/api/staff'),
     get: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`),
-    me: () =>
-      fetchApi<ApiResponse<{ id: string; name: string; role: string; email: string | null; permissionKeys: string[] }>>('/api/staff/me'),
+    me: () => fetchApi<ApiResponse<StaffMember>>('/api/staff/me'),
     create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }> }) =>
       fetchApi<ApiResponse<StaffMember>>('/api/staff', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false }) =>
+    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }> }) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -2428,6 +2427,12 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/staff/${id}`, { method: 'DELETE' }),
     regenerateKey: (id: string) =>
       fetchApi<ApiResponse<{ apiKey: string }>>(`/api/staff/${id}/regenerate-key`, { method: 'POST' }),
+    beginTwoFactorSetup: (id: string) =>
+      fetchApi<ApiResponse<{ provisioningUri: string; manualKey: string }>>(`/api/staff/${id}/two-factor/setup`, { method: 'POST' }),
+    confirmTwoFactorSetup: (id: string, code: string) =>
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor/confirm`, { method: 'POST', body: JSON.stringify({ code }) }),
+    disableTwoFactor: (id: string) =>
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor`, { method: 'DELETE' }),
   },
   usersGrouped: {
     list: (opts?: {

@@ -4,9 +4,10 @@ import {
   createStaffMember, updateStaffMember, deleteStaffMember,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
-import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
+import { requireRole } from '../middleware/role-guard.js';
 import { sha256Hex } from '../middleware/auth.js';
 import { sendStaffInviteEmail, sendStaffLineLinkEmail } from '../services/staff-invite.js';
+import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import type { Env } from '../index.js';
 
 const staff = new Hono<Env>();
@@ -28,6 +29,7 @@ function serializeStaff(row: StaffMember) {
     email: row.email,
     role: displayRole(row),
     lineLinked: Boolean(row.line_user_id),
+    twoFactorEnabled: Boolean(row.totp_enabled_at && row.totp_secret_enc),
     isActive: Boolean(row.is_active),
     permissionKeys: safeJson<string[]>(row.permission_keys, []),
     notificationPreferences: safeJson<Record<string, { email: boolean; line: boolean }>>(row.notification_preferences, {}),
@@ -99,7 +101,7 @@ staff.get('/api/staff/me', async (c) => {
   }
 });
 
-staff.get('/api/staff', requireRole('owner', 'admin'), denyReadOnly(), async (c) => {
+staff.get('/api/staff', async (c) => {
   try {
     return c.json({ success: true, data: (await getStaffMembers(c.env.DB)).map(serializeStaff) });
   } catch (error) {
@@ -108,7 +110,7 @@ staff.get('/api/staff', requireRole('owner', 'admin'), denyReadOnly(), async (c)
   }
 });
 
-staff.get('/api/staff/:id', requireRole('owner', 'admin'), denyReadOnly(), async (c) => {
+staff.get('/api/staff/:id', async (c) => {
   const member = await getStaffById(c.env.DB, c.req.param('id'));
   return member ? c.json({ success: true, data: serializeStaff(member) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
@@ -172,7 +174,7 @@ staff.get('/api/staff/invitations/:token/verify', async (c) => {
   return c.html('<!doctype html><meta charset="utf-8"><title>メール確認完了</title><main style="font-family:sans-serif;max-width:560px;margin:80px auto;padding:24px"><h1>メールアドレスを確認しました</h1><p>続けて届くメールからLINE連携を完了してください。</p></main>');
 });
 
-staff.patch('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
+staff.patch('/api/staff/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json<{
     name?: string; email?: string | null; role?: 'admin' | 'staff' | 'viewer'; isActive?: boolean;
@@ -182,6 +184,25 @@ staff.patch('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
 
   const target = await getStaffById(c.env.DB, id);
   if (!target) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  const current = c.get('staff');
+  const administrator = current.role === 'owner' || current.role === 'admin';
+  if (!administrator && current.id !== id) {
+    return c.json({ success: false, error: 'スタッフは自分の設定だけ変更できます' }, 403);
+  }
+  if (!administrator && (
+    body.name !== undefined || body.role !== undefined || body.isActive !== undefined || body.permissionKeys !== undefined
+  )) {
+    return c.json({ success: false, error: '権限と利用状態は管理者だけが変更できます' }, 403);
+  }
+  if (body.email !== undefined && body.email !== null) {
+    const email = body.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
+    }
+    const duplicate = (await getStaffMembers(c.env.DB)).some((member) => member.id !== id && member.email?.toLowerCase() === email);
+    if (duplicate) return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
+    body.email = email;
+  }
 
   const guard = await guardLastAdmin(c.env.DB, target, {
     isActive: body.isActive,
@@ -201,6 +222,68 @@ staff.patch('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
     line_linked_at: body.lineLinked === false ? null : undefined,
     permission_keys: body.permissionKeys,
     notification_preferences: body.notificationPreferences,
+  });
+  return updated ? c.json({ success: true, data: serializeStaff(updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+});
+
+function canEditMember(c: { get: (key: 'staff') => Env['Variables']['staff'] }, id: string): boolean {
+  const current = c.get('staff');
+  return current.role === 'owner' || current.role === 'admin' || current.id === id;
+}
+
+function totpMasterKey(c: { env: Env['Bindings'] }): string | null {
+  return c.env.TOTP_ENCRYPTION_KEY?.trim() || null;
+}
+
+staff.post('/api/staff/:id/two-factor/setup', async (c) => {
+  const id = c.req.param('id');
+  if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
+  const key = totpMasterKey(c);
+  if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
+  const member = await getStaffById(c.env.DB, id);
+  if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
+
+  const secret = generateTotpSecret();
+  await updateStaffMember(c.env.DB, id, {
+    totp_pending_secret_enc: await encryptTotpSecret(secret, key),
+  });
+  return c.json({
+    success: true,
+    data: {
+      provisioningUri: buildTotpUri(secret, member.email || member.name),
+      manualKey: secret.match(/.{1,4}/g)?.join(' ') ?? secret,
+    },
+  });
+});
+
+staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
+  const id = c.req.param('id');
+  if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
+  const key = totpMasterKey(c);
+  if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
+  const member = await getStaffById(c.env.DB, id);
+  if (!member?.totp_pending_secret_enc) return c.json({ success: false, error: '先にQRコードを表示してください' }, 400);
+  const body = await c.req.json<{ code?: string }>().catch(() => ({} as { code?: string }));
+  const encrypted = member.totp_pending_secret_enc;
+  const result = await verifyTotp(await decryptTotpSecret(encrypted, key), body.code ?? '');
+  if (!result.valid) return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+  const updated = await updateStaffMember(c.env.DB, id, {
+    totp_secret_enc: encrypted,
+    totp_pending_secret_enc: null,
+    totp_enabled_at: new Date().toISOString(),
+    totp_last_used_step: null,
+  });
+  return c.json({ success: true, data: serializeStaff(updated!) });
+});
+
+staff.delete('/api/staff/:id/two-factor', async (c) => {
+  const id = c.req.param('id');
+  if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ解除できます' }, 403);
+  const updated = await updateStaffMember(c.env.DB, id, {
+    totp_secret_enc: null,
+    totp_pending_secret_enc: null,
+    totp_enabled_at: null,
+    totp_last_used_step: null,
   });
   return updated ? c.json({ success: true, data: serializeStaff(updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
