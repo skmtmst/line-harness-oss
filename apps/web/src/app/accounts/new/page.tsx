@@ -130,9 +130,9 @@ export default function NewLineAccountPage() {
     }
   }
 
-  return <div>
-    <nav className="mb-4 text-xs text-ink-faint"><Link href="/accounts" className="font-medium text-accent hover:underline">アカウント</Link><span className="mx-2">/</span><span>新規追加</span></nav>
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+  return <div data-design="Body">
+    <nav data-design="Crumb" className="mb-4 text-xs text-ink-faint"><Link href="/accounts" className="font-medium text-accent hover:underline">アカウント</Link><span className="mx-2">/</span><span>新規追加</span></nav>
+    <div data-design="Head" className="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div><h1 className="text-2xl font-bold tracking-tight text-ink">LINEアカウントを追加する</h1><p className="mt-1 text-sm text-ink-secondary">案内に沿って設定します。すべての接続確認が完了するまでアカウントは追加されません。</p></div>
       <div className="flex items-center gap-2">
         <button onClick={() => { setCopyMode(true); setCurrentStep(1) }} className="cursor-pointer whitespace-nowrap rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-medium text-accent hover:bg-info-bg">⊞ 既存設定から追加</button>
@@ -143,7 +143,7 @@ export default function NewLineAccountPage() {
     <div className="mb-4 rounded-control border border-info bg-info-bg px-4 py-3 text-sm font-medium text-accent">♢ 安全のため、Messaging API・Webhook・LINE Login・LIFFの実接続を順番に確認します。</div>
 
     <div className="grid items-start gap-4 xl:grid-cols-[265px_minmax(0,1fr)_290px]">
-      <aside className="space-y-4">
+      <aside data-design="Left" className="space-y-4">
         <section className="rounded-card border border-hairline bg-canvas p-4">
           <div className="flex items-center justify-between"><h2 className="font-semibold text-ink">設定の進み具合</h2><span className="rounded-pill bg-info-bg px-2 py-1 text-xs font-semibold text-accent">{completedCount} / 5 完了</span></div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-canvas-sunken"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${completedCount * 20}%` }} /></div>
@@ -175,7 +175,7 @@ export default function NewLineAccountPage() {
         {currentStep < 5 && <section className="rounded-card border border-hairline bg-canvas p-4 opacity-60"><div className="flex items-center gap-3"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-canvas-sunken text-xs">🔒</span><div><h3 className="text-sm font-semibold text-ink">ステップ{currentStep + 1}　{STEPS[currentStep][0]}</h3><p className="text-xs text-ink-faint">前の完了後に入力できます。</p></div><span className="ml-auto rounded-pill bg-canvas-sunken px-2 py-1 text-xs text-ink-faint">🔒 ロック中</span></div></section>}
       </main>
 
-      <aside className="space-y-4">
+      <aside data-design="Right" className="space-y-4">
         <Conditions step={currentStep} />
         <section className="rounded-card border border-hairline bg-canvas p-4"><div className="flex items-center justify-between"><h2 className="font-semibold text-ink">アカウント追加まで</h2><span className="text-xs font-semibold text-accent">{completedCount} / 5完了</span></div><div className="mt-4 space-y-3">{STEPS.map(([label], index) => <div key={label} className="flex items-center gap-2 text-xs"><span className={index < completedCount ? 'text-success' : index === completedCount ? 'text-warning' : 'text-ink-faint'}>{index < completedCount ? '◉' : index === completedCount ? '◌' : '🔒'}</span><span className="text-ink">{label}</span><span className={`ml-auto ${index < completedCount ? 'text-success' : index === completedCount ? 'text-warning' : 'text-ink-faint'}`}>{index < completedCount ? '完了' : index === completedCount ? '確認待ち' : 'ロック'}</span></div>)}</div><button onClick={() => void save()} disabled={!allVerified || saving} className="mt-4 w-full cursor-pointer rounded-control bg-accent px-3 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:bg-hairline">🔒 すべて確認後に追加できます</button></section>
         <section className="rounded-card border border-info bg-info-bg p-4"><h2 className="text-sm font-semibold text-accent">ⓘ 設定に迷ったとき</h2><p className="mt-2 text-xs leading-5 text-ink-secondary">各ボタンから設定場所や公式手順を別タブで開けます。入力内容は自動で公開されません。</p><div className="mt-3 grid gap-2"><HelpLink href="https://developers.line.biz/ja/docs/line-login/overview/" label="LINE Login公式ガイド" /><HelpLink href="https://developers.line.biz/ja/docs/liff/overview/" label="LIFF設定を先に確認" /></div></section>
