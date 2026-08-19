@@ -608,6 +608,8 @@ export interface LineAccount {
   ogDefaultDescription: string | null;
   /** OGP: アカウント全体のデフォルト og:image。個別レコードで未設定時に使用。 */
   ogDefaultImageUrl: string | null;
+  /** LINE公式アカウント構成の上位アカウント。null は未設定（ルート）。 */
+  parentLineAccountId: string | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -1122,6 +1124,10 @@ export interface StaffMember {
   inviteStatus: 'pending_email' | 'pending_line' | 'active' | 'expired';
   createdAt: string;
   updatedAt: string;
+  /** このログインユーザーの基準となるLINE公式アカウント。nullは従来互換の全体権限。 */
+  assignedLineAccountId: string | null;
+  /** 基準アカウントより下の子・孫も表示・操作できるか。 */
+  canAccessDescendantAccounts: boolean;
 }
 
 export interface StaffProfile {

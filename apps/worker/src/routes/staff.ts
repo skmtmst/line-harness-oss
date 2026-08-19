@@ -9,6 +9,8 @@ import { sha256Hex } from '../middleware/auth.js';
 import { sendStaffInviteEmail, sendStaffLineLinkEmail } from '../services/staff-invite.js';
 import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import type { Env } from '../index.js';
+import { getLineAccounts } from '@line-crm/db';
+import { filterVisibleLineAccounts } from '../services/account-access.js';
 
 const staff = new Hono<Env>();
 const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
@@ -36,6 +38,8 @@ function serializeStaff(row: StaffMember) {
     inviteStatus: row.invite_status || 'active',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    assignedLineAccountId: row.assigned_line_account_id ?? null,
+    canAccessDescendantAccounts: Boolean(row.can_access_descendant_accounts),
   };
 }
 
@@ -90,7 +94,7 @@ staff.get('/api/staff/me', async (c) => {
   try {
     const current = c.get('staff');
     if (current.id === 'env-owner') {
-      return c.json({ success: true, data: { id: current.id, name: '管理者', role: 'admin', email: null, permissionKeys: [] } });
+      return c.json({ success: true, data: { id: current.id, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true } });
     }
     const member = await getStaffById(c.env.DB, current.id);
     if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
@@ -120,12 +124,29 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     const body = await c.req.json<{
       name?: string; email?: string; role?: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[];
       notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
+      assignedLineAccountId?: string | null;
+      canAccessDescendantAccounts?: boolean;
     }>();
     const name = body.name?.trim();
     const email = body.email?.trim().toLowerCase();
     if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
     if (!body.role || !['admin', 'staff', 'viewer'].includes(body.role)) return c.json({ success: false, error: '役割を選択してください' }, 400);
+    if (!body.assignedLineAccountId) {
+      return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
+    }
+    const visibleAccounts = filterVisibleLineAccounts(await getLineAccounts(c.env.DB), c.get('staff'));
+    if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
+      return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
+    }
+    const current = c.get('staff');
+    const canGrantDescendants =
+      current.role === 'owner' ||
+      !current.assignedLineAccountId ||
+      current.canAccessDescendantAccounts;
+    if (body.canAccessDescendantAccounts && !canGrantDescendants) {
+      return c.json({ success: false, error: '自分が持っていない他アカウント権限は付与できません' }, 403);
+    }
     if ((await getStaffMembers(c.env.DB)).some((item) => item.email?.toLowerCase() === email)) {
       return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
     }
@@ -141,6 +162,8 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       invite_status: 'pending_email',
       invite_token_hash: await sha256Hex(token),
       invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+      assigned_line_account_id: body.assignedLineAccountId,
+      can_access_descendant_accounts: body.role === 'admin' && Boolean(body.canAccessDescendantAccounts),
     });
     try {
       await sendStaffInviteEmail(c.env, {
@@ -180,6 +203,7 @@ staff.patch('/api/staff/:id', async (c) => {
     name?: string; email?: string | null; role?: 'admin' | 'staff' | 'viewer'; isActive?: boolean;
     lineLinked?: boolean;
     permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
+    assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean;
   }>();
 
   const target = await getStaffById(c.env.DB, id);
@@ -190,7 +214,8 @@ staff.patch('/api/staff/:id', async (c) => {
     return c.json({ success: false, error: 'スタッフは自分の設定だけ変更できます' }, 403);
   }
   if (!administrator && (
-    body.name !== undefined || body.role !== undefined || body.isActive !== undefined || body.permissionKeys !== undefined
+    body.name !== undefined || body.role !== undefined || body.isActive !== undefined || body.permissionKeys !== undefined ||
+    body.assignedLineAccountId !== undefined || body.canAccessDescendantAccounts !== undefined
   )) {
     return c.json({ success: false, error: '権限と利用状態は管理者だけが変更できます' }, 403);
   }
@@ -211,6 +236,24 @@ staff.patch('/api/staff/:id', async (c) => {
   });
   if (guard) return c.json({ success: false, error: guard }, 400);
 
+  if (administrator && body.assignedLineAccountId !== undefined) {
+    if (!body.assignedLineAccountId) {
+      return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
+    }
+    const visibleAccounts = filterVisibleLineAccounts(await getLineAccounts(c.env.DB), current);
+    if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
+      return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
+    }
+  }
+  if (
+    body.canAccessDescendantAccounts &&
+    current.role !== 'owner' &&
+    current.assignedLineAccountId &&
+    !current.canAccessDescendantAccounts
+  ) {
+    return c.json({ success: false, error: '自分が持っていない他アカウント権限は付与できません' }, 403);
+  }
+
   const updated = await updateStaffMember(c.env.DB, id, {
     name: body.name, email: body.email,
     role: body.role === 'admin' ? 'admin' : body.role ? 'staff' : undefined,
@@ -222,6 +265,11 @@ staff.patch('/api/staff/:id', async (c) => {
     line_linked_at: body.lineLinked === false ? null : undefined,
     permission_keys: body.permissionKeys,
     notification_preferences: body.notificationPreferences,
+    assigned_line_account_id: body.assignedLineAccountId,
+    can_access_descendant_accounts:
+      body.role === 'admin' || (body.role === undefined && target.role !== 'staff')
+        ? body.canAccessDescendantAccounts
+        : false,
   });
   return updated ? c.json({ success: true, data: serializeStaff(updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });

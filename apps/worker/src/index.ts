@@ -29,6 +29,7 @@ import { sendEventBookingNotification } from './services/event-booking-notifier.
 import { sendBookingNotification } from './services/booking-notifier.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
+import type { AuthenticatedStaff } from './middleware/auth.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { webhook } from './routes/webhook.js';
 import { friends } from './routes/friends.js';
@@ -172,7 +173,7 @@ export type Env = {
   };
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
-    staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; permissionKeys?: string[] };
+    staff: AuthenticatedStaff;
   };
 };
 

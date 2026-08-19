@@ -26,6 +26,8 @@ export interface LineAccount {
   capacity_warn_at: number | null;
   /** 管理画面の一覧やヘッダーで使うアイコン。OGP用の og_default_image_url とは用途が違う */
   icon_url: string | null;
+  /** LINE公式アカウント構成の上位アカウント。NULLなら未設定（ルート）。 */
+  parent_line_account_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,6 +43,7 @@ export interface CreateLineAccountInput {
   ogSiteName?: string | null;
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
+  parentLineAccountId?: string | null;
 }
 
 export async function createLineAccount(
@@ -64,8 +67,9 @@ export async function createLineAccount(
           login_channel_id, login_channel_secret, liff_id,
           is_active, display_order,
           og_site_name, og_default_image_url, og_default_description,
+          parent_line_account_id,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -80,6 +84,7 @@ export async function createLineAccount(
       input.ogSiteName ?? null,
       input.ogDefaultImageUrl ?? null,
       input.ogDefaultDescription ?? null,
+      input.parentLineAccountId ?? null,
       now,
       now,
     )
@@ -132,6 +137,7 @@ export type UpdateLineAccountInput = Partial<
     | 'friend_capacity'
     | 'capacity_warn_at'
     | 'icon_url'
+    | 'parent_line_account_id'
   >
 >;
 
@@ -194,6 +200,10 @@ export async function updateLineAccount(
   if (updates.icon_url !== undefined) {
     fields.push('icon_url = ?');
     values.push(updates.icon_url);
+  }
+  if (updates.parent_line_account_id !== undefined) {
+    fields.push('parent_line_account_id = ?');
+    values.push(updates.parent_line_account_id);
   }
   if (updates.og_default_description !== undefined) {
     fields.push('og_default_description = ?');
