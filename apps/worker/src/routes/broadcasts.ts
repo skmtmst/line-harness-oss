@@ -1350,7 +1350,17 @@ broadcasts.post('/api/segments/count', requireRole('owner', 'admin'), async (c) 
       accountBindings.unshift(body.accountId);
     }
 
-    const countSql = accountSql.replace(/^SELECT .+ FROM/, 'SELECT COUNT(*) as count FROM');
+    /*
+     * 件数は、組み立てた SQL を丸ごと副問い合わせに包んで数える。
+     *
+     * 以前は /^SELECT .+ FROM/ を置き換えていたが、`.+` が貪欲なので
+     * **条件の中に FROM があると、そこまで食べてしまう**。タグの条件は
+     * `EXISTS (SELECT 1 FROM friend_tags ...)` を含むので、
+     *   SELECT COUNT(*) as count FROM friend_tags ft WHERE ...)
+     * という壊れた SQL になり、タグで絞ると常に 400 になっていた。
+     * 他の呼び出し口（broadcast.ts など）は最初から包む形で書かれている。
+     */
+    const countSql = `SELECT COUNT(*) AS count FROM (${accountSql}) q`;
     const result = await c.env.DB.prepare(countSql).bind(...accountBindings).first<{ count: number }>();
 
     return c.json({ success: true, count: result?.count ?? 0 });
