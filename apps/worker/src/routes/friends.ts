@@ -13,6 +13,7 @@ import {
   getMileageSummaryForFriend,
   getMileageHistoryForFriend,
   jstNow,
+  getTagAddedScenarioIds,
 } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
@@ -624,16 +625,18 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), as
     await addTagToFriend(db, friendId, body.tagId);
 
     // Enroll in tag_added scenarios that match this tag
-    const allScenarios = await getScenarios(db);
-    for (const scenario of allScenarios) {
-      if (scenario.trigger_type === 'tag_added' && scenario.is_active && scenario.trigger_tag_id === body.tagId) {
-        const existing = await db
-          .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
-          .bind(friendId, scenario.id)
-          .first();
-        if (!existing) {
-          await enrollFriendInScenario(db, friendId, scenario.id);
-        }
+    /*
+     * 「このタグが付いたら始まる」は scenario_triggers から引く（128）。
+     * 1本のシナリオが複数のタグで始まる形も作れるようになったので、
+     * scenarios.trigger_tag_id は判断に使わない。
+     */
+    for (const scenarioId of await getTagAddedScenarioIds(db, body.tagId)) {
+      const existing = await db
+        .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
+        .bind(friendId, scenarioId)
+        .first();
+      if (!existing) {
+        await enrollFriendInScenario(db, friendId, scenarioId);
       }
     }
 

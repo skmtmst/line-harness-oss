@@ -19,7 +19,12 @@ import { SUPPORTED_CONDITION_TYPES, isSupportedConditionType } from '../services
 import { buildSegmentWhere, type SegmentCondition } from '../services/segment-query.js';
 import { parseQuestion } from '../services/scenario-question.js';
 import { isScenarioActionComplete } from '../services/scenario-actions.js';
-import { resolveStepContent } from '@line-crm/db';
+import {
+  resolveStepContent,
+  getScenarioTriggers,
+  addScenarioTrigger,
+  removeScenarioTrigger,
+} from '@line-crm/db';
 import type {
   Scenario as DbScenario,
   ScenarioWithStepCount as DbScenarioWithStepCount,
@@ -1410,6 +1415,83 @@ scenarios.post(
   '/api/scenarios/:id/steps/:stepId/test-send',
   requireRole('owner', 'admin'),
   async (c) => runTestSend(c, c.req.param('id'), c.req.param('stepId')),
+);
+
+// ============================================================
+// 開始のきっかけ（scenario_triggers）
+// ============================================================
+
+/*
+ * 1本のシナリオに複数のきっかけを持たせられる。
+ *
+ *   friend_add … 友だち追加時
+ *   tag_added  … 決めたタグが付いたとき
+ *
+ * 行が0本なら「外から呼ばれたときだけ流れる」。アクション・質問の選択肢・
+ * 友だち追加時の配信から開始できるので、それが手動と同じ意味になる。
+ */
+
+scenarios.get('/api/scenarios/:id/triggers', async (c) => {
+  try {
+    const rows = await getScenarioTriggers(c.env.DB, c.req.param('id'));
+    return c.json({
+      success: true,
+      data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
+    });
+  } catch (err) {
+    console.error('GET /api/scenarios/:id/triggers error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+scenarios.post('/api/scenarios/:id/triggers', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const scenarioId = c.req.param('id');
+    const body = await c.req.json<{ kind?: string; tagId?: string | null }>();
+    const kind = String(body.kind ?? '');
+    if (kind !== 'friend_add' && kind !== 'tag_added') {
+      return c.json({ success: false, error: 'きっかけの種類が不正です。' }, 400);
+    }
+    if (kind === 'tag_added' && !body.tagId) {
+      return c.json({ success: false, error: 'きっかけになるタグを選んでください。' }, 400);
+    }
+
+    const scenario = await c.env.DB.prepare(`SELECT id FROM scenarios WHERE id = ?`)
+      .bind(scenarioId)
+      .first<{ id: string }>();
+    if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
+
+    if (kind === 'tag_added') {
+      const tag = await c.env.DB.prepare(`SELECT id FROM tags WHERE id = ?`)
+        .bind(body.tagId)
+        .first<{ id: string }>();
+      if (!tag) return c.json({ success: false, error: 'タグが見つかりません。' }, 400);
+    }
+
+    await addScenarioTrigger(c.env.DB, scenarioId, kind, body.tagId ?? null);
+    const rows = await getScenarioTriggers(c.env.DB, scenarioId);
+    return c.json({
+      success: true,
+      data: rows.map((t) => ({ id: t.id, kind: t.kind, tagId: t.tag_id })),
+    });
+  } catch (err) {
+    console.error('POST /api/scenarios/:id/triggers error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+scenarios.delete(
+  '/api/scenarios/:id/triggers/:triggerId',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      await removeScenarioTrigger(c.env.DB, c.req.param('id'), c.req.param('triggerId'));
+      return c.json({ success: true });
+    } catch (err) {
+      console.error('DELETE /api/scenarios/:id/triggers/:triggerId error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
 );
 
 export { scenarios };

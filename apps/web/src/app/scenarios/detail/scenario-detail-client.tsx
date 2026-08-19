@@ -9,6 +9,7 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
+import TriggerEditor from '@/components/scenarios/trigger-editor'
 import QuestionEditor, {
   emptyQuestion,
   type ScenarioQuestion,
@@ -251,6 +252,9 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   } | null>(null)
   /** 通ごとのアクション件数。バッジに出す。 */
   const [actionCounts, setActionCounts] = useState<Record<string, number>>({})
+  /** 開始のきっかけ。窓の開閉と、札に出す件数。 */
+  const [triggerOpen, setTriggerOpen] = useState(false)
+  const [triggerCount, setTriggerCount] = useState<number | null>(null)
 
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -339,6 +343,16 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   useEffect(() => {
     if (id) reloadActionCounts()
   }, [id, reloadActionCounts])
+
+  useEffect(() => {
+    if (!id) return
+    api.scenarios.triggers
+      .list(id)
+      .then((res) => {
+        if (res.success) setTriggerCount(res.data.length)
+      })
+      .catch(() => {})
+  }, [id])
 
   const reloadStats = useCallback(() => {
     api.scenarios.stats(id).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
@@ -1237,6 +1251,25 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 シナリオ全体の配信対象。購読したあとに条件から外れた人には
                 送らずに止める（完了にはしない）。条件に戻れば人が再開できる。
               */}
+              {/*
+                開始のきっかけ。1本に複数持てる（128）。0本は「止まっている」
+                ではなく「外から呼ばれたときだけ流れる」なので、そう書く。
+              */}
+              <SettingCard label="開始のきっかけ">
+                <button type="button" onClick={() => setTriggerOpen(true)} className="text-left">
+                  <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
+                    {triggerCount === null
+                      ? '—'
+                      : triggerCount === 0
+                        ? '呼ばれたときだけ'
+                        : `${triggerCount} 件`}
+                  </span>
+                  <span className="text-ink-faint mt-0.5 block text-xs">
+                    {triggerCount === 0 ? 'アクションなどから開始できます' : '押すと足せます'}
+                  </span>
+                </button>
+              </SettingCard>
+
               <SettingCard label="対象の絞り込み">
                 <button
                   type="button"
@@ -1708,6 +1741,15 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           stepId={testSend.stepId}
           stepLabel={testSend.label}
           onClose={() => setTestSend(null)}
+        />
+      )}
+
+      {/* 開始のきっかけ */}
+      {triggerOpen && (
+        <TriggerEditor
+          scenarioId={id}
+          onClose={() => setTriggerOpen(false)}
+          onChanged={setTriggerCount}
         />
       )}
 

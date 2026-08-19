@@ -133,7 +133,11 @@
     "124_step_target_condition.sql",
     "125_step_question.sql",
     "126_step_draft.sql",
-    "127_account_hierarchy_and_staff_scope.sql"
+    "127_account_hierarchy_and_staff_scope.sql",
+    "128_scenario_triggers.sql",
+    "129_scenario_trigger_indexes.sql",
+    "130_scenario_trigger_lookup_index.sql",
+    "131_scenario_triggers_backfill.sql"
   ],
-  "migrationCount": 134
+  "migrationCount": 138
 }
