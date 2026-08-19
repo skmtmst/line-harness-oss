@@ -83,6 +83,28 @@ async function post<T>(path: string, body: unknown, headers: Record<string, stri
   return res.json();
 }
 
+async function postBinary<T>(path: string, file: Blob): Promise<T> {
+  const url = new URL(`${BASE}${path}`, window.location.origin);
+  url.searchParams.set('liffId', getLiffId());
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    // ファイルの中身をそのまま送る。multipart にすると、境界の組み立てを
+    // 自前で持つことになり、得るものが無い。
+    headers: authHeaders({ 'Content-Type': file.type || 'application/octet-stream' }),
+    body: file,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let parsed: unknown = null;
+    try { parsed = JSON.parse(text); } catch { /* keep raw */ }
+    const err = new Error(`API ${res.status}`) as Error & { status: number; body: unknown };
+    err.status = res.status;
+    err.body = parsed ?? text;
+    throw err;
+  }
+  return res.json();
+}
+
 // ============================================================
 // Event booking types
 // ============================================================
@@ -216,6 +238,12 @@ export const api = {
     id: string,
     body: { data: Record<string, unknown>; trackedLinkId?: string },
   ) => post<{ id: string }>(`/api/forms/${id}/submit`, body),
+  /** 回答に添付する画像を預ける。返ってきたURLを回答に入れる */
+  uploadFormFile: (id: string, file: File) =>
+    postBinary<{ success: true; data: { key: string; url: string; mimeType: string; size: number } }>(
+      `/api/forms/${id}/files`,
+      file,
+    ),
 
   // ===== Webinar =====
   webinarState: (slug: string) => get<WebinarState>(`/api/liff/webinars/${slug}`),

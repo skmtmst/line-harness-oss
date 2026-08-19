@@ -650,6 +650,15 @@ export function validateAnswer(
     return null;
   }
 
+  if (block.type === "file") {
+    // 回答に入るのは、預けた画像のURL。中身そのものは入らない。
+    // 別の場所を指すURLを書き込まれても困るので、こちらが返す形だけを通す。
+    if (!/^https?:\/\/[^\s]+\/images\/form-uploads\//.test(String(value))) {
+      return `${block.label} の画像を送りなおしてください`;
+    }
+    return null;
+  }
+
   const text = String(value);
 
   if (block.limit) {

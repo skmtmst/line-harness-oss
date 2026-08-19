@@ -230,6 +230,20 @@ describe("回答の検証", () => {
     expect(validateAnswer(block, "2026/8/19")).toBe("希望日 は日付を選んでください");
   });
 
+  test("ファイルは、預けた画像のURLだけを通す", () => {
+    const block = input({ name: "x", label: "お写真", type: "file" });
+    expect(
+      validateAnswer(block, "https://nen-line.example.workers.dev/images/form-uploads/f1/fr1/a.jpg"),
+    ).toBeNull();
+    // 別の場所を指すURLは、こちらが預かった画像ではない
+    expect(validateAnswer(block, "https://example.com/photo.jpg")).toBe(
+      "お写真 の画像を送りなおしてください",
+    );
+    expect(validateAnswer(block, "写真を送りました")).toBe(
+      "お写真 の画像を送りなおしてください",
+    );
+  });
+
   test("非表示の欄は、必須でも問わない", () => {
     const layout = layoutWith([
       input({ name: "hidden_one", label: "内部用", required: true, hidden: true }),

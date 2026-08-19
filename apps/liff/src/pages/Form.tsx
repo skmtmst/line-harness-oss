@@ -60,6 +60,8 @@ export default function Form() {
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  /** 送信中のファイル欄。二重に押させないため欄ごとに持つ */
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -131,6 +133,27 @@ export default function Form() {
           : [...current, label],
       };
     });
+
+  /**
+   * 画像を預けて、回答にはURLを入れる。
+   *
+   * 中身をそのまま回答データに入れない。回答は D1 に JSON で入るので、
+   * 画像を base64 で持たせると1件で数MBになり、一覧を開くだけで重くなる。
+   */
+  const uploadFile = async (name: string, file: File) => {
+    if (!id) return;
+    setError(null);
+    setUploading((prev) => ({ ...prev, [name]: true }));
+    try {
+      const res = await api.uploadFormFile(id, file);
+      setValue(name, res.data.url);
+    } catch (err) {
+      const body = (err as { body?: { error?: string } }).body;
+      setError(body?.error ?? '画像を送れませんでした。もう一度お試しください。');
+    } finally {
+      setUploading((prev) => ({ ...prev, [name]: false }));
+    }
+  };
 
   /** このページだけを見る。次のページの必須は、そこへ着くまで問わない。 */
   const validateCurrent = (): string | null => {
@@ -260,6 +283,8 @@ export default function Form() {
             answers={answers}
             onChange={setValue}
             onToggle={toggleCheckbox}
+            onUpload={uploadFile}
+            uploading={!!uploading[block.kind === 'input' ? block.name : '']}
           />
         ))}
       </div>
@@ -319,11 +344,15 @@ function BlockView({
   answers,
   onChange,
   onToggle,
+  onUpload,
+  uploading,
 }: {
   block: FormBlock;
   answers: Answers;
   onChange: (name: string, value: unknown) => void;
   onToggle: (name: string, label: string) => void;
+  onUpload: (name: string, file: File) => void;
+  uploading: boolean;
 }) {
   if (block.kind === 'heading') {
     const size = block.level === 1 ? 'text-xl' : block.level === 3 ? 'text-sm' : 'text-lg';
@@ -481,9 +510,31 @@ function BlockView({
         )}
 
         {block.type === 'file' && (
-          <p className="rounded-lg border border-dashed border-gray-300 px-3 py-4 text-center text-xs text-gray-500">
-            ファイルの添付は、いまこの画面では受け付けていません。
-          </p>
+          <div>
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
+              disabled={uploading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onUpload(block.name, file);
+              }}
+              className="w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-500 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white disabled:opacity-50"
+            />
+            {uploading && <p className="mt-1 text-xs text-gray-500">送っています...</p>}
+            {text && (
+              <div className="mt-2">
+                <img src={text} alt="送った画像" className="max-h-40 rounded-lg" />
+                <button
+                  onClick={() => onChange(block.name, '')}
+                  className="mt-1 text-xs text-gray-500 underline"
+                >
+                  選び直す
+                </button>
+              </div>
+            )}
+            <p className="mt-1 text-xs text-gray-400">jpg・png・gif・webp・heic、10MBまで</p>
+          </div>
         )}
 
         {/* 文字数。上限を決めているときだけ出す */}

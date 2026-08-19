@@ -33,6 +33,7 @@ import {
   checkFormGates,
 } from '../services/form-layout-effects.js';
 import {
+  collectInputs,
   layoutToFields,
   normalizeLayout,
   parseLayout,
@@ -40,6 +41,18 @@ import {
 } from '@line-crm/shared';
 
 const forms = new Hono<Env>();
+
+/** 回答に添付できる画像。heic は iPhone の既定の形式なので入れておく。 */
+const FORM_UPLOAD_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/gif': 'gif',
+  'image/webp': 'webp',
+  'image/heic': 'heic',
+  'image/heif': 'heif',
+};
+
+const FORM_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 
 /** フォームの項目定義。forms.fields は JSON の配列で持っている。 */
 interface FormFieldDef {
@@ -420,6 +433,89 @@ forms.post('/api/forms/:id/partial', async (c) => {
     return c.json({ success: true });
   } catch (err) {
     console.error('POST /api/forms/:id/partial error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/**
+ * POST /api/forms/:id/files — 回答に添付する画像を預かる（回答画面から使う）
+ *
+ * 友だちが送ってくるので、スタッフ用の `/api/images` は使えない。本人確認は
+ * LIFF の id_token で行う。
+ *
+ * 誰でも投げられる口にしないため、次を満たしたときだけ受け取る。
+ *
+ *   - id_token で本人が特定できる（＝この公式アカウントの友だち）
+ *   - フォームが公開中である
+ *   - そのフォームに、実際にファイルを受け取るブロックがある
+ *
+ * 3つ目が無いと、フォームIDさえ知っていれば誰でも画像置き場として使える。
+ */
+forms.post('/api/forms/:id/files', async (c) => {
+  try {
+    const formId = c.req.param('id');
+    const form = await getFormById(c.env.DB, formId);
+    if (!form) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    if (!form.is_active) {
+      return c.json({ success: false, error: 'このフォームは受け付けていません' }, 400);
+    }
+
+    const layout = parseLayout(form.layout, form.fields);
+    const acceptsFile = collectInputs(layout).some((block) => block.type === 'file');
+    if (!acceptsFile) {
+      return c.json({ success: false, error: 'このフォームはファイルを受け付けていません' }, 400);
+    }
+
+    const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
+    if (!lineUserId) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+    if (!friend) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+
+    const mimeType = (c.req.header('Content-Type') || '').split(';')[0].trim();
+    const extension = FORM_UPLOAD_TYPES[mimeType];
+    if (!extension) {
+      return c.json(
+        { success: false, error: '画像は jpg・png・gif・webp・heic のいずれかで送ってください' },
+        400,
+      );
+    }
+
+    // 本文を読む前に、申告された長さで断れるものは断る。10MBを読み込んでから
+    // 大きすぎると返すのは、相手の通信量を無駄に使う。
+    const declared = Number(c.req.header('Content-Length') || 0);
+    if (declared > FORM_UPLOAD_MAX_BYTES) {
+      return c.json({ success: false, error: '画像は10MBまでです' }, 400);
+    }
+
+    const data = await c.req.arrayBuffer();
+    if (data.byteLength === 0) {
+      return c.json({ success: false, error: 'ファイルが空です' }, 400);
+    }
+    if (data.byteLength > FORM_UPLOAD_MAX_BYTES) {
+      return c.json({ success: false, error: '画像は10MBまでです' }, 400);
+    }
+
+    // 誰の・どのフォームの添付かが、キーを見れば分かるようにしておく。
+    // 削除依頼が来たときに、消す対象をキーの形だけで絞り込める。
+    const key = `form-uploads/${formId}/${friend.id}/${crypto.randomUUID()}.${extension}`;
+    await c.env.IMAGES.put(key, data, {
+      httpMetadata: { contentType: mimeType },
+      customMetadata: { formId, friendId: friend.id },
+    });
+
+    const workerUrl = c.env.WORKER_URL || new URL(c.req.url).origin;
+    return c.json(
+      { success: true, data: { key, url: `${workerUrl}/images/${key}`, mimeType, size: data.byteLength } },
+      201,
+    );
+  } catch (err) {
+    console.error('POST /api/forms/:id/files error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
