@@ -320,6 +320,86 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
   )
 }
 
+/**
+ * タグを選ぶ。
+ *
+ * 全部を並べるだけだと、タグが増えたときに画面が埋まる。実際の運用アカウントで
+ * 101個あり、条件を1つ足すだけで縦20行のタグの壁ができて、その下にある
+ * 「送る内容」まで届かなかった。Lステップも入力して絞る形にしている。
+ *
+ * 選んだものは常に先頭に出す。絞り込んだ状態で選ぶと、消したいときに
+ * もう一度同じ言葉を打ち直さないと見つからない。
+ */
+function TagPicker({
+  tags,
+  selected,
+  onToggle,
+}: {
+  tags: Option[]
+  selected: string[]
+  onToggle: (id: string) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
+
+  if (tags.length === 0) {
+    return <span className="text-ink-faint text-xs">タグがまだありません</span>
+  }
+
+  const chosen = tags.filter((t) => selected.includes(t.id))
+  const rest = tags.filter(
+    (t) => !selected.includes(t.id) && (query === '' || t.name.includes(query)),
+  )
+  // 打っていないときだけ畳む。絞り込んだ結果を隠すと、探しているものが出ない。
+  const LIMIT = 24
+  const collapsed = query === '' && !showAll && rest.length > LIMIT
+  const shown = collapsed ? rest.slice(0, LIMIT) : rest
+
+  const chip = (tag: Option, on: boolean) => (
+    <button
+      key={tag.id}
+      type="button"
+      onClick={() => onToggle(tag.id)}
+      className={`rounded-pill h-8 px-3 text-xs transition-colors ${
+        on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
+      }`}
+    >
+      {tag.name}
+    </button>
+  )
+
+  return (
+    <div className="space-y-2">
+      {tags.length > LIMIT && (
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={`タグ名で絞り込む（${tags.length}件）`}
+          aria-label="タグ名で絞り込む"
+          className="border-hairline rounded-control focus:ring-accent h-9 w-full border px-3 text-xs focus:ring-2 focus:outline-none sm:max-w-xs"
+        />
+      )}
+      <div className="flex flex-wrap gap-1.5">
+        {chosen.map((tag) => chip(tag, true))}
+        {shown.map((tag) => chip(tag, false))}
+      </div>
+      {collapsed && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="text-ink-secondary hover:bg-canvas-sunken border-hairline rounded-control h-8 border px-3 text-xs"
+        >
+          残り {rest.length - LIMIT} 件を表示
+        </button>
+      )}
+      {query !== '' && rest.length === 0 && chosen.length === 0 && (
+        <p className="text-ink-faint text-xs">「{query}」に当てはまるタグがありません</p>
+      )}
+    </div>
+  )
+}
+
 interface RuleEditorProps {
   rule: SegmentRule
   onChange: (next: SegmentRule) => void
@@ -368,27 +448,14 @@ function RuleEditor({ rule, onChange, tags, fields, marks, scenarios }: RuleEdit
             ))}
           </select>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {tags.map((tag) => {
-            const on = selected.includes(tag.id)
-            return (
-              <button
-                key={tag.id}
-                type="button"
-                onClick={() => {
-                  const next = on ? selected.filter((id) => id !== tag.id) : [...selected, tag.id]
-                  onChange({ type: rule.type, value: isMulti ? next : (next[next.length - 1] ?? '') })
-                }}
-                className={`rounded-pill h-8 px-3 text-xs transition-colors ${
-                  on ? 'bg-accent text-on-accent' : 'border-hairline text-ink-secondary border'
-                }`}
-              >
-                {tag.name}
-              </button>
-            )
-          })}
-          {tags.length === 0 && <span className="text-ink-faint text-xs">タグがまだありません</span>}
-        </div>
+        <TagPicker
+          tags={tags}
+          selected={selected}
+          onToggle={(id) => {
+            const next = selected.includes(id) ? selected.filter((t) => t !== id) : [...selected, id]
+            onChange({ type: rule.type, value: isMulti ? next : (next[next.length - 1] ?? '') })
+          }}
+        />
       </>
     )
   }

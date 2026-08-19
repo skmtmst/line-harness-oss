@@ -1306,6 +1306,18 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
 
     const { extractFlexAltText } = await import('../utils/flex-alt-text.js');
     const liffId = (account as unknown as { liff_id?: string | null }).liff_id ?? null;
+    /*
+     * 差し込みの値は、本番の配信と同じものを使う。
+     *
+     * ここだけ {{name}} と {{liff_id}} しか渡さないと、友だち情報や共通情報を
+     * 使った本文は `assertNoUnresolvedBroadcastVariables` で落ちる。
+     * **確かめるための機能が、確かめたい本文だけ通らない**ことになる。
+     */
+    const { resolveInterpolationExtra } = await import('../services/interpolation-context.js');
+    const { getCommonVarMap } = await import('@line-crm/db');
+    const commonVars = /\{\{\s*var\./.test(tracked.content) ? await getCommonVarMap(c.env.DB) : undefined;
+    // 配信日の起点は「いま」。テスト送信は今すぐ届くので、今日の日付でよい。
+    const testSendAt = new Date();
 
     let sent = 0;
     let failed = 0;
@@ -1313,9 +1325,13 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
 
     for (const friend of friends.results) {
       try {
+        const extra = await resolveInterpolationExtra(c.env.DB, friend.id, tracked.content);
         const renderedContent = renderBroadcastMessageContent(tracked.messageType, tracked.content, {
           liffId,
           displayName: friend.display_name,
+          fields: extra.fields,
+          vars: commonVars,
+          deliveredAt: testSendAt,
         });
         assertNoUnresolvedBroadcastVariables(renderedContent);
         const altText = raw.alt_text as string
