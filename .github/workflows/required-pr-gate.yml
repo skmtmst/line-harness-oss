@@ -51,6 +51,62 @@ jobs:
             git diff --check
           fi
 
+      # 反映履歴は「あとでまとめて書く」と必ず薄くなる。変更した本人が
+      # 変更した直後に書くのが一番正確なので、PRの時点で見る。
+      #
+      # 落とすが、逃げ道は残す。急ぎの修正が出せなくなるほうが困るので、
+      # PRのタイトルか本文に [skip release-log] があれば通す。
+      # 文書だけ・ワークフローだけの変更も対象外にする。
+      - name: Require a release-log entry
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "PRの差分が取れないため、この確認は飛ばします。"
+            exit 0
+          fi
+
+          case "$PR_TITLE$PR_BODY" in
+            *"[skip release-log]"*)
+              echo "::notice::[skip release-log] があるため、反映履歴の確認を飛ばしました。"
+              exit 0
+              ;;
+          esac
+
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          if [ -z "$changed" ]; then
+            echo "変更がありません。"
+            exit 0
+          fi
+
+          # 文書とワークフローだけの変更は対象外。
+          if ! printf '%s\n' "$changed" | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
+            echo "文書・ワークフローだけの変更のため、反映履歴の確認を飛ばしました。"
+            exit 0
+          fi
+
+          added=$(git diff "$BASE_SHA...$HEAD_SHA" -- docs/release-log/unreleased.md \
+            | grep -c '^+[-*] ' || true)
+          if [ "$added" -gt 0 ]; then
+            echo "反映履歴に $added 行足されています。"
+            exit 0
+          fi
+
+          echo "::error::docs/release-log/unreleased.md に1行も足されていません。"
+          echo ""
+          echo "  変更した内容を、運用者に伝わる言葉で1行書いてください。"
+          echo "  管理画面の 運用状態 → 更新履歴 → 変更内容 にそのまま出ます。"
+          echo ""
+          echo "    ## 修正"
+          echo "    - 予約した絞り込み配信が全員に届いていたのを直した @kenta #151"
+          echo ""
+          echo "  書き方: docs/release-log/README.md"
+          echo "  急ぎで飛ばしたいときは、PRのタイトルか本文に [skip release-log] を入れてください。"
+          exit 1
+
       - name: Build shared packages
         run: >-
           pnpm

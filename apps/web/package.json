@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
+    "prebuild": "node scripts/build-release-log.mjs",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "start": "next start",
+    "release-log": "node scripts/build-release-log.mjs",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
