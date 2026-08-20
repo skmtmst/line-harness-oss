@@ -22,6 +22,8 @@ export interface ReminderRow {
   trigger_field_id: string | null;
   /** 154: 毎年くり返すか。 */
   repeat_yearly: number;
+  /** 156: フォルダ。null は未分類。消しても未分類に戻るだけ。 */
+  folder_id: string | null;
 }
 
 export interface ReminderStepRow {
@@ -71,6 +73,8 @@ export interface ReminderTriggerInput {
   triggerOffsetMinutes?: number | null;
   sendAtTime?: string | null;
   targetTagId?: string | null;
+  /** 156: フォルダ。null は未分類。 */
+  folderId?: string | null;
 }
 
 export async function createReminder(
@@ -83,8 +87,8 @@ export async function createReminder(
     `INSERT INTO reminders
        (id, name, description, trigger_type, trigger_offset_minutes,
         send_at_time, target_tag_id, delivery_mode,
-        trigger_field_id, repeat_yearly, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        trigger_field_id, repeat_yearly, folder_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   )
     .bind(
       id,
@@ -99,6 +103,7 @@ export async function createReminder(
       input.deliveryMode ?? 'countdown',
       input.triggerFieldId ?? null,
       input.repeatYearly ? 1 : 0,
+      input.folderId ?? null,
       now,
       now,
     )
@@ -124,6 +129,7 @@ export async function updateReminder(
   if ('triggerOffsetMinutes' in updates) { sets.push('trigger_offset_minutes = ?'); values.push(updates.triggerOffsetMinutes ?? null); }
   if ('sendAtTime' in updates) { sets.push('send_at_time = ?'); values.push(updates.sendAtTime ?? null); }
   if ('targetTagId' in updates) { sets.push('target_tag_id = ?'); values.push(updates.targetTagId ?? null); }
+  if ('folderId' in updates) { sets.push('folder_id = ?'); values.push(updates.folderId ?? null); }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');
   values.push(jstNow());
