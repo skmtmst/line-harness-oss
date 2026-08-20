@@ -46,17 +46,33 @@ export function addMessageVariation(text: string, index: number): string {
  *
  * 合計遅延の上限: 20秒（30秒制限に対してAPI呼び出し分の余裕を確保）
  *
+ * **batchSize は呼び出し側が実際に使っている 1 バッチの人数を渡す。**
+ * ここを間違えると合計遅延の上限が成り立たなくなる。以前は 500（multicast の
+ * 上限）を直書きしていたため、1 バッチ 10 人で回る経路ではバッチ数を 50 分の 1 に
+ * 見積もっていた。5000 人なら実際は 500 バッチあるのに 10 バッチのつもりで遅延を
+ * 配り、合計 20 秒のはずが 18 分ぶん sleep する状態だった（時間バジェットで
+ * 打ち切られるので stall はしないが、5 分ごとの cron 1 回につき数十人しか
+ * 進まなくなる）。
+ *
+ * **実際にこれが起きるのは `dedup-broadcast.ts`（複アカ重複除外）だけ。**
+ * そちらは sleep が `if (personalized)` の手前にあるので、差し込みありでも通る。
+ * `broadcast.ts` の差し込み経路は `if (personalized) { ... }` のブロックから
+ * return / break / continue で必ず抜けるので、この関数まで到達しない
+ * （あちらで渡している batchSize は常に 500 になる）。
+ *
  * @param totalMessages 送信対象の総メッセージ数
  * @param batchIndex 現在のバッチインデックス（0始まり）
+ * @param batchSize 1 バッチの人数。multicast なら 500、差し込みありの push なら 10
  * @returns このバッチ送信前の遅延（ミリ秒）
  */
 export function calculateStaggerDelay(
   totalMessages: number,
   batchIndex: number,
+  batchSize = 500,
 ): number {
   // Cloudflare Worker実行時間制限内に収めるための上限（20秒）
   const MAX_TOTAL_DELAY_MS = 20_000;
-  const totalBatches = Math.ceil(totalMessages / 500);
+  const totalBatches = Math.ceil(totalMessages / Math.max(batchSize, 1));
 
   if (totalMessages <= 100) {
     // 少量送信: 最小限の遅延 + ジッター

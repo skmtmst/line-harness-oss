@@ -407,7 +407,12 @@ function BroadcastList() {
         </div>
       ) : broadcasts.length === 0 && !showCreate ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">配信がありません。「新規配信」から作成してください。</p>
+          {/* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */}
+          <p className="text-ink-faint">
+            {error
+              ? 'いまは読み込めていません。上の案内をご覧ください。'
+              : '配信がありません。「新規配信」から作成してください。'}
+          </p>
         </div>
       ) : visibleBroadcasts.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center">

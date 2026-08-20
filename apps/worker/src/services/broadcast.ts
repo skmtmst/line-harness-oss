@@ -25,7 +25,13 @@ import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js
 import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 
+// LINE の multicast は 1 リクエストで最大 500 人まで宛先に取れる（LINE の仕様）。
+// これ以上に増やすことはできない。
 const MULTICAST_BATCH_SIZE = 500;
+// 差し込み（{{name}} など）があると本文が人ごとに変わるので multicast が使えず、
+// push を 1 人ずつ送る。この数はレート制限ではなく **区切りの単位**で、
+// 「ここまで送ったら時間を見る／少し待つ」という判断をこの粒度で行う。
+// 小さいほど中断したときの取りこぼしが減り、大きいほど待ちの回数が減る。
 const PERSONALIZED_PUSH_BATCH_SIZE = 10;
 
 /**
@@ -275,7 +281,7 @@ export async function processBroadcastSend(
 
         // Stealth: add staggered delay between batches
         if (batchIndex > 0) {
-          const delay = calculateStaggerDelay(followingFriends.length, batchIndex);
+          const delay = calculateStaggerDelay(followingFriends.length, batchIndex, MULTICAST_BATCH_SIZE);
           await sleep(delay);
         }
 
@@ -680,7 +686,7 @@ async function processQueuedBroadcastBatches(
 
     // ステルス遅延（最初のバッチ以外）
     if (batchIndex > 0) {
-      const delay = calculateStaggerDelay(friends.length, batchIndex);
+      const delay = calculateStaggerDelay(friends.length, batchIndex, deliveryBatchSize);
       await sleep(delay);
     }
 

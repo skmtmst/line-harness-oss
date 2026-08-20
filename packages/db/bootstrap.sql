@@ -303,6 +303,17 @@ CREATE TABLE calendar_bookings (
   updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE carousel_taps (
+  id              TEXT PRIMARY KEY,
+  template_id     TEXT NOT NULL,
+  column_index    INTEGER NOT NULL,
+  action_index    INTEGER NOT NULL,
+  action_label    TEXT,
+  friend_id       TEXT,
+  line_account_id TEXT,
+  tapped_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE chats (
   id            TEXT PRIMARY KEY,
   friend_id     TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
@@ -1255,7 +1266,7 @@ CREATE TABLE "reminders" (
   repeat_yearly INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, display_order INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE rich_menu_area_taps (
   id              TEXT PRIMARY KEY,
@@ -1309,6 +1320,8 @@ CREATE TABLE rich_menu_groups (
   targeting_enabled   INTEGER NOT NULL DEFAULT 0,
   -- 159: フォルダで分ける。箱そのものは folders（kind='rich_menu'）。
   folder_id           TEXT REFERENCES folders(id) ON DELETE SET NULL,
+  -- 160: 自分で決める並び順。小さいほど先。同じなら更新の新しい順。
+  display_order       INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -1608,6 +1621,13 @@ CREATE TABLE templates (
   category        TEXT NOT NULL DEFAULT 'general',
   message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'carousel')),
   message_content TEXT NOT NULL,
+  -- 162: カルーセルの選択肢を押したときの動き。
+  -- { "0": { "0": [アクションの並び] } }（パネル番号 → 選択肢番号 → 中身）
+  carousel_actions_json TEXT,
+  -- 162: 選択肢の押せる回数。'none'（制限なし）／'once'（全体で1回）
+  carousel_tap_limit_mode TEXT NOT NULL DEFAULT 'none',
+  -- 162: 制限を超えたときに返すテキスト。空なら何も返さない。
+  carousel_tap_limit_text TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0);
@@ -1857,6 +1877,10 @@ CREATE INDEX idx_calendar_bookings_friend ON calendar_bookings (friend_id);
 
 CREATE INDEX idx_calendar_bookings_start ON calendar_bookings (start_at);
 
+CREATE INDEX idx_carousel_taps_action ON carousel_taps(template_id, column_index, action_index);
+
+CREATE INDEX idx_carousel_taps_friend ON carousel_taps(template_id, friend_id);
+
 CREATE UNIQUE INDEX idx_chats_friend_unique ON chats (friend_id);
 
 CREATE INDEX idx_chats_operator ON chats (operator_id);
@@ -2092,6 +2116,8 @@ CREATE INDEX idx_ref_tracking_ref    ON ref_tracking (ref_code);
 CREATE INDEX idx_ref_tracking_ref_created ON ref_tracking(ref_code, created_at);
 
 CREATE INDEX idx_reminder_steps_by_reminder ON reminder_steps (reminder_id);
+
+CREATE INDEX idx_reminders_display_order ON reminders(display_order, created_at);
 
 CREATE INDEX idx_reminders_folder ON reminders(folder_id);
 

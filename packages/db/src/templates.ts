@@ -9,6 +9,12 @@ export interface TemplateRow {
   message_content: string;
   /** テンプレートの置き場（099 で追加）。未分類は null。 */
   folder_id: string | null;
+  /** 162: カルーセルの選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
+  carousel_actions_json: string | null;
+  /** 162: 選択肢の押せる回数。'none'（制限なし）／'once'（全体で1回） */
+  carousel_tap_limit_mode: string;
+  /** 162: 制限を超えたときに返すテキスト。空なら何も返さない。 */
+  carousel_tap_limit_text: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -27,21 +33,55 @@ export async function getTemplateById(db: D1Database, id: string): Promise<Templ
   return db.prepare(`SELECT * FROM templates WHERE id = ?`).bind(id).first<TemplateRow>();
 }
 
+export interface CarouselOptions {
+  /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
+  carouselActions?: unknown | null;
+  /** 162: 'none'（制限なし）／'once'（カルーセル全体で1回） */
+  carouselTapLimitMode?: 'none' | 'once';
+  /** 162: 制限を超えたときに返すテキスト。 */
+  carouselTapLimitText?: string | null;
+}
+
 export async function createTemplate(
   db: D1Database,
-  input: { name: string; category?: string; messageType: string; messageContent: string },
+  input: {
+    name: string;
+    category?: string;
+    messageType: string;
+    messageContent: string;
+  } & CarouselOptions,
 ): Promise<TemplateRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO templates (id, name, category, message_type, message_content, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.category ?? 'general', input.messageType, input.messageContent, now, now).run();
+  await db
+    .prepare(
+      `INSERT INTO templates
+         (id, name, category, message_type, message_content,
+          carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
+          created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id,
+      input.name,
+      input.category ?? 'general',
+      input.messageType,
+      input.messageContent,
+      input.carouselActions ? JSON.stringify(input.carouselActions) : null,
+      input.carouselTapLimitMode ?? 'none',
+      input.carouselTapLimitText ?? null,
+      now,
+      now,
+    )
+    .run();
   return (await getTemplateById(db, id))!;
 }
 
 export async function updateTemplate(
   db: D1Database,
   id: string,
-  updates: Partial<{ name: string; category: string; messageType: string; messageContent: string }>,
+  updates: Partial<{ name: string; category: string; messageType: string; messageContent: string }> &
+    CarouselOptions,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -49,6 +89,18 @@ export async function updateTemplate(
   if (updates.category !== undefined) { sets.push('category = ?'); values.push(updates.category); }
   if (updates.messageType !== undefined) { sets.push('message_type = ?'); values.push(updates.messageType); }
   if (updates.messageContent !== undefined) { sets.push('message_content = ?'); values.push(updates.messageContent); }
+  if (updates.carouselActions !== undefined) {
+    sets.push('carousel_actions_json = ?');
+    values.push(updates.carouselActions ? JSON.stringify(updates.carouselActions) : null);
+  }
+  if (updates.carouselTapLimitMode !== undefined) {
+    sets.push('carousel_tap_limit_mode = ?');
+    values.push(updates.carouselTapLimitMode);
+  }
+  if (updates.carouselTapLimitText !== undefined) {
+    sets.push('carousel_tap_limit_text = ?');
+    values.push(updates.carouselTapLimitText);
+  }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');
   values.push(jstNow());

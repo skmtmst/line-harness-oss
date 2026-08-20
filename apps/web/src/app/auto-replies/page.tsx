@@ -81,6 +81,22 @@ function actionSummary(rule: { actions: unknown[] | null }): string[] {
 /** フォルダに入れていないものを選ぶための、内部だけの値。 */
 const UNFILED = '__unfiled__'
 
+type SortKey = 'hits' | 'priority' | 'name' | 'created'
+
+/**
+ * よく使う絞り込み。
+ *
+ * 「よく使う」は設計に語として入っているが、何をもって「よく使う」かは
+ * 決まっていなかった。**数えられるもの**で定義する。数えられない言葉を
+ * 画面に置くと、押しても何も起きない。
+ */
+const SAVED_FILTERS: { key: string; label: string; note: string }[] = [
+  { key: 'used', label: 'よく使う', note: '今月1回以上当たったルール' },
+  { key: 'inactive', label: '停止中のみ', note: '無効にしてあるルール' },
+  { key: 'timed', label: '時間帯あり', note: '曜日か時間帯を決めているルール' },
+  { key: 'never', label: '未ヒット', note: '一度も当たっていないルール' },
+]
+
 interface TemplateLite {
   id: string
   name: string
@@ -119,6 +135,9 @@ export default function AutoRepliesPage() {
   /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [sortKey, setSortKey] = useState<SortKey>('hits')
+  const [savedFilter, setSavedFilter] = useState('')
+  const [pageSize, setPageSize] = useState(20)
   const [editing, setEditing] = useState<AutoReplyDraft | null>(null)
 
   const load = useCallback(async () => {
@@ -170,7 +189,7 @@ export default function AutoRepliesPage() {
             return (
               <span
                 key={ea.accountId}
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-gray-300 line-through"
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
                 title={`${label}: 適用外 (line_account_id 別アカ固定)`}
               >
                 {label}
@@ -250,11 +269,39 @@ export default function AutoRepliesPage() {
           (r.responseContent ?? '').includes(q),
       )
     : items
-  const shownInFolder = shown.filter((r) => {
+  const inFolder = shown.filter((r) => {
     if (folderFilter === UNFILED) return !r.folderId
     if (folderFilter) return r.folderId === folderFilter
     return true
   })
+
+  const inSaved = inFolder.filter((r) => {
+    if (savedFilter === 'inactive') return !r.isActive
+    if (savedFilter === 'used') return (r.hits?.period ?? 0) > 0
+    if (savedFilter === 'never') return (r.hits?.total ?? 0) === 0
+    if (savedFilter === 'timed') {
+      return Boolean(r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0)
+    }
+    return true
+  })
+
+  // 並び替えは元の配列を壊さないよう写してから。
+  const sortedItems = [...inSaved].sort((a, b) => {
+    switch (sortKey) {
+      case 'hits':
+        return (b.hits?.period ?? 0) - (a.hits?.period ?? 0)
+      case 'priority':
+        // 評価順は「実際に見る順」。一覧の並びと動く順を合わせる。
+        return a.priority - b.priority || a.createdAt.localeCompare(b.createdAt)
+      case 'name':
+        return (a.name || a.keyword).localeCompare(b.name || b.keyword, 'ja')
+      case 'created':
+        return b.createdAt.localeCompare(a.createdAt)
+    }
+  })
+
+  const shownInFolder = sortedItems.slice(0, pageSize)
+  const hiddenCount = sortedItems.length - shownInFolder.length
 
   return (
     <div>
@@ -273,7 +320,7 @@ export default function AutoRepliesPage() {
           </button>
           <button
             disabled
-            title="並び替えは準備中です"
+            title="評価順の数字で並びます"
             className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
           >
             並び替え
@@ -357,10 +404,10 @@ export default function AutoRepliesPage() {
         並び順は「評価順」の数字で決まり、小さいほど先に見ます。
       </div>
 
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 space-y-1">
+      <div className="mb-4 p-3 bg-info-bg border border-hairline rounded-lg text-xs text-info space-y-1">
         <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700">✓ アカ名</span> 返信あり (inline) / <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700">✓ アカ名 ⚙</span> automation 経由</p>
         <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">⚠ アカ名</span> silent rule のみ — match するが返信しない (同 keyword の automation rule 未登録)</p>
-        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-gray-300 line-through">アカ名</span> 適用外 (line_account_id が別アカに固定)</p>
+        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through">アカ名</span> 適用外 (line_account_id が別アカに固定)</p>
       </div>
 
       <div
@@ -377,34 +424,51 @@ export default function AutoRepliesPage() {
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
         <select
-          disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+          value={sortKey}
+          onChange={(e) => setSortKey(e.target.value as SortKey)}
+          aria-label="並び順"
+          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
         >
-          <option>ヒット数が多い順</option>
+          <option value="hits">ヒット数が多い順</option>
+          <option value="priority">評価順</option>
+          <option value="name">名前順</option>
+          <option value="created">作った順</option>
         </select>
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
         <select
-          disabled
-          title="表示件数の切り替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+          value={pageSize}
+          onChange={(e) => setPageSize(Number(e.target.value))}
+          aria-label="表示件数"
+          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
         >
-          <option>20件</option>
+          {[20, 50, 100].map((n) => (
+            <option key={n} value={n}>
+              {n}件
+            </option>
+          ))}
         </select>
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-        {['よく使う', '停止中のみ', '時間帯あり', '未ヒット'].map((label) => (
-          <button
-            key={label}
-            disabled
-            title="保存した条件は準備中です"
-            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-          >
-            {label}
-          </button>
-        ))}
+        {SAVED_FILTERS.map((f) => {
+          const on = savedFilter === f.key
+          return (
+            <button
+              key={f.key}
+              onClick={() => setSavedFilter(on ? '' : f.key)}
+              aria-pressed={on}
+              title={f.note}
+              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
+                on
+                  ? 'border-accent bg-accent-soft text-ink'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+              }`}
+            >
+              {f.label}
+            </button>
+          )
+        })}
       </div>
 
       {folderDialogOpen && (
@@ -463,7 +527,10 @@ export default function AutoRepliesPage() {
               {loading ? (
                 <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : shownInFolder.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
+                /* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">
+                  {error ? 'いまは読み込めていません。上の案内をご覧ください。' : '自動返信ルールがありません'}
+                </td></tr>
               ) : (
                 shownInFolder.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
@@ -546,7 +613,7 @@ export default function AutoRepliesPage() {
                           keywords: r.keywords,
                           friendConditions: r.friendConditions,
                         })}
-                        className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md"
+                        className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-info-bg rounded-md"
                       >
                         編集
                       </button>
@@ -565,6 +632,12 @@ export default function AutoRepliesPage() {
         </div>
         </div>
       </div>
+
+      {hiddenCount > 0 && (
+        <p className="text-ink-faint mt-3 text-center text-xs">
+          ほかに {hiddenCount} 件あります。「表示」を増やすと出ます。
+        </p>
+      )}
 
       {editing && (
         <EditDialog

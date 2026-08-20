@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
 import { parseTapPostbackData } from '../lib/rich-menu-tap.js';
+import { parseCarouselPostbackData } from '../lib/carousel-tap.js';
+import { handleCarouselTap } from '../services/carousel-tap.js';
 import { handleRichMenuTap } from '../services/rich-menu-tap.js';
 import type { WebhookRequestBody, WebhookEvent, TextEventMessage } from '@line-crm/line-sdk';
 import { createStickerMessageContent } from '@line-crm/shared';
@@ -428,6 +430,31 @@ async function handleEvent(
      * 剥がすついでに、そのボタンに設定された動き（タグ付け・スコア加算・
      * テンプレート送信）をここで実行する。
      */
+    /*
+     * カルーセルの選択肢。
+     *
+     * リッチメニューと同じ考え方で、data にテンプレートと選択肢の番号を入れて
+     * ある。押されたら、その選択肢に設定されたアクションを実行する。
+     * 「1人につき1回まで」の制限にかかっていれば、決めたテキストを返して終わる。
+     */
+    const carouselTap = parseCarouselPostbackData(rawPostbackData);
+    if (carouselTap) {
+      try {
+        const result = await handleCarouselTap(db, lineClient, friend, carouselTap, {
+          lineAccountId,
+          replyToken: event.replyToken,
+        });
+        // 制限にかかったときは、ここで終わる。自動応答まで回すと、
+        // 「もう押せません」と自動応答の両方が届く。
+        if (result.kind === 'blocked') return;
+      } catch (err) {
+        console.error('Failed to handle carousel tap', err);
+      }
+      // カルーセルの data は運用者が組んだ文字列ではないので、自動応答の
+      // キーワード照合には回さない。
+      return;
+    }
+
     const tap = parseTapPostbackData(rawPostbackData);
     let postbackReplyToken: string | undefined = event.replyToken;
     let tapLabel: string | null = null;

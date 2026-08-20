@@ -42,6 +42,8 @@ interface Reminder {
   folderId?: string | null
   /** 送る内容の数。0 のときは、対象に加わっても何も届かない。 */
   stepCount?: number
+  /** 161: 並び順。同じ値のときは登録日の新しい順。 */
+  displayOrder?: number
   createdAt: string
   updatedAt: string
 }
@@ -105,6 +107,8 @@ export default function RemindersPage() {
 
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  /** いま掴んでいる行。落とした先と入れ替える。 */
+  const [dragId, setDragId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -155,6 +159,38 @@ export default function RemindersPage() {
       void loadReminders()
     } catch {
       setError('フォルダの変更に失敗しました')
+    }
+  }
+
+  /**
+   * 掴んだリマインダを、落とした先の位置へ動かす。
+   *
+   * **いま見えている並びだけを送る。** フォルダや検索で隠れているものの順番は
+   * 触らない。画面に無いものが勝手に動くと、戻すすべがない（タグ・シナリオと
+   * 同じ考え方）。
+   */
+  const dropOn = async (targetId: string) => {
+    const from = dragId
+    setDragId(null)
+    if (!from || from === targetId) return
+
+    const order = filtered.map((r) => r.id)
+    const fromIdx = order.indexOf(from)
+    const toIdx = order.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) return
+    order.splice(toIdx, 0, ...order.splice(fromIdx, 1))
+
+    // 画面はすぐ入れ替える。往復を待つと、掴んだ手応えが無い。
+    const rank = new Map(order.map((id, i) => [id, i]))
+    setReminders((prev) =>
+      [...prev].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9)),
+    )
+    try {
+      const res = await api.reminders.reorder(order)
+      if (!res.success) throw new Error(res.error)
+    } catch {
+      setError('並び順を保存できませんでした')
+      void loadReminders()
     }
   }
 
@@ -209,15 +245,15 @@ export default function RemindersPage() {
               >
                 マニュアル
               </button>
-              {/* 並び順を保存する列が reminders に無い。押せる形にすると、
-                  並べても次に開いたときに戻る。 */}
-              <button
-                disabled
-                title="並び替えは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              {/* 並べ替えは表の左端を掴んで行う。ここはやり方の案内。
+                  窓を開いて並べ替える形にすると、一覧と窓で同じ並びを
+                  2か所に持つことになる。 */}
+              <span
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm"
+                title="表の左端の ⠿ を掴むと並べ替えられます"
               >
-                ⇅ 並び替え
-              </button>
+                ⇅ 並び替えは ⠿ を掴む
+              </span>
               <button
                 onClick={() => setFolderDialogOpen(true)}
                 className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
@@ -314,6 +350,7 @@ export default function RemindersPage() {
                 <table className="w-full min-w-[900px]">
                   <thead>
                     <tr className="bg-canvas-sunken border-hairline border-b">
+                      <th className="w-8 px-2 py-3" aria-label="並び替え" />
                       <th className="w-10 px-3 py-3">
                         <input
                           type="checkbox"
@@ -358,21 +395,42 @@ export default function RemindersPage() {
                   <tbody className="divide-y divide-gray-100">
                     {loading ? (
                       <tr>
-                        <td colSpan={8} className="text-ink-faint px-4 py-8 text-center text-sm">
+                        <td colSpan={9} className="text-ink-faint px-4 py-8 text-center text-sm">
                           読み込み中...
                         </td>
                       </tr>
                     ) : current.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="text-ink-faint px-4 py-8 text-center text-sm">
-                          {reminders.length === 0
-                            ? 'リマインダがありません。「＋ 新しいリマインダ」から作成してください。'
-                            : 'この条件に合うリマインダはありません。'}
+                        <td colSpan={9} className="text-ink-faint px-4 py-8 text-center text-sm">
+                          {/*
+                            * 読み込みに失敗したときは「ありません」と言わない。
+                            * 上に「読み込みに失敗しました」を出しているのに、ここで
+                            * 「ありません。作成してください」と並ぶと、**登録済みの
+                            * ものが消えたように読める**。
+                            */}
+                          {error
+                            ? 'いまは読み込めていません。上の案内をご覧ください。'
+                            : reminders.length === 0
+                              ? 'リマインダがありません。「＋ 新しいリマインダ」から作成してください。'
+                              : 'この条件に合うリマインダはありません。'}
                         </td>
                       </tr>
                     ) : (
                       current.map((r) => (
                         <tr key={r.id} className="hover:bg-canvas-sunken align-top">
+                          {/* 掴んで上下に入れ替える。掴める印が出ていないと、
+                              並べ替えられることに気づけない。 */}
+                          <td
+                            className="text-ink-faint w-8 cursor-grab px-2 py-3 text-center select-none active:cursor-grabbing"
+                            draggable
+                            onDragStart={() => setDragId(r.id)}
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={() => void dropOn(r.id)}
+                            aria-label={`${r.name} を並び替える`}
+                            title="上下に動かして並び替え"
+                          >
+                            ⠿
+                          </td>
                           <td className="px-3 py-3">
                             <input
                               type="checkbox"
