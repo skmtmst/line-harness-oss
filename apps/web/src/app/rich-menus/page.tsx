@@ -7,6 +7,12 @@ import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuTapStats } from '@/lib/api'
+import type { Folder } from '@line-crm/shared'
+import FolderPanel from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+
+/** フォルダに入れていないものを選ぶための、内部だけの値。 */
+const UNFILED = '__unfiled__'
 
 type RichMenuGroupListItem = {
   id: string
@@ -17,6 +23,8 @@ type RichMenuGroupListItem = {
   isDefaultForAll: boolean
   targetingEnabled: boolean
   targetingCondition: string | null
+  /** 159: フォルダ。分けていなければ null。 */
+  folderId: string | null
   thumbnailR2Key: string | null
   updatedAt: string
 }
@@ -61,6 +69,10 @@ export default function RichMenusListPage() {
   const [externalError, setExternalError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [applyTo, setApplyTo] = useState<RichMenuGroupListItem | null>(null)
+  const [folders, setFolders] = useState<Folder[]>([])
+  /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
+  const [folderFilter, setFolderFilter] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
 
   const reload = useCallback(async () => {
@@ -108,9 +120,17 @@ export default function RichMenusListPage() {
     }
   }, [selectedAccount?.id])
 
+  const loadFolders = useCallback(async () => {
+    const res = await api.folders.list('rich_menu')
+    if (res.success) setFolders(res.data)
+  }, [])
+
   useEffect(() => {
     reload()
   }, [reload])
+  useEffect(() => {
+    void loadFolders()
+  }, [loadFolders])
 
   async function handleDelete(group: RichMenuGroupListItem) {
     if (group.status === 'published') {
@@ -175,9 +195,14 @@ export default function RichMenusListPage() {
   const targetingCount = groups.filter((g) => g.targetingEnabled && g.targetingCondition).length
 
   const q = query.trim()
-  const shownGroups = q
+  const byQuery = q
     ? groups.filter((g) => g.name.includes(q) || g.chatBarText.includes(q))
     : groups
+  const shownGroups = byQuery.filter((g) => {
+    if (folderFilter === UNFILED) return !g.folderId
+    if (folderFilter) return g.folderId === folderFilter
+    return true
+  })
 
   return (
     <main className="p-6 max-w-7xl mx-auto">
@@ -201,11 +226,9 @@ export default function RichMenusListPage() {
               >
                 並び替え
               </button>
-              {/* リッチメニューにフォルダを持たせる列が無い。 */}
               <button
-                disabled
-                title="フォルダは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+                onClick={() => setFolderDialogOpen(true)}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
               >
                 フォルダを追加
               </button>
@@ -345,6 +368,16 @@ export default function RichMenusListPage() {
         </div>
       )}
 
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="rich_menu"
+          note="メニューを分けてしまう箱です。消しても、入っていたメニューは未分類として残ります。"
+          placeholder="例: 01_会員向け"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadFolders()}
+        />
+      )}
+
       {/* Admin 管理メニュー見出し */}
       {selectedAccount && !loading && !error && (
         <h2 className="text-sm font-semibold text-ink-secondary mb-3">
@@ -366,8 +399,33 @@ export default function RichMenusListPage() {
         </div>
       )}
 
-      {selectedAccount && !loading && !error && shownGroups.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {selectedAccount && !loading && !error && (
+        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+          <FolderPanel
+            total={`${groups.length} 件`}
+            activeId={folderFilter}
+            onSelect={setFolderFilter}
+            rows={[
+              { id: '', label: 'すべて', count: groups.length },
+              ...folders.map((f) => ({
+                id: f.id,
+                label: f.name,
+                count: groups.filter((g) => g.folderId === f.id).length,
+                color: f.color,
+              })),
+              {
+                id: UNFILED,
+                label: '未分類',
+                count: groups.filter((g) => !g.folderId).length,
+              },
+            ]}
+          >
+            <p className="text-ink-faint text-xs leading-relaxed">
+              フォルダを消しても、入っていたメニューは未分類として残ります。
+            </p>
+          </FolderPanel>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {shownGroups.map((g) => (
             <div
               key={g.id}
@@ -452,6 +510,7 @@ export default function RichMenusListPage() {
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 

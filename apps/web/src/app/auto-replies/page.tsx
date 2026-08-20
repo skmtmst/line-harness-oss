@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import FolderPanel from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
@@ -42,6 +45,8 @@ interface AutoReply {
   name: string | null
   /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
   keywordMatchMode: string
+  /** フォルダ。分けていなければ null。 */
+  folderId: string | null
   /** 152: 当たった回数（今月・累計）。 */
   hits?: { period: number; total: number }
   createdAt: string
@@ -72,6 +77,9 @@ function actionSummary(rule: { actions: unknown[] | null }): string[] {
     return [ACTION_SUMMARY_LABELS[type] ?? type]
   })
 }
+
+/** フォルダに入れていないものを選ぶための、内部だけの値。 */
+const UNFILED = '__unfiled__'
 
 interface TemplateLite {
   id: string
@@ -107,6 +115,10 @@ export default function AutoRepliesPage() {
   const [templates, setTemplates] = useState<TemplateLite[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [folders, setFolders] = useState<Folder[]>([])
+  /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
+  const [folderFilter, setFolderFilter] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [editing, setEditing] = useState<AutoReplyDraft | null>(null)
 
   const load = useCallback(async () => {
@@ -131,7 +143,13 @@ export default function AutoRepliesPage() {
     }
   }, [selectedAccountId])
 
+  const loadFolders = useCallback(async () => {
+    const res = await api.folders.list('auto_reply')
+    if (res.success) setFolders(res.data)
+  }, [])
+
   useEffect(() => { load() }, [load])
+  useEffect(() => { void loadFolders() }, [loadFolders])
 
   const templateById = new Map(templates.map((t) => [t.id, t]))
   const accountById = new Map(accounts.map((a) => [a.id, a]))
@@ -232,6 +250,11 @@ export default function AutoRepliesPage() {
           (r.responseContent ?? '').includes(q),
       )
     : items
+  const shownInFolder = shown.filter((r) => {
+    if (folderFilter === UNFILED) return !r.folderId
+    if (folderFilter) return r.folderId === folderFilter
+    return true
+  })
 
   return (
     <div>
@@ -255,11 +278,9 @@ export default function AutoRepliesPage() {
           >
             並び替え
           </button>
-          {/* 自動応答にフォルダを持たせる列が無い。 */}
           <button
-            disabled
-            title="フォルダは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+            onClick={() => setFolderDialogOpen(true)}
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
           >
             フォルダを追加
           </button>
@@ -386,7 +407,42 @@ export default function AutoRepliesPage() {
         ))}
       </div>
 
-      <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="auto_reply"
+          note="自動応答を分けてしまう箱です。消しても、入っていた応答は未分類として残ります。"
+          placeholder="例: 01_営業時間外"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadFolders()}
+        />
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <FolderPanel
+          total={`${items.length} 件`}
+          activeId={folderFilter}
+          onSelect={setFolderFilter}
+          rows={[
+            { id: '', label: 'すべて', count: items.length },
+            ...folders.map((f) => ({
+              id: f.id,
+              label: f.name,
+              count: items.filter((r) => r.folderId === f.id).length,
+              color: f.color,
+            })),
+            {
+              id: UNFILED,
+              label: '未分類',
+              count: items.filter((r) => !r.folderId).length,
+            },
+          ]}
+        >
+          <p className="text-ink-faint text-xs leading-relaxed">
+            フォルダを消しても、入っていた応答は未分類として残ります。
+          </p>
+        </FolderPanel>
+
+        <div data-design="Table" className="bg-canvas rounded-card border border-hairline overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1080px]">
             <thead>
@@ -406,10 +462,10 @@ export default function AutoRepliesPage() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
-              ) : shown.length === 0 ? (
+              ) : shownInFolder.length === 0 ? (
                 <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
               ) : (
-                shown.map((r) => (
+                shownInFolder.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">{r.priority}</td>
                     <td className="px-4 py-3 text-sm font-medium text-ink">
@@ -506,6 +562,7 @@ export default function AutoRepliesPage() {
               )}
             </tbody>
           </table>
+        </div>
         </div>
       </div>
 
