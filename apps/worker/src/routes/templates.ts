@@ -80,6 +80,11 @@ templates.get('/api/templates/:id', async (c) => {
         category: item.category,
         messageType: item.message_type,
         messageContent: item.message_content,
+        carouselActions: item.carousel_actions_json
+          ? JSON.parse(item.carousel_actions_json)
+          : null,
+        carouselTapLimitMode: item.carousel_tap_limit_mode ?? 'none',
+        carouselTapLimitText: item.carousel_tap_limit_text,
         usedBy,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
@@ -150,6 +155,42 @@ templates.get('/api/templates/:id/usages', async (c) => {
   }
 });
 
+/** 162: カルーセルの選択肢まわりの設定を読む。 */
+function readCarouselOptions(body: Record<string, unknown>):
+  | { ok: true; value: Record<string, unknown> }
+  | { ok: false; error: string } {
+  const value: Record<string, unknown> = {};
+  if ('carouselActions' in body) {
+    const raw = body.carouselActions;
+    if (raw === null) {
+      value.carouselActions = null;
+    } else if (typeof raw !== 'object' || Array.isArray(raw)) {
+      return { ok: false, error: 'carouselActions must be an object keyed by column index' };
+    } else {
+      value.carouselActions = raw;
+    }
+  }
+  if ('carouselTapLimitMode' in body) {
+    if (body.carouselTapLimitMode !== 'none' && body.carouselTapLimitMode !== 'once') {
+      return { ok: false, error: "carouselTapLimitMode must be 'none' or 'once'" };
+    }
+    value.carouselTapLimitMode = body.carouselTapLimitMode;
+  }
+  if ('carouselTapLimitText' in body) {
+    const raw = body.carouselTapLimitText;
+    if (raw === null || raw === '') {
+      value.carouselTapLimitText = null;
+    } else if (typeof raw !== 'string') {
+      return { ok: false, error: 'carouselTapLimitText must be a string' };
+    } else if ([...raw].length > 300) {
+      return { ok: false, error: 'carouselTapLimitText must be 300 characters or fewer' };
+    } else {
+      value.carouselTapLimitText = raw;
+    }
+  }
+  return { ok: true, value };
+}
+
 templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{ name: string; category?: string; messageType: string; messageContent: string }>();
@@ -158,7 +199,9 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     }
     const carousel = checkCarousel(body.messageType, body.messageContent);
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
-    const item = await createTemplate(c.env.DB, body);
+    const options = readCarouselOptions(body as unknown as Record<string, unknown>);
+    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    const item = await createTemplate(c.env.DB, { ...body, ...options.value });
     return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, createdAt: item.created_at } }, 201);
   } catch (err) {
     console.error('POST /api/templates error:', err);
@@ -177,12 +220,25 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       body.messageContent ?? existing?.message_content,
     );
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
-    await updateTemplate(c.env.DB, id, body);
+    const options = readCarouselOptions(body as unknown as Record<string, unknown>);
+    if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    await updateTemplate(c.env.DB, id, { ...body, ...options.value });
     const updated = await getTemplateById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
-      data: { id: updated.id, name: updated.name, category: updated.category, messageType: updated.message_type, messageContent: updated.message_content },
+      data: {
+        id: updated.id,
+        name: updated.name,
+        category: updated.category,
+        messageType: updated.message_type,
+        messageContent: updated.message_content,
+        carouselActions: updated.carousel_actions_json
+          ? JSON.parse(updated.carousel_actions_json)
+          : null,
+        carouselTapLimitMode: updated.carousel_tap_limit_mode ?? 'none',
+        carouselTapLimitText: updated.carousel_tap_limit_text,
+      },
     });
   } catch (err) {
     console.error('PUT /api/templates/:id error:', err);

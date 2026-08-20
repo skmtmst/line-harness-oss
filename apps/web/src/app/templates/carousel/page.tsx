@@ -6,6 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
+import InlineActionList, { useActionOptions } from '@/components/auto-replies/inline-action-list'
+import {
+  readInlineActions,
+  toActionPayload,
+  type InlineAction,
+} from '@/components/auto-replies/draft-fields'
 
 /**
  * カルーセルの編集。
@@ -20,15 +26,29 @@ const TITLE_MAX = 40
 const TEXT_MAX_WITH_IMAGE = 60
 const TEXT_MAX_WITHOUT_IMAGE = 120
 
+/** 選択肢1つぶん。 */
+interface Choice {
+  label: string
+  /** 'uri'（URLを開く）か 'action'（押されたときに何かする）。 */
+  kind: 'uri' | 'action'
+  uri: string
+  /** kind='action' のときに実行する並び。 */
+  actions: InlineAction[]
+}
+
 interface Panel {
   thumbnailImageUrl: string
   title: string
   text: string
-  actions: Array<{ label: string; uri: string }>
+  actions: Choice[]
+}
+
+function emptyChoice(): Choice {
+  return { label: '', kind: 'uri', uri: '', actions: [] }
 }
 
 function emptyPanel(): Panel {
-  return { thumbnailImageUrl: '', title: '', text: '', actions: [{ label: '', uri: '' }] }
+  return { thumbnailImageUrl: '', title: '', text: '', actions: [emptyChoice()] }
 }
 
 function CarouselEditorInner() {
@@ -41,6 +61,9 @@ function CarouselEditorInner() {
   const [loading, setLoading] = useState(Boolean(id))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [tapLimitMode, setTapLimitMode] = useState<'none' | 'once'>('none')
+  const [tapLimitText, setTapLimitText] = useState('')
+  const actionOptions = useActionOptions()
 
   useEffect(() => {
     if (!id) return
@@ -49,6 +72,12 @@ function CarouselEditorInner() {
       .then((res) => {
         if (!res.success) return
         setName(res.data.name)
+        setTapLimitMode(res.data.carouselTapLimitMode === 'once' ? 'once' : 'none')
+        setTapLimitText(res.data.carouselTapLimitText ?? '')
+        const storedActions = (res.data.carouselActions ?? null) as Record<
+          string,
+          Record<string, unknown[]>
+        > | null
         try {
           const parsed = JSON.parse(res.data.messageContent) as unknown
           const columns = Array.isArray(parsed)
@@ -56,7 +85,7 @@ function CarouselEditorInner() {
             : ((parsed as { columns?: unknown })?.columns ?? [])
           if (Array.isArray(columns) && columns.length > 0) {
             setPanels(
-              columns.map((c) => {
+              columns.map((c, i) => {
                 const col = c as Partial<Panel>
                 return {
                   thumbnailImageUrl: col.thumbnailImageUrl ?? '',
@@ -64,8 +93,18 @@ function CarouselEditorInner() {
                   text: col.text ?? '',
                   actions:
                     Array.isArray(col.actions) && col.actions.length > 0
-                      ? col.actions.map((a) => ({ label: a.label ?? '', uri: (a as { uri?: string }).uri ?? '' }))
-                      : [{ label: '', uri: '' }],
+                      ? (col.actions as unknown as Array<Record<string, unknown>>).map((a, ai) => {
+                          const isUri = a.type === 'uri' || typeof a.uri === 'string'
+                          return {
+                            label: (a.label as string) ?? '',
+                            kind: isUri ? ('uri' as const) : ('action' as const),
+                            uri: (a.uri as string) ?? '',
+                            actions: readInlineActions(
+                              (storedActions?.[String(i)]?.[String(ai)] as unknown[]) ?? null,
+                            ),
+                          }
+                        })
+                      : [emptyChoice()],
                 }
               }),
             )
@@ -89,35 +128,92 @@ function CarouselEditorInner() {
       setError('名前を入力してください')
       return
     }
-    const content = JSON.stringify(
-      panels.map((p) => ({
-        ...(p.thumbnailImageUrl.trim() ? { thumbnailImageUrl: p.thumbnailImageUrl.trim() } : {}),
-        ...(p.title.trim() ? { title: p.title.trim() } : {}),
-        text: p.text.trim(),
-        actions: p.actions
-          .filter((a) => a.label.trim())
-          .map((a) => ({ type: 'uri', label: a.label.trim(), uri: a.uri.trim() })),
-      })),
-    )
+    /*
+     * 選択肢の中身を組み立てる。
+     *
+     * 「押されたときに何かする」を選んだ選択肢は postback になる。data には
+     * どのテンプレートのどの選択肢かを入れる。**テンプレートの id は、新規作成の
+     * ときまだ決まっていない**ので、いったん空で作り、id が返ってから埋めて
+     * 保存し直す（下の saveWith）。
+     */
+    const buildContent = (templateId: string) =>
+      JSON.stringify(
+        panels.map((p, ci) => ({
+          ...(p.thumbnailImageUrl.trim() ? { thumbnailImageUrl: p.thumbnailImageUrl.trim() } : {}),
+          ...(p.title.trim() ? { title: p.title.trim() } : {}),
+          text: p.text.trim(),
+          actions: p.actions
+            .filter((a) => a.label.trim())
+            .map((a, ai) =>
+              a.kind === 'action'
+                ? {
+                    type: 'postback',
+                    label: a.label.trim(),
+                    data: `ctpl=${templateId}&c=${ci}&a=${ai}`,
+                  }
+                : { type: 'uri', label: a.label.trim(), uri: a.uri.trim() },
+            ),
+        })),
+      )
+
+    // 選択肢ごとのアクションは、パネル番号 → 選択肢番号 の入れ子で持つ。
+    const carouselActions: Record<string, Record<string, unknown[]>> = {}
+    panels.forEach((p, ci) => {
+      p.actions
+        .filter((a) => a.label.trim())
+        .forEach((a, ai) => {
+          if (a.kind !== 'action' || a.actions.length === 0) return
+          carouselActions[String(ci)] ??= {}
+          carouselActions[String(ci)][String(ai)] = a.actions.map(toActionPayload)
+        })
+    })
+
+    const content = buildContent(id ?? '')
     setSaving(true)
     setError('')
     try {
       // サーバー側でも同じ制限を見る。何枚目の何が問題かを返してくれる。
-      const res = id
-        ? await api.templates.update(id, {
-            name: name.trim(),
-            messageType: 'carousel',
-            messageContent: content,
+      const carouselOptions = {
+        carouselActions: Object.keys(carouselActions).length > 0 ? carouselActions : null,
+        carouselTapLimitMode: tapLimitMode,
+        carouselTapLimitText: tapLimitText.trim() || null,
+      }
+
+      if (id) {
+        const res = await api.templates.update(id, {
+          name: name.trim(),
+          messageType: 'carousel',
+          messageContent: content,
+          ...carouselOptions,
+        })
+        if (!res.success) {
+          setError(res.error)
+          return
+        }
+      } else {
+        const created = await api.templates.create({
+          name: name.trim(),
+          category: 'カルーセル',
+          messageType: 'carousel',
+          messageContent: content,
+          ...carouselOptions,
+        })
+        if (!created.success) {
+          setError(created.error)
+          return
+        }
+        // id が決まったので、postback の data を埋め直す。
+        // 「押されたときに何かする」選択肢が1つも無ければ、埋め直す必要はない。
+        const hasPostback = panels.some((p) => p.actions.some((a) => a.kind === 'action'))
+        if (hasPostback) {
+          const fixed = await api.templates.update(created.data.id, {
+            messageContent: buildContent(created.data.id),
           })
-        : await api.templates.create({
-            name: name.trim(),
-            category: 'カルーセル',
-            messageType: 'carousel',
-            messageContent: content,
-          })
-      if (!res.success) {
-        setError(res.error)
-        return
+          if (!fixed.success) {
+            setError(fixed.error)
+            return
+          }
+        }
       }
       router.push('/templates')
     } catch (e) {
@@ -285,49 +381,100 @@ function CarouselEditorInner() {
                   ボタン（{MAX_ACTIONS}個まで）
                 </p>
                 {panel.actions.map((action, ai) => (
-                  <div key={ai} className="mb-2 flex flex-wrap gap-2">
-                    <input
-                      type="text"
-                      value={action.label}
-                      onChange={(e) =>
-                        update(i, {
-                          actions: panel.actions.map((a, j) =>
-                            j === ai ? { ...a, label: e.target.value } : a,
-                          ),
-                        })
-                      }
-                      placeholder="ボタンの文字"
-                      className={`${inputClass} w-40`}
-                    />
-                    <input
-                      type="url"
-                      value={action.uri}
-                      onChange={(e) =>
-                        update(i, {
-                          actions: panel.actions.map((a, j) =>
-                            j === ai ? { ...a, uri: e.target.value } : a,
-                          ),
-                        })
-                      }
-                      placeholder="https://example.com"
-                      className={`${inputClass} min-w-[12rem] flex-1`}
-                    />
-                    {panel.actions.length > 1 && (
-                      <button
-                        onClick={() =>
-                          update(i, { actions: panel.actions.filter((_, j) => j !== ai) })
+                  <div key={ai} className="border-hairline mb-2 rounded-lg border p-3">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={action.label}
+                        onChange={(e) =>
+                          update(i, {
+                            actions: panel.actions.map((a, j) =>
+                              j === ai ? { ...a, label: e.target.value } : a,
+                            ),
+                          })
                         }
-                        className="text-danger hover:bg-danger-bg rounded px-2 text-xs"
-                      >
-                        外す
-                      </button>
+                        placeholder="ボタンの文字"
+                        className={`${inputClass} w-40`}
+                      />
+                      <div className="flex gap-1.5">
+                        {(
+                          [
+                            { value: 'uri' as const, label: 'URLを開く' },
+                            { value: 'action' as const, label: '押されたときに何かする' },
+                          ]
+                        ).map((o) => (
+                          <button
+                            key={o.value}
+                            type="button"
+                            onClick={() =>
+                              update(i, {
+                                actions: panel.actions.map((a, j) =>
+                                  j === ai ? { ...a, kind: o.value } : a,
+                                ),
+                              })
+                            }
+                            className={`rounded-control px-2.5 py-1 text-xs ${action.kind === o.value ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                          >
+                            {o.label}
+                          </button>
+                        ))}
+                      </div>
+                      {panel.actions.length > 1 && (
+                        <button
+                          onClick={() =>
+                            update(i, { actions: panel.actions.filter((_, j) => j !== ai) })
+                          }
+                          className="text-danger hover:bg-danger-bg ml-auto rounded px-2 text-xs"
+                        >
+                          外す
+                        </button>
+                      )}
+                    </div>
+
+                    {action.kind === 'uri' ? (
+                      <input
+                        type="url"
+                        value={action.uri}
+                        onChange={(e) =>
+                          update(i, {
+                            actions: panel.actions.map((a, j) =>
+                              j === ai ? { ...a, uri: e.target.value } : a,
+                            ),
+                          })
+                        }
+                        placeholder="https://example.com"
+                        className={`${inputClass} w-full`}
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                        <InlineActionList
+                          actions={action.actions}
+                          onChange={(next) =>
+                            update(i, {
+                              actions: panel.actions.map((a, j) =>
+                                j === ai ? { ...a, actions: next } : a,
+                              ),
+                            })
+                          }
+                          tags={actionOptions.tags}
+                          fields={actionOptions.fields}
+                          marks={actionOptions.marks}
+                          scenarios={actionOptions.scenarios}
+                          vars={actionOptions.vars}
+                        />
+                        {action.actions.length === 0 && (
+                          <p className="text-[11px] text-amber-600">
+                            何も設定されていません。押されても何も起きません。
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 ))}
                 {panel.actions.length < MAX_ACTIONS && (
                   <button
                     onClick={() =>
-                      update(i, { actions: [...panel.actions, { label: '', uri: '' }] })
+                      update(i, { actions: [...panel.actions, emptyChoice()] })
                     }
                     className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs"
                   >
@@ -337,6 +484,60 @@ function CarouselEditorInner() {
               </div>
             </div>
           ))}
+
+          <section className="bg-canvas rounded-card border-hairline space-y-3 border p-5">
+            <div>
+              <p className="text-ink text-sm font-semibold">押せる回数</p>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                「押されたときに何かする」ボタンだけが対象です。URLを開くボタンは、LINE の外へ
+                出るので数えられません。
+              </p>
+            </div>
+            <div className="space-y-1">
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="radio"
+                  name="tap-limit"
+                  checked={tapLimitMode === 'none'}
+                  onChange={() => setTapLimitMode('none')}
+                  className="mt-0.5"
+                />
+                <span className="text-sm">何度でも押せる</span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-2">
+                <input
+                  type="radio"
+                  name="tap-limit"
+                  checked={tapLimitMode === 'once'}
+                  onChange={() => setTapLimitMode('once')}
+                  className="mt-0.5"
+                />
+                <span className="text-sm">
+                  1人につき1回だけ
+                  <span className="text-ink-faint block text-[11px]">
+                    このカルーセル全体で1回です。どのボタンを押しても、次からは動きません。
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {tapLimitMode === 'once' && (
+              <Field
+                label="2回目に押されたときの返事"
+                htmlFor="cr-limit-text"
+                note="空にすると、何も返さず黙って何も起きません。"
+              >
+                <input
+                  id="cr-limit-text"
+                  type="text"
+                  value={tapLimitText}
+                  onChange={(e) => setTapLimitText(e.target.value)}
+                  placeholder="例：こちらはすでに受け付けています。"
+                  className={inputClass}
+                />
+              </Field>
+            )}
+          </section>
 
           {panels.length < MAX_COLUMNS && (
             <button
