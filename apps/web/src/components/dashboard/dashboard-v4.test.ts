@@ -35,6 +35,9 @@ describe('ダッシュボードV4の初期表示', () => {
       'friend-add',
     ])
     expect(preferences.right.filter((item) => item.visible).map((item) => item.id)).toEqual([
+      'send-quota',
+      'operational-alerts',
+      'connection-status',
       'upcoming',
       'monthly-delivery',
       'recent-results',

@@ -16,12 +16,13 @@ function accountLabel(account: AccountSwitchTarget) {
   return account.displayName || account.name
 }
 
-function AccountMark({ account }: { account: AccountSwitchTarget }) {
+function AccountMark({ account, compact = false }: { account: AccountSwitchTarget; compact?: boolean }) {
+  const size = compact ? 'h-7 w-7 rounded-lg text-xs' : 'h-9 w-9 rounded-control text-sm'
   if (account.pictureUrl) {
     // eslint-disable-next-line @next/next/no-img-element -- LINE公式アカウントのCDN画像
-    return <img src={account.pictureUrl} alt="" className="h-9 w-9 shrink-0 rounded-control object-cover" />
+    return <img src={account.pictureUrl} alt="" className={`${size} shrink-0 object-cover`} />
   }
-  return <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-accent-soft text-sm font-bold text-success">然</span>
+  return <span className={`flex ${size} shrink-0 items-center justify-center bg-accent-soft font-bold text-success`}>然</span>
 }
 
 export function AccountSwitchDialog({
@@ -79,11 +80,11 @@ export default function AccountSwitcher() {
   }
 
   return <>
-    <div className="relative mx-3 mt-3">
-      <p className="mb-1.5 px-1 text-[10px] font-semibold tracking-wide text-ink-faint">現在のLINEアカウント</p>
-      <button type="button" onClick={() => setOpen((value) => !value)} disabled={loading || !selectedAccount} aria-expanded={open} className="flex w-full items-center gap-2 rounded-control border border-hairline bg-canvas px-3 py-2.5 text-left hover:border-accent disabled:cursor-not-allowed disabled:opacity-60">
-        {selectedAccount && <AccountMark account={selectedAccount} />}
-        <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold text-ink">{selectedAccount ? accountLabel(selectedAccount) : '読み込み中…'}</span><span className="mt-0.5 block truncate text-[10px] text-ink-faint">{selectedAccount?.plan?.label || selectedAccount?.basicId || 'LINE情報を確認中'}</span></span>
+    <div className="relative px-3 pb-2.5 pt-2.5">
+      <p className="mb-2 text-[11px] font-normal text-ink-faint">現在のLINEアカウント</p>
+      <button type="button" onClick={() => setOpen((value) => !value)} disabled={loading || !selectedAccount} aria-expanded={open} className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left hover:border-accent disabled:cursor-not-allowed disabled:opacity-60">
+        {selectedAccount && <AccountMark account={selectedAccount} compact />}
+        <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-bold text-ink">{selectedAccount ? accountLabel(selectedAccount) : '読み込み中…'}</span><span className="mt-0.5 block truncate text-[10px] text-ink-faint">{selectedAccount?.plan?.label || selectedAccount?.basicId || 'LINE情報を確認中'}</span></span>
         <span className="rounded-pill bg-accent-soft px-2 py-1 text-[9px] font-semibold text-success">表示中</span>
         <span className={`text-[10px] text-ink-faint transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>

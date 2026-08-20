@@ -9,6 +9,9 @@ export type DashboardCardId =
   | 'friend-add'
   | 'scenario-status'
   | 'uid-migration'
+  | 'send-quota'
+  | 'operational-alerts'
+  | 'connection-status'
   | 'upcoming'
   | 'monthly-delivery'
   | 'recent-results'
@@ -42,6 +45,9 @@ export const DASHBOARD_CARD_DEFINITIONS: CardDefinition[] = [
   { id: 'friend-add', label: '友だち追加リンク', description: '追加URL・QRコード', group: 'main', defaultVisible: true },
   { id: 'scenario-status', label: 'シナリオ配信状況', description: 'メイン｜配信中・停止中', group: 'main', defaultVisible: false },
   { id: 'uid-migration', label: 'UID移行状況', description: 'メイン｜移行の進捗', group: 'main', defaultVisible: false },
+  { id: 'send-quota', label: '今月の送信枠', description: '右サイド｜使用数と残り', group: 'right', defaultVisible: true },
+  { id: 'operational-alerts', label: '運用アラート', description: '右サイド｜障害・長時間未対応', group: 'right', defaultVisible: true },
+  { id: 'connection-status', label: '接続状態', description: '右サイド｜Webhook・自動処理', group: 'right', defaultVisible: true },
   { id: 'upcoming', label: '今後の予定', description: '予約・配信の予定', group: 'right', defaultVisible: true },
   { id: 'monthly-delivery', label: '今月の配信', description: 'プッシュ・リプライ・残枠', group: 'right', defaultVisible: true },
   { id: 'recent-results', label: '最近の成果', description: 'コンバージョン', group: 'right', defaultVisible: true },
