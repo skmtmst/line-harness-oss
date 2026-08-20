@@ -120,6 +120,22 @@ function CarouselEditorInner() {
   const update = (index: number, patch: Partial<Panel>) =>
     setPanels((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)))
 
+  /**
+   * パネルを1つ隣と入れ替える。
+   *
+   * カルーセルは横に並ぶので「上下」ではなく「左右」。端では何もしない
+   * （ボタン側でも押せなくしているが、キーボードから呼ばれても配列の外に
+   * 出ないよう、ここでも見る）。
+   */
+  const move = (index: number, direction: -1 | 1) =>
+    setPanels((prev) => {
+      const to = index + direction
+      if (to < 0 || to >= prev.length) return prev
+      const next = [...prev]
+      ;[next[index], next[to]] = [next[to], next[index]]
+      return next
+    })
+
   const anyImage = panels.some((p) => p.thumbnailImageUrl.trim())
   const textMax = anyImage ? TEXT_MAX_WITH_IMAGE : TEXT_MAX_WITHOUT_IMAGE
 
@@ -278,9 +294,8 @@ function CarouselEditorInner() {
 
           <div className="bg-canvas rounded-card border-hairline border p-5">
             <p className="text-ink text-sm font-semibold">パネル</p>
-            {/* 並べ替えの操作が無い。追加した順のまま送られる。 */}
             <p className="text-ink-faint mt-0.5 text-xs">
-              左から順に表示されます。並べ替えは準備中です。
+              左から順に表示されます。順番は下の各パネルの「←」「→」で入れ替えられます。
             </p>
             <ol className="mt-2 flex flex-wrap gap-1.5">
               {panels.map((panel, i) => (
@@ -300,6 +315,24 @@ function CarouselEditorInner() {
               <div className="flex items-center justify-between">
                 <p className="text-ink text-sm font-semibold">パネル {i + 1} の内容</p>
                 <div className="flex items-center gap-1">
+                <button
+                  onClick={() => move(i, -1)}
+                  disabled={i === 0}
+                  aria-label={`パネル ${i + 1} を左へ移動`}
+                  title={i === 0 ? 'いちばん左です' : '左へ移動'}
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={() => move(i, 1)}
+                  disabled={i === panels.length - 1}
+                  aria-label={`パネル ${i + 1} を右へ移動`}
+                  title={i === panels.length - 1 ? 'いちばん右です' : '右へ移動'}
+                  className="text-ink-secondary hover:bg-canvas-sunken rounded px-2 py-1 text-xs disabled:opacity-40"
+                >
+                  →
+                </button>
                 <button
                   onClick={() =>
                     setPanels((prev) =>
