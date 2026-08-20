@@ -29,6 +29,26 @@ const MULTICAST_BATCH_SIZE = 500;
 const PERSONALIZED_PUSH_BATCH_SIZE = 10;
 
 /**
+ * 1人ずつ送る配信で、**1回のcronで何人まで送るか**。
+ *
+ * 差し込みのある配信は multicast が使えないので、1人ずつ push する。
+ * 以前はここに上限が無く、10人送るたびに `return` していた。cron は5分刻み
+ * なので、**1時間に120人**しか送れない計算になる。友だち5,000人なら41時間。
+ * 途中で止まっているように見えるが、**エラーは出ない**。「送信中」のまま
+ * 何日も残る。
+ *
+ * 上限を置く理由は Workers の subrequest（1回の実行で出せる問い合わせの数、
+ * 1,000）。1人あたり最大4つ使う。
+ *
+ *   照合1（送信済みか） + 友だち情報1 + LINEへの送信1 + 記録1 = 4
+ *
+ * 150人で600。10人ごとに `batch_offset` を書いているので、上限に当たって
+ * 実行が切れても**次のcronで続きから再開する**。送信済みの照合があるので
+ * 二重送信にもならない。
+ */
+const PERSONALIZED_PUSH_PER_TICK = 150;
+
+/**
  * 配信全体で1つに決まる差し込みの値。
  *
  * 共通情報（営業時間など）と配信日は、誰に送っても同じ値になる。
@@ -549,6 +569,7 @@ async function processQueuedBroadcastBatches(
   // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
   const unit = aggregationUnitFor(broadcast);
   let currentOffset = batchOffset;
+  const tickStartOffset = batchOffset;
   const personalized = hasRecipientVariables(finalContent);
   const unsupportedVariables = getUnsupportedBroadcastVariables(finalContent);
   if (unsupportedVariables.length > 0) {
@@ -651,8 +672,10 @@ async function processQueuedBroadcastBatches(
                 )
           WHERE id = ?`,
       ).bind(currentOffset, broadcast.id, broadcast.id).run();
-      if (currentOffset < friends.length) return;
-      break;
+      if (currentOffset >= friends.length) break;
+      // subrequest を使い切る手前で切り上げる。次の cron が続きから再開する。
+      if (currentOffset - tickStartOffset >= PERSONALIZED_PUSH_PER_TICK) return;
+      continue;
     }
 
     // ステルス遅延（最初のバッチ以外）
