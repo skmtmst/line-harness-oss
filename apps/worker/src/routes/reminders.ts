@@ -88,6 +88,12 @@ function readTriggerInput(
     const raw = body.targetTagId;
     out.targetTagId = raw === null || raw === '' || raw === undefined ? null : String(raw);
   }
+  // 156: フォルダ。空文字は「未分類へ戻す」として扱う。画面の select は
+  // 未分類を空の値で出すので、そこを null に読み替える。
+  if (has('folderId')) {
+    const raw = body.folderId;
+    out.folderId = raw === null || raw === '' || raw === undefined ? null : String(raw);
+  }
   return { ok: true, value: out };
 }
 
@@ -121,6 +127,7 @@ reminders.get('/api/reminders', async (c) => {
         triggerOffsetMinutes: r.trigger_offset_minutes ?? null,
         sendAtTime: r.send_at_time ?? null,
         targetTagId: r.target_tag_id ?? null,
+        folderId: r.folder_id ?? null,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),
@@ -153,6 +160,7 @@ reminders.get('/api/reminders/:id', async (c) => {
         triggerOffsetMinutes: reminder.trigger_offset_minutes ?? null,
         sendAtTime: reminder.send_at_time ?? null,
         targetTagId: reminder.target_tag_id ?? null,
+        folderId: reminder.folder_id ?? null,
         createdAt: reminder.created_at,
         updatedAt: reminder.updated_at,
         steps: steps.map((s) => ({

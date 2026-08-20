@@ -162,7 +162,9 @@
     "153_reminder_step_timing.sql",
     "154_reminder_friend_field_trigger.sql",
     "155_reminder_step_message_kinds.sql",
-    "157_auto_reply_respond_to_all.sql"
+    "156_reminder_folder.sql",
+    "157_auto_reply_respond_to_all.sql",
+    "158_auto_reply_name.sql"
   ],
-  "migrationCount": 163
+  "migrationCount": 165
 }
