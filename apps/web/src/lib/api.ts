@@ -2552,6 +2552,12 @@ export const api = {
       }),
   },
   reminders: {
+    /** 161: 渡した順に並べ替える。見えているものだけ送る。 */
+    reorder: (ids: string[]) =>
+      fetchApi<ApiResponse<{ updated: number }>>('/api/reminders/reorder', {
+        method: 'PATCH',
+        body: JSON.stringify({ ids }),
+      }),
     list: (params?: { accountId?: string }) => {
       const query = params?.accountId ? '?lineAccountId=' + params.accountId : ''
       return fetchApi<ApiResponse<Reminder[]>>('/api/reminders' + query)

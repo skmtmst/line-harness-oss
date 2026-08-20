@@ -1255,7 +1255,7 @@ CREATE TABLE "reminders" (
   repeat_yearly INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, display_order INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE rich_menu_area_taps (
   id              TEXT PRIMARY KEY,
@@ -2090,6 +2090,8 @@ CREATE INDEX idx_ref_tracking_ref    ON ref_tracking (ref_code);
 CREATE INDEX idx_ref_tracking_ref_created ON ref_tracking(ref_code, created_at);
 
 CREATE INDEX idx_reminder_steps_by_reminder ON reminder_steps (reminder_id);
+
+CREATE INDEX idx_reminders_display_order ON reminders(display_order, created_at);
 
 CREATE INDEX idx_reminders_folder ON reminders(folder_id);
 

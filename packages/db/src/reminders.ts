@@ -24,6 +24,8 @@ export interface ReminderRow {
   repeat_yearly: number;
   /** 156: フォルダ。null は未分類。消しても未分類に戻るだけ。 */
   folder_id: string | null;
+  /** 161: 並び順。同じ値のときは created_at の新しい順。 */
+  display_order: number;
 }
 
 export interface ReminderStepRow {
@@ -54,8 +56,27 @@ export interface FriendReminderRow {
 // --- リマインダCRUD ---
 
 export async function getReminders(db: D1Database): Promise<ReminderRow[]> {
-  const result = await db.prepare(`SELECT * FROM reminders ORDER BY created_at DESC`).all<ReminderRow>();
+  // 161: 並べ替えたものが先。まだ並べ替えていないものは全部 0 なので、
+  // created_at の新しい順で割る（これまでの並びが変わらない）。
+  const result = await db
+    .prepare(`SELECT * FROM reminders ORDER BY display_order ASC, created_at DESC`)
+    .all<ReminderRow>();
   return result.results;
+}
+
+/**
+ * 並び順をまとめて書く。渡された順に 0,1,2… を入れる。
+ *
+ * 送られてこなかったものは触らない。絞り込みで隠れているリマインダの順番を
+ * 勝手に動かすと、戻すすべがない（タグ・シナリオと同じ考え方）。
+ */
+export async function reorderReminders(db: D1Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.batch(
+    ids.map((id, i) =>
+      db.prepare(`UPDATE reminders SET display_order = ? WHERE id = ?`).bind(i, id),
+    ),
+  );
 }
 
 export async function getReminderById(db: D1Database, id: string): Promise<ReminderRow | null> {
