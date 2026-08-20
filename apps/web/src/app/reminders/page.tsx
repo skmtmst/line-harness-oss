@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import type { ReminderTriggerType, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -97,7 +98,6 @@ export default function RemindersPage() {
   const [nameQuery, setNameQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState<CreateFormState>(EMPTY_CREATE_FORM)
   const [tags, setTags] = useState<Tag[]>([])
   const [saving, setSaving] = useState(false)
@@ -171,40 +171,6 @@ export default function RemindersPage() {
     setShowStepForm(false)
     setStepFormError('')
     loadDetail(id)
-  }
-
-  const handleCreate = async () => {
-    if (!form.name.trim()) {
-      setFormError('リマインダー名を入力してください')
-      return
-    }
-    setSaving(true)
-    setFormError('')
-    try {
-      const res = await api.reminders.create({
-        name: form.name,
-        description: form.description || undefined,
-        triggerType: form.triggerType,
-        // 手動のときは起点の設定が効かないので、送らずに空のままにする。
-        sendAtTime: form.triggerType === 'manual' ? null : form.sendAtTime || null,
-        triggerOffsetMinutes:
-          form.triggerType === 'manual' || form.triggerOffsetMinutes === ''
-            ? null
-            : Number(form.triggerOffsetMinutes),
-        targetTagId: form.targetTagId || null,
-      })
-      if (res.success) {
-        setShowCreate(false)
-        setForm(EMPTY_CREATE_FORM)
-        loadReminders()
-      } else {
-        setFormError(res.error)
-      }
-    } catch {
-      setFormError('作成に失敗しました')
-    } finally {
-      setSaving(false)
-    }
   }
 
   const handleToggleActive = async (id: string, current: boolean) => {
@@ -301,13 +267,12 @@ export default function RemindersPage() {
             >
               フォルダを追加
             </button>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: 'var(--color-accent)' }}
+          <Link
+            href="/reminders/new"
+            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium transition-colors"
           >
             + 新規リマインダー
-          </button>
+          </Link>
           </div>
         }
       />
@@ -344,150 +309,30 @@ export default function RemindersPage() {
         </div>
       )}
 
-      {/* Create form */}
-      {showCreate && (
-        <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">新規リマインダーを作成</h2>
-          <div className="space-y-4 max-w-lg">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">リマインダー名 <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="例: セミナー参加リマインダー"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">説明</label>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-                rows={2}
-                placeholder="リマインダーの説明 (省略可)"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-              />
-            </div>
-
-
-            {/* きっかけ。ここを手動以外にすると、予約やイベントから自動で登録される。 */}
-            <div className="border-hairline space-y-3 rounded-lg border p-3">
-              <div>
-                <label htmlFor="rm-trigger" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  いつ対象に加えるか
-                </label>
-                <select
-                  id="rm-trigger"
-                  value={form.triggerType}
-                  onChange={(e) =>
-                    setForm({ ...form, triggerType: e.target.value as ReminderTriggerType })
-                  }
-                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                >
-                  {(Object.keys(TRIGGER_LABELS) as ReminderTriggerType[]).map((k) => (
-                    <option key={k} value={k}>
-                      {TRIGGER_LABELS[k]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {form.triggerType !== 'manual' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="rm-time" className="text-ink-secondary mb-1 block text-xs font-medium">
-                      送る時刻を固定する
-                    </label>
-                    <input
-                      id="rm-time"
-                      type="time"
-                      value={form.sendAtTime}
-                      onChange={(e) => setForm({ ...form, sendAtTime: e.target.value })}
-                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="rm-offset" className="text-ink-secondary mb-1 block text-xs font-medium">
-                      起点をずらす（分）
-                    </label>
-                    <input
-                      id="rm-offset"
-                      type="number"
-                      value={form.triggerOffsetMinutes}
-                      onChange={(e) => setForm({ ...form, triggerOffsetMinutes: e.target.value })}
-                      placeholder="0"
-                      className="border-hairline rounded-control w-full border px-3 py-2 text-sm tabular-nums"
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="rm-tag" className="text-ink-secondary mb-1 block text-xs font-medium">
-                  対象を絞るタグ
-                </label>
-                <select
-                  id="rm-tag"
-                  value={form.targetTagId}
-                  onChange={(e) => setForm({ ...form, targetTagId: e.target.value })}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                >
-                  <option value="">— 絞らない —</option>
-                  {tags.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <p className="text-ink-faint text-xs leading-relaxed">
-                「送る時刻を固定する」を空にすると、予約時刻を起点にステップの時間差だけずらして届きます。
-                10時の予約は前日10時、20時の予約は前日20時、という具合です。
-                時刻を入れると、予約が何時でもその時刻に届きます。
-              </p>
-            </div>
-
-            {formError && <p className="text-xs text-red-600">{formError}</p>}
-
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={saving}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity"
-                style={{ backgroundColor: 'var(--color-accent)' }}
-              >
-                {saving ? '作成中...' : '作成'}
-              </button>
-              <button
-                onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-              >
-                キャンセル
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/*
+        作る入口は /reminders/new に1つだけ。ここにも同じフォームがあったが、
+        項目が食い違っていた（こちらにはタグの絞り込みが無く、あちらには
+        起点の選び方があった）。**両方の項目は /reminders/new が持っている。**
+        入口が2つあると、片方だけ直したときに食い違ったまま気づけない。
+      */}
 
       {/* Loading skeleton */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-white rounded-lg border border-gray-200 p-5 animate-pulse space-y-3">
+            <div key={i} className="bg-canvas rounded-lg border border-hairline p-5 animate-pulse space-y-3">
               <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-gray-100 rounded w-full" />
+              <div className="h-3 bg-canvas-sunken rounded w-full" />
               <div className="flex gap-4">
-                <div className="h-3 bg-gray-100 rounded w-24" />
-                <div className="h-3 bg-gray-100 rounded w-16" />
+                <div className="h-3 bg-canvas-sunken rounded w-24" />
+                <div className="h-3 bg-canvas-sunken rounded w-16" />
               </div>
             </div>
           ))}
         </div>
-      ) : reminders.length === 0 && !showCreate ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-          <p className="text-gray-500">リマインダーがありません。「新規リマインダー」から作成してください。</p>
+      ) : reminders.length === 0 ? (
+        <div className="bg-canvas rounded-lg shadow-sm border border-hairline p-12 text-center">
+          <p className="text-ink-faint">リマインダーがありません。「新規リマインダー」から作成してください。</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -503,18 +348,18 @@ export default function RemindersPage() {
             return (
               <div
                 key={reminder.id}
-                className={`bg-white rounded-lg shadow-sm border border-gray-200 transition-all ${isExpanded ? 'md:col-span-2 xl:col-span-3' : ''}`}
+                className={`bg-canvas rounded-lg shadow-sm border border-hairline transition-all ${isExpanded ? 'md:col-span-2 xl:col-span-3' : ''}`}
               >
                 {/* Card header */}
                 <div
-                  className="p-5 cursor-pointer hover:bg-gray-50 transition-colors"
+                  className="p-5 cursor-pointer hover:bg-canvas-sunken transition-colors"
                   onClick={() => handleExpand(reminder.id)}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-gray-900 truncate">{reminder.name}</h3>
+                      <h3 className="text-sm font-semibold text-ink truncate">{reminder.name}</h3>
                       {reminder.description && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{reminder.description}</p>
+                        <p className="text-xs text-ink-faint mt-1 line-clamp-2">{reminder.description}</p>
                       )}
                       {/* 自動で動くものだけ印を出す。手動は既定なので、
                           全件に「手動」と並べると自動のものが埋もれる。 */}
@@ -529,13 +374,13 @@ export default function RemindersPage() {
                       className={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
                         reminder.isActive
                           ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-500'
+                          : 'bg-canvas-sunken text-ink-faint'
                       }`}
                     >
                       {reminder.isActive ? '有効' : '無効'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
+                  <div className="flex items-center gap-4 mt-3 text-xs text-ink-faint">
                     <span>作成日: {new Date(reminder.createdAt).toLocaleDateString('ja-JP')}</span>
                     <span className="flex items-center gap-1">
                       {isExpanded ? '▲ 閉じる' : '▼ 詳細'}
@@ -545,14 +390,14 @@ export default function RemindersPage() {
 
                 {/* Expanded detail */}
                 {isExpanded && (
-                  <div className="border-t border-gray-200 p-5">
+                  <div className="border-t border-hairline p-5">
                     {/* Actions */}
                     <div className="flex flex-wrap items-center gap-2 mb-4">
                       <button
                         onClick={(e) => { e.stopPropagation(); handleToggleActive(reminder.id, reminder.isActive) }}
                         className={`px-3 py-1.5 min-h-[44px] text-xs font-medium rounded-md transition-colors ${
                           reminder.isActive
-                            ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            ? 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
                             : 'text-white hover:opacity-90'
                         }`}
                         style={!reminder.isActive ? { backgroundColor: 'var(--color-accent)' } : undefined}
@@ -571,13 +416,13 @@ export default function RemindersPage() {
                     {expandLoading ? (
                       <div className="space-y-2 animate-pulse">
                         <div className="h-3 bg-gray-200 rounded w-32" />
-                        <div className="h-10 bg-gray-100 rounded" />
-                        <div className="h-10 bg-gray-100 rounded" />
+                        <div className="h-10 bg-canvas-sunken rounded" />
+                        <div className="h-10 bg-canvas-sunken rounded" />
                       </div>
                     ) : expandedData ? (
                       <div>
                         <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-xs font-semibold text-gray-700">
+                          <h4 className="text-xs font-semibold text-ink-secondary">
                             ステップ ({expandedData.steps.length}件)
                           </h4>
                           <button
@@ -590,7 +435,7 @@ export default function RemindersPage() {
                         </div>
 
                         {expandedData.steps.length === 0 ? (
-                          <p className="text-xs text-gray-400 py-4 text-center">ステップがありません。「ステップ追加」から作成してください。</p>
+                          <p className="text-xs text-ink-faint py-4 text-center">ステップがありません。「ステップ追加」から作成してください。</p>
                         ) : (
                           <div className="space-y-2">
                             {expandedData.steps
@@ -598,18 +443,18 @@ export default function RemindersPage() {
                               .map((step) => (
                                 <div
                                   key={step.id}
-                                  className="flex items-start justify-between bg-gray-50 rounded-lg p-3 border border-gray-100"
+                                  className="flex items-start justify-between bg-canvas-sunken rounded-lg p-3 border border-hairline"
                                 >
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-info-bg text-info">
                                         {formatOffset(step.offsetMinutes)}
                                       </span>
-                                      <span className="text-xs text-gray-400">
+                                      <span className="text-xs text-ink-faint">
                                         {messageTypeLabels[step.messageType] ?? step.messageType}
                                       </span>
                                     </div>
-                                    <p className="text-xs text-gray-600 whitespace-pre-wrap break-words line-clamp-3">
+                                    <p className="text-xs text-ink-secondary whitespace-pre-wrap break-words line-clamp-3">
                                       {step.messageContent}
                                     </p>
                                   </div>
@@ -626,26 +471,26 @@ export default function RemindersPage() {
 
                         {/* Add step form */}
                         {showStepForm && (
-                          <div className="mt-4 bg-white border border-gray-200 rounded-lg p-4">
-                            <h5 className="text-xs font-semibold text-gray-700 mb-3">ステップを追加</h5>
+                          <div className="mt-4 bg-canvas border border-hairline rounded-lg p-4">
+                            <h5 className="text-xs font-semibold text-ink-secondary mb-3">ステップを追加</h5>
                             <div className="space-y-3 max-w-lg">
                               <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">オフセット (分)</label>
+                                <label className="block text-xs font-medium text-ink-secondary mb-1">オフセット (分)</label>
                                 <input
                                   type="number"
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                  className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                                   placeholder="例: -60 (1時間前), +30 (30分後)"
                                   value={stepForm.offsetMinutes}
                                   onChange={(e) => setStepForm({ ...stepForm, offsetMinutes: Number(e.target.value) })}
                                 />
-                                <p className="text-xs text-gray-400 mt-1">
+                                <p className="text-xs text-ink-faint mt-1">
                                   現在の値: {formatOffset(stepForm.offsetMinutes)}
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">メッセージタイプ</label>
+                                <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージタイプ</label>
                                 <select
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                                  className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas"
                                   value={stepForm.messageType}
                                   onChange={(e) => setStepForm({ ...stepForm, messageType: e.target.value })}
                                 >
@@ -655,9 +500,9 @@ export default function RemindersPage() {
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">メッセージ内容 <span className="text-red-500">*</span></label>
+                                <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-red-500">*</span></label>
                                 <textarea
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                                  className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
                                   rows={3}
                                   placeholder="メッセージ内容を入力"
                                   value={stepForm.messageContent}
@@ -678,7 +523,7 @@ export default function RemindersPage() {
                                 </button>
                                 <button
                                   onClick={() => { setShowStepForm(false); setStepFormError('') }}
-                                  className="px-4 py-2 min-h-[44px] text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                                  className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-lg transition-colors"
                                 >
                                   キャンセル
                                 </button>
