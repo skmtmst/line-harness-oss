@@ -70,6 +70,7 @@ function parseEntry(line) {
 }
 
 function parseFile(name) {
+  // name にはサブディレクトリ（`unreleased/196-kenta-....md`）も来る。
   const raw = readFileSync(join(LOG_DIR, name), 'utf8')
   const { meta, body } = parseFrontMatter(raw)
   const entries = []
@@ -112,6 +113,29 @@ function main() {
 
   const files = readdirSync(LOG_DIR).filter((f) => f.endsWith('.md') && f !== 'README.md')
   const releases = files.map(parseFile)
+
+  /*
+   * 未リリースぶんは、PRごとの1ファイルからも拾う。
+   *
+   * `unreleased.md` に全員が書き足す形だと、**全員が同じ場所（`## 追加` の
+   * 直後）に行を差し込むので、PRのたびに必ずぶつかる。** 一晩で9本のPRが
+   * 全部ここで止まった。1本ずつ別のファイルにすれば、ぶつかりようがない。
+   *
+   * ファイル名は `<番号>-<担当>-<何の話か>.md`。番号で並ぶので、
+   * 並び順を人が決めなくてよくなる。
+   */
+  const partsDir = join(LOG_DIR, 'unreleased')
+  if (existsSync(partsDir)) {
+    const unreleased = releases.find((r) => r.released === null)
+    const parts = readdirSync(partsDir)
+      .filter((f) => f.endsWith('.md') && f !== 'README.md')
+      .sort()
+    for (const name of parts) {
+      const parsed = parseFile(join('unreleased', name))
+      if (unreleased) unreleased.entries.push(...parsed.entries)
+      else releases.push({ version: 'unreleased', released: null, entries: parsed.entries })
+    }
+  }
 
   // 未リリースを先頭に、あとは新しい版から。
   releases.sort((a, b) => {
