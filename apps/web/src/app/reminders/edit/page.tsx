@@ -27,6 +27,8 @@ type StepDraft = {
   sendAtTime: string
   offsetMinutes: number
   messageContent: string
+  /** テンプレートから選ぶ場合の id。選ぶと本文の代わりにそちらが送られる。 */
+  templateId: string
 }
 
 function emptyStep(mode: 'time' | 'countdown'): StepDraft {
@@ -35,6 +37,7 @@ function emptyStep(mode: 'time' | 'countdown'): StepDraft {
     sendAtTime: '10:00',
     offsetMinutes: mode === 'time' ? 0 : -1440,
     messageContent: '',
+    templateId: '',
   }
 }
 
@@ -56,6 +59,7 @@ function ReminderEditInner() {
   const [targetTagId, setTargetTagId] = useState('')
   const [sendAtTime, setSendAtTime] = useState('')
   const [newStep, setNewStep] = useState<StepDraft>(emptyStep('countdown'))
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
 
   const load = useCallback(async () => {
     if (!id) return
@@ -84,6 +88,9 @@ function ReminderEditInner() {
     void load()
     void api.tags.list().then((res) => {
       if (res.success) setTags(res.data)
+    })
+    void api.templates.list().then((res) => {
+      if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
     })
   }, [load])
 
@@ -115,8 +122,9 @@ function ReminderEditInner() {
   }
 
   async function handleAddStep() {
-    if (!newStep.messageContent.trim()) {
-      setError('送る内容を入力してください')
+    // テンプレートを選んでいれば本文は要らない。どちらも空なら何も届かない。
+    if (!newStep.templateId && !newStep.messageContent.trim()) {
+      setError('送る内容を入力するか、テンプレートを選んでください')
       return
     }
     setSaving(true)
@@ -125,9 +133,12 @@ function ReminderEditInner() {
       const res = await api.reminders.addStep(id, {
         offsetMinutes: mode === 'time' ? 0 : newStep.offsetMinutes,
         messageType: 'text',
-        messageContent: newStep.messageContent.trim(),
+        // テンプレートを選んでいても本文は残す。テンプレートを消したときに、
+        // ここが送られる（参照が切れて何も届かなくなるのを防ぐ）。
+        messageContent: newStep.messageContent.trim() || '（テンプレートから送ります）',
         offsetDays: mode === 'time' ? newStep.offsetDays : null,
         sendAtTime: mode === 'time' ? newStep.sendAtTime : null,
+        templateId: newStep.templateId || null,
       })
       if (!res.success) throw new Error(res.error)
       setNewStep(emptyStep(mode))
@@ -375,6 +386,25 @@ function ReminderEditInner() {
                   />
                 </label>
               )}
+
+              <label className="block">
+                <span className="text-ink-faint text-xs">テンプレートから選ぶ</span>
+                <span className="text-ink-faint block text-[11px]">
+                  選ぶと、下の本文の代わりにテンプレートの中身が届きます。
+                </span>
+                <select
+                  value={newStep.templateId}
+                  onChange={(e) => setNewStep({ ...newStep, templateId: e.target.value })}
+                  className={`mt-1 ${inputClass}`}
+                >
+                  <option value="">使わない（下に直接書く）</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
               <label className="block">
                 <span className="text-ink-faint text-xs">送る内容</span>

@@ -12,6 +12,7 @@ import {
   getPendingReminderDeliveries,
   completeReminderIfDone,
   getFriendById,
+  getTemplateById,
   jstNow,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
@@ -99,16 +100,33 @@ export async function processReminderDeliveries(
           },
           fr.delivery_mode === 'time' ? 'time' : 'countdown',
         );
+        /*
+         * テンプレートを選んでいれば、その中身を送る。
+         *
+         * 参照が切れていたら（テンプレートを消した等）、通に書いてある本文を
+         * そのまま送る。自動応答と同じ考え方。テンプレートが消えたせいで
+         * 何も届かなくなるより、書いてあるものが届くほうがよい。
+         */
+        let messageType = step.message_type;
+        let messageContent = step.message_content;
+        if (step.template_id) {
+          const tpl = await getTemplateById(db, step.template_id);
+          if (tpl) {
+            messageType = tpl.message_type;
+            messageContent = tpl.message_content;
+          }
+        }
+
         const resolvedMeta = await resolveMetadata(db, friend);
-        const extra = await resolveInterpolationExtra(db, friend.id, step.message_content);
+        const extra = await resolveInterpolationExtra(db, friend.id, messageContent);
         const expanded = expandVariables(
-          step.message_content,
+          messageContent,
           { ...friend, metadata: resolvedMeta },
           undefined,
-          step.message_type,
+          messageType,
           { ...extra, deliveredAt: sendAt },
         );
-        const message = buildMessage(step.message_type, expanded);
+        const message = buildMessage(messageType, expanded);
         await deliveryClient.pushMessage(friend.line_user_id, [message]);
 
         // Mark as delivered AFTER successful send.
@@ -127,7 +145,7 @@ export async function processReminderDeliveries(
             `INSERT INTO messages_log (id, friend_id, direction, message_type, content, source, created_at)
              VALUES (?, ?, 'outgoing', ?, ?, 'reminder', ?)`,
           )
-          .bind(logId, friend.id, step.message_type, step.message_content, jstNow())
+          .bind(logId, friend.id, messageType, messageContent, jstNow())
           .run();
       }
 

@@ -40,6 +40,8 @@ export default function NewReminderPage() {
   const [triggerFieldId, setTriggerFieldId] = useState('')
   const [repeatYearly, setRepeatYearly] = useState(true)
   const [dateFields, setDateFields] = useState<Array<{ id: string; name: string }>>([])
+  const [templateId, setTemplateId] = useState('')
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
   // 153: 配信方式。作成後は変えられない
   const [deliveryMode, setDeliveryMode] = useState<'time' | 'countdown'>('countdown')
   const [offsetDays, setOffsetDays] = useState(-1)
@@ -48,6 +50,9 @@ export default function NewReminderPage() {
   useEffect(() => {
     void api.tags.list().then((res) => {
       if (res.success) setTags(res.data)
+    })
+    void api.templates.list().then((res) => {
+      if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
     })
     // 起点にできるのは日付の欄だけ。文字の欄を選ばせても日付として読めない。
     void api.friendFields.list().then((res) => {
@@ -69,7 +74,10 @@ export default function NewReminderPage() {
       saveLabel="リマインダを作成"
       validate={() => {
         if (!name.trim()) return 'リマインダ名を入力してください'
-        if (!messageContent.trim()) return '送る内容を入力してください'
+        // テンプレートを選んでいれば本文は要らない。どちらも空なら何も届かない。
+        if (!templateId && !messageContent.trim()) {
+          return '送る内容を入力するか、テンプレートを選んでください'
+        }
         if (triggerType === 'friend_field' && !triggerFieldId) {
           return '起点にする友だち情報の欄を選んでください'
         }
@@ -101,7 +109,10 @@ export default function NewReminderPage() {
         await api.reminders.addStep(res.data.id, {
           offsetMinutes,
           messageType: 'text',
-          messageContent: messageContent.trim(),
+          // テンプレートを選んでいても本文は残す。テンプレートを消したときに
+          // ここが送られる（参照が切れて何も届かなくなるのを防ぐ）。
+          messageContent: messageContent.trim() || '（テンプレートから送ります）',
+          templateId: templateId || null,
           // 「○日前の●時」で決めるときは、日数と時刻を持たせる。
           offsetDays: deliveryMode === 'time' ? offsetDays : null,
           sendAtTime: deliveryMode === 'time' ? stepSendAtTime : null,
@@ -363,20 +374,29 @@ export default function NewReminderPage() {
         label="送る内容"
         note="テンプレートから呼び出すか、直接入力します。"
       >
-        {/* テンプレートを本文に流し込む口が無い（4-3-1 と同じ）。 */}
-        <button
-          type="button"
-          disabled
-          title="テンプレートからの読み込みは準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
+        <Field
+          label="テンプレートから選ぶ"
+          htmlFor="rm-template"
+          note="選ぶと、下の本文の代わりにテンプレートの中身が届きます。"
         >
-          テンプレートから選ぶ
-        </button>
+          <select
+            id="rm-template"
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">使わない（下に直接書く）</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </Field>
 
         <Field
           label="本文"
           htmlFor="rm-body"
-          required
           note={`${'{{name}}'} や ${'{{予約日時}}'} は、送るときに一人ひとりの内容へ置き換わります。`}
         >
           <textarea
