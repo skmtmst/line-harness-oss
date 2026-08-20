@@ -64,7 +64,7 @@ export default function FriendTrendTable({
                           </button>
                           <span
                             role="tooltip"
-                            className="bg-ink text-on-accent pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-72 -translate-x-1/2 rounded-control px-3 py-2 text-left text-xs leading-relaxed whitespace-normal shadow-lg group-hover:block group-focus-within:block"
+                            className="bg-ink text-on-accent pointer-events-none absolute top-1/2 left-full z-20 ml-2 hidden w-72 -translate-y-1/2 rounded-control px-3 py-2 text-left text-xs leading-relaxed whitespace-normal shadow-lg group-hover:block group-focus-within:block"
                           >
                             「推定」の日は、日次の記録が始まる前のぶんです。いま残っている友だちから逆算しているので、退会した人は数に入っていません。記録は今日から溜まります。
                           </span>
@@ -96,7 +96,7 @@ export default function FriendTrendTable({
 
 /** 8月15日(土) の形にする。設計の表記に合わせている。 */
 function formatDate(iso: string): string {
-  const d = new Date(`${iso}T00:00:00+09:00`)
-  const weekday = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()]
-  return `${d.getMonth() + 1}月${d.getDate()}日(${weekday})`
+  const [year, month, day] = iso.split('-').map(Number)
+  const weekday = ['日', '月', '火', '水', '木', '金', '土'][new Date(Date.UTC(year, month - 1, day)).getUTCDay()]
+  return `${month}月${day}日(${weekday})`
 }

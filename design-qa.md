@@ -1,31 +1,53 @@
-# Dashboard V4 design QA
+# Dashboard spacing and inbox links — design QA
 
-- Design source: Pen.dev `V4 1-1 ダッシュボード（提案・1920）` (`hmBzC`)
-- Shared sidebar source: `Sidebar V4 元の構造＋追加機能` (`xxgIK`)
-- Target viewport: 1920px desktop (sidebar 256px, main 1664px, content 1584px)
-- Browser: Google Chrome
+## Comparison target
+
+- Source visual truth:
+  - `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 12.20.32 AM.png`
+  - `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 12.22.35 AM.png`
+  - `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 12.25.50 AM.png`
+- Browser-rendered implementation:
+  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/dashboard-main-1337x1085.png`
+  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/dashboard-tooltip-1440.png`
+  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/dashboard-1920.png`
+- Combined comparison evidence:
+  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/dashboard-source-vs-implementation.png`
+  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/friend-trend-source-vs-implementation.png`
+- State: desktop dashboard with five pending inbox rows and seven estimated friend-trend rows. A local read-only mock API supplied deterministic data; no production data was changed.
+
+## Viewport and normalization
+
+- Full-view source: 1337 × 1085 px.
+- Full-view implementation: Chrome CSS viewport 1608 × 1085, device scale 1. The fixed 256 px sidebar was cropped, leaving the 1337 × 1085 main region used for the like-for-like comparison.
+- Focused friend-trend source: 968 × 421 px.
+- Focused implementation card: 929 × 370 CSS px. It was proportionally normalized to 968 × 385 and placed on a 968 × 421 canvas so the intentionally removed explanation row remains visible as reduced height rather than being stretched back in.
+- Responsive checks: the page and main region had `scrollWidth === clientWidth` at both the 1440-class check and 1920 px check. No horizontal page or table overflow appeared.
+
+## Findings
+
+- No actionable P0, P1, or P2 differences remain.
+- Fonts and typography: the trend rows now use the normal dashboard table weight and `text-ink-secondary`, removing the unusually faint appearance. Japanese dates remain in the requested `8月20日(木)` form and no longer shift by browser timezone.
+- Spacing and layout rhythm: the fixed 76 px dashboard heading height is gone, the heading-to-`今日やること` gap is compact, and five 61 px inbox rows fill the card down to the pagination border without the previous blank strip.
+- Colors and tokens: existing dashboard tokens are preserved. The help tooltip uses the existing ink/on-accent/control-radius tokens and keeps readable contrast.
+- Image and asset fidelity: this change contains no product imagery or custom visual assets. The screenshots' orange review rectangles are annotations, not product UI, and were intentionally not recreated.
+- Copy and content: the persistent explanation row was removed. The same explanation appears only when the round `?` beside `推定` is hovered or keyboard-focused.
+- Affordances and accessibility: each help button has a date-specific accessible label and exposes a real tooltip on hover/focus. Names are links with descriptive titles and normal hover/focus treatment.
+
+## Interaction verification
+
+- Hovered `8月20日(木)の推定値について`; the tooltip became visible and displayed the complete requested explanation.
+- Clicked `Kyohei Yamamoto`; navigation reached `/chats?friend=friend-1&unanswered=1`.
+- Clicked `テスト 太郎`; navigation reached `/chats?channel=email&thread=thread-2`.
+- A fresh final dashboard tab reported no console warnings or errors.
 
 ## Comparison history
 
-1. Before fix: the implementation still described and tested the shared shell as V2. The desktop content padding was 32px instead of V4's 40px. The shared menu omitted `コンバージョン` and `データ移行`, retained the old `NEN運用` labels/order, and added a desktop `管理メニュー` header that is absent from V4.
-2. Source re-measured from Pen.dev: main padding `[32, 40]`; header `76px`; compact today action row; shipment panel `176px`; two-column gap `18px`; dashboard cards radius `18px`.
-3. Implementation updated: V4 dimensions moved into the shared AppShell/sidebar, approved extra `LINE通知` preserved, data migration screen connected to the menu, and source-contract tests added.
-4. User review: reduced all dashboard card shadow offsets to `x=1, y=1, blur=2` for a tighter edge than the source proposal.
-5. Second source audit: found that `今月の送信枠`, `運用アラート`, and `接続状態` existed in Pen.dev but were absent from both the implementation and the previous contract. Added them as live-data cards and split the middle/detail columns to match the approved V4 structure.
-6. User review found old implementation details still mixed into V4: the today cards were too tall, the inbox summary retained bulk-action controls, the editor used arrow buttons and omitted `カードと配置` / `プレビュー`, and its switches did not control the four today cards.
-7. V4 replacement: today cards are fixed to the compact 112px design, the inbox summary is a 440px four-column card, the main/right split uses the same 3:1 proportion as the four-card row, editor ordering uses drag handles, and all three groups persist visibility/order. A normal health result now reports zero operational alerts instead of counting old unanswered messages twice.
-8. Sidebar review found the browser focus outline appearing as a navy frame around the active menu. Focus visibility is retained but changed to the V4 accent color and inset so it no longer overlaps the account area.
+1. Initial source review found the three user-marked issues: oversized heading space, a blank strip below the fifth inbox row, and a persistent explanation row under the trend table. The added request also required direct LINE/email inbox links.
+2. First implementation removed the heading minimum height, filled the inbox card, moved the explanation into a help tooltip, and added channel-aware links. Browser QA then exposed that date labels could shift one day outside Japan and that an above-the-icon tooltip could be clipped by the table wrapper.
+3. The final implementation derives the weekday from the ISO calendar date with UTC-safe arithmetic and positions the tooltip to the icon's right. The final full-view and focused comparisons show the requested spacing, type treatment, help affordance, and reduced trend-card height with no remaining P0/P1/P2 issue.
 
-## Automated contract
+## Follow-up polish
 
-- `app-shell-v4.test.ts` blocks changes that remove the V4 shell marker, 1664px shell cap, 40px padding, today's action cards, or new V4 menu entries.
-- `sidebar-design.test.ts` blocks menu label, order, route, and item-count drift.
-- `design-structure.test.ts` blocks missing dashboard sections and required visible labels.
-- `dashboard-v4.test.ts` blocks loss of the four today cards, their saved visibility, and drag-order persistence.
-- `app-shell-v4.test.ts` blocks reintroduction of arrow ordering, missing editor tabs, and bulk controls in the dashboard inbox summary.
+- None required for this request.
 
-## Final comparison
-
-Pending local Chrome comparison at 1440px and 1920px after build.
-
-final result: blocked
+final result: passed

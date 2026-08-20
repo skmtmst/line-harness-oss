@@ -81,6 +81,7 @@ describe('Pen.dev V4を共通レイアウトの正本にする', () => {
     expect(friendTrend).toContain('role="tooltip"')
     expect(friendTrend).toContain('group-hover:block')
     expect(friendTrend).not.toContain('border-t px-5 py-3')
+    expect(friendTrend).toContain('Date.UTC(year, month - 1, day)')
   })
 
   it('ダッシュボードの名前からLINE・メールそれぞれの受信内容を開く', () => {
