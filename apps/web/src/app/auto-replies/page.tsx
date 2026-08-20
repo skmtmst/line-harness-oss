@@ -527,7 +527,10 @@ export default function AutoRepliesPage() {
               {loading ? (
                 <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : shownInFolder.length === 0 ? (
-                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
+                /* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">
+                  {error ? 'いまは読み込めていません。上の案内をご覧ください。' : '自動返信ルールがありません'}
+                </td></tr>
               ) : (
                 shownInFolder.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
