@@ -13,6 +13,7 @@ import type { SegmentCondition } from './segment-query.js';
 import { buildMessage } from './broadcast.js';
 import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
 
+// LINE の multicast は 1 リクエストで最大 500 人まで（LINE の仕様）。増やせない。
 const MULTICAST_BATCH_SIZE = 500;
 
 interface FriendRow {
@@ -69,7 +70,7 @@ export async function processSegmentSend(
 
       // Stealth: stagger delays between batches
       if (batchIndex > 0) {
-        const delay = calculateStaggerDelay(friends.length, batchIndex);
+        const delay = calculateStaggerDelay(friends.length, batchIndex, MULTICAST_BATCH_SIZE);
         await sleep(delay);
       }
 

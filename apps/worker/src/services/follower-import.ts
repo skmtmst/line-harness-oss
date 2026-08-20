@@ -1,8 +1,18 @@
 import { getAccountSetting, jstNow, setAccountSetting } from '@line-crm/db';
 
 const LINE_USER_ID_PATTERN = /^U[0-9a-f]{32}$/;
+// `WHERE line_user_id IN (?, ?, ...)` の ? の数。D1 が 1 文に受け付ける
+// バインド変数は 100 個までなので、他の条件を足す余地を見て 90 に抑えている。
+// **この数はこの SQL 文の形に紐づく。** 文に条件を足すときは一緒に減らす。
 const LOOKUP_CHUNK_SIZE = 90;
+// db.batch() にまとめて渡す **文の数**。上の 90 とは別の理由で決まる。
+// batch は文ごとに独立してバインドするので、変数 100 個の制限には当たらない。
+// ここは 1 回のトランザクションをどこまで大きくするかの話で、
+// 大きすぎると失敗したときに巻き戻る範囲が広くなる。
 const WRITE_CHUNK_SIZE = 100;
+// LINE のプロフィール取得は 1 人ずつしか引けない（まとめて引く API が無い）。
+// 1 回の実行でこの人数だけ引き、続きは次の実行に回す。
+// LINE のレート制限に当たらないための数ではなく、1 回の実行を短く終わらせるための数。
 const PROFILE_BATCH_SIZE = 25;
 export const FOLLOWER_IMPORT_STATE_KEY = 'follower_import_v1';
 

@@ -44,6 +44,18 @@ interface BroadcastFormProps {
   initialContentTemplateId?: string | null
 }
 
+/*
+ * 右側のプレビューの枠は、**LINEのトーク画面を描いたもの**。
+ * アプリのデザインの色ではないので、トークンにしない。
+ * `bg-canvas` などに置き換えると、LINEに見えなくなって用をなさなくなる。
+ */
+const LINE_MOCK = {
+  frame: 'border-[#1f2937]',   // 端末の外枠
+  bar: 'bg-[#1f2937]',         // 上のバー
+  wallpaper: 'bg-[#8faed2]',   // LINEの既定の壁紙
+  onDark: 'text-white',        // 上のバーと日付の文字
+} as const
+
 const TYPE_LABELS: Record<BroadcastBubbleType, string> = {
   text: 'テキスト', sticker: 'スタンプ', image: '写真', flex: 'Flex', location: '位置情報',
   audio: '音声', carousel: 'カルーセル', video: '動画', rich_message: 'リッチメッセージ',
@@ -150,10 +162,10 @@ function BubblePreview({ bubble }: { bubble: BroadcastBubble }) {
   }
   if (bubble.type === 'image') return imageUrl ? <img src={imageUrl} alt="写真プレビュー" className="max-h-52 w-[82%] rounded-card object-cover" /> : <div className="flex h-36 w-[82%] items-center justify-center rounded-card bg-canvas-sunken text-sm text-ink-faint">写真</div>
   if (bubble.type === 'flex') return <div className="w-[82%] rounded-card bg-canvas p-4 shadow-sm"><p className="text-xs font-bold text-info">Flexテンプレート</p><p className="mt-1 truncate text-[11px] text-ink-faint">{String(bubble.content.templateName ?? 'Flex JSON')}</p></div>
-  if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-white"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
+  if (bubble.type === 'video' || bubble.type === 'rich_video') return <div className="relative flex h-40 w-[82%] items-center justify-center overflow-hidden rounded-card bg-ink text-canvas"><span className="text-4xl">▶</span><span className="absolute bottom-2 left-3 text-xs">{bubble.type === 'rich_video' ? 'リッチビデオ' : '動画'}</span></div>
   if (bubble.type === 'card_message') {
     const cards = Array.isArray(bubble.content.cards) ? bubble.content.cards as Array<Record<string, unknown>> : [{ title: bubble.content.assetName ?? 'カード' }]
-    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent py-1 text-[10px] text-white">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
+    return <div className="flex w-full gap-2 overflow-x-auto pb-1">{cards.map((card, index) => <div key={index} className="w-36 shrink-0 rounded-card bg-canvas p-2 shadow">{card.imageUrl ? <img src={String(card.imageUrl)} alt="" className="h-20 w-full rounded-control object-cover" /> : <div className="h-20 rounded-control bg-canvas-sunken"/>}<p className="mt-2 truncate text-xs font-bold">{String(card.title ?? 'カード')}</p><button className="mt-2 w-full rounded bg-accent py-1 text-[10px] text-on-accent">{String(card.actionLabel ?? '詳しく見る')}</button></div>)}</div>
   }
   return <div className="w-[82%] overflow-hidden rounded-card bg-canvas shadow-sm">{imageUrl && <img src={imageUrl} alt="素材プレビュー" className="h-32 w-full object-cover" />}<div className="p-3"><p className="text-xs font-bold">{String(bubble.content.assetName ?? TYPE_LABELS[bubble.type])}</p><p className="mt-1 text-[11px] text-ink-faint">{TYPE_LABELS[bubble.type]}のプレビュー</p></div></div>
 }
@@ -167,7 +179,7 @@ function BubbleEditor({ bubble, index, total, assets, onChange, onMove, onDelete
   const textRef = useRef<HTMLTextAreaElement>(null)
   return <section className="overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
     <div className="flex items-center gap-3 border-b border-hairline bg-canvas-sunken px-4 py-3">
-      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">{index + 1}</span>
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-on-accent">{index + 1}</span>
       <select value={bubble.type} onChange={(e) => onChange(emptyBubble(e.target.value as BroadcastBubbleType))} className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-semibold">
         {Object.entries(TYPE_LABELS).map(([value, label]) => {
           const reason = UNSENDABLE_TYPES[value as BroadcastBubbleType]
@@ -995,7 +1007,7 @@ export default function BroadcastForm({
       </button>
     </div>
       </div>
-      <aside className="xl:sticky xl:top-6 xl:h-fit"><div className="overflow-hidden rounded-[28px] border-[8px] border-slate-800 bg-[#8faed2] shadow-xl"><div className="bg-slate-800 px-4 py-2 text-center text-xs font-bold text-white">プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className="mb-3 text-center text-[11px] text-white/80">今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
+      <aside className="xl:sticky xl:top-6 xl:h-fit"><div className={`overflow-hidden rounded-[28px] border-[8px] shadow-xl ${LINE_MOCK.frame} ${LINE_MOCK.wallpaper}`}><div className={`px-4 py-2 text-center text-xs font-bold ${LINE_MOCK.bar} ${LINE_MOCK.onDark}`}>プレビュー</div><div className="flex min-h-[600px] flex-col gap-3 p-4"><p className={`mb-3 text-center text-[11px] opacity-80 ${LINE_MOCK.onDark}`}>今日</p>{bubbles.map((bubble) => <BubblePreview key={bubble.id} bubble={bubble} />)}</div></div><p className="text-ink-faint mt-3 text-center text-xs">差し込み後の見え方（編集内容がそのまま反映されます）</p>
     {sendMode === 'scheduled' && scheduledDate && (
       <p className="text-ink-faint mt-1 text-center text-xs">
         {scheduledDate.replace(/-/g, '/')} {scheduledTime} から{' '}

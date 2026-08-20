@@ -27,6 +27,10 @@ export interface RichMenuGroup {
   /** 複数のメニューに当てはまったときの順番。小さいほうが先。 */
   targeting_priority: number;
   targeting_enabled: number;
+  /** 159: フォルダ。分けていなければ null。 */
+  folder_id: string | null;
+  /** 160: 自分で決める並び順。小さいほど先。 */
+  display_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -123,6 +127,10 @@ export interface UpdateRichMenuGroupMetaInput {
   targetingCondition?: string | null;
   targetingPriority?: number;
   targetingEnabled?: boolean;
+  /** 159: フォルダ。null で未分類に戻す。 */
+  folderId?: string | null;
+  /** 160: 自分で決める並び順。 */
+  displayOrder?: number;
 }
 
 export type RichMenuAreaWithParsed = RichMenuArea & {
@@ -200,7 +208,9 @@ export async function getRichMenuGroups(
 ): Promise<RichMenuGroup[]> {
   const result = await db
     .prepare(
-      `SELECT * FROM rich_menu_groups WHERE account_id = ? ORDER BY updated_at DESC`,
+      // 自分で決めた並び順が先。同じなら更新の新しい順（これまでの並び）。
+      `SELECT * FROM rich_menu_groups WHERE account_id = ?
+        ORDER BY display_order ASC, updated_at DESC`,
     )
     .bind(accountId)
     .all<RichMenuGroup>();
@@ -349,6 +359,14 @@ export async function updateRichMenuGroupMeta(
   if (patch.targetingEnabled !== undefined) {
     sets.push('targeting_enabled = ?');
     vals.push(patch.targetingEnabled ? 1 : 0);
+  }
+  if (patch.folderId !== undefined) {
+    sets.push('folder_id = ?');
+    vals.push(patch.folderId);
+  }
+  if (patch.displayOrder !== undefined) {
+    sets.push('display_order = ?');
+    vals.push(patch.displayOrder);
   }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');

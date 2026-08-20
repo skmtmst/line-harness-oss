@@ -2247,6 +2247,8 @@ export const api = {
         name: string | null;
         /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
         keywordMatchMode: string;
+        /** フォルダ。分けていなければ null。 */
+        folderId: string | null;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
         createdAt: string;
@@ -2321,6 +2323,8 @@ export const api = {
       name?: string | null;
       /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
       keywordMatchMode?: 'any' | 'all';
+      /** フォルダ。 */
+      folderId?: string | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -2358,6 +2362,8 @@ export const api = {
       name?: string | null;
       /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
       keywordMatchMode?: 'any' | 'all';
+      /** フォルダ。 */
+      folderId?: string | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',
@@ -2926,6 +2932,10 @@ export const api = {
         targetingCondition: string | null;
         targetingPriority: number;
         targetingEnabled: boolean;
+        /** 159: フォルダ。分けていなければ null。 */
+        folderId: string | null;
+        /** 160: 自分で決める並び順。 */
+        displayOrder: number;
         thumbnailR2Key: string | null;
         createdAt: string;
         updatedAt: string;
@@ -2945,6 +2955,7 @@ export const api = {
         targetingCondition: string | null;
         targetingPriority: number;
         targetingEnabled: boolean;
+        folderId: string | null;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -2984,6 +2995,10 @@ export const api = {
       targetingCondition?: string | null;
       targetingPriority?: number;
       targetingEnabled?: boolean;
+      /** 159: フォルダ。null で未分類に戻す。 */
+      folderId?: string | null;
+      /** 160: 自分で決める並び順。 */
+      displayOrder?: number;
       pages?: Array<{
         id?: string;
         name: string;

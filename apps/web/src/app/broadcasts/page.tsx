@@ -18,9 +18,9 @@ const statusConfig: Record<
   { label: string; className: string }
 > = {
   draft: { label: '下書き', className: 'bg-canvas-sunken text-ink-secondary' },
-  scheduled: { label: '予約済み', className: 'bg-blue-100 text-blue-700' },
-  sending: { label: '送信中', className: 'bg-warning-bg text-yellow-700' },
-  sent: { label: '送信完了', className: 'bg-success-bg text-green-700' },
+  scheduled: { label: '予約済み', className: 'bg-info-bg text-info' },
+  sending: { label: '送信中', className: 'bg-warning-bg text-warning' },
+  sent: { label: '送信完了', className: 'bg-success-bg text-success' },
 }
 
 function formatDatetime(iso: string | null): string {
@@ -377,7 +377,7 @@ function BroadcastList() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-green-500 text-ink'
+                  ? 'border-accent text-ink'
                   : 'border-transparent text-ink-faint hover:text-ink-secondary'
               }`}
               style={activeTab === tab.id ? { borderColor: 'var(--color-accent)' } : undefined}
@@ -397,7 +397,7 @@ function BroadcastList() {
           {[...Array(4)].map((_, i) => (
             <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
               <div className="flex-1 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-48" />
+                <div className="h-3 bg-hairline rounded w-48" />
                 <div className="h-2 bg-canvas-sunken rounded w-32" />
               </div>
               <div className="h-5 bg-canvas-sunken rounded-full w-16" />
@@ -451,7 +451,7 @@ function BroadcastList() {
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hairline">
               {visibleBroadcasts.map((broadcast) => {
                 const statusInfo = statusConfig[broadcast.status]
                 const tagName = getTagName(broadcast.targetTagId)
@@ -463,7 +463,7 @@ function BroadcastList() {
                     <td className="px-4 py-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                          <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-action hover:text-action-hover hover:underline">
                             {broadcast.title}
                           </a>
                           {isDedup && (
@@ -522,14 +522,14 @@ function BroadcastList() {
                                 <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insights[broadcast.id].delivered!.toLocaleString('ja-JP')}</span></p>
                               )}
                               {insights[broadcast.id].uniqueImpression != null && (
-                                <p className="text-xs">開封: <span className="font-medium text-blue-600">{insights[broadcast.id].uniqueImpression!.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">開封: <span className="font-medium text-info">{insights[broadcast.id].uniqueImpression!.toLocaleString('ja-JP')}</span>
                                   {insights[broadcast.id].openRate != null && (
                                     <span className="text-ink-faint"> ({(insights[broadcast.id].openRate! * 100).toFixed(1)}%)</span>
                                   )}
                                 </p>
                               )}
                               {insights[broadcast.id].uniqueClick != null && (
-                                <p className="text-xs">クリック: <span className="font-medium text-green-600">{insights[broadcast.id].uniqueClick!.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">クリック: <span className="font-medium text-success">{insights[broadcast.id].uniqueClick!.toLocaleString('ja-JP')}</span>
                                   {insights[broadcast.id].clickRate != null && (
                                     <span className="text-ink-faint"> ({(insights[broadcast.id].clickRate! * 100).toFixed(1)}%)</span>
                                   )}
@@ -540,7 +540,7 @@ function BroadcastList() {
                             <button
                               onClick={() => handleFetchInsight(broadcast.id)}
                               disabled={fetchingInsight === broadcast.id}
-                              className="mt-1 text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50"
+                              className="mt-1 text-xs text-action hover:text-action-hover disabled:opacity-50"
                             >
                               {fetchingInsight === broadcast.id ? '取得中...' : 'インサイトを取得'}
                             </button>
@@ -564,7 +564,7 @@ function BroadcastList() {
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
                             onClick={() => handleDelete(broadcast.id)}
-                            className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
+                            className="px-3 py-1 min-h-[44px] text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
                           >
                             削除
                           </button>

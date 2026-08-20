@@ -7,6 +7,27 @@ import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuTapStats } from '@/lib/api'
+import type { Folder } from '@line-crm/shared'
+import FolderPanel from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+
+/** フォルダに入れていないものを選ぶための、内部だけの値。 */
+const UNFILED = '__unfiled__'
+
+type SortKey = 'taps' | 'updated' | 'name' | 'manual'
+
+/**
+ * よく使う絞り込み。
+ *
+ * 「よく使う」は、押された回数が多いものを指す。設計に語として入っているが、
+ * 何をもって「よく使う」かは決まっていなかったので、**数えられるもの**で
+ * 定義した。数えられない言葉を画面に置くと、押しても何も起きない。
+ */
+const SAVED_FILTERS: { key: string; label: string; note: string }[] = [
+  { key: 'used', label: 'よく使う', note: '今月1回以上押されたメニュー' },
+  { key: 'published', label: '公開中のみ', note: 'LINE に登録済みのメニュー' },
+  { key: 'draft', label: '下書きのみ', note: 'まだ LINE に登録していないメニュー' },
+]
 
 type RichMenuGroupListItem = {
   id: string
@@ -17,6 +38,10 @@ type RichMenuGroupListItem = {
   isDefaultForAll: boolean
   targetingEnabled: boolean
   targetingCondition: string | null
+  /** 159: フォルダ。分けていなければ null。 */
+  folderId: string | null
+  /** 160: 自分で決める並び順。 */
+  displayOrder: number
   thumbnailR2Key: string | null
   updatedAt: string
 }
@@ -61,6 +86,14 @@ export default function RichMenusListPage() {
   const [externalError, setExternalError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [applyTo, setApplyTo] = useState<RichMenuGroupListItem | null>(null)
+  const [folders, setFolders] = useState<Folder[]>([])
+  /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
+  const [folderFilter, setFolderFilter] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [sortKey, setSortKey] = useState<SortKey>('taps')
+  const [savedFilter, setSavedFilter] = useState('')
+  const [pageSize, setPageSize] = useState(20)
+  const [reordering, setReordering] = useState(false)
   const [tapStats, setTapStats] = useState<RichMenuTapStats | null>(null)
 
   const reload = useCallback(async () => {
@@ -108,9 +141,46 @@ export default function RichMenusListPage() {
     }
   }, [selectedAccount?.id])
 
+  const loadFolders = useCallback(async () => {
+    const res = await api.folders.list('rich_menu')
+    if (res.success) setFolders(res.data)
+  }, [])
+
   useEffect(() => {
     reload()
   }, [reload])
+  useEffect(() => {
+    void loadFolders()
+  }, [loadFolders])
+
+  const [reorderBusy, setReorderBusy] = useState(false)
+
+  /**
+   * 1つ上／下と順番を入れ替える。
+   *
+   * 画面に出ている並びの中で入れ替える。フォルダや絞り込みで隠れているものは
+   * 動かさない。見えていないものが動くと、何が起きたか分からなくなる。
+   */
+  async function moveGroup(group: RichMenuGroupListItem, delta: number) {
+    const list = shownGroups
+    const index = list.findIndex((g) => g.id === group.id)
+    const target = list[index + delta]
+    if (!target) return
+    setReorderBusy(true)
+    try {
+      // 同じ数字どうしだと入れ替えても並びが変わらない。並んでいる位置を
+      // そのまま番号にして、確実に前後が入れ替わるようにする。
+      await Promise.all([
+        api.richMenuGroups.update(group.id, { displayOrder: index + delta }),
+        api.richMenuGroups.update(target.id, { displayOrder: index }),
+      ])
+      await reload()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setReorderBusy(false)
+    }
+  }
 
   async function handleDelete(group: RichMenuGroupListItem) {
     if (group.status === 'published') {
@@ -175,9 +245,39 @@ export default function RichMenusListPage() {
   const targetingCount = groups.filter((g) => g.targetingEnabled && g.targetingCondition).length
 
   const q = query.trim()
-  const shownGroups = q
+  const byQuery = q
     ? groups.filter((g) => g.name.includes(q) || g.chatBarText.includes(q))
     : groups
+  const inFolder = byQuery.filter((g) => {
+    if (folderFilter === UNFILED) return !g.folderId
+    if (folderFilter) return g.folderId === folderFilter
+    return true
+  })
+
+  const inSaved = inFolder.filter((g) => {
+    if (savedFilter === 'published') return g.status === 'published'
+    if (savedFilter === 'draft') return g.status === 'draft'
+    if (savedFilter === 'used') return (tapsByGroup.get(g.id) ?? 0) > 0
+    return true
+  })
+
+  // 並び替えは元の配列を壊さないよう写してから。
+  const sorted = [...inSaved].sort((a, b) => {
+    switch (sortKey) {
+      case 'taps':
+        return (tapsByGroup.get(b.id) ?? 0) - (tapsByGroup.get(a.id) ?? 0)
+      case 'name':
+        return a.name.localeCompare(b.name, 'ja')
+      case 'updated':
+        return b.updatedAt.localeCompare(a.updatedAt)
+      case 'manual':
+        // 自分で決めた順。同じ数字なら更新の新しい順（一覧の既定と同じ）。
+        return a.displayOrder - b.displayOrder || b.updatedAt.localeCompare(a.updatedAt)
+    }
+  })
+
+  const shownGroups = sorted.slice(0, pageSize)
+  const hiddenCount = sorted.length - shownGroups.length
 
   return (
     <main className="p-6 max-w-7xl mx-auto">
@@ -195,17 +295,24 @@ export default function RichMenusListPage() {
                 マニュアル
               </button>
               <button
-                disabled
-                title="並び替えは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+                onClick={() => {
+                  // 並び替えは「自分で決めた順」で見ているときだけ意味がある。
+                  // 他の順で上下させても、次に開いたときその順で並ばない。
+                  setSortKey('manual')
+                  setReordering((v) => !v)
+                }}
+                aria-pressed={reordering}
+                className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
+                  reordering
+                    ? 'border-accent bg-accent-soft text-ink'
+                    : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+                }`}
               >
-                並び替え
+                {reordering ? '並び替えを終える' : '並び替え'}
               </button>
-              {/* リッチメニューにフォルダを持たせる列が無い。 */}
               <button
-                disabled
-                title="フォルダは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+                onClick={() => setFolderDialogOpen(true)}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
               >
                 フォルダを追加
               </button>
@@ -283,34 +390,51 @@ export default function RichMenusListPage() {
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
         <select
-          disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+          value={sortKey}
+          onChange={(e) => setSortKey(e.target.value as SortKey)}
+          aria-label="並び順"
+          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
         >
-          <option>タップ数が多い順</option>
+          <option value="taps">タップ数が多い順</option>
+          <option value="updated">更新が新しい順</option>
+          <option value="name">名前順</option>
+          <option value="manual">自分で決めた順</option>
         </select>
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
         <select
-          disabled
-          title="表示件数の切り替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+          value={pageSize}
+          onChange={(e) => setPageSize(Number(e.target.value))}
+          aria-label="表示件数"
+          className="border-hairline rounded-control focus:ring-accent border px-2 py-2 text-sm focus:ring-2 focus:outline-none"
         >
-          <option>20件</option>
+          {[20, 50, 100].map((n) => (
+            <option key={n} value={n}>
+              {n}件
+            </option>
+          ))}
         </select>
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
         <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-        {['よく使う', '公開中のみ', '下書きのみ'].map((label) => (
-          <button
-            key={label}
-            disabled
-            title="保存した条件は準備中です"
-            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-          >
-            {label}
-          </button>
-        ))}
+        {SAVED_FILTERS.map((f) => {
+          const on = savedFilter === f.key
+          return (
+            <button
+              key={f.key}
+              onClick={() => setSavedFilter(on ? '' : f.key)}
+              aria-pressed={on}
+              title={f.note}
+              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
+                on
+                  ? 'border-accent bg-accent-soft text-ink'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+              }`}
+            >
+              {f.label}
+            </button>
+          )
+        })}
       </div>
 
       {!selectedAccount && (
@@ -345,6 +469,16 @@ export default function RichMenusListPage() {
         </div>
       )}
 
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="rich_menu"
+          note="メニューを分けてしまう箱です。消しても、入っていたメニューは未分類として残ります。"
+          placeholder="例: 01_会員向け"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadFolders()}
+        />
+      )}
+
       {/* Admin 管理メニュー見出し */}
       {selectedAccount && !loading && !error && (
         <h2 className="text-sm font-semibold text-ink-secondary mb-3">
@@ -366,8 +500,33 @@ export default function RichMenusListPage() {
         </div>
       )}
 
-      {selectedAccount && !loading && !error && shownGroups.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {selectedAccount && !loading && !error && (
+        <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+          <FolderPanel
+            total={`${groups.length} 件`}
+            activeId={folderFilter}
+            onSelect={setFolderFilter}
+            rows={[
+              { id: '', label: 'すべて', count: groups.length },
+              ...folders.map((f) => ({
+                id: f.id,
+                label: f.name,
+                count: groups.filter((g) => g.folderId === f.id).length,
+                color: f.color,
+              })),
+              {
+                id: UNFILED,
+                label: '未分類',
+                count: groups.filter((g) => !g.folderId).length,
+              },
+            ]}
+          >
+            <p className="text-ink-faint text-xs leading-relaxed">
+              フォルダを消しても、入っていたメニューは未分類として残ります。
+            </p>
+          </FolderPanel>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {shownGroups.map((g) => (
             <div
               key={g.id}
@@ -427,6 +586,29 @@ export default function RichMenusListPage() {
                   </div>
                 </div>
               </Link>
+              {reordering && (
+                <div className="border-hairline bg-canvas-sunken flex items-center justify-between gap-2 border-t px-4 py-2">
+                  <span className="text-ink-faint text-[11px]">並び順 {g.displayOrder}</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => void moveGroup(g, -1)}
+                      disabled={reorderBusy}
+                      className="border-hairline rounded-control hover:bg-canvas border px-2 py-0.5 text-xs disabled:opacity-40"
+                      aria-label="上へ"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => void moveGroup(g, 1)}
+                      disabled={reorderBusy}
+                      className="border-hairline rounded-control hover:bg-canvas border px-2 py-0.5 text-xs disabled:opacity-40"
+                      aria-label="下へ"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="border-t border-hairline px-4 py-2.5 flex justify-end gap-4 text-xs">
                 {g.status === 'published' && (
                   <button
@@ -452,7 +634,14 @@ export default function RichMenusListPage() {
               </div>
             </div>
           ))}
+          </div>
         </div>
+      )}
+
+      {hiddenCount > 0 && (
+        <p className="text-ink-faint mt-3 text-center text-xs">
+          ほかに {hiddenCount} 件あります。「表示」を増やすと出ます。
+        </p>
       )}
 
       {applyTo && (

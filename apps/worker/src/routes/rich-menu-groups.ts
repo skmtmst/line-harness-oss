@@ -60,6 +60,8 @@ function serializeGroup(row: RichMenuGroup) {
     targetingCondition: row.targeting_condition,
     targetingPriority: row.targeting_priority,
     targetingEnabled: row.targeting_enabled === 1,
+    folderId: row.folder_id,
+    displayOrder: row.display_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -340,6 +342,21 @@ function parsePatchBody(raw: unknown): Parsed<{ meta: UpdateRichMenuGroupMetaInp
       return { ok: false, error: 'targetingEnabled must be boolean' };
     }
     meta.targetingEnabled = r.targetingEnabled;
+  }
+  if (r.folderId !== undefined) {
+    if (r.folderId === null || r.folderId === '') {
+      meta.folderId = null;
+    } else if (typeof r.folderId !== 'string') {
+      return { ok: false, error: 'folderId must be a string' };
+    } else {
+      meta.folderId = r.folderId;
+    }
+  }
+  if (r.displayOrder !== undefined) {
+    if (typeof r.displayOrder !== 'number' || !Number.isInteger(r.displayOrder)) {
+      return { ok: false, error: 'displayOrder must be an integer' };
+    }
+    meta.displayOrder = r.displayOrder;
   }
   let pages: RichMenuPageInput[] | undefined;
   if (r.pages !== undefined) {

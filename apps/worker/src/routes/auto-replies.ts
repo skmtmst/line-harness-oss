@@ -91,6 +91,8 @@ interface SerializedAutoReply {
   name: string | null;
   /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
   keywordMatchMode: string;
+  /** フォルダ。分けていなければ null。 */
+  folderId: string | null;
   /** 152: 当たった回数。一覧でだけ入る。 */
   hits?: { period: number; total: number };
   createdAt: string;
@@ -110,6 +112,7 @@ function readExtras(body: Record<string, unknown>):
       respondToAll?: boolean;
       name?: string | null;
       keywordMatchMode?: 'any' | 'all';
+      folderId?: string | null;
     } }
   | { ok: false; error: string } {
   const value: Record<string, unknown> = {};
@@ -152,6 +155,15 @@ function readExtras(body: Record<string, unknown>):
       return { ok: false, error: 'respondToAll must be boolean' };
     }
     value.respondToAll = body.respondToAll;
+  }
+  if ('folderId' in body) {
+    if (body.folderId === null || body.folderId === '') {
+      value.folderId = null;
+    } else if (typeof body.folderId !== 'string') {
+      return { ok: false, error: 'folderId must be a string' };
+    } else {
+      value.folderId = body.folderId;
+    }
   }
   if ('keywordMatchMode' in body) {
     if (body.keywordMatchMode !== 'any' && body.keywordMatchMode !== 'all') {
@@ -277,6 +289,7 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     respondToAll: Boolean(row.respond_to_all),
     name: row.name,
     keywordMatchMode: row.keyword_match_mode ?? 'any',
+    folderId: row.folder_id,
     createdAt: row.created_at,
   };
 }
@@ -418,6 +431,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       respondToAll?: boolean;
       name?: string | null;
       keywordMatchMode?: 'any' | 'all';
+      folderId?: string | null;
     }>();
 
     // 一律で応答するルール（157）はキーワードを見ないので、空でも作れる。
