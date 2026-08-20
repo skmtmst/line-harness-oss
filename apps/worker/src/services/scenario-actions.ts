@@ -172,7 +172,18 @@ export async function runScenarioActions(
   db: D1Database,
   input: RunActionsInput,
 ): Promise<RunActionsResult> {
-  const result: RunActionsResult = {
+  let actions: ScenarioActionRow[]
+  try {
+    actions = await loadScenarioActions(db, input)
+  } catch (err) {
+    console.error('[scenario-actions] failed to load actions', err)
+    return emptyActionsResult()
+  }
+  return runActionRows(db, actions, input.friendId)
+}
+
+function emptyActionsResult(): RunActionsResult {
+  return {
     executed: 0,
     skippedByCondition: 0,
     skippedByOnce: 0,
@@ -180,15 +191,32 @@ export async function runScenarioActions(
     skippedIncomplete: 0,
     scenarioTouched: false,
   }
+}
 
-  let actions: ScenarioActionRow[]
-  try {
-    actions = await loadScenarioActions(db, input)
-  } catch (err) {
-    console.error('[scenario-actions] failed to load actions', err)
-    return result
-  }
+/**
+ * 並べたアクションを順に実行する。
+ *
+ * シナリオは `scenario_actions` の行を読んでここへ渡す。自動応答は
+ * `auto_replies.actions_json` を読んで同じ形に組み立てて渡す。**実行そのものは
+ * 1か所しかない。** 呼び出し元ごとに実装を分けると、タグ操作の細かい挙動
+ * （フォルダ指定、条件付き、1回だけ）がすぐに食い違う。
+ *
+ * 並び順は画面で決めた順のまま逐次で動かす。タグを付けてから、そのタグを
+ * 条件にした次のアクションを動かす、という書き方ができるようにするため。
+ * 並列にすると画面の見た目どおりに動かない。
+ *
+ * 1つ失敗しても残りは続ける。タグが1つ付かなかったせいでメッセージが
+ * 止まるほうが、運用上はよほど困る。
+ */
+export async function runActionRows(
+  db: D1Database,
+  actions: ScenarioActionRow[],
+  friendId: string,
+): Promise<RunActionsResult> {
+  const result = emptyActionsResult()
   if (actions.length === 0) return result
+
+  const input = { friendId }
 
   for (const action of actions) {
     try {

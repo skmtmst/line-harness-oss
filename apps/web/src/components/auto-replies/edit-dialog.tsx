@@ -2,6 +2,20 @@
 
 import { useState } from 'react'
 import { api } from '@/lib/api'
+import type { SegmentCondition } from '@/lib/segment-condition'
+import ConditionBuilder from '@/components/shared/condition-builder'
+import InlineActionList, { useActionOptions } from './inline-action-list'
+import {
+  readKeywordRules,
+  readInlineActions,
+  toKeywordPayload,
+  toActionPayload,
+  WEEKDAY_LABELS,
+  HOLIDAY_RULE_LABELS,
+  type KeywordRuleDraft,
+  type HolidayRuleValue,
+  type InlineAction,
+} from './draft-fields'
 import ImageUploader from '@/components/shared/image-uploader'
 
 export interface AutoReplyDraft {
@@ -24,6 +38,18 @@ export interface AutoReplyDraft {
   priority?: number
   /** 対象にするメッセージ種別。null / 空で全部 */
   messageKinds?: string[] | null
+  /** 151: 応答したときに順に実行すること。 */
+  actions?: unknown[] | null
+  /** 151: 応答する曜日（0=日 … 6=土）。null / 空で曜日を問わない。 */
+  responseWeekdays?: number[] | null
+  /** 151: 祝日の扱い。 */
+  responseHolidayRule?: string | null
+  /** 151: 1人につき1回だけ応答する。 */
+  oncePerFriend?: boolean
+  /** 151: キーワードの複数行。null なら keyword / matchType を見る。 */
+  keywords?: unknown[] | null
+  /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
+  friendConditions?: unknown | null
 }
 
 /** 画面に出すメッセージ種別。LINE から届くもののうち、実務で使うものだけ。 */
@@ -72,8 +98,22 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   )
   const [priority, setPriority] = useState(String(draft.priority ?? 0))
   const [messageKinds, setMessageKinds] = useState<string[]>(draft.messageKinds ?? [])
+  const [keywordRules, setKeywordRules] = useState<KeywordRuleDraft[]>(() =>
+    readKeywordRules(draft),
+  )
+  const [weekdays, setWeekdays] = useState<number[]>(draft.responseWeekdays ?? [])
+  const [holidayRule, setHolidayRule] = useState<HolidayRuleValue>(
+    (draft.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
+  )
+  const [oncePerFriend, setOncePerFriend] = useState(draft.oncePerFriend ?? false)
+  const [actions, setActions] = useState<InlineAction[]>(() => readInlineActions(draft.actions))
+  const [friendConditions, setFriendConditions] = useState<SegmentCondition | null>(
+    (draft.friendConditions as SegmentCondition | null) ?? null,
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
+  const actionOptions = useActionOptions()
 
   const flexTemplates = templates.filter((t) => t.messageType === 'flex')
   const textTemplates = templates.filter((t) => t.messageType === 'text')
@@ -102,6 +142,12 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         skipWhenOperatorActive: boolean;
         priority: number;
         messageKinds: string[] | null;
+        actions: unknown[] | null;
+        responseWeekdays: number[] | null;
+        responseHolidayRule: string | null;
+        oncePerFriend: boolean;
+        keywords: unknown[] | null;
+        friendConditions: unknown | null;
       } = {
         keyword,
         matchType,
@@ -127,6 +173,14 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
           messageKinds.length === 0 || messageKinds.length === MESSAGE_KIND_LABELS.length
             ? null
             : messageKinds,
+        actions: actions.length > 0 ? actions.map(toActionPayload) : null,
+        // 全部の曜日を選ぶことと、1つも選ばないことは同じ意味。null に寄せる。
+        responseWeekdays: weekdays.length === 0 || weekdays.length === 7 ? null : weekdays,
+        responseHolidayRule: holidayRule === 'ignore' ? null : holidayRule,
+        oncePerFriend,
+        // 1行だけで、中身が上の「キーワード」と同じなら、複数行として持たない。
+        keywords: keywordRules.length > 0 ? keywordRules.map(toKeywordPayload) : null,
+        friendConditions,
       }
       if (mode === 'template' && templateId) {
         const tpl = templates.find((t) => t.id === templateId)
@@ -308,10 +362,68 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
           {/* 返す条件。キーワードが合っても、ここに当てはまらなければ返さない。 */}
           <div className="border-hairline space-y-3 rounded-lg border p-3">
             <p className="text-ink text-sm font-semibold">2. いつ・誰に反応するか</p>
-            {/* 曜日ごとの指定を持っていない。時間帯だけ。 */}
-            <p className="text-ink-faint text-xs">
-              曜日ごとの指定は準備中です。いまは毎日、決めた時間帯で反応します。
-            </p>
+
+            <div>
+              <p className="text-ink-faint mb-1.5 text-xs">応答する曜日</p>
+              <div className="flex flex-wrap gap-1.5">
+                {WEEKDAY_LABELS.map((label, day) => {
+                  const on = weekdays.length === 0 || weekdays.includes(day)
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => {
+                        // 何も選ばない＝すべての曜日。最初の1つを押したときは
+                        // 「その曜日だけ」にする（全部入りから1つ外す、ではない）。
+                        if (weekdays.length === 0) {
+                          setWeekdays([day])
+                          return
+                        }
+                        const next = weekdays.includes(day)
+                          ? weekdays.filter((d) => d !== day)
+                          : [...weekdays, day].sort((a, b) => a - b)
+                        setWeekdays(next)
+                      }}
+                      className={`rounded-control border px-2.5 py-1 text-xs transition-colors ${
+                        on
+                          ? 'border-accent bg-accent-soft text-ink'
+                          : 'border-hairline text-ink-faint'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-ink-faint mt-1 text-[11px]">
+                {weekdays.length === 0
+                  ? 'すべての曜日で応答します。'
+                  : `${weekdays.map((d) => WEEKDAY_LABELS[d]).join('・')}曜だけ応答します。`}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-ink-faint mb-1.5 text-xs">祝日</p>
+              <div className="space-y-1">
+                {HOLIDAY_RULE_LABELS.map((option) => (
+                  <label key={option.value} className="flex cursor-pointer items-start gap-2">
+                    <input
+                      type="radio"
+                      name="ar-holiday"
+                      checked={holidayRule === option.value}
+                      onChange={() => setHolidayRule(option.value)}
+                      className="mt-0.5"
+                    />
+                    <span className="text-sm">
+                      {option.label}
+                      <span className="text-ink-faint block text-[11px]">{option.hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label htmlFor="ar-from" className="text-ink-faint mb-1 block text-xs">
@@ -409,6 +521,71 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                 </span>
               </span>
             </label>
+
+            <div>
+              <p className="text-ink-faint mb-1.5 text-xs">応答する回数</p>
+              <div className="space-y-1">
+                <label className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="radio"
+                    name="ar-once"
+                    checked={!oncePerFriend}
+                    onChange={() => setOncePerFriend(false)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm">何度でも応答する</span>
+                </label>
+                <label className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="radio"
+                    name="ar-once"
+                    checked={oncePerFriend}
+                    onChange={() => setOncePerFriend(true)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-sm">
+                    1人につき1回だけ応答する
+                    <span className="text-ink-faint block text-[11px]">
+                      このルールで一度応答した人には、以後どのキーワードでも応答しません。
+                      上の「連投を防ぐ」は時間をあけるだけですが、こちらは二度と応答しません。
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-ink-faint mb-1.5 text-xs">応答する相手</p>
+              <ConditionBuilder
+                value={friendConditions}
+                onChange={setFriendConditions}
+                label="この応答を返す友だち"
+                showCount={false}
+              />
+              <p className="text-ink-faint mt-1 text-[11px]">
+                条件を入れないと、全員に応答します。
+              </p>
+            </div>
+          </div>
+
+          {/* 応答したときに、あわせて行うこと */}
+          <div className="border-hairline space-y-3 rounded-lg border p-3">
+            <div>
+              <p className="text-ink text-sm font-semibold">4. 応答したときに行うこと</p>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                並べた順に実行します。タグを付けてから、そのタグを条件にした次の動きを置く、
+                という書き方ができます。
+              </p>
+            </div>
+            <InlineActionList
+              actions={actions}
+              onChange={setActions}
+              tags={actionOptions.tags}
+              fields={actionOptions.fields}
+              marks={actionOptions.marks}
+              scenarios={actionOptions.scenarios}
+              vars={actionOptions.vars}
+            />
           </div>
 
           <label className="inline-flex items-center gap-2 cursor-pointer">
