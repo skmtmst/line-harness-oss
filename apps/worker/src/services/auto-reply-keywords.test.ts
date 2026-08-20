@@ -186,3 +186,44 @@ describe('一律で応答（キーワードを見ない）', () => {
     expect(keywordMatches({ keyword: '予約', match_type: 'exact' }, '関係ない話')).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 158: キーワードが複数あるときの見方
+// ---------------------------------------------------------------------------
+
+describe('すべてにマッチ', () => {
+  const twoKeywords = JSON.stringify([
+    { keyword: '予約', matchType: 'contains' },
+    { keyword: 'キャンセル', matchType: 'contains' },
+  ]);
+
+  it('all は、全部そろって初めて当たる', () => {
+    const rule = { keyword: '', match_type: 'exact', keywords_json: twoKeywords, keyword_match_mode: 'all' };
+    expect(keywordMatches(rule, '予約をキャンセルしたい')).toBe(true);
+    // 片方だけの問い合わせには返さない。ここが絞り込みとして効く。
+    expect(keywordMatches(rule, '予約したい')).toBe(false);
+    expect(keywordMatches(rule, 'キャンセルしたい')).toBe(false);
+  });
+
+  it('any（既定）は、どれか1つで当たる', () => {
+    const rule = { keyword: '', match_type: 'exact', keywords_json: twoKeywords, keyword_match_mode: 'any' };
+    expect(keywordMatches(rule, '予約したい')).toBe(true);
+    expect(keywordMatches(rule, 'キャンセルしたい')).toBe(true);
+  });
+
+  it('設定が無い（昔のルール）なら any として扱う', () => {
+    const rule = { keyword: '', match_type: 'exact', keywords_json: twoKeywords };
+    expect(keywordMatches(rule, '予約したい')).toBe(true);
+  });
+
+  it('一律で応答するなら、all でもキーワードを見ない', () => {
+    const rule = {
+      keyword: '',
+      match_type: 'exact',
+      keywords_json: twoKeywords,
+      keyword_match_mode: 'all',
+      respond_to_all: 1,
+    };
+    expect(keywordMatches(rule, '関係ない話')).toBe(true);
+  });
+});

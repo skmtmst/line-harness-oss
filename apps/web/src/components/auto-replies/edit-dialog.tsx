@@ -52,6 +52,10 @@ export interface AutoReplyDraft {
   friendConditions?: unknown | null
   /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
   respondToAll?: boolean
+  /** 158: 管理用の名前。空なら keyword を代わりに出す。 */
+  name?: string | null
+  /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+  keywordMatchMode?: 'any' | 'all'
 }
 
 /** 画面に出すメッセージ種別。LINE から届くもののうち、実務で使うものだけ。 */
@@ -109,6 +113,10 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   )
   const [oncePerFriend, setOncePerFriend] = useState(draft.oncePerFriend ?? false)
   const [respondToAll, setRespondToAll] = useState(draft.respondToAll ?? false)
+  const [ruleName, setRuleName] = useState(draft.name ?? '')
+  const [keywordMatchMode, setKeywordMatchMode] = useState<'any' | 'all'>(
+    draft.keywordMatchMode ?? 'any',
+  )
   const [actions, setActions] = useState<InlineAction[]>(() => readInlineActions(draft.actions))
   const [friendConditions, setFriendConditions] = useState<SegmentCondition | null>(
     (draft.friendConditions as SegmentCondition | null) ?? null,
@@ -156,6 +164,8 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         keywords: unknown[] | null;
         friendConditions: unknown | null;
         respondToAll: boolean;
+        name: string | null;
+        keywordMatchMode: 'any' | 'all';
       } = {
         keyword,
         matchType,
@@ -190,6 +200,8 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         keywords: keywordRules.length > 0 ? keywordRules.map(toKeywordPayload) : null,
         friendConditions,
         respondToAll,
+        name: ruleName.trim() || null,
+        keywordMatchMode,
       }
       if (mode === 'template' && templateId) {
         const tpl = templates.find((t) => t.id === templateId)
@@ -225,6 +237,22 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         <div className="p-5 space-y-4">
           <div>
             <p className="text-ink mb-2 text-sm font-semibold">1. どのメッセージに反応するか</p>
+
+            <label className="mb-3 block">
+              <span className="text-ink-secondary text-xs">自動応答名</span>
+              <span className="text-ink-faint block text-[11px]">
+                一覧に出る名前です。友だちには見えません。空にすると、キーワードが名前の
+                代わりに出ます。
+              </span>
+              <input
+                type="text"
+                value={ruleName}
+                onChange={(e) => setRuleName(e.target.value)}
+                maxLength={250}
+                placeholder="例：営業時間外の案内"
+                className="border-hairline rounded-control focus:ring-accent mt-1 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              />
+            </label>
 
             <div className="mb-3 flex gap-2">
               <button
@@ -266,6 +294,31 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
             )}
           </div>
           <div className={respondToAll ? 'hidden' : ''}>
+            <label className="text-ink-secondary mb-1 block text-xs">
+              キーワードが複数あるとき
+            </label>
+            <div className="mb-3 flex gap-2">
+              {(
+                [
+                  { value: 'any' as const, label: 'どれか1つに当たれば返す' },
+                  { value: 'all' as const, label: 'すべて当たったときだけ返す' },
+                ]
+              ).map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setKeywordMatchMode(o.value)}
+                  className={`rounded-control px-3 py-1.5 text-xs ${keywordMatchMode === o.value ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-ink-faint mb-3 text-[11px] leading-relaxed">
+              「すべて」は絞り込みに使います。「予約」と「キャンセル」の両方が入った文にだけ
+              返す、という形です。片方だけの問い合わせには返しません。
+            </p>
+
             <label className="text-ink-secondary mb-1 block text-xs">一致のしかた</label>
             <div className="flex gap-2">
               {(['exact', 'contains'] as const).map((mt) => (

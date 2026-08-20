@@ -102,8 +102,12 @@ export function resolveKeywordRules(rule: {
 /**
  * キーワードに当たるか。
  *
- * 複数行あるときは、**どれか1つに当たれば**当たり扱い。Lステップの
- * 「どれか一つにマッチするとき応答」にあたる。
+ * 複数行あるときの見方は2つ（158）。
+ *   'any' … どれか1つに当たれば当たり（既定）
+ *   'all' … 全部そろって初めて当たり
+ *
+ * 'all' は絞り込みに使う。「予約」と「キャンセル」の両方が入った文にだけ返す、
+ * という形。どちらか片方だけの問い合わせには返さない。
  *
  * webhook のテキスト/postback 経路と unanswered-inbox の「構造化メッセ除外」
  * 判定が、同じ解釈を共有する。未知の match_type は当てない
@@ -115,6 +119,7 @@ export function keywordMatches(
     match_type: string;
     keywords_json?: string | null;
     respond_to_all?: number;
+    keyword_match_mode?: string | null;
   },
   text: string,
 ): boolean {
@@ -122,7 +127,14 @@ export function keywordMatches(
   // 「営業時間外は必ずこれを返す」を作るための形。時間帯や友だち条件は
   // このあとで見るので、いつでも誰にでも返るわけではない。
   if (rule.respond_to_all === 1) return true;
-  return resolveKeywordRules(rule).some((k) => keywordRuleMatches(k, text));
+
+  const rules = resolveKeywordRules(rule);
+  if (rule.keyword_match_mode === 'all') {
+    // 1行も無いときに every が true を返すと、全部に当たってしまう。
+    // resolveKeywordRules は最低1行を返すので通常は起きないが、明示しておく。
+    return rules.length > 0 && rules.every((k) => keywordRuleMatches(k, text));
+  }
+  return rules.some((k) => keywordRuleMatches(k, text));
 }
 
 /**

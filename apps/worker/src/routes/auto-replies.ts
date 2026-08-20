@@ -87,6 +87,10 @@ interface SerializedAutoReply {
   friendConditions: unknown | null;
   /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
   respondToAll: boolean;
+  /** 158: 管理用の名前。空なら keyword を代わりに出す。 */
+  name: string | null;
+  /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+  keywordMatchMode: string;
   /** 152: 当たった回数。一覧でだけ入る。 */
   hits?: { period: number; total: number };
   createdAt: string;
@@ -104,6 +108,8 @@ function readExtras(body: Record<string, unknown>):
       keywords?: unknown[] | null;
       friendConditions?: unknown | null;
       respondToAll?: boolean;
+      name?: string | null;
+      keywordMatchMode?: 'any' | 'all';
     } }
   | { ok: false; error: string } {
   const value: Record<string, unknown> = {};
@@ -146,6 +152,23 @@ function readExtras(body: Record<string, unknown>):
       return { ok: false, error: 'respondToAll must be boolean' };
     }
     value.respondToAll = body.respondToAll;
+  }
+  if ('keywordMatchMode' in body) {
+    if (body.keywordMatchMode !== 'any' && body.keywordMatchMode !== 'all') {
+      return { ok: false, error: "keywordMatchMode must be 'any' or 'all'" };
+    }
+    value.keywordMatchMode = body.keywordMatchMode;
+  }
+  if ('name' in body) {
+    if (body.name === null || body.name === '') {
+      value.name = null;
+    } else if (typeof body.name !== 'string') {
+      return { ok: false, error: 'name must be a string' };
+    } else if ([...body.name].length > 250) {
+      return { ok: false, error: 'name must be 250 characters or fewer' };
+    } else {
+      value.name = body.name;
+    }
   }
 
   return { ok: true, value };
@@ -252,6 +275,8 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     keywords: readJson<unknown[]>(row.keywords_json),
     friendConditions: readJson<unknown>(row.friend_conditions_json),
     respondToAll: Boolean(row.respond_to_all),
+    name: row.name,
+    keywordMatchMode: row.keyword_match_mode ?? 'any',
     createdAt: row.created_at,
   };
 }
@@ -391,6 +416,8 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       priority?: unknown;
       messageKinds?: unknown;
       respondToAll?: boolean;
+      name?: string | null;
+      keywordMatchMode?: 'any' | 'all';
     }>();
 
     // 一律で応答するルール（157）はキーワードを見ないので、空でも作れる。

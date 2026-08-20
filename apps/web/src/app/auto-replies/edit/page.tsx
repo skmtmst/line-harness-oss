@@ -58,6 +58,8 @@ function AutoReplyEditInner() {
               priority: res.data.priority,
               messageKinds: res.data.messageKinds,
               respondToAll: res.data.respondToAll,
+              name: res.data.name,
+              keywordMatchMode: res.data.keywordMatchMode === 'all' ? 'all' : 'any',
             })
           } else {
             setError(res.error)
