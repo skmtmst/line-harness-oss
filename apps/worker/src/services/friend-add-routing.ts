@@ -23,6 +23,7 @@ import {
   type FriendAddBranch,
   type FriendAddFirstTimeCriterion,
   type FriendAddReturningMode,
+  type FriendAddRowActionType,
   type FriendAddStartPosition,
   type FriendAddTiming,
 } from '@line-crm/shared';
@@ -52,6 +53,8 @@ function pickString<T extends string>(
     : fallback;
 }
 
+const ROW_ACTION_TYPES = ['tag', 'friend_field', 'support_mark', 'scenario', 'common_var'] as const;
+
 function normalizeActions(value: unknown): FriendAddAction[] {
   if (!Array.isArray(value)) return [];
   const out: FriendAddAction[] = [];
@@ -59,12 +62,31 @@ function normalizeActions(value: unknown): FriendAddAction[] {
     if (!item || typeof item !== 'object') continue;
     const kind = (item as { kind?: unknown }).kind;
     if (kind === 'tag') {
+      /*
+       * 古い形。**読むときに新しい形へ直す。**
+       *
+       * 以前は「タグを1つ付ける」しかできなかった。外すこともフォルダを
+       * 指定することもできない。シナリオ側には同じことをする仕組みが
+       * あるので、そちらへ寄せた。既に保存されている設定を読めなくすると
+       * 「設定が消えた」ことになるので、ここで直す。
+       */
       const tagId = (item as { tagId?: unknown }).tagId;
-      if (typeof tagId === 'string' && tagId) out.push({ kind: 'tag', tagId });
+      if (typeof tagId === 'string' && tagId) {
+        out.push({ kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: [tagId] } });
+      }
     } else if (kind === 'mile') {
       const amount = (item as { amount?: unknown }).amount;
       if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) {
         out.push({ kind: 'mile', amount: Math.floor(amount) });
+      }
+    } else if (kind === 'row') {
+      const actionType = (item as { actionType?: unknown }).actionType;
+      if (typeof actionType === 'string' && (ROW_ACTION_TYPES as readonly string[]).includes(actionType)) {
+        out.push({
+          kind: 'row',
+          actionType: actionType as FriendAddRowActionType,
+          config: (item as { config?: unknown }).config ?? {},
+        });
       }
     }
   }
@@ -190,9 +212,42 @@ async function runActions(
   actions: FriendAddAction[],
   push?: ImmediatePushContext,
 ): Promise<void> {
+  /*
+   * シナリオと同じアクションは、シナリオと同じところで実行する。
+   *
+   * 自前で書くと、条件付き実行・順次実行・失敗の切り離しを2か所で
+   * 保つことになり、必ずどちらかがずれる。行の形だけ合わせて渡す。
+   * `scenario_id` などはシナリオ側の都合の列なので、ここでは空で埋める。
+   */
+  const rows = actions
+    .filter((a): a is Extract<FriendAddAction, { kind: 'row' }> => a.kind === 'row')
+    .map((a, i) => ({
+      id: `friend-add-${i}`,
+      scenario_id: '',
+      hook: 'on_enroll' as const,
+      step_id: null,
+      choice_index: null,
+      sort_order: i,
+      action_type: a.actionType,
+      config_json: JSON.stringify(a.config ?? {}),
+      condition_json: null,
+      repeat_on_refire: 1,
+    }));
+  if (rows.length > 0) {
+    try {
+      const { runActionRows } = await import('./scenario-actions.js');
+      await runActionRows(db, rows as never, friendId);
+    } catch (err) {
+      // 1つ失敗しても配信は止めない。
+      console.error('[friend-add-routing] row actions failed:', err);
+    }
+  }
+
   for (const action of actions) {
     try {
       if (action.kind === 'tag') {
+        // 読み込みで row へ直しているので、ここへは来ない。古い保存を
+        // そのまま渡された場合の保険として残す。
         await attachTagAndFireSideEffects(db, friendId, action.tagId, push);
       } else if (action.kind === 'mile') {
         // 直接台帳へ1行入れる。付与ルール（/scoring）は「こういう行動をしたら
@@ -277,8 +332,32 @@ export async function applyFriendAddRouting(
   const useFirst = kind === 'first_time' || routing.returning.mode === 'same';
   const branch: FriendAddBranch = useFirst ? routing.firstTime : routing.returning;
 
-  // シナリオを決めていない＝いままでどおり全部流す
-  if (!branch.scenarioId) return none;
+  /*
+   * シナリオを決めていない。
+   *
+   * ①（はじめての人）で決めていないのは**意図した設定**。画面にも
+   * 「決めていない（有効なシナリオを全部流す）」と書いてある。従来どおり流す。
+   *
+   * ②で「別のシナリオを配信する」を選んでシナリオが空なのは**書きかけ**。
+   * ここで従来どおりに落とすと、**有効な友だち追加シナリオが全部流れる**。
+   * この画面は「以前からのお客さまに『はじめまして』を届けない」ために
+   * あるのに、書きかけの設定がいちばん困る結果（全部届く）になる。
+   *
+   * 送らないほうへ倒す。「別のシナリオ」と決めた人が、そのシナリオを
+   * 選び忘れただけで全部届くよりは、何も届かないほうがまだ直せる。
+   * 画面側でも保存させないようにしてある。
+   */
+  if (!branch.scenarioId) {
+    if (kind === 'returning' && routing.returning.mode === 'other') {
+      console.warn(
+        `[friend-add-routing] ②で「別のシナリオ」を選んでシナリオが未設定のため配信しません`
+        + `（friend=${friend.id}）。画面の設定を見直してください。`,
+      );
+      await runActions(db, friend.id, routing.returning.actions, push);
+      return { routed: true, kind, enrollments: [], timing, suppressed: true };
+    }
+    return none;
+  }
 
   /*
    * 「前回読んだところから」は、**②に当たる人すべて**で意味がある。
