@@ -18,6 +18,12 @@ export interface AccountWithStats {
   role: string | null
   displayOrder: number
   liffId?: string | null
+  webhook?: {
+    expectedUrl: string
+    actualUrl: string | null
+    active: boolean | null
+    status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'
+  }
   plan?: {
     key: 'communication' | 'light' | 'standard' | 'unknown'
     label: string

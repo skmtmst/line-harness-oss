@@ -1,5 +1,5 @@
 {
-  "_comment": "Pen.dev の V2 設計から書き写した、各画面の Main 直下の並び。実装側は data-design 属性で同じ名前を付ける。ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。",
+  "_comment": "Pen.dev の承認済み設計から書き写した、各画面の Main 直下の並び。ダッシュボードと共通レイアウトはV4、未改修画面はV2を参照する。実装側は data-design 属性で同じ名前を付け、ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。",
   "_source": "docs/design-node-ids.md",
   "screens": {
     "/": {
@@ -9,6 +9,7 @@
         "Head",
         "TodayTasks",
         "Shipment",
+        "Middle",
         "Body",
         "Editor",
         "QR"
@@ -23,6 +24,9 @@
         "写真審査",
         "今日の予約",
         "出荷予定",
+        "今月の送信枠",
+        "運用アラート",
+        "接続状態",
         "友だち数の推移",
         "今月の配信",
         "最近の成果",

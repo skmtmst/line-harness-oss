@@ -17,7 +17,7 @@ import {
 
 // ─── メニュー定義 ───
 //
-// Pen.dev の V2 設計（`V2 1-1 ダッシュボード` のサイドバー）に合わせている。
+// Pen.dev の V4 設計（`hmBzC` のサイドバー）に合わせている。
 // 区分・並び・呼び名は設計が出どころで、勝手に足したり並べ替えたりしない。
 //
 // 行き先（href）は実装側の都合で決まる。設計は画面の名前しか持たないので、
@@ -34,7 +34,7 @@ import {
  */
 function NavIcon({ d }: { d: string }) {
   return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
     </svg>
   )
@@ -77,6 +77,16 @@ export default function Sidebar() {
   const [itemOrder, setItemOrder] = useState<Record<string, string[]> | null>(null)
   const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
+  const [currentSearch, setCurrentSearch] = useState('')
+
+  // 同じ画面の別タブをメニューへ出す項目（コンバージョン、データ移行）が
+  // あるため、pathnameだけでなくクエリも選択状態へ反映する。
+  useEffect(() => {
+    const sync = () => setCurrentSearch(window.location.search)
+    sync()
+    window.addEventListener('popstate', sync)
+    return () => window.removeEventListener('popstate', sync)
+  }, [pathname])
 
   // 設定を読む。取れなくても既定の並び・表示で使えるので、失敗は握る。
   useEffect(() => {
@@ -116,12 +126,13 @@ export default function Sidebar() {
   }, [selectedAccountId])
   // 区分の中の並びを当ててから、区分そのものの並びを当てる。
   const sections = orderedMenuSections(itemOrder)
-  const orderedSections = sectionOrder
+  const normalizedSectionOrder = sectionOrder?.map((label) => label === 'NEN運用' ? '専用機能' : label)
+  const orderedSections = normalizedSectionOrder
     ? [
-        ...sectionOrder
+        ...normalizedSectionOrder
           .map((label) => sections.find((s) => (s.label ?? '') === label))
           .filter((s): s is (typeof sections)[number] => Boolean(s)),
-        ...sections.filter((s) => !sectionOrder.includes(s.label ?? '')),
+        ...sections.filter((s) => !normalizedSectionOrder.includes(s.label ?? '')),
       ]
     : sections
 
@@ -245,7 +256,15 @@ export default function Sidebar() {
 
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/'
-    return href.split('?')[0] === activeHref
+    const [path, query = ''] = href.split('?')
+    if (path !== activeHref) return false
+
+    const siblingQueries = sections
+      .flatMap((section) => section.items)
+      .filter((item) => item.href.split('?')[0] === path && item.href.includes('?'))
+      .map((item) => item.href.split('?')[1])
+    if (query) return currentSearch === `?${query}`
+    return !siblingQueries.some((siblingQuery) => currentSearch === `?${siblingQuery}`)
   }
 
   /**
@@ -273,24 +292,18 @@ export default function Sidebar() {
           </div>
         </div>
       ) : (
-        /* PCの先頭はアカウント切替ではなく、用途が分かる固定見出しにする。 */
-        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-5">
-          <svg className="h-5 w-5 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-          <p className="text-sm font-bold text-gray-900">管理メニュー</p>
-        </div>
+        null
       )}
 
       <AccountSwitcher />
 
       {/* ナビゲーション */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-2">
         {visibleSections.map((section, si) => (
-          <div key={si}>
+          <div key={si} className="space-y-0.5">
             {section.label && (
-              <div className="px-3 pb-2 pt-5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{section.label}</p>
+              <div className="flex h-[34px] items-end px-3 pb-[5px] pt-3">
+                <p className="text-xs font-semibold text-gray-400">{section.label}</p>
               </div>
             )}
             {section.items.map((item) => {
@@ -300,6 +313,7 @@ export default function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
                   title={item.label}
                   /*
                     いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
@@ -307,7 +321,7 @@ export default function Sidebar() {
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`relative flex h-10 items-center gap-[11px] rounded-[10px] px-3 text-sm font-semibold transition-colors ${
                     active
                       ? isDanger
                         ? 'bg-danger-bg text-danger'
@@ -324,7 +338,7 @@ export default function Sidebar() {
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
                       {/* 地が薄い緑になったので、選ばれていても札の色は変えない。
                           緑ベタの上に置いていたころは白抜きにする必要があった。 */}
-                      <span className="bg-amber-500 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
+                      <span className="bg-red-500 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
                       <span className="sr-only">{badgeCount(item)} 件</span>

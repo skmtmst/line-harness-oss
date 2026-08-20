@@ -96,9 +96,10 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '成果と分析',
     title: '成果と分析',
     items: [
-      { href: '/conversions', label: '成果とアフィリエイト', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' , id: 'affiliates', note: '成果地点の定義と、紹介者への報酬管理', featureKey: 'affiliates' },
+      { href: '/conversions?tab=affiliates', label: '成果とアフィリエイト', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' , id: 'affiliates', note: '紹介者・案件・成果承認を管理します', featureKey: 'affiliates' },
       { href: '/scoring', label: 'マイル', icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' , id: 'mileage', note: '購入・紹介でたまるポイント', featureKey: 'mileage' },
       { href: '/inflow-links', label: '流入と計測', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' , id: 'inflow', note: 'URLごとのクリックと友だち追加の計測', featureKey: 'inflow_tracking' },
+      { href: '/conversions', label: 'コンバージョン', icon: 'M9 11l3 3L22 4M21 4h-7M21 4v7M5 3H4a2 2 0 00-2 2v15a2 2 0 002 2h15a2 2 0 002-2v-1' , id: 'conversions', note: '成果地点（CV）と集計レポートを管理します', featureKey: 'affiliates' },
       { href: '/analytics', label: '分析', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' , id: 'analytics', note: '友だちの増減・配信の反応をまとめて見ます', featureKey: 'analytics' },
     ],
   },
@@ -123,16 +124,16 @@ export const MENU_SECTIONS: MenuSection[] = [
   },
   {
     id: 'specialized',
-    label: 'NEN運用',
-    title: 'NEN運用',
+    label: '専用機能',
+    title: '専用機能',
     items: [
-      { href: '/ec-commerce', label: 'ECデータ連携', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z', badge: 'unmatched' , id: 'ec-commerce', note: 'ECの会員・注文・定期便データを取り込みます', featureKey: 'ec_commerce' },
-      { href: '/line-notifications', label: 'LINE通知', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', id: 'line-notifications', note: '注文・入金・発送・返金・定期便の重要なお知らせ', featureKey: 'line_notifications' },
-      { href: '/nen-campaigns', label: 'フォロー配信', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' , id: 'nen-campaigns', note: '購入後のご案内・コラム・誕生日クーポンを管理します', featureKey: 'nen_campaigns' },
+      { href: '/nen-campaigns', label: 'NEN配信', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' , id: 'nen-campaigns', note: '購入後のご案内・コラム・誕生日クーポンを管理します', featureKey: 'nen_campaigns' },
       // /health は「BAN検知ダッシュボード」で写真審査ではない。写真審査の画面は
       // /nen-members。§3-1 が BAN検知を「運用状態」へ統合すると書いているので
       // そちらに合わせた。仕様書 §2 もこのルートに直してある（2026-08-18）。
-      { href: '/nen-members', label: '投稿写真審査', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', badge: 'photos' , id: 'photo-review', note: 'お客様が投稿した写真を確認・承認します', featureKey: 'photo_review' },
+      { href: '/nen-members', label: '写真審査', icon: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z', badge: 'photos' , id: 'photo-review', note: 'お客様が投稿した写真を確認・承認します', featureKey: 'photo_review' },
+      { href: '/ec-commerce', label: 'EC連携', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z', badge: 'unmatched' , id: 'ec-commerce', note: 'ECの会員・注文・定期便データを取り込みます', featureKey: 'ec_commerce' },
+      { href: '/line-notifications', label: 'LINE通知', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', id: 'line-notifications', note: '注文・入金・発送・返金・定期便の重要なお知らせ', featureKey: 'line_notifications' },
     ],
   },
   {
@@ -143,6 +144,7 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/accounts', label: 'アカウント', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' , id: 'accounts', note: 'LINEアカウントの登録と切り替え', required: true },
       { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' , id: 'staff', note: '管理画面に入る人と、その権限', required: true },
       { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' , id: 'settings', note: 'この画面。項目の表示と並びを決めます', required: true },
+      { href: '/accounts?tab=migration', label: 'データ移行', icon: 'M7 7h10M7 7l3-3M7 7l3 3m7 7H7m10 0l-3-3m3 3l-3 3' , id: 'data-migration', note: 'UIDなど既存データの移行状況を確認します', required: true },
       { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' , id: 'emergency', note: '配信の停止・再開と、異常の記録', required: true },
     ],
   },
@@ -197,5 +199,12 @@ export function applyItemOrder(section: MenuSection, order: string[] | undefined
 
 /** 保存された並び順をまとめて当てる。 */
 export function orderedMenuSections(itemOrder: Record<string, string[]> | null | undefined): MenuSection[] {
-  return MENU_SECTIONS.map((section) => applyItemOrder(section, itemOrder?.[section.id]))
+  return MENU_SECTIONS.map((section) => {
+    const order = itemOrder?.[section.id]
+    // V2で保存された専用機能の既定順は、V4の順番と正反対に近い。
+    // 利用者が明示的に並べ替えた設定は残し、旧既定値だけV4へ移行する。
+    const legacySpecialized = section.id === 'specialized'
+      && order?.join(',') === 'ec-commerce,line-notifications,nen-campaigns,photo-review'
+    return applyItemOrder(section, legacySpecialized ? undefined : order)
+  })
 }

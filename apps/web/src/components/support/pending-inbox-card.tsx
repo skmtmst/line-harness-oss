@@ -81,7 +81,7 @@ export default function PendingInboxCard({
   }, [load])
 
   return (
-    <section className="bg-canvas rounded-card border-hairline border shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
+    <section className="bg-canvas rounded-[18px] border-hairline border shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
       <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
         <div className="flex items-baseline gap-2">
           <h2 className="text-ink text-sm font-semibold">対応が必要な受信</h2>

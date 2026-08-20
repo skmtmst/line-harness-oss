@@ -105,7 +105,7 @@ export default function ShipmentPanel({
   const rows = data ? (bucket === 'soon' ? data.soon : data.later) : []
 
   return (
-    <div className="bg-canvas rounded-card border-hairline border p-5 shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
+    <div className="bg-canvas min-h-44 rounded-[18px] border-hairline border p-[18px] shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-gray-800">出荷予定</h2>
         <Link href="/ec-commerce" className="text-action text-xs font-medium hover:underline">
