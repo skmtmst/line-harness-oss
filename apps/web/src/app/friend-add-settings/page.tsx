@@ -17,6 +17,9 @@ export default function FriendAddSettingsPage() {
   const [configured, setConfigured] = useState(false)
   const [scenarios, setScenarios] = useState<Option[]>([])
   const [tags, setTags] = useState<Option[]>([])
+  /* アクションで選ぶもの。シナリオ側と同じ種類を出すために引く。 */
+  const [marks, setMarks] = useState<Option[]>([])
+  const [fields, setFields] = useState<Option[]>([])
   const [orphans, setOrphans] = useState<{ id: string; name: string }[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -31,6 +34,11 @@ export default function FriendAddSettingsPage() {
 
   useEffect(() => {
     let cancelled = false
+    void Promise.all([api.supportMarks.list(), api.friendFields.list()]).then(([m, f]) => {
+      if (cancelled) return
+      if (m.success) setMarks(m.data.map(x => ({ id: x.id, name: x.name })))
+      if (f.success) setFields(f.data.map(x => ({ id: x.id, name: x.name })))
+    }).catch(() => undefined)
     void api.friends.addBreakdown({ days: 30 }).then(res => {
       if (!cancelled && res.success) setBreakdown(res.data)
     })
@@ -244,6 +252,9 @@ export default function FriendAddSettingsPage() {
             <ActionChips
               actions={routing.firstTime.actions}
               tags={tags}
+              marks={marks}
+              fields={fields}
+              scenarios={scenarios}
               onChange={actions => patch({ firstTime: { ...routing.firstTime, actions } })}
             />
           </section>
@@ -330,6 +341,9 @@ export default function FriendAddSettingsPage() {
             <ActionChips
               actions={routing.returning.actions}
               tags={tags}
+              marks={marks}
+              fields={fields}
+              scenarios={scenarios}
               onChange={actions => patch({ returning: { ...routing.returning, actions } })}
             />
           </section>
@@ -563,20 +577,76 @@ function RadioRow({
 }
 
 /** 「あわせて実行すること」。受け口があるのはタグ付与とマイル付与だけ。 */
+
+/** 画面で選べるアクション。シナリオ側の種類を、選びやすい言葉に開いてある。 */
+type ActionKind =
+  | 'tag_add'
+  | 'tag_remove'
+  | 'support_mark_set'
+  | 'support_mark_clear'
+  | 'friend_field'
+  | 'scenario_start'
+  | 'mile'
+
+const ACTION_KINDS: { id: ActionKind; name: string }[] = [
+  { id: 'tag_add', name: 'タグを付ける' },
+  { id: 'tag_remove', name: 'タグを外す' },
+  { id: 'support_mark_set', name: '対応マークを付ける' },
+  { id: 'support_mark_clear', name: '対応マークを外す' },
+  { id: 'friend_field', name: '友だち情報欄に入れる' },
+  { id: 'scenario_start', name: '別のシナリオを開始する' },
+  { id: 'mile', name: 'マイルを付与' },
+]
+
+/**
+ * チップと要約に出す言葉。
+ *
+ * 中身は `config` にシナリオ側の形で入っているので、ここで読み解く。
+ * 読めない形は「設定を確認してください」と出す。**黙って何も出さないと、
+ * 設定したつもりで消えたように見える。**
+ */
+function actionLabel(a: FriendAddAction, tags: Option[]): string {
+  if (a.kind === 'mile') return `マイル ${a.amount} を付与`
+  if (a.kind === 'tag') return `タグ「${tags.find(t => t.id === a.tagId)?.name ?? '?'}」を付ける`
+
+  const c = (a.config ?? {}) as Record<string, unknown>
+  const name = (id: unknown) => tags.find(t => t.id === id)?.name ?? '?'
+  switch (a.actionType) {
+    case 'tag': {
+      const ids = Array.isArray(c.tagIds) ? (c.tagIds as unknown[]) : []
+      const label = ids.map(name).join('・') || '?'
+      return c.op === 'remove' ? `タグ「${label}」を外す` : `タグ「${label}」を付ける`
+    }
+    case 'support_mark':
+      return c.markId ? '対応マークを付ける' : '対応マークを外す'
+    case 'friend_field':
+      return `友だち情報欄に「${String(c.value ?? '')}」を入れる`
+    case 'scenario':
+      return c.op === 'start' ? '別のシナリオを開始する' : 'シナリオを操作する'
+    case 'common_var':
+      return '共通情報を変える'
+    default:
+      return '設定を確認してください'
+  }
+}
+
 function ActionChips({
   actions,
   tags,
+  marks,
+  fields,
+  scenarios,
   onChange,
 }: {
   actions: FriendAddAction[]
   tags: Option[]
+  marks: Option[]
+  fields: Option[]
+  scenarios: Option[]
   onChange: (actions: FriendAddAction[]) => void
 }) {
   const [adding, setAdding] = useState(false)
-  const label = (a: FriendAddAction) =>
-    a.kind === 'tag'
-      ? `タグ「${tags.find(t => t.id === a.tagId)?.name ?? '?'}」を付ける`
-      : `マイル ${a.amount} を付与`
+  const label = (a: FriendAddAction) => actionLabel(a, tags)
 
   return (
     <div className="mt-4">
@@ -611,6 +681,9 @@ function ActionChips({
       {adding && (
         <ActionEditor
           tags={tags}
+          marks={marks}
+          fields={fields}
+          scenarios={scenarios}
           onCancel={() => setAdding(false)}
           onAdd={a => {
             onChange([...actions, a])
@@ -619,7 +692,7 @@ function ActionChips({
         />
       )}
       <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-        流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません。担当者への通知は受け口がまだありません。
+        シナリオのアクションと同じものが使えます。流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません。担当者への通知は受け口がまだありません。
       </p>
     </div>
   )
@@ -627,35 +700,100 @@ function ActionChips({
 
 function ActionEditor({
   tags,
+  marks,
+  fields,
+  scenarios,
   onAdd,
   onCancel,
 }: {
   tags: Option[]
+  marks: Option[]
+  fields: Option[]
+  scenarios: Option[]
   onAdd: (action: FriendAddAction) => void
   onCancel: () => void
 }) {
-  const [kind, setKind] = useState<'tag' | 'mile'>('tag')
+  /*
+   * 種類はシナリオのアクションと同じものを並べる。以前は「タグを付ける」と
+   * 「マイルを付与」の2つだけで、タグを外すこともフォルダで指定することも
+   * できなかった。実行はシナリオと同じところを通る。
+   */
+  const [kind, setKind] = useState<ActionKind>('tag_add')
   const [tagId, setTagId] = useState(tags[0]?.id ?? '')
   const [amount, setAmount] = useState(100)
-  const canAdd = kind === 'tag' ? Boolean(tagId) : amount > 0
+  const [markId, setMarkId] = useState('')
+  const [fieldId, setFieldId] = useState('')
+  const [fieldValue, setFieldValue] = useState('')
+  const [scenarioId, setScenarioId] = useState('')
+
+  const canAdd =
+    kind === 'tag_add' || kind === 'tag_remove' ? Boolean(tagId)
+    : kind === 'mile' ? amount > 0
+    : kind === 'support_mark_set' ? Boolean(markId)
+    : kind === 'support_mark_clear' ? true
+    : kind === 'friend_field' ? Boolean(fieldId)
+    : kind === 'scenario_start' ? Boolean(scenarioId)
+    : false
+
+  const build = (): FriendAddAction => {
+    switch (kind) {
+      case 'tag_add':
+        return { kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: [tagId] } }
+      case 'tag_remove':
+        return { kind: 'row', actionType: 'tag', config: { op: 'remove', tagIds: [tagId] } }
+      case 'support_mark_set':
+        return { kind: 'row', actionType: 'support_mark', config: { markId } }
+      case 'support_mark_clear':
+        return { kind: 'row', actionType: 'support_mark', config: { markId: null } }
+      case 'friend_field':
+        return { kind: 'row', actionType: 'friend_field', config: { fieldId, op: 'set', value: fieldValue } }
+      case 'scenario_start':
+        return { kind: 'row', actionType: 'scenario', config: { op: 'start', scenarioId, restart: 'from_start' } }
+      default:
+        return { kind: 'mile', amount }
+    }
+  }
 
   return (
     <div className="border-hairline rounded-control mt-2 flex flex-wrap items-end gap-2 border p-3">
       <Field label="種類">
         <Select
           value={kind}
-          onChange={v => setKind(v as 'tag' | 'mile')}
-          options={[
-            { id: 'tag', name: 'タグを付ける' },
-            { id: 'mile', name: 'マイルを付与' },
-          ]}
+          onChange={v => setKind(v as ActionKind)}
+          options={ACTION_KINDS as unknown as Option[]}
         />
       </Field>
-      {kind === 'tag' ? (
+      {(kind === 'tag_add' || kind === 'tag_remove') && (
         <Field label="タグ">
           <Select value={tagId} onChange={setTagId} options={tags} placeholder="選んでください" />
         </Field>
-      ) : (
+      )}
+      {kind === 'support_mark_set' && (
+        <Field label="対応マーク">
+          <Select value={markId} onChange={setMarkId} options={marks} placeholder="選んでください" />
+        </Field>
+      )}
+      {kind === 'friend_field' && (
+        <>
+          <Field label="友だち情報欄">
+            <Select value={fieldId} onChange={setFieldId} options={fields} placeholder="選んでください" />
+          </Field>
+          <Field label="入れる値">
+            <input
+              value={fieldValue}
+              onChange={e => setFieldValue(e.target.value)}
+              placeholder="例: 友だち追加"
+              className="border-hairline rounded-control bg-canvas text-ink w-40 border px-3 py-2 text-sm"
+            />
+          </Field>
+        </>
+      )}
+      {kind === 'scenario_start' && (
+        <Field label="シナリオ">
+          <Select value={scenarioId} onChange={setScenarioId} options={scenarios} placeholder="選んでください" />
+        </Field>
+      )}
+      {kind === 'mile' && (
         <Field label="マイル">
           <input
             type="number"
@@ -669,7 +807,7 @@ function ActionEditor({
       <button
         type="button"
         disabled={!canAdd}
-        onClick={() => onAdd(kind === 'tag' ? { kind: 'tag', tagId } : { kind: 'mile', amount })}
+        onClick={() => onAdd(build())}
         className="bg-accent text-on-accent rounded-control px-3 py-2 text-xs font-bold disabled:opacity-50"
       >
         入れる
@@ -687,13 +825,7 @@ function ActionEditor({
 
 function ActionSummary({ actions, tags }: { actions: FriendAddAction[]; tags: Option[] }) {
   if (actions.length === 0) return null
-  const text = actions
-    .map(a =>
-      a.kind === 'tag'
-        ? `タグ「${tags.find(t => t.id === a.tagId)?.name ?? '?'}」`
-        : `マイル${a.amount}`,
-    )
-    .join(' ・ ')
+  const text = actions.map(a => actionLabel(a, tags)).join(' ・ ')
   return (
     <div className="border-hairline rounded-control bg-canvas-sunken text-ink-secondary border px-3 py-2 text-xs">
       {text}
