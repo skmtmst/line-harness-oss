@@ -56,6 +56,14 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   { section: '予約', items: ['予約管理', '予約設定', 'イベント予約'] },
   { section: 'NEN運用', items: ['ECデータ連携', 'LINE通知', 'フォロー配信', '投稿写真審査'] },
   { section: '設定', items: ['アカウント', 'ログインユーザー', '機能設定', '運用状態'] },
+  {
+    // 飲食店向けはPen R-1〜R-8を正本とし、既存V2の運用状態より下へ分離する。
+    section: '飲食店向け（テスト）',
+    items: [
+      '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
+      '予約枠・在庫', 'メニュー管理', 'Google・口コミ', 'LINE来店フォロー',
+    ],
+  },
 ];
 
 /** menu.ts の MENU_SECTIONS から、区分と項目を順序どおりに読む。 */
@@ -116,6 +124,15 @@ const ROUTES: Record<string, string> = {
   ログインユーザー: '/staff',
   機能設定: '/settings',
   運用状態: '/emergency',
+  店舗ダッシュボード: '/restaurant-test/dashboard',
+  '組織・権限': '/restaurant-test/organization',
+  承認ワークフロー: '/restaurant-test/approvals',
+  予約台帳: '/restaurant-test/reservations',
+  '座席・卓管理': '/restaurant-test/tables',
+  '予約枠・在庫': '/restaurant-test/inventory',
+  メニュー管理: '/restaurant-test/menu',
+  'Google・口コミ': '/restaurant-test/google',
+  LINE来店フォロー: '/restaurant-test/line-followup',
 };
 
 describe('サイドバーが V2 設計と一致する', () => {
@@ -132,11 +149,11 @@ describe('サイドバーが V2 設計と一致する', () => {
     },
   );
 
-  it('項目の総数が設計どおり（32）', () => {
+  it('項目の総数が設計どおり（41）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 30 → 31 は「コンテンツ」を「共通情報」「登録メディア一覧」に分けた分。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(32);
+    expect(total).toBe(41);
   });
 
   it('項目の行き先が仕様どおり', () => {

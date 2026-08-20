@@ -112,4 +112,3 @@ export function restaurantRoleFromAdminRole(role: 'owner' | 'admin' | 'staff' | 
   if (role === 'admin') return 'store_manager';
   return 'staff';
 }
-
