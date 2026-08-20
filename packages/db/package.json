@@ -15,7 +15,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "generate:bootstrap": "node ./scripts/generate-bootstrap.mjs"
+    "generate:bootstrap": "node ./scripts/generate-bootstrap.mjs",
+    "check:bootstrap": "node ./scripts/generate-bootstrap.mjs --check"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241205.0",
