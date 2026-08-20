@@ -65,7 +65,13 @@ describe('normalizeRouting', () => {
       returning: { scenarioId: 's2', mode: 'other', startPosition: 'resume', actions: [{ kind: 'mile', amount: 100 }] },
       criteria: { firstTime: 'first_followed_at_missing' },
     });
-    expect(out.firstTime).toEqual({ scenarioId: 's1', timing: 'scenario', actions: [{ kind: 'tag', tagId: 't1' }] });
+    // 古い形（tag）は、読むときに新しい形（row）へ直す。保存済みの設定を
+    // 読めなくすると「設定が消えた」ことになるので、消さずに直す。
+    expect(out.firstTime).toEqual({
+      scenarioId: 's1',
+      timing: 'scenario',
+      actions: [{ kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: ['t1'] } }],
+    });
     expect(out.returning).toEqual({
       scenarioId: 's2',
       mode: 'other',
@@ -90,7 +96,9 @@ describe('normalizeRouting', () => {
         ],
       },
     });
-    expect(out.firstTime.actions).toEqual([{ kind: 'tag', tagId: 't-ok' }]);
+    expect(out.firstTime.actions).toEqual([
+      { kind: 'row', actionType: 'tag', config: { op: 'add', tagIds: ['t-ok'] } },
+    ]);
   });
 
   test('マイルの端数は切り捨てる', () => {
@@ -176,3 +184,37 @@ describe('ブロックを解除した人への配信', () => {
     expect(row.status).toBe('paused')
   })
 })
+
+/*
+ * 友だち追加のアクションを、シナリオと同じ仕組みに寄せたぶん。
+ *
+ * 以前は「タグを1つ付ける」しかできなかった。外すこともフォルダを指定する
+ * こともできない。**同じことを2か所で実装すると、片方だけ育って必ずずれる。**
+ * 今夜、一斉配信とシナリオのメッセージ組み立てで実際に起きた。
+ */
+describe('シナリオと同じアクション', () => {
+  test('新しい形をそのまま読む', () => {
+    const out = normalizeRouting({
+      firstTime: {
+        actions: [
+          { kind: 'row', actionType: 'support_mark', config: { markId: 'm1' } },
+          { kind: 'row', actionType: 'friend_field', config: { fieldId: 'f1', op: 'set', value: 'x' } },
+        ],
+      },
+    });
+    expect(out.firstTime.actions).toHaveLength(2);
+    expect(out.firstTime.actions[0]).toMatchObject({ kind: 'row', actionType: 'support_mark' });
+  });
+
+  test('知らない種別は落とす', () => {
+    const out = normalizeRouting({
+      firstTime: { actions: [{ kind: 'row', actionType: '知らない', config: {} }] },
+    });
+    expect(out.firstTime.actions).toEqual([]);
+  });
+
+  test('マイルは残す（シナリオ側に無いため）', () => {
+    const out = normalizeRouting({ firstTime: { actions: [{ kind: 'mile', amount: 100 }] } });
+    expect(out.firstTime.actions).toEqual([{ kind: 'mile', amount: 100 }]);
+  });
+});

@@ -1237,13 +1237,33 @@ export type FriendAddStartPosition =
 /**
  * 振り分けと同時に実行すること。
  *
- * `tag` と `mile` だけ受け口がある（`attachTagAndFireSideEffects` /
- * `enqueueMileageEvent`）。流入元の記録は友だち追加のたびに常に走るので
- * ここでは持たない。担当者への通知は受け口が無い。
+ * **`row` はシナリオのアクションと同じ形。** タグ・友だち情報欄・対応マーク・
+ * シナリオ操作・共通情報が、シナリオ側とまったく同じ設定と実行で動く。
+ * 以前は `tag` に1つのタグIDを持つだけで、付けることしかできず、
+ * フォルダ指定も外すこともできなかった。**同じことを2か所で実装すると、
+ * 片方だけ育って必ずずれる**（今夜、一斉配信とシナリオのメッセージ組み立てで
+ * 実際に起きた）。
+ *
+ * `mile` はシナリオ側に無い。友だち追加のときだけ付けたい、という
+ * 使い方があるので残す。
+ *
+ * `tag` は古い形。**読むときに `row` へ直す。**新しく作られることはないが、
+ * 既に保存されている設定があるので、消さずに読めるようにしておく。
  */
 export type FriendAddAction =
+  /** 古い形。読むときに row へ直す。 */
   | { kind: "tag"; tagId: string }
-  | { kind: "mile"; amount: number };
+  | { kind: "mile"; amount: number }
+  /** シナリオのアクションと同じ。`actionType` と `config` はそちらの定義。 */
+  | { kind: "row"; actionType: FriendAddRowActionType; config: unknown };
+
+/** `row` で使えるアクションの種類。シナリオ側と同じ並び。 */
+export type FriendAddRowActionType =
+  | "tag"
+  | "friend_field"
+  | "support_mark"
+  | "scenario"
+  | "common_var";
 
 /** ①または②の設定。 */
 export interface FriendAddBranch {
