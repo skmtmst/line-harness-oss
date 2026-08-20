@@ -5,7 +5,15 @@ import { logOutgoingMessage } from './event-bus.js';
 import { pushViaHarnessProxy, type HarnessProxyDispatch } from './line-proxy-send.js';
 
 const FOLLOW_UP_KEYS = ['arrival_check', 'review_request', 'cross_sell'] as const;
+// 1 回の cron 実行で送る件数。cron は 5 分ごとなので、
+// **ここが 1 時間に送れる件数の上限になる（30 × 12 = 360 件/時、8,640 件/日）。**
+// 誕生日クーポンのように 1 日ぶんがまとめて積まれるものは、
+// これを超えた分が翌日以降にずれ込む。増やすときは、この実行が
+// 他の cron 処理（ウェビナーのリマインダなど）と同じ 1 回の中で動くことに注意する。
 const MAX_JOBS_PER_TICK = 30;
+// 送信に失敗した job を何回まで試すか。これを超えた job は拾われなくなり、
+// status='failed' のまま残る（last_error に理由が入る）。
+const MAX_DELIVERY_ATTEMPTS = 5;
 
 type CampaignRow = {
   campaign_key: string;
@@ -363,9 +371,9 @@ export async function processNenDeliveries(
     `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload
        FROM nen_delivery_jobs
       WHERE status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
-        AND attempts < 5
+        AND attempts < ?
       ORDER BY scheduled_at ASC LIMIT ?`,
-  ).bind(MAX_JOBS_PER_TICK).all<DeliveryJob>();
+  ).bind(MAX_DELIVERY_ATTEMPTS, MAX_JOBS_PER_TICK).all<DeliveryJob>();
   let sent = 0;
   let failed = 0;
   let skipped = 0;
