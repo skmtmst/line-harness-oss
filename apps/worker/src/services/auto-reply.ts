@@ -110,9 +110,18 @@ export function resolveKeywordRules(rule: {
  * （誤って当てて inbox から隠すより安全側）。
  */
 export function keywordMatches(
-  rule: { keyword: string; match_type: string; keywords_json?: string | null },
+  rule: {
+    keyword: string;
+    match_type: string;
+    keywords_json?: string | null;
+    respond_to_all?: number;
+  },
   text: string,
 ): boolean {
+  // 157: 一律で応答するルールは、キーワードを見ない。
+  // 「営業時間外は必ずこれを返す」を作るための形。時間帯や友だち条件は
+  // このあとで見るので、いつでも誰にでも返るわけではない。
+  if (rule.respond_to_all === 1) return true;
   return resolveKeywordRules(rule).some((k) => keywordRuleMatches(k, text));
 }
 
@@ -245,10 +254,21 @@ export async function matchAndReply(
   // 上から順に評価して、最初に当てはまった1件だけを動かす。
   // 並び順は priority が先で、同じなら作った順。一覧の並びと評価順を
   // 一致させないと、「上にあるのに動かない」という形で食い違う。
+  /*
+   * 並び順は priority が先で、同じなら「キーワードのあるもの」を先に見る。
+   *
+   * 一律で応答するルール（157）が上にあると、そこで必ず止まって、キーワードの
+   * ルールが1つも動かなくなる。しかも**一律のほうは返っている**ので、
+   * 壊れていることに気づけない。画面の注意書きだけでは守れないので、
+   * 並び順の既定で守る。
+   *
+   * 明示的に順番を決めたい人は、これまでどおり priority の数字で決められる。
+   * **同じ数字のときだけ**この規則が効く。
+   */
   const autoReplies = await db
     .prepare(
       `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)
-        ORDER BY priority ASC, created_at ASC`,
+        ORDER BY priority ASC, respond_to_all ASC, created_at ASC`,
     )
     .bind(lineAccountId)
     .all<AutoReply>();

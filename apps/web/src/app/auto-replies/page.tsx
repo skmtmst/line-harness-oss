@@ -36,6 +36,8 @@ interface AutoReply {
   oncePerFriend: boolean
   keywords: unknown[] | null
   friendConditions: unknown | null
+  /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+  respondToAll: boolean
   /** 152: 当たった回数（今月・累計）。 */
   hits?: { period: number; total: number }
   createdAt: string
@@ -403,7 +405,13 @@ export default function AutoRepliesPage() {
                 shown.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">{r.priority}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-ink">{r.keyword}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-ink">
+                      {r.respondToAll ? (
+                        <span className="text-ink-secondary">すべてのメッセージ</span>
+                      ) : (
+                        r.keyword
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-xs text-ink-secondary">{matchTypeLabel[r.matchType]}</td>
                     <td className="px-4 py-3">
                       <div className="space-y-0.5">
@@ -459,6 +467,7 @@ export default function AutoRepliesPage() {
                           isActive: r.isActive,
                           priority: r.priority,
                           messageKinds: r.messageKinds,
+                          respondToAll: r.respondToAll,
                           activeFrom: r.activeFrom,
                           activeUntil: r.activeUntil,
                           cooldownMinutes: r.cooldownMinutes,

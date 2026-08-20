@@ -38,6 +38,8 @@ export interface AutoReply {
   once_per_friend: number;
   /** 151: キーワードを複数行持つ。NULL なら keyword / match_type を見る。 */
   keywords_json: string | null;
+  /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+  respond_to_all: number;
   created_at: string;
 }
 
@@ -106,6 +108,8 @@ export interface CreateAutoReplyInput {
   keywords?: unknown[] | null;
   /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
   friendConditions?: unknown | null;
+  /** 157: キーワードを問わず応答する。 */
+  respondToAll?: boolean;
 }
 
 export async function createAutoReply(
@@ -123,9 +127,9 @@ export async function createAutoReply(
           active_from, active_until, cooldown_minutes, skip_when_operator_active,
           priority, message_kinds_json,
           actions_json, response_weekdays_json, response_holiday_rule,
-          once_per_friend, keywords_json, friend_conditions_json,
+          once_per_friend, keywords_json, friend_conditions_json, respond_to_all,
           created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -149,6 +153,7 @@ export async function createAutoReply(
       input.oncePerFriend ? 1 : 0,
       jsonOrNull(input.keywords),
       input.friendConditions ? JSON.stringify(input.friendConditions) : null,
+      input.respondToAll ? 1 : 0,
       now,
     )
     .run();
@@ -182,6 +187,8 @@ export interface UpdateAutoReplyInput {
   keywords?: unknown[] | null;
   /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
   friendConditions?: unknown | null;
+  /** 157: キーワードを問わず応答する。 */
+  respondToAll?: boolean;
 }
 
 export async function updateAutoReply(
@@ -216,6 +223,7 @@ export async function updateAutoReply(
            once_per_friend = ?,
            keywords_json = ?,
            friend_conditions_json = ?,
+           respond_to_all = ?,
            created_at = ?
        WHERE id = ?`,
     )
@@ -255,6 +263,7 @@ export async function updateAutoReply(
       'friendConditions' in input
         ? (input.friendConditions ? JSON.stringify(input.friendConditions) : null)
         : existing.friend_conditions_json,
+      'respondToAll' in input ? (input.respondToAll ? 1 : 0) : existing.respond_to_all,
       existing.created_at,
       id,
     )

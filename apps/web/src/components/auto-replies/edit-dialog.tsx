@@ -50,6 +50,8 @@ export interface AutoReplyDraft {
   keywords?: unknown[] | null
   /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
   friendConditions?: unknown | null
+  /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+  respondToAll?: boolean
 }
 
 /** 画面に出すメッセージ種別。LINE から届くもののうち、実務で使うものだけ。 */
@@ -106,6 +108,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
     (draft.responseHolidayRule as HolidayRuleValue) ?? 'ignore',
   )
   const [oncePerFriend, setOncePerFriend] = useState(draft.oncePerFriend ?? false)
+  const [respondToAll, setRespondToAll] = useState(draft.respondToAll ?? false)
   const [actions, setActions] = useState<InlineAction[]>(() => readInlineActions(draft.actions))
   const [friendConditions, setFriendConditions] = useState<SegmentCondition | null>(
     (draft.friendConditions as SegmentCondition | null) ?? null,
@@ -120,7 +123,11 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   const imageTemplates = templates.filter((t) => t.messageType === 'image')
 
   const handleSave = async () => {
-    if (!keyword.trim()) { setError('keyword を入力してください'); return }
+    // 一律で応答するならキーワードは要らない。
+    if (!respondToAll && !keyword.trim()) {
+      setError('キーワードを入力してください')
+      return
+    }
     if (mode === 'template' && !templateId) { setError('template を選んでください'); return }
     if ((mode === 'inline-text' || mode === 'inline-flex' || mode === 'inline-image') && !responseContent.trim()) {
       setError('内容を入力してください'); return
@@ -148,6 +155,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         oncePerFriend: boolean;
         keywords: unknown[] | null;
         friendConditions: unknown | null;
+        respondToAll: boolean;
       } = {
         keyword,
         matchType,
@@ -181,6 +189,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         // 1行だけで、中身が上の「キーワード」と同じなら、複数行として持たない。
         keywords: keywordRules.length > 0 ? keywordRules.map(toKeywordPayload) : null,
         friendConditions,
+        respondToAll,
       }
       if (mode === 'template' && templateId) {
         const tpl = templates.find((t) => t.id === templateId)
@@ -216,16 +225,47 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         <div className="p-5 space-y-4">
           <div>
             <p className="text-ink mb-2 text-sm font-semibold">1. どのメッセージに反応するか</p>
-            <label className="text-ink-secondary mb-1 block text-xs">キーワード</label>
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-              placeholder="例: コスト比較"
-            />
+
+            <div className="mb-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setRespondToAll(false)}
+                className={`rounded-control px-3 py-1.5 text-xs ${!respondToAll ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+              >
+                キーワードで応答
+              </button>
+              <button
+                type="button"
+                onClick={() => setRespondToAll(true)}
+                className={`rounded-control px-3 py-1.5 text-xs ${respondToAll ? 'bg-accent text-on-accent' : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'}`}
+              >
+                一律で応答
+              </button>
+            </div>
+
+            {respondToAll ? (
+              <p className="text-ink-faint text-xs leading-relaxed">
+                届いたメッセージすべてに応答します。「営業時間外はこれを返す」のような使い方を
+                想定しています。曜日・時間帯・友だちの条件は、このあとで見ます。
+                <span className="mt-1 block">
+                  評価順が同じときは、キーワードのあるルールを先に見ます。一律のルールが
+                  先に当たって、ほかが動かなくなることはありません。
+                </span>
+              </p>
+            ) : (
+              <>
+                <label className="text-ink-secondary mb-1 block text-xs">キーワード</label>
+                <input
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+                  placeholder="例: コスト比較"
+                />
+              </>
+            )}
           </div>
-          <div>
+          <div className={respondToAll ? 'hidden' : ''}>
             <label className="text-ink-secondary mb-1 block text-xs">一致のしかた</label>
             <div className="flex gap-2">
               {(['exact', 'contains'] as const).map((mt) => (

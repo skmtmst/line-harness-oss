@@ -2215,6 +2215,8 @@ export const api = {
         oncePerFriend: boolean;
         keywords: unknown[] | null;
         friendConditions: unknown | null;
+        /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+        respondToAll: boolean;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
         createdAt: string;
@@ -2248,6 +2250,7 @@ export const api = {
         oncePerFriend: boolean;
         keywords: unknown[] | null;
         friendConditions: unknown | null;
+        respondToAll: boolean;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {
@@ -2280,6 +2283,8 @@ export const api = {
       keywords?: unknown[] | null;
       /** 友だちの絞り込み（一斉配信・シナリオと同じ形） */
       friendConditions?: unknown | null;
+      /** 157: キーワードを問わず応答する。 */
+      respondToAll?: boolean;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -2311,6 +2316,8 @@ export const api = {
       keywords?: unknown[] | null;
       /** 友だちの絞り込み（一斉配信・シナリオと同じ形） */
       friendConditions?: unknown | null;
+      /** 157: キーワードを問わず応答する。 */
+      respondToAll?: boolean;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',

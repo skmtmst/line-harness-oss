@@ -57,6 +57,7 @@ function AutoReplyEditInner() {
               skipWhenOperatorActive: res.data.skipWhenOperatorActive,
               priority: res.data.priority,
               messageKinds: res.data.messageKinds,
+              respondToAll: res.data.respondToAll,
             })
           } else {
             setError(res.error)

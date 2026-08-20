@@ -85,6 +85,8 @@ interface SerializedAutoReply {
   keywords: unknown[] | null;
   /** 友だちの絞り込み（一斉配信・シナリオと同じ形）。 */
   friendConditions: unknown | null;
+  /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+  respondToAll: boolean;
   /** 152: 当たった回数。一覧でだけ入る。 */
   hits?: { period: number; total: number };
   createdAt: string;
@@ -101,6 +103,7 @@ function readExtras(body: Record<string, unknown>):
       oncePerFriend?: boolean;
       keywords?: unknown[] | null;
       friendConditions?: unknown | null;
+      respondToAll?: boolean;
     } }
   | { ok: false; error: string } {
   const value: Record<string, unknown> = {};
@@ -137,6 +140,12 @@ function readExtras(body: Record<string, unknown>):
     const parsed = readFriendConditions(body.friendConditions);
     if (!parsed.ok) return { ok: false, error: 'friendConditions must be valid JSON' };
     value.friendConditions = parsed.value;
+  }
+  if ('respondToAll' in body) {
+    if (typeof body.respondToAll !== 'boolean') {
+      return { ok: false, error: 'respondToAll must be boolean' };
+    }
+    value.respondToAll = body.respondToAll;
   }
 
   return { ok: true, value };
@@ -242,6 +251,7 @@ function serializeAutoReply(row: DbAutoReply): SerializedAutoReply {
     oncePerFriend: Boolean(row.once_per_friend),
     keywords: readJson<unknown[]>(row.keywords_json),
     friendConditions: readJson<unknown>(row.friend_conditions_json),
+    respondToAll: Boolean(row.respond_to_all),
     createdAt: row.created_at,
   };
 }
@@ -380,9 +390,12 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
       skipWhenOperatorActive?: unknown;
       priority?: unknown;
       messageKinds?: unknown;
+      respondToAll?: boolean;
     }>();
 
-    if (!body.keyword) {
+    // 一律で応答するルール（157）はキーワードを見ないので、空でも作れる。
+    // ただし列は NOT NULL なので、空文字を入れておく。
+    if (!body.keyword && body.respondToAll !== true) {
       return c.json({ success: false, error: 'keyword is required' }, 400);
     }
     // template_id があれば content は空でも OK (template から resolve される)。
@@ -434,7 +447,7 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
 
     const item = await createAutoReply(c.env.DB, {
       ...extras.value,
-      keyword: body.keyword,
+      keyword: body.keyword ?? '',
       matchType: body.matchType,
       responseType: resolvedResponseType,
       responseContent: resolvedResponseContent,
