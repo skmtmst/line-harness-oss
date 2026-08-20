@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import {
   getReminders,
+  reorderReminders,
   getReminderById,
   createReminder,
   updateReminder,
@@ -100,13 +101,46 @@ function readTriggerInput(
 
 // ========== リマインダCRUD ==========
 
+/**
+ * PATCH /api/reminders/reorder — 並び順をまとめて書く。
+ *
+ * 経路が /api/reminders/:id より前にあるのは、:id に "reorder" として
+ * 吸われるのを避けるため（シナリオと同じ並べ方）。
+ */
+reminders.patch('/api/reminders/reorder', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ ids?: unknown }>();
+    if (!Array.isArray(body.ids) || body.ids.some((v) => typeof v !== 'string')) {
+      return c.json({ success: false, error: 'ids must be an array of reminder ids' }, 400);
+    }
+    if (body.ids.length > 500) {
+      return c.json({ success: false, error: 'too many ids' }, 400);
+    }
+    await reorderReminders(c.env.DB, body.ids as string[]);
+    return c.json({ success: true, data: { updated: body.ids.length } });
+  } catch (err) {
+    console.error('PATCH /api/reminders/reorder error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 reminders.get('/api/reminders', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
     let items: Awaited<ReturnType<typeof getReminders>>;
     if (lineAccountId) {
+      /*
+       * 並びは getReminders() と同じにする（161）。
+       *
+       * ここだけ created_at DESC のままだと、**画面から並べ替えても効かない。**
+       * アカウントを選んでいるのが通常の状態（選択は既定で先頭のアカウントに
+       * 入る）なので、効かないほうが既定になっていた。
+       */
       const result = await c.env.DB
-        .prepare(`SELECT * FROM reminders WHERE line_account_id = ? ORDER BY created_at DESC`)
+        .prepare(
+          `SELECT * FROM reminders WHERE line_account_id = ?
+            ORDER BY display_order ASC, created_at DESC`,
+        )
         .bind(lineAccountId)
         .all();
       items = result.results as unknown as Awaited<ReturnType<typeof getReminders>>;
@@ -141,6 +175,7 @@ reminders.get('/api/reminders', async (c) => {
         targetTagId: r.target_tag_id ?? null,
         folderId: r.folder_id ?? null,
         stepCount: stepCounts.get(r.id) ?? 0,
+        displayOrder: r.display_order ?? 0,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),

@@ -167,7 +167,8 @@
     "158_auto_reply_name.sql",
     "159_rich_menu_folder.sql",
     "160_rich_menu_display_order.sql",
+    "161_reminder_display_order.sql",
     "162_carousel_actions.sql"
   ],
-  "migrationCount": 168
+  "migrationCount": 169
 }
