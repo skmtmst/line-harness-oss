@@ -28,11 +28,11 @@ export default function KpiCard({
   loading?: boolean
 }) {
   return (
-    <div className="bg-canvas rounded-card border-hairline border p-5">
+    <div className="bg-canvas rounded-card border-hairline border p-5 shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
       <div className="flex items-start justify-between gap-2">
         <p className="text-ink-secondary text-sm font-medium">{title}</p>
         {action && (
-          <Link href={action.href} className="text-accent shrink-0 text-xs hover:underline">
+          <Link href={action.href} className="text-action shrink-0 text-xs hover:underline">
             {action.label}
           </Link>
         )}
