@@ -12,8 +12,7 @@ import { syncNenPetTags } from '../services/nen-tag-sync.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
-  'order_confirmed', 'shipping_confirmed', 'arrival_check', 'review_request',
-  'cross_sell', 'column', 'birthday_coupon',
+  'arrival_check', 'review_request', 'cross_sell', 'column', 'birthday_coupon',
 ]);
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -39,7 +38,7 @@ async function verifyEccubeSignature(secret: string, timestamp: string, signatur
 
 nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
   const [settings, jobs, columns, pets, coupons] = await Promise.all([
-    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_campaign_settings WHERE is_enabled = 1`).first<{ count: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_campaign_settings WHERE is_enabled = 1 AND category != 'transactional'`).first<{ count: number }>(),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
               SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
@@ -64,7 +63,7 @@ nenCampaigns.get('/api/nen-campaigns/settings', async (c) => {
   const rows = await c.env.DB.prepare(
     `SELECT campaign_key, label, category, trigger_event, delay_days, delivery_time,
             is_enabled, title, body_text, button_label, button_url, image_url, updated_at
-       FROM nen_campaign_settings ORDER BY rowid`,
+       FROM nen_campaign_settings WHERE category != 'transactional' ORDER BY rowid`,
   ).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results.map((row) => ({
     campaignKey: row.campaign_key,

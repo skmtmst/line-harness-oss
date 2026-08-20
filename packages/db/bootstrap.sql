@@ -394,7 +394,7 @@ CREATE TABLE ec_notification_settings (
   title_override TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-, intro_text TEXT, outro_text TEXT);
+, intro_text TEXT, outro_text TEXT, category TEXT NOT NULL DEFAULT 'order', button_label TEXT, button_url TEXT, image_url TEXT, display_order INTEGER NOT NULL DEFAULT 100);
 
 CREATE TABLE engagement_events (
   id                TEXT PRIMARY KEY,
