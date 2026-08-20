@@ -350,7 +350,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
             <div key={msg.id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                 msg.direction === 'outgoing'
-                  ? 'bg-accent-soft0 text-on-accent'
+                  ? 'bg-accent text-on-accent'
                   : 'bg-canvas-sunken text-ink'
               }`}>
                 <div className="text-sm whitespace-pre-wrap break-words">{renderContent(msg)}</div>
