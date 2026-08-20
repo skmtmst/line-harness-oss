@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import ConditionBuilder from '@/components/shared/condition-builder'
@@ -56,6 +56,8 @@ export interface AutoReplyDraft {
   name?: string | null
   /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
   keywordMatchMode?: 'any' | 'all'
+  /** フォルダ。分けていなければ null。 */
+  folderId?: string | null
 }
 
 /** 画面に出すメッセージ種別。LINE から届くもののうち、実務で使うものだけ。 */
@@ -117,6 +119,8 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   const [keywordMatchMode, setKeywordMatchMode] = useState<'any' | 'all'>(
     draft.keywordMatchMode ?? 'any',
   )
+  const [folderId, setFolderId] = useState(draft.folderId ?? '')
+  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
   const [actions, setActions] = useState<InlineAction[]>(() => readInlineActions(draft.actions))
   const [friendConditions, setFriendConditions] = useState<SegmentCondition | null>(
     (draft.friendConditions as SegmentCondition | null) ?? null,
@@ -125,6 +129,12 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
   const [error, setError] = useState('')
   // アクションで選ぶもの（タグ・友だち情報・対応マーク・シナリオ・共通情報）。
   const actionOptions = useActionOptions()
+
+  useEffect(() => {
+    void api.folders.list('auto_reply').then((res) => {
+      if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name })))
+    })
+  }, [])
 
   const flexTemplates = templates.filter((t) => t.messageType === 'flex')
   const textTemplates = templates.filter((t) => t.messageType === 'text')
@@ -166,6 +176,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         respondToAll: boolean;
         name: string | null;
         keywordMatchMode: 'any' | 'all';
+        folderId: string | null;
       } = {
         keyword,
         matchType,
@@ -202,6 +213,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
         respondToAll,
         name: ruleName.trim() || null,
         keywordMatchMode,
+        folderId: folderId || null,
       }
       if (mode === 'template' && templateId) {
         const tpl = templates.find((t) => t.id === templateId)
@@ -252,6 +264,22 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                 placeholder="例：営業時間外の案内"
                 className="border-hairline rounded-control focus:ring-accent mt-1 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
               />
+            </label>
+
+            <label className="mb-3 block">
+              <span className="text-ink-secondary text-xs">フォルダ</span>
+              <select
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                className="border-hairline rounded-control focus:ring-accent mt-1 w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              >
+                <option value="">未分類</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <div className="mb-3 flex gap-2">

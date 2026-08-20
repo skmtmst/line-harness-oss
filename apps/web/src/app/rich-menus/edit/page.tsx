@@ -51,6 +51,8 @@ type Group = {
   targetingCondition: string | null
   targetingPriority: number
   targetingEnabled: boolean
+  /** 159: フォルダ。分けていなければ null。 */
+  folderId: string | null
   pages: Page[]
 }
 
@@ -119,6 +121,8 @@ function Editor({
   const [targetingEnabled, setTargetingEnabled] = useState(false)
   const [targetingPriority, setTargetingPriority] = useState(0)
   const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
+  const [folderId, setFolderId] = useState('')
+  const [folders, setFolders] = useState<PickerOption[]>([])
 
   // ボタンの設定で選ぶもの（タグ・テンプレート・回答フォーム・計測リンク）。
   // メニュー本体とは別に、開いたとき1回だけ読む。
@@ -151,6 +155,7 @@ function Editor({
       setTargetingEnabled(g.targetingEnabled)
       setTargetingPriority(g.targetingPriority)
       setTargetingCondition(parseStoredCondition(g.targetingCondition))
+      setFolderId(g.folderId ?? '')
       setPages(g.pages)
       void api.richMenuGroups
         .tapStats(g.accountId)
@@ -181,11 +186,12 @@ function Editor({
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      const [tagRes, tplRes, formRes, linkRes] = await Promise.allSettled([
+      const [tagRes, tplRes, formRes, linkRes, folderRes] = await Promise.allSettled([
         api.tags.list(),
         api.templates.list(),
         api.forms.list(),
         api.trackedLinks.list(),
+        api.folders.list('rich_menu'),
       ])
       if (cancelled) return
       if (tagRes.status === 'fulfilled' && tagRes.value.success) {
@@ -196,6 +202,9 @@ function Editor({
       }
       if (formRes.status === 'fulfilled' && formRes.value.success) {
         setForms(formRes.value.data.map((f) => ({ id: f.id, name: f.name })))
+      }
+      if (folderRes.status === 'fulfilled' && folderRes.value.success) {
+        setFolders(folderRes.value.data.map((f) => ({ id: f.id, name: f.name })))
       }
       if (linkRes.status === 'fulfilled' && linkRes.value.success) {
         setTrackedLinks(linkRes.value.data.map((l) => ({ id: l.id, name: l.name })))
@@ -301,6 +310,7 @@ function Editor({
       targetingEnabled,
       targetingPriority,
       targetingCondition: targetingCondition ? JSON.stringify(targetingCondition) : null,
+      folderId: folderId || null,
       pages: pages.map((p, i) => ({
         // 既存 page (UUID) は id を渡す。新規 page (`tmp-*` プレフィックス) は
         // id を渡さず Worker 側で新 UUID を発行させる。
@@ -655,6 +665,21 @@ function Editor({
                 className="mt-1 block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
               />
               <p className="mt-1 text-[11px] text-gray-500">管理画面でだけ使う名前 (友だちには見えない)</p>
+            </label>
+            <label className="block">
+              <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
+              <select
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                className="border-hairline rounded-control focus:ring-accent mt-1 block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              >
+                <option value="">未分類</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block">
               <span className="text-ink-secondary text-xs font-medium">メニューバーの文字</span>

@@ -27,6 +27,8 @@ export interface RichMenuGroup {
   /** 複数のメニューに当てはまったときの順番。小さいほうが先。 */
   targeting_priority: number;
   targeting_enabled: number;
+  /** 159: フォルダ。分けていなければ null。 */
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -123,6 +125,8 @@ export interface UpdateRichMenuGroupMetaInput {
   targetingCondition?: string | null;
   targetingPriority?: number;
   targetingEnabled?: boolean;
+  /** 159: フォルダ。null で未分類に戻す。 */
+  folderId?: string | null;
 }
 
 export type RichMenuAreaWithParsed = RichMenuArea & {
@@ -349,6 +353,10 @@ export async function updateRichMenuGroupMeta(
   if (patch.targetingEnabled !== undefined) {
     sets.push('targeting_enabled = ?');
     vals.push(patch.targetingEnabled ? 1 : 0);
+  }
+  if (patch.folderId !== undefined) {
+    sets.push('folder_id = ?');
+    vals.push(patch.folderId);
   }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');

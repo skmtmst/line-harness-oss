@@ -118,6 +118,8 @@ export interface CreateAutoReplyInput {
   name?: string | null;
   /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
   keywordMatchMode?: 'any' | 'all';
+  /** フォルダ。分けていなければ null。 */
+  folderId?: string | null;
 }
 
 export async function createAutoReply(
@@ -135,9 +137,9 @@ export async function createAutoReply(
           active_from, active_until, cooldown_minutes, skip_when_operator_active,
           priority, message_kinds_json,
           actions_json, response_weekdays_json, response_holiday_rule,
-          once_per_friend, keywords_json, friend_conditions_json, respond_to_all, name, keyword_match_mode,
+          once_per_friend, keywords_json, friend_conditions_json, respond_to_all, name, keyword_match_mode, folder_id,
           created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -164,6 +166,7 @@ export async function createAutoReply(
       input.respondToAll ? 1 : 0,
       input.name ?? null,
       input.keywordMatchMode ?? 'any',
+      input.folderId ?? null,
       now,
     )
     .run();
@@ -203,6 +206,8 @@ export interface UpdateAutoReplyInput {
   name?: string | null;
   /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
   keywordMatchMode?: 'any' | 'all';
+  /** フォルダ。分けていなければ null。 */
+  folderId?: string | null;
 }
 
 export async function updateAutoReply(
@@ -240,6 +245,7 @@ export async function updateAutoReply(
            respond_to_all = ?,
            name = ?,
            keyword_match_mode = ?,
+           folder_id = ?,
            created_at = ?
        WHERE id = ?`,
     )
@@ -284,6 +290,7 @@ export async function updateAutoReply(
       'keywordMatchMode' in input
         ? (input.keywordMatchMode ?? 'any')
         : existing.keyword_match_mode,
+      'folderId' in input ? (input.folderId ?? null) : existing.folder_id,
       existing.created_at,
       id,
     )

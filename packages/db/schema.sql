@@ -1176,6 +1176,8 @@ CREATE TABLE IF NOT EXISTS rich_menu_groups (
   targeting_condition TEXT,
   targeting_priority  INTEGER NOT NULL DEFAULT 0,
   targeting_enabled   INTEGER NOT NULL DEFAULT 0,
+  -- 159: フォルダで分ける。箱そのものは folders（kind='rich_menu'）。
+  folder_id           TEXT REFERENCES folders(id) ON DELETE SET NULL,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
