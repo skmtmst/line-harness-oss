@@ -102,18 +102,39 @@ export function resolveKeywordRules(rule: {
 /**
  * キーワードに当たるか。
  *
- * 複数行あるときは、**どれか1つに当たれば**当たり扱い。Lステップの
- * 「どれか一つにマッチするとき応答」にあたる。
+ * 複数行あるときの見方は2つ（158）。
+ *   'any' … どれか1つに当たれば当たり（既定）
+ *   'all' … 全部そろって初めて当たり
+ *
+ * 'all' は絞り込みに使う。「予約」と「キャンセル」の両方が入った文にだけ返す、
+ * という形。どちらか片方だけの問い合わせには返さない。
  *
  * webhook のテキスト/postback 経路と unanswered-inbox の「構造化メッセ除外」
  * 判定が、同じ解釈を共有する。未知の match_type は当てない
  * （誤って当てて inbox から隠すより安全側）。
  */
 export function keywordMatches(
-  rule: { keyword: string; match_type: string; keywords_json?: string | null },
+  rule: {
+    keyword: string;
+    match_type: string;
+    keywords_json?: string | null;
+    respond_to_all?: number;
+    keyword_match_mode?: string | null;
+  },
   text: string,
 ): boolean {
-  return resolveKeywordRules(rule).some((k) => keywordRuleMatches(k, text));
+  // 157: 一律で応答するルールは、キーワードを見ない。
+  // 「営業時間外は必ずこれを返す」を作るための形。時間帯や友だち条件は
+  // このあとで見るので、いつでも誰にでも返るわけではない。
+  if (rule.respond_to_all === 1) return true;
+
+  const rules = resolveKeywordRules(rule);
+  if (rule.keyword_match_mode === 'all') {
+    // 1行も無いときに every が true を返すと、全部に当たってしまう。
+    // resolveKeywordRules は最低1行を返すので通常は起きないが、明示しておく。
+    return rules.length > 0 && rules.every((k) => keywordRuleMatches(k, text));
+  }
+  return rules.some((k) => keywordRuleMatches(k, text));
 }
 
 /**
@@ -245,10 +266,21 @@ export async function matchAndReply(
   // 上から順に評価して、最初に当てはまった1件だけを動かす。
   // 並び順は priority が先で、同じなら作った順。一覧の並びと評価順を
   // 一致させないと、「上にあるのに動かない」という形で食い違う。
+  /*
+   * 並び順は priority が先で、同じなら「キーワードのあるもの」を先に見る。
+   *
+   * 一律で応答するルール（157）が上にあると、そこで必ず止まって、キーワードの
+   * ルールが1つも動かなくなる。しかも**一律のほうは返っている**ので、
+   * 壊れていることに気づけない。画面の注意書きだけでは守れないので、
+   * 並び順の既定で守る。
+   *
+   * 明示的に順番を決めたい人は、これまでどおり priority の数字で決められる。
+   * **同じ数字のときだけ**この規則が効く。
+   */
   const autoReplies = await db
     .prepare(
       `SELECT * FROM auto_replies WHERE is_active = 1 AND (line_account_id IS NULL OR line_account_id = ?)
-        ORDER BY priority ASC, created_at ASC`,
+        ORDER BY priority ASC, respond_to_all ASC, created_at ASC`,
     )
     .bind(lineAccountId)
     .all<AutoReply>();

@@ -143,7 +143,13 @@ CREATE TABLE auto_replies (
   -- 151: 1人につき1回だけ応答する。cooldown_minutes（N分空ける）とは別。
   once_per_friend        INTEGER NOT NULL DEFAULT 0,
   -- 151: キーワードを複数行持つ。未設定なら keyword / match_type を見る。
-  keywords_json          TEXT
+  keywords_json          TEXT,
+  -- 157: キーワードを問わず、届いたメッセージすべてに応答する（営業時間外の案内など）。
+  respond_to_all         INTEGER NOT NULL DEFAULT 0,
+  -- 158: 管理用の名前。空なら keyword を代わりに出す。
+  name                   TEXT,
+  -- 158: キーワードが複数あるとき 'any'（どれか1つ）か 'all'（すべて）か。
+  keyword_match_mode     TEXT NOT NULL DEFAULT 'any'
 , active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0, message_kinds_json TEXT
   CHECK (message_kinds_json IS NULL OR json_valid(message_kinds_json)), friend_conditions_json TEXT
   CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)));
