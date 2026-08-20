@@ -5,13 +5,13 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "predev": "node scripts/build-release-log.mjs",
-    "prebuild": "node scripts/build-release-log.mjs",
+    "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "build": "next build",
-    "pretypecheck": "node scripts/build-release-log.mjs",
+    "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "release-log": "node scripts/build-release-log.mjs",
-    "pretest": "node scripts/build-release-log.mjs",
+    "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
