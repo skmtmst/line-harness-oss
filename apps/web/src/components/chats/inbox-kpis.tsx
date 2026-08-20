@@ -41,7 +41,7 @@ export default function InboxKpis() {
   return (
     <section
       data-inbox-v4="summary"
-      className="border-[#E5E7EB] bg-white shadow-[1px_2px_2px_rgba(15,23,42,0.15)] flex min-h-[74px] flex-wrap items-center gap-x-6 gap-y-3 rounded-[10px] border px-[18px] py-3 xl:flex-nowrap"
+      className="border-[#E5E7EB] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)] flex min-h-[74px] flex-wrap items-center gap-x-6 gap-y-3 rounded-[10px] border px-[18px] py-3 xl:flex-nowrap"
       aria-label="受信箱の対応状況"
     >
       <div className="flex min-w-[270px] items-center gap-3">

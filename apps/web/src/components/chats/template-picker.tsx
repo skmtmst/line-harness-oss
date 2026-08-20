@@ -28,6 +28,7 @@ export default function TemplatePicker({
   const [search, setSearch] = useState('')
   const [folderId, setFolderId] = useState('')
   const [selectedId, setSelectedId] = useState('')
+  const [category, setCategory] = useState<'all' | 'frequent' | 'reservation' | 'ec'>('all')
 
   useEffect(() => {
     if (!open) return
@@ -59,14 +60,18 @@ export default function TemplatePicker({
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return textTemplates.filter((t) => {
+    const filtered = textTemplates.filter((t) => {
       if (folderId === '__none__' ? t.folderId !== null : folderId && t.folderId !== folderId) {
         return false
       }
       if (!q) return true
       return t.name.toLowerCase().includes(q) || t.messageContent.toLowerCase().includes(q)
     })
-  }, [textTemplates, search, folderId])
+    if (category === 'frequent') return filtered.slice(0, 5)
+    if (category === 'reservation') return filtered.filter((template) => /予約|来店|前日|日程/.test(`${template.name} ${template.messageContent}`))
+    if (category === 'ec') return filtered.filter((template) => /EC|注文|発送|配送|商品/.test(`${template.name} ${template.messageContent}`))
+    return filtered
+  }, [category, textTemplates, search, folderId])
 
   if (!open) return null
 
@@ -126,25 +131,40 @@ export default function TemplatePicker({
           </select>
         </div>
 
-        <div className="min-h-0 flex-1 grid-cols-[330px_1fr] md:grid">
-          <div className="min-h-0 overflow-y-auto border-r border-[#E5E7EB]">
-            <div className="flex items-center justify-between px-4 py-3 text-xs font-semibold text-[#667085]">
-              <span>テンプレート</span>
-              <span>{shown.length}件</span>
+        <div className="min-h-0 flex-1 grid-cols-[350px_1fr] md:grid">
+          <div className="min-h-0 overflow-y-auto border-r border-[#E5E7EB] bg-[#F7F8F6] p-3">
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              {[
+                { key: 'all' as const, label: 'すべて' },
+                { key: 'frequent' as const, label: 'よく使う' },
+                { key: 'reservation' as const, label: '予約' },
+                { key: 'ec' as const, label: 'EC' },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setCategory(item.key)}
+                  aria-pressed={category === item.key}
+                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-[#A6E7BD] bg-[#EAFBF0] text-[#057A37]' : 'border-[#E5E7EB] bg-white text-[#667085] hover:bg-[#F2F4F7]'}`}
+                >
+                  {item.label}
+                </button>
+              ))}
+              <span className="ml-auto text-[11px] text-[#98A2B3]">{shown.length}件</span>
             </div>
             {shown.length === 0 ? (
               <p className="px-4 py-10 text-center text-sm text-[#98A2B3]">
                 {templates.length === 0 ? '文字のテンプレートがまだありません。' : '見つかりませんでした。'}
               </p>
             ) : (
-              <ul className="divide-y divide-[#E5E7EB]">
+              <ul className="space-y-2">
                 {shown.map((template) => (
                   <li key={template.id}>
                     <button
                       type="button"
                       onClick={() => setSelectedId(template.id)}
                       aria-pressed={selected?.id === template.id}
-                      className={`w-full px-4 py-3 text-left ${selected?.id === template.id ? 'bg-[#EAFBF0]' : 'hover:bg-[#F7F8F6]'}`}
+                      className={`w-full rounded-lg border px-3 py-3 text-left ${selected?.id === template.id ? 'border-[#A6E7BD] bg-[#EAFBF0]' : 'border-[#E5E7EB] bg-white hover:bg-[#F2F4F7]'}`}
                     >
                       <p className="truncate text-sm font-semibold text-[#1F2937]">{template.name}</p>
                       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#667085]">{template.messageContent}</p>
@@ -155,12 +175,22 @@ export default function TemplatePicker({
             )}
           </div>
 
-          <section className="hidden min-h-0 overflow-y-auto bg-[#F7F8F6] p-6 md:block" aria-label="テンプレートのプレビュー">
-            <p className="text-xs font-semibold text-[#667085]">プレビュー</p>
+          <section className="hidden min-h-0 overflow-y-auto bg-white p-6 md:block" aria-label="テンプレートのプレビュー">
             {selected ? (
-              <div className="mt-3 rounded-[12px] border border-[#E5E7EB] bg-white p-5 shadow-[1px_2px_2px_rgba(15,23,42,0.15)]">
-                <h3 className="text-sm font-bold text-[#1F2937]">{selected.name}</h3>
-                <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[#344054]">{selected.messageContent}</p>
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-base font-bold text-[#1F2937]">{selected.name}</h3>
+                  {category === 'frequent' && <span className="rounded-lg border border-[#F6D68A] bg-[#FFF8E7] px-2.5 py-1.5 text-xs font-semibold text-[#B45309]">☆ よく使う</span>}
+                </div>
+                <p className="mt-5 text-xs font-semibold text-[#667085]">送信内容のプレビュー</p>
+                <div className="mt-3 min-h-[250px] rounded-[12px] bg-[#7292BD] p-5 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+                  <div className="flex justify-center"><span className="rounded-full bg-white/85 px-3 py-1 text-[11px] text-[#667085]">今日</span></div>
+                  <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-[#344054] shadow-sm">{selected.messageContent}</div>
+                </div>
+                <div className="mt-3 rounded-lg bg-[#F7F8F6] px-4 py-3 text-xs leading-6 text-[#667085]">
+                  この操作ではまだ送信されません。入力欄へ内容を挿入します。<br />
+                  種類：テキスト
+                </div>
               </div>
             ) : (
               <p className="mt-10 text-center text-sm text-[#98A2B3]">左からテンプレートを選択してください。</p>

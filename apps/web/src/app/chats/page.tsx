@@ -73,6 +73,77 @@ interface EmailInboxItem {
   isUnread: boolean
 }
 
+function EmailCustomerMemo({ threadId }: { threadId: string }) {
+  const [notes, setNotes] = useState('')
+  const [savedNotes, setSavedNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setError('')
+    void fetchApi<{
+      success: boolean
+      data: { thread: { notes: string | null } }
+    }>(`/api/support/email/threads/${encodeURIComponent(threadId)}`)
+      .then((response) => {
+        if (cancelled || !response.success) return
+        const value = response.data.thread.notes ?? ''
+        setNotes(value)
+        setSavedNotes(value)
+      })
+      .catch(() => {
+        if (!cancelled) setError('内部メモを読み込めませんでした')
+      })
+    return () => { cancelled = true }
+  }, [threadId])
+
+  const save = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const response = await fetchApi<{ success: boolean; error?: string }>(
+        `/api/support/email/threads/${encodeURIComponent(threadId)}/notes`,
+        { method: 'PATCH', body: JSON.stringify({ notes }) },
+      )
+      if (!response.success) {
+        setError(response.error || '内部メモを保存できませんでした')
+        return
+      }
+      setSavedNotes(notes)
+    } catch {
+      setError('内部メモを保存できませんでした')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="mt-5 border-t border-[#E5E7EB] pt-4" aria-label="メール相手の内部メモ">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold text-[#344054]">内部メモ</h3>
+        {notes === savedNotes && <span className="text-[10px] text-[#98A2B3]">保存済み</span>}
+      </div>
+      <textarea
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+        rows={5}
+        placeholder="担当者だけに見えるメモ"
+        className="mt-2 w-full resize-y rounded-lg border border-[#D0D5DD] bg-white px-3 py-2 text-xs leading-5 outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+      />
+      {error && <p className="mt-1 text-xs text-[#D92D20]">{error}</p>}
+      <button
+        type="button"
+        onClick={() => void save()}
+        disabled={saving || notes === savedNotes}
+        className="mt-2 w-full rounded-lg bg-[#06C755] px-3 py-2 text-xs font-semibold text-white hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {saving ? '保存中...' : '内部メモを保存'}
+      </button>
+    </section>
+  )
+}
+
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
   unread: { label: '未対応', className: 'bg-red-100 text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-yellow-700' },
@@ -329,6 +400,7 @@ const MERGED_TABS = [
 ]
 
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
+  const router = useRouter()
   const { selectedAccountId } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   /**
@@ -874,6 +946,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
+  const visibleMailItems = channel === 'line' ? [] : emailItems
+  const visibleLineItems = channel === 'email' ? [] : chats
+  const quickCounts = {
+    all: visibleMailItems.length + visibleLineItems.length,
+    reply:
+      visibleMailItems.filter((item) => item.status === 'unread').length
+      + visibleLineItems.filter((chat) => chat.status === 'unread').length,
+    mine:
+      visibleMailItems.filter((item) => Boolean(currentStaffId) && item.assignedStaffId === currentStaffId).length
+      + visibleLineItems.filter((chat) => Boolean(currentStaffId) && chat.operatorId === currentStaffId).length,
+    overdue:
+      visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
+      + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
+  }
+
   return (
     <div className="space-y-3">
       {/* Error */}
@@ -885,7 +972,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
       <section
         data-inbox-v4="quick-filters"
-        className="border-[#E5E7EB] bg-white shadow-[1px_2px_2px_rgba(15,23,42,0.15)] flex min-h-12 flex-wrap items-center gap-2 rounded-[10px] border px-3 py-2"
+        className="relative flex min-h-10 flex-wrap items-center gap-2"
         aria-label="受信箱のクイック絞り込み"
       >
         {[
@@ -905,7 +992,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 : 'border-[#E5E7EB] bg-white text-[#667085] hover:bg-[#F7F8F6]'
             }`}
           >
-            {filter.label}
+            {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCounts[filter.key]}</span>
           </button>
         ))}
         <button
@@ -917,12 +1004,28 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         >
           ☆
         </button>
-        <span className="ml-auto hidden text-[11px] text-[#98A2B3] lg:inline">新しい順</span>
+        <details className="relative ml-auto">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
+            絞り込み
+          </summary>
+          <div className="absolute top-[calc(100%+6px)] right-0 z-30 w-52 rounded-lg border border-[#E5E7EB] bg-white p-3 shadow-lg">
+            <p className="text-[11px] font-semibold text-[#667085]">対応状態</p>
+            <div className="mt-2 grid gap-1">
+              {statusFilters.map((filter) => (
+                <button key={filter.key} type="button" onClick={() => setStatusFilter(filter.key)} className={`rounded-md px-2 py-1.5 text-left text-xs ${statusFilter === filter.key ? 'bg-[#EAFBF0] font-semibold text-[#057A37]' : 'text-[#667085] hover:bg-[#F7F8F6]'}`}>{filter.label}</button>
+              ))}
+            </div>
+          </div>
+        </details>
+        <button type="button" disabled title="保存した検索は準備中です" className="rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-semibold text-[#2563EB] disabled:cursor-not-allowed">
+          保存した検索
+        </button>
       </section>
 
       <div
         data-design="Panes"
-        className="border-[#E5E7EB] bg-white shadow-[1px_2px_2px_rgba(15,23,42,0.15)] relative flex min-h-[650px] h-[calc(100vh-292px)] overflow-hidden rounded-[10px] border"
+        className="border-[#E5E7EB] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)] relative flex h-[calc(100vh-282px)] min-h-[560px] overflow-hidden rounded-[10px] border"
       >
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
@@ -948,9 +1051,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className="w-full rounded-lg border border-[#E5E7EB] bg-white py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
               />
             </div>
-            <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-[11px] font-semibold text-[#667085]">LINE・メール</span>
-              <span className="text-[11px] font-semibold text-[#2563EB]">新しい順</span>
+            <div className="mt-2 flex items-center gap-1.5">
+              {CHANNELS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => router.push(item.key === 'all' ? '/chats' : `/chats?channel=${item.key}`)}
+                  aria-pressed={channel === item.key}
+                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold ${channel === item.key ? 'bg-[#EAFBF0] text-[#057A37]' : 'text-[#344054] hover:bg-[#F7F8F6]'}`}
+                >
+                  {item.key === 'line' && <ChannelBadge channel="line" />}
+                  {item.key === 'email' && <ChannelBadge channel="email" />}
+                  {item.label}
+                </button>
+              ))}
+              <span className="ml-auto text-[11px] font-semibold text-[#2563EB]">新しい順⌄</span>
             </div>
           </div>
 
@@ -1447,21 +1562,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-white px-4 py-3">
                 {/* 上段 */}
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
                     <button
                       type="button"
                       onClick={() => setShowTemplatePicker(true)}
-                      className="text-accent text-xs hover:underline"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
                     >
-                      テンプレートを選択
+                      ▧ テンプレートを選択
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowComposerOptions((v) => !v)}
-                      className="text-accent text-xs hover:underline"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
                     >
-                      {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+                      ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </button>
                   </div>
                   <span className="text-ink-faint text-xs">
@@ -1495,8 +1610,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 )}
 
-                {/* 中段 */}
-                <textarea
+                <div className="rounded-[10px] border border-[#D0D5DD] bg-white p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
+                  {/* 中段 */}
+                  <textarea
                   value={messageContent}
                   onChange={(e) => setMessageContent(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -1505,11 +1621,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   rows={3}
                   placeholder="メッセージを入力"
                   aria-label="メッセージを入力"
-                  className="border-hairline rounded-control focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-                />
+                  className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
+                  />
 
-                {/* 下段 */}
-                <div className="mt-2 flex items-center justify-between gap-2">
+                  {/* 下段 */}
+                  <div className="mt-1 flex items-center justify-between gap-2">
                   {/*
                     画像はここから。以前は「送信の設定」の中に投入枠を出しっぱなし
                     にしていて、入力欄が縦に伸びてトークが読めなかった。
@@ -1534,7 +1650,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       disabled={uploadingImage}
                       title="画像を選ぶ"
                       aria-label="画像を選ぶ"
-                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2 py-1 text-sm disabled:opacity-50"
+                      className="rounded-md px-2 py-1 text-sm text-[#667085] hover:bg-[#F2F4F7] disabled:opacity-50"
                     >
                       {uploadingImage ? (
                         '…'
@@ -1564,7 +1680,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <button
                     onClick={handleSendMessage}
                     disabled={sending || (!messageContent.trim() && !pendingImage)}
-                    className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {sending ? '送信中...' : '送信'}
                   </button>
@@ -1577,6 +1693,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       setMessageContent((prev) => (prev.trim() ? `${prev}\n${content}` : content))
                     }
                   />
+                  </div>
                 </div>
               </div>
             </>
@@ -1661,6 +1778,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <li>・そのままメールで返信する（この画面の下から送れます）</li>
                     </ul>
 
+                    <EmailCustomerMemo threadId={selectedThreadId} />
+
                     <p className="text-ink-faint border-hairline mt-4 border-t pt-3 text-xs leading-relaxed">
                       アドレスから友だちを自動で探す仕組みは、まだ入っていません。友だち情報欄に
                       メールアドレスの項目を作って値を貯めておくと、入ったときにそのまま結びつけられます。
@@ -1714,7 +1833,6 @@ const CHANNELS = [
 ] as const
 
 function ChatsPageHost() {
-  const router = useRouter()
   const params = useSearchParams()
   const [showReadAllConfirm, setShowReadAllConfirm] = useState(false)
   const [markingAllRead, setMarkingAllRead] = useState(false)
@@ -1762,28 +1880,6 @@ function ChatsPageHost() {
 
       <div data-design="KPIs" data-inbox-v4="summary">
         <InboxKpis />
-      </div>
-
-      {/* 設計 `Filters` の左側。チャネルの絞り込み。 */}
-      <div data-design="Filters" className="flex flex-wrap items-center gap-2">
-        {CHANNELS.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => router.push(c.key === 'all' ? '/chats' : `/chats?channel=${c.key}`)}
-            aria-pressed={channel === c.key}
-            className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
-              channel === c.key
-                ? 'bg-[#06C755] text-white'
-                : 'border border-[#E5E7EB] bg-white text-[#667085] hover:bg-[#F7F8F6]'
-            }`}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              {c.key === 'line' && <ChannelBadge channel="line" />}
-              {c.key === 'email' && <ChannelBadge channel="email" />}
-              {c.label}
-            </span>
-          </button>
-        ))}
       </div>
 
       {/*

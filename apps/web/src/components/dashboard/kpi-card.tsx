@@ -28,7 +28,7 @@ export default function KpiCard({
   loading?: boolean
 }) {
   return (
-    <div className="bg-canvas rounded-card border-hairline border p-5 shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
+    <div className="bg-canvas rounded-card border-hairline border p-5 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
       <div className="flex items-start justify-between gap-2">
         <p className="text-ink-secondary text-sm font-medium">{title}</p>
         {action && (

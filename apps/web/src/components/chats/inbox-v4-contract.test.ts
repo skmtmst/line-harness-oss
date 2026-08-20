@@ -30,13 +30,19 @@ describe('受信箱V4で既存機能を失わない', () => {
     expect(PAGE).toContain('handleStatusUpdate')
     expect(EMAIL_THREAD).toContain('/reply`')
     expect(EMAIL_THREAD).toContain('/assignee`')
-    expect(EMAIL_THREAD).toContain('/notes`')
+    expect(PAGE).toContain('/notes`')
   })
 
   it('テンプレートは選択だけでは送信せず入力欄へ挿入する', () => {
     expect(TEMPLATE_PICKER).toContain('入力欄へ挿入')
     expect(TEMPLATE_PICKER).toContain('すべてのフォルダ')
+    expect(TEMPLATE_PICKER).toContain('送信内容のプレビュー')
     expect(PAGE).toContain('setMessageContent')
+  })
+
+  it('カード影は右1px・下1pxに統一する', () => {
+    expect(PAGE).toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
+    expect(TEMPLATE_PICKER).toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
   })
 })
 
