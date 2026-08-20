@@ -36,10 +36,33 @@ export default function NewReminderPage() {
   const [messageContent, setMessageContent] = useState('')
   const [activateNow, setActivateNow] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
+  // 154: 友だち情報欄の日付を起点にするときの設定
+  const [triggerFieldId, setTriggerFieldId] = useState('')
+  const [repeatYearly, setRepeatYearly] = useState(true)
+  const [dateFields, setDateFields] = useState<Array<{ id: string; name: string }>>([])
+  const [templateId, setTemplateId] = useState('')
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
+  // 153: 配信方式。作成後は変えられない
+  const [deliveryMode, setDeliveryMode] = useState<'time' | 'countdown'>('countdown')
+  const [offsetDays, setOffsetDays] = useState(-1)
+  const [stepSendAtTime, setStepSendAtTime] = useState('10:00')
 
   useEffect(() => {
     void api.tags.list().then((res) => {
       if (res.success) setTags(res.data)
+    })
+    void api.templates.list().then((res) => {
+      if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
+    })
+    // 起点にできるのは日付の欄だけ。文字の欄を選ばせても日付として読めない。
+    void api.friendFields.list().then((res) => {
+      if (res.success) {
+        setDateFields(
+          res.data
+            .filter((f) => f.type === 'date')
+            .map((f) => ({ id: f.id, name: f.name })),
+        )
+      }
     })
   }, [])
 
@@ -51,7 +74,13 @@ export default function NewReminderPage() {
       saveLabel="リマインダを作成"
       validate={() => {
         if (!name.trim()) return 'リマインダ名を入力してください'
-        if (!messageContent.trim()) return '送る内容を入力してください'
+        // テンプレートを選んでいれば本文は要らない。どちらも空なら何も届かない。
+        if (!templateId && !messageContent.trim()) {
+          return '送る内容を入力するか、テンプレートを選んでください'
+        }
+        if (triggerType === 'friend_field' && !triggerFieldId) {
+          return '起点にする友だち情報の欄を選んでください'
+        }
         return null
       }}
       onReset={() => {
@@ -66,14 +95,27 @@ export default function NewReminderPage() {
           triggerType,
           sendAtTime: triggerType === 'manual' ? null : sendAtTime || null,
           targetTagId: targetTagId || null,
+          deliveryMode,
+          triggerFieldId: triggerType === 'friend_field' ? triggerFieldId || null : null,
+          repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
         })
         if (!res.success) throw new Error(res.error)
-        // ステップが1つも無いと、対象に加わっても何も届かない。作るときに
-        // 1通目まで入れてしまう。
+        // 下書きとして作りたい場合は、作ったあとに止める。作成の受け口が
+        // is_active を受け取らないので、ここで1回だけ更新する。
+        if (!activateNow) {
+          await api.reminders.update(res.data.id, { isActive: false })
+        }
+        // 通が1つも無いと、対象に加わっても何も届かない。作るときに1通目まで入れる。
         await api.reminders.addStep(res.data.id, {
           offsetMinutes,
           messageType: 'text',
-          messageContent: messageContent.trim(),
+          // テンプレートを選んでいても本文は残す。テンプレートを消したときに
+          // ここが送られる（参照が切れて何も届かなくなるのを防ぐ）。
+          messageContent: messageContent.trim() || '（テンプレートから送ります）',
+          templateId: templateId || null,
+          // 「○日前の●時」で決めるときは、日数と時刻を持たせる。
+          offsetDays: deliveryMode === 'time' ? offsetDays : null,
+          sendAtTime: deliveryMode === 'time' ? stepSendAtTime : null,
         })
         return res.data.id
       }}
@@ -160,10 +202,106 @@ export default function NewReminderPage() {
               note="一度だけ送ります"
               onClick={() => setTriggerType('manual')}
             />
+            <ChoiceCard
+              selected={triggerType === 'friend_field'}
+              title="友だち情報欄の日付"
+              note="誕生日・次回お届け日・契約更新日など"
+              onClick={() => setTriggerType('friend_field')}
+            />
           </div>
         </Field>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        {triggerType === 'friend_field' && (
+          <>
+            <Field
+              label="どの日付を見るか"
+              htmlFor="rm-field"
+              note="友だち情報の「日付」の欄だけが並びます。"
+            >
+              <select
+                id="rm-field"
+                value={triggerFieldId}
+                onChange={(e) => setTriggerFieldId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">選んでください</option>
+                {dateFields.length === 0 && <option value="">（日付の欄がありません）</option>}
+                {dateFields.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="くり返し">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <ChoiceCard
+                  selected={repeatYearly}
+                  title="毎年くり返す"
+                  note="誕生日など。年が変わるたびに送ります"
+                  onClick={() => setRepeatYearly(true)}
+                />
+                <ChoiceCard
+                  selected={!repeatYearly}
+                  title="1回だけ"
+                  note="契約更新日など。その日が来たら1度だけ"
+                  onClick={() => setRepeatYearly(false)}
+                />
+              </div>
+            </Field>
+          </>
+        )}
+
+        <Field
+          label="送るタイミングの決め方"
+          note="**作成したあとは変えられません。** 途中で変えると、すでに登録済みの人の配信予定がすべて変わってしまうためです。"
+        >
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ChoiceCard
+              selected={deliveryMode === 'time'}
+              title="○日前の●時"
+              note="「3日前の10時」のように、日付と時刻で決めます"
+              onClick={() => setDeliveryMode('time')}
+            />
+            <ChoiceCard
+              selected={deliveryMode === 'countdown'}
+              title="ゴールからの残り時間"
+              note="「1時間前」のように、そこからの長さで決めます"
+              onClick={() => setDeliveryMode('countdown')}
+            />
+          </div>
+        </Field>
+
+        {deliveryMode === 'time' && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="何日ずらすか" htmlFor="rm-offset-days" note="マイナスが前、プラスが後。">
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="rm-offset-days"
+                  type="number"
+                  value={offsetDays}
+                  onChange={(e) => setOffsetDays(parseInt(e.target.value, 10) || 0)}
+                  className={`${inputClass} w-24`}
+                />
+                <span className="text-ink-faint text-xs whitespace-nowrap">
+                  日{offsetDays < 0 ? '前' : offsetDays > 0 ? '後' : '（当日）'}
+                </span>
+              </div>
+            </Field>
+            <Field label="その日の何時に" htmlFor="rm-step-time">
+              <input
+                id="rm-step-time"
+                type="time"
+                value={stepSendAtTime}
+                onChange={(e) => setStepSendAtTime(e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+        )}
+
+        <div className={`grid gap-3 sm:grid-cols-2 ${deliveryMode === 'time' ? 'hidden' : ''}`}>
           <Field label="どれだけ前に送るか" htmlFor="rm-offset">
             <select
               id="rm-offset"
@@ -236,20 +374,29 @@ export default function NewReminderPage() {
         label="送る内容"
         note="テンプレートから呼び出すか、直接入力します。"
       >
-        {/* テンプレートを本文に流し込む口が無い（4-3-1 と同じ）。 */}
-        <button
-          type="button"
-          disabled
-          title="テンプレートからの読み込みは準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
+        <Field
+          label="テンプレートから選ぶ"
+          htmlFor="rm-template"
+          note="選ぶと、下の本文の代わりにテンプレートの中身が届きます。"
         >
-          テンプレートから選ぶ
-        </button>
+          <select
+            id="rm-template"
+            value={templateId}
+            onChange={(e) => setTemplateId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">使わない（下に直接書く）</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </Field>
 
         <Field
           label="本文"
           htmlFor="rm-body"
-          required
           note={`${'{{name}}'} や ${'{{予約日時}}'} は、送るときに一人ひとりの内容へ置き換わります。`}
         >
           <textarea
@@ -262,19 +409,18 @@ export default function NewReminderPage() {
           />
         </Field>
 
-        {/* 作ったリマインダを止めておく口が無い。作成時は常に動きだす。 */}
-        <label className="text-ink-faint flex items-start gap-2 text-sm" title="準備中です">
+        <label className="text-ink-secondary flex cursor-pointer items-start gap-2 text-sm">
           <input
             type="checkbox"
             className="mt-0.5"
             checked={activateNow}
-            disabled
             onChange={(e) => setActivateNow(e.target.checked)}
           />
           <span>
             作成したらすぐ動かす
-            <span className="block text-xs">
-              オフにすると下書きとして保存され、条件に合っても送られません。下書きは準備中です。
+            <span className="text-ink-faint block text-xs">
+              オフにすると下書きとして保存され、条件に合っても送られません。あとから編集画面で
+              動かせます。
             </span>
           </span>
         </label>

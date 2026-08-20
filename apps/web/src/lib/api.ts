@@ -2215,6 +2215,12 @@ export const api = {
         oncePerFriend: boolean;
         keywords: unknown[] | null;
         friendConditions: unknown | null;
+        /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+        respondToAll: boolean;
+        /** 158: 管理用の名前。 */
+        name: string | null;
+        /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+        keywordMatchMode: string;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
         createdAt: string;
@@ -2248,6 +2254,9 @@ export const api = {
         oncePerFriend: boolean;
         keywords: unknown[] | null;
         friendConditions: unknown | null;
+        respondToAll: boolean;
+        name: string | null;
+        keywordMatchMode: string;
         createdAt: string;
       }>>(`/api/auto-replies/${id}`),
     create: (body: {
@@ -2280,6 +2289,12 @@ export const api = {
       keywords?: unknown[] | null;
       /** 友だちの絞り込み（一斉配信・シナリオと同じ形） */
       friendConditions?: unknown | null;
+      /** 157: キーワードを問わず応答する。 */
+      respondToAll?: boolean;
+      /** 158: 管理用の名前。 */
+      name?: string | null;
+      /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+      keywordMatchMode?: 'any' | 'all';
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -2311,6 +2326,12 @@ export const api = {
       keywords?: unknown[] | null;
       /** 友だちの絞り込み（一斉配信・シナリオと同じ形） */
       friendConditions?: unknown | null;
+      /** 157: キーワードを問わず応答する。 */
+      respondToAll?: boolean;
+      /** 158: 管理用の名前。 */
+      name?: string | null;
+      /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+      keywordMatchMode?: 'any' | 'all';
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',
@@ -2538,10 +2559,17 @@ export const api = {
     get: (id: string) =>
       fetchApi<ApiResponse<Reminder & { steps: ReminderStep[] }>>(`/api/reminders/${id}`),
     /** この友だちをこのリマインダに登録する（1人ぶん）。 */
-    enroll: (reminderId: string, friendId: string) =>
+    /**
+     * 友だちをリマインダに登録する。
+     *
+     * targetDate はゴール日時（予約日・開催日）。**これが無いと登録できない。**
+     * 以前は本文を送っておらず、worker 側が「targetDate is required」の手前で
+     * 落ちて 500 を返していた。画面から一度も登録できていなかった。
+     */
+    enroll: (reminderId: string, friendId: string, targetDate: string) =>
       fetchApi<ApiResponse<unknown>>(
         `/api/reminders/${reminderId}/enroll/${friendId}`,
-        { method: 'POST' },
+        { method: 'POST', body: JSON.stringify({ targetDate }) },
       ),
     create: (data: {
       name: string
@@ -2550,6 +2578,12 @@ export const api = {
       triggerOffsetMinutes?: number | null
       sendAtTime?: string | null
       targetTagId?: string | null
+      /** 153: 'time'（○日前の●時）か 'countdown'（残り時間）。**作成後は変えられない。** */
+      deliveryMode?: 'time' | 'countdown'
+      /** 154: 友だち情報欄の日付を起点にするとき、見る欄。 */
+      triggerFieldId?: string | null
+      /** 154: 毎年くり返すか（誕生日なら true）。 */
+      repeatYearly?: boolean
     }) =>
       fetchApi<ApiResponse<Reminder>>('/api/reminders', {
         method: 'POST',
@@ -2576,7 +2610,20 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/reminders/${id}`, { method: 'DELETE' }),
-    addStep: (id: string, data: { offsetMinutes: number; messageType: string; messageContent: string }) =>
+    addStep: (
+      id: string,
+      data: {
+        offsetMinutes: number
+        messageType: string
+        messageContent: string
+        /** 153: ゴールから何日ずらすか。配信方式が 'time' のとき使う。 */
+        offsetDays?: number | null
+        /** 153: その日の何時に送るか（日本時間の "HH:MM"）。 */
+        sendAtTime?: string | null
+        /** 153: 送る中身をテンプレートから選ぶ。 */
+        templateId?: string | null
+      },
+    ) =>
       fetchApi<ApiResponse<ReminderStep>>(`/api/reminders/${id}/steps`, {
         method: 'POST',
         body: JSON.stringify(data),

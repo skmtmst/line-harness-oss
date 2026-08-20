@@ -17,7 +17,8 @@ import { requireRole } from '../middleware/role-guard.js';
 
 const reminders = new Hono<Env>();
 
-const TRIGGER_TYPES = ['manual', 'booking', 'event'] as const;
+const TRIGGER_TYPES = ['manual', 'booking', 'event', 'friend_field'] as const;
+const DELIVERY_MODES = ['time', 'countdown'] as const;
 type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 /**
@@ -37,6 +38,28 @@ function readTriggerInput(
       return { ok: false, error: `triggerType must be one of ${TRIGGER_TYPES.join(', ')}` };
     }
     out.triggerType = body.triggerType;
+  }
+  if (has('triggerFieldId')) {
+    const raw = body.triggerFieldId;
+    if (raw === null || raw === '' || raw === undefined) {
+      out.triggerFieldId = null;
+    } else if (typeof raw !== 'string') {
+      return { ok: false, error: 'triggerFieldId must be a string' };
+    } else {
+      out.triggerFieldId = raw;
+    }
+  }
+  if (has('repeatYearly')) {
+    if (typeof body.repeatYearly !== 'boolean') {
+      return { ok: false, error: 'repeatYearly must be boolean' };
+    }
+    out.repeatYearly = body.repeatYearly;
+  }
+  if (has('deliveryMode')) {
+    if (!DELIVERY_MODES.includes(body.deliveryMode as (typeof DELIVERY_MODES)[number])) {
+      return { ok: false, error: `deliveryMode must be one of ${DELIVERY_MODES.join(', ')}` };
+    }
+    out.deliveryMode = body.deliveryMode;
   }
   if (has('triggerOffsetMinutes')) {
     const raw = body.triggerOffsetMinutes;
@@ -92,6 +115,9 @@ reminders.get('/api/reminders', async (c) => {
         description: r.description,
         isActive: Boolean(r.is_active),
         triggerType: r.trigger_type ?? 'manual',
+        deliveryMode: r.delivery_mode ?? 'countdown',
+        triggerFieldId: r.trigger_field_id ?? null,
+        repeatYearly: r.repeat_yearly === 1,
         triggerOffsetMinutes: r.trigger_offset_minutes ?? null,
         sendAtTime: r.send_at_time ?? null,
         targetTagId: r.target_tag_id ?? null,
@@ -121,6 +147,9 @@ reminders.get('/api/reminders/:id', async (c) => {
         description: reminder.description,
         isActive: Boolean(reminder.is_active),
         triggerType: reminder.trigger_type ?? 'manual',
+        deliveryMode: reminder.delivery_mode ?? 'countdown',
+        triggerFieldId: reminder.trigger_field_id ?? null,
+        repeatYearly: reminder.repeat_yearly === 1,
         triggerOffsetMinutes: reminder.trigger_offset_minutes ?? null,
         sendAtTime: reminder.send_at_time ?? null,
         targetTagId: reminder.target_tag_id ?? null,
@@ -132,6 +161,9 @@ reminders.get('/api/reminders/:id', async (c) => {
           offsetMinutes: s.offset_minutes,
           messageType: s.message_type,
           messageContent: s.message_content,
+          offsetDays: s.offset_days,
+          sendAtTime: s.send_at_time,
+          templateId: s.template_id,
           createdAt: s.created_at,
         })),
       },
@@ -196,14 +228,45 @@ reminders.delete('/api/reminders/:id', requireRole('owner', 'admin'), async (c) 
 reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async (c) => {
   try {
     const reminderId = c.req.param('id');
-    const body = await c.req.json<{ offsetMinutes: number; messageType: string; messageContent: string }>();
+    const body = await c.req.json<{
+      offsetMinutes: number;
+      messageType: string;
+      messageContent: string;
+      offsetDays?: number | null;
+      sendAtTime?: string | null;
+      templateId?: string | null;
+    }>();
     if (body.offsetMinutes === undefined || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'offsetMinutes, messageType, messageContent are required' }, 400);
+    }
+    if (
+      body.sendAtTime !== undefined &&
+      body.sendAtTime !== null &&
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.sendAtTime)
+    ) {
+      return c.json({ success: false, error: 'sendAtTime must be HH:MM' }, 400);
+    }
+    if (
+      body.offsetDays !== undefined &&
+      body.offsetDays !== null &&
+      (!Number.isInteger(body.offsetDays) || Math.abs(body.offsetDays) > 365)
+    ) {
+      return c.json({ success: false, error: 'offsetDays must be an integer within +/- 365' }, 400);
     }
     const step = await createReminderStep(c.env.DB, { reminderId, ...body });
     return c.json({
       success: true,
-      data: { id: step.id, reminderId: step.reminder_id, offsetMinutes: step.offset_minutes, messageType: step.message_type, createdAt: step.created_at },
+      data: {
+        id: step.id,
+        reminderId: step.reminder_id,
+        offsetMinutes: step.offset_minutes,
+        messageType: step.message_type,
+        messageContent: step.message_content,
+        offsetDays: step.offset_days,
+        sendAtTime: step.send_at_time,
+        templateId: step.template_id,
+        createdAt: step.created_at,
+      },
     }, 201);
   } catch (err) {
     console.error('POST /api/reminders/:id/steps error:', err);

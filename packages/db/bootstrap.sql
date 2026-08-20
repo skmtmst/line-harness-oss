@@ -143,7 +143,9 @@ CREATE TABLE auto_replies (
   -- 151: 1人につき1回だけ応答する。cooldown_minutes（N分空ける）とは別。
   once_per_friend        INTEGER NOT NULL DEFAULT 0,
   -- 151: キーワードを複数行持つ。未設定なら keyword / match_type を見る。
-  keywords_json          TEXT
+  keywords_json          TEXT,
+  -- 157: キーワードを問わず、届いたメッセージすべてに応答する（営業時間外の案内など）。
+  respond_to_all         INTEGER NOT NULL DEFAULT 0
 , active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0, message_kinds_json TEXT
   CHECK (message_kinds_json IS NULL OR json_valid(message_kinds_json)), friend_conditions_json TEXT
   CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)));
@@ -1217,24 +1219,39 @@ CREATE TABLE ref_tracking (
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 , fbclid TEXT, gclid TEXT, twclid TEXT, ttclid TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, user_agent TEXT, ip_address TEXT);
 
-CREATE TABLE reminder_steps (
+CREATE TABLE "reminder_steps" (
   id              TEXT PRIMARY KEY,
   reminder_id     TEXT NOT NULL REFERENCES reminders (id) ON DELETE CASCADE,
   offset_minutes  INTEGER NOT NULL,
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
+  message_type    TEXT NOT NULL CHECK (message_type IN (
+                    'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel'
+                  )),
   message_content TEXT NOT NULL,
+  offset_days     INTEGER,
+  send_at_time    TEXT,
+  template_id     TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
-CREATE TABLE reminders (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  description TEXT,
-  is_active   INTEGER NOT NULL DEFAULT 1,
-  created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT, trigger_type TEXT NOT NULL DEFAULT 'manual'
-  CHECK (trigger_type IN ('manual', 'booking', 'event')), trigger_offset_minutes INTEGER, send_at_time TEXT, target_tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL);
+CREATE TABLE "reminders" (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  description   TEXT,
+  is_active     INTEGER NOT NULL DEFAULT 1,
+  line_account_id TEXT,
+  trigger_type  TEXT NOT NULL DEFAULT 'manual'
+                CHECK (trigger_type IN ('manual', 'booking', 'event', 'friend_field')),
+  trigger_offset_minutes INTEGER,
+  send_at_time  TEXT,
+  target_tag_id TEXT REFERENCES tags(id) ON DELETE SET NULL,
+  folder_id     TEXT REFERENCES folders(id) ON DELETE SET NULL,
+  delivery_mode TEXT NOT NULL DEFAULT 'countdown',
+  -- 154: 友だち情報欄の日付を起点にするときの設定
+  trigger_field_id TEXT,
+  repeat_yearly INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE rich_menu_area_taps (
   id              TEXT PRIMARY KEY,
@@ -2068,7 +2085,7 @@ CREATE INDEX idx_ref_tracking_ref    ON ref_tracking (ref_code);
 
 CREATE INDEX idx_ref_tracking_ref_created ON ref_tracking(ref_code, created_at);
 
-CREATE INDEX idx_reminder_steps_reminder ON reminder_steps (reminder_id);
+CREATE INDEX idx_reminder_steps_by_reminder ON reminder_steps (reminder_id);
 
 CREATE INDEX idx_reminders_status_scheduled ON booking_reminders (status, scheduled_at);
 

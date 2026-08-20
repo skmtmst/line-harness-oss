@@ -36,6 +36,12 @@ interface AutoReply {
   oncePerFriend: boolean
   keywords: unknown[] | null
   friendConditions: unknown | null
+  /** 157: キーワードを問わず、届いたメッセージすべてに応答する。 */
+  respondToAll: boolean
+  /** 158: 管理用の名前。空なら keyword を代わりに出す。 */
+  name: string | null
+  /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
+  keywordMatchMode: string
   /** 152: 当たった回数（今月・累計）。 */
   hits?: { period: number; total: number }
   createdAt: string
@@ -220,7 +226,10 @@ export default function AutoRepliesPage() {
   const q = query.trim()
   const shown = q
     ? items.filter(
-        (r) => r.keyword.includes(q) || (r.responseContent ?? '').includes(q),
+        (r) =>
+          r.keyword.includes(q) ||
+          (r.name ?? '').includes(q) ||
+          (r.responseContent ?? '').includes(q),
       )
     : items
 
@@ -403,7 +412,15 @@ export default function AutoRepliesPage() {
                 shown.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">{r.priority}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-ink">{r.keyword}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-ink">
+                      {/* 名前があればそれを出す。無ければキーワード。
+                          一律で応答するルールはキーワードが無いので、名前を付けて
+                          いないと「すべてのメッセージ」しか出ず、見分けられない。 */}
+                      {r.name || (r.respondToAll ? 'すべてのメッセージ' : r.keyword)}
+                      {r.name && !r.respondToAll && (
+                        <span className="text-ink-faint ml-1.5 text-[11px]">{r.keyword}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-xs text-ink-secondary">{matchTypeLabel[r.matchType]}</td>
                     <td className="px-4 py-3">
                       <div className="space-y-0.5">
@@ -459,6 +476,9 @@ export default function AutoRepliesPage() {
                           isActive: r.isActive,
                           priority: r.priority,
                           messageKinds: r.messageKinds,
+                          respondToAll: r.respondToAll,
+                          name: r.name,
+                          keywordMatchMode: r.keywordMatchMode === 'all' ? 'all' : 'any',
                           activeFrom: r.activeFrom,
                           activeUntil: r.activeUntil,
                           cooldownMinutes: r.cooldownMinutes,
