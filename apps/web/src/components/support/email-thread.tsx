@@ -210,7 +210,7 @@ export default function EmailThread({
 
   return (
     <>
-      <div className="border-hairline flex items-center justify-between gap-2 border-b px-4 py-4">
+      <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-white px-4 py-3">
         <div className="min-w-0">
           <p className="text-ink truncate text-sm font-medium">{detail.thread.subject}</p>
           <p className="text-ink-faint mt-0.5 truncate text-xs">
@@ -252,7 +252,7 @@ export default function EmailThread({
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex-1 space-y-4 overflow-y-auto bg-[#F7F8F6] p-4">
         {detail.messages.map((message) => (
           <div key={message.id} className={`flex items-end gap-2 ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
             <div
@@ -287,7 +287,7 @@ export default function EmailThread({
       </div>
 
       {/* メモ。LINE のトークと同じ位置・同じ形（114 で列を足した）。 */}
-      <div className="border-hairline bg-canvas-sunken border-t px-4 py-2">
+      <div className="border-t border-[#E5E7EB] bg-white px-4 py-2">
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -306,7 +306,7 @@ export default function EmailThread({
         </div>
       </div>
 
-      <div className="border-hairline border-t px-4 py-3">
+      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-[#E5E7EB] bg-white px-4 py-3">
         {/* 上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた */}
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">

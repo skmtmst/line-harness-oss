@@ -434,6 +434,8 @@ export async function getDashboardOverview(
 export interface InboxStats {
   /** 返信を待っている人。 */
   waiting: number;
+  /** 返信を待っている会話のうち、最も長い待ち時間（分）。 */
+  oldestWaitingMinutes: number | null;
   /** 受信から初回返信までの平均（分）。記録が無ければ null。 */
   averageFirstReplyMinutes: number | null;
   /** そのうち1時間以上待たせているもの。 */
@@ -463,11 +465,12 @@ export async function getInboxStats(
     .prepare(
       `SELECT
          COUNT(*) AS n,
-         SUM(CASE WHEN last_message_at < ? THEN 1 ELSE 0 END) AS over_hour
+         SUM(CASE WHEN last_message_at < ? THEN 1 ELSE 0 END) AS over_hour,
+         CAST((julianday('now') - julianday(MIN(last_message_at))) * 1440 AS INTEGER) AS oldest_minutes
        FROM chats WHERE status = 'unread'`,
     )
     .bind(hourAgo)
-    .first<{ n: number; over_hour: number }>();
+    .first<{ n: number; over_hour: number; oldest_minutes: number | null }>();
 
   const mine = operatorId
     ? await count(
@@ -496,6 +499,7 @@ export async function getInboxStats(
   return {
     averageFirstReplyMinutes: inbox.averageFirstReplyMinutes,
     waiting: waiting?.n ?? 0,
+    oldestWaitingMinutes: waiting?.oldest_minutes ?? null,
     waitingOverAnHour: waiting?.over_hour ?? 0,
     mine,
     todayInbound: byChannel?.total ?? 0,

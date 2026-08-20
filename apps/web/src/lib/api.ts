@@ -589,6 +589,8 @@ export type FriendStats = {
 /** 受信箱の上部に出す数（設計 `V2 2-1 受信箱`）。 */
 export type InboxStats = {
   waiting: number
+  /** 返信を待っている会話のうち、最も長い待ち時間（分）。 */
+  oldestWaitingMinutes: number | null
   /** 受信から初回返信までの平均（分）。記録が無ければ null。 */
   averageFirstReplyMinutes: number | null
   /** そのうち1時間以上待たせているもの。 */
