@@ -81,6 +81,7 @@ jobs:
       - name: Run every populated workspace test suite
         run: |
           pnpm --filter @line-crm/db test
+          pnpm --filter @line-crm/shared test
           pnpm --filter @line-harness/update-engine test
           pnpm --filter create-line-harness test
           pnpm --filter worker test

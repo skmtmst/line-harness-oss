@@ -183,6 +183,15 @@ jobs:
           sys.exit(1 if failed else 0)
           PY
 
+      - name: Test shared
+        run: |
+          pnpm --filter @line-crm/shared typecheck
+          pnpm --filter @line-crm/shared test
+          # 日付・時刻を扱うものが入っているので、日本時間以外でも通ることを見る。
+          # 実行環境の時計に引きずられる書き方は、JST で走らせている限り
+          # 気づけない（深夜0時前後で1日ずれる、曜日が変わる、など）。
+          TZ=Asia/Bangkok pnpm --filter @line-crm/shared test
+
       - name: Typecheck and test Worker
         run: |
           pnpm --filter worker typecheck
