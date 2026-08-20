@@ -161,7 +161,8 @@
     "152_auto_reply_hits.sql",
     "153_reminder_step_timing.sql",
     "154_reminder_friend_field_trigger.sql",
-    "155_reminder_step_message_kinds.sql"
+    "155_reminder_step_message_kinds.sql",
+    "157_auto_reply_respond_to_all.sql"
   ],
-  "migrationCount": 162
+  "migrationCount": 163
 }

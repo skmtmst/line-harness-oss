@@ -240,7 +240,13 @@ CREATE TABLE IF NOT EXISTS auto_replies (
   -- 151: 1人につき1回だけ応答する。cooldown_minutes（N分空ける）とは別。
   once_per_friend        INTEGER NOT NULL DEFAULT 0,
   -- 151: キーワードを複数行持つ。未設定なら keyword / match_type を見る。
-  keywords_json          TEXT
+  keywords_json          TEXT,
+  -- 157: キーワードを問わず、届いたメッセージすべてに応答する（営業時間外の案内など）。
+  respond_to_all         INTEGER NOT NULL DEFAULT 0,
+  -- 158: 管理用の名前。空なら keyword を代わりに出す。
+  name                   TEXT,
+  -- 158: キーワードが複数あるとき 'any'（どれか1つ）か 'all'（すべて）か。
+  keyword_match_mode     TEXT NOT NULL DEFAULT 'any'
 );
 
 CREATE INDEX IF NOT EXISTS idx_auto_replies_template_id ON auto_replies(template_id);
