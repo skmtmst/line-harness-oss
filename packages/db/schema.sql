@@ -79,7 +79,10 @@ CREATE TABLE IF NOT EXISTS scenario_steps (
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
   step_order      INTEGER NOT NULL,
   delay_minutes   INTEGER NOT NULL DEFAULT 0,
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
+  -- 155: シナリオ・一斉配信と同じ8種別
+  message_type    TEXT NOT NULL CHECK (message_type IN (
+                    'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel'
+                  )),
   message_content TEXT NOT NULL,
   message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
   offset_days     INTEGER,
@@ -651,6 +654,13 @@ CREATE TABLE IF NOT EXISTS reminders (
   name        TEXT NOT NULL,
   description TEXT,
   is_active   INTEGER NOT NULL DEFAULT 1,
+  -- 153: 配信方式。作成後は変えられない（登録済みの配信予定が全部変わるため）。
+  -- 'time' … ゴールの○日前の●時 / 'countdown' … ゴールから何分ずらすか
+  delivery_mode TEXT NOT NULL DEFAULT 'countdown',
+  -- 154: 友だち情報欄の日付をゴールにする（誕生日・次回お届け日・契約更新日）。
+  trigger_field_id TEXT,
+  -- 154: 毎年くり返すか。誕生日は 1、契約更新日は 0。
+  repeat_yearly INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -661,6 +671,12 @@ CREATE TABLE IF NOT EXISTS reminder_steps (
   offset_minutes  INTEGER NOT NULL,
   message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
   message_content TEXT NOT NULL,
+  -- 153: 「ゴールの○日前の●時」で指定する。offset_minutes より優先する。
+  offset_days     INTEGER,
+  send_at_time    TEXT,
+  -- 153: 送る中身をテンプレートから選ぶ。外部キーは張らない
+  -- （テンプレートを消したときにリマインダごと消えないように）。
+  template_id     TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 

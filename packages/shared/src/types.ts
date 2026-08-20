@@ -906,7 +906,11 @@ export interface CalendarBooking {
 // -----------------------------------------------------------------------------
 
 /** リマインダを動かすきっかけ */
-export type ReminderTriggerType = "manual" | "booking" | "event";
+/**
+ * リマインダのゴールを何で決めるか。
+ *   friend_field … 友だち情報欄の日付（誕生日・次回お届け日・契約更新日）。154 で追加。
+ */
+export type ReminderTriggerType = "manual" | "booking" | "event" | "friend_field";
 
 export interface Reminder {
   id: string;
@@ -921,6 +925,12 @@ export interface Reminder {
   sendAtTime?: string | null;
   /** 対象を絞るタグ。null なら対象者全員 */
   targetTagId?: string | null;
+  /** 153: 'time'（ゴールの○日前の●時）か 'countdown'（残り時間）。**作成後は変えられない。** */
+  deliveryMode?: 'time' | 'countdown';
+  /** 154: 友だち情報欄の日付を起点にするとき、見る欄。 */
+  triggerFieldId?: string | null;
+  /** 154: 毎年くり返すか（誕生日なら true）。 */
+  repeatYearly?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -931,6 +941,12 @@ export interface ReminderStep {
   offsetMinutes: number;
   messageType: MessageType;
   messageContent: string;
+  /** 153: ゴールから何日ずらすか。配信方式が 'time' のとき使う。 */
+  offsetDays?: number | null;
+  /** 153: その日の何時に送るか（日本時間の "HH:MM"）。 */
+  sendAtTime?: string | null;
+  /** 153: 送る中身をテンプレートから選ぶ。 */
+  templateId?: string | null;
   createdAt: string;
 }
 

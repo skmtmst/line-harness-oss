@@ -31,7 +31,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { validateRichMenuImage } from '../lib/image-validator.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
-import { currentMonthRange } from '../lib/rich-menu-tap.js';
+import { currentMonthRange } from '../lib/jst-range.js';
 import {
   publishRichMenuGroup,
   unpublishRichMenuGroup,

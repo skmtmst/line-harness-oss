@@ -289,6 +289,9 @@ function FieldPanel({ friendId, busy, run }: { friendId: string; busy: boolean; 
 function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolean; run: Run }) {
   const [items, setItems] = useState<Reminder[]>([])
   const [id, setId] = useState('')
+  // ゴール日時（予約日・開催日）。リマインダはここを起点に逆算するので、
+  // これが決まらないと登録できない。以前はこの欄が無く、登録が必ず失敗していた。
+  const [targetDate, setTargetDate] = useState('')
   useEffect(() => {
     void api.reminders.list().then((res) => {
       if (res.success) setItems(res.data)
@@ -302,9 +305,23 @@ function ReminderPanel({ friendId, busy, run }: { friendId: string; busy: boolea
           <option key={r.id} value={r.id}>{r.name}</option>
         ))}
       </select>
+      <input
+        type="datetime-local"
+        value={targetDate}
+        onChange={(e) => setTargetDate(e.target.value)}
+        aria-label="ゴール日時"
+        title="予約日や開催日。ここから逆算して届きます"
+        className={SELECT}
+      />
       <Go
-        busy={busy || !id}
-        onClick={() => void run(() => api.reminders.enroll(id, friendId), 'リマインダを開始しました')}
+        busy={busy || !id || !targetDate}
+        onClick={() =>
+          void run(
+            // datetime-local は "2026-09-01T15:00" の形。日本時間として送る。
+            () => api.reminders.enroll(id, friendId, `${targetDate}:00+09:00`),
+            'リマインダを開始しました',
+          )
+        }
         label="開始する"
       />
     </Row>
