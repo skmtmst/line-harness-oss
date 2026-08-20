@@ -2578,6 +2578,8 @@ export const api = {
       triggerOffsetMinutes?: number | null
       sendAtTime?: string | null
       targetTagId?: string | null
+      /** 156: フォルダ。null は未分類。 */
+      folderId?: string | null
       /** 153: 'time'（○日前の●時）か 'countdown'（残り時間）。**作成後は変えられない。** */
       deliveryMode?: 'time' | 'countdown'
       /** 154: 友だち情報欄の日付を起点にするとき、見る欄。 */
@@ -2602,7 +2604,10 @@ export const api = {
           | 'sendAtTime'
           | 'targetTagId'
         >
-      >,
+      > & {
+        /** 156: フォルダ。null は未分類へ戻す。 */
+        folderId?: string | null
+      },
     ) =>
       fetchApi<ApiResponse<Reminder>>(`/api/reminders/${id}`, {
         method: 'PUT',

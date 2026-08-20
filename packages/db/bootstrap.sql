@@ -2091,6 +2091,8 @@ CREATE INDEX idx_ref_tracking_ref_created ON ref_tracking(ref_code, created_at);
 
 CREATE INDEX idx_reminder_steps_by_reminder ON reminder_steps (reminder_id);
 
+CREATE INDEX idx_reminders_folder ON reminders(folder_id);
+
 CREATE INDEX idx_reminders_status_scheduled ON booking_reminders (status, scheduled_at);
 
 CREATE INDEX idx_rich_menu_area_taps_area  ON rich_menu_area_taps(area_id, tapped_at);
