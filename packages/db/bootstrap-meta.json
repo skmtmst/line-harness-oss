@@ -169,7 +169,8 @@
     "160_rich_menu_display_order.sql",
     "161_reminder_display_order.sql",
     "162_carousel_actions.sql",
-    "163_inbox_staff_reads.sql"
+    "163_line_notification_templates.sql",
+    "164_inbox_staff_reads.sql"
   ],
-  "migrationCount": 170
+  "migrationCount": 171
 }

@@ -54,7 +54,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   },
   { section: '自動化', items: ['オートメーション', '外部連携'] },
   { section: '予約', items: ['予約管理', '予約設定', 'イベント予約'] },
-  { section: '専用機能', items: ['NEN配信', '写真審査', 'EC連携'] },
+  { section: 'NEN運用', items: ['ECデータ連携', 'LINE通知', 'フォロー配信', '投稿写真審査'] },
   { section: '設定', items: ['アカウント', 'ログインユーザー', '機能設定', '運用状態'] },
 ];
 
@@ -105,12 +105,13 @@ const ROUTES: Record<string, string> = {
   予約管理: '/booking/bookings',
   予約設定: '/booking/menus',
   イベント予約: '/events',
-  NEN配信: '/nen-campaigns',
+  フォロー配信: '/nen-campaigns',
   // 仕様書 §2 は /health と書いているが、/health は「BAN検知ダッシュボード」。
   // 写真審査の画面は /nen-members。§3-1 が BAN検知を「運用状態」へ
   // 統合すると書いているので、そちらに合わせている。
-  写真審査: '/nen-members',
-  EC連携: '/ec-commerce',
+  投稿写真審査: '/nen-members',
+  ECデータ連携: '/ec-commerce',
+  LINE通知: '/line-notifications',
   アカウント: '/accounts',
   ログインユーザー: '/staff',
   機能設定: '/settings',
@@ -131,11 +132,11 @@ describe('サイドバーが V2 設計と一致する', () => {
     },
   );
 
-  it('項目の総数が設計どおり（31）', () => {
+  it('項目の総数が設計どおり（32）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 30 → 31 は「コンテンツ」を「共通情報」「登録メディア一覧」に分けた分。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(31);
+    expect(total).toBe(32);
   });
 
   it('項目の行き先が仕様どおり', () => {

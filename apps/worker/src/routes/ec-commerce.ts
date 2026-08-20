@@ -5,7 +5,8 @@ import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
-import { EC_EVENT_TYPES, ecTextMessage, type EcEvent } from './ec-integrations.js';
+import { EC_EVENT_TYPES, type EcEvent } from './ec-integrations.js';
+import { ecFlexMessage } from '../services/ec-notification-message.js';
 
 const ecCommerce = new Hono<Env>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
@@ -13,20 +14,35 @@ const STATUS_SET = new Set(['received', 'processing', 'processed', 'skipped', 'f
 
 const EVENT_LABELS: Record<string, string> = {
   'ec.order.confirmed': '注文完了',
+  'ec.order.payment_received': '入金確認完了',
+  'ec.order.bank_transfer_reminder': '銀行振込期限',
   'ec.order.shipped': '発送完了',
+  'ec.order.cancelled': '注文キャンセル',
+  'ec.order.refunded': '返金完了',
   'ec.subscription.upcoming': '次回定期便',
   'ec.subscription.payment_failed': '定期便の決済失敗',
+  'ec.subscription.card_updated': 'カード変更・再決済結果',
   'ec.subscription.cancelled': '定期便の解約',
   'ec.customer.profile_updated': 'ペット情報更新',
 };
 
 const FIXED_FIELDS: Record<string, string[]> = {
   'ec.order.confirmed': ['注文番号', '商品名・数量', '合計金額', 'お届け予定', '注文詳細URL'],
+  'ec.order.payment_received': ['注文番号', '入金額', '注文詳細URL'],
+  'ec.order.bank_transfer_reminder': ['注文番号', 'お振込期限', '振込先口座', '注文詳細URL'],
   'ec.order.shipped': ['注文番号', '商品名・数量', '配送会社', '送り状番号', '配送確認URL'],
+  'ec.order.cancelled': ['注文番号', 'キャンセル受付の案内', '注文詳細URL'],
+  'ec.order.refunded': ['注文番号', '返金額', '返金完了の案内'],
   'ec.subscription.upcoming': ['次回確定日', '変更期限', '商品名・数量', '予定金額', '定期便管理URL'],
   'ec.subscription.payment_failed': ['決済失敗の案内', '支払い方法確認の案内', '定期便管理URL'],
+  'ec.subscription.card_updated': ['定期便番号', 'カード変更・再決済結果', 'お支払い金額', '定期便管理URL'],
   'ec.subscription.cancelled': ['解約受付の案内', '定期便番号'],
 };
+
+function isValidHttpsUrl(value: string): boolean {
+  if (!value) return true;
+  try { return new URL(value).protocol === 'https:'; } catch { return false; }
+}
 
 function testEvent(eventType: string): EcEvent {
   const base: EcEvent = {
@@ -41,6 +57,8 @@ function testEvent(eventType: string): EcEvent {
       delivery_date: '2026年8月15日',
       delivery_time: '18:00〜20:00',
       detail_url: 'https://stg.nen-petfood.com/mypage',
+      payment_method: '銀行振込',
+      payment_deadline: '2026年8月25日',
     },
     shipping: {
       carrier: 'ヤマト運輸',
@@ -52,7 +70,11 @@ function testEvent(eventType: string): EcEvent {
       next_order_date: '2026年9月1日',
       change_deadline: '2026年8月28日',
       manage_url: 'https://stg.nen-petfood.com/mypage',
+      contract_number: 'NEN-SUB-TEST',
+      amount: 2860,
+      retry_status: '再決済に成功しました',
     },
+    refund: { amount: 2860, full_refund: true },
   };
   return base;
 }
@@ -151,19 +173,21 @@ ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff')
 
 ecCommerce.get('/api/ec-commerce/settings', async (c) => {
   const rows = await c.env.DB.prepare(
-    `SELECT event_type, is_enabled, title_override, intro_text, outro_text, updated_at
-       FROM ec_notification_settings ORDER BY rowid`,
+    `SELECT event_type, is_enabled, title_override, intro_text, outro_text,
+            category, button_label, button_url, image_url, display_order, updated_at
+       FROM ec_notification_settings ORDER BY display_order, rowid`,
   ).all<{
     event_type: string; is_enabled: number; title_override: string | null;
-    intro_text: string | null; outro_text: string | null; updated_at: string;
+    intro_text: string | null; outro_text: string | null; category: string;
+    button_label: string | null; button_url: string | null; image_url: string | null;
+    display_order: number; updated_at: string;
   }>();
   return c.json({
     success: true,
     data: rows.results.map((row) => {
-      const fixedMessage = ecTextMessage(testEvent(row.event_type), { title: '__FIXED__' });
-      const fixedPreview = fixedMessage.type === 'text'
-        ? fixedMessage.text.replace(/^__FIXED__\n\n?/, '')
-        : '';
+      const fixedPreview = (FIXED_FIELDS[row.event_type] || [])
+        .map((field) => `${field}：ecデータから自動表示`)
+        .join('\n');
       return {
         eventType: row.event_type,
         label: EVENT_LABELS[row.event_type] || row.event_type,
@@ -171,6 +195,11 @@ ecCommerce.get('/api/ec-commerce/settings', async (c) => {
         title: row.title_override,
         introText: row.intro_text || '',
         outroText: row.outro_text || '',
+        category: row.category,
+        buttonLabel: row.button_label || '',
+        buttonUrl: row.button_url || '',
+        imageUrl: row.image_url || '',
+        displayOrder: row.display_order,
         fixedFields: FIXED_FIELDS[row.event_type] || [],
         fixedPreview,
         updatedAt: row.updated_at,
@@ -184,9 +213,12 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
   if (!EVENT_TYPE_SET.has(eventType)) return c.json({ success: false, error: 'Invalid eventType' }, 400);
   const body = await c.req.json<{
     isEnabled?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
+    buttonLabel?: unknown; buttonUrl?: unknown; imageUrl?: unknown;
   }>().catch(() => null);
   if (!body || typeof body.isEnabled !== 'boolean' || typeof body.title !== 'string'
-      || typeof body.introText !== 'string' || typeof body.outroText !== 'string') {
+      || typeof body.introText !== 'string' || typeof body.outroText !== 'string'
+      || typeof body.buttonLabel !== 'string' || typeof body.buttonUrl !== 'string'
+      || typeof body.imageUrl !== 'string') {
     return c.json({ success: false, error: 'isEnabled, title, introText and outroText are required' }, 400);
   }
   const title = body.title.trim();
@@ -196,21 +228,32 @@ ecCommerce.put('/api/ec-commerce/settings/:eventType', requireRole('owner', 'adm
   if (introText.length > 800 || outroText.length > 800) {
     return c.json({ success: false, error: 'Editable copy must be 800 characters or fewer' }, 400);
   }
+  const buttonLabel = body.buttonLabel.trim();
+  const buttonUrl = body.buttonUrl.trim();
+  const imageUrl = body.imageUrl.trim();
+  if (buttonLabel.length > 20 || !isValidHttpsUrl(buttonUrl) || !isValidHttpsUrl(imageUrl)) {
+    return c.json({ success: false, error: 'Invalid button or image' }, 400);
+  }
   const now = jstNow();
   await c.env.DB.prepare(
     `INSERT INTO ec_notification_settings
-       (event_type, is_enabled, title_override, intro_text, outro_text, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
+       (event_type, is_enabled, title_override, intro_text, outro_text,
+        button_label, button_url, image_url, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(event_type) DO UPDATE SET is_enabled = excluded.is_enabled,
        title_override = excluded.title_override, intro_text = excluded.intro_text,
-       outro_text = excluded.outro_text, updated_at = excluded.updated_at`,
-  ).bind(eventType, body.isEnabled ? 1 : 0, title, introText, outroText, now, now).run();
+       outro_text = excluded.outro_text, button_label = excluded.button_label,
+       button_url = excluded.button_url, image_url = excluded.image_url,
+       updated_at = excluded.updated_at`,
+  ).bind(eventType, body.isEnabled ? 1 : 0, title, introText, outroText,
+    buttonLabel || null, buttonUrl || null, imageUrl || null, now, now).run();
   return c.json({ success: true });
 });
 
 ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{
     eventType?: unknown; accountId?: unknown; title?: unknown; introText?: unknown; outroText?: unknown;
+    buttonLabel?: unknown; buttonUrl?: unknown; imageUrl?: unknown;
   }>().catch(() => null);
   if (!body || typeof body.eventType !== 'string' || !EVENT_TYPE_SET.has(body.eventType)) {
     return c.json({ success: false, error: 'Invalid eventType' }, 400);
@@ -220,8 +263,15 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   }
   if (typeof body.title !== 'string' || !body.title.trim() || body.title.trim().length > 80
       || typeof body.introText !== 'string' || body.introText.trim().length > 800
-      || typeof body.outroText !== 'string' || body.outroText.trim().length > 800) {
+      || typeof body.outroText !== 'string' || body.outroText.trim().length > 800
+      || typeof body.buttonLabel !== 'string' || typeof body.buttonUrl !== 'string'
+      || typeof body.imageUrl !== 'string') {
     return c.json({ success: false, error: 'Invalid notification copy' }, 400);
+  }
+  if (body.buttonLabel.trim().length > 20
+      || !isValidHttpsUrl(body.buttonUrl.trim())
+      || !isValidHttpsUrl(body.imageUrl.trim())) {
+    return c.json({ success: false, error: 'Invalid button or image' }, 400);
   }
   const account = await getLineAccountById(c.env.DB, body.accountId);
   if (!account?.channel_access_token) return c.json({ success: false, error: 'LINE account is not configured' }, 400);
@@ -244,10 +294,13 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
   ).bind(body.accountId, ...friendIds).all<{ id: string; line_user_id: string }>();
   if (!friends.results.length) return c.json({ success: false, error: 'No active test recipients' }, 400);
 
-  const message = ecTextMessage(testEvent(body.eventType), {
+  const message = ecFlexMessage(testEvent(body.eventType), {
     title: body.title.trim(),
     introText: body.introText.trim(),
     outroText: body.outroText.trim(),
+    buttonLabel: body.buttonLabel.trim(),
+    buttonUrl: body.buttonUrl.trim(),
+    imageUrl: body.imageUrl.trim(),
     test: true,
   });
   const client = new LineClient(account.channel_access_token);

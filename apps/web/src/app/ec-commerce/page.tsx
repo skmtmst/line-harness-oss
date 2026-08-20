@@ -33,6 +33,7 @@ function MetricCard({ label, value, note, tone = 'green' }: { label: string; val
 }
 
 export default function EcCommercePage() {
+  // Pen canonical: V2 9-3 EC連携。画面名は運用整理後の「ECデータ連携」を表示する。
   const { selectedAccountId } = useAccount()
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [events, setEvents] = useState<EcCommerceEvent[]>([])
@@ -60,7 +61,7 @@ export default function EcCommercePage() {
       setSettings(subscriptionSettings)
       setExpandedEventType((current) => current ?? subscriptionSettings[0]?.eventType ?? null)
     } catch {
-      setMessage({ tone: 'error', text: 'EC連携情報を読み込めませんでした。時間をおいて再度お試しください。' })
+      setMessage({ tone: 'error', text: 'ECデータ連携の情報を読み込めませんでした。時間をおいて再度お試しください。' })
     } finally {
       setLoading(false)
     }
@@ -85,6 +86,9 @@ export default function EcCommercePage() {
         title: setting.title,
         introText: setting.introText,
         outroText: setting.outroText,
+        buttonLabel: setting.buttonLabel,
+        buttonUrl: setting.buttonUrl,
+        imageUrl: setting.imageUrl,
       })
       setMessage({ tone: 'success', text: `${setting.label}の通知設定を保存しました。` })
     } catch {
@@ -112,6 +116,9 @@ export default function EcCommercePage() {
         title: setting.title || '',
         introText: setting.introText,
         outroText: setting.outroText,
+        buttonLabel: setting.buttonLabel,
+        buttonUrl: setting.buttonUrl,
+        imageUrl: setting.imageUrl,
       })
       setMessage({ tone: 'success', text: `${setting.label}を${isEnabled ? 'ON' : 'OFF'}にしました。` })
     } catch {
@@ -136,6 +143,9 @@ export default function EcCommercePage() {
         title: setting.title || '',
         introText: setting.introText,
         outroText: setting.outroText,
+        buttonLabel: setting.buttonLabel,
+        buttonUrl: setting.buttonUrl,
+        imageUrl: setting.imageUrl,
       })
       if (!result.success) throw new Error(result.error)
       setMessage({ tone: 'success', text: `テスト受信者 ${result.data.sent}名へ送信しました。` })
@@ -150,7 +160,7 @@ export default function EcCommercePage() {
     <div>
       <div data-design="Head">
         <Header
-          title="EC連携"
+          title="ECデータ連携"
           description="ECサイトの購入・定期便の情報を取り込み、タグ付けやシナリオ配信につなげます。取り込んだ結果はここで確認できます。"
           action={
             <div className="flex flex-wrap gap-2">
@@ -199,7 +209,7 @@ export default function EcCommercePage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-hairline bg-white shadow-sm">
+          <section className="hidden" aria-hidden="true">
             <div className="border-b border-hairline px-5 py-5 sm:px-6">
               <h2 className="text-lg font-bold text-ink">通知設定</h2>
               <p className="mt-1 text-sm text-ink-faint">OFFにしてもECイベントは記録され、ステップ配信の条件には利用できます。</p>

@@ -700,6 +700,11 @@ export type EcNotificationSetting = {
   title: string | null
   introText: string
   outroText: string
+  category: 'order' | 'payment' | 'shipping' | 'support' | 'subscription'
+  buttonLabel: string
+  buttonUrl: string
+  imageUrl: string
+  displayOrder: number
   fixedFields: string[]
   fixedPreview: string
   updatedAt: string
@@ -2445,12 +2450,12 @@ export const api = {
     },
     settings: () =>
       fetchApi<ApiResponse<EcNotificationSetting[]>>('/api/ec-commerce/settings'),
-    updateSetting: (eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string }) =>
+    updateSetting: (eventType: string, data: { isEnabled: boolean; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
       fetchApi<{ success: boolean }>(`/api/ec-commerce/settings/${encodeURIComponent(eventType)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    testSend: (data: { eventType: string; accountId: string; title: string; introText: string; outroText: string }) =>
+    testSend: (data: { eventType: string; accountId: string; title: string; introText: string; outroText: string; buttonLabel: string; buttonUrl: string; imageUrl: string }) =>
       fetchApi<ApiResponse<{ sent: number }>>('/api/ec-commerce/test-send', {
         method: 'POST',
         body: JSON.stringify(data),
