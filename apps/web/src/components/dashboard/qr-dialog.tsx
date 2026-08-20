@@ -11,7 +11,8 @@ import { api } from '@/lib/api'
  * 選べるようにしてある。Worker の /api/qr は size と download を受けるので、
  * 保存もそのまま通る。
  *
- * 印刷用PDFだけは受け口が無い。押せない形にして理由を書いた。
+ * PDF生成APIは無いため、ブラウザの印刷画面を開く。そこで「PDFに保存」を
+ * 選べば、外部サービスへデータを送らずにPDF化できる。
  */
 
 const SIZES = [
@@ -59,10 +60,14 @@ export default function QrDialog({
   useEffect(() => {
     if (!open) return
     let cancelled = false
-    void api.entryRoutes.list().then((res) => {
-      // 停止中の経路のQRを配ると、読み取っても友だち追加できない。
-      if (!cancelled && res.success) setRoutes(res.data.filter((r) => r.isActive))
-    })
+    void api.entryRoutes.list()
+      .then((res) => {
+        // 停止中の経路のQRを配ると、読み取っても友だち追加できない。
+        if (!cancelled && res.success) setRoutes(res.data.filter((r) => r.isActive))
+      })
+      .catch(() => {
+        // 経路一覧だけが取れなくても、基本の追加URLのQRは表示できる。
+      })
     return () => {
       cancelled = true
     }
@@ -104,8 +109,34 @@ export default function QrDialog({
     }
   }
 
+  const printQr = () => {
+    const printWindow = window.open('', '_blank', 'width=720,height=820')
+    if (!printWindow) return
+    printWindow.opener = null
+    const doc = printWindow.document
+    doc.title = `${accountName} 友だち追加QRコード`
+    const style = doc.createElement('style')
+    style.textContent = 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:48px;text-align:center;color:#1a1c1a}main{max-width:560px;margin:0 auto}img{width:360px;height:360px;object-fit:contain}h1{font-size:22px;margin:24px 0 8px}p{font-size:12px;color:#565f59;word-break:break-all}@media print{body{padding:20mm}}'
+    doc.head.appendChild(style)
+    const main = doc.createElement('main')
+    const image = doc.createElement('img')
+    image.alt = '友だち追加QRコード'
+    image.src = qrSrc
+    const heading = doc.createElement('h1')
+    heading.textContent = accountName
+    const url = doc.createElement('p')
+    url.textContent = link
+    main.append(image, heading, url)
+    doc.body.appendChild(main)
+    image.onload = () => {
+      printWindow.focus()
+      printWindow.print()
+    }
+  }
+
   return (
     <div
+      data-design="QR"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       role="dialog"
       aria-modal="true"
@@ -113,7 +144,7 @@ export default function QrDialog({
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-card max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6"
+        className="bg-canvas rounded-card border-hairline max-h-[90vh] w-full max-w-3xl overflow-y-auto border p-6 shadow-[1px_2px_0_rgba(26,28,26,0.16)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
@@ -151,7 +182,7 @@ export default function QrDialog({
                 href={profileUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="text-info mt-1 max-w-[240px] truncate text-xs hover:underline"
+                className="text-action mt-1 max-w-[240px] truncate text-xs hover:underline"
               >
                 {profileUrl}
               </a>
@@ -181,7 +212,7 @@ export default function QrDialog({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
               <div>
                 <label htmlFor="qr-size" className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像の大きさ
@@ -200,21 +231,22 @@ export default function QrDialog({
                 </select>
               </div>
               <div>
-                <label htmlFor="qr-format" className="text-ink-secondary mb-1 block text-xs font-medium">
+                <span className="text-ink-secondary mb-1 block text-xs font-medium">
                   形式
-                </label>
-                <select
-                  id="qr-format"
-                  value={format}
-                  onChange={(e) => setFormat(e.target.value)}
-                  className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
-                >
-                  {FORMATS.map((f) => (
-                    <option key={f.value} value={f.value}>
-                      {f.label}
-                    </option>
+                </span>
+                <div className="border-hairline rounded-control flex overflow-hidden border" aria-label="画像形式">
+                  {FORMATS.map((entry) => (
+                    <button
+                      key={entry.value}
+                      type="button"
+                      onClick={() => setFormat(entry.value)}
+                      aria-pressed={format === entry.value}
+                      className={`border-hairline border-r px-3 py-2 text-xs font-medium last:border-r-0 ${format === entry.value ? 'bg-action text-on-action' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+                    >
+                      {entry.label}
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
 
@@ -253,15 +285,14 @@ export default function QrDialog({
                 href={saveHref}
                 className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
-                画像を保存
+                {format.toUpperCase()}をダウンロード
               </a>
-              {/* PDFを組み立てる仕組みが無い。 */}
               <button
-                disabled
-                title="印刷用PDFは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+                type="button"
+                onClick={printQr}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
-                印刷用PDF
+                PDFで印刷
               </button>
             </div>
           </div>

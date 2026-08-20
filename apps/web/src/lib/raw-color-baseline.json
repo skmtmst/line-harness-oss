@@ -81,7 +81,7 @@
   "components/chats/friend-info-sidebar.tsx": 85,
   "components/chats/template-picker.tsx": 1,
   "components/dashboard/qr-dialog.tsx": 1,
-  "components/dashboard/shipment-panel.tsx": 29,
+  "components/dashboard/shipment-panel.tsx": 26,
   "components/emergency/release-log-panel.tsx": 32,
   "components/events/event-form.tsx": 235,
   "components/events/event-wizard.tsx": 2,

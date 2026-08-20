@@ -16,7 +16,7 @@ import { fetchApi } from '@/lib/api'
  * 一覧として置けば、件数と中身を同じ重さで読める。
  */
 
-type Summary = {
+export type PendingInboxSummary = {
   total: number
   line: number
   email: number
@@ -40,8 +40,12 @@ function elapsed(iso: string): string {
   return hours < 24 ? `${hours}時間前` : `${Math.floor(hours / 24)}日前`
 }
 
-export default function PendingInboxCard() {
-  const [summary, setSummary] = useState<Summary | null>(null)
+export default function PendingInboxCard({
+  onSummaryChange,
+}: {
+  onSummaryChange?: (summary: PendingInboxSummary | null) => void
+}) {
+  const [summary, setSummary] = useState<PendingInboxSummary | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
   // 一括で畳むための選択。id で持つ。行の並びは自動更新で変わるので、
   // 位置で覚えると別の相手を畳んでしまう。
@@ -50,17 +54,20 @@ export default function PendingInboxCard() {
   const load = useCallback(async () => {
     try {
       const [summaryResponse, inboxResponse] = await Promise.all([
-        fetchApi<{ success: boolean; data: Summary }>('/api/support/summary'),
+        fetchApi<{ success: boolean; data: PendingInboxSummary }>('/api/support/summary'),
         fetchApi<{ success: boolean; data: { items: InboxItem[] } }>(
           '/api/support/inbox?status=open&limit=5',
         ),
       ])
-      if (summaryResponse.success) setSummary(summaryResponse.data)
+      if (summaryResponse.success) {
+        setSummary(summaryResponse.data)
+        onSummaryChange?.(summaryResponse.data)
+      }
       if (inboxResponse.success) setItems(inboxResponse.data.items)
     } catch {
       // ダッシュボード本体は残し、次のポーリングで復旧する。
     }
-  }, [])
+  }, [onSummaryChange])
 
   useEffect(() => {
     void load()
@@ -74,7 +81,7 @@ export default function PendingInboxCard() {
   }, [load])
 
   return (
-    <section className="bg-canvas rounded-card border-hairline border">
+    <section className="bg-canvas rounded-card border-hairline border shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
       <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
         <div className="flex items-baseline gap-2">
           <h2 className="text-ink text-sm font-semibold">対応が必要な受信</h2>
@@ -82,7 +89,7 @@ export default function PendingInboxCard() {
             <span className="text-ink-faint text-xs tabular-nums">{summary.total} 件</span>
           )}
         </div>
-        <Link href="/chats" className="text-accent text-xs hover:underline">
+        <Link href="/chats" className="text-action text-xs hover:underline">
           受信箱をすべて見る
         </Link>
       </div>
@@ -174,7 +181,7 @@ export default function PendingInboxCard() {
                       <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[10px] font-medium">
                         未確認
                       </span>
-                      <Link href="/chats" className="text-accent ml-2 text-xs hover:underline">
+                      <Link href="/chats" className="text-action ml-2 text-xs hover:underline">
                         開く
                       </Link>
                     </td>
@@ -189,7 +196,7 @@ export default function PendingInboxCard() {
               LINE {summary.line} ・ メール {summary.email}
               {summary.oldestWaitMinutes !== null && ` ・ 最長待ち ${summary.oldestWaitMinutes}分`}
             </span>
-            <Link href="/chats" className="text-accent hover:underline">
+            <Link href="/chats" className="text-action hover:underline">
               対応する →
             </Link>
           </div>

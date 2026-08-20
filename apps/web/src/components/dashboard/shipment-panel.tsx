@@ -59,7 +59,17 @@ function ShipmentRow({ row, today, tomorrow }: { row: EcShipment; today: string;
   )
 }
 
-export default function ShipmentPanel() {
+export type ShipmentSummary = {
+  today: number
+  soon: number
+  later: number
+}
+
+export default function ShipmentPanel({
+  onSummaryChange,
+}: {
+  onSummaryChange?: (summary: ShipmentSummary | null) => void
+}) {
   const [data, setData] = useState<EcShipmentList | null>(null)
   const [bucket, setBucket] = useState<Bucket>('soon')
   const [loading, setLoading] = useState(true)
@@ -73,10 +83,16 @@ export default function ShipmentPanel() {
         if (cancelled) return
         if (!r.success) throw new Error(r.error)
         setData(r.data)
+        onSummaryChange?.({
+          today: r.data.soon.filter((row) => row.shipDate === r.data.today).length,
+          soon: r.data.soonCount,
+          later: r.data.laterCount,
+        })
       })
       .catch((e: unknown) => {
         if (cancelled) return
         setError(e instanceof Error ? e.message : String(e))
+        onSummaryChange?.(null)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -84,16 +100,16 @@ export default function ShipmentPanel() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [onSummaryChange])
 
   const rows = data ? (bucket === 'soon' ? data.soon : data.later) : []
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="bg-canvas rounded-card border-hairline border p-5 shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-gray-800">出荷予定</h2>
-        <Link href="/ec-commerce" className="text-xs font-medium text-green-700 hover:underline">
-          すべて見る
+        <Link href="/ec-commerce" className="text-action text-xs font-medium hover:underline">
+          すべて見る →
         </Link>
       </div>
 
