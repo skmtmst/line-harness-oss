@@ -129,8 +129,18 @@ reminders.get('/api/reminders', async (c) => {
     const lineAccountId = c.req.query('lineAccountId');
     let items: Awaited<ReturnType<typeof getReminders>>;
     if (lineAccountId) {
+      /*
+       * 並びは getReminders() と同じにする（161）。
+       *
+       * ここだけ created_at DESC のままだと、**画面から並べ替えても効かない。**
+       * アカウントを選んでいるのが通常の状態（選択は既定で先頭のアカウントに
+       * 入る）なので、効かないほうが既定になっていた。
+       */
       const result = await c.env.DB
-        .prepare(`SELECT * FROM reminders WHERE line_account_id = ? ORDER BY created_at DESC`)
+        .prepare(
+          `SELECT * FROM reminders WHERE line_account_id = ?
+            ORDER BY display_order ASC, created_at DESC`,
+        )
         .bind(lineAccountId)
         .all();
       items = result.results as unknown as Awaited<ReturnType<typeof getReminders>>;
