@@ -2152,6 +2152,8 @@ export const api = {
         messageType: string;
         messageContent: string;
         usageCount: number;
+        /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+        tapCount: number;
         createdAt: string;
         updatedAt: string;
       }>>>(

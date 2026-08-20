@@ -15,6 +15,8 @@ interface Template {
   messageType: string
   messageContent: string
   usageCount: number
+  /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+  tapCount: number
   createdAt: string
   updatedAt: string
 }
@@ -45,7 +47,7 @@ const messageTypeLabels: Record<string, string> = {
 const typeBadgeColor: Record<string, string> = {
   text: 'bg-canvas-sunken text-ink-secondary',
   flex: 'bg-purple-100 text-purple-700',
-  image: 'bg-blue-100 text-blue-700',
+  image: 'bg-info-bg text-info',
   carousel: 'bg-amber-100 text-amber-700',
 }
 
@@ -253,7 +255,7 @@ export default function TemplatesPage() {
       />
       </div>
 
-      <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2" aria-label="テンプレート種別">
+      <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-canvas p-2" aria-label="テンプレート種別">
         {([
           ['message', 'メッセージ'],
           ['rich_message', 'リッチメッセージ'],
@@ -265,7 +267,7 @@ export default function TemplatesPage() {
             key={id}
             type="button"
             onClick={() => { setActiveSection(id); setShowCreate(false) }}
-            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${activeSection === id ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${activeSection === id ? 'bg-accent text-on-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
           >
             {label}
           </button>
@@ -365,13 +367,13 @@ export default function TemplatesPage() {
       {/* Create form */}
       {showCreate && (
         <div className="mb-6 bg-canvas rounded-card border border-hairline p-6">
-          <h2 className="text-sm font-semibold text-gray-800 mb-4">新規テンプレートを作成</h2>
+          <h2 className="text-sm font-semibold text-ink mb-4">新規テンプレートを作成</h2>
           <div className="space-y-4 max-w-lg">
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">名前 <span className="text-red-500">*</span></label>
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="例: コスト比較 flex"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -381,7 +383,7 @@ export default function TemplatesPage() {
               <label className="block text-xs font-medium text-ink-secondary mb-1">カテゴリ</label>
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 placeholder="例: general, 挨拶, 返信"
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
@@ -390,7 +392,7 @@ export default function TemplatesPage() {
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
               <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-canvas"
                 value={form.messageType}
                 onChange={(e) => setForm({ ...form, messageType: e.target.value })}
               >
@@ -431,7 +433,7 @@ export default function TemplatesPage() {
                 />
               ) : (
                 <textarea
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                  className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                   rows={form.messageType === 'flex' ? 10 : 4}
                   placeholder={form.messageType === 'flex' ? '{"type":"bubble","body":...}' : 'メッセージ内容'}
                   value={form.messageContent}
@@ -452,7 +454,7 @@ export default function TemplatesPage() {
               </button>
               <button
                 onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg"
+                className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-lg"
               >
                 キャンセル
               </button>
@@ -496,16 +498,17 @@ export default function TemplatesPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">名前</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">本文</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">使われている配信</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">ヒット数</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">登録日</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-hairline">
                 {filteredTemplates.map((t) => (
                   <tr
                     key={t.id}
                     onClick={() => setDrawerId(t.id)}
-                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors ${drawerId === t.id ? 'bg-green-50' : ''}`}
+                    className={`hover:bg-canvas-sunken cursor-pointer transition-colors ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
@@ -519,7 +522,7 @@ export default function TemplatesPage() {
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
                         {t.category}
                       </span>
                     </td>
@@ -528,13 +531,22 @@ export default function TemplatesPage() {
                         {t.usageCount}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right">
+                      {/* 押される仕掛け（カルーセルの選択肢など）が無いものは 0 のまま。
+                          「-」にしないのは、0 と「数えられない」を見分けられなくなるため。 */}
+                      <span
+                        className={`text-sm tabular-nums ${t.tapCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}
+                      >
+                        {t.tapCount}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                       <a
                         href={`/broadcasts/new?templateId=${encodeURIComponent(t.id)}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="rounded-md border border-emerald-200 px-2.5 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
+                        className="rounded-md border border-hairline px-2.5 py-1 text-xs font-bold text-accent hover:bg-accent-soft"
                       >
                         一斉配信で使う
                       </a>
@@ -561,8 +573,8 @@ export default function TemplatesPage() {
             className="fixed inset-0 bg-black/30 z-30 lg:hidden"
             onClick={() => setDrawerId(null)}
           />
-          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-white shadow-xl border-l border-hairline z-40 overflow-y-auto">
-            <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-white z-10">
+          <div className="fixed inset-y-0 right-0 w-full lg:w-[480px] bg-canvas shadow-xl border-l border-hairline z-40 overflow-y-auto">
+            <div className="px-4 py-3 border-b border-hairline flex items-center justify-between sticky top-0 bg-canvas z-10">
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 {editName !== null ? (
                   <input
@@ -570,7 +582,7 @@ export default function TemplatesPage() {
                     autoFocus
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="flex-1 border border-hairline rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 ) : (
                   <h3
@@ -603,7 +615,7 @@ export default function TemplatesPage() {
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                     {messageTypeLabels[drawerData.messageType] ?? drawerData.messageType}
                   </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
                     {drawerData.category}
                   </span>
                   <span className="text-[10px] text-ink-faint">
@@ -643,7 +655,7 @@ export default function TemplatesPage() {
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
+                    className="w-full border border-hairline rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-green-500 resize-y"
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
                   />
@@ -660,7 +672,7 @@ export default function TemplatesPage() {
                     </button>
                     <button
                       onClick={() => { setEditContent(null); setEditName(null) }}
-                      className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-md"
+                      className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-md"
                     >
                       キャンセル
                     </button>

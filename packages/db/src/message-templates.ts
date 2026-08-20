@@ -166,3 +166,20 @@ export async function getCarouselTapCounts(
     taps: r.taps,
   }));
 }
+
+/**
+ * テンプレートごとの、選択肢が押された回数の合計。
+ *
+ * 一覧に出すためのもの。**1件ずつ引かない。** 20件並べば20回叩くことになる。
+ * まとめて1回で取って、呼び出し側で id から引く。
+ */
+export async function getCarouselTapTotals(db: D1Database): Promise<Map<string, number>> {
+  const rows = await db
+    .prepare(
+      `SELECT template_id, COUNT(*) AS taps
+         FROM carousel_taps
+        GROUP BY template_id`,
+    )
+    .all<{ template_id: string; taps: number }>();
+  return new Map((rows.results ?? []).map((r) => [r.template_id, r.taps]));
+}

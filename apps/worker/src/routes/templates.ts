@@ -6,6 +6,7 @@ import {
   createTemplate,
   updateTemplate,
   deleteTemplate,
+  getCarouselTapTotals,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -46,6 +47,15 @@ templates.get('/api/templates', async (c) => {
   try {
     const category = c.req.query('category') ?? undefined;
     const items = await getTemplatesWithUsageCount(c.env.DB, category);
+    // 押された回数は1回のクエリでまとめて取る。1件ずつ引くと、
+    // 20件並べば20回叩くことになる。
+    let taps = new Map<string, number>();
+    try {
+      taps = await getCarouselTapTotals(c.env.DB);
+    } catch (err) {
+      // 数が出ないだけ。一覧そのものは出す。
+      console.error('GET /api/templates — failed to count carousel taps', err);
+    }
     return c.json({
       success: true,
       data: items.map((t) => ({
@@ -56,6 +66,8 @@ templates.get('/api/templates', async (c) => {
         messageContent: t.message_content,
         folderId: t.folder_id ?? null,
         usageCount: t.usage_count,
+        /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+        tapCount: taps.get(t.id) ?? 0,
         createdAt: t.created_at,
         updatedAt: t.updated_at,
       })),
