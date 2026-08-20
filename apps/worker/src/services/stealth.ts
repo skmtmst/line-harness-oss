@@ -46,17 +46,27 @@ export function addMessageVariation(text: string, index: number): string {
  *
  * 合計遅延の上限: 20秒（30秒制限に対してAPI呼び出し分の余裕を確保）
  *
+ * **batchSize は呼び出し側が実際に使っている 1 バッチの人数を渡す。**
+ * ここを間違えると合計遅延の上限が成り立たなくなる。以前は 500（multicast の
+ * 上限）を直書きしていたため、差し込みあり配信（1 人ずつ push するので
+ * 1 バッチ 10 人）ではバッチ数を 50 分の 1 に見積もっていた。5000 人なら
+ * 実際は 500 バッチあるのに 10 バッチのつもりで遅延を配り、合計 20 秒のはずが
+ * 18 分ぶん sleep する状態だった（時間バジェットで打ち切られるので stall は
+ * しないが、5 分ごとの cron 1 回につき数十人しか進まなくなる）。
+ *
  * @param totalMessages 送信対象の総メッセージ数
  * @param batchIndex 現在のバッチインデックス（0始まり）
+ * @param batchSize 1 バッチの人数。multicast なら 500、差し込みありの push なら 10
  * @returns このバッチ送信前の遅延（ミリ秒）
  */
 export function calculateStaggerDelay(
   totalMessages: number,
   batchIndex: number,
+  batchSize = 500,
 ): number {
   // Cloudflare Worker実行時間制限内に収めるための上限（20秒）
   const MAX_TOTAL_DELAY_MS = 20_000;
-  const totalBatches = Math.ceil(totalMessages / 500);
+  const totalBatches = Math.ceil(totalMessages / Math.max(batchSize, 1));
 
   if (totalMessages <= 100) {
     // 少量送信: 最小限の遅延 + ジッター

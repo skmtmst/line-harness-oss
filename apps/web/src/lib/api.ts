@@ -2152,6 +2152,8 @@ export const api = {
         messageType: string;
         messageContent: string;
         usageCount: number;
+        /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+        tapCount: number;
         createdAt: string;
         updatedAt: string;
       }>>>(
@@ -2164,6 +2166,12 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
+        carouselActions: unknown | null;
+        /** 162: 'none'（制限なし）／'once'（全体で1回） */
+        carouselTapLimitMode: string;
+        /** 162: 制限を超えたときに返すテキスト。 */
+        carouselTapLimitText: string | null;
         usedBy: {
           autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>;
           automations: Array<{ id: string; name: string; eventType: string }>;
@@ -2173,12 +2181,30 @@ export const api = {
       }>>(
         `/api/templates/${id}`,
       ),
-    create: (data: { name: string; category: string; messageType: string; messageContent: string }) =>
+    create: (data: {
+      name: string
+      category: string
+      messageType: string
+      messageContent: string
+      /** 162: 選択肢を押したときの動き。 */
+      carouselActions?: unknown | null
+      /** 162: 'none'（制限なし）／'once'（全体で1回） */
+      carouselTapLimitMode?: 'none' | 'once'
+      /** 162: 制限を超えたときに返すテキスト。 */
+      carouselTapLimitText?: string | null
+    }) =>
       fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
-    update: (id: string, data: Partial<{ name: string; category: string; messageType: string; messageContent: string }>) =>
+    update: (
+      id: string,
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string }> & {
+        carouselActions?: unknown | null
+        carouselTapLimitMode?: 'none' | 'once'
+        carouselTapLimitText?: string | null
+      },
+    ) =>
       fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
@@ -2221,6 +2247,8 @@ export const api = {
         name: string | null;
         /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
         keywordMatchMode: string;
+        /** フォルダ。分けていなければ null。 */
+        folderId: string | null;
         /** 152: 当たった回数（今月・累計）。一覧でだけ入る。 */
         hits?: { period: number; total: number };
         createdAt: string;
@@ -2295,6 +2323,8 @@ export const api = {
       name?: string | null;
       /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
       keywordMatchMode?: 'any' | 'all';
+      /** フォルダ。 */
+      folderId?: string | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/auto-replies', {
         method: 'POST',
@@ -2332,6 +2362,8 @@ export const api = {
       name?: string | null;
       /** 158: 'any'（どれか1つ）か 'all'（すべて）。 */
       keywordMatchMode?: 'any' | 'all';
+      /** フォルダ。 */
+      folderId?: string | null;
     }) =>
       fetchApi<ApiResponse<{ id: string }>>(`/api/auto-replies/${id}`, {
         method: 'PUT',
@@ -2906,6 +2938,10 @@ export const api = {
         targetingCondition: string | null;
         targetingPriority: number;
         targetingEnabled: boolean;
+        /** 159: フォルダ。分けていなければ null。 */
+        folderId: string | null;
+        /** 160: 自分で決める並び順。 */
+        displayOrder: number;
         thumbnailR2Key: string | null;
         createdAt: string;
         updatedAt: string;
@@ -2925,6 +2961,7 @@ export const api = {
         targetingCondition: string | null;
         targetingPriority: number;
         targetingEnabled: boolean;
+        folderId: string | null;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -2964,6 +3001,10 @@ export const api = {
       targetingCondition?: string | null;
       targetingPriority?: number;
       targetingEnabled?: boolean;
+      /** 159: フォルダ。null で未分類に戻す。 */
+      folderId?: string | null;
+      /** 160: 自分で決める並び順。 */
+      displayOrder?: number;
       pages?: Array<{
         id?: string;
         name: string;

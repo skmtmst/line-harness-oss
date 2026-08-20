@@ -165,7 +165,10 @@
     "156_reminder_folder.sql",
     "157_auto_reply_respond_to_all.sql",
     "158_auto_reply_name.sql",
-    "161_reminder_display_order.sql"
+    "159_rich_menu_folder.sql",
+    "160_rich_menu_display_order.sql",
+    "161_reminder_display_order.sql",
+    "162_carousel_actions.sql"
   ],
-  "migrationCount": 166
+  "migrationCount": 169
 }
