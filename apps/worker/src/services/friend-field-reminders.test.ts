@@ -2,13 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const getFriendFieldReminders = vi.fn();
 const getFriendsWithFieldValue = vi.fn();
-const hasReminderEnrollment = vi.fn();
+/*
+ * 「もう入っているか」は、1人ずつではなく1回で引く。
+ * 友だちの数だけ問い合わせが飛ぶと、Cloudflare Workers の上限に当たって
+ * その日のぶんが途中で止まる（しかも例外にならない）。
+ */
+const getReminderEnrollmentKeys = vi.fn();
 const enrollFriendInReminder = vi.fn();
 
 vi.mock('@line-crm/db', () => ({
   getFriendFieldReminders: (...a: unknown[]) => getFriendFieldReminders(...a),
   getFriendsWithFieldValue: (...a: unknown[]) => getFriendsWithFieldValue(...a),
-  hasReminderEnrollment: (...a: unknown[]) => hasReminderEnrollment(...a),
+  getReminderEnrollmentKeys: (...a: unknown[]) => getReminderEnrollmentKeys(...a),
   enrollFriendInReminder: (...a: unknown[]) => enrollFriendInReminder(...a),
 }));
 
@@ -31,7 +36,7 @@ function reminder(patch: Record<string, unknown> = {}) {
 beforeEach(() => {
   getFriendFieldReminders.mockReset();
   getFriendsWithFieldValue.mockReset();
-  hasReminderEnrollment.mockReset().mockResolvedValue(false);
+  getReminderEnrollmentKeys.mockReset().mockResolvedValue(new Set<string>());
   enrollFriendInReminder.mockReset().mockResolvedValue({ id: 'fr-1' });
 });
 
@@ -80,7 +85,10 @@ describe('processFriendFieldReminders', () => {
       getFriendsWithFieldValue.mockResolvedValue([
         { friend_id: 'f-1', value: '1990-05-03' },
       ]);
-      hasReminderEnrollment.mockResolvedValue(true);
+      // 既に入っている組を返す。手元で照合するので、鍵は friendId + \u0000 + targetDate。
+      getReminderEnrollmentKeys.mockResolvedValue(
+        new Set(['f-1\u00002026-05-03T00:00:00+09:00']),
+      );
 
       const result = await processFriendFieldReminders(db, jst('2026-04-01T00:05'));
 
@@ -149,5 +157,28 @@ describe('processFriendFieldReminders', () => {
     const result = await processFriendFieldReminders(db, new Date('2026-05-02T15:30:00Z'));
 
     expect(result.enrolled).toBe(1);
+  });
+});
+
+/*
+ * 友だちの数だけ問い合わせが飛ばないか。
+ *
+ * 誕生日リマインダは「誕生日が入っている人」を**全員**見る。1人ずつ
+ * 「もう入っているか」を聞くと、5,000人いれば毎日5,000回になる。
+ * Cloudflare Workers の1回の実行で出せる問い合わせ数には上限があり、
+ * そこに当たると**その日のぶんが途中で止まる。しかも例外にならないので、
+ * 途中まで動いたように見える。**
+ */
+describe('問い合わせの回数', () => {
+  it('友だちが何人いても、1つのリマインダにつき1回しか引かない', async () => {
+    getFriendFieldReminders.mockResolvedValue([reminder()]);
+    getFriendsWithFieldValue.mockResolvedValue(
+      Array.from({ length: 500 }, (_, i) => ({ friend_id: `f-${i}`, value: '1990-05-03' })),
+    );
+    getReminderEnrollmentKeys.mockResolvedValue(new Set<string>());
+
+    await processFriendFieldReminders(db, jst('2026-04-01T00:05'));
+
+    expect(getReminderEnrollmentKeys).toHaveBeenCalledTimes(1);
   });
 });
