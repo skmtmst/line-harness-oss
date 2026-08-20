@@ -164,7 +164,8 @@
     "155_reminder_step_message_kinds.sql",
     "157_auto_reply_respond_to_all.sql",
     "158_auto_reply_name.sql",
-    "159_rich_menu_folder.sql"
+    "159_rich_menu_folder.sql",
+    "160_rich_menu_display_order.sql"
   ],
-  "migrationCount": 165
+  "migrationCount": 166
 }
