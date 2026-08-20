@@ -333,6 +333,28 @@ export async function getFriendsWithFieldValue(
  * 毎年くり返すリマインダは、年ごとに別のゴール日になる。だから
  * 「去年立てたから今年は立てない」にはならない。同じ年に二重に立つのだけを防ぐ。
  */
+/**
+ * このリマインダに、いま入っている「友だち＋ゴール日」の組を全部返す。
+ *
+ * 毎日の処理で1人ずつ `hasReminderEnrollment` を呼ぶと、**友だちの数だけ
+ * 問い合わせが飛ぶ。** 誕生日リマインダは「誕生日が入っている人」を全員
+ * 見るので、5,000人いれば毎日5,000回になる。Cloudflare Workers の
+ * 1回の実行で出せる問い合わせ数には上限があり、そこに当たると
+ * **その日のぶんが途中で止まる**（しかも例外にならず、途中まで動いたように見える）。
+ *
+ * 1回で引いて、あとは手元で照合する。
+ */
+export async function getReminderEnrollmentKeys(
+  db: D1Database,
+  reminderId: string,
+): Promise<Set<string>> {
+  const rows = await db
+    .prepare(`SELECT friend_id, target_date FROM friend_reminders WHERE reminder_id = ?`)
+    .bind(reminderId)
+    .all<{ friend_id: string; target_date: string }>();
+  return new Set((rows.results ?? []).map((r) => `${r.friend_id}\u0000${r.target_date}`));
+}
+
 export async function hasReminderEnrollment(
   db: D1Database,
   friendId: string,
