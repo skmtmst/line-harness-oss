@@ -4,11 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
-    "prebuild": "node scripts/build-release-log.mjs",
+    "predev": "node scripts/build-release-log.mjs",
+    "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "build": "next build",
+    "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "release-log": "node scripts/build-release-log.mjs",
+    "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
