@@ -9,6 +9,10 @@ import { markInboxConversationRead } from '@line-crm/db';
 
 export const supportInbox = new Hono<Env>();
 
+export function paginateSupportInboxItems<T>(items: T[], offset: number, limit: number): T[] {
+  return items.slice(offset, offset + limit);
+}
+
 export function extractContactFormReceipt(text: string | undefined): {
   customerEmail?: string;
   customerName?: string;
@@ -155,6 +159,10 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
     const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
+    const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+    // LINEとメールを待ち時間順で統合してからページを切るため、要求ページの末尾まで
+    // 両方の候補を取得する。1回に読む件数は従来どおり最大200件に抑える。
+    const fetchLimit = Math.min(200, limit + offset);
     const items: Array<Record<string, unknown>> = [];
 
     if (channel !== 'line') {
@@ -174,7 +182,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
         const like = `%${query}%`;
         bindings.push(like, like, like);
       }
-      bindings.push(limit);
+      bindings.push(fetchLimit);
       const emailRows = await c.env.DB.prepare(
         `SELECT t.id, t.customer_email, t.customer_name, t.subject, t.status,
                 t.assigned_staff_id,
@@ -220,7 +228,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       const line = await computeUnansweredInbox(c.env.DB, {
         q: query || undefined,
         page: 1,
-        pageSize: limit,
+        pageSize: fetchLimit,
       });
       for (const row of line.rows) {
         items.push({
@@ -249,7 +257,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       // 対応漏れを防ぐため、同じ状態では待ち時間が長い顧客を先頭にする。
       return String(a.lastIncomingAt).localeCompare(String(b.lastIncomingAt));
     });
-    return c.json({ success: true, data: { items: items.slice(0, limit) } });
+    return c.json({ success: true, data: { items: paginateSupportInboxItems(items, offset, limit) } });
   } catch (error) {
     console.error(JSON.stringify({ event: 'support_inbox_failed', error: String(error) }));
     return c.json({ success: false, error: 'Internal server error' }, 500);
