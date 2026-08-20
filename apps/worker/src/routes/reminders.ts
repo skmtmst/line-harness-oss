@@ -225,9 +225,30 @@ reminders.delete('/api/reminders/:id', requireRole('owner', 'admin'), async (c) 
 reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async (c) => {
   try {
     const reminderId = c.req.param('id');
-    const body = await c.req.json<{ offsetMinutes: number; messageType: string; messageContent: string }>();
+    const body = await c.req.json<{
+      offsetMinutes: number;
+      messageType: string;
+      messageContent: string;
+      offsetDays?: number | null;
+      sendAtTime?: string | null;
+      templateId?: string | null;
+    }>();
     if (body.offsetMinutes === undefined || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'offsetMinutes, messageType, messageContent are required' }, 400);
+    }
+    if (
+      body.sendAtTime !== undefined &&
+      body.sendAtTime !== null &&
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.sendAtTime)
+    ) {
+      return c.json({ success: false, error: 'sendAtTime must be HH:MM' }, 400);
+    }
+    if (
+      body.offsetDays !== undefined &&
+      body.offsetDays !== null &&
+      (!Number.isInteger(body.offsetDays) || Math.abs(body.offsetDays) > 365)
+    ) {
+      return c.json({ success: false, error: 'offsetDays must be an integer within +/- 365' }, 400);
     }
     const step = await createReminderStep(c.env.DB, { reminderId, ...body });
     return c.json({

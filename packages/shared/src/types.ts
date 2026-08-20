@@ -906,7 +906,11 @@ export interface CalendarBooking {
 // -----------------------------------------------------------------------------
 
 /** リマインダを動かすきっかけ */
-export type ReminderTriggerType = "manual" | "booking" | "event";
+/**
+ * リマインダのゴールを何で決めるか。
+ *   friend_field … 友だち情報欄の日付（誕生日・次回お届け日・契約更新日）。154 で追加。
+ */
+export type ReminderTriggerType = "manual" | "booking" | "event" | "friend_field";
 
 export interface Reminder {
   id: string;

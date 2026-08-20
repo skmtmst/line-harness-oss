@@ -11,10 +11,7 @@ import {
 import type { AutoReply as DbAutoReply } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-// 集計の期間（その月の1日〜翌月1日、日本時間）はリッチメニューと同じもの。
-// 置き場所が rich-menu-tap.ts なのは、そちらで先に要ったため。共通の置き場へ
-// 移すのは #189 が入ってから（いま動かすとレビュー中の差分が変わる）。
-import { currentMonthRange } from '../lib/rich-menu-tap.js';
+import { currentMonthRange } from '../lib/jst-range.js';
 
 const autoReplies = new Hono<Env>();
 

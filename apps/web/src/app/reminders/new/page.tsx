@@ -36,10 +36,28 @@ export default function NewReminderPage() {
   const [messageContent, setMessageContent] = useState('')
   const [activateNow, setActivateNow] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
+  // 154: 友だち情報欄の日付を起点にするときの設定
+  const [triggerFieldId, setTriggerFieldId] = useState('')
+  const [repeatYearly, setRepeatYearly] = useState(true)
+  const [dateFields, setDateFields] = useState<Array<{ id: string; name: string }>>([])
+  // 153: 配信方式。作成後は変えられない
+  const [deliveryMode, setDeliveryMode] = useState<'time' | 'countdown'>('countdown')
+  const [offsetDays, setOffsetDays] = useState(-1)
+  const [stepSendAtTime, setStepSendAtTime] = useState('10:00')
 
   useEffect(() => {
     void api.tags.list().then((res) => {
       if (res.success) setTags(res.data)
+    })
+    // 起点にできるのは日付の欄だけ。文字の欄を選ばせても日付として読めない。
+    void api.friendFields.list().then((res) => {
+      if (res.success) {
+        setDateFields(
+          res.data
+            .filter((f) => f.type === 'date')
+            .map((f) => ({ id: f.id, name: f.name })),
+        )
+      }
     })
   }, [])
 
@@ -52,6 +70,9 @@ export default function NewReminderPage() {
       validate={() => {
         if (!name.trim()) return 'リマインダ名を入力してください'
         if (!messageContent.trim()) return '送る内容を入力してください'
+        if (triggerType === 'friend_field' && !triggerFieldId) {
+          return '起点にする友だち情報の欄を選んでください'
+        }
         return null
       }}
       onReset={() => {
@@ -66,14 +87,19 @@ export default function NewReminderPage() {
           triggerType,
           sendAtTime: triggerType === 'manual' ? null : sendAtTime || null,
           targetTagId: targetTagId || null,
+          deliveryMode,
+          triggerFieldId: triggerType === 'friend_field' ? triggerFieldId || null : null,
+          repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
         })
         if (!res.success) throw new Error(res.error)
-        // ステップが1つも無いと、対象に加わっても何も届かない。作るときに
-        // 1通目まで入れてしまう。
+        // 通が1つも無いと、対象に加わっても何も届かない。作るときに1通目まで入れる。
         await api.reminders.addStep(res.data.id, {
           offsetMinutes,
           messageType: 'text',
           messageContent: messageContent.trim(),
+          // 「○日前の●時」で決めるときは、日数と時刻を持たせる。
+          offsetDays: deliveryMode === 'time' ? offsetDays : null,
+          sendAtTime: deliveryMode === 'time' ? stepSendAtTime : null,
         })
         return res.data.id
       }}
@@ -160,10 +186,106 @@ export default function NewReminderPage() {
               note="一度だけ送ります"
               onClick={() => setTriggerType('manual')}
             />
+            <ChoiceCard
+              selected={triggerType === 'friend_field'}
+              title="友だち情報欄の日付"
+              note="誕生日・次回お届け日・契約更新日など"
+              onClick={() => setTriggerType('friend_field')}
+            />
           </div>
         </Field>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        {triggerType === 'friend_field' && (
+          <>
+            <Field
+              label="どの日付を見るか"
+              htmlFor="rm-field"
+              note="友だち情報の「日付」の欄だけが並びます。"
+            >
+              <select
+                id="rm-field"
+                value={triggerFieldId}
+                onChange={(e) => setTriggerFieldId(e.target.value)}
+                className={inputClass}
+              >
+                <option value="">選んでください</option>
+                {dateFields.length === 0 && <option value="">（日付の欄がありません）</option>}
+                {dateFields.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="くり返し">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <ChoiceCard
+                  selected={repeatYearly}
+                  title="毎年くり返す"
+                  note="誕生日など。年が変わるたびに送ります"
+                  onClick={() => setRepeatYearly(true)}
+                />
+                <ChoiceCard
+                  selected={!repeatYearly}
+                  title="1回だけ"
+                  note="契約更新日など。その日が来たら1度だけ"
+                  onClick={() => setRepeatYearly(false)}
+                />
+              </div>
+            </Field>
+          </>
+        )}
+
+        <Field
+          label="送るタイミングの決め方"
+          note="**作成したあとは変えられません。** 途中で変えると、すでに登録済みの人の配信予定がすべて変わってしまうためです。"
+        >
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ChoiceCard
+              selected={deliveryMode === 'time'}
+              title="○日前の●時"
+              note="「3日前の10時」のように、日付と時刻で決めます"
+              onClick={() => setDeliveryMode('time')}
+            />
+            <ChoiceCard
+              selected={deliveryMode === 'countdown'}
+              title="ゴールからの残り時間"
+              note="「1時間前」のように、そこからの長さで決めます"
+              onClick={() => setDeliveryMode('countdown')}
+            />
+          </div>
+        </Field>
+
+        {deliveryMode === 'time' && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="何日ずらすか" htmlFor="rm-offset-days" note="マイナスが前、プラスが後。">
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="rm-offset-days"
+                  type="number"
+                  value={offsetDays}
+                  onChange={(e) => setOffsetDays(parseInt(e.target.value, 10) || 0)}
+                  className={`${inputClass} w-24`}
+                />
+                <span className="text-ink-faint text-xs whitespace-nowrap">
+                  日{offsetDays < 0 ? '前' : offsetDays > 0 ? '後' : '（当日）'}
+                </span>
+              </div>
+            </Field>
+            <Field label="その日の何時に" htmlFor="rm-step-time">
+              <input
+                id="rm-step-time"
+                type="time"
+                value={stepSendAtTime}
+                onChange={(e) => setStepSendAtTime(e.target.value)}
+                className={inputClass}
+              />
+            </Field>
+          </div>
+        )}
+
+        <div className={`grid gap-3 sm:grid-cols-2 ${deliveryMode === 'time' ? 'hidden' : ''}`}>
           <Field label="どれだけ前に送るか" htmlFor="rm-offset">
             <select
               id="rm-offset"

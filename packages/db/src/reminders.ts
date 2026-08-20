@@ -145,12 +145,40 @@ export async function getReminderSteps(db: D1Database, reminderId: string): Prom
 
 export async function createReminderStep(
   db: D1Database,
-  input: { reminderId: string; offsetMinutes: number; messageType: string; messageContent: string },
+  input: {
+    reminderId: string;
+    offsetMinutes: number;
+    messageType: string;
+    messageContent: string;
+    /** 153: ゴールから何日ずらすか。配信方式が 'time' のとき使う。 */
+    offsetDays?: number | null;
+    /** 153: その日の何時に送るか（日本時間の "HH:MM"）。 */
+    sendAtTime?: string | null;
+    /** 153: 送る中身をテンプレートから選ぶ。 */
+    templateId?: string | null;
+  },
 ): Promise<ReminderStepRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO reminder_steps (id, reminder_id, offset_minutes, message_type, message_content, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.reminderId, input.offsetMinutes, input.messageType, input.messageContent, now).run();
+  await db
+    .prepare(
+      `INSERT INTO reminder_steps
+         (id, reminder_id, offset_minutes, message_type, message_content,
+          offset_days, send_at_time, template_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      id,
+      input.reminderId,
+      input.offsetMinutes,
+      input.messageType,
+      input.messageContent,
+      input.offsetDays ?? null,
+      input.sendAtTime ?? null,
+      input.templateId ?? null,
+      now,
+    )
+    .run();
   return (await db.prepare(`SELECT * FROM reminder_steps WHERE id = ?`).bind(id).first<ReminderStepRow>())!;
 }
 

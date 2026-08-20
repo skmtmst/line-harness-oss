@@ -79,7 +79,10 @@ CREATE TABLE IF NOT EXISTS scenario_steps (
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
   step_order      INTEGER NOT NULL,
   delay_minutes   INTEGER NOT NULL DEFAULT 0,
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
+  -- 155: シナリオ・一斉配信と同じ8種別
+  message_type    TEXT NOT NULL CHECK (message_type IN (
+                    'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel'
+                  )),
   message_content TEXT NOT NULL,
   message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
   offset_days     INTEGER,

@@ -2557,6 +2557,12 @@ export const api = {
       triggerOffsetMinutes?: number | null
       sendAtTime?: string | null
       targetTagId?: string | null
+      /** 153: 'time'（○日前の●時）か 'countdown'（残り時間）。**作成後は変えられない。** */
+      deliveryMode?: 'time' | 'countdown'
+      /** 154: 友だち情報欄の日付を起点にするとき、見る欄。 */
+      triggerFieldId?: string | null
+      /** 154: 毎年くり返すか（誕生日なら true）。 */
+      repeatYearly?: boolean
     }) =>
       fetchApi<ApiResponse<Reminder>>('/api/reminders', {
         method: 'POST',
@@ -2583,7 +2589,20 @@ export const api = {
       }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/reminders/${id}`, { method: 'DELETE' }),
-    addStep: (id: string, data: { offsetMinutes: number; messageType: string; messageContent: string }) =>
+    addStep: (
+      id: string,
+      data: {
+        offsetMinutes: number
+        messageType: string
+        messageContent: string
+        /** 153: ゴールから何日ずらすか。配信方式が 'time' のとき使う。 */
+        offsetDays?: number | null
+        /** 153: その日の何時に送るか（日本時間の "HH:MM"）。 */
+        sendAtTime?: string | null
+        /** 153: 送る中身をテンプレートから選ぶ。 */
+        templateId?: string | null
+      },
+    ) =>
       fetchApi<ApiResponse<ReminderStep>>(`/api/reminders/${id}/steps`, {
         method: 'POST',
         body: JSON.stringify(data),

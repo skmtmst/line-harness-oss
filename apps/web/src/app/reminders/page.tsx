@@ -56,6 +56,7 @@ const TRIGGER_LABELS: Record<ReminderTriggerType, string> = {
   manual: '手動で対象を登録',
   booking: '予約が入ったとき',
   event: 'イベントに申し込まれたとき',
+  friend_field: '友だち情報欄の日付',
 }
 
 interface StepFormState {
