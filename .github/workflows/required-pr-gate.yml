@@ -63,6 +63,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "PRの差分が取れないため、この確認は飛ばします。"
@@ -88,10 +89,31 @@ jobs:
             exit 0
           fi
 
-          added=$(git diff "$BASE_SHA...$HEAD_SHA" -- docs/release-log/unreleased.md \
-            | grep -c '^+[-*] ' || true)
+          added_lines=$(git diff "$BASE_SHA...$HEAD_SHA" -- docs/release-log/unreleased.md \
+            | grep '^+[-*] ' || true)
+          added=$(printf '%s' "$added_lines" | grep -c '^+' || true)
           if [ "$added" -gt 0 ]; then
             echo "反映履歴に $added 行足されています。"
+
+            # PR番号が入っているか。
+            #
+            # 行を書く時点ではPR番号がまだ無いので、書き忘れやすい。書式では
+            # 任意なので、抜けていても組み立ては通る。**通ってしまうから抜ける。**
+            # 管理画面の「更新履歴」に番号が出ず、どの変更か辿れなくなる。
+            # 実際、一晩で19行が番号なしのまま入った。
+            missing=$(printf '%s\n' "$added_lines" | grep -v "#${PR_NUMBER}\b" || true)
+            if [ -n "$missing" ]; then
+              echo "::error::反映履歴の行に PR番号 #${PR_NUMBER} が入っていません。"
+              echo ""
+              echo "  管理画面の 運用状態 → 更新履歴 で、どの変更か辿れなくなります。"
+              echo "  次の形にしてください（順序は問いません）:"
+              echo ""
+              echo "    - 変更した内容 @kenta #${PR_NUMBER} $(date -u +%Y-%m-%d) HH:MM"
+              echo ""
+              echo "  入っていない行:"
+              printf '%s\n' "$missing" | sed 's/^+/    /'
+              exit 1
+            fi
             exit 0
           fi
 
