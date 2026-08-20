@@ -55,11 +55,16 @@ describe('Pen.dev V4を共通レイアウトの正本にする', () => {
   })
 
   it('対応が必要な受信はV4の4列だけを出し、右カラムと同じ高さにする', () => {
-    for (const label of ['お名前', '内容', '待ち時間', '状態', 'h-[440px]']) {
+    for (const label of ['お名前', '内容', '待ち時間', '状態', 'h-[440px]', 'PAGE_SIZE = 5', '前のページ', '次のページ']) {
       expect(pendingInbox).toContain(label)
     }
+    expect(pendingInbox).toContain('offset=${(page - 1) * PAGE_SIZE}')
     expect(pendingInbox).not.toContain('一括で確認済みにする')
     expect(pendingInbox).not.toContain('すべて選択')
+  })
+
+  it('ダッシュボード見出しの補足文を表示しない', () => {
+    expect(dashboard).not.toContain('運用状況です。')
   })
 
   it('V4で追加したメニューが実装から消えていない', () => {

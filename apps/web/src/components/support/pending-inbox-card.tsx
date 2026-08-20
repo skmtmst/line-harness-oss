@@ -32,6 +32,8 @@ type InboxItem = {
   lastIncomingAt: string
 }
 
+const PAGE_SIZE = 5
+
 function elapsed(iso: string): string {
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000))
   if (minutes < 1) return 'たった今'
@@ -47,13 +49,15 @@ export default function PendingInboxCard({
 }) {
   const [summary, setSummary] = useState<PendingInboxSummary | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
+  const [page, setPage] = useState(1)
+  const pageCount = Math.max(1, Math.ceil((summary?.total ?? 0) / PAGE_SIZE))
 
   const load = useCallback(async () => {
     try {
       const [summaryResponse, inboxResponse] = await Promise.all([
         fetchApi<{ success: boolean; data: PendingInboxSummary }>('/api/support/summary'),
         fetchApi<{ success: boolean; data: { items: InboxItem[] } }>(
-          '/api/support/inbox?status=open&limit=5',
+          `/api/support/inbox?status=open&limit=${PAGE_SIZE}&offset=${(page - 1) * PAGE_SIZE}`,
         ),
       ])
       if (summaryResponse.success) {
@@ -64,7 +68,11 @@ export default function PendingInboxCard({
     } catch {
       // ダッシュボード本体は残し、次のポーリングで復旧する。
     }
-  }, [onSummaryChange])
+  }, [onSummaryChange, page])
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
 
   useEffect(() => {
     void load()
@@ -96,8 +104,9 @@ export default function PendingInboxCard({
           返信を待っている問い合わせはありません。
         </p>
       ) : (
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <table className="w-full table-fixed text-sm">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <table className="w-full table-fixed text-sm">
               <thead>
                 <tr className="text-ink-faint border-hairline h-[34px] border-b text-left text-xs">
                   <th className="w-[36%] px-5 font-medium">お名前</th>
@@ -135,7 +144,36 @@ export default function PendingInboxCard({
                   </tr>
                 ))}
               </tbody>
-          </table>
+            </table>
+          </div>
+          {pageCount > 1 ? (
+            <nav
+              className="border-hairline flex h-[50px] shrink-0 items-center justify-end gap-2 border-t px-5"
+              aria-label="受信一覧のページ送り"
+            >
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+                className="border-hairline text-ink hover:bg-canvas-sunken rounded-control min-h-8 border px-3 text-xs disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="前のページ"
+              >
+                前へ
+              </button>
+              <span className="text-ink-secondary min-w-16 text-center text-xs tabular-nums">
+                {page} / {pageCount}ページ
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                disabled={page === pageCount}
+                className="border-hairline text-ink hover:bg-canvas-sunken rounded-control min-h-8 border px-3 text-xs disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="次のページ"
+              >
+                次へ
+              </button>
+            </nav>
+          ) : null}
         </div>
       )}
     </section>
