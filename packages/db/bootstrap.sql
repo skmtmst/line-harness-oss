@@ -133,10 +133,29 @@ CREATE TABLE auto_replies (
   template_id      TEXT REFERENCES templates(id) ON DELETE SET NULL,
   line_account_id  TEXT DEFAULT NULL,
   is_active        INTEGER NOT NULL DEFAULT 1,
-  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  -- 151: 応答したときに順に実行することの並び（シナリオのアクションと同じ形）。
+  actions_json           TEXT,
+  -- 151: 応答する曜日（0=日 … 6=土）。時間帯は active_from / active_until が持つ。
+  response_weekdays_json TEXT,
+  -- 151: 'ignore' | 'include' | 'exclude'
+  response_holiday_rule  TEXT,
+  -- 151: 1人につき1回だけ応答する。cooldown_minutes（N分空ける）とは別。
+  once_per_friend        INTEGER NOT NULL DEFAULT 0,
+  -- 151: キーワードを複数行持つ。未設定なら keyword / match_type を見る。
+  keywords_json          TEXT
 , active_from TEXT, active_until TEXT, cooldown_minutes INTEGER, skip_when_operator_active INTEGER NOT NULL DEFAULT 0, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, priority INTEGER NOT NULL DEFAULT 0, message_kinds_json TEXT
   CHECK (message_kinds_json IS NULL OR json_valid(message_kinds_json)), friend_conditions_json TEXT
   CHECK (friend_conditions_json IS NULL OR json_valid(friend_conditions_json)));
+
+CREATE TABLE auto_reply_hits (
+  id              TEXT PRIMARY KEY,
+  auto_reply_id   TEXT NOT NULL,
+  friend_id       TEXT,
+  line_account_id TEXT,
+  matched_keyword TEXT,
+  hit_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE automation_logs (
   id             TEXT PRIMARY KEY,
@@ -1785,6 +1804,10 @@ CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
 CREATE UNIQUE INDEX idx_affiliates_friend ON affiliates (friend_id) WHERE friend_id IS NOT NULL;
 
 CREATE INDEX idx_auto_replies_template_id ON auto_replies(template_id);
+
+CREATE INDEX idx_auto_reply_hits_friend ON auto_reply_hits(auto_reply_id, friend_id);
+
+CREATE INDEX idx_auto_reply_hits_rule   ON auto_reply_hits(auto_reply_id, hit_at);
 
 CREATE INDEX idx_automation_logs_automation ON automation_logs (automation_id);
 

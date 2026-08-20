@@ -5,6 +5,7 @@ import {
   isOperatorHandling,
   jstHhmm,
   shouldReply,
+  isOnRespondingDay,
 } from './auto-reply-conditions.js';
 
 describe('時間帯の判定', () => {
@@ -122,10 +123,15 @@ describe('有人対応の判定', () => {
 describe('3条件をまとめた判定', () => {
   const now = new Date('2026-08-15T03:00:00Z'); // JST 12:00
   const base = {
+    id: 'rule-1',
     active_from: null,
     active_until: null,
     cooldown_minutes: null,
     skip_when_operator_active: 0,
+    once_per_friend: 0,
+    friend_conditions_json: null,
+    response_weekdays_json: null,
+    response_holiday_rule: null,
   };
 
   it('条件が無ければ返す', async () => {
@@ -161,5 +167,79 @@ describe('3条件をまとめた判定', () => {
   it('抑制中は返さない', async () => {
     const db = dbReturning({ 1: 1 });
     expect(await shouldReply(db, { ...base, cooldown_minutes: 30 }, 'f-1', now)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 151: 曜日・祝日・1人につき1回
+// ---------------------------------------------------------------------------
+
+describe('応答する曜日', () => {
+  const base = {
+    active_from: null,
+    active_until: null,
+    response_weekdays_json: null,
+    response_holiday_rule: null,
+  };
+  /** 日本時間の "YYYY-MM-DDTHH:MM" を Date にする。 */
+  const jst = (text: string) => new Date(`${text}:00+09:00`);
+
+  it('設定が無ければ、どの曜日でも応答する', () => {
+    expect(isOnRespondingDay(base, jst('2026-08-20T12:00'))).toBe(true);
+  });
+
+  it('選んだ曜日だけ応答する', () => {
+    // 2026-08-20 は木曜（4）、21 は金曜（5）
+    const rule = { ...base, response_weekdays_json: '[4]' };
+    expect(isOnRespondingDay(rule, jst('2026-08-20T12:00'))).toBe(true);
+    expect(isOnRespondingDay(rule, jst('2026-08-21T12:00'))).toBe(false);
+  });
+
+  it('UTC で日付が変わる時刻でも、日本時間の曜日で見る', () => {
+    // 2026-08-20T15:30Z = 2026-08-21 00:30 JST（木→金）
+    const rule = { ...base, response_weekdays_json: '[5]' }; // 金
+    expect(isOnRespondingDay(rule, new Date('2026-08-20T15:30:00Z'))).toBe(true);
+  });
+
+  it('読めない設定なら曜日を問わない（応答が黙って止まらないように）', () => {
+    expect(isOnRespondingDay({ ...base, response_weekdays_json: '{壊れた' }, jst('2026-08-20T12:00'))).toBe(
+      true,
+    );
+  });
+
+  describe('祝日', () => {
+    // 2026-08-11 は火曜で「山の日」。2026-08-18 は火曜の平日。
+    it('include なら、選んでいない曜日でも祝日は応答する', () => {
+      const rule = { ...base, response_weekdays_json: '[3]', response_holiday_rule: 'include' };
+      expect(isOnRespondingDay(rule, jst('2026-08-11T12:00'))).toBe(true);
+    });
+
+    it('exclude なら、選んだ曜日でも祝日は応答しない', () => {
+      const rule = { ...base, response_weekdays_json: '[2]', response_holiday_rule: 'exclude' };
+      expect(isOnRespondingDay(rule, jst('2026-08-11T12:00'))).toBe(false);
+      expect(isOnRespondingDay(rule, jst('2026-08-18T12:00'))).toBe(true);
+    });
+  });
+
+  describe('日をまたぐ時間帯', () => {
+    // 「金曜 22:00〜02:00」。土曜の未明は「金曜の夜」として扱う。
+    const rule = {
+      active_from: '22:00',
+      active_until: '02:00',
+      response_weekdays_json: '[5]', // 金
+      response_holiday_rule: null,
+    };
+
+    it('金曜の夜は応答する', () => {
+      expect(isOnRespondingDay(rule, jst('2026-08-21T23:00'))).toBe(true);
+    });
+
+    it('土曜の未明も、前日（金）の曜日で見る', () => {
+      expect(isOnRespondingDay(rule, jst('2026-08-22T01:00'))).toBe(true);
+    });
+
+    it('土曜の夜は対象外（土曜は選んでいない）', () => {
+      expect(isOnRespondingDay(rule, jst('2026-08-22T23:00'))).toBe(false);
+    });
   });
 });
