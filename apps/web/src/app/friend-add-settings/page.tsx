@@ -84,8 +84,30 @@ export default function FriendAddSettingsPage() {
   const patch = (next: Partial<FriendAddRouting>) =>
     setRouting(prev => (prev ? { ...prev, ...next } : prev))
 
+  /**
+   * 保存してよいか。だめなら理由を返す。
+   *
+   * 「別のシナリオを配信する」を選んでシナリオが空のまま保存すると、
+   * **有効な友だち追加シナリオが全部流れる**。この画面は「以前からの
+   * お客さまに『はじめまして』を届けない」ためにあるのに、書きかけの
+   * 設定がいちばん困る結果になる。
+   */
+  const routingError = (): string => {
+    if (!routing) return ''
+    if (routing.returning.mode === 'other' && !routing.returning.scenarioId) {
+      return '「別のシナリオを配信する」を選んだときは、配信するシナリオを選んでください。選ばないまま保存すると、以前からの友だちにも有効なシナリオが全部届きます。'
+    }
+    return ''
+  }
+
   const save = async () => {
     if (!accountId || !routing) return
+    const problem = routingError()
+    if (problem) {
+      setError(problem)
+      setNotice('')
+      return
+    }
     setSaving(true)
     setError('')
     setNotice('')
@@ -135,7 +157,8 @@ export default function FriendAddSettingsPage() {
               <button
                 type="button"
                 onClick={save}
-                disabled={saving}
+                disabled={saving || routingError() !== ''}
+                title={routingError() || undefined}
                 className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
               >
                 {saving ? '保存中…' : '保存'}
