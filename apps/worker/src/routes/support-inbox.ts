@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
 import { verifySupportRelay } from '../services/support-relay.js';
+import { markInboxConversationRead } from '@line-crm/db';
 
 export const supportInbox = new Hono<Env>();
 
@@ -109,6 +110,8 @@ type EmailThreadRow = {
   last_incoming_at: string;
   last_outgoing_at: string | null;
   preview: string | null;
+  assigned_staff_id: string | null;
+  assigned_staff_name: string | null;
 };
 
 supportInbox.get('/api/support/summary', async (c) => {
@@ -162,7 +165,8 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           : status === 'unread' || status === 'in_progress'
             ? 't.status = ?'
             : `t.status != 'resolved'`;
-      const bindings: Array<string | number> = [];
+      // SQL 上は read join の staff_id が最初の placeholder。
+      const bindings: Array<string | number> = [c.get('staff').id];
       if (status === 'unread' || status === 'in_progress') bindings.push(status);
       let searchSql = '';
       if (query) {
@@ -173,10 +177,20 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       bindings.push(limit);
       const emailRows = await c.env.DB.prepare(
         `SELECT t.id, t.customer_email, t.customer_name, t.subject, t.status,
+                t.assigned_staff_id,
+                (SELECT name FROM staff_members sm WHERE sm.id = t.assigned_staff_id) AS assigned_staff_name,
                 t.last_message_at, t.last_incoming_at, t.last_outgoing_at,
+                CASE
+                  WHEN sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at
+                  THEN 1 ELSE 0
+                END AS is_unread_for_staff,
                 (SELECT body_text FROM support_email_messages m
                  WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS preview
          FROM support_email_threads t
+         LEFT JOIN inbox_staff_reads sr
+           ON sr.channel = 'email'
+          AND sr.conversation_id = t.id
+          AND sr.staff_id = ?
          WHERE ${statusSql} ${searchSql}
          ORDER BY CASE t.status WHEN 'unread' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
                   t.last_message_at DESC
@@ -192,9 +206,12 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           subject: row.subject,
           preview: row.preview || '(本文なし)',
           status: row.status,
+          assignedStaffId: row.assigned_staff_id,
+          assignedStaffName: row.assigned_staff_name,
           lastMessageAt: row.last_message_at,
           lastIncomingAt: row.last_incoming_at,
           lastOutgoingAt: row.last_outgoing_at,
+          isUnread: Boolean((row as EmailThreadRow & { is_unread_for_staff: number }).is_unread_for_staff),
         });
       }
     }
@@ -249,11 +266,57 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
   if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
   const messages = await c.env.DB.prepare(
     `SELECT id, direction, sender_email, sender_name, recipient_email, subject,
-            body_text, sent_by_staff_id, created_at
+            body_text, sent_by_staff_id,
+            (SELECT name FROM staff_members sm WHERE sm.id = support_email_messages.sent_by_staff_id) AS sent_by_staff_name,
+            created_at
      FROM support_email_messages WHERE thread_id = ? ORDER BY created_at ASC`,
   ).bind(id).all();
   return c.json({ success: true, data: { thread, messages: messages.results } });
 });
+
+supportInbox.post(
+  '/api/support/email/threads/:id/read',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const id = c.req.param('id');
+    const thread = await c.env.DB
+      .prepare(`SELECT last_incoming_at FROM support_email_threads WHERE id = ?`)
+      .bind(id)
+      .first<{ last_incoming_at: string | null }>();
+    if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (thread.last_incoming_at) {
+      await markInboxConversationRead(c.env.DB, {
+        staffId: c.get('staff').id,
+        channel: 'email',
+        conversationId: id,
+        lastReadAt: thread.last_incoming_at,
+      });
+    }
+    return c.json({ success: true, data: { isUnread: false } });
+  },
+);
+
+supportInbox.post(
+  '/api/support/email/read-all',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const now = new Date().toISOString();
+    await c.env.DB
+      .prepare(
+        `INSERT INTO inbox_staff_reads
+           (staff_id, channel, conversation_id, last_read_at, updated_at)
+         SELECT ?, 'email', id, last_incoming_at, ?
+         FROM support_email_threads
+         WHERE last_incoming_at IS NOT NULL
+         ON CONFLICT(staff_id, channel, conversation_id) DO UPDATE SET
+           last_read_at = excluded.last_read_at,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(c.get('staff').id, now)
+      .run();
+    return c.json({ success: true, data: { marked: true } });
+  },
+);
 
 supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = c.req.param('id');

@@ -208,6 +208,7 @@ CREATE TABLE IF NOT EXISTS messages_log (
   delivery_type    TEXT CHECK (delivery_type IN ('push', 'reply', 'test')),
   source           TEXT,
   line_account_id  TEXT,
+  sent_by_staff_id TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -217,6 +218,21 @@ CREATE INDEX IF NOT EXISTS idx_messages_log_friend_id ON messages_log (friend_id
 CREATE INDEX IF NOT EXISTS idx_messages_log_created_at ON messages_log (created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_source ON messages_log (friend_id, source);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_direction_created ON messages_log (friend_id, direction, created_at);
+
+-- ============================================================
+-- Per-staff inbox read positions
+-- ============================================================
+CREATE TABLE IF NOT EXISTS inbox_staff_reads (
+  staff_id        TEXT NOT NULL,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  conversation_id TEXT NOT NULL,
+  last_read_at    TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (staff_id, channel, conversation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_inbox_staff_reads_conversation
+  ON inbox_staff_reads (channel, conversation_id, staff_id);
 
 -- ============================================================
 -- Auto Replies
