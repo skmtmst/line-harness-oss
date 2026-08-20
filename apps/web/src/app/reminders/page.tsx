@@ -40,6 +40,8 @@ interface Reminder {
   targetTagId?: string | null
   /** 156: フォルダ。null は未分類。 */
   folderId?: string | null
+  /** 送る内容の数。0 のときは、対象に加わっても何も届かない。 */
+  stepCount?: number
   createdAt: string
   updatedAt: string
 }
@@ -340,6 +342,9 @@ export default function RemindersPage() {
                         きっかけ
                       </th>
                       <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                        送る内容
+                      </th>
+                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
                         フォルダ
                       </th>
                       <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
@@ -353,13 +358,13 @@ export default function RemindersPage() {
                   <tbody className="divide-y divide-gray-100">
                     {loading ? (
                       <tr>
-                        <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
+                        <td colSpan={8} className="text-ink-faint px-4 py-8 text-center text-sm">
                           読み込み中...
                         </td>
                       </tr>
                     ) : current.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="text-ink-faint px-4 py-8 text-center text-sm">
+                        <td colSpan={8} className="text-ink-faint px-4 py-8 text-center text-sm">
                           {reminders.length === 0
                             ? 'リマインダがありません。「＋ 新しいリマインダ」から作成してください。'
                             : 'この条件に合うリマインダはありません。'}
@@ -406,6 +411,17 @@ export default function RemindersPage() {
                             {TRIGGER_LABELS[r.triggerType ?? 'manual']}
                             {r.sendAtTime && (
                               <span className="text-ink-faint block tabular-nums">{r.sendAtTime}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs whitespace-nowrap">
+                            {/* 0通のリマインダは、対象に加わっても何も届かない。
+                                稼働中に見えるだけに、数字だけでなく警告として出す。 */}
+                            {r.stepCount === 0 ? (
+                              <span className="text-warning">0通（届きません）</span>
+                            ) : (
+                              <span className="text-ink-secondary tabular-nums">
+                                {r.stepCount ?? '—'} 通
+                              </span>
                             )}
                           </td>
                           <td className="px-4 py-3">

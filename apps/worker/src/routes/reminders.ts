@@ -113,6 +113,18 @@ reminders.get('/api/reminders', async (c) => {
     } else {
       items = await getReminders(c.env.DB);
     }
+    /*
+     * 通の数を1回のクエリでまとめて数える。
+     *
+     * 一覧に「何通持っているか」を出すため。リマインダごとに
+     * /api/reminders/:id を叩くと、20件で20回になる。
+     * 1つも無いリマインダは行が返らないので、既定を0にする。
+     */
+    const counts = await c.env.DB
+      .prepare(`SELECT reminder_id, COUNT(*) AS c FROM reminder_steps GROUP BY reminder_id`)
+      .all<{ reminder_id: string; c: number }>();
+    const stepCounts = new Map(counts.results.map((row) => [row.reminder_id, Number(row.c)]));
+
     return c.json({
       success: true,
       data: items.map((r) => ({
@@ -128,6 +140,7 @@ reminders.get('/api/reminders', async (c) => {
         sendAtTime: r.send_at_time ?? null,
         targetTagId: r.target_tag_id ?? null,
         folderId: r.folder_id ?? null,
+        stepCount: stepCounts.get(r.id) ?? 0,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
       })),
