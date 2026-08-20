@@ -463,7 +463,7 @@ function CarouselEditorInner() {
                           vars={actionOptions.vars}
                         />
                         {action.actions.length === 0 && (
-                          <p className="text-[11px] text-amber-600">
+                          <p className="text-warning text-[11px]">
                             何も設定されていません。押されても何も起きません。
                           </p>
                         )}
