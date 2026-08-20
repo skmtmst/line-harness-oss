@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLIENT = readFileSync(join(HERE, 'email-thread.tsx'), 'utf8');
+const CHATS_PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'utf8');
 const WORKER = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'support-inbox.ts'),
   'utf8',
@@ -33,7 +34,9 @@ describe('メールのスレッドの経路', () => {
     const call = new RegExp(
       `threads/\\$\\{encodeURIComponent\\(threadId\\)\\}/${tail}\`[\\s\\S]{0,200}?method: '([A-Z]+)'`,
     );
-    const found = CLIENT.match(call);
+    // 内部メモはトーク内ではなく右側の顧客情報へ移したため、
+    // notes だけは受信箱本体にある。他の経路はメール本文の部品にある。
+    const found = (tail === 'notes' ? CHATS_PAGE : CLIENT).match(call);
     expect(found?.[1], `${tail} の呼び出しが見つからない`).toBe(method);
   });
 
@@ -55,12 +58,16 @@ describe('メールの担当', () => {
 });
 
 describe('LINE のトークとそろえたもの', () => {
-  it.each(['対応', '担当', 'メモ保存', 'テンプレートを選択', '送信の設定'])(
+  it.each(['対応', '担当', 'テンプレートを選択', '送信の設定'])(
     '%s がメール側にもある',
     (label) => {
       expect(CLIENT).toContain(label);
     },
   );
+
+  it('内部メモは右側の顧客情報で保存できる', () => {
+    expect(CHATS_PAGE).toContain('内部メモを保存');
+  });
 
   it('送信キーの設定は LINE と同じ置き場を読み書きする', () => {
     // 別々にすると、片方で変えても、もう片方に効かない。

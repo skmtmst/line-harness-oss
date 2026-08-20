@@ -207,15 +207,18 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   if (!friendId) return null
 
   return (
-    <div className="w-full lg:w-80 lg:flex-shrink-0 bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col overflow-hidden">
-      <div className="relative border-b border-gray-200 bg-gray-50 px-4 py-3">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-white">
+      <div className="relative min-h-[66px] border-b border-[#E5E7EB] bg-white px-4 py-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-gray-700">友だち詳細</h3>
+          <div>
+            <h3 className="text-sm font-bold text-[#1F2937]">顧客情報</h3>
+            <p className="mt-0.5 text-[10px] text-[#98A2B3]">対応に必要な情報をまとめて確認できます</p>
+          </div>
           <button
             type="button"
             onClick={() => setShowSettings((current) => !current)}
             aria-expanded={showSettings}
-            className="rounded-control border-hairline bg-canvas text-ink-secondary border px-2 py-1 text-[11px] font-medium"
+            className="mr-14 rounded-lg border border-[#E5E7EB] bg-white px-2 py-1 text-[11px] font-semibold text-[#667085] hover:bg-[#F7F8F6]"
           >
             表示項目
           </button>
@@ -277,7 +280,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
         ) : error ? (
           <div className="p-4 text-xs text-red-600">{error}</div>
         ) : friend ? (
-          <div className="flex flex-col divide-y divide-gray-100">
+          <div className="flex flex-col divide-y divide-[#E5E7EB]">
             {/* Profile Header */}
             <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} p-4 flex items-start gap-3`}>
               {friend.pictureUrl ? (

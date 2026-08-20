@@ -1,19 +1,19 @@
 'use client'
 
+import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type InboxStats } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 
-/**
- * 受信箱の上部に出す数（設計 `V2 2-1 受信箱` の KPIs）。
- *
- * 設計は4枚。うち「平均の初回返信」は、返信までの時間を記録していないので
- * 出せない。代わりに「1時間以上待たせている件数」を1枚目の内訳に出す。
- * どちらも放置に気づくための数で、役割は同じ。
- *
- * 4枚目には、そのぶん「メールの受信」を出す。設計の3枚目が
- * 「LINE 9 ・ メール 3」と内訳を持っているので、数字としては設計にある。
- */
+function formatWait(minutes: number | null): string {
+  if (!minutes || minutes < 1) return '待ちはありません'
+  if (minutes < 60) return `最長 ${minutes}分待ち`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return `最長 ${hours}時間${rest ? `${rest}分` : ''}待ち`
+}
+
+/** Pen.dev V4「対応状況バー」。数字は既存の集計APIだけを使う。 */
 export default function InboxKpis() {
   const [stats, setStats] = useState<InboxStats | null>(null)
   const [loading, setLoading] = useState(true)
@@ -23,7 +23,7 @@ export default function InboxKpis() {
       const res = await api.chatStats.get()
       if (res.success) setStats(res.data)
     } catch {
-      // 数が出ないだけで受信箱そのものは使える。黙って諦める。
+      setStats(null)
     } finally {
       setLoading(false)
     }
@@ -31,70 +31,49 @@ export default function InboxKpis() {
 
   useEffect(() => {
     void load()
-    // 対応済みにしたら数が変わる。一覧側が投げる合図に乗る。
     const onRefresh = () => void load()
     window.addEventListener(UNANSWERED_REFRESH_EVENT, onRefresh)
     return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, onRefresh)
   }, [load])
 
-  const cards = [
-    {
-      title: '返信を待っている人',
-      value: stats?.waiting ?? null,
-      unit: '件',
-      detail:
-        stats && stats.waitingOverAnHour > 0
-          ? `うち1時間以上が${stats.waitingOverAnHour}件`
-          : '1時間以上の放置はありません',
-      warn: (stats?.waitingOverAnHour ?? 0) > 0,
-    },
-    {
-      title: '自分が担当',
-      value: stats?.mine ?? null,
-      unit: '件',
-      detail: '対応中のもの',
-      warn: false,
-    },
-    {
-      title: '今日の受信',
-      value: stats?.todayInbound ?? null,
-      unit: '件',
-      detail: stats
-        ? `LINE ${stats.todayByChannel.line} ・ メール ${stats.todayByChannel.email}`
-        : '—',
-      warn: false,
-    },
-    {
-      title: 'メールの受信',
-      value: stats?.todayByChannel.email ?? null,
-      unit: '件',
-      detail: '過去7日',
-      warn: false,
-    },
-  ]
+  const value = (number: number | undefined) => loading || number === undefined ? '—' : `${number.toLocaleString('ja-JP')}件`
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
-      {cards.map((card) => (
-        <div key={card.title} className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-secondary text-xs font-medium">{card.title}</p>
-          <p className="mt-1 flex items-baseline gap-1">
-            {loading ? (
-              <span className="bg-canvas-sunken inline-block h-7 w-12 animate-pulse rounded" />
-            ) : (
-              <>
-                <span
-                  className={`text-2xl font-bold tabular-nums ${card.warn ? 'text-warning' : 'text-ink'}`}
-                >
-                  {card.value === null ? '—' : card.value.toLocaleString('ja-JP')}
-                </span>
-                <span className="text-ink-secondary text-xs">{card.unit}</span>
-              </>
-            )}
-          </p>
-          <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">{card.detail}</p>
+    <section
+      data-inbox-v4="summary"
+      className="border-[#E5E7EB] bg-canvas shadow-[1px_1px_2px_rgba(29,29,31,0.13)] flex min-h-[74px] flex-wrap items-center gap-x-6 gap-y-3 rounded-[10px] border px-[18px] py-3 xl:flex-nowrap"
+      aria-label="受信箱の対応状況"
+    >
+      <div className="flex min-w-[270px] items-center gap-3">
+        <span className="bg-[#FFF1F2] text-[#E5484D] flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full" aria-hidden="true">
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 17h.01"/></svg>
+        </span>
+        <div>
+          <p className="text-[#1F2937] text-[17px] font-bold">要返信 {value(stats?.waiting)}</p>
+          <p className="text-[#B45309] mt-0.5 text-[11px] font-semibold">{formatWait(stats?.oldestWaitingMinutes ?? null)}</p>
         </div>
-      ))}
-    </div>
+      </div>
+
+      <div className="bg-[#E5E7EB] hidden h-px w-[min(17vw,280px)] shrink-0 xl:block" />
+
+      <div className="grid min-w-0 flex-1 grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4">
+        {[
+          ['自分が担当', value(stats?.mine)],
+          ['今日の受信', value(stats?.todayInbound)],
+          ['メール', value(stats?.todayByChannel.email)],
+          ['期限超過', value(stats?.waitingOverAnHour)],
+        ].map(([label, count], index) => (
+          <div key={label} className="min-w-0">
+            <p className={`text-[11px] font-semibold ${index === 3 ? 'text-[#334155]' : 'text-[#667085]'}`}>{label}</p>
+            <p className={`mt-0.5 text-[18px] font-bold tabular-nums ${index === 3 ? 'text-[#334155]' : 'text-[#1F2937]'}`}>{count}</p>
+          </div>
+        ))}
+      </div>
+
+      <Link href="/tags?tab=marks" className="border-[#E5E7EB] text-[#2563EB] inline-flex h-[38px] shrink-0 items-center gap-2 rounded-lg border bg-canvas px-3.5 text-[13px] font-semibold hover:bg-[#F7F8F6]">
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6"/></svg>
+        対応ルール
+      </Link>
+    </section>
   )
 }

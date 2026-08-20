@@ -60,8 +60,6 @@ export default function EmailThread({
 
   // 以下は LINE のトークに揃えるためのもの（設計 `TalkPane` / `Reply`）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
-  const [notes, setNotes] = useState('')
-  const [savingNotes, setSavingNotes] = useState(false)
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [showComposerOptions, setShowComposerOptions] = useState(false)
   /** 送信キー。LINE 側と同じ設定を読む。別々にすると片方だけ効かない。 */
@@ -99,8 +97,6 @@ export default function EmailThread({
         )
         if (res.success) {
           setDetail(res.data)
-          // 入力中に5秒ごとの取り直しで消えないよう、空のときだけ入れる。
-          setNotes(prev => (prev === '' ? (res.data.thread.notes ?? '') : prev))
           if (!quiet) {
             window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
@@ -165,22 +161,6 @@ export default function EmailThread({
     }
   }
 
-  const saveNotes = async () => {
-    setSavingNotes(true)
-    try {
-      const res = await fetchApi<{ success: boolean; error?: string }>(
-        `/api/support/email/threads/${encodeURIComponent(threadId)}/notes`,
-        { method: 'PATCH', body: JSON.stringify({ notes }) },
-      )
-      if (!res.success) setError(res.error || 'メモを保存できませんでした')
-      else setError('')
-    } catch {
-      setError('メモを保存できませんでした')
-    } finally {
-      setSavingNotes(false)
-    }
-  }
-
   const sendReply = async () => {
     if (!reply.trim() || sending) return
     setSending(true)
@@ -210,7 +190,7 @@ export default function EmailThread({
 
   return (
     <>
-      <div className="border-hairline flex items-center justify-between gap-2 border-b px-4 py-4">
+      <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
         <div className="min-w-0">
           <p className="text-ink truncate text-sm font-medium">{detail.thread.subject}</p>
           <p className="text-ink-faint mt-0.5 truncate text-xs">
@@ -252,18 +232,18 @@ export default function EmailThread({
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex-1 space-y-4 overflow-y-auto bg-[#F7F8F6] p-4">
         {detail.messages.map((message) => (
           <div key={message.id} className={`flex items-end gap-2 ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${
                 message.direction === 'outgoing'
-                  ? 'rounded-br-md bg-[#c9f4d8] text-gray-900'
-                  : 'rounded-bl-md bg-white text-gray-900'
+                  ? 'rounded-br-md bg-[#c9f4d8] text-ink'
+                  : 'rounded-bl-md bg-canvas text-ink'
               }`}
             >
               <p className="text-sm leading-6 break-words whitespace-pre-wrap">{message.body_text}</p>
-              <p className="mt-2 text-right text-[10px] text-gray-400">
+              <p className="mt-2 text-right text-[10px] text-ink-faint">
                 {dateTime(message.created_at)}
                 {message.direction === 'outgoing' ? ' ・ 送信済み' : ''}
               </p>
@@ -286,43 +266,23 @@ export default function EmailThread({
         <div ref={bottomRef} />
       </div>
 
-      {/* メモ。LINE のトークと同じ位置・同じ形（114 で列を足した）。 */}
-      <div className="border-hairline bg-canvas-sunken border-t px-4 py-2">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="メモを入力..."
-            className="border-hairline bg-canvas focus:ring-accent flex-1 rounded-md border px-2 py-1 text-xs focus:ring-1 focus:outline-none"
-          />
-          <button
-            onClick={() => void saveNotes()}
-            disabled={savingNotes}
-            className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50"
-          >
-            {savingNotes ? '保存中...' : 'メモ保存'}
-          </button>
-        </div>
-      </div>
-
-      <div className="border-hairline border-t px-4 py-3">
+      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-[#E5E7EB] bg-canvas px-4 py-3">
         {/* 上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた */}
         <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className="text-accent text-xs hover:underline"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
             >
-              テンプレートを選択
+              ▧ テンプレートを選択
             </button>
             <button
               type="button"
               onClick={() => setShowComposerOptions(v => !v)}
-              className="text-accent text-xs hover:underline"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
             >
-              {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+              ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
             </button>
           </div>
           <span className="text-ink-faint text-xs">
@@ -362,40 +322,42 @@ export default function EmailThread({
         )}
 
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
-        <textarea
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return
-            if (e.metaKey || e.ctrlKey) {
-              e.preventDefault()
-              void sendReply()
-              return
-            }
-            // LINE 側と同じ判定。enter は Enter 単体で送信、
-            // shift-enter は Shift + Enter で送信。
-            const shouldSend = sendMode === 'enter' ? !e.shiftKey : e.shiftKey
-            if (shouldSend) {
-              e.preventDefault()
-              void sendReply()
-            }
-          }}
-          placeholder="メールの返信を入力"
-          aria-label="メールの返信を入力"
-          rows={3}
-          className="border-hairline rounded-control focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-ink-faint text-xs">
-            差出人 contact-shed@nen-petfood.com
-          </span>
-          <button
-            onClick={() => void sendReply()}
-            disabled={!reply.trim() || sending}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {sending ? '送信中...' : 'メールで返信'}
-          </button>
+        <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
+          <textarea
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              if (e.metaKey || e.ctrlKey) {
+                e.preventDefault()
+                void sendReply()
+                return
+              }
+              // LINE 側と同じ判定。enter は Enter 単体で送信、
+              // shift-enter は Shift + Enter で送信。
+              const shouldSend = sendMode === 'enter' ? !e.shiftKey : e.shiftKey
+              if (shouldSend) {
+                e.preventDefault()
+                void sendReply()
+              }
+            }}
+            placeholder="メールの返信を入力"
+            aria-label="メールの返信を入力"
+            rows={3}
+            className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
+          />
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <span className="text-ink-faint text-xs">
+              差出人 contact-shed@nen-petfood.com
+            </span>
+            <button
+              onClick={() => void sendReply()}
+              disabled={!reply.trim() || sending}
+              className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {sending ? '送信中...' : 'メールで返信'}
+            </button>
+          </div>
         </div>
       </div>
 
