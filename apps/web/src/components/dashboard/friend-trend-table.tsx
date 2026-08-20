@@ -28,12 +28,10 @@ export default function FriendTrendTable({
 
   // 新しい日から見せる。設計も 8月15日 が先頭。
   const rows = [...trend].reverse()
-  const hasEstimated = rows.some((r) => r.estimated)
-
   return (
     <div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm font-normal">
           <thead>
             <tr className="text-ink-faint border-hairline border-b text-left text-xs">
               <th className="px-5 py-2 font-medium">日付</th>
@@ -50,15 +48,27 @@ export default function FriendTrendTable({
               const previous = rows[i + 1]
               const diff = previous ? row.active - previous.active : null
               return (
-                <tr key={row.date} className={row.estimated ? 'text-ink-faint' : 'text-ink'}>
+                <tr key={row.date} className="text-ink-secondary">
                   <td className="px-5 py-2.5 whitespace-nowrap">
                     {formatDate(row.date)}
                     {row.estimated && (
-                      <span
-                        className="text-ink-faint ml-1.5 text-[10px]"
-                        title="この日の記録が無いため、いま残っている友だちから逆算した値です"
-                      >
-                        推定
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-[10px]">
+                        <span className="text-ink-faint">推定</span>
+                        <span className="group relative inline-flex">
+                          <button
+                            type="button"
+                            aria-label={`${formatDate(row.date)}の推定値について`}
+                            className="border-ink-faint text-ink-faint focus-visible:border-action focus-visible:text-action inline-flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border text-[9px] leading-none font-semibold outline-none"
+                          >
+                            ?
+                          </button>
+                          <span
+                            role="tooltip"
+                            className="bg-ink text-on-accent pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-72 -translate-x-1/2 rounded-control px-3 py-2 text-left text-xs leading-relaxed whitespace-normal shadow-lg group-hover:block group-focus-within:block"
+                          >
+                            「推定」の日は、日次の記録が始まる前のぶんです。いま残っている友だちから逆算しているので、退会した人は数に入っていません。記録は今日から溜まります。
+                          </span>
+                        </span>
                       </span>
                     )}
                   </td>
@@ -80,12 +90,6 @@ export default function FriendTrendTable({
         </table>
       </div>
 
-      {hasEstimated && (
-        <p className="text-ink-faint border-hairline border-t px-5 py-3 text-xs leading-relaxed">
-          「推定」の日は、日次の記録が始まる前のぶんです。いま残っている友だちから
-          逆算しているので、退会した人は数に入っていません。記録は今日から溜まります。
-        </p>
-      )}
     </div>
   )
 }

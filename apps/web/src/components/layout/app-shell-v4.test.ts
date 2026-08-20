@@ -8,6 +8,8 @@ const APP_SHELL = join(ROOT, '..', 'app-shell.tsx')
 const DASHBOARD = join(ROOT, '..', '..', 'app', 'page.tsx')
 const DASHBOARD_EDITOR = join(ROOT, '..', 'dashboard', 'dashboard-editor.tsx')
 const PENDING_INBOX = join(ROOT, '..', 'support', 'pending-inbox-card.tsx')
+const FRIEND_TREND = join(ROOT, '..', 'dashboard', 'friend-trend-table.tsx')
+const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
 const MENU = join(ROOT, '..', '..', 'lib', 'menu.ts')
 
 describe('Pen.dev V4を共通レイアウトの正本にする', () => {
@@ -15,6 +17,8 @@ describe('Pen.dev V4を共通レイアウトの正本にする', () => {
   const dashboard = readFileSync(DASHBOARD, 'utf8')
   const dashboardEditor = readFileSync(DASHBOARD_EDITOR, 'utf8')
   const pendingInbox = readFileSync(PENDING_INBOX, 'utf8')
+  const friendTrend = readFileSync(FRIEND_TREND, 'utf8')
+  const chats = readFileSync(CHATS, 'utf8')
   const menu = readFileSync(MENU, 'utf8')
 
   it('1920pxでサイドバー256px・本体1664px・左右40pxになる', () => {
@@ -65,6 +69,24 @@ describe('Pen.dev V4を共通レイアウトの正本にする', () => {
 
   it('ダッシュボード見出しの補足文を表示しない', () => {
     expect(dashboard).not.toContain('運用状況です。')
+  })
+
+  it('見出しと受信一覧の余白を詰める', () => {
+    expect(dashboard).toContain('data-design="Head" className="mb-4 flex')
+    expect(dashboard).not.toContain('min-h-[76px]')
+    expect(pendingInbox).toContain('h-[61px]')
+  })
+
+  it('推定の説明は表の下ではなく各日のヘルプに表示する', () => {
+    expect(friendTrend).toContain('role="tooltip"')
+    expect(friendTrend).toContain('group-hover:block')
+    expect(friendTrend).not.toContain('border-t px-5 py-3')
+  })
+
+  it('ダッシュボードの名前からLINE・メールそれぞれの受信内容を開く', () => {
+    expect(pendingInbox).toContain('/chats?channel=email&thread=')
+    expect(pendingInbox).toContain('/chats?friend=')
+    expect(chats).toContain("params.get('thread')")
   })
 
   it('V4で追加したメニューが実装から消えていない', () => {
