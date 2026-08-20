@@ -186,6 +186,7 @@ describe('ブロックを解除した人への配信', () => {
 })
 
 /*
+<<<<<<< HEAD
  * 友だち追加のアクションを、シナリオと同じ仕組みに寄せたぶん。
  *
  * 以前は「タグを1つ付ける」しかできなかった。外すこともフォルダを指定する
@@ -218,3 +219,64 @@ describe('シナリオと同じアクション', () => {
     expect(out.firstTime.actions).toEqual([{ kind: 'mile', amount: 100 }]);
   });
 });
+=======
+ * 書きかけの設定が、いちばん困る結果にならないか。
+ *
+ * この画面は「以前からのお客さまに『はじめまして』を届けない」ために
+ * ある。②で「別のシナリオを配信する」を選んでシナリオを選び忘れると、
+ * 従来の経路（有効な友だち追加シナリオを全部流す）に落ちて、
+ * **止めたかったものが全部届く**。設定した人の意図と正反対になる。
+ */
+describe('書きかけの設定', () => {
+  async function setup(returning: { mode: 'other' | 'same'; scenarioId: string | null }) {
+    const { db, raw } = createTestD1()
+    raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+                 VALUES ('acc-1', 'テスト', 'c', 's', 't')`).run()
+    insertFriend(raw, 'f-back', { line_account_id: 'acc-1', unfollow_count: 1 })
+    raw.prepare(`INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+                 VALUES ('sc-1', 'ようこそ', 'friend_add', 1, 'acc-1')`).run()
+    raw.prepare(`INSERT INTO scenario_steps (id, scenario_id, step_order, delay_minutes, message_type, message_content)
+                 VALUES ('st-1','sc-1',0,0,'text','1通目')`).run()
+
+    await saveFriendAddRouting(db, 'acc-1', {
+      ...FRIEND_ADD_ROUTING_DEFAULT,
+      firstTime: { ...FRIEND_ADD_ROUTING_DEFAULT.firstTime, scenarioId: 'sc-1' },
+      returning: { ...FRIEND_ADD_ROUTING_DEFAULT.returning, ...returning },
+    })
+    return { db, raw }
+  }
+
+  test('「別のシナリオ」でシナリオ未選択なら、送らないほうへ倒す', async () => {
+    // ここで routed:false を返すと、呼び出し側が「設定なし」と解釈して
+    // 有効な友だち追加シナリオを全部流す。止めたかったものが全部届く。
+    const { db } = await setup({ mode: 'other', scenarioId: null })
+    const result = await applyFriendAddRouting(db, 'acc-1', { id: 'f-back', unfollow_count: 1 })
+
+    expect(result.routed).toBe(true)
+    expect(result.suppressed).toBe(true)
+    expect(result.enrollments).toHaveLength(0)
+  })
+
+  test('「同じもの」なら、①のシナリオを使う（未選択ではない）', async () => {
+    const { db } = await setup({ mode: 'same', scenarioId: null })
+    const result = await applyFriendAddRouting(db, 'acc-1', { id: 'f-back', unfollow_count: 1 })
+    expect(result.enrollments).toHaveLength(1)
+    expect(result.suppressed).toBe(false)
+  })
+
+  test('①でシナリオを決めていないのは、これまでどおり全部流す', async () => {
+    // こちらは意図した設定。画面にも「決めていない（有効なシナリオを
+    // 全部流す）」と書いてある。挙動を変えない。
+    const { db, raw } = createTestD1()
+    raw.prepare(`INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+                 VALUES ('acc-1', 'テスト', 'c', 's', 't')`).run()
+    insertFriend(raw, 'f-new', { line_account_id: 'acc-1', unfollow_count: 0 })
+    await saveFriendAddRouting(db, 'acc-1', {
+      ...FRIEND_ADD_ROUTING_DEFAULT,
+      firstTime: { ...FRIEND_ADD_ROUTING_DEFAULT.firstTime, scenarioId: null },
+    })
+    const result = await applyFriendAddRouting(db, 'acc-1', { id: 'f-new', unfollow_count: 0 })
+    expect(result.routed).toBe(false)
+  })
+})
+>>>>>>> origin/codex/development
