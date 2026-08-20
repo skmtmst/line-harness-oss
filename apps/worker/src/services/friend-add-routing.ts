@@ -277,8 +277,32 @@ export async function applyFriendAddRouting(
   const useFirst = kind === 'first_time' || routing.returning.mode === 'same';
   const branch: FriendAddBranch = useFirst ? routing.firstTime : routing.returning;
 
-  // シナリオを決めていない＝いままでどおり全部流す
-  if (!branch.scenarioId) return none;
+  /*
+   * シナリオを決めていない。
+   *
+   * ①（はじめての人）で決めていないのは**意図した設定**。画面にも
+   * 「決めていない（有効なシナリオを全部流す）」と書いてある。従来どおり流す。
+   *
+   * ②で「別のシナリオを配信する」を選んでシナリオが空なのは**書きかけ**。
+   * ここで従来どおりに落とすと、**有効な友だち追加シナリオが全部流れる**。
+   * この画面は「以前からのお客さまに『はじめまして』を届けない」ために
+   * あるのに、書きかけの設定がいちばん困る結果（全部届く）になる。
+   *
+   * 送らないほうへ倒す。「別のシナリオ」と決めた人が、そのシナリオを
+   * 選び忘れただけで全部届くよりは、何も届かないほうがまだ直せる。
+   * 画面側でも保存させないようにしてある。
+   */
+  if (!branch.scenarioId) {
+    if (kind === 'returning' && routing.returning.mode === 'other') {
+      console.warn(
+        `[friend-add-routing] ②で「別のシナリオ」を選んでシナリオが未設定のため配信しません`
+        + `（friend=${friend.id}）。画面の設定を見直してください。`,
+      );
+      await runActions(db, friend.id, routing.returning.actions, push);
+      return { routed: true, kind, enrollments: [], timing, suppressed: true };
+    }
+    return none;
+  }
 
   /*
    * 「前回読んだところから」は、**②に当たる人すべて**で意味がある。
