@@ -52,7 +52,7 @@
   "app/templates/carousel/page.tsx": 1,
   "app/templates/detail/page.tsx": 1,
   "app/templates/edit/page.tsx": 1,
-  "app/templates/page.tsx": 51,
+  "app/templates/page.tsx": 23,
   "app/updates/page.tsx": 18,
   "app/users/page.tsx": 7,
   "app/webhooks/page.tsx": 137,

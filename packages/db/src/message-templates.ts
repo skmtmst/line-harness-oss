@@ -82,3 +82,104 @@ export async function deleteMessageTemplate(db: D1Database, id: string): Promise
     .run();
   return result.meta.changes > 0;
 }
+
+// =============================================================================
+// カルーセルの選択肢（162）
+// =============================================================================
+
+export async function recordCarouselTap(
+  db: D1Database,
+  input: {
+    templateId: string;
+    columnIndex: number;
+    actionIndex: number;
+    actionLabel?: string | null;
+    friendId?: string | null;
+    lineAccountId?: string | null;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO carousel_taps
+         (id, template_id, column_index, action_index, action_label,
+          friend_id, line_account_id, tapped_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.templateId,
+      input.columnIndex,
+      input.actionIndex,
+      input.actionLabel ?? null,
+      input.friendId ?? null,
+      input.lineAccountId ?? null,
+      jstNow(),
+    )
+    .run();
+}
+
+/**
+ * この人が、このカルーセルの選択肢を一度でも押したか。
+ * 「カルーセル全体で1回のみ」の判定に使う。どの選択肢でも1回は1回と数える。
+ */
+export async function hasCarouselTap(
+  db: D1Database,
+  templateId: string,
+  friendId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(
+      `SELECT 1 AS hit FROM carousel_taps
+        WHERE template_id = ? AND friend_id = ? LIMIT 1`,
+    )
+    .bind(templateId, friendId)
+    .first<{ hit: number }>();
+  return row != null;
+}
+
+export interface CarouselTapCount {
+  columnIndex: number;
+  actionIndex: number;
+  label: string | null;
+  taps: number;
+}
+
+/** 選択肢ごとに押された回数。どのパネルが効いているかを見るため。 */
+export async function getCarouselTapCounts(
+  db: D1Database,
+  templateId: string,
+): Promise<CarouselTapCount[]> {
+  const rows = await db
+    .prepare(
+      `SELECT column_index, action_index, MAX(action_label) AS label, COUNT(*) AS taps
+         FROM carousel_taps
+        WHERE template_id = ?
+        GROUP BY column_index, action_index
+        ORDER BY column_index, action_index`,
+    )
+    .bind(templateId)
+    .all<{ column_index: number; action_index: number; label: string | null; taps: number }>();
+  return (rows.results ?? []).map((r) => ({
+    columnIndex: r.column_index,
+    actionIndex: r.action_index,
+    label: r.label,
+    taps: r.taps,
+  }));
+}
+
+/**
+ * テンプレートごとの、選択肢が押された回数の合計。
+ *
+ * 一覧に出すためのもの。**1件ずつ引かない。** 20件並べば20回叩くことになる。
+ * まとめて1回で取って、呼び出し側で id から引く。
+ */
+export async function getCarouselTapTotals(db: D1Database): Promise<Map<string, number>> {
+  const rows = await db
+    .prepare(
+      `SELECT template_id, COUNT(*) AS taps
+         FROM carousel_taps
+        GROUP BY template_id`,
+    )
+    .all<{ template_id: string; taps: number }>();
+  return new Map((rows.results ?? []).map((r) => [r.template_id, r.taps]));
+}

@@ -2152,6 +2152,8 @@ export const api = {
         messageType: string;
         messageContent: string;
         usageCount: number;
+        /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
+        tapCount: number;
         createdAt: string;
         updatedAt: string;
       }>>>(
@@ -2164,6 +2166,12 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
+        carouselActions: unknown | null;
+        /** 162: 'none'（制限なし）／'once'（全体で1回） */
+        carouselTapLimitMode: string;
+        /** 162: 制限を超えたときに返すテキスト。 */
+        carouselTapLimitText: string | null;
         usedBy: {
           autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>;
           automations: Array<{ id: string; name: string; eventType: string }>;
@@ -2173,12 +2181,30 @@ export const api = {
       }>>(
         `/api/templates/${id}`,
       ),
-    create: (data: { name: string; category: string; messageType: string; messageContent: string }) =>
+    create: (data: {
+      name: string
+      category: string
+      messageType: string
+      messageContent: string
+      /** 162: 選択肢を押したときの動き。 */
+      carouselActions?: unknown | null
+      /** 162: 'none'（制限なし）／'once'（全体で1回） */
+      carouselTapLimitMode?: 'none' | 'once'
+      /** 162: 制限を超えたときに返すテキスト。 */
+      carouselTapLimitText?: string | null
+    }) =>
       fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
-    update: (id: string, data: Partial<{ name: string; category: string; messageType: string; messageContent: string }>) =>
+    update: (
+      id: string,
+      data: Partial<{ name: string; category: string; messageType: string; messageContent: string }> & {
+        carouselActions?: unknown | null
+        carouselTapLimitMode?: 'none' | 'once'
+        carouselTapLimitText?: string | null
+      },
+    ) =>
       fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
