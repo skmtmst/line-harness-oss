@@ -12,6 +12,7 @@ import {
   getFriendById,
   getLineAccountById,
   updateChat,
+  markInboxConversationRead,
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -203,6 +204,7 @@ chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) 
 
 chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    const staff = c.get('staff');
     const status = c.req.query('status') ?? undefined;
     const operatorId = c.req.query('operatorId') ?? undefined;
     const lineAccountId = c.req.query('lineAccountId') ?? undefined;
@@ -323,6 +325,14 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
           AND friend_id IN (SELECT friend_id FROM page)
         GROUP BY friend_id
       ),
+      latest_incoming AS (
+        SELECT friend_id, MAX(created_at) AS last_incoming_at
+        FROM messages_log
+        WHERE direction = 'incoming'
+          AND (delivery_type IS NULL OR delivery_type != 'test')
+          AND friend_id IN (SELECT friend_id FROM page)
+        GROUP BY friend_id
+      ),
       /*
        * 一覧に出す1行は「最後のメッセージ」。送信でも受信でも、いちばん新しいもの。
        *
@@ -355,6 +365,11 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         rm.content AS last_message_content,
         rm.direction AS last_message_direction,
         rm.message_type AS last_message_type,
+        CASE
+          WHEN ri.last_incoming_at IS NOT NULL
+           AND (sr.last_read_at IS NULL OR ri.last_incoming_at > sr.last_read_at)
+          THEN 1 ELSE 0
+        END AS is_unread_for_staff,
         COALESCE(c.created_at, d.last_message_at) AS created_at,
         COALESCE(c.updated_at, d.last_message_at) AS updated_at
       FROM page d
@@ -363,6 +378,11 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
       )
       LEFT JOIN recent_msg rm ON rm.friend_id = f.id
+      LEFT JOIN latest_incoming ri ON ri.friend_id = f.id
+      LEFT JOIN inbox_staff_reads sr
+        ON sr.channel = 'line'
+       AND sr.conversation_id = f.id
+       AND sr.staff_id = ?
       ORDER BY d.last_message_at DESC, d.friend_id DESC
     `;
 
@@ -373,7 +393,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     if (lineAccountId) allBindings.push(lineAccountId, lineAccountId);
     allBindings.push(...conditionBindings);
     if (useCursor) allBindings.push(beforeAt, beforeAt, beforeId);
-    allBindings.push(limit);
+    allBindings.push(limit, staff.id);
     const result = await c.env.DB.prepare(sql).bind(...allBindings).all();
 
     let data = result.results.map((ch: Record<string, unknown>) => ({
@@ -388,6 +408,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       lastMessageContent: ch.last_message_content || null,
       lastMessageDirection: ch.last_message_direction || null,
       lastMessageType: ch.last_message_type || null,
+      isUnread: Boolean(ch.is_unread_for_staff),
       createdAt: ch.created_at,
       updatedAt: ch.updated_at,
     }));
@@ -463,7 +484,13 @@ chats.get('/api/chats/:id', async (c) => {
     // 現状の最重量ユーザー(481件)の2倍バッファ。これ以上の履歴はページング未実装（Phase 2 TODO）。
     const messages = await c.env.DB
       .prepare(
-        `SELECT id, friend_id, direction, message_type, content, created_at
+        `SELECT id, friend_id, direction, message_type, content, source, origin_kind,
+                sent_by_staff_id,
+                (SELECT name FROM staff_members sm WHERE sm.id = messages_log.sent_by_staff_id) AS sent_by_staff_name,
+                (SELECT s.name FROM scenario_steps ss
+                  JOIN scenarios s ON s.id = ss.scenario_id
+                  WHERE ss.id = messages_log.scenario_step_id) AS scenario_name,
+                created_at
          FROM messages_log
          WHERE friend_id = ? AND (delivery_type IS NULL OR delivery_type != 'test')
          ORDER BY created_at DESC LIMIT 1000`,
@@ -489,6 +516,11 @@ chats.get('/api/chats/:id', async (c) => {
           direction: m.direction,
           messageType: m.message_type,
           content: m.content,
+          source: m.source || null,
+          originKind: m.origin_kind || null,
+          sentByStaffId: m.sent_by_staff_id || null,
+          sentByStaffName: m.sent_by_staff_name || null,
+          scenarioName: m.scenario_name || null,
           createdAt: m.created_at,
         })),
       },
@@ -496,6 +528,60 @@ chats.get('/api/chats/:id', async (c) => {
   } catch (err) {
     console.error('GET /api/chats/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// 開いた担当者だけを既読にする。対応状態は共有だが、既読位置は共有しない。
+chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const resolved = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
+    if (!resolved) return c.json({ success: false, error: 'Chat not found' }, 404);
+    const latest = await c.env.DB
+      .prepare(
+        `SELECT MAX(created_at) AS last_read_at
+         FROM messages_log
+         WHERE friend_id = ? AND direction = 'incoming'
+           AND (delivery_type IS NULL OR delivery_type != 'test')`,
+      )
+      .bind(resolved.friend_id)
+      .first<{ last_read_at: string | null }>();
+    if (latest?.last_read_at) {
+      await markInboxConversationRead(c.env.DB, {
+        staffId: c.get('staff').id,
+        channel: 'line',
+        conversationId: resolved.friend_id,
+        lastReadAt: latest.last_read_at,
+      });
+    }
+    return c.json({ success: true, data: { isUnread: false } });
+  } catch (err) {
+    console.error('POST /api/chats/:id/read error:', err);
+    return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
+  }
+});
+
+chats.post('/api/chats/read-all', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const now = jstNow();
+    await c.env.DB
+      .prepare(
+        `INSERT INTO inbox_staff_reads
+           (staff_id, channel, conversation_id, last_read_at, updated_at)
+         SELECT ?, 'line', friend_id, MAX(created_at), ?
+         FROM messages_log
+         WHERE direction = 'incoming'
+           AND (delivery_type IS NULL OR delivery_type != 'test')
+         GROUP BY friend_id
+         ON CONFLICT(staff_id, channel, conversation_id) DO UPDATE SET
+           last_read_at = excluded.last_read_at,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(c.get('staff').id, now)
+      .run();
+    return c.json({ success: true, data: { marked: true } });
+  } catch (err) {
+    console.error('POST /api/chats/read-all error:', err);
+    return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
   }
 });
 
@@ -616,8 +702,8 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async 
     // メッセージログに記録
     const logId = crypto.randomUUID();
     await c.env.DB
-      .prepare(`INSERT INTO messages_log (id, friend_id, direction, message_type, content, source, created_at) VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?)`)
-      .bind(logId, friend.id, messageType, body.content, jstNow())
+      .prepare(`INSERT INTO messages_log (id, friend_id, direction, message_type, content, source, sent_by_staff_id, created_at) VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?)`)
+      .bind(logId, friend.id, messageType, body.content, c.get('staff').id, jstNow())
       .run();
 
     // チャットの最終メッセージ日時を更新（chat.id を直接使う — friend_id で呼ばれても resolveOrCreateChat 済み）
@@ -642,7 +728,10 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async 
       console.error('first_replied_at update error:', e);
     }
 
-    return c.json({ success: true, data: { sent: true, messageId: logId } });
+    return c.json({
+      success: true,
+      data: { sent: true, messageId: logId, sentByStaffName: c.get('staff').name },
+    });
   } catch (err) {
     console.error('POST /api/chats/:id/send error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
