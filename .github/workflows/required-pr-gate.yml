@@ -89,7 +89,16 @@ jobs:
             exit 0
           fi
 
-          added_lines=$(git diff "$BASE_SHA...$HEAD_SHA" -- docs/release-log/unreleased.md \
+          # 反映履歴は2か所から拾う。
+          #
+          #   docs/release-log/unreleased/<番号>-<担当>-<何の話か>.md  ← これから
+          #   docs/release-log/unreleased.md                          ← これまで
+          #
+          # 1ファイルに全員が書き足す形だと、**全員が同じ場所（`## 追加` の
+          # 直後）に行を差し込むので、PRのたびに必ずぶつかる。** 一晩で9本の
+          # PRが全部ここで止まった。1本ずつ別のファイルにすれば起きない。
+          added_lines=$(git diff "$BASE_SHA...$HEAD_SHA" \
+            -- docs/release-log/unreleased.md 'docs/release-log/unreleased/*.md' \
             | grep '^+[-*] ' || true)
           added=$(printf '%s' "$added_lines" | grep -c '^+' || true)
           if [ "$added" -gt 0 ]; then
@@ -123,7 +132,7 @@ jobs:
             exit 0
           fi
 
-          echo "::error::docs/release-log/unreleased.md に1行も足されていません。"
+          echo "::error::反映履歴に1行も足されていません。"
           echo ""
           echo "  変更した内容を、運用者に伝わる言葉で1行書いてください。"
           echo "  管理画面の 運用状態 → 更新履歴 → 変更内容 にそのまま出ます。"
