@@ -1309,6 +1309,8 @@ CREATE TABLE rich_menu_groups (
   targeting_enabled   INTEGER NOT NULL DEFAULT 0,
   -- 159: フォルダで分ける。箱そのものは folders（kind='rich_menu'）。
   folder_id           TEXT REFERENCES folders(id) ON DELETE SET NULL,
+  -- 160: 自分で決める並び順。小さいほど先。同じなら更新の新しい順。
+  display_order       INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
