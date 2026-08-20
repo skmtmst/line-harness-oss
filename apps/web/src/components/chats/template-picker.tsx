@@ -86,7 +86,7 @@ export default function TemplatePicker({
       onClick={onClose}
     >
       <div
-        className="flex h-[min(720px,calc(100vh-32px))] w-[min(920px,calc(100vw-32px))] flex-col overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-white shadow-2xl"
+        className="flex h-[min(720px,calc(100vh-32px))] w-[min(920px,calc(100vw-32px))] flex-col overflow-hidden rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-6 py-5">
@@ -121,7 +121,7 @@ export default function TemplatePicker({
             value={folderId}
             onChange={(e) => setFolderId(e.target.value)}
             aria-label="フォルダ"
-            className="rounded-lg border border-[#E5E7EB] bg-white px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none focus:border-[#06C755]"
+            className="rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none focus:border-[#06C755]"
           >
             <option value="">すべてのフォルダ（{textTemplates.length}）</option>
             {folders.map((folder) => (
@@ -145,7 +145,7 @@ export default function TemplatePicker({
                   type="button"
                   onClick={() => setCategory(item.key)}
                   aria-pressed={category === item.key}
-                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-[#A6E7BD] bg-[#EAFBF0] text-[#057A37]' : 'border-[#E5E7EB] bg-white text-[#667085] hover:bg-[#F2F4F7]'}`}
+                  className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold ${category === item.key ? 'border-[#A6E7BD] bg-[#EAFBF0] text-[#057A37]' : 'border-[#E5E7EB] bg-canvas text-[#667085] hover:bg-[#F2F4F7]'}`}
                 >
                   {item.label}
                 </button>
@@ -164,7 +164,7 @@ export default function TemplatePicker({
                       type="button"
                       onClick={() => setSelectedId(template.id)}
                       aria-pressed={selected?.id === template.id}
-                      className={`w-full rounded-lg border px-3 py-3 text-left ${selected?.id === template.id ? 'border-[#A6E7BD] bg-[#EAFBF0]' : 'border-[#E5E7EB] bg-white hover:bg-[#F2F4F7]'}`}
+                      className={`w-full rounded-lg border px-3 py-3 text-left ${selected?.id === template.id ? 'border-[#A6E7BD] bg-[#EAFBF0]' : 'border-[#E5E7EB] bg-canvas hover:bg-[#F2F4F7]'}`}
                     >
                       <p className="truncate text-sm font-semibold text-[#1F2937]">{template.name}</p>
                       <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-[#667085]">{template.messageContent}</p>
@@ -175,7 +175,7 @@ export default function TemplatePicker({
             )}
           </div>
 
-          <section className="hidden min-h-0 overflow-y-auto bg-white p-6 md:block" aria-label="テンプレートのプレビュー">
+          <section className="hidden min-h-0 overflow-y-auto bg-canvas p-6 md:block" aria-label="テンプレートのプレビュー">
             {selected ? (
               <div>
                 <div className="flex items-center justify-between gap-3">
@@ -184,8 +184,8 @@ export default function TemplatePicker({
                 </div>
                 <p className="mt-5 text-xs font-semibold text-[#667085]">送信内容のプレビュー</p>
                 <div className="mt-3 min-h-[250px] rounded-[12px] bg-[#7292BD] p-5 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
-                  <div className="flex justify-center"><span className="rounded-full bg-white/85 px-3 py-1 text-[11px] text-[#667085]">今日</span></div>
-                  <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-[#344054] shadow-sm">{selected.messageContent}</div>
+                  <div className="flex justify-center"><span className="rounded-full bg-canvas/85 px-3 py-1 text-[11px] text-[#667085]">今日</span></div>
+                  <div className="mt-4 max-w-[78%] rounded-[12px] rounded-tl-[4px] bg-canvas px-4 py-3 text-sm leading-6 whitespace-pre-wrap text-[#344054] shadow-sm">{selected.messageContent}</div>
                 </div>
                 <div className="mt-3 rounded-lg bg-[#F7F8F6] px-4 py-3 text-xs leading-6 text-[#667085]">
                   この操作ではまだ送信されません。入力欄へ内容を挿入します。<br />
@@ -198,12 +198,12 @@ export default function TemplatePicker({
           </section>
         </div>
 
-        <footer className="flex items-center justify-between gap-4 border-t border-[#E5E7EB] bg-white px-6 py-4">
+        <footer className="flex items-center justify-between gap-4 border-t border-[#E5E7EB] bg-canvas px-6 py-4">
           <p className="text-xs text-[#667085]">入力後に文章を編集してから送信できます。</p>
           <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="rounded-lg border border-[#E5E7EB] bg-white px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+            className="rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]"
           >
             キャンセル
           </button>
@@ -214,7 +214,7 @@ export default function TemplatePicker({
               onPick(selected.messageContent)
               onClose()
             }}
-            className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#05B94F] disabled:opacity-40"
+            className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-[#05B94F] disabled:opacity-40"
           >
             入力欄へ挿入
           </button>

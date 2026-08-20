@@ -41,7 +41,7 @@ export default function InboxKpis() {
   return (
     <section
       data-inbox-v4="summary"
-      className="border-[#E5E7EB] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)] flex min-h-[74px] flex-wrap items-center gap-x-6 gap-y-3 rounded-[10px] border px-[18px] py-3 xl:flex-nowrap"
+      className="border-[#E5E7EB] bg-canvas shadow-[1px_1px_2px_rgba(29,29,31,0.13)] flex min-h-[74px] flex-wrap items-center gap-x-6 gap-y-3 rounded-[10px] border px-[18px] py-3 xl:flex-nowrap"
       aria-label="受信箱の対応状況"
     >
       <div className="flex min-w-[270px] items-center gap-3">
@@ -70,7 +70,7 @@ export default function InboxKpis() {
         ))}
       </div>
 
-      <Link href="/tags?tab=marks" className="border-[#E5E7EB] text-[#2563EB] inline-flex h-[38px] shrink-0 items-center gap-2 rounded-lg border bg-white px-3.5 text-[13px] font-semibold hover:bg-[#F7F8F6]">
+      <Link href="/tags?tab=marks" className="border-[#E5E7EB] text-[#2563EB] inline-flex h-[38px] shrink-0 items-center gap-2 rounded-lg border bg-canvas px-3.5 text-[13px] font-semibold hover:bg-[#F7F8F6]">
         <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M9 4v6M15 14v6"/></svg>
         対応ルール
       </Link>

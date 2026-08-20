@@ -190,7 +190,7 @@ export default function EmailThread({
 
   return (
     <>
-      <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-white px-4 py-3">
+      <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
         <div className="min-w-0">
           <p className="text-ink truncate text-sm font-medium">{detail.thread.subject}</p>
           <p className="text-ink-faint mt-0.5 truncate text-xs">
@@ -238,12 +238,12 @@ export default function EmailThread({
             <div
               className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${
                 message.direction === 'outgoing'
-                  ? 'rounded-br-md bg-[#c9f4d8] text-gray-900'
-                  : 'rounded-bl-md bg-white text-gray-900'
+                  ? 'rounded-br-md bg-[#c9f4d8] text-ink'
+                  : 'rounded-bl-md bg-canvas text-ink'
               }`}
             >
               <p className="text-sm leading-6 break-words whitespace-pre-wrap">{message.body_text}</p>
-              <p className="mt-2 text-right text-[10px] text-gray-400">
+              <p className="mt-2 text-right text-[10px] text-ink-faint">
                 {dateTime(message.created_at)}
                 {message.direction === 'outgoing' ? ' ・ 送信済み' : ''}
               </p>
@@ -266,21 +266,21 @@ export default function EmailThread({
         <div ref={bottomRef} />
       </div>
 
-      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-[#E5E7EB] bg-white px-4 py-3">
+      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-[#E5E7EB] bg-canvas px-4 py-3">
         {/* 上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた */}
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
             >
               ▧ テンプレートを選択
             </button>
             <button
               type="button"
               onClick={() => setShowComposerOptions(v => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-white px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
             >
               ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
             </button>
@@ -322,7 +322,7 @@ export default function EmailThread({
         )}
 
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
-        <div className="rounded-[10px] border border-[#D0D5DD] bg-white p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
+        <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
           <textarea
             value={reply}
             onChange={(e) => setReply(e.target.value)}
@@ -353,7 +353,7 @@ export default function EmailThread({
             <button
               onClick={() => void sendReply()}
               disabled={!reply.trim() || sending}
-              className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sending ? '送信中...' : 'メールで返信'}
             </button>
