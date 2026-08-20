@@ -2901,6 +2901,8 @@ export const api = {
         targetingCondition: string | null;
         targetingPriority: number;
         targetingEnabled: boolean;
+        /** 159: フォルダ。分けていなければ null。 */
+        folderId: string | null;
         thumbnailR2Key: string | null;
         createdAt: string;
         updatedAt: string;
@@ -2920,6 +2922,7 @@ export const api = {
         targetingCondition: string | null;
         targetingPriority: number;
         targetingEnabled: boolean;
+        folderId: string | null;
         createdAt: string;
         updatedAt: string;
         pages: Array<{
@@ -2959,6 +2962,8 @@ export const api = {
       targetingCondition?: string | null;
       targetingPriority?: number;
       targetingEnabled?: boolean;
+      /** 159: フォルダ。null で未分類に戻す。 */
+      folderId?: string | null;
       pages?: Array<{
         id?: string;
         name: string;
