@@ -17,6 +17,7 @@ export * from './reminders';
 export * from './scoring';
 export * from './templates';
 export * from './chats';
+export * from './inbox-reads';
 export * from './notifications';
 export * from './stripe';
 export * from './health';

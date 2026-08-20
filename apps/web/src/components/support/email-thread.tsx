@@ -30,6 +30,7 @@ type EmailDetail = {
     id: string
     direction: 'incoming' | 'outgoing'
     body_text: string
+    sent_by_staff_name: string | null
     created_at: string
   }>
 }
@@ -253,10 +254,7 @@ export default function EmailThread({
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {detail.messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}
-          >
+          <div key={message.id} className={`flex items-end gap-2 ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${
                 message.direction === 'outgoing'
@@ -270,6 +268,19 @@ export default function EmailThread({
                 {message.direction === 'outgoing' ? ' ・ 送信済み' : ''}
               </p>
             </div>
+            {message.direction === 'outgoing' && (
+              <div className="flex w-12 shrink-0 flex-col items-center">
+                <div
+                  className="bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-bold"
+                  title={message.sent_by_staff_name ?? '担当者情報なし'}
+                >
+                  {(message.sent_by_staff_name ?? '担').charAt(0)}
+                </div>
+                <span className="text-ink-faint mt-1 w-full truncate text-center text-[9px]">
+                  {message.sent_by_staff_name ?? '担当者'}
+                </span>
+              </div>
+            )}
           </div>
         ))}
         <div ref={bottomRef} />

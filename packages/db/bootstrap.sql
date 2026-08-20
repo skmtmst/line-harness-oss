@@ -740,6 +740,15 @@ CREATE TABLE google_calendar_connections (
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE inbox_staff_reads (
+  staff_id        TEXT NOT NULL,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  conversation_id TEXT NOT NULL,
+  last_read_at    TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (staff_id, channel, conversation_id)
+);
+
 CREATE TABLE incoming_webhooks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -880,6 +889,7 @@ CREATE TABLE messages_log (
   delivery_type    TEXT CHECK (delivery_type IN ('push', 'reply', 'test')),
   source           TEXT,
   line_account_id  TEXT,
+  sent_by_staff_id TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , origin_kind TEXT, origin_id TEXT);
 
@@ -2004,6 +2014,9 @@ CREATE INDEX idx_google_calendar_connections_staff
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
 CREATE INDEX idx_idempotency_expires ON booking_idempotency_keys (expires_at);
+
+CREATE INDEX idx_inbox_staff_reads_conversation
+  ON inbox_staff_reads (channel, conversation_id, staff_id);
 
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
