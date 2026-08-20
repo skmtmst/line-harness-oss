@@ -567,15 +567,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
   }, [loadChats, loadEmails])
 
-  // Deep-link from other pages (e.g. /form-submissions): ?friend=<friendId>
-  // chat list returns id = friend_id, so selectedChatId === friendId is correct.
-  // If no chat exists yet, loadChatDetail will fail and the user can fall back to
-  // the friend list — acceptable for now.
+  // Deep-link from other pages. LINE is ?friend=<friendId>, email is
+  // ?thread=<threadId>. Selecting one side always clears the other so the
+  // center panel has exactly one conversation to show.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const friendId = params.get('friend')
-    if (friendId) setSelectedChatId(friendId)
+    const threadId = params.get('thread')
+    if (threadId) {
+      setSelectedChatId(null)
+      setSelectedFriendId(null)
+      setSelectedThreadId(threadId)
+    } else if (friendId) {
+      setSelectedThreadId(null)
+      setSelectedChatId(friendId)
+    }
   }, [])
 
   useEffect(() => {

@@ -393,7 +393,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <header data-design="Head" className="mb-6 flex min-h-[76px] flex-wrap items-start justify-between gap-4">
+      <header data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-ink text-2xl font-bold sm:text-3xl">ダッシュボード</h1>
           <button type="button" onClick={() => setEditorOpen(true)} className="border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken rounded-control mt-0.5 inline-flex items-center gap-2 border px-3 py-2 text-xs font-medium">

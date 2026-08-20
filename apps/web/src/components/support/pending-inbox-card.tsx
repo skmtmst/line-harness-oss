@@ -32,6 +32,13 @@ type InboxItem = {
   lastIncomingAt: string
 }
 
+export function inboxItemHref(item: Pick<InboxItem, 'channel' | 'id'>): string {
+  const rawId = item.id.replace(/^(line|email):/, '')
+  return item.channel === 'email'
+    ? `/chats?channel=email&thread=${encodeURIComponent(rawId)}`
+    : `/chats?friend=${encodeURIComponent(rawId)}&unanswered=1`
+}
+
 const PAGE_SIZE = 5
 
 function elapsed(iso: string): string {
@@ -117,7 +124,7 @@ export default function PendingInboxCard({
               </thead>
               <tbody className="divide-hairline divide-y">
                 {items.map((item) => (
-                  <tr key={item.id} className="h-[58px] hover:bg-canvas-sunken">
+                  <tr key={item.id} className="h-[61px] hover:bg-canvas-sunken">
                     <td className="overflow-hidden px-5 py-2.5 whitespace-nowrap">
                       <span
                         className={`mr-2 rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${
@@ -128,7 +135,13 @@ export default function PendingInboxCard({
                       >
                         {item.channel === 'email' ? 'メール' : 'LINE'}
                       </span>
-                      <span className="text-ink font-medium" title={item.customerName}>{item.customerName}</span>
+                      <Link
+                        href={inboxItemHref(item)}
+                        className="text-ink font-medium hover:text-action hover:underline focus-visible:text-action focus-visible:underline"
+                        title={`${item.customerName}の受信箱を開く`}
+                      >
+                        {item.customerName}
+                      </Link>
                     </td>
                     <td className="text-ink-secondary truncate px-3 py-2.5" title={item.preview}>
                       {item.preview}
