@@ -18,7 +18,7 @@ import ConditionBuilder, {
   type SegmentCondition,
 } from '@/components/shared/condition-builder'
 
-const ACTION_KINDS: { type: ScenarioActionType; label: string; make: () => unknown }[] = [
+export const ACTION_KINDS: { type: ScenarioActionType; label: string; make: () => unknown }[] = [
   { type: 'tag', label: 'タグ操作', make: () => ({ op: 'add', tagIds: [] }) },
   { type: 'friend_field', label: '友だち情報操作', make: () => ({ fieldId: '', op: 'set', value: '' }) },
   { type: 'support_mark', label: '対応マーク操作', make: () => ({ markId: null }) },
@@ -326,7 +326,14 @@ export default function ActionEditor({
 const selectClass = 'border-hairline rounded-control text-ink h-9 border bg-white px-2 text-sm min-w-0'
 const inputClass = 'border-hairline rounded-control text-ink h-9 border px-3 text-sm min-w-0 flex-1'
 
-function ActionConfigEditor({
+/**
+ * アクション1つぶんの中身を編集する。
+ *
+ * 値と onChange だけで動く。シナリオ（scenario_actions の行）からも、
+ * 自動応答（actions_json）からも同じものを使う。**中身の編集を2つ持つと、
+ * 種別を足したときに片方だけ増える。**
+ */
+export function ActionConfigEditor({
   action,
   tags,
   fields,

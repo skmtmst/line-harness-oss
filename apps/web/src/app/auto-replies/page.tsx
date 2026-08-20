@@ -28,8 +28,43 @@ interface AutoReply {
   skipWhenOperatorActive: boolean
   priority: number
   messageKinds: string[] | null
+  /** 151: 応答したときに順に実行すること。 */
+  actions: unknown[] | null
+  /** 151: 応答する曜日（0=日 … 6=土）。 */
+  responseWeekdays: number[] | null
+  responseHolidayRule: string | null
+  oncePerFriend: boolean
+  keywords: unknown[] | null
+  friendConditions: unknown | null
+  /** 152: 当たった回数（今月・累計）。 */
+  hits?: { period: number; total: number }
   createdAt: string
   effectiveAccounts?: EffectiveAccount[]
+}
+
+/**
+ * 応答したときに行うことを、短い言葉で並べる。
+ *
+ * 一覧に「タグを追加 → テキストを送信」と出す。設定を開かずに何をするルールか
+ * 読めるようにするため。Lステップの一覧も同じ出し方をしている。
+ */
+const ACTION_SUMMARY_LABELS: Record<string, string> = {
+  tag: 'タグ',
+  friend_field: '友だち情報',
+  support_mark: '対応マーク',
+  scenario: 'シナリオ',
+  common_var: '共通情報',
+}
+
+function actionSummary(rule: { actions: unknown[] | null }): string[] {
+  if (!Array.isArray(rule.actions)) return []
+  return rule.actions.flatMap((item): string[] => {
+    if (!item || typeof item !== 'object') return []
+    const r = item as Record<string, unknown>
+    const type = r.actionType ?? r.action_type
+    if (typeof type !== 'string') return []
+    return [ACTION_SUMMARY_LABELS[type] ?? type]
+  })
 }
 
 interface TemplateLite {
@@ -171,6 +206,15 @@ export default function AutoRepliesPage() {
     }
   }
 
+  // ヒット数の合計（152）。KPI に出す。
+  const monthlyHits = items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)
+  const totalHits = items.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
+  // 曜日か時間帯を決めているルール。「営業時間外だけ返す」の類がいくつあるか。
+  const timeRestrictedCount = items.filter(
+    (r) => r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0,
+  ).length
+  const neverHitCount = items.filter((r) => (r.hits?.total ?? 0) === 0).length
+
   // キーワードと返す本文の両方を見る。名前を付けていないルールは
   // キーワードでしか探せない。
   const q = query.trim()
@@ -240,22 +284,33 @@ export default function AutoRepliesPage() {
             停止中 {items.filter((r) => !r.isActive).length}
           </p>
         </div>
-        {/* ルールが何回当たったかを記録していない。返信は messages_log に
-            残るが、どのルールが当てたかまでは持っていない。 */}
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のヒット</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">ヒット数は未集計</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {monthlyHits}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            累計 {totalHits} 回・ヒット数はルールごとに数えます
+          </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">営業時間外の応答</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">時間帯ごとの集計は未対応</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {timeRestrictedCount}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">曜日か時間帯を決めているルール</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">未ヒット</p>
-          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
-          <p className="text-ink-faint mt-0.5 text-xs">30日以上当たっていないルール</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {neverHitCount}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            一度も当たっていないルール（30日以上の絞り込みは準備中）
+          </p>
         </div>
       </div>
 
@@ -334,22 +389,37 @@ export default function AutoRepliesPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">template</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">応答条件</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">適用アカウント</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">ヒット数</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">状態</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : shown.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
+                <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">自動返信ルールがありません</td></tr>
               ) : (
                 shown.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3 text-sm text-ink-secondary tabular-nums">{r.priority}</td>
                     <td className="px-4 py-3 text-sm font-medium text-ink">{r.keyword}</td>
                     <td className="px-4 py-3 text-xs text-ink-secondary">{matchTypeLabel[r.matchType]}</td>
-                    <td className="px-4 py-3">{renderResponseCell(r)}</td>
+                    <td className="px-4 py-3">
+                      <div className="space-y-0.5">
+                        {renderResponseCell(r)}
+                        {actionSummary(r).length > 0 && (
+                          <div className="text-ink-secondary flex flex-wrap items-center gap-1 text-[11px]">
+                            {actionSummary(r).map((label, i) => (
+                              <span key={i} className="whitespace-nowrap">
+                                {i > 0 && <span className="text-ink-faint mr-1">→</span>}
+                                {label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">{renderTemplateCell(r)}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
@@ -364,6 +434,13 @@ export default function AutoRepliesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">{renderEffectiveCell(r)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? 0}</span>
+                      <span className="text-ink-faint text-xs">回</span>
+                      <span className="text-ink-faint ml-1 text-[10px]">
+                        （累計 {r.hits?.total ?? 0}）
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${r.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'}`}>
                         {r.isActive ? '有効' : '無効'}
@@ -386,6 +463,12 @@ export default function AutoRepliesPage() {
                           activeUntil: r.activeUntil,
                           cooldownMinutes: r.cooldownMinutes,
                           skipWhenOperatorActive: r.skipWhenOperatorActive,
+                          actions: r.actions,
+                          responseWeekdays: r.responseWeekdays,
+                          responseHolidayRule: r.responseHolidayRule,
+                          oncePerFriend: r.oncePerFriend,
+                          keywords: r.keywords,
+                          friendConditions: r.friendConditions,
                         })}
                         className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-md"
                       >
