@@ -6,6 +6,7 @@
     "dev": "next dev --port 3001",
     "predev": "node scripts/build-release-log.mjs",
     "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
+    "update:raw-color-baseline": "node ./scripts/raw-color-baseline.mjs",
     "build": "next build",
     "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "typecheck": "tsc --noEmit",
