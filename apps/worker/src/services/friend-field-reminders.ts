@@ -1,7 +1,7 @@
 import {
   getFriendFieldReminders,
   getFriendsWithFieldValue,
-  hasReminderEnrollment,
+  getReminderEnrollmentKeys,
   enrollFriendInReminder,
 } from '@line-crm/db';
 import { nextAnniversary, isSameJstDay, toJstParts } from '@line-crm/shared';
@@ -37,6 +37,17 @@ export async function processFriendFieldReminders(
     try {
       const friends = await getFriendsWithFieldValue(db, reminder.trigger_field_id);
 
+      /*
+       * 「もう入っているか」は、1回引いて手元で照合する。
+       *
+       * 1人ずつ問い合わせると、**友だちの数だけ問い合わせが飛ぶ。**
+       * 誕生日リマインダは「誕生日が入っている人」を全員見るので、
+       * 5,000人いれば毎日5,000回になる。Cloudflare Workers の1回の実行で
+       * 出せる問い合わせ数には上限があり、そこに当たるとその日のぶんが
+       * 途中で止まる。**例外にならないので、途中まで動いたように見える。**
+       */
+      const already = await getReminderEnrollmentKeys(db, reminder.id);
+
       for (const friend of friends) {
         // 毎年くり返すなら「次に来るその日」、くり返さないなら「その日が今日か」。
         const targetDate = reminder.repeat_yearly === 1
@@ -52,7 +63,7 @@ export async function processFriendFieldReminders(
         // ゴール日は日本時間の 0:00 として持つ。何時にするかは通ごとの設定で決まる。
         const targetDateTime = `${targetDate}T00:00:00+09:00`;
 
-        if (await hasReminderEnrollment(db, friend.friend_id, reminder.id, targetDateTime)) {
+        if (already.has(`${friend.friend_id}\u0000${targetDateTime}`)) {
           skipped++;
           continue;
         }
