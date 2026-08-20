@@ -63,6 +63,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
             echo "PRの差分が取れないため、この確認は飛ばします。"
@@ -88,10 +89,37 @@ jobs:
             exit 0
           fi
 
-          added=$(git diff "$BASE_SHA...$HEAD_SHA" -- docs/release-log/unreleased.md \
-            | grep -c '^+[-*] ' || true)
+          added_lines=$(git diff "$BASE_SHA...$HEAD_SHA" -- docs/release-log/unreleased.md \
+            | grep '^+[-*] ' || true)
+          added=$(printf '%s' "$added_lines" | grep -c '^+' || true)
           if [ "$added" -gt 0 ]; then
             echo "反映履歴に $added 行足されています。"
+
+            # このPRの番号が入った行が1行でもあるか。
+            #
+            # 行を書く時点ではPR番号がまだ無いので、書き忘れやすい。書式では
+            # 任意なので、抜けていても組み立ては通る。**通ってしまうから抜ける。**
+            # 管理画面の「更新履歴」に番号が出ず、どの変更か辿れなくなる。
+            # 実際、一晩で19行が番号なしのまま入った。
+            #
+            # **「全部の行に入っているか」では見ない。** 過去の行を直すPRでは、
+            # 他のPRの番号が付いた行が差分に出る（それが直した中身なので）。
+            # 全部を求めると、そういうPRが通らなくなる。実際にこの仕組みを
+            # 入れたPR自身が引っかかった。
+            own=$(printf '%s\n' "$added_lines" | grep -c "#${PR_NUMBER}\b" || true)
+            if [ "$own" -eq 0 ]; then
+              echo "::error::反映履歴に、このPRの番号 #${PR_NUMBER} が入った行がありません。"
+              echo ""
+              echo "  管理画面の 運用状態 → 更新履歴 で、どの変更か辿れなくなります。"
+              echo "  足した行のどれかに #${PR_NUMBER} を入れてください（順序は問いません）:"
+              echo ""
+              echo "    - 変更した内容 @kenta #${PR_NUMBER} $(date -u +%Y-%m-%d) HH:MM"
+              echo ""
+              echo "  いま足されている行:"
+              printf '%s\n' "$added_lines" | sed 's/^+/    /'
+              exit 1
+            fi
+            echo "うち $own 行に #${PR_NUMBER} が入っています。"
             exit 0
           fi
 
