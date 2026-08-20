@@ -404,6 +404,13 @@ export default function RemindersPage() {
                       >
                         {reminder.isActive ? '無効にする' : '有効にする'}
                       </button>
+                      <Link
+                        href={`/reminders/edit?id=${reminder.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="border-hairline text-ink-secondary hover:bg-canvas-sunken inline-flex min-h-[44px] items-center rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+                      >
+                        編集
+                      </Link>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(reminder.id) }}
                         className="px-3 py-1.5 min-h-[44px] text-xs font-medium text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-md transition-colors"

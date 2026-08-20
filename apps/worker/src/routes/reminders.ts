@@ -161,6 +161,9 @@ reminders.get('/api/reminders/:id', async (c) => {
           offsetMinutes: s.offset_minutes,
           messageType: s.message_type,
           messageContent: s.message_content,
+          offsetDays: s.offset_days,
+          sendAtTime: s.send_at_time,
+          templateId: s.template_id,
           createdAt: s.created_at,
         })),
       },
@@ -253,7 +256,17 @@ reminders.post('/api/reminders/:id/steps', requireRole('owner', 'admin'), async 
     const step = await createReminderStep(c.env.DB, { reminderId, ...body });
     return c.json({
       success: true,
-      data: { id: step.id, reminderId: step.reminder_id, offsetMinutes: step.offset_minutes, messageType: step.message_type, createdAt: step.created_at },
+      data: {
+        id: step.id,
+        reminderId: step.reminder_id,
+        offsetMinutes: step.offset_minutes,
+        messageType: step.message_type,
+        messageContent: step.message_content,
+        offsetDays: step.offset_days,
+        sendAtTime: step.send_at_time,
+        templateId: step.template_id,
+        createdAt: step.created_at,
+      },
     }, 201);
   } catch (err) {
     console.error('POST /api/reminders/:id/steps error:', err);

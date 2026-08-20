@@ -92,6 +92,11 @@ export default function NewReminderPage() {
           repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
         })
         if (!res.success) throw new Error(res.error)
+        // 下書きとして作りたい場合は、作ったあとに止める。作成の受け口が
+        // is_active を受け取らないので、ここで1回だけ更新する。
+        if (!activateNow) {
+          await api.reminders.update(res.data.id, { isActive: false })
+        }
         // 通が1つも無いと、対象に加わっても何も届かない。作るときに1通目まで入れる。
         await api.reminders.addStep(res.data.id, {
           offsetMinutes,
@@ -384,19 +389,18 @@ export default function NewReminderPage() {
           />
         </Field>
 
-        {/* 作ったリマインダを止めておく口が無い。作成時は常に動きだす。 */}
-        <label className="text-ink-faint flex items-start gap-2 text-sm" title="準備中です">
+        <label className="text-ink-secondary flex cursor-pointer items-start gap-2 text-sm">
           <input
             type="checkbox"
             className="mt-0.5"
             checked={activateNow}
-            disabled
             onChange={(e) => setActivateNow(e.target.checked)}
           />
           <span>
             作成したらすぐ動かす
-            <span className="block text-xs">
-              オフにすると下書きとして保存され、条件に合っても送られません。下書きは準備中です。
+            <span className="text-ink-faint block text-xs">
+              オフにすると下書きとして保存され、条件に合っても送られません。あとから編集画面で
+              動かせます。
             </span>
           </span>
         </label>
