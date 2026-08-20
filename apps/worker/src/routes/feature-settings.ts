@@ -56,6 +56,7 @@ export const TOGGLEABLE_FEATURES = [
   'affiliates',
   'mileage',
   'ec_commerce',
+  'line_notifications',
   'nen_campaigns',
 ] as const;
 
@@ -93,6 +94,7 @@ export const NEN_SPECIALIZED_FEATURES: ToggleableFeature[] = [
   'nen_campaigns',
   'photo_review',
   'ec_commerce',
+  'line_notifications',
 ];
 
 function isToggleable(key: unknown): key is ToggleableFeature {

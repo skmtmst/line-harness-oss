@@ -160,11 +160,11 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   if (!setting) {
     return (
       <div>
-        <Header title="NENコラムを編集する" />
+        <Header title="フォロー配信を編集する" />
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
           {error || 'この配信が見つかりませんでした。'}
           <Link href="/nen-campaigns" className="text-accent ml-1 hover:underline">
-            NEN配信へ戻る
+            フォロー配信へ戻る
           </Link>
         </p>
       </div>
@@ -175,7 +175,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     <div>
       <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
         <Link href="/nen-campaigns" className="hover:underline">
-          NEN配信
+          フォロー配信
         </Link>
         <span className="mx-1.5">/</span>
         <span>編集</span>
@@ -183,7 +183,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
 
       <div data-design="Head">
         <Header
-          title="NENコラムを編集する"
+          title={`${setting.label}を編集する`}
           description="定期的に届けるコラムの内容と送り方を設定します。"
           action={
             <div className="flex flex-wrap gap-2">
@@ -450,7 +450,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
             <p className="text-ink-faint text-xs leading-relaxed">
               配信ごとの送信数・開封数を数える経路がまだありません。送信の待ち行列は
               <Link href="/nen-campaigns" className="text-accent mx-1 hover:underline">
-                NEN配信
+                フォロー配信
               </Link>
               で見られます。
             </p>

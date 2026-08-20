@@ -29,6 +29,7 @@ export type FeatureKey =
   | 'nen_campaigns'
   | 'photo_review'
   | 'ec_commerce'
+  | 'line_notifications'
 
 export interface FeatureItem {
   id: string
@@ -47,7 +48,7 @@ export interface FeatureGroup {
 }
 
 export const FEATURE_SETTINGS_UPDATED_EVENT = 'line-harness:feature-settings-updated'
-export const SPECIALIZED_FEATURE_KEYS: FeatureKey[] = ['nen_campaigns', 'photo_review', 'ec_commerce']
+export const SPECIALIZED_FEATURE_KEYS: FeatureKey[] = ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications']
 
 /**
  * 記録が無い契約の初期状態。
@@ -77,6 +78,7 @@ export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   nen_campaigns: true,
   photo_review: true,
   ec_commerce: true,
+  line_notifications: true,
 }
 
 function toFeatureItem(item: MenuItem): FeatureItem {

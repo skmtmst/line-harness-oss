@@ -88,7 +88,7 @@ function NenColumnEditInner() {
 
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/nen-campaigns" className="hover:underline">
-          NEN配信
+          フォロー配信
         </Link>
         <span className="mx-1.5">›</span>
         <span>コラムの編集</span>

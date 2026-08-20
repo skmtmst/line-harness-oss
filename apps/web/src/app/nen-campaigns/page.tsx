@@ -160,7 +160,7 @@ export default function NenCampaignsPage() {
       setOverview(overviewRes.data)
       setCoupon(couponRes.data)
     } catch {
-      setNotice({ tone: 'error', text: 'NEN配信の情報を読み込めませんでした。' })
+      setNotice({ tone: 'error', text: 'フォロー配信の情報を読み込めませんでした。' })
     } finally { setLoading(false) }
   }, [])
 
@@ -267,14 +267,15 @@ export default function NenCampaignsPage() {
     } catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
   }
 
-  if (loading) return <><Header title="NEN配信" /><main className="p-6 text-sm text-gray-500">読み込み中...</main></>
+  if (loading) return <><Header title="フォロー配信" /><main className="p-6 text-sm text-gray-500">読み込み中...</main></>
 
   return (
     <>
+      {/* Pen canonical: V2 9-1 NEN配信 / ケアフラグ連動 */}
       <div data-design="Head">
         <Header
-          title="NEN配信"
-          description="然-NEN- 専用の配信を管理します。健康コラム・誕生日クーポン・ケアフラグ連動のフォローなど、この事業に固有の配信をまとめています。"
+          title="フォロー配信"
+          description="購入後のご案内、NENコラム、お誕生日クーポンなど、お客様との関係を育てる配信を管理します。"
           action={
             <div className="flex flex-wrap gap-2">
               {['マニュアル', '並び替え', 'フォルダを追加'].map((label) => (
@@ -324,10 +325,10 @@ export default function NenCampaignsPage() {
         </div>
       </div>
       <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
-        <section className="rounded-3xl bg-gradient-to-br from-[#0d4a32] to-[#16815b] p-6 text-white shadow-lg sm:p-8">
+        <section className="hidden" aria-hidden="true">
           <p className="text-xs font-semibold tracking-[0.25em] text-emerald-100">NEN CUSTOMER JOURNEY</p>
           <h1 className="mt-2 text-2xl font-bold sm:text-3xl">購入後も、LINEで丁寧につながる</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50">注文・発送から商品到着、口コミ、次の商品提案、コラム、お誕生日までを一つの画面で管理します。</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50">商品到着後の確認、口コミ、次の商品提案、コラム、お誕生日までを一つの画面で管理します。</p>
           {overview && <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
               ['稼働中', `${overview.activeCampaigns}件`], ['配信待ち', `${overview.jobs.pending}件`],

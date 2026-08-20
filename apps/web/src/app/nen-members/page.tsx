@@ -45,7 +45,7 @@ export default function PhotoReviewsPage() {
   return <>
     <div data-design="Head">
       <Header
-        title="写真審査"
+        title="投稿写真審査"
         description="友だちから投稿された写真を確認して、公開してよいものを承認します。承認するとマイル付与とお礼の配信が自動で走ります。"
         action={
           <div className="flex flex-wrap gap-2">
@@ -111,7 +111,7 @@ export default function PhotoReviewsPage() {
       </div>
     </div>
     <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
-      <section className="rounded-3xl bg-gradient-to-br from-[#0d4a32] to-[#16815b] p-6 text-white shadow-lg sm:p-8">
+      <section className="hidden" aria-hidden="true">
         <p className="text-xs font-semibold tracking-[.22em] text-emerald-100">NEN CUSTOMER PHOTO</p>
         <h1 className="mt-2 text-2xl font-bold sm:text-3xl">お客様の写真を、然-NEN-の物語へ</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50">投稿写真を審査し、採用した写真だけをLINE会員画面と公式サイトへ掲載します。採用時はECポイントを5ポイント付与します。</p>
