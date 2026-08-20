@@ -130,15 +130,25 @@ reminders.get('/api/reminders', async (c) => {
     let items: Awaited<ReturnType<typeof getReminders>>;
     if (lineAccountId) {
       /*
-       * 並びは getReminders() と同じにする（161）。
+       * line_account_id が NULL のものも拾う。
        *
-       * ここだけ created_at DESC のままだと、**画面から並べ替えても効かない。**
-       * アカウントを選んでいるのが通常の状態（選択は既定で先頭のアカウントに
-       * 入る）なので、効かないほうが既定になっていた。
+       * このリポジトリでは **NULL は「どのアカウントでも使う」** の意味で、
+       * シナリオ・自動応答・オートメーション・成果地点がすべてそう書いている
+       * （scenarios.ts の「NULL line_account_id = global scenario」）。
+       * リマインダだけが NULL を落としていた。
+       *
+       * 落ちると何が起きるか: 作成画面は lineAccountId を送っていないので、
+       * **画面から作ったリマインダは必ず NULL になる。** アカウントの選択は
+       * 既定で先頭に入るため、この経路が通常の状態。つまり
+       * **作った直後から一覧に出てこない。** エラーは出ない。
+       *
+       * 並びは getReminders() と同じにする（161）。ここだけ created_at DESC の
+       * ままだと、画面から並べ替えても効かない。
        */
       const result = await c.env.DB
         .prepare(
-          `SELECT * FROM reminders WHERE line_account_id = ?
+          `SELECT * FROM reminders
+            WHERE line_account_id IS NULL OR line_account_id = ?
             ORDER BY display_order ASC, created_at DESC`,
         )
         .bind(lineAccountId)

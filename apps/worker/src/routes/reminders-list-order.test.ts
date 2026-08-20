@@ -83,6 +83,30 @@ describe('リマインダ一覧の並び', () => {
     ).toContain('display_order');
   });
 
+  it('アカウントを選んでいるとき、どのアカウントでも使うもの（NULL）も拾う', async () => {
+    /*
+     * 作成画面は lineAccountId を送っていないので、画面から作った
+     * リマインダは必ず line_account_id = NULL になる。ここで NULL を
+     * 落とすと、**作った直後から一覧に出てこない。** エラーは出ない。
+     *
+     * このリポジトリでは NULL は「どのアカウントでも使う」の意味で、
+     * シナリオ・自動応答・オートメーション・成果地点が同じ書き方をしている。
+     */
+    const seen: string[] = [];
+    const app = makeApp();
+    const res = await app.request('/api/reminders?lineAccountId=acc-1', {}, {
+      DB: makeDb(seen),
+    });
+    expect(res.status).toBe(200);
+
+    const listSql = seen.find((sql) => sql.includes('FROM reminders'));
+    expect(
+      listSql?.replace(/\s+/g, ' '),
+      'line_account_id が NULL のリマインダが一覧から落ちます。' +
+        '画面から作ったものは必ず NULL なので、作った直後から出てきません。',
+    ).toContain('line_account_id IS NULL');
+  });
+
   it('アカウントを選んでいないときは getReminders() に任せる', async () => {
     const seen: string[] = [];
     const app = makeApp();
