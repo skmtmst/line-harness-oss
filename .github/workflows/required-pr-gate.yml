@@ -153,6 +153,9 @@ jobs:
           --filter @line-harness/update-engine
           build
 
+      - name: Check the generated bootstrap schema
+        run: pnpm --filter @line-crm/db check:bootstrap
+
       - name: Test repository scripts
         run: pnpm test:scripts
 
