@@ -106,6 +106,7 @@ import { contents } from './routes/contents.js';
 import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
+import { restaurantTest } from './routes/restaurant-test.js';
 import { receiveSupportEmail } from './services/support-email.js';
 import { qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -294,6 +295,8 @@ app.route('/', contents);
 app.route('/', analytics);
 app.route('/', dashboard);
 app.route('/', siteTracking);
+// 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
+app.route('/', restaurantTest);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
