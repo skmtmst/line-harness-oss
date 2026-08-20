@@ -2578,9 +2578,17 @@ export const api = {
         body: JSON.stringify(data),
       }),
     send: (id: string, data: { content: string; messageType?: string }) =>
-      fetchApi<ApiResponse<unknown>>(`/api/chats/${id}/send`, {
+      fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string }>>(`/api/chats/${id}/send`, {
         method: 'POST',
         body: JSON.stringify(data),
+      }),
+    markRead: (id: string) =>
+      fetchApi<ApiResponse<{ isUnread: false }>>(`/api/chats/${id}/read`, {
+        method: 'POST',
+      }),
+    markAllRead: () =>
+      fetchApi<ApiResponse<{ marked: true }>>('/api/chats/read-all', {
+        method: 'POST',
       }),
   },
   reminders: {

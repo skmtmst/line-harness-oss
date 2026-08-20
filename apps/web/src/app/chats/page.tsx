@@ -12,6 +12,7 @@ import TemplatePicker from '@/components/chats/template-picker'
 import InboxKpis from '@/components/chats/inbox-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -29,6 +30,8 @@ interface Chat {
   lastMessageContent: string | null
   lastMessageDirection: 'incoming' | 'outgoing' | null
   lastMessageType: string | null
+  /** ログイン中の担当者だけの未読。対応状態とは別。 */
+  isUnread: boolean
   createdAt: string
   updatedAt: string
 }
@@ -38,6 +41,11 @@ interface ChatMessage {
   direction: 'incoming' | 'outgoing'
   messageType: string
   content: string
+  source?: string | null
+  originKind?: string | null
+  sentByStaffId?: string | null
+  sentByStaffName?: string | null
+  scenarioName?: string | null
   createdAt: string
 }
 
@@ -59,7 +67,10 @@ interface EmailInboxItem {
   subject: string
   preview: string
   status: 'unread' | 'in_progress' | 'resolved'
+  assignedStaffId?: string | null
+  assignedStaffName?: string | null
   lastIncomingAt: string
+  isUnread: boolean
 }
 
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
@@ -74,6 +85,18 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'in_progress', label: '対応中' },
   { key: 'resolved', label: '対応済' },
 ]
+
+function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
+  return channel === 'line' ? (
+    <span className="bg-accent text-on-accent inline-flex h-5 min-w-8 items-center justify-center rounded-md px-1.5 text-[9px] font-bold">
+      LINE
+    </span>
+  ) : (
+    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 w-5 items-center justify-center rounded-md border text-[10px] font-bold">
+      M
+    </span>
+  )
+}
 
 // 一覧の1ページ件数。worker 側 /api/chats のデフォルト LIMIT と揃える。
 const CHAT_PAGE_SIZE = 300
@@ -393,8 +416,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [pendingImage, setPendingImage] = useState<ImageUploaderValue | null>(null)
   const [sending, setSending] = useState(false)
   const sendLockRef = useRef(false)
-  const [notes, setNotes] = useState('')
-  const [savingNotes, setSavingNotes] = useState(false)
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false)
   const isComposingRef = useRef(false)
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
@@ -519,7 +540,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       const res = await api.chats.get(chatId)
       if (res.success) {
         setChatDetail(res.data as unknown as ChatDetail)
-        setNotes((res.data as unknown as ChatDetail).notes || '')
       } else {
         // API は 200 で success:false を返す可能性 (例: 404 lookup)。詳細を画面に出す。
         const errMsg = (res as { error?: string }).error ?? '不明なエラー'
@@ -537,6 +557,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   useEffect(() => {
     loadChats()
   }, [loadChats])
+
+  useEffect(() => {
+    const refresh = () => {
+      void loadChats()
+      void loadEmails()
+    }
+    window.addEventListener(UNANSWERED_REFRESH_EVENT, refresh)
+    return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
+  }, [loadChats, loadEmails])
 
   // Deep-link from other pages (e.g. /form-submissions): ?friend=<friendId>
   // chat list returns id = friend_id, so selectedChatId === friendId is correct.
@@ -584,6 +613,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         lastMessageContent: chatDetail.lastMessageContent ?? lastMsg?.content ?? null,
         lastMessageDirection: chatDetail.lastMessageDirection ?? lastMsg?.direction ?? null,
         lastMessageType: chatDetail.lastMessageType ?? lastMsg?.messageType ?? null,
+        isUnread: false,
         createdAt: chatDetail.createdAt,
         updatedAt: chatDetail.updatedAt,
       }
@@ -630,6 +660,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   const handleSelectChat = (chatId: string) => {
     setSelectedChatId(chatId)
+    // 既読はログイン中の担当者だけに反映する。対応状態は変えない。
+    setChats((prev) => prev.map((chat) => (
+      chat.id === chatId ? { ...chat, isUnread: false } : chat
+    )))
+    void api.chats.markRead(chatId).catch(() => {
+      // 会話を開く処理は止めない。次の一覧取得で正しい未読へ戻る。
+    })
     /*
      * 開いていたメールを外す。
      *
@@ -657,7 +694,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           originalContentUrl: pendingImage.originalContentUrl,
           previewImageUrl: pendingImage.previewImageUrl,
         })
-        await api.chats.send(sendingChatId, { messageType: 'image', content: imgPayload })
+        const sendResult = await api.chats.send(sendingChatId, { messageType: 'image', content: imgPayload })
         setPendingImage(null)
         // Optimistic update for image
         setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
@@ -671,6 +708,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               direction: 'outgoing',
               messageType: 'image',
               content: imgPayload,
+              sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
               createdAt: now,
             },
           ],
@@ -700,7 +738,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // --- Text send path (runs independently — both paths execute when both image and text are present) ---
       if (messageContent.trim()) {
         const content = messageContent.trim()
-        await api.chats.send(sendingChatId, { content })
+        const sendResult = await api.chats.send(sendingChatId, { content })
         setMessageContent('')
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
         // Only mutate chatDetail if it still corresponds to the chat we just sent to
@@ -715,6 +753,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               direction: 'outgoing',
               messageType: 'text',
               content,
+              sentByStaffName: sendResult.success ? sendResult.data.sentByStaffName : '自分',
               createdAt: now,
             },
           ],
@@ -797,19 +836,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
-  const handleSaveNotes = async () => {
-    if (!selectedChatId) return
-    setSavingNotes(true)
-    try {
-      await api.chats.update(selectedChatId, { notes })
-      loadChatDetail(selectedChatId)
-    } catch {
-      setError('メモの保存に失敗しました。')
-    } finally {
-      setSavingNotes(false)
-    }
-  }
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     // IME変換確定のEnterでは送信しない
     if (e.nativeEvent.isComposing || isComposingRef.current || e.keyCode === 229) return
@@ -847,8 +873,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               type="search"
               value={nameQuery}
               onChange={(e) => setNameQuery(e.target.value)}
-              placeholder="名前で検索"
-              aria-label="名前で検索"
+              placeholder="名前・メールアドレス・内容で検索"
+              aria-label="名前・メールアドレス・内容で検索"
               className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-1.5 text-xs focus:ring-2 focus:outline-none"
             />
           </div>
@@ -912,7 +938,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   .filter((item) =>
                     nameQuery.trim() === ''
                       ? true
-                      : item.customerName.toLowerCase().includes(nameQuery.trim().toLowerCase()),
+                      : [item.customerName, item.customerIdentifier, item.subject, item.preview]
+                          .filter(Boolean)
+                          .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
                   .filter((item) => statusFilter === 'all' || item.status === statusFilter)
                   .map((item) => ({
@@ -926,12 +954,23 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         setSelectedChatId(null)
                         setSelectedFriendId(null)
                         setSelectedThreadId(item.threadId)
+                        setEmailItems((prev) => prev.map((email) => (
+                          email.threadId === item.threadId ? { ...email, isUnread: false } : email
+                        )))
+                        void fetchApi(`/api/support/email/threads/${encodeURIComponent(item.threadId)}/read`, {
+                          method: 'POST',
+                        }).catch(() => undefined)
                       }}
                       className="border-hairline hover:bg-canvas-sunken w-full border-b px-4 py-3 text-left transition-colors"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="bg-canvas-sunken flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
-                          <span className="text-ink-faint text-sm">✉</span>
+                        <div className="relative shrink-0">
+                          <div className="bg-canvas-sunken border-hairline flex h-10 w-10 items-center justify-center rounded-full border">
+                            <span className="text-ink-secondary text-sm font-bold">M</span>
+                          </div>
+                          {item.isUnread && (
+                            <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2" aria-label="未読" />
+                          )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
@@ -940,16 +979,25 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               {formatDatetime(item.lastIncomingAt)}
                             </span>
                           </div>
-                          <div className="mt-0.5 flex items-center gap-1.5">
+                          <div className="mt-1 flex items-start justify-between gap-2">
+                            <p className="text-ink-faint line-clamp-2 min-w-0 flex-1 text-xs leading-4">
+                              {item.subject || item.preview}
+                            </p>
                             <span
-                              className={`rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${statusConfig[item.status].className}`}
+                              className={`rounded-pill shrink-0 px-1.5 py-0.5 text-[10px] font-medium ${statusConfig[item.status].className}`}
                             >
                               {statusConfig[item.status].label}
                             </span>
                           </div>
-                          <p className="text-ink-faint mt-0.5 truncate text-xs">
-                            ✉ {item.subject || item.preview}
-                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <ChannelBadge channel="email" />
+                            <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-[10px]">
+                              <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold">
+                                {(item.assignedStaffName ?? '未').charAt(0)}
+                              </span>
+                              <span className="truncate">{item.assignedStaffName ?? '未割り当て'}</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </button>
@@ -959,10 +1007,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   .filter((chat) =>
                     nameQuery.trim() === ''
                       ? true
-                      : chat.friendName.toLowerCase().includes(nameQuery.trim().toLowerCase()),
+                      : [chat.friendName, chat.lastMessageContent]
+                          .filter(Boolean)
+                          .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
                   .map((chat) => {
                   const isSelected = selectedChatId === chat.id
+                  const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? null
                   // 「真の自発（要対応）」= chat.status='unread'。webhook 側で auto_reply に
                   // マッチしなかった incoming のみ unread に設定される。auto_reply trigger
                   // (キーワード "コスト比較" 等) は matched 扱いで unread 化しない。
@@ -991,19 +1042,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       }`}
                     >
                       <div className="flex items-start gap-3">
-                        {chat.friendPictureUrl ? (
-                          <img src={chat.friendPictureUrl} alt="" className="w-10 h-10 rounded-full flex-shrink-0" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                            <span className="text-ink-faint text-sm">{chat.friendName.charAt(0)}</span>
-                          </div>
-                        )}
+                        <div className="relative shrink-0">
+                          {chat.friendPictureUrl ? (
+                            <img src={chat.friendPictureUrl} alt="" className="h-10 w-10 rounded-full" />
+                          ) : (
+                            <div className="bg-canvas-sunken flex h-10 w-10 items-center justify-center rounded-full">
+                              <span className="text-ink-faint text-sm">{chat.friendName.charAt(0)}</span>
+                            </div>
+                          )}
+                          {chat.isUnread && (
+                            <span className="border-canvas bg-danger absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2" aria-label="未読" />
+                          )}
+                        </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              {chat.status === 'unread' && (
-                                <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" aria-label="未読" />
-                              )}
                               <p className="text-sm font-medium text-ink truncate">{chat.friendName}</p>
                             </div>
                             <span className="text-[10px] text-ink-faint flex-shrink-0">{formatDatetime(chat.lastMessageAt)}</span>
@@ -1012,26 +1065,33 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             設計は行ごとに状態を出す。色だけだと、赤い点が
                             「未読」なのか「未対応」なのか区別が付かない。
                           */}
-                          <div className="mt-0.5 flex items-center gap-1.5">
+                          <div className="mt-1 flex items-start justify-between gap-2">
+                            <p
+                              className={`line-clamp-2 min-w-0 flex-1 text-xs leading-4 ${
+                                needsAttention ? 'text-ink font-medium' : 'text-ink-faint'
+                              }`}
+                              title={preview}
+                            >
+                              {chat.lastMessageDirection === 'outgoing' && (
+                                <span className="text-ink-faint mr-1">返信：</span>
+                              )}
+                              {preview || <span className="text-ink-faint italic">(まだメッセージなし)</span>}
+                            </p>
                             <span
-                              className={`rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${statusConfig[chat.status].className}`}
+                              className={`rounded-pill shrink-0 px-1.5 py-0.5 text-[10px] font-medium ${statusConfig[chat.status].className}`}
                             >
                               {statusConfig[chat.status].label}
                             </span>
                           </div>
-                          <p
-                            className={`text-xs mt-0.5 truncate ${
-                              needsAttention
-                                ? 'text-ink font-medium'
-                                : 'text-ink-faint'
-                            }`}
-                            title={preview}
-                          >
-                            {chat.lastMessageDirection === 'outgoing' && (
-                              <span className="text-ink-faint mr-1">↪</span>
-                            )}
-                            {preview || <span className="italic text-gray-300">(まだメッセージなし)</span>}
-                          </p>
+                          <div className="mt-1 flex items-center gap-2">
+                            <ChannelBadge channel="line" />
+                            <span className="text-ink-faint inline-flex min-w-0 items-center gap-1 text-[10px]">
+                              <span className="bg-action-soft text-action flex h-4 w-4 shrink-0 items-center justify-center rounded-full font-bold">
+                                {(operatorName ?? '未').charAt(0)}
+                              </span>
+                              <span className="truncate">{operatorName ?? '未割り当て'}</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </button>
@@ -1198,6 +1258,29 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       bubbleContent = <span>{msg.content}</span>
                     }
 
+                    if (msg.source === 'scenario') {
+                      const startedAt = new Date(msg.createdAt).toLocaleString('ja-JP', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit',
+                      })
+                      return (
+                        <div key={msg.id}>
+                          {showDateSep && (
+                            <div className="my-3 flex justify-center">
+                              <span className="bg-ink/20 text-on-accent/85 rounded-full px-2.5 py-0.5 text-[11px]">
+                                {formatYmdSlash(msg.createdAt)}
+                              </span>
+                            </div>
+                          )}
+                          <div className="my-2 flex justify-center">
+                            <span className="bg-canvas/90 text-action rounded-full px-3 py-1 text-[11px] font-medium shadow-sm">
+                              シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始 ・ {startedAt}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    }
+
                     return (
                       <div key={msg.id}>
                         {showDateSep && (
@@ -1236,31 +1319,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               {new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
+
+                          {/* 返信担当者は管理画面だけに表示。LINEの相手には公式アカウントの表示のまま。 */}
+                          {isOutgoing && (
+                            <div className="mb-0.5 flex w-12 shrink-0 flex-col items-center">
+                              <div
+                                className="border-canvas bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-full border-2 text-[11px] font-bold"
+                                title={msg.sentByStaffName ?? '担当者情報なし'}
+                              >
+                                {(msg.sentByStaffName ?? '担').charAt(0)}
+                              </div>
+                              <span className="text-on-accent/80 mt-1 w-full truncate text-center text-[9px]">
+                                {msg.sentByStaffName ?? '担当者'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
                   })
                 )}
-              </div>
-
-              {/* Notes */}
-              <div className="px-4 py-2 border-t border-hairline bg-canvas-sunken">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="メモを入力..."
-                    className="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-green-500"
-                  />
-                  <button
-                    onClick={handleSaveNotes}
-                    disabled={savingNotes}
-                    className="px-2 py-1 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-md transition-colors disabled:opacity-50"
-                  >
-                    {savingNotes ? '保存中...' : 'メモ保存'}
-                  </button>
-                </div>
               </div>
 
               {/*
@@ -1274,7 +1352,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
                 よく使うものだけ出し、設定は畳む。
               */}
-              <div className="border-hairline border-t px-4 py-3">
+              <div className="border-hairline bg-canvas sticky bottom-0 z-10 border-t px-4 py-3">
                 {/* 上段 */}
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
@@ -1538,6 +1616,8 @@ const CHANNELS = [
 function ChatsPageHost() {
   const router = useRouter()
   const params = useSearchParams()
+  const [showReadAllConfirm, setShowReadAllConfirm] = useState(false)
+  const [markingAllRead, setMarkingAllRead] = useState(false)
   // すべて / LINE / メール。既定はすべて。
   // 出どころを気にせず「返信を待っている人」を見たいのが普通なので、
   // 最初から絞った状態で出さない。
@@ -1569,14 +1649,11 @@ function ChatsPageHost() {
                 確認を挟む。設計にも同じボタンがある。
               */}
               <button
-                onClick={() => {
-                  if (window.confirm('未対応をすべて確認済みにします。よろしいですか。')) {
-                    window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-                  }
-                }}
+                onClick={() => setShowReadAllConfirm(true)}
+                disabled={markingAllRead}
                 className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
-                すべて確認済みにする
+                {markingAllRead ? '更新中...' : 'すべて確認済みにする'}
               </button>
             </div>
           }
@@ -1600,7 +1677,11 @@ function ChatsPageHost() {
                 : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
             }`}
           >
-            {c.label}
+            <span className="inline-flex items-center gap-1.5">
+              {c.key === 'line' && <ChannelBadge channel="line" />}
+              {c.key === 'email' && <ChannelBadge channel="email" />}
+              {c.label}
+            </span>
           </button>
         ))}
 
@@ -1628,6 +1709,24 @@ function ChatsPageHost() {
         「✉ 定期便の解約について」のように1本に混ざっている。
       */}
       <ChatsPageInner channel={channel} />
+
+      <ConfirmDialog
+        open={showReadAllConfirm}
+        title="すべて確認済みにしますか？"
+        description="ログイン中のあなたの未読だけを確認済みにします。他の担当者の未読や、共有している対応状態は変わりません。"
+        confirmLabel="確認済みにする"
+        onCancel={() => setShowReadAllConfirm(false)}
+        onConfirm={() => {
+          setShowReadAllConfirm(false)
+          setMarkingAllRead(true)
+          void Promise.all([
+            api.chats.markAllRead(),
+            fetchApi('/api/support/email/read-all', { method: 'POST' }),
+          ]).then(() => {
+            window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
+          }).finally(() => setMarkingAllRead(false))
+        }}
+      />
     </div>
   )
 }
