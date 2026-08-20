@@ -75,15 +75,15 @@ function TodayTaskCard({
   status: string
 }) {
   return (
-    <DashboardCard className="flex min-h-[132px] flex-col p-[18px]">
+    <DashboardCard className="flex h-[112px] min-w-0 flex-col p-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-ink text-sm font-semibold">{title}</h3>
         <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
       </div>
-      <p className="text-ink mt-4 text-3xl font-bold tabular-nums">
+      <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
         {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-0.5 text-lg">件</span>
       </p>
-      <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+      <div className="mt-auto flex items-end justify-between gap-3 pt-2">
         <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
         <span className="text-success shrink-0 text-xs font-medium">{status}</span>
       </div>
@@ -224,17 +224,18 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
 }
 
 function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null }) {
-  const longWait = oldestWaitMinutes !== null && oldestWaitMinutes >= 60
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
-  const count = (currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0) + (longWait ? 1 : 0)
+  // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
+  // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
+  const count = risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0
   return <DashboardCard className="min-h-[128px] p-[18px]">
     <div className="flex items-start justify-between gap-3">
       <h2 className="text-ink text-base font-bold">運用アラート</h2>
-      <span className={count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count}件</span>
+      <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `${count}件`}</span>
     </div>
     <div className="text-ink-secondary mt-3 space-y-2 text-xs">
-      <p>・接続・自動処理：{currentHealthIssue ? '確認が必要です' : '正常です'}</p>
-      <p>・最も古い未対応：{oldestWaitMinutes === null ? '確認中' : `${oldestWaitMinutes.toLocaleString('ja-JP')}分`}</p>
+      <p>・接続・自動処理：{risk === null ? '確認中' : currentHealthIssue ? '確認が必要です' : '正常です'}</p>
+      <p>・未対応の最長待ち：{oldestWaitMinutes === null ? '確認中' : `${oldestWaitMinutes.toLocaleString('ja-JP')}分（受信箱で確認）`}</p>
     </div>
     <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
   </DashboardCard>
@@ -351,9 +352,7 @@ export default function DashboardPage() {
       : '読み込み中'
   const visibleMain = preferences.main.filter((item) => item.visible)
   const visibleRight = preferences.right.filter((item) => item.visible)
-  const operationalRightIds = new Set<DashboardCardId>(['send-quota', 'operational-alerts', 'connection-status'])
-  const visibleOperationalRight = visibleRight.filter((item) => operationalRightIds.has(item.id))
-  const visibleDetailRight = visibleRight.filter((item) => !operationalRightIds.has(item.id))
+  const visibleToday = preferences.today.filter((item) => item.visible)
   const shipmentVisible = visibleMain.some((item) => item.id === 'shipment')
   const pendingInboxVisible = visibleMain.some((item) => item.id === 'pending-inbox')
 
@@ -363,6 +362,14 @@ export default function DashboardPage() {
     if (id === 'friend-add') return <FriendAddLinkCard />
     if (id === 'scenario-status') return <EmptyDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" />
     if (id === 'uid-migration') return <EmptyDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" />
+    return null
+  }
+
+  const renderTodayCard = (id: DashboardCardId): ReactNode => {
+    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${inboxSummary.oldestWaitMinutes}分` : '確認待ち'} />
+    if (id === 'today-photo-review') return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
+    if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
+    if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
     return null
   }
 
@@ -414,18 +421,15 @@ export default function DashboardPage() {
 
       {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
 
-      <section data-design="TodayTasks" className="mb-6">
+      {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
         <div className="mb-2.5 flex items-center justify-between gap-3">
           <h2 className="text-ink text-lg font-bold">今日やること</h2>
           <span className="text-ink-faint text-xs">優先度順</span>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${inboxSummary.oldestWaitMinutes}分` : '確認待ち'} />
-          <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
-          <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
-          <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
+          {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
         </div>
-      </section>
+      </section> : null}
 
       <div data-design="Shipment" className={shipmentVisible ? 'mb-6' : 'hidden'} aria-hidden={!shipmentVisible}>
         <ShipmentPanel onSummaryChange={setShipmentSummary} />
@@ -436,21 +440,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div data-design="Middle" className="mb-6 grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0">
-          {pendingInboxVisible ? <PendingInboxCard onSummaryChange={setInboxSummary} /> : null}
+      <div data-design="Middle" className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
+        <div data-design="Body" className="min-w-0 space-y-[18px]">
+          {visibleMain.filter((item) => item.id !== 'shipment').map((item) => <div key={item.id}>{renderMainCard(item.id)}</div>)}
         </div>
         <aside className="min-w-0 space-y-3.5">
-          {visibleOperationalRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
-        </aside>
-      </div>
-
-      <div data-design="Body" className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0 space-y-[18px]">
-          {visibleMain.filter((item) => item.id !== 'shipment' && item.id !== 'pending-inbox').map((item) => <div key={item.id}>{renderMainCard(item.id)}</div>)}
-        </div>
-        <aside className="min-w-0 space-y-3.5">
-          {visibleDetailRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
+          {visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
         </aside>
       </div>
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
+  reorderDashboardItems,
 } from './dashboard-editor'
 import { activeUpcomingBookings } from './side-cards'
 import type { BookingRequest } from '@/lib/api'
@@ -28,6 +29,12 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
 describe('ダッシュボードV4の初期表示', () => {
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
     const preferences = defaultDashboardPreferences()
+    expect(preferences.today.filter((item) => item.visible).map((item) => item.id)).toEqual([
+      'today-inbox',
+      'today-photo-review',
+      'today-bookings',
+      'today-shipments',
+    ])
     expect(preferences.main.filter((item) => item.visible).map((item) => item.id)).toEqual([
       'shipment',
       'pending-inbox',
@@ -50,11 +57,27 @@ describe('ダッシュボードV4の初期表示', () => {
       main: [{ id: 'friend-trend', visible: true }],
       right: [{ id: 'monthly-delivery', visible: true }],
     })
+    expect(normalized.today).toEqual(defaultDashboardPreferences().today)
     expect(normalized.main[0]).toEqual({ id: 'friend-trend', visible: true })
     expect(normalized.right.find((item) => item.id === 'friend-status')).toEqual({
       id: 'friend-status',
       visible: false,
     })
+  })
+
+  it('カードの表示状態を保ったままドラッグ順へ並べ替える', () => {
+    const items = defaultDashboardPreferences().today.map((item, index) => ({
+      ...item,
+      visible: index !== 1,
+    }))
+    const reordered = reorderDashboardItems(items, 'today-shipments', 'today-inbox')
+    expect(reordered.map((item) => item.id)).toEqual([
+      'today-shipments',
+      'today-inbox',
+      'today-photo-review',
+      'today-bookings',
+    ])
+    expect(reordered.find((item) => item.id === 'today-photo-review')?.visible).toBe(false)
   })
 })
 
