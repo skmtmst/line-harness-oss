@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { formatDurationMinutes } from '@/lib/format-duration'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
@@ -254,7 +255,7 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk
     </div>
     <div className="text-ink-secondary mt-3 space-y-2 text-xs">
       <p>・接続・自動処理：{risk === null ? '確認中' : currentHealthIssue ? '確認が必要です' : '正常です'}</p>
-      <p>・未対応の最長待ち：{oldestWaitMinutes === null ? '確認中' : `${oldestWaitMinutes.toLocaleString('ja-JP')}分（受信箱で確認）`}</p>
+      <p>・未対応の最長待ち：{oldestWaitMinutes === null ? '確認中' : `${formatDurationMinutes(oldestWaitMinutes)}（受信箱で確認）`}</p>
     </div>
     <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
   </DashboardCard>
@@ -396,7 +397,7 @@ export default function DashboardPage() {
   }
 
   const renderTodayCard = (id: DashboardCardId): ReactNode => {
-    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${inboxSummary.oldestWaitMinutes}分` : '確認待ち'} />
+    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatDurationMinutes(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
     if (id === 'today-photo-review') return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
     if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
     if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
