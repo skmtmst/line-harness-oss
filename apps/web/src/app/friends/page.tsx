@@ -312,7 +312,6 @@ function FriendsPageHost() {
       <div data-design="V4Head">
       <Header
         title="友だち"
-        description="友だちの状態・配信状況・対応履歴を、1画面で確認して操作できます。"
         action={
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button type="button" onClick={() => setNotice({ title: 'マニュアル', message: '友だち管理のマニュアルは準備中です。公開後、このボタンから開けるようにします。' })} className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm font-medium text-[#565F59] hover:bg-[#F6F6F8]">マニュアル</button>
