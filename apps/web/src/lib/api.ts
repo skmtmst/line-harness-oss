@@ -949,6 +949,8 @@ export const api = {
       referralRewardMiles: number
       multiplierBps: number | null
       multiplierPriority: number
+      /** true のときだけ、すでにこのタグが付いている人へ遡及する。 */
+      applyToExisting?: boolean
     }) =>
       fetchApi<ApiResponse<{ tag: Tag; queued: number }>>(`/api/tags/${id}/mileage`, {
         method: 'PATCH',

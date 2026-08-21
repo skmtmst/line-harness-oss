@@ -89,3 +89,53 @@ describe('PATCH /api/tags/reorder', () => {
     expect(dbMocks.reorderTags).not.toHaveBeenCalled();
   });
 });
+
+describe('PATCH /api/tags/:id/mileage', () => {
+  const storedTag = {
+    id: 'tag-1',
+    name: 'VIP',
+    color: '#3B82F6',
+    group_id: null,
+    folder_id: null,
+    mileage_reward: 100,
+    referral_mileage_reward: 20,
+    mileage_multiplier_bps: 15000,
+    mileage_multiplier_priority: 1,
+    is_starred: 0,
+    display_order: 0,
+    created_at: '2026-08-21T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) fn.mockReset();
+    dbMocks.updateTagMileageSettings.mockResolvedValue(storedTag);
+    dbMocks.enqueueHistoricTagMileage.mockResolvedValue(12);
+  });
+
+  test('通常の保存では既存ユーザーへ遡及しない', async () => {
+    const res = await patch('/api/tags/tag-1/mileage', {
+      rewardMiles: 100,
+      referralRewardMiles: 20,
+      multiplierBps: 15000,
+      multiplierPriority: 1,
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.enqueueHistoricTagMileage).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 0 } });
+  });
+
+  test('遡及を明示した場合だけ既存ユーザーをキューへ登録する', async () => {
+    const res = await patch('/api/tags/tag-1/mileage', {
+      rewardMiles: 100,
+      referralRewardMiles: 20,
+      multiplierBps: 15000,
+      multiplierPriority: 1,
+      applyToExisting: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.enqueueHistoricTagMileage).toHaveBeenCalledWith(expect.anything(), 'tag-1');
+    await expect(res.json()).resolves.toMatchObject({ success: true, data: { queued: 12 } });
+  });
+});

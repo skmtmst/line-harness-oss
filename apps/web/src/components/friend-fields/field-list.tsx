@@ -5,6 +5,7 @@ import Link from 'next/link'
 import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import FolderPanel from '@/components/shared/folder-panel'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNFILED = '__unfiled__'
@@ -55,6 +56,7 @@ export default function FriendFieldList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -89,13 +91,12 @@ export default function FriendFieldList() {
     }
   }
 
-  const handleDelete = async (field: FriendField) => {
+  const handleDelete = (field: FriendField) => {
+    setPendingDelete(field)
+  }
+
+  const confirmDelete = async (field: FriendField) => {
     const count = field.usageCount ?? 0
-    const message =
-      count > 0
-        ? `「${field.name}」は ${count} 人に値が入っています。\n削除すると、その値も一緒に消えます。よろしいですか？`
-        : `「${field.name}」を削除しますか？`
-    if (!confirm(message)) return
     setError('')
     try {
       await api.friendFields.delete(field.id, { force: count > 0 })
@@ -185,29 +186,28 @@ export default function FriendFieldList() {
         </div>
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px]">
+      <div className="bg-canvas rounded-card border-hairline overflow-hidden border [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="bg-canvas-sunken border-hairline border-b">
                 {/* 列は設計の絵の並び。差し込みの形は項目名の下に添える。
                     列を1つ使うほどではないが、この画面で調べる人は多い。 */}
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+                <th className="text-ink-faint w-[28%] px-4 py-3 text-left text-xs font-semibold uppercase">
                   友だち情報欄名
                 </th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+                <th className="text-ink-faint w-[14%] px-4 py-3 text-left text-xs font-semibold uppercase">
                   種別
                 </th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+                <th className="text-ink-faint w-[16%] px-4 py-3 text-left text-xs font-semibold uppercase">
                   既定値
                 </th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+                <th className="text-ink-faint w-[10%] px-4 py-3 text-left text-xs font-semibold uppercase">
                   入力済み
                 </th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
+                <th className="text-ink-faint w-[22%] px-4 py-3 text-left text-xs font-semibold uppercase">
                   表示
                 </th>
-                <th className="px-4 py-3" />
+                <th className="w-[10%] px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -229,7 +229,7 @@ export default function FriendFieldList() {
                 visible.map((field) => (
                   <tr key={field.id} className="hover:bg-canvas-sunken">
                     <td className="px-4 py-3">
-                      <p className="text-ink text-sm font-medium">{field.name}</p>
+                      <p className="text-ink truncate text-sm font-medium" title={field.name}>{field.name}</p>
                       {/* 差し込みの形は名前の下に添える。押すと写せる。 */}
                       <button
                         onClick={() => copyKey(field)}
@@ -245,7 +245,9 @@ export default function FriendFieldList() {
                       </span>
                     </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm">
-                      {field.defaultValue || <span className="text-ink-faint">—</span>}
+                      <span className="block truncate" title={field.defaultValue ?? undefined}>
+                        {field.defaultValue || <span className="text-ink-faint">—</span>}
+                      </span>
                     </td>
                     <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
                       {field.usageCount ?? 0}
@@ -291,7 +293,6 @@ export default function FriendFieldList() {
               )}
             </tbody>
           </table>
-        </div>
       </div>
 
       <p className="text-ink-faint mt-3 text-xs leading-relaxed">
@@ -299,6 +300,23 @@ export default function FriendFieldList() {
         種類を変えると入っている値の意味が変わり、差し込み名を変えるとテンプレートの差し込みが空になるためです。
         変えたいときは新しい項目を作ってください。
       </p>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`項目「${pendingDelete?.name ?? ''}」を削除しますか？`}
+        description={
+          (pendingDelete?.usageCount ?? 0) > 0
+            ? `${pendingDelete?.usageCount ?? 0} 人に保存されている値も削除されます。この操作は元に戻せません。`
+            : 'この項目を削除します。この操作は元に戻せません。'
+        }
+        confirmLabel="削除する"
+        destructive
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const target = pendingDelete
+          setPendingDelete(null)
+          if (target) void confirmDelete(target)
+        }}
+      />
         </div>
       </div>
     </div>

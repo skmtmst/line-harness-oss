@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { SavedSearch } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * 条件1本を人が読める行にする。
@@ -51,6 +52,7 @@ export default function SavedSearchList() {
   const [items, setItems] = useState<SavedSearch[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,8 +71,11 @@ export default function SavedSearchList() {
     void load()
   }, [load])
 
-  const remove = async (search: SavedSearch) => {
-    if (!confirm(`「${search.name}」を削除しますか？`)) return
+  const remove = (search: SavedSearch) => {
+    setPendingDelete(search)
+  }
+
+  const confirmRemove = async (search: SavedSearch) => {
     setError('')
     try {
       await api.savedSearches.delete(search.id)
@@ -116,7 +121,7 @@ export default function SavedSearchList() {
             return (
               <section
                 key={search.id}
-                className="bg-canvas rounded-card border-hairline border p-4"
+                className="bg-canvas rounded-card border-hairline border p-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"
               >
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <Link
@@ -189,6 +194,19 @@ export default function SavedSearchList() {
       <p className="text-ink-faint mt-3 text-xs">
         保存できるのは 50 件までです。{items.length} / 50 件。
       </p>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`保存した検索「${pendingDelete?.name ?? ''}」を削除しますか？`}
+        description="保存した絞り込み条件を削除します。友だち自体は削除されません。"
+        confirmLabel="削除する"
+        destructive
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const target = pendingDelete
+          setPendingDelete(null)
+          if (target) void confirmRemove(target)
+        }}
+      />
     </div>
   )
 }
