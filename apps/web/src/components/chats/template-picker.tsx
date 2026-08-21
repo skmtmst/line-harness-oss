@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 
@@ -77,9 +78,9 @@ export default function TemplatePicker({
 
   const selected = textTemplates.find((t) => t.id === selectedId) ?? shown[0] ?? null
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#101828]/45 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="テンプレートを選択"
@@ -221,6 +222,7 @@ export default function TemplatePicker({
           </div>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

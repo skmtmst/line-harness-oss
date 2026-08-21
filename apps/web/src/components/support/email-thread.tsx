@@ -47,10 +47,14 @@ function dateTime(iso: string): string {
 export default function EmailThread({
   threadId,
   onChanged,
+  customerInfoOpen = false,
+  onOpenCustomerInfo,
 }: {
   threadId: string
   /** 状態や返信で一覧の中身が変わったときに知らせる。 */
   onChanged?: () => void
+  customerInfoOpen?: boolean
+  onOpenCustomerInfo?: () => void
 }) {
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [reply, setReply] = useState('')
@@ -197,10 +201,7 @@ export default function EmailThread({
             {detail.thread.customer_name || detail.thread.customer_email} ・ メール
           </p>
         </div>
-        {/* LINE のトークと同じ並び：対応 ・ 担当。
-            「友だち詳細」はここには置けない。メールは差出人のアドレスしか
-            分からず、LINEの友だちと結びついていない（どの項目で突き合わせるかが
-            未決。docs/v025-design-pass-day1.md の5番）。 */}
+        {/* LINE のトークと同じ並び：対応 ・ 担当 ・ 顧客情報。 */}
         <div className="flex flex-wrap items-center justify-end gap-3">
           <label className="flex items-center gap-1.5 text-xs">
             <span className="text-ink-faint">対応</span>
@@ -229,6 +230,15 @@ export default function EmailThread({
               ))}
             </select>
           </label>
+          {!customerInfoOpen && onOpenCustomerInfo && (
+            <button
+              type="button"
+              onClick={onOpenCustomerInfo}
+              className="whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+            >
+              顧客情報を開く
+            </button>
+          )}
         </div>
       </div>
 

@@ -41,14 +41,14 @@ interface Props {
 
 const DETAIL_SECTIONS = [
   { key: 'profile', label: 'プロフィール' },
-  { key: 'names', label: '名前' },
-  { key: 'mileage', label: 'マイル' },
-  { key: 'support', label: '対応・メモ' },
+  { key: 'names', label: '基本情報' },
   { key: 'tags', label: 'タグ' },
+  { key: 'support', label: '次の対応' },
   { key: 'starred', label: '★つき情報' },
   { key: 'richMenu', label: 'リッチメニュー' },
   { key: 'metadata', label: '友だち情報' },
   { key: 'forms', label: 'フォーム回答' },
+  { key: 'mileage', label: 'マイル' },
 ] as const
 type DetailSectionKey = (typeof DETAIL_SECTIONS)[number]['key']
 
@@ -92,7 +92,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem('chat.friendInfoSections')
+      const raw = localStorage.getItem('chat.friendInfoSections.v4')
       if (raw) {
         const parsed = JSON.parse(raw) as { order?: DetailSectionKey[]; hidden?: DetailSectionKey[] }
         const valid = new Set(DETAIL_SECTIONS.map((item) => item.key))
@@ -111,7 +111,7 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
   useEffect(() => {
     if (!prefsLoaded) return
     try {
-      localStorage.setItem('chat.friendInfoSections', JSON.stringify({ order: sectionOrder, hidden: hiddenSections }))
+      localStorage.setItem('chat.friendInfoSections.v4', JSON.stringify({ order: sectionOrder, hidden: hiddenSections }))
     } catch {
       // 保存できないブラウザでは、この表示中だけ設定を保つ。
     }
@@ -210,15 +210,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
     <div className="flex h-full w-full flex-col overflow-hidden bg-white">
       <div className="relative min-h-[66px] border-b border-[#E5E7EB] bg-white px-4 py-3">
         <div className="flex items-center justify-between gap-2">
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-[#1F2937]">顧客情報</h3>
-            <p className="mt-0.5 text-[10px] text-[#98A2B3]">対応に必要な情報をまとめて確認できます</p>
+            <p className="mt-0.5 truncate text-[10px] text-[#98A2B3]">対応に必要な情報をまとめて確認できます</p>
           </div>
           <button
             type="button"
             onClick={() => setShowSettings((current) => !current)}
             aria-expanded={showSettings}
-            className="mr-14 rounded-lg border border-[#E5E7EB] bg-white px-2 py-1 text-[11px] font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+            className="mr-14 shrink-0 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#667085] hover:bg-[#F7F8F6]"
           >
             表示項目
           </button>
@@ -281,26 +281,40 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
           <div className="p-4 text-xs text-red-600">{error}</div>
         ) : friend ? (
           <div className="flex flex-col divide-y divide-[#E5E7EB]">
-            {/* Profile Header */}
-            <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} p-4 flex items-start gap-3`}>
+            {/* Profile Header — V4は相手・対応・担当をひとまとまりにする。 */}
+            <div style={sectionStyle('profile')} className={`${sectionVisibility('profile')} flex flex-col items-center px-5 py-5 text-center`}>
               {friend.pictureUrl ? (
-                <img src={friend.pictureUrl} alt="" className="w-12 h-12 rounded-full flex-shrink-0" />
+                <img src={friend.pictureUrl} alt="" className="h-14 w-14 flex-shrink-0 rounded-full object-cover" />
               ) : (
-                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                  <span className="text-gray-500 text-base">{(friend.displayName || '?').charAt(0)}</span>
+                <div className="bg-action text-on-action flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full">
+                  <span className="text-lg font-bold">{(friend.displayName || '?').charAt(0)}</span>
                 </div>
               )}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-gray-900 truncate">{friend.displayName || '名前なし'}</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">
-                  登録日: {formatDate(friend.createdAt)}
-                </p>
-                {!friend.isFollowing && (
-                  <span className="inline-block mt-1 px-1.5 py-0 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
-                    ブロック済
+              <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{friend.displayName || '名前なし'}</p>
+              <p className="text-ink-faint mt-0.5 text-[11px]">LINE表示名</p>
+              <div className="mt-3 flex max-w-full items-center justify-center gap-1.5">
+                {chatStatus?.status && statusLabels[chatStatus.status] ? (
+                  <span className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${statusLabels[chatStatus.status].className}`}>
+                    {statusLabels[chatStatus.status].label}
                   </span>
+                ) : (
+                  <span className="bg-canvas-sunken text-ink-faint rounded-full px-2 py-1 text-[11px] font-semibold">未設定</span>
                 )}
+                <span className="bg-canvas-sunken text-ink-secondary max-w-[130px] truncate rounded-full px-2 py-1 text-[11px] font-semibold">
+                  {operatorName || '未割り当て'}
+                </span>
               </div>
+              {!friend.isFollowing && (
+                <span className="bg-canvas-sunken text-ink-faint mt-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-medium">
+                  ブロック済
+                </span>
+              )}
+              <a
+                href={`/friends/detail?id=${friend.id}`}
+                className="border-hairline text-action mt-3 inline-flex items-center rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-[#F7F8F6]"
+              >
+                友だち詳細
+              </a>
             </div>
 
             {/*
@@ -308,8 +322,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               LINEの表示名と、こちらで付けた本名は別物。取り違えると
               別人に送ってしまうので、両方を並べて出す。
             */}
-            <div style={sectionStyle('names')} className={`${sectionVisibility('names')} p-4 space-y-2`}>
-              <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">名前</h4>
+            <div style={sectionStyle('names')} className={`${sectionVisibility('names')} space-y-2 px-5 py-4`}>
+              <h4 className="text-ink mb-2 text-xs font-bold">基本情報</h4>
               <div className="flex justify-between items-center gap-2">
                 <span className="text-[11px] text-gray-500 shrink-0">本名</span>
                 <span className="text-xs text-gray-700 truncate">
@@ -322,11 +336,15 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
                   {friend.systemDisplayName || <span className="text-gray-400">未登録</span>}
                 </span>
               </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="shrink-0 text-[11px] text-gray-500">登録日</span>
+                <span className="truncate text-xs text-gray-700">{formatDate(friend.createdAt)}</span>
+              </div>
             </div>
 
             {/* Harness Mileage — canonical user identity across LINE accounts */}
-            <div style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} p-4`}>
-              <h4 className="text-[11px] font-medium text-gray-500 mb-2">マイル</h4>
+            <div style={sectionStyle('mileage')} className={`${sectionVisibility('mileage')} px-5 py-4`}>
+              <h4 className="text-ink mb-2 text-xs font-bold">マイル</h4>
               {mileage.kind === 'loading' ? (
                 <div className="h-24 animate-pulse rounded-xl bg-gray-100" />
               ) : mileage.kind === 'error' ? (
@@ -376,8 +394,8 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
               「この画面には対応の情報が無い」ように見えていた。
               設計は「未設定」「未割り当て」と書いて枠を残している。
             */}
-            <div style={sectionStyle('support')} className={`${sectionVisibility('support')} p-4 space-y-2`}>
-              <h4 className="text-[11px] font-medium text-gray-500 mb-1.5">対応</h4>
+            <div style={sectionStyle('support')} className={`${sectionVisibility('support')} space-y-2 px-5 py-4`}>
+              <h4 className="text-ink mb-2 text-xs font-bold">次の対応</h4>
               <div className="flex justify-between items-center">
                 <span className="text-[11px] text-gray-500">対応マーク</span>
                 {chatStatus?.status && statusLabels[chatStatus.status] ? (
@@ -401,9 +419,9 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
             </div>
 
             {/* Tags */}
-            <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} p-4`}>
+            <div style={sectionStyle('tags')} className={`${sectionVisibility('tags')} px-5 py-4`}>
               <div className="mb-1.5 flex items-center justify-between">
-                <h4 className="text-[11px] font-medium text-gray-500">タグ</h4>
+                <h4 className="text-ink text-xs font-bold">タグ</h4>
                 <a href={`/friends/detail?id=${friend.id}`} className="text-accent text-[11px] hover:underline">
                   ＋ 追加
                 </a>

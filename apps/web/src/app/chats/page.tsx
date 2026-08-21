@@ -12,9 +12,9 @@ import TemplatePicker from '@/components/chats/template-picker'
 import InboxKpis from '@/components/chats/inbox-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 
@@ -163,8 +163,8 @@ function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
       LINE
     </span>
   ) : (
-    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 w-5 items-center justify-center rounded-md border text-[10px] font-bold">
-      M
+    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-[9px] font-bold">
+      MAIL
     </span>
   )
 }
@@ -401,7 +401,7 @@ const MERGED_TABS = [
 
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const router = useRouter()
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   /**
    * メールの問い合わせ。LINEのトークと同じ一覧に混ぜる。
@@ -436,6 +436,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 送信の細かい設定。既定は畳む。出しっぱなしだと入力欄が縦に伸びて
   // トークが読めなくなる。
   const [showComposerOptions, setShowComposerOptions] = useState(false)
+  const [showMemoEditor, setShowMemoEditor] = useState(false)
+  const [memoDraft, setMemoDraft] = useState('')
+  const [memoSaving, setMemoSaving] = useState(false)
+  const [memoError, setMemoError] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -672,6 +676,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setChatDetail(null)
     }
   }, [selectedChatId, loadChatDetail])
+
+  useEffect(() => {
+    setMemoDraft(chatDetail?.notes ?? '')
+    setMemoError('')
+    setShowMemoEditor(false)
+  }, [chatDetail?.id, chatDetail?.notes])
 
   // Surface deep-linked chats in the sidebar even when the current account
   // filter or status filter would exclude them — otherwise the user replies
@@ -933,6 +943,28 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
+  const handleSaveMemo = async () => {
+    if (!selectedChatId || memoSaving) return
+    setMemoSaving(true)
+    setMemoError('')
+    try {
+      const notes = memoDraft.trim() || null
+      const response = await api.chats.update(selectedChatId, { notes })
+      if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした')
+      setChatDetail((current) => current && current.id === selectedChatId
+        ? { ...current, notes }
+        : current)
+      setChats((current) => current.map((chat) => chat.id === selectedChatId
+        ? { ...chat, notes }
+        : chat))
+      setShowMemoEditor(false)
+    } catch (memoSaveError) {
+      setMemoError(memoSaveError instanceof Error ? memoSaveError.message : '内部メモを保存できませんでした')
+    } finally {
+      setMemoSaving(false)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     // IME変換確定のEnterでは送信しない
     if (e.nativeEvent.isComposing || isComposingRef.current || e.keyCode === 229) return
@@ -960,6 +992,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
       + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
   }
+  const activeFriendId = selectedFriendId
+    ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
+    ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
+    ?? null
 
   return (
     <div className="space-y-3">
@@ -1052,21 +1088,27 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
               />
             </div>
-            <div className="mt-2 flex items-center gap-1.5">
+            <div className="mt-2 flex items-center gap-1">
               {CHANNELS.map((item) => (
                 <button
                   key={item.key}
                   type="button"
                   onClick={() => router.push(item.key === 'all' ? '/chats' : `/chats?channel=${item.key}`)}
                   aria-pressed={channel === item.key}
-                  className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold ${channel === item.key ? 'bg-[#EAFBF0] text-[#057A37]' : 'text-[#344054] hover:bg-[#F7F8F6]'}`}
+                  className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-[#EAFBF0] text-[#057A37]' : 'text-[#344054] hover:bg-[#F7F8F6]'}`}
                 >
                   {item.key === 'line' && <ChannelBadge channel="line" />}
                   {item.key === 'email' && <ChannelBadge channel="email" />}
                   {item.label}
                 </button>
               ))}
-              <span className="ml-auto text-[11px] font-semibold text-[#2563EB]">新しい順⌄</span>
+              <select
+                aria-label="並び順"
+                defaultValue="newest"
+                className="ml-auto shrink-0 rounded-lg border border-[#E5E7EB] bg-canvas px-1.5 py-1 text-[11px] font-semibold whitespace-nowrap text-[#2563EB] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15"
+              >
+                <option value="newest">新しい順</option>
+              </select>
             </div>
           </div>
 
@@ -1076,7 +1118,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   statusFilter === f.key
                     ? 'bg-[#06C755] text-on-accent'
                     : 'bg-[#F2F4F7] text-[#667085] hover:bg-[#EAECF0]'
@@ -1331,6 +1373,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             /* メールの往復。LINEのトークと同じ場所に出す。 */
             <EmailThread
               threadId={selectedThreadId}
+              customerInfoOpen={showFriendInfo}
+              onOpenCustomerInfo={() => setShowFriendInfo(true)}
               onChanged={() => {
                 void loadEmails()
               }}
@@ -1413,14 +1457,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       ))}
                     </select>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowFriendInfo((v) => !v)}
-                    aria-pressed={showFriendInfo}
-                    className="rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap text-[#2563EB] hover:bg-[#F7F8F6]"
-                  >
-                    {showFriendInfo ? '顧客情報を閉じる' : '顧客情報を表示'}
-                  </button>
+                  {!showFriendInfo && (
+                    <button
+                      type="button"
+                      onClick={() => setShowFriendInfo(true)}
+                      className="whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                    >
+                      顧客情報を開く
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {/*
@@ -1528,18 +1573,35 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             </span>
                           </div>
 
-                          {/* 返信担当者は管理画面だけに表示。LINEの相手には公式アカウントの表示のまま。 */}
+                          {/*
+                            相手に見える送信元はLINE公式アカウント。管理画面では、
+                            その下に実際に返信した担当者も出して取り違えを防ぐ。
+                          */}
                           {isOutgoing && (
-                            <div className="mb-0.5 flex w-12 shrink-0 flex-col items-center">
+                            <div className="mb-0.5 flex w-14 shrink-0 flex-col items-center gap-1">
+                              {selectedAccount?.pictureUrl ? (
+                                <img
+                                  src={selectedAccount.pictureUrl}
+                                  alt=""
+                                  className="border-canvas h-9 w-9 rounded-full border-2 object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-full border-2 bg-[#EAFBF0] text-[12px] font-bold text-[#057A37]"
+                                  title={selectedAccount?.displayName ?? selectedAccount?.name ?? '送信アカウント'}
+                                >
+                                  {(selectedAccount?.displayName ?? selectedAccount?.name ?? '送').charAt(0)}
+                                </div>
+                              )}
                               <div
-                                className="border-canvas bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-full border-2 text-[11px] font-bold"
+                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold shadow-sm"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
-                                {(msg.sentByStaffName ?? '担').charAt(0)}
+                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold">
+                                  {(msg.sentByStaffName ?? '担').charAt(0)}
+                                </span>
+                                <span className="truncate">{msg.sentByStaffName ?? '担当者'}</span>
                               </div>
-                              <span className="text-on-accent/80 mt-1 w-full truncate text-center text-[9px]">
-                                {msg.sentByStaffName ?? '担当者'}
-                              </span>
                             </div>
                           )}
                         </div>
@@ -1579,6 +1641,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     >
                       ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMemoEditor((current) => !current)}
+                      aria-expanded={showMemoEditor}
+                      className="inline-flex items-center rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]"
+                    >
+                      内部メモ
+                    </button>
                   </div>
                   <span className="text-ink-faint text-xs">
                     {sendMode === 'enter' ? 'Shift + Enter で改行' : 'Enter で改行'}
@@ -1609,6 +1679,78 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <span>Shift+Enter</span>
                     </label>
                   </div>
+                )}
+
+                {showMemoEditor && typeof document !== 'undefined' && createPortal(
+                  <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="chat-internal-memo-title"
+                    onClick={() => {
+                      setMemoDraft(chatDetail?.notes ?? '')
+                      setMemoError('')
+                      setShowMemoEditor(false)
+                    }}
+                  >
+                    <div
+                      className="border-hairline w-full max-w-lg rounded-[14px] border bg-canvas shadow-2xl"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="border-hairline flex items-start justify-between gap-4 border-b px-5 py-4">
+                        <div>
+                          <h2 id="chat-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
+                          <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMemoDraft(chatDetail?.notes ?? '')
+                            setMemoError('')
+                            setShowMemoEditor(false)
+                          }}
+                          className="border-hairline text-ink-secondary hover:bg-canvas-sunken inline-flex h-8 shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-semibold"
+                        >
+                          閉じる
+                        </button>
+                      </div>
+                      <div className="px-5 py-4">
+                        <label htmlFor="chat-internal-memo" className="text-ink-secondary text-xs font-semibold">メモ内容</label>
+                        <textarea
+                          id="chat-internal-memo"
+                          value={memoDraft}
+                          onChange={(event) => setMemoDraft(event.target.value)}
+                          rows={7}
+                          autoFocus
+                          placeholder="メモを追加"
+                          className="border-hairline focus:border-accent focus:ring-accent/15 mt-2 w-full resize-y rounded-lg border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
+                        />
+                        {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
+                      </div>
+                      <div className="border-hairline flex justify-end gap-2 border-t px-5 py-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMemoDraft(chatDetail?.notes ?? '')
+                            setMemoError('')
+                            setShowMemoEditor(false)
+                          }}
+                          className="border-hairline text-ink-secondary rounded-lg border bg-canvas px-4 py-2 text-sm font-semibold hover:bg-[#F7F8F6]"
+                        >
+                          キャンセル
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveMemo()}
+                          disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
+                          className="bg-accent text-on-accent rounded-lg px-4 py-2 text-sm font-semibold hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {memoSaving ? '保存中...' : '保存'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>,
+                  document.body,
                 )}
 
                 <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
@@ -1708,8 +1850,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           3列だが、実際の画面幅はそれより狭いことが多い。
 
           friendId は **現在の選択** を優先する。chatDetail の読み込み中は
-          前の chat のデータが残っているので、それを参照すると
-          ここだけ前の友だちを出し続ける。選択IDがそのまま friend_id。
+          一覧にある chat.friendId を使い、読み込み後は同じ会話の
+          chatDetail.friendId を使う。会話IDと友だちIDは別物なので混同しない。
         */}
         {/*
           友だち詳細。メールでも出したいが、メールのスレッドは友だちに
@@ -1733,7 +1875,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             <button
               type="button"
               onClick={() => setShowFriendInfo(false)}
-              aria-label="友だち詳細を閉じる"
+              aria-label="顧客情報を閉じる"
               className="absolute top-3 right-3 z-10 rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#667085] hover:bg-[#F7F8F6]"
             >
               閉じる
@@ -1748,56 +1890,62 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               (() => {
                 const mail = emailItems.find((e) => e.threadId === selectedThreadId)
                 return (
-                  <div className="bg-canvas rounded-card border-hairline h-full w-full overflow-y-auto border p-5">
-                    <p className="text-ink text-sm font-semibold">メールの相手</p>
-                    <p className="text-ink mt-3 text-sm">{mail?.customerName ?? '—'}</p>
-                    {mail?.customerIdentifier && (
-                      <p className="text-ink-secondary mt-0.5 font-mono text-xs break-all">
-                        {mail.customerIdentifier}
-                      </p>
-                    )}
-
-                    <div className="bg-canvas-sunken rounded-card mt-4 p-3">
-                      <p className="text-ink-secondary text-xs font-medium">
-                        この人はまだ友だちと結びついていません
-                      </p>
-                      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                        メールは差出人のアドレスしか分かりません。LINEの友だちはアドレスを持っていないので、
-                        同じ人かどうかを自動で判断できません。タグ・マイル・購入履歴はこの画面には出ません。
-                      </p>
+                  <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
+                    <div className="min-h-[66px] border-b border-[#E5E7EB] px-4 py-3 pr-20">
+                      <p className="text-ink text-sm font-bold">顧客情報</p>
+                      <p className="text-ink-faint mt-0.5 truncate text-[10px]">メールの相手を確認できます</p>
                     </div>
 
-                    <p className="text-ink-secondary mt-4 text-xs font-medium">いまできること</p>
-                    <ul className="text-ink-faint mt-1 space-y-1.5 text-xs leading-relaxed">
-                      <li>
-                        ・
-                        <Link href="/friends" className="text-accent hover:underline">
-                          友だち一覧
+                    <div className="flex-1 overflow-y-auto divide-y divide-[#E5E7EB]">
+                      <section className="flex flex-col items-center px-5 py-5 text-center">
+                        <div className="bg-canvas-sunken border-hairline flex h-14 w-14 items-center justify-center rounded-full border">
+                          <span className="text-ink-secondary text-[11px] font-bold">MAIL</span>
+                        </div>
+                        <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{mail?.customerName ?? '—'}</p>
+                        <p className="text-ink-faint mt-0.5 max-w-full break-all text-[11px]">
+                          {mail?.customerIdentifier ?? 'メールアドレス未登録'}
+                        </p>
+                      </section>
+
+                      <section className="px-5 py-4">
+                        <p className="text-ink text-xs font-bold">基本情報</p>
+                        <dl className="mt-2 space-y-2 text-xs">
+                          <div className="flex items-start justify-between gap-3">
+                            <dt className="text-ink-faint shrink-0">名前</dt>
+                            <dd className="text-ink-secondary min-w-0 truncate text-right">{mail?.customerName ?? '未登録'}</dd>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <dt className="text-ink-faint shrink-0">メール</dt>
+                            <dd className="text-ink-secondary min-w-0 break-all text-right">{mail?.customerIdentifier ?? '未登録'}</dd>
+                          </div>
+                        </dl>
+                      </section>
+
+                      <section className="px-5 py-4">
+                        <p className="text-ink text-xs font-bold">LINE友だちとの連携</p>
+                        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+                          このメールアドレスは、まだLINEの友だちと結びついていません。
+                        </p>
+                        <Link href="/friends" className="text-action mt-2 inline-flex text-xs font-semibold hover:underline">
+                          友だち一覧で確認する
                         </Link>
-                        で名前を検索して、同じ人かどうかを確かめる
-                      </li>
-                      <li>・そのままメールで返信する（この画面の下から送れます）</li>
-                    </ul>
+                      </section>
 
-                    <EmailCustomerMemo threadId={selectedThreadId} />
-
-                    <p className="text-ink-faint border-hairline mt-4 border-t pt-3 text-xs leading-relaxed">
-                      アドレスから友だちを自動で探す仕組みは、まだ入っていません。友だち情報欄に
-                      メールアドレスの項目を作って値を貯めておくと、入ったときにそのまま結びつけられます。
-                    </p>
+                      <EmailCustomerMemo threadId={selectedThreadId} />
+                    </div>
                   </div>
                 )
               })()
             ) : (
             <FriendInfoSidebar
-              friendId={selectedFriendId || selectedChatId}
+              friendId={activeFriendId}
               operatorName={
                 chatDetail?.operatorId
                   ? operators.find((operator) => operator.id === chatDetail.operatorId)?.name ?? null
                   : null
               }
               chatStatus={
-                chatDetail && chatDetail.id === (selectedFriendId || selectedChatId)
+                chatDetail && chatDetail.id === selectedChatId
                   ? { status: chatDetail.status, notes: chatDetail.notes }
                   : undefined
               }
@@ -1835,8 +1983,6 @@ const CHANNELS = [
 
 function ChatsPageHost() {
   const params = useSearchParams()
-  const [showReadAllConfirm, setShowReadAllConfirm] = useState(false)
-  const [markingAllRead, setMarkingAllRead] = useState(false)
   // すべて / LINE / メール。既定はすべて。
   // 出どころを気にせず「返信を待っている人」を見たいのが普通なので、
   // 最初から絞った状態で出さない。
@@ -1851,7 +1997,7 @@ function ChatsPageHost() {
           title="受信箱"
           description="返信が必要な会話を見つけ、担当・期限・顧客情報を見ながら対応できます。"
           action={
-            <div className="flex items-center gap-2">
+            <div className="flex items-center">
               {/*
                 設計にあるボタン。行き先の文書がまだ無いので押せなくしている。
                 リンク先を仮置きすると行き止まりになる（route-integrity が落ちる）。
@@ -1862,17 +2008,6 @@ function ChatsPageHost() {
                 className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
               >
                 マニュアル
-              </button>
-              {/*
-                すべて確認済みにする。押し間違えると未対応が全部消えるので、
-                確認を挟む。設計にも同じボタンがある。
-              */}
-              <button
-                onClick={() => setShowReadAllConfirm(true)}
-                disabled={markingAllRead}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-              >
-                {markingAllRead ? '更新中...' : 'すべて確認済みにする'}
               </button>
             </div>
           }
@@ -1892,23 +2027,6 @@ function ChatsPageHost() {
       */}
       <ChatsPageInner channel={channel} />
 
-      <ConfirmDialog
-        open={showReadAllConfirm}
-        title="すべて確認済みにしますか？"
-        description="ログイン中のあなたの未読だけを確認済みにします。他の担当者の未読や、共有している対応状態は変わりません。"
-        confirmLabel="確認済みにする"
-        onCancel={() => setShowReadAllConfirm(false)}
-        onConfirm={() => {
-          setShowReadAllConfirm(false)
-          setMarkingAllRead(true)
-          void Promise.all([
-            api.chats.markAllRead(),
-            fetchApi('/api/support/email/read-all', { method: 'POST' }),
-          ]).then(() => {
-            window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-          }).finally(() => setMarkingAllRead(false))
-        }}
-      />
     </div>
   )
 }
