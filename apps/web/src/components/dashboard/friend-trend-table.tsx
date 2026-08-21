@@ -46,6 +46,7 @@ export default function FriendTrendTable({
               // 前日比は、1つ後ろ（＝前日）との差。最終行は比べる相手がいない。
               const previous = rows[i + 1]
               const diff = previous ? row.active - previous.active : null
+              const sources = formatTrendSources(row.sources)
               return (
                 <tr key={row.date} className="text-ink-secondary">
                   <td className="px-5 py-2.5 whitespace-nowrap">
@@ -79,10 +80,8 @@ export default function FriendTrendTable({
                   <td className="px-3 py-2.5 text-right font-medium tabular-nums">
                     {row.active.toLocaleString('ja-JP')}
                   </td>
-                  <td className="text-ink-faint max-w-[240px] truncate px-5 py-2.5" title={row.sources.map((source) => `${source.name} ${source.count}`).join('、')}>
-                    {row.sources.length
-                      ? row.sources.slice(0, 2).map((source) => `${source.name} ${source.count}`).join('、')
-                      : '経路なし'}
+                  <td className="text-ink-faint max-w-[240px] truncate px-5 py-2.5" title={sources.full}>
+                    {sources.compact}
                   </td>
                 </tr>
               )
@@ -93,6 +92,18 @@ export default function FriendTrendTable({
 
     </div>
   )
+}
+
+export function formatTrendSources(
+  sources: DashboardOverview['trend'][number]['sources'],
+): { full: string; compact: string } {
+  const values = sources ?? []
+  return {
+    full: values.map((source) => `${source.name} ${source.count}`).join('、'),
+    compact: values.length
+      ? values.slice(0, 2).map((source) => `${source.name} ${source.count}`).join('、')
+      : '経路なし',
+  }
 }
 
 /** 8月15日(土) の形にする。設計の表記に合わせている。 */
