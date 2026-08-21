@@ -35,6 +35,16 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(source).not.toContain('sm:text-3xl">ダッシュボード')
   })
 
+  it('旧Workerが追加集計を返さなくてもダッシュボードを描画できる', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('data?.partialFailures?.length')
+    expect(source).toContain('data?.operations?.scenarios')
+    expect(source).toContain('data?.operations?.migrations')
+    expect(source).toContain('data?.operations?.bookings')
+    expect(source).not.toContain('data?.partialFailures.length')
+    expect(source).not.toMatch(/data\?\.operations\.[a-zA-Z]/)
+  })
+
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
     const preferences = defaultDashboardPreferences()
     expect(preferences.today.filter((item) => item.visible).map((item) => item.id)).toEqual([

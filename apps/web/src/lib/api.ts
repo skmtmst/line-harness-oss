@@ -642,9 +642,10 @@ export type DashboardOverview = {
     total: number
     byPoint: Array<{ name: string; count: number }>
   }
-  /** 取得に失敗して0へ見せていない項目。 */
-  partialFailures: string[]
-  operations: {
+  /** 取得に失敗して0へ見せていない項目。段階配備中の旧Workerでは未返却。 */
+  partialFailures?: string[]
+  /** 段階配備中の旧Workerでは未返却。 */
+  operations?: {
     scenarios: { active: number; paused: number }
     migrations: { active: number; completed: number }
     bookings: { pending: number; upcoming: number }
