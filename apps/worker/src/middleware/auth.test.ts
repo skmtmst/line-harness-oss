@@ -4,11 +4,16 @@ import { cors } from 'hono/cors';
 import { authMiddleware } from './auth.js';
 import { resolveCorsOrigin } from './admin-auth-config.js';
 import { adminAuth } from '../routes/admin-auth.js';
+import { encryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import type { Env } from '../index.js';
 
 vi.mock('@line-crm/db', () => ({
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
     if (token === 'viewer-key') return { id: 'viewer-1', name: 'Viewer One', role: 'staff', access_level: 'read_only' };
+    if (token === 'friends-key') return { id: 'friends-1', name: 'Friends Staff', role: 'staff', permission_keys: '["/friends"]' };
+    if (token === 'chats-key') return { id: 'chats-1', name: 'Chats Staff', role: 'staff', permission_keys: '["/chats"]' };
+    if (token === 'tags-key') return { id: 'tags-1', name: 'Tags Staff', role: 'staff', permission_keys: '["/tags"]' };
+    if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
     return { id: 'staff-1', name: 'Staff One', role: 'admin' };
   }),
@@ -24,7 +29,18 @@ vi.mock('@line-crm/db', () => ({
     return { id: 'staff-1', name: 'Staff One', role: 'admin', is_active: 1 };
   }),
   createAdminSession: vi.fn(async () => undefined),
+  createTwoFactorChallenge: vi.fn(async () => undefined),
+  deleteExpiredTwoFactorChallenges: vi.fn(async () => undefined),
+  getTwoFactorChallenge: vi.fn(async () => null),
+  getStaffById: vi.fn(async () => null),
+  incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
+  deleteTwoFactorChallenge: vi.fn(async () => undefined),
+  claimStaffTotpStep: vi.fn(async () => true),
+  updateStaffMember: vi.fn(async () => null),
   deleteAdminSession: vi.fn(async () => undefined),
+  // ログイン・ログアウト・失敗を記録する。本体では例外を握るので、
+  // ここでも何もしない実装で足りる。
+  recordLoginAudit: vi.fn(async () => undefined),
 }));
 
 const PAGES = 'https://your-admin.pages.dev';
@@ -69,6 +85,16 @@ function app() {
   a.post('/api/forms/:id/submit', (c) => c.json({ success: true }));
   a.post('/api/forms/:id/partial', (c) => c.json({ success: true }));
   a.post('/api/forms/:id/opened', (c) => c.json({ success: true }));
+  a.post('/api/integrations/codex-slack/events', (c) => c.json({ success: true }));
+  a.post('/api/integrations/slack/actions', (c) => c.json({ success: true }));
+  a.get('/api/public/brand', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
+  for (const path of [
+    '/api/support', '/api/operators', '/api/support-marks', '/api/saved-searches',
+    '/api/folders', '/api/tag-groups', '/api/friends/:id', '/api/friends/:id/messages',
+    '/api/friends/:id/fields', '/api/friends/:id/support-mark', '/api/friends/support-mark/bulk',
+  ]) {
+    a.get(path, (c) => c.json({ success: true }));
+  }
   return a;
 }
 
@@ -188,6 +214,35 @@ describe('LINE admin login', () => {
   });
 });
 
+describe('Authenticator verification', () => {
+  test('valid code exchanges a short-lived challenge for a cross-site admin session', async () => {
+    const db = await import('@line-crm/db');
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+    const masterKey = 'test-master-key-which-is-longer-than-32-characters';
+    vi.mocked(db.getTwoFactorChallenge).mockResolvedValueOnce({
+      token_hash: 'hash', staff_id: 'staff-1', expires_at: new Date(Date.now() + 60_000).toISOString(), attempts: 0, created_at: new Date().toISOString(),
+    });
+    vi.mocked(db.getStaffById).mockResolvedValueOnce({
+      id: 'staff-1', name: 'Staff One', email: 'staff@example.com', role: 'admin', access_level: 'full', api_key: 'hidden', line_user_id: 'U1', is_active: 1,
+      permission_keys: '[]', notification_preferences: '{}', invite_status: 'active', invite_token_hash: null, invite_expires_at: null, email_verified_at: null, line_linked_at: null,
+      totp_secret_enc: await encryptTotpSecret(secret, masterKey), totp_pending_secret_enc: null, totp_enabled_at: new Date().toISOString(), totp_last_used_step: null,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+    const step = Math.floor(Date.now() / 30_000);
+    const response = await app().request('/api/auth/two-factor/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeToken: 'challenge', code: await totpAtStep(secret, step) }),
+    }, { ...crossSiteEnv(), TOTP_ENCRYPTION_KEY: masterKey });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { success: boolean; data: { sessionToken?: string }; csrfToken: string };
+    expect(body.success).toBe(true);
+    expect(body.data.sessionToken).toBeTruthy();
+    expect(body.csrfToken).toBeTruthy();
+    expect(cookieFor(response, 'lh_admin_session')).toBeTruthy();
+    expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
+  });
+});
+
 describe('topology guard', () => {
   test('cross-site WITHOUT opt-in refuses login with an actionable error', async () => {
     const res = await app().request('/api/auth/login', {
@@ -277,6 +332,40 @@ describe('protected API access', () => {
   });
 });
 
+describe('staff feature permissions', () => {
+  const bearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
+
+  test.each(['/api/support', '/api/operators', '/api/friends/friend-1/messages'])(
+    'chat permission protects %s',
+    async (path) => {
+      expect((await app().request(path, bearer('chats-key'), crossSiteEnv())).status).toBe(200);
+      expect((await app().request(path, bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+    },
+  );
+
+  test.each([
+    '/api/support-marks', '/api/saved-searches', '/api/folders', '/api/tag-groups',
+    '/api/friends/friend-1/fields', '/api/friends/friend-1/support-mark',
+    '/api/friends/support-mark/bulk',
+  ])('friend-attributes permission protects %s', async (path) => {
+    expect((await app().request(path, bearer('tags-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request(path, bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+  });
+
+  test('friend permission still allows ordinary friend APIs but not nested chat or attributes', async () => {
+    expect((await app().request('/api/friends/friend-1', bearer('friends-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/friends/friend-1/messages', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+    expect((await app().request('/api/friends/friend-1/fields', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+  });
+
+  test.each(['/api/support', '/api/friends/friend-1', '/api/support-marks'])(
+    'missing feature permission fails closed for %s',
+    async (path) => {
+      expect((await app().request(path, bearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
+    },
+  );
+});
+
 describe('public form method boundaries', () => {
   test('allows unauthenticated GET of a form definition', async () => {
     const res = await app().request('/api/forms/form-1', {}, crossSiteEnv());
@@ -311,6 +400,31 @@ describe('public form method boundaries', () => {
     const res = await app().request('/api/forms/form-1/submit', {
       method: 'DELETE',
     }, crossSiteEnv());
+    expect(res.status).toBe(401);
+  });
+});
+
+describe('署名検証を持つSlack連携入口', () => {
+  test.each([
+    '/api/integrations/codex-slack/events',
+    '/api/integrations/slack/actions',
+  ])('%s は管理者認証より前へ通す', async (path) => {
+    const res = await app().request(path, { method: 'POST' }, crossSiteEnv());
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('ログイン画面の看板', () => {
+  // ログイン画面は認証より手前にあるので、ここが通らないと名前もアイコンも
+  // 出せない。逆に通しすぎると認証の穴になるので、この1本で固定する。
+  test('認証なしで読める', async () => {
+    const res = await app().request('/api/public/brand', {}, crossSiteEnv());
+    expect(res.status).toBe(200);
+    expect((await res.json() as { staff: unknown }).staff).toBeNull();
+  });
+
+  test('似た名前の道は通さない', async () => {
+    const res = await app().request('/api/public/brands', {}, crossSiteEnv());
     expect(res.status).toBe(401);
   });
 });

@@ -10,7 +10,7 @@ import {
   getLinkClicks,
   getFriendByLineUserId,
 } from '@line-crm/db';
-import { enrollFriendInScenario } from '@line-crm/db';
+import { enrollFriendInScenario, getUrlReachConversionPoints, trackConversion } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import type { TrackedLink } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -358,6 +358,32 @@ trackedLinks.get('/t/:linkId', async (c) => {
         // Run automatic actions if a friend is identified
         if (friendId) {
           const actions: Promise<unknown>[] = [];
+
+          // 「このURLに着いたら成果」と決めてある地点があれば数える。
+          // 判定は転送先URL（link.original_url）に対して行う。/t/ 自体は
+          // 短縮URLで、成果地点の設定には出てこないため。
+          //
+          // ここで数えるのは、リンクを踏んだ人が確実に分かるのがこの経路だけ
+          // だから。転送先のページに計測を仕込む方法だと、そのページを
+          // こちらで触れる必要がある。
+          actions.push(
+            (async () => {
+              const points = await getUrlReachConversionPoints(
+                c.env.DB,
+                link.original_url,
+                link.line_account_id ?? null,
+              );
+              for (const point of points) {
+                // 一人一回の地点で二度目のときは trackConversion 側が
+                // 既存の1件を返すので、ここでは重複を気にしなくてよい。
+                await trackConversion(c.env.DB, {
+                  conversionPointId: point.id,
+                  friendId: friendId!,
+                  metadata: JSON.stringify({ via: 'tracked_link', trackedLinkId: link.id }),
+                });
+              }
+            })(),
+          );
 
           if (link.tag_id) {
             // Guarded attach: fires tag_added scenario enrollment only when

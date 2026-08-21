@@ -4,7 +4,8 @@ import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
-import { buildNenImmediateMessage, enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
+import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
+import { ecFlexMessage } from '../services/ec-notification-message.js';
 import { syncNenEcTags, syncNenPetTags } from '../services/nen-tag-sync.js';
 
 const ecIntegrations = new Hono<Env>();
@@ -12,9 +13,14 @@ const MAX_BODY_BYTES = 256 * 1024;
 const MAX_CLOCK_SKEW_SECONDS = 5 * 60;
 export const EC_EVENT_TYPES = [
   'ec.order.confirmed',
+  'ec.order.payment_received',
+  'ec.order.bank_transfer_reminder',
   'ec.order.shipped',
+  'ec.order.cancelled',
+  'ec.order.refunded',
   'ec.subscription.upcoming',
   'ec.subscription.payment_failed',
+  'ec.subscription.card_updated',
   'ec.subscription.cancelled',
   'ec.customer.profile_updated',
 ] as const;
@@ -38,6 +44,7 @@ export type EcEvent = {
     delivery_date?: string | null;
     delivery_time?: string | null;
     detail_url?: string | null;
+    payment_deadline?: string | null;
   };
   order_history?: Array<{
     id?: string;
@@ -63,6 +70,10 @@ export type EcEvent = {
     tracking_url?: string | null;
     shipped_at?: string | null;
   };
+  refund?: {
+    amount?: number | null;
+    full_refund?: boolean | null;
+  };
   subscription?: {
     id?: string;
     contract_number?: string;
@@ -79,6 +90,7 @@ export type EcEvent = {
     next_shipping_date?: string | null;
     cycle?: string | null;
     items?: EcItem[];
+    retry_status?: string | null;
   };
   profile?: {
     owner_name?: string | null;
@@ -366,15 +378,14 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       return c.json({ success: true, status: 'processed' });
     }
 
-    const nenImmediate = await buildNenImmediateMessage(c.env.DB, event);
-    const setting = nenImmediate.message || !nenImmediate.enabled
-      ? null
-      : await c.env.DB.prepare(
-          `SELECT is_enabled, title_override, intro_text, outro_text
-             FROM ec_notification_settings WHERE event_type = ?`,
-        ).bind(event.event_type).first<{
-          is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
-        }>();
+    const setting = await c.env.DB.prepare(
+      `SELECT is_enabled, title_override, intro_text, outro_text,
+              button_label, button_url, image_url
+         FROM ec_notification_settings WHERE event_type = ?`,
+    ).bind(event.event_type).first<{
+      is_enabled: number; title_override: string | null; intro_text: string | null; outro_text: string | null;
+      button_label: string | null; button_url: string | null; image_url: string | null;
+    }>();
 
     if (event.event_type === 'ec.order.shipped') {
       await enqueuePostShippingFollowUps(
@@ -384,7 +395,7 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
 
     // Transactional delivery can be paused independently while automation
     // events continue to fire for segmentation and step campaigns.
-    if (!nenImmediate.enabled || setting?.is_enabled === 0) {
+    if (setting?.is_enabled === 0) {
       await c.env.DB.prepare(
         `UPDATE ec_events SET friend_id = ?, status = 'skipped', error_message = 'notification_disabled', processed_at = ?, updated_at = ? WHERE id = ?`,
       ).bind(friend.id, now, now, row.id).run();
@@ -395,10 +406,13 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
       return c.json({ success: true, status: 'skipped' }, 202);
     }
 
-    const message = nenImmediate.message ?? ecTextMessage(event, {
+    const message = ecFlexMessage(event, {
       title: setting?.title_override,
       introText: setting?.intro_text,
       outroText: setting?.outro_text,
+      buttonLabel: setting?.button_label,
+      buttonUrl: setting?.button_url,
+      imageUrl: setting?.image_url,
     });
     const lineClient = new LineClient(accessToken);
     await lineClient.pushMessage(event.line_user_id, [message]);

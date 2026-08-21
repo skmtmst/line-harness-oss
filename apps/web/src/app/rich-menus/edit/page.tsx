@@ -6,7 +6,26 @@ import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
 import { CanvasEditor, type Area } from '@/components/rich-menus/canvas-editor'
-import { AreaProperties } from '@/components/rich-menus/area-properties'
+import { AreaProperties, intentOf } from '@/components/rich-menus/area-properties'
+import type { RichMenuAreaTapCount } from '@/lib/api'
+import ConditionBuilder from '@/components/shared/condition-builder'
+import type { SegmentCondition } from '@/lib/segment-condition'
+
+/**
+ * 保存されている条件を読む。
+ *
+ * 壊れた JSON は「条件なし」として扱う。ここで落とすと編集画面が開かなくなり、
+ * 直すこともできなくなる。画面には「条件なし」に見えるが、保存し直すまで
+ * 元の値は消えない。
+ */
+function parseStoredCondition(raw: string | null): SegmentCondition | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as SegmentCondition
+  } catch {
+    return null
+  }
+}
 
 type Page = {
   id: string
@@ -29,8 +48,16 @@ type Group = {
   isDefaultForAll: boolean
   status: 'draft' | 'published'
   publishingAt: string | null
+  targetingCondition: string | null
+  targetingPriority: number
+  targetingEnabled: boolean
+  /** 159: フォルダ。分けていなければ null。 */
+  folderId: string | null
   pages: Page[]
 }
+
+/** 右パネルのプルダウンに出す選択肢。 */
+type PickerOption = { id: string; name: string }
 
 const SIZE_LABEL: Record<Group['size'], string> = {
   large: '2500×1686',
@@ -90,6 +117,21 @@ function Editor({
   // isDefaultForAll はこの画面では編集しない (ON/OFF は「友だちに表示」モーダルから)。
   // ただし persistDraft で送信値を一致させるため、現在値を保持する。
   const [isDefaultForAll, setIsDefaultForAll] = useState(false)
+  // 出し分け（149）。条件の形は一斉配信・シナリオと同じもの。
+  const [targetingEnabled, setTargetingEnabled] = useState(false)
+  const [targetingPriority, setTargetingPriority] = useState(0)
+  const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
+  const [folderId, setFolderId] = useState('')
+  const [folders, setFolders] = useState<PickerOption[]>([])
+
+  // ボタンの設定で選ぶもの（タグ・テンプレート・回答フォーム・計測リンク）。
+  // メニュー本体とは別に、開いたとき1回だけ読む。
+  const [tags, setTags] = useState<PickerOption[]>([])
+  const [templates, setTemplates] = useState<PickerOption[]>([])
+  const [forms, setForms] = useState<PickerOption[]>([])
+  const [trackedLinks, setTrackedLinks] = useState<PickerOption[]>([])
+  // ボタンごとに押された回数。取れなくても編集はできるので、失敗しても止めない。
+  const [tapsByArea, setTapsByArea] = useState<Map<string, RichMenuAreaTapCount>>(new Map())
 
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
@@ -110,7 +152,21 @@ function Editor({
       setName(g.name)
       setChatBarText(g.chatBarText)
       setIsDefaultForAll(g.isDefaultForAll)
+      setTargetingEnabled(g.targetingEnabled)
+      setTargetingPriority(g.targetingPriority)
+      setTargetingCondition(parseStoredCondition(g.targetingCondition))
+      setFolderId(g.folderId ?? '')
       setPages(g.pages)
+      void api.richMenuGroups
+        .tapStats(g.accountId)
+        .then((res) => {
+          if (res.success) {
+            setTapsByArea(new Map(res.data.byArea.map((a) => [a.areaId, a])))
+          }
+        })
+        .catch(() => {
+          // 数が出ないだけ。編集は続けられる。
+        })
       setActivePageId((prev) =>
         prev && g.pages.some((p) => p.id === prev) ? prev : (g.pages[0]?.id ?? null),
       )
@@ -125,6 +181,39 @@ function Editor({
   useEffect(() => {
     reload()
   }, [reload])
+
+  // 選択肢は片方が落ちても残りを出す。1つ取れなくても編集自体は続けられる。
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const [tagRes, tplRes, formRes, linkRes, folderRes] = await Promise.allSettled([
+        api.tags.list(),
+        api.templates.list(),
+        api.forms.list(),
+        api.trackedLinks.list(),
+        api.folders.list('rich_menu'),
+      ])
+      if (cancelled) return
+      if (tagRes.status === 'fulfilled' && tagRes.value.success) {
+        setTags(tagRes.value.data.map((t) => ({ id: t.id, name: t.name })))
+      }
+      if (tplRes.status === 'fulfilled' && tplRes.value.success) {
+        setTemplates(tplRes.value.data.map((t) => ({ id: t.id, name: t.name })))
+      }
+      if (formRes.status === 'fulfilled' && formRes.value.success) {
+        setForms(formRes.value.data.map((f) => ({ id: f.id, name: f.name })))
+      }
+      if (folderRes.status === 'fulfilled' && folderRes.value.success) {
+        setFolders(folderRes.value.data.map((f) => ({ id: f.id, name: f.name })))
+      }
+      if (linkRes.status === 'fulfilled' && linkRes.value.success) {
+        setTrackedLinks(linkRes.value.data.map((l) => ({ id: l.id, name: l.name })))
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const activePage = pages.find((p) => p.id === activePageId) ?? pages[0] ?? null
   const selectedArea =
@@ -218,6 +307,10 @@ function Editor({
       name,
       chatBarText,
       isDefaultForAll,
+      targetingEnabled,
+      targetingPriority,
+      targetingCondition: targetingCondition ? JSON.stringify(targetingCondition) : null,
+      folderId: folderId || null,
       pages: pages.map((p, i) => ({
         // 既存 page (UUID) は id を渡す。新規 page (`tmp-*` プレフィックス) は
         // id を渡さず Worker 側で新 UUID を発行させる。
@@ -225,12 +318,22 @@ function Editor({
         name: p.name,
         orderIndex: i,
         areas: p.areas.map((a) => ({
+          // id を渡すと、そのボタンの記録（押された回数）が保存後も続く。
+          // まだ保存されていない id は、サーバー側で新しく振り直される。
+          id: a.id,
           boundsX: a.boundsX,
           boundsY: a.boundsY,
           boundsWidth: a.boundsWidth,
           boundsHeight: a.boundsHeight,
           actionType: a.actionType,
           actionData: a.actionData,
+          intent: a.intent ?? null,
+          label: a.label ?? null,
+          tagIds: a.tagIds ?? null,
+          scoreChange: a.scoreChange ?? null,
+          templateId: a.templateId ?? null,
+          formId: a.formId ?? null,
+          trackedLinkId: a.trackedLinkId ?? null,
         })),
       })),
     })
@@ -377,9 +480,17 @@ function Editor({
 
   return (
     <main className="p-6 max-w-7xl mx-auto">
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+        <Link href="/rich-menus" className="hover:underline">
+          リッチメニュー
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>{name || '(無名)'}</span>
+      </nav>
+
       <Header
-        title={name || '(無名)'}
-        description={`サイズ ${SIZE_LABEL[group.size]} • ${group.status === 'published' ? 'LINE 登録済み' : '下書き'}`}
+        title="リッチメニュー編集"
+        description="トーク画面の下に出るメニューを作ります。エリアを選んで、押したときの動きを設定してください。"
         action={
           <div className="flex items-center gap-2">
             <label className="flex items-center gap-1.5 text-sm text-gray-600 mr-2 cursor-pointer">
@@ -401,7 +512,7 @@ function Editor({
               onClick={handlePublish}
               disabled={saving || publishing || unpublishing || busy}
               className="px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-50 transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#06C755' }}
+              style={{ backgroundColor: 'var(--color-accent)' }}
             >
               {publishing
                 ? 'LINE 登録中...'
@@ -442,7 +553,7 @@ function Editor({
                   ? 'text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
-              style={active ? { backgroundColor: '#06C755' } : undefined}
+              style={active ? { backgroundColor: 'var(--color-accent)' } : undefined}
             >
               {p.name}
               {p.id.startsWith('tmp-') && (
@@ -462,6 +573,12 @@ function Editor({
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         {/* 中央: キャンバス */}
         <section>
+          <div className="mb-3">
+            <h2 className="text-ink text-sm font-semibold">タップできる場所</h2>
+            <p className="text-ink-faint mt-0.5 text-xs">
+              エリアをクリックすると、右側で動きを設定できます。画像の上を区切って、タップしたときの動きをエリアごとに決めます。
+            </p>
+          </div>
           {activePage ? (
             <CanvasEditor
               areas={activePage.areas}
@@ -474,17 +591,50 @@ function Editor({
               onDeleteArea={(id) => deleteArea(activePage.id, id)}
               preview={preview}
               onPreviewAction={(area) => {
-                if (area.actionType === 'uri') {
-                  const uri = (area.actionData as { uri?: string }).uri
-                  if (uri) window.open(uri, '_blank')
-                } else if (area.actionType === 'richmenuswitch') {
-                  const targetId = (area.actionData as { targetPageId?: string }).targetPageId
-                  if (targetId && pages.some((p) => p.id === targetId)) {
-                    setActivePageId(targetId)
-                    setSelectedAreaId(null)
+                // プレビューは「押すと何が起きるか」を確かめるためのもの。
+                // 実際に送ったり電話をかけたりはせず、起きることを文で見せる。
+                const data = area.actionData as {
+                  uri?: string
+                  tel?: string
+                  text?: string
+                  targetPageId?: string
+                }
+                const nameOf = (list: PickerOption[], id: string | null | undefined) =>
+                  list.find((o) => o.id === id)?.name ?? '(未選択)'
+                switch (intentOf(area)) {
+                  case 'url':
+                    if (area.trackedLinkId) {
+                      alert(`計測リンクを開きます: ${nameOf(trackedLinks, area.trackedLinkId)}`)
+                    } else if (data.uri) {
+                      window.open(data.uri, '_blank')
+                    } else {
+                      alert('URLが未設定です')
+                    }
+                    break
+                  case 'tel':
+                    alert(`電話をかけます: ${data.tel || '(未設定)'}`)
+                    break
+                  case 'text':
+                    alert(`「${data.text || '(未設定)'}」を送ったことになります`)
+                    break
+                  case 'template':
+                    alert(`テンプレートを送ります: ${nameOf(templates, area.templateId)}`)
+                    break
+                  case 'form':
+                    alert(`回答フォームを開きます: ${nameOf(forms, area.formId)}`)
+                    break
+                  case 'switch': {
+                    const targetId = data.targetPageId
+                    if (targetId && pages.some((p) => p.id === targetId)) {
+                      setActivePageId(targetId)
+                      setSelectedAreaId(null)
+                    } else {
+                      alert('切り替え先のページが未設定です')
+                    }
+                    break
                   }
-                } else {
-                  alert(`action: ${area.actionType}\n${JSON.stringify(area.actionData)}`)
+                  default:
+                    alert(`合図を送ります: ${JSON.stringify(area.actionData)}`)
                 }
               }}
             />
@@ -495,11 +645,20 @@ function Editor({
 
         {/* 右パネル */}
         <aside className="space-y-5">
+            {selectedAreaId && (
+              <p className="text-ink-faint text-xs">
+                タップしたときに何が起きるかを決めます。
+              </p>
+            )}
           {/* メニュー設定 */}
           <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-gray-900">メニュー設定</h2>
+            <h2 className="text-ink text-sm font-semibold">基本設定</h2>
+            <p className="text-ink-faint text-xs">
+              サイズ {SIZE_LABEL[group.size]} ・{' '}
+              {group.status === 'published' ? 'LINE 登録済み' : '下書き'}
+            </p>
             <label className="block">
-              <span className="text-xs font-medium text-gray-600">名前</span>
+              <span className="text-ink-secondary text-xs font-medium">メニュー名</span>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -508,7 +667,22 @@ function Editor({
               <p className="mt-1 text-[11px] text-gray-500">管理画面でだけ使う名前 (友だちには見えない)</p>
             </label>
             <label className="block">
-              <span className="text-xs font-medium text-gray-600">トーク画面下の文言</span>
+              <span className="text-ink-secondary text-xs font-medium">フォルダ</span>
+              <select
+                value={folderId}
+                onChange={(e) => setFolderId(e.target.value)}
+                className="border-hairline rounded-control focus:ring-accent mt-1 block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              >
+                <option value="">未分類</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-ink-secondary text-xs font-medium">メニューバーの文字</span>
               <input
                 value={chatBarText}
                 onChange={(e) => setChatBarText(e.target.value)}
@@ -522,7 +696,10 @@ function Editor({
           {/* ページ設定 (画像 upload 含む、常時表示) */}
           {activePage && (
             <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 space-y-4">
-              <h2 className="text-sm font-semibold text-gray-900">ページ設定</h2>
+              <h2 className="text-ink text-sm font-semibold">タブ（メニューの切り替え）</h2>
+              <p className="text-ink-faint text-xs leading-relaxed">
+                1つのメニューの中でタブを分けられます。タブのボタンを押すと別の面に切り替わります。タブは2〜3つまでを推奨します。多いと押されなくなります。
+              </p>
               <label className="block">
                 <span className="text-xs font-medium text-gray-600">ページ名</span>
                 <input
@@ -573,12 +750,87 @@ function Editor({
             </section>
           )}
 
+          {/* 誰に出すか（149） */}
+          <section className="bg-white border border-hairline rounded-lg shadow-sm p-5 space-y-4">
+            <div>
+              <h2 className="text-ink text-sm font-semibold">誰に出すか</h2>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                条件に当てはまった友だちに、このメニューを自動で出します。タグが付いた時点で
+                切り替わるので、あとから当てはまった人にも出ます。
+              </p>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={targetingEnabled}
+                onChange={(e) => setTargetingEnabled(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                条件で出し分ける
+                <span className="text-ink-faint block text-[11px]">
+                  切ると、このメニューは条件で配られなくなります。すでに見えている人からは
+                  すぐには消えません。
+                </span>
+              </span>
+            </label>
+
+            {targetingEnabled && (
+              <>
+                {group.status !== 'published' && (
+                  <p className="rounded-control bg-amber-50 p-2 text-[11px] text-amber-700">
+                    このメニューはまだ LINE に登録されていません。登録するまで、条件に
+                    当てはまっても出せません。
+                  </p>
+                )}
+
+                <label className="block">
+                  <span className="text-ink-secondary text-xs font-medium">順番</span>
+                  <span className="text-ink-faint block text-[11px]">
+                    複数のメニューの条件に当てはまったとき、数が小さいほうが先に出ます。
+                  </span>
+                  <input
+                    type="number"
+                    value={targetingPriority}
+                    onChange={(e) => setTargetingPriority(parseInt(e.target.value, 10) || 0)}
+                    className="border-hairline rounded-control focus:ring-accent mt-1 block w-24 border px-2 py-1 text-sm focus:ring-2 focus:outline-none"
+                  />
+                </label>
+
+                <ConditionBuilder
+                  value={targetingCondition}
+                  onChange={setTargetingCondition}
+                  label="このメニューを出す友だち"
+                />
+
+                {!targetingCondition && (
+                  <p className="text-[11px] text-amber-600">
+                    条件が空です。このままだと誰にも出しません。条件を1つ以上足してください。
+                  </p>
+                )}
+              </>
+            )}
+          </section>
+
           {/* 選択中エリア (area が選択されている時のみ追加表示) */}
           {selectedArea && activePage && (
             <section className="bg-white border border-gray-200 rounded-lg shadow-sm p-5">
               <AreaProperties
                 area={selectedArea}
                 pages={pagesForSelect}
+                tags={tags}
+                templates={templates}
+                forms={forms}
+                trackedLinks={trackedLinks}
+                taps={
+                  tapsByArea.has(selectedArea.id)
+                    ? {
+                        count: tapsByArea.get(selectedArea.id)!.taps,
+                        viaTrackedLink: tapsByArea.get(selectedArea.id)!.viaTrackedLink,
+                      }
+                    : null
+                }
                 onUpdate={(patch) =>
                   updateArea(activePage.id, selectedArea.id, patch)
                 }

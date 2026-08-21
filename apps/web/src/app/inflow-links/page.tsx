@@ -5,11 +5,16 @@ import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
 import Header from '@/components/layout/header'
+import KpiCard from '@/components/dashboard/kpi-card'
 import { useAccount } from '@/contexts/account-context'
 import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
 import EditRouteModal from './_components/edit-route-modal'
 import GenreModal from './_components/create-genre-modal'
 import { shouldShowReferralRow } from './visibility'
+import { Suspense } from 'react'
+import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import AdIntegration from './ad-integration'
+import SiteScript from '@/components/inflow-links/site-script'
 
 interface MessageTemplate {
   id: string
@@ -72,7 +77,13 @@ function FolderIcon({ className = '' }: { className?: string }) {
   )
 }
 
-export default function InflowLinksPage() {
+const MERGED_TABS = [
+  { key: 'links', label: '流入経路' },
+  { key: 'script', label: 'サイトスクリプト' },
+  { key: 'ads', label: '広告連携' },
+]
+
+function InflowLinksPageInner() {
   const { selectedAccountId } = useAccount()
   const [routes, setRoutes] = useState<EntryRoute[]>([])
   const [genres, setGenres] = useState<EntryRouteGenre[]>([])
@@ -403,33 +414,70 @@ export default function InflowLinksPage() {
     })
   }
 
+  // 設計のKPI。stats は期間を受け取らないので、出せるのは累計だけ。
+  // 「稼働中」は登録済みの行。orphan（外部が発行した未登録 ref）は流入実績が
+  // あるだけで、こちらから止める・直すができないので数に入れない。
+  const activeRouteCount = sortedRows.filter((r) => r.source !== 'orphan').length
+  const totalClicks = sortedRows.reduce((sum, r) => sum + (r.stats?.clickCount ?? 0), 0)
+  const totalFriends = sortedRows.reduce((sum, r) => sum + (r.stats?.friendCount ?? 0), 0)
+  const addRate = totalClicks > 0 ? Math.round((totalFriends / totalClicks) * 100) : null
+
   return (
     <div>
-      <Header
-        title="リファラルリンク"
-        description="流入経路ごとの URL を発行し、Pool・起動シナリオ・即時 push を設定します。"
-      />
+      <div data-design="Head">
+        <Header
+          title="流入と計測"
+          description="どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              <button
+                disabled
+                title="並び替えは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                並び替え
+              </button>
+              <button
+                onClick={() => setEditingGenre('new')}
+                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
+              >
+                フォルダを追加
+              </button>
+              <Link
+                href="/inflow-links/new"
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+              >
+                URLを発行
+              </Link>
+            </div>
+          }
+        />
+      </div>
 
-      {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-5 border border-hairline">
-            <p className="text-sm text-ink-faint">総友だち数</p>
-            <p className="text-3xl font-bold text-ink mt-1">{summary.totalFriends}</p>
-          </div>
-          <div className="bg-white rounded-xl p-5 border border-hairline">
-            <p className="text-sm text-ink-faint">ref 経由</p>
-            <p className="text-3xl font-bold text-green-600 mt-1">{summary.friendsWithRef}</p>
-          </div>
-          <div className="bg-white rounded-xl p-5 border border-hairline">
-            <p className="text-sm text-ink-faint">ref 不明</p>
-            <p className="text-3xl font-bold text-ink-faint mt-1">{summary.friendsWithoutRef}</p>
-          </div>
-          <div className="bg-white rounded-xl p-5 border border-hairline">
-            <p className="text-sm text-ink-faint">リンク数</p>
-            <p className="text-3xl font-bold text-blue-600 mt-1">{routes.length}</p>
-          </div>
-        </div>
-      )}
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          title="流入元"
+          value={sortedRows.length}
+          unit="件"
+          detail={`稼働中 ${activeRouteCount}`}
+        />
+        {/* 今月ぶんに絞る術が無い。stats は期間を受け取らず、累計で返る。 */}
+        <KpiCard title="今月の追加" value={null} unit="人" detail="前月比は出せません" />
+        <KpiCard title="クリック" value={totalClicks} unit="回" detail="累計" />
+        <KpiCard
+          title="平均の追加率"
+          value={addRate}
+          unit="%"
+          detail="クリックのうち"
+        />
+      </div>
 
       {error && (
         <div className="p-3 rounded bg-danger-bg border border-danger-bg text-danger text-sm mb-4">
@@ -444,11 +492,11 @@ export default function InflowLinksPage() {
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700"
           >
             <span className="text-xl leading-none">＋</span>
-            新しいジャンル
+            フォルダを追加
           </button>
           <div className="mt-3 overflow-hidden rounded-xl border border-hairline bg-white shadow-sm">
             <div className="border-b border-hairline px-4 py-3">
-              <h2 className="text-sm font-bold text-ink">ジャンル</h2>
+              <h2 className="text-sm font-bold text-ink">フォルダ</h2>
               <p className="mt-0.5 text-xs text-ink-faint">選ぶと右側のリンクが切り替わります</p>
             </div>
             {availableGenres.length === 0 && !hasUncategorized ? (
@@ -456,7 +504,7 @@ export default function InflowLinksPage() {
                 onClick={() => setEditingGenre('new')}
                 className="w-full px-4 py-8 text-center text-sm text-ink-faint hover:bg-canvas-sunken"
               >
-                最初のジャンルを作成してください
+                最初のフォルダを作ってください
               </button>
             ) : (
               <div className="divide-y divide-gray-100">
@@ -512,30 +560,60 @@ export default function InflowLinksPage() {
         <section className="min-w-0">
           <div className="mb-3 flex flex-col gap-3 rounded-xl border border-hairline bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-medium text-ink-faint">選択中のジャンル</p>
-              <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'ジャンルを選択してください'}</h2>
+              <p className="text-xs font-medium text-ink-faint">選択中のフォルダ</p>
+              <h2 className="mt-0.5 text-lg font-bold text-ink">{selectedGenreLabel || 'フォルダを選んでください'}</h2>
               <p className="text-xs text-ink-faint">{genreRows.length} リンク</p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <label className="relative block">
-                <span className="sr-only">リンクを検索</span>
+                <span className="sr-only">流入元名で検索</span>
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="名前・refコードで検索"
+                  placeholder="流入元名で検索"
                   className="w-full rounded-lg border border-hairline py-2 pl-3 pr-9 text-sm sm:w-64"
                 />
                 <span aria-hidden="true" className="absolute right-3 top-2 text-ink-faint">⌕</span>
               </label>
+              <span className="text-ink-faint self-center text-xs whitespace-nowrap">並び順</span>
+              <select
+                disabled
+                title="並び替えは準備中です"
+                className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+              >
+                <option>友だち追加が多い順</option>
+              </select>
+              <span className="text-ink-faint self-center text-xs whitespace-nowrap">表示</span>
+              <select
+                disabled
+                title="表示件数の切り替えは準備中です"
+                className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+              >
+                <option>20件</option>
+              </select>
               <button
                 onClick={() => setEditing('new')}
                 disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-                title={selectedGenre === UNCATEGORIZED ? '先に左側でジャンルを選択してください' : undefined}
+                title={selectedGenre === UNCATEGORIZED ? '先に左側でフォルダを選んでください' : undefined}
               >
-                ＋ このジャンルに新規リンク
+                ＋ このフォルダにURLを発行
               </button>
             </div>
+          </div>
+
+          <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
+            {['よく使う', '今月分', '追加率が高い', '計測停止中'].map((label) => (
+              <button
+                key={label}
+                disabled
+                title="保存した条件は準備中です"
+                className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
       {loading ? (
@@ -546,7 +624,7 @@ export default function InflowLinksPage() {
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center text-ink-faint">
           {selectedGenre
             ? `「${selectedGenreLabel}」にはまだリンクがありません。`
-            : '左側の「新しいジャンル」から最初のジャンルを作成してください。'}
+            : '左側の「フォルダを追加」から最初のフォルダを作ってください。'}
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-hairline bg-white">
@@ -567,7 +645,7 @@ export default function InflowLinksPage() {
             <thead className="bg-canvas-sunken border-b border-hairline">
               <tr>
                 <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
-                  名前
+                  流入元名
                 </th>
                 <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
                   REF
@@ -579,13 +657,13 @@ export default function InflowLinksPage() {
                   シナリオ
                 </th>
                 <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
-                  タグ
+                  自動付与
                 </th>
                 <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
                   モード
                 </th>
                 <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-ink-faint">
-                  友だち
+                  友だち追加
                 </th>
                 <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-ink-faint">
                   クリック
@@ -594,7 +672,7 @@ export default function InflowLinksPage() {
                   最新追加
                 </th>
                 <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
-                  URL
+                  発行URL
                 </th>
                 <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-ink-faint">編集</th>
               </tr>
@@ -763,6 +841,24 @@ export default function InflowLinksPage() {
           </table>
         </div>
       )}
+
+          <div data-design="tf" className="mt-3 flex items-center justify-end gap-2 text-xs">
+            <span className="text-ink-faint tabular-nums">全 {sortedRows.length} 件</span>
+            <button
+              disabled
+              title="ページの切り替えは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
+            >
+              前へ
+            </button>
+            <button
+              disabled
+              title="ページの切り替えは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
+            >
+              次へ
+            </button>
+          </div>
         </section>
       </div>
 
@@ -929,5 +1025,26 @@ function ReferralQrModal({
         </div>
       </div>
     </div>
+  )
+}
+
+function InflowLinksPageHost() {
+  const tab = useMergedTab(MERGED_TABS)
+  return (
+    <div>
+      <MergedTabs basePath="/inflow-links" tabs={MERGED_TABS} active={tab} />
+      {tab === 'links' && <InflowLinksPageInner />}
+      {tab === 'script' && <SiteScript />}
+      {tab === 'ads' && <AdIntegration />}
+    </div>
+  )
+}
+
+export default function InflowLinksPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <InflowLinksPageHost />
+    </Suspense>
   )
 }

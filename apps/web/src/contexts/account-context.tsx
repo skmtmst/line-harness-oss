@@ -11,13 +11,25 @@ export interface AccountWithStats {
   channelId: string
   name: string
   displayName?: string
-  pictureUrl?: string
-  basicId?: string
+  pictureUrl?: string | null
+  basicId?: string | null
   isActive: boolean
   country: string | null
   role: string | null
   displayOrder: number
   liffId?: string | null
+  webhook?: {
+    expectedUrl: string
+    actualUrl: string | null
+    active: boolean | null
+    status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown'
+  }
+  plan?: {
+    key: 'communication' | 'light' | 'standard' | 'unknown'
+    label: string
+    monthlyMessageLimit: number | null
+    source: 'messaging-api-quota'
+  }
   stats?: {
     friendCount: number
     activeScenarios: number
@@ -52,7 +64,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   const refreshAccounts = useCallback(async () => {
     try {
-      const res = await api.lineAccounts.list()
+      const res = await api.lineAccounts.list(false)
       if (res.success && res.data.length > 0) {
         const list = res.data as AccountWithStats[]
         setAccounts(list)

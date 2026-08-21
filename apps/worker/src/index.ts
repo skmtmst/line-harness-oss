@@ -17,6 +17,8 @@ import {
 import { processStepDeliveries } from './services/step-delivery.js';
 import { processScheduledBroadcasts, processQueuedBroadcasts } from './services/broadcast.js';
 import { processReminderDeliveries } from './services/reminder-delivery.js';
+import { processFriendFieldReminders } from './services/friend-field-reminders.js';
+import { toJstParts } from '@line-crm/shared';
 import { checkAccountHealth } from './services/ban-monitor.js';
 import { refreshLineAccessTokens } from './services/token-refresh.js';
 import { processInsightFetch } from './services/insight-fetcher.js';
@@ -29,6 +31,7 @@ import { sendEventBookingNotification } from './services/event-booking-notifier.
 import { sendBookingNotification } from './services/booking-notifier.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
+import type { AuthenticatedStaff } from './middleware/auth.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { webhook } from './routes/webhook.js';
 import { friends } from './routes/friends.js';
@@ -38,6 +41,7 @@ import { broadcasts } from './routes/broadcasts.js';
 import { broadcastMessageAssets } from './routes/broadcast-message-assets.js';
 import { users } from './routes/users.js';
 import { lineAccounts } from './routes/line-accounts.js';
+import { brand } from './routes/brand.js';
 import { conversions } from './routes/conversions.js';
 import { affiliates } from './routes/affiliates.js';
 import { affiliateOffers } from './routes/affiliate-offers.js';
@@ -94,8 +98,19 @@ import { nenCampaigns } from './routes/nen-campaigns.js';
 import { nenMembers } from './routes/nen-members.js';
 import { supportInbox } from './routes/support-inbox.js';
 import { searchConsole } from './routes/search-console.js';
+import { friendFields } from './routes/friend-fields.js';
+import { friendAttributes } from './routes/friend-attributes.js';
+import { featureSettings } from './routes/feature-settings.js';
+import { friendAddRouting } from './routes/friend-add-routing.js';
+import { contents } from './routes/contents.js';
+import { analytics } from './routes/analytics.js';
+import { dashboard } from './routes/dashboard.js';
+import { siteTracking } from './routes/site-tracking.js';
+import { codexSlackEvents } from './routes/codex-slack-events.js';
+import { clientErrors } from './routes/client-errors.js';
+import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { receiveSupportEmail } from './services/support-email.js';
-import { qrResponseHeaders } from './lib/qr-response.js';
+import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -118,6 +133,7 @@ export type Env = {
     XSERVER_MAIL_PASSWORD?: string;
     XSERVER_RELAY_URL?: string;
     XSERVER_RELAY_SECRET?: string;
+    MEET_CALLBACK_SECRET?: string;
     LINE_CHANNEL_SECRET: string;
     LINE_CHANNEL_ACCESS_TOKEN: string;
     API_KEY: string;
@@ -126,6 +142,7 @@ export type Env = {
     LINE_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_SECRET: string;
+    TOTP_ENCRYPTION_KEY?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
     NEN_RICH_MENU_STORE_URL?: string;
@@ -159,14 +176,50 @@ export type Env = {
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
     // Read-only Google Search Console performance dashboard.
     SEARCH_CONSOLE_SITE_URL?: string;
+    // Codex lifecycle events -> Slack relay. Tokens/secrets are Worker secrets;
+    // channel ids and range mapping are non-secret deployment variables.
+    CODEX_SLACK_RELAY_SECRET?: string;
+    SLACK_BOT_TOKEN?: string;
+    SLACK_COMMAND_CHANNEL_ID?: string;
+    SLACK_ERROR_CHANNEL_ID?: string;
+    SLACK_IDEA_CHANNEL_ID?: string;
+    SLACK_DEFAULT_PR_CHANNEL_ID?: string;
+    SLACK_PR_CHANNELS_JSON?: string;
+    SLACK_KENTA_USER_ID?: string;
+    SLACK_MASATO_USER_ID?: string;
+    SLACK_TASK_CHANNEL_ID?: string;
+    SLACK_SIGNING_SECRET?: string;
   };
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
-    staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean };
+    staff: AuthenticatedStaff;
   };
 };
 
 const app = new Hono<Env>();
+
+/**
+ * 管理画面から送られてくるヘッダ。
+ *
+ * ここに無いヘッダを1つでも付けると、ブラウザは**preflight の段階で**
+ * 止める。サーバーには何も届かないので worker のログにも残らず、
+ * 画面には「保存できませんでした」とだけ出る。
+ *
+ * 実際に起きた: 一斉配信の作成が `Idempotency-Key` を送るのに、ここに
+ * 無かった。下書き保存・テスト送信・配信予約はすべてこの1本の POST を
+ * 通るので、**管理画面から一斉配信を1つも作れない**状態だった。
+ *
+ * 追加するときは `cors-headers.test.ts` の一覧にも足す。
+ */
+export const ADMIN_REQUEST_HEADERS = [
+  'Content-Type',
+  'Authorization',
+  'X-CSRF-Token',
+  'x-admin-api-key',
+  'X-Filename',
+  'Idempotency-Key',
+  'X-Confirm-Irreversible',
+] as const;
 
 // CORS — credentialed cookie auth cannot use a wildcard origin. Reflect only
 // same-origin requests and origins on the ADMIN_ORIGIN allowlist; everything
@@ -176,7 +229,7 @@ app.use('*', cors({
   origin: (origin, c) => resolveCorsOrigin(c.env, origin, c.req.url),
   credentials: true,
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'x-admin-api-key', 'X-Filename'],
+  allowHeaders: [...ADMIN_REQUEST_HEADERS],
   maxAge: 600,
 }));
 
@@ -195,6 +248,7 @@ app.route('/', broadcasts);
 app.route('/', broadcastMessageAssets);
 app.route('/', users);
 app.route('/', lineAccounts);
+app.route('/', brand);
 app.route('/', conversions);
 app.route('/', affiliates);
 app.route('/', affiliateOffers);
@@ -249,6 +303,16 @@ app.route('/', nenCampaigns);
 app.route('/', nenMembers);
 app.route('/', supportInbox);
 app.route('/', searchConsole);
+app.route('/', friendFields);
+app.route('/', friendAttributes);
+app.route('/', featureSettings);
+app.route('/', friendAddRouting);
+app.route('/', contents);
+app.route('/', analytics);
+app.route('/', dashboard);
+app.route('/', siteTracking);
+app.route('/', codexSlackEvents);
+app.route('/', clientErrors);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -264,15 +328,27 @@ app.route('/admin/update', adminUpdate);
 app.get('/api/qr', async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
-  const size = c.req.query('size') || '240x240';
-  const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&data=${encodeURIComponent(data)}`;
-  const res = await fetch(upstream);
+  if (!isQrDataAllowed(data)) return c.text('Data param too long', 400);
+  const size = normalizeQrSize(c.req.query('size'));
+  if (!size) return c.text('Invalid size', 400);
+  // 印刷に使うので svg も出せる。知らない値は png に丸める。
+  const format = normalizeQrFormat(c.req.query('format'));
+  const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&format=${format}&data=${encodeURIComponent(data)}`;
+  const res = await fetch(upstream, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
+  if (!res) return c.text('QR generation timed out', 504);
   if (!res.ok) return c.text('QR generation failed', 502);
-  return new Response(res.body, {
+  const declaredLength = Number(res.headers.get('content-length') || '0');
+  if (declaredLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
+  const bytes = await res.arrayBuffer();
+  if (bytes.byteLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
+  const contentType = res.headers.get('Content-Type');
+  if (!contentType?.toLowerCase().startsWith('image/')) return c.text('Invalid QR response', 502);
+  return new Response(bytes, {
     headers: qrResponseHeaders(
-      res.headers.get('Content-Type'),
+      contentType,
       c.req.query('download') === '1',
       c.req.query('filename') || 'referral-link-qr',
+      format,
     ),
   });
 });
@@ -905,6 +981,36 @@ export async function notFoundHandler(
   }
   return assetRes;
 }
+app.onError((error, c) => {
+  const incidentId = crypto.randomUUID();
+  const url = new URL(c.req.url);
+  console.error(JSON.stringify({
+    event: 'unhandled_worker_error',
+    incidentId,
+    method: c.req.method,
+    path: url.pathname,
+    error: String(error),
+  }));
+  const reportPromise = reportHarnessErrorToSlack(c.env, {
+    source: 'worker',
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    path: `${c.req.method} ${url.pathname}`,
+  }).catch((reportError) => {
+    console.error(JSON.stringify({
+      event: 'unhandled_worker_error_slack_report_failed',
+      incidentId,
+      error: String(reportError),
+    }));
+  });
+  try {
+    c.executionCtx.waitUntil(reportPromise);
+  } catch {
+    void reportPromise;
+  }
+  return c.json({ success: false, error: 'Internal Server Error', incidentId }, 500);
+});
+
 app.notFound(notFoundHandler);
 
 // Scheduled handler for cron triggers — runs for all active LINE accounts
@@ -1059,6 +1165,55 @@ async function scheduled(
     }
   }
 
+  // 友だち数を日次で記録する。
+  //
+  // 6時間ごとに同じ日を上書きするので、その日の最後の値が残る。
+  // ダッシュボードの「友だち数の推移」がこれを読む。
+  //
+  // 記録が無い日はいまの友だちからの逆算で埋まるが、退会して行ごと
+  // 消えた友だちは数に出ないので実態とずれる。今日から正しく残す。
+  if (event.cron === '0 */6 * * *') {
+    try {
+      const { recordFriendSnapshot } = await import('@line-crm/db');
+      await recordFriendSnapshot(env.DB, null);
+    } catch (e) {
+      // 記録が1周飛んでも、その日は逆算で埋まる。配信を止める理由にはならない。
+      console.error('friend snapshot error:', e);
+    }
+  }
+
+  // メディアの使用箇所を数え直す。
+  //
+  // 6時間ごと。削除前の警告に使うだけなので、常に最新である必要はない。
+  // 毎分走らせると、本文の LIKE 検索がメディアの数だけ走って重い。
+  if (event.cron === '0 */6 * * *') {
+    try {
+      const { scanMediaUsage } = await import('./services/media-usage-scan.js');
+      const scanStartedAt = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
+      const result = await scanMediaUsage(env.DB, scanStartedAt);
+      if (result.matched > 0 || result.pruned > 0) {
+        console.log(JSON.stringify({ event: 'media_usage_scan', ...result }));
+      }
+    } catch (e) {
+      console.error('media usage scan error:', e);
+    }
+  }
+
+  // 共通情報の日付での切り替え。
+  //
+  // applied_at が NULL で、予約した日時を過ぎたものだけを反映する。
+  // 二度当たらないので、cron が重なっても値が飛ばない。
+  // 失敗しても他の処理は続ける。営業時間の表記が1周ぶん古いままなのと、
+  // 配信そのものが止まるのとでは、後者の方がはるかに重い。
+  try {
+    const { applyDueCommonVarSchedules } = await import('@line-crm/db');
+    const jstNowIso = new Date(Date.now() + 9 * 3600_000).toISOString().replace('Z', '');
+    const applied = await applyDueCommonVarSchedules(env.DB, jstNowIso);
+    if (applied > 0) console.log(JSON.stringify({ event: 'common_var_schedule_applied', applied }));
+  } catch (e) {
+    console.error('common-var schedule error:', e);
+  }
+
   // 管理画面ログインに依存せず、DBに登録された一度限りの設置ジョブを安全に実行する。
   try {
     const { processPendingNenRichMenuJobs } = await import('./services/nen-rich-menu.js');
@@ -1100,6 +1255,32 @@ async function scheduled(
   );
   jobs.push(processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL));
   jobs.push(checkAccountHealth(env.DB));
+
+  /*
+   * 友だち情報欄の日付から、リマインダのゴール日を立てる（154）。
+   *
+   * 1日1回でよい。日本時間の 0:05 に動かす。日付が変わった直後に、その日から
+   * 先のぶんを立てる。**送るのはここではない。** リマインダ配信が、立った
+   * ゴール日から逆算して送る。分けているのは、「3日前に送る」通を届けるには
+   * ゴール日がその3日以上前に立っている必要があるため。
+   *
+   * 毎分の cron に相乗りしている。専用の Cron Trigger を増やさずに済む
+   * （マイルの処理と同じやり方）。
+   */
+  if (event.cron === '* * * * *') {
+    const jstMinutes = toJstParts(new Date(event.scheduledTime)).minutes;
+    if (jstMinutes === 5) {
+      jobs.push(
+        processFriendFieldReminders(env.DB).then((result) => {
+          if (result.enrolled > 0) {
+            console.log(
+              `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped}`,
+            );
+          }
+        }),
+      );
+    }
+  }
 
   // Mileage is an eventually-consistent projection. Reuse the existing
   // minute cron invocation, but drain only every five minutes and at most 100

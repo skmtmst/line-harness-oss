@@ -29,7 +29,7 @@ export default function InboxList({
     <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
       {rows.length === 0 && !loading ? (
         <div className="px-4 py-12 text-center text-sm text-gray-400">
-          未対応はありません 🎉
+          未対応はありません
         </div>
       ) : (
         <div>

@@ -11,7 +11,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false
 
-    if (pathname === '/login') {
+    if (pathname === '/login' || pathname === '/login/two-factor') {
       setChecked(true)
       return () => { cancelled = true }
     }
@@ -32,6 +32,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (!data?.success || !data?.data) throw new Error('unauthenticated')
         if (data.data.name) localStorage.setItem('lh_staff_name', data.data.name)
         if (data.data.role) localStorage.setItem('lh_staff_role', data.data.role)
+        localStorage.setItem('lh_staff_permissions', JSON.stringify(data.data.permissionKeys ?? []))
         if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
         if (!cancelled) setChecked(true)
       } catch {

@@ -621,3 +621,281 @@ describe('linkRichMenuBulkChunked', () => {
     expect(line.calls).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 147: 運用者から見た「何をするボタンか」(intent) を LINE の action へ変換する
+// ---------------------------------------------------------------------------
+
+/** publish して、LINE に送られた areas の action だけを取り出す。 */
+async function publishAndReadActions(
+  group: Parameters<typeof publishRichMenuGroup>[0],
+): Promise<Record<string, unknown>[]> {
+  const line = makeMockLineClient();
+  const r2 = makeMockR2();
+  await publishRichMenuGroup(group, line, r2);
+  const payload = (line.createRichMenu as unknown as { mock: { calls: unknown[][] } }).mock
+    .calls[0][0] as { areas: { action: Record<string, unknown> }[] };
+  return payload.areas.map((a) => a.action);
+}
+
+/** areas だけ差し替えた、publish できる最小の group を作る。 */
+function groupWithAreas(
+  areas: Parameters<typeof publishRichMenuGroup>[0]['pages'][number]['areas'],
+  extra: { formBaseUrl?: string | null } = {},
+): Parameters<typeof publishRichMenuGroup>[0] {
+  return {
+    id: 'gid12345-aaaa',
+    size: 'large',
+    chatBarText: 'menu',
+    isDefaultForAll: false,
+    ...extra,
+    pages: [
+      {
+        id: 'p1',
+        orderIndex: 0,
+        name: '基本メニュー',
+        imageR2Key: 'rich-menus/test/p1.png',
+        imageContentType: 'image/png',
+        lineRichMenuId: null,
+        areas,
+      },
+    ],
+  };
+}
+
+const BOUNDS = { x: 0, y: 0, width: 100, height: 100 };
+
+describe('intent から LINE の action への変換', () => {
+  it('電話をかける → tel: の uri。ハイフンや括弧は落とす', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'uri',
+          actionData: { tel: '03-1234-5678' },
+          intent: 'tel',
+        },
+      ]),
+    );
+    expect(action).toEqual({ type: 'uri', uri: 'tel:0312345678' });
+  });
+
+  it('回答フォームを開く → アカウントの LIFF に form を付けた uri', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas(
+        [
+          {
+            id: 'a1',
+            bounds: BOUNDS,
+            actionType: 'uri',
+            actionData: {},
+            intent: 'form',
+            formId: 'form-9',
+          },
+        ],
+        { formBaseUrl: 'https://liff.line.me/1234-abcd' },
+      ),
+    );
+    expect(action).toEqual({ type: 'uri', uri: 'https://liff.line.me/1234-abcd?form=form-9' });
+  });
+
+  it('テンプレートを送る → 押されたことが届く postback', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'postback',
+          actionData: {},
+          intent: 'template',
+          templateId: 'tpl-1',
+        },
+      ]),
+    );
+    expect(action).toEqual({ type: 'postback', data: 'rma=a1' });
+  });
+
+  it('URLを開く → 計測リンクを選んでいればそちらを開く', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'uri',
+          actionData: { uri: 'https://example.com/original' },
+          intent: 'url',
+          trackedLinkUrl: 'https://short.example/t/abc123',
+        },
+      ]),
+    );
+    expect(action).toEqual({ type: 'uri', uri: 'https://short.example/t/abc123' });
+  });
+
+  it('テキストを送る（追加の動きなし）→ メッセージ送信のまま', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'message',
+          actionData: { text: 'こんにちは' },
+          intent: 'text',
+        },
+      ]),
+    );
+    expect(action).toEqual({ type: 'message', text: 'こんにちは' });
+  });
+
+  it('テキストを送る（タグ付きの場合）→ 見え方はそのままに postback へ寄せる', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'message',
+          actionData: { text: '資料がほしい' },
+          intent: 'text',
+          tagIds: ['tag-1'],
+        },
+      ]),
+    );
+    expect(action).toEqual({
+      type: 'postback',
+      data: 'rma=a1&d=%E8%B3%87%E6%96%99%E3%81%8C%E3%81%BB%E3%81%97%E3%81%84',
+      // displayText があるので、トークの見え方はメッセージ送信と変わらない
+      displayText: '資料がほしい',
+    });
+  });
+
+  it('スコアだけ設定した場合も postback へ寄せる', async () => {
+    const [action] = await publishAndReadActions(
+      groupWithAreas([
+        {
+          id: 'a1',
+          bounds: BOUNDS,
+          actionType: 'message',
+          actionData: { text: 'はい' },
+          intent: 'text',
+          scoreChange: 10,
+        },
+      ]),
+    );
+    expect(action.type).toBe('postback');
+  });
+
+  it('intent が無い昔のボタンは、今までどおりそのまま送る', async () => {
+    const actions = await publishAndReadActions(
+      groupWithAreas([
+        { id: 'a1', bounds: BOUNDS, actionType: 'message', actionData: { text: 'hi' } },
+        {
+          id: 'a2',
+          bounds: BOUNDS,
+          actionType: 'uri',
+          actionData: { uri: 'https://example.com' },
+        },
+      ]),
+    );
+    expect(actions).toEqual([
+      { type: 'message', text: 'hi' },
+      { type: 'uri', uri: 'https://example.com' },
+    ]);
+  });
+
+  it('メニューを切り替える（intent あり）→ 押されたことが届く目印を data に載せる', async () => {
+    const group = {
+      id: 'gid12345-aaaa',
+      size: 'large' as const,
+      chatBarText: 'menu',
+      isDefaultForAll: false,
+      pages: [
+        {
+          id: 'p1',
+          orderIndex: 0,
+          name: 'p1',
+          imageR2Key: 'rich-menus/test/p1.png',
+          imageContentType: 'image/png',
+          lineRichMenuId: null,
+          areas: [
+            {
+              id: 'a1',
+              bounds: BOUNDS,
+              actionType: 'richmenuswitch' as const,
+              actionData: { targetPageId: 'p2' },
+              intent: 'switch' as const,
+            },
+          ],
+        },
+        {
+          id: 'p2',
+          orderIndex: 1,
+          name: 'p2',
+          imageR2Key: 'rich-menus/test/p2.png',
+          imageContentType: 'image/png',
+          lineRichMenuId: null,
+          areas: [],
+        },
+      ],
+    };
+    const [action] = await publishAndReadActions(group);
+    expect(action).toEqual({
+      type: 'richmenuswitch',
+      richMenuAliasId: 'lhx-gid12345-1',
+      data: 'rma=a1&d=switch-to-p2',
+    });
+  });
+});
+
+describe('intent の入力チェック', () => {
+  const r2 = makeMockR2();
+
+  it('電話番号が空なら、LINE を呼ぶ前に日本語で止める', async () => {
+    await expect(
+      publishRichMenuGroup(
+        groupWithAreas([
+          {
+            id: 'a1',
+            bounds: BOUNDS,
+            actionType: 'uri',
+            actionData: { tel: '' },
+            intent: 'tel',
+            label: '電話する',
+          },
+        ]),
+        makeMockLineClient(),
+        r2,
+      ),
+    ).rejects.toThrowError(/「電話する」: 電話番号を入力してください/);
+  });
+
+  it('LIFF が無いアカウントでは、回答フォームのボタンを publish させない', async () => {
+    await expect(
+      publishRichMenuGroup(
+        groupWithAreas([
+          {
+            id: 'a1',
+            bounds: BOUNDS,
+            actionType: 'uri',
+            actionData: {},
+            intent: 'form',
+            formId: 'form-1',
+          },
+        ]),
+        makeMockLineClient(),
+        r2,
+      ),
+    ).rejects.toThrowError(/LIFFが設定されていない/);
+  });
+
+  it('テンプレート未選択なら止める', async () => {
+    await expect(
+      publishRichMenuGroup(
+        groupWithAreas([
+          { id: 'a1', bounds: BOUNDS, actionType: 'postback', actionData: {}, intent: 'template' },
+        ]),
+        makeMockLineClient(),
+        r2,
+      ),
+    ).rejects.toThrowError(/送るテンプレートを選んでください/);
+  });
+});

@@ -35,8 +35,20 @@ export async function resolveAffiliateAttribution(
   db: D1Database,
   friendId: string,
   at?: string, // 省略時 jstNow()
+  opts?: {
+    /**
+     * この成果地点だけ期間を変える場合の日数。省略時は全体の既定
+     * (ATTRIBUTION_WINDOW_DAYS = 90)。0 以下や整数でない値は無視して既定に戻す
+     * —— 報酬の計算に効くので、壊れた値で勝手に狭めない。
+     */
+    windowDays?: number;
+  },
 ): Promise<{ affiliateId: string; refCode: string } | null> {
   const now = at ?? jstNow();
+  const windowDays =
+    opts?.windowDays != null && Number.isInteger(opts.windowDays) && opts.windowDays > 0
+      ? opts.windowDays
+      : ATTRIBUTION_WINDOW_DAYS;
   const row = await db
     .prepare(
       `SELECT al.affiliate_id AS affiliate_id, rt.ref_code AS ref_code
@@ -44,7 +56,7 @@ export async function resolveAffiliateAttribution(
          JOIN affiliate_links al ON al.ref_code = rt.ref_code
          JOIN affiliates a ON a.id = al.affiliate_id
         WHERE rt.friend_id = ?
-          AND julianday(rt.created_at) >= julianday(?) - ${ATTRIBUTION_WINDOW_DAYS}
+          AND julianday(rt.created_at) >= julianday(?) - ${windowDays}
           AND julianday(rt.created_at) <= julianday(?)
           AND (a.friend_id IS NULL OR a.friend_id != rt.friend_id)  -- 自己クリック除外
         ORDER BY julianday(rt.created_at) DESC

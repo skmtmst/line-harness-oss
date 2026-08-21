@@ -65,6 +65,9 @@ function check(key: string, max: number, windowMs: number): { ok: boolean; remai
 const UNAUTHENTICATED_PATTERNS: Array<string | RegExp> = [
   '/webhook',
   /^\/api\/forms\/[^/]+\/submit$/,
+  // サイトスクリプトの受け口。認証が無く、外のサイトから直接叩かれる。
+  '/api/site/collect',
+  '/api/qr',
 ];
 
 function isUnauthenticatedPath(path: string): boolean {
@@ -135,7 +138,7 @@ export async function rateLimitMiddleware(c: Context<Env>, next: Next): Promise<
   if (isUnauthenticatedPath(path)) {
     // Key by IP for unauthenticated endpoints
     key = `ip:${getClientIp(c)}`;
-    max = UNAUTHENTICATED_MAX;
+    max = path === '/api/qr' ? 30 : UNAUTHENTICATED_MAX;
     windowMs = UNAUTHENTICATED_WINDOW;
   } else {
     // Key by API key for authenticated endpoints

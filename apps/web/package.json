@@ -1,11 +1,18 @@
 {
   "name": "web",
-  "version": "0.20.0",
+  "version": "0.24.0",
   "private": true,
   "scripts": {
     "dev": "next dev --port 3001",
+    "predev": "node scripts/build-release-log.mjs",
+    "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
+    "update:raw-color-baseline": "node ./scripts/raw-color-baseline.mjs",
     "build": "next build",
+    "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
+    "typecheck": "tsc --noEmit",
     "start": "next start",
+    "release-log": "node scripts/build-release-log.mjs",
+    "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
@@ -13,14 +20,16 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@line-crm/shared": "workspace:*",
+    "@line-harness/update-engine": "workspace:*",
     "next": "^15.1.0",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "@line-harness/update-engine": "workspace:*"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "25.5.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "postcss": "^8.5.0",

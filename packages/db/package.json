@@ -1,6 +1,6 @@
 {
   "name": "@line-crm/db",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "description": "D1 database query helpers for LINE CRM",
   "license": "MIT",
   "main": "./src/index.ts",
@@ -15,7 +15,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "generate:bootstrap": "node ./scripts/generate-bootstrap.mjs"
+    "generate:bootstrap": "node ./scripts/generate-bootstrap.mjs",
+    "check:bootstrap": "node ./scripts/generate-bootstrap.mjs --check"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241205.0",

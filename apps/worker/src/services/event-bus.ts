@@ -20,9 +20,15 @@ import {
   jstNow,
   getFriendScore,
 } from '@line-crm/db';
+import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
+
+import {
+  applyRichMenuTargeting,
+  isTargetingTrigger,
+} from './rich-menu-targeting.js';
 
 export interface EventPayload {
   friendId?: string;
@@ -73,6 +79,35 @@ export async function fireEvent(
 
   // Phase 2: evaluate automations.
   await processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+
+  // Phase 3: リッチメニューの出し分けを見直す。
+  //
+  // オートメーションの後に置くのは、オートメーションでタグを付ける構成が
+  // 多いため。先に見直すと、いま付いたばかりのタグが条件に反映されない。
+  await reevaluateRichMenuTargeting(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+}
+
+/**
+ * 友だちごとに出すメニューを選び直す。
+ *
+ * 失敗しても呼び出し元には投げ返さない。メニューの出し分けは、そのとき
+ * 起きていること（メッセージへの返信やタグ付け）の付随処理なので、
+ * ここで転ぶと本体まで巻き添えになる。
+ */
+async function reevaluateRichMenuTargeting(
+  db: D1Database,
+  eventType: string,
+  payload: EventPayload,
+  lineAccessToken?: string,
+  lineAccountId?: string | null,
+): Promise<void> {
+  if (!isTargetingTrigger(eventType)) return;
+  if (!payload.friendId || !lineAccessToken || !lineAccountId) return;
+  try {
+    await applyRichMenuTargeting(db, payload.friendId, lineAccountId, lineAccessToken);
+  } catch (err) {
+    console.error('[eventBus] rich menu targeting failed:', err);
+  }
 }
 
 /** 送信Webhookへの通知 */
@@ -90,27 +125,16 @@ async function fireOutgoingWebhooks(
           timestamp: jstNow(),
           data: payload,
         });
-
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-
-        // HMAC署名（シークレットがある場合）
-        if (wh.secret) {
-          const encoder = new TextEncoder();
-          const key = await crypto.subtle.importKey(
-            'raw',
-            encoder.encode(wh.secret),
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign'],
+        // 以前は fetch を投げっぱなしにしていて、相手が 500 を返しても
+        // 成功として扱っていた（例外にならないため）。deliverWebhook は
+        // 応答の状態まで見て、必要なら送り直す。
+        const result = await deliverWebhook(wh, body);
+        if (!result.ok) {
+          console.error(
+            `送信Webhook ${wh.id} 失敗 (${result.attempts}回試行, 最後の応答=${result.lastStatus ?? '接続不可'})`,
           );
-          const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-          const hexSignature = Array.from(new Uint8Array(signature))
-            .map((b) => b.toString(16).padStart(2, '0'))
-            .join('');
-          headers['X-Webhook-Signature'] = hexSignature;
         }
-
-        await fetch(wh.url, { method: 'POST', headers, body });
+        await recordDeliveryOutcome(db, wh.id, result.ok);
       } catch (err) {
         console.error(`送信Webhook ${wh.id} への通知失敗:`, err);
       }

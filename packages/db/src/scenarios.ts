@@ -1,7 +1,7 @@
 import { jstNow } from './utils.js';
 import { computeNextDeliveryAt } from './scenario-schedule.js';
 export type ScenarioTriggerType = 'friend_add' | 'tag_added' | 'manual';
-export type MessageType = 'text' | 'image' | 'flex';
+export type MessageType = 'text' | 'image' | 'flex' | 'location' | 'video' | 'audio' | 'sticker' | 'carousel';
 export type FriendScenarioStatus = 'active' | 'paused' | 'completed' | 'delivering';
 export type DeliveryMode = 'relative' | 'elapsed' | 'absolute_time';
 
@@ -14,6 +14,18 @@ export interface Scenario {
   line_account_id: string | null;
   is_active: number;
   delivery_mode: DeliveryMode;
+  /** 他のシナリオと同時に動いてよいか。1 が既定（並行を許す） */
+  allow_concurrent: number;
+  /** 一覧での並び順。小さいほど上（113 で追加） */
+  display_order: number;
+  /** 置き場（099 で追加）。未分類は null。 */
+  folder_id: string | null;
+  /** シナリオ全体の配信対象（120）。SegmentCondition の JSON。null は条件なし。 */
+  audience_condition_json: string | null;
+  /** 最終コンテンツを配り終えたあと（121）。'pause' | 'resume_previous' | 'move' */
+  on_complete_mode: string;
+  /** on_complete_mode が 'move' のときの移動先（122）。 */
+  on_complete_scenario_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -33,6 +45,14 @@ export interface ScenarioStep {
   delivery_time: string | null;
   template_id: string | null;
   on_reach_tag_id: string | null;
+  /** この通を送ったあと。'continue' で次へ、'pause' で止める（113 で追加） */
+  after_send: string;
+  /** 1通ごとの配信対象（124）。SegmentCondition の JSON。null は購読中の全員。 */
+  target_condition_json: string | null;
+  /** 質問メッセージ（125）。ScenarioQuestion の JSON。null なら質問ではない。 */
+  question_json: string | null;
+  /** 下書き（126）。1 なら配信しない。 */
+  is_draft: number;
   created_at: string;
 }
 
@@ -48,6 +68,8 @@ export interface FriendScenario {
   status: FriendScenarioStatus;
   started_at: string;
   next_delivery_at: string | null;
+  /** 割り込む前に読んでいたシナリオ（123）。「1つ前のシナリオを再開」で使う。 */
+  previous_scenario_id: string | null;
   updated_at: string;
 }
 
@@ -56,6 +78,21 @@ export interface FriendScenario {
 // ============================================================
 
 export type ScenarioWithStepCount = Scenario & { step_count: number };
+
+/**
+ * 並び順をまとめて書く。
+ *
+ * 1件ずつ当てると、10件動かしたときに10往復する。その途中で誰かが一覧を
+ * 開くと、半分だけ入れ替わった並びが見える。渡された順に 0,1,2… を振る。
+ */
+export async function reorderScenarios(db: D1Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.batch(
+    ids.map((id, i) =>
+      db.prepare(`UPDATE scenarios SET display_order = ? WHERE id = ?`).bind(i, id),
+    ),
+  );
+}
 
 export async function getScenarios(db: D1Database): Promise<ScenarioWithStepCount[]> {
   const result = await db
@@ -97,6 +134,8 @@ export interface CreateScenarioInput {
   triggerType: ScenarioTriggerType;
   triggerTagId?: string | null;
   deliveryMode?: DeliveryMode;
+  /** 他のシナリオと同時に動いてよいか。省略時は許す（従来どおり） */
+  allowConcurrent?: boolean;
 }
 
 export async function createScenario(
@@ -108,8 +147,11 @@ export async function createScenario(
 
   await db
     .prepare(
-      `INSERT INTO scenarios (id, name, description, trigger_type, trigger_tag_id, is_active, delivery_mode, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+      // allow_concurrent は必ず渡す。列の既定は 0 だが、それは
+      // 「他のシナリオが動いていたら登録しない」という強い動きになる。
+      // 既定は従来どおり「並行を許す」(1) にする。
+      `INSERT INTO scenarios (id, name, description, trigger_type, trigger_tag_id, is_active, delivery_mode, allow_concurrent, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -118,6 +160,7 @@ export async function createScenario(
       input.triggerType,
       input.triggerTagId ?? null,
       input.deliveryMode ?? 'relative',
+      input.allowConcurrent === false ? 0 : 1,
       now,
       now,
     )
@@ -130,7 +173,28 @@ export async function createScenario(
 }
 
 export type UpdateScenarioInput = Partial<
-  Pick<Scenario, 'name' | 'description' | 'trigger_type' | 'trigger_tag_id' | 'is_active'>
+  Pick<
+    Scenario,
+    | 'name'
+    | 'description'
+    | 'trigger_type'
+    | 'trigger_tag_id'
+    | 'is_active'
+    | 'allow_concurrent'
+    | 'folder_id'
+    /**
+     * 配信方式。**通が1つでもあるときは変えない。**
+     * 通の予定の持ち方（delay_minutes / offset_days / delivery_time）が
+     * 方式ごとに違うので、あとから変えると予定の意味が変わる。
+     * 呼ぶ側（worker）で通の数を見てから渡すこと。
+     */
+    | 'delivery_mode'
+    /** シナリオ全体の配信対象（120）。 */
+    | 'audience_condition_json'
+    /** 最終コンテンツ配信後の処理（121/122）。 */
+    | 'on_complete_mode'
+    | 'on_complete_scenario_id'
+  >
 >;
 
 export async function updateScenario(
@@ -154,6 +218,10 @@ export async function updateScenario(
     fields.push('trigger_type = ?');
     values.push(updates.trigger_type);
   }
+  if (updates.allow_concurrent !== undefined) {
+    fields.push('allow_concurrent = ?');
+    values.push(updates.allow_concurrent);
+  }
   if (updates.trigger_tag_id !== undefined) {
     fields.push('trigger_tag_id = ?');
     values.push(updates.trigger_tag_id);
@@ -161,6 +229,26 @@ export async function updateScenario(
   if (updates.is_active !== undefined) {
     fields.push('is_active = ?');
     values.push(updates.is_active);
+  }
+  if (updates.folder_id !== undefined) {
+    fields.push('folder_id = ?');
+    values.push(updates.folder_id);
+  }
+  if (updates.delivery_mode !== undefined) {
+    fields.push('delivery_mode = ?');
+    values.push(updates.delivery_mode);
+  }
+  if (updates.audience_condition_json !== undefined) {
+    fields.push('audience_condition_json = ?');
+    values.push(updates.audience_condition_json);
+  }
+  if (updates.on_complete_mode !== undefined) {
+    fields.push('on_complete_mode = ?');
+    values.push(updates.on_complete_mode);
+  }
+  if (updates.on_complete_scenario_id !== undefined) {
+    fields.push('on_complete_scenario_id = ?');
+    values.push(updates.on_complete_scenario_id);
   }
 
   if (fields.length === 0) {
@@ -207,6 +295,14 @@ export interface CreateScenarioStepInput {
   deliveryTime?: string | null;
   templateId?: string | null;
   onReachTagId?: string | null;
+  /** この通を送ったあと。'pause' なら次へ進めず止める。 */
+  afterSend?: 'continue' | 'pause';
+  /** 1通ごとの配信対象（124）。SegmentCondition の JSON。 */
+  targetConditionJson?: string | null;
+  /** 質問メッセージ（125）。ScenarioQuestion の JSON。 */
+  questionJson?: string | null;
+  /** 下書き（126）。 */
+  isDraft?: boolean;
 }
 
 export async function createScenarioStep(
@@ -222,9 +318,10 @@ export async function createScenarioStep(
        (id, scenario_id, step_order, delay_minutes, message_type, message_content,
         condition_type, condition_value, next_step_on_false,
         offset_days, offset_minutes, delivery_time,
-        template_id, on_reach_tag_id,
+        template_id, on_reach_tag_id, after_send,
+        target_condition_json, question_json, is_draft,
         created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -241,6 +338,10 @@ export async function createScenarioStep(
       input.deliveryTime ?? null,
       input.templateId ?? null,
       input.onReachTagId ?? null,
+      input.afterSend ?? 'continue',
+      input.targetConditionJson ?? null,
+      input.questionJson ?? null,
+      input.isDraft ? 1 : 0,
       now,
     )
     .run();
@@ -266,6 +367,10 @@ export type UpdateScenarioStepInput = Partial<
     | 'delivery_time'
     | 'template_id'
     | 'on_reach_tag_id'
+    | 'after_send'
+    | 'target_condition_json'
+    | 'question_json'
+    | 'is_draft'
   >
 >;
 
@@ -325,6 +430,27 @@ export async function updateScenarioStep(
     fields.push('on_reach_tag_id = ?');
     values.push(updates.on_reach_tag_id);
   }
+  /*
+   * after_send は型には並んでいたが、ここで拾っていなかった。
+   * 作成時だけ効いて、編集では黙って捨てられていた（＝画面で
+   * 「送信後に一時停止」を外しても元に戻らない）。
+   */
+  if (updates.after_send !== undefined) {
+    fields.push('after_send = ?');
+    values.push(updates.after_send);
+  }
+  if (updates.target_condition_json !== undefined) {
+    fields.push('target_condition_json = ?');
+    values.push(updates.target_condition_json);
+  }
+  if (updates.question_json !== undefined) {
+    fields.push('question_json = ?');
+    values.push(updates.question_json);
+  }
+  if (updates.is_draft !== undefined) {
+    fields.push('is_draft = ?');
+    values.push(updates.is_draft);
+  }
 
   if (fields.length > 0) {
     values.push(id);
@@ -371,10 +497,33 @@ export async function enrollFriendInScenario(
 
   // delivery_mode を取得（migration 037 適用前の DB では 'relative' が DEFAULT で既に入っている）
   const scenarioRow = await db
-    .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
+    .prepare(`SELECT delivery_mode, allow_concurrent FROM scenarios WHERE id = ?`)
     .bind(scenarioId)
-    .first<{ delivery_mode: DeliveryMode }>();
+    .first<{ delivery_mode: DeliveryMode; allow_concurrent: number | null }>();
   if (!scenarioRow) return null;
+
+  // 並行を許さないシナリオは、他のシナリオが動いている人には登録しない。
+  //
+  // 既定は「許す」（104 で既存の行を 1 に寄せ、作成時も 1 を渡す）。
+  // ここを既定で塞ぐと、いま複数のシナリオに入っている人への配信が
+  // 止まってしまう。止めたい人だけが画面から 0 にする。
+  //
+  // 同じシナリオへの二重登録は、これとは別に部分UNIQUE索引が防いでいる
+  // （idx_friend_scenarios_unique）。ここで見るのは「他のシナリオ」だけ。
+  if (scenarioRow.allow_concurrent === 0) {
+    const other = await db
+      .prepare(
+        `SELECT 1 FROM friend_scenarios
+          WHERE friend_id = ? AND scenario_id != ? AND status = 'active'
+          LIMIT 1`,
+      )
+      .bind(friendId, scenarioId)
+      .first<{ 1: number }>();
+    // null を返す。例外にしないのは、呼び出し口が「友だち追加」や
+    // 「タグが付いた」といった副作用の中にあり、そこで throw すると
+    // 本来の処理まで巻き添えで失敗するため。
+    if (other) return null;
+  }
 
   const firstStep = await db
     .prepare(
@@ -536,6 +685,32 @@ export async function advanceFriendScenario(
     .run();
 }
 
+/**
+ * 送ったところで止める。
+ *
+ * 「送信後 一時停止」が付いた通を送ったあとに呼ぶ。次の配信日時を消して
+ * status を paused にするので、時間が来ても勝手には進まない。人が再開すると
+ * 止まった続きから流れる（current_step_order はそのまま残す）。
+ */
+export async function pauseFriendScenario(
+  db: D1Database,
+  id: string,
+  atStepOrder: number,
+): Promise<void> {
+  const now = jstNow();
+  await db
+    .prepare(
+      `UPDATE friend_scenarios
+       SET status = 'paused',
+           current_step_order = ?,
+           next_delivery_at = NULL,
+           updated_at = ?
+       WHERE id = ?`,
+    )
+    .bind(atStepOrder, now, id)
+    .run();
+}
+
 export async function completeFriendScenario(
   db: D1Database,
   id: string,
@@ -551,4 +726,66 @@ export async function completeFriendScenario(
     )
     .bind(now, id)
     .run();
+}
+
+/**
+ * 前回読んだところから、同じシナリオを再開する（設計 V2 4-6「開始位置」）。
+ *
+ * `enrollFriendInScenario` は必ず `current_step_order = -1` の新しい行を作るので、
+ * ブロックを解除した人にもう一度1通目から流れてしまう。ここは既にある行を
+ * 生かして、続きから配信する。
+ *
+ * 進める先が無い（最後まで読み終えている）ときは `null` を返す。呼ぶ側で
+ * 「送るものが無い」として扱う。既にある行が `active` のときも `null`
+ * （もう流れているので、触ると二重配信になる）。
+ */
+export async function resumeFriendScenario(
+  db: D1Database,
+  friendId: string,
+  scenarioId: string,
+): Promise<FriendScenario | null> {
+  const existing = await db
+    .prepare(
+      `SELECT * FROM friend_scenarios
+        WHERE friend_id = ? AND scenario_id = ?
+        ORDER BY started_at DESC
+        LIMIT 1`,
+    )
+    .bind(friendId, scenarioId)
+    .first<FriendScenario>();
+  if (!existing) return null;
+  if (existing.status === 'active' || existing.status === 'delivering') return null;
+
+  const scenarioRow = await db
+    .prepare(`SELECT delivery_mode FROM scenarios WHERE id = ?`)
+    .bind(scenarioId)
+    .first<{ delivery_mode: DeliveryMode }>();
+  if (!scenarioRow) return null;
+
+  const steps = await getScenarioSteps(db, scenarioId);
+  const nextStep = steps.find(s => s.step_order > existing.current_step_order);
+  if (!nextStep) return null;
+
+  const nowDate = new Date(Date.now() + 9 * 60 * 60_000);
+  const nextDeliveryDate = computeNextDeliveryAt(
+    { delivery_mode: scenarioRow.delivery_mode },
+    nextStep,
+    { enrolledAt: nowDate, previousDeliveredAt: nowDate, now: nowDate },
+  );
+  const nextDeliveryAt = nextDeliveryDate.toISOString().slice(0, -1) + '+09:00';
+  const now = jstNow();
+
+  await db
+    .prepare(
+      `UPDATE friend_scenarios
+          SET status = 'active', next_delivery_at = ?, updated_at = ?
+        WHERE id = ?`,
+    )
+    .bind(nextDeliveryAt, now, existing.id)
+    .run();
+
+  return (await db
+    .prepare(`SELECT * FROM friend_scenarios WHERE id = ?`)
+    .bind(existing.id)
+    .first<FriendScenario>())!;
 }

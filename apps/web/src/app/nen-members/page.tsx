@@ -43,9 +43,75 @@ export default function PhotoReviewsPage() {
   }
 
   return <>
-    <Header title="写真審査" description="お客様から届いた愛犬・愛猫の写真を確認します。" />
+    <div data-design="Head">
+      <Header
+        title="投稿写真審査"
+        description="友だちから投稿された写真を確認して、公開してよいものを承認します。承認するとマイル付与とお礼の配信が自動で走ります。"
+        action={
+          <div className="flex flex-wrap gap-2">
+            <button
+              disabled
+              title="マニュアルは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            {/* 審査の基準を保存する場所が無い。いまは人の判断だけ。 */}
+            <button
+              disabled
+              title="審査ルールの設定は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              審査ルールを設定
+            </button>
+            {/* まとめて承認する口が無い。1枚ずつ承認する。 */}
+            <button
+              disabled
+              title="まとめて承認は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              選択をまとめて承認
+            </button>
+          </div>
+        }
+      />
+    </div>
+    <div data-design="KPIs" className="mx-auto mb-4 grid max-w-7xl grid-cols-1 gap-4 px-4 sm:grid-cols-2 sm:px-6 xl:grid-cols-4">
+      <div className="bg-canvas rounded-card border-hairline border p-4">
+        <p className="text-ink-faint text-xs">未審査</p>
+        <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+          {counts.pending}
+          <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+        </p>
+        <p className="text-ink-faint mt-0.5 text-xs">確認をお待ちしています</p>
+      </div>
+      <div className="bg-canvas rounded-card border-hairline border p-4">
+        <p className="text-ink-faint text-xs">承認済</p>
+        <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+          {counts.adopted}
+          <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+        </p>
+        <p className="text-ink-faint mt-0.5 text-xs">公開してよいと判断したもの</p>
+      </div>
+      <div className="bg-canvas rounded-card border-hairline border p-4">
+        <p className="text-ink-faint text-xs">見送り</p>
+        <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+          {counts.rejected}
+          <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+        </p>
+        <p className="text-ink-faint mt-0.5 text-xs">公開しないと判断したもの</p>
+      </div>
+      <div className="bg-canvas rounded-card border-hairline border p-4">
+        <p className="text-ink-faint text-xs">投稿の合計</p>
+        <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+          {counts.all}
+          <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+        </p>
+        <p className="text-ink-faint mt-0.5 text-xs">これまでに届いた数</p>
+      </div>
+    </div>
     <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
-      <section className="rounded-3xl bg-gradient-to-br from-[#0d4a32] to-[#16815b] p-6 text-white shadow-lg sm:p-8">
+      <section className="hidden" aria-hidden="true">
         <p className="text-xs font-semibold tracking-[.22em] text-emerald-100">NEN CUSTOMER PHOTO</p>
         <h1 className="mt-2 text-2xl font-bold sm:text-3xl">お客様の写真を、然-NEN-の物語へ</h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50">投稿写真を審査し、採用した写真だけをLINE会員画面と公式サイトへ掲載します。採用時はECポイントを5ポイント付与します。</p>

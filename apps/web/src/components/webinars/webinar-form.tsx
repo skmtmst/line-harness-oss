@@ -118,11 +118,21 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
       <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
         <div><h2 className="font-bold text-slate-900">基本情報</h2><p className="mt-1 text-xs text-slate-500">普段変更する項目だけを表示しています</p></div>
         <div>
-          <label className={labelClass}>タイトル</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
+          <label className={labelClass}>
+            タイトル
+            <span className="bg-danger-bg text-danger rounded-pill ml-1.5 px-1.5 py-0.5 text-[10px]">
+              必須
+            </span>
+          </label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="例：然-NEN- はじめての定期便セミナー"
+            className={inputClass}
+          />
         </div>
         <div>
-          <label className={labelClass}>状態</label>
+          <label className={labelClass}>公開状態</label>
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as Webinar['status'])}
@@ -164,9 +174,16 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div><h2 className="font-bold text-slate-900">開催スケジュール</h2><p className="mt-1 text-xs text-slate-500">日本時間・参加画面には直近の候補だけを表示します</p></div>
+            <div><h2 className="font-bold text-slate-900">配信スケジュール</h2><p className="mt-1 text-xs text-slate-500">日本時間。参加画面には直近の候補だけが表示されます。</p></div>
             <span className="w-fit rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">{rules.length}枠</span>
           </div>
+          {rules.length === 0 && (
+            /* 枠が無いと、公開しても友だちの画面に「次の回」が出ない。
+               作ったのに見られない状態になるので、その場で断る。 */
+            <p className="text-warning bg-warning-bg rounded-card mt-3 p-3 text-xs">
+              配信枠が未設定です。このままでは友だちが視聴できません。
+            </p>
+          )}
           {dailyRules.length > 0 ? (
             <div className="mt-4 flex flex-col gap-1 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-cyan-50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm font-bold text-slate-900">毎日 {dailyOverview.start}〜{dailyOverview.end}</div>

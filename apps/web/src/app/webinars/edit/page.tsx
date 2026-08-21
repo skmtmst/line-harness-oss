@@ -774,7 +774,7 @@ function CtasTab({ webinarId }: { webinarId: string }) {
           <input
             value={c.title}
             onChange={(e) => update(i, { title: e.target.value })}
-            placeholder="カード見出し（例: 🎁 個別導入診断、受付中です）"
+            placeholder="カード見出し（例: 個別導入診断、受付中です）"
             className="w-full rounded border px-2 py-1 text-sm font-bold"
           />
           <input
@@ -816,11 +816,16 @@ function CtasTab({ webinarId }: { webinarId: string }) {
   )
 }
 
+/**
+ * タブの並び。設計（4-8-1）は「どのウェビナーか → いつ見られるようにするか →
+ * 見ている途中に出すもの → 見終わったあとの動き」の順に並べている。
+ * 実装は分析タブを先頭に置いていたが、編集画面なので設定を先にする。
+ */
 const TABS = [
-  ['analytics', '概要・分析'],
-  ['settings', '配信設定'],
-  ['ctas', 'CTA・フォーム'],
+  ['settings', 'いつ見られるようにするか'],
+  ['ctas', '見ている途中に出すもの'],
   ['comments', 'コメント演出'],
+  ['analytics', '概要・分析'],
 ] as const
 
 type TabKey = (typeof TABS)[number][0]
@@ -869,15 +874,38 @@ function EditWebinarInner() {
 
   return (
     <>
-      <Header
-        title={webinar.title}
-        description="参加ペースと相談フォームへの到達を、友だち単位で確認できます"
-        action={
-          <Link href="/webinars" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            ← 一覧へ
-          </Link>
-        }
-      />
+      <nav data-design="Crumb" className="text-ink-faint mx-auto max-w-[1400px] px-3 pt-4 text-xs sm:px-6">
+        <Link href="/webinars" className="hover:underline">
+          ウェビナー
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>編集</span>
+      </nav>
+
+      <div data-design="Head">
+        <Header
+          title="ウェビナーの編集"
+          description="動画セミナーの公開設定と、視聴中・視聴後の動きを決めます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              {/* 参加画面をそのまま開く導線が無い。slug は下に出している。 */}
+              <button
+                disabled
+                title="プレビューは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                プレビュー
+              </button>
+              <Link
+                href="/webinars"
+                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm font-medium"
+              >
+                ← 一覧へ
+              </Link>
+            </div>
+          }
+        />
+      </div>
       <div className="mx-auto max-w-[1400px] px-3 pb-10 sm:px-6">
         <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">

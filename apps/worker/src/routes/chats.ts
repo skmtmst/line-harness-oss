@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Message } from '@line-crm/line-sdk';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import {
   getOperators,
@@ -12,10 +13,17 @@ import {
   getFriendById,
   getLineAccountById,
   updateChat,
+  markInboxConversationRead,
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import {
+  completeOutboundSendStatement,
+  hashOutboundPayload,
+  isValidIdempotencyKey,
+  reserveOutboundSend,
+} from '../services/outbound-idempotency.js';
 
 const chats = new Hono<Env>();
 
@@ -133,11 +141,6 @@ chats.get('/api/operators', async (c) => {
       data: items.map((o) => ({
         id: o.id,
         name: o.name,
-        email: o.email,
-        role: o.role,
-        isActive: Boolean(o.is_active),
-        createdAt: o.created_at,
-        updatedAt: o.updated_at,
       })),
     });
   } catch (err) {
@@ -184,8 +187,26 @@ chats.delete('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
 
 // ========== チャットCRUD ==========
 
+/**
+ * 受信箱の上部に出す数（設計 `V2 2-1 受信箱` の KPIs）。
+ *
+ * :id より先に置く。あとに置くと 'stats' が id として解釈される。
+ */
+chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const { getInboxStats } = await import('@line-crm/db');
+    const staff = c.get('staff');
+    const stats = await getInboxStats(c.env.DB, staff?.id ?? null);
+    return c.json({ success: true as const, data: stats });
+  } catch (err) {
+    console.error('GET /api/chats/stats error:', err);
+    return c.json({ success: false as const, error: '受信箱の集計を取得できませんでした' }, 500);
+  }
+});
+
 chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    const staff = c.get('staff');
     const status = c.req.query('status') ?? undefined;
     const operatorId = c.req.query('operatorId') ?? undefined;
     const lineAccountId = c.req.query('lineAccountId') ?? undefined;
@@ -264,7 +285,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // incoming が無い (broadcast push など outbound only) chat は最新 outbound にフォールバック。
     // text 以外 (flex/image/sticker 等) は content を NULL にして payload size を抑える
     // (フロントは type で 📋 Flex / 📷 画像 等のラベルを出すので content は不要)。
-    // any_agg / in_agg の bare column (content 等) は「単一 MAX() を含む集約は max 行の
+    // any_agg の bare column (content 等) は「単一 MAX() を含む集約は max 行の
     // 値を返す」という SQLite の documented 挙動で argmax として使っている。
     // 集約は page 確定後の friend に絞って実行する (全 friend 分の content を
     // materialize しない)。last_any は並び順決定専用のスリムな全走査 1 回のみ。
@@ -306,25 +327,31 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
           AND friend_id IN (SELECT friend_id FROM page)
         GROUP BY friend_id
       ),
-      in_agg AS (
-        SELECT friend_id,
-          CASE WHEN message_type = 'text' THEN SUBSTR(content, 1, 200) ELSE NULL END AS content,
-          message_type,
-          MAX(created_at) AS created_at
+      latest_incoming AS (
+        SELECT friend_id, MAX(created_at) AS last_incoming_at
         FROM messages_log
         WHERE direction = 'incoming'
           AND (delivery_type IS NULL OR delivery_type != 'test')
           AND friend_id IN (SELECT friend_id FROM page)
         GROUP BY friend_id
       ),
+      /*
+       * 一覧に出す1行は「最後のメッセージ」。送信でも受信でも、いちばん新しいもの。
+       *
+       * 以前は受信を優先していた（incoming があればそちらを出す）。そのせいで、
+       * こちらが返信したあとも一覧には古い受信が出たままで、返したのかどうかが
+       * 一覧から読めなかった。
+       *
+       * 「返信を待っている人」の判定は unanswered-inbox サービスが別に持っている
+       * ので、ここを最新に変えても未対応の数え方は変わらない。
+       */
       recent_msg AS (
         SELECT a.friend_id,
-          COALESCE(i.content, a.content) AS content,
-          CASE WHEN i.friend_id IS NOT NULL THEN 'incoming' ELSE a.direction END AS direction,
-          COALESCE(i.message_type, a.message_type) AS message_type,
-          COALESCE(i.created_at, a.created_at) AS preview_at
+          a.content AS content,
+          a.direction AS direction,
+          a.message_type AS message_type,
+          a.created_at AS preview_at
         FROM any_agg a
-        LEFT JOIN in_agg i ON i.friend_id = a.friend_id
       )
       SELECT
         f.id AS id,
@@ -340,6 +367,11 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         rm.content AS last_message_content,
         rm.direction AS last_message_direction,
         rm.message_type AS last_message_type,
+        CASE
+          WHEN ri.last_incoming_at IS NOT NULL
+           AND (sr.last_read_at IS NULL OR ri.last_incoming_at > sr.last_read_at)
+          THEN 1 ELSE 0
+        END AS is_unread_for_staff,
         COALESCE(c.created_at, d.last_message_at) AS created_at,
         COALESCE(c.updated_at, d.last_message_at) AS updated_at
       FROM page d
@@ -348,17 +380,22 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         SELECT id FROM chats WHERE friend_id = f.id ORDER BY created_at DESC LIMIT 1
       )
       LEFT JOIN recent_msg rm ON rm.friend_id = f.id
+      LEFT JOIN latest_incoming ri ON ri.friend_id = f.id
+      LEFT JOIN inbox_staff_reads sr
+        ON sr.channel = 'line'
+       AND sr.conversation_id = f.id
+       AND sr.staff_id = ?
       ORDER BY d.last_message_at DESC, d.friend_id DESC
     `;
 
     // placeholder 順 = SQL 出現順: last_any(account) → deduped 内 chats(account) →
     // page 条件 → cursor (beforeAt ×2 + beforeId) → LIMIT。
-    // any_agg / in_agg は page で friend が確定済みのため account filter 不要。
+    // any_agg は page で friend が確定済みのため account filter 不要。
     const allBindings: unknown[] = [];
     if (lineAccountId) allBindings.push(lineAccountId, lineAccountId);
     allBindings.push(...conditionBindings);
     if (useCursor) allBindings.push(beforeAt, beforeAt, beforeId);
-    allBindings.push(limit);
+    allBindings.push(limit, staff.id);
     const result = await c.env.DB.prepare(sql).bind(...allBindings).all();
 
     let data = result.results.map((ch: Record<string, unknown>) => ({
@@ -373,6 +410,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       lastMessageContent: ch.last_message_content || null,
       lastMessageDirection: ch.last_message_direction || null,
       lastMessageType: ch.last_message_type || null,
+      isUnread: Boolean(ch.is_unread_for_staff),
       createdAt: ch.created_at,
       updatedAt: ch.updated_at,
     }));
@@ -448,7 +486,13 @@ chats.get('/api/chats/:id', async (c) => {
     // 現状の最重量ユーザー(481件)の2倍バッファ。これ以上の履歴はページング未実装（Phase 2 TODO）。
     const messages = await c.env.DB
       .prepare(
-        `SELECT id, friend_id, direction, message_type, content, created_at
+        `SELECT id, friend_id, direction, message_type, content, source, origin_kind,
+                sent_by_staff_id,
+                (SELECT name FROM staff_members sm WHERE sm.id = messages_log.sent_by_staff_id) AS sent_by_staff_name,
+                (SELECT s.name FROM scenario_steps ss
+                  JOIN scenarios s ON s.id = ss.scenario_id
+                  WHERE ss.id = messages_log.scenario_step_id) AS scenario_name,
+                created_at
          FROM messages_log
          WHERE friend_id = ? AND (delivery_type IS NULL OR delivery_type != 'test')
          ORDER BY created_at DESC LIMIT 1000`,
@@ -474,6 +518,11 @@ chats.get('/api/chats/:id', async (c) => {
           direction: m.direction,
           messageType: m.message_type,
           content: m.content,
+          source: m.source || null,
+          originKind: m.origin_kind || null,
+          sentByStaffId: m.sent_by_staff_id || null,
+          sentByStaffName: m.sent_by_staff_name || null,
+          scenarioName: m.scenario_name || null,
           createdAt: m.created_at,
         })),
       },
@@ -481,6 +530,60 @@ chats.get('/api/chats/:id', async (c) => {
   } catch (err) {
     console.error('GET /api/chats/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// 開いた担当者だけを既読にする。対応状態は共有だが、既読位置は共有しない。
+chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const resolved = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
+    if (!resolved) return c.json({ success: false, error: 'Chat not found' }, 404);
+    const latest = await c.env.DB
+      .prepare(
+        `SELECT MAX(created_at) AS last_read_at
+         FROM messages_log
+         WHERE friend_id = ? AND direction = 'incoming'
+           AND (delivery_type IS NULL OR delivery_type != 'test')`,
+      )
+      .bind(resolved.friend_id)
+      .first<{ last_read_at: string | null }>();
+    if (latest?.last_read_at) {
+      await markInboxConversationRead(c.env.DB, {
+        staffId: c.get('staff').id,
+        channel: 'line',
+        conversationId: resolved.friend_id,
+        lastReadAt: latest.last_read_at,
+      });
+    }
+    return c.json({ success: true, data: { isUnread: false } });
+  } catch (err) {
+    console.error('POST /api/chats/:id/read error:', err);
+    return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
+  }
+});
+
+chats.post('/api/chats/read-all', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const now = jstNow();
+    await c.env.DB
+      .prepare(
+        `INSERT INTO inbox_staff_reads
+           (staff_id, channel, conversation_id, last_read_at, updated_at)
+         SELECT ?, 'line', friend_id, MAX(created_at), ?
+         FROM messages_log
+         WHERE direction = 'incoming'
+           AND (delivery_type IS NULL OR delivery_type != 'test')
+         GROUP BY friend_id
+         ON CONFLICT(staff_id, channel, conversation_id) DO UPDATE SET
+           last_read_at = excluded.last_read_at,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(c.get('staff').id, now)
+      .run();
+    return c.json({ success: true, data: { marked: true } });
+  } catch (err) {
+    console.error('POST /api/chats/read-all error:', err);
+    return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
   }
 });
 
@@ -563,6 +666,10 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), asy
 chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const chatId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
@@ -580,35 +687,99 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async 
     const { LineClient } = await import('@line-crm/line-sdk');
     const lineClient = new LineClient(accessToken);
     const messageType = body.messageType ?? 'text';
-
+    let message: Message;
     if (messageType === 'text') {
-      await lineClient.pushTextMessage(friend.line_user_id, body.content);
+      message = { type: 'text', text: body.content };
     } else if (messageType === 'flex') {
       const contents = JSON.parse(body.content);
-      await lineClient.pushFlexMessage(friend.line_user_id, extractFlexAltText(contents), contents);
+      message = { type: 'flex', altText: extractFlexAltText(contents), contents };
     } else if (messageType === 'image') {
       const parsed = JSON.parse(body.content) as {
         originalContentUrl: string;
         previewImageUrl: string;
       };
-      await lineClient.pushImageMessage(
-        friend.line_user_id,
-        parsed.originalContentUrl,
-        parsed.previewImageUrl,
-      );
+      message = {
+        type: 'image',
+        originalContentUrl: parsed.originalContentUrl,
+        previewImageUrl: parsed.previewImageUrl,
+      };
+    } else {
+      return c.json({ success: false, error: 'messageType is not supported' }, 400);
     }
 
+    const payloadHash = await hashOutboundPayload(
+      JSON.stringify({ chatId: chat.id, friendId: friend.id, messageType, content: body.content }),
+    );
+    const reservation = await reserveOutboundSend(c.env.DB, {
+      key: idempotencyKey,
+      channel: 'line',
+      resourceId: chat.id,
+      payloadHash,
+      retryInProgress: true,
+      now: new Date().toISOString(),
+    });
+    if (reservation.kind === 'conflict') {
+      return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
+    }
+    if (reservation.kind === 'in_progress') {
+      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+    }
+    if (reservation.kind === 'replay') {
+      return c.json({
+        success: true,
+        data: {
+          sent: true,
+          messageId: reservation.responseId,
+          sentByStaffName: c.get('staff').name,
+          replayed: true,
+        },
+      });
+    }
+
+    // LINE 側にも同じキーを渡す。DB保存前に通信が切れて再実行されても、
+    // LINE API が同一リクエストを二重配信しない。
+    await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+
     // メッセージログに記録
-    const logId = crypto.randomUUID();
-    await c.env.DB
-      .prepare(`INSERT INTO messages_log (id, friend_id, direction, message_type, content, source, created_at) VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?)`)
-      .bind(logId, friend.id, messageType, body.content, jstNow())
-      .run();
+    const logId = idempotencyKey;
+    const sentAt = jstNow();
+    await c.env.DB.batch([
+      c.env.DB
+        .prepare(`INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, source, sent_by_staff_id, created_at) VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?)`)
+        .bind(logId, friend.id, messageType, body.content, c.get('staff').id, sentAt),
+      completeOutboundSendStatement(c.env.DB, {
+        key: idempotencyKey,
+        responseId: logId,
+        now: new Date().toISOString(),
+      }),
+    ]);
 
     // チャットの最終メッセージ日時を更新（chat.id を直接使う — friend_id で呼ばれても resolveOrCreateChat 済み）
-    await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: jstNow() });
+    await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
 
-    return c.json({ success: true, data: { sent: true, messageId: logId } });
+    // 初回返信の時刻を残す（107）。
+    //
+    // 受信してから最初に返すまでの時間を出すために要る。
+    // まだ入っていないときだけ入れる。2回目以降の返信で上書きすると、
+    // 「最初に返すまで」ではなく「最後に返したのはいつか」になる。
+    //
+    // 失敗しても送信そのものは成功しているので、握りつぶす。
+    try {
+      await c.env.DB
+        .prepare(
+          `UPDATE chats SET first_replied_at = ?
+            WHERE id = ? AND first_replied_at IS NULL`,
+        )
+        .bind(jstNow(), chat.id)
+        .run();
+    } catch (e) {
+      console.error('first_replied_at update error:', e);
+    }
+
+    return c.json({
+      success: true,
+      data: { sent: true, messageId: logId, sentByStaffName: c.get('staff').name },
+    });
   } catch (err) {
     console.error('POST /api/chats/:id/send error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

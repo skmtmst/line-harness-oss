@@ -33,6 +33,7 @@ function MetricCard({ label, value, note, tone = 'green' }: { label: string; val
 }
 
 export default function EcCommercePage() {
+  // Pen canonical: V2 9-3 EC連携。画面名は運用整理後の「ECデータ連携」を表示する。
   const { selectedAccountId } = useAccount()
   const [overview, setOverview] = useState<EcCommerceOverview | null>(null)
   const [events, setEvents] = useState<EcCommerceEvent[]>([])
@@ -60,7 +61,7 @@ export default function EcCommercePage() {
       setSettings(subscriptionSettings)
       setExpandedEventType((current) => current ?? subscriptionSettings[0]?.eventType ?? null)
     } catch {
-      setMessage({ tone: 'error', text: 'EC連携情報を読み込めませんでした。時間をおいて再度お試しください。' })
+      setMessage({ tone: 'error', text: 'ECデータ連携の情報を読み込めませんでした。時間をおいて再度お試しください。' })
     } finally {
       setLoading(false)
     }
@@ -85,6 +86,9 @@ export default function EcCommercePage() {
         title: setting.title,
         introText: setting.introText,
         outroText: setting.outroText,
+        buttonLabel: setting.buttonLabel,
+        buttonUrl: setting.buttonUrl,
+        imageUrl: setting.imageUrl,
       })
       setMessage({ tone: 'success', text: `${setting.label}の通知設定を保存しました。` })
     } catch {
@@ -112,6 +116,9 @@ export default function EcCommercePage() {
         title: setting.title || '',
         introText: setting.introText,
         outroText: setting.outroText,
+        buttonLabel: setting.buttonLabel,
+        buttonUrl: setting.buttonUrl,
+        imageUrl: setting.imageUrl,
       })
       setMessage({ tone: 'success', text: `${setting.label}を${isEnabled ? 'ON' : 'OFF'}にしました。` })
     } catch {
@@ -136,6 +143,9 @@ export default function EcCommercePage() {
         title: setting.title || '',
         introText: setting.introText,
         outroText: setting.outroText,
+        buttonLabel: setting.buttonLabel,
+        buttonUrl: setting.buttonUrl,
+        imageUrl: setting.imageUrl,
       })
       if (!result.success) throw new Error(result.error)
       setMessage({ tone: 'success', text: `テスト受信者 ${result.data.sent}名へ送信しました。` })
@@ -148,15 +158,37 @@ export default function EcCommercePage() {
 
   return (
     <div>
-      <Header
-        title="EC連携"
-        description="然-NEN-の注文・発送・定期便通知を、ここから確認・管理できます。"
-        action={(
-          <button onClick={() => void load()} className="rounded-lg border border-hairline bg-white px-4 py-2 text-sm font-medium text-ink-secondary hover:bg-canvas-sunken">
-            再読み込み
-          </button>
-        )}
-      />
+      <div data-design="Head">
+        <Header
+          title="ECデータ連携"
+          description="ECサイトの購入・定期便の情報を取り込み、タグ付けやシナリオ配信につなげます。取り込んだ結果はここで確認できます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              {/* 接続先や突合キーを画面から変える口が無い。 */}
+              <button
+                disabled
+                title="連携設定は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                連携設定
+              </button>
+              <button
+                onClick={() => void load()}
+                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border bg-white px-4 py-2 text-sm font-medium"
+              >
+                今すぐ同期
+              </button>
+            </div>
+          }
+        />
+      </div>
 
       {message && (
         <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${message.tone === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-danger-bg bg-danger-bg text-danger'}`}>
@@ -177,7 +209,7 @@ export default function EcCommercePage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-hairline bg-white shadow-sm">
+          <section className="hidden" aria-hidden="true">
             <div className="border-b border-hairline px-5 py-5 sm:px-6">
               <h2 className="text-lg font-bold text-ink">通知設定</h2>
               <p className="mt-1 text-sm text-ink-faint">OFFにしてもECイベントは記録され、ステップ配信の条件には利用できます。</p>

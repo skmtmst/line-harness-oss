@@ -1,6 +1,6 @@
 {
   "name": "@line-crm/shared",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Shared types and constants for LINE CRM",
   "license": "MIT",
   "main": "./dist/index.js",
@@ -19,7 +19,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

@@ -85,6 +85,8 @@ export interface Tag {
   name: string;
   /** 表示色 (HEX: #RRGGBB) */
   color: string;
+  /** 所属する親分類のID。null は未分類 */
+  groupId?: string | null;
   /** このタグを初めて獲得したときに付与するマイル */
   mileageReward?: number;
   /** 紹介された友だちがこのタグを獲得したとき、紹介者へ付与するマイル */
@@ -93,10 +95,172 @@ export interface Tag {
   mileageMultiplierBps?: number | null;
   /** 複数の倍率タグがある場合の優先順位（大きい値を採用） */
   mileageMultiplierPriority?: number;
+  /** 友だち一覧の「★つきタグ」列に出すか */
+  isStarred?: boolean;
+  /** 一覧での並び順。小さいほど上 */
+  displayOrder?: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
   friendCount?: number;
+}
+
+/** 友だち情報欄の種類 */
+export type FriendFieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "date"
+  | "select"
+  | "multi_select"
+  | "checkbox"
+  | "url"
+  | "tel"
+  | "email";
+
+/**
+ * 友だち情報欄の項目。
+ *
+ * フォームの回答 → 情報欄 → 友だち詳細 → テンプレートの差し込み、が
+ * 1本の線で繋がる。その起点。
+ */
+export interface FriendField {
+  id: string;
+  folderId: string | null;
+  /** 画面に出す名前 */
+  name: string;
+  /** 差し込み変数名。{{field.pet_name}} のように使う */
+  fieldKey: string;
+  type: FriendFieldType;
+  /** select / multi_select のときの選択肢 */
+  options: string[] | null;
+  defaultValue: string | null;
+  source: "manual" | "form" | "ec" | "automation";
+  ecFieldPath: string | null;
+  /** true ならEC側が正。管理画面からは変更できない */
+  ecIsMaster: boolean;
+  /** 本名・電話・住所など。閲覧を役割で絞る */
+  isPersonal: boolean;
+  isStarred: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  /** GET /api/friends/:id/fields のときだけ付く */
+  value?: string | null;
+  updatedBy?: string | null;
+  /** ?withUsage=1 のときだけ付く */
+  usageCount?: number;
+}
+
+/** 汎用フォルダ */
+export interface Folder {
+  id: string;
+  kind: string;
+  name: string;
+  parentId: string | null;
+  displayOrder: number;
+  /**
+   * #RRGGBB。未設定は null。
+   *
+   * 色はフォルダに付く。タグ1つずつに色を決めさせると、100枚あるタグで
+   * 色がばらけて一覧での区別に使えない。分類の色を、属するタグに出す。
+   */
+  color: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 対応マーク */
+export interface SupportMark {
+  id: string;
+  name: string;
+  color: string;
+  isDefault: boolean;
+  autoOnInbound: boolean;
+  displayOrder: number;
+  createdAt: string;
+}
+
+/** メディアライブラリの1件 */
+export interface MediaItem {
+  id: string;
+  folderId: string | null;
+  kind: "image" | "video" | "audio" | "file";
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  width: number | null;
+  height: number | null;
+  durationMs: number | null;
+  url: string;
+  uploadedBy: string | null;
+  createdAt: string;
+}
+
+/** メディアの使用箇所 */
+export interface MediaUsage {
+  refKind: string;
+  refId: string;
+  scannedAt: string;
+}
+
+/** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
+export interface CommonVar {
+  id: string;
+  folderId: string | null;
+  name: string;
+  varKey: string;
+  type: "text" | "url" | "image" | "number";
+  value: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 共通情報の日付での切り替え予約 */
+export interface CommonVarSchedule {
+  id: string;
+  varId: string;
+  effectiveFrom: string;
+  value: string;
+  appliedAt: string | null;
+}
+
+/** 保存した検索 */
+export interface SavedSearch {
+  id: string;
+  name: string;
+  scope: "friends" | "chats" | "bookings";
+  /** { all: [...], any: [...], visibility } の形 */
+  conditions: unknown;
+  createdBy: string | null;
+  isShared: boolean;
+  displayOrder: number;
+  createdAt: string;
+}
+
+/**
+ * タグの親分類。「お悩み」「ペット」のようにタグをまとめる。
+ * 入れ子にはしない（二段で足りる）。
+ */
+export interface TagGroup {
+  /** 主キー (UUIDv4) */
+  id: string;
+  /** 分類名 */
+  name: string;
+  /** 一覧での並び順。小さいほど上 */
+  sortOrder: number;
+  /**
+   * #RRGGBB。未設定は null。
+   *
+   * 色はこの分類（フォルダ）に付く。属するタグの印に出る。
+   * タグ1つずつに色を決めさせると、100枚あるタグで色がばらけて
+   * 一覧での区別に使えない。
+   */
+  color: string | null;
+  /** 作成日時 (ISO 8601) */
+  createdAt: string;
+  /** 更新日時 (ISO 8601) */
+  updatedAt: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -143,10 +307,25 @@ export interface Scenario {
   isActive: boolean;
   /** 配信モード (作成後の変更不可)。レスポンスでは常にセット、Create リクエストでは省略可 (default: 'relative') */
   deliveryMode?: DeliveryMode;
+  /**
+   * 他のシナリオと同時に動いてよいか。既定は true（並行を許す）。
+   * false にすると、他のシナリオが動いている人はこのシナリオに登録されない。
+   */
+  allowConcurrent?: boolean;
+  /** 一覧での並び順。小さいほど上 */
+  displayOrder?: number;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */
   updatedAt: string;
+  /** 置き場。未分類は null。 */
+  folderId?: string | null;
+  /** シナリオ全体の配信対象 (120)。SegmentCondition。null は条件なし。 */
+  audienceCondition?: unknown;
+  /** 最終コンテンツを配り終えたあとどうするか (121)。 */
+  onCompleteMode?: 'pause' | 'resume_previous' | 'move';
+  /** onCompleteMode が 'move' のときの移動先 (122)。 */
+  onCompleteScenarioId?: string | null;
 }
 
 // -----------------------------------------------------------------------------
@@ -154,7 +333,21 @@ export interface Scenario {
 // -----------------------------------------------------------------------------
 
 /** メッセージ種別 */
-export type MessageType = "text" | "image" | "flex";
+/**
+ * シナリオの通で送れる種別（132 で拡張）。
+ *
+ * カルーセルは含めない。LINE のカルーセルは Flex の一種なので flex として
+ * 送る。別の種別にすると、配信側で同じものを2通りに扱うことになる。
+ */
+export type MessageType =
+  | "text"
+  | "image"
+  | "flex"
+  | "location"
+  | "video"
+  | "audio"
+  | "sticker"
+  | "carousel";
 
 export interface ScenarioStep {
   /** 主キー (UUIDv4) */
@@ -175,10 +368,23 @@ export interface ScenarioStep {
   templateId?: string | null;
   /** このステップ到達時に付与するタグ ID */
   onReachTagId?: string | null;
+  /** この通を送ったあと。'pause' なら次へ進めず止める */
+  afterSend?: 'continue' | 'pause';
   /** メッセージ種別 */
   messageType: MessageType;
   /** メッセージ内容 (テキスト or JSONシリアライズ済みFlexメッセージ等) */
   messageContent: string;
+  /**
+   * 1通ごとの配信対象 (124)。SegmentCondition。null は「購読中の全員に配信する」。
+   *
+   * ステップの条件 (condition_type) とは意味が違う。あちらは「満たさなければ
+   * 次へ飛ばす」、こちらは「対象でなければこの通だけ送らない」。
+   */
+  targetCondition?: unknown;
+  /** 質問メッセージ (125)。ScenarioQuestion。null ならふつうの通。 */
+  question?: unknown;
+  /** 下書き (126)。true なら配信の対象から外れる。 */
+  isDraft?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }
@@ -394,6 +600,12 @@ export interface LineAccount {
   liffId: string | null;
   /** 有効/無効 */
   isActive: boolean;
+  /** 友だち数の上限。null なら上限を管理しない */
+  friendCapacity?: number | null;
+  /** 何人で警告を出すか。null なら警告しない */
+  capacityWarnAt?: number | null;
+  /** 管理画面の一覧やヘッダーで使うアイコン。OGP用の ogDefaultImageUrl とは用途が違う */
+  iconUrl?: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */
@@ -410,6 +622,15 @@ export interface LineAccount {
   ogDefaultDescription: string | null;
   /** OGP: アカウント全体のデフォルト og:image。個別レコードで未設定時に使用。 */
   ogDefaultImageUrl: string | null;
+  /** LINE公式アカウント構成の上位アカウント。null は未設定（ルート）。 */
+  parentLineAccountId: string | null;
+  /** 管理画面の一覧で表示する Webhook URL の照合結果。 */
+  webhook?: {
+    expectedUrl: string;
+    actualUrl: string | null;
+    active: boolean | null;
+    status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
+  };
 }
 
 // -----------------------------------------------------------------------------
@@ -514,6 +735,9 @@ export interface LineFriend {
 // コンバージョンポイント (ConversionPoint) — CV計測
 // -----------------------------------------------------------------------------
 
+/** 成果をどうやって数えるか */
+export type ConversionMeasureMethod = "url_reach" | "webhook" | "manual";
+
 export interface ConversionPoint {
   /** 主キー (UUIDv4) */
   id: string;
@@ -523,6 +747,16 @@ export interface ConversionPoint {
   eventType: string;
   /** 金額 (任意) */
   value: number | null;
+  /** どうやって数えるか。既定は manual（人が記録する） */
+  measureMethod?: ConversionMeasureMethod;
+  /** url_reach のときの対象URL。前方一致で判定する */
+  targetUrl?: string | null;
+  /** 同じ人を何度でも数えるか。false なら一人一回 */
+  countRepeat?: boolean;
+  /** 成果を紐づける日数。null なら全体の既定（90日） */
+  attributionDays?: number | null;
+  /** 集計対象を1アカウントに絞る場合。null なら全アカウント */
+  lineAccountId?: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }
@@ -563,6 +797,14 @@ export interface Affiliate {
   commissionRate: number;
   /** 有効/無効 */
   isActive: boolean;
+  /** 連絡先。報酬の連絡に使う。null なら未登録 */
+  email?: string | null;
+  /** 成果が確定するまでの保留日数。null なら即確定 */
+  holdDays?: number | null;
+  /** 支払いサイクルの覚書。計算には使わない */
+  payoutCycle?: string | null;
+  /** 成果が出たときに本人へ知らせるか */
+  notifyOnConversion?: boolean;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }
@@ -617,6 +859,12 @@ export interface OutgoingWebhook {
   eventTypes: string[];
   hasSecret: boolean;
   isActive: boolean;
+  /** 失敗したとき何回まで送り直すか。0 なら送り直さない */
+  maxRetries?: number;
+  /** 連続して失敗している回数。成功すると 0 に戻る */
+  consecutiveFailures?: number;
+  /** 最後に失敗した時刻。成功すると null に戻る */
+  lastFailedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -657,11 +905,32 @@ export interface CalendarBooking {
 // リマインダ (Reminder)
 // -----------------------------------------------------------------------------
 
+/** リマインダを動かすきっかけ */
+/**
+ * リマインダのゴールを何で決めるか。
+ *   friend_field … 友だち情報欄の日付（誕生日・次回お届け日・契約更新日）。154 で追加。
+ */
+export type ReminderTriggerType = "manual" | "booking" | "event" | "friend_field";
+
 export interface Reminder {
   id: string;
   name: string;
   description: string | null;
   isActive: boolean;
+  /** きっかけ。manual は従来どおり手で登録する */
+  triggerType?: ReminderTriggerType;
+  /** 起点を何分ずらすか。null ならずらさない。負の値も使える */
+  triggerOffsetMinutes?: number | null;
+  /** 起点の時刻を固定する JST の "HH:MM"。null なら予約時刻のまま */
+  sendAtTime?: string | null;
+  /** 対象を絞るタグ。null なら対象者全員 */
+  targetTagId?: string | null;
+  /** 153: 'time'（ゴールの○日前の●時）か 'countdown'（残り時間）。**作成後は変えられない。** */
+  deliveryMode?: 'time' | 'countdown';
+  /** 154: 友だち情報欄の日付を起点にするとき、見る欄。 */
+  triggerFieldId?: string | null;
+  /** 154: 毎年くり返すか（誕生日なら true）。 */
+  repeatYearly?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -672,6 +941,12 @@ export interface ReminderStep {
   offsetMinutes: number;
   messageType: MessageType;
   messageContent: string;
+  /** 153: ゴールから何日ずらすか。配信方式が 'time' のとき使う。 */
+  offsetDays?: number | null;
+  /** 153: その日の何時に送るか（日本時間の "HH:MM"）。 */
+  sendAtTime?: string | null;
+  /** 153: 送る中身をテンプレートから選ぶ。 */
+  templateId?: string | null;
   createdAt: string;
 }
 
@@ -718,6 +993,8 @@ export interface Template {
   category: string;
   messageType: string;
   messageContent: string;
+  /** 置き場。未分類は null。 */
+  folderId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -876,11 +1153,18 @@ export interface StaffMember {
   name: string;
   email: string | null;
   role: 'owner' | 'admin' | 'staff' | 'viewer';
-  apiKey: string;
   lineLinked: boolean;
+  twoFactorEnabled: boolean;
   isActive: boolean;
+  permissionKeys: string[];
+  notificationPreferences: Record<string, { email: boolean; line: boolean }>;
+  inviteStatus: 'pending_email' | 'pending_line' | 'active' | 'expired';
   createdAt: string;
   updatedAt: string;
+  /** このログインユーザーの基準となるLINE公式アカウント。nullは従来互換の全体権限。 */
+  assignedLineAccountId: string | null;
+  /** 基準アカウントより下の子・孫も表示・操作できるか。 */
+  canAccessDescendantAccounts: boolean;
 }
 
 export interface StaffProfile {
@@ -927,3 +1211,110 @@ export interface PaginatedResponse<T> {
   /** 次ページが存在するか */
   hasNextPage: boolean;
 }
+
+// ============================================================
+// 友だち追加時の配信の振り分け（設計 V2 4-6）
+// ============================================================
+
+/**
+ * 「はじめての人」をどう見分けるか。
+ *
+ * 設計の絵は「初回フォロー日が未記録」を既定にしているが、**この環境では
+ * 使えない**。マイグレーション 065 が既存の行すべてに初回フォロー日を
+ * 埋めたため、未記録の人がもう居ない。既定は `unfollow_count_zero`。
+ */
+export type FriendAddFirstTimeCriterion =
+  | "unfollow_count_zero"
+  | "first_followed_at_missing";
+
+/** ①のシナリオをいつ流すか。 */
+export type FriendAddTiming =
+  /** すぐに配信（1通目が遅延0なら reply で即時に出す） */
+  | "immediate"
+  /** シナリオの設定どおり（1通目のタイミング指定に従う） */
+  | "scenario";
+
+/** ②で何を配信するか。 */
+export type FriendAddReturningMode =
+  /** 何も送らない */
+  | "none"
+  /** 別のシナリオを配信する */
+  | "other"
+  /** はじめての人と同じものを配信する */
+  | "same";
+
+/** ②をどこから流すか。 */
+export type FriendAddStartPosition =
+  /** 最初から */
+  | "beginning"
+  /** 前回読んだところから（friend_scenarios.current_step_order を引き継ぐ） */
+  | "resume";
+
+/**
+ * 振り分けと同時に実行すること。
+ *
+ * **`row` はシナリオのアクションと同じ形。** タグ・友だち情報欄・対応マーク・
+ * シナリオ操作・共通情報が、シナリオ側とまったく同じ設定と実行で動く。
+ * 以前は `tag` に1つのタグIDを持つだけで、付けることしかできず、
+ * フォルダ指定も外すこともできなかった。**同じことを2か所で実装すると、
+ * 片方だけ育って必ずずれる**（今夜、一斉配信とシナリオのメッセージ組み立てで
+ * 実際に起きた）。
+ *
+ * `mile` はシナリオ側に無い。友だち追加のときだけ付けたい、という
+ * 使い方があるので残す。
+ *
+ * `tag` は古い形。**読むときに `row` へ直す。**新しく作られることはないが、
+ * 既に保存されている設定があるので、消さずに読めるようにしておく。
+ */
+export type FriendAddAction =
+  /** 古い形。読むときに row へ直す。 */
+  | { kind: "tag"; tagId: string }
+  | { kind: "mile"; amount: number }
+  /** シナリオのアクションと同じ。`actionType` と `config` はそちらの定義。 */
+  | { kind: "row"; actionType: FriendAddRowActionType; config: unknown };
+
+/** `row` で使えるアクションの種類。シナリオ側と同じ並び。 */
+export type FriendAddRowActionType =
+  | "tag"
+  | "friend_field"
+  | "support_mark"
+  | "scenario"
+  | "common_var";
+
+/** ①または②の設定。 */
+export interface FriendAddBranch {
+  /** 配信するシナリオ。null は「決めていない」。 */
+  scenarioId: string | null;
+  actions: FriendAddAction[];
+}
+
+/** 画面1枚ぶんの設定。`account_settings.friend_add_routing` に JSON で入る。 */
+export interface FriendAddRouting {
+  /** ① はじめて友だち追加した人 */
+  firstTime: FriendAddBranch & { timing: FriendAddTiming };
+  /** ② 以前からの友だち・ブロックを解除した人 */
+  returning: FriendAddBranch & {
+    mode: FriendAddReturningMode;
+    startPosition: FriendAddStartPosition;
+  };
+  /** ③ 判定の基準 */
+  criteria: { firstTime: FriendAddFirstTimeCriterion };
+}
+
+/**
+ * 既定値。**設定が無いアカウントはここに落ちる。**
+ *
+ * `returning.mode` を `same` にしてあるのは、**いまの挙動を変えないため**。
+ * 設定を入れる前は「相手によらず friend_add シナリオが全部動く」ので、
+ * 既定を `none` にすると、設定していないアカウントで配信が止まる。
+ */
+export const FRIEND_ADD_ROUTING_DEFAULT: FriendAddRouting = {
+  firstTime: { scenarioId: null, timing: "immediate", actions: [] },
+  returning: {
+    scenarioId: null,
+    mode: "same",
+    startPosition: "beginning",
+    actions: [],
+  },
+  criteria: { firstTime: "unfollow_count_zero" },
+};

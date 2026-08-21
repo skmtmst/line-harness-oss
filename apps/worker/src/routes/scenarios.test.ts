@@ -112,10 +112,18 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     // an account-specific scenario.
     const globalRow = body.data.find((d) => d.id === 's-global');
     expect(globalRow?.lineAccountId).toBeNull();
-    expect(calls).toHaveLength(1);
-    expect(calls[0].sql).toMatch(/line_account_id IS NULL/);
-    expect(calls[0].sql).toMatch(/s\.line_account_id = \?/);
-    expect(calls[0].binds).toEqual(['acc-1']);
+    // 一覧を引くクエリは1本だけ。人数の集計は別に1本走るので、
+    // 本数ではなく「一覧を引くもの」を選んで見る。
+    const listCalls = calls.filter((c) => /FROM scenarios s\b/i.test(c.sql));
+    expect(listCalls).toHaveLength(1);
+    expect(listCalls[0].sql).toMatch(/line_account_id IS NULL/);
+    expect(listCalls[0].sql).toMatch(/s\.line_account_id = \?/);
+    expect(listCalls[0].binds).toEqual(['acc-1']);
+
+    // 購読中と読了済は、シナリオごとに引かず1回でまとめて数える。
+    // 件数ぶん往復すると、シナリオが増えるほど一覧が遅くなる。
+    const countCalls = calls.filter((c) => /FROM friend_scenarios/i.test(c.sql));
+    expect(countCalls).toHaveLength(1);
   });
 
   test('falls back to getScenarios helper when no lineAccountId is provided', async () => {

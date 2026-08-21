@@ -140,5 +140,19 @@ export async function upsertChatOnMessage(db: D1Database, friendId: string): Pro
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
   const newStatus = chat.status === 'resolved' ? 'unread' : chat.status;
   await updateChat(db, chat.id, { status: newStatus, lastMessageAt: now });
+
+  // 受信の時刻を残し、初回返信の時計を巻き直す（107）。
+  //
+  // 「受信 → 返信までの時間」を出すために要る。新しい問い合わせが来たら、
+  // 前の往復の first_replied_at は関係ないので消す。消さないと、
+  // 2回目の問い合わせに何時間かかっても「初回返信は速かった」ままになる。
+  //
+  // 更新に失敗しても受信そのものは成立しているので、握りつぶさず投げる。
+  // ここが落ちるのは列が無いときで、それは配布の抜けなので気づきたい。
+  await db
+    .prepare(`UPDATE chats SET last_incoming_at = ?, first_replied_at = NULL WHERE id = ?`)
+    .bind(now, chat.id)
+    .run();
+
   return (await getChatById(db, chat.id))!;
 }

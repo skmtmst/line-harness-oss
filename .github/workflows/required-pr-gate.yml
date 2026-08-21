@@ -1,15 +1,22 @@
 name: Required PR gate
 
-# This workflow intentionally runs for every pull request targeting either
-# integration branch. Path-filtered workflows are useful for speed, but they
-# cannot be made a universal branch-protection requirement because GitHub
-# reports no check at all when their path filter does not match.
+# This workflow intentionally runs for every pull request. Path-filtered
+# workflows are useful for speed, but they cannot be made a universal
+# branch-protection requirement because GitHub reports no check at all when
+# their path filter does not match.
+#
+# The branch filter used to be `codex/development` and `main`. Stacked pull
+# requests — the ones whose base is another feature branch — therefore never
+# ran this gate at all. #57 added 24 admin screens and landed with zero status
+# checks, because its base was another feature branch rather than an
+# integration branch. A 15-deep stack could reach `codex/development` with
+# only its final pull request ever checked.
+#
+# There is no branch filter now: every pull request runs it, whatever it
+# targets.
 
 on:
   pull_request:
-    branches:
-      - codex/development
-      - main
   workflow_dispatch:
 
 permissions:
@@ -44,6 +51,99 @@ jobs:
             git diff --check
           fi
 
+      # 反映履歴は「あとでまとめて書く」と必ず薄くなる。変更した本人が
+      # 変更した直後に書くのが一番正確なので、PRの時点で見る。
+      #
+      # 落とすが、逃げ道は残す。急ぎの修正が出せなくなるほうが困るので、
+      # PRのタイトルか本文に [skip release-log] があれば通す。
+      # 文書だけ・ワークフローだけの変更も対象外にする。
+      - name: Require a release-log entry
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "PRの差分が取れないため、この確認は飛ばします。"
+            exit 0
+          fi
+
+          case "$PR_TITLE$PR_BODY" in
+            *"[skip release-log]"*)
+              echo "::notice::[skip release-log] があるため、反映履歴の確認を飛ばしました。"
+              exit 0
+              ;;
+          esac
+
+          changed=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          if [ -z "$changed" ]; then
+            echo "変更がありません。"
+            exit 0
+          fi
+
+          # 文書とワークフローだけの変更は対象外。
+          if ! printf '%s\n' "$changed" | grep -qvE '^(docs/|\.github/|README\.md$|AGENTS\.md$)'; then
+            echo "文書・ワークフローだけの変更のため、反映履歴の確認を飛ばしました。"
+            exit 0
+          fi
+
+          # 反映履歴は2か所から拾う。
+          #
+          #   docs/release-log/unreleased/<番号>-<担当>-<何の話か>.md  ← これから
+          #   docs/release-log/unreleased.md                          ← これまで
+          #
+          # 1ファイルに全員が書き足す形だと、**全員が同じ場所（`## 追加` の
+          # 直後）に行を差し込むので、PRのたびに必ずぶつかる。** 一晩で9本の
+          # PRが全部ここで止まった。1本ずつ別のファイルにすれば起きない。
+          added_lines=$(git diff "$BASE_SHA...$HEAD_SHA" \
+            -- docs/release-log/unreleased.md 'docs/release-log/unreleased/*.md' \
+            | grep '^+[-*] ' || true)
+          added=$(printf '%s' "$added_lines" | grep -c '^+' || true)
+          if [ "$added" -gt 0 ]; then
+            echo "反映履歴に $added 行足されています。"
+
+            # このPRの番号が入った行が1行でもあるか。
+            #
+            # 行を書く時点ではPR番号がまだ無いので、書き忘れやすい。書式では
+            # 任意なので、抜けていても組み立ては通る。**通ってしまうから抜ける。**
+            # 管理画面の「更新履歴」に番号が出ず、どの変更か辿れなくなる。
+            # 実際、一晩で19行が番号なしのまま入った。
+            #
+            # **「全部の行に入っているか」では見ない。** 過去の行を直すPRでは、
+            # 他のPRの番号が付いた行が差分に出る（それが直した中身なので）。
+            # 全部を求めると、そういうPRが通らなくなる。実際にこの仕組みを
+            # 入れたPR自身が引っかかった。
+            own=$(printf '%s\n' "$added_lines" | grep -c "#${PR_NUMBER}\b" || true)
+            if [ "$own" -eq 0 ]; then
+              echo "::error::反映履歴に、このPRの番号 #${PR_NUMBER} が入った行がありません。"
+              echo ""
+              echo "  管理画面の 運用状態 → 更新履歴 で、どの変更か辿れなくなります。"
+              echo "  足した行のどれかに #${PR_NUMBER} を入れてください（順序は問いません）:"
+              echo ""
+              echo "    - 変更した内容 @kenta #${PR_NUMBER} $(date -u +%Y-%m-%d) HH:MM"
+              echo ""
+              echo "  いま足されている行:"
+              printf '%s\n' "$added_lines" | sed 's/^+/    /'
+              exit 1
+            fi
+            echo "うち $own 行に #${PR_NUMBER} が入っています。"
+            exit 0
+          fi
+
+          echo "::error::反映履歴に1行も足されていません。"
+          echo ""
+          echo "  変更した内容を、運用者に伝わる言葉で1行書いてください。"
+          echo "  管理画面の 運用状態 → 更新履歴 → 変更内容 にそのまま出ます。"
+          echo ""
+          echo "    ## 修正"
+          echo "    - 予約した絞り込み配信が全員に届いていたのを直した @kenta #151"
+          echo ""
+          echo "  書き方: docs/release-log/README.md"
+          echo "  急ぎで飛ばしたいときは、PRのタイトルか本文に [skip release-log] を入れてください。"
+          exit 1
+
       - name: Build shared packages
         run: >-
           pnpm
@@ -52,6 +152,9 @@ jobs:
           --filter @line-crm/db
           --filter @line-harness/update-engine
           build
+
+      - name: Check the generated bootstrap schema
+        run: pnpm --filter @line-crm/db check:bootstrap
 
       - name: Test repository scripts
         run: pnpm test:scripts
@@ -120,6 +223,15 @@ jobs:
           sys.exit(1 if failed else 0)
           PY
 
+      - name: Test shared
+        run: |
+          pnpm --filter @line-crm/shared typecheck
+          pnpm --filter @line-crm/shared test
+          # 日付・時刻を扱うものが入っているので、日本時間以外でも通ることを見る。
+          # 実行環境の時計に引きずられる書き方は、JST で走らせている限り
+          # 気づけない（深夜0時前後で1日ずれる、曜日が変わる、など）。
+          TZ=Asia/Bangkok pnpm --filter @line-crm/shared test
+
       - name: Typecheck and test Worker
         run: |
           pnpm --filter worker typecheck
@@ -136,5 +248,6 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
         run: |
+          pnpm --filter web typecheck
           pnpm --filter web test
           pnpm --filter web build
