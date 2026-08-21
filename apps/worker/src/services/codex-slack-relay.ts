@@ -250,20 +250,20 @@ function taskBlocks(
         {
           type: 'button',
           text: { type: 'plain_text', text: '作業中' },
-          action_id: TASK_ACTION_ID,
+          action_id: `${TASK_ACTION_ID}_working`,
           value: taskActionValue('working', key, sourceChannel, sourceThreadTs),
         },
         {
           type: 'button',
           text: { type: 'plain_text', text: '確認待ち' },
-          action_id: TASK_ACTION_ID,
+          action_id: `${TASK_ACTION_ID}_review`,
           value: taskActionValue('review', key, sourceChannel, sourceThreadTs),
         },
         {
           type: 'button',
           style: 'primary',
           text: { type: 'plain_text', text: '完了' },
-          action_id: TASK_ACTION_ID,
+          action_id: `${TASK_ACTION_ID}_done`,
           value: taskActionValue('done', key, sourceChannel, sourceThreadTs),
           confirm: {
             title: { type: 'plain_text', text: 'タスクを完了しますか？' },
@@ -511,7 +511,9 @@ export async function handleSlackTaskAction(
   if (payload.channel?.id !== taskChannel || !payload.message?.ts) {
     throw new Error('SLACK_TASK_ACTION_INVALID_CHANNEL');
   }
-  const action = payload.actions?.find((item) => item.action_id === TASK_ACTION_ID);
+  const action = payload.actions?.find((item) => (
+    item.action_id === TASK_ACTION_ID || item.action_id?.startsWith(`${TASK_ACTION_ID}_`)
+  ));
   const value = parseTaskActionValue(action?.value);
   if (!value) throw new Error('SLACK_TASK_ACTION_INVALID_VALUE');
 
