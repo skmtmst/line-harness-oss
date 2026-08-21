@@ -115,12 +115,12 @@ export default function UsersPage() {
   )
 
   return (
-    <div className="space-y-6" data-users-design="v4">
+    <div className="space-y-4" data-users-design="v4">
       {!embedded ? <Header title="ユーザー一覧" description={headerDescription} /> : null}
 
       <SummaryBar />
 
-      <div className="flex items-start gap-3">
+      <div className="flex items-stretch gap-3">
         <div className="flex-1">
           <UsersFilters
             q={q}
@@ -138,7 +138,7 @@ export default function UsersPage() {
           type="button"
           onClick={() => setPendingForceRefresh(true)}
           disabled={refreshing}
-          className="mt-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="rounded-[9px] border border-[#DADDE2] bg-white px-4 text-xs font-semibold text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)] hover:bg-[#F6F6F8] disabled:opacity-50"
           title="worker キャッシュをバイパスして再集計"
         >
           {refreshing ? '再計算中…' : '再計算'}

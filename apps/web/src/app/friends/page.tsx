@@ -17,6 +17,7 @@ import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 const CARD_SHADOW = 'shadow-[1px_1px_2px_rgba(29,29,31,0.13)]'
+const SECONDARY_CONTROL = 'h-10 whitespace-nowrap rounded-[9px] border border-[#DADDE2] bg-white px-4 text-sm font-medium text-[#1D1D1F] hover:bg-[#F6F6F8]'
 
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -174,13 +175,13 @@ function FriendsPageInner({
               className="h-10 w-full rounded-[9px] border border-[#DADDE2] bg-white px-3 text-sm text-[#1D1D1F] outline-none transition focus:border-[#07C653] focus:ring-2 focus:ring-[#07C653]/15"
             />
           </label>
-          <button type="button" onClick={() => setAdvancedOpen(true)} className="h-10 whitespace-nowrap rounded-[9px] border border-[#DADDE2] bg-white px-4 text-sm font-medium text-[#1D1D1F] hover:bg-[#F6F6F8]">
+          <button type="button" onClick={() => setAdvancedOpen(true)} className={SECONDARY_CONTROL}>
             詳細検索{advanced ? '（設定中）' : ''}
           </button>
           <button
             type="button"
             onClick={() => onNotice({ title: '保存した検索', message: '保存済み検索の呼び出しは、検索条件の保存機能と一緒に実装予定です。' })}
-            className="h-10 whitespace-nowrap rounded-[9px] border border-[#DADDE2] bg-white px-4 text-sm font-medium text-[#1D1D1F] hover:bg-[#F6F6F8]"
+            className={SECONDARY_CONTROL}
           >
             保存した検索
           </button>
@@ -247,20 +248,28 @@ function FriendsPageInner({
           {Array.from({ length: Math.min(pageSize, 8) }, (_, index) => <div key={index} className="h-[66px] animate-pulse border-b border-[#EAEBED] bg-gradient-to-r from-white via-[#F6F6F8] to-white" />)}
         </div>
       ) : (
-        <FriendListTable friends={friends} selectedIds={selectedIds} onToggleSelect={toggleSelect} onToggleAll={(select) => setSelectedIds(select ? new Set(friends.map((friend) => friend.id)) : new Set())} />
+        <FriendListTable
+          friends={friends}
+          total={total}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleAll={(select) => setSelectedIds(select ? new Set(friends.map((friend) => friend.id)) : new Set())}
+          headerRight={!loading && total > 0 ? (
+            <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-[#565F59]">
+              <span className="whitespace-nowrap">{(page - 1) * pageSize + 1}〜{Math.min(page * pageSize, total)}件 / 全{total.toLocaleString('ja-JP')}件</span>
+              <label className="flex items-center gap-2 whitespace-nowrap">
+                表示件数
+                <select value={pageSize} onChange={(event) => resetPageWith(() => setPageSize(Number(event.target.value) as (typeof PAGE_SIZE_OPTIONS)[number]))} className="h-8 rounded-[8px] border border-[#DADDE2] bg-white px-2 text-xs text-[#1D1D1F]">
+                  {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}件</option>)}
+                </select>
+              </label>
+            </div>
+          ) : null}
+        />
       )}
 
       {!loading && total > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3 text-xs text-[#565F59]">
-            <span>{(page - 1) * pageSize + 1}〜{Math.min(page * pageSize, total)}件 / 全{total.toLocaleString('ja-JP')}件</span>
-            <label className="flex items-center gap-2 whitespace-nowrap">
-              表示件数
-              <select value={pageSize} onChange={(event) => resetPageWith(() => setPageSize(Number(event.target.value) as (typeof PAGE_SIZE_OPTIONS)[number]))} className="h-9 rounded-[8px] border border-[#DADDE2] bg-white px-2 text-xs text-[#1D1D1F]">
-                {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}件</option>)}
-              </select>
-            </label>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <nav aria-label="友だち一覧のページ" className="flex items-center gap-1">
             <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1} className="h-9 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs text-[#0067D9] disabled:text-[#B8BCC2]">前へ</button>
             {pageItems.map((item, index) => item === 'ellipsis' ? <span key={`ellipsis-${index}`} className="px-1 text-xs text-[#8B938D]">…</span> : (
@@ -309,7 +318,6 @@ function FriendsPageHost() {
             <button type="button" onClick={() => setNotice({ title: 'マニュアル', message: '友だち管理のマニュアルは準備中です。公開後、このボタンから開けるようにします。' })} className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm font-medium text-[#565F59] hover:bg-[#F6F6F8]">マニュアル</button>
             <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage || tab !== 'list'} className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm font-medium text-[#0067D9] hover:bg-[#F3F8FF] disabled:text-[#B8BCC2]">CSVで書き出す</button>
             <Link href="/accounts?tab=migration" className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm font-medium text-[#0067D9] hover:bg-[#F3F8FF]">UID移行</Link>
-            <button type="button" onClick={() => setNotice({ title: '一括アクション', message: '一覧で対象の友だちにチェックを付けると、実行できる操作が表示されます。' })} className="rounded-[9px] bg-[#07C653] px-4 py-2 text-sm font-bold text-white hover:bg-[#079B45]">一括アクション</button>
           </div>
         }
       />

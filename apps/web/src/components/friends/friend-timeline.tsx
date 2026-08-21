@@ -155,13 +155,6 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
             {f.label}
           </button>
         ))}
-        {/* 受信箱の側が持っている操作。ここから叩く口が無いので送る。 */}
-        <a
-          href={`/chats?friendId=${friendId}`}
-          className="text-accent ml-auto text-xs hover:underline"
-        >
-          すべて確認済みにする
-        </a>
       </div>
 
       {/* 本体 */}

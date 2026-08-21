@@ -37,9 +37,9 @@ export default function FriendListRow({ friend, selected, onToggleSelect, gridCl
           openChat()
         }
       }}
-      className={`grid min-w-0 cursor-pointer grid-cols-[30px_minmax(0,1fr)_auto] gap-2 border-b border-[#EAEBED] px-3 py-3 transition last:border-b-0 hover:bg-[#F9FAFA] focus:bg-[#F9FAFA] focus:outline-none ${gridClass}`}
+      className={`grid min-w-0 cursor-pointer grid-cols-[30px_minmax(0,1fr)_auto] gap-2 border-b border-[#EAEBED] px-3 py-3 transition last:border-b-0 hover:bg-[#F9FAFA] focus:bg-[#F9FAFA] focus:outline-none lg:items-center ${gridClass}`}
     >
-      <div className="pt-1" onClick={(event) => event.stopPropagation()}>
+      <div onClick={(event) => event.stopPropagation()}>
         <input
           type="checkbox"
           checked={selected ?? false}
@@ -49,7 +49,7 @@ export default function FriendListRow({ friend, selected, onToggleSelect, gridCl
         />
       </div>
 
-      <div className="flex min-w-0 items-start gap-2.5">
+      <div className="flex min-w-0 items-center gap-2.5">
         {friend.pictureUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
           <img src={friend.pictureUrl} alt="" className="h-9 w-9 shrink-0 rounded-full bg-[#EEF0F2] object-cover" />
@@ -67,12 +67,12 @@ export default function FriendListRow({ friend, selected, onToggleSelect, gridCl
         </div>
       </div>
 
-      <div className="flex justify-end lg:block lg:pt-0.5">
+      <div className="flex justify-end lg:block">
         <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold ${status.className}`}>{status.label}</span>
         <p className="mt-1 hidden truncate text-[10px] text-[#8B938D] lg:block">担当 未設定</p>
       </div>
 
-      <div className="col-start-2 min-w-0 lg:col-auto lg:pt-0.5">
+      <div className="col-start-2 min-w-0 lg:col-auto">
         {friend.activeScenario ? (
           <>
             <p className="truncate text-xs font-medium text-[#0067D9]" title={friend.activeScenario.name}>{friend.activeScenario.name}</p>
@@ -92,7 +92,7 @@ export default function FriendListRow({ friend, selected, onToggleSelect, gridCl
         ) : <span className="text-xs text-[#8B938D]">受信なし</span>}
       </div>
 
-      <div className="col-span-2 col-start-2 flex min-w-0 flex-wrap content-start gap-1 lg:col-auto lg:col-span-1">
+      <div className="col-span-2 col-start-2 flex min-w-0 flex-wrap content-center gap-1 lg:col-auto lg:col-span-1">
         {friend.tags.slice(0, 2).map((tag) => (
           <span key={tag.id} title={tag.name} className="max-w-full truncate rounded-full bg-[#E9F9EF] px-2 py-1 text-[10px] font-medium text-[#079B45]">{tag.name}</span>
         ))}
@@ -101,12 +101,8 @@ export default function FriendListRow({ friend, selected, onToggleSelect, gridCl
         {!friend.tags.length && !friend.firstTrackedLinkName ? <span className="text-[10px] text-[#B8BCC2]">—</span> : null}
       </div>
 
-      <div className="col-start-2 text-xs tabular-nums text-[#565F59] lg:col-auto lg:pt-0.5" title={formatDateTime(lastContact)}>
+      <div className="col-start-2 text-xs tabular-nums text-[#565F59] lg:col-auto lg:text-center" title={formatDateTime(lastContact)}>
         {formatDate(lastContact)}
-      </div>
-
-      <div className="flex items-start justify-end" onClick={(event) => event.stopPropagation()}>
-        <Link href={`/chats?friend=${friend.id}`} className="whitespace-nowrap text-xs font-medium text-[#0067D9] hover:underline">開く</Link>
       </div>
     </div>
   )
