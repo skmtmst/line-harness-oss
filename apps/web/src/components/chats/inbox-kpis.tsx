@@ -4,13 +4,11 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type InboxStats } from '@/lib/api'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
+import { formatDurationMinutes } from '@/lib/format-duration'
 
 function formatWait(minutes: number | null): string {
   if (!minutes || minutes < 1) return '待ちはありません'
-  if (minutes < 60) return `最長 ${minutes}分待ち`
-  const hours = Math.floor(minutes / 60)
-  const rest = minutes % 60
-  return `最長 ${hours}時間${rest ? `${rest}分` : ''}待ち`
+  return `最長 ${formatDurationMinutes(minutes)}待ち`
 }
 
 /** Pen.dev V4「対応状況バー」。数字は既存の集計APIだけを使う。 */

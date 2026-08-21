@@ -1,14 +1,12 @@
 'use client'
 
+import { formatDurationMinutes } from '@/lib/format-duration'
+
 const fmt = new Intl.NumberFormat('ja-JP')
 
 function formatOldest(min: number | null): string {
   if (min == null) return '—'
-  if (min < 60) return `${min}分`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}時間`
-  const day = Math.floor(hr / 24)
-  return `${day}日`
+  return formatDurationMinutes(min)
 }
 
 interface Props {

@@ -93,7 +93,7 @@ export default function PendingInboxCard({
   }, [load])
 
   return (
-    <section className="bg-canvas rounded-[18px] border-hairline flex h-[440px] min-w-0 flex-col overflow-hidden border shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+    <section className="bg-canvas rounded-[18px] border-hairline flex h-fit min-w-0 flex-col overflow-hidden border shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
       <div className="border-hairline flex h-[50px] shrink-0 items-center justify-between border-b px-5">
         <div className="flex items-baseline gap-2">
           <h2 className="text-ink text-sm font-semibold">対応が必要な受信</h2>
@@ -107,7 +107,7 @@ export default function PendingInboxCard({
       </div>
 
       {!summary || summary.total === 0 ? (
-        <p className="text-ink-faint flex flex-1 items-center justify-center px-5 text-center text-sm">
+        <p className="text-ink-faint flex min-h-24 items-center justify-center px-5 py-6 text-center text-sm">
           返信を待っている問い合わせはありません。
         </p>
       ) : (
