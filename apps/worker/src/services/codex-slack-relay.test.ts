@@ -150,6 +150,29 @@ describe('Codex Slack relay', () => {
     expect(JSON.stringify(task.blocks)).toContain(taskIdForKey('pr:220'));
   });
 
+  test('元スレッドのリンク取得に失敗しても要対応タスクを起票する', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '1787334034.300149' }))
+      .mockResolvedValueOnce(slackResponse({ ts: '1787334034.300150' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ ok: false, error: 'invalid_arguments' }))
+      .mockResolvedValueOnce(slackResponse({ ts: '1787334034.300151' }));
+
+    await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C-PR',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+    }, event({ prNumber: 220 }), fetcher);
+
+    expect(fetcher).toHaveBeenCalledTimes(6);
+    const task = JSON.parse(String(fetcher.mock.calls[5]?.[1]?.body));
+    expect(task.channel).toBe('C-TASK');
+    expect(JSON.stringify(task.blocks)).toContain(
+      'https://slack.com/archives/C-PR/p1787334034300149',
+    );
+  });
+
   test('Codexが完了を報告すると要対応一覧から削除する', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({

@@ -419,11 +419,21 @@ async function ensureOpenTask(
     await updateTaskMessageStatus(token, taskChannel, existing, status, fetcher);
     return;
   }
-  const permalinkResult = await slackApi(token, 'chat.getPermalink', {
-    channel: sourceChannel,
-    message_ts: sourceThreadTs,
-  }, fetcher);
-  const permalink = permalinkResult.permalink || `https://slack.com/archives/${sourceChannel}`;
+  let permalink = `https://slack.com/archives/${sourceChannel}/p${sourceThreadTs.replace('.', '')}`;
+  try {
+    const permalinkResult = await slackApi(token, 'chat.getPermalink', {
+      channel: sourceChannel,
+      message_ts: sourceThreadTs,
+    }, fetcher);
+    permalink = permalinkResult.permalink || permalink;
+  } catch (error) {
+    console.warn(JSON.stringify({
+      event: 'slack_permalink_fallback',
+      sourceChannel,
+      sourceThreadTs,
+      error: String(error),
+    }));
+  }
   await slackApi(token, 'chat.postMessage', {
     channel: taskChannel,
     text: taskText(event, category, status, key),
