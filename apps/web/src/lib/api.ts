@@ -636,7 +636,8 @@ export type DashboardOverview = {
     active: number
     /** 日次記録が無く、いまの友だちから逆算した日。 */
     estimated: boolean
-    sources: Array<{ name: string; count: number }>
+    /** 段階配備中の旧Workerでは未返却。 */
+    sources?: Array<{ name: string; count: number }>
   }>
   conversions: {
     total: number

@@ -7,6 +7,7 @@ import {
   reorderDashboardItems,
 } from './dashboard-editor'
 import { activeUpcomingBookings } from './side-cards'
+import { formatTrendSources } from './friend-trend-table'
 import type { BookingRequest } from '@/lib/api'
 
 function booking(id: string, startsAt: string, status = 'confirmed'): BookingRequest {
@@ -43,6 +44,14 @@ describe('ダッシュボードV4の初期表示', () => {
     expect(source).toContain('data?.operations?.bookings')
     expect(source).not.toContain('data?.partialFailures.length')
     expect(source).not.toMatch(/data\?\.operations\.[a-zA-Z]/)
+  })
+
+  it('旧Workerが友だちの流入元を返さなくても推移表を描画できる', () => {
+    expect(formatTrendSources(undefined)).toEqual({ full: '', compact: '経路なし' })
+    expect(formatTrendSources([{ name: '広告', count: 2 }])).toEqual({
+      full: '広告 2',
+      compact: '広告 2',
+    })
   })
 
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
