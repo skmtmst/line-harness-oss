@@ -53,9 +53,11 @@ export default function UserRow({ row, accountColorMap }: Props) {
         className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
         onClick={() => setExpanded((v) => !v)}
       >
-        <td className="px-4 py-3 font-mono text-xs text-gray-500">{idShort}</td>
-        <td className="px-4 py-3 text-sm font-medium text-gray-900">
-          {row.displayName || <span className="text-gray-400">—</span>}
+        <td className="overflow-hidden px-4 py-3 font-mono text-xs text-gray-500" title={row.identityKey}>
+          <span className="block truncate">{idShort}</span>
+        </td>
+        <td className="overflow-hidden px-4 py-3 text-sm font-medium text-gray-900" title={row.displayName ?? undefined}>
+          <span className="block truncate">{row.displayName || <span className="text-gray-400">—</span>}</span>
         </td>
         <td className="px-4 py-3">
           <div className="flex flex-wrap gap-1">
@@ -65,7 +67,7 @@ export default function UserRow({ row, accountColorMap }: Props) {
                 <span
                   key={a.accountId}
                   title={a.accountName}
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
+                  className={`max-w-full truncate rounded-full px-2 py-0.5 text-xs font-medium ${color}`}
                 >
                   {a.accountName}
                 </span>
@@ -73,20 +75,20 @@ export default function UserRow({ row, accountColorMap }: Props) {
             })}
           </div>
         </td>
-        <td className="px-4 py-3 text-sm text-gray-600">
-          {row.xUsername ? `@${row.xUsername}` : <span className="text-gray-300">—</span>}
+        <td className="overflow-hidden px-4 py-3 text-sm text-gray-600" title={row.xUsername ?? undefined}>
+          <span className="block truncate">{row.xUsername ? `@${row.xUsername}` : <span className="text-gray-300">—</span>}</span>
         </td>
-        <td className="px-4 py-3 text-sm text-gray-600">
-          {row.emails[0] ?? <span className="text-gray-300">—</span>}
-          {row.emails.length > 1 ? (
-            <span className="text-gray-400"> +{row.emails.length - 1}</span>
-          ) : null}
+        <td className="overflow-hidden px-4 py-3 text-sm text-gray-600" title={row.emails.join(', ') || undefined}>
+          <span className="block truncate">
+            {row.emails[0] ?? <span className="text-gray-300">—</span>}
+            {row.emails.length > 1 ? <span className="text-gray-400"> +{row.emails.length - 1}</span> : null}
+          </span>
         </td>
-        <td className="px-4 py-3 text-sm text-gray-600">
-          {row.phones[0] ?? <span className="text-gray-300">—</span>}
-          {row.phones.length > 1 ? (
-            <span className="text-gray-400"> +{row.phones.length - 1}</span>
-          ) : null}
+        <td className="overflow-hidden px-4 py-3 text-sm text-gray-600" title={row.phones.join(', ') || undefined}>
+          <span className="block truncate">
+            {row.phones[0] ?? <span className="text-gray-300">—</span>}
+            {row.phones.length > 1 ? <span className="text-gray-400"> +{row.phones.length - 1}</span> : null}
+          </span>
         </td>
       </tr>
       {expanded && (

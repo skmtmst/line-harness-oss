@@ -4,13 +4,7 @@ import { useEffect, useState } from 'react'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
-/**
- * 友だち画面の上部に出す数（設計 `V2 2-2 友だち` の KPIs）。
- *
- * 数え方はダッシュボードの `/api/dashboard/overview` と揃えている。
- * 同じ「有効友だち」が画面によって違う数だと、どちらが正しいのか
- * 分からなくなる。
- */
+/** V4の上部カード。数え方はダッシュボードと共通にしている。 */
 export default function FriendKpis() {
   const { selectedAccountId } = useAccount()
   const [stats, setStats] = useState<FriendStats | null>(null)
@@ -66,23 +60,23 @@ export default function FriendKpis() {
   ]
 
   return (
-    <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="V4FriendKpis">
       {cards.map((card) => (
-        <div key={card.title} className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-secondary text-xs font-medium">{card.title}</p>
+        <div key={card.title} className="rounded-[14px] border border-[#DADDE2] bg-white p-4 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+          <p className="text-xs font-medium text-[#565F59]">{card.title}</p>
           <p className="mt-1 flex items-baseline gap-1">
             {loading ? (
-              <span className="bg-canvas-sunken inline-block h-7 w-14 animate-pulse rounded" />
+              <span className="inline-block h-7 w-14 animate-pulse rounded bg-[#F6F6F8]" />
             ) : (
               <>
-                <span className="text-ink text-2xl font-bold tabular-nums">
+                <span className="text-2xl font-bold tabular-nums text-[#1D1D1F]">
                   {card.value === null ? '—' : card.value.toLocaleString('ja-JP')}
                 </span>
-                <span className="text-ink-secondary text-xs">{card.unit}</span>
+                <span className="text-xs text-[#565F59]">{card.unit}</span>
               </>
             )}
           </p>
-          <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">{card.detail}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-[#8B938D]">{card.detail}</p>
         </div>
       ))}
     </div>

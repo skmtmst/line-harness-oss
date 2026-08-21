@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Header from '@/components/layout/header'
+import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import SummaryBar from '@/components/users/summary-bar'
 import UsersFilters from '@/components/users/users-filters'
 import UsersTable from '@/components/users/users-table'
@@ -16,6 +17,7 @@ interface AccountOption {
 }
 
 export default function UsersPage() {
+  const embedded = useEmbeddedPage()
   const [rows, setRows] = useState<UserRowData[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -113,8 +115,8 @@ export default function UsersPage() {
   )
 
   return (
-    <div className="space-y-6">
-      <Header title="ユーザー一覧" description={headerDescription} />
+    <div className="space-y-6" data-users-design="v4">
+      {!embedded ? <Header title="ユーザー一覧" description={headerDescription} /> : null}
 
       <SummaryBar />
 
