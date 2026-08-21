@@ -73,77 +73,6 @@ interface EmailInboxItem {
   isUnread: boolean
 }
 
-function EmailCustomerMemo({ threadId }: { threadId: string }) {
-  const [notes, setNotes] = useState('')
-  const [savedNotes, setSavedNotes] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let cancelled = false
-    setError('')
-    void fetchApi<{
-      success: boolean
-      data: { thread: { notes: string | null } }
-    }>(`/api/support/email/threads/${encodeURIComponent(threadId)}`)
-      .then((response) => {
-        if (cancelled || !response.success) return
-        const value = response.data.thread.notes ?? ''
-        setNotes(value)
-        setSavedNotes(value)
-      })
-      .catch(() => {
-        if (!cancelled) setError('内部メモを読み込めませんでした')
-      })
-    return () => { cancelled = true }
-  }, [threadId])
-
-  const save = async () => {
-    setSaving(true)
-    setError('')
-    try {
-      const response = await fetchApi<{ success: boolean; error?: string }>(
-        `/api/support/email/threads/${encodeURIComponent(threadId)}/notes`,
-        { method: 'PATCH', body: JSON.stringify({ notes }) },
-      )
-      if (!response.success) {
-        setError(response.error || '内部メモを保存できませんでした')
-        return
-      }
-      setSavedNotes(notes)
-    } catch {
-      setError('内部メモを保存できませんでした')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <section className="mt-5 border-t border-[#E5E7EB] pt-4" aria-label="メール相手の内部メモ">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold text-[#344054]">内部メモ</h3>
-        {notes === savedNotes && <span className="text-[10px] text-[#98A2B3]">保存済み</span>}
-      </div>
-      <textarea
-        value={notes}
-        onChange={(event) => setNotes(event.target.value)}
-        rows={5}
-        placeholder="担当者だけに見えるメモ"
-        className="mt-2 w-full resize-y rounded-lg border border-[#D0D5DD] bg-canvas px-3 py-2 text-xs leading-5 outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
-      />
-      {error && <p className="mt-1 text-xs text-[#D92D20]">{error}</p>}
-      <button
-        type="button"
-        onClick={() => void save()}
-        disabled={saving || notes === savedNotes}
-        className="mt-2 w-full rounded-lg bg-[#06C755] px-3 py-2 text-xs font-semibold text-on-accent hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {saving ? '保存中...' : '内部メモを保存'}
-      </button>
-    </section>
-  )
-}
-
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
   unread: { label: '未対応', className: 'bg-danger-bg text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
@@ -418,8 +347,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null)
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'mine' | 'overdue'>('all')
-  const [currentStaffId, setCurrentStaffId] = useState<string | null>(null)
+  const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
+  const [assigneeFilter, setAssigneeFilter] = useState('all')
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
@@ -905,16 +834,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   useEffect(() => {
     let cancelled = false
-    void fetchApi<{ success: boolean; data: { id?: string } }>('/api/auth/session')
-      .then((res) => {
-        if (!cancelled && res.success) setCurrentStaffId(res.data.id ?? null)
-      })
-      .catch(() => undefined)
-    return () => { cancelled = true }
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
     ;(async () => {
       try {
         const res = await fetchApi<{ success: boolean; data: Array<{ id: string; name: string }> }>(
@@ -985,9 +904,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     reply:
       visibleMailItems.filter((item) => item.status === 'unread').length
       + visibleLineItems.filter((chat) => chat.status === 'unread').length,
-    mine:
-      visibleMailItems.filter((item) => Boolean(currentStaffId) && item.assignedStaffId === currentStaffId).length
-      + visibleLineItems.filter((chat) => Boolean(currentStaffId) && chat.operatorId === currentStaffId).length,
     overdue:
       visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
       + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
@@ -1015,7 +931,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         {[
           { key: 'all' as const, label: 'すべて' },
           { key: 'reply' as const, label: '要返信' },
-          { key: 'mine' as const, label: '自分担当' },
           { key: 'overdue' as const, label: '期限超過' },
         ].map((filter) => (
           <button
@@ -1088,6 +1003,21 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
               />
             </div>
+            <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
+              <span className="shrink-0">担当者</span>
+              <select
+                value={assigneeFilter}
+                onChange={(event) => setAssigneeFilter(event.target.value)}
+                aria-label="担当者で絞り込む"
+                className="min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-canvas px-2 py-1.5 text-[11px] font-medium text-[#344054] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+              >
+                <option value="all">すべて</option>
+                <option value="unassigned">未割り当て</option>
+                {operators.map((operator) => (
+                  <option key={operator.id} value={operator.id}>{operator.name}</option>
+                ))}
+              </select>
+            </label>
             <div className="mt-2 flex items-center gap-1">
               {CHANNELS.map((item) => (
                 <button
@@ -1176,9 +1106,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
                   .filter((item) => statusFilter === 'all' || item.status === statusFilter)
+                  .filter((item) => assigneeFilter === 'all'
+                    || (assigneeFilter === 'unassigned' ? !item.assignedStaffId : item.assignedStaffId === assigneeFilter))
                   .filter((item) => {
                     if (quickFilter === 'reply') return item.status === 'unread'
-                    if (quickFilter === 'mine') return Boolean(currentStaffId) && item.assignedStaffId === currentStaffId
                     if (quickFilter === 'overdue') return item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)
                     return true
                   })
@@ -1253,8 +1184,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
                   .filter((chat) => {
+                    if (assigneeFilter !== 'all') {
+                      if (assigneeFilter === 'unassigned' ? Boolean(chat.operatorId) : chat.operatorId !== assigneeFilter) return false
+                    }
                     if (quickFilter === 'reply') return chat.status === 'unread'
-                    if (quickFilter === 'mine') return Boolean(currentStaffId) && chat.operatorId === currentStaffId
                     if (quickFilter === 'overdue') return chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)
                     return true
                   })
@@ -1931,7 +1864,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         </Link>
                       </section>
 
-                      <EmailCustomerMemo threadId={selectedThreadId} />
                     </div>
                   </div>
                 )
