@@ -17,6 +17,9 @@ const USER_ROW = readFileSync(join(HERE, '..', 'users', 'user-row.tsx'), 'utf8')
 const STRUCTURE = readFileSync(join(HERE, '..', '..', 'lib', 'design-structure.json'), 'utf8')
 
 describe('友だちV4の画面契約', () => {
+  it('見出し下の説明を外して一覧を上へ詰める', () => {
+    expect(PAGE).not.toContain('友だちの状態・配信状況・対応履歴を、1画面で確認して操作できます。')
+  })
   it('V2の固定値ではなくV4を画面の正本にする', () => {
     expect(PAGE).toContain('data-friends-page="v4"')
     expect(PAGE).toContain('data-friends-design="v4"')

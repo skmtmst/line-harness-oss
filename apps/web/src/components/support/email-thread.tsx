@@ -394,12 +394,11 @@ export default function EmailThread({
               className="w-full max-w-lg rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex items-start justify-between gap-4 border-b border-[#E5E7EB] px-5 py-4">
+              <div className="border-b border-[#E5E7EB] px-5 py-4">
                 <div>
                   <h2 id="email-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
                   <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
                 </div>
-                <button type="button" onClick={closeMemoEditor} className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-[#E5E7EB] px-3 text-xs font-semibold text-[#667085] hover:bg-[#F7F8F6]">閉じる</button>
               </div>
               <div className="px-5 py-4">
                 <label htmlFor="email-internal-memo" className="text-xs font-semibold text-[#667085]">メモ内容</label>

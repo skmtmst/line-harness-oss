@@ -1479,14 +1479,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           </div>
                         )}
                         <div
-                          className={`flex items-end gap-2 ${isOutgoing ? 'justify-end' : 'justify-start'}`}
+                          className={`flex gap-2 ${isOutgoing ? 'items-end justify-end' : 'items-start justify-start'}`}
                         >
                           {/* 相手のアイコン（incoming のみ） */}
                           {!isOutgoing && (
                             chatDetail.friendPictureUrl ? (
-                              <img src={chatDetail.friendPictureUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0 mb-1" />
+                              <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-hairline flex-shrink-0 mb-1" />
+                              <div className="bg-hairline h-8 w-8 flex-shrink-0 rounded-full" />
                             )
                           )}
 
@@ -1513,7 +1513,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             その下に実際に返信した担当者も出して取り違えを防ぐ。
                           */}
                           {isOutgoing && (
-                            <div className="mb-0.5 flex w-14 shrink-0 flex-col items-center gap-1">
+                            <div className="mb-0.5 flex w-24 shrink-0 flex-col items-center gap-1">
                               {selectedAccount?.pictureUrl ? (
                                 <img
                                   src={selectedAccount.pictureUrl}
@@ -1529,7 +1529,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                                 </div>
                               )}
                               <div
-                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-semibold shadow-sm"
+                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
                                 <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold">
@@ -1632,22 +1632,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       className="border-hairline w-full max-w-lg rounded-[14px] border bg-canvas shadow-2xl"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <div className="border-hairline flex items-start justify-between gap-4 border-b px-5 py-4">
+                      <div className="border-hairline border-b px-5 py-4">
                         <div>
                           <h2 id="chat-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
                           <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setMemoDraft(chatDetail?.notes ?? '')
-                            setMemoError('')
-                            setShowMemoEditor(false)
-                          }}
-                          className="border-hairline text-ink-secondary hover:bg-canvas-sunken inline-flex h-8 shrink-0 items-center justify-center rounded-lg border px-3 text-xs font-semibold"
-                        >
-                          閉じる
-                        </button>
                       </div>
                       <div className="px-5 py-4">
                         <label htmlFor="chat-internal-memo" className="text-ink-secondary text-xs font-semibold">メモ内容</label>
@@ -1811,7 +1800,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               type="button"
               onClick={() => setShowFriendInfo(false)}
               aria-label="顧客情報を閉じる"
-              className="absolute top-3 right-3 z-10 rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+              className="absolute top-[17px] right-3 z-10 inline-flex h-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-canvas px-3 text-xs font-semibold text-[#667085] hover:bg-[#F7F8F6]"
             >
               閉じる
             </button>
@@ -1929,7 +1918,6 @@ function ChatsPageHost() {
       <div data-design="Head">
         <Header
           title="受信箱"
-          description="返信が必要な会話を見つけ、担当・期限・顧客情報を見ながら対応できます。"
           action={
             <div className="flex items-center">
               {/*

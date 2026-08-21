@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
@@ -27,6 +29,12 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
 }
 
 describe('ダッシュボードV4の初期表示', () => {
+  it('見出しを受信箱と同じ文字サイズで表示する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('text-ink text-2xl font-bold tracking-tight">ダッシュボード')
+    expect(source).not.toContain('sm:text-3xl">ダッシュボード')
+  })
+
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
     const preferences = defaultDashboardPreferences()
     expect(preferences.today.filter((item) => item.visible).map((item) => item.id)).toEqual([
