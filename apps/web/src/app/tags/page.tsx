@@ -13,6 +13,7 @@ import FriendFieldList from '@/components/friend-fields/field-list'
 import SupportMarkList from '@/components/friend-fields/mark-list'
 import SavedSearchList from '@/components/friend-fields/saved-search-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -889,11 +890,21 @@ function TagsPageInner() {
   )
 }
 
-export default function TagsPage() {
+function LegacyTagsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
       <TagsPageInner />
+    </Suspense>
+  )
+}
+
+void LegacyTagsPage
+
+export default function TagsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
+      <TagsPageV4 />
     </Suspense>
   )
 }

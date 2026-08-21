@@ -174,16 +174,34 @@
       ]
     },
     "/tags": {
-      "node": "V4 4-1 series",
+      "node": "xn98K wdLjf KYG39 X79IHW t7Mhgl lNGcs NU4N2 FORVU",
       "name": "V4 4-1 友だち属性（4タブ）",
       "visualVerification": {
-        "status": "blocked",
-        "referenceNodeIds": ["X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
+        "status": "verified",
+        "referenceNodeIds": ["xn98K", "wdLjf", "KYG39", "X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
         "requiredViewports": [1440, 1920],
-        "blockingIssues": [
-          "V4一覧4タブの実ノードIDが未記録",
-          "Pen.devと実装の同状態・同横幅比較が未完了"
-        ]
+        "referenceScreenshots": [
+          "docs/design-reference/friend-attributes-v4/01-list.png/xn98K.png",
+          "docs/design-reference/friend-attributes-v4/02-create-initial.png/wdLjf.png",
+          "docs/design-reference/friend-attributes-v4/03-create-linked.png/KYG39.png",
+          "docs/design-reference/friend-attributes-v4/04-action-drawer.png/X79IHW.png",
+          "docs/design-reference/friend-attributes-v4/05-edit-existing.png/t7Mhgl.png",
+          "docs/design-reference/friend-attributes-v4/06-retroactive-dialog.png/lNGcs.png",
+          "docs/design-reference/friend-attributes-v4/07-delete-dialog.png/NU4N2.png",
+          "docs/design-reference/friend-attributes-v4/08-folder-dialog.png/FORVU.png"
+        ],
+        "implementationScreenshots": [
+          "docs/design-qa/friend-attributes-v4/01-list.png",
+          "docs/design-qa/friend-attributes-v4/02-create-initial.png",
+          "docs/design-qa/friend-attributes-v4/03-create-linked.png",
+          "docs/design-qa/friend-attributes-v4/04-action-drawer.png",
+          "docs/design-qa/friend-attributes-v4/05-edit-existing.png",
+          "docs/design-qa/friend-attributes-v4/06-retroactive-dialog.png",
+          "docs/design-qa/friend-attributes-v4/07-delete-dialog.png",
+          "docs/design-qa/friend-attributes-v4/08-folder-dialog.png"
+        ],
+        "checkedAt": "2026-08-21T18:18:00+09:00",
+        "evidence": "docs/design-qa/friend-attributes-v4/design-qa.md"
       },
       "sections": [
         "Body",

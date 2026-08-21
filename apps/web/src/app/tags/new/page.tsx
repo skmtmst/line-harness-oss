@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { TagGroup } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import NewTagPageV4 from '@/components/friend-fields/new-tag-page-v4'
 
 /**
  * 倍率の選択肢。内部は bps（10000 = 1.0倍）で持つ。
@@ -18,7 +19,7 @@ const MULTIPLIERS = [
   { value: '30000', label: '3.0倍' },
 ]
 
-export default function NewTagPage() {
+function LegacyNewTagPage() {
   const [name, setName] = useState('')
   const [groupId, setGroupId] = useState('')
 
@@ -321,5 +322,15 @@ export default function NewTagPage() {
         </label>
       </section>
     </CreatePage>
+  )
+}
+
+void LegacyNewTagPage
+
+export default function NewTagPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-ink-faint">読み込み中…</p>}>
+      <NewTagPageV4 />
+    </Suspense>
   )
 }

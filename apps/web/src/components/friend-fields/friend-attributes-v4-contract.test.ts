@@ -7,27 +7,30 @@ const read = (path: string) => readFileSync(resolve(root, path), 'utf8')
 
 describe('友だち属性 V4 contract', () => {
   it('タグ作成で本人・紹介者マイルと倍率を同時に設定できる', () => {
-    const source = read('app/tags/new/page.tsx')
-    expect(source).toContain('本人へ付与するマイル')
-    expect(source).toContain('紹介者へ付与するマイル')
-    expect(source).toContain('タグを持っている間の倍率')
-    expect(source).toContain('applyToExisting: false')
+    const editor = read('components/friend-fields/tag-editor-v4.tsx')
+    const page = read('components/friend-fields/new-tag-page-v4.tsx')
+    expect(editor).toContain('本人へのマイル付与')
+    expect(editor).toContain('紹介者へのマイル付与')
+    expect(editor).toContain('今後のマイル倍率')
+    expect(editor).toContain('タグを外して付け直したときの扱い')
+    expect(page).toContain('applyToExisting: false')
   })
 
   it('タグ編集の遡及付与は初期OFFで専用確認を通す', () => {
-    const source = read('app/tags/edit/page.tsx')
-    expect(source).toContain('useState(false)')
-    expect(source).toContain('すでにこのタグが付いている人にも遡って付与する')
-    expect(source).toContain('既存の友だちへマイルを遡及しますか？')
-    expect(source).toContain('applyToExisting: confirmedRetroactive && applyToExisting')
+    const editor = read('components/friend-fields/tag-editor-v4.tsx')
+    const page = read('components/friend-fields/edit-tag-page-v4.tsx')
+    expect(editor).toContain("useState(initialValues?.applyToExisting ?? initialApplyToExisting)")
+    expect(editor).toContain('すでに付いている人への反映')
+    expect(editor).toContain('さかのぼってマイルを積みますか？')
+    expect(page).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
   })
 
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
-    const source = read('app/tags/page.tsx')
-    expect(source).toContain('[20, 30, 40, 50]')
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    expect(source).toMatch(/\[20,\s*30,\s*40,\s*50\]/)
     expect(source).toContain('前へ')
     expect(source).toContain('次へ')
-    expect(source).toContain('CSV出力')
+    expect(source).toContain('CSVで一括登録')
     expect(source).toContain('並び替えを終了')
     expect(source).not.toContain('min-w-[1180px]')
   })
@@ -46,14 +49,32 @@ describe('友だち属性 V4 contract', () => {
 
   it('友だち属性ではブラウザ標準confirmを使わない', () => {
     const sources = [
-      read('app/tags/page.tsx'),
+      read('components/friend-fields/tags-page-v4.tsx'),
+      read('components/friend-fields/tag-editor-v4.tsx'),
+      read('components/friend-fields/edit-tag-page-v4.tsx'),
       read('components/friend-fields/field-list.tsx'),
       read('components/friend-fields/mark-list.tsx'),
       read('components/friend-fields/saved-search-list.tsx'),
     ]
     for (const source of sources) {
       expect(source).not.toMatch(/\bconfirm\s*\(/)
-      expect(source).toContain('ConfirmDialog')
     }
+  })
+
+  it('Pen.devで指定された8状態を検証用ルートから再現できる', () => {
+    const source = read('app/visual-qa/friend-attributes/page.tsx')
+    for (const state of ['list', 'create', 'linked', 'drawer', 'edit', 'retroactive', 'delete', 'folder']) {
+      expect(source).toContain(`'${state}'`)
+    }
+    expect(source).toContain('LINKED_ACTIONS')
+    expect(source).toContain('initialRetroactiveOpen')
+    expect(source).toContain('<DeleteDialog')
+    expect(source).toContain('<FolderEditor')
+  })
+
+  it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {
+    expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 />')
+    expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')
+    expect(read('app/tags/edit/page.tsx')).toContain('<EditTagPageV4 />')
   })
 })
