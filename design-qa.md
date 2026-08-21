@@ -1,53 +1,46 @@
-# Dashboard spacing and inbox links — design QA
+# 受信箱 V4 の細部調整 — design QA
 
-## Comparison target
+## 比較対象
 
-- Source visual truth:
-  - `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 12.20.32 AM.png`
-  - `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 12.22.35 AM.png`
-  - `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 12.25.50 AM.png`
-- Browser-rendered implementation:
-  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/dashboard-main-1337x1085.png`
-  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/dashboard-tooltip-1440.png`
-  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/dashboard-1920.png`
-- Combined comparison evidence:
-  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/dashboard-source-vs-implementation.png`
-  - `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-spacing-links/friend-trend-source-vs-implementation.png`
-- State: desktop dashboard with five pending inbox rows and seven estimated friend-trend rows. A local read-only mock API supplied deterministic data; no production data was changed.
+- 参照デザイン: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/hSLxG.png`
+- 実装（1440px）: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/inbox-visual-polish-1440.png`
+- 内部メモ画面: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/inbox-memo-modal-1440.png`
+- メール顧客情報（1920px）: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/inbox-email-1920.png`
+- 同一画面での比較: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-polish/inbox-side-by-side.png`
+- 状態: ローカルの確認用データだけを使用。開発・本番データは変更していない。
 
-## Viewport and normalization
+## 表示条件
 
-- Full-view source: 1337 × 1085 px.
-- Full-view implementation: Chrome CSS viewport 1608 × 1085, device scale 1. The fixed 256 px sidebar was cropped, leaving the 1337 × 1085 main region used for the like-for-like comparison.
-- Focused friend-trend source: 968 × 421 px.
-- Focused implementation card: 929 × 370 CSS px. It was proportionally normalized to 968 × 385 and placed on a 968 × 421 canvas so the intentionally removed explanation row remains visible as reduced height rather than being stretched back in.
-- Responsive checks: the page and main region had `scrollWidth === clientWidth` at both the 1440-class check and 1920 px check. No horizontal page or table overflow appeared.
+- 参照デザイン: 3840 × 3680 px。
+- 実装確認: 1440 × 1000 px と 1920 × 1080 px。
+- 1440px は `scrollWidth === clientWidth === 1425`、1920px は `scrollWidth === clientWidth === 1905`。ページ全体の横スクロールなし。
+- 参照と実装を同じ比較画面に配置し、文字、余白、操作位置、3ペインの比率、モーダル背景を目視確認した。
 
-## Findings
+## 確認結果
 
-- No actionable P0, P1, or P2 differences remain.
-- Fonts and typography: the trend rows now use the normal dashboard table weight and `text-ink-secondary`, removing the unusually faint appearance. Japanese dates remain in the requested `8月20日(木)` form and no longer shift by browser timezone.
-- Spacing and layout rhythm: the fixed 76 px dashboard heading height is gone, the heading-to-`今日やること` gap is compact, and five 61 px inbox rows fill the card down to the pagination border without the previous blank strip.
-- Colors and tokens: existing dashboard tokens are preserved. The help tooltip uses the existing ink/on-accent/control-radius tokens and keeps readable contrast.
-- Image and asset fidelity: this change contains no product imagery or custom visual assets. The screenshots' orange review rectangles are annotations, not product UI, and were intentionally not recreated.
-- Copy and content: the persistent explanation row was removed. The same explanation appears only when the round `?` beside `推定` is hovered or keyboard-focused.
-- Affordances and accessibility: each help button has a date-specific accessible label and exposes a real tooltip on hover/focus. Names are links with descriptive titles and normal hover/focus treatment.
+- P0 / P1 / P2 の未解決差分なし。
+- LINE と MAIL の4文字バッジ、ラベル、並び順が狭い一覧幅でも途中改行しない。
+- 「すべて確認済みにする」は表示されない。
+- 送信元LINEアカウントと実際の担当者を分けて表示する。
+- LINE顧客情報は会話IDではなく友だちIDで読み込み、中央には閉じる操作を重複表示しない。
+- メールでも顧客情報を開閉できる。閉じた後は中央の「顧客情報を開く」だけが表示される。
+- 内部メモは送信欄とは別の中央ポップアップで開き、「担当者だけに表示され、相手には送信されません」と明示する。
+- 内部メモとテンプレート選択のどちらも `document.body` 直下へ表示し、顧客情報の「閉じる」を含む背景全体に同じブラインドがかかる。
+- 集計APIの一部項目が欠けても受信箱全体が停止しない。
 
-## Interaction verification
+## 操作確認
 
-- Hovered `8月20日(木)の推定値について`; the tooltip became visible and displayed the complete requested explanation.
-- Clicked `Kyohei Yamamoto`; navigation reached `/chats?friend=friend-1&unanswered=1`.
-- Clicked `テスト 太郎`; navigation reached `/chats?channel=email&thread=thread-2`.
-- A fresh final dashboard tab reported no console warnings or errors.
+1. LINE会話を開き、顧客情報、マイル、対応、タグを表示できた。
+2. 右側の「閉じる」で顧客情報を閉じ、中央の「顧客情報を開く」から再表示できた。
+3. 「内部メモ」で専用ポップアップを開き、既存メモが別のテキスト欄へ入ることを確認した。
+4. 「テンプレートを選択」を開き、右側の顧客情報操作も背景と一緒に暗くなることを確認した。
+5. メール会話を開き、顧客情報を右側へ表示し、同じ開閉動作を確認した。
+6. 最終タブのブラウザログにエラー・警告なし。
 
-## Comparison history
+## 比較履歴
 
-1. Initial source review found the three user-marked issues: oversized heading space, a blank strip below the fifth inbox row, and a persistent explanation row under the trend table. The added request also required direct LINE/email inbox links.
-2. First implementation removed the heading minimum height, filled the inbox card, moved the explanation into a help tooltip, and added channel-aware links. Browser QA then exposed that date labels could shift one day outside Japan and that an above-the-icon tooltip could be clipped by the table wrapper.
-3. The final implementation derives the weekday from the ISO calendar date with UTC-safe arithmetic and positions the tooltip to the icon's right. The final full-view and focused comparisons show the requested spacing, type treatment, help affordance, and reduced trend-card height with no remaining P0/P1/P2 issue.
-
-## Follow-up polish
-
-- None required for this request.
+1. 初回確認では、チャネル行の短い文字が1440pxで折り返し、顧客情報が会話IDを友だちIDとして読み込んで画面が停止した。
+2. チャネル操作を縮まない1行表示へ直し、選択中会話の `friendId` を使うよう修正した。
+3. 再比較で、参照デザインと同じ情報階層、メモの独立性、モーダル背景、横幅の収まりを確認した。
 
 final result: passed
