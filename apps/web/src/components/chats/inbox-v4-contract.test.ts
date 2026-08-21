@@ -75,6 +75,9 @@ describe('受信箱V4の画面契約', () => {
 
   it('メール表示と並び順の形をLINEにそろえる', () => {
     expect(PAGE).toContain('MAIL')
+    expect(PAGE).toContain('aria-label={item.label}')
+    expect(PAGE).toContain("{item.key === 'all' && item.label}")
+    expect(PAGE).not.toContain('{item.label}\n                </button>')
     expect(PAGE).toContain('aria-label="並び順"')
     expect(PAGE).toContain('shrink-0 items-center')
     expect(PAGE).toContain('whitespace-nowrap')

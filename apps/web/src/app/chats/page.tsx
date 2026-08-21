@@ -1024,12 +1024,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   key={item.key}
                   type="button"
                   onClick={() => router.push(item.key === 'all' ? '/chats' : `/chats?channel=${item.key}`)}
+                  aria-label={item.label}
+                  title={item.label}
                   aria-pressed={channel === item.key}
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-[#EAFBF0] text-[#057A37]' : 'text-[#344054] hover:bg-[#F7F8F6]'}`}
+                  className={`inline-flex shrink-0 items-center justify-center rounded-md px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-[#EAFBF0] text-[#057A37]' : 'text-[#344054] hover:bg-[#F7F8F6]'}`}
                 >
                   {item.key === 'line' && <ChannelBadge channel="line" />}
                   {item.key === 'email' && <ChannelBadge channel="email" />}
-                  {item.label}
+                  {item.key === 'all' && item.label}
                 </button>
               ))}
               <select
