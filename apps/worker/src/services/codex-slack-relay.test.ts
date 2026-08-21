@@ -148,6 +148,14 @@ describe('Codex Slack relay', () => {
       source_thread_ts: '200.001',
     });
     expect(JSON.stringify(task.blocks)).toContain(taskIdForKey('pr:220'));
+    const actionsBlock = task.blocks.find((block: { type?: string }) => block.type === 'actions');
+    const actionIds = actionsBlock.elements.map((item: { action_id: string }) => item.action_id);
+    expect(new Set(actionIds).size).toBe(3);
+    expect(actionIds).toEqual([
+      `${TASK_ACTION_ID}_working`,
+      `${TASK_ACTION_ID}_review`,
+      `${TASK_ACTION_ID}_done`,
+    ]);
   });
 
   test('元スレッドのリンク取得に失敗しても要対応タスクを起票する', async () => {
