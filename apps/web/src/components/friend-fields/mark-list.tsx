@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import type { SupportMark } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type MarkRow = SupportMark & { friendCount: number }
 
@@ -21,6 +23,7 @@ export default function SupportMarkList() {
   const [name, setName] = useState('')
   const [color, setColor] = useState(PRESET_COLORS[0])
   const [adding, setAdding] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,12 +72,11 @@ export default function SupportMarkList() {
     }
   }
 
-  const remove = async (mark: MarkRow) => {
-    const message =
-      mark.friendCount > 0
-        ? `「${mark.name}」は ${mark.friendCount} 人に付いています。\n削除すると、その人たちは未設定に戻ります。よろしいですか？`
-        : `「${mark.name}」を削除しますか？`
-    if (!confirm(message)) return
+  const remove = (mark: MarkRow) => {
+    setPendingDelete(mark)
+  }
+
+  const confirmRemove = async (mark: MarkRow) => {
     setError('')
     try {
       const res = await api.supportMarks.delete(mark.id, { force: mark.friendCount > 0 })
@@ -101,23 +103,25 @@ export default function SupportMarkList() {
         </div>
       )}
 
-      <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-        <table className="w-full min-w-[760px]">
+      <div className="bg-canvas rounded-card border-hairline overflow-hidden border [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <table className="w-full table-fixed">
           <thead>
             <tr className="bg-canvas-sunken border-hairline border-b">
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                マーク
+              <th className="text-ink-faint w-[28%] px-4 py-3 text-left text-xs font-semibold uppercase">
+                マーク名
               </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                付いている人
+              {/* 列の順は設計の絵どおり。初期値が名前のすぐ隣に来る。
+                  どのマークが新しい友だちに付くかは、人数より先に見る。 */}
+              <th className="text-ink-faint w-[18%] px-4 py-3 text-left text-xs font-semibold uppercase">
+                新規の初期値
               </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                新しい友だちの初期値
+              <th className="text-ink-faint w-[18%] px-4 py-3 text-left text-xs font-semibold uppercase">
+                いまの人数
               </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                受信したら自動で付ける
+              <th className="text-ink-faint w-[24%] px-4 py-3 text-left text-xs font-semibold uppercase">
+                自動で変わるとき
               </th>
-              <th className="px-4 py-3" />
+              <th className="w-[12%] px-4 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -136,21 +140,33 @@ export default function SupportMarkList() {
                         className="inline-block h-3 w-3 rounded-full"
                         style={{ backgroundColor: mark.color }}
                       />
-                      <span className="text-ink text-sm font-medium">{mark.name}</span>
+                      <span className="text-ink truncate text-sm font-medium" title={mark.name}>{mark.name}</span>
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {/* 初期値は1つだけ。選ばれているものは札で出す。
+                        丸だけだと、どれが初期値かを目で追う必要がある。 */}
+                    {mark.isDefault ? (
+                      <span className="bg-info-bg text-info rounded-pill px-2 py-0.5 text-[11px] font-medium">
+                        初期値
+                      </span>
+                    ) : (
+                      <label className="text-ink-faint inline-flex cursor-pointer items-center gap-1.5 text-xs">
+                        <input
+                          type="radio"
+                          name="default-mark"
+                          checked={false}
+                          onChange={() => patch(mark, { isDefault: true })}
+                          aria-label={`${mark.name}を初期値にする`}
+                          className="accent-accent"
+                        />
+                        —
+                      </label>
+                    )}
                   </td>
                   <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums">
                     {mark.friendCount}
                     <span className="text-ink-faint ml-0.5 text-xs">人</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="radio"
-                      name="default-mark"
-                      checked={mark.isDefault}
-                      onChange={() => patch(mark, { isDefault: true })}
-                      aria-label={`${mark.name}を初期値にする`}
-                    />
                   </td>
                   <td className="px-4 py-3">
                     <input
@@ -178,7 +194,7 @@ export default function SupportMarkList() {
         </table>
       </div>
 
-      <div className="bg-canvas rounded-card border-hairline mt-4 flex flex-wrap items-end gap-3 border p-4">
+      <div className="bg-canvas rounded-card border-hairline mt-4 flex flex-wrap items-end gap-3 border p-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
         <div>
           <label htmlFor="mark-name" className="text-ink-faint mb-1 block text-xs font-semibold">
             マークの名前
@@ -224,6 +240,51 @@ export default function SupportMarkList() {
         初期値のマークは削除できません。先に別のマークを初期値にしてください。
         初期値が1つも無いと、新しい友だちに何も付かなくなるためです。
       </p>
+
+      {/*
+        どこで使われているか。マークを消す・増やす前に、どこに響くかが
+        分かるようにする。設計でもこの位置に置かれている。行き先を
+        持たせて、その場で見に行けるようにした。
+      */}
+      <section className="bg-canvas rounded-card border-hairline mt-4 border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <p className="text-ink mb-3 text-sm font-semibold">どこで使われているか</p>
+        <ul className="divide-hairline divide-y">
+          {[
+            { label: '受信箱の絞り込み', href: '/chats' },
+            { label: '友だち一覧の列と絞り込み', href: '/friends' },
+            { label: 'ダッシュボードの対応状況', href: '/' },
+            { label: '配信の絞り込み条件', href: '/broadcasts' },
+            { label: 'オートメーションの動作', href: '/automations' },
+          ].map((row) => (
+            <li key={row.label}>
+              <Link
+                href={row.href}
+                className="text-ink-secondary hover:text-ink flex items-center justify-between gap-2 py-2.5 text-sm"
+              >
+                {row.label}
+                <span className="text-ink-faint shrink-0 text-xs">›</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={`対応マーク「${pendingDelete?.name ?? ''}」を削除しますか？`}
+        description={
+          (pendingDelete?.friendCount ?? 0) > 0
+            ? `${pendingDelete?.friendCount ?? 0} 人の対応マークが未設定へ戻ります。この操作は元に戻せません。`
+            : 'この対応マークを削除します。この操作は元に戻せません。'
+        }
+        confirmLabel="削除する"
+        destructive
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={() => {
+          const target = pendingDelete
+          setPendingDelete(null)
+          if (target) void confirmRemove(target)
+        }}
+      />
     </div>
   )
 }

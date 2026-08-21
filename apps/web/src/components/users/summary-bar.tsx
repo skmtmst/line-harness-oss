@@ -30,7 +30,7 @@ export default function SummaryBar() {
     return (
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-20 rounded-lg bg-white shadow-sm ring-1 ring-gray-200" />
+          <div key={i} className="h-20 rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]" />
         ))}
       </div>
     )
@@ -53,10 +53,10 @@ export default function SummaryBar() {
 
 function Card({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-      <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{value}</div>
-      {hint ? <div className="mt-1 text-xs text-gray-400">{hint}</div> : null}
+    <div className="rounded-[14px] border border-[#DADDE2] bg-white p-4 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+      <div className="text-xs font-medium text-[#565F59]">{label}</div>
+      <div className="mt-1 text-2xl font-bold tabular-nums text-[#1D1D1F]">{value}</div>
+      {hint ? <div className="mt-1 text-xs text-[#8B938D]">{hint}</div> : null}
     </div>
   )
 }

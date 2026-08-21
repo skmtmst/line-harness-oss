@@ -19,6 +19,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 //   - existing friend with NO enrollment history → enrolls (catch-up)
 
 const dbMocks = {
+  /*
+   * 128 で「開始のきっかけ」を scenario_triggers に分けた。テストの仕掛けは
+   * これまでどおり trigger_type で書いてあるので、本物のSQLと同じ意味
+   * （kind='friend_add' かつ is_active=1）になるよう、ここで対応づける。
+   */
+  getFriendAddScenarioIds: vi.fn(async () => {
+    const list = (await dbMocks.getScenarios()) as Array<{
+      id: string;
+      trigger_type?: string;
+      is_active?: number;
+    }>;
+    return list
+      .filter((s) => s.trigger_type === 'friend_add' && s.is_active)
+      .map((s) => s.id);
+  }),
   // eager module-load deps
   getLineAccounts: vi.fn().mockResolvedValue([]),
   getStaffByApiKey: vi.fn(),

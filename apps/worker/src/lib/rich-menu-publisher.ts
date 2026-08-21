@@ -10,14 +10,38 @@
 //   4. 旧 richmenu があれば DELETE
 // 最後に isDefaultForAll なら 1 ページ目を全友だち default に。
 
+import { buildTapPostbackData } from './rich-menu-tap.js';
+
 export type Bounds = { x: number; y: number; width: number; height: number };
 
 export type ActionType = 'uri' | 'message' | 'postback' | 'richmenuswitch';
 
+/**
+ * 運用者から見た「何をするボタンか」。
+ *
+ * LINE が持てる action は上の4つだけなので、「電話をかける」「テンプレートを送る」
+ * 「回答フォームを開く」はここで受けて、publish のときに4つのどれかへ変換する。
+ * 未設定 (null) の area は、この仕組みが入る前に作られたもの。今までどおり
+ * actionType と actionData をそのまま LINE に渡す。
+ */
+export type AreaIntent = 'url' | 'tel' | 'text' | 'template' | 'form' | 'switch' | 'postback';
+
 export type AreaInput = {
+  id?: string;
   bounds: Bounds;
   actionType: ActionType;
   actionData: Record<string, unknown>;
+  intent?: AreaIntent | null;
+  /** 管理用のボタン名。エラー文で「どのボタンか」を示すのに使う。 */
+  label?: string | null;
+  /** 押されたときに付けるタグ。あると postback 経由になる。 */
+  tagIds?: string[];
+  /** 押されたときに足すスコア。あると postback 経由になる。 */
+  scoreChange?: number | null;
+  templateId?: string | null;
+  formId?: string | null;
+  /** intent='url' で計測リンクを選んだ場合の、解決済み URL。 */
+  trackedLinkUrl?: string | null;
 };
 
 export type PageInput = {
@@ -36,6 +60,12 @@ export type GroupInput = {
   chatBarText: string;
   isDefaultForAll: boolean;
   pages: PageInput[];
+  /**
+   * 「回答フォームを開く」ボタンの飛び先。アカウントの LIFF URL を渡す。
+   * これが無いと intent='form' のボタンは publish できない (どこへ飛ばせばいいか
+   * 決められないため)。
+   */
+  formBaseUrl?: string | null;
 };
 
 export class RichMenuValidationError extends Error {
@@ -88,11 +118,14 @@ export function resolveSwitcherActions(pages: PageInput[], groupId: string): Pag
       if (!alias) {
         throw new Error(`richmenuswitch target page ${targetPageId} not found in group ${groupId}`);
       }
+      const inner = `switch-to-${targetPageId}`;
       return {
         ...area,
         actionData: {
           richMenuAliasId: alias,
-          data: `switch-to-${targetPageId}`,
+          // intent が付いている area は、押されたことをこちらで受け取れるように
+          // 目印を足す。旧データ (intent なし) は今までどおりの data のまま。
+          data: area.intent && area.id ? buildTapPostbackData(area.id, inner) : inner,
         },
       };
     }),
@@ -110,11 +143,102 @@ function requiredString(value: unknown): value is string {
  * publish すると LINE API が 400 を返す。外部 API を呼ぶ前に、管理画面で修正可能な
  * 日本語メッセージとして返す。
  */
+function limited(value: string, max: number): boolean {
+  return [...value].length <= max;
+}
+
+/**
+ * intent が設定された area の検証。運用者が画面で直せる言葉で返す。
+ */
+function validateAreaByIntent(area: AreaInput, prefix: string, group: GroupInput): void {
+  const data = area.actionData ?? {};
+  switch (area.intent) {
+    case 'tel': {
+      const raw = String(data.tel ?? data.uri ?? '');
+      if (!requiredString(raw)) {
+        throw new RichMenuValidationError(`${prefix}: 電話番号を入力してください`);
+      }
+      if (!/[0-9]/.test(raw)) {
+        throw new RichMenuValidationError(`${prefix}: 電話番号に数字が入っていません`);
+      }
+      return;
+    }
+    case 'form': {
+      const formId = area.formId ?? String(data.formId ?? '');
+      if (!requiredString(formId)) {
+        throw new RichMenuValidationError(`${prefix}: 開く回答フォームを選んでください`);
+      }
+      if (!requiredString(group.formBaseUrl ?? '')) {
+        throw new RichMenuValidationError(
+          `${prefix}: このLINEアカウントにLIFFが設定されていないため、回答フォームを開くボタンは使えません`,
+        );
+      }
+      return;
+    }
+    case 'template': {
+      if (!requiredString(area.templateId ?? '')) {
+        throw new RichMenuValidationError(`${prefix}: 送るテンプレートを選んでください`);
+      }
+      return;
+    }
+    case 'url': {
+      const uri = area.trackedLinkUrl ?? String(data.uri ?? '');
+      if (!requiredString(uri)) {
+        throw new RichMenuValidationError(`${prefix}: URLを入力してください`);
+      }
+      if (!limited(uri, 1000)) {
+        throw new RichMenuValidationError(`${prefix}: URLは1000文字以内にしてください`);
+      }
+      return;
+    }
+    case 'text': {
+      const text = String(data.text ?? '');
+      if (!requiredString(text)) {
+        throw new RichMenuValidationError(`${prefix}: 送信テキストを入力してください`);
+      }
+      if (!limited(text, 300)) {
+        throw new RichMenuValidationError(`${prefix}: 送信テキストは300文字以内にしてください`);
+      }
+      return;
+    }
+    case 'switch': {
+      if (!requiredString(data.richMenuAliasId) || !requiredString(data.data)) {
+        throw new RichMenuValidationError(`${prefix}: 遷移先ページを選択してください`);
+      }
+      return;
+    }
+    case 'postback': {
+      const inner = String(data.data ?? '');
+      if (!requiredString(inner)) {
+        throw new RichMenuValidationError(`${prefix}: postback dataを入力してください`);
+      }
+      if (!limited(inner, 200)) {
+        // 目印 (rma=<id>) を足した後に LINE の 300 文字上限へ収める必要がある。
+        throw new RichMenuValidationError(`${prefix}: postback dataは200文字以内にしてください`);
+      }
+      const displayText = data.displayText;
+      if (typeof displayText === 'string' && !limited(displayText, 300)) {
+        throw new RichMenuValidationError(`${prefix}: displayTextは300文字以内にしてください`);
+      }
+      return;
+    }
+  }
+}
+
 export function validateRichMenuGroupForPublish(group: GroupInput): void {
   for (const page of group.pages) {
     for (let i = 0; i < page.areas.length; i++) {
       const area = page.areas[i];
-      const prefix = `ページ「${page.name}」のタップ領域${i + 1}`;
+      const label = area.label?.trim();
+      const prefix = label
+        ? `ページ「${page.name}」の「${label}」`
+        : `ページ「${page.name}」のタップ領域${i + 1}`;
+
+      // intent がある area は intent で見る。無いものは今までどおり actionType で見る。
+      if (area.intent) {
+        validateAreaByIntent(area, prefix, group);
+        continue;
+      }
 
       if (area.actionType === 'message') {
         const text = area.actionData.text;
@@ -153,11 +277,98 @@ export function validateRichMenuGroupForPublish(group: GroupInput): void {
   }
 }
 
-function toLineAction(area: AreaInput): Record<string, unknown> {
-  const action: Record<string, unknown> = { type: area.actionType, ...area.actionData };
-  // displayText は任意項目。エディタの初期値 "" を LINE に送らない。
-  if (action.displayText === '') delete action.displayText;
-  return action;
+/** 押されたときに、こちら側で何かする設定が入っているか。 */
+export function hasTapSideEffects(area: AreaInput): boolean {
+  if ((area.tagIds?.length ?? 0) > 0) return true;
+  return typeof area.scoreChange === 'number' && area.scoreChange !== 0;
+}
+
+/** 「電話をかける」の入力を tel: の形に整える。 */
+export function normalizeTelUri(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.toLowerCase().startsWith('tel:')) return trimmed;
+  // ハイフンや括弧は落とす。先頭の + は国番号なので残す。
+  return `tel:${trimmed.replace(/[^0-9+]/g, '')}`;
+}
+
+/** 「回答フォームを開く」の飛び先を組み立てる。 */
+export function buildFormUri(base: string, formId: string): string {
+  const sep = base.includes('?') ? '&' : '?';
+  return `${base}${sep}form=${encodeURIComponent(formId)}`;
+}
+
+function toLineAction(area: AreaInput, group: GroupInput): Record<string, unknown> {
+  const data = area.actionData ?? {};
+  const intent = area.intent ?? null;
+
+  // intent が無いのは、この仕組みが入る前に作られた area。挙動を変えない。
+  if (!intent) {
+    const action: Record<string, unknown> = { type: area.actionType, ...data };
+    // displayText は任意項目。エディタの初期値 "" を LINE に送らない。
+    if (action.displayText === '') delete action.displayText;
+    return action;
+  }
+
+  const areaId = area.id ?? '';
+
+  switch (intent) {
+    case 'tel':
+      return { type: 'uri', uri: normalizeTelUri(String(data.tel ?? data.uri ?? '')) };
+
+    case 'form':
+      return {
+        type: 'uri',
+        uri: buildFormUri(group.formBaseUrl ?? '', area.formId ?? String(data.formId ?? '')),
+      };
+
+    case 'url':
+      // 計測リンクを選んでいればそちらを開く。クリック数もタグ付けも、
+      // 計測リンク側の仕組みがそのまま面倒を見てくれる。
+      return { type: 'uri', uri: area.trackedLinkUrl ?? String(data.uri ?? '') };
+
+    case 'template': {
+      const action: Record<string, unknown> = {
+        type: 'postback',
+        data: buildTapPostbackData(areaId),
+      };
+      if (typeof data.displayText === 'string' && data.displayText !== '') {
+        action.displayText = data.displayText;
+      }
+      return action;
+    }
+
+    case 'text': {
+      const text = String(data.text ?? '');
+      if (!hasTapSideEffects(area)) {
+        // 何もしないならメッセージ送信のまま。トークの見え方がいちばん自然。
+        return { type: 'message', text };
+      }
+      // タグやスコアを付けるには、押されたことがこちらに届かないといけない。
+      // postback に displayText を添えると、トークの見え方はメッセージ送信と
+      // ほぼ同じまま、押されたことを受け取れる。
+      return {
+        type: 'postback',
+        data: buildTapPostbackData(areaId, text),
+        displayText: text,
+      };
+    }
+
+    case 'switch':
+      // data は resolveSwitcherActions が解決済み。
+      return { type: 'richmenuswitch', ...data };
+
+    case 'postback': {
+      const inner = String(data.data ?? '');
+      const action: Record<string, unknown> = {
+        type: 'postback',
+        data: areaId ? buildTapPostbackData(areaId, inner) : inner,
+      };
+      if (typeof data.displayText === 'string' && data.displayText !== '') {
+        action.displayText = data.displayText;
+      }
+      return action;
+    }
+  }
 }
 
 export type PublishResult = {
@@ -196,7 +407,7 @@ export async function publishRichMenuGroup(
       chatBarText: group.chatBarText,
       areas: page.areas.map((a) => ({
         bounds: a.bounds,
-        action: toLineAction(a),
+        action: toLineAction(a, group),
       })),
     });
     const newRichMenuId = created.richMenuId;

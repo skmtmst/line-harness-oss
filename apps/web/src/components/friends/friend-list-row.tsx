@@ -6,180 +6,113 @@ import type { FriendListItem } from '@/lib/api'
 
 interface Props {
   friend: FriendListItem
-  onDetailClick?: () => void
+  selected?: boolean
+  onToggleSelect?: () => void
+  gridClass: string
 }
 
-// Single row of the L-step style friend list. Renders 6 columns:
-// 対応マーク / 名前 / シナリオ / 受信メッセージ / 友だち情報 / 詳細
-// Clicking the row navigates to the per-friend chat view at
-// `/chats?friend=<id>` so the operator can read history / reply / mark as
-// resolved without leaving the list. Tags are intentionally kept in the
-// detail drawer so a large number of automatic tags cannot stretch the row.
-export default function FriendListRow({ friend, onDetailClick }: Props) {
+function statusView(status: FriendListItem['chatStatus']) {
+  if (status === 'unread') return { label: '未対応', className: 'bg-[#FFF1F2] text-[#C3323B]' }
+  if (status === 'in_progress') return { label: '対応中', className: 'bg-[#FFF5DE] text-[#94600A]' }
+  return { label: '対応済み', className: 'bg-[#EEF0F2] text-[#565F59]' }
+}
+
+export default function FriendListRow({ friend, selected, onToggleSelect, gridClass }: Props) {
   const router = useRouter()
-  const navigateToChat = () => router.push(`/chats?friend=${friend.id}`)
-  const incoming = friend.latestIncomingMessage
-  const scenario = friend.activeScenario
-  const isFollowing = friend.isFollowing
+  const status = statusView(friend.chatStatus)
+  const latest = friend.latestIncomingMessage
+  const lastContact = latest?.createdAt ?? friend.latestOutgoingAt ?? friend.createdAt
+
+  const openChat = () => router.push(`/chats?friend=${friend.id}`)
 
   return (
     <div
-      onClick={navigateToChat}
       role="link"
       tabIndex={0}
-      onKeyDown={(e) => {
-        // Only react when the row itself is the keyboard target. Otherwise
-        // an Enter/Space pressed on a nested button (e.g. タグ編集) would
-        // bubble up here and override the button's own click handler,
-        // navigating away instead of toggling the tag editor.
-        if (e.target !== e.currentTarget) return
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          navigateToChat()
+      onClick={openChat}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          openChat()
         }
       }}
-      className="grid grid-cols-[80px_220px_120px_1fr_160px_88px] gap-3 px-4 py-3 border-b border-gray-100 hover:bg-gray-50 cursor-pointer items-start focus:outline-none focus:bg-gray-50"
+      className={`grid min-w-0 cursor-pointer grid-cols-[30px_minmax(0,1fr)_auto] gap-2 border-b border-[#EAEBED] px-3 py-3 transition last:border-b-0 hover:bg-[#F9FAFA] focus:bg-[#F9FAFA] focus:outline-none lg:items-center ${gridClass}`}
     >
-      {/* 対応マーク — chats.status 由来 (unread / in_progress / resolved). */}
-      <div className="pt-1">
-        {friend.chatStatus === 'unread' ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-red-100 text-red-700">
-            未対応
-          </span>
-        ) : friend.chatStatus === 'in_progress' ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-yellow-100 text-yellow-700">
-            対応中
-          </span>
-        ) : (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-500">
-            対応済み
-          </span>
-        )}
+      <div onClick={(event) => event.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={selected ?? false}
+          onChange={() => onToggleSelect?.()}
+          aria-label={`${friend.displayName}を選ぶ`}
+          className="h-4 w-4 cursor-pointer accent-[#07C653]"
+        />
       </div>
 
-      {/* 名前 + アバター + 登録日 */}
-      <div className="flex items-start gap-2">
+      <div className="flex min-w-0 items-center gap-2.5">
         {friend.pictureUrl ? (
-          <img
-            src={friend.pictureUrl}
-            alt={friend.displayName}
-            className="w-9 h-9 rounded-full object-cover bg-gray-100 flex-shrink-0"
-          />
+          // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
+          <img src={friend.pictureUrl} alt="" className="h-9 w-9 shrink-0 rounded-full bg-[#EEF0F2] object-cover" />
         ) : (
-          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-medium flex-shrink-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E9F9EF] text-sm font-bold text-[#079B45]">
             {friend.displayName?.charAt(0) ?? '?'}
           </div>
         )}
         <div className="min-w-0">
-          {/* 行のクリックはトークを開く。名前からは詳細へ行けるようにする。
-              行の動きを変えると、既にトークを開く操作として覚えられている
-              ものが変わってしまう。 */}
-          <Link
-            href={`/friends/detail?id=${friend.id}`}
-            onClick={(event) => event.stopPropagation()}
-            className="block truncate text-sm font-medium text-gray-900 hover:underline"
-          >
+          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block truncate text-sm font-semibold text-[#1D1D1F] hover:text-[#0067D9] hover:underline">
             {friend.displayName}
           </Link>
-          <p className="text-[10px] text-gray-400 mt-0.5">登録: {formatJstDate(friend.createdAt)}</p>
-          {!isFollowing && (
-            <p className="text-[10px] text-red-400 mt-0.5">ブロック / 退会</p>
-          )}
+          <p className="mt-0.5 truncate text-[10px] text-[#8B938D]">登録 {formatDate(friend.createdAt)}</p>
+          {!friend.isFollowing ? <span className="mt-1 inline-flex rounded-full bg-[#FFF1F2] px-2 py-0.5 text-[10px] font-medium text-[#C3323B]">ブロック / 非表示</span> : null}
         </div>
       </div>
 
-      {/* シナリオ */}
-      <div className="pt-1">
-        {scenario ? (
-          <div>
-            <p className="text-xs font-medium text-blue-700 truncate" title={scenario.name}>
-              {scenario.name}
-            </p>
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              {scenario.status === 'active' ? '配信中' : scenario.status === 'delivering' ? '配信処理中' : scenario.status}
-            </p>
-          </div>
-        ) : (
-          <span className="text-xs text-gray-400">停止中</span>
-        )}
+      <div className="flex justify-end lg:block">
+        <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold ${status.className}`}>{status.label}</span>
+        <p className="mt-1 hidden truncate text-[10px] text-[#8B938D] lg:block">担当 未設定</p>
       </div>
 
-      {/* 受信メッセージ */}
-      <div className="min-w-0">
-        {incoming ? (
+      <div className="col-start-2 min-w-0 lg:col-auto">
+        {friend.activeScenario ? (
           <>
-            <p className="text-xs text-gray-700 line-clamp-2 break-all">
-              {incoming.messageType === 'text' ? incoming.content : `[${incoming.messageType}]`}
-            </p>
-            <p className="text-[10px] text-gray-400 mt-1">
-              ({formatJstTimestamp(incoming.createdAt)})
-            </p>
+            <p className="truncate text-xs font-medium text-[#0067D9]" title={friend.activeScenario.name}>{friend.activeScenario.name}</p>
+            <p className="mt-0.5 text-[10px] text-[#8B938D]">{friend.activeScenario.status === 'active' ? '配信中' : '停止中'}</p>
           </>
-        ) : (
-          <span className="text-xs text-gray-400">受信なし</span>
-        )}
+        ) : <span className="text-xs text-[#8B938D]">なし</span>}
       </div>
 
-      {/* 流入など、一覧で判別しやすい最小限の友だち情報だけを表示。 */}
-      <div className="space-y-1">
-        {friend.firstTrackedLinkName && (
-          <p className="text-[10px] text-gray-500">
-            <span className="text-gray-400">ASP_LP名：</span>
-            {friend.firstTrackedLinkName}
-          </p>
-        )}
-        {friend.refCode && !friend.firstTrackedLinkName && (
-          <p className="text-[10px] text-gray-500">
-            <span className="text-gray-400">流入：</span>
-            {friend.refCode}
-          </p>
-        )}
-        {/* IG account attribution (written by IG Harness cross-link, first touch) */}
-        {(() => {
-          const meta = (friend as unknown as { metadata?: Record<string, unknown> }).metadata
-          const igUsername = meta?.ig_account_username as string | undefined
-          const igAccountId = meta?.ig_account_id as string | undefined
-          if (!igUsername && !igAccountId) return null
-          return (
-            <p className="text-[10px] text-pink-600">
-              <span className="text-gray-400">IG流入：</span>
-              {igUsername ? `@${igUsername}` : igAccountId}
+      <div className="col-span-2 col-start-2 min-w-0 lg:col-auto lg:col-span-1">
+        {latest ? (
+          <>
+            <p className="line-clamp-2 text-xs leading-5 text-[#565F59]" title={latest.content}>
+              {latest.messageType === 'text' ? latest.content : `[${latest.messageType}]`}
             </p>
-          )
-        })()}
-        {!friend.firstTrackedLinkName && !friend.refCode &&
-          !(friend as unknown as { metadata?: Record<string, unknown> }).metadata?.ig_account_username &&
-          !(friend as unknown as { metadata?: Record<string, unknown> }).metadata?.ig_account_id && (
-          <span className="text-[10px] text-gray-300">—</span>
-        )}
+            <p className="mt-0.5 text-[10px] text-[#8B938D]">{formatDateTime(latest.createdAt)}</p>
+          </>
+        ) : <span className="text-xs text-[#8B938D]">受信なし</span>}
       </div>
 
-      <div className="pt-0.5 text-right">
-        <button
-          type="button"
-          onClick={(event) => { event.stopPropagation(); onDetailClick?.() }}
-          className="w-full rounded-lg border border-emerald-600 bg-white px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-50"
-        >
-          詳細
-        </button>
+      <div className="col-span-2 col-start-2 flex min-w-0 flex-wrap content-center gap-1 lg:col-auto lg:col-span-1">
+        {friend.tags.slice(0, 2).map((tag) => (
+          <span key={tag.id} title={tag.name} className="max-w-full truncate rounded-full bg-[#E9F9EF] px-2 py-1 text-[10px] font-medium text-[#079B45]">{tag.name}</span>
+        ))}
+        {friend.tags.length > 2 ? <span className="rounded-full bg-[#EEF0F2] px-2 py-1 text-[10px] text-[#565F59]">+{friend.tags.length - 2}</span> : null}
+        {!friend.tags.length && friend.firstTrackedLinkName ? <span title={friend.firstTrackedLinkName} className="max-w-full truncate text-[10px] text-[#565F59]">{friend.firstTrackedLinkName}</span> : null}
+        {!friend.tags.length && !friend.firstTrackedLinkName ? <span className="text-[10px] text-[#B8BCC2]">—</span> : null}
+      </div>
+
+      <div className="col-start-2 text-xs tabular-nums text-[#565F59] lg:col-auto lg:text-center" title={formatDateTime(lastContact)}>
+        {formatDate(lastContact)}
       </div>
     </div>
   )
 }
 
-// Format ISO ts to "YYYY-MM-DD HH:MM:SS" in JST. The DB stores values
-// already in JST (`+09:00` strftime), so we render as-is — using the
-// browser's locale formatter would re-interpret as UTC and shift 9h.
-function formatJstTimestamp(iso: string): string {
-  // Accept both `2026-05-08T13:45:00.000+09:00` and `2026-05-08T13:45:00`.
-  // Slice off the timezone suffix and the millisecond decimals to land on
-  // the 19-char canonical form, then swap T → space.
+function formatDateTime(iso: string): string {
   const trimmed = iso.replace(/(\.\d+)?(Z|[+\-]\d{2}:?\d{2})?$/, '')
-  return trimmed.replace('T', ' ').slice(0, 19)
+  return trimmed.replace('T', ' ').slice(0, 16)
 }
 
-// Date-only variant for the registration column. Same JST-as-stored
-// rationale — slice off everything after the date portion.
-function formatJstDate(iso: string): string {
+function formatDate(iso: string): string {
   return iso.slice(0, 10).replace(/-/g, '/')
 }

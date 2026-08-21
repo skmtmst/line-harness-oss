@@ -79,7 +79,10 @@ CREATE TABLE IF NOT EXISTS scenario_steps (
   scenario_id     TEXT NOT NULL REFERENCES scenarios (id) ON DELETE CASCADE,
   step_order      INTEGER NOT NULL,
   delay_minutes   INTEGER NOT NULL DEFAULT 0,
-  message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
+  -- 155: シナリオ・一斉配信と同じ8種別
+  message_type    TEXT NOT NULL CHECK (message_type IN (
+                    'text', 'image', 'flex', 'location', 'video', 'audio', 'sticker', 'carousel'
+                  )),
   message_content TEXT NOT NULL,
   message_bubbles_json TEXT CHECK (message_bubbles_json IS NULL OR json_valid(message_bubbles_json)),
   offset_days     INTEGER,
@@ -205,6 +208,7 @@ CREATE TABLE IF NOT EXISTS messages_log (
   delivery_type    TEXT CHECK (delivery_type IN ('push', 'reply', 'test')),
   source           TEXT,
   line_account_id  TEXT,
+  sent_by_staff_id TEXT,
   created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -214,6 +218,40 @@ CREATE INDEX IF NOT EXISTS idx_messages_log_friend_id ON messages_log (friend_id
 CREATE INDEX IF NOT EXISTS idx_messages_log_created_at ON messages_log (created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_source ON messages_log (friend_id, source);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_direction_created ON messages_log (friend_id, direction, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
+
+-- ============================================================
+-- Manual outbound send idempotency
+-- ============================================================
+CREATE TABLE IF NOT EXISTS outbound_send_requests (
+  idempotency_key TEXT PRIMARY KEY,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  resource_id     TEXT NOT NULL,
+  payload_hash    TEXT NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('in_progress', 'succeeded')),
+  response_id     TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  completed_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbound_send_requests_created
+  ON outbound_send_requests(created_at);
+
+-- ============================================================
+-- Per-staff inbox read positions
+-- ============================================================
+CREATE TABLE IF NOT EXISTS inbox_staff_reads (
+  staff_id        TEXT NOT NULL,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  conversation_id TEXT NOT NULL,
+  last_read_at    TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  PRIMARY KEY (staff_id, channel, conversation_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_inbox_staff_reads_conversation
+  ON inbox_staff_reads (channel, conversation_id, staff_id);
 
 -- ============================================================
 -- Auto Replies
@@ -227,10 +265,42 @@ CREATE TABLE IF NOT EXISTS auto_replies (
   template_id      TEXT REFERENCES templates(id) ON DELETE SET NULL,
   line_account_id  TEXT DEFAULT NULL,
   is_active        INTEGER NOT NULL DEFAULT 1,
-  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  -- 151: 応答したときに順に実行することの並び（シナリオのアクションと同じ形）。
+  actions_json           TEXT,
+  -- 151: 応答する曜日（0=日 … 6=土）。時間帯は active_from / active_until が持つ。
+  response_weekdays_json TEXT,
+  -- 151: 'ignore' | 'include' | 'exclude'
+  response_holiday_rule  TEXT,
+  -- 151: 1人につき1回だけ応答する。cooldown_minutes（N分空ける）とは別。
+  once_per_friend        INTEGER NOT NULL DEFAULT 0,
+  -- 151: キーワードを複数行持つ。未設定なら keyword / match_type を見る。
+  keywords_json          TEXT,
+  -- 157: キーワードを問わず、届いたメッセージすべてに応答する（営業時間外の案内など）。
+  respond_to_all         INTEGER NOT NULL DEFAULT 0,
+  -- 158: 管理用の名前。空なら keyword を代わりに出す。
+  name                   TEXT,
+  -- 158: キーワードが複数あるとき 'any'（どれか1つ）か 'all'（すべて）か。
+  keyword_match_mode     TEXT NOT NULL DEFAULT 'any'
 );
 
 CREATE INDEX IF NOT EXISTS idx_auto_replies_template_id ON auto_replies(template_id);
+
+-- =============================================================================
+-- 152: 自動応答が当たった記録
+-- =============================================================================
+-- 外部キーは張らない。ルールを消しても、当たった事実は残す。
+CREATE TABLE IF NOT EXISTS auto_reply_hits (
+  id              TEXT PRIMARY KEY,
+  auto_reply_id   TEXT NOT NULL,
+  friend_id       TEXT,
+  line_account_id TEXT,
+  matched_keyword TEXT,
+  hit_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_auto_reply_hits_rule   ON auto_reply_hits(auto_reply_id, hit_at);
+CREATE INDEX IF NOT EXISTS idx_auto_reply_hits_friend ON auto_reply_hits(auto_reply_id, friend_id);
 
 -- ============================================================
 -- Admin Users
@@ -312,6 +382,7 @@ CREATE TABLE IF NOT EXISTS conversion_events (
 
 CREATE INDEX IF NOT EXISTS idx_conversion_events_point ON conversion_events (conversion_point_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_events_friend ON conversion_events (friend_id);
+CREATE INDEX IF NOT EXISTS idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 
 -- ============================================================
@@ -625,6 +696,13 @@ CREATE TABLE IF NOT EXISTS reminders (
   name        TEXT NOT NULL,
   description TEXT,
   is_active   INTEGER NOT NULL DEFAULT 1,
+  -- 153: 配信方式。作成後は変えられない（登録済みの配信予定が全部変わるため）。
+  -- 'time' … ゴールの○日前の●時 / 'countdown' … ゴールから何分ずらすか
+  delivery_mode TEXT NOT NULL DEFAULT 'countdown',
+  -- 154: 友だち情報欄の日付をゴールにする（誕生日・次回お届け日・契約更新日）。
+  trigger_field_id TEXT,
+  -- 154: 毎年くり返すか。誕生日は 1、契約更新日は 0。
+  repeat_yearly INTEGER NOT NULL DEFAULT 0,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -635,6 +713,12 @@ CREATE TABLE IF NOT EXISTS reminder_steps (
   offset_minutes  INTEGER NOT NULL,
   message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex')),
   message_content TEXT NOT NULL,
+  -- 153: 「ゴールの○日前の●時」で指定する。offset_minutes より優先する。
+  offset_days     INTEGER,
+  send_at_time    TEXT,
+  -- 153: 送る中身をテンプレートから選ぶ。外部キーは張らない
+  -- （テンプレートを消したときにリマインダごと消えないように）。
+  template_id     TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -695,11 +779,36 @@ CREATE TABLE IF NOT EXISTS templates (
   category        TEXT NOT NULL DEFAULT 'general',
   message_type    TEXT NOT NULL CHECK (message_type IN ('text', 'image', 'flex', 'carousel')),
   message_content TEXT NOT NULL,
+  -- 162: カルーセルの選択肢を押したときの動き。
+  -- { "0": { "0": [アクションの並び] } }（パネル番号 → 選択肢番号 → 中身）
+  carousel_actions_json TEXT,
+  -- 162: 選択肢の押せる回数。'none'（制限なし）／'once'（全体で1回）
+  carousel_tap_limit_mode TEXT NOT NULL DEFAULT 'none',
+  -- 162: 制限を超えたときに返すテキスト。空なら何も返さない。
+  carousel_tap_limit_text TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_templates_category ON templates (category);
+
+-- =============================================================================
+-- 162: カルーセルの選択肢が押された記録
+-- =============================================================================
+-- 外部キーは張らない。テンプレートを消しても、押された事実は残す。
+CREATE TABLE IF NOT EXISTS carousel_taps (
+  id              TEXT PRIMARY KEY,
+  template_id     TEXT NOT NULL,
+  column_index    INTEGER NOT NULL,
+  action_index    INTEGER NOT NULL,
+  action_label    TEXT,
+  friend_id       TEXT,
+  line_account_id TEXT,
+  tapped_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_carousel_taps_friend ON carousel_taps(template_id, friend_id);
+CREATE INDEX IF NOT EXISTS idx_carousel_taps_action ON carousel_taps(template_id, column_index, action_index);
 
 -- ============================================================
 -- Round 3: オペレーター/チャット
@@ -762,6 +871,7 @@ WHERE EXISTS (
 );
 DROP INDEX IF EXISTS idx_chats_friend;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chats_friend_unique ON chats (friend_id);
+CREATE INDEX IF NOT EXISTS idx_chats_friend_status_message ON chats(friend_id, status, last_message_at);
 CREATE INDEX IF NOT EXISTS idx_chats_operator ON chats (operator_id);
 CREATE INDEX IF NOT EXISTS idx_chats_status ON chats (status);
 
@@ -912,12 +1022,20 @@ CREATE TABLE IF NOT EXISTS staff_members (
   access_level TEXT NOT NULL DEFAULT 'full' CHECK (access_level IN ('full', 'read_only')),
   api_key    TEXT UNIQUE NOT NULL,
   is_active  INTEGER NOT NULL DEFAULT 1,
+  permission_keys TEXT NOT NULL DEFAULT '[]',
+  notification_preferences TEXT NOT NULL DEFAULT '{}',
+  invite_status TEXT NOT NULL DEFAULT 'active',
+  invite_token_hash TEXT,
+  invite_expires_at TEXT,
+  email_verified_at TEXT,
+  line_linked_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_staff_members_api_key ON staff_members(api_key);
 CREATE INDEX IF NOT EXISTS idx_staff_members_role ON staff_members(role);
+CREATE INDEX IF NOT EXISTS idx_staff_members_invite_token ON staff_members(invite_token_hash);
 
 -- Reusable message templates (text or Flex) for reward messages in campaigns
 CREATE TABLE IF NOT EXISTS message_templates (
@@ -1114,6 +1232,16 @@ CREATE TABLE IF NOT EXISTS rich_menu_groups (
   is_default_for_all INTEGER NOT NULL DEFAULT 0,
   status             TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
   publishing_at      TEXT,
+  -- 149: 友だちごとの出し分け。条件の形は一斉配信・シナリオと同じ
+  -- （SegmentCondition の JSON）。priority は当てはまったときの順番で、
+  -- 小さいほうが先。
+  targeting_condition TEXT,
+  targeting_priority  INTEGER NOT NULL DEFAULT 0,
+  targeting_enabled   INTEGER NOT NULL DEFAULT 0,
+  -- 159: フォルダで分ける。箱そのものは folders（kind='rich_menu'）。
+  folder_id           TEXT REFERENCES folders(id) ON DELETE SET NULL,
+  -- 160: 自分で決める並び順。小さいほど先。同じなら更新の新しい順。
+  display_order       INTEGER NOT NULL DEFAULT 0,
   created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -1141,6 +1269,16 @@ CREATE TABLE IF NOT EXISTS rich_menu_areas (
   bounds_height   INTEGER NOT NULL,
   action_type     TEXT NOT NULL CHECK (action_type IN ('uri','message','postback','richmenuswitch')),
   action_data     TEXT NOT NULL,
+  -- 146: 運用者から見た「何をするボタンか」。LINE の action_type 4種の上に乗せる
+  -- 言い換え（url / tel / text / template / form / switch / postback）。空なら
+  -- action_type から推測する。
+  intent          TEXT,
+  label           TEXT,
+  tag_ids         TEXT,
+  score_change    INTEGER,
+  template_id     TEXT,
+  form_id         TEXT,
+  tracked_link_id TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
@@ -1148,6 +1286,23 @@ CREATE TABLE IF NOT EXISTS rich_menu_areas (
 CREATE INDEX IF NOT EXISTS idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_index);
 CREATE INDEX IF NOT EXISTS idx_rich_menu_areas_page     ON rich_menu_areas(page_id);
 CREATE INDEX IF NOT EXISTS idx_rich_menu_groups_account ON rich_menu_groups(account_id, status);
+
+-- 148: リッチメニューのボタンが押された記録。
+-- 外部キーは張らない。ボタンやページを消しても、数えた事実は残す。
+-- 押された時点のボタン名を写しておくのも同じ理由（消えた後も名前が出る）。
+CREATE TABLE IF NOT EXISTS rich_menu_area_taps (
+  id              TEXT PRIMARY KEY,
+  area_id         TEXT NOT NULL,
+  page_id         TEXT NOT NULL,
+  group_id        TEXT NOT NULL,
+  area_label      TEXT,
+  friend_id       TEXT,
+  line_account_id TEXT,
+  tapped_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_rich_menu_area_taps_group ON rich_menu_area_taps(group_id, tapped_at);
+CREATE INDEX IF NOT EXISTS idx_rich_menu_area_taps_area  ON rich_menu_area_taps(area_id, tapped_at);
 
 -- =============================================================================
 -- Unified customer support inbox: email threads and messages (migration 072)
@@ -1194,6 +1349,15 @@ CREATE INDEX IF NOT EXISTS idx_support_email_messages_thread_created
   ON support_email_messages (thread_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_support_email_messages_reply_lookup
   ON support_email_messages (message_id);
+
+CREATE TABLE IF NOT EXISTS meet_callback_receipts (
+  session_id   TEXT PRIMARY KEY,
+  payload_hash TEXT NOT NULL,
+  received_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_meet_callback_receipts_received
+  ON meet_callback_receipts(received_at);
 
 CREATE TABLE IF NOT EXISTS support_email_sync_state (
   mailbox TEXT PRIMARY KEY,

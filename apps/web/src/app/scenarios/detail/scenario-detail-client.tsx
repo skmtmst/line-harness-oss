@@ -1,12 +1,42 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 
 import Link from 'next/link'
-import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode } from '@line-crm/shared'
+import { useRouter } from 'next/navigation'
+import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import FlexPreviewComponent from '@/components/flex-preview'
+import ActionEditor from '@/components/scenarios/action-editor'
+import TriggerEditor from '@/components/scenarios/trigger-editor'
+import CarouselPicker from '@/components/scenarios/carousel-picker'
+import InsertToolbar from '@/components/scenarios/insert-toolbar'
+import MessageKindFields, {
+  emptyMessageKindState,
+  parseMessageKind,
+  serializeMessageKind,
+  type MessageKind,
+  type MessageKindState,
+} from '@/components/scenarios/message-kind-fields'
+
+/** 専用の入力欄で書く種別か。 */
+function isStructuredKind(type: MessageType): boolean {
+  return type === 'location' || type === 'video' || type === 'audio' || type === 'sticker'
+}
+import QuestionEditor, {
+  emptyQuestion,
+  type ScenarioQuestion,
+} from '@/components/scenarios/question-editor'
+import {
+  ConditionDialog,
+  OnCompleteDialog,
+  TestSendDialog,
+  ON_COMPLETE_LABEL,
+  describeCondition,
+  type OnCompleteMode,
+} from '@/components/scenarios/scenario-dialogs'
+import type { SegmentCondition } from '@/components/shared/condition-builder'
 import ScheduleInput, {
   emptySchedule,
   buildSchedulePayload,
@@ -23,10 +53,21 @@ const triggerOptions: { value: ScenarioTriggerType; label: string }[] = [
   { value: 'manual', label: '手動' },
 ]
 
+/*
+ * 送れる種別（132 で拡張）。
+ *
+ * Flex はLステップのタブには無いが、こちらには前からある。カードタイプの
+ * メッセージを直に書くための口なので残す。
+ */
 const messageTypeOptions: { value: MessageType; label: string }[] = [
   { value: 'text', label: 'テキスト' },
   { value: 'image', label: '画像' },
-  { value: 'flex', label: 'Flex' },
+  { value: 'flex', label: 'Flex（カードタイプ）' },
+  { value: 'sticker', label: 'スタンプ' },
+  { value: 'location', label: '位置情報' },
+  { value: 'video', label: '動画' },
+  { value: 'audio', label: '音声' },
+  { value: 'carousel', label: 'カルーセル' },
 ]
 
 const modeBadgeStyle: Record<DeliveryMode, { bg: string; text: string; label: string }> = {
@@ -76,7 +117,15 @@ interface StepFormState {
   messageContent: string
   templateId: string | null
   onReachTagId: string | null
+  /** この通を送ったあと。'pause' なら次へ進めず止める。 */
+  afterSend: 'continue' | 'pause'
   inputMode: 'direct' | 'template'
+  /** 1通ごとの配信対象。null は「購読中の全員に配信する」。 */
+  targetCondition: SegmentCondition | null
+  /** 質問メッセージ。null ならふつうの通。 */
+  question: ScenarioQuestion | null
+  /** 下書き。1 なら配信しない。 */
+  isDraft: boolean
 }
 
 function emptyStepForm(stepOrder: number): StepFormState {
@@ -87,7 +136,11 @@ function emptyStepForm(stepOrder: number): StepFormState {
     messageContent: '',
     templateId: null,
     onReachTagId: null,
+    afterSend: 'continue',
     inputMode: 'direct',
+    targetCondition: null,
+    question: null,
+    isDraft: false,
   }
 }
 
@@ -124,7 +177,7 @@ function ImagePreview({ content }: { content: string }) {
       <div>
         <span className="text-xs font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded mb-2 inline-block">画像</span>
         {url ? (
-          <img src={url} alt="preview" className="max-w-[200px] rounded-lg border border-hairline mt-1" />
+          <img src={url} alt="preview" className="border-hairline rounded-card mt-1 max-w-[200px] border" />
         ) : (
           <p className="text-xs text-ink-faint">プレビューなし</p>
         )}
@@ -135,6 +188,42 @@ function ImagePreview({ content }: { content: string }) {
   }
 }
 
+/**
+ * 設定の札1枚。設計は5枚を横に並べ、直せるものだけ右上に入口を出す。
+ *
+ * 直す先が無いものに入口を付けると、押しても何も起きない札ができる。
+ * action を渡さなければ、読むだけの札になる。
+ */
+function SettingCard({
+  label,
+  action,
+  onAction,
+  children,
+}: {
+  label: string
+  action?: string
+  onAction?: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="bg-canvas rounded-card border-hairline border p-4">
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <p className="text-ink-faint text-xs">{label}</p>
+        {action && onAction && (
+          <button
+            type="button"
+            onClick={onAction}
+            className="text-accent shrink-0 text-xs hover:underline"
+          >
+            {action}
+          </button>
+        )}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 export default function ScenarioDetailClient({ scenarioId }: { scenarioId: string }) {
   const id = scenarioId
 
@@ -143,14 +232,58 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   const [error, setError] = useState('')
 
   const [editing, setEditing] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true })
+  const [editForm, setEditForm] = useState({ name: '', description: '', triggerType: 'friend_add' as ScenarioTriggerType, isActive: true, allowConcurrent: true, folderId: '' })
+  const [folders, setFolders] = useState<Folder[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    void api.folders.list('scenario').then((res) => {
+      if (!cancelled && res.success) setFolders(res.data)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
   const [saving, setSaving] = useState(false)
 
+  const router = useRouter()
+  const [duplicating, setDuplicating] = useState(false)
+  /** 表の行で開いている1通ぶんのプレビュー。設計の「プレビュー」。 */
+  const [previewStepId, setPreviewStepId] = useState<string | null>(null)
+  const [duplicatingStepId, setDuplicatingStepId] = useState<string | null>(null)
   const [showStepForm, setShowStepForm] = useState(false)
+  /** 何通目のあとに差し込むか。末尾に足すときは null。 */
+  const [insertAfter, setInsertAfter] = useState<number | null>(null)
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [stepForm, setStepForm] = useState<StepFormState>(() => emptyStepForm(1))
   const [stepSaving, setStepSaving] = useState(false)
   const [stepError, setStepError] = useState('')
+
+  /* --- 追加した窓。開いているものだけ描く --- */
+  /** シナリオ全体の配信対象。 */
+  const [audienceOpen, setAudienceOpen] = useState(false)
+  /** 最終コンテンツ配信後の処理。 */
+  const [onCompleteOpen, setOnCompleteOpen] = useState(false)
+  /** 1通ごとの配信対象。編集中のフォームに対して開く。 */
+  const [stepTargetOpen, setStepTargetOpen] = useState(false)
+  /** テスト送信。null なら閉じている。stepId が null なら全通。 */
+  const [testSend, setTestSend] = useState<{ stepId: string | null; label: string } | null>(null)
+  /** アクション設定。 */
+  const [actionTarget, setActionTarget] = useState<{
+    hook: 'step_sent' | 'scenario_completed' | 'choice_selected'
+    stepId: string | null
+    choiceIndex: number | null
+    title: string
+  } | null>(null)
+  /** 通ごとのアクション件数。バッジに出す。 */
+  const [actionCounts, setActionCounts] = useState<Record<string, number>>({})
+  /** 開始のきっかけ。窓の開閉と、札に出す件数。 */
+  const [triggerOpen, setTriggerOpen] = useState(false)
+  const [triggerCount, setTriggerCount] = useState<number | null>(null)
+  /** 位置情報・動画・音声・スタンプの入力。 */
+  const [kindState, setKindState] = useState<MessageKindState>(() => emptyMessageKindState())
+  /** 差し込みをカーソルの位置に入れるために、本文の入力欄を持つ。 */
+  const stepBodyRef = useRef<HTMLTextAreaElement>(null)
 
   const [previewOpen, setPreviewOpen] = useState(false)
 
@@ -173,6 +306,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           triggerType: res.data.triggerType,
           isActive: res.data.isActive,
           allowConcurrent: res.data.allowConcurrent !== false,
+          folderId: res.data.folderId ?? '',
         })
       } else {
         setError(res.error)
@@ -215,9 +349,123 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     return () => { cancelled = true }
   }, [id])
 
+  /**
+   * 通ごとのアクション件数。行に「アクション 2」と出すために引く。
+   * 件数が見えないと、設定したことを忘れて二重に足す。
+   */
+  const reloadActionCounts = useCallback(() => {
+    api.scenarios.actions
+      .list(id)
+      .then((res) => {
+        if (!res.success) return
+        const counts: Record<string, number> = {}
+        for (const action of res.data) {
+          const key = action.hook === 'scenario_completed' ? '__complete__' : (action.stepId ?? '')
+          if (!key) continue
+          counts[key] = (counts[key] ?? 0) + 1
+        }
+        setActionCounts(counts)
+      })
+      .catch(() => {})
+  }, [id])
+
+  useEffect(() => {
+    if (id) reloadActionCounts()
+  }, [id, reloadActionCounts])
+
+  useEffect(() => {
+    if (!id) return
+    api.scenarios.triggers
+      .list(id)
+      .then((res) => {
+        if (res.success) setTriggerCount(res.data.length)
+      })
+      .catch(() => {})
+  }, [id])
+
   const reloadStats = useCallback(() => {
     api.scenarios.stats(id).then((r) => { if (r.success) setStats(r.data) }).catch(() => {})
   }, [id])
+
+  /**
+   * 重複購読の許可を切り替える。
+   *
+   * 編集モードに入らずその場で当てる。読むだけの説明の隣にあるものなので、
+   * 「編集 → 変更 → 保存」を挟むと、何を編集しているのか分からなくなる。
+   */
+  const handleConcurrentChange = async (allow: boolean) => {
+    if (!scenario || (scenario.allowConcurrent ?? true) === allow) return
+    setError('')
+    try {
+      const res = await api.scenarios.update(id, { allowConcurrent: allow })
+      if (res.success) loadScenario()
+      else setError(res.error)
+    } catch {
+      setError('重複購読の設定を変更できませんでした')
+    }
+  }
+
+  /**
+   * シナリオを丸ごと複製する。
+   *
+   * 似た流れをもう1本作るとき、通を1つずつ写すのは現実的でない。
+   * 中身だけ写して、名前に「のコピー」を付け、止めた状態で作る。
+   * 作った直後に配信が始まると、確かめる前に届いてしまう。
+   */
+  const handleDuplicate = async () => {
+    if (!scenario || duplicating) return
+    setDuplicating(true)
+    setError('')
+    try {
+      const created = await api.scenarios.create({
+        name: `${scenario.name} のコピー`,
+        description: scenario.description,
+        triggerType: scenario.triggerType,
+        triggerTagId: scenario.triggerTagId,
+        lineAccountId: scenario.lineAccountId,
+        isActive: false,
+        deliveryMode: scenario.deliveryMode,
+        allowConcurrent: scenario.allowConcurrent,
+      })
+      if (!created.success) throw new Error(created.error)
+      // 通は順に足す。まとめて入れる口が無い。
+      for (const step of sortedSteps) {
+        await api.scenarios.addStep(created.data.id, {
+          stepOrder: step.stepOrder,
+          offsetMinutes: step.offsetMinutes ?? 0,
+          messageType: step.messageType,
+          messageContent: step.messageContent,
+          templateId: step.templateId ?? null,
+          onReachTagId: step.onReachTagId ?? null,
+          // 複製先でも同じところで止まる。止まる位置が変わると流れが別物になる。
+          afterSend: step.afterSend ?? 'continue',
+        })
+      }
+      router.push(`/scenarios/detail?id=${created.data.id}`)
+    } catch {
+      setError('複製に失敗しました')
+    } finally {
+      setDuplicating(false)
+    }
+  }
+
+  const handleDeleteScenario = async () => {
+    if (!scenario) return
+    const count = stats?.activeNow ?? 0
+    const message =
+      count > 0
+        ? `「${scenario.name}」はいま ${count} 人が購読中です。\n削除すると配信が止まり、途中の人は続きを受け取れません。よろしいですか？`
+        : `「${scenario.name}」を削除しますか？`
+    if (!confirm(message)) return
+    setError('')
+    try {
+      const res = await api.scenarios.delete(id)
+      if (!res.success) throw new Error(res.error)
+      router.push('/scenarios')
+    } catch {
+      setError('削除に失敗しました')
+    }
+  }
 
   const handleSaveScenario = async () => {
     if (!editForm.name.trim()) return
@@ -226,6 +474,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       const res = await api.scenarios.update(id, {
         name: editForm.name,
         description: editForm.description || null,
+        folderId: editForm.folderId || null,
         triggerType: editForm.triggerType,
         isActive: editForm.isActive,
         allowConcurrent: editForm.allowConcurrent,
@@ -248,6 +497,61 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
     setStepForm(emptyStepForm(nextOrder))
     setEditingStepId(null)
     setShowStepForm(true)
+    setInsertAfter(null)
+    setStepError('')
+  }
+
+  /**
+   * テンプレートから1通足す。
+   *
+   * 中身を直に書くのと同じフォームを、最初からテンプレート選択の状態で
+   * 開くだけ。別のフォームを作ると、あとから入力欄が片方にしか
+   * 足されない形でずれていく。
+   */
+  /**
+   * 質問（分岐）の通を新しく足す。
+   *
+   * 質問は本文を持たないので、messageContent は空のまま。配信側は
+   * question_json があればそちらを組み立てる。
+   */
+  const openAddQuestionStep = () => {
+    const nextOrder = scenario
+      ? scenario.steps.length > 0
+        ? Math.max(...scenario.steps.map((s) => s.stepOrder)) + 1
+        : 1
+      : 1
+    setStepForm({ ...emptyStepForm(nextOrder), question: emptyQuestion() })
+    setEditingStepId(null)
+    setShowStepForm(true)
+    setInsertAfter(null)
+    setStepError('')
+  }
+
+  const openAddTemplateStep = () => {
+    const nextOrder = scenario
+      ? scenario.steps.length > 0
+        ? Math.max(...scenario.steps.map(s => s.stepOrder)) + 1
+        : 1
+      : 1
+    setStepForm({ ...emptyStepForm(nextOrder), inputMode: 'template' })
+    setEditingStepId(null)
+    setShowStepForm(true)
+    setInsertAfter(null)
+    setStepError('')
+  }
+
+  /**
+   * 通と通のあいだに差し込む。
+   *
+   * 末尾にしか足せないと、3通目と4通目のあいだに1通入れたいときに、
+   * 後ろを全部作り直すことになる。あいだの「ここに挿入」から開くと、
+   * その位置の番号で新しい通を作る。
+   */
+  const openInsertStep = (afterOrder: number) => {
+    setStepForm(emptyStepForm(afterOrder + 1))
+    setEditingStepId(null)
+    setShowStepForm(true)
+    setInsertAfter(afterOrder)
     setStepError('')
   }
 
@@ -266,11 +570,22 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       messageContent: step.messageContent,
       templateId: step.templateId ?? null,
       onReachTagId: step.onReachTagId ?? null,
+      afterSend: step.afterSend ?? 'continue',
       inputMode: step.templateId ? 'template' : 'direct',
+      targetCondition: (step.targetCondition as SegmentCondition | null) ?? null,
+      question: (step.question as ScenarioQuestion | null) ?? null,
+      isDraft: step.isDraft === true,
     })
+    // 専用の欄で書く種別は、保存されている JSON を欄の形に戻す。
+    setKindState(
+      isStructuredKind(step.messageType)
+        ? parseMessageKind(step.messageType as MessageKind, step.messageContent)
+        : emptyMessageKindState(),
+    )
     setEditingStepId(step.id)
     // 編集はステップ行直下にインライン表示するので、上部の新規追加フォームは閉じる
     setShowStepForm(false)
+    setInsertAfter(null)
     setStepError('')
   }
 
@@ -333,6 +648,12 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         messageContent: payloadMessageContent,
         templateId: stepForm.inputMode === 'template' ? stepForm.templateId : null,
         onReachTagId: stepForm.onReachTagId,
+        afterSend: stepForm.afterSend,
+        // null を渡すと「絞り込みなし」に戻る。undefined だと据え置きになるので、
+        // 外したつもりが残るのを防ぐために必ず値を送る。
+        targetCondition: stepForm.targetCondition,
+        question: stepForm.question,
+        isDraft: stepForm.isDraft,
       }
       if (editingStepId) {
         const res = await api.scenarios.updateStep(id, editingStepId, payload)
@@ -341,6 +662,24 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           return
         }
       } else {
+        /*
+         * あいだに差し込むときは、後ろの通の番号を先に1つずつ送る。
+         * 送らずに同じ番号で足すと、並び順が重なってどちらが先か決まらない。
+         * 後ろから順に動かすのは、途中で番号がぶつからないようにするため。
+         */
+        if (insertAfter !== null) {
+          const moving = sortedSteps
+            .filter((st) => st.stepOrder > insertAfter)
+            .sort((a, b) => b.stepOrder - a.stepOrder)
+          if (moving.length > 0) {
+            const orders = moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 }))
+            const moved = await api.scenarios.reorderSteps(id, orders)
+            if (!moved.success) {
+              setStepError('あいだに入れるための並べ替えに失敗しました')
+              return
+            }
+          }
+        }
         const res = await api.scenarios.addStep(id, payload)
         if (!res.success) {
           setStepError(res.error)
@@ -354,6 +693,37 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       setStepError('ステップの保存に失敗しました')
     } finally {
       setStepSaving(false)
+    }
+  }
+
+  /**
+   * この通を複製する（設計の行の操作）。
+   *
+   * 同じ中身の通を、すぐ下（stepOrder + 1）に作る。あいだに入れるので、
+   * 後ろの通は「ここに挿入」と同じ経路で押し出される。
+   */
+  const handleDuplicateStep = async (step: ScenarioStep) => {
+    if (duplicatingStepId) return
+    setDuplicatingStepId(step.id)
+    try {
+      await api.scenarios.addStep(id, {
+        stepOrder: step.stepOrder + 1,
+        messageType: step.messageType,
+        messageContent: step.messageContent,
+        delayMinutes: step.delayMinutes,
+        offsetDays: step.offsetDays ?? undefined,
+        offsetMinutes: step.offsetMinutes ?? undefined,
+        deliveryTime: step.deliveryTime ?? undefined,
+        templateId: step.templateId ?? null,
+        onReachTagId: step.onReachTagId ?? null,
+        afterSend: step.afterSend,
+      })
+      loadScenario()
+      reloadStats()
+    } catch {
+      setError('この通を複製できませんでした')
+    } finally {
+      setDuplicatingStepId(null)
     }
   }
 
@@ -392,7 +762,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   // 新規追加（上部）とステップ編集（行直下インライン）の両方で使うフォーム。
   // 同時に開くのは常に片方だけなので、state は stepForm を共有する。
   const renderStepForm = () => (
-    <div className={`${editingStepId ? 'mt-3' : 'mb-6'} p-4 bg-canvas-sunken rounded-lg border border-hairline`}>
+    <div className={`${editingStepId ? 'mt-3' : 'mb-6'} border-hairline rounded-card bg-canvas-sunken border p-4`}>
       <h4 className="text-sm font-medium text-ink-secondary mb-3">
         {editingStepId ? 'ステップを編集' : '新しいステップを追加'}
       </h4>
@@ -402,7 +772,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           <input
             type="number"
             min={1}
-            className="w-32 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+            className="w-32 border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             value={stepForm.stepOrder}
             onChange={(e) => setStepForm({ ...stepForm, stepOrder: Number(e.target.value) })}
           />
@@ -436,11 +806,58 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </div>
         </div>
 
-        {stepForm.inputMode === 'template' && (
+        {/*
+          質問（分岐）の通。本文の代わりに選択肢を組み立てる。ふつうの通と
+          行き来できるように、切り替えのボタンをここに置く。
+        */}
+        {stepForm.question ? (
+          <div className="border-hairline rounded-card border p-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h4 className="text-ink text-sm font-bold">質問（分岐）</h4>
+              <button
+                type="button"
+                onClick={() => setStepForm({ ...stepForm, question: null })}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 border px-3 text-xs"
+              >
+                ふつうの通に戻す
+              </button>
+            </div>
+            <QuestionEditor
+              value={stepForm.question}
+              onChange={(next) => setStepForm({ ...stepForm, question: next })}
+              onOpenChoiceActions={
+                editingStepId
+                  ? (choiceIndex) =>
+                      setActionTarget({
+                        hook: 'choice_selected',
+                        stepId: editingStepId,
+                        choiceIndex,
+                        title: `選択肢${choiceIndex + 1}が押されたとき`,
+                      })
+                  : undefined
+              }
+            />
+            {!editingStepId && (
+              <p className="text-ink-faint mt-3 text-xs">
+                選択肢ごとのアクションは、この通を保存してから設定できます。
+              </p>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setStepForm({ ...stepForm, question: emptyQuestion() })}
+            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 self-start border px-3 text-xs"
+          >
+            この通を質問（分岐）にする
+          </button>
+        )}
+
+        {!stepForm.question && stepForm.inputMode === 'template' && (
           <div>
-            <label className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-medium text-ink-secondary mb-1">テンプレート <span className="text-danger">*</span></label>
             <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               value={stepForm.templateId ?? ''}
               onChange={(e) => setStepForm({ ...stepForm, templateId: e.target.value || null })}
             >
@@ -455,12 +872,12 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </div>
         )}
 
-        {stepForm.inputMode === 'direct' && (
+        {!stepForm.question && stepForm.inputMode === 'direct' && (
           <>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージタイプ</label>
               <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 value={stepForm.messageType}
                 onChange={(e) => setStepForm({ ...stepForm, messageType: e.target.value as MessageType })}
               >
@@ -469,16 +886,58 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-red-500">*</span></label>
-              <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
-                rows={4}
-                placeholder="メッセージ内容を入力..."
-                value={stepForm.messageContent}
-                onChange={(e) => setStepForm({ ...stepForm, messageContent: e.target.value })}
+            {/*
+              位置情報・動画・音声・スタンプは、本文ではなく専用の欄で書く。
+              中身は JSON なので、生のまま書かせると必ず壊れる。
+            */}
+            {stepForm.messageType === 'carousel' ? (
+              // カルーセルはテンプレートを指す形。中身はそちらが持つ。
+              <CarouselPicker
+                value={stepForm.templateId ?? ''}
+                onChange={(id, tpl) =>
+                  setStepForm((prev) => ({
+                    ...prev,
+                    templateId: id || null,
+                    // 控えは実物を入れる。テンプレートを消したときに
+                    // これが使われるので、要約では送れなくなる。
+                    messageContent: tpl?.messageContent ?? '',
+                  }))
+                }
               />
-            </div>
+            ) : isStructuredKind(stepForm.messageType) ? (
+              <MessageKindFields
+                kind={stepForm.messageType as MessageKind}
+                value={kindState}
+                onChange={(next) => {
+                  setKindState(next)
+                  const json = serializeMessageKind(stepForm.messageType as MessageKind, next)
+                  setStepForm((prev) => ({ ...prev, messageContent: json ?? '' }))
+                }}
+              />
+            ) : (
+              <div>
+                <label className="block text-xs font-medium text-ink-secondary mb-1">メッセージ内容 <span className="text-danger">*</span></label>
+                {/* 差し込みは本文のときだけ。Flex は JSON なので、入れる位置を
+                    間違えると本文が壊れる。 */}
+                {stepForm.messageType === 'text' && (
+                  <div className="mb-2">
+                    <InsertToolbar
+                      targetRef={stepBodyRef}
+                      value={stepForm.messageContent}
+                      onChange={(next) => setStepForm((prev) => ({ ...prev, messageContent: next }))}
+                    />
+                  </div>
+                )}
+                <textarea
+                  ref={stepBodyRef}
+                  className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                  rows={4}
+                  placeholder="メッセージ内容を入力..."
+                  value={stepForm.messageContent}
+                  onChange={(e) => setStepForm({ ...stepForm, messageContent: e.target.value })}
+                />
+              </div>
+            )}
           </>
         )}
 
@@ -488,7 +947,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">到達したらタグ付与</label>
             <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               value={stepForm.onReachTagId ?? ''}
               onChange={(e) => setStepForm({ ...stepForm, onReachTagId: e.target.value || null })}
             >
@@ -501,6 +960,58 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
               このステップが配信完了したら、選んだタグを友だちに付与します
             </p>
           </div>
+
+          {/*
+            送ったあと止めるかどうか。体調の記録をお願いして返事を待つ、と
+            いった流れで要る。止めておけば、返事が来てから人が再開できる。
+            以前は送ったら必ず次へ進み、返事を待つあいだにも次の通が届いていた。
+          */}
+          <div>
+            <label className="block text-xs font-medium text-ink-secondary mb-1">配信後</label>
+            <select
+              className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              value={stepForm.afterSend}
+              onChange={(e) =>
+                setStepForm({ ...stepForm, afterSend: e.target.value as 'continue' | 'pause' })
+              }
+            >
+              <option value="continue">次の通へ進む</option>
+              <option value="pause">送信後 一時停止する</option>
+            </select>
+            <p className="text-xs text-ink-faint mt-0.5">
+              一時停止にすると、この通を送ったところで止まります。再開するまで次は届きません。
+            </p>
+          </div>
+
+          {/*
+            1通ごとの配信対象。シナリオ全体の絞り込みとは別。対象から外れた人は
+            この通だけ飛ばして次へ進む（止めない）。
+          */}
+          <div>
+            <label className="block text-xs font-medium text-ink-secondary mb-1">配信対象の絞り込み</label>
+            <button
+              type="button"
+              onClick={() => setStepTargetOpen(true)}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control h-9 w-full border px-3 text-left text-sm"
+            >
+              {stepForm.targetCondition
+                ? describeCondition(stepForm.targetCondition)
+                : 'シナリオ購読中の全員に配信する'}
+            </button>
+            <p className="text-xs text-ink-faint mt-0.5">
+              条件に合わない人には、この通だけ送りません。次の通へはそのまま進みます。
+            </p>
+          </div>
+
+          {/* 下書き。書きかけを保存しておくため。配信からは外れる。 */}
+          <label className="text-ink-secondary flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={stepForm.isDraft}
+              onChange={(e) => setStepForm({ ...stepForm, isDraft: e.target.checked })}
+            />
+            下書きにする（配信されません。テスト送信では送れます）
+          </label>
         </div>
 
         {stepError && <p className="text-xs text-red-600">{stepError}</p>}
@@ -515,7 +1026,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </button>
           <button
             onClick={closeStepForm}
-            className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors"
+            className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
           >
             キャンセル
           </button>
@@ -529,7 +1040,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       <div>
         <Header title="シナリオ詳細" />
         <div className="bg-canvas rounded-card border border-hairline p-8 animate-pulse space-y-4">
-          <div className="h-6 bg-gray-200 rounded w-1/3" />
+          <div className="bg-canvas-sunken h-6 w-1/3 rounded" />
           <div className="h-4 bg-canvas-sunken rounded w-2/3" />
           <div className="h-4 bg-canvas-sunken rounded w-1/2" />
         </div>
@@ -543,7 +1054,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         <Header title="シナリオ詳細" />
         <div className="bg-canvas rounded-card border border-hairline p-8 text-center">
           <p className="text-ink-faint">{error || 'シナリオが見つかりません'}</p>
-          <Link href="/scenarios" className="text-sm text-green-600 hover:text-green-700 mt-4 inline-block">
+          <Link href="/scenarios" className="text-accent hover:text-accent-hover mt-4 inline-block text-sm">
             ← シナリオ一覧に戻る
           </Link>
         </div>
@@ -552,43 +1063,131 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
   }
 
   const sortedSteps = [...scenario.steps].sort((a, b) => a.stepOrder - b.stepOrder)
+
+  /**
+   * 隣り合う通の間で、いちばん人が減ったところ。
+   *
+   * 到達人数はステップごとに集計済みだったが、画面はそれを表の中でしか
+   * 使っていなかった。「どこで読まれなくなるか」は1通ずつ見比べないと
+   * 分からず、通数が増えるほど気づけない。差がいちばん大きい1か所を出す。
+   *
+   * 減っていない（増えている）ときは出さない。分岐で人が分かれた場合など、
+   * 減少として読むと誤解になる。
+   */
+  const biggestDrop = (() => {
+    const steps = stats?.steps ?? []
+    if (steps.length < 2) return null
+    let worst: { fromOrder: number; toOrder: number; lost: number; rate: number } | null = null
+    for (let i = 0; i < steps.length - 1; i += 1) {
+      const from = steps[i]
+      const to = steps[i + 1]
+      const lost = from.reachedCount - to.reachedCount
+      if (lost <= 0 || from.reachedCount === 0) continue
+      const rate = lost / from.reachedCount
+      if (!worst || lost > worst.lost) {
+        worst = { fromOrder: from.stepOrder, toOrder: to.stepOrder, lost, rate }
+      }
+    }
+    return worst
+  })()
   const modeBadge = modeBadgeStyle[deliveryMode]
 
   return (
     <div>
-      <Header
-        title="シナリオ詳細"
-        action={
-          <Link
-            href="/scenarios"
-            className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors inline-flex items-center"
-          >
-            ← シナリオ一覧
-          </Link>
-        }
-      />
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+        <Link href="/scenarios" className="hover:underline">
+          シナリオ配信
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>{scenario.name}</span>
+      </nav>
+
+      <div data-design="Head">
+        <Header
+          title="シナリオ編集"
+          description="配信のタイミングと内容を並べます。作成しただけでは配信されません。開始するには友だち追加時の配信やアクションから呼び出します。"
+          action={
+            /* 設計の並び：マニュアル / 一括プレビュー / 一括テスト送信 / 保存。
+               一覧へ戻る導線は設計では最下部にあり、ここには置かない
+               （下の「シナリオ一覧に戻る」がそれ）。 */
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              <button
+                onClick={() => setPreviewOpen(true)}
+                disabled={sortedSteps.length === 0}
+                title={sortedSteps.length === 0 ? 'コンテンツがまだありません' : undefined}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium disabled:opacity-40"
+              >
+                一括プレビュー
+              </button>
+              <button
+                disabled
+                title="一括テスト送信は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                一括テスト送信
+              </button>
+              {/* 保存するものは、いま開いている編集の内容。カードの「編集」
+                  「変更」を押していないときは、保存するものが無い。 */}
+              <button
+                onClick={handleSaveScenario}
+                disabled={!editing || saving}
+                title={editing ? undefined : '「編集」か「変更」を押すと、ここで保存できます'}
+                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold transition-colors disabled:opacity-40"
+              >
+                {saving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          }
+        />
+      </div>
+
+      {/*
+        同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
+
+        右で切り替えられる。これまでは文だけ置いて「許可しない」と書いて
+        いたが、実際は列（allow_concurrent）で持っていて、作るときにしか
+        決められなかった。読むだけの説明の隣に、それを決める場所が無い。
+      */}
+      <section className="bg-info-bg rounded-card mb-4 flex flex-wrap items-start gap-4 p-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-info text-sm font-semibold">同時に購読できるシナリオは 1つ</p>
+          <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
+            別のシナリオを開始すると、いま流れているシナリオは停止します。あとで戻すと、止まった続きから再開します。複数の流れを同時に届けたい場合は、1つのシナリオ内で分岐させてください。
+          </p>
+        </div>
+        <div className="border-hairline bg-canvas rounded-control flex shrink-0 overflow-hidden border">
+          {[
+            { value: false, label: '重複を許可しない' },
+            { value: true, label: '許可する' },
+          ].map((opt) => {
+            const on = (scenario.allowConcurrent ?? true) === opt.value
+            return (
+              <button
+                key={opt.label}
+                type="button"
+                onClick={() => void handleConcurrentChange(opt.value)}
+                aria-pressed={on}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  on ? 'bg-accent-soft text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'
+                }`}
+              >
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
+      </section>
 
       {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
+        <div className="bg-danger-bg text-danger rounded-card mb-4 p-4 text-sm">
           {error}
-        </div>
-      )}
-
-      {/* Stats Header Bar */}
-      {stats && stats.enrolledTotal > 0 && (
-        <div className="mb-4 bg-canvas rounded-card border border-hairline p-3 flex items-center gap-4 text-sm flex-wrap">
-          <span className="font-medium text-ink-secondary">📊 集計</span>
-          <span>登録 <span className="font-semibold">{stats.enrolledTotal}</span> 人</span>
-          <span className="text-ink-faint">/</span>
-          <span>進行中 <span className="font-semibold text-blue-700">{stats.activeNow}</span></span>
-          <span className="text-ink-faint">/</span>
-          <span>完了 <span className="font-semibold text-green-700">{stats.completed}</span></span>
-          {stats.paused > 0 && (
-            <>
-              <span className="text-ink-faint">/</span>
-              <span>一時停止 {stats.paused}</span>
-            </>
-          )}
         </div>
       )}
 
@@ -597,10 +1196,10 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         {editing ? (
           <div className="space-y-4 max-w-lg">
             <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">シナリオ名 <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">シナリオ名 <span className="text-danger">*</span></label>
               <input
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               />
@@ -608,16 +1207,30 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">説明</label>
               <textarea
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 rows={2}
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
               />
             </div>
             <div>
+              <label className="block text-xs font-medium text-ink-secondary mb-1">フォルダ</label>
+              <select
+                className="border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full"
+                value={editForm.folderId}
+                onChange={(e) => setEditForm({ ...editForm, folderId: e.target.value })}
+              >
+                <option value="">未分類</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+              <p className="text-ink-faint mt-1 text-xs">一覧の左のパネルで、この分類ごとに絞り込めます。</p>
+            </div>
+            <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">トリガー</label>
               <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
+                className="w-full border-hairline rounded-control bg-canvas text-ink border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 value={editForm.triggerType}
                 onChange={(e) => setEditForm({ ...editForm, triggerType: e.target.value as ScenarioTriggerType })}
               >
@@ -632,17 +1245,17 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                 id="editIsActive"
                 checked={editForm.isActive}
                 onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                className="h-4 w-4 rounded border-hairline text-accent focus:ring-accent"
               />
               <label htmlFor="editIsActive" className="text-sm text-ink-secondary">有効</label>
             </div>
-            <div className="border-hairline rounded-lg border p-3">
+            <div className="border-hairline rounded-card border p-3">
               <label className="flex cursor-pointer items-start gap-2">
                 <input
                   type="checkbox"
                   checked={!editForm.allowConcurrent}
                   onChange={(e) => setEditForm({ ...editForm, allowConcurrent: !e.target.checked })}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  className="mt-0.5 h-4 w-4 rounded border-hairline text-accent focus:ring-accent"
                 />
                 <span className="text-ink-secondary text-sm">
                   他のシナリオが動いている人は登録しない
@@ -671,9 +1284,10 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                     triggerType: scenario.triggerType,
                     isActive: scenario.isActive,
                     allowConcurrent: scenario.allowConcurrent !== false,
+                    folderId: scenario.folderId ?? '',
                   })
                 }}
-                className="px-4 py-2 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors"
+                className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control min-h-[44px] px-4 py-2 text-sm font-medium transition-colors"
               >
                 キャンセル
               </button>
@@ -681,56 +1295,174 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           </div>
         ) : (
           <div>
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <h2 className="text-lg font-semibold text-ink">{scenario.name}</h2>
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${modeBadge.bg} ${modeBadge.text}`}>
-                  {modeBadge.label}
-                </span>
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    scenario.isActive ? 'bg-success-bg text-green-700' : 'bg-canvas-sunken text-ink-faint'
-                  }`}
-                >
-                  {scenario.isActive ? '有効' : '無効'}
-                </span>
-                <button
-                  onClick={() => setEditing(true)}
-                  className="text-xs font-medium text-green-600 hover:text-green-700 px-3 py-1.5 rounded-md hover:bg-green-50 transition-colors"
-                >
-                  編集
+            {/*
+              設計は5枚の札を横に並べ、それぞれに直す入口を付ける。
+              以前は名前と説明の下に定義リストを縦に置いていたが、
+              どれが直せてどれが読むだけなのかが見分けられなかった。
+            */}
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <SettingCard label="シナリオ名" action="編集" onAction={() => setEditing(true)}>
+                <p className="text-ink truncate text-sm font-bold">{scenario.name}</p>
+                {/* 置き場は scenarios.folder_id（099）。一覧の左のパネルで
+                    絞り込む先になる。 */}
+                <p className="text-ink-faint mt-0.5 truncate text-xs">
+                  フォルダ：{folders.find((f) => f.id === scenario.folderId)?.name ?? '未分類'}
+                </p>
+              </SettingCard>
+
+              <SettingCard label="配信方式">
+                <p className="text-ink text-sm font-bold">{modeBadge.label}</p>
+                <p className="text-ink-faint mt-0.5 text-xs">作ったあとは変えられません</p>
+              </SettingCard>
+
+              <SettingCard label="状態" action="変更" onAction={() => setEditing(true)}>
+                <p className={`text-sm font-bold ${scenario.isActive ? 'text-ink' : 'text-warning'}`}>
+                  {scenario.isActive ? '配信可' : '一時停止中'}
+                </p>
+                <p className="text-ink-faint mt-0.5 text-xs">
+                  {scenario.isActive ? '配信を一時停止する' : '配信を再開する'}
+                </p>
+              </SettingCard>
+
+              {/*
+                シナリオ全体の配信対象。購読したあとに条件から外れた人には
+                送らずに止める（完了にはしない）。条件に戻れば人が再開できる。
+              */}
+              {/*
+                開始のきっかけ。1本に複数持てる（128）。0本は「止まっている」
+                ではなく「外から呼ばれたときだけ流れる」なので、そう書く。
+              */}
+              <SettingCard label="開始のきっかけ">
+                <button type="button" onClick={() => setTriggerOpen(true)} className="text-left">
+                  <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
+                    {triggerCount === null
+                      ? '—'
+                      : triggerCount === 0
+                        ? '呼ばれたときだけ'
+                        : `${triggerCount} 件`}
+                  </span>
+                  <span className="text-ink-faint mt-0.5 block text-xs">
+                    {triggerCount === 0 ? 'アクションなどから開始できます' : '押すと足せます'}
+                  </span>
                 </button>
-              </div>
+              </SettingCard>
+
+              <SettingCard label="対象の絞り込み">
+                <button
+                  type="button"
+                  onClick={() => setAudienceOpen(true)}
+                  className="text-left"
+                >
+                  <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
+                    {describeCondition((scenario.audienceCondition as SegmentCondition | null) ?? null)}
+                  </span>
+                  <span className="text-ink-faint mt-0.5 block text-xs">
+                    押すと条件を組み立てられます
+                  </span>
+                </button>
+              </SettingCard>
+
+              <SettingCard label="最終ステップ後の処理">
+                <button type="button" onClick={() => setOnCompleteOpen(true)} className="text-left">
+                  <span className="text-ink block text-sm font-bold underline-offset-2 hover:underline">
+                    {ON_COMPLETE_LABEL[(scenario.onCompleteMode ?? 'pause') as OnCompleteMode]}
+                  </span>
+                  <span className="text-ink-faint mt-0.5 block text-xs">
+                    {actionCounts['__complete__']
+                      ? `アクション ${actionCounts['__complete__']} 件`
+                      : '読み終えた人を次のシナリオへ送ることもできます'}
+                  </span>
+                </button>
+              </SettingCard>
             </div>
-            {scenario.description && (
-              <p className="text-sm text-ink-faint mb-3">{scenario.description}</p>
-            )}
-            <div className="flex items-center gap-4 text-xs text-ink-faint flex-wrap">
-              <span>トリガー: {triggerOptions.find(o => o.value === scenario.triggerType)?.label ?? scenario.triggerType}</span>
-              <span>ステップ数: {scenario.steps.length}</span>
-              <span>作成日: {new Date(scenario.createdAt).toLocaleDateString('ja-JP')}</span>
-            </div>
+
+            {/*
+              シナリオの説明はここに出さない。絵にこの段落が無い。
+              中身は「シナリオ名」の札の「編集」を開けば読める。
+            */}
           </div>
         )}
       </div>
 
+      {/*
+        統計。設計は1行。カード4枚に散らすと、購読中と読了済と離脱地点を
+        見比べるのに目が横に大きく動く。並べて読むものなので1本にまとめる。
+
+        位置は5枚の札の下。絵がその並びで、以前は逆に出していた。
+      */}
+      {stats && stats.enrolledTotal > 0 && (
+        <div
+          data-design="KPIs"
+          className="bg-canvas rounded-card border-hairline mb-4 flex flex-wrap items-center gap-x-8 gap-y-3 border px-5 py-4"
+        >
+          <div>
+            <p className="text-ink-faint text-xs">購読中</p>
+            <p className="text-ink text-xl font-bold tabular-nums">
+              {stats.activeNow.toLocaleString('ja-JP')}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+          </div>
+          <div className="border-hairline border-l pl-8">
+            <p className="text-ink-faint text-xs">読了済</p>
+            <p className="text-ink text-xl font-bold tabular-nums">
+              {stats.completed.toLocaleString('ja-JP')}
+              <span className="text-ink-faint ml-0.5 text-xs font-normal">人</span>
+            </p>
+          </div>
+          <div className="border-hairline border-l pl-8">
+            <p className="text-ink-faint text-xs">離脱が大きい地点</p>
+            {biggestDrop ? (
+              <p className="text-warning text-xl font-bold">
+                {biggestDrop.fromOrder}通目 <span className="mx-1">→</span> {biggestDrop.toOrder}通目
+              </p>
+            ) : (
+              <p className="text-ink-faint text-xl font-bold">—</p>
+            )}
+          </div>
+          {biggestDrop && (
+            <p className="text-warning ml-auto text-xs">
+              ↘ {biggestDrop.fromOrder}通目で {biggestDrop.lost.toLocaleString('ja-JP')}人（
+              {Math.round(biggestDrop.rate * 100)}%）が離脱しています
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Steps */}
       <div className="bg-canvas rounded-card border border-hairline p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-gray-800">ステップ一覧</h3>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPreviewOpen(true)}
-              disabled={sortedSteps.length === 0}
-              className="px-3 py-1.5 min-h-[44px] text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-40"
-            >
-              一括プレビュー
-            </button>
+          <h3 className="text-ink text-sm font-semibold">コンテンツ {sortedSteps.length} 通</h3>
+          {/* 設計の3つ。一括プレビューは見出しへ移した。 */}
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={openAddStep}
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover px-3 py-1.5 min-h-[44px] text-sm font-medium rounded-control"
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
             >
-              + ステップ追加
+              ＋ メッセージを追加
+            </button>
+            {/* テンプレートは受け口がある（scenario_steps.template_id）。
+                最初からテンプレートを選ぶ状態でフォームを開く。 */}
+            <button
+              onClick={openAddTemplateStep}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+            >
+              テンプレートを追加
+            </button>
+            {/* 質問メッセージ。選択肢ごとにタグ・友だち情報・シナリオを動かせる。
+                押されたことは postback で戻ってくる（sq:<stepId>:<index>）。 */}
+            <button
+              onClick={openAddQuestionStep}
+              title="質問メッセージを足します。選択肢ごとにタグ・友だち情報・シナリオを動かせます"
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+            >
+              分岐を追加
+            </button>
+            <button
+              onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}
+              disabled={sortedSteps.length === 0}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
+            >
+              一括テスト送信
             </button>
           </div>
         </div>
@@ -741,110 +1473,280 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         {/* Steps list */}
         {sortedSteps.length === 0 ? (
           <div className="text-center py-8 text-ink-faint text-sm">
-            ステップがありません。「+ ステップ追加」から追加してください。
+            まだ1通もありません。上の「＋ メッセージを追加」から足してください。
           </div>
         ) : (
-          <div className="space-y-3">
-            {sortedSteps.map((step, idx) => (
-              <div
-                key={step.id}
-                className="border border-hairline rounded-lg p-4 hover:border-gray-300 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2 flex-wrap">
-                      <span
- className="bg-accent text-on-accent transition-colors hover:bg-accent-hover inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0"
-                      >
-                        {step.stepOrder}
-                      </span>
-                      <span className="text-xs text-ink-faint">{formatScheduleLabel(deliveryMode, step)}</span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                        step.messageType === 'text' ? 'bg-blue-50 text-blue-600' :
-                        step.messageType === 'image' ? 'bg-purple-50 text-purple-600' :
-                        'bg-orange-50 text-orange-600'
-                      }`}>
-                        {messageTypeOptions.find(o => o.value === step.messageType)?.label ?? step.messageType}
-                      </span>
-                      {(() => {
-                        const stat = stats?.steps.find((s) => s.stepOrder === step.stepOrder)
-                        return stat ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700">
-                            📊 {stat.reachedCount}人到達 ({Math.round(stat.reachRate * 100)}%)
-                          </span>
-                        ) : null
-                      })()}
-                    </div>
-                    {(() => {
-                      // テンプレ参照時は、表示も「現在のテンプレ内容」を見せる。
-                      // (templates state には list で取得済みの最新内容が入っている)
-                      const tpl = step.templateId ? templates.find((t) => t.id === step.templateId) : null
-                      const displayType = tpl ? tpl.messageType : step.messageType
-                      const displayContent = tpl ? tpl.messageContent : step.messageContent
-                      return (
-                        <div className="text-sm text-ink-secondary bg-canvas-sunken rounded-md px-3 py-2">
-                          {displayType === 'text' ? (
-                            <p className="whitespace-pre-wrap break-words">{displayContent}</p>
-                          ) : displayType === 'flex' ? (
-                            <FlexPreview content={displayContent} />
-                          ) : displayType === 'image' ? (
-                            <ImagePreview content={displayContent} />
-                          ) : (
-                            <p className="whitespace-pre-wrap break-words">{displayContent}</p>
+          /*
+            設計は表。以前はカードを縦に積んでいたので、通ごとの
+            タイミング・種別・到達人数を上下で見比べられなかった。
+            桁をそろえると、上から下へ人数が減っていくのがそのまま見える。
+          */
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px]">
+              <thead>
+                <tr className="border-hairline border-b">
+                  <th className="w-16 px-2 py-2" aria-label="並び" />
+                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    タイミング
+                  </th>
+                  <th className="text-ink-faint w-full max-w-0 px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    内容
+                  </th>
+                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    種別
+                  </th>
+                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    到達人数
+                  </th>
+                  <th className="text-ink-faint px-3 py-2 text-left text-xs font-semibold whitespace-nowrap">
+                    配信後
+                  </th>
+                  <th className="px-3 py-2" aria-label="操作" />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedSteps.map((step, idx) => {
+                  const stat = stats?.steps.find((v) => v.stepOrder === step.stepOrder)
+                  const pct = stat ? Math.round(stat.reachRate * 100) : null
+                  const tpl = step.templateId
+                    ? templates.find((t) => t.id === step.templateId)
+                    : null
+                  const kindLabel = tpl
+                    ? 'テンプレート'
+                    : (messageTypeOptions.find((o) => o.value === step.messageType)?.label ??
+                      step.messageType)
+                  // 内容の桁は見出しだけ出す。中身はプレビューで開く。
+                  // 本文をそのまま桁に入れると、行の高さが通ごとに変わって
+                  // 上下の見比べができなくなる。
+                  const title =
+                    tpl?.name ??
+                    (step.messageContent || '').split('\n')[0].slice(0, 60) ??
+                    '（空）'
+                  return (
+                    <Fragment key={step.id}>
+                      {idx > 0 && (
+                        <tr className="group">
+                          <td colSpan={7} className="px-0 py-0">
+                            {/*
+                              通と通のあいだに差し込む入口。末尾にしか足せないと、
+                              3通目と4通目のあいだに1通入れたいときに後ろを
+                              作り直すことになる。ふだんは薄く、近づいたときだけ見える。
+                            */}
+                            <div className="flex items-center py-1">
+                              <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
+                              <button
+                                type="button"
+                                onClick={() => openInsertStep(sortedSteps[idx - 1].stepOrder)}
+                                className="text-ink-faint hover:text-accent px-3 text-xs opacity-40 transition-opacity group-hover:opacity-100"
+                              >
+                                ＋ ここに挿入
+                              </button>
+                              <div className="border-hairline flex-1 border-t opacity-0 transition-opacity group-hover:opacity-100" />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      <tr className="border-hairline hover:bg-canvas-sunken border-b">
+                        <td className="px-2 py-3 align-top whitespace-nowrap">
+                          <div className="text-ink-faint flex items-center gap-1 text-xs">
+                            <span className="flex flex-col leading-none">
+                              <button
+                                type="button"
+                                onClick={() => void handleMoveStep(step.id, 'up')}
+                                disabled={idx === 0}
+                                aria-label="上へ"
+                                className="hover:text-ink-secondary disabled:opacity-30"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleMoveStep(step.id, 'down')}
+                                disabled={idx === sortedSteps.length - 1}
+                                aria-label="下へ"
+                                className="hover:text-ink-secondary disabled:opacity-30"
+                              >
+                                ↓
+                              </button>
+                            </span>
+                            <span className="text-ink tabular-nums">{step.stepOrder}</span>
+                          </div>
+                        </td>
+                        <td className="text-ink px-3 py-3 align-top text-sm whitespace-nowrap">
+                          {formatScheduleLabel(deliveryMode, step)}
+                        </td>
+                        <td className="w-full max-w-0 px-3 py-3 align-top">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              editingStepId === step.id ? closeStepForm() : openEditStep(step)
+                            }
+                            className="text-info block w-full truncate text-left text-sm hover:underline"
+                            title={title}
+                          >
+                            {title}
+                          </button>
+                          {step.onReachTagId && (
+                            <p className="text-accent mt-0.5 truncate text-xs">
+                              到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}
+                            </p>
                           )}
-                        </div>
-                      )
-                    })()}
-                    {step.templateId && (
-                      <p className="mt-2 text-xs text-amber-700">
-                        📋 テンプレ: {templates.find((t) => t.id === step.templateId)?.name ?? step.templateId}
-                      </p>
-                    )}
-                    {step.onReachTagId && (
-                      <p className="mt-1 text-xs text-green-700">
-                        🏷 到達タグ: {tags.find((t) => t.id === step.onReachTagId)?.name ?? step.onReachTagId}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-stretch gap-1 shrink-0">
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleMoveStep(step.id, 'up')}
-                        disabled={idx === 0}
-                        className="text-xs text-ink-faint hover:text-ink-secondary px-2 py-1 rounded hover:bg-canvas-sunken transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                        aria-label="上へ"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        onClick={() => handleMoveStep(step.id, 'down')}
-                        disabled={idx === sortedSteps.length - 1}
-                        className="text-xs text-ink-faint hover:text-ink-secondary px-2 py-1 rounded hover:bg-canvas-sunken transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
-                        aria-label="下へ"
-                      >
-                        ↓
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => (editingStepId === step.id ? closeStepForm() : openEditStep(step))}
-                      className="text-xs text-green-600 hover:text-green-700 px-2 py-1 rounded hover:bg-green-50 transition-colors"
-                    >
-                      {editingStepId === step.id ? '閉じる' : '編集'}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteStep(step.id)}
-                      className="text-xs text-red-500 hover:text-danger px-2 py-1 rounded hover:bg-danger-bg transition-colors"
-                    >
-                      削除
-                    </button>
-                  </div>
-                </div>
-                {/* インライン編集フォーム: 編集対象ステップの行直下に展開 */}
-                {editingStepId === step.id && renderStepForm()}
-              </div>
-            ))}
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                          <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs">
+                            {kindLabel}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                          {stat ? (
+                            <span className="inline-flex items-center gap-2">
+                              <span className="bg-canvas-sunken h-1.5 w-20 overflow-hidden rounded-full">
+                                <span
+                                  className="bg-accent block h-full rounded-full"
+                                  style={{ width: `${Math.min(100, pct ?? 0)}%` }}
+                                />
+                              </span>
+                              <span className="text-ink text-sm tabular-nums">
+                                {stat.reachedCount}人
+                              </span>
+                              <span className="text-ink-faint text-xs tabular-nums">{pct}%</span>
+                            </span>
+                          ) : (
+                            <span className="text-ink-faint text-sm">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 align-top whitespace-nowrap">
+                          {step.afterSend === 'pause' ? (
+                            <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs font-medium">
+                              送信後 一時停止
+                            </span>
+                          ) : (
+                            <span className="text-ink-faint text-sm">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right align-top whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2 text-xs">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                editingStepId === step.id ? closeStepForm() : openEditStep(step)
+                              }
+                              className="text-info hover:underline"
+                            >
+                              {editingStepId === step.id ? '閉じる' : '編集'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewStepId(previewStepId === step.id ? null : step.id)}
+                              className="text-info hover:underline"
+                            >
+                              プレビュー
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setTestSend({ stepId: step.id, label: `${step.stepOrder}通目` })
+                              }
+                              className="text-info hover:underline"
+                            >
+                              テスト
+                            </button>
+                            {/* この通を送ったあとに動かすアクション。件数を出すのは、
+                                設定済みを忘れて二重に足すのを防ぐため。 */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setActionTarget({
+                                  hook: 'step_sent',
+                                  stepId: step.id,
+                                  choiceIndex: null,
+                                  title: `${step.stepOrder}通目を送ったあと`,
+                                })
+                              }
+                              className="text-info hover:underline"
+                            >
+                              アクション
+                              {actionCounts[step.id] ? ` ${actionCounts[step.id]}` : ''}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDuplicateStep(step)}
+                              disabled={duplicatingStepId === step.id}
+                              title="この通を複製する"
+                              aria-label="この通を複製する"
+                              className="text-ink-faint hover:text-ink-secondary disabled:opacity-40"
+                            >
+                              複製
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteStep(step.id)}
+                              title="この通を削除する"
+                              aria-label="この通を削除する"
+                              className="text-ink-faint hover:text-danger"
+                            >
+                              削除
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                      {previewStepId === step.id && (
+                        <tr className="border-hairline border-b">
+                          <td colSpan={7} className="px-3 pb-3">
+                            <div className="text-ink-secondary bg-canvas-sunken rounded-card px-3 py-2 text-sm">
+                              {(() => {
+                                // テンプレ参照時は「いまのテンプレの中身」を見せる。
+                                const t = tpl ? tpl.messageType : step.messageType
+                                const c = tpl ? tpl.messageContent : step.messageContent
+                                if (t === 'flex') return <FlexPreview content={c} />
+                                if (t === 'image') return <ImagePreview content={c} />
+                                return <p className="break-words whitespace-pre-wrap">{c}</p>
+                              })()}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {editingStepId === step.id && (
+                        <tr>
+                          <td colSpan={7} className="px-3 pb-3">
+                            {renderStepForm()}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
+      </div>
+
+      {/*
+        画面のいちばん下。設計もこの位置。
+
+        削除は右端に離して置く。編集の流れの途中にあると、保存のつもりで
+        押し間違える。複製は左、戻るは中。
+      */}
+      <div className="border-hairline mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+        <button
+          type="button"
+          onClick={() => void handleDuplicate()}
+          disabled={duplicating}
+          className="text-ink-secondary hover:text-ink text-sm font-medium disabled:opacity-40"
+        >
+          {duplicating ? '複製中...' : 'このシナリオを複製'}
+        </button>
+        <Link href="/scenarios" className="text-ink-secondary hover:text-ink ml-auto text-sm">
+          シナリオ一覧に戻る
+        </Link>
+        <button
+          type="button"
+          onClick={() => void handleDeleteScenario()}
+          className="text-danger hover:underline text-sm font-medium"
+        >
+          このシナリオを削除
+        </button>
       </div>
 
       <BulkPreviewModal
@@ -852,6 +1754,94 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
         scenarioId={id}
         onClose={() => setPreviewOpen(false)}
       />
+
+      {/* シナリオ全体の配信対象 */}
+      {audienceOpen && scenario && (
+        <ConditionDialog
+          title="対象の絞り込み"
+          description="このシナリオを配る相手を絞ります。購読したあとに条件から外れた人は、送らずに止まります。"
+          value={(scenario.audienceCondition as SegmentCondition | null) ?? null}
+          onSave={async (next) => {
+            const res = await api.scenarios.update(id, { audienceCondition: next } as never)
+            if (res.success) await loadScenario()
+          }}
+          onClose={() => setAudienceOpen(false)}
+        />
+      )}
+
+      {/* 最終コンテンツ配信後の処理 */}
+      {onCompleteOpen && scenario && (
+        <OnCompleteDialog
+          scenarioId={id}
+          mode={(scenario.onCompleteMode ?? 'pause') as OnCompleteMode}
+          targetScenarioId={scenario.onCompleteScenarioId ?? null}
+          onSave={async (mode, target) => {
+            const res = await api.scenarios.update(id, {
+              onCompleteMode: mode,
+              onCompleteScenarioId: target,
+            } as never)
+            if (!res.success) return res.error
+            await loadScenario()
+            return null
+          }}
+          onClose={() => setOnCompleteOpen(false)}
+          actionCount={actionCounts['__complete__'] ?? 0}
+          onOpenActions={() => {
+            setOnCompleteOpen(false)
+            setActionTarget({
+              hook: 'scenario_completed',
+              stepId: null,
+              choiceIndex: null,
+              title: '最終コンテンツを配り終えたあと',
+            })
+          }}
+        />
+      )}
+
+      {/* 1通ごとの配信対象。保存はフォームの「保存」でまとめて行う。 */}
+      {stepTargetOpen && (
+        <ConditionDialog
+          title="この通の配信対象"
+          description="条件に合わない人には、この通だけ送りません。次の通へはそのまま進みます。"
+          value={stepForm.targetCondition}
+          onSave={async (next) => {
+            setStepForm((prev) => ({ ...prev, targetCondition: next }))
+          }}
+          onClose={() => setStepTargetOpen(false)}
+        />
+      )}
+
+      {/* テスト送信 */}
+      {testSend && (
+        <TestSendDialog
+          scenarioId={id}
+          stepId={testSend.stepId}
+          stepLabel={testSend.label}
+          onClose={() => setTestSend(null)}
+        />
+      )}
+
+      {/* 開始のきっかけ */}
+      {triggerOpen && (
+        <TriggerEditor
+          scenarioId={id}
+          onClose={() => setTriggerOpen(false)}
+          onChanged={setTriggerCount}
+        />
+      )}
+
+      {/* アクション設定 */}
+      {actionTarget && (
+        <ActionEditor
+          scenarioId={id}
+          hook={actionTarget.hook}
+          stepId={actionTarget.stepId}
+          choiceIndex={actionTarget.choiceIndex}
+          title={actionTarget.title}
+          onClose={() => setActionTarget(null)}
+          onChanged={reloadActionCounts}
+        />
+      )}
     </div>
   )
 }

@@ -66,6 +66,37 @@ function formatDateTime(iso: string): string {
   })
 }
 
+/**
+ * 添付された画像の回答か。
+ *
+ * 回答に入るのはURLだけで、中身は R2 にある。文字として出すと
+ * `https://.../images/form-uploads/...` の長い1行になり、何が送られたのか
+ * 分からない。ここだけ絵で出す。
+ */
+function isUploadedImage(v: unknown): v is string {
+  return typeof v === 'string' && /^https?:\/\/[^\s]+\/images\/form-uploads\//.test(v)
+}
+
+/** 回答1つを描く。画像なら小さく出し、押すと元の大きさで開く。 */
+function AnswerValue({ value, thumb }: { value: unknown; thumb?: boolean }) {
+  if (isUploadedImage(value)) {
+    return (
+      <a href={value} target="_blank" rel="noreferrer" className="inline-block">
+        {/* R2 に置いた画像をそのまま出すため next/image は使わない */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={value}
+          alt="送られた画像"
+          className={`rounded-control border-hairline border object-cover ${
+            thumb ? 'h-10 w-10' : 'max-h-60'
+          }`}
+        />
+      </a>
+    )
+  }
+  return <>{formatValue(value)}</>
+}
+
 function formatValue(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—'
   if (Array.isArray(v)) return v.length === 0 ? '—' : v.join(', ')
@@ -215,7 +246,56 @@ export default function FormSubmissionsPage() {
 
   return (
     <div>
-      <Header title="フォーム回答" description="送信されたフォームを件数・配信アカウント・回答内容まで一覧で確認" />
+      <div data-design="Head">
+        <Header
+          title="回答フォーム"
+          description="友だちに答えてもらうフォームを作ります。回答は指定した友だち情報欄にそのまま記録され、友だち詳細やテンプレートの差し込みで使えます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              {['マニュアル', '並び替え', 'フォルダを追加'].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  title="準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">フォーム</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {forms.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">作成済み</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">回答</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {submissions.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">読み込んだぶん</p>
+        </div>
+        {/* 月ごとの集計と、回答率（配ったうち何人が答えたか）を出す経路が無い。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">今月の回答</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">月ごとの集計は未対応</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">回答率</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">配った人数を持っていません</p>
+        </div>
+      </div>
 
       {/* Form cards */}
       <section className="mb-6">
@@ -427,7 +507,7 @@ export default function FormSubmissionsPage() {
                         </td>
                         {fieldKeys.slice(0, 4).map((key) => (
                           <td key={key} className="px-4 py-3 text-sm text-gray-700 max-w-[200px] truncate">
-                            {formatValue(sub.data[key])}
+                            <AnswerValue value={sub.data[key]} thumb />
                           </td>
                         ))}
                         {fieldKeys.length > 4 && (
@@ -519,7 +599,7 @@ export default function FormSubmissionsPage() {
                       <div key={key} className="grid grid-cols-1 gap-1">
                         <dt className="text-[11px] text-gray-500">{fieldLabels[key] || key}</dt>
                         <dd className="text-sm text-gray-900 break-words whitespace-pre-wrap">
-                          {formatValue(detailSubmission.data[key])}
+                          <AnswerValue value={detailSubmission.data[key]} />
                         </dd>
                       </div>
                     ))

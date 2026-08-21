@@ -3,6 +3,7 @@ import {
   getFriends,
   getFriendById,
   getFriendCount,
+  getFriendAddBreakdown,
   addTagToFriend,
   removeTagFromFriend,
   getFriendTags,
@@ -12,12 +13,19 @@ import {
   getMileageSummaryForFriend,
   getMileageHistoryForFriend,
   jstNow,
+  getTagAddedScenarioIds,
 } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import {
+  completeOutboundSendStatement,
+  hashOutboundPayload,
+  isValidIdempotencyKey,
+  reserveOutboundSend,
+} from '../services/outbound-idempotency.js';
 
 const friends = new Hono<Env>();
 
@@ -42,6 +50,12 @@ function serializeFriend(row: DbFriend) {
     refCode: (row as unknown as Record<string, unknown>).ref_code as string | null,
     lineAccountId: ((row as unknown as Record<string, unknown>).line_account_id as string | null) ?? null,
     userId: row.user_id,
+    // 100 で足した列。友だち詳細（設計 `友だち詳細` の「名前」）が読む。
+    // LINEの表示名と、こちらで付けた本名は別物。取り違えると別人に送るので、
+    // 画面で両方を並べて出せるように、ここから返す。
+    realName: ((row as unknown as Record<string, unknown>).real_name as string | null) ?? null,
+    systemDisplayName:
+      ((row as unknown as Record<string, unknown>).system_display_name as string | null) ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -156,13 +170,97 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       );
     }
     // Metadata filters: ?metadata.key=value (e.g. ?metadata.monthly_cost=〜100万円)
+    // ?metadataNot.key=value is the「等しくない」side. 値を持たない人も含める
+    // （項目そのものが無い人を外すと、絞り込みの意味が変わる）。
     const url = new URL(c.req.url);
     for (const [key, value] of url.searchParams.entries()) {
       if (key.startsWith('metadata.')) {
         const metaKey = key.slice('metadata.'.length);
         conditions.push(`json_extract(f.metadata, '$.' || ?) = ?`);
         binds.push(metaKey, value);
+      } else if (key.startsWith('metadataNot.')) {
+        const metaKey = key.slice('metadataNot.'.length);
+        conditions.push(
+          `(json_extract(f.metadata, '$.' || ?) IS NULL OR json_extract(f.metadata, '$.' || ?) != ?)`,
+        );
+        binds.push(metaKey, metaKey, value);
       }
+    }
+
+    /*
+     * 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）の受け口。
+     *
+     * どれも足し算で、指定が無ければ何も起きない。既にある tagId / search /
+     * handled はそのまま残してある（一覧やオートコンプリートが使っている）。
+     */
+
+    /** タグを複数（すべて満たす）。`?tagIds=a,b` */
+    const tagIds = (c.req.query('tagIds') ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    for (const t of tagIds) {
+      conditions.push(
+        'EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)',
+      );
+      binds.push(t);
+    }
+
+    /** このタグが付いていない人。`?excludeTagIds=a,b` */
+    const excludeTagIds = (c.req.query('excludeTagIds') ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    for (const t of excludeTagIds) {
+      conditions.push(
+        'NOT EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)',
+      );
+      binds.push(t);
+    }
+
+    /** ステータスメッセージに含む。`?statusMessage=...` */
+    const statusMessage = c.req.query('statusMessage');
+    if (statusMessage) {
+      conditions.push('f.status_message LIKE ?');
+      binds.push(`%${statusMessage}%`);
+    }
+
+    /** 友だち登録日の範囲。`?createdFrom=YYYY-MM-DD&createdTo=YYYY-MM-DD` */
+    const createdFrom = c.req.query('createdFrom');
+    if (createdFrom) {
+      conditions.push('f.created_at >= ?');
+      binds.push(createdFrom);
+    }
+    const createdTo = c.req.query('createdTo');
+    if (createdTo) {
+      // その日の終わりまで含める。日付だけで比べると当日ぶんが落ちる。
+      conditions.push('f.created_at <= ?');
+      binds.push(`${createdTo}T23:59:59.999`);
+    }
+
+    /**
+     * 対応マーク。`?chatStatus=unread|in_progress|resolved`
+     * 既にある `?handled=unhandled` と同じ見方（最新の chats 行）をする。
+     */
+    const chatStatus = c.req.query('chatStatus');
+    if (chatStatus && ['unread', 'in_progress', 'resolved'].includes(chatStatus)) {
+      conditions.push(
+        `COALESCE(
+           (SELECT status FROM chats c
+            WHERE c.friend_id = f.id
+            ORDER BY c.created_at DESC LIMIT 1),
+           'resolved'
+         ) = ?`,
+      );
+      binds.push(chatStatus);
+    }
+
+    /** 表示設定。`?visibility=following|blocked` 既定は指定なし（全部） */
+    const visibility = c.req.query('visibility');
+    if (visibility === 'following') {
+      conditions.push('f.is_following = 1');
+    } else if (visibility === 'blocked') {
+      conditions.push('f.is_following = 0');
     }
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -350,6 +448,25 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
 });
 
 // GET /api/friends/count - friend count (must be before /:id)
+// 友だち追加の内訳（設計 V2 4-6）。「はじめての人」と「以前からの友だち」を
+// 分けて数える。追加時の配信を1本しか持てないうちは、returning の人数が
+// そのまま「はじめまして」を誤って送った人数になる。
+friends.get('/api/friends/add-breakdown', async (c) => {
+  try {
+    const days = Number(c.req.query('days') ?? '30');
+    const lineAccountId = c.req.query('lineAccountId') ?? null;
+    const data = await getFriendAddBreakdown(
+      c.env.DB,
+      Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30,
+      lineAccountId,
+    );
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('GET /api/friends/add-breakdown error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 friends.get('/api/friends/count', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
@@ -419,15 +536,53 @@ friends.get('/api/friends/:id/mileage', async (c) => {
 });
 
 // GET /api/friends/:id - get single friend with tags
+/**
+ * 友だち画面の上部に出す数（設計 `V2 2-2 友だち` の KPIs）。
+ *
+ * :id より前に置くこと。あとに置くと 'stats' が id として拾われる。
+ */
+friends.get('/api/friends/stats', async (c) => {
+  try {
+    const { getFriendStats } = await import('@line-crm/db');
+    const stats = await getFriendStats(c.env.DB, c.req.query('accountId') ?? null);
+    return c.json({ success: true as const, data: stats });
+  } catch (err) {
+    console.error('GET /api/friends/stats error:', err);
+    return c.json({ success: false as const, error: '友だちの集計を取得できませんでした' }, 500);
+  }
+});
+
 friends.get('/api/friends/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const db = c.env.DB;
 
-    const [friend, tags, formSubmissions] = await Promise.all([
+    const [friend, tags, formSubmissions, support] = await Promise.all([
       getFriendById(db, id),
       getFriendTags(db, id),
       getFormSubmissionsByFriend(db, id, 10),
+      /*
+       * 対応の状況（対応マーク・担当者・個別メモ）。
+       *
+       * 詳細画面はこれを出す設計だが、これまで返していなかったので
+       * 「受信箱で扱っています」という案内文しか置けなかった。同じ人の
+       * 話を2画面に分けて見に行くことになる。
+       *
+       * chats に行が無い友だちもいる（一度も受信していない）。その場合は
+       * 未対応でも対応済みでもなく「やり取りがまだ無い」なので null を返し、
+       * 画面側で出し分ける。
+       */
+      db
+        .prepare(
+          `SELECT c.status, c.notes, o.name AS operator_name
+             FROM chats c
+             LEFT JOIN operators o ON o.id = c.operator_id
+            WHERE c.friend_id = ?
+            LIMIT 1`,
+        )
+        .bind(id)
+        .first<{ status: string; notes: string | null; operator_name: string | null }>()
+        .catch(() => null),
     ]);
 
     if (!friend) {
@@ -439,6 +594,13 @@ friends.get('/api/friends/:id', async (c) => {
       data: {
         ...serializeFriend(friend),
         tags: tags.map(serializeTag),
+        support: support
+          ? {
+              status: support.status,
+              operatorName: support.operator_name,
+              notes: support.notes,
+            }
+          : null,
         formSubmissions: formSubmissions.map((submission) => ({
           id: submission.id,
           formId: submission.form_id,
@@ -469,16 +631,18 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), as
     await addTagToFriend(db, friendId, body.tagId);
 
     // Enroll in tag_added scenarios that match this tag
-    const allScenarios = await getScenarios(db);
-    for (const scenario of allScenarios) {
-      if (scenario.trigger_type === 'tag_added' && scenario.is_active && scenario.trigger_tag_id === body.tagId) {
-        const existing = await db
-          .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
-          .bind(friendId, scenario.id)
-          .first();
-        if (!existing) {
-          await enrollFriendInScenario(db, friendId, scenario.id);
-        }
+    /*
+     * 「このタグが付いたら始まる」は scenario_triggers から引く（128）。
+     * 1本のシナリオが複数のタグで始まる形も作れるようになったので、
+     * scenarios.trigger_tag_id は判断に使わない。
+     */
+    for (const scenarioId of await getTagAddedScenarioIds(db, body.tagId)) {
+      const existing = await db
+        .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
+        .bind(friendId, scenarioId)
+        .first();
+      if (!existing) {
+        await enrollFriendInScenario(db, friendId, scenarioId);
       }
     }
 
@@ -576,6 +740,10 @@ friends.get('/api/friends/:id/messages', async (c) => {
 friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const friendId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
     const body = await c.req.json<{
       messageType?: string;
       content: string;
@@ -593,6 +761,34 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
+    const messageType = body.messageType ?? 'text';
+    const payloadHash = await hashOutboundPayload(
+      JSON.stringify({
+        friendId: friend.id,
+        messageType,
+        content: body.content,
+        altText: body.altText,
+        trackLinks: body.trackLinks !== false,
+      }),
+    );
+    const reservation = await reserveOutboundSend(db, {
+      key: idempotencyKey,
+      channel: 'line',
+      resourceId: friend.id,
+      payloadHash,
+      retryInProgress: true,
+      now: new Date().toISOString(),
+    });
+    if (reservation.kind === 'conflict') {
+      return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
+    }
+    if (reservation.kind === 'in_progress') {
+      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+    }
+    if (reservation.kind === 'replay') {
+      return c.json({ success: true, data: { messageId: reservation.responseId, replayed: true } });
+    }
+
     const { LineClient } = await import('@line-crm/line-sdk');
     // Resolve access token from friend's account (multi-account support)
     let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -604,7 +800,6 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
       if (account) accessToken = account.channel_access_token;
     }
     const lineClient = new LineClient(accessToken);
-    const messageType = body.messageType ?? 'text';
 
     // Auto-wrap URLs with tracking links (text with URLs → Flex with button)
     // trackLinks=false で明示的に短縮 OFF (URL をそのまま送る)
@@ -629,17 +824,23 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
     }
 
     const message = buildMessage(tracked.messageType, tracked.content, body.altText);
-    await lineClient.pushMessage(friend.line_user_id, [message]);
+    await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
 
     // Log outgoing message
-    const logId = crypto.randomUUID();
-    await db
-      .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
+    const logId = idempotencyKey;
+    const sentAt = jstNow();
+    await db.batch([
+      db.prepare(
+        `INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
          VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'manual', ?)`,
       )
-      .bind(logId, friend.id, messageType, body.content, jstNow())
-      .run();
+        .bind(logId, friend.id, messageType, body.content, sentAt),
+      completeOutboundSendStatement(db, {
+        key: idempotencyKey,
+        responseId: logId,
+        now: new Date().toISOString(),
+      }),
+    ]);
 
     return c.json({ success: true, data: { messageId: logId } });
   } catch (err) {

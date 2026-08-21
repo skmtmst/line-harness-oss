@@ -248,7 +248,11 @@ events.get('/api/events/admin/events', async (c) => {
          (SELECT COUNT(*)
             FROM event_bookings b
            WHERE b.event_id = e.id AND b.status = 'requested'
-         ) AS pending_count
+         ) AS pending_count,
+         -- 申込条件。e.* に visible_tag_id は入るが ID だけでは一覧に出せない。
+         -- タグが消されていると NULL になるので、ID の有無と名前の有無は
+         -- 呼び出し側で別に見ること。
+         (SELECT t.name FROM tags t WHERE t.id = e.visible_tag_id) AS visible_tag_name
        FROM events e
        WHERE e.deleted_at IS NULL AND (
          (e.target_type = 'single' AND e.line_account_id = ?)

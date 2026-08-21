@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Header from '@/components/layout/header'
 import { api } from '@/lib/api'
-import CcPromptButton from '@/components/cc-prompt-button'
 import type { IncomingWebhook, OutgoingWebhook } from '@line-crm/shared'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
@@ -12,25 +11,6 @@ import NotificationsPage from '@/app/notifications/page'
 type Tab = 'incoming' | 'outgoing'
 
 const MIN_SECRET_LENGTH = 32
-
-const ccPrompts = [
-  {
-    title: 'Webhook設定ガイド',
-    prompt: `Webhookの設定手順をガイドしてください。
-1. 受信Webhook（Incoming）の作成とエンドポイントURLの設定方法
-2. 送信Webhook（Outgoing）のURL・イベントタイプ・シークレット設定
-3. LINE公式アカウントとのWebhook連携設定手順
-手順を示してください。`,
-  },
-  {
-    title: 'Webhookデバッグ',
-    prompt: `Webhookの動作確認とデバッグをサポートしてください。
-1. 受信・送信Webhookの有効/無効ステータスを確認
-2. Webhookのテスト送信と応答検証の手順
-3. よくあるエラーパターンとトラブルシューティング方法
-手順を示してください。`,
-  },
-]
 
 // Generate a 32-char URL-safe random secret in the browser. 24 random bytes
 // produce exactly 32 base64 characters; remap +/ to -/_ instead of stripping
@@ -245,18 +225,37 @@ function WebhooksPageInner() {
 
   return (
     <div>
-      <Header
-        title="Webhook管理"
-        action={
-          <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-opacity hover:opacity-90"
-            style={{ backgroundColor: 'var(--color-accent)' }}
-          >
-            {showCreate ? 'キャンセル' : '+ 新規Webhook'}
-          </button>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="外部連携"
+          description="受信・送信のWebhookと、SlackやメールへのSlack通知をまとめて設定します。どれも「外部とやりとりする設定」です。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              {/* 通知先（Slack・メール）の設定はこの画面に無い。 */}
+              <button
+                disabled
+                title="通知先の追加は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                通知先を追加
+              </button>
+              <button
+                onClick={() => setShowCreate(!showCreate)}
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {showCreate ? 'キャンセル' : 'Webhookを追加'}
+              </button>
+            </div>
+          }
+        />
+      </div>
 
       {/* Rotate-secret modal — used to recover legacy webhooks or rotate. */}
       {rotateTarget && (
@@ -772,7 +771,6 @@ function WebhooksPageInner() {
           </div>
         )
       )}
-      <CcPromptButton prompts={ccPrompts} />
     </div>
   )
 }

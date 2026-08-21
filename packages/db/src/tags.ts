@@ -15,7 +15,20 @@ export interface Tag {
   referral_mileage_reward: number;
   mileage_multiplier_bps: number | null;
   mileage_multiplier_priority: number;
+  /** 友だち一覧の「★つきタグ」列に出すか。0 / 1（111 で追加） */
+  is_starred: number;
+  /** 一覧での並び順。小さいほど上（112 で追加） */
+  display_order: number;
   created_at: string;
+  /**
+   * 属するフォルダの色（#RRGGBB）。folders.color を読んだもので、tags 側に
+   * 保存はしない。
+   *
+   * 画面に出す印の色はこれ。タグ1つずつに色を持たせると、100枚あるタグで
+   * 色がばらけて一覧での区別に使えなくなる。色はフォルダに1つだけ付けて、
+   * 中のタグはそれを写す。JOIN していない読み方では undefined になる。
+   */
+  folder_color?: string | null;
 }
 
 /**
@@ -29,6 +42,8 @@ export interface TagGroup {
   id: string;
   name: string;
   sort_order: number;
+  /** #RRGGBB。未設定は null。115 で folders.color を足した。 */
+  color: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,7 +56,12 @@ export interface FriendTag {
 
 export async function getTags(db: D1Database): Promise<Tag[]> {
   const result = await db
-    .prepare(`SELECT * FROM tags ORDER BY name ASC`)
+    .prepare(
+      `SELECT t.*, fo.color AS folder_color
+       FROM tags t
+       LEFT JOIN folders fo ON fo.id = t.folder_id
+       ORDER BY t.name ASC`,
+    )
     .all<Tag>();
   return result.results;
 }
@@ -55,11 +75,14 @@ export async function getTagsWithCounts(
 ): Promise<TagWithCount[]> {
   const result = await db
     .prepare(
-      `SELECT t.*, COUNT(ft.friend_id) AS friend_count
+      `SELECT t.*, fo.color AS folder_color, COUNT(ft.friend_id) AS friend_count
        FROM tags t
        LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+       LEFT JOIN folders fo ON fo.id = t.folder_id
        GROUP BY t.id
-       ORDER BY t.name ASC`,
+       -- 入れ替えたものが先。触っていないものは全部 0 なので、
+       -- そのあとの付与人数と名前で並ぶ（設計の既定は付与人数が多い順）。
+       ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
     )
     .all<TagWithCount>();
   return result.results;
@@ -115,6 +138,65 @@ export async function assignTagToGroup(
   );
 }
 
+/**
+ * タグの名前と色を変える。
+ *
+ * 一覧の表からマイルの列を外して編集画面へ移したときに要るようになった。
+ * それまでは作るときにしか決められず、打ち間違えたタグは消して作り直す
+ * しかなかった。作り直すと、付いていた友だちの分がすべて外れる。
+ *
+ * 渡されたものだけ当てる。色だけ変えたいときに名前を送らせると、
+ * 呼ぶ側が現在値を読んでから書くことになり、その間に別の人が変えた
+ * 名前を上書きしてしまう。
+ */
+export async function updateTag(
+  db: D1Database,
+  id: string,
+  input: { name?: string; color?: string; isStarred?: boolean },
+): Promise<Tag | null> {
+  const sets: string[] = [];
+  const binds: unknown[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    binds.push(input.name);
+  }
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    binds.push(input.color);
+  }
+  if (input.isStarred !== undefined) {
+    sets.push('is_starred = ?');
+    binds.push(input.isStarred ? 1 : 0);
+  }
+  if (sets.length > 0) {
+    await db
+      .prepare(`UPDATE tags SET ${sets.join(', ')} WHERE id = ?`)
+      .bind(...binds, id)
+      .run();
+  }
+  return (
+    (await db.prepare(`SELECT * FROM tags WHERE id = ?`).bind(id).first<Tag>()) ?? null
+  );
+}
+
+/**
+ * 並び順をまとめて書く。
+ *
+ * 1件ずつ当てると、10件動かしたときに10往復する。その途中で誰かが
+ * 一覧を開くと、半分だけ入れ替わった並びが見える。まとめて送る。
+ *
+ * 渡された順に 0,1,2… を振る。画面で見えている並びをそのまま写す形なので、
+ * 抜けや重複を気にしなくてよい。
+ */
+export async function reorderTags(db: D1Database, ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db.batch(
+    ids.map((id, i) =>
+      db.prepare(`UPDATE tags SET display_order = ? WHERE id = ?`).bind(i, id),
+    ),
+  );
+}
+
 export async function deleteTag(db: D1Database, id: string): Promise<void> {
   await db.prepare(`DELETE FROM tags WHERE id = ?`).bind(id).run();
 }
@@ -127,7 +209,7 @@ export async function deleteTag(db: D1Database, id: string): Promise<void> {
 export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
   const result = await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, created_at, updated_at
+      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
          FROM folders WHERE kind = 'tag'
         ORDER BY display_order ASC, name ASC`,
     )
@@ -137,20 +219,20 @@ export async function getTagGroups(db: D1Database): Promise<TagGroup[]> {
 
 export async function createTagGroup(
   db: D1Database,
-  input: { name: string; sortOrder?: number },
+  input: { name: string; sortOrder?: number; color?: string | null },
 ): Promise<TagGroup> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
     .prepare(
-      `INSERT INTO folders (id, kind, name, display_order, created_at, updated_at)
-       VALUES (?, 'tag', ?, ?, ?, ?)`,
+      `INSERT INTO folders (id, kind, name, display_order, color, created_at, updated_at)
+       VALUES (?, 'tag', ?, ?, ?, ?, ?)`,
     )
-    .bind(id, input.name, input.sortOrder ?? 0, now, now)
+    .bind(id, input.name, input.sortOrder ?? 0, input.color ?? null, now, now)
     .run();
   return (await db
     .prepare(
-      `SELECT id, name, display_order AS sort_order, created_at, updated_at
+      `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
          FROM folders WHERE id = ?`,
     )
     .bind(id)
@@ -160,7 +242,7 @@ export async function createTagGroup(
 export async function updateTagGroup(
   db: D1Database,
   id: string,
-  input: { name?: string; sortOrder?: number },
+  input: { name?: string; sortOrder?: number; color?: string | null },
 ): Promise<TagGroup | null> {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -171,6 +253,10 @@ export async function updateTagGroup(
   if (input.sortOrder !== undefined) {
     sets.push('display_order = ?');
     values.push(input.sortOrder);
+  }
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    values.push(input.color);
   }
   if (sets.length > 0) {
     sets.push('updated_at = ?');
@@ -183,7 +269,7 @@ export async function updateTagGroup(
   return (
     (await db
       .prepare(
-        `SELECT id, name, display_order AS sort_order, created_at, updated_at
+        `SELECT id, name, display_order AS sort_order, color, created_at, updated_at
            FROM folders WHERE id = ? AND kind = 'tag'`,
       )
       .bind(id)
@@ -354,9 +440,10 @@ export async function getFriendTags(
 ): Promise<Tag[]> {
   const result = await db
     .prepare(
-      `SELECT t.*
+      `SELECT t.*, fo.color AS folder_color
        FROM tags t
        INNER JOIN friend_tags ft ON ft.tag_id = t.id
+       LEFT JOIN folders fo ON fo.id = t.folder_id
        WHERE ft.friend_id = ?
        ORDER BY t.name ASC`,
     )

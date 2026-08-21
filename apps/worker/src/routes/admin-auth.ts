@@ -18,16 +18,30 @@ import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { recordLoginAudit } from '@line-crm/db';
 import {
   createAdminSession,
+  createTwoFactorChallenge,
+  claimStaffTotpStep,
   deleteAdminSession,
+  deleteExpiredTwoFactorChallenges,
+  deleteTwoFactorChallenge,
+  getStaffById,
+  getStaffByInviteTokenHash,
   getStaffByLineUserId,
+  getStaffByLineUserIdIncludingInactive,
+  getTwoFactorChallenge,
+  incrementTwoFactorChallengeAttempts,
+  updateStaffMember,
 } from '@line-crm/db';
+import { decryptTotpSecret, verifyTotp } from '../lib/totp.js';
 
 export const adminAuth = new Hono<Env>();
 
 const OAUTH_STATE_COOKIE = 'lh_line_state';
 const OAUTH_NONCE_COOKIE = 'lh_line_nonce';
 const OAUTH_VERIFIER_COOKIE = 'lh_line_verifier';
+const OAUTH_INVITE_COOKIE = 'lh_line_invite';
 const OAUTH_MAX_AGE = 600;
+const TWO_FACTOR_CHALLENGE_MAX_AGE = 5 * 60 * 1000;
+const TWO_FACTOR_MAX_ATTEMPTS = 5;
 
 function randomToken(bytes = 32): string {
   const value = new Uint8Array(bytes);
@@ -62,6 +76,14 @@ function adminLoginUrl(c: Context<Env>, error?: string): string {
   return `${base}/login${error ? `?error=${encodeURIComponent(error)}` : ''}`;
 }
 
+function twoFactorLoginUrl(c: Context<Env>, challengeToken: string): string {
+  const base = c.env.ADMIN_PUBLIC_URL?.replace(/\/+$/, '');
+  if (!base) throw new Error('ADMIN_PUBLIC_URL is not configured');
+  const url = new URL(`${base}/login/two-factor`);
+  url.hash = new URLSearchParams({ lh_2fa: challengeToken }).toString();
+  return url.toString();
+}
+
 async function issueSession(c: Context<Env>, staffId: string, sameSite: 'Strict' | 'Lax' | 'None') {
   const sessionToken = randomToken();
   const expiresAt = new Date(Date.now() + SESSION_MAX_AGE * 1000).toISOString();
@@ -89,6 +111,8 @@ adminAuth.get('/api/auth/line', async (c) => {
   c.header('Set-Cookie', oauthCookie(OAUTH_STATE_COOKIE, state), { append: true });
   c.header('Set-Cookie', oauthCookie(OAUTH_NONCE_COOKIE, nonce), { append: true });
   c.header('Set-Cookie', oauthCookie(OAUTH_VERIFIER_COOKIE, verifier), { append: true });
+  const invite = c.req.query('invite');
+  if (invite) c.header('Set-Cookie', oauthCookie(OAUTH_INVITE_COOKIE, invite), { append: true });
 
   const authorize = new URL('https://access.line.me/oauth2/v2.1/authorize');
   authorize.search = new URLSearchParams({
@@ -109,10 +133,11 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
   const expectedState = readCookie(cookies, OAUTH_STATE_COOKIE);
   const nonce = readCookie(cookies, OAUTH_NONCE_COOKIE);
   const verifier = readCookie(cookies, OAUTH_VERIFIER_COOKIE);
+  const invite = readCookie(cookies, OAUTH_INVITE_COOKIE);
   const state = c.req.query('state');
   const code = c.req.query('code');
 
-  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE]) {
+  for (const name of [OAUTH_STATE_COOKIE, OAUTH_NONCE_COOKIE, OAUTH_VERIFIER_COOKIE, OAUTH_INVITE_COOKIE]) {
     c.header('Set-Cookie', oauthCookie(name, '', 0), { append: true });
   }
 
@@ -150,11 +175,47 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
     const profile = await verifyResponse.json<{ sub?: string }>();
     if (!profile.sub) return c.redirect(adminLoginUrl(c, 'line_login_failed'));
 
-    const staff = await getStaffByLineUserId(c.env.DB, profile.sub);
+    let staff = await getStaffByLineUserId(c.env.DB, profile.sub);
+    if (!staff && invite) {
+      const invited = await getStaffByInviteTokenHash(c.env.DB, await sha256Hex(invite));
+      if (
+        invited?.invite_status === 'pending_line' &&
+        invited.invite_expires_at &&
+        Date.parse(invited.invite_expires_at) >= Date.now()
+      ) {
+        // 同じLINEアカウントを握ったままの古い行があると、line_user_id の
+        // ユニーク制約で連携が落ちる。招待の方が新しい意思なので、古い方の
+        // 連携を先に外す。行そのものは消さない（権限の記録は残す）。
+        const previous = await getStaffByLineUserIdIncludingInactive(c.env.DB, profile.sub);
+        if (previous && previous.id !== invited.id) {
+          await updateStaffMember(c.env.DB, previous.id, { line_user_id: null, line_linked_at: null });
+        }
+        staff = await updateStaffMember(c.env.DB, invited.id, {
+          line_user_id: profile.sub,
+          is_active: 1,
+          invite_status: 'active',
+          invite_token_hash: null,
+          invite_expires_at: null,
+          line_linked_at: new Date().toISOString(),
+        });
+      }
+    }
     if (!staff) return c.redirect(adminLoginUrl(c, 'not_authorized'));
 
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
     if (config.misconfigured) return c.redirect(adminLoginUrl(c, 'configuration_error'));
+    if (staff.totp_enabled_at && staff.totp_secret_enc) {
+      if (!c.env.TOTP_ENCRYPTION_KEY) return c.redirect(adminLoginUrl(c, 'configuration_error'));
+      const challengeToken = randomToken();
+      await deleteExpiredTwoFactorChallenges(c.env.DB, new Date().toISOString());
+      await createTwoFactorChallenge(
+        c.env.DB,
+        await sha256Hex(challengeToken),
+        staff.id,
+        new Date(Date.now() + TWO_FACTOR_CHALLENGE_MAX_AGE).toISOString(),
+      );
+      return c.redirect(twoFactorLoginUrl(c, challengeToken));
+    }
     const session = await issueSession(c, staff.id, config.sameSite);
     const adminUrl = new URL(c.env.ADMIN_PUBLIC_URL!.replace(/\/+$/, ''));
     if (config.crossSite) {
@@ -163,11 +224,78 @@ adminAuth.get('/api/auth/line/callback', async (c) => {
         lh_csrf: session.csrfToken,
       }).toString();
     }
+    await recordLoginAudit(c.env.DB, {
+      adminUserId: staff.id,
+      action: 'login',
+      ip: clientIp(c),
+      userAgent: c.req.header('user-agent') ?? null,
+    });
     return c.redirect(adminUrl.toString());
   } catch (error) {
     console.error('[admin-auth] LINE Login callback failed', error);
     return c.redirect(adminLoginUrl(c, 'line_login_failed'));
   }
+});
+
+adminAuth.post('/api/auth/two-factor/verify', async (c) => {
+  const body = await c.req.json<{ challengeToken?: string; code?: string }>()
+    .catch(() => ({} as { challengeToken?: string; code?: string }));
+  const challengeToken = body.challengeToken?.trim() ?? '';
+  const code = body.code?.trim() ?? '';
+  if (!challengeToken || !/^\d{6}$/.test(code)) {
+    return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
+  }
+
+  const tokenHash = await sha256Hex(challengeToken);
+  const challenge = await getTwoFactorChallenge(c.env.DB, tokenHash);
+  if (!challenge || Date.parse(challenge.expires_at) <= Date.now()) {
+    if (challenge) await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, error: '認証の有効時間が切れました。LINEログインからやり直してください' }, 401);
+  }
+  if (challenge.attempts >= TWO_FACTOR_MAX_ATTEMPTS) {
+    await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, error: '入力回数を超えました。LINEログインからやり直してください' }, 429);
+  }
+
+  const staff = await getStaffById(c.env.DB, challenge.staff_id);
+  const masterKey = c.env.TOTP_ENCRYPTION_KEY;
+  if (!staff?.is_active || !staff.totp_secret_enc || !staff.totp_enabled_at || !masterKey) {
+    await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, error: '二段階認証を確認できません' }, 401);
+  }
+
+  const verified = await verifyTotp(
+    await decryptTotpSecret(staff.totp_secret_enc, masterKey),
+    code,
+    Date.now(),
+    staff.totp_last_used_step,
+  );
+  if (!verified.valid || verified.step === null) {
+    await incrementTwoFactorChallengeAttempts(c.env.DB, tokenHash);
+    return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+  }
+
+  const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
+  if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
+  if (!await claimStaffTotpStep(c.env.DB, staff.id, verified.step)) {
+    await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+    return c.json({ success: false, error: 'この認証コードは使用済みです。次のコードを入力してください' }, 409);
+  }
+  await deleteTwoFactorChallenge(c.env.DB, tokenHash);
+  const session = await issueSession(c, staff.id, config.sameSite);
+  await recordLoginAudit(c.env.DB, {
+    adminUserId: staff.id,
+    action: 'login',
+    ip: clientIp(c),
+    userAgent: c.req.header('user-agent') ?? null,
+  });
+  return c.json({
+    success: true,
+    // Same-site deployments keep the credential HttpOnly. Only the documented
+    // cross-site fallback hands the opaque session token to the SPA.
+    data: { sessionToken: config.crossSite ? session.sessionToken : undefined },
+    csrfToken: session.csrfToken,
+  });
 });
 
 /**

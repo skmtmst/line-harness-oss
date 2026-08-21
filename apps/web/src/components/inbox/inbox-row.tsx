@@ -17,10 +17,10 @@ export interface InboxRowData {
 
 const TYPE_LABELS: Record<string, string> = {
   sticker: 'スタンプ',
-  video: '🎥 動画',
-  audio: '🎤 音声',
-  file: '📄 ファイル',
-  location: '📍 位置情報',
+  video: '動画',
+  audio: '音声',
+  file: 'ファイル',
+  location: '位置情報',
 }
 
 function formatPreview(type: string, content: string): string {
@@ -53,7 +53,7 @@ function ImageThumb({ raw }: { raw: string }) {
   } catch {
     // ignore
   }
-  if (!src) return <span className="text-sm text-gray-600">🖼 画像</span>
+  if (!src) return <span className="text-sm text-gray-600">画像</span>
   return (
     <span className="inline-flex items-center gap-2">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -63,7 +63,7 @@ function ImageThumb({ raw }: { raw: string }) {
         loading="lazy"
         className="h-12 w-12 flex-shrink-0 rounded object-cover ring-1 ring-gray-200"
       />
-      <span className="text-sm text-gray-500">🖼 画像</span>
+      <span className="text-sm text-gray-500">画像</span>
     </span>
   )
 }

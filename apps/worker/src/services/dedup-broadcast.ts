@@ -201,7 +201,13 @@ import {
 import { buildMessage } from './broadcast.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 
+// LINE の multicast は 1 リクエストで最大 500 人まで宛先に取れる（LINE の仕様）。
+// これ以上に増やすことはできない。
 const MULTICAST_BATCH_SIZE = 500;
+// 差し込み（{{name}} など）があると本文が人ごとに変わるので multicast が使えず、
+// push を 1 人ずつ送る。この数はレート制限ではなく **区切りの単位**で、
+// 「ここまで送ったら時間を見る／少し待つ」という判断をこの粒度で行う。
+// 小さいほど中断したときの取りこぼしが減り、大きいほど待ちの回数が減る。
 const PERSONALIZED_PUSH_BATCH_SIZE = 10;
 
 export interface ProcessMultiAccountDedupResult {
@@ -398,7 +404,7 @@ export async function processMultiAccountDedupBroadcast(
         }
 
         if (batchIdx > 0) {
-          await sleep(calculateStaggerDelay(remaining.length, batchIdx));
+          await sleep(calculateStaggerDelay(remaining.length, batchIdx, deliveryBatchSize));
         }
 
         const delivered = [] as Array<{

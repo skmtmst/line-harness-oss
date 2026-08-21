@@ -1,5 +1,9 @@
 import { Hono } from 'hono';
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
+import { parseTapPostbackData } from '../lib/rich-menu-tap.js';
+import { parseCarouselPostbackData } from '../lib/carousel-tap.js';
+import { handleCarouselTap } from '../services/carousel-tap.js';
+import { handleRichMenuTap } from '../services/rich-menu-tap.js';
 import type { WebhookRequestBody, WebhookEvent, TextEventMessage } from '@line-crm/line-sdk';
 import { createStickerMessageContent } from '@line-crm/shared';
 import {
@@ -13,12 +17,16 @@ import {
   jstNow,
   getEntryRouteByRefCode,
   getMessageTemplateById,
+  getFriendAddScenarioIds,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
+import { applyFriendAddRouting } from '../services/friend-add-routing.js';
 import { fireEvent } from '../services/event-bus.js';
 import { matchAndReply } from '../services/auto-reply.js';
 import { buildMessage } from '../services/step-delivery.js';
 import { pushImmediateFirstStep } from '../services/immediate-first-step.js';
+import { parseQuestionPostback } from '../services/scenario-question.js';
+import { handleQuestionAnswer } from '../services/scenario-question-answer.js';
 import type { Env } from '../index.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 
@@ -254,13 +262,64 @@ async function handleEvent(
     const runAccountScenarios =
       !referralRoute || referralRoute.run_account_friend_add_scenarios !== 0;
 
+    // 友だち追加時の配信の振り分け（設計 V2 4-6）。
+    //
+    // 設定が保存されているアカウントは、相手が「はじめて」か「以前からの友だち・
+    // ブロックを解除した人」かを見て、流すシナリオを1本に絞る。
+    //
+    // **保存されていないアカウントは routed:false が返る。** そのときは下の
+    // いままでどおりの経路（有効な friend_add シナリオを全部流す）に落ちる。
+    // ここを既定で絞ると、設定していないアカウントで配信が止まる。
+    const routing = runAccountScenarios
+      ? await applyFriendAddRouting(db, lineAccountId, friend, {
+          defaultAccessToken: lineAccessToken,
+          workerUrl,
+        })
+      : null;
+
+    if (routing?.routed) {
+      for (const { scenarioId, enrollment, resumed } of routing.enrollments) {
+        try {
+          // 「前回読んだところから」で再開したぶんは、ここで1通目を出さない。
+          // 出すと続きではなく最初の1通がもう一度届く。次の通は
+          // next_delivery_at を見て cron が出す。
+          if (resumed) continue;
+          if (routing.timing !== 'immediate') continue;
+          const sent = await pushImmediateFirstStep(
+            db,
+            friend.id,
+            scenarioId,
+            { defaultAccessToken: lineAccessToken, workerUrl },
+            {
+              enrollment,
+              reply: { client: lineClient, replyToken: event.replyToken },
+              skipCooldown: true,
+            },
+          );
+          if (sent) console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1 to ${userId}`);
+        } catch (err) {
+          console.error('Failed immediate delivery for routed scenario', scenarioId, err);
+        }
+      }
+      if (routing.suppressed) {
+        console.log(`[friend-add-routing] suppressed for ${userId} (kind=${routing.kind})`);
+      }
+    }
+
     // friend_add シナリオに登録（このアカウントのシナリオのみ）
     // Skip entirely when a referral link explicitly overrides (run_account_friend_add_scenarios=0).
-    const scenarios = runAccountScenarios ? await getScenarios(db) : [];
+    // 振り分け設定があるアカウントはここを通らない（上で1本に絞ってある）。
+    const scenarios = runAccountScenarios && !routing?.routed ? await getScenarios(db) : [];
+    /*
+     * 「友だち追加で始まる」は scenario_triggers から引く（128）。
+     * 1本のシナリオに複数のきっかけを持たせられるようにしたため、
+     * scenarios.trigger_type は判断に使わない。
+     */
+    const friendAddIds = scenarios.length > 0 ? new Set(await getFriendAddScenarioIds(db)) : new Set<string>();
     for (const scenario of scenarios) {
       // Only trigger scenarios belonging to this account (or unassigned for backward compat)
       const scenarioAccountMatch = !scenario.line_account_id || !lineAccountId || scenario.line_account_id === lineAccountId;
-      if (scenario.trigger_type === 'friend_add' && scenario.is_active && scenarioAccountMatch) {
+      if (friendAddIds.has(scenario.id) && scenarioAccountMatch) {
         try {
           // INSERT OR IGNORE handles dedup via UNIQUE(friend_id, scenario_id)
           const friendScenario = await enrollFriendInScenario(db, friend.id, scenario.id);
@@ -357,7 +416,95 @@ async function handleEvent(
     const friend = await ensureFriendFromWebhookUser(db, lineClient, userId, lineAccountId);
     if (!friend) return;
 
-    const postbackData = (event as unknown as { postback: { data: string } }).postback.data;
+    const rawPostbackData = (event as unknown as { postback: { data: string } }).postback.data;
+
+    /*
+     * リッチメニューのボタン。
+     *
+     * どのボタンが押されたかを知るために、publish のときに data の先頭へ area の
+     * id を付けている。ここで剥がして、運用者が設定した本来の data だけを下流へ流す。
+     * 自動応答やオートメーションは「data がこの文字列と一致したら」で判定しているので、
+     * こちらの都合で付けた目印を混ぜたままにすると、今まで当たっていた条件に
+     * 当たらなくなる。
+     *
+     * 剥がすついでに、そのボタンに設定された動き（タグ付け・スコア加算・
+     * テンプレート送信）をここで実行する。
+     */
+    /*
+     * カルーセルの選択肢。
+     *
+     * リッチメニューと同じ考え方で、data にテンプレートと選択肢の番号を入れて
+     * ある。押されたら、その選択肢に設定されたアクションを実行する。
+     * 「1人につき1回まで」の制限にかかっていれば、決めたテキストを返して終わる。
+     */
+    const carouselTap = parseCarouselPostbackData(rawPostbackData);
+    if (carouselTap) {
+      try {
+        const result = await handleCarouselTap(db, lineClient, friend, carouselTap, {
+          lineAccountId,
+          replyToken: event.replyToken,
+        });
+        // 制限にかかったときは、ここで終わる。自動応答まで回すと、
+        // 「もう押せません」と自動応答の両方が届く。
+        if (result.kind === 'blocked') return;
+      } catch (err) {
+        console.error('Failed to handle carousel tap', err);
+      }
+      // カルーセルの data は運用者が組んだ文字列ではないので、自動応答の
+      // キーワード照合には回さない。
+      return;
+    }
+
+    const tap = parseTapPostbackData(rawPostbackData);
+    let postbackReplyToken: string | undefined = event.replyToken;
+    let tapLabel: string | null = null;
+    if (tap) {
+      try {
+        const tapResult = await handleRichMenuTap(db, lineClient, friend, tap.areaId, {
+          lineAccountId,
+          replyToken: postbackReplyToken,
+        });
+        if (tapResult.replyTokenConsumed) postbackReplyToken = undefined;
+        tapLabel = tapResult.target?.label ?? null;
+      } catch (err) {
+        // ボタンの動きが失敗しても、下の自動応答までは止めない。
+        console.error('Failed to handle rich menu tap', err);
+      }
+    }
+    const postbackData = tap ? (tap.inner ?? '') : rawPostbackData;
+    // 押されたボタンに本来の data が無い（テンプレートを送るだけ等）ときは、
+    // トーク履歴に空行を残さないようボタン名を出す。
+    const postbackLogText =
+      postbackData || (tapLabel ? `[メニュー] ${tapLabel}` : '[メニュー]');
+
+    /*
+     * シナリオの質問メッセージの選択肢。
+     *
+     * data が `sq:<stepId>:<index>` の形なら、こちらで処理して抜ける。
+     * auto_replies のキーワード照合には回さない。`sq:...` は利用者が
+     * 打った言葉ではないので、キーワードに当たっても意味がない。
+     *
+     * 記録も向こうで取る（押した回数を数えるのに、記録より先に読む必要が
+     * あるため）。
+     */
+    const questionHit = parseQuestionPostback(postbackData);
+    if (questionHit) {
+      const answered = await handleQuestionAnswer(
+        db,
+        lineClient,
+        friend,
+        { ...questionHit, lineAccountId },
+        postbackReplyToken,
+      );
+      if (answered.handled) {
+        await fireEvent(db, 'postback_received', {
+          friendId: friend.id,
+          eventData: { text: postbackData, matched: true },
+          replyToken: answered.replyTokenConsumed ? undefined : postbackReplyToken,
+        }, lineAccessToken, lineAccountId);
+        return;
+      }
+    }
 
     // postback の incoming 自体を messages_log に記録する。Rich Menu のタップで
     // 利用者が "コスト比較" などのアクションを起こした事実を chat 履歴で可視化する。
@@ -369,7 +516,7 @@ async function handleEvent(
           `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
            VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?)`,
         )
-        .bind(crypto.randomUUID(), friend.id, postbackData, lineAccountId ?? null, jstNow())
+        .bind(crypto.randomUUID(), friend.id, postbackLogText, lineAccountId ?? null, jstNow())
         .run();
     } catch (err) {
       console.error('Failed to log incoming postback', err);
@@ -377,13 +524,19 @@ async function handleEvent(
 
     // postback data を auto_replies にマッチさせて返信 (テキスト経路と共通)。
     // silent + automation で「返信なしでタグだけ付ける」構成もここで成立する。
+    // 本来の data が無いボタン（テンプレートを送るだけ等）は、自動応答の
+    // キーワード照合に回さない。空文字はどのキーワードとも照らし合わせようがない。
+    // 返信の権利（replyToken）を先にテンプレート送信で使い切っている場合も回さない。
+    // 自動応答は reply でしか返せないので、使い切った後に呼ぶと送信が失敗する。
     const { matched: postbackMatched, replyTokenConsumed: postbackReplyTokenConsumed } =
-      await matchAndReply(db, lineClient, friend, postbackData, event.replyToken, {
-        lineAccountId,
-        workerUrl,
-        logContext: 'postback',
-        messageKind: 'postback',
-      });
+      postbackData && postbackReplyToken
+        ? await matchAndReply(db, lineClient, friend, postbackData, postbackReplyToken, {
+            lineAccountId,
+            workerUrl,
+            logContext: 'postback',
+            messageKind: 'postback',
+          })
+        : { matched: false, replyTokenConsumed: false };
 
     // イベントバス発火: 専用イベント postback_received。
     // postback.data を text に載せることで、IF-THEN 自動化の keyword /
@@ -395,8 +548,9 @@ async function handleEvent(
     // ないので、未対応 inbox を汚さないのが正しい (テキスト経路との意図的な差分)。
     await fireEvent(db, 'postback_received', {
       friendId: friend.id,
-      eventData: { text: postbackData, matched: postbackMatched },
-      replyToken: postbackReplyTokenConsumed ? undefined : event.replyToken,
+      // data が無いボタンでも、ボタン名でオートメーションを組めるようにする。
+      eventData: { text: postbackData || tapLabel || '', matched: postbackMatched },
+      replyToken: postbackReplyTokenConsumed ? undefined : postbackReplyToken,
     }, lineAccessToken, lineAccountId);
 
     return;

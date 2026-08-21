@@ -18,9 +18,11 @@
  *   - ALTER TABLE ... ADD COLUMN  (NULL or with DEFAULT)
  *   - CREATE [UNIQUE] INDEX
  *   - INSERT (seed data)
+ *   - 表の作り直し（`-- migration-policy: table-rebuild` と書いた場合だけ）
+ *     SQLite は CHECK を後から変えられないので、この手順しか無い。
  *
  * Library API:
- *   checkMigration(sql) → { ok: true } | { ok: false, violation: string }
+ *   checkMigration(sql, fileName?) → { ok: true } | { ok: false, violation: string }
  *
  * CLI:
  *   tsx scripts/check-migrations.ts [--all] [file.sql ...]
@@ -38,7 +40,7 @@
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { argv, exit, stderr, stdout } from 'node:process';
 
@@ -49,6 +51,13 @@ interface Rule {
   label: string;
   // Matches against the comment-stripped SQL. Use case-insensitive regex.
   pattern: RegExp;
+  /**
+   * 表の作り直し（`-- migration-policy: table-rebuild`）でだけ見逃す。
+   *
+   * 見逃すのはこの2つだけ。作り直しのファイルに、ついでに `DROP COLUMN` を
+   * 混ぜられると、印が「何でも通る札」になる。
+   */
+  allowedInRebuild?: true;
 }
 
 // Order matters: more specific rules first so messages are useful.
@@ -56,6 +65,7 @@ const RULES: Rule[] = [
   {
     label: 'DROP TABLE is forbidden (additive-only migrations)',
     pattern: /\bDROP\s+TABLE\b/i,
+    allowedInRebuild: true,
   },
   {
     label: 'DROP COLUMN is forbidden (additive-only migrations)',
@@ -74,6 +84,7 @@ const RULES: Rule[] = [
     label: 'RENAME TABLE is forbidden (additive-only migrations)',
     // `ALTER TABLE x RENAME TO y` — distinct from RENAME COLUMN.
     pattern: /\bALTER\s+TABLE\s+\S+\s+RENAME\s+TO\b/i,
+    allowedInRebuild: true,
   },
   {
     label:
@@ -111,9 +122,87 @@ function stripLineComments(sql: string): string {
     .join('\n');
 }
 
-export function checkMigration(sql: string): CheckResult {
+/**
+ * SQLite で CHECK 制約を変えるには、表を作り直すしかない。
+ *
+ * `ALTER TABLE ... ALTER COLUMN` が無いので、
+ *   新しい表を作る → 中身を写す → 古い表を落とす → 名前を付け替える
+ * という手順になる。この途中に `DROP TABLE` と `RENAME TO` が必ず入るので、
+ * additive-only の規則と真正面からぶつかる。
+ *
+ * 禁止を外すのではなく、**その手順だと書いた場合だけ**通す。ファイルの
+ * どこかに次の1行を入れる。
+ *
+ *   -- migration-policy: table-rebuild
+ *
+ * こうしておくと、うっかりの `DROP TABLE` は今までどおり止まり、
+ * 意図した作り直しは `grep 'table-rebuild'` で全部数えられる。
+ *
+ * **落とす表と作る表が同じでなければ通さない。** 印を書けば何でも
+ * 落とせる、では印の意味が無い。`broadcasts_new` を作って `broadcasts` を
+ * 落とし、`broadcasts_new` を `broadcasts` に改名する、という組でだけ許す。
+ */
+const REBUILD_MARKER = /--\s*migration-policy:\s*table-rebuild\b/i;
+
+/** 印のあるファイルが、ほんとうに表の作り直しになっているか。 */
+function isCoherentRebuild(stripped: string): boolean {
+  const created = [...stripped.matchAll(/\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["\[`]?(\w+)["\]`]?/gi)]
+    .map((m) => m[1]);
+  const dropped = [...stripped.matchAll(/\bDROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["\[`]?(\w+)["\]`]?/gi)]
+    .map((m) => m[1]);
+  const renamed = [...stripped.matchAll(/\bALTER\s+TABLE\s+["\[`]?(\w+)["\]`]?\s+RENAME\s+TO\s+["\[`]?(\w+)["\]`]?/gi)]
+    .map((m) => ({ from: m[1], to: m[2] }));
+
+  // 落とすだけ・改名するだけは通さない。作り直しは必ず両方そろう。
+  for (const table of dropped) {
+    const back = renamed.find((r) => r.to === table);
+    if (!back) return false;
+    // 改名の元は、この手順で作った（か、前の手順で作った）`<表名>_new` であること。
+    if (back.from !== `${table}_new`) return false;
+  }
+  for (const r of renamed) {
+    if (r.from !== `${r.to}_new`) return false;
+    // 改名先の表を、この一連で落としているか、既にあるか。落としていない
+    // のに同じ名前へ改名すると、その時点で失敗する。
+  }
+  // 印だけ書いて何もしない、も通さない。
+  if (dropped.length === 0 && renamed.length === 0 && created.length === 0) return false;
+  return true;
+}
+
+/**
+ * 印が付く前に検証・本番へ当ててしまった作り直し。
+ *
+ * 規則で「適用済みのマイグレーションは改名・書き換えしない」と決めている
+ * ので、後から印を足せない。ここに名前で置いて通す。
+ *
+ * **新しく足さないこと。** これから書くものは印を使う。
+ */
+const GRANDFATHERED_REBUILDS = new Set([
+  '134_step_message_kinds_swap.sql',
+  '135_step_message_kinds_rename.sql',
+  '139_step_carousel_swap.sql',
+  '140_step_carousel_rename.sql',
+]);
+
+export function checkMigration(sql: string, fileName?: string): CheckResult {
   const stripped = stripLineComments(sql);
+
+  if (fileName && GRANDFATHERED_REBUILDS.has(fileName)) return { ok: true };
+
+  const rebuild = REBUILD_MARKER.test(sql);
+  if (rebuild && !isCoherentRebuild(stripped)) {
+    return {
+      ok: false,
+      violation:
+        'table-rebuild の印があるが、作り直しの形になっていない'
+        + '（`<表名>_new` を作って、同じ表を落として、`<表名>` へ改名する組でのみ許される）',
+    };
+  }
+
   for (const rule of RULES) {
+    // 作り直しで見逃すのは、作り直しに必要な2つだけ。
+    if (rebuild && rule.allowedInRebuild) continue;
     const m = stripped.match(rule.pattern);
     if (m) {
       return { ok: false, violation: `${rule.label} (matched: "${m[0].trim()}")` };
@@ -186,7 +275,7 @@ function main(rawArgs: string[]): void {
   const failures: { file: string; violation: string }[] = [];
   for (const file of files) {
     const sql = readFileSync(file, 'utf8');
-    const result = checkMigration(sql);
+    const result = checkMigration(sql, basename(file));
     if (!result.ok) {
       failures.push({ file, violation: result.violation });
       stdout.write(`[FAIL] ${file}: ${result.violation}\n`);

@@ -5,8 +5,15 @@ import { requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
 import { verifySupportRelay } from '../services/support-relay.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import { markInboxConversationRead } from '@line-crm/db';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 export const supportInbox = new Hono<Env>();
+
+export function paginateSupportInboxItems<T>(items: T[], offset: number, limit: number): T[] {
+  return items.slice(offset, offset + limit);
+}
 
 export function extractContactFormReceipt(text: string | undefined): {
   customerEmail?: string;
@@ -109,13 +116,18 @@ type EmailThreadRow = {
   last_incoming_at: string;
   last_outgoing_at: string | null;
   preview: string | null;
+  assigned_staff_id: string | null;
+  assigned_staff_name: string | null;
+  total_count: number;
+  unread_count: number;
 };
 
 supportInbox.get('/api/support/summary', async (c) => {
   try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const [line, email] = await Promise.all([
-      countUnanswered(c.env.DB),
-      c.env.DB.prepare(
+      countUnanswered(c.env.DB, { allowedAccountIds: scope.restricted ? scope.ids : undefined }),
+      scope.restricted ? Promise.resolve(null) : c.env.DB.prepare(
         `SELECT
            SUM(CASE WHEN status != 'resolved' THEN 1 ELSE 0 END) AS open_count,
            SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unread_count,
@@ -148,13 +160,23 @@ supportInbox.get('/api/support/summary', async (c) => {
 
 supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const channel = c.req.query('channel') || 'all';
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
     const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
+    const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
+    // LINEとメールを待ち時間順で統合してからページを切るため、要求ページの末尾まで
+    // 両方の候補を取得する。1回に読む件数は従来どおり最大200件に抑える。
+    const fetchLimit = Math.min(200, limit + offset);
     const items: Array<Record<string, unknown>> = [];
+    let emailTotal = 0;
+    let emailUnread = 0;
+    let lineTotal = 0;
 
-    if (channel !== 'line') {
+    // Email threads have no account key in the legacy schema. Until a thread
+    // is explicitly attributed, only unrestricted operators may view them.
+    if (channel !== 'line' && !scope.restricted) {
       const statusSql = status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -162,7 +184,8 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           : status === 'unread' || status === 'in_progress'
             ? 't.status = ?'
             : `t.status != 'resolved'`;
-      const bindings: Array<string | number> = [];
+      // SQL 上は read join の staff_id が最初の placeholder。
+      const bindings: Array<string | number> = [c.get('staff').id];
       if (status === 'unread' || status === 'in_progress') bindings.push(status);
       let searchSql = '';
       if (query) {
@@ -170,18 +193,32 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
         const like = `%${query}%`;
         bindings.push(like, like, like);
       }
-      bindings.push(limit);
+      bindings.push(fetchLimit);
       const emailRows = await c.env.DB.prepare(
         `SELECT t.id, t.customer_email, t.customer_name, t.subject, t.status,
+                COUNT(*) OVER() AS total_count,
+                SUM(CASE WHEN t.status = 'unread' THEN 1 ELSE 0 END) OVER() AS unread_count,
+                t.assigned_staff_id,
+                (SELECT name FROM staff_members sm WHERE sm.id = t.assigned_staff_id) AS assigned_staff_name,
                 t.last_message_at, t.last_incoming_at, t.last_outgoing_at,
+                CASE
+                  WHEN sr.last_read_at IS NULL OR t.last_incoming_at > sr.last_read_at
+                  THEN 1 ELSE 0
+                END AS is_unread_for_staff,
                 (SELECT body_text FROM support_email_messages m
                  WHERE m.thread_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS preview
          FROM support_email_threads t
+         LEFT JOIN inbox_staff_reads sr
+           ON sr.channel = 'email'
+          AND sr.conversation_id = t.id
+          AND sr.staff_id = ?
          WHERE ${statusSql} ${searchSql}
          ORDER BY CASE t.status WHEN 'unread' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
                   t.last_message_at DESC
          LIMIT ?`,
       ).bind(...bindings).all<EmailThreadRow>();
+      emailTotal = emailRows.results[0]?.total_count ?? 0;
+      emailUnread = emailRows.results[0]?.unread_count ?? 0;
       for (const row of emailRows.results) {
         items.push({
           id: `email:${row.id}`,
@@ -192,9 +229,12 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           subject: row.subject,
           preview: row.preview || '(本文なし)',
           status: row.status,
+          assignedStaffId: row.assigned_staff_id,
+          assignedStaffName: row.assigned_staff_name,
           lastMessageAt: row.last_message_at,
           lastIncomingAt: row.last_incoming_at,
           lastOutgoingAt: row.last_outgoing_at,
+          isUnread: Boolean((row as EmailThreadRow & { is_unread_for_staff: number }).is_unread_for_staff),
         });
       }
     }
@@ -203,8 +243,10 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       const line = await computeUnansweredInbox(c.env.DB, {
         q: query || undefined,
         page: 1,
-        pageSize: limit,
+        pageSize: fetchLimit,
+        allowedAccountIds: scope.restricted ? scope.ids : undefined,
       });
+      lineTotal = line.total;
       for (const row of line.rows) {
         items.push({
           id: `line:${row.friendId}`,
@@ -232,28 +274,100 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       // 対応漏れを防ぐため、同じ状態では待ち時間が長い顧客を先頭にする。
       return String(a.lastIncomingAt).localeCompare(String(b.lastIncomingAt));
     });
-    return c.json({ success: true, data: { items: items.slice(0, limit) } });
+    const oldest = items.reduce<string | null>((value, item) => {
+      const at = String(item.lastIncomingAt || '');
+      return !at ? value : value === null || at < value ? at : value;
+    }, null);
+    return c.json({
+      success: true,
+      data: {
+        items: paginateSupportInboxItems(items, offset, limit),
+        summary: {
+          total: lineTotal + emailTotal,
+          line: lineTotal,
+          email: emailTotal,
+          emailUnread,
+          oldestWaitMinutes: oldest
+            ? Math.max(0, Math.floor((Date.now() - new Date(oldest).getTime()) / 60_000))
+            : null,
+        },
+      },
+    });
   } catch (error) {
     console.error(JSON.stringify({ event: 'support_inbox_failed', error: String(error) }));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
 
+supportInbox.use('/api/support/email/*', async (c, next) => {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (scope.restricted) {
+    return c.json({ success: false, error: 'Thread not found' }, 404);
+  }
+  return next();
+});
+
 supportInbox.get('/api/support/email/threads/:id', async (c) => {
   const id = c.req.param('id');
   const thread = await c.env.DB.prepare(
-    `SELECT id, customer_email, customer_name, subject, status, assigned_staff_id,
+    `SELECT id, customer_email, customer_name, subject, status, assigned_staff_id, notes,
             last_message_at, last_incoming_at, last_outgoing_at, resolved_at
      FROM support_email_threads WHERE id = ?`,
   ).bind(id).first();
   if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
   const messages = await c.env.DB.prepare(
     `SELECT id, direction, sender_email, sender_name, recipient_email, subject,
-            body_text, sent_by_staff_id, created_at
+            body_text, sent_by_staff_id,
+            (SELECT name FROM staff_members sm WHERE sm.id = support_email_messages.sent_by_staff_id) AS sent_by_staff_name,
+            created_at
      FROM support_email_messages WHERE thread_id = ? ORDER BY created_at ASC`,
   ).bind(id).all();
   return c.json({ success: true, data: { thread, messages: messages.results } });
 });
+
+supportInbox.post(
+  '/api/support/email/threads/:id/read',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const id = c.req.param('id');
+    const thread = await c.env.DB
+      .prepare(`SELECT last_incoming_at FROM support_email_threads WHERE id = ?`)
+      .bind(id)
+      .first<{ last_incoming_at: string | null }>();
+    if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (thread.last_incoming_at) {
+      await markInboxConversationRead(c.env.DB, {
+        staffId: c.get('staff').id,
+        channel: 'email',
+        conversationId: id,
+        lastReadAt: thread.last_incoming_at,
+      });
+    }
+    return c.json({ success: true, data: { isUnread: false } });
+  },
+);
+
+supportInbox.post(
+  '/api/support/email/read-all',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const now = new Date().toISOString();
+    await c.env.DB
+      .prepare(
+        `INSERT INTO inbox_staff_reads
+           (staff_id, channel, conversation_id, last_read_at, updated_at)
+         SELECT ?, 'email', id, last_incoming_at, ?
+         FROM support_email_threads
+         WHERE last_incoming_at IS NOT NULL
+         ON CONFLICT(staff_id, channel, conversation_id) DO UPDATE SET
+           last_read_at = excluded.last_read_at,
+           updated_at = excluded.updated_at`,
+      )
+      .bind(c.get('staff').id, now)
+      .run();
+    return c.json({ success: true, data: { marked: true } });
+  },
+);
 
 supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = c.req.param('id');
@@ -263,9 +377,17 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
   }
   const staff = c.get('staff');
   const now = new Date().toISOString();
+  // 担当は「まだ誰も付いていないとき」だけ、操作した人を入れる。
+  //
+  // 以前は毎回 staff.id で上書きしていた。担当を選べるようにすると、
+  // 対応を変えるたびに担当が勝手に別の人へ移ってしまう。
   const result = await c.env.DB.prepare(
     `UPDATE support_email_threads
-     SET status = ?, assigned_staff_id = ?, resolved_at = ?, updated_at = ? WHERE id = ?`,
+     SET status = ?,
+         assigned_staff_id = COALESCE(assigned_staff_id, ?),
+         resolved_at = ?,
+         updated_at = ?
+     WHERE id = ?`,
   ).bind(
     body.status,
     staff.id,
@@ -277,15 +399,75 @@ supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner',
   return c.json({ success: true });
 });
 
+/**
+ * 担当を付け替える。LINE のトーク（`/api/chats/:id/operator`）と揃える。
+ *
+ * `null` で未割り当てに戻せる。列（assigned_staff_id）は前からあるが、
+ * 画面から選ぶ口が無く、状態を変えた人が自動で入るだけだった。
+ */
+supportInbox.patch(
+  '/api/support/email/threads/:id/assignee',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const id = c.req.param('id');
+    const body: { staffId?: string | null } = await c.req
+      .json<{ staffId?: string | null }>()
+      .catch(() => ({}));
+    const staffId = body.staffId ? String(body.staffId) : null;
+
+    // 知らないIDを入れると、誰も見ていない担当になる。実在を確かめる。
+    if (staffId) {
+      const exists = await c.env.DB.prepare(`SELECT 1 FROM users WHERE id = ?`)
+        .bind(staffId)
+        .first();
+      if (!exists) return c.json({ success: false, error: '担当者が見つかりません' }, 400);
+    }
+
+    const result = await c.env.DB.prepare(
+      `UPDATE support_email_threads SET assigned_staff_id = ?, updated_at = ? WHERE id = ?`,
+    )
+      .bind(staffId, new Date().toISOString(), id)
+      .run();
+    if (!result.meta.changes) return c.json({ success: false, error: 'Thread not found' }, 404);
+    return c.json({ success: true });
+  },
+);
+
+/**
+ * メモ。LINE のトークにはあってメールに無かった（114 で列を足した）。
+ *
+ * 同じ受信箱の中で、相手がメールというだけで残せないのは扱いが揃っていない。
+ */
+supportInbox.patch(
+  '/api/support/email/threads/:id/notes',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const id = c.req.param('id');
+    const body: { notes?: string } = await c.req.json<{ notes?: string }>().catch(() => ({}));
+    const notes = (body.notes ?? '').slice(0, 10_000);
+    const result = await c.env.DB.prepare(
+      `UPDATE support_email_threads SET notes = ?, updated_at = ? WHERE id = ?`,
+    )
+      .bind(notes || null, new Date().toISOString(), id)
+      .run();
+    if (!result.meta.changes) return c.json({ success: false, error: 'Thread not found' }, 404);
+    return c.json({ success: true });
+  },
+);
+
 supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = c.req.param('id');
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+  if (!isValidIdempotencyKey(idempotencyKey)) {
+    return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+  }
   const body: { body?: string } = await c.req.json<{ body?: string }>().catch(() => ({}));
   const content = body.body?.trim() || '';
   if (!content || content.length > 50_000) {
     return c.json({ success: false, error: '本文は1〜50,000文字で入力してください' }, 400);
   }
   try {
-    const result = await sendSupportEmailReply(c.env, id, content, c.get('staff').id);
+    const result = await sendSupportEmailReply(c.env, id, content, c.get('staff').id, idempotencyKey);
     return c.json({ success: true, data: result });
   } catch (error) {
     if (error instanceof Error && error.message === 'THREAD_NOT_FOUND') {
@@ -293,6 +475,12 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     }
     if (error instanceof Error && error.message === 'INVALID_CUSTOMER_RECIPIENT') {
       return c.json({ success: false, error: '顧客のメールアドレスを確認できないため送信を停止しました' }, 409);
+    }
+    if (error instanceof Error && error.message === 'IDEMPOTENCY_KEY_CONFLICT') {
+      return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
+    }
+    if (error instanceof Error && error.message === 'IDEMPOTENCY_IN_PROGRESS') {
+      return c.json({ success: false, error: '前回の送信結果を確認中です。再送せず受信履歴を確認してください' }, 409);
     }
     console.error(JSON.stringify({ event: 'support_email_reply_failed', threadId: id, error: String(error) }));
     return c.json({ success: false, error: 'メール送信に失敗しました' }, 502);

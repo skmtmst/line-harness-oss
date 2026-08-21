@@ -8,8 +8,7 @@ export default function UpdateBanner() {
   return (
     <div className="bg-blue-50 border-b border-blue-200 px-4 py-2.5 flex items-center justify-between gap-3 text-sm">
       <div className="flex items-center gap-2 min-w-0 flex-wrap">
-        <span aria-hidden="true">🎉</span>
-        <span className="text-blue-900">
+                <span className="text-blue-900">
           新バージョン <strong>{release.tag}</strong> がリリースされました
         </span>
         <a

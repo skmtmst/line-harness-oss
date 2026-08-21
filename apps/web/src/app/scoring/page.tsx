@@ -173,17 +173,37 @@ export default function MileagePage() {
 
   return (
     <div>
-      <Header
-        title="マイル"
-        action={
-          <button
-            onClick={() => void reloadAll()}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
-          >
-            再読み込み
-          </button>
-        }
-      />
+      <div data-design="Head">
+        <Header
+          title="マイル"
+          description="購入や紹介でたまるマイルを管理します。付与ルールと、友だちごとの残高・履歴を確認できます。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
+              </button>
+              {/* 残高の書き出しは無い。友だち単位の残高は画面で見るしかない。 */}
+              <button
+                disabled
+                title="残高のCSV出力は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                残高をCSV出力
+              </button>
+              <button
+                onClick={() => void reloadAll()}
+                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border bg-white px-4 py-2 text-sm font-medium"
+              >
+                再読み込み
+              </button>
+            </div>
+          }
+        />
+      </div>
 
       <div className="mb-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -310,7 +330,7 @@ export default function MileagePage() {
                   return (
                     <tr key={member.identityKey} className="hover:bg-gray-50/70">
                       <td className="px-4 py-4 text-center text-sm font-bold text-gray-500">
-                        {rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : rank}
+                        {rank}
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
@@ -344,16 +364,17 @@ export default function MileagePage() {
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                          <span>💬 {formatNumber(member.messageCount)}</span>
-                          <span>🔗 {formatNumber(member.linkClickCount)}</span>
-                          <span>📝 {formatNumber(member.formCount)}</span>
-                          <span>📅 {formatNumber(member.bookingCount)}</span>
-                          <span>🎬 {formatNumber(member.webinarCount)}</span>
-                          <span>📸 {formatNumber(member.instagramCount)}</span>
-                          <span>🌱 継続{formatNumber(member.followingDays)}日</span>
-                          {member.unfollowCount > 0 && <span>↩ 再フォロー{formatNumber(member.unfollowCount)}回</span>}
+                          {/* 絵文字だと何の数か読み取れない。言葉で書く。 */}
+                          <span>メッセージ {formatNumber(member.messageCount)}</span>
+                          <span>リンク {formatNumber(member.linkClickCount)}</span>
+                          <span>フォーム {formatNumber(member.formCount)}</span>
+                          <span>予約 {formatNumber(member.bookingCount)}</span>
+                          <span>ウェビナー {formatNumber(member.webinarCount)}</span>
+                          <span>Instagram {formatNumber(member.instagramCount)}</span>
+                          <span>継続 {formatNumber(member.followingDays)}日</span>
+                          {member.unfollowCount > 0 && <span>再フォロー {formatNumber(member.unfollowCount)}回</span>}
                           {member.qualityReferralCount > 0 && (
-                            <span>🤝 良質紹介{formatNumber(member.qualityReferralCount)}人・{formatNumber(member.referralMiles)}mile</span>
+                            <span>良質紹介 {formatNumber(member.qualityReferralCount)}人・{formatNumber(member.referralMiles)}mile</span>
                           )}
                         </div>
                       </td>

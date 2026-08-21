@@ -18,7 +18,14 @@ export interface ResolvedContent {
  * に coerce する。
  */
 function normalizeMessageType(type: string): string {
-  if (type === 'carousel') return 'flex';
+  /*
+   * 以前は carousel を flex に寄せていたが、**別物**だった。
+   * カルーセルの中身は columns の配列で、Flex が要求するのは bubble か
+   * carousel のオブジェクト。配列を渡すと LINE が 400 を返し、400 は
+   * 永続エラー扱いなので、その人の購読ごと止まっていた。
+   *
+   * carousel のまま返し、buildMessage が template メッセージに組み立てる。
+   */
   return type;
 }
 

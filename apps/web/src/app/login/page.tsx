@@ -1,9 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useBrand } from '@/lib/use-brand'
+
+/** 看板が取れないときに出す名前。 */
+const FALLBACK_NAME = '然-NEN- LINE管理システム'
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const brand = useBrand()
 
   useEffect(() => {
     const errorCode = new URLSearchParams(window.location.search).get('error')
@@ -22,42 +27,77 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-[100svh] bg-accent px-4 py-8 sm:px-6 sm:py-12 flex items-center justify-center">
-      <section className="w-full max-w-md rounded-3xl bg-white px-5 py-8 shadow-xl sm:px-10 sm:py-10">
-        <div className="mb-7 text-center sm:mb-8">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-xl font-bold text-white shadow-sm" aria-hidden="true">
-            N
-          </div>
-          <h1 className="mx-auto max-w-sm text-xl font-bold leading-snug text-gray-900 sm:text-2xl">
-            然-NEN- LINE管理システム TEST
+    // 地は沈んだ面。緑ベタの上に白カードを浮かせていたが、設計では
+    // 薄いグレーの上に置く。緑はボタンとロゴだけに残す。
+    <main className="flex min-h-[100svh] flex-col items-center justify-center bg-canvas-sunken px-4 py-8 sm:px-6 sm:py-12">
+      <section className="w-full max-w-lg rounded-card bg-canvas px-6 py-10 shadow-sm sm:px-12">
+        <div className="text-center">
+          {/* 設定したアイコンを出す。無いときだけ「然」の字に落ちる。
+              画像を出す先が公式アカウントなので、alt は名前をそのまま使う。 */}
+          {brand.iconUrl ? (
+            <img
+              src={brand.iconUrl}
+              alt={brand.name ?? FALLBACK_NAME}
+              className="mx-auto h-16 w-16 rounded-card object-cover"
+            />
+          ) : (
+            <div
+              className="mx-auto flex h-16 w-16 items-center justify-center rounded-card bg-accent-soft text-2xl font-bold text-accent"
+              aria-hidden="true"
+            >
+              然
+            </div>
+          )}
+          {/* 公式アカウントの表示名。友だちに見えているのはこちらで、
+              DB 側の呼び名（「本番」「テスト」など）ではない。 */}
+          <h1 className="mx-auto mt-5 max-w-sm text-xl font-bold leading-snug text-ink">
+            {brand.name ?? FALLBACK_NAME}
           </h1>
-          <p className="mt-2 text-sm text-gray-500 sm:text-base">管理画面にログイン</p>
+          <p className="mt-2 text-sm text-ink-secondary">管理画面にログイン</p>
         </div>
 
-        <div>
+        <div className="mt-7">
           {error && (
-            <p className="text-sm text-red-600 mb-4">{error}</p>
+            <p className="mb-4 rounded-control bg-danger-bg px-4 py-3 text-sm text-danger">{error}</p>
           )}
 
           <button
             type="button"
             onClick={handleLogin}
             disabled={loading}
-            className="flex min-h-14 w-full items-center justify-center gap-3 rounded-xl px-4 py-3 text-base font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50 sm:text-lg"
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-control bg-accent px-4 text-base font-bold text-on-accent transition-colors hover:bg-accent-hover disabled:opacity-50"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white" aria-hidden="true">
-              <svg viewBox="0 0 32 32" className="h-6 w-6 fill-accent">
-                <path d="M27.8 14.1c0-5.3-5.3-9.6-11.8-9.6S4.2 8.8 4.2 14.1c0 4.7 4.2 8.7 9.8 9.4.4.1.9.3 1 .7.1.3.1.9 0 1.2l-.2 1.1c-.1.3-.3 1.3 1.1.7 1.4-.6 7.5-4.4 10.2-7.5 1.8-2 1.7-4.1 1.7-5.6Z" />
-              </svg>
-            </span>
+            {/* 白い四角の中に緑のアイコンを入れていたが、設計は白の線画そのまま。 */}
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-5 w-5 shrink-0"
+              aria-hidden="true"
+            >
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />
+            </svg>
             <span>{loading ? 'LINEへ移動中…' : 'LINEでログイン'}</span>
           </button>
-          <p className="mt-5 text-center text-xs leading-relaxed text-gray-500 sm:text-sm">
-            管理者または閲覧者として許可された<br className="sm:hidden" />LINEアカウントのみログインできます。
+          <p className="mt-5 text-center text-xs leading-relaxed text-ink-faint">
+            管理者または閲覧者として許可された<br className="sm:hidden" />LINEアカウントだけが
+            ログインできます。
+          </p>
+        </div>
+
+        <div className="mt-6 border-t border-hairline pt-6 text-center">
+          <p className="text-sm font-bold text-ink">ログインできない場合</p>
+          <p className="mt-1 text-xs leading-relaxed text-ink-faint">
+            管理者にアカウントの登録を依頼してください。
           </p>
         </div>
       </section>
+
+      {/* 著作表示はカードの中ではなく、カードの外の下。 */}
+      <p className="mt-10 text-center text-xs text-ink-faint">© 然-NEN-</p>
     </main>
   )
 }
