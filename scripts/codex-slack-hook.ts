@@ -18,6 +18,8 @@ type GitContext = {
   prUrl?: string;
 };
 
+export const CODEX_SLACK_RELAY_TIMEOUT_MS = 20_000;
+
 function run(command: string, args: string[], cwd: string): string | null {
   try {
     return execFileSync(command, args, {
@@ -121,7 +123,7 @@ export async function sendHookEvent(input: HookInput): Promise<void> {
         'x-nen-signature': signature,
       },
       body,
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(CODEX_SLACK_RELAY_TIMEOUT_MS),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     result();
