@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, fetchApi } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
@@ -178,6 +179,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   const [loadingMessages, setLoadingMessages] = useState(true)
   const isComposingRef = useRef(false)
   const sendLockRef = useRef(false)
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
 
   useEffect(() => {
     const loadMessages = async () => {
@@ -195,18 +197,23 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
 
   const handleSend = async () => {
     if (!message.trim() || sending || sendLockRef.current) return
+    const content = message.trim()
+    const signature = JSON.stringify({ friendId, messageType: 'text', content })
+    const idempotencyKey = sendKeysRef.current.get(signature)
     sendLockRef.current = true
     setSending(true)
     try {
       await fetchApi(`/api/friends/${friendId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content: message, messageType: 'text' }),
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ content, messageType: 'text' }),
       })
+      sendKeysRef.current.clear(signature)
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
         direction: 'outgoing',
         messageType: 'text',
-        content: message,
+        content,
         createdAt: new Date().toISOString(),
       }])
       setMessage('')
@@ -429,6 +436,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [pendingImage, setPendingImage] = useState<ImageUploaderValue | null>(null)
   const [sending, setSending] = useState(false)
   const sendLockRef = useRef(false)
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false)
   const isComposingRef = useRef(false)
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
@@ -720,7 +728,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           originalContentUrl: pendingImage.originalContentUrl,
           previewImageUrl: pendingImage.previewImageUrl,
         })
-        const sendResult = await api.chats.send(sendingChatId, { messageType: 'image', content: imgPayload })
+        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload })
+        const sendResult = await api.chats.send(sendingChatId,
+          { messageType: 'image', content: imgPayload },
+          sendKeysRef.current.get(signature),
+        )
+        sendKeysRef.current.clear(signature)
         setPendingImage(null)
         // Optimistic update for image
         setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
@@ -764,7 +777,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // --- Text send path (runs independently — both paths execute when both image and text are present) ---
       if (messageContent.trim()) {
         const content = messageContent.trim()
-        const sendResult = await api.chats.send(sendingChatId, { content })
+        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content })
+        const sendResult = await api.chats.send(sendingChatId,
+          { content },
+          sendKeysRef.current.get(signature),
+        )
+        sendKeysRef.current.clear(signature)
         setMessageContent('')
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
         // Only mutate chatDetail if it still corresponds to the chat we just sent to

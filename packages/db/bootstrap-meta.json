@@ -172,7 +172,8 @@
     "163_line_notification_templates.sql",
     "164_inbox_staff_reads.sql",
     "165_meet_callback_receipts.sql",
-    "166_dashboard_scope_indexes.sql"
+    "166_dashboard_scope_indexes.sql",
+    "167_outbound_send_idempotency.sql"
   ],
-  "migrationCount": 173
+  "migrationCount": 174
 }

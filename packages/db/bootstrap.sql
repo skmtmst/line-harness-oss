@@ -1221,6 +1221,18 @@ CREATE TABLE operators (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE outbound_send_requests (
+  idempotency_key TEXT PRIMARY KEY,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  resource_id     TEXT NOT NULL,
+  payload_hash    TEXT NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('in_progress', 'succeeded')),
+  response_id     TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  completed_at    TEXT
+);
+
 CREATE TABLE outgoing_webhooks (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
@@ -2134,6 +2146,9 @@ CREATE INDEX idx_notifications_status ON notifications (status);
 
 CREATE INDEX idx_operation_audit_kind_date
   ON operation_audit (target_kind, created_at);
+
+CREATE INDEX idx_outbound_send_requests_created
+  ON outbound_send_requests(created_at);
 
 CREATE INDEX idx_ref_tracking_friend ON ref_tracking (friend_id);
 
