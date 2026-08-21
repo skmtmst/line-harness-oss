@@ -208,17 +208,16 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName }
 
   return (
     <div className="flex h-full w-full flex-col overflow-hidden bg-white">
-      <div className="relative min-h-[66px] border-b border-[#E5E7EB] bg-white px-4 py-3">
-        <div className="flex items-center justify-between gap-2">
+      <div className="relative flex min-h-[66px] items-center border-b border-[#E5E7EB] bg-white px-4">
+        <div className="flex w-full items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
             <h3 className="text-sm font-bold text-[#1F2937]">顧客情報</h3>
-            <p className="mt-0.5 truncate text-[10px] text-[#98A2B3]">対応に必要な情報をまとめて確認できます</p>
           </div>
           <button
             type="button"
             onClick={() => setShowSettings((current) => !current)}
             aria-expanded={showSettings}
-            className="mr-14 shrink-0 whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-white px-2.5 py-1.5 text-[11px] font-semibold text-[#667085] hover:bg-[#F7F8F6]"
+            className="mr-14 inline-flex h-8 shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-white px-3 text-[11px] font-semibold text-[#667085] hover:bg-[#F7F8F6]"
           >
             表示項目
           </button>

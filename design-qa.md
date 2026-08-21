@@ -119,3 +119,51 @@ final result: passed
 2. 重複文字を削除し、実装画像でバッジだけが1行に並ぶことを再確認した。
 
 final result: passed
+
+---
+
+# Design QA — 受信箱・友だち・ダッシュボードの細部調整
+
+## 比較対象
+
+- 受信箱参照: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 1.48.48 PM.png`、`/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 1.52.04 PM.png`
+- 友だち参照: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 1.54.59 PM.png`（1350×901 px）
+- ダッシュボード参照: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 2.05.43 PM.png`（1350×749 px）
+- 内部メモ参照: `/Users/kentakenta/Pictures/Zappy/Screen Shot 2026-08-21 at 1.50.43 PM.png`
+- 受信箱実装: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/inbox-visual-details-1600x900.png`（1600×900 px）
+- 友だち実装: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/friends-visual-details-1600x900.png`（1585×892 px）
+- ダッシュボード実装: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/dashboard-heading-1600x900.png`（1585×892 px）
+- 内部メモ実装: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/internal-memo-no-close-1600x900.png`
+- 全体比較: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/visual-details-comparison.png`
+- 内部メモ重点比較: `/Users/kentakenta/.codex/visualizations/2026/08/20/01a02033-4ebc-77d3-ab98-f2247981416b/internal-memo-comparison.png`
+
+## 確認条件
+
+- PC表示を1600×900へ固定し、同じ確認用データで受信箱、友だち一覧、ダッシュボードを確認した。
+- 参照と実装を同じ比較画像へ配置し、文字、余白、ボタン高、吹き出し、モーダル操作を目視確認した。
+- ローカルの確認用APIだけを使用し、開発・本番データは変更していない。
+
+## 確認結果
+
+- P0 / P1 / P2 の未解決差分なし。
+- 文字: ダッシュボード見出しを受信箱と同じ24px・700へ統一した。担当者名は表示領域を広げ、途中で省略されない。
+- 余白: 受信箱と友だち一覧の説明文を削除し、タイトル直下の内容を上へ詰めた。
+- 操作: 顧客情報の「表示項目」と「閉じる」はともに32px高。内部メモは上部の重複した「閉じる」を外し、下部の「キャンセル」「保存」だけを残した。
+- 配置: 受信メッセージのアバターと吹き出しを上端でそろえ、送信メッセージの担当者表示は吹き出し横で全文を確認できる。
+- 色・枠線・角丸・影: 既存V4トークンを維持し、新しい色や装飾は追加していない。
+
+## 操作確認
+
+1. LINE会話を選び、顧客情報パネルが表示されることを確認した。
+2. 顧客情報の2ボタンを実測し、どちらも32px高であることを確認した。
+3. 内部メモを開き、ダイアログ内の操作が「キャンセル」「保存」の2つだけであることを確認した。
+4. 友だち一覧へ遷移し、説明文がなく一覧全体が上へ詰まることを確認した。
+5. ダッシュボードへ遷移し、見出しが24px・700で表示されることを確認した。
+
+## 比較履歴
+
+1. 初回参照では説明文の分だけ主要領域が下がり、ダッシュボード見出しだけ大きく、内部メモに閉じる操作が重複していた。
+2. 説明文、見出し、ボタン高、メッセージ行、内部メモ操作を修正した。
+3. 実装画像を再取得し、全体比較と内部メモ重点比較で指定箇所が解消していることを確認した。
+
+final result: passed
