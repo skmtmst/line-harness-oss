@@ -107,6 +107,8 @@ import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
+import { clientErrors } from './routes/client-errors.js';
+import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { receiveSupportEmail } from './services/support-email.js';
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -185,6 +187,8 @@ export type Env = {
     SLACK_PR_CHANNELS_JSON?: string;
     SLACK_KENTA_USER_ID?: string;
     SLACK_MASATO_USER_ID?: string;
+    SLACK_TASK_CHANNEL_ID?: string;
+    SLACK_SIGNING_SECRET?: string;
   };
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
@@ -308,6 +312,7 @@ app.route('/', analytics);
 app.route('/', dashboard);
 app.route('/', siteTracking);
 app.route('/', codexSlackEvents);
+app.route('/', clientErrors);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -976,6 +981,36 @@ export async function notFoundHandler(
   }
   return assetRes;
 }
+app.onError((error, c) => {
+  const incidentId = crypto.randomUUID();
+  const url = new URL(c.req.url);
+  console.error(JSON.stringify({
+    event: 'unhandled_worker_error',
+    incidentId,
+    method: c.req.method,
+    path: url.pathname,
+    error: String(error),
+  }));
+  const reportPromise = reportHarnessErrorToSlack(c.env, {
+    source: 'worker',
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    path: `${c.req.method} ${url.pathname}`,
+  }).catch((reportError) => {
+    console.error(JSON.stringify({
+      event: 'unhandled_worker_error_slack_report_failed',
+      incidentId,
+      error: String(reportError),
+    }));
+  });
+  try {
+    c.executionCtx.waitUntil(reportPromise);
+  } catch {
+    void reportPromise;
+  }
+  return c.json({ success: false, error: 'Internal Server Error', incidentId }, 500);
+});
+
 app.notFound(notFoundHandler);
 
 // Scheduled handler for cron triggers — runs for all active LINE accounts

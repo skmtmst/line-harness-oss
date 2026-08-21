@@ -21,6 +21,7 @@ Slackのアプリ候補から選んだ実際の `@Codex` メンションが必�
 - エラー・白画面・動かない: `#line-harness-エラー報告`
 - アイデア・正本化: `#line-harness-アイデア`
 - 承認待ち・競合・完了: `#line-harness-指令塔`
+- 未完了タスク: `#line-harness-要対応`
 
 各案件は1つの親メッセージにまとめ、作業開始、追加指示、Codexの結果はそのスレッドへ追記する。
 
@@ -31,12 +32,28 @@ Slackのアプリ候補から選んだ実際の `@Codex` メンションが必�
 3. Workerが署名を確認し、内容を分類して対象Slackスレッドへ投稿する。
 4. トークンやパスワードらしき文字は投稿前に伏せる。
 
+## 要対応タスク
+
+- 修正、エラー、承認待ちなど、対応が必要な投稿は `#line-harness-要対応` に自動表示する。
+- 状態は `作業中` / `確認待ち`。SlackのボタンまたはCodexの完了報告で完了すると、要対応一覧から消える。
+- 消すのは要対応一覧の通知だけ。元のPR・エラー・アイデアのスレッドには完了履歴を残す。
+- 新しいCodexチャットで続きを行う場合は、要対応メッセージの `TASK-ID` を先頭へ貼る。例: `TASK-0123456789ABCDEF この対応を進めて`。
+- 同じPR番号または同じ専用ブランチから始めた場合は、`TASK-ID` がなくても同じタスクへ紐づく。
+
+## エラー自動検知
+
+- Workerで捕捉されなかった例外は、`#line-harness-エラー報告` と `#line-harness-要対応` へ自動送信する。
+- 管理画面の白画面、未処理のJavaScriptエラー、未処理Promise、APIの5xx応答も自動送信する。
+- 入力ミスなどの4xxは開発エラーとして自動起票しない。
+- 同じ内容と画面のエラーは同じスレッドへ集約する。URLのクエリと顧客本文は送信しない。
+
 ## 必要な設定
 
 Workerの秘密値:
 
 - `CODEX_SLACK_RELAY_SECRET`: Codex側と共通の十分に長いランダム値
 - `SLACK_BOT_TOKEN`: 内部SlackアプリのBot token。`chat:write` と対象チャンネルの履歴読み取り権限が必要
+- `SLACK_SIGNING_SECRET`: Slackのボタン操作が本物か確認する署名秘密値
 
 Workerの非秘密設定:
 
@@ -47,6 +64,11 @@ Workerの非秘密設定:
 - `SLACK_PR_CHANNELS_JSON` 例: `{"201-300":"C0BSNTKHB7A"}`
 - `SLACK_KENTA_USER_ID`
 - `SLACK_MASATO_USER_ID`
+- `SLACK_TASK_CHANNEL_ID`
+
+Slackアプリの Interactivity Request URL:
+
+- `<Worker URL>/api/integrations/slack/actions`
 
 ケンタとマサトのCodex実行環境:
 

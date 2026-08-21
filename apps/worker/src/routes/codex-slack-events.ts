@@ -2,10 +2,12 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { verifySupportRelay } from '../services/support-relay.js';
 import {
+  handleSlackTaskAction,
   relayCodexSlackEvent,
   type CodexSlackCategory,
   type CodexSlackEvent,
 } from '../services/codex-slack-relay.js';
+import { verifySlackRequest } from '../services/slack-signature.js';
 
 const MAX_BODY_BYTES = 32 * 1024;
 const ALLOWED_EVENT_TYPES = new Set(['prompt_submitted', 'turn_completed', 'approval_required']);
@@ -87,5 +89,46 @@ codexSlackEvents.post('/api/integrations/codex-slack/events', async (c) => {
       error: String(error),
     }));
     return c.json({ success: false, error: 'Slack relay failed' }, 502);
+  }
+});
+
+codexSlackEvents.post('/api/integrations/slack/actions', async (c) => {
+  if (!c.env.SLACK_SIGNING_SECRET || !c.env.SLACK_BOT_TOKEN || !c.env.SLACK_TASK_CHANNEL_ID) {
+    return c.json({ success: false, error: 'Slack task actions not configured' }, 503);
+  }
+  const rawBody = await c.req.text();
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
+    return c.json({ success: false, error: 'Payload too large' }, 413);
+  }
+  const verified = await verifySlackRequest(
+    c.env.SLACK_SIGNING_SECRET,
+    c.req.header('x-slack-request-timestamp'),
+    c.req.header('x-slack-signature'),
+    rawBody,
+  );
+  if (!verified) return c.json({ success: false, error: 'Invalid Slack signature' }, 401);
+
+  const encodedPayload = new URLSearchParams(rawBody).get('payload');
+  if (!encodedPayload) return c.json({ success: false, error: 'Invalid Slack payload' }, 400);
+  let payload: Parameters<typeof handleSlackTaskAction>[1];
+  try {
+    payload = JSON.parse(encodedPayload) as Parameters<typeof handleSlackTaskAction>[1];
+  } catch {
+    return c.json({ success: false, error: 'Invalid Slack payload' }, 400);
+  }
+
+  try {
+    const result = await handleSlackTaskAction(c.env, payload);
+    return c.json({ success: true, ...result });
+  } catch (error) {
+    const message = String(error);
+    if (message.includes('FORBIDDEN')) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    if (message.includes('INVALID_')) {
+      return c.json({ success: false, error: 'Invalid Slack task action' }, 400);
+    }
+    console.error(JSON.stringify({ event: 'slack_task_action_failed', error: message }));
+    return c.json({ success: false, error: 'Slack task action failed' }, 502);
   }
 });
