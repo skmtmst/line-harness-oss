@@ -221,6 +221,24 @@ CREATE INDEX IF NOT EXISTS idx_messages_log_friend_direction_created ON messages
 CREATE INDEX IF NOT EXISTS idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
 
 -- ============================================================
+-- Manual outbound send idempotency
+-- ============================================================
+CREATE TABLE IF NOT EXISTS outbound_send_requests (
+  idempotency_key TEXT PRIMARY KEY,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  resource_id     TEXT NOT NULL,
+  payload_hash    TEXT NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('in_progress', 'succeeded')),
+  response_id     TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  completed_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbound_send_requests_created
+  ON outbound_send_requests(created_at);
+
+-- ============================================================
 -- Per-staff inbox read positions
 -- ============================================================
 CREATE TABLE IF NOT EXISTS inbox_staff_reads (

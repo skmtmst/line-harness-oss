@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Chat, Reminder, Scenario, Tag, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -157,6 +158,7 @@ function StatusPanel({ friendId, busy, run }: { friendId: string; busy: boolean;
 function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolean; run: Run }) {
   const [templates, setTemplates] = useState<Template[]>([])
   const [id, setId] = useState('')
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
   useEffect(() => {
     void api.templates.list().then((res) => {
       if (res.success) {
@@ -166,6 +168,17 @@ function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolea
     })
   }, [])
   const picked = templates.find((t) => t.id === id)
+  const sendPicked = async () => {
+    if (!picked) return { success: false, error: 'テンプレートを選んでください' }
+    const signature = JSON.stringify({ friendId, messageType: 'text', content: picked.messageContent })
+    const result = await api.chats.send(
+      friendId,
+      { content: picked.messageContent },
+      sendKeysRef.current.get(signature),
+    )
+    if (result.success) sendKeysRef.current.clear(signature)
+    return result
+  }
   return (
     <div className="space-y-2">
       <Row>
@@ -179,7 +192,7 @@ function TemplatePanel({ friendId, busy, run }: { friendId: string; busy: boolea
           busy={busy || !picked}
           onClick={() =>
             picked &&
-            void run(() => api.chats.send(friendId, { content: picked.messageContent }), '送りました')
+            void run(sendPicked, '送りました')
           }
           label="送る"
         />
