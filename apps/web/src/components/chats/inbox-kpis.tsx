@@ -60,7 +60,7 @@ export default function InboxKpis() {
         {[
           ['自分が担当', value(stats?.mine)],
           ['今日の受信', value(stats?.todayInbound)],
-          ['メール', value(stats?.todayByChannel.email)],
+          ['メール', value(stats?.todayByChannel?.email)],
           ['期限超過', value(stats?.waitingOverAnHour)],
         ].map(([label, count], index) => (
           <div key={label} className="min-w-0">
