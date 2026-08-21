@@ -5,6 +5,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-inbox.js';
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
 import { verifySupportRelay } from '../services/support-relay.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { markInboxConversationRead } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
@@ -456,13 +457,17 @@ supportInbox.patch(
 
 supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = c.req.param('id');
+  const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+  if (!isValidIdempotencyKey(idempotencyKey)) {
+    return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+  }
   const body: { body?: string } = await c.req.json<{ body?: string }>().catch(() => ({}));
   const content = body.body?.trim() || '';
   if (!content || content.length > 50_000) {
     return c.json({ success: false, error: '本文は1〜50,000文字で入力してください' }, 400);
   }
   try {
-    const result = await sendSupportEmailReply(c.env, id, content, c.get('staff').id);
+    const result = await sendSupportEmailReply(c.env, id, content, c.get('staff').id, idempotencyKey);
     return c.json({ success: true, data: result });
   } catch (error) {
     if (error instanceof Error && error.message === 'THREAD_NOT_FOUND') {
@@ -470,6 +475,12 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     }
     if (error instanceof Error && error.message === 'INVALID_CUSTOMER_RECIPIENT') {
       return c.json({ success: false, error: '顧客のメールアドレスを確認できないため送信を停止しました' }, 409);
+    }
+    if (error instanceof Error && error.message === 'IDEMPOTENCY_KEY_CONFLICT') {
+      return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
+    }
+    if (error instanceof Error && error.message === 'IDEMPOTENCY_IN_PROGRESS') {
+      return c.json({ success: false, error: '前回の送信結果を確認中です。再送せず受信履歴を確認してください' }, 409);
     }
     console.error(JSON.stringify({ event: 'support_email_reply_failed', threadId: id, error: String(error) }));
     return c.json({ success: false, error: 'メール送信に失敗しました' }, 502);

@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchApi } from '@/lib/api'
+import { ApiError, fetchApi } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 
 type Channel = 'all' | 'line' | 'email'
 type ThreadStatus = 'unread' | 'in_progress' | 'resolved'
@@ -76,6 +77,7 @@ function dateTime(iso: string): string {
  * 中身は SupportInbox に置き、page.tsx はそれを呼ぶだけにする。
  */
 export default function SupportInbox({ channel = 'email' }: { channel?: Channel }) {
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
   const [status, setStatus] = useState<'open' | ThreadStatus | 'all'>('open')
   const [query, setQuery] = useState('')
   const [items, setItems] = useState<InboxItem[]>([])
@@ -153,17 +155,26 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
 
   const sendReply = async () => {
     if (!selected || selected.channel !== 'email' || !reply.trim() || sending) return
+    const content = reply.trim()
+    const signature = JSON.stringify({ threadId: selected.threadId, body: content })
+    const idempotencyKey = sendKeysRef.current.get(signature)
     setSending(true)
     setError('')
     try {
       await fetchApi(`/api/support/email/threads/${encodeURIComponent(selected.threadId)}/reply`, {
         method: 'POST',
-        body: JSON.stringify({ body: reply.trim() }),
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ body: content }),
       })
+      sendKeysRef.current.clear(signature)
       setReply('')
       await Promise.all([loadDetail(selected.threadId), loadInbox(true)])
-    } catch {
-      setError('メールを送信できませんでした。送信設定を確認してください')
+    } catch (sendError) {
+      setError(
+        sendError instanceof ApiError && sendError.status === 409
+          ? '送信結果を確認中です。二重送信を避けるため再送せず、受信履歴を確認してください'
+          : 'メールを送信できませんでした。送信設定を確認してください',
+      )
     } finally {
       setSending(false)
     }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TemplatePicker from '@/components/chats/template-picker'
 
 /**
@@ -73,6 +74,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
   const [showTemplates, setShowTemplates] = useState(false)
   // 二重送信よけ。押しっぱなしと Enter の連打の両方を止める。
   const sendLock = useRef(false)
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
   const isComposing = useRef(false)
 
   const load = useCallback(async () => {
@@ -95,14 +97,19 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
 
   const send = async () => {
     if (!text.trim() || sending || sendLock.current) return
+    const content = text.trim()
+    const signature = JSON.stringify({ friendId, messageType: 'text', content })
+    const idempotencyKey = sendKeysRef.current.get(signature)
     sendLock.current = true
     setSending(true)
     setError('')
     try {
       await fetchApi(`/api/friends/${friendId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content: text, messageType: 'text' }),
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ content, messageType: 'text' }),
       })
+      sendKeysRef.current.clear(signature)
       // 送った直後は自分の画面にだけ足す。読み直すと往復が1回増える。
       setMessages((prev) => [
         ...prev,
@@ -110,7 +117,7 @@ export default function FriendTimeline({ friendId }: { friendId: string }) {
           id: crypto.randomUUID(),
           direction: 'outgoing',
           messageType: 'text',
-          content: text,
+          content,
           createdAt: new Date().toISOString(),
         },
       ])

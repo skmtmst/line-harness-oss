@@ -2600,9 +2600,10 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    send: (id: string, data: { content: string; messageType?: string }) =>
+    send: (id: string, data: { content: string; messageType?: string }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string }>>(`/api/chats/${id}/send`, {
         method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
       }),
     markRead: (id: string) =>

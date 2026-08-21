@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { fetchApi } from '@/lib/api'
+import { ApiError, fetchApi } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TemplatePicker from '@/components/chats/template-picker'
 
 /**
@@ -62,6 +63,7 @@ export default function EmailThread({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
 
   // 以下は LINE のトークに揃えるためのもの（設計 `TalkPane` / `Reply`）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -172,18 +174,27 @@ export default function EmailThread({
 
   const sendReply = async () => {
     if (!reply.trim() || sending) return
+    const content = reply.trim()
+    const signature = JSON.stringify({ threadId, body: content })
+    const idempotencyKey = sendKeysRef.current.get(signature)
     setSending(true)
     setError('')
     try {
       await fetchApi(`/api/support/email/threads/${encodeURIComponent(threadId)}/reply`, {
         method: 'POST',
-        body: JSON.stringify({ body: reply }),
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ body: content }),
       })
+      sendKeysRef.current.clear(signature)
       setReply('')
       await load()
       onChanged?.()
-    } catch {
-      setError('返信を送れませんでした')
+    } catch (sendError) {
+      setError(
+        sendError instanceof ApiError && sendError.status === 409
+          ? '送信結果を確認中です。二重送信を避けるため再送せず、受信履歴を確認してください'
+          : '返信を送れませんでした',
+      )
     } finally {
       setSending(false)
     }

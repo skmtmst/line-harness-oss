@@ -20,6 +20,12 @@ import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import {
+  completeOutboundSendStatement,
+  hashOutboundPayload,
+  isValidIdempotencyKey,
+  reserveOutboundSend,
+} from '../services/outbound-idempotency.js';
 
 const friends = new Hono<Env>();
 
@@ -734,6 +740,10 @@ friends.get('/api/friends/:id/messages', async (c) => {
 friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const friendId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
     const body = await c.req.json<{
       messageType?: string;
       content: string;
@@ -751,6 +761,34 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
 
+    const messageType = body.messageType ?? 'text';
+    const payloadHash = await hashOutboundPayload(
+      JSON.stringify({
+        friendId: friend.id,
+        messageType,
+        content: body.content,
+        altText: body.altText,
+        trackLinks: body.trackLinks !== false,
+      }),
+    );
+    const reservation = await reserveOutboundSend(db, {
+      key: idempotencyKey,
+      channel: 'line',
+      resourceId: friend.id,
+      payloadHash,
+      retryInProgress: true,
+      now: new Date().toISOString(),
+    });
+    if (reservation.kind === 'conflict') {
+      return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
+    }
+    if (reservation.kind === 'in_progress') {
+      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+    }
+    if (reservation.kind === 'replay') {
+      return c.json({ success: true, data: { messageId: reservation.responseId, replayed: true } });
+    }
+
     const { LineClient } = await import('@line-crm/line-sdk');
     // Resolve access token from friend's account (multi-account support)
     let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
@@ -762,7 +800,6 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
       if (account) accessToken = account.channel_access_token;
     }
     const lineClient = new LineClient(accessToken);
-    const messageType = body.messageType ?? 'text';
 
     // Auto-wrap URLs with tracking links (text with URLs → Flex with button)
     // trackLinks=false で明示的に短縮 OFF (URL をそのまま送る)
@@ -787,17 +824,23 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
     }
 
     const message = buildMessage(tracked.messageType, tracked.content, body.altText);
-    await lineClient.pushMessage(friend.line_user_id, [message]);
+    await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
 
     // Log outgoing message
-    const logId = crypto.randomUUID();
-    await db
-      .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
+    const logId = idempotencyKey;
+    const sentAt = jstNow();
+    await db.batch([
+      db.prepare(
+        `INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
          VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'manual', ?)`,
       )
-      .bind(logId, friend.id, messageType, body.content, jstNow())
-      .run();
+        .bind(logId, friend.id, messageType, body.content, sentAt),
+      completeOutboundSendStatement(db, {
+        key: idempotencyKey,
+        responseId: logId,
+        now: new Date().toISOString(),
+      }),
+    ]);
 
     return c.json({ success: true, data: { messageId: logId } });
   } catch (err) {
