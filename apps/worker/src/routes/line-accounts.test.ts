@@ -86,7 +86,7 @@ beforeEach(() => {
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
   dbMocks.setAccountSetting.mockResolvedValue(undefined);
   dbMocks.jstNow.mockReturnValue('2026-08-10T12:00:00.000+09:00');
   lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
@@ -150,18 +150,21 @@ describe('GET /api/line-accounts/:id/follower-insight', () => {
     expect(lineClientMocks.getFollowersInsight).not.toHaveBeenCalled();
   });
 
-  test('assigned staff cannot fetch another account insight', async () => {
+  test('assigned staff can fetch another account insight in the same organization', async () => {
     dbMocks.getLineAccountById.mockResolvedValue({ ...fakeAccount, id: 'acc-2' });
     dbMocks.getLineAccounts.mockResolvedValue([
       { ...fakeAccount, id: 'acc-1', parent_line_account_id: null },
       { ...fakeAccount, id: 'acc-2', parent_line_account_id: null },
     ]);
+    lineClientMocks.getFollowersInsight.mockResolvedValue({
+      status: 'ready', followers: 123, targetedReaches: 111, blocks: 4,
+    });
     const app = setupApp('staff', makeDbStub(), {
       assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
     });
     const res = await app.request('/api/line-accounts/acc-2/follower-insight?date=20260616');
-    expect(res.status).toBe(404);
-    expect(lineClientMocks.getFollowersInsight).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(lineClientMocks.getFollowersInsight).toHaveBeenCalled();
   });
 });
 

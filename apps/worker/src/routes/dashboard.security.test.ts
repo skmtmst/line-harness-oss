@@ -37,22 +37,24 @@ function env(): Env['Bindings'] {
   return { DB: {} as D1Database, LINE_CHANNEL_ACCESS_TOKEN: 'env-token' } as Env['Bindings'];
 }
 
-describe('dashboard account boundary', () => {
+describe('dashboard organization account policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dbMocks.getLineAccounts.mockResolvedValue([account('account-1'), account('account-2')]);
     dbMocks.getLineAccountById.mockImplementation(async (_db: unknown, id: string) => account(id));
   });
 
-  test('restricted staff cannot select another account', async () => {
+  test('staff can select another account in the same organization', async () => {
+    dbMocks.getDashboardOverview.mockResolvedValue({ delivery: {}, partialFailures: [] });
     const response = await app().request('/api/dashboard/overview?accountId=account-2', {}, env());
-    expect(response.status).toBe(404);
-    expect(dbMocks.getDashboardOverview).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', 'account-2');
   });
 
-  test('restricted staff must send an explicit account', async () => {
+  test('staff can request the organization-wide overview without an explicit account', async () => {
+    dbMocks.getDashboardOverview.mockResolvedValue({ delivery: {}, partialFailures: [] });
     const response = await app().request('/api/dashboard/overview', {}, env());
-    expect(response.status).toBe(400);
-    expect(dbMocks.getDashboardOverview).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', null);
   });
 });

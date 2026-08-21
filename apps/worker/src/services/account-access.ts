@@ -4,44 +4,25 @@ import type { AuthenticatedStaff } from '../middleware/auth.js';
 /**
  * 認証済みユーザーが閲覧できるLINE公式アカウントを返す。
  *
- * - owner と既存ユーザー（割当なし）は後方互換のため全件
- * - 割当あり・他アカウント権限OFFは自分の1件だけ
- * - ONは構成上の子・孫を再帰的に含む
+ * このシステムは1つの組織で使う前提で、認証済みスタッフは役割にかかわらず
+ * 組織内の全アカウントを操作できる。assignedLineAccountId はログイン直後に
+ * 選ぶ既定値であり、認可境界には使わない。
  */
 export function filterVisibleLineAccounts(
   accounts: LineAccount[] | undefined,
-  staff: AuthenticatedStaff | undefined,
+  _staff: AuthenticatedStaff | undefined,
 ): LineAccount[] {
-  const available = accounts ?? [];
-  if (!staff || staff.role === 'owner' || !staff.assignedLineAccountId) return available;
-
-  const visible = new Set<string>([staff.assignedLineAccountId]);
-  if (staff.canAccessDescendantAccounts) {
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const account of available) {
-        if (
-          account.parent_line_account_id &&
-          visible.has(account.parent_line_account_id) &&
-          !visible.has(account.id)
-        ) {
-          visible.add(account.id);
-          changed = true;
-        }
-      }
-    }
-  }
-  return available.filter((account) => visible.has(account.id));
+  return accounts ?? [];
 }
 
 export function canAccessLineAccount(
   accounts: LineAccount[] | undefined,
-  staff: AuthenticatedStaff | undefined,
+  _staff: AuthenticatedStaff | undefined,
   accountId: string,
 ): boolean {
-  if (!staff || staff.role === 'owner' || !staff.assignedLineAccountId) return true;
-  return filterVisibleLineAccounts(accounts, staff).some((account) => account.id === accountId);
+  // There is no staff-assignment restriction, but the account must still
+  // belong to this installation (the organization boundary).
+  return (accounts ?? []).some((account) => account.id === accountId);
 }
 
 export type VisibleLineAccountScope = {
@@ -58,8 +39,7 @@ export async function getVisibleLineAccountScope(
 ): Promise<VisibleLineAccountScope> {
   const allAccounts = await getLineAccounts(db);
   const accounts = filterVisibleLineAccounts(allAccounts, staff);
-  const restricted = Boolean(staff && staff.role !== 'owner' && staff.assignedLineAccountId);
-  return { accounts, ids: accounts.map((account) => account.id), restricted };
+  return { accounts, ids: accounts.map((account) => account.id), restricted: false };
 }
 
 export type HierarchyRelationship = { id: string; parentLineAccountId: string | null };

@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { LineAccount } from '@line-crm/db';
 import {
+  canAccessLineAccount,
   filterVisibleLineAccounts,
+  getVisibleLineAccountScope,
   validateAccountHierarchy,
 } from './account-access.js';
+
+vi.mock('@line-crm/db', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@line-crm/db')>();
+  return { ...actual, getLineAccounts: vi.fn(async () => accounts) };
+});
 
 function account(id: string, parent: string | null = null): LineAccount {
   return {
@@ -19,18 +26,23 @@ function account(id: string, parent: string | null = null): LineAccount {
 const accounts = [account('parent'), account('child', 'parent'), account('grandchild', 'child'), account('other')];
 
 describe('filterVisibleLineAccounts', () => {
-  it('他アカウント権限OFFなら担当アカウントだけを返す', () => {
+  it('担当アカウントは既定値として扱い、組織内の全アカウントを返す', () => {
     expect(filterVisibleLineAccounts(accounts, {
       id: 's', name: 'S', role: 'admin', readOnly: false,
       assignedLineAccountId: 'parent', canAccessDescendantAccounts: false,
-    }).map((item) => item.id)).toEqual(['parent']);
+    }).map((item) => item.id)).toEqual(['parent', 'child', 'grandchild', 'other']);
   });
 
-  it('他アカウント権限ONなら子・孫を返し、別系統は返さない', () => {
-    expect(filterVisibleLineAccounts(accounts, {
-      id: 's', name: 'S', role: 'admin', readOnly: false,
-      assignedLineAccountId: 'parent', canAccessDescendantAccounts: true,
-    }).map((item) => item.id)).toEqual(['parent', 'child', 'grandchild']);
+  it('スタッフも別系統のアカウントを操作できる', async () => {
+    const staff = {
+      id: 's', name: 'S', role: 'staff' as const, readOnly: false,
+      assignedLineAccountId: 'parent', canAccessDescendantAccounts: false,
+    };
+    expect(canAccessLineAccount(accounts, staff, 'other')).toBe(true);
+    await expect(getVisibleLineAccountScope({} as D1Database, staff)).resolves.toMatchObject({
+      ids: ['parent', 'child', 'grandchild', 'other'],
+      restricted: false,
+    });
   });
 });
 
