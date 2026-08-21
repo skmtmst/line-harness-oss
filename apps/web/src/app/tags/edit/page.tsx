@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import EditTagPageV4 from '@/components/friend-fields/edit-tag-page-v4'
 
 /**
  * タグを編集する。
@@ -418,11 +419,21 @@ function EditTagInner() {
   )
 }
 
-export default function EditTagPage() {
+function LegacyEditTagPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
       <EditTagInner />
+    </Suspense>
+  )
+}
+
+void LegacyEditTagPage
+
+export default function EditTagPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
+      <EditTagPageV4 />
     </Suspense>
   )
 }
