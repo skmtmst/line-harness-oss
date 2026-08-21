@@ -41,9 +41,9 @@ function app() {
   return instance;
 }
 
-test('restricted staff cannot read another account transcript by friend id', async () => {
+test('staff can read another account transcript in the same organization', async () => {
   const response = await app().request('/api/conversations/friend-2', {}, {
     DB: dbWithFriend('account-2'),
   } as Env['Bindings']);
-  expect(response.status).toBe(404);
+  expect(response.status).toBe(200);
 });

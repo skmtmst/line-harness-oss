@@ -10,6 +10,10 @@ import type { Env } from '../index.js';
 vi.mock('@line-crm/db', () => ({
   getStaffByApiKey: vi.fn(async (_db: unknown, token: string) => {
     if (token === 'viewer-key') return { id: 'viewer-1', name: 'Viewer One', role: 'staff', access_level: 'read_only' };
+    if (token === 'friends-key') return { id: 'friends-1', name: 'Friends Staff', role: 'staff', permission_keys: '["/friends"]' };
+    if (token === 'chats-key') return { id: 'chats-1', name: 'Chats Staff', role: 'staff', permission_keys: '["/chats"]' };
+    if (token === 'tags-key') return { id: 'tags-1', name: 'Tags Staff', role: 'staff', permission_keys: '["/tags"]' };
+    if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
     return { id: 'staff-1', name: 'Staff One', role: 'admin' };
   }),
@@ -82,6 +86,13 @@ function app() {
   a.post('/api/forms/:id/partial', (c) => c.json({ success: true }));
   a.post('/api/forms/:id/opened', (c) => c.json({ success: true }));
   a.get('/api/public/brand', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
+  for (const path of [
+    '/api/support', '/api/operators', '/api/support-marks', '/api/saved-searches',
+    '/api/folders', '/api/tag-groups', '/api/friends/:id', '/api/friends/:id/messages',
+    '/api/friends/:id/fields', '/api/friends/:id/support-mark', '/api/friends/support-mark/bulk',
+  ]) {
+    a.get(path, (c) => c.json({ success: true }));
+  }
   return a;
 }
 
@@ -317,6 +328,40 @@ describe('protected API access', () => {
     }, crossSiteEnv());
     expect(res.status).toBe(401);
   });
+});
+
+describe('staff feature permissions', () => {
+  const bearer = (token: string) => ({ headers: { Authorization: `Bearer ${token}` } });
+
+  test.each(['/api/support', '/api/operators', '/api/friends/friend-1/messages'])(
+    'chat permission protects %s',
+    async (path) => {
+      expect((await app().request(path, bearer('chats-key'), crossSiteEnv())).status).toBe(200);
+      expect((await app().request(path, bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+    },
+  );
+
+  test.each([
+    '/api/support-marks', '/api/saved-searches', '/api/folders', '/api/tag-groups',
+    '/api/friends/friend-1/fields', '/api/friends/friend-1/support-mark',
+    '/api/friends/support-mark/bulk',
+  ])('friend-attributes permission protects %s', async (path) => {
+    expect((await app().request(path, bearer('tags-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request(path, bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+  });
+
+  test('friend permission still allows ordinary friend APIs but not nested chat or attributes', async () => {
+    expect((await app().request('/api/friends/friend-1', bearer('friends-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/friends/friend-1/messages', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+    expect((await app().request('/api/friends/friend-1/fields', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+  });
+
+  test.each(['/api/support', '/api/friends/friend-1', '/api/support-marks'])(
+    'missing feature permission fails closed for %s',
+    async (path) => {
+      expect((await app().request(path, bearer('no-permissions-key'), crossSiteEnv())).status).toBe(403);
+    },
+  );
 });
 
 describe('public form method boundaries', () => {

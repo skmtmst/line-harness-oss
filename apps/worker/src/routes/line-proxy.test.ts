@@ -219,7 +219,7 @@ describe('auth', () => {
     expect(res.status).toBe(401);
   });
 
-  test('staff key cannot operate a different assigned LINE account', async () => {
+  test('staff key can operate another LINE account in the same organization', async () => {
     vi.mocked(getLineAccounts).mockResolvedValue([ACCOUNT, ACCOUNT_2] as never);
     vi.mocked(authenticateApiToken).mockResolvedValue({
       id: 'staff-1', name: 'Restricted', role: 'staff', readOnly: false,
@@ -230,8 +230,8 @@ describe('auth', () => {
     const res = await setupApp().request(
       pushRequest('staff-key', undefined, { 'X-Line-Account-Id': 'acc-2' }), {}, env(db),
     );
-    expect(res.status).toBe(404);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   test('read-only staff key cannot send LINE messages', async () => {

@@ -132,8 +132,9 @@ function toAuthenticatedStaff(staff: {
 
 const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
-  ['/api/support', '/chats'],
+  ['/api/support', '/chats'], ['/api/operators', '/chats'],
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
+  ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
   ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
   ['/api/auto-replies', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
   ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'],
@@ -142,7 +143,21 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
 ];
 
+/**
+ * A few APIs live under /api/friends for URL compatibility but expose another
+ * feature. Resolve them before the broad /api/friends prefix so a staff member
+ * cannot inherit chat or friend-attribute access from the friends permission.
+ */
+const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/friends\/[^/]+\/messages(?:\/|$)/, '/chats'],
+  [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
+  [/^\/api\/friends\/[^/]+\/support-mark(?:\/|$)/, '/tags'],
+  [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
+];
+
 function permissionForApiPath(path: string): string | null {
+  const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
+  if (override) return override[1];
   return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
 }
 

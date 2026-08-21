@@ -179,9 +179,6 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
     };
   }
   if (c.env.LINE_CHANNEL_ACCESS_TOKEN) {
-    if (staff.assignedLineAccountId) {
-      return c.json({ message: 'Set an accessible X-Line-Account-Id header' }, 400);
-    }
     return {
       upstreamToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
       lineAccountId: null,

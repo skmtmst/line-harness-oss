@@ -134,11 +134,6 @@ chats.get('/api/operators', async (c) => {
       data: items.map((o) => ({
         id: o.id,
         name: o.name,
-        email: o.email,
-        role: o.role,
-        isActive: Boolean(o.is_active),
-        createdAt: o.created_at,
-        updatedAt: o.updated_at,
       })),
     });
   } catch (err) {

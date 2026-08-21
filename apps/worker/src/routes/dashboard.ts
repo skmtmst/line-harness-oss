@@ -70,9 +70,6 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     if (accountId && !canAccessLineAccount(accounts, staff, accountId)) {
       return c.json({ success: false as const, error: 'LINE account not found' }, 404);
     }
-    if (!accountId && staff?.role !== 'owner' && staff?.assignedLineAccountId) {
-      return c.json({ success: false as const, error: 'accountId is required' }, 400);
-    }
     const selectedAccount = accountId ? await getLineAccountById(c.env.DB, accountId) : null;
     if (accountId && !selectedAccount) {
       return c.json({ success: false as const, error: 'LINE account not found' }, 404);

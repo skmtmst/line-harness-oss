@@ -60,6 +60,7 @@ function patch(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getLineAccounts.mockResolvedValue([{ ...ACCOUNT, parent_line_account_id: null }]);
   mocks.getLineAccountById.mockResolvedValue(ACCOUNT);
   mocks.updateLineAccountFields.mockResolvedValue(ACCOUNT);
   mocks.updateLineAccount.mockResolvedValue(ACCOUNT);

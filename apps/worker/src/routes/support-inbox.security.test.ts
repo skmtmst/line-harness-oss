@@ -19,13 +19,13 @@ vi.mock('../services/unanswered-inbox.js', () => ({
 
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: vi.fn(async () => ({
-    accounts: [{ id: 'account-1' }], ids: ['account-1'], restricted: true,
+    accounts: [{ id: 'account-1' }, { id: 'account-2' }], ids: ['account-1', 'account-2'], restricted: false,
   })),
 }));
 
 import { supportInbox } from './support-inbox.js';
 
-test('restricted support inbox passes its account scope and hides unattributed email', async () => {
+test('organization-wide support inbox does not add an account restriction', async () => {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
     c.set('staff', {
@@ -36,13 +36,17 @@ test('restricted support inbox passes its account scope and hides unattributed e
     return next();
   });
   app.route('/', supportInbox);
+  const statement = {
+    bind() { return statement; },
+    all: async () => ({ results: [] }),
+  };
   const response = await app.request('/api/support/inbox?status=open&limit=5', {}, {
-    DB: {} as D1Database,
+    DB: { prepare: () => statement } as unknown as D1Database,
   } as Env['Bindings']);
   expect(response.status).toBe(200);
   expect(computeUnansweredInbox).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({ allowedAccountIds: ['account-1'] }),
+    expect.objectContaining({ allowedAccountIds: undefined }),
   );
   const body = await response.json() as { data: { items: Array<{ channel: string }>; summary: { email: number } } };
   expect(body.data.items.map((item) => item.channel)).toEqual(['line']);
