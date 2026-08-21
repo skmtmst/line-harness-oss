@@ -20,7 +20,7 @@ import FriendTimeline from '@/components/friends/friend-timeline'
  */
 
 /**
- * 右カラムのタブ（設計 V2 2-2-1）。
+ * 右カラムのタブ（友だちV4詳細設計）。
  *
  * `pending` は、出す先のデータを取る口がまだ無いもの。タブそのものを
  * 消すと設計と並びが変わるので、出したうえで何が足りないかを書く。
@@ -297,7 +297,7 @@ function FriendDetailInner() {
     .join(' ・ ')
 
   return (
-    <div>
+    <div data-friends-detail-design="v4">
       <nav className="text-ink-faint mb-2 text-xs" data-design="Crumb">
         <Link href="/friends" className="hover:underline">
           友だち

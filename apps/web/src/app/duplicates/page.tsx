@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Header from '@/components/layout/header'
+import { useEmbeddedPage } from '@/components/layout/embedded-page-context'
 import { api } from '@/lib/api'
 
 interface PerAccountStat {
@@ -47,6 +48,7 @@ function formatRelative(iso: string): string {
 const fmt = new Intl.NumberFormat('ja-JP')
 
 export default function DuplicatesPage() {
+  const embedded = useEmbeddedPage()
   const [data, setData] = useState<DuplicatesStatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -84,14 +86,16 @@ export default function DuplicatesPage() {
   }, [])
 
   return (
-    <div className="space-y-8">
-      <Header
-        title="重複検出"
-        description="複数アカウントに重複している友だちを把握し、配信コストの無駄を減らすためのビューです。"
-      />
+    <div className="space-y-6" data-duplicates-design="v4">
+      {!embedded ? (
+        <Header
+          title="重複検出"
+          description="複数アカウントに重複している友だちを把握し、配信コストの無駄を減らすためのビューです。"
+        />
+      ) : null}
 
       {loading && !data ? (
-        <div className="rounded-lg bg-white p-8 text-center text-gray-500 shadow-sm">
+        <div className="rounded-[14px] border border-[#DADDE2] bg-white p-8 text-center text-[#565F59] shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
           読み込み中…
         </div>
       ) : !data ? (
@@ -154,8 +158,8 @@ export default function DuplicatesPage() {
             {data.perAccount.length === 0 ? (
               <p className="mt-3 text-sm text-gray-500">アカウントが登録されていません。</p>
             ) : (
-              <div className="mt-3 overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+                <table className="w-full table-fixed divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
                     <tr>
                       <th className="px-4 py-3">アカウント</th>
@@ -191,7 +195,7 @@ export default function DuplicatesPage() {
               <p className="mt-1 text-sm text-gray-500">
                 行アカウントの友だちのうち、列アカウントにも居る人数 (行アカに対する割合)。
               </p>
-              <div className="mt-3 overflow-x-auto rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
+              <div className="mt-3 overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
                 <table className="min-w-full divide-y divide-gray-200 text-sm">
                   <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
                     <tr>
@@ -199,7 +203,8 @@ export default function DuplicatesPage() {
                       {data.perAccount.map((col) => (
                         <th
                           key={col.accountId}
-                          className="px-4 py-3 text-right whitespace-nowrap"
+                          title={col.accountName}
+                          className="truncate px-2 py-3 text-right"
                         >
                           {col.accountName}
                         </th>
@@ -209,7 +214,7 @@ export default function DuplicatesPage() {
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {data.perAccount.map((row) => (
                       <tr key={row.accountId}>
-                        <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">
+                        <td title={row.accountName} className="truncate px-2 py-3 font-medium text-gray-900">
                           {row.accountName}
                         </td>
                         {data.perAccount.map((col) => {
@@ -233,7 +238,7 @@ export default function DuplicatesPage() {
                           return (
                             <td
                               key={col.accountId}
-                              className="px-4 py-3 text-right tabular-nums whitespace-nowrap"
+                              className="px-2 py-3 text-right tabular-nums"
                             >
                               {fmt.format(overlap)}{' '}
                               <span className="text-xs text-gray-400">
@@ -266,10 +271,10 @@ function StatCard({
   hint?: string
 }) {
   return (
-    <div className="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-      <div className="text-xs font-medium text-gray-500">{label}</div>
-      <div className="mt-1 text-2xl font-bold tabular-nums text-gray-900">{value}</div>
-      {hint ? <div className="mt-1 text-xs text-gray-400">{hint}</div> : null}
+    <div className="rounded-[14px] border border-[#DADDE2] bg-white p-4 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+      <div className="text-xs font-medium text-[#565F59]">{label}</div>
+      <div className="mt-1 text-2xl font-bold tabular-nums text-[#1D1D1F]">{value}</div>
+      {hint ? <div className="mt-1 text-xs text-[#8B938D]">{hint}</div> : null}
     </div>
   )
 }

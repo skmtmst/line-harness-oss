@@ -5,7 +5,7 @@ import type { Tag } from '@line-crm/shared'
 import { api, type FriendListParams } from '@/lib/api'
 
 /**
- * 絞り込み条件を設定（設計 V2 2-2 の「詳細検索」）。
+ * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
  *
  * これまで「詳細検索」は押せないボタンだった。条件を組み立てて渡す口が
  * 無かったため。`/api/friends` に足し算の絞り込みを入れたので、
@@ -89,12 +89,11 @@ export default function AdvancedSearchDialog({
   ])
   const [visibility, setVisibility] = useState<'' | 'following' | 'blocked'>('following')
   const [sort, setSort] = useState<'recent' | 'oldest'>('recent')
-  const [limit, setLimit] = useState(50)
   const [count, setCount] = useState<number | null>(null)
   const [counting, setCounting] = useState(false)
 
   const params = useMemo<AdvancedSearchResult['params']>(() => {
-    const p: AdvancedSearchResult['params'] = { sort, limit }
+    const p: AdvancedSearchResult['params'] = { sort }
     if (visibility) p.visibility = visibility
     for (const b of blocks) {
       if (b.kind === 'name' && b.keyword.trim()) p.search = b.keyword.trim()
@@ -114,7 +113,7 @@ export default function AdvancedSearchDialog({
       if (b.kind === 'chat_status') p.chatStatus = b.value
     }
     return p
-  }, [blocks, visibility, sort, limit])
+  }, [blocks, visibility, sort])
 
   const summary = useMemo(() => {
     const out: string[] = []
@@ -180,11 +179,11 @@ export default function AdvancedSearchDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/35 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-card my-8 w-full max-w-3xl shadow-xl"
+        className="my-8 w-full max-w-3xl rounded-[16px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-hairline flex items-start justify-between gap-3 border-b px-6 py-5">
@@ -198,9 +197,9 @@ export default function AdvancedSearchDialog({
             type="button"
             onClick={onClose}
             aria-label="閉じる"
-            className="text-ink-faint hover:text-ink rounded-pill px-2 py-1"
+            className="rounded-[8px] px-3 py-1.5 text-xs font-medium text-[#565F59] hover:bg-[#F6F6F8]"
           >
-            ✕
+            閉じる
           </button>
         </div>
 
@@ -396,7 +395,7 @@ export default function AdvancedSearchDialog({
             </section>
 
             <section className="border-hairline rounded-card border p-4">
-              <h3 className="text-ink text-sm font-bold">並び替え・表示数</h3>
+              <h3 className="text-ink text-sm font-bold">並び替え</h3>
               <label className="mt-2 block">
                 <span className="text-ink-secondary mb-1 block text-xs">表示順</span>
                 <select
@@ -406,20 +405,6 @@ export default function AdvancedSearchDialog({
                 >
                   <option value="recent">友だち追加の新しい順</option>
                   <option value="oldest">友だち追加の古い順</option>
-                </select>
-              </label>
-              <label className="mt-2 block">
-                <span className="text-ink-secondary mb-1 block text-xs">表示数</span>
-                <select
-                  value={limit}
-                  onChange={(e) => setLimit(Number(e.target.value))}
-                  className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
-                >
-                  {[20, 50, 100].map((n) => (
-                    <option key={n} value={n}>
-                      {n}人ずつ
-                    </option>
-                  ))}
                 </select>
               </label>
             </section>

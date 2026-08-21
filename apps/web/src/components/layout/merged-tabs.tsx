@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 
 /**
- * V2で統合した画面のタブ。
+ * 関連する画面をURL付きで切り替える共通タブ。
  *
  * 旧ルート（/duplicates など）は消さずに 308 で飛ばしている
  * （apps/web/public/_redirects）。ブックマーク・社内Wiki・LINEの

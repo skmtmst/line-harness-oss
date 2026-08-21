@@ -47,34 +47,40 @@ export default function UsersTable({
   const end = Math.min(total, page * pageSize)
 
   return (
-    <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
-      <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
+    <div className="overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+      <table className="w-full table-fixed">
+        <colgroup>
+          <col className="w-[13%]" />
+          <col className="w-[17%]" />
+          <col className="w-[23%]" />
+          <col className="w-[12%]" />
+          <col className="w-[20%]" />
+          <col className="w-[15%]" />
+        </colgroup>
+        <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
+          <tr>
+            <th className="px-4 py-3">識別子</th>
+            <th className="px-4 py-3">表示名</th>
+            <th className="px-4 py-3">登録アカウント</th>
+            <th className="px-4 py-3">X</th>
+            <th className="px-4 py-3">メール</th>
+            <th className="px-4 py-3">電話</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && !loading ? (
             <tr>
-              <th className="px-4 py-3">識別子</th>
-              <th className="px-4 py-3">表示名</th>
-              <th className="px-4 py-3">登録アカウント</th>
-              <th className="px-4 py-3">X</th>
-              <th className="px-4 py-3">メール</th>
-              <th className="px-4 py-3">電話</th>
+              <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+                該当ユーザーがいません
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && !loading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                  該当ユーザーがいません
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <UserRow key={row.identityKey} row={row} accountColorMap={accountColorMap} />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+          ) : (
+            rows.map((row) => (
+              <UserRow key={row.identityKey} row={row} accountColorMap={accountColorMap} />
+            ))
+          )}
+        </tbody>
+      </table>
       <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
         <span>
           {fmt.format(total)} 件中 {fmt.format(start)}–{fmt.format(end)} 件
