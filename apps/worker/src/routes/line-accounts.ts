@@ -130,6 +130,7 @@ async function fetchWebhookEndpointState(
   try {
     const response = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', {
       headers: { Authorization: `Bearer ${channelAccessToken}` },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) {
       return { expectedUrl, actualUrl: null, active: null, status: 'unknown' };
@@ -154,6 +155,12 @@ lineAccounts.get('/api/line-accounts', async (c) => {
     const db = c.env.DB;
     const allItems = await getLineAccounts(db);
     const items = filterVisibleLineAccounts(allItems, c.get('staff'));
+    if (c.req.query('live') === '0') {
+      return c.json({
+        success: true,
+        data: items.map((item) => ({ ...serializeLineAccount(item), displayName: item.name })),
+      });
+    }
     const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
     const expectedWebhookUrl = `${base}/webhook`;
 
@@ -355,6 +362,11 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
 
+    const visibleAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(visibleAccounts, c.get('staff'), account.id)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+
     const client = new LineClient(account.channel_access_token);
     const insight = await client.getFollowersInsight(date);
     return c.json({
@@ -381,6 +393,10 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
 lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
   const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
   if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  const allAccounts = await getLineAccounts(c.env.DB);
+  if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+    return c.json({ success: false, error: 'LINE account not found' }, 404);
+  }
   const state = await getFollowerImportState(c.env.DB, account.id);
   return c.json({ success: true, data: state });
 });
@@ -392,6 +408,10 @@ lineAccounts.post(
     try {
       const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
       if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+      const allAccounts = await getLineAccounts(c.env.DB);
+      if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
       const client = new LineClient(account.channel_access_token);
       const state = await detectFollowerImportCapability(
         c.env.DB,
@@ -413,6 +433,10 @@ lineAccounts.post(
   async (c) => {
     const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    const allAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
     try {
       const state = await startFollowerImport(c.env.DB, account.id);
       return c.json({ success: true, data: state });
@@ -431,6 +455,10 @@ lineAccounts.post(
   async (c) => {
     const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    const allAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
     const client = new LineClient(account.channel_access_token);
     const result = await processFollowerImportStep(
       c.env.DB,

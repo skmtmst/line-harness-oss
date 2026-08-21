@@ -64,7 +64,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   const refreshAccounts = useCallback(async () => {
     try {
-      const res = await api.lineAccounts.list()
+      const res = await api.lineAccounts.list(false)
       if (res.success && res.data.length > 0) {
         const list = res.data as AccountWithStats[]
         setAccounts(list)

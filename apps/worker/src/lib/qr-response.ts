@@ -18,6 +18,22 @@ export function normalizeQrFormat(raw: string | undefined): QrFormat {
   return (QR_FORMATS as readonly string[]).includes(v) ? (v as QrFormat) : 'png';
 }
 
+export function normalizeQrSize(raw: string | undefined): string | null {
+  const size = raw || '240x240';
+  const match = /^(\d{2,4})x(\d{2,4})$/.exec(size);
+  if (!match) return null;
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (width < 64 || width > 1024 || height < 64 || height > 1024 || width * height > 1_048_576) {
+    return null;
+  }
+  return size;
+}
+
+export function isQrDataAllowed(data: string): boolean {
+  return new TextEncoder().encode(data).byteLength <= 2048;
+}
+
 export function qrResponseHeaders(
   contentType: string | null,
   download: boolean,

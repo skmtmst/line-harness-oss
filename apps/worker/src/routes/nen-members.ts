@@ -6,6 +6,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { installNenRichMenu } from '../services/nen-rich-menu.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import {
@@ -459,13 +460,25 @@ nenMembers.post('/api/liff/nen/consultations', async (c) => {
 
 // Admin APIs
 nenMembers.get('/api/nen-members/overview', async (c) => {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const accountWhere = scope.restricted
+    ? scope.ids.length
+      ? `AND f.line_account_id IN (${scope.ids.map(() => '?').join(',')})`
+      : 'AND 1 = 0'
+    : '';
+  const countScoped = async (table: string, alias: string, extra = '') =>
+    c.env.DB.prepare(
+      `SELECT COUNT(*) count FROM ${table} ${alias}
+       JOIN friends f ON f.id = ${alias}.friend_id
+       WHERE 1 = 1 ${extra} ${accountWhere}`,
+    ).bind(...(scope.restricted ? scope.ids : [])).first<{ count: number }>();
   const [pets, logs, care, photos, members, consultations] = await Promise.all([
-    c.env.DB.prepare(`SELECT COUNT(*) count FROM nen_pet_profiles`).first<{ count: number }>(),
-    c.env.DB.prepare(`SELECT COUNT(*) count FROM nen_health_logs`).first<{ count: number }>(),
-    c.env.DB.prepare(`SELECT COUNT(*) count FROM nen_care_flags WHERE status='active'`).first<{ count: number }>(),
-    c.env.DB.prepare(`SELECT COUNT(*) count FROM nen_photo_submissions WHERE status='pending'`).first<{ count: number }>(),
-    c.env.DB.prepare(`SELECT COUNT(*) count FROM nen_ec_member_snapshots`).first<{ count: number }>(),
-    c.env.DB.prepare(`SELECT COUNT(*) count FROM nen_consultation_logs_v2`).first<{ count: number }>(),
+    countScoped('nen_pet_profiles', 'p'),
+    countScoped('nen_health_logs', 'h'),
+    countScoped('nen_care_flags', 'cf', `AND cf.status='active'`),
+    countScoped('nen_photo_submissions', 'ps', `AND ps.status='pending'`),
+    countScoped('nen_ec_member_snapshots', 's'),
+    countScoped('nen_consultation_logs_v2', 'cl'),
   ]);
   return c.json({ success: true, data: { pets: pets?.count || 0, healthLogs: logs?.count || 0, activeCare: care?.count || 0, pendingPhotos: photos?.count || 0, members: members?.count || 0, consultations: consultations?.count || 0 } });
 });

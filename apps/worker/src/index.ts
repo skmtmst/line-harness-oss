@@ -107,7 +107,7 @@ import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { receiveSupportEmail } from './services/support-email.js';
-import { qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
+import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -130,6 +130,7 @@ export type Env = {
     XSERVER_MAIL_PASSWORD?: string;
     XSERVER_RELAY_URL?: string;
     XSERVER_RELAY_SECRET?: string;
+    MEET_CALLBACK_SECRET?: string;
     LINE_CHANNEL_SECRET: string;
     LINE_CHANNEL_ACCESS_TOKEN: string;
     API_KEY: string;
@@ -309,15 +310,24 @@ app.route('/admin/update', adminUpdate);
 app.get('/api/qr', async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
-  const size = c.req.query('size') || '240x240';
+  if (!isQrDataAllowed(data)) return c.text('Data param too long', 400);
+  const size = normalizeQrSize(c.req.query('size'));
+  if (!size) return c.text('Invalid size', 400);
   // 印刷に使うので svg も出せる。知らない値は png に丸める。
   const format = normalizeQrFormat(c.req.query('format'));
   const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&format=${format}&data=${encodeURIComponent(data)}`;
-  const res = await fetch(upstream);
+  const res = await fetch(upstream, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
+  if (!res) return c.text('QR generation timed out', 504);
   if (!res.ok) return c.text('QR generation failed', 502);
-  return new Response(res.body, {
+  const declaredLength = Number(res.headers.get('content-length') || '0');
+  if (declaredLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
+  const bytes = await res.arrayBuffer();
+  if (bytes.byteLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
+  const contentType = res.headers.get('Content-Type');
+  if (!contentType?.toLowerCase().startsWith('image/')) return c.text('Invalid QR response', 502);
+  return new Response(bytes, {
     headers: qrResponseHeaders(
-      res.headers.get('Content-Type'),
+      contentType,
       c.req.query('download') === '1',
       c.req.query('filename') || 'referral-link-qr',
       format,

@@ -6,8 +6,7 @@ import type { DashboardOverview } from '@/lib/api'
  * 設計（`card 友だち数の推移`）は表。折れ線ではない。
  * 日付・前日比・登録・ブロック・有効友だち・流入元の6列。
  *
- * 流入元の内訳は、それを返すAPIがまだ無いので「—」を出す。
- * 適当な値を入れると、見た人が実データだと思ってしまう。
+ * 流入元は友だち追加日の経路名ごとに集計した実データを表示する。
  */
 export default function FriendTrendTable({
   trend,
@@ -80,9 +79,11 @@ export default function FriendTrendTable({
                   <td className="px-3 py-2.5 text-right font-medium tabular-nums">
                     {row.active.toLocaleString('ja-JP')}
                   </td>
-                  {/* 流入元ごとの内訳を返すAPIがまだ無い。埋めるとしたら
-                      entry_routes と friends の紐づけを日次で数える必要がある。 */}
-                  <td className="text-ink-faint px-5 py-2.5">—</td>
+                  <td className="text-ink-faint max-w-[240px] truncate px-5 py-2.5" title={row.sources.map((source) => `${source.name} ${source.count}`).join('、')}>
+                    {row.sources.length
+                      ? row.sources.slice(0, 2).map((source) => `${source.name} ${source.count}`).join('、')
+                      : '経路なし'}
+                  </td>
                 </tr>
               )
             })}

@@ -42,10 +42,10 @@ export async function createAccountHealthLog(
 }
 
 /** 最新のリスクレベルを取得 */
-export async function getLatestRiskLevel(db: D1Database, lineAccountId: string): Promise<string> {
+export async function getLatestRiskLevel(db: D1Database, lineAccountId: string): Promise<string | null> {
   const row = await db.prepare(`SELECT risk_level FROM account_health_logs WHERE line_account_id = ? ORDER BY created_at DESC LIMIT 1`)
     .bind(lineAccountId).first<{ risk_level: string }>();
-  return row?.risk_level ?? 'normal';
+  return row?.risk_level ?? null;
 }
 
 // --- マイグレーション ---
