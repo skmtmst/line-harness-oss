@@ -215,6 +215,31 @@ export function extractApiErrorMessage(raw: string, status: number): string {
   return ''
 }
 
+function reportServerFailure(path: string, status: number): void {
+  if (typeof window === 'undefined' || path === '/api/client-errors') return
+  const token = getCsrfToken()
+  void (async () => {
+    try {
+      await fetch(`${API_URL}/api/client-errors`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...adminSessionHeaders(),
+          ...(token ? { 'X-CSRF-Token': token } : {}),
+        },
+        body: JSON.stringify({
+          message: `API ${status}: ${path}`,
+          path: `${window.location.origin}${window.location.pathname}`,
+          occurredAt: new Date().toISOString(),
+        }),
+      })
+    } catch {
+      // Slack報告自体の失敗で、元のAPIエラー処理を壊さない。
+    }
+  })()
+}
+
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase()
   const csrfHeaders: Record<string, string> = {}
@@ -244,6 +269,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   if (res.status === 401 && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
   }
+  if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) throw new ApiError(res.status, extractApiErrorMessage(await res.text(), res.status))
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>

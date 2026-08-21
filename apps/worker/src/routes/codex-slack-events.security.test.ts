@@ -2,6 +2,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { signSupportRelay } from '../services/support-relay.js';
+import { signSlackRequest } from '../services/slack-signature.js';
+import { TASK_ACTION_ID } from '../services/codex-slack-relay.js';
 import { codexSlackEvents } from './codex-slack-events.js';
 
 const payload = {
@@ -93,5 +95,59 @@ describe('Codex Slack relay security boundary', () => {
       method: 'POST', body: JSON.stringify(payload),
     }, current);
     expect(response.status).toBe(503);
+  });
+
+  test('Slack署名済みの完了ボタンだけを処理する', async () => {
+    const current = env();
+    current.SLACK_TASK_CHANNEL_ID = 'C-TASK';
+    current.SLACK_SIGNING_SECRET = 'slack-signing-secret';
+    current.SLACK_KENTA_USER_ID = 'U-KENTA';
+    const actionPayload = {
+      type: 'block_actions',
+      user: { id: 'U-KENTA' },
+      channel: { id: 'C-TASK' },
+      message: { ts: '1787326497.583159', text: '【要対応】' },
+      actions: [{
+        action_id: TASK_ACTION_ID,
+        value: JSON.stringify({
+          status: 'done',
+          key: 'pr:220',
+          sourceChannel: 'C0SOURCE123',
+          sourceThreadTs: '1787326000.000001',
+        }),
+      }],
+    };
+    const body = `payload=${encodeURIComponent(JSON.stringify(actionPayload))}`;
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = await signSlackRequest('slack-signing-secret', timestamp, body);
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, ts: '1787326000.000002' })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, ts: '1787326497.583159' })));
+    vi.stubGlobal('fetch', fetcher);
+
+    const response = await app().request('/api/integrations/slack/actions', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        'x-slack-request-timestamp': timestamp,
+        'x-slack-signature': signature,
+      },
+      body,
+    }, current);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, status: 'done' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  test('Slack署名のないボタン操作を拒否する', async () => {
+    const current = env();
+    current.SLACK_TASK_CHANNEL_ID = 'C-TASK';
+    current.SLACK_SIGNING_SECRET = 'slack-signing-secret';
+    const response = await app().request('/api/integrations/slack/actions', {
+      method: 'POST',
+      body: 'payload=%7B%7D',
+    }, current);
+    expect(response.status).toBe(401);
   });
 });
