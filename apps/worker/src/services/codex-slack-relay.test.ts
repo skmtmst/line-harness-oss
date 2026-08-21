@@ -119,7 +119,7 @@ describe('Codex Slack relay', () => {
     const parent = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
     const reply = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body));
     expect(parent.channel).toBe('C-IDEA');
-    expect(parent.metadata.event_payload.work_key).toBe('idea:session:session-1');
+    expect(parent.metadata.event_payload.work_key).toBe('session:session-1');
     expect(reply.thread_ts).toBe('200.001');
   });
 
@@ -182,14 +182,21 @@ describe('Codex Slack relay', () => {
   });
 
   test('Codexが完了を報告すると要対応一覧から削除する', async () => {
+    const taskMessage = {
+      ts: '300.001',
+      metadata: {
+        event_type: 'line_harness_task',
+        event_payload: {
+          work_key: 'pr:220',
+          source_channel: 'C0PR123',
+          source_thread_ts: '1787334034.300149',
+        },
+      },
+    };
     const fetcher = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(slackResponse({
-        messages: [{ ts: '200.001', metadata: { event_type: 'line_harness_codex', event_payload: { work_key: 'pr:220' } } }],
-      }))
+      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
-      .mockResolvedValueOnce(slackResponse({
-        messages: [{ ts: '300.001', metadata: { event_type: 'line_harness_task', event_payload: { work_key: 'pr:220' } } }],
-      }))
+      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
 
     await relayCodexSlackEvent({
@@ -200,6 +207,39 @@ describe('Codex Slack relay', () => {
 
     const deletion = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
     expect(String(fetcher.mock.calls[3]?.[0])).toContain('chat.delete');
+    expect(deletion).toEqual({ channel: 'C-TASK', ts: '300.001' });
+  });
+
+  test('同じCodexチャットなら分類が変わった完了報告も元タスクを閉じる', async () => {
+    const taskMessage = {
+      ts: '300.001',
+      metadata: {
+        event_type: 'line_harness_task',
+        event_payload: {
+          work_key: 'session:session-1',
+          source_channel: 'C0PR123',
+          source_thread_ts: '1787334034.300149',
+        },
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
+
+    await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_COMMAND_CHANNEL_ID: 'C-COMMAND',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+    }, event({
+      eventType: 'turn_completed',
+      content: 'Slack接続確認タスクが完了しました',
+    }), fetcher);
+
+    const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
+    const deletion = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    expect(reply).toMatchObject({ channel: 'C0PR123', thread_ts: '1787334034.300149' });
     expect(deletion).toEqual({ channel: 'C-TASK', ts: '300.001' });
   });
 
