@@ -194,6 +194,8 @@ export interface UnansweredInboxOptions {
   minWaitMinutes?: number;
   page?: number;
   pageSize?: number;
+  /** Restrict output to accounts visible to the authenticated caller. */
+  allowedAccountIds?: readonly string[];
 }
 
 interface RawCandidateRow {
@@ -216,6 +218,10 @@ interface RawIncomingRow {
 
 function applyFilters(rows: UnansweredRow[], opts: UnansweredInboxOptions): UnansweredRow[] {
   let filtered = rows;
+  if (opts.allowedAccountIds) {
+    const allowed = new Set(opts.allowedAccountIds);
+    filtered = filtered.filter((r) => allowed.has(r.accountId));
+  }
   if (opts.account) {
     filtered = filtered.filter((r) => r.accountId === opts.account);
   }
@@ -354,8 +360,11 @@ export async function getUnansweredFriendIds(db: D1Database): Promise<Set<string
   return new Set(map.keys());
 }
 
-export async function countUnanswered(db: D1Database): Promise<UnansweredCount> {
-  const allRows = await getAllUnansweredRows(db);
+export async function countUnanswered(
+  db: D1Database,
+  opts: Pick<UnansweredInboxOptions, 'allowedAccountIds'> = {},
+): Promise<UnansweredCount> {
+  const allRows = applyFilters(await getAllUnansweredRows(db), opts);
 
   const byAccountMap = new Map<string, { accountName: string; count: number }>();
   let oldest: string | null = null;

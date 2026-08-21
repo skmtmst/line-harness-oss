@@ -636,10 +636,21 @@ export type DashboardOverview = {
     active: number
     /** 日次記録が無く、いまの友だちから逆算した日。 */
     estimated: boolean
+    sources: Array<{ name: string; count: number }>
   }>
   conversions: {
     total: number
     byPoint: Array<{ name: string; count: number }>
+  }
+  /** 取得に失敗して0へ見せていない項目。 */
+  partialFailures: string[]
+  operations: {
+    scenarios: { active: number; paused: number }
+    migrations: { active: number; completed: number }
+    bookings: { pending: number; upcoming: number }
+    inflowTop: Array<{ name: string; count: number }>
+    funnelAlerts: number
+    automationFailures: number
   }
 }
 
@@ -678,6 +689,7 @@ export type EcShipment = {
   /** 「鹿肉ミンチ × 2」のような一行。商品情報が無ければ空文字。 */
   items: string
   itemCount: number
+  quantity: number
   /** JSTの暦日（YYYY-MM-DD）。 */
   shipDate: string
   /** subscription = EC側の予定日、ordered_at = 注文日時からの算出。 */
@@ -1884,8 +1896,8 @@ export const api = {
       fetchApi<ApiResponse<{ name: string | null; iconUrl: string | null }>>('/api/public/brand'),
   },
   lineAccounts: {
-    list: () =>
-      fetchApi<ApiResponse<LineAccount[]>>('/api/line-accounts'),
+    list: (live = true) =>
+      fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '' : '?live=0'}`),
     summary: () =>
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>

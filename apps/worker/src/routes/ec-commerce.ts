@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
 import { EC_EVENT_TYPES, type EcEvent } from './ec-integrations.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const ecCommerce = new Hono<Env>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
@@ -349,15 +350,15 @@ type ShipmentRow = {
 };
 
 /** payload の items 配列（JSON文字列）を「商品名 × 数量」の一行にする。 */
-function summarizeItems(raw: string | null): { text: string; count: number } {
-  if (!raw) return { text: '', count: 0 };
+function summarizeItems(raw: string | null): { text: string; count: number; quantity: number } {
+  if (!raw) return { text: '', count: 0, quantity: 0 };
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { text: '', count: 0 };
+    return { text: '', count: 0, quantity: 0 };
   }
-  if (!Array.isArray(parsed) || parsed.length === 0) return { text: '', count: 0 };
+  if (!Array.isArray(parsed) || parsed.length === 0) return { text: '', count: 0, quantity: 0 };
   const items = parsed
     .filter((item): item is { name?: unknown; quantity?: unknown } => typeof item === 'object' && item !== null)
     .map((item) => ({
@@ -365,10 +366,10 @@ function summarizeItems(raw: string | null): { text: string; count: number } {
       quantity: typeof item.quantity === 'number' && Number.isFinite(item.quantity) ? item.quantity : null,
     }))
     .filter((item) => item.name);
-  if (items.length === 0) return { text: '', count: 0 };
+  if (items.length === 0) return { text: '', count: 0, quantity: 0 };
   const head = items.slice(0, 2).map((item) => (item.quantity === null ? item.name : `${item.name} × ${item.quantity}`));
   const text = items.length > head.length ? `${head.join('、')} ほか${items.length - head.length}点` : head.join('、');
-  return { text, count: items.length };
+  return { text, count: items.length, quantity: items.reduce((sum, item) => sum + (item.quantity ?? 0), 0) };
 }
 
 ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -378,6 +379,12 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
   // 出荷予定日は計算値なのでSQLでは並べ替えられない。直近のイベントを多めに
   // 取り出してから、算出した日付で並べ替えて limit で切る。
   const scanLimit = Math.min(limit * 5, 200);
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const accountWhere = scope.restricted
+    ? scope.ids.length
+      ? `AND f.line_account_id IN (${scope.ids.map(() => '?').join(',')})`
+      : 'AND 1 = 0'
+    : '';
   const placeholders = SHIPMENT_EVENT_TYPES.map(() => '?').join(', ');
   const rows = await c.env.DB.prepare(
     `SELECT e.id, e.event_type, e.friend_id, e.received_at,
@@ -391,10 +398,11 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
        LEFT JOIN friends f ON f.id = e.friend_id
       WHERE e.event_type IN (${placeholders})
         AND e.status != 'failed'
+        ${accountWhere}
       ORDER BY e.received_at DESC
       LIMIT ?`,
   )
-    .bind(...SHIPMENT_EVENT_TYPES, scanLimit)
+    .bind(...SHIPMENT_EVENT_TYPES, ...(scope.restricted ? scope.ids : []), scanLimit)
     .all<ShipmentRow>();
 
   const todayJst = toJstMoment(new Date().toISOString())?.date ?? '';
@@ -420,6 +428,7 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
         friendName: row.friend_name,
         items: fallback.text,
         itemCount: fallback.count,
+        quantity: fallback.quantity,
         shipDate: date,
         shipDateSource: source,
         // 今日・明日とそれ以降で分けるための印。日付の比較は文字列で足りる。

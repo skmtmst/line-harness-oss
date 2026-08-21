@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
@@ -202,6 +202,25 @@ function EmptyDataCard({ title, href, linkLabel }: { title: string; href: string
   )
 }
 
+function LiveDataCard({
+  title, href, linkLabel, value, unit = '件', detail,
+}: {
+  title: string; href: string; linkLabel: string; value: number | null; unit?: string; detail: string
+}) {
+  return (
+    <DashboardCard className="p-[18px]">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-ink text-sm font-semibold">{title}</h2>
+        <Link href={href} className="text-action text-xs hover:underline">{linkLabel} →</Link>
+      </div>
+      <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
+        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
+      </p>
+      <p className="text-ink-faint mt-2 truncate text-xs" title={detail}>{detail}</p>
+    </DashboardCard>
+  )
+}
+
 function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] | null }) {
   const used = delivery?.quotaUsed ?? null
   const limit = delivery?.quotaLimit ?? null
@@ -269,6 +288,15 @@ export default function DashboardPage() {
   const [supplementLoading, setSupplementLoading] = useState(true)
   const [healthRisk, setHealthRisk] = useState<HealthRisk>(null)
   const [healthIssueCount, setHealthIssueCount] = useState<number | null>(null)
+  const loadRequestId = useRef(0)
+  const visibleMain = preferences.main.filter((item) => item.visible)
+  const visibleRight = preferences.right.filter((item) => item.visible)
+  const visibleToday = preferences.today.filter((item) => item.visible)
+  const shipmentVisible = visibleMain.some((item) => item.id === 'shipment')
+  const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
+  const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
+    || visibleRight.some((item) => item.id === 'upcoming')
+  const needsHealth = visibleRight.some((item) => item.id === 'operational-alerts' || item.id === 'connection-status')
 
   useEffect(() => {
     const key = dashboardStorageKey(selectedAccountId)
@@ -288,16 +316,18 @@ export default function DashboardPage() {
   }
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current
     setLoading(true)
     setError('')
     try {
       const response = await api.dashboard.overview({ period, accountId: selectedAccountId ?? undefined })
+      if (requestId !== loadRequestId.current) return
       if (response.success) setData(response.data)
       else setError(response.error)
     } catch {
-      setError('データの読み込みに失敗しました')
+      if (requestId === loadRequestId.current) setError('データの読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestId.current) setLoading(false)
     }
   }, [period, selectedAccountId])
 
@@ -315,27 +345,27 @@ export default function DashboardPage() {
     let cancelled = false
     setSupplementLoading(true)
     void Promise.allSettled([
-      api.nenMembers.overview(),
-      bookingApi.listRequests(selectedAccountId, 'all'),
-      api.health.getHealth(selectedAccountId),
+      needsPhotos ? api.nenMembers.overview() : Promise.resolve(null),
+      needsBookings ? bookingApi.listRequests(selectedAccountId, 'all') : Promise.resolve(null),
+      needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
     ]).then(([photoResult, bookingResult, healthResult]) => {
       if (cancelled) return
-      setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value.success ? photoResult.value.data.pendingPhotos : null)
-      setBookings(bookingResult.status === 'fulfilled' ? bookingResult.value.requests : null)
+      setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingPhotos : null)
+      setBookings(bookingResult.status === 'fulfilled' && bookingResult.value ? bookingResult.value.requests : null)
       setHealthRisk(
-        healthResult.status === 'fulfilled' && healthResult.value.success
+        healthResult.status === 'fulfilled' && healthResult.value?.success
           ? (healthResult.value.data.riskLevel as HealthRisk)
           : null,
       )
       setHealthIssueCount(
-        healthResult.status === 'fulfilled' && healthResult.value.success
+        healthResult.status === 'fulfilled' && healthResult.value?.success
           ? healthResult.value.data.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
           : null,
       )
       setSupplementLoading(false)
     })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [needsBookings, needsHealth, needsPhotos, selectedAccountId])
 
   const activeBookings = useMemo(
     () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],
@@ -350,18 +380,12 @@ export default function DashboardPage() {
     : data
       ? `対応中 ${data.inbox.inProgress}`
       : '読み込み中'
-  const visibleMain = preferences.main.filter((item) => item.visible)
-  const visibleRight = preferences.right.filter((item) => item.visible)
-  const visibleToday = preferences.today.filter((item) => item.visible)
-  const shipmentVisible = visibleMain.some((item) => item.id === 'shipment')
-  const pendingInboxVisible = visibleMain.some((item) => item.id === 'pending-inbox')
-
   const renderMainCard = (id: DashboardCardId): ReactNode => {
     if (id === 'pending-inbox') return <PendingInboxCard onSummaryChange={setInboxSummary} />
     if (id === 'friend-trend') return <FriendTrendCard data={data} loading={loading} />
     if (id === 'friend-add') return <FriendAddLinkCard />
-    if (id === 'scenario-status') return <EmptyDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" />
-    if (id === 'uid-migration') return <EmptyDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" />
+    if (id === 'scenario-status') return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={data?.operations.scenarios.active ?? null} detail={data ? `一時停止 ${data.operations.scenarios.paused}件` : '読み込み中'} />
+    if (id === 'uid-migration') return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={data?.operations.migrations.active ?? null} detail={data ? `完了 ${data.operations.migrations.completed}件` : '読み込み中'} />
     return null
   }
 
@@ -381,10 +405,10 @@ export default function DashboardPage() {
     if (id === 'monthly-delivery') return data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
     if (id === 'recent-results') return data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
     if (id === 'friend-status' && data) return <FriendStatusCard friends={data.friends} />
-    if (id === 'booking-status') return <EmptyDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" />
-    if (id === 'inflow-top') return <EmptyDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" />
-    if (id === 'funnel-alert') return <EmptyDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" />
-    if (id === 'automation-failures') return <EmptyDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" />
+    if (id === 'booking-status') return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={data?.operations.bookings.upcoming ?? null} detail={data ? `承認待ち ${data.operations.bookings.pending}件` : '読み込み中'} />
+    if (id === 'inflow-top') return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={data?.operations.inflowTop[0]?.count ?? (data ? 0 : null)} detail={data?.operations.inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし'} />
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={data?.operations.funnelAlerts ?? null} detail="3人以上追加・成果0件の経路" />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={data?.operations.automationFailures ?? null} detail="期間内の失敗・一部失敗" />
     return null
   }
 
@@ -417,6 +441,11 @@ export default function DashboardPage() {
       </header>
 
       {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
+      {data?.partialFailures.length ? (
+        <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
+          一部のデータを取得できませんでした（{data.partialFailures.join('、')}）。0件としては表示していません。
+        </div>
+      ) : null}
 
       {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
         <div className="mb-2.5 flex items-center justify-between gap-3">
@@ -431,11 +460,6 @@ export default function DashboardPage() {
       <div data-design="Shipment" className={shipmentVisible ? 'mb-6' : 'hidden'} aria-hidden={!shipmentVisible}>
         <ShipmentPanel onSummaryChange={setShipmentSummary} />
       </div>
-      {!pendingInboxVisible && (
-        <div className="hidden" aria-hidden="true">
-          <PendingInboxCard onSummaryChange={setInboxSummary} />
-        </div>
-      )}
 
       <div data-design="Middle" className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
         <div data-design="Body" className="min-w-0 space-y-[18px]">

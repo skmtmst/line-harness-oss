@@ -27,6 +27,7 @@ export async function fetchLineMonthlyPlan(channelAccessToken: string): Promise<
   try {
     const response = await fetch('https://api.line.me/v2/bot/message/quota', {
       headers: { Authorization: `Bearer ${channelAccessToken}` },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!response.ok) return classifyLineMonthlyPlan(null);
     const quota = await response.json<{ type?: string; value?: number }>();

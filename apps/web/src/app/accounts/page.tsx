@@ -72,7 +72,7 @@ function AccountsPageInner() {
     setLoading(true)
     setError('')
     const [accountsResult, summaryResult] = await Promise.allSettled([
-      api.lineAccounts.list(),
+      api.lineAccounts.list(true),
       api.lineAccounts.summary(),
     ])
     if (accountsResult.status === 'fulfilled' && accountsResult.value.success) {

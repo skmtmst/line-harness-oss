@@ -61,17 +61,15 @@ export default function PendingInboxCard({
 
   const load = useCallback(async () => {
     try {
-      const [summaryResponse, inboxResponse] = await Promise.all([
-        fetchApi<{ success: boolean; data: PendingInboxSummary }>('/api/support/summary'),
-        fetchApi<{ success: boolean; data: { items: InboxItem[] } }>(
-          `/api/support/inbox?status=open&limit=${PAGE_SIZE}&offset=${(page - 1) * PAGE_SIZE}`,
-        ),
-      ])
-      if (summaryResponse.success) {
-        setSummary(summaryResponse.data)
-        onSummaryChange?.(summaryResponse.data)
+      const inboxResponse = await fetchApi<{
+        success: boolean
+        data: { items: InboxItem[]; summary: PendingInboxSummary }
+      }>(`/api/support/inbox?status=open&limit=${PAGE_SIZE}&offset=${(page - 1) * PAGE_SIZE}`)
+      if (inboxResponse.success) {
+        setSummary(inboxResponse.data.summary)
+        onSummaryChange?.(inboxResponse.data.summary)
+        setItems(inboxResponse.data.items)
       }
-      if (inboxResponse.success) setItems(inboxResponse.data.items)
     } catch {
       // ダッシュボード本体は残し、次のポーリングで復旧する。
     }
@@ -83,7 +81,9 @@ export default function PendingInboxCard({
 
   useEffect(() => {
     void load()
-    const timer = window.setInterval(load, 5_000)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load()
+    }, 30_000)
     const onFocus = () => void load()
     window.addEventListener('focus', onFocus)
     return () => {

@@ -6,6 +6,7 @@ import { computeUnansweredInbox, countUnanswered } from '../services/unanswered-
 import { sendSupportEmailReply, storeSupportEmail } from '../services/support-email.js';
 import { verifySupportRelay } from '../services/support-relay.js';
 import { markInboxConversationRead } from '@line-crm/db';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 export const supportInbox = new Hono<Env>();
 
@@ -116,13 +117,16 @@ type EmailThreadRow = {
   preview: string | null;
   assigned_staff_id: string | null;
   assigned_staff_name: string | null;
+  total_count: number;
+  unread_count: number;
 };
 
 supportInbox.get('/api/support/summary', async (c) => {
   try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const [line, email] = await Promise.all([
-      countUnanswered(c.env.DB),
-      c.env.DB.prepare(
+      countUnanswered(c.env.DB, { allowedAccountIds: scope.restricted ? scope.ids : undefined }),
+      scope.restricted ? Promise.resolve(null) : c.env.DB.prepare(
         `SELECT
            SUM(CASE WHEN status != 'resolved' THEN 1 ELSE 0 END) AS open_count,
            SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unread_count,
@@ -155,6 +159,7 @@ supportInbox.get('/api/support/summary', async (c) => {
 
 supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const channel = c.req.query('channel') || 'all';
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
@@ -164,8 +169,13 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     // 両方の候補を取得する。1回に読む件数は従来どおり最大200件に抑える。
     const fetchLimit = Math.min(200, limit + offset);
     const items: Array<Record<string, unknown>> = [];
+    let emailTotal = 0;
+    let emailUnread = 0;
+    let lineTotal = 0;
 
-    if (channel !== 'line') {
+    // Email threads have no account key in the legacy schema. Until a thread
+    // is explicitly attributed, only unrestricted operators may view them.
+    if (channel !== 'line' && !scope.restricted) {
       const statusSql = status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -185,6 +195,8 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       bindings.push(fetchLimit);
       const emailRows = await c.env.DB.prepare(
         `SELECT t.id, t.customer_email, t.customer_name, t.subject, t.status,
+                COUNT(*) OVER() AS total_count,
+                SUM(CASE WHEN t.status = 'unread' THEN 1 ELSE 0 END) OVER() AS unread_count,
                 t.assigned_staff_id,
                 (SELECT name FROM staff_members sm WHERE sm.id = t.assigned_staff_id) AS assigned_staff_name,
                 t.last_message_at, t.last_incoming_at, t.last_outgoing_at,
@@ -204,6 +216,8 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
                   t.last_message_at DESC
          LIMIT ?`,
       ).bind(...bindings).all<EmailThreadRow>();
+      emailTotal = emailRows.results[0]?.total_count ?? 0;
+      emailUnread = emailRows.results[0]?.unread_count ?? 0;
       for (const row of emailRows.results) {
         items.push({
           id: `email:${row.id}`,
@@ -229,7 +243,9 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
         q: query || undefined,
         page: 1,
         pageSize: fetchLimit,
+        allowedAccountIds: scope.restricted ? scope.ids : undefined,
       });
+      lineTotal = line.total;
       for (const row of line.rows) {
         items.push({
           id: `line:${row.friendId}`,
@@ -257,11 +273,37 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       // 対応漏れを防ぐため、同じ状態では待ち時間が長い顧客を先頭にする。
       return String(a.lastIncomingAt).localeCompare(String(b.lastIncomingAt));
     });
-    return c.json({ success: true, data: { items: paginateSupportInboxItems(items, offset, limit) } });
+    const oldest = items.reduce<string | null>((value, item) => {
+      const at = String(item.lastIncomingAt || '');
+      return !at ? value : value === null || at < value ? at : value;
+    }, null);
+    return c.json({
+      success: true,
+      data: {
+        items: paginateSupportInboxItems(items, offset, limit),
+        summary: {
+          total: lineTotal + emailTotal,
+          line: lineTotal,
+          email: emailTotal,
+          emailUnread,
+          oldestWaitMinutes: oldest
+            ? Math.max(0, Math.floor((Date.now() - new Date(oldest).getTime()) / 60_000))
+            : null,
+        },
+      },
+    });
   } catch (error) {
     console.error(JSON.stringify({ event: 'support_inbox_failed', error: String(error) }));
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
+});
+
+supportInbox.use('/api/support/email/*', async (c, next) => {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (scope.restricted) {
+    return c.json({ success: false, error: 'Thread not found' }, 404);
+  }
+  return next();
 });
 
 supportInbox.get('/api/support/email/threads/:id', async (c) => {

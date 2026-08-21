@@ -132,6 +132,7 @@ function toAuthenticatedStaff(staff: {
 
 const STAFF_API_PERMISSIONS: Array<[string, string]> = [
   ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
+  ['/api/support', '/chats'],
   ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
   ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
   ['/api/auto-replies', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
