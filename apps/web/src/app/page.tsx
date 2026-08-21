@@ -384,8 +384,14 @@ export default function DashboardPage() {
     if (id === 'pending-inbox') return <PendingInboxCard onSummaryChange={setInboxSummary} />
     if (id === 'friend-trend') return <FriendTrendCard data={data} loading={loading} />
     if (id === 'friend-add') return <FriendAddLinkCard />
-    if (id === 'scenario-status') return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={data?.operations.scenarios.active ?? null} detail={data ? `一時停止 ${data.operations.scenarios.paused}件` : '読み込み中'} />
-    if (id === 'uid-migration') return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={data?.operations.migrations.active ?? null} detail={data ? `完了 ${data.operations.migrations.completed}件` : '読み込み中'} />
+    if (id === 'scenario-status') {
+      const scenarios = data?.operations?.scenarios
+      return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'uid-migration') {
+      const migrations = data?.operations?.migrations
+      return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? '取得できません' : '読み込み中'} />
+    }
     return null
   }
 
@@ -405,10 +411,16 @@ export default function DashboardPage() {
     if (id === 'monthly-delivery') return data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
     if (id === 'recent-results') return data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
     if (id === 'friend-status' && data) return <FriendStatusCard friends={data.friends} />
-    if (id === 'booking-status') return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={data?.operations.bookings.upcoming ?? null} detail={data ? `承認待ち ${data.operations.bookings.pending}件` : '読み込み中'} />
-    if (id === 'inflow-top') return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={data?.operations.inflowTop[0]?.count ?? (data ? 0 : null)} detail={data?.operations.inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし'} />
-    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={data?.operations.funnelAlerts ?? null} detail="3人以上追加・成果0件の経路" />
-    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={data?.operations.automationFailures ?? null} detail="期間内の失敗・一部失敗" />
+    if (id === 'booking-status') {
+      const bookingsStatus = data?.operations?.bookings
+      return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'inflow-top') {
+      const inflowTop = data?.operations?.inflowTop
+      return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし' : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={data?.operations?.funnelAlerts ?? null} detail="3人以上追加・成果0件の経路" />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={data?.operations?.automationFailures ?? null} detail="期間内の失敗・一部失敗" />
     return null
   }
 
@@ -441,7 +453,7 @@ export default function DashboardPage() {
       </header>
 
       {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
-      {data?.partialFailures.length ? (
+      {data?.partialFailures?.length ? (
         <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
           一部のデータを取得できませんでした（{data.partialFailures.join('、')}）。0件としては表示していません。
         </div>
