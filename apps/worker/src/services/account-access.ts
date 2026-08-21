@@ -1,4 +1,4 @@
-import type { LineAccount } from '@line-crm/db';
+import { getLineAccounts, type LineAccount } from '@line-crm/db';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 /**
@@ -42,6 +42,24 @@ export function canAccessLineAccount(
 ): boolean {
   if (!staff || staff.role === 'owner' || !staff.assignedLineAccountId) return true;
   return filterVisibleLineAccounts(accounts, staff).some((account) => account.id === accountId);
+}
+
+export type VisibleLineAccountScope = {
+  accounts: LineAccount[];
+  ids: string[];
+  /** false means the caller may use legacy rows whose account is not assigned. */
+  restricted: boolean;
+};
+
+/** Resolve account visibility once at a route boundary and reuse it in every query. */
+export async function getVisibleLineAccountScope(
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+): Promise<VisibleLineAccountScope> {
+  const allAccounts = await getLineAccounts(db);
+  const accounts = filterVisibleLineAccounts(allAccounts, staff);
+  const restricted = Boolean(staff && staff.role !== 'owner' && staff.assignedLineAccountId);
+  return { accounts, ids: accounts.map((account) => account.id), restricted };
 }
 
 export type HierarchyRelationship = { id: string; parentLineAccountId: string | null };

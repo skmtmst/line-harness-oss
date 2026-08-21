@@ -2,12 +2,28 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 import { getFriendByLineUserId } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
+import { verifySupportRelay } from '../services/support-relay.js';
+import { sha256Hex } from '../middleware/auth.js';
 
 const app = new Hono<Env>();
 
 // Meet Harness calls this when a hearing session completes
 app.post('/api/meet-callback', async (c) => {
-  const body = await c.req.json<{
+  const secret = c.env.MEET_CALLBACK_SECRET;
+  if (!secret) return c.json({ success: false, error: 'Meet callback not configured' }, 503);
+  const rawBody = await c.req.text();
+  if (new TextEncoder().encode(rawBody).byteLength > 256 * 1024) {
+    return c.json({ success: false, error: 'Payload too large' }, 413);
+  }
+  const verified = await verifySupportRelay(
+    secret,
+    c.req.header('x-nen-timestamp'),
+    c.req.header('x-nen-signature'),
+    rawBody,
+  );
+  if (!verified) return c.json({ success: false, error: 'Invalid signature' }, 401);
+
+  let body: {
     session_id: string;
     scenario_id: string;
     line_user_id: string;
@@ -19,16 +35,45 @@ app.post('/api/meet-callback', async (c) => {
     }>;
     requirements_doc?: string;
     completed_at: string;
-  }>();
+  };
+  try {
+    body = JSON.parse(rawBody) as typeof body;
+  } catch {
+    return c.json({ success: false, error: 'Invalid JSON' }, 400);
+  }
 
-  if (!body.line_user_id) {
-    return c.json({ success: false, error: 'line_user_id required' }, 400);
+  if (
+    !body.session_id || body.session_id.length > 255 ||
+    !/^U[0-9a-f]{32}$/i.test(body.line_user_id || '') ||
+    !Array.isArray(body.transcripts) || body.transcripts.length > 100 ||
+    body.transcripts.some((item) => !item || typeof item.transcript !== 'string' || item.transcript.length > 10_000) ||
+    (body.requirements_doc?.length ?? 0) > 100_000 ||
+    !Number.isFinite(Date.parse(body.completed_at))
+  ) {
+    return c.json({ success: false, error: 'Invalid callback payload' }, 400);
+  }
+
+  const payloadHash = await sha256Hex(rawBody);
+  const existing = await c.env.DB.prepare(
+    'SELECT payload_hash FROM meet_callback_receipts WHERE session_id = ?',
+  ).bind(body.session_id).first<{ payload_hash: string }>();
+  if (existing) {
+    if (existing.payload_hash !== payloadHash) {
+      return c.json({ success: false, error: 'Session payload conflict' }, 409);
+    }
+    return c.json({ success: true, duplicate: true });
   }
 
   const friend = await getFriendByLineUserId(c.env.DB, body.line_user_id);
   if (!friend) {
     return c.json({ success: false, error: 'friend not found' }, 404);
   }
+
+  const receipt = await c.env.DB.prepare(
+    `INSERT OR IGNORE INTO meet_callback_receipts (session_id, payload_hash, received_at)
+     VALUES (?, ?, ?)`,
+  ).bind(body.session_id, payloadHash, new Date().toISOString()).run();
+  if (!receipt.meta.changes) return c.json({ success: true, duplicate: true });
 
   // Resolve LINE access token (multi-account support)
   let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
