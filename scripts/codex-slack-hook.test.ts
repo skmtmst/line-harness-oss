@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { hookEventType, repositoryFromRemote } from './codex-slack-hook.js';
+import {
+  CODEX_SLACK_RELAY_TIMEOUT_MS,
+  hookEventType,
+  repositoryFromRemote,
+} from './codex-slack-hook.js';
 
 describe('Codex Slack hook', () => {
   test('GitHubのHTTPSとSSHリモートを同じリポジトリ名にする', () => {
@@ -12,5 +16,9 @@ describe('Codex Slack hook', () => {
     expect(hookEventType('PermissionRequest')).toBe('approval_required');
     expect(hookEventType('Stop')).toBe('turn_completed');
     expect(hookEventType('PreToolUse')).toBeNull();
+  });
+
+  test('Slackの初回起票が複数API呼び出しでも完了するまで待つ', () => {
+    expect(CODEX_SLACK_RELAY_TIMEOUT_MS).toBeGreaterThanOrEqual(20_000);
   });
 });
