@@ -50,14 +50,14 @@ export default function UserRow({ row, accountColorMap }: Props) {
   return (
     <>
       <tr
-        className="cursor-pointer border-b border-gray-100 hover:bg-gray-50"
+        className="cursor-pointer border-b border-[#EAEBED] hover:bg-[#F9FAFA]"
         onClick={() => setExpanded((v) => !v)}
       >
-        <td className="overflow-hidden px-4 py-3 font-mono text-xs text-gray-500" title={row.identityKey}>
+        <td className="overflow-hidden px-4 py-3 font-mono text-xs text-[#8B938D]" title={row.identityKey}>
           <span className="block truncate">{idShort}</span>
         </td>
-        <td className="overflow-hidden px-4 py-3 text-sm font-medium text-gray-900" title={row.displayName ?? undefined}>
-          <span className="block truncate">{row.displayName || <span className="text-gray-400">—</span>}</span>
+        <td className="overflow-hidden px-4 py-3 text-sm font-semibold text-[#1D1D1F]" title={row.displayName ?? undefined}>
+          <span className="block truncate">{row.displayName || <span className="text-[#8B938D]">—</span>}</span>
         </td>
         <td className="px-4 py-3">
           <div className="flex flex-wrap gap-1">
@@ -75,28 +75,28 @@ export default function UserRow({ row, accountColorMap }: Props) {
             })}
           </div>
         </td>
-        <td className="overflow-hidden px-4 py-3 text-sm text-gray-600" title={row.xUsername ?? undefined}>
-          <span className="block truncate">{row.xUsername ? `@${row.xUsername}` : <span className="text-gray-300">—</span>}</span>
+        <td className="overflow-hidden px-4 py-3 text-sm text-[#565F59]" title={row.xUsername ?? undefined}>
+          <span className="block truncate">{row.xUsername ? `@${row.xUsername}` : <span className="text-[#B8BCC2]">—</span>}</span>
         </td>
-        <td className="overflow-hidden px-4 py-3 text-sm text-gray-600" title={row.emails.join(', ') || undefined}>
+        <td className="overflow-hidden px-4 py-3 text-sm text-[#565F59]" title={row.emails.join(', ') || undefined}>
           <span className="block truncate">
-            {row.emails[0] ?? <span className="text-gray-300">—</span>}
-            {row.emails.length > 1 ? <span className="text-gray-400"> +{row.emails.length - 1}</span> : null}
+            {row.emails[0] ?? <span className="text-[#B8BCC2]">—</span>}
+            {row.emails.length > 1 ? <span className="text-[#8B938D]"> +{row.emails.length - 1}</span> : null}
           </span>
         </td>
-        <td className="overflow-hidden px-4 py-3 text-sm text-gray-600" title={row.phones.join(', ') || undefined}>
+        <td className="overflow-hidden px-4 py-3 text-sm text-[#565F59]" title={row.phones.join(', ') || undefined}>
           <span className="block truncate">
-            {row.phones[0] ?? <span className="text-gray-300">—</span>}
-            {row.phones.length > 1 ? <span className="text-gray-400"> +{row.phones.length - 1}</span> : null}
+            {row.phones[0] ?? <span className="text-[#B8BCC2]">—</span>}
+            {row.phones.length > 1 ? <span className="text-[#8B938D]"> +{row.phones.length - 1}</span> : null}
           </span>
         </td>
       </tr>
       {expanded && (
-        <tr className="border-b border-gray-100 bg-gray-50">
+        <tr className="border-b border-[#EAEBED] bg-[#F6F6F8]">
           <td colSpan={6} className="px-6 py-4">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <p className="mb-2 text-xs font-medium text-gray-500">登録アカウント詳細</p>
+                <p className="mb-2 text-xs font-semibold text-[#565F59]">登録アカウント詳細</p>
                 <ul className="space-y-1 text-sm">
                   {row.accounts.map((a) => (
                     <li key={a.friendId} className="flex flex-wrap items-center gap-2 text-gray-700">

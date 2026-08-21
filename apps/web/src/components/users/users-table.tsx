@@ -57,7 +57,7 @@ export default function UsersTable({
           <col className="w-[20%]" />
           <col className="w-[15%]" />
         </colgroup>
-        <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
+        <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
           <tr>
             <th className="px-4 py-3">識別子</th>
             <th className="px-4 py-3">表示名</th>
@@ -70,7 +70,7 @@ export default function UsersTable({
         <tbody>
           {rows.length === 0 && !loading ? (
             <tr>
-              <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+              <td colSpan={6} className="px-4 py-8 text-center text-sm text-[#8B938D]">
                 該当ユーザーがいません
               </td>
             </tr>
@@ -81,7 +81,7 @@ export default function UsersTable({
           )}
         </tbody>
       </table>
-      <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
+      <div className="flex items-center justify-between border-t border-[#EAEBED] px-4 py-3 text-sm text-[#565F59]">
         <span>
           {fmt.format(total)} 件中 {fmt.format(start)}–{fmt.format(end)} 件
         </span>
@@ -90,18 +90,18 @@ export default function UsersTable({
             type="button"
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1 || loading}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="h-8 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#0067D9] hover:bg-[#F6F6F8] disabled:text-[#B8BCC2]"
           >
             前へ
           </button>
-          <span className="tabular-nums text-xs text-gray-500">
+          <span className="tabular-nums text-xs text-[#8B938D]">
             {page} / {totalPages}
           </span>
           <button
             type="button"
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages || loading}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="h-8 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#0067D9] hover:bg-[#F6F6F8] disabled:text-[#B8BCC2]"
           >
             次へ
           </button>

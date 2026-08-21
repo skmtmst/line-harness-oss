@@ -179,14 +179,14 @@ export default function AdvancedSearchDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/35 p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
       onClick={onClose}
     >
       <div
-        className="my-8 w-full max-w-3xl rounded-[16px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
+        className="flex max-h-[calc(100vh-32px)] w-full max-w-[760px] flex-col overflow-hidden rounded-[16px] border border-[#DADDE2] bg-canvas shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-hairline flex items-start justify-between gap-3 border-b px-6 py-5">
+        <div className="flex items-start justify-between gap-3 border-b border-[#EAEBED] px-6 py-5">
           <div>
             <h2 className="text-ink text-lg font-bold">絞り込み条件を設定</h2>
             <p className="text-ink-secondary mt-0.5 text-xs">
@@ -197,32 +197,42 @@ export default function AdvancedSearchDialog({
             type="button"
             onClick={onClose}
             aria-label="閉じる"
-            className="rounded-[8px] px-3 py-1.5 text-xs font-medium text-[#565F59] hover:bg-[#F6F6F8]"
+            className="flex h-8 w-8 items-center justify-center rounded-[8px] text-xl leading-none text-[#8B938D] hover:bg-[#F6F6F8]"
           >
-            閉じる
+            ×
           </button>
         </div>
 
-        <div className="space-y-4 px-6 py-5">
-          <div className="flex items-center gap-2">
+        <div className="space-y-3 overflow-y-auto px-6 py-4">
+          <section className="rounded-[12px] border border-[#A8E9C1] bg-[#E9F9EF] px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[11px] font-medium text-[#079B45]">現在の条件に一致</p>
+                <p className="mt-0.5 text-xl font-bold tabular-nums text-[#057A37]">
+                  {counting ? '…' : count === null ? '—' : `${count.toLocaleString('ja-JP')}人`}
+                </p>
+              </div>
+              <span className="text-[11px] text-[#079B45]">自動で再計算</span>
+            </div>
+          </section>
+
+          <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
+          <div className="flex items-center gap-2 px-1 pb-2">
             <span className="bg-accent text-on-accent rounded-pill px-2 py-0.5 text-xs font-bold">
               AND
             </span>
             <span className="text-ink text-sm font-bold">すべて満たす条件</span>
-            <span className="text-ink-faint text-xs">
-              下の条件をすべて満たす友だちが対象になります
-            </span>
           </div>
 
           {blocks.map((b, i) => (
-            <section key={`${b.kind}-${i}`} className="bg-canvas-sunken rounded-card p-4">
+            <section key={`${b.kind}-${i}`} className="mb-2 rounded-[9px] bg-[#F6F6F8] p-3 last:mb-0">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-ink text-sm font-bold">{BLOCK_LABEL[b.kind]}</h3>
                 <button
                   type="button"
                   onClick={() => drop(i)}
                   aria-label={`${BLOCK_LABEL[b.kind]}の条件を外す`}
-                  className="text-ink-faint hover:text-danger text-sm"
+                  className="text-danger text-xs hover:underline"
                 >
                   外す
                 </button>
@@ -327,121 +337,88 @@ export default function AdvancedSearchDialog({
             </section>
           ))}
 
-          <div className="border-hairline rounded-card border border-dashed p-4">
-            <p className="text-ink-secondary text-xs">絞り込む項目をさらに追加できます</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2 px-1 pt-1">
               {(Object.keys(BLOCK_LABEL) as Block['kind'][]).map((k) => (
                 <button
                   key={k}
                   type="button"
                   onClick={() => add(k)}
-                  className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-1.5 text-xs"
+                  className="text-action rounded-[7px] px-1 py-1 text-xs font-semibold hover:bg-[#F3F8FF]"
                 >
                   ＋ {BLOCK_LABEL[k]}
                 </button>
               ))}
-              {NOT_YET.map((n) => (
-                <button
-                  key={n.label}
-                  type="button"
-                  disabled
-                  title={n.why}
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-1.5 text-xs opacity-50"
-                >
-                  ＋ {n.label}
+          </div>
+          </section>
+
+          <section className="rounded-[12px] border border-[#DADDE2] bg-canvas p-3">
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-[#0067D9] px-2 py-0.5 text-xs font-bold text-on-action">OR</span>
+              <span className="text-sm font-bold text-[#1D1D1F]">いずれか1つ以上満たす条件</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {NOT_YET.filter((item) => ['対応マーク', 'シナリオ', 'イベント予約', '回答フォーム', '最終反応日'].includes(item.label)).map((item) => (
+                <button key={item.label} type="button" disabled title={item.why} className="rounded-full border border-[#DADDE2] bg-[#F6F8FB] px-3 py-1.5 text-xs text-[#667085] opacity-70">
+                  ＋ {item.label === 'イベント予約' ? '予約' : item.label}
                 </button>
               ))}
             </div>
-          </div>
+          </section>
 
-          {/* 設計の「いずれか1つ以上を満たす（OR）」。条件の入れ子を組み立てる
-              口が無い。いまの絞り込みは足し算（AND）だけ。 */}
-          <button
-            type="button"
-            disabled
-            title="いまの絞り込みは「すべて満たす」だけです。入れ子の条件を組み立てる口がありません"
-            className="border-hairline text-ink-faint w-full rounded-card border border-dashed py-3 text-sm opacity-50"
-          >
-            ＋ 「いずれか1つ以上を満たす」条件（OR）を追加
-          </button>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <section className="border-hairline rounded-card border p-4">
-              <h3 className="text-ink text-sm font-bold">友だちの絞り込み</h3>
-              <p className="text-ink-secondary mt-2 mb-1 text-xs">表示設定</p>
-              <div className="flex flex-wrap gap-3 text-sm">
-                {(
-                  [
-                    { value: 'following', label: '表示中' },
-                    { value: 'blocked', label: 'ブロックした人' },
-                    { value: '', label: 'すべて' },
-                  ] as const
-                ).map((o) => (
-                  <label key={o.label} className="inline-flex cursor-pointer items-center gap-1.5">
-                    <input
-                      type="radio"
-                      name="visibility"
-                      checked={visibility === o.value}
-                      onChange={() => setVisibility(o.value)}
-                    />
-                    <span className="text-ink-secondary">{o.label}</span>
-                  </label>
-                ))}
-              </div>
-              {/* 設計は「非表示」も分けている。非表示かどうかを持つ列が無い。 */}
-              <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-                「非表示」は分けられません。ブロックしたかどうかしか持っていないためです。
-              </p>
-            </section>
-
-            <section className="border-hairline rounded-card border p-4">
-              <h3 className="text-ink text-sm font-bold">並び替え</h3>
-              <label className="mt-2 block">
-                <span className="text-ink-secondary mb-1 block text-xs">表示順</span>
+          <div className="grid gap-2 sm:grid-cols-3">
+            <label className="rounded-[9px] border border-[#DADDE2] bg-canvas px-3 py-2">
+              <span className="text-[10px] text-[#8B938D]">対象</span>
+              <select value={visibility} onChange={(event) => setVisibility(event.target.value as '' | 'following' | 'blocked')} className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-[#565F59] outline-none">
+                <option value="following">友だち中</option>
+                <option value="blocked">ブロックした人</option>
+                <option value="">すべて</option>
+              </select>
+            </label>
+            <label className="rounded-[9px] border border-[#DADDE2] bg-canvas px-3 py-2">
+              <span className="text-[10px] text-[#8B938D]">並び順</span>
                 <select
                   value={sort}
                   onChange={(e) => setSort(e.target.value as 'recent' | 'oldest')}
-                  className="border-hairline rounded-control bg-canvas text-ink w-full border px-3 py-2 text-sm"
+                  className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-[#565F59] outline-none"
                 >
                   <option value="recent">友だち追加の新しい順</option>
                   <option value="oldest">友だち追加の古い順</option>
                 </select>
-              </label>
-            </section>
+            </label>
+            <label className="rounded-[9px] border border-[#DADDE2] bg-canvas px-3 py-2">
+              <span className="text-[10px] text-[#8B938D]">表示件数</span>
+              <select defaultValue="20" className="mt-0.5 w-full border-0 bg-transparent p-0 text-xs font-semibold text-[#565F59] outline-none">
+                {[10, 20, 30, 40, 50].map((size) => <option key={size} value={size}>{size}件</option>)}
+              </select>
+            </label>
           </div>
         </div>
 
-        <div className="border-hairline flex flex-wrap items-center gap-3 border-t px-6 py-4">
+        <div className="flex flex-wrap items-center gap-3 border-t border-[#EAEBED] px-6 py-4">
           <button
             type="button"
             onClick={() => {
               setBlocks([])
               setVisibility('')
             }}
-            className="text-accent text-sm hover:underline"
+            className="text-xs font-medium text-[#8B938D] hover:text-[#565F59]"
           >
             条件をすべてクリア
           </button>
-          <span className="text-ink-secondary ml-auto text-sm">
-            該当{' '}
-            <strong className="text-ink text-base tabular-nums">
-              {counting ? '…' : count === null ? '—' : count.toLocaleString('ja-JP')}
-            </strong>{' '}
-            人
-          </span>
           <button
             type="button"
             onClick={onClose}
-            className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm"
+            className="ml-auto rounded-[9px] border border-[#DADDE2] bg-canvas px-4 py-2 text-sm font-semibold text-[#565F59] hover:bg-[#F6F6F8]"
           >
-            閉じる
+            キャンセル
           </button>
+          <button type="button" onClick={() => { try { localStorage.setItem('friends.savedSearch', JSON.stringify({ params, summary })) } catch { /* 保存できない環境では今回の絞り込みだけ使う */ } }} className="rounded-[9px] border border-[#DADDE2] bg-canvas px-4 py-2 text-sm font-semibold text-[#0067D9] hover:bg-[#F3F8FF]">条件を保存</button>
           <button
             type="button"
             onClick={() => onApply({ params, summary })}
-            className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-5 py-2 text-sm font-bold"
+            className="rounded-[9px] bg-[#07C653] px-5 py-2 text-sm font-bold text-on-accent hover:bg-[#079B45]"
           >
-            この条件で絞り込む
+            {counting ? '再計算中…' : count === null ? 'この条件で表示' : `${count.toLocaleString('ja-JP')}人を表示`}
           </button>
         </div>
       </div>

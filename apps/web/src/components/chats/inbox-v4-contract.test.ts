@@ -32,7 +32,7 @@ describe('受信箱V4で既存機能を失わない', () => {
     expect(PAGE).toContain('handleStatusUpdate')
     expect(EMAIL_THREAD).toContain('/reply`')
     expect(EMAIL_THREAD).toContain('/assignee`')
-    expect(PAGE).toContain('/notes`')
+    expect(PAGE + EMAIL_THREAD).toContain('/notes`')
   })
 
   it('テンプレートは選択だけでは送信せず入力欄へ挿入する', () => {
@@ -91,7 +91,23 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain('handleSaveMemo')
     expect(PAGE).toContain('createPortal(')
     expect(PAGE).toContain('aria-labelledby="chat-internal-memo-title"')
+    expect(EMAIL_THREAD).toContain('createPortal(')
+    expect(EMAIL_THREAD).toContain('aria-labelledby="email-internal-memo-title"')
+    expect(EMAIL_THREAD).toContain('/notes`')
     expect(PAGE).toContain('担当者だけに表示され、相手には送信されません。')
+    expect(EMAIL_THREAD).toContain('担当者だけに表示され、相手には送信されません。')
+  })
+
+  it('自分担当チップを外し、担当者プルダウンでLINEとメールを絞る', () => {
+    expect(PAGE).not.toContain("{ key: 'mine' as const, label: '自分担当' }")
+    expect(PAGE).toContain('aria-label="担当者で絞り込む"')
+    expect(PAGE).toContain("assigneeFilter === 'unassigned'")
+    expect(PAGE).toContain('item.assignedStaffId === assigneeFilter')
+    expect(PAGE).toContain('chat.operatorId !== assigneeFilter')
+  })
+
+  it('狭い画面でも対応状況の見出しを1行で表示する', () => {
+    expect(INBOX_KPIS).toContain('whitespace-nowrap text-[11px] font-semibold')
   })
 
   it('顧客情報の操作と情報順をV4へそろえる', () => {

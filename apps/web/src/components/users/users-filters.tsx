@@ -29,7 +29,7 @@ export default function UsersFilters({
         placeholder="名前・X・メール・電話・LINE ID で検索"
         className="min-w-[240px] flex-1 rounded-[9px] border border-[#DADDE2] px-3 py-2 text-sm outline-none focus:border-[#07C653]"
       />
-      <label className="flex items-center gap-2 text-sm text-gray-700">
+      <label className="flex items-center gap-2 whitespace-nowrap text-sm text-[#565F59]">
         <input
           type="checkbox"
           checked={onlyDups}
@@ -40,7 +40,7 @@ export default function UsersFilters({
       <select
         value={account}
         onChange={(e) => onChange({ account: e.target.value })}
-        className="rounded-[9px] border border-[#DADDE2] px-3 py-2 text-sm"
+        className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm text-[#1D1D1F]"
       >
         <option value="">全アカウント</option>
         {accountOptions.map((a) => (

@@ -64,7 +64,7 @@ export default function InboxKpis() {
           ['期限超過', value(stats?.waitingOverAnHour)],
         ].map(([label, count], index) => (
           <div key={label} className="min-w-0">
-            <p className={`text-[11px] font-semibold ${index === 3 ? 'text-[#334155]' : 'text-[#667085]'}`}>{label}</p>
+            <p className={`whitespace-nowrap text-[11px] font-semibold ${index === 3 ? 'text-[#334155]' : 'text-[#667085]'}`}>{label}</p>
             <p className={`mt-0.5 text-[18px] font-bold tabular-nums ${index === 3 ? 'text-[#334155]' : 'text-[#1F2937]'}`}>{count}</p>
           </div>
         ))}
