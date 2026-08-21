@@ -1,153 +1,49 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 
-interface AuditRow {
+interface Row {
   id: string
   adminUserId: string | null
+  userName: string
+  role: 'admin' | 'staff' | 'viewer' | null
+  lineLinked: boolean
+  isActive: boolean
   action: string
   screen: string | null
   ip: string | null
+  connectionSource: string | null
   result: string
   createdAt: string
 }
+const ACTIONS: Record<string, string> = { login: 'ログイン', logout: 'ログアウト', fail: 'ログイン失敗', view_personal: '個人情報を表示', export: 'CSVを書き出し' }
+const ROLES: Record<string, string> = { admin: '管理者', staff: 'スタッフ', viewer: '閲覧のみ' }
 
-/** 操作の表示名。'view_personal' のままでは伝わらない。 */
-const ACTION_LABELS: Record<string, string> = {
-  login: 'ログイン',
-  logout: 'ログアウト',
-  fail: 'ログイン失敗',
-  view_personal: '個人情報を表示',
-  export: '書き出し',
-}
-
-const FILTERS = [
-  { key: '', label: 'すべて' },
-  { key: 'login', label: 'ログイン' },
-  { key: 'fail', label: '失敗' },
-  { key: 'view_personal', label: '個人情報' },
-]
-
-/**
- * ログイン履歴。
- *
- * 誰がいつ入ったか、誰が個人情報を開いたか。個人情報保護法上の
- * 利用記録として残しているものを、そのまま見せる。
- */
 export default function LoginAudit({ userId }: { userId?: string }) {
-  const [rows, setRows] = useState<AuditRow[]>([])
-  const [action, setAction] = useState('')
+  const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
-
+  const [query, setQuery] = useState('')
   const load = useCallback(async () => {
     setLoading(true)
-    try {
-      const res = await api.loginAudit.list({ userId, action: action || undefined, limit: 200 })
-      if (res.success) setRows(res.data)
-    } catch {
-      // 権限が無ければ空のまま。画面の空欄で伝わる。
-    } finally {
-      setLoading(false)
-    }
-  }, [userId, action])
+    const res = await api.loginAudit.list({ userId, limit: 200 })
+    if (res.success) setRows(res.data)
+    setLoading(false)
+  }, [userId])
+  useEffect(() => { void load() }, [load])
+  const shown = useMemo(() => rows.filter((r) => `${r.userName} ${ACTIONS[r.action] ?? r.action} ${r.screen ?? ''}`.toLowerCase().includes(query.toLowerCase())), [rows, query])
+  const loginRows = rows.filter((r) => r.action === 'login')
 
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  return (
-    <div>
-      <div className="mb-4 flex flex-wrap gap-1">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            onClick={() => setAction(f.key)}
-            className={`rounded-pill px-3 py-1 text-sm transition-colors ${
-              action === f.key
-                ? 'bg-accent text-on-accent'
-                : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-canvas rounded-card border-hairline overflow-hidden border">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px]">
-            <thead>
-              <tr className="bg-canvas-sunken border-hairline border-b">
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  日時
-                </th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  操作
-                </th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  ユーザー
-                </th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  画面
-                </th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold uppercase">
-                  接続元
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="text-ink-faint px-4 py-8 text-center text-sm">
-                    読み込み中...
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-ink-faint px-4 py-8 text-center text-sm">
-                    記録がありません。
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-canvas-sunken">
-                    <td className="text-ink-secondary px-4 py-3 text-sm tabular-nums whitespace-nowrap">
-                      {row.createdAt.replace('T', ' ').slice(0, 19)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`rounded-pill px-2 py-0.5 text-xs ${
-                          row.action === 'fail'
-                            ? 'bg-danger-bg text-danger'
-                            : row.action === 'view_personal'
-                              ? 'bg-warning-bg text-warning'
-                              : 'bg-canvas-sunken text-ink-secondary'
-                        }`}
-                      >
-                        {ACTION_LABELS[row.action] ?? row.action}
-                      </span>
-                    </td>
-                    <td className="text-ink-secondary px-4 py-3 text-sm">
-                      {row.adminUserId ?? '—'}
-                    </td>
-                    <td className="text-ink-faint px-4 py-3 text-xs">{row.screen ?? '—'}</td>
-                    <td className="text-ink-faint px-4 py-3 text-xs tabular-nums">
-                      {row.ip ?? '—'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <p className="text-ink-faint mt-3 text-xs leading-relaxed">
-        接続元は末尾を伏せています。見たいのは「いつもと違うところから入っていないか」で、
-        完全な値は要らないためです。
-        個人情報の項目を開いたときは、値が入っている場合にだけ記録されます。
-      </p>
+  return <>
+    <div className="mb-4 grid gap-4 md:grid-cols-3">
+      <div className="bg-canvas rounded-card border-hairline border p-4"><p className="text-sm text-ink-secondary">過去30日の操作</p><p className="mt-2 text-3xl font-bold text-ink">{rows.length}<span className="ml-1 text-sm font-normal text-ink-faint">件</span></p></div>
+      <div className="bg-canvas rounded-card border-hairline border p-4"><p className="text-sm text-ink-secondary">直近のログイン</p><p className="mt-2 text-lg font-bold text-ink">{loginRows[0]?.createdAt?.replace('T', ' ').slice(0, 16) ?? '—'}</p></div>
+      <div className="bg-canvas rounded-card border-hairline border p-4"><p className="text-sm text-ink-secondary">無効の操作</p><p className="mt-2 text-3xl font-bold text-ink">{rows.filter((r) => !r.isActive || r.result !== 'ok').length}<span className="ml-1 text-sm font-normal text-ink-faint">件</span></p></div>
     </div>
-  )
+    <div className="bg-canvas rounded-card border-hairline border">
+      <div className="border-hairline flex flex-wrap gap-3 border-b p-4"><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="履歴を検索" className="border-hairline rounded-control min-w-64 flex-1 border px-3 py-2 text-sm outline-none focus:border-accent" /><select className="rounded-control border border-hairline bg-canvas px-3 text-sm text-ink-secondary"><option>すべての履歴</option></select><select className="rounded-control border border-hairline bg-canvas px-3 text-sm text-ink-secondary"><option>過去30日</option></select></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[1120px] text-sm"><thead><tr className="bg-canvas-sunken border-hairline border-b text-left text-xs text-ink-faint"><th className="px-4 py-3">操作日時</th><th className="px-4 py-3">操作内容</th><th className="px-4 py-3">操作画面</th><th className="px-4 py-3">ユーザー</th><th className="px-4 py-3">権限</th><th className="px-4 py-3">LINE連携</th><th className="px-4 py-3">接続元</th><th className="px-4 py-3">状況</th></tr></thead>
+      <tbody className="divide-hairline divide-y">{loading ? <tr><td colSpan={8} className="p-8 text-center text-ink-faint">読み込み中...</td></tr> : shown.length === 0 ? <tr><td colSpan={8} className="p-8 text-center text-ink-faint">記録がありません。</td></tr> : shown.map((r) => <tr key={r.id} className="hover:bg-canvas-sunken"><td className="whitespace-nowrap px-4 py-3 tabular-nums text-ink-secondary">{r.createdAt.replace('T', ' ').slice(0, 19)}</td><td className="px-4 py-3 font-medium text-ink">{ACTIONS[r.action] ?? r.action}</td><td className="px-4 py-3 text-ink-secondary">{r.screen ?? 'ログイン画面'}</td><td className="px-4 py-3 text-ink">{r.userName}</td><td className="px-4 py-3 text-ink-secondary">{r.role ? ROLES[r.role] : '—'}</td><td className="px-4 py-3 text-ink-secondary">{r.lineLinked ? '連携済み' : '未連携'}</td><td className="max-w-64 truncate px-4 py-3 text-xs text-ink-faint" title={r.connectionSource ?? ''}>{r.connectionSource ?? '—'}</td><td className="px-4 py-3"><span className={`rounded-pill px-2 py-1 text-xs font-medium ${r.isActive && r.result === 'ok' ? 'bg-accent-soft text-success' : 'bg-danger-bg text-danger'}`}>{r.isActive && r.result === 'ok' ? '有効' : '無効'}</span></td></tr>)}</tbody></table></div>
+    </div>
+  </>
 }

@@ -47,35 +47,41 @@ export default function UsersTable({
   const end = Math.min(total, page * pageSize)
 
   return (
-    <div className="overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-200">
-      <div className="overflow-x-auto">
-        <table className="min-w-full">
-          <thead className="bg-gray-50 text-left text-xs font-medium uppercase text-gray-500">
+    <div className="overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+      <table className="w-full table-fixed">
+        <colgroup>
+          <col className="w-[13%]" />
+          <col className="w-[17%]" />
+          <col className="w-[23%]" />
+          <col className="w-[12%]" />
+          <col className="w-[20%]" />
+          <col className="w-[15%]" />
+        </colgroup>
+        <thead className="border-b border-[#DADDE2] bg-[#F6F6F8] text-left text-[11px] font-semibold text-[#565F59]">
+          <tr>
+            <th className="px-4 py-3">識別子</th>
+            <th className="px-4 py-3">表示名</th>
+            <th className="px-4 py-3">登録アカウント</th>
+            <th className="px-4 py-3">X</th>
+            <th className="px-4 py-3">メール</th>
+            <th className="px-4 py-3">電話</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && !loading ? (
             <tr>
-              <th className="px-4 py-3">識別子</th>
-              <th className="px-4 py-3">表示名</th>
-              <th className="px-4 py-3">登録アカウント</th>
-              <th className="px-4 py-3">X</th>
-              <th className="px-4 py-3">メール</th>
-              <th className="px-4 py-3">電話</th>
+              <td colSpan={6} className="px-4 py-8 text-center text-sm text-[#8B938D]">
+                該当ユーザーがいません
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && !loading ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                  該当ユーザーがいません
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <UserRow key={row.identityKey} row={row} accountColorMap={accountColorMap} />
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-      <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3 text-sm text-gray-600">
+          ) : (
+            rows.map((row) => (
+              <UserRow key={row.identityKey} row={row} accountColorMap={accountColorMap} />
+            ))
+          )}
+        </tbody>
+      </table>
+      <div className="flex items-center justify-between border-t border-[#EAEBED] px-4 py-3 text-sm text-[#565F59]">
         <span>
           {fmt.format(total)} 件中 {fmt.format(start)}–{fmt.format(end)} 件
         </span>
@@ -84,18 +90,18 @@ export default function UsersTable({
             type="button"
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1 || loading}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="h-8 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#0067D9] hover:bg-[#F6F6F8] disabled:text-[#B8BCC2]"
           >
             前へ
           </button>
-          <span className="tabular-nums text-xs text-gray-500">
+          <span className="tabular-nums text-xs text-[#8B938D]">
             {page} / {totalPages}
           </span>
           <button
             type="button"
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages || loading}
-            className="rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            className="h-8 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs font-semibold text-[#0067D9] hover:bg-[#F6F6F8] disabled:text-[#B8BCC2]"
           >
             次へ
           </button>

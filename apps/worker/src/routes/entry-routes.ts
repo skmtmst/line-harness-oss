@@ -6,6 +6,7 @@ import {
   updateEntryRoute,
   deleteEntryRoute,
   getEntryRouteFunnel,
+  getEntryRouteSources,
   getEntryRouteGenres,
   createEntryRouteGenre,
   updateEntryRouteGenre,
@@ -217,6 +218,22 @@ entryRoutes.get('/api/entry-routes/:id/funnel', async (c) => {
     return c.json({ success: true, data: funnel });
   } catch (err) {
     console.error('GET /api/entry-routes/:id/funnel error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/entry-routes/:id/sources
+// そのリンクのクリックが「どこから来ているか」。utm_source > 参照元URLの
+// ホスト名 > 「直接アクセス」の順で寄せる。
+entryRoutes.get('/api/entry-routes/:id/sources', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const route = await getEntryRouteById(c.env.DB, id);
+    if (!route) return c.json({ success: false, error: 'Not found' }, 404);
+    const sources = await getEntryRouteSources(c.env.DB, id);
+    return c.json({ success: true, data: sources });
+  } catch (err) {
+    console.error('GET /api/entry-routes/:id/sources error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

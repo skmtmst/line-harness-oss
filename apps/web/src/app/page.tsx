@@ -1,432 +1,490 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { api } from '@/lib/api'
-import CcPromptButton from '@/components/cc-prompt-button'
+import type { EntryRoute } from '@line-crm/shared'
+import { api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import SupportAlertPanel from '@/components/support/support-alert-panel'
-import ShipmentPanel from '@/components/dashboard/shipment-panel'
+import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
+import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
+import QrDialog from '@/components/dashboard/qr-dialog'
+import FriendTrendTable from '@/components/dashboard/friend-trend-table'
+import {
+  FriendStatusCard,
+  MonthlyDeliveryCard,
+  RecentResultsCard,
+  UpcomingCard,
+  activeUpcomingBookings,
+} from '@/components/dashboard/side-cards'
+import DashboardEditor, {
+  defaultDashboardPreferences,
+  normalizeDashboardPreferences,
+  type DashboardCardId,
+  type DashboardPreferences,
+} from '@/components/dashboard/dashboard-editor'
 
-const ccPrompts = [
-  {
-    title: 'ダッシュボードのKPI分析',
-    prompt: `LINE CRM ダッシュボードのデータを分析してください。
-1. 友だち数の推移を確認
-2. アクティブシナリオの効果を評価
-3. 配信の開封率・クリック率を分析
-改善提案を含めてレポートしてください。`,
-  },
-  {
-    title: '新しいシナリオを提案',
-    prompt: `現在の友だちデータとタグ情報を元に、効果的なシナリオ配信を提案してください。
-1. ターゲットセグメントの特定
-2. メッセージ内容の提案
-3. 配信タイミングの最適化
-具体的なステップ配信の構成を含めてください。`,
-  },
-]
+const PERIODS = [
+  { key: 'today', label: '今日' },
+  { key: 'last7', label: '過去7日' },
+  { key: 'last28', label: '過去28日' },
+] as const
 
-interface DashboardStats {
-  friendCount: number | null
-  activeScenarioCount: number | null
-  broadcastCount: number | null
-  templateCount: number | null
-  automationCount: number | null
-  scoringRuleCount: number | null
+type PeriodKey = (typeof PERIODS)[number]['key']
+type HealthRisk = 'normal' | 'warning' | 'danger' | null
+
+const inactiveBookingStatuses = new Set(['rejected', 'cancelled', 'canceled', 'completed', 'no_show'])
+
+function dashboardStorageKey(accountId: string | null): string {
+  return `lh_dashboard_v4:${accountId ?? 'default'}`
 }
 
-interface StatCardProps {
-  title: string
-  value: number | null
-  loading: boolean
-  icon: React.ReactNode
-  href: string
-  accentColor?: string
+function jstDay(iso: string | number | Date): string {
+  const date = iso instanceof Date ? iso : new Date(iso)
+  return new Date(date.getTime() + 9 * 3600_000).toISOString().slice(0, 10)
 }
 
-function StatCard({ title, value, loading, icon, href, accentColor = 'var(--color-accent)' }: StatCardProps) {
+function EditIcon() {
   return (
-    <Link href={href} className="block bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow group">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-500 mb-2">{title}</p>
-          {loading ? (
-            <div className="h-8 w-20 bg-gray-100 rounded animate-pulse" />
-          ) : (
-            <p className="text-3xl font-bold text-gray-900">
-              {value !== null ? value.toLocaleString('ja-JP') : '-'}
-            </p>
-          )}
-        </div>
-        <div
-          className="w-10 h-10 rounded-lg flex items-center justify-center text-white shrink-0"
-          style={{ backgroundColor: accentColor }}
-        >
-          {icon}
-        </div>
-      </div>
-      <p className="text-xs text-gray-400 mt-3 group-hover:text-green-600 transition-colors">
-        詳細を見る →
-      </p>
-    </Link>
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 5h12M7 10h9M4 15h12M7 3v4m5 1v4m-5 1v4" strokeLinecap="round" />
+    </svg>
   )
 }
 
-// 友だち追加リンクの即時取得カード。/auth/line は UUID 付与・アカウント解決・
-// PC では QR ランディング表示までやる正規の流入口なので、共有リンクは常に
-// これを配る (公式の lin.ee 直リンクだと計測も UUID 紐づけも失われる)。
+function DashboardCard({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return (
+    <section className={`bg-canvas rounded-[18px] border-hairline border shadow-[1px_1px_2px_rgba(29,29,31,0.13)] ${className}`}>
+      {children}
+    </section>
+  )
+}
+
+function TodayTaskCard({
+  title,
+  href,
+  action,
+  value,
+  detail,
+  status,
+}: {
+  title: string
+  href: string
+  action: string
+  value: number | null
+  detail: string
+  status: string
+}) {
+  return (
+    <DashboardCard className="flex h-[112px] min-w-0 flex-col p-4">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-ink text-sm font-semibold">{title}</h3>
+        <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
+      </div>
+      <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
+        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-0.5 text-lg">件</span>
+      </p>
+      <div className="mt-auto flex items-end justify-between gap-3 pt-2">
+        <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
+        <span className="text-success shrink-0 text-xs font-medium">{status}</span>
+      </div>
+    </DashboardCard>
+  )
+}
+
+/** 友だち追加リンク。共有URLは計測とUUID紐づけができる正規の流入口を使う。 */
 function FriendAddLinkCard() {
   const { selectedAccount } = useAccount()
   const [copied, setCopied] = useState(false)
   const [showQr, setShowQr] = useState(false)
+  const [routes, setRoutes] = useState<EntryRoute[]>([])
+  const [routeId, setRouteId] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    void api.entryRoutes.list()
+      .then((res) => {
+        if (!cancelled && res.success) setRoutes(res.data.filter((route) => route.isActive))
+      })
+      .catch(() => {
+        // 経路一覧だけが取れなくても、基本の追加URLは利用できる。
+      })
+    return () => { cancelled = true }
+  }, [])
+
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
-  const link = selectedAccount
+  const baseLink = selectedAccount
     ? `${base}/auth/line?account=${encodeURIComponent(selectedAccount.channelId)}`
     : `${base}/auth/line`
+  const route = routes.find((entry) => entry.id === routeId)
+  const link = route ? `${base}/r/${route.refCode}` : baseLink
 
   const onCopy = async () => {
     try {
       await navigator.clipboard.writeText(link)
       setCopied(true)
-      setTimeout(() => setCopied(false), 1200)
+      window.setTimeout(() => setCopied(false), 1200)
     } catch {
-      // clipboard requires a secure context; the input below allows manual copy
+      // コピーできない環境でも、読み取り専用欄から手動で取得できる。
     }
   }
 
   return (
-    <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-2">
+    <DashboardCard className="p-[18px]">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-gray-800">友だち追加リンク</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {selectedAccount
-              ? `${selectedAccount.displayName || selectedAccount.name} への追加リンク (UUID計測つき)`
-              : 'デフォルトアカウントへの追加リンク (UUID計測つき)'}
-          </p>
+          <h2 className="text-ink text-sm font-semibold">友だち追加リンク</h2>
+          <p className="text-ink-faint mt-1 text-xs leading-relaxed">このURLから追加された友だちは、流入元を記録して計測できます。</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowQr((v) => !v)}
-          className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 font-medium text-gray-600"
-        >
-          {showQr ? 'QRを隠す' : 'QR表示'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="border-hairline bg-canvas rounded-control flex min-w-[220px] items-center gap-2 border px-3 py-2">
+            <span className="text-ink-faint shrink-0 text-[10px] font-medium">発行中</span>
+            <select
+              value={routeId}
+              onChange={(event) => setRouteId(event.target.value)}
+              aria-label="発行中の追加URL"
+              className="text-ink min-w-0 flex-1 bg-transparent text-xs font-medium focus:outline-none"
+            >
+              <option value="">基本の追加URL</option>
+              {routes.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+            </select>
+          </label>
+          <Link href="/inflow-links" className="border-hairline text-action hover:bg-action-soft rounded-control border px-3 py-2 text-xs font-medium">経路を分けて発行</Link>
+        </div>
       </div>
-      <div className="flex items-stretch gap-2">
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
         <input
           readOnly
           value={link}
-          onFocus={(e) => e.currentTarget.select()}
-          className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-xs font-mono bg-gray-50 text-gray-700 truncate"
+          onFocus={(event) => event.currentTarget.select()}
+          aria-label="友だち追加リンク"
+          className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control min-w-0 flex-1 truncate border px-3 py-2.5 font-mono text-xs"
         />
-        <button
-          type="button"
-          onClick={onCopy}
-          className="px-4 rounded-lg text-xs font-medium text-white shrink-0"
-          style={{
-            backgroundColor: copied ? 'var(--color-success)' : 'var(--color-accent)',
-          }}
-        >
+        <button type="button" onClick={onCopy} className="bg-accent text-on-accent hover:bg-accent-hover rounded-control shrink-0 px-5 py-2.5 text-xs font-medium">
           {copied ? 'コピーしました ✓' : 'コピー'}
         </button>
+        <button type="button" onClick={() => setShowQr(true)} className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control shrink-0 border px-5 py-2.5 text-xs font-medium">QRを表示</button>
       </div>
-      {showQr && (
-        <div className="mt-3 flex justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element -- worker QR proxy, not a static asset */}
-          <img
-            src={`${base}/api/qr?data=${encodeURIComponent(link)}&size=240x240`}
-            alt="友だち追加QRコード"
-            width={240}
-            height={240}
-            className="border border-gray-200 rounded-lg"
-          />
-        </div>
-      )}
-    </div>
+
+      <QrDialog
+        open={showQr}
+        onClose={() => setShowQr(false)}
+        accountName={selectedAccount?.displayName ?? '然-NEN- 公式'}
+        accountBasicId={selectedAccount?.basicId ?? null}
+        baseLink={baseLink}
+        initialRouteId={routeId}
+      />
+    </DashboardCard>
   )
+}
+
+function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; loading: boolean }) {
+  return (
+    <DashboardCard>
+      <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
+        <h2 className="text-ink text-sm font-semibold">友だち数の推移</h2>
+        <Link href="/analytics" className="text-action text-xs hover:underline">さらに詳しく →</Link>
+      </div>
+      <FriendTrendTable trend={data?.trend ?? []} loading={loading} />
+    </DashboardCard>
+  )
+}
+
+function EmptyDataCard({ title, href, linkLabel }: { title: string; href: string; linkLabel: string }) {
+  return (
+    <DashboardCard>
+      <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
+        <h2 className="text-ink text-sm font-semibold">{title}</h2>
+        <Link href={href} className="text-action text-xs hover:underline">{linkLabel} →</Link>
+      </div>
+      <p className="text-ink-faint px-5 py-8 text-center text-sm">このカードで表示できるデータはまだありません。</p>
+    </DashboardCard>
+  )
+}
+
+function LiveDataCard({
+  title, href, linkLabel, value, unit = '件', detail,
+}: {
+  title: string; href: string; linkLabel: string; value: number | null; unit?: string; detail: string
+}) {
+  return (
+    <DashboardCard className="p-[18px]">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-ink text-sm font-semibold">{title}</h2>
+        <Link href={href} className="text-action text-xs hover:underline">{linkLabel} →</Link>
+      </div>
+      <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
+        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
+      </p>
+      <p className="text-ink-faint mt-2 truncate text-xs" title={detail}>{detail}</p>
+    </DashboardCard>
+  )
+}
+
+function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] | null }) {
+  const used = delivery?.quotaUsed ?? null
+  const limit = delivery?.quotaLimit ?? null
+  const remaining = used !== null && limit !== null ? Math.max(0, limit - used) : null
+  const remainingRate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
+  return <DashboardCard className="min-h-[128px] p-[18px]">
+    <div className="flex items-start justify-between gap-3">
+      <h2 className="text-ink text-base font-bold">今月の送信枠</h2>
+      <span className="text-ink-faint text-xs">月初リセット</span>
+    </div>
+    <p className="text-ink mt-3 text-2xl font-bold tabular-nums">
+      {remaining === null || limit === null ? '—' : `${remaining.toLocaleString('ja-JP')} / ${limit.toLocaleString('ja-JP')}通`}
+    </p>
+    <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className="bg-accent h-full rounded-pill" style={{ width: `${remainingRate ?? 0}%` }} /></div>
+    <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+      <span className="text-success">{remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}</span>
+      <Link href="/accounts" className="text-action font-medium hover:underline">配信設定へ →</Link>
+    </div>
+  </DashboardCard>
+}
+
+function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null }) {
+  const currentHealthIssue = risk === 'warning' || risk === 'danger'
+  // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
+  // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
+  const count = risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0
+  return <DashboardCard className="min-h-[128px] p-[18px]">
+    <div className="flex items-start justify-between gap-3">
+      <h2 className="text-ink text-base font-bold">運用アラート</h2>
+      <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `${count}件`}</span>
+    </div>
+    <div className="text-ink-secondary mt-3 space-y-2 text-xs">
+      <p>・接続・自動処理：{risk === null ? '確認中' : currentHealthIssue ? '確認が必要です' : '正常です'}</p>
+      <p>・未対応の最長待ち：{oldestWaitMinutes === null ? '確認中' : `${oldestWaitMinutes.toLocaleString('ja-JP')}分（受信箱で確認）`}</p>
+    </div>
+    <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
+  </DashboardCard>
+}
+
+function ConnectionStatusCard({ account, risk, activeFriends }: { account: ReturnType<typeof useAccount>['selectedAccount']; risk: HealthRisk; activeFriends: number | null }) {
+  const webhook = account?.webhook?.status
+  const webhookLabel = webhook === 'matched' ? '正常' : webhook === 'mismatched' || webhook === 'unconfigured' ? '要確認' : '確認中'
+  return <DashboardCard className="min-h-[128px] p-[18px]">
+    <h2 className="text-ink text-base font-bold">接続状態</h2>
+    <dl className="mt-3 space-y-2 text-xs">
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">LINE Webhook</dt><dd className={webhookLabel === '正常' ? 'text-success font-semibold' : webhookLabel === '要確認' ? 'text-danger font-semibold' : 'text-ink-faint'}>{webhookLabel}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-success font-semibold">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
+    </dl>
+  </DashboardCard>
 }
 
 export default function DashboardPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
-  const [stats, setStats] = useState<DashboardStats>({
-    friendCount: null,
-    activeScenarioCount: null,
-    broadcastCount: null,
-    templateCount: null,
-    automationCount: null,
-    scoringRuleCount: null,
-  })
+  const [period, setPeriod] = useState<PeriodKey>('today')
+  const [data, setData] = useState<DashboardOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [preferences, setPreferences] = useState<DashboardPreferences>(defaultDashboardPreferences)
+  const [inboxSummary, setInboxSummary] = useState<PendingInboxSummary | null>(null)
+  const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
+  const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
+  const [bookings, setBookings] = useState<BookingRequest[] | null>(null)
+  const [supplementLoading, setSupplementLoading] = useState(true)
+  const [healthRisk, setHealthRisk] = useState<HealthRisk>(null)
+  const [healthIssueCount, setHealthIssueCount] = useState<number | null>(null)
+  const loadRequestId = useRef(0)
+  const visibleMain = preferences.main.filter((item) => item.visible)
+  const visibleRight = preferences.right.filter((item) => item.visible)
+  const visibleToday = preferences.today.filter((item) => item.visible)
+  const shipmentVisible = visibleMain.some((item) => item.id === 'shipment')
+  const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
+  const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
+    || visibleRight.some((item) => item.id === 'upcoming')
+  const needsHealth = visibleRight.some((item) => item.id === 'operational-alerts' || item.id === 'connection-status')
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const [friendCountRes, scenariosRes, broadcastsRes, templatesRes, automationsRes, scoringRes] = await Promise.allSettled([
-          api.friends.count({ accountId: selectedAccountId ?? undefined }),
-          api.scenarios.list(),
-          api.broadcasts.list(),
-          api.templates.list(),
-          api.automations.list(),
-          api.mileage.rules(),
-        ])
-
-        setStats({
-          friendCount:
-            friendCountRes.status === 'fulfilled' && friendCountRes.value.success
-              ? friendCountRes.value.data.count
-              : null,
-          activeScenarioCount:
-            scenariosRes.status === 'fulfilled' && scenariosRes.value.success
-              ? scenariosRes.value.data.filter((s) => s.isActive).length
-              : null,
-          broadcastCount:
-            broadcastsRes.status === 'fulfilled' && broadcastsRes.value.success
-              ? broadcastsRes.value.data.length
-              : null,
-          templateCount:
-            templatesRes.status === 'fulfilled' && templatesRes.value.success
-              ? templatesRes.value.data.length
-              : null,
-          automationCount:
-            automationsRes.status === 'fulfilled' && automationsRes.value.success
-              ? automationsRes.value.data.filter((a) => a.isActive).length
-              : null,
-          scoringRuleCount:
-            scoringRes.status === 'fulfilled' && scoringRes.value.success
-              ? scoringRes.value.data.length
-              : null,
-        })
-      } catch {
-        setError('データの読み込みに失敗しました')
-      } finally {
-        setLoading(false)
-      }
+    const key = dashboardStorageKey(selectedAccountId)
+    try {
+      const raw = window.localStorage.getItem(key)
+      setPreferences(normalizeDashboardPreferences(raw ? JSON.parse(raw) : null))
+    } catch {
+      setPreferences(defaultDashboardPreferences())
     }
-
-    load()
   }, [selectedAccountId])
+
+  const applyPreferences = (next: DashboardPreferences) => {
+    const normalized = normalizeDashboardPreferences(next)
+    setPreferences(normalized)
+    window.localStorage.setItem(dashboardStorageKey(selectedAccountId), JSON.stringify(normalized))
+    setEditorOpen(false)
+  }
+
+  const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current
+    setLoading(true)
+    setError('')
+    try {
+      const response = await api.dashboard.overview({ period, accountId: selectedAccountId ?? undefined })
+      if (requestId !== loadRequestId.current) return
+      if (response.success) setData(response.data)
+      else setError(response.error)
+    } catch {
+      if (requestId === loadRequestId.current) setError('データの読み込みに失敗しました')
+    } finally {
+      if (requestId === loadRequestId.current) setLoading(false)
+    }
+  }, [period, selectedAccountId])
+
+  useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    if (!selectedAccountId) {
+      setBookings(null)
+      setPendingPhotos(null)
+      setHealthRisk(null)
+      setHealthIssueCount(null)
+      setSupplementLoading(false)
+      return
+    }
+    let cancelled = false
+    setSupplementLoading(true)
+    void Promise.allSettled([
+      needsPhotos ? api.nenMembers.overview() : Promise.resolve(null),
+      needsBookings ? bookingApi.listRequests(selectedAccountId, 'all') : Promise.resolve(null),
+      needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
+    ]).then(([photoResult, bookingResult, healthResult]) => {
+      if (cancelled) return
+      setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingPhotos : null)
+      setBookings(bookingResult.status === 'fulfilled' && bookingResult.value ? bookingResult.value.requests : null)
+      setHealthRisk(
+        healthResult.status === 'fulfilled' && healthResult.value?.success
+          ? (healthResult.value.data.riskLevel as HealthRisk)
+          : null,
+      )
+      setHealthIssueCount(
+        healthResult.status === 'fulfilled' && healthResult.value?.success
+          ? healthResult.value.data.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
+          : null,
+      )
+      setSupplementLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [needsBookings, needsHealth, needsPhotos, selectedAccountId])
+
+  const activeBookings = useMemo(
+    () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],
+    [bookings],
+  )
+  const today = jstDay(new Date())
+  const todayBookings = activeBookings.filter((booking) => jstDay(booking.starts_at) === today)
+  const upcomingBookings = bookings ? activeUpcomingBookings(bookings) : []
+  const pendingTotal = inboxSummary?.total ?? data?.inbox.unanswered ?? null
+  const pendingDetail = inboxSummary
+    ? `LINE ${inboxSummary.line}・メール ${inboxSummary.email}`
+    : data
+      ? `対応中 ${data.inbox.inProgress}`
+      : '読み込み中'
+  const renderMainCard = (id: DashboardCardId): ReactNode => {
+    if (id === 'pending-inbox') return <PendingInboxCard onSummaryChange={setInboxSummary} />
+    if (id === 'friend-trend') return <FriendTrendCard data={data} loading={loading} />
+    if (id === 'friend-add') return <FriendAddLinkCard />
+    if (id === 'scenario-status') {
+      const scenarios = data?.operations?.scenarios
+      return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'uid-migration') {
+      const migrations = data?.operations?.migrations
+      return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? '取得できません' : '読み込み中'} />
+    }
+    return null
+  }
+
+  const renderTodayCard = (id: DashboardCardId): ReactNode => {
+    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${inboxSummary.oldestWaitMinutes}分` : '確認待ち'} />
+    if (id === 'today-photo-review') return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
+    if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
+    if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
+    return null
+  }
+
+  const renderRightCard = (id: DashboardCardId): ReactNode => {
+    if (id === 'send-quota') return <SendQuotaCard delivery={data?.delivery ?? null} />
+    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? data?.inbox.oldestUnansweredMinutes ?? null} />
+    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={data?.friends.active ?? null} />
+    if (id === 'upcoming') return <UpcomingCard bookings={bookings} loading={supplementLoading} />
+    if (id === 'monthly-delivery') return data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
+    if (id === 'recent-results') return data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
+    if (id === 'friend-status' && data) return <FriendStatusCard friends={data.friends} />
+    if (id === 'booking-status') {
+      const bookingsStatus = data?.operations?.bookings
+      return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'inflow-top') {
+      const inflowTop = data?.operations?.inflowTop
+      return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし' : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={data?.operations?.funnelAlerts ?? null} detail="3人以上追加・成果0件の経路" />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={data?.operations?.automationFailures ?? null} detail="期間内の失敗・一部失敗" />
+    return null
+  }
+
+  const healthLabel = healthRisk === 'normal' ? '正常稼働' : healthRisk === 'warning' ? '要確認' : healthRisk === 'danger' ? '障害あり' : '状態確認中'
+  const healthClass = healthRisk === 'danger' ? 'text-danger' : healthRisk === 'warning' ? 'text-warning' : healthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">ダッシュボード</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {selectedAccount
-            ? `${selectedAccount.displayName || selectedAccount.name} の管理画面`
-            : 'LINE公式アカウント CRM 管理画面'}
-        </p>
-      </div>
-
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
+      <header data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-ink text-2xl font-bold tracking-tight">ダッシュボード</h1>
+          <button type="button" onClick={() => setEditorOpen(true)} className="border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken rounded-control mt-0.5 inline-flex items-center gap-2 border px-3 py-2 text-xs font-medium">
+            <EditIcon />ダッシュボード編集
+          </button>
         </div>
-      )}
-
-      <SupportAlertPanel />
-
-      <FriendAddLinkCard />
-
-      {/* Demo banner */}
-      <a
-        href="https://your-worker.your-subdomain.workers.dev/auth/line?ref=dashboard"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block mb-6 p-4 rounded-xl border border-green-200 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 transition-colors"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-bold text-gray-900">LINE で体験する</p>
-            <p className="text-xs text-gray-500 mt-0.5">友だち追加でステップ配信・フォーム・自動返信を体験</p>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
+          <div className="flex gap-2">
+            {PERIODS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setPeriod(item.key)}
+                aria-pressed={period === item.key}
+                className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
+              >{item.label}</button>
+            ))}
           </div>
-          <span className="text-xs px-3 py-1.5 rounded-full text-white font-medium" style={{ backgroundColor: 'var(--color-accent)' }}>
-            友だち追加
-          </span>
         </div>
-      </a>
+      </header>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
-        <StatCard
-          title="友だち数"
-          value={stats.friendCount}
-          loading={loading}
-          href="/friends"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="アクティブシナリオ数"
-          value={stats.activeScenarioCount}
-          loading={loading}
-          href="/scenarios"
-          accentColor="#3B82F6"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="配信数 (合計)"
-          value={stats.broadcastCount}
-          loading={loading}
-          href="/broadcasts"
-          accentColor="#8B5CF6"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* Round 3 summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
-        <StatCard
-          title="テンプレート数"
-          value={stats.templateCount}
-          loading={loading}
-          href="/templates"
-          accentColor="#F59E0B"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="アクティブルール数"
-          value={stats.automationCount}
-          loading={loading}
-          href="/automations"
-          accentColor="#EF4444"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="マイル付与ルール数"
-          value={stats.scoringRuleCount}
-          loading={loading}
-          href="/scoring"
-          accentColor="#10B981"
-          icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* 出荷予定 — ec_events.payload から算出した予定日で並べる */}
-      <div className="mb-6">
-        <ShipmentPanel />
-      </div>
-
-      {/* Quick links */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-sm font-semibold text-gray-800 mb-4">クイックアクション</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Link
-            href="/friends"
-            className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-green-300 hover:bg-green-50 transition-colors group"
-          >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0" style={{ backgroundColor: 'var(--color-accent)' }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900 group-hover:text-green-700 transition-colors">友だち管理</p>
-              <p className="text-xs text-gray-400">友だちの一覧・タグ管理</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/scenarios"
-            className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
-          >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-blue-500">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900 group-hover:text-blue-700 transition-colors">シナリオ配信</p>
-              <p className="text-xs text-gray-400">自動配信シナリオの作成・編集</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/broadcasts"
-            className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-colors group"
-          >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-purple-500">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900 group-hover:text-purple-700 transition-colors">一斉配信</p>
-              <p className="text-xs text-gray-400">メッセージの一斉送信・予約</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/chats"
-            className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-green-300 hover:bg-green-50 transition-colors group"
-          >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0" style={{ backgroundColor: 'var(--color-accent)' }}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900 group-hover:text-green-700 transition-colors">チャット</p>
-              <p className="text-xs text-gray-400">オペレーターチャット管理</p>
-            </div>
-          </Link>
-
-          <Link
-            href="/health"
-            className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-red-300 hover:bg-red-50 transition-colors group"
-          >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white shrink-0 bg-red-500">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900 group-hover:text-red-700 transition-colors">BAN検知</p>
-              <p className="text-xs text-gray-400">アカウント健康度ダッシュボード</p>
-            </div>
-          </Link>
+      {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
+      {data?.partialFailures?.length ? (
+        <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
+          一部のデータを取得できませんでした（{data.partialFailures.join('、')}）。0件としては表示していません。
         </div>
+      ) : null}
+
+      {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
+        <div className="mb-2.5 flex items-center justify-between gap-3">
+          <h2 className="text-ink text-lg font-bold">今日やること</h2>
+          <span className="text-ink-faint text-xs">優先度順</span>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
+        </div>
+      </section> : null}
+
+      <div data-design="Shipment" className={shipmentVisible ? 'mb-6' : 'hidden'} aria-hidden={!shipmentVisible}>
+        <ShipmentPanel onSummaryChange={setShipmentSummary} />
       </div>
 
-      <CcPromptButton prompts={ccPrompts} />
+      <div data-design="Middle" className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
+        <div data-design="Body" className="min-w-0 space-y-[18px]">
+          {visibleMain.filter((item) => item.id !== 'shipment').map((item) => <div key={item.id}>{renderMainCard(item.id)}</div>)}
+        </div>
+        <aside className="min-w-0 space-y-3.5">
+          {visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
+        </aside>
+      </div>
+
+      {data && <p className="text-ink-faint mt-5 text-xs">{new Date(data.generatedAt).toLocaleString('ja-JP')} 時点 ・ 最新データへ更新</p>}
+
+      <DashboardEditor open={editorOpen} preferences={preferences} onCancel={() => setEditorOpen(false)} onApply={applyPreferences} />
     </div>
   )
 }

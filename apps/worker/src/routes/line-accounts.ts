@@ -11,6 +11,7 @@ import {
 } from '@line-crm/db';
 import type { LineAccount as DbLineAccount } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
+import { fetchBotProfile } from '../lib/bot-profile.js';
 import {
   detectFollowerImportCapability,
   getFollowerImportState,
@@ -18,6 +19,14 @@ import {
   startFollowerImport,
 } from '../services/follower-import.js';
 import type { FollowerImportClient } from '../services/follower-import.js';
+import {
+  canAccessLineAccount,
+  filterVisibleLineAccounts,
+  validateAccountHierarchy,
+} from '../services/account-access.js';
+import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
+import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
+import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import type { Env } from '../index.js';
 
 const lineAccounts = new Hono<Env>();
@@ -85,6 +94,7 @@ function serializeLineAccount(row: DbLineAccount) {
     friendCapacity: row.friend_capacity ?? null,
     capacityWarnAt: row.capacity_warn_at ?? null,
     iconUrl: row.icon_url ?? null,
+    parentLineAccountId: row.parent_line_account_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     // Intentionally omit channelAccessToken / channelSecret / loginChannelSecret
@@ -101,17 +111,41 @@ function serializeLineAccountFull(row: DbLineAccount) {
   };
 }
 
-// Fetch bot profile (displayName, pictureUrl) from LINE API
-async function fetchBotProfile(accessToken: string): Promise<{ displayName?: string; pictureUrl?: string; basicId?: string }> {
+type WebhookEndpointState = {
+  expectedUrl: string;
+  actualUrl: string | null;
+  active: boolean | null;
+  status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
+};
+
+/**
+ * LINE Developers に登録されている Webhook URL を読み取る。
+ * 一覧の表示用なので設定変更や接続テストは行わない。
+ * LINE API が一時的に応答できない場合は unknown とし、正常と誤判定しない。
+ */
+async function fetchWebhookEndpointState(
+  channelAccessToken: string,
+  expectedUrl: string,
+): Promise<WebhookEndpointState> {
   try {
-    const res = await fetch('https://api.line.me/v2/bot/info', {
-      headers: { Authorization: `Bearer ${accessToken}` },
+    const response = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', {
+      headers: { Authorization: `Bearer ${channelAccessToken}` },
+      signal: AbortSignal.timeout(10_000),
     });
-    if (!res.ok) return {};
-    const data = await res.json() as { displayName?: string; pictureUrl?: string; basicId?: string };
-    return { displayName: data.displayName, pictureUrl: data.pictureUrl, basicId: data.basicId };
+    if (!response.ok) {
+      return { expectedUrl, actualUrl: null, active: null, status: 'unknown' };
+    }
+    const endpoint = await response.json<{ endpoint?: string; active?: boolean }>();
+    const actualUrl = endpoint.endpoint?.trim() || null;
+    const active = endpoint.active === true;
+    const status: WebhookEndpointState['status'] = !actualUrl
+      ? 'unconfigured'
+      : actualUrl === expectedUrl && active
+        ? 'matched'
+        : 'mismatched';
+    return { expectedUrl, actualUrl, active, status };
   } catch {
-    return {};
+    return { expectedUrl, actualUrl: null, active: null, status: 'unknown' };
   }
 }
 
@@ -119,13 +153,24 @@ async function fetchBotProfile(accessToken: string): Promise<{ displayName?: str
 lineAccounts.get('/api/line-accounts', async (c) => {
   try {
     const db = c.env.DB;
-    const items = await getLineAccounts(db);
+    const allItems = await getLineAccounts(db);
+    const items = filterVisibleLineAccounts(allItems, c.get('staff'));
+    if (c.req.query('live') === '0') {
+      return c.json({
+        success: true,
+        data: items.map((item) => ({ ...serializeLineAccount(item), displayName: item.name })),
+      });
+    }
+    const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+    const expectedWebhookUrl = `${base}/webhook`;
 
     // Get stats for all accounts in parallel
     const results = await Promise.all(
       items.map(async (item) => {
-        const [profile, friendCount, scenarioCount, msgCount] = await Promise.all([
+        const [profile, webhook, plan, friendCount, scenarioCount, msgCount] = await Promise.all([
           fetchBotProfile(item.channel_access_token),
+          fetchWebhookEndpointState(item.channel_access_token, expectedWebhookUrl),
+          fetchLineMonthlyPlan(item.channel_access_token),
           db.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND line_account_id = ?`).bind(item.id).first<{ count: number }>(),
           db.prepare(
             `SELECT COUNT(*) as count FROM friend_scenarios fs
@@ -148,6 +193,8 @@ lineAccounts.get('/api/line-accounts', async (c) => {
           displayName: profile.displayName || item.name,
           pictureUrl: profile.pictureUrl || null,
           basicId: profile.basicId || null,
+          webhook,
+          plan,
           stats: {
             friendCount: friendCount?.count ?? 0,
             activeScenarios: scenarioCount?.count ?? 0,
@@ -163,11 +210,131 @@ lineAccounts.get('/api/line-accounts', async (c) => {
   }
 });
 
+// GET /api/line-accounts/summary - visible accounts only
+lineAccounts.get('/api/line-accounts/summary', async (c) => {
+  try {
+    const db = c.env.DB;
+    const allItems = await getLineAccounts(db);
+    const visibleActiveIds = filterVisibleLineAccounts(allItems, c.get('staff'))
+      .filter((item) => Boolean(item.is_active))
+      .map((item) => item.id);
+    if (visibleActiveIds.length === 0) {
+      return c.json({ success: true, data: { uniqueFriendCount: 0 } });
+    }
+    const placeholders = visibleActiveIds.map(() => '?').join(', ');
+    const row = await db.prepare(
+      `SELECT COUNT(DISTINCT (${IDENTITY_KEY_SQL})) AS count
+       FROM friends
+       WHERE friends.is_following = 1
+         AND friends.line_account_id IN (${placeholders})`,
+    ).bind(...visibleActiveIds).first<{ count: number }>();
+    return c.json({ success: true, data: { uniqueFriendCount: row?.count ?? 0 } });
+  } catch (err) {
+    console.error('GET /api/line-accounts/summary error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+type ConnectionVerification = {
+  messagingApi: boolean;
+  webhook: boolean;
+  lineLogin: boolean;
+  liff: boolean;
+  webhookUrl: string | null;
+  errors: string[];
+};
+
+async function verifyConnection(input: {
+  channelAccessToken: string;
+  loginChannelId: string;
+  loginChannelSecret: string;
+  liffId: string;
+  expectedWebhookUrl: string | null;
+}): Promise<ConnectionVerification> {
+  const result: ConnectionVerification = {
+    messagingApi: false,
+    webhook: false,
+    lineLogin: /^\d+$/.test(input.loginChannelId),
+    liff: /^\d+-[A-Za-z0-9]+$/.test(input.liffId),
+    webhookUrl: null,
+    errors: [],
+  };
+  if (!input.loginChannelSecret.trim()) result.lineLogin = false;
+  if (!result.lineLogin) result.errors.push('LINE LoginのChannel IDまたはChannel Secretを確認してください');
+  if (!result.liff) result.errors.push('LIFF IDの形式を確認してください');
+
+  const headers = { Authorization: `Bearer ${input.channelAccessToken}` };
+  try {
+    const botResponse = await fetch('https://api.line.me/v2/bot/info', { headers });
+    result.messagingApi = botResponse.ok;
+    if (!botResponse.ok) result.errors.push('Messaging APIのChannel Access Tokenを確認してください');
+  } catch {
+    result.errors.push('Messaging APIへ接続できませんでした');
+  }
+
+  if (result.messagingApi) {
+    try {
+      const endpointResponse = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', {
+        headers: { ...headers, 'Content-Type': 'application/json' },
+      });
+      if (endpointResponse.ok) {
+        const endpoint = await endpointResponse.json<{ endpoint?: string; active?: boolean }>();
+        result.webhookUrl = endpoint.endpoint ?? null;
+        const sameEndpoint = !input.expectedWebhookUrl || endpoint.endpoint === input.expectedWebhookUrl;
+        if (endpoint.active && sameEndpoint) {
+          const testResponse = await fetch('https://api.line.me/v2/bot/channel/webhook/test', {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: '{}',
+          });
+          if (testResponse.ok) {
+            const tested = await testResponse.json<{ success?: boolean }>();
+            result.webhook = tested.success === true;
+          }
+        }
+      }
+      if (!result.webhook) {
+        result.errors.push('Webhook URLの一致・利用設定・接続テストを確認してください');
+      }
+    } catch {
+      result.errors.push('Webhookの接続確認に失敗しました');
+    }
+  }
+  return result;
+}
+
+// 保存前の接続確認。成功してもDBには一切書き込まない。
+lineAccounts.post(
+  '/api/line-accounts/verify-connection',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const body = await c.req.json<{
+      channelAccessToken?: string;
+      loginChannelId?: string;
+      loginChannelSecret?: string;
+      liffId?: string;
+    }>();
+    const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+    const data = await verifyConnection({
+      channelAccessToken: body.channelAccessToken?.trim() ?? '',
+      loginChannelId: body.loginChannelId?.trim() ?? '',
+      loginChannelSecret: body.loginChannelSecret?.trim() ?? '',
+      liffId: body.liffId?.trim() ?? '',
+      expectedWebhookUrl: `${base}/webhook`,
+    });
+    return c.json({ success: true, data });
+  },
+);
+
 // GET /api/line-accounts/:id - get single (secrets only for owner/admin)
 lineAccounts.get('/api/line-accounts/:id', async (c) => {
   try {
     const account = await getLineAccountById(c.env.DB, c.req.param('id'));
     if (!account) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const allAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     const staff = c.get('staff');
@@ -192,6 +359,11 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
 
     const account = await getLineAccountById(c.env.DB, c.req.param('id'));
     if (!account) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+
+    const visibleAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(visibleAccounts, c.get('staff'), account.id)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
 
@@ -221,6 +393,10 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
 lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
   const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
   if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+  const allAccounts = await getLineAccounts(c.env.DB);
+  if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+    return c.json({ success: false, error: 'LINE account not found' }, 404);
+  }
   const state = await getFollowerImportState(c.env.DB, account.id);
   return c.json({ success: true, data: state });
 });
@@ -232,6 +408,10 @@ lineAccounts.post(
     try {
       const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
       if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+      const allAccounts = await getLineAccounts(c.env.DB);
+      if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
       const client = new LineClient(account.channel_access_token);
       const state = await detectFollowerImportCapability(
         c.env.DB,
@@ -253,6 +433,10 @@ lineAccounts.post(
   async (c) => {
     const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    const allAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
     try {
       const state = await startFollowerImport(c.env.DB, account.id);
       return c.json({ success: true, data: state });
@@ -271,6 +455,10 @@ lineAccounts.post(
   async (c) => {
     const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
+    const allAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
     const client = new LineClient(account.channel_access_token);
     const result = await processFollowerImportStep(
       c.env.DB,
@@ -374,7 +562,7 @@ async function checkUniqueLoginAndLiff(
 }
 
 // POST /api/line-accounts - create
-lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
+lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
       channelId: string;
@@ -387,6 +575,8 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
       ogSiteName?: string | null;
       ogDefaultImageUrl?: string | null;
       ogDefaultDescription?: string | null;
+      copyFromAccountId?: string | null;
+      copyItems?: unknown;
     }>();
 
     if (!body.channelId || !body.name || !body.channelAccessToken || !body.channelSecret) {
@@ -408,9 +598,50 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
       null,
     );
     if (pairError) return c.json({ success: false, error: pairError }, 400);
+    if (!loginChannelId || !loginChannelSecret || !liffId) {
+      return c.json({ success: false, error: 'LINE LoginとLIFFの設定は必須です' }, 400);
+    }
 
     const dupError = await checkUniqueLoginAndLiff(c.env.DB, { loginChannelId, liffId }, null);
     if (dupError) return c.json({ success: false, error: dupError }, 409);
+
+    const copyItems = normalizeCopyItems(body.copyItems);
+    if (copyItems === null) return c.json({ success: false, error: 'コピー項目が正しくありません' }, 400);
+    const copyFromAccountId = normalizeOptionalString(body.copyFromAccountId) ?? null;
+    const allAccounts = await getLineAccounts(c.env.DB);
+    const visibleAccounts = filterVisibleLineAccounts(allAccounts, c.get('staff'));
+    const currentStaff = c.get('staff');
+    if (
+      currentStaff.role === 'admin' &&
+      currentStaff.assignedLineAccountId &&
+      !currentStaff.canAccessDescendantAccounts
+    ) {
+      return c.json({ success: false, error: '他アカウント権限がないため追加できません' }, 403);
+    }
+    if (copyFromAccountId) {
+      const source = visibleAccounts.find((item) => item.id === copyFromAccountId);
+      if (!source) return c.json({ success: false, error: 'コピー元を選択できません' }, 404);
+      if (!source.is_active || !source.login_channel_id || !source.liff_id) {
+        return c.json({ success: false, error: '接続済みのアカウントだけコピー元に選べます' }, 400);
+      }
+      if (copyItems.length === 0) {
+        return c.json({ success: false, error: 'コピーする項目を1つ以上選択してください' }, 400);
+      }
+    } else if (copyItems.length > 0) {
+      return c.json({ success: false, error: 'コピー元を選択してください' }, 400);
+    }
+
+    const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+    const verification = await verifyConnection({
+      channelAccessToken: body.channelAccessToken.trim(),
+      loginChannelId,
+      loginChannelSecret,
+      liffId,
+      expectedWebhookUrl: `${base}/webhook`,
+    });
+    if (!verification.messagingApi || !verification.webhook || !verification.lineLogin || !verification.liff) {
+      return c.json({ success: false, error: 'すべての接続確認を完了してください', details: { connection: verification.errors } }, 400);
+    }
 
     const account = await createLineAccount(c.env.DB, {
       channelId: body.channelId,
@@ -425,6 +656,16 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
       ogDefaultDescription: normalizeOptionalString(body.ogDefaultDescription) ?? null,
     });
 
+    if (copyFromAccountId && copyItems.length > 0) {
+      try {
+        await copyLineAccountSettings(c.env.DB, copyFromAccountId, account.id, copyItems);
+      } catch (copyError) {
+        await deleteLineAccount(c.env.DB, account.id);
+        console.error('[line-accounts] account setting copy failed', copyError);
+        return c.json({ success: false, error: '設定のコピーに失敗したため、アカウントは追加していません' }, 500);
+      }
+    }
+
     // One read-only request at connection time records whether this account
     // can use followers/ids. This never starts the migration and is non-fatal:
     // a temporary LINE outage must not roll back account registration.
@@ -436,32 +677,6 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
       );
     } catch (err) {
       console.error('[line-accounts] follower import capability probe failed', err);
-    }
-
-    // Auto-enroll new account into the 'main' traffic pool.
-    // If migration 039 ran before any LINE accounts existed (fresh tenant),
-    // the 'main' pool was never seeded — create it on the first account.
-    // createTrafficPool already mirrors activeAccountId into pool_accounts,
-    // so we only call addPoolAccount when the pool already exists.
-    // Non-fatal: account creation succeeds even if pool enrollment fails.
-    try {
-      const { getTrafficPoolBySlug, createTrafficPool, addPoolAccount } = await import(
-        '@line-crm/db'
-      );
-      const existingMain = await getTrafficPoolBySlug(c.env.DB, 'main');
-      if (!existingMain) {
-        await createTrafficPool(c.env.DB, {
-          slug: 'main',
-          name: 'メインプール',
-          activeAccountId: account.id,
-        });
-        console.log(`[line-accounts] created main pool (first-account bootstrap)`);
-      } else {
-        await addPoolAccount(c.env.DB, existingMain.id, account.id);
-        console.log(`[line-accounts] enrolled new account ${account.id} into main pool`);
-      }
-    } catch (err) {
-      console.error('[line-accounts] failed to auto-enroll into main pool', err);
     }
 
     return c.json({ success: true, data: serializeLineAccountFull(account) }, 201);
@@ -489,6 +704,62 @@ lineAccounts.post('/api/line-accounts', requireRole('owner'), async (c) => {
 // PATCH /api/line-accounts/order — bulk update display_order
 // IMPORTANT: must be declared BEFORE /:id so Hono matches the literal "order" first.
 lineAccounts.patch(
+  '/api/line-accounts/hierarchy',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{
+        relationships?: Array<{ id?: unknown; parentLineAccountId?: unknown }>;
+      }>();
+      if (!Array.isArray(body.relationships) || body.relationships.length === 0) {
+        return c.json({ success: false, error: '変更するLINEアカウント構成がありません' }, 400);
+      }
+      const relationships: Array<{ id: string; parentLineAccountId: string | null }> = [];
+      for (const item of body.relationships) {
+        if (
+          typeof item.id !== 'string' ||
+          !(item.parentLineAccountId === null || typeof item.parentLineAccountId === 'string')
+        ) {
+          return c.json({ success: false, error: 'LINEアカウント構成の形式が正しくありません' }, 400);
+        }
+        relationships.push({ id: item.id, parentLineAccountId: item.parentLineAccountId });
+      }
+
+      const allAccounts = await getLineAccounts(c.env.DB);
+      const visible = filterVisibleLineAccounts(allAccounts, c.get('staff'));
+      const visibleIds = new Set(visible.map((account) => account.id));
+      if (
+        relationships.some(
+          (item) =>
+            !visibleIds.has(item.id) ||
+            (item.parentLineAccountId !== null && !visibleIds.has(item.parentLineAccountId)),
+        )
+      ) {
+        return c.json({ success: false, error: '権限のないLINEアカウントは変更できません' }, 403);
+      }
+      const hierarchyError = validateAccountHierarchy(allAccounts, relationships);
+      if (hierarchyError) return c.json({ success: false, error: hierarchyError }, 400);
+
+      await c.env.DB.batch(
+        relationships.map((item) =>
+          c.env.DB
+            .prepare(
+              `UPDATE line_accounts
+               SET parent_line_account_id = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+               WHERE id = ?`,
+            )
+            .bind(item.parentLineAccountId, item.id),
+        ),
+      );
+      return c.json({ success: true, data: relationships });
+    } catch (err) {
+      console.error('PATCH /api/line-accounts/hierarchy error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
+
+lineAccounts.patch(
   '/api/line-accounts/order',
   requireRole('owner', 'admin'),
   async (c) => {
@@ -507,6 +778,12 @@ lineAccounts.patch(
             400,
           );
         }
+      }
+
+      const allAccounts = await getLineAccounts(c.env.DB);
+      const visibleIds = new Set(filterVisibleLineAccounts(allAccounts, c.get('staff')).map((item) => item.id));
+      if (body.ordered.some((item) => !visibleIds.has(item.id))) {
+        return c.json({ success: false, error: '権限のないLINEアカウントは並べ替えできません' }, 403);
       }
 
       await updateLineAccountOrder(c.env.DB, body.ordered);
@@ -534,6 +811,10 @@ lineAccounts.patch(
   async (c) => {
     try {
       const id = c.req.param('id')!;
+      const allAccounts = await getLineAccounts(c.env.DB);
+      if (!canAccessLineAccount(allAccounts, c.get('staff'), id)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
       const body = await c.req.json<{
         name?: string;
         isActive?: boolean;
@@ -673,6 +954,10 @@ lineAccounts.patch(
 lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id')!;
+    const allAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(allAccounts, c.get('staff'), id)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
     const body = await c.req.json<{
       name?: string;
       channelAccessToken?: string;
@@ -777,7 +1062,12 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
 // DELETE /api/line-accounts/:id - delete
 lineAccounts.delete('/api/line-accounts/:id', requireRole('owner'), async (c) => {
   try {
-    await deleteLineAccount(c.env.DB, c.req.param('id')!);
+    const id = c.req.param('id')!;
+    const allAccounts = await getLineAccounts(c.env.DB);
+    if (!canAccessLineAccount(allAccounts, c.get('staff'), id)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    await deleteLineAccount(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/line-accounts/:id error:', err);

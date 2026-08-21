@@ -1,9 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import CampaignEditor from './campaign-editor'
 
 interface Column {
   id: string
@@ -20,13 +22,19 @@ interface Column {
  * 一言」だけ。本文まで直せるように見せると、直したのに反映されない、
  * という食い違いになる。
  */
-export default function NenColumnEditPage() {
+function NenColumnEditInner() {
+  const params = useSearchParams()
+  const campaignKey = params.get('key') ?? ''
+
   const [columns, setColumns] = useState<Column[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+
+  // ?key= が付いていれば、その配信そのものを編集する（設計 9-1-1）。
+  // 付いていないときは、EC側のコラムに添える紹介文の一覧を出す。
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,6 +77,8 @@ export default function NenColumnEditPage() {
     }
   }
 
+  if (campaignKey) return <CampaignEditor campaignKey={campaignKey} />
+
   return (
     <div>
       <Header
@@ -78,7 +88,7 @@ export default function NenColumnEditPage() {
 
       <nav className="text-ink-faint mb-4 text-xs">
         <Link href="/nen-campaigns" className="hover:underline">
-          NEN配信
+          フォロー配信
         </Link>
         <span className="mx-1.5">›</span>
         <span>コラムの編集</span>
@@ -137,5 +147,14 @@ export default function NenColumnEditPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function NenColumnEditPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <NenColumnEditInner />
+    </Suspense>
   )
 }

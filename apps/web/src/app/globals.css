@@ -26,6 +26,12 @@
   --color-accent-soft: #e8f8ee;
   --color-on-accent: #ffffff;
 
+  /* 操作。LINEの状態色とは分け、設定画面のリンクと主要ボタンに使う。 */
+  --color-action: #0b63ce;
+  --color-action-hover: #0957b7;
+  --color-action-soft: #eaf4ff;
+  --color-on-action: #ffffff;
+
   /* 文字。ink が本文、ink-secondary が補足、ink-faint がラベル。
    * 実測で最も多かった text-gray-500 / 400 / 900 に対応する。 */
   --color-ink: #1a1c1a;
@@ -35,6 +41,7 @@
   /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
   --color-canvas: #ffffff;
   --color-canvas-sunken: #f7f7f5;
+  --color-shell: #f5f5f7;
   --color-hairline: #e2e4df;
 
   /* 状態。アクセントと混ぜない。 */
@@ -47,6 +54,18 @@
   --color-info: #0a6e80;
   --color-info-bg: #e2f2f5;
 
+  /* 然-NEN- のLINEカード。Pen V2の必要な高級感を、生の色値ではなく共通語彙にする。 */
+  --color-nen-ivory: #fbf8f1;
+  --color-nen-green: #1b3a31;
+  --color-nen-gold: #b08d57;
+  --color-nen-gold-soft: #e6ded0;
+  --color-nen-border: #ded5c5;
+  --color-nen-copy: #4b5b55;
+  --color-nen-ink: #25352f;
+  --color-nen-muted: #6e7773;
+  --color-nen-label: #9a8060;
+  --color-nen-chip: #6e5d48;
+
   /* --- 角丸 -------------------------------------------------------------
    * 大きさで役割を分ける。カードは card、押せるものは control、
    * 丸いものは pill。すべて rounded-lg で済ませない。
@@ -54,4 +73,18 @@
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
   --radius-pill: 9999px;
+
+  /* --- 本体の幅 ---------------------------------------------------------
+   * 設計のフレームは幅1920pxで描かれている。そこから常時表示のサイドバー
+   * `w-64`（256px）を引いた 1664px = 104rem が、本体が取れる幅。
+   *
+   * `max-w-shell` をV4共通レイアウトに当て、左右40pxの余白を引いた
+   * 1584pxを1920px表示時の実コンテンツ幅にする。
+   *
+   * 注意: 一度 74rem（1184px）で入れて間違えた。`docs/admin-ui-design-guidelines.md`
+   * の「幅1440pxと1920pxの両方で確認」をフレーム幅と読み違えたため。あれは
+   * 確認する幅の指示であって、設計フレームの幅ではない。絵を実測すると
+   * サイドバー256px＋本体1664pxで、右端まで使い切っている。
+   */
+  --container-shell: 104rem;
 }

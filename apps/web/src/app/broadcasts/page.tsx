@@ -2,43 +2,25 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import type { Tag } from '@line-crm/shared'
+import type { Folder, Tag } from '@line-crm/shared'
 import { api, type ApiBroadcast, type BroadcastInsight } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import BroadcastKpis from '@/components/broadcasts/broadcast-kpis'
 import BroadcastForm from '@/components/broadcasts/broadcast-form'
 import BroadcastDetail from '@/components/broadcasts/broadcast-detail'
-import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
-import type { BroadcastAssetKind } from '@/lib/api'
-import CcPromptButton from '@/components/cc-prompt-button'
-
-const ccPrompts = [
-  {
-    title: '配信メッセージを作成',
-    prompt: `一斉配信用のメッセージを作成してください。
-1. 配信目的: [目的を指定]
-2. ターゲット: 全員 / タグ指定
-3. メッセージタイプ: テキスト / 画像 / Flex
-効果的なメッセージ文面を提案してください。`,
-  },
-  {
-    title: '配信スケジュール最適化',
-    prompt: `配信スケジュールを最適化してください。
-1. 過去の配信実績から最適な時間帯を分析
-2. 曜日別の開封率を確認
-3. 推奨スケジュールを提案
-データに基づいた根拠も示してください。`,
-  },
-]
+import FolderPanel from '@/components/shared/folder-panel'
+import { audienceSummary, contentExcerpt, messageTypeLabel } from '@/lib/broadcast-summary'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
 
 const statusConfig: Record<
   ApiBroadcast['status'],
   { label: string; className: string }
 > = {
   draft: { label: '下書き', className: 'bg-canvas-sunken text-ink-secondary' },
-  scheduled: { label: '予約済み', className: 'bg-blue-100 text-blue-700' },
-  sending: { label: '送信中', className: 'bg-warning-bg text-yellow-700' },
-  sent: { label: '送信完了', className: 'bg-success-bg text-green-700' },
+  scheduled: { label: '予約済み', className: 'bg-info-bg text-info' },
+  sending: { label: '送信中', className: 'bg-warning-bg text-warning' },
+  sent: { label: '送信完了', className: 'bg-success-bg text-success' },
 }
 
 function formatDatetime(iso: string | null): string {
@@ -66,17 +48,37 @@ function BroadcastsPageContent() {
 
 type BroadcastTab = 'single' | 'dedup' | 'all'
 
+/** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
+const UNFILED = '__unfiled__'
+
 function BroadcastList() {
   const { selectedAccountId } = useAccount()
   const [broadcasts, setBroadcasts] = useState<ApiBroadcast[]>([])
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  /** よく使う絞り込み。いま数えられるのは「予約中のみ」だけ。 */
+  const [scheduledOnly, setScheduledOnly] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [openTemplatePicker, setOpenTemplatePicker] = useState(false)
+  // タイトルの絞り込み（設計 `Body` の「タイトルで検索」）。
+  // 一覧が増えると、配信名を覚えていても探すのに時間がかかる。
+  const [titleQuery, setTitleQuery] = useState('')
+  /*
+   * 配信日で絞る。
+   *
+   * 一覧が伸びると、「先月の配信を見たい」だけのために延々とめくることになる。
+   * 見るのは予約中なら予約の日、送信済みなら送った日。列と同じ日付を見る。
+   */
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [folders, setFolders] = useState<Folder[]>([])
+  /** 選んでいるフォルダ。空は「すべて」、UNFILED は「未分類」。 */
+  const [folderFilter, setFolderFilter] = useState('')
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [insights, setInsights] = useState<Record<string, BroadcastInsight>>({})
   const [fetchingInsight, setFetchingInsight] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<BroadcastTab>('all')
-  const [activeSection, setActiveSection] = useState<'list' | BroadcastAssetKind>('list')
 
   const loadInsight = async (id: string) => {
     try {
@@ -100,6 +102,13 @@ function BroadcastList() {
       setFetchingInsight(null)
     }
   }
+
+  const loadFolders = useCallback(async () => {
+    const res = await api.folders.list('broadcast')
+    if (res.success) setFolders(res.data)
+  }, [])
+
+  useEffect(() => { void loadFolders() }, [loadFolders])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -146,6 +155,26 @@ function BroadcastList() {
   const dedupCount = broadcasts.filter((b) => b.targetType === 'multi-account-dedup').length
   const singleCount = broadcasts.length - dedupCount
   const visibleBroadcasts = broadcasts.filter((b) => {
+    // タイトルは手元で絞る。打つたびに取り直すと重い。
+    if (titleQuery.trim() && !b.title.toLowerCase().includes(titleQuery.trim().toLowerCase())) {
+      return false
+    }
+    // まだ送っていない予約だけを見る。送る前に中身を直せるのはこれだけ。
+    if (scheduledOnly && b.status !== 'scheduled') return false
+    if (folderFilter === UNFILED) {
+      if (b.folderId) return false
+    } else if (folderFilter && b.folderId !== folderFilter) {
+      return false
+    }
+    if (dateFrom || dateTo) {
+      // 一覧の「配信日時」列と同じものを見る。送信済みは送った日、それ以外は予約日。
+      const iso = b.status === 'sent' ? b.sentAt : b.scheduledAt
+      if (!iso) return false
+      // JST の日付で比べる。UTC のまま切ると、夜の配信が前日に入る。
+      const ymd = new Date(new Date(iso).getTime() + 9 * 3600_000).toISOString().slice(0, 10)
+      if (dateFrom && ymd < dateFrom) return false
+      if (dateTo && ymd > dateTo) return false
+    }
     if (activeTab === 'all') return true
     if (activeTab === 'dedup') return b.targetType === 'multi-account-dedup'
     return b.targetType !== 'multi-account-dedup'
@@ -153,29 +182,170 @@ function BroadcastList() {
 
   return (
     <div>
+      {/* 設計 `V2 4-2 一斉配信` */}
+      <div data-design="Head">
       <Header
         title="一斉配信"
-        action={activeSection === 'list' ? (
-          <button
-            onClick={() => setShowCreate(true)}
-            className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-          >
-            + 新規配信
-          </button>
-        ) : undefined}
+        description="条件を指定した友だちにメッセージをまとめて送ります。予約配信と開封の計測ができます。"
+        action={(
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。 */}
+            <button
+              disabled
+              title="マニュアルは準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+            >
+              マニュアル
+            </button>
+            <button
+              type="button"
+              onClick={() => setFolderDialogOpen(true)}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+            >
+              フォルダを追加
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOpenTemplatePicker(true); setShowCreate(true) }}
+              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+            >
+              テンプレートから配信
+            </button>
+            <button
+              onClick={() => { setOpenTemplatePicker(false); setShowCreate(true) }}
+              className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+            >
+              + 新規配信
+            </button>
+          </div>
+        )}
       />
+      </div>
 
-      <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2" aria-label="一斉配信メニュー">
-        {([
-          ['list', '配信一覧'],
-          ['rich_message', 'リッチメッセージ'],
-          ['card_message', 'カードタイプ'],
-          ['coupon', 'クーポン'],
-          ['research', 'リサーチ'],
-        ] as const).map(([id, label]) => <button key={id} onClick={() => { setActiveSection(id); setShowCreate(false) }} className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${activeSection === id ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>{label}</button>)}
-      </nav>
+      {folderDialogOpen && (
+        <FolderAddDialog
+          kind="broadcast"
+          note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
+          placeholder="例: 01_キャンペーン"
+          onClose={() => setFolderDialogOpen(false)}
+          onAdded={() => void loadFolders()}
+        />
+      )}
 
-      {activeSection !== 'list' ? <BroadcastAssetManager kind={activeSection} /> : <>
+      <div data-design="KPIs">
+      <BroadcastKpis />
+      </div>
+
+      {/* 一覧本体（設計 `Body`）。 */}
+      <div data-design="Body">
+          {/* 設計はフォルダを左の縦パネルに置く。タグ・シナリオと同じ形。 */}
+          <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+            <FolderPanel
+              total={`${broadcasts.length} 件`}
+              activeId={folderFilter}
+              onSelect={setFolderFilter}
+              rows={[
+                { id: '', label: 'すべて', count: broadcasts.length },
+                ...folders.map((f) => ({
+                  id: f.id,
+                  label: f.name,
+                  count: broadcasts.filter((b) => b.folderId === f.id).length,
+                  color: f.color,
+                })),
+                {
+                  id: UNFILED,
+                  label: '未分類',
+                  count: broadcasts.filter((b) => !b.folderId).length,
+                },
+              ]}
+            >
+              <p className="text-ink-faint text-xs leading-relaxed">
+                フォルダを消しても、入っていた配信は未分類として残ります。
+              </p>
+            </FolderPanel>
+
+            <div>
+
+          {/* 検索と並び順（設計 `Body` の上）。 */}
+          <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
+            <input
+              type="search"
+              placeholder="タイトルで検索"
+              aria-label="タイトルで検索"
+              value={titleQuery}
+              onChange={(e) => setTitleQuery(e.target.value)}
+              className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+            />
+            <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
+            <select
+              disabled
+              title="並び替えは準備中です"
+              className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+            >
+              <option>配信日が新しい順</option>
+            </select>
+            <span className="text-ink-faint text-xs whitespace-nowrap">配信日</span>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              aria-label="配信日（開始）"
+              className="border-hairline rounded-control border px-2 py-2 text-sm"
+            />
+            <span className="text-ink-faint text-xs">〜</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              aria-label="配信日（終了）"
+              className="border-hairline rounded-control border px-2 py-2 text-sm"
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => { setDateFrom(''); setDateTo('') }}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm"
+              >
+                日付を外す
+              </button>
+            )}
+            <button
+              disabled
+              title="保存した条件は準備中です"
+              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+            >
+              保存した条件
+            </button>
+          </div>
+
+          {/*
+            よく使う絞り込み。数え方が決まっているのは「予約中のみ」だけ。
+            開封率の低さと今月分は、比べる相手や区切りを決める前に押せる
+            ようにすると、押した人ごとに違うものを想像する。
+          */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="text-ink-faint text-xs">よく使う</span>
+            <button
+              onClick={() => setScheduledOnly((v) => !v)}
+              className={`rounded-pill px-3 py-1 text-xs transition-colors ${
+                scheduledOnly
+                  ? 'bg-accent-soft text-accent'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
+              }`}
+            >
+              予約中のみ
+            </button>
+            {['開封率が低い', '今月分'].map((label) => (
+              <button
+                key={label}
+                disabled
+                title="この絞り込みはまだ数えられません"
+                className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
       {/* Error */}
       {error && (
@@ -190,6 +360,7 @@ function BroadcastList() {
           tags={tags}
           onSuccess={() => { setShowCreate(false); load() }}
           onCancel={() => setShowCreate(false)}
+          openTemplatePickerInitially={openTemplatePicker}
         />
       )}
 
@@ -206,7 +377,7 @@ function BroadcastList() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-green-500 text-ink'
+                  ? 'border-accent text-ink'
                   : 'border-transparent text-ink-faint hover:text-ink-secondary'
               }`}
               style={activeTab === tab.id ? { borderColor: 'var(--color-accent)' } : undefined}
@@ -226,7 +397,7 @@ function BroadcastList() {
           {[...Array(4)].map((_, i) => (
             <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
               <div className="flex-1 space-y-2">
-                <div className="h-3 bg-gray-200 rounded w-48" />
+                <div className="h-3 bg-hairline rounded w-48" />
                 <div className="h-2 bg-canvas-sunken rounded w-32" />
               </div>
               <div className="h-5 bg-canvas-sunken rounded-full w-16" />
@@ -236,7 +407,12 @@ function BroadcastList() {
         </div>
       ) : broadcasts.length === 0 && !showCreate ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
-          <p className="text-ink-faint">配信がありません。「新規配信」から作成してください。</p>
+          {/* 読み込みに失敗したときは「ありません」と言わない。消えたように読めるため。 */}
+          <p className="text-ink-faint">
+            {error
+              ? 'いまは読み込めていません。上の案内をご覧ください。'
+              : '配信がありません。「新規配信」から作成してください。'}
+          </p>
         </div>
       ) : visibleBroadcasts.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
@@ -251,27 +427,36 @@ function BroadcastList() {
             <thead>
               <tr className="bg-canvas-sunken border-b border-hairline">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信タイトル
+                  タイトル
+                </th>
+                {/*
+                  列は設計 `V2 4-2 一斉配信` の並び。
+                  「予約日時」と「送信完了日時」を「配信日時」の1列にまとめている。
+                  予約中なら予約の時刻、送信済みなら送った時刻。どちらか一方しか
+                  意味を持たないので、2列に分けると常に片方が空になる。
+                */}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
+                  配信日時
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  ステータス
+                  配信条件
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  配信対象
+                  内容
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  予約日時
+                  配信数
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  送信完了日時
+                  開封（率）
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase tracking-wider">
-                  実績
+                  状態
                 </th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-hairline">
               {visibleBroadcasts.map((broadcast) => {
                 const statusInfo = statusConfig[broadcast.status]
                 const tagName = getTagName(broadcast.targetTagId)
@@ -283,7 +468,7 @@ function BroadcastList() {
                     <td className="px-4 py-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline">
+                          <a href={`/broadcasts?id=${broadcast.id}`} className="text-sm font-medium text-action hover:text-action-hover hover:underline">
                             {broadcast.title}
                           </a>
                           {isDedup && (
@@ -292,40 +477,41 @@ function BroadcastList() {
                             </span>
                           )}
                         </div>
+                        {/*
+                          前は text / image 以外をすべて「Flex」と出していた。
+                          スタンプもカルーセルも位置情報も「Flex」に見えるので、
+                          一覧で中身を確かめられなかった。
+                        */}
                         <p className="text-xs text-ink-faint mt-0.5">
-                          {broadcast.messageType === 'text' ? 'テキスト' : broadcast.messageType === 'image' ? '画像' : 'Flex'}
+                          {messageTypeLabel(broadcast.messageType)}
                         </p>
                       </div>
                     </td>
 
-                    {/* Status */}
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
-                        {statusInfo.label}
-                      </span>
+                    {/*
+                      配信日時。予約中なら予約の時刻、送信済みなら送った時刻。
+                      2列に分けると、どちらかが常に空になって読みにくい。
+                    */}
+                    <td className="px-4 py-3 text-sm text-ink-faint">
+                      {broadcast.status === 'sent'
+                        ? formatDatetime(broadcast.sentAt)
+                        : formatDatetime(broadcast.scheduledAt)}
                     </td>
 
-                    {/* Target */}
+                    {/*
+                      配信条件。前は「全員」か「タグ指定」の2つしか見ていなかったので、
+                      詳細条件で絞った配信も「タグ指定」と出ていた。送った相手を
+                      後から確かめられないので、監査にならなかった。
+                    */}
                     <td className="px-4 py-3 text-sm text-ink-secondary">
-                      {isDedup ? (
-                        <span className="text-purple-700">重複除外{tagName ? `: ${tagName}` : ''}</span>
-                      ) : broadcast.targetType === 'all' ? (
-                        '全員'
-                      ) : tagName ? (
-                        <span>タグ: {tagName}</span>
-                      ) : (
-                        'タグ指定'
-                      )}
+                      {audienceSummary(broadcast, getTagName)}
                     </td>
 
-                    {/* Scheduled */}
-                    <td className="px-4 py-3 text-sm text-ink-faint">
-                      {formatDatetime(broadcast.scheduledAt)}
-                    </td>
-
-                    {/* Sent */}
-                    <td className="px-4 py-3 text-sm text-ink-faint">
-                      {formatDatetime(broadcast.sentAt)}
+                    {/* 内容。一覧から中身を思い出せるように、本文の頭を出す。 */}
+                    <td className="px-4 py-3 text-sm text-ink-secondary">
+                      <span className="line-clamp-2 break-all">
+                        {contentExcerpt(broadcast.messageType, broadcast.messageContent) || '—'}
+                      </span>
                     </td>
 
                     {/* Stats & Insight */}
@@ -341,14 +527,14 @@ function BroadcastList() {
                                 <p className="text-xs">配信: <span className="font-medium text-ink-secondary">{insights[broadcast.id].delivered!.toLocaleString('ja-JP')}</span></p>
                               )}
                               {insights[broadcast.id].uniqueImpression != null && (
-                                <p className="text-xs">開封: <span className="font-medium text-blue-600">{insights[broadcast.id].uniqueImpression!.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">開封: <span className="font-medium text-info">{insights[broadcast.id].uniqueImpression!.toLocaleString('ja-JP')}</span>
                                   {insights[broadcast.id].openRate != null && (
                                     <span className="text-ink-faint"> ({(insights[broadcast.id].openRate! * 100).toFixed(1)}%)</span>
                                   )}
                                 </p>
                               )}
                               {insights[broadcast.id].uniqueClick != null && (
-                                <p className="text-xs">クリック: <span className="font-medium text-green-600">{insights[broadcast.id].uniqueClick!.toLocaleString('ja-JP')}</span>
+                                <p className="text-xs">クリック: <span className="font-medium text-success">{insights[broadcast.id].uniqueClick!.toLocaleString('ja-JP')}</span>
                                   {insights[broadcast.id].clickRate != null && (
                                     <span className="text-ink-faint"> ({(insights[broadcast.id].clickRate! * 100).toFixed(1)}%)</span>
                                   )}
@@ -359,7 +545,7 @@ function BroadcastList() {
                             <button
                               onClick={() => handleFetchInsight(broadcast.id)}
                               disabled={fetchingInsight === broadcast.id}
-                              className="mt-1 text-xs text-blue-500 hover:text-blue-700 disabled:opacity-50"
+                              className="mt-1 text-xs text-action hover:text-action-hover disabled:opacity-50"
                             >
                               {fetchingInsight === broadcast.id ? '取得中...' : 'インサイトを取得'}
                             </button>
@@ -370,13 +556,20 @@ function BroadcastList() {
                       )}
                     </td>
 
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusInfo.className}`}>
+                        {statusInfo.label}
+                      </span>
+                    </td>
+
                     {/* Actions */}
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {(broadcast.status === 'draft' || broadcast.status === 'scheduled') && (
                           <button
                             onClick={() => handleDelete(broadcast.id)}
-                            className="px-3 py-1 min-h-[44px] text-xs font-medium text-red-500 hover:text-danger bg-danger-bg hover:bg-red-100 rounded-md transition-colors"
+                            className="px-3 py-1 min-h-[44px] text-xs font-medium text-danger bg-canvas hover:bg-danger-bg border border-danger-bg rounded-md transition-colors"
                           >
                             削除
                           </button>
@@ -391,9 +584,9 @@ function BroadcastList() {
           </div>
         </div>
       )}
-
-      <CcPromptButton prompts={ccPrompts} />
-      </>}
+            </div>
+          </div>
+      </div>
     </div>
   )
 }

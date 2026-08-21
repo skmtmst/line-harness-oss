@@ -7,6 +7,7 @@ import ImageUploader from '@/components/shared/image-uploader'
 import OgEditor from '@/components/shared/og-editor'
 import { useAccount } from '@/contexts/account-context'
 import { generateBulkSlots, type BulkSlotInput } from './bulk-slot-generator'
+import { jstHHMMToUtcIso } from './jst'
 
 type Tab = 'overview' | 'slots' | 'publish'
 
@@ -739,14 +740,14 @@ function SlotsTab({
             onClick={() => setShowBulk(true)}
             className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
           >
-            📅 一括追加
+            一括追加
           </button>
         </div>
       </div>
       {err && <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg mb-3 text-sm">{err}</div>}
       {slots.length === 0 ? (
         <div className="text-center py-12 text-gray-500 text-sm border border-dashed border-gray-300 rounded-lg">
-          予約枠がありません。「＋ 枠を追加」または「📅 一括追加」から作成してください。
+          予約枠がありません。「＋ 枠を追加」または「一括追加」から作成してください。
         </div>
       ) : (
         <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -1060,14 +1061,6 @@ function BulkSlotDialog({
   )
 }
 
-function jstHHMMToUtcIso(date: string, hhmm: string): string {
-  const [h, m] = hhmm.split(':').map(Number)
-  const totalMin = h * 60 + m - 9 * 60
-  const [y, mo, d] = date.split('-').map(Number)
-  const t = Date.UTC(y, mo - 1, d) + totalMin * 60_000
-  return new Date(t).toISOString()
-}
-
 // ----------------------------------------------------------------
 // Tab 3: Publish settings
 // ----------------------------------------------------------------
@@ -1249,7 +1242,7 @@ function PublishTab({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            🔔 リマインドメッセージへの追記
+            リマインドメッセージへの追記
             <span className="ml-2 text-xs text-gray-400">
               {(draft.reminder_message_extra ?? '').length} / 2,000
             </span>

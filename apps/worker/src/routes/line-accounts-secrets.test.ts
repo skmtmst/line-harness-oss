@@ -9,7 +9,7 @@ vi.mock('@line-crm/db', () => ({
     is_active: 1, country: 'JP', role: 'main', display_order: 0,
     created_at: '2026-08-15', updated_at: '2026-08-15',
   }),
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccounts: vi.fn().mockResolvedValue([{ id: 'acc-1', parent_line_account_id: null }]),
   jstNow: () => '2026-08-15T00:00:00+09:00',
 }));
 

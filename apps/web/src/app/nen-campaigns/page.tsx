@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { api, type NenCampaignSetting, type NenColumn, type NenPetProfile } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -159,18 +160,33 @@ export default function NenCampaignsPage() {
       setOverview(overviewRes.data)
       setCoupon(couponRes.data)
     } catch {
-      setNotice({ tone: 'error', text: 'NEN配信の情報を読み込めませんでした。' })
+      setNotice({ tone: 'error', text: 'フォロー配信の情報を読み込めませんでした。' })
     } finally { setLoading(false) }
   }, [])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
     if (!selectedAccountId) return
-    void api.friends.list({ accountId: selectedAccountId, limit: 100, includeTags: false }).then((res) => {
-      if (!res.success) return
-      const list = res.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
+    void Promise.allSettled([
+      api.friends.list({ accountId: selectedAccountId, limit: 100, includeTags: false }),
+      api.accountSettings.getTestRecipientLoginUsers(selectedAccountId),
+    ]).then(([friendResult, loginUserResult]) => {
+      if (friendResult.status !== 'fulfilled' || !friendResult.value.success) return
+      const friendResponse = friendResult.value
+      // 100件より古い友だちでも、LINE連携済みログインユーザーは先頭へ残す。
+      // NENテスト送信APIは同じLINEアカウントの友だちだけを受け付けるため、
+      // sameAccount=true の候補だけを混ぜる。
+      const loginUsers = loginUserResult.status === 'fulfilled' && loginUserResult.value.success
+        ? loginUserResult.value.data
+            .filter((candidate) => candidate.sameAccount)
+            .map((candidate) => ({ id: candidate.id, displayName: candidate.staffName }))
+        : []
+      const accountFriends = friendResponse.data.items.map((friend) => ({ id: friend.id, displayName: friend.displayName }))
+      const list = [...new Map([...loginUsers, ...accountFriends].map((friend) => [friend.id, friend])).values()]
       setFriends(list)
-      setTestFriendId((current) => current || list[0]?.id || '')
+      setTestFriendId((current) =>
+        list.some((friend) => friend.id === current) ? current : list[0]?.id || '',
+      )
       setPetDraft((current) => ({ ...current, friendId: current.friendId || list[0]?.id || '' }))
     }).catch(() => undefined)
   }, [selectedAccountId])
@@ -251,16 +267,68 @@ export default function NenCampaignsPage() {
     } catch { setNotice({ tone: 'error', text: 'クーポン設定を保存できませんでした。' }) }
   }
 
-  if (loading) return <><Header title="NEN配信" /><main className="p-6 text-sm text-gray-500">読み込み中...</main></>
+  if (loading) return <><Header title="フォロー配信" /><main className="p-6 text-sm text-gray-500">読み込み中...</main></>
 
   return (
     <>
-      <Header title="NEN配信" />
+      {/* Pen canonical: V2 9-1 NEN配信 / ケアフラグ連動 */}
+      <div data-design="Head">
+        <Header
+          title="フォロー配信"
+          description="購入後のご案内、NENコラム、お誕生日クーポンなど、お客様との関係を育てる配信を管理します。"
+          action={
+            <div className="flex flex-wrap gap-2">
+              {['マニュアル', '並び替え', 'フォルダを追加'].map((label) => (
+                <button
+                  key={label}
+                  disabled
+                  title="準備中です"
+                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          }
+        />
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">配信ジョブ</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {settings.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            稼働中 {settings.filter((x) => x.isEnabled).length}
+          </p>
+        </div>
+        {/* 配信した通数・到達率・失敗を、この画面では集計していない。 */}
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">今月の配信</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">この画面では集計していません</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">待機中</p>
+          <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+            {jobs.length}
+            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+          </p>
+          <p className="text-ink-faint mt-0.5 text-xs">送信待ちのジョブ</p>
+        </div>
+        <div className="bg-canvas rounded-card border-hairline border p-4">
+          <p className="text-ink-faint text-xs">失敗</p>
+          <p className="text-ink-faint mt-1 text-2xl font-bold">—</p>
+          <p className="text-ink-faint mt-0.5 text-xs">失敗の記録がありません</p>
+        </div>
+      </div>
       <main className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
-        <section className="rounded-3xl bg-gradient-to-br from-[#0d4a32] to-[#16815b] p-6 text-white shadow-lg sm:p-8">
+        <section className="hidden" aria-hidden="true">
           <p className="text-xs font-semibold tracking-[0.25em] text-emerald-100">NEN CUSTOMER JOURNEY</p>
           <h1 className="mt-2 text-2xl font-bold sm:text-3xl">購入後も、LINEで丁寧につながる</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50">注文・発送から商品到着、口コミ、次の商品提案、コラム、お誕生日までを一つの画面で管理します。</p>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-emerald-50">商品到着後の確認、口コミ、次の商品提案、コラム、お誕生日までを一つの画面で管理します。</p>
           {overview && <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
               ['稼働中', `${overview.activeCampaigns}件`], ['配信待ち', `${overview.jobs.pending}件`],
@@ -300,6 +368,8 @@ export default function NenCampaignsPage() {
                     className={`rounded-xl border px-4 py-2 text-sm font-semibold ${previewCampaignKey === setting.campaignKey ? 'border-emerald-600 bg-emerald-50 text-emerald-800' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}
                   >{previewCampaignKey === setting.campaignKey ? 'プレビューを隠す' : '配信プレビュー'}</button>
                   <button onClick={() => setExpanded(expanded === setting.campaignKey ? null : setting.campaignKey)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">{expanded === setting.campaignKey ? '編集を閉じる' : '内容を編集'}</button>
+                  {/* 設計 9-1-1。送り方まで含めて1画面で直す。 */}
+                  <Link href={`/nen-campaigns/edit?key=${encodeURIComponent(setting.campaignKey)}`} className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700">送り方も編集</Link>
                 </div>
               </div>
               {previewCampaignKey === setting.campaignKey && <CampaignLinePreview setting={setting} onClose={() => setPreviewCampaignKey(null)} />}

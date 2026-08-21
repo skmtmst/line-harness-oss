@@ -1,0 +1,461 @@
+'use client'
+
+import { Suspense, useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import type { Reminder, ReminderStep, Tag } from '@line-crm/shared'
+import { describeReminderTiming } from '@line-crm/shared'
+import { api } from '@/lib/api'
+import Header from '@/components/layout/header'
+
+/**
+ * リマインダの編集。
+ *
+ * 作れるのに直せない状態だった。名前を打ち間違えても、送る時刻を変えたくなっても、
+ * 作り直すしかなかった。
+ *
+ * **配信方式（○日前の●時／残り時間）はここで変えられない。** 途中で変えると、
+ * すでに登録済みの人の配信予定がすべて変わる。「3日前」で予約が入っている人が、
+ * 突然「4320分前」の解釈に切り替わる。作るときに決めたものを守る。
+ */
+
+const inputClass =
+  'border-hairline rounded-control focus:ring-accent block w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+
+type StepDraft = {
+  offsetDays: number
+  sendAtTime: string
+  offsetMinutes: number
+  messageContent: string
+  /** テンプレートから選ぶ場合の id。選ぶと本文の代わりにそちらが送られる。 */
+  templateId: string
+}
+
+function emptyStep(mode: 'time' | 'countdown'): StepDraft {
+  return {
+    offsetDays: -1,
+    sendAtTime: '10:00',
+    offsetMinutes: mode === 'time' ? 0 : -1440,
+    messageContent: '',
+    templateId: '',
+  }
+}
+
+function ReminderEditInner() {
+  const params = useSearchParams()
+  const id = params.get('id') ?? ''
+
+  const [reminder, setReminder] = useState<(Reminder & { steps: ReminderStep[] }) | null>(null)
+  const [tags, setTags] = useState<Tag[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  // 編集する値
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [isActive, setIsActive] = useState(true)
+  const [targetTagId, setTargetTagId] = useState('')
+  const [sendAtTime, setSendAtTime] = useState('')
+  const [newStep, setNewStep] = useState<StepDraft>(emptyStep('countdown'))
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string }>>([])
+
+  const load = useCallback(async () => {
+    if (!id) return
+    setLoading(true)
+    try {
+      const res = await api.reminders.get(id)
+      if (!res.success) {
+        setError(res.error)
+        return
+      }
+      setReminder(res.data)
+      setName(res.data.name)
+      setDescription(res.data.description ?? '')
+      setIsActive(res.data.isActive)
+      setTargetTagId(res.data.targetTagId ?? '')
+      setSendAtTime(res.data.sendAtTime ?? '')
+      setNewStep(emptyStep(res.data.deliveryMode === 'time' ? 'time' : 'countdown'))
+    } catch {
+      setError('読み込みに失敗しました')
+    } finally {
+      setLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => {
+    void load()
+    void api.tags.list().then((res) => {
+      if (res.success) setTags(res.data)
+    })
+    void api.templates.list().then((res) => {
+      if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
+    })
+  }, [load])
+
+  const mode = reminder?.deliveryMode === 'time' ? 'time' : 'countdown'
+
+  async function handleSave() {
+    if (!name.trim()) {
+      setError('リマインダ名を入力してください')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await api.reminders.update(id, {
+        name: name.trim(),
+        description: description.trim() || null,
+        isActive,
+        targetTagId: targetTagId || null,
+        sendAtTime: sendAtTime || null,
+      })
+      if (!res.success) throw new Error(res.error)
+      setMessage('保存しました')
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '保存に失敗しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAddStep() {
+    // テンプレートを選んでいれば本文は要らない。どちらも空なら何も届かない。
+    if (!newStep.templateId && !newStep.messageContent.trim()) {
+      setError('送る内容を入力するか、テンプレートを選んでください')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const res = await api.reminders.addStep(id, {
+        offsetMinutes: mode === 'time' ? 0 : newStep.offsetMinutes,
+        messageType: 'text',
+        // テンプレートを選んでいても本文は残す。テンプレートを消したときに、
+        // ここが送られる（参照が切れて何も届かなくなるのを防ぐ）。
+        messageContent: newStep.messageContent.trim() || '（テンプレートから送ります）',
+        offsetDays: mode === 'time' ? newStep.offsetDays : null,
+        sendAtTime: mode === 'time' ? newStep.sendAtTime : null,
+        templateId: newStep.templateId || null,
+      })
+      if (!res.success) throw new Error(res.error)
+      setNewStep(emptyStep(mode))
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '追加に失敗しました')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDeleteStep(stepId: string) {
+    if (!confirm('この通を削除します。よろしいですか。')) return
+    try {
+      const res = await api.reminders.deleteStep(id, stepId)
+      if (!res.success) throw new Error(res.error)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '削除に失敗しました')
+    }
+  }
+
+  if (!id) {
+    return (
+      <main className="mx-auto max-w-3xl p-6">
+        <p className="text-danger text-sm">id が指定されていません</p>
+        <Link href="/reminders" className="text-info mt-2 inline-block text-sm hover:underline">
+          ← 一覧に戻る
+        </Link>
+      </main>
+    )
+  }
+
+  return (
+    <main className="mx-auto max-w-3xl p-6">
+      <nav className="text-ink-faint mb-2 text-xs">
+        <Link href="/reminders" className="hover:underline">
+          リマインダ
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>{name || '編集'}</span>
+      </nav>
+
+      <Header
+        title="リマインダを編集"
+        description="名前・送る相手・通の中身を変えられます。送るタイミングの決め方は、作ったときのまま変わりません。"
+      />
+
+      {error && (
+        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-3 text-sm">
+          {error}
+        </div>
+      )}
+      {message && (
+        <div className="bg-success-bg mb-4 rounded-lg p-3 text-sm text-green-700">{message}</div>
+      )}
+
+      {loading ? (
+        <p className="text-ink-faint text-sm">読み込み中...</p>
+      ) : !reminder ? (
+        <p className="text-ink-faint text-sm">リマインダが見つかりません</p>
+      ) : (
+        <div className="space-y-6">
+          <section className="bg-canvas border-hairline rounded-card space-y-4 border p-5">
+            <h2 className="text-ink text-sm font-semibold">基本</h2>
+
+            <label className="block">
+              <span className="text-ink-secondary text-xs font-medium">リマインダ名</span>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={`mt-1 ${inputClass}`}
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-ink-secondary text-xs font-medium">説明</span>
+              <span className="text-ink-faint block text-[11px]">管理用のメモです。</span>
+              <textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className={`mt-1 resize-y ${inputClass}`}
+              />
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span className="text-sm">
+                動かす
+                <span className="text-ink-faint block text-[11px]">
+                  切ると下書きになります。条件に合っても送られません。すでに登録されている人にも届きません。
+                </span>
+              </span>
+            </label>
+          </section>
+
+          <section className="bg-canvas border-hairline rounded-card space-y-4 border p-5">
+            <div>
+              <h2 className="text-ink text-sm font-semibold">送るタイミングの決め方</h2>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                作ったときに決めたもので、ここでは変えられません。変えると、すでに登録済みの人の
+                配信予定がすべて変わってしまうためです。変えたいときは新しく作り直してください。
+              </p>
+            </div>
+            <p className="bg-canvas-sunken rounded-control px-3 py-2 text-sm">
+              {mode === 'time' ? '○日前の●時' : 'ゴールからの残り時間'}
+            </p>
+
+            {reminder.triggerType !== 'manual' && (
+              <label className="block">
+                <span className="text-ink-secondary text-xs font-medium">送る時刻</span>
+                <span className="text-ink-faint block text-[11px]">
+                  空にすると、予約の時刻を起点にずらして届きます。
+                </span>
+                <input
+                  type="time"
+                  value={sendAtTime}
+                  onChange={(e) => setSendAtTime(e.target.value)}
+                  className={`mt-1 w-40 ${inputClass}`}
+                />
+              </label>
+            )}
+          </section>
+
+          <section className="bg-canvas border-hairline rounded-card space-y-4 border p-5">
+            <div>
+              <h2 className="text-ink text-sm font-semibold">誰に送るか</h2>
+              <p className="text-ink-faint mt-0.5 text-xs">
+                タグを選ぶと、そのタグを持つ人だけに送ります。
+              </p>
+            </div>
+            <select
+              value={targetTagId}
+              onChange={(e) => setTargetTagId(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">対象になった友だち全員</option>
+              {tags.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </section>
+
+          <section className="bg-canvas border-hairline rounded-card space-y-4 border p-5">
+            <div>
+              <h2 className="text-ink text-sm font-semibold">送る通</h2>
+              <p className="text-ink-faint mt-0.5 text-xs leading-relaxed">
+                ゴール日時を起点に、この並びで届きます。通が1つも無いと、対象に加わっても
+                何も届きません。
+              </p>
+            </div>
+
+            {reminder.steps.length === 0 ? (
+              <p className="text-[11px] text-amber-600">
+                通がありません。このままだと何も届きません。
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {reminder.steps.map((step) => (
+                  <li
+                    key={step.id}
+                    className="border-hairline rounded-control flex items-start justify-between gap-3 border p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-ink text-xs font-semibold">
+                        {describeReminderTiming(
+                          {
+                            offsetDays: step.offsetDays,
+                            sendAtTime: step.sendAtTime,
+                            offsetMinutes: step.offsetMinutes,
+                          },
+                          mode,
+                        )}
+                      </div>
+                      <p className="text-ink-secondary mt-1 text-sm whitespace-pre-wrap">
+                        {step.messageContent}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => void handleDeleteStep(step.id)}
+                      className="shrink-0 text-xs text-red-600 hover:underline"
+                    >
+                      削除
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="border-hairline space-y-3 border-t pt-4">
+              <p className="text-ink-secondary text-xs font-medium">通を足す</p>
+
+              {mode === 'time' ? (
+                <div className="flex flex-wrap items-end gap-3">
+                  <label className="block">
+                    <span className="text-ink-faint text-xs">何日ずらすか</span>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        value={newStep.offsetDays}
+                        onChange={(e) =>
+                          setNewStep({
+                            ...newStep,
+                            offsetDays: parseInt(e.target.value, 10) || 0,
+                          })
+                        }
+                        className={`w-24 ${inputClass}`}
+                      />
+                      <span className="text-ink-faint text-xs whitespace-nowrap">
+                        日{newStep.offsetDays < 0 ? '前' : newStep.offsetDays > 0 ? '後' : '（当日）'}
+                      </span>
+                    </div>
+                  </label>
+                  <label className="block">
+                    <span className="text-ink-faint text-xs">その日の何時に</span>
+                    <input
+                      type="time"
+                      value={newStep.sendAtTime}
+                      onChange={(e) => setNewStep({ ...newStep, sendAtTime: e.target.value })}
+                      className={`mt-1 w-32 ${inputClass}`}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="block">
+                  <span className="text-ink-faint text-xs">ゴールから何分ずらすか</span>
+                  <span className="text-ink-faint block text-[11px]">
+                    マイナスが前。-1440 で1日前です。
+                  </span>
+                  <input
+                    type="number"
+                    value={newStep.offsetMinutes}
+                    onChange={(e) =>
+                      setNewStep({ ...newStep, offsetMinutes: parseInt(e.target.value, 10) || 0 })
+                    }
+                    className={`mt-1 w-32 ${inputClass}`}
+                  />
+                </label>
+              )}
+
+              <label className="block">
+                <span className="text-ink-faint text-xs">テンプレートから選ぶ</span>
+                <span className="text-ink-faint block text-[11px]">
+                  選ぶと、下の本文の代わりにテンプレートの中身が届きます。
+                </span>
+                <select
+                  value={newStep.templateId}
+                  onChange={(e) => setNewStep({ ...newStep, templateId: e.target.value })}
+                  className={`mt-1 ${inputClass}`}
+                >
+                  <option value="">使わない（下に直接書く）</option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-ink-faint text-xs">送る内容</span>
+                <span className="text-ink-faint block text-[11px]">
+                  {'{{name}}'} は、送るときに一人ひとりの名前へ置き換わります。
+                </span>
+                <textarea
+                  rows={3}
+                  value={newStep.messageContent}
+                  onChange={(e) => setNewStep({ ...newStep, messageContent: e.target.value })}
+                  placeholder="例：{{name}}さん、明日のご予約のお知らせです。"
+                  className={`mt-1 resize-y ${inputClass}`}
+                />
+              </label>
+
+              <button
+                onClick={() => void handleAddStep()}
+                disabled={saving}
+                className="border-hairline rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                この通を足す
+              </button>
+            </div>
+          </section>
+
+          <div className="border-hairline flex justify-end gap-2 border-t pt-4">
+            <Link
+              href="/reminders"
+              className="border-hairline rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium transition-colors"
+            >
+              一覧へ戻る
+            </Link>
+            <button
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </div>
+      )}
+    </main>
+  )
+}
+
+export default function ReminderEditPage() {
+  // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
+  return (
+    <Suspense fallback={<p className="text-ink-faint p-6 text-sm">読み込み中...</p>}>
+      <ReminderEditInner />
+    </Suspense>
+  )
+}

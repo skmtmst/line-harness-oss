@@ -103,6 +103,9 @@ export type AuthenticatedStaff = {
   role: StaffRole;
   /** true なら役割にかかわらず更新・削除・設定変更をさせない。 */
   readOnly: boolean;
+  permissionKeys?: string[];
+  assignedLineAccountId?: string | null;
+  canAccessDescendantAccounts?: boolean;
 };
 
 function toAuthenticatedStaff(staff: {
@@ -110,13 +113,52 @@ function toAuthenticatedStaff(staff: {
   name: string;
   role: StaffRole;
   access_level?: 'full' | 'read_only';
+  permission_keys?: string;
+  assigned_line_account_id?: string | null;
+  can_access_descendant_accounts?: number;
 }): AuthenticatedStaff {
+  let permissionKeys: string[] = [];
+  try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
   return {
     id: staff.id,
     name: staff.name,
     role: staff.role,
     readOnly: staff.access_level === 'read_only',
+    permissionKeys,
+    assignedLineAccountId: staff.assigned_line_account_id ?? null,
+    canAccessDescendantAccounts: Boolean(staff.can_access_descendant_accounts),
   };
+}
+
+const STAFF_API_PERMISSIONS: Array<[string, string]> = [
+  ['/api/inbox', '/chats'], ['/api/chats', '/chats'], ['/api/conversations', '/chats'],
+  ['/api/support', '/chats'], ['/api/operators', '/chats'],
+  ['/api/friends', '/friends'], ['/api/tags', '/tags'], ['/api/friend-fields', '/tags'],
+  ['/api/tag-groups', '/tags'], ['/api/support-marks', '/tags'], ['/api/saved-searches', '/tags'], ['/api/folders', '/tags'],
+  ['/api/scenarios', '/scenarios'], ['/api/broadcasts', '/broadcasts'], ['/api/reminders', '/reminders'],
+  ['/api/auto-replies', '/auto-replies'], ['/api/friend-add', '/friend-add-settings'], ['/api/webinars', '/webinars'],
+  ['/api/templates', '/templates'], ['/api/rich-menu', '/rich-menus'], ['/api/forms', '/form-submissions'], ['/api/contents', '/contents'],
+  ['/api/conversions', '/conversions'], ['/api/scoring', '/scoring'], ['/api/tracked-links', '/inflow-links'], ['/api/analytics', '/analytics'],
+  ['/api/automations', '/automations'], ['/api/webhooks', '/webhooks'], ['/api/booking', '/booking/bookings'], ['/api/events', '/events'],
+  ['/api/nen-campaigns', '/nen-campaigns'], ['/api/nen-members', '/nen-members'], ['/api/ec-commerce', '/ec-commerce'],
+];
+
+/**
+ * A few APIs live under /api/friends for URL compatibility but expose another
+ * feature. Resolve them before the broad /api/friends prefix so a staff member
+ * cannot inherit chat or friend-attribute access from the friends permission.
+ */
+const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/friends\/[^/]+\/messages(?:\/|$)/, '/chats'],
+  [/^\/api\/friends\/[^/]+\/fields(?:\/|$)/, '/tags'],
+  [/^\/api\/friends\/[^/]+\/support-mark(?:\/|$)/, '/tags'],
+  [/^\/api\/friends\/support-mark\/bulk(?:\/|$)/, '/tags'],
+];
+
+function permissionForApiPath(path: string): string | null {
+  const override = STAFF_API_PERMISSION_OVERRIDES.find(([pattern]) => pattern.test(path));
+  if (override) return override[1];
+  return STAFF_API_PERMISSIONS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))?.[1] ?? null;
 }
 
 export async function sha256Hex(value: string): Promise<string> {
@@ -172,7 +214,7 @@ export async function authenticateApiToken(
 
   // Fallback: env API_KEY acts as owner (current rotation slot)
   if (token === c.env.API_KEY) {
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true };
   }
 
   // Legacy fallback: LEGACY_API_KEY accepted during rotation grace period.
@@ -186,7 +228,7 @@ export async function authenticateApiToken(
     token === c.env.LEGACY_API_KEY
   ) {
     console.log('[auth] accept_via=LEGACY_API_KEY');
-    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false };
+    return { id: 'env-owner', name: 'Owner', role: 'owner', readOnly: false, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true };
   }
 
   return null;
@@ -268,14 +310,23 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/api/auth/logout' ||
     path === '/api/auth/line' ||
     path === '/api/auth/line/callback' ||
+    path === '/api/auth/two-factor/verify' ||
+    /^\/api\/staff\/invitations\/[^/]+\/verify$/.test(path) ||
     path.startsWith('/auth/') ||
     path === '/setup' ||
     path === '/api/integrations/stripe/webhook' ||
     path === '/api/integrations/eccube/events' ||
     path === '/api/integrations/eccube/columns' ||
+    // Codex clients sign the exact body with a dedicated shared secret.
+    path === '/api/integrations/codex-slack/events' ||
+    // Slack button actions are verified with the Slack app signing secret.
+    path === '/api/integrations/slack/actions' ||
     path.match(/^\/api\/webhooks\/incoming\/[^/]+\/receive$/) ||
     path === '/api/meet-callback' || // Meet Harness completion callback
     path === '/api/qr' || // Public QR proxy — used by desktop landing pages
+    // ログイン画面の看板（公式アカウントの表示名とアイコン）。認証より手前の
+    // 画面が読むので通す。返すのは LINE 上で公開されている2つの値だけ。
+    path === '/api/public/brand' ||
     path === '/api/health' // Liveness probe (update CLI / self-update verify)
   ) {
     return next();
@@ -292,6 +343,13 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
 
   if (staff.readOnly && !SAFE_METHODS.has(method)) {
     return c.json({ success: false, error: '閲覧のみの権限では変更操作を実行できません' }, 403);
+  }
+
+  if (staff.role === 'staff') {
+    const requiredPermission = permissionForApiPath(path);
+    if (requiredPermission && !staff.permissionKeys?.includes(requiredPermission)) {
+      return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
+    }
   }
 
   // CSRF protection applies ONLY to cookie-authenticated, state-changing

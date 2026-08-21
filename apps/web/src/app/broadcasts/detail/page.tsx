@@ -61,17 +61,54 @@ function BroadcastDetailInner() {
     )
   }
 
+  const total = broadcast?.totalCount ?? 0
+  const success = broadcast?.successCount ?? 0
+  const failed = Math.max(0, total - success)
+  const pct = (n: number, base: number) =>
+    base > 0 ? `${Math.round((n / base) * 1000) / 10}%` : '—'
+
   return (
     <div>
-      <Header title={broadcast?.title ?? '配信の詳細'} />
-
-      <nav className="text-ink-faint mb-4 text-xs">
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/broadcasts" className="hover:underline">
           一斉配信
         </Link>
-        <span className="mx-1.5">›</span>
+        <span className="mx-1.5">/</span>
         <span>{broadcast?.title ?? '詳細'}</span>
       </nav>
+
+      <div data-design="Head">
+        <Header
+          title={broadcast?.title ?? '配信の詳細'}
+          description={
+            broadcast?.sentAt
+              ? `${new Date(broadcast.sentAt).toLocaleString('ja-JP')} に送信`
+              : broadcast?.scheduledAt
+                ? `${new Date(broadcast.scheduledAt).toLocaleString('ja-JP')} に予約`
+                : undefined
+          }
+          action={
+            <div className="flex flex-wrap gap-2">
+              {/* 送った内容は下に出ている。別画面で開く先が無い。 */}
+              <button
+                disabled
+                title="配信内容の別画面は準備中です。内容は下に出ています"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                配信内容を見る
+              </button>
+              {/* 既存の配信を種にして作り直す口が無い。作成は空から始まる。 */}
+              <button
+                disabled
+                title="複製は準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              >
+                複製して作る
+              </button>
+            </div>
+          }
+        />
+      </div>
 
       {loading ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
@@ -82,60 +119,147 @@ function BroadcastDetailInner() {
           この配信は見つかりませんでした。
         </p>
       ) : (
-        <div className="max-w-3xl space-y-5">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-canvas rounded-card border-hairline border p-4">
-              <p className="text-ink-faint text-xs">届いた数</p>
-              <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-                {insight?.delivered?.toLocaleString('ja-JP') ?? '—'}
-              </p>
+        <div className="max-w-3xl space-y-4">
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-ink text-sm font-semibold">送信の進み具合</p>
+              <span
+                className={`rounded-pill px-2 py-0.5 text-xs ${
+                  broadcast.status === 'sent'
+                    ? 'bg-success-bg text-success'
+                    : broadcast.status === 'sending'
+                      ? 'bg-warning-bg text-warning'
+                      : 'bg-canvas-sunken text-ink-faint'
+                }`}
+              >
+                {STATUS_LABELS[broadcast.status] ?? broadcast.status}
+              </span>
             </div>
-            <div className="bg-canvas rounded-card border-hairline border p-4">
-              <p className="text-ink-faint text-xs">開封</p>
-              <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-                {insight?.uniqueImpression?.toLocaleString('ja-JP') ?? '—'}
-              </p>
-              {insight?.suppressedByAudienceSize && (
-                <p className="text-ink-faint mt-1 text-[11px]">配信先が20人未満のため取れません</p>
-              )}
+            <p className="text-ink mt-2 text-sm tabular-nums">
+              {success.toLocaleString('ja-JP')} / {total.toLocaleString('ja-JP')} 件
+              {broadcast.status === 'sent' ? ' 完了' : ''}
+            </p>
+            <div className="bg-canvas-sunken mt-2 h-2 overflow-hidden rounded-full">
+              <div
+                className="bg-accent h-full"
+                style={{ width: total > 0 ? `${(success / total) * 100}%` : '0%' }}
+              />
             </div>
-            <div className="bg-canvas rounded-card border-hairline border p-4">
-              <p className="text-ink-faint text-xs">クリック</p>
-              <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-                {insight?.uniqueClick?.toLocaleString('ja-JP') ?? '—'}
-              </p>
-            </div>
+            {/* 開始・完了の時刻を別々に持っていない。sent_at は完了だけ。 */}
+            <p className="text-ink-faint mt-2 text-xs">
+              {broadcast.sentAt
+                ? `完了 ${new Date(broadcast.sentAt).toLocaleTimeString('ja-JP')}`
+                : '開始・完了の時刻は記録していません'}
+            </p>
+          </section>
+
+          <div data-design="KPIs" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Stat label="送信" value={total} unit="件" detail={broadcast.scheduledAt ? '予約どおり実行' : '即時配信'} />
+            <Stat
+              label="到達"
+              value={success}
+              unit="件"
+              detail={`${pct(success, total)} ・ 失敗 ${failed}`}
+            />
+            <Stat
+              label="開封"
+              value={insight?.uniqueImpression ?? null}
+              unit="件"
+              detail={
+                insight?.suppressedByAudienceSize
+                  ? '配信先が20人未満のため取れません'
+                  : insight?.uniqueImpression != null && insight.delivered
+                    ? pct(insight.uniqueImpression, insight.delivered)
+                    : '—'
+              }
+            />
+            <Stat
+              label="クリック"
+              value={insight?.uniqueClick ?? null}
+              unit="件"
+              detail={
+                insight?.uniqueClick != null && insight.uniqueImpression
+                  ? `開封のうち ${pct(insight.uniqueClick, insight.uniqueImpression)}`
+                  : '—'
+              }
+            />
           </div>
 
-          <div className="bg-canvas rounded-card border-hairline border p-5">
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between gap-4">
-                <dt className="text-ink-faint">状態</dt>
-                <dd className="text-ink-secondary">
-                  {STATUS_LABELS[broadcast.status] ?? broadcast.status}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-ink-faint">配信先</dt>
-                <dd className="text-ink-secondary">
-                  {broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込み'}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-4">
-                <dt className="text-ink-faint">送信日時</dt>
-                <dd className="text-ink-secondary">
-                  {broadcast.sentAt ? new Date(broadcast.sentAt).toLocaleString('ja-JP') : '—'}
-                </dd>
-              </div>
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-semibold">アカウント別の内訳</p>
+            {/* 複数アカウントに配ったとき、どのアカウントで何件届いたかを
+                残していない。totalCount / successCount は全体の合計だけ。 */}
+            <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+              アカウントごとの送信・到達・開封は記録していません。複数アカウントに配った場合も、上の数は合計です。
+            </p>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-ink text-sm font-semibold">この配信の設定</p>
+              <button
+                disabled
+                title="同じ設定での作り直しは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-1 text-xs opacity-50"
+              >
+                同じ設定で作り直す
+              </button>
+            </div>
+            <dl className="mt-3 space-y-2 text-sm">
+              <Row label="宛先の条件" value={broadcast.targetType === 'all' ? 'すべての友だち' : '絞り込みあり'} />
+              <Row
+                label="対象人数"
+                value={`${total.toLocaleString('ja-JP')}人（ブロック中を自動で除外）`}
+              />
+              <Row label="メッセージ" value={`1通（${broadcast.messageType}）`} />
+              <Row
+                label="送信タイミング"
+                value={
+                  broadcast.scheduledAt
+                    ? `${new Date(broadcast.scheduledAt).toLocaleString('ja-JP')} に予約`
+                    : '即時配信'
+                }
+              />
+              {/* 誰が作ったかを記録していない。 */}
+              <Row label="作成者" value={`記録していません ・ ${new Date(broadcast.createdAt).toLocaleString('ja-JP')} 作成`} />
             </dl>
-          </div>
+          </section>
 
-          <div className="bg-canvas rounded-card border-hairline border p-5">
-            <p className="text-ink-secondary mb-2 text-sm font-medium">本文</p>
-            <pre className="bg-canvas-sunken text-ink-secondary overflow-x-auto rounded p-3 text-xs whitespace-pre-wrap">
-              {broadcast.messageContent}
-            </pre>
-          </div>
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-ink text-sm font-semibold">クリックされたリンク</p>
+              <Link href="/inflow-links" className="text-accent text-xs hover:underline">
+                流入経路で見る
+              </Link>
+            </div>
+            {/* どのリンクがどの配信に入っていたかを結ぶ記録が無い（18-29）。 */}
+            <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+              配信ごとのリンク別クリックはまだ出せません。リンク全体のクリックは「分析 → URLクリック」で見られます。
+            </p>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-semibold">送った内容</p>
+            <p className="text-ink-faint mt-0.5 mb-2 text-xs">実際に届いた形</p>
+            <div className="bg-canvas-sunken rounded-card p-3">
+              <p className="text-ink rounded-2xl bg-white px-4 py-3 text-sm leading-6 whitespace-pre-wrap">
+                {broadcast.messageContent}
+              </p>
+            </div>
+          </section>
+
+          <section className="bg-canvas rounded-card border-hairline border p-5">
+            <p className="text-ink text-sm font-semibold">数え方</p>
+            <ul className="text-ink-faint mt-2 space-y-1.5 text-xs leading-relaxed">
+              <li>
+                ・開封は LINE の集計値です。個人単位では取れないため「誰が読んだか」は分かりません
+              </li>
+              <li>・配信対象が20人未満のときは、LINE側の仕様で開封数・クリック数が表示されません</li>
+              <li>
+                ・クリックは短縮URL経由の実測値です。LINE側の集計値とは数字がずれることがあります
+              </li>
+            </ul>
+          </section>
 
           <Link
             href="/broadcasts"
@@ -145,6 +269,38 @@ function BroadcastDetailInner() {
           </Link>
         </div>
       )}
+    </div>
+  )
+}
+
+function Stat({
+  label,
+  value,
+  unit,
+  detail,
+}: {
+  label: string
+  value: number | null
+  unit: string
+  detail: string
+}) {
+  return (
+    <div className="bg-canvas rounded-card border-hairline border p-4">
+      <p className="text-ink-faint text-xs">{label}</p>
+      <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
+        {value == null ? '—' : value.toLocaleString('ja-JP')}
+        <span className="text-ink-faint ml-0.5 text-xs font-normal">{unit}</span>
+      </p>
+      <p className="text-ink-faint mt-0.5 text-xs">{detail}</p>
+    </div>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4">
+      <dt className="text-ink-faint shrink-0">{label}</dt>
+      <dd className="text-ink-secondary min-w-0 text-right">{value}</dd>
     </div>
   )
 }

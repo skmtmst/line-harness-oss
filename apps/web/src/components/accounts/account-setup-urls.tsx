@@ -72,23 +72,23 @@ function UrlRow({ label, hint, url }: { label: string; hint: string; url: string
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
+      <div className="mb-1 flex flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:justify-between">
         <span className="text-xs font-medium text-gray-600">{label}</span>
         <span className="text-[10px] text-gray-400">{hint}</span>
       </div>
-      <div className="flex items-stretch gap-1">
+      <div className="flex min-w-0 items-stretch gap-1">
         <input
           readOnly
           value={url}
           placeholder="—"
           onFocus={(e) => e.currentTarget.select()}
-          className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-xs font-mono bg-gray-50 text-gray-700 truncate"
+          className="min-w-0 flex-1 truncate rounded border border-gray-200 bg-gray-50 px-2 py-1.5 font-mono text-xs text-gray-700"
         />
         <button
           type="button"
           onClick={onCopy}
           disabled={!url}
-          className="px-2 rounded text-xs font-medium border border-gray-200 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="shrink-0 rounded border border-gray-200 px-2 text-xs font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {copied ? '✓' : 'コピー'}
         </button>

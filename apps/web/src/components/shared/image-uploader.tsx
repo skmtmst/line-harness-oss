@@ -176,7 +176,7 @@ export default function ImageUploader({ mode, value, onChange, label }: ImageUpl
                 disabled={busy}
                 className="rounded-md bg-emerald-600 px-3 py-1.5 text-white hover:bg-emerald-700 disabled:opacity-50"
               >
-                {busy ? 'アップロード中…' : '📎 画像を選択'}
+                {busy ? 'アップロード中…' : '画像を選択'}
               </button>
               <div className="text-xs text-gray-400">またはドラッグ&ドロップ / Cmd+V でペースト</div>
             </div>

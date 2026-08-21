@@ -165,14 +165,14 @@ export default function AccountEditModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/40 flex items-start sm:items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-2 sm:p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl w-full max-w-2xl my-8"
+        className="my-2 w-full max-w-2xl overflow-hidden rounded-lg bg-white shadow-xl sm:my-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-4 sm:px-6">
           <h2 className="text-base font-bold text-gray-900">アカウント編集</h2>
           <button
             type="button"
@@ -184,7 +184,7 @@ export default function AccountEditModal({
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-6 space-y-4">
+        <form onSubmit={handleSave} className="space-y-4 p-4 sm:p-6">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">アカウント名</label>
             <input
@@ -213,7 +213,7 @@ export default function AccountEditModal({
           {/* 上限とアイコン。鍵ではないので、この画面に置いても閲覧権限で困らない。 */}
           <div className="border-hairline space-y-3 rounded-lg border p-3">
             <p className="text-ink-secondary text-sm font-semibold">友だち数とアイコン</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="acc-capacity" className="text-ink-faint mb-1 block text-xs font-medium">
                   上限
@@ -281,7 +281,7 @@ export default function AccountEditModal({
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+          <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-gray-100 bg-white px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
             <button
               type="button"
               onClick={onClose}

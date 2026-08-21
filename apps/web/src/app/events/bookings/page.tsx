@@ -44,6 +44,7 @@ function BookingsInner() {
   const { selectedAccountId, accounts } = useAccount()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [items, setItems] = useState<EventBookingItem[]>([])
+  const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
   const [tab, setTab] = useState<string>('requested')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -72,6 +73,23 @@ function BookingsInner() {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  // 枠の合計＝定員。一覧APIからしか取れない。
+  useEffect(() => {
+    if (!selectedAccountId || !eventId) return
+    let alive = true
+    eventsApi
+      .listEvents(selectedAccountId)
+      .then((r) => {
+        if (alive) setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
+      })
+      .catch(() => {
+        // 定員が出ないだけ。一覧と操作はできる。
+      })
+    return () => {
+      alive = false
+    }
+  }, [selectedAccountId, eventId])
 
   if (!eventId) {
     return <div className="p-4 text-red-700">id クエリが必要です</div>
@@ -123,24 +141,85 @@ function BookingsInner() {
     }
   }
 
-  return (
-    <>
-      <Header title={event?.name ?? 'イベント予約管理'} />
-      <div className="p-6 max-w-6xl mx-auto">
-        <div className="mb-4 flex items-center gap-2 text-sm">
-          <Link href="/events" className="text-blue-600 hover:underline">イベント一覧</Link>
-          <span className="text-gray-400">/</span>
-          <Link href={`/events/edit?id=${eventId}`} className="text-blue-600 hover:underline">
-            {event?.name ?? '編集'}
-          </Link>
-          <span className="text-gray-400">/</span>
-          <span className="text-gray-700">予約管理</span>
-        </div>
+  const confirmed = items.filter((b) => b.status === 'confirmed').length
+  const pending = items.filter((b) => b.status === 'requested').length
+  const cancelled = items.filter((b) => b.status === 'cancelled').length
+  // 定員は一覧APIが持っている（枠の合計）。詳細APIには入っていない。
+  const capacity = totalCapacity ?? 0
 
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">{event?.name ?? 'イベント予約管理'}</h1>
-          <p className="text-sm text-gray-500 mt-0.5">予約の承認・キャンセル・出欠管理</p>
+  return (
+    <div>
+      <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
+        <Link href="/events" className="hover:underline">
+          イベント予約
+        </Link>
+        <span className="mx-1.5">/</span>
+        <Link href={`/events/edit?id=${eventId}`} className="hover:underline">
+          {event?.name ?? '編集'}
+        </Link>
+        <span className="mx-1.5">/</span>
+        <span>予約者</span>
+      </nav>
+
+      <div data-design="Head">
+        <Header
+          title="イベントの予約者"
+          description="申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。"
+        />
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <button
+            disabled
+            title="操作マニュアルは準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+          >
+            マニュアル
+          </button>
+          <button
+            disabled
+            title="書き出しは準備中です"
+            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
+          >
+            CSVで書き出す
+          </button>
+          {/* 予約者だけに送る仕組みが無い。一斉配信はいまのところ
+              タグや友だち全体が単位で、イベントの申込者を宛先にできない。 */}
+          <button
+            disabled
+            title="予約者だけを宛先にする配信は準備中です"
+            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
+          >
+            予約者に一斉送信
+          </button>
         </div>
+      </div>
+
+      <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
+        <span className="text-ink-faint mr-2 text-xs">イベント</span>
+        <span className="text-ink text-sm font-medium">{event?.name ?? '読み込み中…'}</span>
+        <Link href="/events" className="text-accent ml-3 text-xs hover:underline">
+          ほかのイベントを選ぶ
+        </Link>
+      </div>
+
+      <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <EventKpi
+          title="申込"
+          value={String(confirmed + pending)}
+          unit="人"
+          detail={capacity > 0 ? `定員 ${capacity} ・ 残り${Math.max(0, capacity - confirmed)}` : '定員なし'}
+        />
+        <EventKpi title="承認待ち" value={String(pending)} unit="件" detail="対応が必要" />
+        {/* event_bookings に「キャンセル待ち」という状態が無い。
+            イベント側に waitlist_enabled はあるが、待っている人を数える
+            場所がまだない。数を作らずに、受けるかどうかだけ出す。 */}
+        <EventKpi
+          title="キャンセル待ち"
+          value="—"
+          unit="人"
+          detail={event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
+        />
+        <EventKpi title="キャンセル" value={String(cancelled)} unit="件" detail="この一覧のうち" />
+      </div>
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -256,8 +335,31 @@ function BookingsInner() {
             </div>
           )}
         </div>
-      </div>
-    </>
+    </div>
+  )
+}
+
+/** KPIの札。予約まわりの他画面と同じ形にそろえる。 */
+function EventKpi({
+  title,
+  value,
+  unit,
+  detail,
+}: {
+  title: string
+  value: string
+  unit: string
+  detail: string
+}) {
+  return (
+    <div className="bg-canvas rounded-card border-hairline border p-4">
+      <p className="text-ink-faint text-xs">{title}</p>
+      <p className="text-ink mt-1 text-2xl font-semibold tabular-nums">
+        {value}
+        <span className="text-ink-faint ml-1 text-xs font-normal">{unit}</span>
+      </p>
+      <p className="text-ink-faint mt-1 text-xs">{detail}</p>
+    </div>
   )
 }
 

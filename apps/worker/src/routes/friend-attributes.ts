@@ -18,6 +18,7 @@ import {
   SAVED_SEARCH_LIMIT,
   SAVED_SEARCH_SCOPES,
   getLoginAudit,
+  getStaffMembers,
   LOGIN_AUDIT_ACTIONS,
   type LoginAuditRow,
   type LoginAuditAction,
@@ -75,6 +76,7 @@ function serializeFolder(row: Folder) {
     name: row.name,
     parentId: row.parent_id,
     displayOrder: row.display_order,
+    color: row.color ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -384,16 +386,26 @@ friendAttributes.get('/api/login-audit', requireRole('owner', 'admin'), async (c
       action,
       limit: Number(c.req.query('limit') ?? 100),
     });
+    const staffById = new Map((await getStaffMembers(c.env.DB)).map((member) => [member.id, member]));
     return c.json({
       success: true,
       data: items.map((row: LoginAuditRow) => ({
         id: row.id,
         adminUserId: row.admin_user_id,
+        userName: row.admin_user_id ? staffById.get(row.admin_user_id)?.name ?? '不明なユーザー' : '不明なユーザー',
+        role: row.admin_user_id
+          ? (staffById.get(row.admin_user_id)?.access_level === 'read_only'
+              ? 'viewer'
+              : staffById.get(row.admin_user_id)?.role === 'staff' ? 'staff' : 'admin')
+          : null,
+        lineLinked: row.admin_user_id ? Boolean(staffById.get(row.admin_user_id)?.line_user_id) : false,
+        isActive: row.admin_user_id ? Boolean(staffById.get(row.admin_user_id)?.is_active) : false,
         action: row.action,
         screen: row.screen,
         // IPは残すが、一覧では末尾を伏せる。監査に必要なのは
         // 「いつもと違うところから入っていないか」で、完全な値は要らない。
         ip: row.ip ? maskIp(row.ip) : null,
+        connectionSource: [row.ip ? maskIp(row.ip) : null, row.user_agent ? row.user_agent.slice(0, 42) : null].filter(Boolean).join(' / ') || null,
         result: row.result,
         createdAt: row.created_at,
       })),
@@ -441,11 +453,22 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
       }
     }
 
+    // 色はフォルダに付く。既存の COLOR_PATTERN と同じ決まりで見る。
+    let color: string | null = null;
+    if (body.color !== undefined && body.color !== null && body.color !== '') {
+      const raw = String(body.color);
+      if (!COLOR_PATTERN.test(raw)) {
+        return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+      }
+      color = raw;
+    }
+
     const folder = await createFolder(c.env.DB, {
       kind: body.kind,
       name,
       parentId: body.parentId ? String(body.parentId) : null,
       displayOrder: Number(body.displayOrder ?? 0),
+      color,
     });
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
@@ -476,6 +499,18 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
       patch.parentId = parentId;
     }
     if (body.displayOrder !== undefined) patch.displayOrder = Number(body.displayOrder);
+    if ('color' in body) {
+      const raw = body.color;
+      if (raw === null || raw === '') {
+        patch.color = null;
+      } else {
+        const value = String(raw);
+        if (!COLOR_PATTERN.test(value)) {
+          return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
+        }
+        patch.color = value;
+      }
+    }
 
     const folder = await updateFolder(c.env.DB, id, patch);
     return c.json({ success: true, data: serializeFolder(folder!) });

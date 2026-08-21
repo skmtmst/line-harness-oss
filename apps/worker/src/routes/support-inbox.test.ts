@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { extractContactFormReceipt } from './support-inbox.js';
+import { extractContactFormReceipt, paginateSupportInboxItems } from './support-inbox.js';
+
+describe('paginateSupportInboxItems', () => {
+  it('5件表示で6件目を2ページ目に出す', () => {
+    expect(paginateSupportInboxItems(['1', '2', '3', '4', '5', '6'], 5, 5)).toEqual(['6']);
+  });
+});
 
 describe('extractContactFormReceipt', () => {
   it('extracts the customer and only the submitted inquiry from the legacy receipt', () => {

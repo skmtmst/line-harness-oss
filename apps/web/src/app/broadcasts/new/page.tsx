@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
@@ -14,8 +14,9 @@ import BroadcastForm from '@/components/broadcasts/broadcast-form'
  * 中身は一覧で使っているフォームをそのまま出す。作成の中身を2つ持つと、
  * 片方だけ直したときに食い違う。
  */
-export default function NewBroadcastPage() {
+function NewBroadcastPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [tags, setTags] = useState<Tag[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -53,8 +54,19 @@ export default function NewBroadcastPage() {
           tags={tags}
           onSuccess={() => router.push('/broadcasts')}
           onCancel={() => router.push('/broadcasts')}
+          openTemplatePickerInitially={searchParams.get('templatePicker') === '1'}
+          initialTemplateId={searchParams.get('templateId')}
+          initialContentTemplateId={searchParams.get('contentTemplateId')}
         />
       )}
     </div>
+  )
+}
+
+export default function NewBroadcastPage() {
+  return (
+    <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
+      <NewBroadcastPageContent />
+    </Suspense>
   )
 }

@@ -51,7 +51,9 @@ const TAG = {
   id: 't-1',
   name: '腰痛',
   color: '#3B82F6',
-  group_id: 'g-1',
+  // group_idは旧互換列。APIはfoldersを正本とするfolder_idを返す。
+  group_id: null,
+  folder_id: 'g-1',
   mileage_reward: 0,
   referral_mileage_reward: 0,
   mileage_multiplier_bps: null,
@@ -69,7 +71,30 @@ describe('タグの親分類', () => {
     const body = (await res.json()) as { data: { name: string; sortOrder: number } };
     expect(body.data).toMatchObject({ name: 'お悩み', sortOrder: 0 });
     // 前後の空白は落とす。画面から貼り付けたときに空白付きの分類ができるのを防ぐ。
-    expect(mocks.createTagGroup).toHaveBeenCalledWith(env.DB, { name: 'お悩み', sortOrder: 0 });
+    // 色を指定しなければ null。色はフォルダに付く（115）。
+    expect(mocks.createTagGroup).toHaveBeenCalledWith(env.DB, {
+      name: 'お悩み',
+      sortOrder: 0,
+      color: null,
+    });
+  });
+
+  it('色を付けて作れる', async () => {
+    mocks.createTagGroup.mockResolvedValue({ ...GROUP, color: '#10B981' });
+    const res = await req('/api/tag-groups', 'POST', { name: 'お悩み', color: '#10B981' });
+    expect(res.status).toBe(201);
+    expect(mocks.createTagGroup).toHaveBeenCalledWith(env.DB, {
+      name: 'お悩み',
+      sortOrder: 0,
+      color: '#10B981',
+    });
+  });
+
+  it('色の形が違うと作れない', async () => {
+    // 名前付きの色を混ぜると、画面での見た目が揃わない。
+    const res = await req('/api/tag-groups', 'POST', { name: 'お悩み', color: 'red' });
+    expect(res.status).toBe(400);
+    expect(mocks.createTagGroup).not.toHaveBeenCalled();
   });
 
   it('名前が空の分類は作れない', async () => {
@@ -116,7 +141,7 @@ describe('タグの所属', () => {
   });
 
   it('null を送ると未分類に戻る', async () => {
-    mocks.assignTagToGroup.mockResolvedValue({ ...TAG, group_id: null });
+    mocks.assignTagToGroup.mockResolvedValue({ ...TAG, folder_id: null });
     const res = await req('/api/tags/t-1/group', 'PATCH', { groupId: null });
     expect(mocks.assignTagToGroup).toHaveBeenCalledWith(env.DB, 't-1', null);
     const body = (await res.json()) as { data: { groupId: string | null } };
@@ -125,7 +150,7 @@ describe('タグの所属', () => {
 
   it('空文字も未分類として扱う', async () => {
     // 画面のプルダウンで「未分類」を選ぶと空文字が飛ぶ。null と同じ意味にする。
-    mocks.assignTagToGroup.mockResolvedValue({ ...TAG, group_id: null });
+    mocks.assignTagToGroup.mockResolvedValue({ ...TAG, folder_id: null });
     await req('/api/tags/t-1/group', 'PATCH', { groupId: '' });
     expect(mocks.assignTagToGroup).toHaveBeenCalledWith(env.DB, 't-1', null);
   });
@@ -150,7 +175,7 @@ describe('タグの所属', () => {
   });
 
   it('分類を指定せずに作ると未分類になる', async () => {
-    mocks.createTag.mockResolvedValue({ ...TAG, group_id: null });
+    mocks.createTag.mockResolvedValue({ ...TAG, folder_id: null });
     await req('/api/tags', 'POST', { name: '腰痛' });
     expect(mocks.createTag).toHaveBeenCalledWith(
       env.DB,
@@ -163,5 +188,12 @@ describe('タグの所属', () => {
     const res = await req('/api/tags', 'GET');
     const body = (await res.json()) as { data: Array<{ groupId: string | null }> };
     expect(body.data[0].groupId).toBe('g-1');
+  });
+
+  it('旧group_idに値が残っていてもfolder_idを正として返す', async () => {
+    mocks.getTags.mockResolvedValue([{ ...TAG, group_id: 'legacy-group', folder_id: 'folder-group' }]);
+    const res = await req('/api/tags', 'GET');
+    const body = (await res.json()) as { data: Array<{ groupId: string | null }> };
+    expect(body.data[0].groupId).toBe('folder-group');
   });
 });

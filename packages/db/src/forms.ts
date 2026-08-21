@@ -7,7 +7,9 @@ export interface Form {
   id: string;
   name: string;
   description: string | null;
-  fields: string; // JSON string of FormField[]
+  fields: string; // JSON string of FormField[]（layout から作り直す互換用）
+  /** 回答フォームの中身。FormLayout の JSON。NULL なら fields だけのフォーム */
+  layout: string | null;
   on_submit_tag_id: string | null;
   on_submit_scenario_id: string | null;
   on_submit_message_type: 'text' | 'flex' | null;
@@ -119,6 +121,7 @@ export interface CreateFormInput {
   name: string;
   description?: string | null;
   fields: string; // JSON string
+  layout?: string | null;
   onSubmitTagId?: string | null;
   onSubmitScenarioId?: string | null;
   onSubmitMessageType?: 'text' | 'flex' | null;
@@ -139,19 +142,20 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
   await db
     .prepare(
       `INSERT INTO forms
-         (id, name, description, fields, on_submit_tag_id, on_submit_scenario_id,
+         (id, name, description, fields, layout, on_submit_tag_id, on_submit_scenario_id,
           on_submit_message_type, on_submit_message_content,
           on_submit_webhook_url, on_submit_webhook_headers, on_submit_webhook_fail_message,
           save_to_metadata, is_active, submit_count,
           og_title, og_description, og_image_url,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
       input.name,
       input.description ?? null,
       input.fields,
+      input.layout ?? null,
       input.onSubmitTagId ?? null,
       input.onSubmitScenarioId ?? null,
       input.onSubmitMessageType ?? null,
@@ -175,6 +179,7 @@ export interface UpdateFormInput {
   name?: string;
   description?: string | null;
   fields?: string;
+  layout?: string | null;
   onSubmitTagId?: string | null;
   onSubmitScenarioId?: string | null;
   onSubmitMessageType?: 'text' | 'flex' | null;
@@ -205,6 +210,7 @@ export async function updateForm(
        SET name = ?,
            description = ?,
            fields = ?,
+           layout = ?,
            on_submit_tag_id = ?,
            on_submit_scenario_id = ?,
            on_submit_message_type = ?,
@@ -224,6 +230,7 @@ export async function updateForm(
       input.name ?? existing.name,
       'description' in input ? (input.description ?? null) : existing.description,
       input.fields ?? existing.fields,
+      'layout' in input ? (input.layout ?? null) : existing.layout,
       'onSubmitTagId' in input ? (input.onSubmitTagId ?? null) : existing.on_submit_tag_id,
       'onSubmitScenarioId' in input
         ? (input.onSubmitScenarioId ?? null)
@@ -337,4 +344,77 @@ export async function createFormSubmission(
     .prepare(`SELECT * FROM form_submissions WHERE id = ?`)
     .bind(id)
     .first<FormSubmission>())!;
+}
+
+// ── 送信時の制限判定 ─────────────────────────────────────────────────────────
+
+/** この友だちが、このフォームに何回答えたか。「1人1回」の判定に使う。 */
+export async function countFormSubmissionsByFriend(
+  db: D1Database,
+  formId: string,
+  friendId: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM form_submissions WHERE form_id = ? AND friend_id = ?`,
+    )
+    .bind(formId, friendId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+/** 前回の回答。オプションの「前回の回答を復元する」で使う。 */
+export async function getLatestFormSubmission(
+  db: D1Database,
+  formId: string,
+  friendId: string,
+): Promise<FormSubmission | null> {
+  return db
+    .prepare(
+      `SELECT * FROM form_submissions
+       WHERE form_id = ? AND friend_id = ?
+       ORDER BY created_at DESC LIMIT 1`,
+    )
+    .bind(formId, friendId)
+    .first<FormSubmission>();
+}
+
+/**
+ * 選択肢ごとの、これまでの選ばれた数。定員の判定に使う。
+ *
+ * 回答は JSON なので SQL では数えられない。ここで読んで数える。
+ * 定員は「先着の枠取り」に使うもので、何万件も溜まった頃には枠は
+ * とっくに埋まっている。読む件数に上限を置いて、重くならないようにする。
+ */
+export async function countChoiceUsage(
+  db: D1Database,
+  formId: string,
+  blockName: string,
+  limit = 5000,
+): Promise<Map<string, number>> {
+  const safeLimit = Math.max(1, Math.min(Math.floor(limit), 20000));
+  const result = await db
+    .prepare(
+      `SELECT data FROM form_submissions
+       WHERE form_id = ?
+       ORDER BY created_at DESC LIMIT ?`,
+    )
+    .bind(formId, safeLimit)
+    .all<{ data: string }>();
+
+  const counts = new Map<string, number>();
+  for (const row of result.results) {
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(row.data || '{}') as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const value = parsed[blockName];
+    const labels = Array.isArray(value) ? value.map(String) : value == null ? [] : [String(value)];
+    for (const label of labels) {
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+  }
+  return counts;
 }

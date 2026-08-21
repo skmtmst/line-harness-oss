@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildWarnings, countAudience } from './broadcast-preflight.js';
+import { buildSegmentQuery, type SegmentCondition } from './segment-query.js';
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 /** first だけを返す最小のモック。SQLとバインドも見られるようにする。 */
 function makeDb(row: { total: number | null; hidden: number | null } | null) {
@@ -109,3 +111,64 @@ describe('注意の組み立て', () => {
     expect(() => buildWarnings({ total: 0, hiddenExcluded: 0 })).not.toThrow();
   });
 });
+
+/*
+ * 詳細条件で絞ったときの人数。
+ *
+ * ここが条件を無視すると、**そのアカウントの全員**の人数が出る。
+ * 12人に送るつもりの画面に「312人に届きます」と出たまま送信を押すことに
+ * なる。一斉配信は取り消せないので、実際より多い数字を出すのが
+ * いちばん危ない間違い方になる。
+ */
+describe('詳細条件で絞ったときの人数', () => {
+  const VIP_CONDITION: SegmentCondition = {
+    operator: 'AND',
+    rules: [
+      { type: 'is_following', value: true },
+      { type: 'tag_exists', value: 't-vip' },
+    ],
+  }
+
+  function setup() {
+    const { db, raw } = createTestD1()
+    insertFriend(raw, 'f1')
+    insertFriend(raw, 'f2')
+    insertFriend(raw, 'f3')
+    insertFriend(raw, 'f4', { is_following: 0 })
+    insertFriend(raw, 'f5', { is_hidden: 1 })
+    raw.prepare(`INSERT INTO tags (id, name) VALUES ('t-vip', 'VIP')`).run()
+    for (const f of ['f1', 'f4', 'f5']) {
+      raw.prepare(`INSERT INTO friend_tags (friend_id, tag_id) VALUES (?, 't-vip')`).run(f)
+    }
+    return { db, raw }
+  }
+
+  it('条件で絞った人数を返す', async () => {
+    const { db } = setup()
+    const result = await countAudience(db, {
+      targetType: 'segment',
+      segmentConditions: VIP_CONDITION,
+    })
+    // VIP は f1 / f4 / f5。f4 はブロック中で条件から外れ、
+    // f5 は非表示なので届く人数には入らず、除外として数える。
+    expect(result).toEqual({ total: 1, hiddenExcluded: 1 })
+  })
+
+  it('条件を渡さなければ絞り込まれない（渡し忘れると全員の人数が出る）', async () => {
+    // VIP は1人しかいないのに、条件を渡さないとブロック中・非表示を除いた
+    // 全員の人数が返る。渡し忘れが「多い側」に外れることを、ここで固定する。
+    const { db } = setup()
+    const result = await countAudience(db, { targetType: 'segment' })
+    expect(result.total).toBe(3)
+  })
+
+  it('数えた人数と、実際に送る相手が同じ組み立てで決まる', async () => {
+    // 別々に書くと、条件を1つ足したときにどちらかだけ直して食い違う。
+    const { db, raw } = setup()
+    const counted = await countAudience(db, { targetType: 'segment', segmentConditions: VIP_CONDITION })
+    const query = buildSegmentQuery(VIP_CONDITION)
+    const sent = raw.prepare(query.sql).all(...(query.bindings as never[])) as Array<{ id: string }>
+    // 送信側は非表示の人も含むので、その差だけがずれの許される範囲。
+    expect(sent.length).toBe(counted.total + counted.hiddenExcluded)
+  })
+})

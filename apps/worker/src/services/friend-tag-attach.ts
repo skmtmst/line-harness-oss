@@ -1,4 +1,9 @@
-import { getScenarios, enrollFriendInScenario, jstNow, enqueueMileageEvent } from '@line-crm/db';
+import {
+  enrollFriendInScenario,
+  jstNow,
+  enqueueMileageEvent,
+  getTagAddedScenarioIds,
+} from '@line-crm/db';
 import { fireEvent } from './event-bus.js';
 import { pushImmediateFirstStep, type ImmediatePushContext } from './immediate-first-step.js';
 
@@ -46,22 +51,20 @@ export async function attachTagAndFireSideEffects(
     console.error('tag mileage enqueue failed:', error);
   }
 
-  const scenarios = await getScenarios(db);
-  for (const scenario of scenarios) {
-    if (
-      scenario.trigger_type === 'tag_added' &&
-      scenario.is_active &&
-      scenario.trigger_tag_id === tagId
-    ) {
-      const existing = await db
-        .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
-        .bind(friendId, scenario.id)
-        .first();
-      if (!existing) {
-        const enrollment = await enrollFriendInScenario(db, friendId, scenario.id);
-        if (push) {
-          await pushImmediateFirstStep(db, friendId, scenario.id, push, { enrollment });
-        }
+  /*
+   * 「このタグが付いたら始まる」は scenario_triggers から引く（128）。
+   * 1本のシナリオを複数のタグから始められるようにしたため、
+   * scenarios.trigger_tag_id は判断に使わない。
+   */
+  for (const scenarioId of await getTagAddedScenarioIds(db, tagId)) {
+    const existing = await db
+      .prepare(`SELECT id FROM friend_scenarios WHERE friend_id = ? AND scenario_id = ?`)
+      .bind(friendId, scenarioId)
+      .first();
+    if (!existing) {
+      const enrollment = await enrollFriendInScenario(db, friendId, scenarioId);
+      if (push) {
+        await pushImmediateFirstStep(db, friendId, scenarioId, push, { enrollment });
       }
     }
   }

@@ -6,6 +6,7 @@ import {
   getFriendSiteEvents,
   SITE_EVENT_TYPES,
   type SiteEventType,
+  getSiteTrackingSummary,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 
@@ -173,6 +174,17 @@ siteTracking.post('/api/site/link', async (c) => {
     return c.json({ success: true, data: { linked } });
   } catch (err) {
     console.error('POST /api/site/link error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/site/summary — 計測が動いているかと、その内訳
+siteTracking.get('/api/site/summary', async (c) => {
+  try {
+    const summary = await getSiteTrackingSummary(c.env.DB);
+    return c.json({ success: true, data: summary });
+  } catch (err) {
+    console.error('GET /api/site/summary error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });

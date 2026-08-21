@@ -140,7 +140,7 @@ export function ProgressModal({
         {final && (
           <div className="mt-4 p-3 rounded bg-gray-50">
             {final.status === 'success' && (
-              <p className="text-green-700 font-semibold">完了しました 🎉</p>
+              <p className="text-green-700 font-semibold">完了しました</p>
             )}
             {final.status === 'rolled_back' && (
               <p className="text-amber-700">
@@ -178,7 +178,7 @@ export function ProgressModal({
 
 function iconFor(s: UpdateEvent['status']): string {
   if (s === 'done') return '✓'
-  if (s === 'running') return '⏳'
+  if (s === 'running') return '…'
   if (s === 'failed') return '✗'
   return '○'
 }

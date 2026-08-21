@@ -13,6 +13,7 @@ import {
 } from '@line-crm/db';
 import type { Friend, LineAccount } from '@line-crm/db';
 import { authenticateApiToken } from '../middleware/auth.js';
+import { canAccessLineAccount } from '../services/account-access.js';
 import { messageToLogPayload } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 
@@ -102,6 +103,8 @@ type ResolvedCaller = {
   lineAccountId: string | null;
   /** Total number of registered accounts — used to scope broadcast logging. */
   accountCount: number;
+  /** Present only when the caller authenticated with a Harness staff key. */
+  staff?: Awaited<ReturnType<typeof authenticateApiToken>>;
 };
 
 function bearerToken(header: string | undefined): string | null {
@@ -140,12 +143,20 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
   const staff = await authenticateApiToken(c, token);
   if (!staff) return c.json(AUTH_FAILED, 401);
 
+  const method = c.req.method.toUpperCase();
+  if (staff.readOnly && !['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    return c.json({ message: 'Read-only staff cannot mutate LINE data' }, 403);
+  }
+
   const requestedId = c.req.header('X-Line-Account-Id');
   let account: LineAccount | undefined;
   if (requestedId) {
     account = active.find((a) => a.id === requestedId || a.channel_id === requestedId);
     if (!account) {
       return c.json({ message: `Unknown X-Line-Account-Id: ${requestedId}` }, 400);
+    }
+    if (!canAccessLineAccount(accounts, staff, account.id)) {
+      return c.json({ message: 'LINE account not found' }, 404);
     }
   } else if (active.length === 1) {
     account = active[0];
@@ -156,11 +167,15 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
     );
   }
 
+  if (account && !canAccessLineAccount(accounts, staff, account.id)) {
+    return c.json({ message: 'LINE account not found' }, 404);
+  }
   if (account) {
     return {
       upstreamToken: account.channel_access_token,
       lineAccountId: account.id,
       accountCount: active.length,
+      staff,
     };
   }
   if (c.env.LINE_CHANNEL_ACCESS_TOKEN) {
@@ -168,9 +183,24 @@ async function resolveCaller(c: Context<Env>, token: string): Promise<ResolvedCa
       upstreamToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
       lineAccountId: null,
       accountCount: active.length,
+      staff,
     };
   }
   return c.json({ message: 'No LINE account configured' }, 400);
+}
+
+function requiredProxyPermission(method: string, path: string): string | null {
+  if (method === 'POST' && ['/v2/bot/message/broadcast', '/v2/bot/message/multicast', '/v2/bot/message/narrowcast'].includes(path)) {
+    return '/broadcasts';
+  }
+  if (
+    (method === 'POST' && ['/v2/bot/message/push', '/v2/bot/message/reply'].includes(path)) ||
+    (method === 'GET' && /^\/v2\/bot\/(?:profile\/[^/]+|message\/[^/]+\/content)$/.test(path))
+  ) {
+    return '/chats';
+  }
+  if (/^\/v2\/bot\/richmenu(?:\/|$)/.test(path)) return '/rich-menus';
+  return null;
 }
 
 /** Look up friends for a set of userIds in IN-clause chunks (≤100 binds each). */
@@ -428,6 +458,13 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     if (caller instanceof Response) return caller;
 
     const method = c.req.method.toUpperCase();
+    if (caller.staff) {
+      const requiredPermission = requiredProxyPermission(method, path);
+      if (!requiredPermission) return c.json({ message: 'LINE proxy endpoint not allowed' }, 403);
+      if (caller.staff.role === 'staff' && !caller.staff.permissionKeys?.includes(requiredPermission)) {
+        return c.json({ message: 'Permission denied' }, 403);
+      }
+    }
     const isMessageSend = logSends && method === 'POST' && MESSAGE_SEND_PATHS.has(path);
 
     // Proxy 経由の自動送信と、人間が行う個別返信を区別する。未指定は従来どおり
@@ -486,6 +523,7 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         method,
         headers,
         body: rawBody ?? binaryBody,
+        signal: AbortSignal.timeout(15_000),
       });
     } catch (err) {
       console.error('[line-proxy] upstream fetch failed:', err);

@@ -1,4 +1,4 @@
-import { extractFlexAltText } from '../utils/flex-alt-text.js';
+import { buildMessage } from './line-message.js';
 import {
   getBroadcastById,
   getBroadcasts,
@@ -19,11 +19,69 @@ import {
   getUnsupportedBroadcastVariables,
   hasRecipientVariables,
   renderBroadcastMessageContent,
+  type BroadcastRenderContext,
 } from './render-message.js';
+import { aggregationUnitFor, aggregationUnits } from './broadcast-aggregation.js';
+import { resolveInterpolationExtra } from './interpolation-context.js';
 import { createBroadcastRetryKey } from './broadcast-retry-key.js';
 
+// LINE の multicast は 1 リクエストで最大 500 人まで宛先に取れる（LINE の仕様）。
+// これ以上に増やすことはできない。
 const MULTICAST_BATCH_SIZE = 500;
+// 差し込み（{{name}} など）があると本文が人ごとに変わるので multicast が使えず、
+// push を 1 人ずつ送る。この数はレート制限ではなく **区切りの単位**で、
+// 「ここまで送ったら時間を見る／少し待つ」という判断をこの粒度で行う。
+// 小さいほど中断したときの取りこぼしが減り、大きいほど待ちの回数が減る。
 const PERSONALIZED_PUSH_BATCH_SIZE = 10;
+
+/**
+ * 1人ずつ送る配信で、**1回のcronで何人まで送るか**。
+ *
+ * 差し込みのある配信は multicast が使えないので、1人ずつ push する。
+ * 以前はここに上限が無く、10人送るたびに `return` していた。cron は5分刻み
+ * なので、**1時間に120人**しか送れない計算になる。友だち5,000人なら41時間。
+ * 途中で止まっているように見えるが、**エラーは出ない**。「送信中」のまま
+ * 何日も残る。
+ *
+ * 上限を置く理由は Workers の subrequest（1回の実行で出せる問い合わせの数、
+ * 1,000）。1人あたり最大4つ使う。
+ *
+ *   照合1（送信済みか） + 友だち情報1 + LINEへの送信1 + 記録1 = 4
+ *
+ * 150人で600。10人ごとに `batch_offset` を書いているので、上限に当たって
+ * 実行が切れても**次のcronで続きから再開する**。送信済みの照合があるので
+ * 二重送信にもならない。
+ */
+const PERSONALIZED_PUSH_PER_TICK = 150;
+
+/**
+ * 配信全体で1つに決まる差し込みの値。
+ *
+ * 共通情報（営業時間など）と配信日は、誰に送っても同じ値になる。
+ * 1人ずつ引くと人数分クエリが増えるので、送る前に1回だけ用意する。
+ *
+ * 配信日の起点は**実際に送る時刻**。予約時刻ではない。cron は5分刻みで
+ * 動くので、深夜0時前後の配信では予約時刻と実際の日付が割れる。
+ * 相手が受け取った日と、本文に書かれた日が食い違うのがいちばん困る。
+ */
+async function broadcastWideContext(
+  db: D1Database,
+  accountId: string | null,
+  content: string,
+): Promise<BroadcastRenderContext> {
+  const context: BroadcastRenderContext = { deliveredAt: new Date() };
+  if (accountId) {
+    const { getLineAccountById: getLA } = await import('@line-crm/db');
+    const acct = await getLA(db, accountId);
+    context.liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
+  }
+  // 共通情報は本文で使っているときだけ引く。使わない配信で毎回1クエリ増やさない。
+  if (/\{\{\s*var\./.test(content)) {
+    const { getCommonVarMap } = await import('@line-crm/db');
+    context.vars = await getCommonVarMap(db);
+  }
+  return context;
+}
 
 export async function processBroadcastSend(
   db: D1Database,
@@ -86,6 +144,53 @@ export async function processBroadcastSend(
     return (await getBroadcastById(db, broadcastId))!;
   }
 
+  /*
+   * 絞り込み配信は、この関数では送らずキューへ渡す。
+   *
+   * ここを通さないと、下のふつうの経路（LINE の broadcast/multicast）へ
+   * 落ちて**全員に届く**。予約した絞り込み配信が全員に飛ぶ形で表に出る。
+   * 条件は下書きの segment_conditions に入っているので、
+   * status='sending' に移せば processQueuedBroadcasts が拾う。
+   */
+  if (broadcast.target_type === 'segment') {
+    const raw = broadcast as unknown as Record<string, unknown>;
+    const stored = raw.segment_conditions as string | null;
+    if (!stored) {
+      throw new Error('segment_conditions is required for segment broadcast');
+    }
+    const conditions = JSON.parse(stored) as { operator: 'AND' | 'OR'; rules: unknown[] };
+    if (!conditions || !Array.isArray(conditions.rules)) {
+      throw new Error('segment_conditions is malformed');
+    }
+    const { buildSegmentQuery } = await import('./segment-query.js');
+    const { sql, bindings } = buildSegmentQuery(conditions as Parameters<typeof buildSegmentQuery>[0]);
+    const accountId = raw.line_account_id as string | null;
+    const countSql = accountId
+      ? `SELECT COUNT(*) AS cnt FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
+      : `SELECT COUNT(*) AS cnt FROM (${sql}) q`;
+    const binds = accountId ? [accountId, ...bindings] : bindings;
+    const row = await db.prepare(countSql).bind(...binds).first<{ cnt: number }>();
+
+    // 名前を差し込む本文は、名前の無い人がいると差し込めない。送る前に止める。
+    if (hasRecipientVariables(broadcast.message_content)) {
+      const nameSql = accountId
+        ? `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+             FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
+        : `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+             FROM (${sql}) q`;
+      const missing = await db.prepare(nameSql).bind(...binds).first<{ missing_name: number | null }>();
+      if (Number(missing?.missing_name ?? 0) > 0) {
+        throw new Error(`Cannot personalize broadcast: ${missing!.missing_name} recipient(s) have no display name`);
+      }
+    }
+
+    await db
+      .prepare(`UPDATE broadcasts SET status = 'sending', batch_offset = 0, total_count = ? WHERE id = ?`)
+      .bind(Number(row?.cnt ?? 0), broadcast.id)
+      .run();
+    return (await getBroadcastById(db, broadcastId))!;
+  }
+
   // multi-account-dedup は inline 送信せず cron queue (processQueuedBroadcasts) に委譲する。
   // この関数は scheduled / 即時の単一 account 経路用で、毎回 auto-track を実行する。dedup を
   // ここで送ると (1) auto-track がここと queue 側で二重実行されて tracked link が重複し、
@@ -124,16 +229,17 @@ export async function processBroadcastSend(
     finalType = tracked.messageType;
     finalContent = tracked.content;
   }
-  // {{liff_id}} 置換: broadcast の line_account_id に紐付く LIFF ID で替える。
-  // ここは tag / all 系の単一 account 経路のみ (multi-account-dedup は冒頭で queue に
-  // 委譲済みで到達しない。dedup の {{liff_id}} 置換は dedup-broadcast.ts 側で per-account
-  // に行う)。
-  if (broadcastAccountId) {
-    const { getLineAccountById: getLA } = await import('@line-crm/db');
-    const acct = await getLA(db, broadcastAccountId);
-    const liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
-    finalContent = renderBroadcastMessageContent(finalType, finalContent, { liffId });
-  }
+  /*
+   * 配信全体で決まる差し込みを、ここで置き換える。
+   *   {{liff_id}} … この配信のアカウントの LIFF ID
+   *   {{var.…}}   … 共通情報
+   *   {{date…}}   … 配信日・目標日までの日数
+   * ここは tag / all 系の単一 account 経路のみ (multi-account-dedup は冒頭で
+   * queue に委譲済みで到達しない。dedup の置換は dedup-broadcast.ts 側で
+   * per-account に行う)。
+   */
+  const wideContext = await broadcastWideContext(db, broadcastAccountId, finalContent);
+  finalContent = renderBroadcastMessageContent(finalType, finalContent, wideContext);
   assertNoUnresolvedBroadcastVariables(finalContent);
   const altText = (broadcast as unknown as Record<string, unknown>).alt_text as string | undefined;
   const message = buildMessage(finalType, finalContent, altText || undefined);
@@ -166,7 +272,8 @@ export async function processBroadcastSend(
       // Send in batches with stealth delays to mimic human patterns
       const now = jstNow();
       const totalBatches = Math.ceil(followingFriends.length / MULTICAST_BATCH_SIZE);
-      const unit = `bcast_${broadcast.id.slice(0, 8)}`;
+      // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
+      const unit = aggregationUnitFor(broadcast);
       for (let i = 0; i < followingFriends.length; i += MULTICAST_BATCH_SIZE) {
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
@@ -174,7 +281,7 @@ export async function processBroadcastSend(
 
         // Stealth: add staggered delay between batches
         if (batchIndex > 0) {
-          const delay = calculateStaggerDelay(followingFriends.length, batchIndex);
+          const delay = calculateStaggerDelay(followingFriends.length, batchIndex, MULTICAST_BATCH_SIZE);
           await sleep(delay);
         }
 
@@ -191,7 +298,7 @@ export async function processBroadcastSend(
             ...batch.map((f) => f.id),
             JSON.stringify(batchMessage),
           );
-          await lineClient.multicast(lineUserIds, [batchMessage], [unit], retryKey);
+          await lineClient.multicast(lineUserIds, [batchMessage], aggregationUnits(unit), retryKey);
           successCount += batch.length;
 
           // Log only successfully sent messages (batch insert for performance)
@@ -379,13 +486,12 @@ async function processQueuedBroadcastBatches(
     }
   }
 
-  // {{liff_id}} 置換 (single account 経路のみ; multi は dedup 側で per-account 置換)。
+  // 配信全体で決まる差し込み（{{liff_id}} / {{var.…}} / {{date…}}）を先に置き換える。
+  // single account 経路のみ; multi は dedup 側で per-account に置換する。
   const queuedAccountId = raw.line_account_id as string | null;
-  if (queuedAccountId && broadcast.target_type !== 'multi-account-dedup') {
-    const { getLineAccountById: getLA } = await import('@line-crm/db');
-    const acct = await getLA(db, queuedAccountId);
-    const liffId = (acct as unknown as { liff_id?: string | null } | null)?.liff_id ?? null;
-    finalContent = renderBroadcastMessageContent(finalType, finalContent, { liffId });
+  if (broadcast.target_type !== 'multi-account-dedup') {
+    const wide = await broadcastWideContext(db, queuedAccountId, finalContent);
+    finalContent = renderBroadcastMessageContent(finalType, finalContent, wide);
   }
   const altText = raw.alt_text as string | undefined;
   const message = buildMessage(finalType, finalContent, altText || undefined);
@@ -466,8 +572,10 @@ async function processQueuedBroadcastBatches(
   }
 
   const now = jstNow();
-  const unit = `bcast_${broadcast.id.slice(0, 8).replace(/[^a-zA-Z0-9_]/g, '_')}`;
+  // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
+  const unit = aggregationUnitFor(broadcast);
   let currentOffset = batchOffset;
+  const tickStartOffset = batchOffset;
   const personalized = hasRecipientVariables(finalContent);
   const unsupportedVariables = getUnsupportedBroadcastVariables(finalContent);
   if (unsupportedVariables.length > 0) {
@@ -512,8 +620,12 @@ async function processQueuedBroadcastBatches(
         }
 
         try {
+          // 友だち情報欄は人ごとに違うので、ここで引く。本文で使っていなければ
+          // 引かない（resolveInterpolationExtra が中で判断する）。
+          const extra = await resolveInterpolationExtra(db, friend.id, finalContent);
           const renderedContent = renderBroadcastMessageContent(finalType, finalContent, {
             displayName: friend.display_name,
+            fields: extra.fields,
           });
           assertNoUnresolvedBroadcastVariables(renderedContent);
           const personalizedMessage = buildMessage(finalType, renderedContent, altText || undefined);
@@ -524,7 +636,7 @@ async function processQueuedBroadcastBatches(
             finalType,
             renderedContent,
           );
-          await lineClient.pushMessage(friend.line_user_id, [personalizedMessage], retryKey, [unit]);
+          await lineClient.pushMessage(friend.line_user_id, [personalizedMessage], retryKey, aggregationUnits(unit));
 
           await db.prepare(
             `INSERT INTO messages_log
@@ -566,13 +678,15 @@ async function processQueuedBroadcastBatches(
                 )
           WHERE id = ?`,
       ).bind(currentOffset, broadcast.id, broadcast.id).run();
-      if (currentOffset < friends.length) return;
-      break;
+      if (currentOffset >= friends.length) break;
+      // subrequest を使い切る手前で切り上げる。次の cron が続きから再開する。
+      if (currentOffset - tickStartOffset >= PERSONALIZED_PUSH_PER_TICK) return;
+      continue;
     }
 
     // ステルス遅延（最初のバッチ以外）
     if (batchIndex > 0) {
-      const delay = calculateStaggerDelay(friends.length, batchIndex);
+      const delay = calculateStaggerDelay(friends.length, batchIndex, deliveryBatchSize);
       await sleep(delay);
     }
 
@@ -589,7 +703,7 @@ async function processQueuedBroadcastBatches(
         ...batch.map((f) => f.id),
         JSON.stringify(batchMessage),
       );
-      await lineClient.multicast(lineUserIds, [batchMessage], [unit], retryKey);
+      await lineClient.multicast(lineUserIds, [batchMessage], aggregationUnits(unit), retryKey);
     } catch (err) {
       console.error(`Queued broadcast batch ${batchIndex} send failed:`, err);
       // 送信失敗: ロック解除 + offsetを保存して次のCronで再開
@@ -633,35 +747,12 @@ async function processQueuedBroadcastBatches(
   await updateBroadcastStatus(db, broadcast.id, 'sent');
 }
 
-export function buildMessage(messageType: string, messageContent: string, altText?: string): Message {
-  if (messageType === 'text') {
-    return { type: 'text', text: messageContent };
-  }
-
-  if (messageType === 'image') {
-    try {
-      const parsed = JSON.parse(messageContent) as {
-        originalContentUrl: string;
-        previewImageUrl: string;
-      };
-      return {
-        type: 'image',
-        originalContentUrl: parsed.originalContentUrl,
-        previewImageUrl: parsed.previewImageUrl,
-      };
-    } catch {
-      return { type: 'text', text: messageContent };
-    }
-  }
-
-  if (messageType === 'flex') {
-    try {
-      const contents = JSON.parse(messageContent);
-      return { type: 'flex', altText: altText || extractFlexAltText(contents), contents };
-    } catch {
-      return { type: 'text', text: messageContent };
-    }
-  }
-
-  return { type: 'text', text: messageContent };
-}
+/*
+ * メッセージの組み立ては、シナリオと同じものを使う。
+ *
+ * ここに別実装を持っていたときは、text / image / flex の3つしか
+ * 組み立てられなかった。それ以外の種別を渡すと「テキストに JSON を
+ * 入れたもの」に落ちるので、**中身の JSON がそのまま相手のトークに届く**。
+ * 呼び出し側が多いので、ここからも取れるようにしておく。
+ */
+export { buildMessage };

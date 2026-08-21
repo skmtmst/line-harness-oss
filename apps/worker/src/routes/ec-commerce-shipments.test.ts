@@ -16,14 +16,12 @@ type Row = Record<string, unknown>;
 
 function dbReturning(rows: Row[]) {
   return {
-    prepare() {
-      return {
-        bind() {
-          return {
-            all: async () => ({ results: rows }),
-          };
-        },
+    prepare(sql: string) {
+      const statement = {
+        bind() { return statement; },
+        all: async () => ({ results: sql.includes('FROM line_accounts') ? [] : rows }),
       };
+      return statement;
     },
   };
 }
@@ -73,6 +71,7 @@ describe('GET /api/ec-commerce/shipments', () => {
     expect(all[0].shipDateSource).toBe('ordered_at');
     expect(all[0].orderNumber).toBe('NEN-1001');
     expect(all[0].items).toBe('鹿肉ミンチ × 2');
+    expect(all[0].quantity).toBe(2);
   });
 
   it('定期便は EC 側の発送予定日をそのまま使う', async () => {
@@ -139,6 +138,7 @@ describe('GET /api/ec-commerce/shipments', () => {
     const all = [...(data.soon as Row[]), ...(data.later as Row[])];
     expect(all[0].items).toBe('A × 1、B × 2 ほか2点');
     expect(all[0].itemCount).toBe(4);
+    expect(all[0].quantity).toBe(10);
   });
 
   it('出荷予定日が決まらない行は返さない', async () => {
