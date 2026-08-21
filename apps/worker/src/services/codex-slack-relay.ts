@@ -129,12 +129,12 @@ export function resolveCodexSlackChannel(
   return config.SLACK_DEFAULT_PR_CHANNEL_ID || config.SLACK_COMMAND_CHANNEL_ID || null;
 }
 
-function workKey(event: CodexSlackEvent, category: CodexSlackCategory): string {
+function workKey(event: CodexSlackEvent): string {
   if (event.prNumber) return `pr:${event.prNumber}`;
   if (event.branch && !['main', 'master', 'codex/development'].includes(event.branch)) {
     return `branch:${event.repository || 'repo'}:${event.branch}`;
   }
-  return `${category}:session:${event.sessionId}`;
+  return `session:${event.sessionId}`;
 }
 
 export function taskIdForKey(key: string): string {
@@ -583,15 +583,15 @@ export async function relayCodexSlackEvent(
   const category = classifyCodexSlackEvent(event);
   let channelId = resolveCodexSlackChannel(config, category, event.prNumber);
   if (!channelId) throw new Error(`SLACK_CHANNEL_NOT_CONFIGURED:${category}`);
-  let key = workKey(event, category);
+  let key = workKey(event);
   let threadTs: string | null = null;
 
   const requestedTaskId = taskIdFromContent(event.content);
-  if (requestedTaskId && config.SLACK_TASK_CHANNEL_ID) {
+  if ((requestedTaskId || event.eventType === 'turn_completed') && config.SLACK_TASK_CHANNEL_ID) {
     const linkedTask = await findTaskMessage(
       token,
       config.SLACK_TASK_CHANNEL_ID,
-      { taskId: requestedTaskId },
+      requestedTaskId ? { taskId: requestedTaskId } : { key },
       fetcher,
     );
     const metadata = linkedTask?.metadata?.event_payload;
