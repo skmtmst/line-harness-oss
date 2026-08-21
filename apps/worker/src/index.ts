@@ -106,6 +106,7 @@ import { contents } from './routes/contents.js';
 import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
+import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { receiveSupportEmail } from './services/support-email.js';
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
@@ -173,6 +174,17 @@ export type Env = {
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
     // Read-only Google Search Console performance dashboard.
     SEARCH_CONSOLE_SITE_URL?: string;
+    // Codex lifecycle events -> Slack relay. Tokens/secrets are Worker secrets;
+    // channel ids and range mapping are non-secret deployment variables.
+    CODEX_SLACK_RELAY_SECRET?: string;
+    SLACK_BOT_TOKEN?: string;
+    SLACK_COMMAND_CHANNEL_ID?: string;
+    SLACK_ERROR_CHANNEL_ID?: string;
+    SLACK_IDEA_CHANNEL_ID?: string;
+    SLACK_DEFAULT_PR_CHANNEL_ID?: string;
+    SLACK_PR_CHANNELS_JSON?: string;
+    SLACK_KENTA_USER_ID?: string;
+    SLACK_MASATO_USER_ID?: string;
   };
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
@@ -295,6 +307,7 @@ app.route('/', contents);
 app.route('/', analytics);
 app.route('/', dashboard);
 app.route('/', siteTracking);
+app.route('/', codexSlackEvents);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version

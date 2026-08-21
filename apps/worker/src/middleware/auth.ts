@@ -302,6 +302,8 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/api/integrations/stripe/webhook' ||
     path === '/api/integrations/eccube/events' ||
     path === '/api/integrations/eccube/columns' ||
+    // Codex clients sign the exact body with a dedicated shared secret.
+    path === '/api/integrations/codex-slack/events' ||
     path.match(/^\/api\/webhooks\/incoming\/[^/]+\/receive$/) ||
     path === '/api/meet-callback' || // Meet Harness completion callback
     path === '/api/qr' || // Public QR proxy — used by desktop landing pages
