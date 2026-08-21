@@ -1,0 +1,41 @@
+{
+  "description": "LINE HarnessのCodex作業をSlackの適切なスレッドへ自動報告する。",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pnpm exec tsx \"$(git rev-parse --show-toplevel)/scripts/codex-slack-hook.ts\"",
+            "timeout": 12,
+            "statusMessage": "Slackへ作業開始を共有しています"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pnpm exec tsx \"$(git rev-parse --show-toplevel)/scripts/codex-slack-hook.ts\"",
+            "timeout": 12,
+            "statusMessage": "Slackへ承認待ちを共有しています"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pnpm exec tsx \"$(git rev-parse --show-toplevel)/scripts/codex-slack-hook.ts\"",
+            "timeout": 12,
+            "statusMessage": "Slackへ作業結果を共有しています"
+          }
+        ]
+      }
+    ]
+  }
+}

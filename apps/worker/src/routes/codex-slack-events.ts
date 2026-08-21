@@ -1,0 +1,91 @@
+import { Hono } from 'hono';
+import type { Env } from '../index.js';
+import { verifySupportRelay } from '../services/support-relay.js';
+import {
+  relayCodexSlackEvent,
+  type CodexSlackCategory,
+  type CodexSlackEvent,
+} from '../services/codex-slack-relay.js';
+
+const MAX_BODY_BYTES = 32 * 1024;
+const ALLOWED_EVENT_TYPES = new Set(['prompt_submitted', 'turn_completed', 'approval_required']);
+const ALLOWED_OPERATORS = new Set(['kenta', 'masato', 'codex']);
+const ALLOWED_CATEGORIES = new Set(['error', 'idea', 'fix', 'decision']);
+
+export const codexSlackEvents = new Hono<Env>();
+
+function parseEvent(rawBody: string): CodexSlackEvent | null {
+  let value: Record<string, unknown>;
+  try {
+    value = JSON.parse(rawBody) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (
+    value.version !== 1 ||
+    typeof value.eventId !== 'string' || value.eventId.length < 3 || value.eventId.length > 255 ||
+    typeof value.eventType !== 'string' || !ALLOWED_EVENT_TYPES.has(value.eventType) ||
+    typeof value.sessionId !== 'string' || value.sessionId.length < 3 || value.sessionId.length > 255 ||
+    typeof value.operator !== 'string' || !ALLOWED_OPERATORS.has(value.operator) ||
+    typeof value.content !== 'string' || value.content.length < 1 || value.content.length > 20_000 ||
+    typeof value.occurredAt !== 'string' || !Number.isFinite(Date.parse(value.occurredAt))
+  ) {
+    return null;
+  }
+  if (value.prNumber != null && (!Number.isInteger(value.prNumber) || Number(value.prNumber) < 1)) return null;
+  if (value.explicitCategory != null && (
+    typeof value.explicitCategory !== 'string' || !ALLOWED_CATEGORIES.has(value.explicitCategory)
+  )) return null;
+
+  return {
+    version: 1,
+    eventId: value.eventId,
+    eventType: value.eventType as CodexSlackEvent['eventType'],
+    sessionId: value.sessionId,
+    turnId: typeof value.turnId === 'string' ? value.turnId.slice(0, 255) : undefined,
+    operator: value.operator as CodexSlackEvent['operator'],
+    repository: typeof value.repository === 'string' ? value.repository.slice(0, 255) : undefined,
+    branch: typeof value.branch === 'string' ? value.branch.slice(0, 255) : undefined,
+    prNumber: typeof value.prNumber === 'number' ? value.prNumber : undefined,
+    prUrl: typeof value.prUrl === 'string' && /^https:\/\/github\.com\//.test(value.prUrl)
+      ? value.prUrl.slice(0, 500)
+      : undefined,
+    content: value.content,
+    occurredAt: value.occurredAt,
+    explicitCategory: value.explicitCategory as CodexSlackCategory | undefined,
+  };
+}
+
+codexSlackEvents.post('/api/integrations/codex-slack/events', async (c) => {
+  const secret = c.env.CODEX_SLACK_RELAY_SECRET;
+  if (!secret || !c.env.SLACK_BOT_TOKEN) {
+    return c.json({ success: false, error: 'Codex Slack relay not configured' }, 503);
+  }
+  const rawBody = await c.req.text();
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
+    return c.json({ success: false, error: 'Payload too large' }, 413);
+  }
+  const verified = await verifySupportRelay(
+    secret,
+    c.req.header('x-nen-timestamp'),
+    c.req.header('x-nen-signature'),
+    rawBody,
+  );
+  if (!verified) return c.json({ success: false, error: 'Invalid signature' }, 401);
+
+  const event = parseEvent(rawBody);
+  if (!event) return c.json({ success: false, error: 'Invalid event payload' }, 400);
+
+  try {
+    const result = await relayCodexSlackEvent(c.env, event);
+    return c.json({ success: true, ...result });
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'codex_slack_relay_failed',
+      eventId: event.eventId,
+      sessionId: event.sessionId,
+      error: String(error),
+    }));
+    return c.json({ success: false, error: 'Slack relay failed' }, 502);
+  }
+});
