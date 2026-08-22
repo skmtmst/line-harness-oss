@@ -175,7 +175,8 @@
     "166_dashboard_scope_indexes.sql",
     "167_outbound_send_idempotency.sql",
     "168_restaurant_test_foundation.sql",
-    "169_restaurant_email_intake.sql"
+    "169_restaurant_email_intake.sql",
+    "170_restaurant_inbound_emails.sql"
   ],
-  "migrationCount": 176
+  "migrationCount": 177
 }
