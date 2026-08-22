@@ -78,9 +78,10 @@ export function sanitizeSlackContent(value: string): string {
 export function classifyCodexSlackEvent(event: CodexSlackEvent): CodexSlackCategory {
   if (event.explicitCategory) return event.explicitCategory;
   if (event.eventType === 'approval_required') return 'decision';
+  if (event.prNumber) return 'fix';
   if (ERROR_PATTERN.test(event.content)) return 'error';
   if (IDEA_PATTERN.test(event.content)) return 'idea';
-  if (event.prNumber || FIX_PATTERN.test(event.content)) return 'fix';
+  if (FIX_PATTERN.test(event.content)) return 'fix';
   return 'decision';
 }
 

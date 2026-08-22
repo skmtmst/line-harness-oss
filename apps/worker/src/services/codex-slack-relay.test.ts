@@ -41,6 +41,7 @@ describe('Codex Slack relay', () => {
     expect(classifyCodexSlackEvent(event({ content: 'この会話を正本化して' }))).toBe('idea');
     expect(classifyCodexSlackEvent(event({ eventType: 'approval_required' }))).toBe('decision');
     expect(classifyCodexSlackEvent(event({ prNumber: 220 }))).toBe('fix');
+    expect(classifyCodexSlackEvent(event({ prNumber: 250, content: 'Slackエラー対応が完了しました' }))).toBe('fix');
   });
 
   test('PR番号を100件単位のチャンネルに振り分ける', () => {
@@ -343,7 +344,7 @@ describe('Codex Slack relay', () => {
     expect(deletion).toEqual({ channel: 'C-TASK', ts: '300.001' });
   });
 
-  test('分類が変わっても同じPR番号なら同じタスクとして扱う', async () => {
+  test('本文にエラーがあってもPR番号があればPRチャンネルで同じタスクとして扱う', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({
         messages: [{ ts: '1787326497.583159', metadata: { event_type: 'line_harness_codex', event_payload: { work_key: 'pr:220' } } }],
@@ -357,11 +358,12 @@ describe('Codex Slack relay', () => {
     await relayCodexSlackEvent({
       SLACK_BOT_TOKEN: 'xoxb-test',
       SLACK_ERROR_CHANNEL_ID: 'C0ERROR123',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C0PR123',
       SLACK_TASK_CHANNEL_ID: 'C0TASK123',
     }, event({ prNumber: 220, content: 'PR #220でエラーが出ました' }), fetcher);
 
     const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
-    expect(reply).toMatchObject({ channel: 'C0ERROR123', thread_ts: '1787326497.583159' });
+    expect(reply).toMatchObject({ channel: 'C0PR123', thread_ts: '1787326497.583159' });
   });
 
   test('Slackの完了ボタンは元スレッドへ記録して要対応メッセージを消す', async () => {
