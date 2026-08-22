@@ -23,4 +23,13 @@ describe('予約メール原文の環境分離', () => {
     expect(production).toMatch(/^RESTAURANT_INTAKE_DOMAIN = "r\.musubo\.jp"$/m);
     expect(staging).toMatch(/^RESTAURANT_INTAKE_DOMAIN = "rs\.musubo\.jp"$/m);
   });
+
+  it('メール原文をメモリ展開せず、rawSize付きストリームでR2へ渡す', () => {
+    const intakeSource = readFileSync(join(workerRoot, 'src/services/restaurant-email-intake.ts'), 'utf8');
+
+    expect(intakeSource).toContain('new FixedLengthStream(message.rawSize)');
+    expect(intakeSource).toContain('message.raw.pipeTo(fixedLength.writable');
+    expect(intakeSource).not.toContain('new Response(message.raw).arrayBuffer()');
+    expect(intakeSource).not.toContain('new Response(message.raw).text()');
+  });
 });
