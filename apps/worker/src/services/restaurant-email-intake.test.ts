@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../index.js';
 import { routeInboundEmail } from './inbound-email-router.js';
@@ -15,6 +15,23 @@ let rawPut: ReturnType<typeof vi.fn>;
 let rawDelete: ReturnType<typeof vi.fn>;
 let imagePut: ReturnType<typeof vi.fn>;
 let env: Env['Bindings'];
+
+class TestFixedLengthStream extends TransformStream<Uint8Array, Uint8Array> {
+  constructor(expectedLength: number | bigint) {
+    const expected = Number(expectedLength);
+    let received = 0;
+    super({
+      transform(chunk, controller) {
+        received += chunk.byteLength;
+        if (received > expected) throw new Error('fixed-length stream overflow');
+        controller.enqueue(chunk);
+      },
+      flush() {
+        if (received !== expected) throw new Error('fixed-length stream underflow');
+      },
+    });
+  }
+}
 
 function fakeRawMailBucket(): R2Bucket {
   rawPut = vi.fn(async (key: string, value: ReadableStream, options?: R2PutOptions) => {
@@ -49,6 +66,7 @@ function email(
 }
 
 beforeEach(() => {
+  vi.stubGlobal('FixedLengthStream', TestFixedLengthStream);
   testDb = createTestD1();
   testDb.raw.prepare("INSERT INTO rt_organizations (id, account_id, name) VALUES ('org-1', 'account-1', 'Test')").run();
   testDb.raw.prepare("INSERT INTO rt_stores (id, organization_id, name, code) VALUES ('store-1', 'org-1', 'Store', 'STORE')").run();
@@ -66,6 +84,10 @@ beforeEach(() => {
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
     WORKER_URL: 'https://worker.example.test',
   };
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('飲食店向けcatch-all予約メール', () => {
