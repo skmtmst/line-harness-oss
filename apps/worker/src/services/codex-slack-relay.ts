@@ -60,7 +60,7 @@ const FIX_PATTERN = /(修正|直して|対応|実装|変更|作って|追加|更
 const TRACKABLE_DECISION_PATTERN = /(要対応|確認|承認|判断|保留|待ち|競合|できない|blocked|approval|decision)/i;
 const TRACKABLE_IDEA_PATTERN = /(正本化|実装|追加|作って|対応|検討|issue|spec)/i;
 const COMPLETION_PATTERN = /(?:作業|対応|修正|実装|タスク|PR|マージ).{0,20}(?:完了|終了|統合済み)|(?:完了しました|対応済み|修正済み|マージ済み|統合しました)/i;
-const INCOMPLETE_PATTERN = /(未完了|未対応|完了していない|残作業|残っています|blocked|失敗|エラー)/i;
+const INCOMPLETE_PATTERN = /(未完了|未対応|完了していない|残作業|残っています|blocked|失敗)/i;
 
 function singleLine(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
