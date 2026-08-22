@@ -110,7 +110,7 @@ import { restaurantTest } from './routes/restaurant-test.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { clientErrors } from './routes/client-errors.js';
 import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
-import { receiveSupportEmail } from './services/support-email.js';
+import { routeInboundEmail } from './services/inbound-email-router.js';
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
@@ -129,6 +129,7 @@ export type Env = {
     EMAIL?: SendEmail;
     CONTACT_EMAIL?: string;
     SUPPORT_INBOUND_EMAIL?: string;
+    RESTAURANT_INTAKE_DOMAIN?: string;
     XSERVER_MAIL_HOST?: string;
     XSERVER_MAIL_USER?: string;
     XSERVER_MAIL_PASSWORD?: string;
@@ -1370,12 +1371,7 @@ export default {
     env: Env['Bindings'],
     _ctx: ExecutionContext,
   ): Promise<void> {
-    try {
-      await receiveSupportEmail(message, env);
-    } catch (error) {
-      console.error(JSON.stringify({ event: 'support_email_receive_failed', error: String(error) }));
-      message.setReject('メール受信処理に失敗しました');
-    }
+    await routeInboundEmail(message, env);
   },
 };
 // redeploy trigger

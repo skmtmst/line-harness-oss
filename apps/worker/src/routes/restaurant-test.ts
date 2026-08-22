@@ -5,6 +5,10 @@ import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import {
+  issueRestaurantIntakeAddress,
+  RestaurantIntakeConfigurationError,
+} from '../services/restaurant-email-intake.js';
+import {
   chooseRestaurantTable,
   isRestaurantReservationSource,
   validateInboundReservation,
@@ -190,6 +194,26 @@ restaurantTest.post('/api/restaurant-test/bootstrap', requireRole('owner', 'admi
   }
   await dbFor(c.env, mainId).batch(statements);
   return c.json({ success: true, data: { organizationId: orgId, created: true } }, 201);
+});
+
+/** 店舗の予約メール取り込みアドレスを発行・再発行する。 */
+restaurantTest.post('/api/restaurant-test/intake-addresses', requireRole('owner', 'admin'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const body: { storeId?: string } = await c.req.json<{ storeId?: string }>().catch(() => ({}));
+  if (!body.storeId || !await storeBelongsTo(c, organization.id, body.storeId)) {
+    return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  }
+  try {
+    const issued = await issueRestaurantIntakeAddress(c.env, body.storeId);
+    return c.json({ success: true, data: issued }, 201);
+  } catch (error) {
+    if (error instanceof RestaurantIntakeConfigurationError) {
+      return c.json({ success: false, error: '予約メール取り込み用ドメインが設定されていません' }, 503);
+    }
+    throw error;
+  }
 });
 
 restaurantTest.patch('/api/restaurant-test/approvals/:id', requireRole('owner', 'admin'), async (c) => {
