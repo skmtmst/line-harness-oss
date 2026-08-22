@@ -9,9 +9,19 @@ import SessionLostNotice from './session-lost-notice'
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const isFriendAttributesV2 = pathname === '/tags-v2' || pathname === '/visual-qa/friend-attributes-v2'
+  const isFriendAttributesV3 = pathname === '/tags-v3' || pathname === '/visual-qa/friend-attributes-v3'
 
   if (pathname === '/login' || pathname === '/login/two-factor') {
     return <>{children}</>
+  }
+
+  // V3は既存のサイドバー・共通余白・共通画面部品を使わない静的な比較面。
+  // 本番側の入口だけ認証を通し、画面そのものは完全に独立させる。
+  if (isFriendAttributesV3) {
+    if (process.env.NODE_ENV === 'development' && pathname.startsWith('/visual-qa/')) {
+      return <>{children}</>
+    }
+    return <AuthGuard>{children}</AuthGuard>
   }
 
   // 参照画像との比較専用。開発中だけ表示し、実データの取得・保存は行わない。

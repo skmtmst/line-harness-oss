@@ -27,7 +27,7 @@ const MENU_END = '/** 区分の目印から中身を引く。 */';
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
   // 上の4つは見出しを付けない。設計でも「対応」「友だち属性」の見出しは無く、
   // 毎日開くものが見出し無しでひとかたまりになっている。
-  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性', '友だち属性V2'] },
+  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性', '友だち属性V3'] },
   {
     section: '配信',
     items: [
@@ -86,7 +86,7 @@ const ROUTES: Record<string, string> = {
   受信箱: '/chats',
   友だち: '/friends',
   友だち属性: '/tags',
-  友だち属性V2: '/tags-v2',
+  友だち属性V3: '/tags-v3',
   シナリオ配信: '/scenarios',
   一斉配信: '/broadcasts',
   テンプレート: '/templates',

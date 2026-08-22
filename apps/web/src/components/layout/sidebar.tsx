@@ -153,8 +153,8 @@ export default function Sidebar({
         if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
-        // 移行確認用のV2は、現行「友だち属性」の権限をそのまま引き継ぐ。
-        const inheritsTagsPermission = item.href === '/tags-v2' && staffPermissions.includes('/tags')
+        // 見た目を確認するV3は、現行「友だち属性」の権限をそのまま引き継ぐ。
+        const inheritsTagsPermission = item.href === '/tags-v3' && staffPermissions.includes('/tags')
         if (staffRole === 'staff' && !staffPermissions.includes(item.href) && !inheritsTagsPermission) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (
