@@ -1,20 +1,33 @@
 {
-  "_comment": "Pen.dev の V2 設計から書き写した、各画面の Main 直下の並び。実装側は data-design 属性で同じ名前を付ける。ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。",
+  "_comment": "Pen.dev の承認済み設計から書き写した、各画面の Main 直下の並び。ダッシュボードと共通レイアウトはV4、未改修画面はV2を参照する。実装側は data-design 属性で同じ名前を付け、ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。",
   "_source": "docs/design-node-ids.md",
   "screens": {
     "/": {
       "node": "hmBzC kuTR2 QEThZ",
       "name": "V4 ダッシュボード（編集・QRコードを含む）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["hmBzC", "kuTR2", "QEThZ"],
+        "requiredViewports": [1440, 1920],
+        "reason": "同じ状態・同じ横幅の設計画像と実装画像をPR証拠として再登録するまで未検証"
+      },
       "sections": [
         "Head",
         "TodayTasks",
         "Shipment",
+        "Middle",
         "Body",
         "Editor",
         "QR"
       ],
       "parts": [
         "ダッシュボード編集",
+        "カードと配置",
+        "プレビュー",
+        "持ち手をドラッグして移動",
+        "最大4枚まで",
+        "初期状態に戻す",
+        "変更を適用",
         "今日やること",
         "今日",
         "過去7日",
@@ -23,6 +36,9 @@
         "写真審査",
         "今日の予約",
         "出荷予定",
+        "今月の送信枠",
+        "運用アラート",
+        "接続状態",
         "友だち数の推移",
         "今月の配信",
         "最近の成果",
@@ -45,8 +61,14 @@
       ]
     },
     "/chats": {
-      "node": "nR2FI AUzdY",
-      "name": "V2 2-1 受信箱（2-1-1 テンプレートを選ぶを含む）",
+      "node": "hSLxG eSOQd yluhx",
+      "name": "V4 受信箱（テンプレート選択・顧客情報表示切替を含む）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["hSLxG", "eSOQd", "yluhx"],
+        "requiredViewports": [1440, 1920],
+        "reason": "通常・テンプレート・顧客情報の全状態を同条件で比較した証拠が未登録"
+      },
       "sections": [
         "Head",
         "KPIs",
@@ -54,49 +76,44 @@
         "Panes"
       ],
       "parts": [
-        "返信を待っている人",
+        "要返信",
         "自分が担当",
         "今日の受信",
         "すべて",
         "LINE",
         "メール",
-        "名前で検索",
+        "名前・メールアドレス・内容で検索",
         "対応",
         "担当",
         "メッセージを入力",
         "送信",
         "マニュアル",
-        "すべて確認済みにする",
-        "うち1時間以上",
-        "過去7日",
-        "受信・送信・システム",
-        "本名",
-        "システム表示名",
-        "★つき友だち情報",
-        "すべて見る",
-        "現在の設定",
-        "追加日",
-        "流入元",
-        "＋ 追加",
-        "平均の初回返信",
-        "テンプレートを選ぶ",
+        "顧客情報を開く",
         "テンプレートを選択",
         "テンプレート名・本文で検索",
-        "この内容を入れる",
+        "送信内容のプレビュー",
+        "入力欄へ挿入",
+        "顧客情報",
+        "内部メモを保存",
         "閉じる"
       ]
     },
     "/friends": {
-      "node": "P2guNv",
-      "name": "V2 2-2 友だち",
+      "node": "Wi50h",
+      "name": "V4 3-1 友だち（提案・1920）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["Wi50h"],
+        "requiredViewports": [1440, 1920],
+        "reason": "一覧・詳細検索・一括操作・重複・統合の全状態を同条件で比較した証拠が未登録"
+      },
       "sections": [
-        "Head",
-        "KPIs",
-        "Tabs",
-        "SearchBar",
-        "SavedChips",
-        "BulkBar",
-        "Table"
+        "V4Head",
+        "V4Tabs",
+        "V4FriendKpis",
+        "V4SearchPanel",
+        "V4BulkBar",
+        "V4FriendTable"
       ],
       "parts": [
         "有効友だち",
@@ -105,24 +122,23 @@
         "今月の追加",
         "マニュアル",
         "CSVで書き出す",
+        "UID移行",
         "一括アクション",
-        "友だち名で検索",
+        "友だち名・LINE表示名で検索",
         "詳細検索",
         "保存した検索",
-        "並び順",
-        "保存済み",
+        "追加が新しい順",
         "未対応かつ7日以内",
         "ブロック解除者",
-        "＋ この条件を保存",
-        "選んだ友だちにまとめて実行できます",
-        "対応マークを変える",
-        "テンプレートを送る",
-        "シナリオを開始",
-        "タグを付ける・外す",
-        "友だち情報を書き換える",
-        "リマインダを開始",
-        "★つきタグ・友だち情報",
-        "最終接触"
+        "選択した友だちにまとめて操作します",
+        "対応 / 担当",
+        "シナリオ",
+        "最新メッセージ",
+        "タグ・属性",
+        "最終接触",
+        "表示件数",
+        "前へ",
+        "次へ"
       ]
     },
     "/broadcasts": {
@@ -157,9 +173,97 @@
         "状態"
       ]
     },
+    "/tags-v2": {
+      "node": "xn98K",
+      "name": "V4 4-1 友だち属性・タグ（移行確認用V2）",
+      "visualVerification": {
+        "status": "verified",
+        "referenceNodeIds": ["xn98K"],
+        "requiredViewports": [1440, 1920],
+        "referenceScreenshots": [
+          "docs/design-reference/friend-attributes-v2/xn98K-1920.png/xn98K.png"
+        ],
+        "implementationScreenshots": [
+          "docs/design-qa/friend-attributes-v2/implementation-1440.png",
+          "docs/design-qa/friend-attributes-v2/implementation-1920.png",
+          "docs/design-qa/friend-attributes-v2/side-by-side-1920.png"
+        ],
+        "checkedAt": "2026-08-22T13:41:42+09:00",
+        "evidence": "docs/design-qa/friend-attributes-v2/design-qa.md"
+      },
+      "sections": [
+        "Head",
+        "Tabs",
+        "KPIs",
+        "Actions",
+        "Folder",
+        "Toolbar",
+        "QuickFilters",
+        "Table",
+        "Pagination"
+      ],
+      "parts": [
+        "タグ数",
+        "付与済み友だち",
+        "今月の付与",
+        "整理候補",
+        "マニュアル",
+        "CSVで一括登録",
+        "フォルダを追加",
+        "タグを追加",
+        "フォルダ",
+        "タグ名・用途で検索",
+        "使用状態",
+        "付与元",
+        "表示件数",
+        "未使用のタグ",
+        "今月増えたタグ",
+        "自動付与あり",
+        "連動あり",
+        "一覧表示",
+        "タグ",
+        "付与人数",
+        "自動付与のもと",
+        "連動（マイル・アクション）",
+        "使用先",
+        "登録日",
+        "表示",
+        "編集",
+        "削除",
+        "前へ",
+        "次へ"
+      ]
+    },
     "/tags": {
-      "node": "IvqXE KWqHd rKbqo HdEpm",
-      "name": "V2 3-1〜3-4 友だち属性（4タブ）",
+      "node": "xn98K wdLjf KYG39 X79IHW t7Mhgl lNGcs NU4N2 FORVU",
+      "name": "V4 4-1 友だち属性（4タブ）",
+      "visualVerification": {
+        "status": "verified",
+        "referenceNodeIds": ["xn98K", "wdLjf", "KYG39", "X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
+        "requiredViewports": [1440, 1920],
+        "referenceScreenshots": [
+          "docs/design-reference/friend-attributes-v4/01-list.png/xn98K.png",
+          "docs/design-reference/friend-attributes-v4/02-create-initial.png/wdLjf.png",
+          "docs/design-reference/friend-attributes-v4/03-create-linked.png/KYG39.png",
+          "docs/design-reference/friend-attributes-v4/04-action-drawer.png/X79IHW.png",
+          "docs/design-reference/friend-attributes-v4/05-edit-existing.png/t7Mhgl.png",
+          "docs/design-reference/friend-attributes-v4/06-retroactive-dialog.png/lNGcs.png",
+          "docs/design-reference/friend-attributes-v4/07-delete-dialog.png/NU4N2.png",
+          "docs/design-reference/friend-attributes-v4/08-folder-dialog.png/FORVU.png"
+        ],
+        "implementationScreenshots": [
+          "docs/design-qa/friend-attributes-v4/01-list.png",
+          "docs/design-qa/friend-attributes-v4/02-create-initial.png",
+          "docs/design-qa/friend-attributes-v4/03-create-linked.png",
+          "docs/design-qa/friend-attributes-v4/04-action-drawer.png",
+          "docs/design-qa/friend-attributes-v4/05-edit-existing.png",
+          "docs/design-qa/friend-attributes-v4/06-retroactive-dialog.png",
+          "docs/design-qa/friend-attributes-v4/07-delete-dialog.png",
+          "docs/design-qa/friend-attributes-v4/08-folder-dialog.png"
+        ],
+        "checkedAt": "2026-08-21T18:18:00+09:00",
+        "evidence": "docs/design-qa/friend-attributes-v4/design-qa.md"
+      },
       "sections": [
         "Body",
         "GroupTabs",
@@ -170,8 +274,7 @@
         "タグ数",
         "付与済み友だち",
         "今月の付与",
-        "マニュアル",
-        "CSVで一括登録",
+        "CSV出力",
         "並び替え",
         "フォルダを追加",
         "フォルダ",
@@ -2037,8 +2140,17 @@
       ]
     },
     "/tags/new": {
-      "node": "oTvZD",
-      "name": "V2 3-1-1 タグを作る",
+      "node": "V4 4-1-A",
+      "name": "V4 4-1-A タグを作る",
+      "visualVerification": {
+        "status": "blocked",
+        "referenceNodeIds": ["X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
+        "requiredViewports": [1440, 1920],
+        "blockingIssues": [
+          "V4タグ作成の実ノードIDが未記録",
+          "右側パネルと連動アクションを含む同条件比較が未完了"
+        ]
+      },
       "sections": [
         "Body",
         "Crumb",
@@ -2055,16 +2167,13 @@
         "どの分類に入れるかを選びます。未選択なら「未分類」になります。",
         "タグ名",
         "必須",
-        "色",
         "自動で付ける条件",
-        "きっかけ",
-        "フォームの回答",
-        "対象",
-        "条件",
-        "マイルの倍率",
+        "本人へ付与するマイル",
+        "紹介者へ付与するマイル",
+        "タグを持っている間の倍率",
         "倍率",
         "優先度",
-        "プレビュー"
+        "できあがるタグ"
       ]
     },
     "/tags/fields/new": {
@@ -2533,8 +2642,14 @@
       ]
     },
     "/friends/detail": {
-      "node": "B8yZio",
-      "name": "V2 2-2-1 友だち詳細",
+      "node": "hsWaL",
+      "name": "V4 3-1-D 友だち詳細（1920）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["hsWaL"],
+        "requiredViewports": [1440, 1920],
+        "reason": "詳細の全タブと空・読込中・エラー状態を同条件で比較した証拠が未登録"
+      },
       "sections": [
         "Crumb",
         "Head",

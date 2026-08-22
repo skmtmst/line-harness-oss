@@ -38,7 +38,6 @@ export default function NewStaffPage() {
   const [permissionKeys, setPermissionKeys] = useState<string[]>([])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [assignedLineAccountId, setAssignedLineAccountId] = useState('')
-  const [canAccessDescendantAccounts, setCanAccessDescendantAccounts] = useState(false)
   const [notifications, setNotifications] = useState<Record<string, Channel>>({
     operations: { email: true, line: true }, emergency: { email: true, line: true },
     security: { email: true, line: false }, updates: { email: false, line: true },
@@ -56,8 +55,8 @@ export default function NewStaffPage() {
     description="管理画面にログインできる人を追加し、できることの範囲を決めます。"
     parent={['ログインユーザー', '/staff?tab=members']}
     saveLabel="招待メールを送る"
-    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !assignedLineAccountId ? '担当するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
-    onSave={async () => { const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys, notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: role === 'admin' && canAccessDescendantAccounts }); if (!res.success) throw new Error(res.error); return res.data.id }}
+    validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
+    onSave={async () => { const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys, notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: true }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
       <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-accent">1.</b> 招待メールでアドレスを確認</li><li><b className="text-accent">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-accent">3.</b> 連携完了後はLINEでログイン</li></ol></AsideCard>
       <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${permissionKeys.length}件` : 'すべて'}</dd></div></dl></AsideCard>
@@ -74,17 +73,13 @@ export default function NewStaffPage() {
       <div className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <button key={item.value} type="button" onClick={() => setRole(item.value)} className={`min-h-24 cursor-pointer rounded-card border p-4 text-left transition-colors ${role === item.value ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'}`}><span className="flex items-center gap-2 text-sm font-semibold text-ink"><span className={`h-4 w-4 rounded-full border-2 ${role === item.value ? 'border-accent bg-accent shadow-[inset_0_0_0_3px_white]' : 'border-hairline'}`} />{item.label}</span><span className="mt-2 block whitespace-nowrap text-xs text-ink-secondary">{item.note}</span></button>)}</div>
     </FormSection>
 
-    <FormSection step={3} label="担当LINEアカウント" note="このユーザーがログインしたときの基準となるLINE公式アカウントです。">
-      <Field label="担当アカウント" htmlFor="staff-account" required>
+    <FormSection step={3} label="最初に表示するLINEアカウント" note="ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。">
+      <Field label="最初に表示するアカウント" htmlFor="staff-account" required>
         <select id="staff-account" value={assignedLineAccountId} onChange={(event) => setAssignedLineAccountId(event.target.value)} className={inputClass}>
           <option value="">選択してください</option>
           {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
         </select>
       </Field>
-      {role === 'admin' && <label className={`mt-3 flex cursor-pointer items-start gap-3 rounded-card border p-4 ${canAccessDescendantAccounts ? 'border-accent bg-accent-soft' : 'border-hairline'}`}>
-        <input type="checkbox" checked={canAccessDescendantAccounts} onChange={(event) => setCanAccessDescendantAccounts(event.target.checked)} className="mt-0.5 accent-green-500" />
-        <span><span className="block text-sm font-semibold text-ink">他アカウント権限を付与</span><span className="mt-1 block text-xs text-ink-faint">担当アカウントより下に紐づく子・孫アカウントも表示・操作できます。</span></span>
-      </label>}
     </FormSection>
 
     {role === 'staff' && <FormSection step={4} label="スタッフに表示する機能" note="選択した機能だけが左のメニューに表示され、操作できます。">

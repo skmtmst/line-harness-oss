@@ -105,7 +105,7 @@ export default function ShipmentPanel({
   const rows = data ? (bucket === 'soon' ? data.soon : data.later) : []
 
   return (
-    <div className="bg-canvas rounded-card border-hairline border p-5 shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
+    <div className="bg-canvas min-h-44 rounded-[18px] border-hairline border p-[18px] shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-sm font-semibold text-gray-800">出荷予定</h2>
         <Link href="/ec-commerce" className="text-action text-xs font-medium hover:underline">
@@ -204,7 +204,9 @@ export default function ShipmentPanel({
                           出荷予定の API が返していない。列だけ出して
                           入ったら繋ぐ。docs/v025-open-questions.md に残す。
                         */}
-                        <td className="text-ink-faint py-2.5 pr-3 text-right tabular-nums">—</td>
+                        <td className="text-ink-faint py-2.5 pr-3 text-right tabular-nums">
+                          {row.quantity > 0 ? row.quantity.toLocaleString('ja-JP') : '—'}
+                        </td>
                         <td className="py-2.5 pr-3 whitespace-nowrap">
                           <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${toneClass[tone]}`}>
                             {label}

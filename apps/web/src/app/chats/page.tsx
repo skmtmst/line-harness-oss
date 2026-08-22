@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, fetchApi } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
@@ -12,9 +13,9 @@ import TemplatePicker from '@/components/chats/template-picker'
 import InboxKpis from '@/components/chats/inbox-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
 import FriendInfoSidebar from '@/components/chats/friend-info-sidebar'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ImageUploader, { type ImageUploaderValue } from '@/components/shared/image-uploader'
 import { Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 
@@ -74,8 +75,8 @@ interface EmailInboxItem {
 }
 
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
-  unread: { label: '未読', className: 'bg-red-100 text-danger' },
-  in_progress: { label: '対応中', className: 'bg-warning-bg text-yellow-700' },
+  unread: { label: '未対応', className: 'bg-danger-bg text-danger' },
+  in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
   resolved: { label: '対応済', className: 'bg-success-bg text-success' },
 }
 
@@ -92,8 +93,8 @@ function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
       LINE
     </span>
   ) : (
-    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 w-5 items-center justify-center rounded-md border text-[10px] font-bold">
-      M
+    <span className="bg-canvas-sunken text-ink-secondary border-hairline inline-flex h-5 min-w-8 items-center justify-center rounded-md border px-1.5 text-[9px] font-bold">
+      MAIL
     </span>
   )
 }
@@ -145,6 +146,12 @@ function formatYmdSlash(iso: string): string {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 }
 
+function isOlderThanOneHour(iso: string | null): boolean {
+  if (!iso) return false
+  const time = new Date(iso).getTime()
+  return Number.isFinite(time) && Date.now() - time >= 60 * 60 * 1000
+}
+
 interface FriendItem {
   id: string
   displayName: string
@@ -172,6 +179,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
   const [loadingMessages, setLoadingMessages] = useState(true)
   const isComposingRef = useRef(false)
   const sendLockRef = useRef(false)
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
 
   useEffect(() => {
     const loadMessages = async () => {
@@ -189,18 +197,23 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
 
   const handleSend = async () => {
     if (!message.trim() || sending || sendLockRef.current) return
+    const content = message.trim()
+    const signature = JSON.stringify({ friendId, messageType: 'text', content })
+    const idempotencyKey = sendKeysRef.current.get(signature)
     sendLockRef.current = true
     setSending(true)
     try {
       await fetchApi(`/api/friends/${friendId}/messages`, {
         method: 'POST',
-        body: JSON.stringify({ content: message, messageType: 'text' }),
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ content, messageType: 'text' }),
       })
+      sendKeysRef.current.clear(signature)
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
         direction: 'outgoing',
         messageType: 'text',
-        content: message,
+        content,
         createdAt: new Date().toISOString(),
       }])
       setMessage('')
@@ -254,7 +267,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
         {friend?.pictureUrl ? (
           <img src={friend.pictureUrl} alt="" className="w-8 h-8 rounded-full" />
         ) : (
-          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-hairline flex items-center justify-center">
             <span className="text-ink-faint text-xs">{(friend?.displayName || '?').charAt(0)}</span>
           </div>
         )}
@@ -273,11 +286,11 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
             <div key={msg.id} className={`flex ${msg.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                 msg.direction === 'outgoing'
-                  ? 'bg-green-500 text-white'
+                  ? 'bg-accent text-on-accent'
                   : 'bg-canvas-sunken text-ink'
               }`}>
                 <div className="text-sm whitespace-pre-wrap break-words">{renderContent(msg)}</div>
-                <p className={`text-xs mt-1 ${msg.direction === 'outgoing' ? 'text-green-200' : 'text-ink-faint'}`}>
+                <p className={`text-xs mt-1 ${msg.direction === 'outgoing' ? 'text-success-bg' : 'text-ink-faint'}`}>
                   {new Date(msg.createdAt).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
@@ -302,7 +315,7 @@ function DirectMessagePanel({ friendId, friend, onBack, onSent }: {
               }
             }}
             placeholder="メッセージを入力..."
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+            className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
           <button
             onClick={handleSend}
@@ -323,7 +336,8 @@ const MERGED_TABS = [
 ]
 
 function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
-  const { selectedAccountId } = useAccount()
+  const router = useRouter()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [chats, setChats] = useState<Chat[]>([])
   /**
    * メールの問い合わせ。LINEのトークと同じ一覧に混ぜる。
@@ -340,6 +354,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null)
   const [chatDetail, setChatDetail] = useState<ChatDetail | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
+  const [assigneeFilter, setAssigneeFilter] = useState('all')
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
@@ -352,10 +368,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
    * 相手の素性を確かめたいときで、返信を書いている間ではない。
    * 見たいときに「友だち詳細」から開く。
    */
-  const [showFriendInfo, setShowFriendInfo] = useState(false)
+  const [showFriendInfo, setShowFriendInfo] = useState(true)
   // 送信の細かい設定。既定は畳む。出しっぱなしだと入力欄が縦に伸びて
   // トークが読めなくなる。
   const [showComposerOptions, setShowComposerOptions] = useState(false)
+  const [showMemoEditor, setShowMemoEditor] = useState(false)
+  const [memoDraft, setMemoDraft] = useState('')
+  const [memoSaving, setMemoSaving] = useState(false)
+  const [memoError, setMemoError] = useState('')
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -416,6 +436,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [pendingImage, setPendingImage] = useState<ImageUploaderValue | null>(null)
   const [sending, setSending] = useState(false)
   const sendLockRef = useRef(false)
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false)
   const isComposingRef = useRef(false)
   const messagesScrollRef = useRef<HTMLDivElement | null>(null)
@@ -567,15 +588,22 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     return () => window.removeEventListener(UNANSWERED_REFRESH_EVENT, refresh)
   }, [loadChats, loadEmails])
 
-  // Deep-link from other pages (e.g. /form-submissions): ?friend=<friendId>
-  // chat list returns id = friend_id, so selectedChatId === friendId is correct.
-  // If no chat exists yet, loadChatDetail will fail and the user can fall back to
-  // the friend list — acceptable for now.
+  // Deep-link from other pages. LINE is ?friend=<friendId>, email is
+  // ?thread=<threadId>. Selecting one side always clears the other so the
+  // center panel has exactly one conversation to show.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const friendId = params.get('friend')
-    if (friendId) setSelectedChatId(friendId)
+    const threadId = params.get('thread')
+    if (threadId) {
+      setSelectedChatId(null)
+      setSelectedFriendId(null)
+      setSelectedThreadId(threadId)
+    } else if (friendId) {
+      setSelectedThreadId(null)
+      setSelectedChatId(friendId)
+    }
   }, [])
 
   useEffect(() => {
@@ -585,6 +613,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       setChatDetail(null)
     }
   }, [selectedChatId, loadChatDetail])
+
+  useEffect(() => {
+    setMemoDraft(chatDetail?.notes ?? '')
+    setMemoError('')
+    setShowMemoEditor(false)
+  }, [chatDetail?.id, chatDetail?.notes])
 
   // Surface deep-linked chats in the sidebar even when the current account
   // filter or status filter would exclude them — otherwise the user replies
@@ -694,7 +728,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           originalContentUrl: pendingImage.originalContentUrl,
           previewImageUrl: pendingImage.previewImageUrl,
         })
-        const sendResult = await api.chats.send(sendingChatId, { messageType: 'image', content: imgPayload })
+        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload })
+        const sendResult = await api.chats.send(sendingChatId,
+          { messageType: 'image', content: imgPayload },
+          sendKeysRef.current.get(signature),
+        )
+        sendKeysRef.current.clear(signature)
         setPendingImage(null)
         // Optimistic update for image
         setChatDetail((prev) => (prev && prev.id === sendingChatId) ? {
@@ -738,7 +777,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       // --- Text send path (runs independently — both paths execute when both image and text are present) ---
       if (messageContent.trim()) {
         const content = messageContent.trim()
-        const sendResult = await api.chats.send(sendingChatId, { content })
+        const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content })
+        const sendResult = await api.chats.send(sendingChatId,
+          { content },
+          sendKeysRef.current.get(signature),
+        )
+        sendKeysRef.current.clear(signature)
         setMessageContent('')
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
         // Only mutate chatDetail if it still corresponds to the chat we just sent to
@@ -836,6 +880,28 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
+  const handleSaveMemo = async () => {
+    if (!selectedChatId || memoSaving) return
+    setMemoSaving(true)
+    setMemoError('')
+    try {
+      const notes = memoDraft.trim() || null
+      const response = await api.chats.update(selectedChatId, { notes })
+      if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした')
+      setChatDetail((current) => current && current.id === selectedChatId
+        ? { ...current, notes }
+        : current)
+      setChats((current) => current.map((chat) => chat.id === selectedChatId
+        ? { ...chat, notes }
+        : chat))
+      setShowMemoEditor(false)
+    } catch (memoSaveError) {
+      setMemoError(memoSaveError instanceof Error ? memoSaveError.message : '内部メモを保存できませんでした')
+    } finally {
+      setMemoSaving(false)
+    }
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     // IME変換確定のEnterでは送信しない
     if (e.nativeEvent.isComposing || isComposingRef.current || e.keyCode === 229) return
@@ -849,8 +915,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
+  const visibleMailItems = channel === 'line' ? [] : emailItems
+  const visibleLineItems = channel === 'email' ? [] : chats
+  const quickCounts = {
+    all: visibleMailItems.length + visibleLineItems.length,
+    reply:
+      visibleMailItems.filter((item) => item.status === 'unread').length
+      + visibleLineItems.filter((chat) => chat.status === 'unread').length,
+    overdue:
+      visibleMailItems.filter((item) => item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)).length
+      + visibleLineItems.filter((chat) => chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)).length,
+  }
+  const activeFriendId = selectedFriendId
+    ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
+    ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
+    ?? null
+
   return (
-    <div>
+    <div className="space-y-3">
       {/* Error */}
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
@@ -858,37 +940,138 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         </div>
       )}
 
-      <div data-design="Panes" className="relative flex gap-4 h-[calc(100vh-120px)] lg:h-[calc(100vh-180px)]">
+      <section
+        data-design="Filters"
+        data-inbox-v4="quick-filters"
+        className="relative flex min-h-10 flex-wrap items-center gap-2"
+        aria-label="受信箱のクイック絞り込み"
+      >
+        {[
+          { key: 'all' as const, label: 'すべて' },
+          { key: 'reply' as const, label: '要返信' },
+          { key: 'overdue' as const, label: '期限超過' },
+        ].map((filter) => (
+          <button
+            key={filter.key}
+            type="button"
+            onClick={() => setQuickFilter(filter.key)}
+            aria-pressed={quickFilter === filter.key}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              quickFilter === filter.key
+                ? 'border-[#06C755] bg-[#EAFBF0] text-[#057A37]'
+                : 'border-[#E5E7EB] bg-canvas text-[#667085] hover:bg-[#F7F8F6]'
+            }`}
+          >
+            {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCounts[filter.key]}</span>
+          </button>
+        ))}
+        <button
+          type="button"
+          disabled
+          title="お気に入り機能は準備中です"
+          aria-label="お気に入り（準備中）"
+          className="border-[#E5E7EB] text-[#667085] rounded-full border bg-canvas px-3 py-1.5 text-xs disabled:cursor-not-allowed"
+        >
+          ☆
+        </button>
+        <details className="relative ml-auto">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
+            絞り込み
+          </summary>
+          <div className="absolute top-[calc(100%+6px)] right-0 z-30 w-52 rounded-lg border border-[#E5E7EB] bg-canvas p-3 shadow-lg">
+            <p className="text-[11px] font-semibold text-[#667085]">対応状態</p>
+            <div className="mt-2 grid gap-1">
+              {statusFilters.map((filter) => (
+                <button key={filter.key} type="button" onClick={() => setStatusFilter(filter.key)} className={`rounded-md px-2 py-1.5 text-left text-xs ${statusFilter === filter.key ? 'bg-[#EAFBF0] font-semibold text-[#057A37]' : 'text-[#667085] hover:bg-[#F7F8F6]'}`}>{filter.label}</button>
+              ))}
+            </div>
+          </div>
+        </details>
+        <button type="button" disabled title="保存した検索は準備中です" className="rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] disabled:cursor-not-allowed">
+          保存した検索
+        </button>
+      </section>
+
+      <div
+        data-design="Panes"
+        className="border-[#E5E7EB] bg-canvas shadow-[1px_1px_2px_rgba(29,29,31,0.13)] relative flex h-[calc(100vh-282px)] min-h-[560px] overflow-hidden rounded-[10px] border"
+      >
         {/* Left Panel: Chat List */}
         {/* 設計 `ListPane` 360px。 */}
         {/* 狭い画面では、開いている間は一覧を隠して中央を広く使う。
             メールを開いたときも同じ。ここが LINE だけを見ていたので、
             メールを開いても一覧が残って中央が半分のままだった。 */}
-        <div className={`w-full lg:w-[360px] lg:flex-shrink-0 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}>
+        <div
+          data-inbox-v4="conversation-list"
+          className={`w-full border-[#E5E7EB] bg-canvas lg:w-[330px] 2xl:w-[420px] lg:flex-shrink-0 border-r flex-col overflow-hidden ${selectedChatId || selectedThreadId ? 'hidden lg:flex' : 'flex'}`}
+        >
           {/* タブ (全て / 未読 / 対応中 / 対応済) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
           {/* 設計 `ListPane` の「名前で検索」。一覧が長くなると状態の絞り込みだけでは足りない。 */}
-          <div className="border-hairline border-b px-3 py-2">
-            <input
+          <div className="border-[#E5E7EB] border-b p-3">
+            <div className="relative">
+              <svg className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-[#98A2B3]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input
               type="search"
               value={nameQuery}
               onChange={(e) => setNameQuery(e.target.value)}
               placeholder="名前・メールアドレス・内容で検索"
               aria-label="名前・メールアドレス・内容で検索"
-              className="border-hairline rounded-control focus:ring-accent w-full border px-3 py-1.5 text-xs focus:ring-2 focus:outline-none"
-            />
+              className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+              />
+            </div>
+            <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
+              <span className="shrink-0">担当者</span>
+              <select
+                value={assigneeFilter}
+                onChange={(event) => setAssigneeFilter(event.target.value)}
+                aria-label="担当者で絞り込む"
+                className="min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-canvas px-2 py-1.5 text-[11px] font-medium text-[#344054] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+              >
+                <option value="all">すべて</option>
+                <option value="unassigned">未割り当て</option>
+                {operators.map((operator) => (
+                  <option key={operator.id} value={operator.id}>{operator.name}</option>
+                ))}
+              </select>
+            </label>
+            <div className="mt-2 flex items-center gap-1">
+              {CHANNELS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => router.push(item.key === 'all' ? '/chats' : `/chats?channel=${item.key}`)}
+                  aria-label={item.label}
+                  title={item.label}
+                  aria-pressed={channel === item.key}
+                  className={`inline-flex shrink-0 items-center justify-center rounded-md px-1.5 py-1.5 text-[11px] font-semibold whitespace-nowrap ${channel === item.key ? 'bg-[#EAFBF0] text-[#057A37]' : 'text-[#344054] hover:bg-[#F7F8F6]'}`}
+                >
+                  {item.key === 'line' && <ChannelBadge channel="line" />}
+                  {item.key === 'email' && <ChannelBadge channel="email" />}
+                  {item.key === 'all' && item.label}
+                </button>
+              ))}
+              <select
+                aria-label="並び順"
+                defaultValue="newest"
+                className="ml-auto shrink-0 rounded-lg border border-[#E5E7EB] bg-canvas px-1.5 py-1 text-[11px] font-semibold whitespace-nowrap text-[#2563EB] outline-none focus:border-[#2563EB] focus:ring-2 focus:ring-[#2563EB]/15"
+              >
+                <option value="newest">新しい順</option>
+              </select>
+            </div>
           </div>
 
           {/* Filter row */}
-          <div className="px-3 py-2 border-b border-hairline flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 border-b border-[#E5E7EB] px-3 py-2">
             {statusFilters.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   statusFilter === f.key
-                    ? 'bg-green-500 text-white'
-                    : 'bg-canvas-sunken text-ink-secondary hover:bg-gray-200'
+                    ? 'bg-[#06C755] text-on-accent'
+                    : 'bg-[#F2F4F7] text-[#667085] hover:bg-[#EAECF0]'
                 }`}
               >
                 {f.label}
@@ -904,7 +1087,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <div key={i} className="px-4 py-3 border-b border-hairline animate-pulse">
                     <div className="flex items-center gap-3">
                       <div className="flex-1 space-y-2">
-                        <div className="h-3 bg-gray-200 rounded w-32" />
+                        <div className="h-3 bg-hairline rounded w-32" />
                         <div className="h-2 bg-canvas-sunken rounded w-20" />
                       </div>
                       <div className="h-5 bg-canvas-sunken rounded-full w-12" />
@@ -943,6 +1126,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
                   .filter((item) => statusFilter === 'all' || item.status === statusFilter)
+                  .filter((item) => assigneeFilter === 'all'
+                    || (assigneeFilter === 'unassigned' ? !item.assignedStaffId : item.assignedStaffId === assigneeFilter))
+                  .filter((item) => {
+                    if (quickFilter === 'reply') return item.status === 'unread'
+                    if (quickFilter === 'overdue') return item.status === 'unread' && isOlderThanOneHour(item.lastIncomingAt)
+                    return true
+                  })
                   .map((item) => ({
                     at: item.lastIncomingAt,
                     node: (
@@ -961,7 +1151,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           method: 'POST',
                         }).catch(() => undefined)
                       }}
-                      className="border-hairline hover:bg-canvas-sunken w-full border-b px-4 py-3 text-left transition-colors"
+                      className={`w-full border-b border-[#E5E7EB] px-3 py-3 text-left transition-colors ${
+                        selectedThreadId === item.threadId ? 'bg-[#EAFBF0]' : 'hover:bg-[#F7F8F6]'
+                      }`}
                     >
                       <div className="flex items-start gap-3">
                         <div className="relative shrink-0">
@@ -1011,6 +1203,14 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                           .filter(Boolean)
                           .some((value) => String(value).toLowerCase().includes(nameQuery.trim().toLowerCase())),
                   )
+                  .filter((chat) => {
+                    if (assigneeFilter !== 'all') {
+                      if (assigneeFilter === 'unassigned' ? Boolean(chat.operatorId) : chat.operatorId !== assigneeFilter) return false
+                    }
+                    if (quickFilter === 'reply') return chat.status === 'unread'
+                    if (quickFilter === 'overdue') return chat.status === 'unread' && isOlderThanOneHour(chat.lastMessageAt)
+                    return true
+                  })
                   .map((chat) => {
                   const isSelected = selectedChatId === chat.id
                   const operatorName = operators.find((operator) => operator.id === chat.operatorId)?.name ?? null
@@ -1037,8 +1237,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <button
                       key={chat.id}
                       onClick={() => { setSelectedFriendId(null); handleSelectChat(chat.id); }}
-                      className={`w-full text-left px-4 py-3 border-b border-hairline transition-colors ${
-                        isSelected && !selectedFriendId ? 'bg-green-50' : 'hover:bg-canvas-sunken'
+                      className={`w-full border-b border-[#E5E7EB] px-3 py-3 text-left transition-colors ${
+                        isSelected && !selectedFriendId ? 'bg-[#EAFBF0]' : 'hover:bg-[#F7F8F6]'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -1107,7 +1307,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <button
                     onClick={() => { void loadMoreChats() }}
                     disabled={loadingMore}
-                    className="w-full px-4 py-3 text-sm text-green-700 hover:bg-green-50 disabled:opacity-50 border-b border-hairline"
+                    className="w-full px-4 py-3 text-sm text-success hover:bg-accent-soft disabled:opacity-50 border-b border-hairline"
                   >
                     {loadingMore ? '読み込み中...' : 'さらに読み込む'}
                   </button>
@@ -1118,11 +1318,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         </div>
 
         {/* Right Panel: Chat Detail */}
-        <div className={`flex-1 bg-canvas rounded-card border border-hairline flex-col overflow-hidden ${selectedChatId || selectedFriendId ? 'flex' : 'hidden lg:flex'}`}>
+        <div
+          data-inbox-v4="talk-pane"
+          className={`min-w-0 flex-1 bg-canvas flex-col overflow-hidden ${showFriendInfo ? 'border-r border-[#E5E7EB]' : ''} ${selectedChatId || selectedFriendId || selectedThreadId ? 'flex' : 'hidden lg:flex'}`}
+        >
           {selectedThreadId ? (
             /* メールの往復。LINEのトークと同じ場所に出す。 */
             <EmailThread
               threadId={selectedThreadId}
+              customerInfoOpen={showFriendInfo}
+              onOpenCustomerInfo={() => setShowFriendInfo(true)}
               onChanged={() => {
                 void loadEmails()
               }}
@@ -1146,7 +1351,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           ) : chatDetail ? (
             <>
               {/* Chat Header */}
-              <div className="px-4 py-4 border-b border-hairline flex items-center justify-between gap-2">
+              <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
                 <div className="flex items-center gap-2 min-w-0">
                   <button
                     onClick={() => setSelectedChatId(null)}
@@ -1205,14 +1410,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       ))}
                     </select>
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowFriendInfo((v) => !v)}
-                    aria-pressed={showFriendInfo}
-                    className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2 py-1 text-xs whitespace-nowrap"
-                  >
-                    {showFriendInfo ? '友だち詳細を閉じる' : '友だち詳細'}
-                  </button>
+                  {!showFriendInfo && (
+                    <button
+                      type="button"
+                      onClick={() => setShowFriendInfo(true)}
+                      className="whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+                    >
+                      顧客情報を開く
+                    </button>
+                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {/*
@@ -1224,10 +1430,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               </div>
 
               {/* Messages — LINE-style chat bubbles */}
-              <div ref={messagesScrollRef} className="flex-1 overflow-y-auto p-4 space-y-2" style={{ backgroundColor: '#7494C0' }}>
+              <div ref={messagesScrollRef} className="flex-1 space-y-2 overflow-y-auto p-4" style={{ backgroundColor: '#7292BD' }}>
                 {(!chatDetail.messages || chatDetail.messages.length === 0) ? (
                   <div className="text-center py-8">
-                    <p className="text-white/60 text-sm">メッセージはまだありません。</p>
+                    <p className="text-on-accent/60 text-sm">メッセージはまだありません。</p>
                   </div>
                 ) : (
                   (chatDetail.messages ?? []).map((msg, idx) => {
@@ -1285,20 +1491,20 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <div key={msg.id}>
                         {showDateSep && (
                           <div className="flex justify-center my-3">
-                            <span className="text-[11px] text-white/85 bg-black/20 px-2.5 py-0.5 rounded-full">
+                            <span className="text-[11px] text-on-accent/85 bg-ink/20 px-2.5 py-0.5 rounded-full">
                               {formatYmdSlash(msg.createdAt)}
                             </span>
                           </div>
                         )}
                         <div
-                          className={`flex items-end gap-2 ${isOutgoing ? 'justify-end' : 'justify-start'}`}
+                          className={`flex gap-2 ${isOutgoing ? 'items-end justify-end' : 'items-start justify-start'}`}
                         >
                           {/* 相手のアイコン（incoming のみ） */}
                           {!isOutgoing && (
                             chatDetail.friendPictureUrl ? (
-                              <img src={chatDetail.friendPictureUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0 mb-1" />
+                              <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
                             ) : (
-                              <div className="w-8 h-8 rounded-full bg-gray-300 flex-shrink-0 mb-1" />
+                              <div className="bg-hairline h-8 w-8 flex-shrink-0 rounded-full" />
                             )
                           )}
 
@@ -1307,31 +1513,48 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             <div
                               className={`max-w-[320px] px-3 py-2 text-sm break-words whitespace-pre-wrap ${
                                 isOutgoing
-                                  ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-white'
-                                  : 'rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-white text-ink'
+                                  ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-on-accent'
+                                  : 'rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-canvas text-ink'
                               }`}
                               style={isOutgoing ? { backgroundColor: 'var(--color-accent)' } : undefined}
                             >
                               {bubbleContent}
                             </div>
                             {/* 時刻 */}
-                            <span className="text-xs text-white/50 mt-0.5 px-1">
+                            <span className="text-xs text-on-accent/50 mt-0.5 px-1">
                               {new Date(msg.createdAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
 
-                          {/* 返信担当者は管理画面だけに表示。LINEの相手には公式アカウントの表示のまま。 */}
+                          {/*
+                            相手に見える送信元はLINE公式アカウント。管理画面では、
+                            その下に実際に返信した担当者も出して取り違えを防ぐ。
+                          */}
                           {isOutgoing && (
-                            <div className="mb-0.5 flex w-12 shrink-0 flex-col items-center">
+                            <div className="mb-0.5 flex w-24 shrink-0 flex-col items-center gap-1">
+                              {selectedAccount?.pictureUrl ? (
+                                <img
+                                  src={selectedAccount.pictureUrl}
+                                  alt=""
+                                  className="border-canvas h-9 w-9 rounded-full border-2 object-cover"
+                                />
+                              ) : (
+                                <div
+                                  className="border-canvas flex h-9 w-9 items-center justify-center rounded-full border-2 bg-[#EAFBF0] text-[12px] font-bold text-[#057A37]"
+                                  title={selectedAccount?.displayName ?? selectedAccount?.name ?? '送信アカウント'}
+                                >
+                                  {(selectedAccount?.displayName ?? selectedAccount?.name ?? '送').charAt(0)}
+                                </div>
+                              )}
                               <div
-                                className="border-canvas bg-action text-on-action flex h-8 w-8 items-center justify-center rounded-full border-2 text-[11px] font-bold"
+                                className="border-canvas/70 bg-canvas/90 text-ink-secondary inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold shadow-sm"
                                 title={msg.sentByStaffName ?? '担当者情報なし'}
                               >
-                                {(msg.sentByStaffName ?? '担').charAt(0)}
+                                <span className="bg-action text-on-action flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-[8px] font-bold">
+                                  {(msg.sentByStaffName ?? '担').charAt(0)}
+                                </span>
+                                <span className="truncate">{msg.sentByStaffName ?? '担当者'}</span>
                               </div>
-                              <span className="text-on-accent/80 mt-1 w-full truncate text-center text-[9px]">
-                                {msg.sentByStaffName ?? '担当者'}
-                              </span>
                             </div>
                           )}
                         </div>
@@ -1352,24 +1575,32 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 すべて出しっぱなしで、入力欄が縦に伸びてトークが読めなかった。
                 よく使うものだけ出し、設定は畳む。
               */}
-              <div className="border-hairline bg-canvas sticky bottom-0 z-10 border-t px-4 py-3">
+              <div data-inbox-v4="composer" className="sticky bottom-0 z-10 border-t border-[#E5E7EB] bg-canvas px-4 py-3">
                 {/* 上段 */}
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {/* 設計 2-1-1。選ぶと本文が入力欄に入る。 */}
                     <button
                       type="button"
                       onClick={() => setShowTemplatePicker(true)}
-                      className="text-accent text-xs hover:underline"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
                     >
-                      テンプレートを選択
+                      ▧ テンプレートを選択
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowComposerOptions((v) => !v)}
-                      className="text-accent text-xs hover:underline"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
                     >
-                      {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+                      ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowMemoEditor((current) => !current)}
+                      aria-expanded={showMemoEditor}
+                      className="inline-flex items-center rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]"
+                    >
+                      内部メモ
                     </button>
                   </div>
                   <span className="text-ink-faint text-xs">
@@ -1387,7 +1618,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         type="radio"
                         checked={sendMode === 'enter'}
                         onChange={() => setSendMode('enter')}
-                        className="accent-green-600"
+                        className="accent-accent"
                       />
                       <span>Enter</span>
                     </label>
@@ -1396,15 +1627,77 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         type="radio"
                         checked={sendMode === 'shift-enter'}
                         onChange={() => setSendMode('shift-enter')}
-                        className="accent-green-600"
+                        className="accent-accent"
                       />
                       <span>Shift+Enter</span>
                     </label>
                   </div>
                 )}
 
-                {/* 中段 */}
-                <textarea
+                {showMemoEditor && typeof document !== 'undefined' && createPortal(
+                  <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="chat-internal-memo-title"
+                    onClick={() => {
+                      setMemoDraft(chatDetail?.notes ?? '')
+                      setMemoError('')
+                      setShowMemoEditor(false)
+                    }}
+                  >
+                    <div
+                      className="border-hairline w-full max-w-lg rounded-[14px] border bg-canvas shadow-2xl"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <div className="border-hairline border-b px-5 py-4">
+                        <div>
+                          <h2 id="chat-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
+                          <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
+                        </div>
+                      </div>
+                      <div className="px-5 py-4">
+                        <label htmlFor="chat-internal-memo" className="text-ink-secondary text-xs font-semibold">メモ内容</label>
+                        <textarea
+                          id="chat-internal-memo"
+                          value={memoDraft}
+                          onChange={(event) => setMemoDraft(event.target.value)}
+                          rows={7}
+                          autoFocus
+                          placeholder="メモを追加"
+                          className="border-hairline focus:border-accent focus:ring-accent/15 mt-2 w-full resize-y rounded-lg border bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:ring-2"
+                        />
+                        {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
+                      </div>
+                      <div className="border-hairline flex justify-end gap-2 border-t px-5 py-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMemoDraft(chatDetail?.notes ?? '')
+                            setMemoError('')
+                            setShowMemoEditor(false)
+                          }}
+                          className="border-hairline text-ink-secondary rounded-lg border bg-canvas px-4 py-2 text-sm font-semibold hover:bg-[#F7F8F6]"
+                        >
+                          キャンセル
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleSaveMemo()}
+                          disabled={memoSaving || memoDraft === (chatDetail?.notes ?? '')}
+                          className="bg-accent text-on-accent rounded-lg px-4 py-2 text-sm font-semibold hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {memoSaving ? '保存中...' : '保存'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>,
+                  document.body,
+                )}
+
+                <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
+                  {/* 中段 */}
+                  <textarea
                   value={messageContent}
                   onChange={(e) => setMessageContent(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -1413,11 +1706,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   rows={3}
                   placeholder="メッセージを入力"
                   aria-label="メッセージを入力"
-                  className="border-hairline rounded-control focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-                />
+                  className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
+                  />
 
-                {/* 下段 */}
-                <div className="mt-2 flex items-center justify-between gap-2">
+                  {/* 下段 */}
+                  <div className="mt-1 flex items-center justify-between gap-2">
                   {/*
                     画像はここから。以前は「送信の設定」の中に投入枠を出しっぱなし
                     にしていて、入力欄が縦に伸びてトークが読めなかった。
@@ -1442,7 +1735,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       disabled={uploadingImage}
                       title="画像を選ぶ"
                       aria-label="画像を選ぶ"
-                      className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-2 py-1 text-sm disabled:opacity-50"
+                      className="rounded-md px-2 py-1 text-sm text-[#667085] hover:bg-[#F2F4F7] disabled:opacity-50"
                     >
                       {uploadingImage ? (
                         '…'
@@ -1472,7 +1765,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   <button
                     onClick={handleSendMessage}
                     disabled={sending || (!messageContent.trim() && !pendingImage)}
-                    className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {sending ? '送信中...' : '送信'}
                   </button>
@@ -1485,6 +1778,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       setMessageContent((prev) => (prev.trim() ? `${prev}\n${content}` : content))
                     }
                   />
+                  </div>
                 </div>
               </div>
             </>
@@ -1498,8 +1792,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           3列だが、実際の画面幅はそれより狭いことが多い。
 
           friendId は **現在の選択** を優先する。chatDetail の読み込み中は
-          前の chat のデータが残っているので、それを参照すると
-          ここだけ前の友だちを出し続ける。選択IDがそのまま friend_id。
+          一覧にある chat.friendId を使い、読み込み後は同じ会話の
+          chatDetail.friendId を使う。会話IDと友だちIDは別物なので混同しない。
         */}
         {/*
           友だち詳細。メールでも出したいが、メールのスレッドは友だちに
@@ -1511,7 +1805,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           なぜ出ないかが分かる方がよい。
         */}
         {showFriendInfo && (selectedChatId || selectedFriendId || selectedThreadId) && (
-          <div className="absolute inset-y-0 right-0 z-20 w-[320px] max-w-full shadow-xl">
+          <aside
+            data-inbox-v4="customer-panel"
+            className="relative hidden h-full w-[300px] shrink-0 overflow-hidden bg-canvas xl:block 2xl:w-[340px]"
+          >
             {/*
               重なりの中にも閉じるボタンを置く。上部のボタンだけだと、
               重なりが上部を覆っている画面幅で閉じられなくなる。
@@ -1520,8 +1817,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             <button
               type="button"
               onClick={() => setShowFriendInfo(false)}
-              aria-label="友だち詳細を閉じる"
-              className="bg-canvas border-hairline text-ink-secondary hover:bg-canvas-sunken absolute top-2 right-2 z-10 rounded-full border px-2 py-1 text-xs"
+              aria-label="顧客情報を閉じる"
+              className="absolute top-[17px] right-3 z-10 inline-flex h-8 items-center justify-center rounded-lg border border-[#E5E7EB] bg-canvas px-3 text-xs font-semibold text-[#667085] hover:bg-[#F7F8F6]"
             >
               閉じる
             </button>
@@ -1535,55 +1832,67 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               (() => {
                 const mail = emailItems.find((e) => e.threadId === selectedThreadId)
                 return (
-                  <div className="bg-canvas rounded-card border-hairline h-full w-full overflow-y-auto border p-5">
-                    <p className="text-ink text-sm font-semibold">メールの相手</p>
-                    <p className="text-ink mt-3 text-sm">{mail?.customerName ?? '—'}</p>
-                    {mail?.customerIdentifier && (
-                      <p className="text-ink-secondary mt-0.5 font-mono text-xs break-all">
-                        {mail.customerIdentifier}
-                      </p>
-                    )}
-
-                    <div className="bg-canvas-sunken rounded-card mt-4 p-3">
-                      <p className="text-ink-secondary text-xs font-medium">
-                        この人はまだ友だちと結びついていません
-                      </p>
-                      <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-                        メールは差出人のアドレスしか分かりません。LINEの友だちはアドレスを持っていないので、
-                        同じ人かどうかを自動で判断できません。タグ・マイル・購入履歴はこの画面には出ません。
-                      </p>
+                  <div className="flex h-full w-full flex-col overflow-hidden bg-canvas">
+                    <div className="min-h-[66px] border-b border-[#E5E7EB] px-4 py-3 pr-20">
+                      <p className="text-ink text-sm font-bold">顧客情報</p>
+                      <p className="text-ink-faint mt-0.5 truncate text-[10px]">メールの相手を確認できます</p>
                     </div>
 
-                    <p className="text-ink-secondary mt-4 text-xs font-medium">いまできること</p>
-                    <ul className="text-ink-faint mt-1 space-y-1.5 text-xs leading-relaxed">
-                      <li>
-                        ・
-                        <Link href="/friends" className="text-accent hover:underline">
-                          友だち一覧
-                        </Link>
-                        で名前を検索して、同じ人かどうかを確かめる
-                      </li>
-                      <li>・そのままメールで返信する（この画面の下から送れます）</li>
-                    </ul>
+                    <div className="flex-1 overflow-y-auto divide-y divide-[#E5E7EB]">
+                      <section className="flex flex-col items-center px-5 py-5 text-center">
+                        <div className="bg-canvas-sunken border-hairline flex h-14 w-14 items-center justify-center rounded-full border">
+                          <span className="text-ink-secondary text-[11px] font-bold">MAIL</span>
+                        </div>
+                        <p className="text-ink mt-2 max-w-full truncate text-sm font-bold">{mail?.customerName ?? '—'}</p>
+                        <p className="text-ink-faint mt-0.5 max-w-full break-all text-[11px]">
+                          {mail?.customerIdentifier ?? 'メールアドレス未登録'}
+                        </p>
+                      </section>
 
-                    <p className="text-ink-faint border-hairline mt-4 border-t pt-3 text-xs leading-relaxed">
-                      アドレスから友だちを自動で探す仕組みは、まだ入っていません。友だち情報欄に
-                      メールアドレスの項目を作って値を貯めておくと、入ったときにそのまま結びつけられます。
-                    </p>
+                      <section className="px-5 py-4">
+                        <p className="text-ink text-xs font-bold">基本情報</p>
+                        <dl className="mt-2 space-y-2 text-xs">
+                          <div className="flex items-start justify-between gap-3">
+                            <dt className="text-ink-faint shrink-0">名前</dt>
+                            <dd className="text-ink-secondary min-w-0 truncate text-right">{mail?.customerName ?? '未登録'}</dd>
+                          </div>
+                          <div className="flex items-start justify-between gap-3">
+                            <dt className="text-ink-faint shrink-0">メール</dt>
+                            <dd className="text-ink-secondary min-w-0 break-all text-right">{mail?.customerIdentifier ?? '未登録'}</dd>
+                          </div>
+                        </dl>
+                      </section>
+
+                      <section className="px-5 py-4">
+                        <p className="text-ink text-xs font-bold">LINE友だちとの連携</p>
+                        <p className="text-ink-faint mt-2 text-xs leading-relaxed">
+                          このメールアドレスは、まだLINEの友だちと結びついていません。
+                        </p>
+                        <Link href="/friends" className="text-action mt-2 inline-flex text-xs font-semibold hover:underline">
+                          友だち一覧で確認する
+                        </Link>
+                      </section>
+
+                    </div>
                   </div>
                 )
               })()
             ) : (
             <FriendInfoSidebar
-              friendId={selectedFriendId || selectedChatId}
+              friendId={activeFriendId}
+              operatorName={
+                chatDetail?.operatorId
+                  ? operators.find((operator) => operator.id === chatDetail.operatorId)?.name ?? null
+                  : null
+              }
               chatStatus={
-                chatDetail && chatDetail.id === (selectedFriendId || selectedChatId)
+                chatDetail && chatDetail.id === selectedChatId
                   ? { status: chatDetail.status, notes: chatDetail.notes }
                   : undefined
               }
             />
             )}
-          </div>
+          </aside>
         )}
       </div>
     </div>
@@ -1614,10 +1923,7 @@ const CHANNELS = [
 ] as const
 
 function ChatsPageHost() {
-  const router = useRouter()
   const params = useSearchParams()
-  const [showReadAllConfirm, setShowReadAllConfirm] = useState(false)
-  const [markingAllRead, setMarkingAllRead] = useState(false)
   // すべて / LINE / メール。既定はすべて。
   // 出どころを気にせず「返信を待っている人」を見たいのが普通なので、
   // 最初から絞った状態で出さない。
@@ -1626,13 +1932,12 @@ function ChatsPageHost() {
     raw === 'line' || raw === 'email' ? raw : 'all'
 
   return (
-    <div>
+    <div className="space-y-3">
       <div data-design="Head">
         <Header
           title="受信箱"
-          description="LINEのトーク・メールでの問い合わせ・返信待ちを、1か所にまとめて扱います。"
           action={
-            <div className="flex items-center gap-2">
+            <div className="flex items-center">
               {/*
                 設計にあるボタン。行き先の文書がまだ無いので押せなくしている。
                 リンク先を仮置きすると行き止まりになる（route-integrity が落ちる）。
@@ -1644,61 +1949,13 @@ function ChatsPageHost() {
               >
                 マニュアル
               </button>
-              {/*
-                すべて確認済みにする。押し間違えると未対応が全部消えるので、
-                確認を挟む。設計にも同じボタンがある。
-              */}
-              <button
-                onClick={() => setShowReadAllConfirm(true)}
-                disabled={markingAllRead}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-              >
-                {markingAllRead ? '更新中...' : 'すべて確認済みにする'}
-              </button>
             </div>
           }
         />
       </div>
 
-      <div data-design="KPIs">
+      <div data-design="KPIs" data-inbox-v4="summary">
         <InboxKpis />
-      </div>
-
-      {/* 設計 `Filters` の左側。チャネルの絞り込み。 */}
-      <div data-design="Filters" className="mb-4 flex flex-wrap items-center gap-2">
-        {CHANNELS.map((c) => (
-          <button
-            key={c.key}
-            onClick={() => router.push(c.key === 'all' ? '/chats' : `/chats?channel=${c.key}`)}
-            aria-pressed={channel === c.key}
-            className={`rounded-pill px-3.5 py-1.5 text-xs font-medium transition-colors ${
-              channel === c.key
-                ? 'bg-accent text-on-accent'
-                : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-            }`}
-          >
-            <span className="inline-flex items-center gap-1.5">
-              {c.key === 'line' && <ChannelBadge channel="line" />}
-              {c.key === 'email' && <ChannelBadge channel="email" />}
-              {c.label}
-            </span>
-          </button>
-        ))}
-
-        {/*
-          設計 `Filters` の右側。トークに何を出すかの切り替え。
-          いまは常に全部出しているので、選んでも表示は変わらない。
-          仕組みが入るまでの枠。docs/v025-open-questions.md に残している。
-        */}
-        <label className="text-ink-faint ml-auto flex items-center gap-1.5 text-xs">
-          表示
-          <select
-            disabled
-            className="border-hairline rounded-control border px-2 py-1 text-xs disabled:opacity-50"
-          >
-            <option>受信・送信・システム</option>
-          </select>
-        </label>
       </div>
 
       {/*
@@ -1710,23 +1967,6 @@ function ChatsPageHost() {
       */}
       <ChatsPageInner channel={channel} />
 
-      <ConfirmDialog
-        open={showReadAllConfirm}
-        title="すべて確認済みにしますか？"
-        description="ログイン中のあなたの未読だけを確認済みにします。他の担当者の未読や、共有している対応状態は変わりません。"
-        confirmLabel="確認済みにする"
-        onCancel={() => setShowReadAllConfirm(false)}
-        onConfirm={() => {
-          setShowReadAllConfirm(false)
-          setMarkingAllRead(true)
-          void Promise.all([
-            api.chats.markAllRead(),
-            fetchApi('/api/support/email/read-all', { method: 'POST' }),
-          ]).then(() => {
-            window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-          }).finally(() => setMarkingAllRead(false))
-        }}
-      />
     </div>
   )
 }

@@ -293,6 +293,7 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
       referralRewardMiles?: unknown;
       multiplierBps?: unknown;
       multiplierPriority?: unknown;
+      applyToExisting?: unknown;
     }>();
     const rewardMiles = Number(body.rewardMiles ?? 0);
     const referralRewardMiles = Number(body.referralRewardMiles ?? 0);
@@ -300,6 +301,7 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
       ? null
       : Number(body.multiplierBps);
     const multiplierPriority = Number(body.multiplierPriority ?? 0);
+    const applyToExisting = body.applyToExisting === true;
     if (!Number.isInteger(rewardMiles) || rewardMiles < 0 || rewardMiles > 1_000_000) {
       return c.json({ success: false, error: 'rewardMiles must be an integer between 0 and 1000000' }, 400);
     }
@@ -322,7 +324,9 @@ tags.patch('/api/tags/:id/mileage', requireRole('owner', 'admin'), async (c) => 
       multiplierPriority,
     });
     if (!tag) return c.json({ success: false, error: 'Not found' }, 404);
-    const queued = rewardMiles > 0 || referralRewardMiles > 0
+    // 保存しただけで既存ユーザーへ付与しない。運用中アカウントでは影響が
+    // 大きいため、画面で遡及を明示したときだけキューへ積む。
+    const queued = applyToExisting && (rewardMiles > 0 || referralRewardMiles > 0)
       ? await enqueueHistoricTagMileage(c.env.DB, tag.id)
       : 0;
     return c.json({ success: true, data: { tag: serializeTag(tag), queued } });

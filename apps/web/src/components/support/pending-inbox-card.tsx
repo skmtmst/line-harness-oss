@@ -32,6 +32,15 @@ type InboxItem = {
   lastIncomingAt: string
 }
 
+export function inboxItemHref(item: Pick<InboxItem, 'channel' | 'id'>): string {
+  const rawId = item.id.replace(/^(line|email):/, '')
+  return item.channel === 'email'
+    ? `/chats?channel=email&thread=${encodeURIComponent(rawId)}`
+    : `/chats?friend=${encodeURIComponent(rawId)}&unanswered=1`
+}
+
+const PAGE_SIZE = 5
+
 function elapsed(iso: string): string {
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000))
   if (minutes < 1) return 'たった今'
@@ -47,31 +56,34 @@ export default function PendingInboxCard({
 }) {
   const [summary, setSummary] = useState<PendingInboxSummary | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
-  // 一括で畳むための選択。id で持つ。行の並びは自動更新で変わるので、
-  // 位置で覚えると別の相手を畳んでしまう。
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(1)
+  const pageCount = Math.max(1, Math.ceil((summary?.total ?? 0) / PAGE_SIZE))
 
   const load = useCallback(async () => {
     try {
-      const [summaryResponse, inboxResponse] = await Promise.all([
-        fetchApi<{ success: boolean; data: PendingInboxSummary }>('/api/support/summary'),
-        fetchApi<{ success: boolean; data: { items: InboxItem[] } }>(
-          '/api/support/inbox?status=open&limit=5',
-        ),
-      ])
-      if (summaryResponse.success) {
-        setSummary(summaryResponse.data)
-        onSummaryChange?.(summaryResponse.data)
+      const inboxResponse = await fetchApi<{
+        success: boolean
+        data: { items: InboxItem[]; summary: PendingInboxSummary }
+      }>(`/api/support/inbox?status=open&limit=${PAGE_SIZE}&offset=${(page - 1) * PAGE_SIZE}`)
+      if (inboxResponse.success) {
+        setSummary(inboxResponse.data.summary)
+        onSummaryChange?.(inboxResponse.data.summary)
+        setItems(inboxResponse.data.items)
       }
-      if (inboxResponse.success) setItems(inboxResponse.data.items)
     } catch {
       // ダッシュボード本体は残し、次のポーリングで復旧する。
     }
-  }, [onSummaryChange])
+  }, [onSummaryChange, page])
+
+  useEffect(() => {
+    if (page > pageCount) setPage(pageCount)
+  }, [page, pageCount])
 
   useEffect(() => {
     void load()
-    const timer = window.setInterval(load, 5_000)
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void load()
+    }, 30_000)
     const onFocus = () => void load()
     window.addEventListener('focus', onFocus)
     return () => {
@@ -81,12 +93,12 @@ export default function PendingInboxCard({
   }, [load])
 
   return (
-    <section className="bg-canvas rounded-card border-hairline border shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
-      <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
+    <section className="bg-canvas rounded-[18px] border-hairline flex h-fit min-w-0 flex-col overflow-hidden border shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+      <div className="border-hairline flex h-[50px] shrink-0 items-center justify-between border-b px-5">
         <div className="flex items-baseline gap-2">
           <h2 className="text-ink text-sm font-semibold">対応が必要な受信</h2>
           {summary && summary.total > 0 && (
-            <span className="text-ink-faint text-xs tabular-nums">{summary.total} 件</span>
+            <span className="text-success text-xs font-medium tabular-nums">{summary.total}件</span>
           )}
         </div>
         <Link href="/chats" className="text-action text-xs hover:underline">
@@ -95,71 +107,25 @@ export default function PendingInboxCard({
       </div>
 
       {!summary || summary.total === 0 ? (
-        <p className="text-ink-faint px-5 py-8 text-center text-sm">
+        <p className="text-ink-faint flex min-h-24 items-center justify-center px-5 py-6 text-center text-sm">
           返信を待っている問い合わせはありません。
         </p>
       ) : (
-        <>
-          {/*
-            一括の操作（設計 `bulk bar`）。
-            1件ずつ開いて確認済みにすると、朝に溜まったぶんを片付けるのに
-            件数ぶんの往復が要る。まとめて畳めるようにする。
-          */}
-          <div className="border-hairline bg-canvas-sunken flex flex-wrap items-center gap-3 border-b px-5 py-2.5">
-            <label className="text-ink-secondary flex cursor-pointer items-center gap-1.5 text-xs select-none">
-              <input
-                type="checkbox"
-                checked={selected.size > 0 && selected.size === items.length}
-                onChange={(e) => setSelected(e.target.checked ? new Set(items.map((i) => i.id)) : new Set())}
-                className="rounded"
-              />
-              すべて選択
-            </label>
-            <span className="text-ink-faint text-xs tabular-nums">{selected.size} 件選択中</span>
-            <button
-              type="button"
-              disabled={selected.size === 0}
-              onClick={() => {
-                if (window.confirm(`${selected.size} 件を確認済みにします。よろしいですか。`)) {
-                  setSelected(new Set())
-                  void load()
-                }
-              }}
-              className="border-hairline text-ink-secondary hover:bg-canvas rounded-control ml-auto border px-3 py-1 text-xs font-medium disabled:opacity-40"
-            >
-              一括で確認済みにする
-            </button>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <table className="w-full table-fixed text-sm">
               <thead>
-                <tr className="text-ink-faint border-hairline border-b text-left text-xs">
-                  <th className="w-8 px-5 py-2" />
-                  <th className="px-3 py-2 font-medium">名前</th>
-                  <th className="px-3 py-2 font-medium">メッセージ</th>
-                  <th className="px-3 py-2 text-right font-medium whitespace-nowrap">返信日時</th>
-                  <th className="px-5 py-2 font-medium">状態</th>
+                <tr className="text-ink-faint border-hairline h-[34px] border-b text-left text-xs">
+                  <th className="w-[36%] px-5 font-medium">お名前</th>
+                  <th className="w-[40%] px-3 font-medium">内容</th>
+                  <th className="w-[14%] px-3 text-right font-medium whitespace-nowrap">待ち時間</th>
+                  <th className="w-[10%] px-5 font-medium">状態</th>
                 </tr>
               </thead>
               <tbody className="divide-hairline divide-y">
                 {items.map((item) => (
-                  <tr key={item.id} className="hover:bg-canvas-sunken">
-                    <td className="px-5 py-2.5">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(item.id)}
-                        onChange={(e) => {
-                          const next = new Set(selected)
-                          if (e.target.checked) next.add(item.id)
-                          else next.delete(item.id)
-                          setSelected(next)
-                        }}
-                        aria-label={`${item.customerName} を選ぶ`}
-                        className="rounded"
-                      />
-                    </td>
-                    <td className="px-3 py-2.5 whitespace-nowrap">
+                  <tr key={item.id} className="h-[61px] hover:bg-canvas-sunken">
+                    <td className="overflow-hidden px-5 py-2.5 whitespace-nowrap">
                       <span
                         className={`mr-2 rounded-pill px-1.5 py-0.5 text-[10px] font-medium ${
                           item.channel === 'email'
@@ -169,38 +135,59 @@ export default function PendingInboxCard({
                       >
                         {item.channel === 'email' ? 'メール' : 'LINE'}
                       </span>
-                      <span className="text-ink font-medium">{item.customerName}</span>
+                      <Link
+                        href={inboxItemHref(item)}
+                        className="text-ink font-medium hover:text-action hover:underline focus-visible:text-action focus-visible:underline"
+                        title={`${item.customerName}の受信箱を開く`}
+                      >
+                        {item.customerName}
+                      </Link>
                     </td>
-                    <td className="text-ink-secondary max-w-0 truncate px-3 py-2.5">
+                    <td className="text-ink-secondary truncate px-3 py-2.5" title={item.preview}>
                       {item.preview}
                     </td>
                     <td className="text-ink-faint px-3 py-2.5 text-right text-xs whitespace-nowrap">
                       {elapsed(item.lastIncomingAt)}
                     </td>
                     <td className="px-5 py-2.5 whitespace-nowrap">
-                      <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[10px] font-medium">
+                      <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-[10px] font-medium">
                         未確認
                       </span>
-                      <Link href="/chats" className="text-action ml-2 text-xs hover:underline">
-                        開く
-                      </Link>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-
-          <div className="border-hairline text-ink-faint flex items-center justify-between border-t px-5 py-3 text-xs">
-            <span>
-              LINE {summary.line} ・ メール {summary.email}
-              {summary.oldestWaitMinutes !== null && ` ・ 最長待ち ${summary.oldestWaitMinutes}分`}
-            </span>
-            <Link href="/chats" className="text-action hover:underline">
-              対応する →
-            </Link>
-          </div>
-        </>
+          {pageCount > 1 ? (
+            <nav
+              className="border-hairline flex h-[50px] shrink-0 items-center justify-end gap-2 border-t px-5"
+              aria-label="受信一覧のページ送り"
+            >
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+                className="border-hairline text-ink hover:bg-canvas-sunken rounded-control min-h-8 border px-3 text-xs disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="前のページ"
+              >
+                前へ
+              </button>
+              <span className="text-ink-secondary min-w-16 text-center text-xs tabular-nums">
+                {page} / {pageCount}ページ
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
+                disabled={page === pageCount}
+                className="border-hairline text-ink hover:bg-canvas-sunken rounded-control min-h-8 border px-3 text-xs disabled:cursor-not-allowed disabled:opacity-35"
+                aria-label="次のページ"
+              >
+                次へ
+              </button>
+            </nav>
+          ) : null}
+        </div>
       )}
     </section>
   )

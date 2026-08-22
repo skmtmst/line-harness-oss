@@ -5,7 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
-vi.mock('@line-crm/db', () => ({ getStaffByApiKey: vi.fn(async () => null) }));
+vi.mock('@line-crm/db', () => ({
+  getStaffByApiKey: vi.fn(async () => null),
+  getLineAccounts: vi.fn(async () => [{ id: 'account-1' }]),
+}));
 
 const { authMiddleware } = await import('../middleware/auth.js');
 const { restaurantTest } = await import('./restaurant-test.js');
@@ -34,7 +37,7 @@ function request(path: string, body?: unknown) {
 
 beforeEach(() => {
   testDb = createTestD1();
-  testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/165_restaurant_test_foundation.sql'), 'utf8'));
+  testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
   env = {
     DB: testDb.db,
     API_KEY: 'owner-key',
@@ -96,5 +99,10 @@ describe('飲食店向けテストAPI', () => {
       storeId: store.id, provider: 'outbound', eventId: 'event-x', reservation: {},
     });
     expect(response.status).toBe(400);
+  });
+
+  it('この組織に存在しないLINEアカウントの飲食店データへアクセスさせない', async () => {
+    const response = await request('/api/restaurant-test/snapshot?account_id=account-2');
+    expect(response.status).toBe(403);
   });
 });

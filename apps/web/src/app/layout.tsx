@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import AppShell from '@/components/app-shell'
 import BrandTitle from '@/components/brand-title'
+import ClientErrorReporter from '@/components/client-error-reporter'
 
 /**
  * 書き出しの時点で決まる題。
@@ -32,6 +33,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className="bg-canvas-sunken text-ink antialiased" style={{ fontFamily: "'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', system-ui, sans-serif" }}>
+        <ClientErrorReporter />
         <BrandTitle />
         <AppShell>
           {children}

@@ -144,7 +144,7 @@ export default function QrDialog({
       onClick={onClose}
     >
       <div
-        className="bg-canvas rounded-card border-hairline max-h-[90vh] w-full max-w-3xl overflow-y-auto border p-6 shadow-[1px_2px_0_rgba(26,28,26,0.16)]"
+        className="bg-canvas rounded-card border-hairline max-h-[90vh] w-full max-w-3xl overflow-y-auto border p-6 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">

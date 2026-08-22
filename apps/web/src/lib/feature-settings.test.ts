@@ -43,18 +43,6 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     expect(DEFAULT_FEATURES.nen_campaigns).toBe(true)
     expect(DEFAULT_FEATURES.photo_review).toBe(true)
     expect(DEFAULT_FEATURES.ec_commerce).toBe(true)
-    expect(DEFAULT_FEATURES.restaurant_test).toBe(true)
-  })
-
-  it('飲食店向けテストは運用状態の下に独立区分として並ぶ', () => {
-    const settingsIndex = MENU_SECTIONS.findIndex((section) => section.id === 'settings')
-    const restaurant = MENU_SECTIONS[settingsIndex + 1]
-    expect(restaurant.id).toBe('restaurant-test')
-    expect(restaurant.label).toBe('飲食店向け（テスト）')
-    expect(restaurant.items.map((item) => item.label)).toEqual([
-      '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
-      '予約枠・在庫', 'メニュー管理', 'Google・口コミ', 'LINE来店フォロー',
-    ])
   })
 
   it('サイドメニューにある切り替え可能な項目には、必ずキーがある', () => {

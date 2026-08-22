@@ -1,83 +1,81 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { FriendListItem } from '@/lib/api'
 import FriendListRow from './friend-list-row'
 
 interface Props {
   friends: FriendListItem[]
-  /** 選ばれている友だちのID。まとめて操作する帯の出し分けに使う。 */
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
-  /** ヘッダーのチェック。いま見えている行をまとめて選ぶ・外す。 */
   onToggleAll?: (select: boolean) => void
+  total?: number
+  headerRight?: ReactNode
 }
+
+const GRID = 'grid-cols-[30px_minmax(150px,1.35fr)_minmax(94px,.72fr)_minmax(105px,.78fr)_minmax(160px,1.55fr)_minmax(130px,1.05fr)_88px]'
+const RESPONSIVE_GRID = 'lg:grid-cols-[30px_minmax(150px,1.35fr)_minmax(94px,.72fr)_minmax(105px,.78fr)_minmax(160px,1.55fr)_minmax(130px,1.05fr)_88px]'
 
 export default function FriendListTable({
   friends,
   selectedIds,
   onToggleSelect,
   onToggleAll,
+  total,
+  headerRight,
 }: Props) {
-  const selectedCount = friends.filter((f) => selectedIds?.has(f.id)).length
+  const checkboxRef = useRef<HTMLInputElement>(null)
+  const selectedCount = friends.filter((friend) => selectedIds?.has(friend.id)).length
   const allSelected = friends.length > 0 && selectedCount === friends.length
+
+  useEffect(() => {
+    if (checkboxRef.current) checkboxRef.current.indeterminate = selectedCount > 0 && !allSelected
+  }, [allSelected, selectedCount])
 
   if (friends.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-        <p className="text-gray-500">友だちが見つかりません</p>
+      <div className="rounded-[14px] border border-[#DADDE2] bg-white p-12 text-center shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
+        <p className="text-sm font-medium text-[#565F59]">条件に合う友だちが見つかりません</p>
+        <p className="mt-1 text-xs text-[#8B938D]">検索条件を外すか、別のキーワードでお試しください。</p>
       </div>
     )
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      {/* Header sits inside the same overflow container as the body so the
-          column labels stay aligned with their values when the user scrolls
-          horizontally on narrower viewports (e.g. desktop with sidebar open
-          and the body forced to min-w-[900px]). */}
-      <div className="overflow-x-auto">
-        <div className="min-w-[1000px]">
-          {/*
-            列は設計 `V2 2-2 友だち` の並び。名前が先頭。
-            対応マークを先頭に置くと、一覧を上から追うときに
-            名前より先に記号が目に入り、誰の行か分かるのが遅れる。
-
-            最後の「最終接触」は、放置されている人を見つけるための列。
-            設計では最も右にあり、対応マークと対で読む。
-          */}
-          <div className="hidden lg:grid grid-cols-[32px_220px_80px_120px_1fr_160px_110px] gap-3 px-4 py-2 bg-gray-50 border-b border-gray-200 text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
-            <div>
-              <input
-                type="checkbox"
-                checked={allSelected}
-                // 一部だけ選ばれている状態は、チェックとも空とも違う見え方にする。
-                ref={(el) => {
-                  if (el) el.indeterminate = selectedCount > 0 && !allSelected
-                }}
-                onChange={(e) => onToggleAll?.(e.target.checked)}
-                aria-label="表示中の友だちをすべて選ぶ"
-                className="accent-accent h-4 w-4 cursor-pointer"
-              />
-            </div>
-            <div>名前</div>
-            <div>対応マーク</div>
-            <div>シナリオ</div>
-            <div>受信メッセージ</div>
-            <div>★つきタグ・友だち情報</div>
-            <div>最終接触</div>
-          </div>
-          {friends.map((friend) => (
-              <div key={friend.id}>
-                <FriendListRow
-                  friend={friend}
-                  selected={selectedIds?.has(friend.id)}
-                  onToggleSelect={() => onToggleSelect?.(friend.id)}
-                />
-              </div>
-          ))}
-        </div>
+    <section className="overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white shadow-[1px_1px_2px_rgba(29,29,31,0.13)]" data-design="V4FriendTable">
+      <div className="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b border-[#DADDE2] px-4 py-2.5">
+        <h2 className="whitespace-nowrap text-sm font-bold text-[#1D1D1F]">
+          友だち一覧 <span className="ml-1 text-xs font-semibold text-[#079B45]">{(total ?? friends.length).toLocaleString('ja-JP')}件</span>
+        </h2>
+        {headerRight}
       </div>
-    </div>
+      <div className={`hidden min-w-0 items-center gap-2 border-b border-[#DADDE2] bg-[#F6F6F8] px-3 py-2.5 text-[11px] font-semibold text-[#565F59] lg:grid ${GRID}`}>
+        <div>
+          <input
+            ref={checkboxRef}
+            type="checkbox"
+            checked={allSelected}
+            onChange={(event) => onToggleAll?.(event.target.checked)}
+            aria-label="表示中の友だちをすべて選ぶ"
+            className="h-4 w-4 cursor-pointer accent-[#07C653]"
+          />
+        </div>
+        <div className="truncate">友だち</div>
+        <div className="truncate">対応 / 担当</div>
+        <div className="truncate">シナリオ</div>
+        <div className="truncate">最新メッセージ</div>
+        <div className="truncate">タグ・属性</div>
+        <div className="truncate text-center">最終接触</div>
+      </div>
+      {friends.map((friend) => (
+        <FriendListRow
+          key={friend.id}
+          friend={friend}
+          selected={selectedIds?.has(friend.id)}
+          onToggleSelect={() => onToggleSelect?.(friend.id)}
+          gridClass={RESPONSIVE_GRID}
+        />
+      ))}
+    </section>
   )
 }

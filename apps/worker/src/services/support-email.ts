@@ -1,4 +1,9 @@
 import PostalMime, { type Address } from 'postal-mime';
+import {
+  completeOutboundSendStatement,
+  hashOutboundPayload,
+  reserveOutboundSend,
+} from './outbound-idempotency.js';
 
 const MAX_INBOUND_BYTES = 10 * 1024 * 1024;
 const MAX_BODY_CHARS = 200_000;
@@ -252,7 +257,8 @@ export async function sendSupportEmailReply(
   threadId: string,
   body: string,
   staffId: string,
-): Promise<{ messageId: string }> {
+  idempotencyKey: string,
+): Promise<{ messageId: string; replayed?: boolean }> {
   if (!env.XSERVER_RELAY_SECRET &&
       (!env.XSERVER_MAIL_HOST || !env.XSERVER_MAIL_USER || !env.XSERVER_MAIL_PASSWORD)) {
     throw new Error('EMAIL_NOT_CONFIGURED');
@@ -269,6 +275,7 @@ export async function sendSupportEmailReply(
     throw new Error('INVALID_CUSTOMER_RECIPIENT');
   }
 
+  const replySubject = /^re\s*:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`;
   const latest = await env.DB.prepare(
     `SELECT message_id, references_header FROM support_email_messages
      WHERE thread_id = ? AND message_id IS NOT NULL
@@ -281,8 +288,28 @@ export async function sendSupportEmailReply(
     headers.References = [latest.references_header, latest.message_id].filter(Boolean).join(' ');
   }
 
+  // 必要なDB読み取りを終えてから予約する。予約後は外部送信直前なので、
+  // 読み取りエラーだけで「結果不明」のキーが残る範囲を狭くできる。
+  const payloadHash = await hashOutboundPayload(
+    JSON.stringify({ threadId, to: thread.customer_email, subject: replySubject, body }),
+  );
+  const reservation = await reserveOutboundSend(env.DB, {
+    key: idempotencyKey,
+    channel: 'email',
+    resourceId: threadId,
+    payloadHash,
+    retryInProgress: false,
+    now: new Date().toISOString(),
+  });
+  if (reservation.kind === 'conflict') throw new Error('IDEMPOTENCY_KEY_CONFLICT');
+  if (reservation.kind === 'in_progress' || reservation.kind === 'retry') {
+    throw new Error('IDEMPOTENCY_IN_PROGRESS');
+  }
+  if (reservation.kind === 'replay') {
+    return { messageId: reservation.responseId, replayed: true };
+  }
+
   const contactEmail = env.CONTACT_EMAIL || 'contact-shed@nen-petfood.com';
-  const replySubject = /^re\s*:/i.test(thread.subject) ? thread.subject : `Re: ${thread.subject}`;
   let sentMessageId: string;
   if (env.XSERVER_RELAY_URL && env.XSERVER_RELAY_SECRET) {
     const { sendViaXServerRelay } = await import('./support-relay.js');
@@ -331,6 +358,11 @@ export async function sendSupportEmailReply(
        SET status = 'in_progress', assigned_staff_id = ?, last_message_at = ?,
            last_outgoing_at = ?, updated_at = ? WHERE id = ?`,
     ).bind(staffId, now, now, now, threadId),
+    completeOutboundSendStatement(env.DB, {
+      key: idempotencyKey,
+      responseId: sentMessageId,
+      now,
+    }),
   ]);
 
   console.log(JSON.stringify({ event: 'support_email_replied', threadId, staffId }));

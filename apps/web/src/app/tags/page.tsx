@@ -12,6 +12,8 @@ import FolderPanel from '@/components/shared/folder-panel'
 import FriendFieldList from '@/components/friend-fields/field-list'
 import SupportMarkList from '@/components/friend-fields/mark-list'
 import SavedSearchList from '@/components/friend-fields/saved-search-list'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -112,6 +114,9 @@ function TagsPageInner() {
   const [filter, setFilter] = useState<string>('')
   /** よく使う絞り込み。いま数えられるのは「未使用のタグ」だけ。 */
   const [quickFilter, setQuickFilter] = useState<'' | 'unused'>('')
+  const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
+  const [reorderMode, setReorderMode] = useState(false)
   /** いま掴んでいるタグ。落とした先と入れ替える。 */
   const [dragId, setDragId] = useState<string | null>(null)
   const [groupName, setGroupName] = useState('')
@@ -119,6 +124,9 @@ function TagsPageInner() {
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   /** 編集中のフォルダ。null なら「追加」。 */
   const [editingFolder, setEditingFolder] = useState<TagGroup | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<
+    { kind: 'tag'; tag: Tag } | { kind: 'group'; group: TagGroup } | null
+  >(null)
 
   /*
    * 色はフォルダにだけ付く。中のタグの色から逆算しない。
@@ -194,6 +202,17 @@ function TagsPageInner() {
     return out.filter((t) => t.groupId === filter)
   }, [items, filter, tagQuery, quickFilter])
 
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const pagedVisible = useMemo(
+    () => visible.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [visible, currentPage, pageSize],
+  )
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter, quickFilter, tagQuery, pageSize])
+
   const ungroupedCount = useMemo(() => items.filter((t) => !t.groupId).length, [items])
 
   /**
@@ -240,14 +259,37 @@ function TagsPageInner() {
     }
   }
 
+  /** 画面で絞り込んだ結果を、そのまま運用者が扱えるCSVにする。 */
+  const exportCsv = () => {
+    const quote = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`
+    const rows = visible.map((tag) => [
+      tag.name,
+      tag.friendCount ?? 0,
+      groups.find((group) => group.id === tag.groupId)?.name ?? '未分類',
+      tag.createdAt ? new Date(tag.createdAt).toLocaleDateString('ja-JP') : '',
+      tag.isStarred ? '一覧に表示' : '非表示',
+    ])
+    const csv = [
+      ['タグ名', '友だち人数', '分類', '登録日', '友だち一覧への表示'],
+      ...rows,
+    ]
+      .map((row) => row.map(quote).join(','))
+      .join('\r\n')
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `tags-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
-  const handleDeleteGroup = async (group: TagGroup) => {
-    const count = items.filter((t) => t.groupId === group.id).length
-    const message =
-      count > 0
-        ? `分類「${group.name}」を削除しますか？\n${count} 個のタグは削除されず、未分類に戻ります。`
-        : `分類「${group.name}」を削除しますか？`
-    if (!confirm(message)) return
+
+  const handleDeleteGroup = (group: TagGroup) => {
+    setDeleteTarget({ kind: 'group', group })
+  }
+
+  const confirmDeleteGroup = async (group: TagGroup) => {
     setError('')
     try {
       await api.tagGroups.delete(group.id)
@@ -258,12 +300,11 @@ function TagsPageInner() {
     }
   }
 
-  const handleDelete = async (tag: Tag) => {
-    const count = tag.friendCount ?? 0
-    const message = count > 0
-      ? `タグ「${tag.name}」は ${count} 人の友だちに付与されています。\n削除すると全員からこのタグが外れます。よろしいですか？`
-      : `タグ「${tag.name}」を削除しますか？`
-    if (!confirm(message)) return
+  const handleDelete = (tag: Tag) => {
+    setDeleteTarget({ kind: 'tag', tag })
+  }
+
+  const confirmDeleteTag = async (tag: Tag) => {
     setError('')
     try {
       await api.tags.delete(tag.id)
@@ -286,16 +327,25 @@ function TagsPageInner() {
         action={
           tab === 'tags' ? (
             <div className="flex flex-wrap items-center gap-2">
-              {['マニュアル', 'CSVで一括登録', '並び替え'].map((label) => (
-                <button
-                  key={label}
-                  disabled
-                  title="準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={exportCsv}
+                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
+              >
+                CSV出力
+              </button>
+              <button
+                type="button"
+                aria-pressed={reorderMode}
+                onClick={() => setReorderMode((value) => !value)}
+                className={`rounded-control border px-3 py-2 text-sm font-medium ${
+                  reorderMode
+                    ? 'border-accent bg-accent-soft text-accent'
+                    : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+                }`}
+              >
+                {reorderMode ? '並び替えを終了' : '並び替え'}
+              </button>
               {/* 左のパネルの中に入力欄を出していたが、設計はここのボタン。
                   押すと名前と色を決める窓が開く。 */}
               <button
@@ -555,6 +605,35 @@ function TagsPageInner() {
         </div>
       )}
 
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={
+          deleteTarget?.kind === 'tag'
+            ? `タグ「${deleteTarget.tag.name}」を削除しますか？`
+            : deleteTarget?.kind === 'group'
+              ? `フォルダ「${deleteTarget.group.name}」を削除しますか？`
+              : '削除しますか？'
+        }
+        description={
+          deleteTarget?.kind === 'tag'
+            ? (deleteTarget.tag.friendCount ?? 0) > 0
+              ? `${deleteTarget.tag.friendCount ?? 0} 人の友だちからこのタグが外れます。この操作は元に戻せません。`
+              : 'このタグを削除します。この操作は元に戻せません。'
+            : deleteTarget?.kind === 'group'
+              ? `${items.filter((tag) => tag.groupId === deleteTarget.group.id).length} 個のタグは削除されず、未分類へ移動します。`
+              : ''
+        }
+        confirmLabel="削除する"
+        destructive
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => {
+          const target = deleteTarget
+          setDeleteTarget(null)
+          if (target?.kind === 'tag') void confirmDeleteTag(target.tag)
+          if (target?.kind === 'group') void confirmDeleteGroup(target.group)
+        }}
+      />
+
       {tab === 'tags' && (
       <>
       {error && (
@@ -600,6 +679,12 @@ function TagsPageInner() {
           sortLabel="付与人数が多い順"
         />
 
+        {reorderMode && (
+          <p className="bg-info-bg text-info rounded-control mb-3 px-3 py-2 text-xs">
+            左端のつまみをドラッグして順番を変更できます。変更はその場で保存されます。
+          </p>
+        )}
+
         {/*
           よく使う絞り込み（設計の絵の帯）。数え方が決まっているのは
           「未使用のタグ」だけ。ほかは何をもってそう呼ぶかを決める前に
@@ -629,9 +714,9 @@ function TagsPageInner() {
           ))}
         </div>
 
-      <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px]">
+      <div className="bg-canvas rounded-card border border-hairline overflow-hidden [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <div>
+          <table className="w-full table-fixed">
             <thead>
               {/*
                 列は設計の絵の並び。以前は獲得マイル・紹介者マイル・行動倍率・
@@ -652,26 +737,34 @@ function TagsPageInner() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : visible.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-ink-faint text-sm">
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-ink-faint text-sm">
                   {items.length === 0 ? 'タグがありません' : 'この分類のタグはありません'}
                 </td></tr>
               ) : (
-                visible.map((t) => (
+                pagedVisible.map((t) => (
                   <tr key={t.id} className="hover:bg-canvas-sunken">
                     {/*
                       掴んで上下に入れ替える。並び替えできることは、掴める
                       印が出ていないと気づけない。
                     */}
                     <td
-                      className="text-ink-faint w-10 cursor-grab px-2 py-3 text-center select-none active:cursor-grabbing"
-                      draggable
-                      onDragStart={() => setDragId(t.id)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => void dropOn(t.id)}
+                      className={`text-ink-faint w-10 px-2 py-3 text-center select-none ${
+                        reorderMode ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-30'
+                      }`}
+                      draggable={reorderMode}
+                      onDragStart={() => {
+                        if (reorderMode) setDragId(t.id)
+                      }}
+                      onDragOver={(e) => {
+                        if (reorderMode) e.preventDefault()
+                      }}
+                      onDrop={() => {
+                        if (reorderMode) void dropOn(t.id)
+                      }}
                       aria-label={`${t.name} を並び替える`}
-                      title="上下に動かして並び替え"
+                      title={reorderMode ? '上下に動かして並び替え' : '上の「並び替え」を押すと動かせます'}
                     >
                       ⠿
                     </td>
@@ -751,6 +844,42 @@ function TagsPageInner() {
             </tbody>
           </table>
         </div>
+        <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
+          <label className="text-ink-secondary flex items-center gap-2 text-xs">
+            表示件数
+            <select
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+              className="border-hairline rounded-control bg-canvas border px-2 py-1.5 text-xs"
+            >
+              {[20, 30, 40, 50].map((size) => (
+                <option key={size} value={size}>{size}件</option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-ink-faint">
+              {visible.length === 0 ? '0件' : `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)}件`} / {visible.length}件
+            </span>
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((value) => Math.max(1, value - 1))}
+              className="border-hairline rounded-control border px-3 py-1.5 disabled:opacity-35"
+            >
+              前へ
+            </button>
+            <span className="text-ink-secondary min-w-16 text-center">{currentPage} / {totalPages}</span>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
+              className="border-hairline rounded-control border px-3 py-1.5 disabled:opacity-35"
+            >
+              次へ
+            </button>
+          </div>
+        </div>
       </div>
         </div>
       </div>
@@ -761,11 +890,21 @@ function TagsPageInner() {
   )
 }
 
-export default function TagsPage() {
+function LegacyTagsPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
       <TagsPageInner />
+    </Suspense>
+  )
+}
+
+void LegacyTagsPage
+
+export default function TagsPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
+      <TagsPageV4 />
     </Suspense>
   )
 }

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { fetchApi } from '@/lib/api'
+import { formatDurationMinutes } from '@/lib/format-duration'
 
 type Summary = {
   total: number
@@ -79,7 +80,7 @@ export default function SupportAlertPanel() {
         <div className="grid grid-cols-3 border-b border-rose-100 bg-rose-50/60 p-4 lg:grid-cols-1 lg:border-b-0 lg:border-r">
           <Metric label="LINE" value={summary.line} />
           <Metric label="メール" value={summary.email} />
-          <Metric label="最長待ち" value={summary.oldestWaitMinutes == null ? '—' : `${summary.oldestWaitMinutes}分`} />
+          <Metric label="最長待ち" value={summary.oldestWaitMinutes == null ? '—' : formatDurationMinutes(summary.oldestWaitMinutes)} />
         </div>
         <div className="divide-y divide-gray-100">
           {items.map((item) => (

@@ -9,6 +9,7 @@ import { AccountSwitchDialog } from '@/components/accounts/account-switcher'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useAccount } from '@/contexts/account-context'
 import AccountHierarchy from './account-hierarchy'
+import AccountMigration from './migration'
 
 type WebhookStatus = 'matched' | 'mismatched' | 'unconfigured' | 'unknown'
 
@@ -44,6 +45,7 @@ interface LineAccountListItem {
 const MERGED_TABS = [
   { key: 'accounts', label: 'アカウント一覧' },
   { key: 'hierarchy', label: 'LINEアカウント構成' },
+  { key: 'migration', label: 'データ移行' },
 ]
 const PAGE_SIZE = 20
 
@@ -70,7 +72,7 @@ function AccountsPageInner() {
     setLoading(true)
     setError('')
     const [accountsResult, summaryResult] = await Promise.allSettled([
-      api.lineAccounts.list(),
+      api.lineAccounts.list(true),
       api.lineAccounts.summary(),
     ])
     if (accountsResult.status === 'fulfilled' && accountsResult.value.success) {
@@ -248,6 +250,14 @@ function AccountsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   const tabs = <div data-design="Tabs"><MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} /></div>
   if (tab === 'hierarchy') return <AccountHierarchy tabs={tabs} />
+  if (tab === 'migration') return <div>
+    <div data-design="Head"><Header
+      title="データ移行"
+      description="タグ・シナリオ・テンプレートなど、別のLINEアカウントへ引き継げる設定と現在の準備状況を確認します。"
+    /></div>
+    {tabs}
+    <AccountMigration />
+  </div>
   return <div>
     <div data-design="Head"><Header
       title="アカウント"

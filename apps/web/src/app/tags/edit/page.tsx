@@ -7,6 +7,8 @@ import type { Tag, TagGroup } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import EditTagPageV4 from '@/components/friend-fields/edit-tag-page-v4'
 
 /**
  * タグを編集する。
@@ -58,6 +60,8 @@ function EditTagInner() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [applyToExisting, setApplyToExisting] = useState(false)
+  const [retroactiveConfirmOpen, setRetroactiveConfirmOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (!tagId) {
@@ -82,6 +86,7 @@ function EditTagInner() {
           setMultiplier(found.mileageMultiplierBps == null ? '' : String(found.mileageMultiplierBps))
           setPriority(String(found.mileageMultiplierPriority ?? 0))
           setIsStarred(found.isStarred ?? false)
+          setApplyToExisting(false)
         }
       }
     } catch {
@@ -95,7 +100,7 @@ function EditTagInner() {
     void load()
   }, [load])
 
-  const save = async () => {
+  const save = async (confirmedRetroactive = false) => {
     if (saving) return
     if (!name.trim()) {
       setError('タグ名を入力してください')
@@ -116,6 +121,7 @@ function EditTagInner() {
         referralRewardMiles: Number(referralReward) || 0,
         multiplierBps: multiplier === '' ? null : Number(multiplier),
         multiplierPriority: Number(priority) || 0,
+        applyToExisting: confirmedRetroactive && applyToExisting,
       })
       if (!res.success) throw new Error(res.error)
       // 付与が積まれたときだけ件数を出す。0件のときに出すと、
@@ -125,12 +131,25 @@ function EditTagInner() {
           ? `保存しました。${res.data.queued} 人にマイルを積みました`
           : '保存しました',
       )
+      setApplyToExisting(false)
       void load()
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存に失敗しました')
     } finally {
       setSaving(false)
     }
+  }
+
+  const requestSave = () => {
+    const needsConfirmation =
+      applyToExisting &&
+      (tag?.friendCount ?? 0) > 0 &&
+      (Number(reward) > 0 || Number(referralReward) > 0)
+    if (needsConfirmation) {
+      setRetroactiveConfirmOpen(true)
+      return
+    }
+    void save(false)
   }
 
   if (!tagId) {
@@ -159,7 +178,7 @@ function EditTagInner() {
 
       <Header
         title="タグを編集"
-        description="名前・色・分類と、マイルの倍率を変えられます。"
+        description="名前・分類と、タグが付いた時のマイル連動を変更できます。"
         action={
           <div className="flex items-center gap-2">
             <button
@@ -169,7 +188,7 @@ function EditTagInner() {
               キャンセル
             </button>
             <button
-              onClick={() => void save()}
+              onClick={requestSave}
               disabled={saving || loading}
               className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium disabled:opacity-40"
             >
@@ -202,7 +221,7 @@ function EditTagInner() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <div className="space-y-5">
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
               <p className="text-ink mb-4 text-sm font-semibold">1. どのタグか</p>
 
               <Field label="タグ名" htmlFor="tag-name" required>
@@ -241,7 +260,7 @@ function EditTagInner() {
               </Field>
             </section>
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
               <p className="text-ink mb-1 text-sm font-semibold">2. 自動で付ける条件</p>
               {/* きっかけはタグ側ではなく、回答フォームやオートメーション側に置かれている。 */}
               <p className="text-ink-faint text-xs leading-relaxed">
@@ -249,8 +268,8 @@ function EditTagInner() {
               </p>
             </section>
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
-              <p className="text-ink mb-1 text-sm font-semibold">3. マイルの倍率</p>
+            <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+              <p className="text-ink mb-1 text-sm font-semibold">3. マイル連動</p>
               <p className="text-ink-faint mb-4 text-xs leading-relaxed">
                 このタグを持つ人のマイル付与に倍率をかけられます。
               </p>
@@ -292,7 +311,7 @@ function EditTagInner() {
 
               <div className="border-hairline mt-4 grid gap-4 border-t pt-4 sm:grid-cols-2">
                 <Field
-                  label="獲得マイル"
+                  label="本人へ付与するマイル"
                   htmlFor="tag-reward"
                   note="このタグが初めて付いたときに一度だけ積みます。"
                 >
@@ -306,7 +325,7 @@ function EditTagInner() {
                   />
                 </Field>
                 <Field
-                  label="紹介者マイル"
+                  label="紹介者へ付与するマイル"
                   htmlFor="tag-referral"
                   note="紹介された人にこのタグが付いたとき、紹介者へ積みます。"
                 >
@@ -320,6 +339,21 @@ function EditTagInner() {
                   />
                 </Field>
               </div>
+
+              <label className="border-warning/30 bg-warning-bg rounded-control mt-4 flex cursor-pointer items-start gap-3 border p-3">
+                <input
+                  type="checkbox"
+                  checked={applyToExisting}
+                  onChange={(e) => setApplyToExisting(e.target.checked)}
+                  className="accent-accent mt-0.5"
+                />
+                <span className="text-ink-secondary text-sm">
+                  すでにこのタグが付いている人にも遡って付与する
+                  <span className="text-ink-faint block text-xs leading-relaxed">
+                    対象は {(tag.friendCount ?? 0).toLocaleString('ja-JP')} 人です。通常の保存では既存ユーザーへ付与しません。
+                  </span>
+                </span>
+              </label>
 
               <label className="border-hairline rounded-control mt-4 flex cursor-pointer items-start gap-3 border p-3">
                 <input
@@ -340,7 +374,7 @@ function EditTagInner() {
 
           {/* 右：できあがるタグ */}
           <aside className="space-y-4">
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
               <p className="text-ink mb-3 text-sm font-semibold">できあがるタグ</p>
               <span
                 className="rounded-pill inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium"
@@ -356,28 +390,50 @@ function EditTagInner() {
               </p>
             </section>
 
-            <section className="bg-canvas rounded-card border-hairline border p-5">
+            <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
               <p className="text-ink mb-1 text-sm font-semibold">いま付いている人</p>
               <p className="text-ink text-xl font-bold tabular-nums">
                 {(tag.friendCount ?? 0).toLocaleString('ja-JP')}
                 <span className="text-ink-faint ml-1 text-xs font-normal">人</span>
               </p>
               <p className="text-ink-faint mt-2 text-xs leading-relaxed">
-                獲得マイルを変えても、すでに付いている人へは積み直されません。倍率は次の付与から効きます。
+                通常の保存では、すでに付いている人へマイルを積み直しません。遡及する場合だけ左の項目を選びます。
               </p>
             </section>
           </aside>
         </div>
       )}
+      <ConfirmDialog
+        open={retroactiveConfirmOpen}
+        title="既存の友だちへマイルを遡及しますか？"
+        description={`このタグが付いている ${(tag?.friendCount ?? 0).toLocaleString('ja-JP')} 人を対象に、未付与分をキューへ登録します。通常の保存より影響が大きい操作です。`}
+        confirmLabel="遡及して保存"
+        destructive
+        onCancel={() => setRetroactiveConfirmOpen(false)}
+        onConfirm={() => {
+          setRetroactiveConfirmOpen(false)
+          void save(true)
+        }}
+      />
     </div>
   )
 }
 
-export default function EditTagPage() {
+function LegacyEditTagPage() {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<div className="text-ink-faint p-6 text-sm">読み込み中...</div>}>
       <EditTagInner />
+    </Suspense>
+  )
+}
+
+void LegacyEditTagPage
+
+export default function EditTagPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
+      <EditTagPageV4 />
     </Suspense>
   )
 }

@@ -126,6 +126,7 @@ describe('画面の一覧', () => {
       '/friends',
       '/friends/detail',
       '/tags',
+      '/tags-v2',
       '/tags/fields/new',
       '/scenarios',
       '/broadcasts',

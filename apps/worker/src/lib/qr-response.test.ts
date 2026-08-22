@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { qrResponseHeaders, normalizeQrFormat } from './qr-response.js';
+import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './qr-response.js';
 
 describe('qrResponseHeaders', () => {
   it('displays QR images inline by default', () => {
@@ -22,6 +22,20 @@ describe('qrResponseHeaders', () => {
       'Content-Type': 'image/svg+xml',
       'Content-Disposition': 'attachment; filename="qr.svg"',
     });
+  });
+});
+
+describe('public QR input bounds', () => {
+  it('accepts normal sizes and rejects oversized work', () => {
+    expect(normalizeQrSize(undefined)).toBe('240x240');
+    expect(normalizeQrSize('1024x1024')).toBe('1024x1024');
+    expect(normalizeQrSize('2048x2048')).toBeNull();
+    expect(normalizeQrSize('wide')).toBeNull();
+  });
+
+  it('limits encoded data to 2 KiB', () => {
+    expect(isQrDataAllowed('a'.repeat(2048))).toBe(true);
+    expect(isQrDataAllowed('あ'.repeat(683))).toBe(false);
   });
 });
 

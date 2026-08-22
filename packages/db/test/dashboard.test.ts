@@ -44,7 +44,7 @@ function jstDate(offsetDays = 0): string {
 
 function insertFriend(
   id: string,
-  opts: { following?: number; hidden?: number; createdAt?: string } = {},
+  opts: { following?: number; hidden?: number; createdAt?: string; lineAccountId?: string } = {},
 ): void {
   sqlite
     .prepare(
@@ -59,6 +59,9 @@ function insertFriend(
       opts.createdAt ?? `${jstDate(0)}T10:00:00.000+09:00`,
       `${jstDate(0)}T10:00:00.000+09:00`,
     );
+  if (opts.lineAccountId) {
+    sqlite.prepare('UPDATE friends SET line_account_id = ? WHERE id = ?').run(opts.lineAccountId, id);
+  }
 }
 
 beforeEach(() => {
@@ -256,6 +259,35 @@ describe('初回返信の平均', () => {
 });
 
 describe('全体', () => {
+  test('選択したアカウントだけを集計し、単独配信と複数アカウント配信を含める', async () => {
+    for (const id of ['account-a', 'account-b']) {
+      sqlite.prepare(
+        `INSERT INTO line_accounts
+          (id, channel_id, name, channel_access_token, channel_secret)
+         VALUES (?, ?, ?, 'token', 'secret')`,
+      ).run(id, `channel-${id}`, id);
+    }
+    insertFriend('friend-a', { lineAccountId: 'account-a' });
+    insertFriend('friend-b', { lineAccountId: 'account-b' });
+
+    const day = `${jstDate(0)}T10:00:00.000+09:00`;
+    for (const row of [
+      ['single-a', 'all', 'account-a', null],
+      ['single-b', 'all', 'account-b', null],
+      ['multi', 'multi-account-dedup', 'account-a', '["account-a","account-b"]'],
+    ] as const) {
+      sqlite.prepare(
+        `INSERT INTO broadcasts
+          (id, title, message_type, message_content, target_type, status, created_at, line_account_id, account_ids)
+         VALUES (?, ?, 'text', '本文', ?, 'sent', ?, ?, ?)`,
+      ).run(row[0], row[0], row[1], day, row[2], row[3]);
+    }
+
+    const overview = await getDashboardOverview(db, 'today', 'account-a');
+    expect(overview.friends.total).toBe(1);
+    expect(overview.delivery.broadcasts).toBe(2);
+  });
+
   test('集計した時刻を返す', async () => {
     // カードごとに基準時刻がずれていないことの手がかりになる。
     const overview = await getDashboardOverview(db, 'today', null);

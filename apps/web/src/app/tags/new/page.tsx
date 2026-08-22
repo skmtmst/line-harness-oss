@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { TagGroup } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import NewTagPageV4 from '@/components/friend-fields/new-tag-page-v4'
 
 /**
  * 倍率の選択肢。内部は bps（10000 = 1.0倍）で持つ。
@@ -18,11 +19,13 @@ const MULTIPLIERS = [
   { value: '30000', label: '3.0倍' },
 ]
 
-export default function NewTagPage() {
+function LegacyNewTagPage() {
   const [name, setName] = useState('')
   const [groupId, setGroupId] = useState('')
 
   const [groups, setGroups] = useState<TagGroup[]>([])
+  const [reward, setReward] = useState('0')
+  const [referralReward, setReferralReward] = useState('0')
   const [multiplier, setMultiplier] = useState('')
   const [priority, setPriority] = useState('0')
   const [isStarred, setIsStarred] = useState(false)
@@ -48,8 +51,25 @@ export default function NewTagPage() {
       description="友だちを分類するタグを作ります。グループは「お悩み」「ペット」などの分類、タグはその中身です。"
       parent={['タグ管理', '/tags']}
       saveLabel="タグを作る"
-      validate={() => (name.trim() ? null : 'タグ名を入力してください')}
-      onReset={() => setName('')}
+      validate={() => {
+        if (!name.trim()) return 'タグ名を入力してください'
+        if (!Number.isInteger(Number(reward)) || Number(reward) < 0) {
+          return '本人へ付与するマイルは0以上の整数で入力してください'
+        }
+        if (!Number.isInteger(Number(referralReward)) || Number(referralReward) < 0) {
+          return '紹介者へ付与するマイルは0以上の整数で入力してください'
+        }
+        return null
+      }}
+      onReset={() => {
+        setName('')
+        setGroupId('')
+        setReward('0')
+        setReferralReward('0')
+        setMultiplier('')
+        setPriority('0')
+        setIsStarred(false)
+      }}
       onSave={async () => {
         // 色は送らない。印の色はフォルダに付いていて、タグ側は持たない。
         const res = await api.tags.create({
@@ -61,20 +81,27 @@ export default function NewTagPage() {
         if (isStarred) {
           await api.tags.update(res.data.id, { isStarred: true })
         }
-        // 倍率は作成の受け口に無い。作ったあとに当てる。
-        if (multiplier !== '' || priority !== '0') {
+        // マイル設定は作成の受け口に無い。作った直後に安全に当てる。
+        // 新規タグなので既存の付与済み友だちはおらず、遡及処理は不要。
+        if (
+          Number(reward) > 0 ||
+          Number(referralReward) > 0 ||
+          multiplier !== '' ||
+          priority !== '0'
+        ) {
           await api.tags.updateMileage(res.data.id, {
-            rewardMiles: 0,
-            referralRewardMiles: 0,
+            rewardMiles: Number(reward) || 0,
+            referralRewardMiles: Number(referralReward) || 0,
             multiplierBps: multiplier === '' ? null : Number(multiplier),
             multiplierPriority: Number(priority) || 0,
+            applyToExisting: false,
           })
         }
         return res.data.id
       }}
       aside={
         <div className="space-y-4">
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
             <p className="text-ink mb-3 text-sm font-semibold">できあがるタグ</p>
             <div className="flex items-center gap-2">
               <span
@@ -91,9 +118,27 @@ export default function NewTagPage() {
             <p className="text-ink-faint mt-3 text-xs leading-relaxed">
               このタグは、配信の絞り込み・シナリオの開始条件・自動応答の付与先として使えます。
             </p>
+            {(Number(reward) > 0 || Number(referralReward) > 0 || multiplier !== '') && (
+              <dl className="border-hairline mt-4 space-y-2 border-t pt-3 text-xs">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-faint">本人への初回付与</dt>
+                  <dd className="text-ink font-semibold">{Number(reward).toLocaleString('ja-JP')} mile</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-faint">紹介者への付与</dt>
+                  <dd className="text-ink font-semibold">{Number(referralReward).toLocaleString('ja-JP')} mile</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-ink-faint">以後の倍率</dt>
+                  <dd className="text-ink font-semibold">
+                    {multiplier === '' ? '1.0倍' : `${Number(multiplier) / 10000}倍`}
+                  </dd>
+                </div>
+              </dl>
+            )}
           </section>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
             <div className="mb-1 flex items-baseline justify-between gap-2">
               <p className="text-ink text-sm font-semibold">グループを追加する</p>
               <Link href="/tags" className="text-accent shrink-0 text-xs hover:underline">
@@ -185,11 +230,46 @@ export default function NewTagPage() {
         </div>
       </section>
 
-      <section className="border-hairline rounded-card border p-5">
-        <p className="text-ink mb-1 text-sm font-semibold">3. マイルの倍率</p>
+      <section className="border-hairline rounded-card border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <p className="text-ink mb-1 text-sm font-semibold">3. マイル連動</p>
         <p className="text-ink-faint mb-4 text-xs leading-relaxed">
-          このタグを持つ人のマイル付与に倍率をかけられます。
+          タグが初めて付いた時のマイルと、タグを持っている間の倍率をまとめて設定します。
         </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="本人へ付与するマイル"
+            htmlFor="tag-reward"
+            note="このタグが初めて付いた時に、本人へ1回だけ付与します。"
+          >
+            <input
+              id="tag-reward"
+              type="number"
+              min={0}
+              step={1}
+              value={reward}
+              onChange={(e) => setReward(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+          <Field
+            label="紹介者へ付与するマイル"
+            htmlFor="tag-referral-reward"
+            note="紹介された人にこのタグが付いた時、紹介者へ1回だけ付与します。"
+          >
+            <input
+              id="tag-referral-reward"
+              type="number"
+              min={0}
+              step={1}
+              value={referralReward}
+              onChange={(e) => setReferralReward(e.target.value)}
+              className={inputClass}
+            />
+          </Field>
+        </div>
+
+        <div className="border-hairline mt-4 border-t pt-4">
+          <p className="text-ink mb-3 text-sm font-medium">タグを持っている間の倍率</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="倍率" htmlFor="tag-multiplier">
             <select
@@ -224,6 +304,7 @@ export default function NewTagPage() {
             </select>
           </Field>
         </div>
+        </div>
 
         <label className="border-hairline rounded-control mt-4 flex cursor-pointer items-start gap-3 border p-3">
           <input
@@ -241,5 +322,15 @@ export default function NewTagPage() {
         </label>
       </section>
     </CreatePage>
+  )
+}
+
+void LegacyNewTagPage
+
+export default function NewTagPage() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-ink-faint">読み込み中…</p>}>
+      <NewTagPageV4 />
+    </Suspense>
   )
 }

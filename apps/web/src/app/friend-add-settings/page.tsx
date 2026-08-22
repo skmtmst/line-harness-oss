@@ -31,6 +31,7 @@ export default function FriendAddSettingsPage() {
     returning: number
     unblocked: number
   } | null>(null)
+  const [breakdownError, setBreakdownError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -39,13 +40,26 @@ export default function FriendAddSettingsPage() {
       if (m.success) setMarks(m.data.map(x => ({ id: x.id, name: x.name })))
       if (f.success) setFields(f.data.map(x => ({ id: x.id, name: x.name })))
     }).catch(() => undefined)
-    void api.friends.addBreakdown({ days: 30 }).then(res => {
-      if (!cancelled && res.success) setBreakdown(res.data)
-    })
     return () => {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    setBreakdown(null)
+    setBreakdownError(false)
+    if (!accountId) return () => { cancelled = true }
+
+    void api.friends.addBreakdown({ days: 30, accountId }).then(res => {
+      if (!cancelled && res.success) setBreakdown(res.data)
+    }).catch(() => {
+      if (!cancelled) setBreakdownError(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [accountId])
 
   const load = useCallback(async () => {
     if (!accountId) {
@@ -464,7 +478,9 @@ export default function FriendAddSettingsPage() {
             <div className="border-hairline mt-4 border-t pt-3">
               <p className="text-ink text-xs font-bold">この1か月の実績</p>
               <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
-                {breakdown
+                {breakdownError
+                  ? '実績を取得できませんでした。画面を再読み込みしてください。'
+                  : breakdown
                   ? `はじめて ${breakdown.firstTime}人 ・ 以前から ${breakdown.returning}人。うち${breakdown.unblocked}人はブロック解除でした。`
                   : '読み込み中…'}
               </p>

@@ -368,13 +368,13 @@ export async function getFriendAddBreakdown(
     .prepare(
       `SELECT
          SUM(CASE WHEN COALESCE(unfollow_count, 0) = 0 THEN 1 ELSE 0 END) AS first_time,
-         SUM(CASE WHEN COALESCE(unfollow_count, 0) > 0 THEN 1 ELSE 0 END) AS returning
+         SUM(CASE WHEN COALESCE(unfollow_count, 0) > 0 THEN 1 ELSE 0 END) AS returning_count
        FROM friends
        WHERE julianday('now', '+9 hours') - julianday(created_at) <= ?
          ${accountClause}`,
     )
     .bind(...binds)
-    .first<{ first_time: number | null; returning: number | null }>();
+    .first<{ first_time: number | null; returning_count: number | null }>();
 
   // ブロック解除で戻ってきた人。いまフォロー中で、外れたことがある人。
   const unblockBinds: unknown[] = [days];
@@ -395,7 +395,7 @@ export async function getFriendAddBreakdown(
   return {
     days,
     firstTime: Number(row?.first_time ?? 0),
-    returning: Number(row?.returning ?? 0),
+    returning: Number(row?.returning_count ?? 0),
     unblocked: Number(unblockRow?.count ?? 0),
   };
 }

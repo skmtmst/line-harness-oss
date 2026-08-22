@@ -820,6 +820,12 @@ CREATE TABLE media_usages (
   PRIMARY KEY (media_id, ref_kind, ref_id)
 );
 
+CREATE TABLE meet_callback_receipts (
+  session_id   TEXT PRIMARY KEY,
+  payload_hash TEXT NOT NULL,
+  received_at  TEXT NOT NULL
+);
+
 CREATE TABLE meet_consultation_reminders (
   id               TEXT PRIMARY KEY,
   consultation_id  TEXT NOT NULL REFERENCES meet_consultations (id) ON DELETE CASCADE,
@@ -1213,6 +1219,18 @@ CREATE TABLE operators (
   is_active  INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE outbound_send_requests (
+  idempotency_key TEXT PRIMARY KEY,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  resource_id     TEXT NOT NULL,
+  payload_hash    TEXT NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('in_progress', 'succeeded')),
+  response_id     TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  completed_at    TEXT
 );
 
 CREATE TABLE outgoing_webhooks (
@@ -2092,6 +2110,8 @@ CREATE INDEX idx_carousel_taps_action ON carousel_taps(template_id, column_index
 
 CREATE INDEX idx_carousel_taps_friend ON carousel_taps(template_id, friend_id);
 
+CREATE INDEX idx_chats_friend_status_message ON chats(friend_id, status, last_message_at);
+
 CREATE UNIQUE INDEX idx_chats_friend_unique ON chats (friend_id);
 
 CREATE INDEX idx_chats_operator ON chats (operator_id);
@@ -2099,6 +2119,8 @@ CREATE INDEX idx_chats_operator ON chats (operator_id);
 CREATE INDEX idx_chats_status ON chats (status);
 
 CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_code);
+
+CREATE INDEX idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
 
 CREATE INDEX idx_conversion_events_friend ON conversion_events (friend_id);
 
@@ -2233,6 +2255,9 @@ CREATE INDEX idx_login_audit_user ON login_audit(admin_user_id, created_at);
 
 CREATE INDEX idx_media_kind ON media(kind, created_at DESC);
 
+CREATE INDEX idx_meet_callback_receipts_received
+  ON meet_callback_receipts(received_at);
+
 CREATE INDEX idx_meet_consultation_reminders_due
   ON meet_consultation_reminders (status, scheduled_at);
 
@@ -2241,6 +2266,8 @@ CREATE INDEX idx_meet_consultations_friend ON meet_consultations (friend_id);
 CREATE INDEX idx_meet_consultations_start ON meet_consultations (status, starts_at);
 
 CREATE INDEX idx_menus_account_sort ON menus (line_account_id, sort_order);
+
+CREATE INDEX idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
 
 CREATE INDEX idx_messages_log_broadcast_id ON messages_log(broadcast_id);
 
@@ -2320,6 +2347,9 @@ CREATE INDEX idx_notifications_status ON notifications (status);
 
 CREATE INDEX idx_operation_audit_kind_date
   ON operation_audit (target_kind, created_at);
+
+CREATE INDEX idx_outbound_send_requests_created
+  ON outbound_send_requests(created_at);
 
 CREATE INDEX idx_ref_tracking_friend ON ref_tracking (friend_id);
 

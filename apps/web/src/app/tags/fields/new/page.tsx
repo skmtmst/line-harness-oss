@@ -134,7 +134,7 @@ function NewFriendFieldForm() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="space-y-5">
-      <section className="bg-canvas rounded-card border-hairline space-y-5 border p-6">
+      <section className="bg-canvas rounded-card border-hairline space-y-5 border p-6 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
         <div>
           <p className="text-ink mb-3 text-sm font-semibold">1. どの項目か</p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -272,7 +272,7 @@ function NewFriendFieldForm() {
 
       </section>
 
-      <section className="bg-canvas rounded-card border-hairline space-y-3 border p-6">
+      <section className="bg-canvas rounded-card border-hairline space-y-3 border p-6 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
         <p className="text-ink text-sm font-semibold">3. どこで使うか</p>
 
         <label className="border-hairline rounded-control flex cursor-pointer items-start gap-3 border p-3">
@@ -312,7 +312,7 @@ function NewFriendFieldForm() {
         </div>
       </section>
 
-      <section className="bg-canvas rounded-card border-hairline space-y-3 border p-6">
+      <section className="bg-canvas rounded-card border-hairline space-y-3 border p-6 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
         <p className="text-ink text-sm font-semibold">4. 値の入り方</p>
         <p className="text-ink-faint text-xs leading-relaxed">
           この項目に値がどこから入るかを決めます。
@@ -381,7 +381,7 @@ function NewFriendFieldForm() {
 
       {/* 右：どこに出るか */}
       <aside className="space-y-4">
-        <section className="bg-canvas rounded-card border-hairline border p-5">
+        <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
           <p className="text-ink mb-3 text-sm font-semibold">どこに出るか</p>
           <ul className="space-y-3">
             <li>
@@ -410,7 +410,7 @@ function NewFriendFieldForm() {
           </ul>
         </section>
 
-        <section className="bg-canvas rounded-card border-hairline border p-5">
+        <section className="bg-canvas rounded-card border-hairline border p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
           <p className="text-ink mb-2 text-sm font-semibold">気をつけること</p>
           <ul className="text-ink-faint space-y-1.5 text-xs leading-relaxed">
             <li>・項目名はあとから変えられますが、差し込みキーは変わりません</li>

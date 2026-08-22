@@ -17,7 +17,7 @@ import {
 
 // ─── メニュー定義 ───
 //
-// Pen.dev の V2 設計（`V2 1-1 ダッシュボード` のサイドバー）に合わせている。
+// Pen.dev の V4 設計（`hmBzC` のサイドバー）に合わせている。
 // 区分・並び・呼び名は設計が出どころで、勝手に足したり並べ替えたりしない。
 //
 // 行き先（href）は実装側の都合で決まる。設計は画面の名前しか持たないので、
@@ -34,13 +34,19 @@ import {
  */
 function NavIcon({ d }: { d: string }) {
   return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={d} />
     </svg>
   )
 }
 
-export default function Sidebar() {
+export default function Sidebar({
+  friendAttributesV2Mode = false,
+  preview = false,
+}: {
+  friendAttributesV2Mode?: boolean
+  preview?: boolean
+} = {}) {
   const pathname = usePathname()
   const { selectedAccountId } = useAccount()
   const brand = useBrand()
@@ -77,6 +83,16 @@ export default function Sidebar() {
   const [itemOrder, setItemOrder] = useState<Record<string, string[]> | null>(null)
   const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean>>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
+  const [currentSearch, setCurrentSearch] = useState('')
+
+  // 同じ画面の別タブをメニューへ出す項目（コンバージョン、データ移行）が
+  // あるため、pathnameだけでなくクエリも選択状態へ反映する。
+  useEffect(() => {
+    const sync = () => setCurrentSearch(window.location.search)
+    sync()
+    window.addEventListener('popstate', sync)
+    return () => window.removeEventListener('popstate', sync)
+  }, [pathname])
 
   // 設定を読む。取れなくても既定の並び・表示で使えるので、失敗は握る。
   useEffect(() => {
@@ -116,12 +132,13 @@ export default function Sidebar() {
   }, [selectedAccountId])
   // 区分の中の並びを当ててから、区分そのものの並びを当てる。
   const sections = orderedMenuSections(itemOrder)
-  const orderedSections = sectionOrder
+  const normalizedSectionOrder = sectionOrder?.map((label) => label === 'NEN運用' ? '専用機能' : label)
+  const orderedSections = normalizedSectionOrder
     ? [
-        ...sectionOrder
+        ...normalizedSectionOrder
           .map((label) => sections.find((s) => (s.label ?? '') === label))
           .filter((s): s is (typeof sections)[number] => Boolean(s)),
-        ...sections.filter((s) => !sectionOrder.includes(s.label ?? '')),
+        ...sections.filter((s) => !normalizedSectionOrder.includes(s.label ?? '')),
       ]
     : sections
 
@@ -129,9 +146,16 @@ export default function Sidebar() {
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
+        // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
+        if (friendAttributesV2Mode && item.href === '/tags') return false
+        if (friendAttributesV2Mode && item.href === '/conversions') return false
+        if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
-        if (staffRole === 'staff' && !staffPermissions.includes(item.href)) return false
+        // 移行確認用のV2は、現行「友だち属性」の権限をそのまま引き継ぐ。
+        const inheritsTagsPermission = item.href === '/tags-v2' && staffPermissions.includes('/tags')
+        if (staffRole === 'staff' && !staffPermissions.includes(item.href) && !inheritsTagsPermission) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (
           featureKey &&
@@ -142,6 +166,7 @@ export default function Sidebar() {
       }),
     }))
     .filter((section) => section.items.length > 0)
+    .filter((section) => !friendAttributesV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
 
   useEffect(() => {
     let cancelled = false
@@ -230,13 +255,15 @@ export default function Sidebar() {
    * 「共通情報」(/contents/vars) を開くと「登録メディア一覧」(/contents) も
    * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
    */
+  // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
+  const activePathname = pathname === '/visual-qa/friend-attributes-v2' ? '/tags-v2' : pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {
       for (const item of section.items) {
         if (item.href === '/') continue
         const path = item.href.split('?')[0]
-        if (pathname !== path && !pathname.startsWith(path + '/')) continue
+        if (activePathname !== path && !activePathname.startsWith(path + '/')) continue
         if (best === null || path.length > best.length) best = path
       }
     }
@@ -244,8 +271,16 @@ export default function Sidebar() {
   })()
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
-    return href.split('?')[0] === activeHref
+    if (href === '/') return activePathname === '/'
+    const [path, query = ''] = href.split('?')
+    if (path !== activeHref) return false
+
+    const siblingQueries = sections
+      .flatMap((section) => section.items)
+      .filter((item) => item.href.split('?')[0] === path && item.href.includes('?'))
+      .map((item) => item.href.split('?')[1])
+    if (query) return currentSearch === `?${query}`
+    return !siblingQueries.some((siblingQuery) => currentSearch === `?${siblingQuery}`)
   }
 
   /**
@@ -273,58 +308,69 @@ export default function Sidebar() {
           </div>
         </div>
       ) : (
-        /* PCの先頭はアカウント切替ではなく、用途が分かる固定見出しにする。 */
-        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-gray-200 px-5">
-          <svg className="h-5 w-5 shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-          <p className="text-sm font-bold text-gray-900">管理メニュー</p>
-        </div>
+        null
       )}
 
-      <AccountSwitcher />
+      {preview ? (
+        <div className="px-[13px] pb-[9px] pt-[18px]">
+          <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
+          <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent">然</div>
+            <div className="ml-3 min-w-0 flex-1">
+              <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
+              <p className="mt-0.5 truncate text-[10px] text-ink-faint">コミュニケーション</p>
+            </div>
+          </div>
+        </div>
+      ) : <AccountSwitcher />}
 
       {/* ナビゲーション */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className={`flex-1 space-y-0.5 px-3 pb-2 ${preview ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {visibleSections.map((section, si) => (
-          <div key={si}>
+          <div key={si} className="space-y-0.5">
             {section.label && (
-              <div className="px-3 pb-2 pt-5">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{section.label}</p>
+              <div className={`flex px-3 ${friendAttributesV2Mode ? 'h-[20px] items-center' : 'h-[34px] items-end pb-[5px] pt-3'}`}>
+                <p className="text-xs font-semibold text-gray-400">{section.label}</p>
               </div>
             )}
             {section.items.map((item) => {
               const active = isActive(item.href)
               const isDanger = 'danger' in item && item.danger
+              const visibleLabel = friendAttributesV2Mode && item.href === '/tags-v2'
+                ? '友だち属性'
+                : item.label
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  title={item.label}
+                  onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
+                  title={visibleLabel}
                   /*
                     いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
                     この形。緑で塗りつぶして白抜きにすると、色の面積が大きく
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  className={`relative flex items-center gap-[11px] rounded-[10px] px-3 font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${friendAttributesV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} text-[13px]` : 'h-10 text-sm'} ${
                     active
                       ? isDanger
                         ? 'bg-danger-bg text-danger'
-                        : 'bg-accent-soft text-accent'
+                        : friendAttributesV2Mode
+                          ? 'border border-accent bg-accent-soft text-accent'
+                          : 'bg-accent-soft text-accent'
                       : isDanger
                         ? 'text-red-500 hover:bg-red-50'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        : `${friendAttributesV2Mode ? 'border border-transparent' : ''} text-gray-600 hover:bg-gray-100 hover:text-gray-900`
                   }`}
                 >
                   <span className="shrink-0"><NavIcon d={item.icon} /></span>
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate">{visibleLabel}</span>
                   {badgeCount(item) > 0 && (
                     <>
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
                       {/* 地が薄い緑になったので、選ばれていても札の色は変えない。
                           緑ベタの上に置いていたころは白抜きにする必要があった。 */}
-                      <span className="bg-amber-500 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
+                      <span className="bg-red-500 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
                       <span className="sr-only">{badgeCount(item)} 件</span>
@@ -338,21 +384,21 @@ export default function Sidebar() {
       </nav>
 
       {/* フッター */}
-      <div className="border-t border-gray-200">
-        {staffName && (
+      <div className={`border-t border-gray-200 ${preview ? 'min-h-[72px]' : ''}`}>
+        {(staffName || preview) && (
           <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
-            <div className="font-medium text-gray-700">{staffName}</div>
+            <div className="font-medium text-gray-700">{preview ? 'Kenta Kawano(Obama)' : staffName}</div>
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
               staffRole === 'owner' ? 'bg-yellow-100 text-yellow-800' :
               staffRole === 'admin' ? 'bg-blue-100 text-blue-800' :
               staffRole === 'viewer' ? 'bg-emerald-100 text-emerald-800' :
               'bg-gray-100 text-gray-600'
             }`}>
-              {staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : staffRole === 'viewer' ? '閲覧のみ' : 'スタッフ'}
+              {preview ? '管理者' : staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : staffRole === 'viewer' ? '閲覧のみ' : 'スタッフ'}
             </span>
           </div>
         )}
-        <div className="px-6 py-4">
+        {!preview && <div className="px-6 py-4">
           <button
             onClick={async () => {
               try {
@@ -382,7 +428,7 @@ export default function Sidebar() {
             </svg>
             <span>ログアウト</span>
           </button>
-        </div>
+        </div>}
       </div>
     </>
   )

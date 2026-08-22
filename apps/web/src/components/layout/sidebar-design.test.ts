@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * サイドバーが Pen.dev の V2 設計と一致していることを確かめる。
+ * サイドバーが Pen.dev の V4 設計（hmBzC）と一致していることを確かめる。
  *
  * 設計（`V2 1-1 ダッシュボード` のサイドバー）が出どころで、
  * 区分・並び・呼び名を勝手に変えないための歯止め。
@@ -23,11 +23,11 @@ const MENU = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'lib', 'm
 const MENU_START = 'export const MENU_SECTIONS: MenuSection[] = [';
 const MENU_END = '/** 区分の目印から中身を引く。 */';
 
-/** Pen.dev の V2 設計から書き写した区分と項目。並びも設計どおり。 */
+/** Pen.dev の V4 設計から書き写した区分と項目。並びも設計どおり。 */
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
   // 上の4つは見出しを付けない。設計でも「対応」「友だち属性」の見出しは無く、
   // 毎日開くものが見出し無しでひとかたまりになっている。
-  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性'] },
+  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性', '友だち属性V2'] },
   {
     section: '配信',
     items: [
@@ -50,20 +50,13 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   },
   {
     section: '成果と分析',
-    items: ['成果とアフィリエイト', 'マイル', '流入と計測', '分析'],
+    items: ['成果とアフィリエイト', 'マイル', '流入と計測', 'コンバージョン', '分析'],
   },
   { section: '自動化', items: ['オートメーション', '外部連携'] },
   { section: '予約', items: ['予約管理', '予約設定', 'イベント予約'] },
-  { section: 'NEN運用', items: ['ECデータ連携', 'LINE通知', 'フォロー配信', '投稿写真審査'] },
-  { section: '設定', items: ['アカウント', 'ログインユーザー', '機能設定', '運用状態'] },
-  {
-    // 飲食店向けはPen R-1〜R-8を正本とし、既存V2の運用状態より下へ分離する。
-    section: '飲食店向け（テスト）',
-    items: [
-      '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
-      '予約枠・在庫', 'メニュー管理', 'Google・口コミ', 'LINE来店フォロー',
-    ],
-  },
+  // LINE通知はV4作成前から運用中の承認済み追加機能なので、専用機能の末尾に残す。
+  { section: '専用機能', items: ['NEN配信', '写真審査', 'EC連携', 'LINE通知'] },
+  { section: '設定', items: ['アカウント', 'ログインユーザー', '機能設定', 'データ移行', '運用状態'] },
 ];
 
 /** menu.ts の MENU_SECTIONS から、区分と項目を順序どおりに読む。 */
@@ -93,6 +86,7 @@ const ROUTES: Record<string, string> = {
   受信箱: '/chats',
   友だち: '/friends',
   友だち属性: '/tags',
+  友だち属性V2: '/tags-v2',
   シナリオ配信: '/scenarios',
   一斉配信: '/broadcasts',
   テンプレート: '/templates',
@@ -103,39 +97,32 @@ const ROUTES: Record<string, string> = {
   ウェビナー: '/webinars',
   共通情報: '/contents/vars',
   登録メディア一覧: '/contents',
-  成果とアフィリエイト: '/conversions',
+  成果とアフィリエイト: '/conversions?tab=affiliates',
   回答フォーム: '/form-submissions',
   マイル: '/scoring',
   流入と計測: '/inflow-links',
+  コンバージョン: '/conversions',
   分析: '/analytics',
   オートメーション: '/automations',
   外部連携: '/webhooks',
   予約管理: '/booking/bookings',
   予約設定: '/booking/menus',
   イベント予約: '/events',
-  フォロー配信: '/nen-campaigns',
+  NEN配信: '/nen-campaigns',
   // 仕様書 §2 は /health と書いているが、/health は「BAN検知ダッシュボード」。
   // 写真審査の画面は /nen-members。§3-1 が BAN検知を「運用状態」へ
   // 統合すると書いているので、そちらに合わせている。
-  投稿写真審査: '/nen-members',
-  ECデータ連携: '/ec-commerce',
+  写真審査: '/nen-members',
+  EC連携: '/ec-commerce',
   LINE通知: '/line-notifications',
   アカウント: '/accounts',
   ログインユーザー: '/staff',
   機能設定: '/settings',
+  データ移行: '/accounts?tab=migration',
   運用状態: '/emergency',
-  店舗ダッシュボード: '/restaurant-test/dashboard',
-  '組織・権限': '/restaurant-test/organization',
-  承認ワークフロー: '/restaurant-test/approvals',
-  予約台帳: '/restaurant-test/reservations',
-  '座席・卓管理': '/restaurant-test/tables',
-  '予約枠・在庫': '/restaurant-test/inventory',
-  メニュー管理: '/restaurant-test/menu',
-  'Google・口コミ': '/restaurant-test/google',
-  LINE来店フォロー: '/restaurant-test/line-followup',
 };
 
-describe('サイドバーが V2 設計と一致する', () => {
+describe('サイドバーが V4 設計と一致する', () => {
   const actual = readSidebar();
 
   it('区分の数と並びが設計どおり', () => {
@@ -149,11 +136,11 @@ describe('サイドバーが V2 設計と一致する', () => {
     },
   );
 
-  it('項目の総数が設計どおり（41）', () => {
+  it('項目の総数が設計どおり（35）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 30 → 31 は「コンテンツ」を「共通情報」「登録メディア一覧」に分けた分。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(41);
+    expect(total).toBe(35);
   });
 
   it('項目の行き先が仕様どおり', () => {
@@ -212,8 +199,8 @@ describe('レスポンシブのメニュー名を維持する', () => {
     expect(source).not.toContain('countryFlag');
   });
 
-  it('PCの先頭に固定の管理メニュー見出しがある', () => {
-    expect(source).toContain('PCの先頭はアカウント切替ではなく');
-    expect(source).toContain('<p className="text-sm font-bold text-gray-900">管理メニュー</p>');
+  it('PCの先頭はV4どおりLINEアカウント切替から始まる', () => {
+    expect(source).toContain('null');
+    expect(source).not.toContain('PCの先頭はアカウント切替ではなく');
   });
 });

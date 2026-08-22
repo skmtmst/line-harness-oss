@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { fetchApi } from '@/lib/api'
+import { createPortal } from 'react-dom'
+import { ApiError, fetchApi } from '@/lib/api'
+import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import TemplatePicker from '@/components/chats/template-picker'
 
 /**
@@ -47,23 +49,30 @@ function dateTime(iso: string): string {
 export default function EmailThread({
   threadId,
   onChanged,
+  customerInfoOpen = false,
+  onOpenCustomerInfo,
 }: {
   threadId: string
   /** 状態や返信で一覧の中身が変わったときに知らせる。 */
   onChanged?: () => void
+  customerInfoOpen?: boolean
+  onOpenCustomerInfo?: () => void
 }) {
   const [detail, setDetail] = useState<EmailDetail | null>(null)
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const sendKeysRef = useRef(new IdempotencyKeyStore())
 
   // 以下は LINE のトークに揃えるためのもの（設計 `TalkPane` / `Reply`）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
-  const [notes, setNotes] = useState('')
-  const [savingNotes, setSavingNotes] = useState(false)
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [showComposerOptions, setShowComposerOptions] = useState(false)
+  const [showMemoEditor, setShowMemoEditor] = useState(false)
+  const [memoDraft, setMemoDraft] = useState('')
+  const [memoSaving, setMemoSaving] = useState(false)
+  const [memoError, setMemoError] = useState('')
   /** 送信キー。LINE 側と同じ設定を読む。別々にすると片方だけ効かない。 */
   const [sendMode, setSendMode] = useState<'enter' | 'shift-enter'>('shift-enter')
 
@@ -99,8 +108,6 @@ export default function EmailThread({
         )
         if (res.success) {
           setDetail(res.data)
-          // 入力中に5秒ごとの取り直しで消えないよう、空のときだけ入れる。
-          setNotes(prev => (prev === '' ? (res.data.thread.notes ?? '') : prev))
           if (!quiet) {
             window.setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
@@ -165,38 +172,69 @@ export default function EmailThread({
     }
   }
 
-  const saveNotes = async () => {
-    setSavingNotes(true)
-    try {
-      const res = await fetchApi<{ success: boolean; error?: string }>(
-        `/api/support/email/threads/${encodeURIComponent(threadId)}/notes`,
-        { method: 'PATCH', body: JSON.stringify({ notes }) },
-      )
-      if (!res.success) setError(res.error || 'メモを保存できませんでした')
-      else setError('')
-    } catch {
-      setError('メモを保存できませんでした')
-    } finally {
-      setSavingNotes(false)
-    }
-  }
-
   const sendReply = async () => {
     if (!reply.trim() || sending) return
+    const content = reply.trim()
+    const signature = JSON.stringify({ threadId, body: content })
+    const idempotencyKey = sendKeysRef.current.get(signature)
     setSending(true)
     setError('')
     try {
       await fetchApi(`/api/support/email/threads/${encodeURIComponent(threadId)}/reply`, {
         method: 'POST',
-        body: JSON.stringify({ body: reply }),
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ body: content }),
       })
+      sendKeysRef.current.clear(signature)
       setReply('')
       await load()
       onChanged?.()
-    } catch {
-      setError('返信を送れませんでした')
+    } catch (sendError) {
+      setError(
+        sendError instanceof ApiError && sendError.status === 409
+          ? '送信結果を確認中です。二重送信を避けるため再送せず、受信履歴を確認してください'
+          : '返信を送れませんでした',
+      )
     } finally {
       setSending(false)
+    }
+  }
+
+  const openMemoEditor = () => {
+    setMemoDraft(detail?.thread.notes ?? '')
+    setMemoError('')
+    setShowMemoEditor(true)
+  }
+
+  const closeMemoEditor = () => {
+    setMemoDraft(detail?.thread.notes ?? '')
+    setMemoError('')
+    setShowMemoEditor(false)
+  }
+
+  const saveMemo = async () => {
+    if (!detail || memoSaving) return
+    setMemoSaving(true)
+    setMemoError('')
+    try {
+      const res = await fetchApi<{ success: boolean; error?: string }>(
+        `/api/support/email/threads/${encodeURIComponent(threadId)}/notes`,
+        { method: 'PATCH', body: JSON.stringify({ notes: memoDraft }) },
+      )
+      if (!res.success) {
+        setMemoError(res.error || '内部メモを保存できませんでした')
+        return
+      }
+      setDetail((current) => current ? {
+        ...current,
+        thread: { ...current.thread, notes: memoDraft || null },
+      } : current)
+      setShowMemoEditor(false)
+      onChanged?.()
+    } catch {
+      setMemoError('内部メモを保存できませんでした')
+    } finally {
+      setMemoSaving(false)
     }
   }
 
@@ -210,17 +248,14 @@ export default function EmailThread({
 
   return (
     <>
-      <div className="border-hairline flex items-center justify-between gap-2 border-b px-4 py-4">
+      <div className="flex min-h-[66px] items-center justify-between gap-2 border-b border-[#E5E7EB] bg-canvas px-4 py-3">
         <div className="min-w-0">
           <p className="text-ink truncate text-sm font-medium">{detail.thread.subject}</p>
           <p className="text-ink-faint mt-0.5 truncate text-xs">
             {detail.thread.customer_name || detail.thread.customer_email} ・ メール
           </p>
         </div>
-        {/* LINE のトークと同じ並び：対応 ・ 担当。
-            「友だち詳細」はここには置けない。メールは差出人のアドレスしか
-            分からず、LINEの友だちと結びついていない（どの項目で突き合わせるかが
-            未決。docs/v025-design-pass-day1.md の5番）。 */}
+        {/* LINE のトークと同じ並び：対応 ・ 担当 ・ 顧客情報。 */}
         <div className="flex flex-wrap items-center justify-end gap-3">
           <label className="flex items-center gap-1.5 text-xs">
             <span className="text-ink-faint">対応</span>
@@ -249,21 +284,30 @@ export default function EmailThread({
               ))}
             </select>
           </label>
+          {!customerInfoOpen && onOpenCustomerInfo && (
+            <button
+              type="button"
+              onClick={onOpenCustomerInfo}
+              className="whitespace-nowrap rounded-lg border border-[#E5E7EB] bg-canvas px-2.5 py-1.5 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
+            >
+              顧客情報を開く
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="flex-1 space-y-4 overflow-y-auto bg-[#F7F8F6] p-4">
         {detail.messages.map((message) => (
           <div key={message.id} className={`flex items-end gap-2 ${message.direction === 'outgoing' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[86%] rounded-2xl px-4 py-3 shadow-sm sm:max-w-[72%] ${
                 message.direction === 'outgoing'
-                  ? 'rounded-br-md bg-[#c9f4d8] text-gray-900'
-                  : 'rounded-bl-md bg-white text-gray-900'
+                  ? 'rounded-br-md bg-[#c9f4d8] text-ink'
+                  : 'rounded-bl-md bg-canvas text-ink'
               }`}
             >
               <p className="text-sm leading-6 break-words whitespace-pre-wrap">{message.body_text}</p>
-              <p className="mt-2 text-right text-[10px] text-gray-400">
+              <p className="mt-2 text-right text-[10px] text-ink-faint">
                 {dateTime(message.created_at)}
                 {message.direction === 'outgoing' ? ' ・ 送信済み' : ''}
               </p>
@@ -286,43 +330,31 @@ export default function EmailThread({
         <div ref={bottomRef} />
       </div>
 
-      {/* メモ。LINE のトークと同じ位置・同じ形（114 で列を足した）。 */}
-      <div className="border-hairline bg-canvas-sunken border-t px-4 py-2">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="メモを入力..."
-            className="border-hairline bg-canvas focus:ring-accent flex-1 rounded-md border px-2 py-1 text-xs focus:ring-1 focus:outline-none"
-          />
-          <button
-            onClick={() => void saveNotes()}
-            disabled={savingNotes}
-            className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50"
-          >
-            {savingNotes ? '保存中...' : 'メモ保存'}
-          </button>
-        </div>
-      </div>
-
-      <div className="border-hairline border-t px-4 py-3">
+      <div data-inbox-v4="composer" className="sticky bottom-0 border-t border-[#E5E7EB] bg-canvas px-4 py-3">
         {/* 上段。LINE のトークと同じ：テンプレートを選択 ・ 送信の設定 …… 改行のしかた */}
         <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowTemplatePicker(true)}
-              className="text-accent text-xs hover:underline"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
             >
-              テンプレートを選択
+              ▧ テンプレートを選択
             </button>
             <button
               type="button"
               onClick={() => setShowComposerOptions(v => !v)}
-              className="text-accent text-xs hover:underline"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
             >
-              {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+              ⚙ {showComposerOptions ? '送信の設定を閉じる' : '送信の設定'}
+            </button>
+            <button
+              type="button"
+              onClick={openMemoEditor}
+              aria-expanded={showMemoEditor}
+              className="inline-flex items-center rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]"
+            >
+              内部メモ
             </button>
           </div>
           <span className="text-ink-faint text-xs">
@@ -361,41 +393,90 @@ export default function EmailThread({
           </div>
         )}
 
-        {error && <p className="text-danger mb-2 text-xs">{error}</p>}
-        <textarea
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return
-            if (e.metaKey || e.ctrlKey) {
-              e.preventDefault()
-              void sendReply()
-              return
-            }
-            // LINE 側と同じ判定。enter は Enter 単体で送信、
-            // shift-enter は Shift + Enter で送信。
-            const shouldSend = sendMode === 'enter' ? !e.shiftKey : e.shiftKey
-            if (shouldSend) {
-              e.preventDefault()
-              void sendReply()
-            }
-          }}
-          placeholder="メールの返信を入力"
-          aria-label="メールの返信を入力"
-          rows={3}
-          className="border-hairline rounded-control focus:ring-accent w-full resize-none border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-ink-faint text-xs">
-            差出人 contact-shed@nen-petfood.com
-          </span>
-          <button
-            onClick={() => void sendReply()}
-            disabled={!reply.trim() || sending}
-            className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-5 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+        {showMemoEditor && typeof document !== 'undefined' && createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#101828]/45 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="email-internal-memo-title"
+            onClick={closeMemoEditor}
           >
-            {sending ? '送信中...' : 'メールで返信'}
-          </button>
+            <div
+              className="w-full max-w-lg rounded-[14px] border border-[#E5E7EB] bg-canvas shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="border-b border-[#E5E7EB] px-5 py-4">
+                <div>
+                  <h2 id="email-internal-memo-title" className="text-ink text-base font-bold">内部メモ</h2>
+                  <p className="text-ink-faint mt-1 text-xs">担当者だけに表示され、相手には送信されません。</p>
+                </div>
+              </div>
+              <div className="px-5 py-4">
+                <label htmlFor="email-internal-memo" className="text-xs font-semibold text-[#667085]">メモ内容</label>
+                <textarea
+                  id="email-internal-memo"
+                  value={memoDraft}
+                  onChange={(event) => setMemoDraft(event.target.value)}
+                  rows={7}
+                  autoFocus
+                  placeholder="メモを追加"
+                  className="mt-2 w-full resize-y rounded-lg border border-[#D0D5DD] bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+                />
+                {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
+              </div>
+              <div className="flex justify-end gap-2 border-t border-[#E5E7EB] px-5 py-4">
+                <button type="button" onClick={closeMemoEditor} className="rounded-lg border border-[#E5E7EB] bg-canvas px-4 py-2 text-sm font-semibold text-[#667085] hover:bg-[#F7F8F6]">キャンセル</button>
+                <button
+                  type="button"
+                  onClick={() => void saveMemo()}
+                  disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}
+                  className="rounded-lg bg-[#06C755] px-4 py-2 text-sm font-semibold text-on-accent hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {memoSaving ? '保存中...' : '保存'}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+        {error && <p className="text-danger mb-2 text-xs">{error}</p>}
+        <div className="rounded-[10px] border border-[#D0D5DD] bg-canvas p-2 focus-within:border-[#06C755] focus-within:ring-2 focus-within:ring-[#06C755]/15">
+          <textarea
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              if (e.metaKey || e.ctrlKey) {
+                e.preventDefault()
+                void sendReply()
+                return
+              }
+              // LINE 側と同じ判定。enter は Enter 単体で送信、
+              // shift-enter は Shift + Enter で送信。
+              const shouldSend = sendMode === 'enter' ? !e.shiftKey : e.shiftKey
+              if (shouldSend) {
+                e.preventDefault()
+                void sendReply()
+              }
+            }}
+            placeholder="メールの返信を入力"
+            aria-label="メールの返信を入力"
+            rows={3}
+            className="w-full resize-none border-0 px-1 py-1 text-sm outline-none"
+          />
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <span className="text-ink-faint text-xs">
+              差出人 contact-shed@nen-petfood.com
+            </span>
+            <button
+              onClick={() => void sendReply()}
+              disabled={!reply.trim() || sending}
+              className="rounded-lg bg-[#06C755] px-5 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-[#05B94F] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {sending ? '送信中...' : 'メールで返信'}
+            </button>
+          </div>
         </div>
       </div>
 

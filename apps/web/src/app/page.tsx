@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { EntryRoute } from '@line-crm/shared'
 import { api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { formatDurationMinutes } from '@/lib/format-duration'
 import PendingInboxCard, { type PendingInboxSummary } from '@/components/support/pending-inbox-card'
 import ShipmentPanel, { type ShipmentSummary } from '@/components/dashboard/shipment-panel'
 import QrDialog from '@/components/dashboard/qr-dialog'
@@ -53,7 +54,7 @@ function EditIcon() {
 
 function DashboardCard({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`bg-canvas rounded-card border-hairline border shadow-[1px_2px_0_rgba(26,28,26,0.10)] ${className}`}>
+    <section className={`bg-canvas rounded-[18px] border-hairline border shadow-[1px_1px_2px_rgba(29,29,31,0.13)] ${className}`}>
       {children}
     </section>
   )
@@ -75,15 +76,15 @@ function TodayTaskCard({
   status: string
 }) {
   return (
-    <DashboardCard className="flex min-h-[138px] flex-col p-5">
+    <DashboardCard className="flex h-[112px] min-w-0 flex-col p-4">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-ink text-sm font-semibold">{title}</h3>
         <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
       </div>
-      <p className="text-ink mt-4 text-3xl font-bold tabular-nums">
+      <p className="text-ink mt-2 text-[28px] leading-none font-bold tabular-nums">
         {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-0.5 text-lg">件</span>
       </p>
-      <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+      <div className="mt-auto flex items-end justify-between gap-3 pt-2">
         <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
         <span className="text-success shrink-0 text-xs font-medium">{status}</span>
       </div>
@@ -129,7 +130,7 @@ function FriendAddLinkCard() {
   }
 
   return (
-    <DashboardCard className="p-5">
+    <DashboardCard className="p-[18px]">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-ink text-sm font-semibold">友だち追加リンク</h2>
@@ -202,6 +203,77 @@ function EmptyDataCard({ title, href, linkLabel }: { title: string; href: string
   )
 }
 
+function LiveDataCard({
+  title, href, linkLabel, value, unit = '件', detail,
+}: {
+  title: string; href: string; linkLabel: string; value: number | null; unit?: string; detail: string
+}) {
+  return (
+    <DashboardCard className="p-[18px]">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="text-ink text-sm font-semibold">{title}</h2>
+        <Link href={href} className="text-action text-xs hover:underline">{linkLabel} →</Link>
+      </div>
+      <p className="text-ink mt-4 text-2xl font-bold tabular-nums">
+        {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
+      </p>
+      <p className="text-ink-faint mt-2 truncate text-xs" title={detail}>{detail}</p>
+    </DashboardCard>
+  )
+}
+
+function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] | null }) {
+  const used = delivery?.quotaUsed ?? null
+  const limit = delivery?.quotaLimit ?? null
+  const remaining = used !== null && limit !== null ? Math.max(0, limit - used) : null
+  const remainingRate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
+  return <DashboardCard className="min-h-[128px] p-[18px]">
+    <div className="flex items-start justify-between gap-3">
+      <h2 className="text-ink text-base font-bold">今月の送信枠</h2>
+      <span className="text-ink-faint text-xs">月初リセット</span>
+    </div>
+    <p className="text-ink mt-3 text-2xl font-bold tabular-nums">
+      {remaining === null || limit === null ? '—' : `${remaining.toLocaleString('ja-JP')} / ${limit.toLocaleString('ja-JP')}通`}
+    </p>
+    <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className="bg-accent h-full rounded-pill" style={{ width: `${remainingRate ?? 0}%` }} /></div>
+    <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+      <span className="text-success">{remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}</span>
+      <Link href="/accounts" className="text-action font-medium hover:underline">配信設定へ →</Link>
+    </div>
+  </DashboardCard>
+}
+
+function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null }) {
+  const currentHealthIssue = risk === 'warning' || risk === 'danger'
+  // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
+  // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
+  const count = risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0
+  return <DashboardCard className="min-h-[128px] p-[18px]">
+    <div className="flex items-start justify-between gap-3">
+      <h2 className="text-ink text-base font-bold">運用アラート</h2>
+      <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `${count}件`}</span>
+    </div>
+    <div className="text-ink-secondary mt-3 space-y-2 text-xs">
+      <p>・接続・自動処理：{risk === null ? '確認中' : currentHealthIssue ? '確認が必要です' : '正常です'}</p>
+      <p>・未対応の最長待ち：{oldestWaitMinutes === null ? '確認中' : `${formatDurationMinutes(oldestWaitMinutes)}（受信箱で確認）`}</p>
+    </div>
+    <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
+  </DashboardCard>
+}
+
+function ConnectionStatusCard({ account, risk, activeFriends }: { account: ReturnType<typeof useAccount>['selectedAccount']; risk: HealthRisk; activeFriends: number | null }) {
+  const webhook = account?.webhook?.status
+  const webhookLabel = webhook === 'matched' ? '正常' : webhook === 'mismatched' || webhook === 'unconfigured' ? '要確認' : '確認中'
+  return <DashboardCard className="min-h-[128px] p-[18px]">
+    <h2 className="text-ink text-base font-bold">接続状態</h2>
+    <dl className="mt-3 space-y-2 text-xs">
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">LINE Webhook</dt><dd className={webhookLabel === '正常' ? 'text-success font-semibold' : webhookLabel === '要確認' ? 'text-danger font-semibold' : 'text-ink-faint'}>{webhookLabel}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
+      <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-success font-semibold">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
+    </dl>
+  </DashboardCard>
+}
+
 export default function DashboardPage() {
   const { selectedAccountId, selectedAccount } = useAccount()
   const [period, setPeriod] = useState<PeriodKey>('today')
@@ -216,6 +288,16 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<BookingRequest[] | null>(null)
   const [supplementLoading, setSupplementLoading] = useState(true)
   const [healthRisk, setHealthRisk] = useState<HealthRisk>(null)
+  const [healthIssueCount, setHealthIssueCount] = useState<number | null>(null)
+  const loadRequestId = useRef(0)
+  const visibleMain = preferences.main.filter((item) => item.visible)
+  const visibleRight = preferences.right.filter((item) => item.visible)
+  const visibleToday = preferences.today.filter((item) => item.visible)
+  const shipmentVisible = visibleMain.some((item) => item.id === 'shipment')
+  const needsPhotos = visibleToday.some((item) => item.id === 'today-photo-review')
+  const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
+    || visibleRight.some((item) => item.id === 'upcoming')
+  const needsHealth = visibleRight.some((item) => item.id === 'operational-alerts' || item.id === 'connection-status')
 
   useEffect(() => {
     const key = dashboardStorageKey(selectedAccountId)
@@ -235,16 +317,18 @@ export default function DashboardPage() {
   }
 
   const load = useCallback(async () => {
+    const requestId = ++loadRequestId.current
     setLoading(true)
     setError('')
     try {
       const response = await api.dashboard.overview({ period, accountId: selectedAccountId ?? undefined })
+      if (requestId !== loadRequestId.current) return
       if (response.success) setData(response.data)
       else setError(response.error)
     } catch {
-      setError('データの読み込みに失敗しました')
+      if (requestId === loadRequestId.current) setError('データの読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestId.current) setLoading(false)
     }
   }, [period, selectedAccountId])
 
@@ -255,28 +339,34 @@ export default function DashboardPage() {
       setBookings(null)
       setPendingPhotos(null)
       setHealthRisk(null)
+      setHealthIssueCount(null)
       setSupplementLoading(false)
       return
     }
     let cancelled = false
     setSupplementLoading(true)
     void Promise.allSettled([
-      api.nenMembers.overview(),
-      bookingApi.listRequests(selectedAccountId, 'all'),
-      api.health.getHealth(selectedAccountId),
+      needsPhotos ? api.nenMembers.overview() : Promise.resolve(null),
+      needsBookings ? bookingApi.listRequests(selectedAccountId, 'all') : Promise.resolve(null),
+      needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
     ]).then(([photoResult, bookingResult, healthResult]) => {
       if (cancelled) return
-      setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value.success ? photoResult.value.data.pendingPhotos : null)
-      setBookings(bookingResult.status === 'fulfilled' ? bookingResult.value.requests : null)
+      setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingPhotos : null)
+      setBookings(bookingResult.status === 'fulfilled' && bookingResult.value ? bookingResult.value.requests : null)
       setHealthRisk(
-        healthResult.status === 'fulfilled' && healthResult.value.success
+        healthResult.status === 'fulfilled' && healthResult.value?.success
           ? (healthResult.value.data.riskLevel as HealthRisk)
+          : null,
+      )
+      setHealthIssueCount(
+        healthResult.status === 'fulfilled' && healthResult.value?.success
+          ? healthResult.value.data.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
           : null,
       )
       setSupplementLoading(false)
     })
     return () => { cancelled = true }
-  }, [selectedAccountId])
+  }, [needsBookings, needsHealth, needsPhotos, selectedAccountId])
 
   const activeBookings = useMemo(
     () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],
@@ -291,29 +381,47 @@ export default function DashboardPage() {
     : data
       ? `対応中 ${data.inbox.inProgress}`
       : '読み込み中'
-  const visibleMain = preferences.main.filter((item) => item.visible)
-  const visibleRight = preferences.right.filter((item) => item.visible)
-  const shipmentVisible = visibleMain.some((item) => item.id === 'shipment')
-  const pendingInboxVisible = visibleMain.some((item) => item.id === 'pending-inbox')
-
   const renderMainCard = (id: DashboardCardId): ReactNode => {
     if (id === 'pending-inbox') return <PendingInboxCard onSummaryChange={setInboxSummary} />
     if (id === 'friend-trend') return <FriendTrendCard data={data} loading={loading} />
     if (id === 'friend-add') return <FriendAddLinkCard />
-    if (id === 'scenario-status') return <EmptyDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" />
-    if (id === 'uid-migration') return <EmptyDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" />
+    if (id === 'scenario-status') {
+      const scenarios = data?.operations?.scenarios
+      return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'uid-migration') {
+      const migrations = data?.operations?.migrations
+      return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? '取得できません' : '読み込み中'} />
+    }
+    return null
+  }
+
+  const renderTodayCard = (id: DashboardCardId): ReactNode => {
+    if (id === 'today-inbox') return <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${formatDurationMinutes(inboxSummary.oldestWaitMinutes)}` : '確認待ち'} />
+    if (id === 'today-photo-review') return <TodayTaskCard title="写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
+    if (id === 'today-bookings') return <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
+    if (id === 'today-shipments') return <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
     return null
   }
 
   const renderRightCard = (id: DashboardCardId): ReactNode => {
+    if (id === 'send-quota') return <SendQuotaCard delivery={data?.delivery ?? null} />
+    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? data?.inbox.oldestUnansweredMinutes ?? null} />
+    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={data?.friends.active ?? null} />
     if (id === 'upcoming') return <UpcomingCard bookings={bookings} loading={supplementLoading} />
     if (id === 'monthly-delivery') return data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
     if (id === 'recent-results') return data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
     if (id === 'friend-status' && data) return <FriendStatusCard friends={data.friends} />
-    if (id === 'booking-status') return <EmptyDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" />
-    if (id === 'inflow-top') return <EmptyDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" />
-    if (id === 'funnel-alert') return <EmptyDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" />
-    if (id === 'automation-failures') return <EmptyDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" />
+    if (id === 'booking-status') {
+      const bookingsStatus = data?.operations?.bookings
+      return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'inflow-top') {
+      const inflowTop = data?.operations?.inflowTop
+      return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし' : data ? '取得できません' : '読み込み中'} />
+    }
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={data?.operations?.funnelAlerts ?? null} detail="3人以上追加・成果0件の経路" />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={data?.operations?.automationFailures ?? null} detail="期間内の失敗・一部失敗" />
     return null
   }
 
@@ -322,12 +430,9 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <header data-design="Head" className="mb-7 flex flex-wrap items-start justify-between gap-4">
+      <header data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <h1 className="text-ink text-2xl font-bold sm:text-3xl">ダッシュボード</h1>
-            <p className="text-ink-faint mt-1 text-sm">{selectedAccount ? `${selectedAccount.displayName || selectedAccount.name} の運用状況です。` : '今日の運用状況です。'}</p>
-          </div>
+          <h1 className="text-ink text-2xl font-bold tracking-tight">ダッシュボード</h1>
           <button type="button" onClick={() => setEditorOpen(true)} className="border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken rounded-control mt-0.5 inline-flex items-center gap-2 border px-3 py-2 text-xs font-medium">
             <EditIcon />ダッシュボード編集
           </button>
@@ -349,34 +454,31 @@ export default function DashboardPage() {
       </header>
 
       {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
+      {data?.partialFailures?.length ? (
+        <div className="bg-warning-bg text-warning rounded-card mb-5 p-4 text-sm" role="status">
+          一部のデータを取得できませんでした（{data.partialFailures.join('、')}）。0件としては表示していません。
+        </div>
+      ) : null}
 
-      <section data-design="TodayTasks" className="mb-6">
-        <div className="mb-3 flex items-center justify-between gap-3">
+      {visibleToday.length > 0 ? <section data-design="TodayTasks" className="mb-6">
+        <div className="mb-2.5 flex items-center justify-between gap-3">
           <h2 className="text-ink text-lg font-bold">今日やること</h2>
           <span className="text-ink-faint text-xs">優先度順</span>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <TodayTaskCard title="対応が必要な受信" href="/chats" action="受信箱を開く" value={pendingTotal} detail={pendingDetail} status={inboxSummary?.oldestWaitMinutes != null ? `最長 ${inboxSummary.oldestWaitMinutes}分` : '確認待ち'} />
-          <TodayTaskCard title="投稿写真審査" href="/nen-members?tab=photos" action="審査する" value={pendingPhotos} detail={pendingPhotos === null ? '読み込み中' : `確認待ち ${pendingPhotos}件`} status="ポイント付与あり" />
-          <TodayTaskCard title="今日の予約" href="/booking/bookings" action="予約を見る" value={bookings === null ? null : todayBookings.length} detail="変更・取消を含む予約一覧" status={upcomingBookings.length > 0 ? `次回 ${new Date(upcomingBookings[0].starts_at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}` : '次回予定なし'} />
-          <TodayTaskCard title="出荷予定" href="/ec-commerce" action="ECを見る" value={shipmentSummary?.today ?? null} detail="EC通知から算出" status={shipmentSummary ? `今日・明日 ${shipmentSummary.soon}件` : '確認中'} />
+          {visibleToday.map((item) => <div key={item.id}>{renderTodayCard(item.id)}</div>)}
         </div>
-      </section>
+      </section> : null}
 
       <div data-design="Shipment" className={shipmentVisible ? 'mb-6' : 'hidden'} aria-hidden={!shipmentVisible}>
         <ShipmentPanel onSummaryChange={setShipmentSummary} />
       </div>
-      {!pendingInboxVisible && (
-        <div className="hidden" aria-hidden="true">
-          <PendingInboxCard onSummaryChange={setInboxSummary} />
-        </div>
-      )}
 
-      <div data-design="Body" className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0 space-y-5">
+      <div data-design="Middle" className="grid grid-cols-1 items-start gap-[18px] xl:grid-cols-[minmax(0,3fr)_minmax(300px,1fr)]">
+        <div data-design="Body" className="min-w-0 space-y-[18px]">
           {visibleMain.filter((item) => item.id !== 'shipment').map((item) => <div key={item.id}>{renderMainCard(item.id)}</div>)}
         </div>
-        <aside className="min-w-0 space-y-5">
+        <aside className="min-w-0 space-y-3.5">
           {visibleRight.map((item) => <div key={item.id}>{renderRightCard(item.id)}</div>)}
         </aside>
       </div>

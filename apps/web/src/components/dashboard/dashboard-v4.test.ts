@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import {
   defaultDashboardPreferences,
   normalizeDashboardPreferences,
+  reorderDashboardItems,
 } from './dashboard-editor'
 import { activeUpcomingBookings } from './side-cards'
+import { formatTrendSources } from './friend-trend-table'
 import type { BookingRequest } from '@/lib/api'
 
 function booking(id: string, startsAt: string, status = 'confirmed'): BookingRequest {
@@ -26,8 +30,38 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
 }
 
 describe('ダッシュボードV4の初期表示', () => {
+  it('見出しを受信箱と同じ文字サイズで表示する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('text-ink text-2xl font-bold tracking-tight">ダッシュボード')
+    expect(source).not.toContain('sm:text-3xl">ダッシュボード')
+  })
+
+  it('旧Workerが追加集計を返さなくてもダッシュボードを描画できる', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('data?.partialFailures?.length')
+    expect(source).toContain('data?.operations?.scenarios')
+    expect(source).toContain('data?.operations?.migrations')
+    expect(source).toContain('data?.operations?.bookings')
+    expect(source).not.toContain('data?.partialFailures.length')
+    expect(source).not.toMatch(/data\?\.operations\.[a-zA-Z]/)
+  })
+
+  it('旧Workerが友だちの流入元を返さなくても推移表を描画できる', () => {
+    expect(formatTrendSources(undefined)).toEqual({ full: '', compact: '経路なし' })
+    expect(formatTrendSources([{ name: '広告', count: 2 }])).toEqual({
+      full: '広告 2',
+      compact: '広告 2',
+    })
+  })
+
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
     const preferences = defaultDashboardPreferences()
+    expect(preferences.today.filter((item) => item.visible).map((item) => item.id)).toEqual([
+      'today-inbox',
+      'today-photo-review',
+      'today-bookings',
+      'today-shipments',
+    ])
     expect(preferences.main.filter((item) => item.visible).map((item) => item.id)).toEqual([
       'shipment',
       'pending-inbox',
@@ -35,6 +69,9 @@ describe('ダッシュボードV4の初期表示', () => {
       'friend-add',
     ])
     expect(preferences.right.filter((item) => item.visible).map((item) => item.id)).toEqual([
+      'send-quota',
+      'operational-alerts',
+      'connection-status',
       'upcoming',
       'monthly-delivery',
       'recent-results',
@@ -47,11 +84,27 @@ describe('ダッシュボードV4の初期表示', () => {
       main: [{ id: 'friend-trend', visible: true }],
       right: [{ id: 'monthly-delivery', visible: true }],
     })
+    expect(normalized.today).toEqual(defaultDashboardPreferences().today)
     expect(normalized.main[0]).toEqual({ id: 'friend-trend', visible: true })
     expect(normalized.right.find((item) => item.id === 'friend-status')).toEqual({
       id: 'friend-status',
       visible: false,
     })
+  })
+
+  it('カードの表示状態を保ったままドラッグ順へ並べ替える', () => {
+    const items = defaultDashboardPreferences().today.map((item, index) => ({
+      ...item,
+      visible: index !== 1,
+    }))
+    const reordered = reorderDashboardItems(items, 'today-shipments', 'today-inbox')
+    expect(reordered.map((item) => item.id)).toEqual([
+      'today-shipments',
+      'today-inbox',
+      'today-photo-review',
+      'today-bookings',
+    ])
+    expect(reordered.find((item) => item.id === 'today-photo-review')?.visible).toBe(false)
   })
 })
 

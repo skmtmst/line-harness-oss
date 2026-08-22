@@ -215,6 +215,31 @@ export function extractApiErrorMessage(raw: string, status: number): string {
   return ''
 }
 
+function reportServerFailure(path: string, status: number): void {
+  if (typeof window === 'undefined' || path === '/api/client-errors') return
+  const token = getCsrfToken()
+  void (async () => {
+    try {
+      await fetch(`${API_URL}/api/client-errors`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...adminSessionHeaders(),
+          ...(token ? { 'X-CSRF-Token': token } : {}),
+        },
+        body: JSON.stringify({
+          message: `API ${status}: ${path}`,
+          path: `${window.location.origin}${window.location.pathname}`,
+          occurredAt: new Date().toISOString(),
+        }),
+      })
+    } catch {
+      // Slack報告自体の失敗で、元のAPIエラー処理を壊さない。
+    }
+  })()
+}
+
 export async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
   const method = (options?.method ?? 'GET').toUpperCase()
   const csrfHeaders: Record<string, string> = {}
@@ -244,6 +269,7 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
   if (res.status === 401 && typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
   }
+  if (res.status >= 500) reportServerFailure(path, res.status)
   if (!res.ok) throw new ApiError(res.status, extractApiErrorMessage(await res.text(), res.status))
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
@@ -589,6 +615,8 @@ export type FriendStats = {
 /** 受信箱の上部に出す数（設計 `V2 2-1 受信箱`）。 */
 export type InboxStats = {
   waiting: number
+  /** 返信を待っている会話のうち、最も長い待ち時間（分）。 */
+  oldestWaitingMinutes: number | null
   /** 受信から初回返信までの平均（分）。記録が無ければ null。 */
   averageFirstReplyMinutes: number | null
   /** そのうち1時間以上待たせているもの。 */
@@ -634,10 +662,23 @@ export type DashboardOverview = {
     active: number
     /** 日次記録が無く、いまの友だちから逆算した日。 */
     estimated: boolean
+    /** 段階配備中の旧Workerでは未返却。 */
+    sources?: Array<{ name: string; count: number }>
   }>
   conversions: {
     total: number
     byPoint: Array<{ name: string; count: number }>
+  }
+  /** 取得に失敗して0へ見せていない項目。段階配備中の旧Workerでは未返却。 */
+  partialFailures?: string[]
+  /** 段階配備中の旧Workerでは未返却。 */
+  operations?: {
+    scenarios: { active: number; paused: number }
+    migrations: { active: number; completed: number }
+    bookings: { pending: number; upcoming: number }
+    inflowTop: Array<{ name: string; count: number }>
+    funnelAlerts: number
+    automationFailures: number
   }
 }
 
@@ -676,6 +717,7 @@ export type EcShipment = {
   /** 「鹿肉ミンチ × 2」のような一行。商品情報が無ければ空文字。 */
   items: string
   itemCount: number
+  quantity: number
   /** JSTの暦日（YYYY-MM-DD）。 */
   shipDate: string
   /** subscription = EC側の予定日、ordered_at = 注文日時からの算出。 */
@@ -947,6 +989,8 @@ export const api = {
       referralRewardMiles: number
       multiplierBps: number | null
       multiplierPriority: number
+      /** true のときだけ、すでにこのタグが付いている人へ遡及する。 */
+      applyToExisting?: boolean
     }) =>
       fetchApi<ApiResponse<{ tag: Tag; queued: number }>>(`/api/tags/${id}/mileage`, {
         method: 'PATCH',
@@ -1880,8 +1924,8 @@ export const api = {
       fetchApi<ApiResponse<{ name: string | null; iconUrl: string | null }>>('/api/public/brand'),
   },
   lineAccounts: {
-    list: () =>
-      fetchApi<ApiResponse<LineAccount[]>>('/api/line-accounts'),
+    list: (live = true) =>
+      fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '' : '?live=0'}`),
     summary: () =>
       fetchApi<ApiResponse<{ uniqueFriendCount: number }>>('/api/line-accounts/summary'),
     get: (id: string) =>
@@ -2582,9 +2626,10 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    send: (id: string, data: { content: string; messageType?: string }) =>
+    send: (id: string, data: { content: string; messageType?: string }, idempotencyKey: string) =>
       fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string }>>(`/api/chats/${id}/send`, {
         method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
       }),
     markRead: (id: string) =>

@@ -18,7 +18,7 @@ function SideCard({
   children: ReactNode
 }) {
   return (
-    <section className="bg-canvas rounded-card border-hairline border shadow-[1px_2px_0_rgba(26,28,26,0.10)]">
+    <section className="bg-canvas rounded-[18px] border-hairline border shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
       <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
         <h2 className="text-ink text-sm font-semibold">{title}</h2>
         <Link href={action.href} className="text-action text-xs hover:underline">

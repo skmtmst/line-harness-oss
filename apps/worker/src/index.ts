@@ -107,8 +107,11 @@ import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
+import { codexSlackEvents } from './routes/codex-slack-events.js';
+import { clientErrors } from './routes/client-errors.js';
+import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { receiveSupportEmail } from './services/support-email.js';
-import { qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
+import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
 import {
@@ -131,6 +134,7 @@ export type Env = {
     XSERVER_MAIL_PASSWORD?: string;
     XSERVER_RELAY_URL?: string;
     XSERVER_RELAY_SECRET?: string;
+    MEET_CALLBACK_SECRET?: string;
     LINE_CHANNEL_SECRET: string;
     LINE_CHANNEL_ACCESS_TOKEN: string;
     API_KEY: string;
@@ -173,6 +177,19 @@ export type Env = {
     GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
     // Read-only Google Search Console performance dashboard.
     SEARCH_CONSOLE_SITE_URL?: string;
+    // Codex lifecycle events -> Slack relay. Tokens/secrets are Worker secrets;
+    // channel ids and range mapping are non-secret deployment variables.
+    CODEX_SLACK_RELAY_SECRET?: string;
+    SLACK_BOT_TOKEN?: string;
+    SLACK_COMMAND_CHANNEL_ID?: string;
+    SLACK_ERROR_CHANNEL_ID?: string;
+    SLACK_IDEA_CHANNEL_ID?: string;
+    SLACK_DEFAULT_PR_CHANNEL_ID?: string;
+    SLACK_PR_CHANNELS_JSON?: string;
+    SLACK_KENTA_USER_ID?: string;
+    SLACK_MASATO_USER_ID?: string;
+    SLACK_TASK_CHANNEL_ID?: string;
+    SLACK_SIGNING_SECRET?: string;
   };
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
@@ -297,6 +314,8 @@ app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', restaurantTest);
+app.route('/', codexSlackEvents);
+app.route('/', clientErrors);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
@@ -312,15 +331,24 @@ app.route('/admin/update', adminUpdate);
 app.get('/api/qr', async (c) => {
   const data = c.req.query('data');
   if (!data) return c.text('Missing data param', 400);
-  const size = c.req.query('size') || '240x240';
+  if (!isQrDataAllowed(data)) return c.text('Data param too long', 400);
+  const size = normalizeQrSize(c.req.query('size'));
+  if (!size) return c.text('Invalid size', 400);
   // 印刷に使うので svg も出せる。知らない値は png に丸める。
   const format = normalizeQrFormat(c.req.query('format'));
   const upstream = `https://api.qrserver.com/v1/create-qr-code/?size=${encodeURIComponent(size)}&format=${format}&data=${encodeURIComponent(data)}`;
-  const res = await fetch(upstream);
+  const res = await fetch(upstream, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
+  if (!res) return c.text('QR generation timed out', 504);
   if (!res.ok) return c.text('QR generation failed', 502);
-  return new Response(res.body, {
+  const declaredLength = Number(res.headers.get('content-length') || '0');
+  if (declaredLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
+  const bytes = await res.arrayBuffer();
+  if (bytes.byteLength > 2 * 1024 * 1024) return c.text('QR response too large', 502);
+  const contentType = res.headers.get('Content-Type');
+  if (!contentType?.toLowerCase().startsWith('image/')) return c.text('Invalid QR response', 502);
+  return new Response(bytes, {
     headers: qrResponseHeaders(
-      res.headers.get('Content-Type'),
+      contentType,
       c.req.query('download') === '1',
       c.req.query('filename') || 'referral-link-qr',
       format,
@@ -956,6 +984,36 @@ export async function notFoundHandler(
   }
   return assetRes;
 }
+app.onError((error, c) => {
+  const incidentId = crypto.randomUUID();
+  const url = new URL(c.req.url);
+  console.error(JSON.stringify({
+    event: 'unhandled_worker_error',
+    incidentId,
+    method: c.req.method,
+    path: url.pathname,
+    error: String(error),
+  }));
+  const reportPromise = reportHarnessErrorToSlack(c.env, {
+    source: 'worker',
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+    path: `${c.req.method} ${url.pathname}`,
+  }).catch((reportError) => {
+    console.error(JSON.stringify({
+      event: 'unhandled_worker_error_slack_report_failed',
+      incidentId,
+      error: String(reportError),
+    }));
+  });
+  try {
+    c.executionCtx.waitUntil(reportPromise);
+  } catch {
+    void reportPromise;
+  }
+  return c.json({ success: false, error: 'Internal Server Error', incidentId }, 500);
+});
+
 app.notFound(notFoundHandler);
 
 // Scheduled handler for cron triggers — runs for all active LINE accounts

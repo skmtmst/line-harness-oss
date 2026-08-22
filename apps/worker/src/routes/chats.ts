@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Message } from '@line-crm/line-sdk';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import {
   getOperators,
@@ -17,6 +18,12 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import {
+  completeOutboundSendStatement,
+  hashOutboundPayload,
+  isValidIdempotencyKey,
+  reserveOutboundSend,
+} from '../services/outbound-idempotency.js';
 
 const chats = new Hono<Env>();
 
@@ -134,11 +141,6 @@ chats.get('/api/operators', async (c) => {
       data: items.map((o) => ({
         id: o.id,
         name: o.name,
-        email: o.email,
-        role: o.role,
-        isActive: Boolean(o.is_active),
-        createdAt: o.created_at,
-        updatedAt: o.updated_at,
       })),
     });
   } catch (err) {
@@ -664,6 +666,10 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), asy
 chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const chatId = c.req.param('id');
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
@@ -681,33 +687,75 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async 
     const { LineClient } = await import('@line-crm/line-sdk');
     const lineClient = new LineClient(accessToken);
     const messageType = body.messageType ?? 'text';
-
+    let message: Message;
     if (messageType === 'text') {
-      await lineClient.pushTextMessage(friend.line_user_id, body.content);
+      message = { type: 'text', text: body.content };
     } else if (messageType === 'flex') {
       const contents = JSON.parse(body.content);
-      await lineClient.pushFlexMessage(friend.line_user_id, extractFlexAltText(contents), contents);
+      message = { type: 'flex', altText: extractFlexAltText(contents), contents };
     } else if (messageType === 'image') {
       const parsed = JSON.parse(body.content) as {
         originalContentUrl: string;
         previewImageUrl: string;
       };
-      await lineClient.pushImageMessage(
-        friend.line_user_id,
-        parsed.originalContentUrl,
-        parsed.previewImageUrl,
-      );
+      message = {
+        type: 'image',
+        originalContentUrl: parsed.originalContentUrl,
+        previewImageUrl: parsed.previewImageUrl,
+      };
+    } else {
+      return c.json({ success: false, error: 'messageType is not supported' }, 400);
     }
 
+    const payloadHash = await hashOutboundPayload(
+      JSON.stringify({ chatId: chat.id, friendId: friend.id, messageType, content: body.content }),
+    );
+    const reservation = await reserveOutboundSend(c.env.DB, {
+      key: idempotencyKey,
+      channel: 'line',
+      resourceId: chat.id,
+      payloadHash,
+      retryInProgress: true,
+      now: new Date().toISOString(),
+    });
+    if (reservation.kind === 'conflict') {
+      return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
+    }
+    if (reservation.kind === 'in_progress') {
+      return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
+    }
+    if (reservation.kind === 'replay') {
+      return c.json({
+        success: true,
+        data: {
+          sent: true,
+          messageId: reservation.responseId,
+          sentByStaffName: c.get('staff').name,
+          replayed: true,
+        },
+      });
+    }
+
+    // LINE 側にも同じキーを渡す。DB保存前に通信が切れて再実行されても、
+    // LINE API が同一リクエストを二重配信しない。
+    await lineClient.pushMessage(friend.line_user_id, [message], idempotencyKey);
+
     // メッセージログに記録
-    const logId = crypto.randomUUID();
-    await c.env.DB
-      .prepare(`INSERT INTO messages_log (id, friend_id, direction, message_type, content, source, sent_by_staff_id, created_at) VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?)`)
-      .bind(logId, friend.id, messageType, body.content, c.get('staff').id, jstNow())
-      .run();
+    const logId = idempotencyKey;
+    const sentAt = jstNow();
+    await c.env.DB.batch([
+      c.env.DB
+        .prepare(`INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, source, sent_by_staff_id, created_at) VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?)`)
+        .bind(logId, friend.id, messageType, body.content, c.get('staff').id, sentAt),
+      completeOutboundSendStatement(c.env.DB, {
+        key: idempotencyKey,
+        responseId: logId,
+        now: new Date().toISOString(),
+      }),
+    ]);
 
     // チャットの最終メッセージ日時を更新（chat.id を直接使う — friend_id で呼ばれても resolveOrCreateChat 済み）
-    await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: jstNow() });
+    await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
 
     // 初回返信の時刻を残す（107）。
     //

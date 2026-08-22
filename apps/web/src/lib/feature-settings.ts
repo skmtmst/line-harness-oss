@@ -30,7 +30,6 @@ export type FeatureKey =
   | 'photo_review'
   | 'ec_commerce'
   | 'line_notifications'
-  | 'restaurant_test'
 
 export interface FeatureItem {
   id: string
@@ -80,7 +79,6 @@ export const DEFAULT_FEATURES: Record<FeatureKey, boolean> = {
   photo_review: true,
   ec_commerce: true,
   line_notifications: true,
-  restaurant_test: true,
 }
 
 function toFeatureItem(item: MenuItem): FeatureItem {
@@ -143,7 +141,7 @@ export function visibleFeatureGroups(options: { specializedFeatureKeys: string[]
     group.id === 'specialized'
       ? { ...group, items: group.items.filter((item) => item.keys.some((key) => specialized.has(key))) }
       : group,
-  ).filter((group) => group.items.length > 0 && group.id !== 'restaurant-test')
+  ).filter((group) => group.items.length > 0)
 }
 
 /** 並び順の保存の形。区分の目印ごとに、項目の目印を並べて持つ。 */

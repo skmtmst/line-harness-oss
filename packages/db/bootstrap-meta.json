@@ -171,7 +171,10 @@
     "162_carousel_actions.sql",
     "163_line_notification_templates.sql",
     "164_inbox_staff_reads.sql",
-    "165_restaurant_test_foundation.sql"
+    "165_meet_callback_receipts.sql",
+    "166_dashboard_scope_indexes.sql",
+    "167_outbound_send_idempotency.sql",
+    "168_restaurant_test_foundation.sql"
   ],
-  "migrationCount": 172
+  "migrationCount": 175
 }

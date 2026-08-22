@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   chooseRestaurantTable,
   isRestaurantReservationSource,
@@ -22,6 +23,16 @@ type OrganizationRow = { id: string; account_id: string; name: string; status: s
 function accountId(c: Context<Env>): string | null {
   return c.req.query('account_id') || null;
 }
+
+restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
+  const selectedAccount = accountId(c);
+  if (!selectedAccount) return next();
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!scope.ids.includes(selectedAccount)) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  return next();
+});
 
 async function organizationFor(c: Context<Env>): Promise<OrganizationRow | null> {
   const id = accountId(c);

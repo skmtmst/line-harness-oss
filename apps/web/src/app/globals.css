@@ -41,6 +41,7 @@
   /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
   --color-canvas: #ffffff;
   --color-canvas-sunken: #f7f7f5;
+  --color-shell: #f5f5f7;
   --color-hairline: #e2e4df;
 
   /* 状態。アクセントと混ぜない。 */
@@ -77,8 +78,8 @@
    * 設計のフレームは幅1920pxで描かれている。そこから常時表示のサイドバー
    * `w-64`（256px）を引いた 1664px = 104rem が、本体が取れる幅。
    *
-   * 上限が無いと、横に広いモニタで表が伸びきって絵と別物になる。
-   * `max-w-shell` を `AppShell` の中身に当てて、それ以上は広げない。
+   * `max-w-shell` をV4共通レイアウトに当て、左右40pxの余白を引いた
+   * 1584pxを1920px表示時の実コンテンツ幅にする。
    *
    * 注意: 一度 74rem（1184px）で入れて間違えた。`docs/admin-ui-design-guidelines.md`
    * の「幅1440pxと1920pxの両方で確認」をフレーム幅と読み違えたため。あれは
@@ -86,4 +87,21 @@
    * サイドバー256px＋本体1664pxで、右端まで使い切っている。
    */
   --container-shell: 104rem;
+}
+
+/*
+ * 友だち属性V2は、Pen.devの1920px画像をそのまま検証する移行面。
+ * 旧画面のNoto Sans JPと256pxサイドバーを継承すると、本文だけ合わせても
+ * 全体座標と文字幅がずれるため、この画面に限って設計値を固定する。
+ */
+.friend-attributes-v2-shell {
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  color: #1d1d1f;
+}
+
+@media (min-width: 1280px) {
+  .friend-attributes-v2-shell > aside {
+    width: 260px !important;
+    flex: 0 0 260px;
+  }
 }

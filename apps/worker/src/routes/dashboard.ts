@@ -2,10 +2,13 @@ import { Hono } from 'hono';
 import {
   getDashboardOverview,
   getListStats,
+  getLineAccountById,
+  getLineAccounts,
   type DashboardPeriod,
   type DashboardOverview,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { canAccessLineAccount } from '../services/account-access.js';
 
 /**
  * ダッシュボードが1回で読む数。
@@ -31,27 +34,30 @@ function readPeriod(raw: string | undefined): DashboardPeriod {
  */
 async function fetchQuota(
   token: string | undefined,
-): Promise<{ limit: number | null; used: number | null }> {
-  if (!token) return { limit: null, used: null };
+): Promise<{ limit: number | null; used: number | null; failed: boolean }> {
+  if (!token) return { limit: null, used: null, failed: false };
   try {
     const [quota, consumption] = await Promise.all([
       fetch('https://api.line.me/v2/bot/message/quota', {
         headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10_000),
       }),
       fetch('https://api.line.me/v2/bot/message/quota/consumption', {
         headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(10_000),
       }),
     ]);
-    if (!quota.ok || !consumption.ok) return { limit: null, used: null };
+    if (!quota.ok || !consumption.ok) return { limit: null, used: null, failed: true };
     // type が 'none' のときは上限なし。数字が入らないので null のままにする。
     const q = (await quota.json()) as { type?: string; value?: number };
     const c = (await consumption.json()) as { totalUsage?: number };
     return {
       limit: q.type === 'limited' && typeof q.value === 'number' ? q.value : null,
       used: typeof c.totalUsage === 'number' ? c.totalUsage : null,
+      failed: false,
     };
   } catch {
-    return { limit: null, used: null };
+    return { limit: null, used: null, failed: true };
   }
 }
 
@@ -59,9 +65,19 @@ dashboard.get('/api/dashboard/overview', async (c) => {
   try {
     const period = readPeriod(c.req.query('period'));
     const accountId = c.req.query('accountId') ?? null;
+    const staff = c.get('staff');
+    const accounts = await getLineAccounts(c.env.DB);
+    if (accountId && !canAccessLineAccount(accounts, staff, accountId)) {
+      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+    }
+    const selectedAccount = accountId ? await getLineAccountById(c.env.DB, accountId) : null;
+    if (accountId && !selectedAccount) {
+      return c.json({ success: false as const, error: 'LINE account not found' }, 404);
+    }
 
     const overview: DashboardOverview = await getDashboardOverview(c.env.DB, period, accountId);
-    const quota = await fetchQuota(c.env.LINE_CHANNEL_ACCESS_TOKEN);
+    const quota = await fetchQuota(selectedAccount?.channel_access_token ?? c.env.LINE_CHANNEL_ACCESS_TOKEN);
+    if (quota.failed) overview.partialFailures.push('quota');
 
     return c.json({
       success: true as const,

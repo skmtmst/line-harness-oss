@@ -58,8 +58,6 @@ export const TOGGLEABLE_FEATURES = [
   'ec_commerce',
   'line_notifications',
   'nen_campaigns',
-  // 検証環境だけに置く飲食店向け領域を、1つのスイッチで完全に分離する。
-  'restaurant_test',
 ] as const;
 
 export type ToggleableFeature = (typeof TOGGLEABLE_FEATURES)[number];

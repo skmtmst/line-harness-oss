@@ -31,7 +31,7 @@ vi.mock('@line-crm/line-sdk', () => ({
 const { lineAccounts } = await import('./line-accounts.js');
 
 type TestEnv = {
-  Variables: { staff: { id: string; role: 'owner' | 'admin' | 'staff' } };
+  Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean } };
   Bindings: { DB: D1Database };
 };
 
@@ -51,10 +51,11 @@ function makeDbStub(firstResult: unknown = null): D1Database {
 function setupApp(
   role: 'owner' | 'admin' | 'staff' = 'owner',
   dbStub: D1Database = makeDbStub(),
+  staffOverride: Partial<TestEnv['Variables']['staff']> = {},
 ) {
   const app = new Hono<TestEnv>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'test-staff', role });
+    c.set('staff', { id: 'test-staff', name: 'Test', role, readOnly: false, ...staffOverride });
     c.env = { DB: dbStub };
     await next();
   });
@@ -85,7 +86,7 @@ beforeEach(() => {
   lineClientMocks.getFollowersInsight.mockReset();
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
   dbMocks.setAccountSetting.mockResolvedValue(undefined);
   dbMocks.jstNow.mockReturnValue('2026-08-10T12:00:00.000+09:00');
   lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
@@ -147,6 +148,23 @@ describe('GET /api/line-accounts/:id/follower-insight', () => {
 
     expect(res.status).toBe(400);
     expect(lineClientMocks.getFollowersInsight).not.toHaveBeenCalled();
+  });
+
+  test('assigned staff can fetch another account insight in the same organization', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue({ ...fakeAccount, id: 'acc-2' });
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, id: 'acc-1', parent_line_account_id: null },
+      { ...fakeAccount, id: 'acc-2', parent_line_account_id: null },
+    ]);
+    lineClientMocks.getFollowersInsight.mockResolvedValue({
+      status: 'ready', followers: 123, targetedReaches: 111, blocks: 4,
+    });
+    const app = setupApp('staff', makeDbStub(), {
+      assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
+    });
+    const res = await app.request('/api/line-accounts/acc-2/follower-insight?date=20260616');
+    expect(res.status).toBe(200);
+    expect(lineClientMocks.getFollowersInsight).toHaveBeenCalled();
   });
 });
 

@@ -144,6 +144,29 @@ git checkout codex/development && git pull
 pnpm deploy:lock acquire staging --note "0.23.0/0.24.0 マイグレーション適用"
 ```
 
+`command not found: pnpm` と出るPCがある。`pnpm` は PATH に無いことがあり、
+このリポジトリも `packageManager` の pin に頼っている。
+その場合は `npx tsx` で中身を直接呼べばよい。
+
+```bash
+npx tsx scripts/deploy/deploy-lock.ts acquire staging --note "0.23.0/0.24.0 マイグレーション適用"
+```
+
+| `pnpm` を使う書き方 | `pnpm` 無しの書き方 |
+|---|---|
+| `pnpm deploy:lock ...` | `npx tsx scripts/deploy/deploy-lock.ts ...` |
+| `pnpm deploy:staging -- --apply` | `bash scripts/deploy/staging-deploy.sh --apply` |
+
+ただし手順7（Worker と管理画面を配る）は、スクリプトの中で
+`pnpm --filter worker build` を呼ぶので `pnpm` が要る。
+**マイグレーションの適用（手順3〜6）までは `npx tsx` だけで進められる。**
+
+`pnpm` を使えるようにするなら corepack から有効化する。
+
+```bash
+corepack enable
+```
+
 検証環境は1組しかない。これが他の開発者への通知になる。
 すでに誰かが持っていれば失敗する。空くまで待つこと。
 

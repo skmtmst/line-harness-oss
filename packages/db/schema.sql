@@ -218,6 +218,25 @@ CREATE INDEX IF NOT EXISTS idx_messages_log_friend_id ON messages_log (friend_id
 CREATE INDEX IF NOT EXISTS idx_messages_log_created_at ON messages_log (created_at);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_source ON messages_log (friend_id, source);
 CREATE INDEX IF NOT EXISTS idx_messages_log_friend_direction_created ON messages_log (friend_id, direction, created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_account_direction_created ON messages_log(line_account_id, direction, created_at);
+
+-- ============================================================
+-- Manual outbound send idempotency
+-- ============================================================
+CREATE TABLE IF NOT EXISTS outbound_send_requests (
+  idempotency_key TEXT PRIMARY KEY,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  resource_id     TEXT NOT NULL,
+  payload_hash    TEXT NOT NULL,
+  status          TEXT NOT NULL CHECK (status IN ('in_progress', 'succeeded')),
+  response_id     TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  completed_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbound_send_requests_created
+  ON outbound_send_requests(created_at);
 
 -- ============================================================
 -- Per-staff inbox read positions
@@ -363,6 +382,7 @@ CREATE TABLE IF NOT EXISTS conversion_events (
 
 CREATE INDEX IF NOT EXISTS idx_conversion_events_point ON conversion_events (conversion_point_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_events_friend ON conversion_events (friend_id);
+CREATE INDEX IF NOT EXISTS idx_conversion_events_created_friend ON conversion_events(created_at, friend_id);
 CREATE INDEX IF NOT EXISTS idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 
 -- ============================================================
@@ -851,6 +871,7 @@ WHERE EXISTS (
 );
 DROP INDEX IF EXISTS idx_chats_friend;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_chats_friend_unique ON chats (friend_id);
+CREATE INDEX IF NOT EXISTS idx_chats_friend_status_message ON chats(friend_id, status, last_message_at);
 CREATE INDEX IF NOT EXISTS idx_chats_operator ON chats (operator_id);
 CREATE INDEX IF NOT EXISTS idx_chats_status ON chats (status);
 
@@ -1328,6 +1349,15 @@ CREATE INDEX IF NOT EXISTS idx_support_email_messages_thread_created
   ON support_email_messages (thread_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_support_email_messages_reply_lookup
   ON support_email_messages (message_id);
+
+CREATE TABLE IF NOT EXISTS meet_callback_receipts (
+  session_id   TEXT PRIMARY KEY,
+  payload_hash TEXT NOT NULL,
+  received_at  TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_meet_callback_receipts_received
+  ON meet_callback_receipts(received_at);
 
 CREATE TABLE IF NOT EXISTS support_email_sync_state (
   mailbox TEXT PRIMARY KEY,
