@@ -173,6 +173,67 @@
         "状態"
       ]
     },
+    "/tags-v2": {
+      "node": "xn98K",
+      "name": "V4 4-1 友だち属性・タグ（移行確認用V2）",
+      "visualVerification": {
+        "status": "verified",
+        "referenceNodeIds": ["xn98K"],
+        "requiredViewports": [1440, 1920],
+        "referenceScreenshots": [
+          "docs/design-reference/friend-attributes-v2/xn98K-1920.png/xn98K.png"
+        ],
+        "implementationScreenshots": [
+          "docs/design-qa/friend-attributes-v2/implementation-1440.png",
+          "docs/design-qa/friend-attributes-v2/implementation-1920.png",
+          "docs/design-qa/friend-attributes-v2/side-by-side-1920.png"
+        ],
+        "checkedAt": "2026-08-22T13:41:42+09:00",
+        "evidence": "docs/design-qa/friend-attributes-v2/design-qa.md"
+      },
+      "sections": [
+        "Head",
+        "Tabs",
+        "KPIs",
+        "Actions",
+        "Folder",
+        "Toolbar",
+        "QuickFilters",
+        "Table",
+        "Pagination"
+      ],
+      "parts": [
+        "タグ数",
+        "付与済み友だち",
+        "今月の付与",
+        "整理候補",
+        "マニュアル",
+        "CSVで一括登録",
+        "フォルダを追加",
+        "タグを追加",
+        "フォルダ",
+        "タグ名・用途で検索",
+        "使用状態",
+        "付与元",
+        "表示件数",
+        "未使用のタグ",
+        "今月増えたタグ",
+        "自動付与あり",
+        "連動あり",
+        "一覧表示",
+        "タグ",
+        "付与人数",
+        "自動付与のもと",
+        "連動（マイル・アクション）",
+        "使用先",
+        "登録日",
+        "表示",
+        "編集",
+        "削除",
+        "前へ",
+        "次へ"
+      ]
+    },
     "/tags": {
       "node": "xn98K wdLjf KYG39 X79IHW t7Mhgl lNGcs NU4N2 FORVU",
       "name": "V4 4-1 友だち属性（4タブ）",
