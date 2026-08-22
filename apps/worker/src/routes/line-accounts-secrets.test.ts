@@ -36,12 +36,16 @@ async function fetchAccount(role: Role, readOnly: boolean) {
   return body.data;
 }
 
-describe('GET /api/line-accounts/:id — 鍵の出し分け', () => {
-  it('オーナーと管理者には鍵を返す', async () => {
+describe('GET /api/line-accounts/:id — 保存済み資格情報を返さない', () => {
+  it('オーナーと管理者にも値を返さず、設定済みだけ返す', async () => {
     for (const role of ['owner', 'admin'] as const) {
       const data = await fetchAccount(role, false);
-      expect(data.channelAccessToken, role).toBe('SECRET-TOKEN');
-      expect(data.channelSecret, role).toBe('SECRET-CHANNEL');
+      expect(data.channelAccessToken, role).toBeUndefined();
+      expect(data.channelSecret, role).toBeUndefined();
+      expect(data.loginChannelSecret, role).toBeUndefined();
+      expect(data.channelAccessTokenConfigured, role).toBe(true);
+      expect(data.channelSecretConfigured, role).toBe(true);
+      expect(data.loginChannelSecretConfigured, role).toBe(true);
     }
   });
 
@@ -50,6 +54,7 @@ describe('GET /api/line-accounts/:id — 鍵の出し分け', () => {
     expect(data.channelAccessToken).toBeUndefined();
     expect(data.channelSecret).toBeUndefined();
     expect(data.loginChannelSecret).toBeUndefined();
+    expect(data.channelAccessTokenConfigured).toBe(true);
   });
 
   it('閲覧のみなら、オーナーでも鍵を返さない', async () => {

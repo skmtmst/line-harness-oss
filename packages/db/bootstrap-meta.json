@@ -177,7 +177,8 @@
     "168_restaurant_test_foundation.sql",
     "169_restaurant_email_intake.sql",
     "170_restaurant_inbound_emails.sql",
-    "171_restaurant_email_parsers.sql"
+    "171_restaurant_email_parsers.sql",
+    "172_line_account_credentials_encrypted.sql"
   ],
-  "migrationCount": 178
+  "migrationCount": 179
 }

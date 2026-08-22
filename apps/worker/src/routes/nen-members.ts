@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
-import { jstNow } from '@line-crm/db';
+import { jstNow, resolveLineCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { verifyCallerLineUserId } from '../services/liff-auth.js';
@@ -47,13 +47,15 @@ const CAUTION_PATTERN = /食べない|下痢|嘔吐|咳|発熱|元気がない|�
 type FriendRow = {
   id: string; line_user_id: string; display_name: string | null; user_id: string | null;
   line_account_id: string | null; channel_access_token: string | null;
+  channel_access_token_encrypted: string | null;
 };
 
 async function currentFriend(c: Context<Env>): Promise<FriendRow | null> {
   const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
   if (!lineUserId) return null;
   return c.env.DB.prepare(
-    `SELECT f.id, f.line_user_id, f.display_name, f.user_id, f.line_account_id, a.channel_access_token
+    `SELECT f.id, f.line_user_id, f.display_name, f.user_id, f.line_account_id,
+            a.channel_access_token, a.channel_access_token_encrypted
        FROM friends f LEFT JOIN line_accounts a ON a.id = f.line_account_id
       WHERE f.line_user_id = ? AND f.is_following = 1 LIMIT 1`,
   ).bind(lineUserId).first<FriendRow>();
@@ -101,9 +103,13 @@ function petCard(pet: Record<string, unknown>): Message {
 
 async function pushPetCard(c: Context<Env>, friend: FriendRow, pet: Record<string, unknown>) {
   if (!friend.channel_access_token) return;
+  const accessToken = await resolveLineCredential(
+    friend.channel_access_token_encrypted,
+    friend.channel_access_token,
+  );
   await pushViaHarnessProxy(
     c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin,
-    friend.channel_access_token,
+    accessToken,
     friend.line_user_id,
     [petCard(pet)],
     crypto.randomUUID(),

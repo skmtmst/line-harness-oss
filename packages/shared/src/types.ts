@@ -588,14 +588,20 @@ export interface LineAccount {
   channelId: string;
   /** アカウント名 */
   name: string;
-  /** Channel Access Token (Messaging API). list responses では省略される. */
-  channelAccessToken: string;
-  /** Channel Secret (Messaging API). list responses では省略される. */
-  channelSecret: string;
+  /** 新しい値を保存するときだけ送る。保存後のレスポンスには含まれない。 */
+  channelAccessToken?: string;
+  /** 新しい値を保存するときだけ送る。保存後のレスポンスには含まれない。 */
+  channelSecret?: string;
+  /** 保存済みかどうかだけを示し、値そのものは返さない。 */
+  channelAccessTokenConfigured?: boolean;
+  /** 保存済みかどうかだけを示し、値そのものは返さない。 */
+  channelSecretConfigured?: boolean;
   /** LINE Login Channel ID. 友だち追加 OAuth 導線で使う. 未設定なら null. */
   loginChannelId: string | null;
-  /** LINE Login Channel Secret. list responses では省略される. */
-  loginChannelSecret: string | null;
+  /** 新しい値を保存するときだけ送る。保存後のレスポンスには含まれない。 */
+  loginChannelSecret?: string | null;
+  /** 保存済みかどうかだけを示し、値そのものは返さない。 */
+  loginChannelSecretConfigured?: boolean;
   /** LIFF ID. このアカ向けの LIFF page を開くときに `?liffId=` で識別する. */
   liffId: string | null;
   /** 有効/無効 */

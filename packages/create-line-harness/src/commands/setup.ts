@@ -16,7 +16,11 @@ import { pinRepoToTag } from "../steps/clone-repo.js";
 import { setSecrets } from "../steps/secrets.js";
 import { configureAdminAuth } from "../steps/admin-auth.js";
 import { generateMcpConfig } from "../steps/mcp-config.js";
-import { generateApiKey } from "../lib/crypto.js";
+import {
+  encryptCredentialForSetup,
+  generateApiKey,
+  generateCredentialEncryptionKey,
+} from "../lib/crypto.js";
 import {
   getAccountIds,
   setAccountId,
@@ -36,6 +40,7 @@ interface SetupState {
   lineLoginChannelId?: string;
   liffId?: string;
   apiKey?: string;
+  lineCredentialEncryptionKey?: string;
   d1DatabaseId?: string;
   d1DatabaseName?: string;
   r2BucketName?: string;
@@ -546,6 +551,10 @@ async function runSetupInner(
     state.apiKey = generateApiKey();
     saveState(repoDir, state);
   }
+  if (!state.lineCredentialEncryptionKey) {
+    state.lineCredentialEncryptionKey = generateCredentialEncryptionKey();
+    saveState(repoDir, state);
+  }
 
   // Step 7: Create D1 database + run migrations
   if (!isDone(state, "database")) {
@@ -649,6 +658,7 @@ async function runSetupInner(
       lineLoginChannelId: state.lineLoginChannelId!,
       liffId: state.liffId!,
       apiKey: state.apiKey!,
+      lineCredentialEncryptionKey: state.lineCredentialEncryptionKey!,
     });
     markDone(state, "secrets");
     saveState(repoDir, state);
@@ -682,16 +692,25 @@ async function runSetupInner(
       // sort inconsistently with rows written by the worker.
       const jstNowStr =
         new Date(Date.now() + 9 * 60 * 60_000).toISOString().slice(0, -1) + "+09:00";
-      // Step A (required): upsert the core row using only the columns that
-      // exist in every shipped schema version. login_channel_id was added in
-      // a later migration, so we update it separately as best-effort to keep
-      // the CLI working against older databases that resumed an old install.
+      const encryptedAccessToken = await encryptCredentialForSetup(
+        state.lineChannelAccessToken!,
+        state.lineCredentialEncryptionKey!,
+      );
+      const encryptedChannelSecret = await encryptCredentialForSetup(
+        state.lineChannelSecret!,
+        state.lineCredentialEncryptionKey!,
+      );
+      // Step A (required): dual-write the legacy plaintext columns and the
+      // encrypted columns. The plaintext columns remain temporarily for the
+      // migration fallback and are intentionally not removed by this change.
       const insertSql = `
-INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, is_active, created_at, updated_at)
-VALUES (${q(id)}, ${q(state.lineChannelId!)}, ${q("LINE Harness")}, ${q(state.lineChannelAccessToken!)}, ${q(state.lineChannelSecret!)}, 1, ${q(jstNowStr)}, ${q(jstNowStr)})
+INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, channel_access_token_encrypted, channel_secret_encrypted, is_active, created_at, updated_at)
+VALUES (${q(id)}, ${q(state.lineChannelId!)}, ${q("LINE Harness")}, ${q(state.lineChannelAccessToken!)}, ${q(state.lineChannelSecret!)}, ${q(encryptedAccessToken)}, ${q(encryptedChannelSecret)}, 1, ${q(jstNowStr)}, ${q(jstNowStr)})
 ON CONFLICT(channel_id) DO UPDATE SET
   channel_access_token = excluded.channel_access_token,
   channel_secret = excluded.channel_secret,
+  channel_access_token_encrypted = excluded.channel_access_token_encrypted,
+  channel_secret_encrypted = excluded.channel_secret_encrypted,
   updated_at = ${q(jstNowStr)};
 `;
       // Restrict to the owner — os.tmpdir() can be a shared directory

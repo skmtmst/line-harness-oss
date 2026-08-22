@@ -1,7 +1,21 @@
 import { jstNow } from './utils.js';
+import { decryptCredential, encryptCredential } from './credential-crypto.js';
 // =============================================================================
 // LINE Accounts — Multi-Account Management
 // =============================================================================
+
+async function resolveCredentialEncryptionKey(explicit?: string): Promise<string | undefined> {
+  if (explicit?.trim()) return explicit;
+  try {
+    // Workers expose bindings through this runtime module. Node-based DB tests
+    // and offline tools do not, so reads retain the migration fallback there.
+    const runtime = await import('cloudflare:workers');
+    const bindings = runtime.env as unknown as { LINE_CREDENTIAL_ENCRYPTION_KEY?: string };
+    return bindings.LINE_CREDENTIAL_ENCRYPTION_KEY?.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export interface LineAccount {
   id: string;
@@ -9,6 +23,8 @@ export interface LineAccount {
   name: string;
   channel_access_token: string;
   channel_secret: string;
+  channel_access_token_encrypted?: string | null;
+  channel_secret_encrypted?: string | null;
   login_channel_id: string | null;
   login_channel_secret: string | null;
   liff_id: string | null;
@@ -49,6 +65,7 @@ export interface CreateLineAccountInput {
 export async function createLineAccount(
   db: D1Database,
   input: CreateLineAccountInput,
+  credentialEncryptionKey?: string,
 ): Promise<LineAccount> {
   const id = crypto.randomUUID();
   const now = jstNow();
@@ -59,17 +76,23 @@ export async function createLineAccount(
     .prepare(`SELECT COALESCE(MAX(display_order), -1) + 1 AS next FROM line_accounts`)
     .first<{ next: number }>();
   const displayOrder = orderRow?.next ?? 0;
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const [encryptedAccessToken, encryptedChannelSecret] = await Promise.all([
+    encryptCredential(input.channelAccessToken, encryptionKey),
+    encryptCredential(input.channelSecret, encryptionKey),
+  ]);
 
   await db
     .prepare(
       `INSERT INTO line_accounts
          (id, channel_id, name, channel_access_token, channel_secret,
+          channel_access_token_encrypted, channel_secret_encrypted,
           login_channel_id, login_channel_secret, liff_id,
           is_active, display_order,
           og_site_name, og_default_image_url, og_default_description,
           parent_line_account_id,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -77,6 +100,8 @@ export async function createLineAccount(
       input.name,
       input.channelAccessToken,
       input.channelSecret,
+      encryptedAccessToken,
+      encryptedChannelSecret,
       input.loginChannelId ?? null,
       input.loginChannelSecret ?? null,
       input.liffId ?? null,
@@ -90,34 +115,90 @@ export async function createLineAccount(
     )
     .run();
 
-  return (await getLineAccountById(db, id))!;
+  return (await getLineAccountById(db, id, encryptionKey))!;
+}
+
+/**
+ * Prefer encrypted credentials. During the staged migration only, a missing key
+ * or failed decrypt falls back to the legacy plaintext columns when they exist.
+ */
+export async function decryptLineAccountCredentials(
+  row: LineAccount,
+  credentialEncryptionKey?: string,
+): Promise<LineAccount> {
+  const next = { ...row };
+  for (const field of [
+    ['channel_access_token', 'channel_access_token_encrypted'],
+    ['channel_secret', 'channel_secret_encrypted'],
+  ] as const) {
+    const [plainField, encryptedField] = field;
+    const encrypted = row[encryptedField];
+    if (!encrypted) continue;
+    try {
+      next[plainField] = await decryptCredential(encrypted, credentialEncryptionKey);
+    } catch {
+      if (!row[plainField]) {
+        throw new Error(`Unable to decrypt ${plainField}; no legacy fallback is available`);
+      }
+      next[plainField] = row[plainField];
+    }
+  }
+  return next;
+}
+
+/** Resolves one joined credential column while preserving the migration fallback. */
+export async function resolveLineCredential(
+  encrypted: string | null | undefined,
+  legacyPlaintext: string | null | undefined,
+  credentialEncryptionKey?: string,
+): Promise<string> {
+  if (!encrypted) return legacyPlaintext ?? '';
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  try {
+    return await decryptCredential(encrypted, encryptionKey);
+  } catch {
+    if (legacyPlaintext) return legacyPlaintext;
+    throw new Error('Unable to decrypt LINE credential; no legacy fallback is available');
+  }
 }
 
 export async function getLineAccountById(
   db: D1Database,
   id: string,
+  credentialEncryptionKey?: string,
 ): Promise<LineAccount | null> {
-  return db
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const row = await db
     .prepare(`SELECT * FROM line_accounts WHERE id = ?`)
     .bind(id)
     .first<LineAccount>();
+  return row ? decryptLineAccountCredentials(row, encryptionKey) : null;
 }
 
-export async function getLineAccounts(db: D1Database): Promise<LineAccount[]> {
+export async function getLineAccounts(
+  db: D1Database,
+  credentialEncryptionKey?: string,
+): Promise<LineAccount[]> {
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   const result = await db
     .prepare(`SELECT * FROM line_accounts ORDER BY display_order ASC, created_at ASC`)
     .all<LineAccount>();
-  return result.results;
+  return Promise.all(
+    result.results.map((row) => decryptLineAccountCredentials(row, encryptionKey)),
+  );
 }
 
 export async function getLineAccountByChannelId(
   db: D1Database,
   channelId: string,
+  credentialEncryptionKey?: string,
 ): Promise<LineAccount | null> {
-  return db
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const row = await db
     .prepare(`SELECT * FROM line_accounts WHERE channel_id = ?`)
     .bind(channelId)
     .first<LineAccount>();
+  return row ? decryptLineAccountCredentials(row, encryptionKey) : null;
 }
 
 export type UpdateLineAccountInput = Partial<
@@ -145,7 +226,9 @@ export async function updateLineAccount(
   db: D1Database,
   id: string,
   updates: UpdateLineAccountInput,
+  credentialEncryptionKey?: string,
 ): Promise<LineAccount | null> {
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   const fields: string[] = [];
   const values: unknown[] = [];
 
@@ -156,10 +239,14 @@ export async function updateLineAccount(
   if (updates.channel_access_token !== undefined) {
     fields.push('channel_access_token = ?');
     values.push(updates.channel_access_token);
+    fields.push('channel_access_token_encrypted = ?');
+    values.push(await encryptCredential(updates.channel_access_token, encryptionKey));
   }
   if (updates.channel_secret !== undefined) {
     fields.push('channel_secret = ?');
     values.push(updates.channel_secret);
+    fields.push('channel_secret_encrypted = ?');
+    values.push(await encryptCredential(updates.channel_secret, encryptionKey));
   }
   if (updates.login_channel_id !== undefined) {
     fields.push('login_channel_id = ?');
@@ -210,7 +297,7 @@ export async function updateLineAccount(
     values.push(updates.og_default_description);
   }
 
-  if (fields.length === 0) return getLineAccountById(db, id);
+  if (fields.length === 0) return getLineAccountById(db, id, encryptionKey);
 
   fields.push('updated_at = ?');
   values.push(jstNow());
@@ -221,7 +308,7 @@ export async function updateLineAccount(
     .bind(...values)
     .run();
 
-  return getLineAccountById(db, id);
+  return getLineAccountById(db, id, encryptionKey);
 }
 
 export async function deleteLineAccount(

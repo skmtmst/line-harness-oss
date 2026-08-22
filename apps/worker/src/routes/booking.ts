@@ -11,7 +11,7 @@
 // scheduled_at / decided_at / expires_at) are written from the Worker.
 
 import { Hono, type Context } from 'hono';
-import { getLineAccounts } from '@line-crm/db';
+import { getLineAccounts, resolveLineCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { enrollByTrigger } from '../services/reminder-trigger.js';
@@ -196,6 +196,7 @@ async function notifyForBooking(
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,
+              la.channel_access_token_encrypted,
               f.line_user_id
          FROM bookings b
          INNER JOIN menus m ON m.id = b.menu_id
@@ -210,11 +211,16 @@ async function notifyForBooking(
       menu_name: string;
       staff_name: string;
       channel_access_token: string;
+      channel_access_token_encrypted: string | null;
       line_user_id: string;
     }>();
   if (!row) return;
+  const accessToken = await resolveLineCredential(
+    row.channel_access_token_encrypted,
+    row.channel_access_token,
+  );
   await sendBookingNotification({
-    channelAccessToken: row.channel_access_token,
+    channelAccessToken: accessToken,
     toLineUserId: row.line_user_id,
     kind,
     ctx: {

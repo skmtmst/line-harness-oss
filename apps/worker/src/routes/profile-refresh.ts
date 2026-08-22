@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { resolveLineCredential } from '@line-crm/db';
 
 const profileRefresh = new Hono<Env>();
 
@@ -32,7 +33,8 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
   // も含めるか? → 含めない。送信対象だけリフレッシュすれば十分で、ブロック済は
   // どうせ profile API も 403/404 で空振りする。
   const baseQuery = `
-    SELECT f.id, f.line_user_id, f.line_account_id, a.channel_access_token
+    SELECT f.id, f.line_user_id, f.line_account_id,
+           a.channel_access_token, a.channel_access_token_encrypted
     FROM friends f
     LEFT JOIN line_accounts a ON a.id = f.line_account_id
     WHERE f.is_following = 1
@@ -52,6 +54,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
     line_user_id: string;
     line_account_id: string | null;
     channel_access_token: string | null;
+    channel_access_token_encrypted: string | null;
   }>();
 
   const rows = batch.results ?? [];
@@ -70,7 +73,9 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
   for (let i = 0; i < rows.length; i += CONCURRENCY) {
     const chunk = rows.slice(i, i + CONCURRENCY);
     await Promise.all(chunk.map(async (row) => {
-      const token = row.channel_access_token ?? defaultToken;
+      const token = row.channel_access_token
+        ? await resolveLineCredential(row.channel_access_token_encrypted, row.channel_access_token)
+        : defaultToken;
       const client = new LineClient(token);
       try {
         const profile = await client.getProfile(row.line_user_id);
