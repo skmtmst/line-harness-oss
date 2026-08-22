@@ -5,15 +5,18 @@
   "scripts": {
     "dev": "next dev --port 3001",
     "predev": "node scripts/build-release-log.mjs",
-    "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
+    "prebuild": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs && pnpm run check:v4-architecture",
     "update:raw-color-baseline": "node ./scripts/raw-color-baseline.mjs",
     "build": "next build",
-    "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
+    "pretypecheck": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs && pnpm run check:v4-architecture",
     "typecheck": "tsc --noEmit",
     "start": "next start",
     "release-log": "node scripts/build-release-log.mjs",
-    "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
-    "test": "vitest run --config vitest.config.ts"
+    "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs && pnpm run check:v4-architecture",
+    "test": "vitest run --config vitest.config.ts && pnpm run test:v4-architecture",
+    "check:v4-architecture": "node scripts/check-v4-architecture.mjs",
+    "test:v4-architecture": "node --test scripts/v4-architecture.test.mjs",
+    "create:v4-screen": "node scripts/create-v4-screen.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

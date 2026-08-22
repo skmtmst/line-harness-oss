@@ -1,7 +1,7 @@
 'use client'
 
 import type { ChangeEvent, DragEvent, ReactNode } from 'react'
-import styles from '../friend-attributes-v3/friend-attributes-v3-static.module.css'
+import styles from './friend-attributes-view.module.css'
 
 export type FriendAttributesTone = 'green' | 'orange' | 'gray'
 

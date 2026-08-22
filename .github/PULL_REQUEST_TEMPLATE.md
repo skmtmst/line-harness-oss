@@ -56,12 +56,18 @@
 - 1440px implementation screenshots:
 - Side-by-side comparison result:
 - Remaining visual differences / unverified states:
+- Current features retained:
+- New features added:
+- Missing or changed features:
+- Approved removals and decision URL:
 
 - [ ] 画面名ではなく、Pencil MCPで取得した実ノードIDを記録した。
 - [ ] Pen.devと実装を同じ状態・同じ横幅で横に並べて確認した。
 - [ ] 文字、余白、寸法、色、枠、角丸、影、表、モーダル、ドロワーを確認した。
 - [ ] 1440pxと1920pxでページ・表の横スクロールが無いことを確認した。
 - [ ] 機能・文字列テストだけで「V4一致」と判定していない。
+- [ ] 現行機能を `retained / added / missing / approved-removal` に分類し、未移植を報告した。
+- [ ] 削除扱いの機能には、利用者が承認したGitHub Issueまたは仕様書のURLがある。
 
 ## Security Impact
 

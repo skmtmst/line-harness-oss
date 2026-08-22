@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "screens": [
+    {
+      "id": "friend-attributes-list",
+      "title": "友だち属性・タグ一覧",
+      "route": "/tags",
+      "status": "migration",
+      "productionConnected": true,
+      "controller": "src/app/tags/page.tsx",
+      "view": "src/components/friend-attributes-v4/friend-attributes-view.tsx",
+      "viewExport": "FriendAttributesView",
+      "stylesheet": "src/components/friend-attributes-v4/friend-attributes-view.module.css",
+      "nodeId": "xn98K",
+      "states": [
+        {
+          "id": "list",
+          "nodeId": "xn98K",
+          "reference1920": "docs/design-reference/friend-attributes-v4/01-list.png/xn98K.png",
+          "implementation1920": "docs/design-qa/friend-attributes-v3/implementation-1920.png",
+          "implementation1440": "docs/design-qa/friend-attributes-v3/implementation-1440.png"
+        }
+      ],
+      "legacyRoutes": ["/tags-v2", "/tags-v3"],
+      "legacyFiles": [
+        "src/components/friend-fields/tags-page-v4.tsx",
+        "src/components/friend-attributes-v2/tag-list-v2.tsx"
+      ],
+      "featureParity": [
+        { "id": "list-load", "label": "タグとフォルダの一覧取得", "result": "retained" },
+        { "id": "search-filter", "label": "検索・フォルダ・使用状態・付与元・クイック絞り込み", "result": "retained" },
+        { "id": "pagination", "label": "20・30・40・50件表示とページ切替", "result": "retained" },
+        { "id": "group-change", "label": "一覧からフォルダを変更", "result": "retained" },
+        { "id": "reorder", "label": "ドラッグによるタグの並べ替え", "result": "retained" },
+        { "id": "create-edit-delete", "label": "タグの追加・編集・削除", "result": "retained" },
+        { "id": "csv-import", "label": "CSVからタグを一括登録", "result": "added" },
+        { "id": "star", "label": "一覧表示対象の切替", "result": "added" },
+        { "id": "fields-tab", "label": "友だち情報欄タブ", "result": "missing", "note": "新しい専用Viewが未作成のため現在は無効表示" },
+        { "id": "marks-tab", "label": "対応マークタブ", "result": "missing", "note": "新しい専用Viewが未作成のため現在は無効表示" },
+        { "id": "saved-searches-tab", "label": "保存した検索タブ", "result": "missing", "note": "新しい専用Viewが未作成のため現在は無効表示" },
+        { "id": "csv-export", "label": "タグ一覧のCSV書き出し", "result": "missing", "note": "旧画面は一括登録と表示しながら実際にはCSVを書き出していた" },
+        { "id": "reorder-mode", "label": "並べ替え開始・終了の明示切替", "result": "missing", "note": "並べ替え自体は残るが開始・終了ボタンがなくなっている" }
+      ]
+    }
+  ]
+}

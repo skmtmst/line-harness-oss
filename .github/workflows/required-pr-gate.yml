@@ -248,6 +248,7 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://nen-line-stg.skmtmst.workers.dev
         run: |
+          pnpm check:v4-architecture
           pnpm --filter web typecheck
           pnpm --filter web test
           pnpm --filter web build
