@@ -1,32 +1,64 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import type { Env } from '../index.js';
 import { routeInboundEmail } from './inbound-email-router.js';
-import { issueRestaurantIntakeAddress } from './restaurant-email-intake.js';
+import {
+  deleteExpiredRestaurantRawEmails,
+  issueRestaurantIntakeAddress,
+} from './restaurant-email-intake.js';
 
 type StoredObject = { body: string; customMetadata?: Record<string, string> };
 
 let testDb: SqliteD1;
-let storedObjects: Map<string, StoredObject>;
+let rawObjects: Map<string, StoredObject>;
+let rawPut: ReturnType<typeof vi.fn>;
+let rawDelete: ReturnType<typeof vi.fn>;
+let imagePut: ReturnType<typeof vi.fn>;
 let env: Env['Bindings'];
 
-function fakeBucket(): R2Bucket {
+class TestFixedLengthStream extends TransformStream<Uint8Array, Uint8Array> {
+  constructor(expectedLength: number | bigint) {
+    const expected = Number(expectedLength);
+    let received = 0;
+    super({
+      transform(chunk, controller) {
+        received += chunk.byteLength;
+        if (received > expected) throw new Error('fixed-length stream overflow');
+        controller.enqueue(chunk);
+      },
+      flush() {
+        if (received !== expected) throw new Error('fixed-length stream underflow');
+      },
+    });
+  }
+}
+
+function fakeRawMailBucket(): R2Bucket {
+  rawPut = vi.fn(async (key: string, value: ReadableStream, options?: R2PutOptions) => {
+    const body = await new Response(value).text();
+    rawObjects.set(key, { body, customMetadata: options?.customMetadata });
+    return { key } as R2Object;
+  });
+  rawDelete = vi.fn(async (keys: string | string[]) => {
+    for (const key of Array.isArray(keys) ? keys : [keys]) rawObjects.delete(key);
+  });
   return {
-    put: vi.fn(async (key: string, value: ReadableStream, options?: R2PutOptions) => {
-      const body = await new Response(value).text();
-      storedObjects.set(key, { body, customMetadata: options?.customMetadata });
-      return { key } as R2Object;
-    }),
+    put: rawPut,
+    delete: rawDelete,
   } as unknown as R2Bucket;
 }
 
-function email(to: string, raw = 'Subject: Reservation\r\n\r\n2 guests'): ForwardableEmailMessage {
+function email(
+  to: string,
+  raw = 'Subject: Reservation\r\n\r\n2 guests',
+  messageId = `<${crypto.randomUUID()}@example.test>`,
+): ForwardableEmailMessage {
   return {
     from: 'sender@example.test',
     to,
     raw: new Blob([raw]).stream(),
     rawSize: new TextEncoder().encode(raw).byteLength,
-    headers: new Headers({ subject: 'Reservation', 'message-id': `<${crypto.randomUUID()}@example.test>` }),
+    headers: new Headers({ subject: 'Reservation', 'message-id': messageId }),
     setReject: vi.fn(),
     forward: vi.fn(),
     reply: vi.fn(),
@@ -34,13 +66,16 @@ function email(to: string, raw = 'Subject: Reservation\r\n\r\n2 guests'): Forwar
 }
 
 beforeEach(() => {
+  vi.stubGlobal('FixedLengthStream', TestFixedLengthStream);
   testDb = createTestD1();
   testDb.raw.prepare("INSERT INTO rt_organizations (id, account_id, name) VALUES ('org-1', 'account-1', 'Test')").run();
   testDb.raw.prepare("INSERT INTO rt_stores (id, organization_id, name, code) VALUES ('store-1', 'org-1', 'Store', 'STORE')").run();
-  storedObjects = new Map();
+  rawObjects = new Map();
+  imagePut = vi.fn();
   env = {
     DB: testDb.db,
-    IMAGES: fakeBucket(),
+    IMAGES: { put: imagePut } as unknown as R2Bucket,
+    RAW_MAIL: fakeRawMailBucket(),
     ASSETS: {} as Fetcher,
     RESTAURANT_INTAKE_DOMAIN: 'intake.example.test',
     API_KEY: 'unused',
@@ -49,6 +84,10 @@ beforeEach(() => {
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
     WORKER_URL: 'https://worker.example.test',
   };
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('飲食店向けcatch-all予約メール', () => {
@@ -63,16 +102,25 @@ describe('飲食店向けcatch-all予約メール', () => {
     };
     expect(event).toMatchObject({ store_id: 'store-1', provider: 'email', status: 'received' });
     expect(JSON.parse(event.payload_json)).toMatchObject({ rawSize: expect.any(Number) });
-    expect([...storedObjects.keys()][0]).toMatch(/^restaurant-intake\/store-1\/.+\.eml$/);
+    expect([...rawObjects.keys()][0]).toMatch(/^restaurant-intake\/store-1\/.+\.eml$/);
+    expect(rawPut).toHaveBeenCalledOnce();
+    expect(imagePut).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare(`SELECT store_id, status, size_bytes, r2_key
+      FROM rt_inbound_emails`).get()).toMatchObject({
+        store_id: 'store-1',
+        status: 'received',
+        size_bytes: expect.any(Number),
+        r2_key: expect.stringMatching(/^restaurant-intake\/store-1\//),
+      });
   });
 
   it('未知の取り込みアドレスは例外で落とさずR2へ隔離する', async () => {
     const message = email('r-unknown@intake.example.test');
     await expect(routeInboundEmail(message, env)).resolves.toBeUndefined();
 
-    const [key] = [...storedObjects.keys()];
+    const [key] = [...rawObjects.keys()];
     expect(key).toMatch(/^restaurant-intake-quarantine\/.+\.eml$/);
-    expect(storedObjects.get(key)?.customMetadata).toMatchObject({
+    expect(rawObjects.get(key)?.customMetadata).toMatchObject({
       reason: 'address_unknown_or_expired',
       localPart: 'r-unknown',
     });
@@ -96,9 +144,9 @@ describe('飲食店向けcatch-all予約メール', () => {
 
     await routeInboundEmail(email('r-12345678901234567890123456789012@intake.example.test'), env);
 
-    const [key] = [...storedObjects.keys()];
+    const [key] = [...rawObjects.keys()];
     expect(key).toMatch(/^restaurant-intake-quarantine\/.+\.eml$/);
-    expect(storedObjects.get(key)?.customMetadata?.reason).toBe('address_revoked');
+    expect(rawObjects.get(key)?.customMetadata?.reason).toBe('address_revoked');
     expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM rt_sync_events WHERE provider = 'email'").get()).toEqual({ count: 0 });
   });
 
@@ -121,5 +169,71 @@ describe('飲食店向けcatch-all予約メール', () => {
     expect(rows.find((row) => row.local_part === first.localPart)?.revoked_at).not.toBeNull();
     expect(rows.find((row) => row.local_part === first.localPart)?.grace_days).toBeCloseTo(90, 5);
     expect(rows.find((row) => row.local_part === second.localPart)?.revoked_at).toBeNull();
+  });
+
+  it('同一message_idを2回受信しても原文台帳は1行だけ増える', async () => {
+    testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
+      VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
+    const recipient = 'r-12345678901234567890123456789012@intake.example.test';
+    const messageId = '<duplicate@example.test>';
+
+    await routeInboundEmail(email(recipient, undefined, messageId), env);
+    await routeInboundEmail(email(recipient, undefined, messageId), env);
+
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_inbound_emails').get()).toEqual({ count: 1 });
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM rt_sync_events WHERE provider = 'email'").get()).toEqual({ count: 1 });
+    expect(rawPut).toHaveBeenCalledOnce();
+  });
+
+  it('R2保存が失敗したら台帳へ失敗を残し、予約として扱わない', async () => {
+    testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
+      VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
+    rawPut.mockRejectedValueOnce(new Error('R2 unavailable'));
+    const message = email('r-12345678901234567890123456789012@intake.example.test');
+
+    await routeInboundEmail(message, env);
+
+    expect(message.setReject).toHaveBeenCalledWith('予約メール受信処理に失敗しました');
+    expect(testDb.raw.prepare(`SELECT status, r2_key FROM rt_inbound_emails`).get()).toEqual({
+      status: 'storage_failed',
+      r2_key: '',
+    });
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM rt_sync_events WHERE provider = 'email'").get()).toEqual({ count: 0 });
+    expect(imagePut).not.toHaveBeenCalled();
+  });
+
+  it('保持期間を過ぎた原文をR2から削除し、台帳行は破棄済みで残す', async () => {
+    const key = 'restaurant-intake/store-1/expired.eml';
+    rawObjects.set(key, { body: 'expired' });
+    testDb.raw.prepare(`INSERT INTO rt_inbound_emails
+      (id, message_id, store_id, r2_key, received_at, status, size_bytes)
+      VALUES ('mail-1', '<expired@example.test>', 'store-1', ?, '2025-01-01 00:00:00', 'received', 7)`).run(key);
+
+    const result = await deleteExpiredRestaurantRawEmails(env, {
+      now: new Date('2026-08-22T00:00:00.000Z'),
+    });
+
+    expect(result).toEqual({ checked: 1, deleted: 1, failed: 0, retentionDays: 90 });
+    expect(rawDelete).toHaveBeenCalledWith([key]);
+    expect(rawObjects.has(key)).toBe(false);
+    expect(testDb.raw.prepare(`SELECT status, r2_key FROM rt_inbound_emails WHERE id = 'mail-1'`).get()).toEqual({
+      status: 'raw_deleted',
+      r2_key: '',
+    });
+  });
+
+  it('RESTAURANT_INTAKE_DOMAIN未設定でも従来どおり原文を隔離する', async () => {
+    delete env.RESTAURANT_INTAKE_DOMAIN;
+    const message = email('r-unknown@intake.example.test');
+
+    await routeInboundEmail(message, env);
+
+    const row = testDb.raw.prepare(`SELECT status, quarantine_reason, r2_key FROM rt_inbound_emails`).get() as {
+      status: string; quarantine_reason: string | null; r2_key: string;
+    };
+    expect(row).toMatchObject({ status: 'quarantined', quarantine_reason: 'domain_not_configured' });
+    expect(row.r2_key).toMatch(/^restaurant-intake-quarantine\//);
+    expect(rawObjects.has(row.r2_key)).toBe(true);
+    expect(message.setReject).not.toHaveBeenCalled();
   });
 });

@@ -407,7 +407,8 @@ gh pr merge 59 --merge --repo skmtmst/line-harness-oss
 | --- | --- | --- |
 | Worker | `nen-line` | `nen-line-stg` |
 | D1 | `nen-line` | `nen-line-stg` |
-| R2 | `nen-line-images` | `nen-line-stg-images` |
+| R2（画像） | `nen-line-images` | `nen-line-stg-images` |
+| R2（予約メール原文・非公開） | `musubo-raw-mail` | `musubo-raw-mail-stg` |
 | 管理画面 | `nen-line-admin-98712679` | `nen-line-stg-admin` |
 | Worker設定 | `apps/worker/wrangler.toml` | `apps/worker/wrangler.staging.toml` |
 

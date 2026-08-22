@@ -22,6 +22,10 @@ database_id = "5b0fcea8-e05e-42bf-9efa-f2bc4c459552"
 binding = "IMAGES"
 bucket_name = "nen-line-images"
 
+[[r2_buckets]]
+binding = "RAW_MAIL"
+bucket_name = "musubo-raw-mail"
+
 [ai]
 binding = "AI"
 
@@ -44,3 +48,5 @@ CONTACT_EMAIL = "contact-shed@nen-petfood.com"
 XSERVER_MAIL_HOST = "sv12504.xserver.jp"
 XSERVER_MAIL_USER = "contact-shed@nen-petfood.com"
 XSERVER_RELAY_URL = "https://nen-petfood.com/_system/support-mail-relay.php"
+RESTAURANT_INTAKE_DOMAIN = "r.musubo.jp"
+RAW_MAIL_RETENTION_DAYS = "90"

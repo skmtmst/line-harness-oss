@@ -62,6 +62,7 @@ beforeEach(() => {
     DB: testDb.db,
     API_KEY: 'owner-key',
     IMAGES: {} as R2Bucket,
+    RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     RESTAURANT_INTAKE_DOMAIN: 'intake.example.test',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',

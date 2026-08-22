@@ -111,6 +111,7 @@ import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { clientErrors } from './routes/client-errors.js';
 import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
+import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
@@ -124,12 +125,14 @@ export type Env = {
   Bindings: {
     DB: D1Database;
     IMAGES: R2Bucket;
+    RAW_MAIL: R2Bucket;
     ASSETS: Fetcher;
     AI?: Ai;
     EMAIL?: SendEmail;
     CONTACT_EMAIL?: string;
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
+    RAW_MAIL_RETENTION_DAYS?: string;
     XSERVER_MAIL_HOST?: string;
     XSERVER_MAIL_USER?: string;
     XSERVER_MAIL_PASSWORD?: string;
@@ -1166,6 +1169,19 @@ async function scheduled(
       if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
     } catch (e) {
       console.error('nen-tag refresh error:', e);
+    }
+  }
+
+  // 飲食店向け予約メールの原文は、既定90日で非公開R2から破棄する。
+  // D1の台帳行は残し、r2_keyとstatusで破棄済みを追跡する。
+  if (event.cron === '0 */6 * * *') {
+    try {
+      const result = await deleteExpiredRestaurantRawEmails(env);
+      if (result.deleted + result.failed > 0) {
+        console.log(JSON.stringify({ event: 'restaurant_raw_mail_retention', ...result }));
+      }
+    } catch (e) {
+      console.error('restaurant raw mail retention error:', e);
     }
   }
 

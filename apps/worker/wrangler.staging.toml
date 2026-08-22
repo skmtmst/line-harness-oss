@@ -26,6 +26,10 @@ database_id = "00bd7aca-950b-4d67-b865-fd7427b9c43f"
 binding = "IMAGES"
 bucket_name = "nen-line-stg-images"
 
+[[r2_buckets]]
+binding = "RAW_MAIL"
+bucket_name = "musubo-raw-mail-stg"
+
 [ai]
 binding = "AI"
 
@@ -48,3 +52,5 @@ CONTACT_EMAIL = "test-shed@stg.nen-petfood.com"
 SUPPORT_INBOUND_EMAIL = "test-shed@stg.nen-petfood.com"
 XSERVER_RELAY_URL = "https://stg.nen-petfood.com/_system/support-mail-relay.php"
 SEARCH_CONSOLE_SITE_URL = "sc-domain:nen-petfood.com"
+RESTAURANT_INTAKE_DOMAIN = "rs.musubo.jp"
+RAW_MAIL_RETENTION_DAYS = "90"

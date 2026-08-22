@@ -11,7 +11,8 @@
 | --- | --- | --- |
 | Worker | `nen-line-stg` | `nen-line` |
 | D1 | `nen-line-stg` | `nen-line` |
-| R2 | `nen-line-stg-images` | `nen-line-images` |
+| R2（画像） | `nen-line-stg-images` | `nen-line-images` |
+| R2（予約メール原文・非公開） | `musubo-raw-mail-stg` | `musubo-raw-mail` |
 | 管理画面 Pages | `nen-line-stg-admin` | `nen-line-admin-98712679` |
 | LINEチャネル | `然-NEN- TEST` | 本番アカウント |
 

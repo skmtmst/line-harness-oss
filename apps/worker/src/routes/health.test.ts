@@ -18,6 +18,7 @@ function env(): Env['Bindings'] {
   return {
     DB: {} as D1Database,
     IMAGES: {} as R2Bucket,
+    RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     LINE_CHANNEL_SECRET: 'secret',
     LINE_CHANNEL_ACCESS_TOKEN: 'line-token',
