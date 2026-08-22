@@ -61,7 +61,7 @@ Workerの非秘密設定:
 - `SLACK_ERROR_CHANNEL_ID`
 - `SLACK_IDEA_CHANNEL_ID`
 - `SLACK_DEFAULT_PR_CHANNEL_ID`
-- `SLACK_PR_CHANNELS_JSON` 例: `{"201-300":"C0BSNTKHB7A"}`
+- `SLACK_PR_CHANNELS_JSON` 例: `{"1-100":"チャンネルID","101-200":"チャンネルID","201-300":"チャンネルID"}`
 - `SLACK_KENTA_USER_ID`
 - `SLACK_MASATO_USER_ID`
 - `SLACK_TASK_CHANNEL_ID`
@@ -76,6 +76,10 @@ Slackアプリの Interactivity Request URL:
 - `CODEX_SLACK_RELAY_URL`: Workerの `/api/integrations/codex-slack/events`
 - `CODEX_SLACK_RELAY_SECRET`: Workerと同じ秘密値
 - `CODEX_SLACK_SYNC_REQUIRED=1`: 未設定や送信失敗をCodexの画面に警告する
+
+macOSでは、Codexアプリが環境変数をまだ引き継いでいない場合も、`launchctl` の設定値と
+キーチェーン（service=`line-harness-codex-slack-relay`、account=`kenta` または `masato`）を
+自動で確認する。完了報告に `PR #246` のような番号がある場合は、その番号の100件単位チャンネルへ送る。
 
 秘密値はリポジトリやSlackへ書かない。両名の環境設定が終わったらCodexを再起動し、プロジェクトフックを信頼済みにする。
 

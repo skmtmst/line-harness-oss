@@ -19,6 +19,9 @@ type GitContext = {
 };
 
 export const CODEX_SLACK_RELAY_TIMEOUT_MS = 20_000;
+export const DEFAULT_CODEX_SLACK_RELAY_URL =
+  'https://nen-line-stg.skmtmst.workers.dev/api/integrations/codex-slack/events';
+const CODEX_SLACK_KEYCHAIN_SERVICE = 'line-harness-codex-slack-relay';
 
 function run(command: string, args: string[], cwd: string): string | null {
   try {
@@ -46,6 +49,30 @@ export function hookEventType(hookEventName: string | undefined): 'prompt_submit
   return null;
 }
 
+export function prNumberFromContent(content: string): number | undefined {
+  const raw = content.match(/\bPR\s*#(\d+)\b/i)?.[1];
+  if (!raw) return undefined;
+  const value = Number(raw);
+  return Number.isSafeInteger(value) && value > 0 ? value : undefined;
+}
+
+function configuredValue(name: string, cwd: string): string | undefined {
+  const direct = process.env[name]?.trim();
+  if (direct) return direct;
+  if (process.platform !== 'darwin') return undefined;
+  return run('/bin/launchctl', ['getenv', name], cwd) || undefined;
+}
+
+function keychainRelaySecret(operatorName: 'kenta' | 'masato' | 'codex', cwd: string): string | undefined {
+  if (process.platform !== 'darwin' || operatorName === 'codex') return undefined;
+  return run('/usr/bin/security', [
+    'find-generic-password',
+    '-s', CODEX_SLACK_KEYCHAIN_SERVICE,
+    '-a', operatorName,
+    '-w',
+  ], cwd) || undefined;
+}
+
 function gitContext(cwd: string): GitContext {
   const repository = repositoryFromRemote(run('git', ['remote', 'get-url', 'origin'], cwd));
   const branch = run('git', ['branch', '--show-current'], cwd) || undefined;
@@ -64,10 +91,10 @@ function contentFor(input: HookInput): string {
   return '';
 }
 
-function operator(): 'kenta' | 'masato' | 'codex' {
-  const configured = (process.env.CODEX_OPERATOR || '').toLowerCase();
+function operator(cwd: string): 'kenta' | 'masato' | 'codex' {
+  const configured = (configuredValue('CODEX_OPERATOR', cwd) || '').toLowerCase();
   if (configured === 'kenta' || configured === 'masato' || configured === 'codex') return configured;
-  const gitName = (run('git', ['config', 'user.name'], process.cwd()) || '').toLowerCase();
+  const gitName = (run('git', ['config', 'user.name'], cwd) || '').toLowerCase();
   if (gitName.includes('masato') || gitName.includes('マサト')) return 'masato';
   if (gitName.includes('kenta') || gitName.includes('ケンタ')) return 'kenta';
   return 'codex';
@@ -84,9 +111,11 @@ async function readInput(): Promise<HookInput> {
 }
 
 export async function sendHookEvent(input: HookInput): Promise<void> {
-  const relayUrl = process.env.CODEX_SLACK_RELAY_URL;
-  const secret = process.env.CODEX_SLACK_RELAY_SECRET;
-  const required = process.env.CODEX_SLACK_SYNC_REQUIRED === '1';
+  const cwd = input.cwd || process.cwd();
+  const operatorName = operator(cwd);
+  const relayUrl = configuredValue('CODEX_SLACK_RELAY_URL', cwd) || DEFAULT_CODEX_SLACK_RELAY_URL;
+  const secret = configuredValue('CODEX_SLACK_RELAY_SECRET', cwd) || keychainRelaySecret(operatorName, cwd);
+  const required = configuredValue('CODEX_SLACK_SYNC_REQUIRED', cwd) !== '0';
   if (!relayUrl || !secret) {
     result(required ? 'Slack自動報告が未設定です。CODEX_SLACK_RELAY_URLとCODEX_SLACK_RELAY_SECRETを設定してください。' : undefined);
     return;
@@ -97,8 +126,14 @@ export async function sendHookEvent(input: HookInput): Promise<void> {
     result();
     return;
   }
-  const cwd = input.cwd || process.cwd();
   const context = gitContext(cwd);
+  const mentionedPrNumber = prNumberFromContent(content);
+  if (!context.prNumber && mentionedPrNumber) {
+    context.prNumber = mentionedPrNumber;
+    if (context.repository) {
+      context.prUrl = `https://github.com/${context.repository}/pull/${mentionedPrNumber}`;
+    }
+  }
   const sessionId = input.session_id || 'unknown-session';
   const turnId = input.turn_id || 'no-turn';
   const body = JSON.stringify({
@@ -107,7 +142,7 @@ export async function sendHookEvent(input: HookInput): Promise<void> {
     eventType,
     sessionId,
     turnId: input.turn_id,
-    operator: operator(),
+    operator: operatorName,
     ...context,
     content,
     occurredAt: new Date().toISOString(),
