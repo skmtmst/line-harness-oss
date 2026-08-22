@@ -256,7 +256,11 @@ export default function Sidebar({
    * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
    */
   // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
-  const activePathname = pathname === '/visual-qa/friend-attributes-v2' ? '/tags-v2' : pathname
+  const activePathname = pathname === '/visual-qa/friend-attributes-v2'
+    ? '/tags-v2'
+    : pathname === '/visual-qa/friend-attributes-v3'
+      ? '/tags-v3'
+      : pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {

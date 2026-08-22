@@ -28,11 +28,12 @@ describe('友だち属性V3の静的デザイン契約', () => {
       expect(component).not.toContain(forbidden)
     }
     expect(component).not.toContain('onClick=')
+    expect(component).not.toContain('styles.sidebar')
   })
 
   it('V3専用CSSで1920pxと1440pxの配置を持つ', () => {
     expect(component).toContain("./friend-attributes-v3-static.module.css")
-    expect(css).toContain('width: 260px')
+    expect(css).not.toContain('.sidebar')
     expect(css).toContain('@media (max-width: 1500px)')
   })
 })

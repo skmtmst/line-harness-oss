@@ -1,12 +1,5 @@
 import styles from './friend-attributes-v3-static.module.css'
 
-const menuSections = [
-  { label: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性V3'] },
-  { label: '配信', items: ['シナリオ配信', '一斉配信', 'リマインダ', '自動応答', '友だち追加時の配信', 'ウェビナー'] },
-  { label: 'コンテンツ', items: ['テンプレート', 'リッチメニュー', '回答フォーム', '共通情報', '登録メディア一覧'] },
-  { label: '成果と分析', items: ['成果とアフィリエイト', 'マイル', '流入と計測'] },
-] as const
-
 const folders = [
   ['すべて', '101', 'green'],
   ['VIP', '8', 'orange'],
@@ -26,10 +19,6 @@ const rows = [
   { tag: '誕生日クーポン対象', folder: 'VIP', folderTone: 'orange', count: '0人', source: '誕生日ルール', links: [['本人+20', 'green'], ['他2', 'gray']], usage: '配信1', date: '2026/01/13', star: '—' },
 ] as const
 
-function NavMark({ index }: { index: number }) {
-  return <span className={styles.navMark} aria-hidden="true">{index < 4 ? ['◇', '▣', '♧', '◇'][index] : '•'}</span>
-}
-
 function StaticButton({ children, accent = false, compact = false }: { children: React.ReactNode; accent?: boolean; compact?: boolean }) {
   return <button type="button" className={`${styles.button} ${accent ? styles.buttonAccent : ''} ${compact ? styles.buttonCompact : ''}`}>{children}</button>
 }
@@ -37,37 +26,7 @@ function StaticButton({ children, accent = false, compact = false }: { children:
 export default function FriendAttributesV3Static() {
   return (
     <div className={styles.screen} data-design-node="xn98K" data-design-version="friend-attributes-v3-static">
-      <aside className={styles.sidebar} aria-label="V3確認用メニュー">
-        <div className={styles.accountArea}>
-          <p className={styles.accountLabel}>現在のLINEアカウント</p>
-          <div className={styles.accountCard}>
-            <span className={styles.accountLogo}>然</span>
-            <span className={styles.accountText}><strong>然-NEN- TEST</strong><small>コミュニケーション</small></span>
-            <span className={styles.chevron}>▾</span>
-          </div>
-        </div>
-        <nav className={styles.navigation}>
-          {menuSections.map((section, sectionIndex) => (
-            <section key={section.label ?? 'basic'} className={styles.navSection}>
-              {section.label && <h2>{section.label}</h2>}
-              {section.items.map((item, itemIndex) => {
-                const active = item === '友だち属性V3'
-                return (
-                  <div key={item} className={`${styles.navItem} ${sectionIndex > 0 ? styles.navItemCompact : ''} ${active ? styles.navItemActive : ''}`}>
-                    <NavMark index={sectionIndex === 0 ? itemIndex : 5} />
-                    <span>{item}</span>
-                    {item === '受信箱' && <b className={styles.unread}>1</b>}
-                  </div>
-                )
-              })}
-            </section>
-          ))}
-        </nav>
-        <footer className={styles.sidebarFooter}><strong>Kenta Kawano(Obama)</strong><span>管理者</span></footer>
-      </aside>
-
-      <main className={styles.main}>
-        <div className={styles.page}>
+      <div className={styles.page}>
           <header className={styles.header} data-design="Head">
             <div><h1>友だち属性</h1><p>タグ・情報欄・対応マーク・保存条件を、用途まで見ながら管理します。</p></div>
             <div className={styles.headerActions}><StaticButton>マニュアル</StaticButton><StaticButton>CSVで一括登録</StaticButton></div>
@@ -124,8 +83,7 @@ export default function FriendAttributesV3Static() {
               <div className={styles.pagination} data-design="Pagination"><span>前へ</span><b>1</b><span>2</span><span>3</span><span>…</span><span>12</span><span>次へ</span></div>
             </div>
           </section>
-        </div>
-      </main>
+      </div>
     </div>
   )
 }

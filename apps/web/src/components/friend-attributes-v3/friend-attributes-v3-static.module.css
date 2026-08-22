@@ -5,52 +5,14 @@
   --v3-muted: #707780;
   --v3-border: #dfe2e6;
   --v3-shell: #f7f7f9;
-  display: flex;
-  min-height: 100vh;
+  min-height: calc(100vh - 64px);
   width: 100%;
-  background: var(--v3-shell);
   color: var(--v3-ink);
   font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Yu Gothic", Meiryo, sans-serif;
   font-size: 13px;
 }
 
-.sidebar {
-  position: sticky;
-  top: 0;
-  display: flex;
-  width: 260px;
-  height: 100vh;
-  flex: 0 0 260px;
-  flex-direction: column;
-  overflow: hidden;
-  border-right: 1px solid #e5e6e8;
-  background: #fff;
-}
-
-.accountArea { padding: 18px 13px 10px; }
-.accountLabel { margin: 0 0 11px; color: #8d949b; font-size: 12px; }
-.accountCard { display: flex; height: 66px; align-items: center; border: 1px solid #d9dde2; border-radius: 13px; padding: 0 12px; }
-.accountLogo { display: grid; width: 34px; height: 34px; flex: 0 0 34px; place-items: center; border-radius: 9px; background: #e7f8ed; color: #06a846; font-size: 14px; font-weight: 700; }
-.accountText { display: flex; min-width: 0; flex: 1; flex-direction: column; margin-left: 12px; }
-.accountText strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
-.accountText small { margin-top: 3px; color: #9aa0a6; font-size: 10px; }
-.chevron { color: #838a91; font-size: 10px; }
-
-.navigation { flex: 1; overflow: hidden; padding: 2px 13px 8px; }
-.navSection { margin: 0; }
-.navSection h2 { height: 24px; margin: 0; color: #a0a6ad; font-size: 11px; font-weight: 500; line-height: 24px; }
-.navItem { display: flex; height: 44px; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 9px; padding: 0 11px; color: #42505b; font-size: 13px; font-weight: 500; white-space: nowrap; }
-.navItemCompact { height: 38px; }
-.navItemActive { border-color: var(--v3-accent); background: var(--v3-accent-soft); color: #079441; font-weight: 700; }
-.navMark { width: 17px; color: #6f7e89; font-size: 16px; line-height: 1; text-align: center; }
-.navItemActive .navMark { color: #0aae4d; }
-.unread { display: grid; width: 20px; height: 20px; margin-left: 2px; place-items: center; border-radius: 50%; background: #ef4444; color: white; font-size: 11px; }
-.sidebarFooter { display: flex; min-height: 73px; flex-direction: column; justify-content: center; border-top: 1px solid #e5e6e8; padding: 0 22px; }
-.sidebarFooter strong { font-size: 12px; }
-.sidebarFooter span { margin-top: 4px; color: #2884d8; font-size: 10px; }
-
-.main { min-width: 0; flex: 1; background: var(--v3-shell); }
-.page { width: 100%; padding: 33px 40px 48px; }
+.page { width: 100%; }
 .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
 .header h1 { margin: 0; font-size: 31px; font-weight: 750; letter-spacing: -.035em; line-height: 1.25; }
 .header p { margin: 5px 0 0; color: var(--v3-muted); font-size: 13px; }
@@ -121,7 +83,6 @@
 .pagination b { border-color: var(--v3-accent); background: var(--v3-accent); color: #fff; }
 
 @media (max-width: 1500px) {
-  .page { padding-right: 28px; padding-left: 28px; }
   .workspace { grid-template-columns: 225px minmax(0, 1fr); }
   .folderPanel { padding-right: 11px; padding-left: 11px; }
   .tableGrid { grid-template-columns: 24px minmax(108px, 1.35fr) minmax(68px, .68fr) 58px minmax(72px, .72fr) minmax(105px, 1.08fr) minmax(68px, .68fr) 78px 48px 66px; }
@@ -131,8 +92,6 @@
 }
 
 @media (max-width: 1050px) {
-  .sidebar { display: none; }
-  .page { padding: 24px 18px 40px; }
   .workspace { grid-template-columns: 200px minmax(0, 1fr); }
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

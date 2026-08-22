@@ -15,22 +15,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>
   }
 
-  // V3は既存のサイドバー・共通余白・共通画面部品を使わない静的な比較面。
-  // 本番側の入口だけ認証を通し、画面そのものは完全に独立させる。
-  if (isFriendAttributesV3) {
-    if (process.env.NODE_ENV === 'development' && pathname.startsWith('/visual-qa/')) {
-      return <>{children}</>
-    }
-    return <AuthGuard>{children}</AuthGuard>
-  }
-
   // 参照画像との比較専用。開発中だけ表示し、実データの取得・保存は行わない。
   // 本番ビルドでは通常の認証ガードを必ず通る。
   if (process.env.NODE_ENV === 'development' && pathname.startsWith('/visual-qa/')) {
     return (
       <AccountProvider>
         <div className={`flex min-h-screen ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
-          <Sidebar friendAttributesV2Mode={isFriendAttributesV2} preview={isFriendAttributesV2} />
+          <Sidebar friendAttributesV2Mode={isFriendAttributesV2} preview={isFriendAttributesV2 || isFriendAttributesV3} />
           <main className="bg-shell min-w-0 flex-1 overflow-auto">
             <div data-design-shell="v4-1920" className={`mx-auto w-full max-w-shell px-4 pb-6 sm:px-6 lg:px-10 lg:pb-10 ${isFriendAttributesV2 ? 'lg:pt-[32px]' : 'lg:pt-8'}`}>
               {children}
