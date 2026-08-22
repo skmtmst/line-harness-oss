@@ -88,3 +88,20 @@
    */
   --container-shell: 104rem;
 }
+
+/*
+ * 友だち属性V2は、Pen.devの1920px画像をそのまま検証する移行面。
+ * 旧画面のNoto Sans JPと256pxサイドバーを継承すると、本文だけ合わせても
+ * 全体座標と文字幅がずれるため、この画面に限って設計値を固定する。
+ */
+.friend-attributes-v2-shell {
+  font-family: "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  color: #1d1d1f;
+}
+
+@media (min-width: 1280px) {
+  .friend-attributes-v2-shell > aside {
+    width: 260px !important;
+    flex: 0 0 260px;
+  }
+}
