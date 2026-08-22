@@ -39,7 +39,7 @@
         { "id": "marks-tab", "label": "対応マークタブ", "result": "missing", "note": "新しい専用Viewが未作成のため現在は無効表示" },
         { "id": "saved-searches-tab", "label": "保存した検索タブ", "result": "missing", "note": "新しい専用Viewが未作成のため現在は無効表示" },
         { "id": "csv-export", "label": "タグ一覧のCSV書き出し", "result": "missing", "note": "旧画面は一括登録と表示しながら実際にはCSVを書き出していた" },
-        { "id": "reorder-mode", "label": "並べ替え開始・終了の明示切替", "result": "missing", "note": "並べ替え自体は残るが開始・終了ボタンがなくなっている" }
+        { "id": "reorder-mode", "label": "タグの並べ替え操作", "result": "retained", "note": "開始・終了ボタン方式から、ドラッグハンドルを直接操作する方式へ変更" }
       ]
     }
   ]
