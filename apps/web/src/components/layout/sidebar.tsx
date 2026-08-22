@@ -313,12 +313,12 @@ export default function Sidebar({
 
       {preview ? (
         <div className="px-[13px] pb-[9px] pt-[18px]">
-          <p className="mb-[11px] text-[12px] font-normal text-[#8b938d]">現在のLINEアカウント</p>
-          <div className="flex h-[66px] items-center rounded-[12px] border border-[#dfe2e5] bg-white px-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-[#e8f8ee] text-[14px] font-semibold text-[#05913e]">然</div>
+          <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
+          <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent">然</div>
             <div className="ml-3 min-w-0 flex-1">
-              <p className="truncate text-[14px] font-semibold text-[#1d1d1f]">然-NEN- TEST</p>
-              <p className="mt-0.5 truncate text-[10px] text-[#8b938d]">コミュニケーション</p>
+              <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
+              <p className="mt-0.5 truncate text-[10px] text-ink-faint">コミュニケーション</p>
             </div>
           </div>
         </div>
