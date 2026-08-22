@@ -1426,6 +1426,15 @@ CREATE TABLE rt_gbp_reviews (
   UNIQUE(store_id, external_review_id)
 );
 
+CREATE TABLE rt_intake_addresses (
+  id TEXT PRIMARY KEY,
+  local_part TEXT NOT NULL UNIQUE,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'revoked')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  revoked_at TEXT
+);
+
 CREATE TABLE rt_inventory_slots (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -2380,6 +2389,9 @@ CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_ind
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 
 CREATE INDEX idx_rt_gbp_reviews_store ON rt_gbp_reviews(store_id, reply_status, reviewed_at DESC);
+
+CREATE INDEX idx_rt_intake_addresses_store
+  ON rt_intake_addresses (store_id, status);
 
 CREATE INDEX idx_rt_inventory_store_time ON rt_inventory_slots(store_id, starts_at);
 
