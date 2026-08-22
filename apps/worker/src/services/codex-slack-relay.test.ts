@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   classifyCodexSlackEvent,
   handleSlackTaskAction,
+  harnessErrorIncidentKey,
   isCodexTaskCompletion,
   prRangeKey,
   reportHarnessErrorToSlack,
@@ -77,6 +78,22 @@ describe('Codex Slack relay', () => {
     expect(taskIdForKey('pr:220')).toMatch(/^TASK-[0-9A-F]{16}$/);
     expect(taskIdForKey('pr:220')).toBe(taskIdForKey('pr:220'));
     expect(taskIdForKey('pr:220')).not.toBe(taskIdForKey('pr:221'));
+  });
+
+  test('同じ画面のAPI 500と未処理Promiseを同じエラーとしてまとめる', () => {
+    const direct = harnessErrorIncidentKey({
+      source: 'admin',
+      path: 'https://nen-line-stg-admin.pages.dev/friend-add-settings',
+      message: 'API 500: /api/friends/add-breakdown?days=30',
+    });
+    const rejection = harnessErrorIncidentKey({
+      source: 'admin',
+      path: 'https://nen-line-stg-admin.pages.dev/friend-add-settings?account=secret',
+      message: '[unhandledrejection] API error: 500',
+    });
+
+    expect(rejection).toBe(direct);
+    expect(direct).not.toContain('secret');
   });
 
   test('既存のPR親スレッドへ作業報告を追記する', async () => {
@@ -274,7 +291,52 @@ describe('Codex Slack relay', () => {
 
     expect(result).toMatchObject({ channelId: 'C0ERROR123', threadTs: '1787326497.583159' });
     const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
+    const taskUpdate = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
     expect(reply).toMatchObject({ channel: 'C0ERROR123', thread_ts: '1787326497.583159' });
+    expect(taskUpdate.metadata.event_payload).toMatchObject({
+      work_key: originalKey,
+      task_id: taskId,
+      session_id: 'session-1',
+    });
+  });
+
+  test('PR番号が後から付いてもCodexセッションから元エラータスクを完了する', async () => {
+    const taskMessage = {
+      ts: '300.001',
+      metadata: {
+        event_type: 'line_harness_task',
+        event_payload: {
+          work_key: 'session:runtime-error',
+          task_id: 'TASK-0123456789ABCDEF',
+          source_channel: 'C0ERROR123',
+          source_thread_ts: '1787326497.583159',
+          session_id: 'session-1',
+        },
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
+
+    const result = await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C-PR',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+    }, event({
+      eventType: 'turn_completed',
+      prNumber: 249,
+      prUrl: 'https://github.com/skmtmst/line-harness-oss/pull/249',
+      content: 'PR #249の修正と検証環境への反映が完了しました',
+    }), fetcher);
+
+    expect(result).toMatchObject({ channelId: 'C0ERROR123', threadTs: '1787326497.583159' });
+    const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
+    const deletion = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    expect(reply).toMatchObject({ channel: 'C0ERROR123', thread_ts: '1787326497.583159' });
+    expect(reply.text).toContain('PR #249');
+    expect(deletion).toEqual({ channel: 'C-TASK', ts: '300.001' });
   });
 
   test('分類が変わっても同じPR番号なら同じタスクとして扱う', async () => {
@@ -329,6 +391,7 @@ describe('Codex Slack relay', () => {
   test('LINE Harnessの実行時エラーをエラー報告と要対応へ自動起票する', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
       .mockResolvedValueOnce(slackResponse({ ts: '1787327000.000001' }))
       .mockResolvedValueOnce(slackResponse({ ts: '1787327000.000002' }))
       .mockResolvedValueOnce(slackResponse({ messages: [] }))
@@ -347,10 +410,11 @@ describe('Codex Slack relay', () => {
     }, fetcher);
 
     expect(reported).toBe(true);
-    const errorParent = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
-    const task = JSON.parse(String(fetcher.mock.calls[5]?.[1]?.body));
+    const errorParent = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body));
+    const task = JSON.parse(String(fetcher.mock.calls[6]?.[1]?.body));
     expect(errorParent.channel).toBe('C-ERROR');
     expect(task.channel).toBe('C-TASK');
     expect(task.text).toContain('LINE Harnessがエラーを自動検知');
+    expect(errorParent.text).toContain('TASK-ID');
   });
 });

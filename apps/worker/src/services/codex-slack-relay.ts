@@ -167,6 +167,13 @@ function taskStatusLabel(status: Exclude<SlackTaskStatus, 'done'>): string {
   return status === 'working' ? ':large_blue_circle: 作業中' : ':eyes: 確認待ち';
 }
 
+function taskPrLabel(event: Pick<CodexSlackEvent, 'prNumber' | 'prUrl'>): string {
+  if (!event.prNumber) return 'なし';
+  return event.prUrl
+    ? `<${event.prUrl}|PR #${event.prNumber}>`
+    : `PR #${event.prNumber}`;
+}
+
 function reviewerMention(config: CodexSlackRelayConfig, event: CodexSlackEvent, category: CodexSlackCategory): string {
   if (!['error', 'decision'].includes(category)) return '';
   const id = event.operator === 'masato' ? config.SLACK_KENTA_USER_ID : config.SLACK_MASATO_USER_ID;
@@ -218,11 +225,7 @@ function taskBlocks(
 ): Array<Record<string, unknown>> {
   const title = sanitizeSlackContent(singleLine(event.content)).slice(0, 240) || '内容未記入';
   const taskId = taskIdForKey(key);
-  const pr = event.prNumber
-    ? event.prUrl
-      ? `<${event.prUrl}|PR #${event.prNumber}>`
-      : `PR #${event.prNumber}`
-    : 'なし';
+  const pr = taskPrLabel(event);
   return [
     {
       type: 'section',
@@ -336,7 +339,7 @@ async function findThreadTs(
 async function findTaskMessage(
   token: string,
   channel: string,
-  selector: { key?: string; taskId?: string },
+  selector: { key?: string; taskId?: string; sessionId?: string },
   fetcher: typeof fetch,
 ): Promise<SlackMessage | null> {
   let cursor = '';
@@ -351,7 +354,8 @@ async function findTaskMessage(
       if (message.metadata?.event_type !== TASK_METADATA_TYPE) return false;
       const metadata = message.metadata.event_payload;
       return (selector.key && metadata?.work_key === selector.key) ||
-        (selector.taskId && metadata?.task_id === selector.taskId);
+        (selector.taskId && metadata?.task_id === selector.taskId) ||
+        (selector.sessionId && metadata?.session_id === selector.sessionId);
     });
     if (match?.ts) return match;
     cursor = result.response_metadata?.next_cursor || '';
@@ -368,6 +372,7 @@ function replaceTaskStatusText(text: string, status: Exclude<SlackTaskStatus, 'd
 function replaceTaskStatusBlocks(
   blocks: Array<Record<string, unknown>> | undefined,
   status: Exclude<SlackTaskStatus, 'done'>,
+  event?: CodexSlackEvent,
 ): Array<Record<string, unknown>> | undefined {
   if (!blocks) return undefined;
   return blocks.map((block) => {
@@ -377,11 +382,34 @@ function replaceTaskStatusBlocks(
       fields: block.fields.map((field) => {
         if (!field || typeof field !== 'object') return field;
         const current = field as Record<string, unknown>;
-        if (typeof current.text !== 'string' || !current.text.startsWith('*状態*')) return field;
-        return { ...current, text: `*状態*\n${taskStatusLabel(status)}` };
+        if (typeof current.text !== 'string') return field;
+        if (current.text.startsWith('*状態*')) {
+          return { ...current, text: `*状態*\n${taskStatusLabel(status)}` };
+        }
+        if (event?.prNumber && current.text.startsWith('*関連*')) {
+          return { ...current, text: `*関連*\n${taskPrLabel(event)}` };
+        }
+        return field;
       }),
     };
   });
+}
+
+function taskMetadataForEvent(
+  message: SlackMessage,
+  event: CodexSlackEvent | undefined,
+): SlackMessage['metadata'] | undefined {
+  if (!event || message.metadata?.event_type !== TASK_METADATA_TYPE) return undefined;
+  const current = message.metadata.event_payload || {};
+  return {
+    event_type: TASK_METADATA_TYPE,
+    event_payload: {
+      ...current,
+      session_id: event.sessionId,
+      ...(event.prNumber ? { pr_number: String(event.prNumber) } : {}),
+      ...(event.prUrl ? { pr_url: event.prUrl } : {}),
+    },
+  };
 }
 
 async function updateTaskMessageStatus(
@@ -390,14 +418,17 @@ async function updateTaskMessageStatus(
   message: SlackMessage,
   status: Exclude<SlackTaskStatus, 'done'>,
   fetcher: typeof fetch,
+  event?: CodexSlackEvent,
 ): Promise<void> {
   if (!message.ts) return;
-  const blocks = replaceTaskStatusBlocks(message.blocks, status);
+  const blocks = replaceTaskStatusBlocks(message.blocks, status, event);
+  const metadata = taskMetadataForEvent(message, event);
   await slackApi(token, 'chat.update', {
     channel,
     ts: message.ts,
     text: replaceTaskStatusText(message.text || '【要対応】', status),
     ...(blocks ? { blocks } : {}),
+    ...(metadata ? { metadata } : {}),
   }, fetcher);
 }
 
@@ -416,7 +447,7 @@ async function ensureOpenTask(
   const status = taskStatusForEvent(event);
   const existing = await findTaskMessage(token, taskChannel, { key }, fetcher);
   if (existing) {
-    await updateTaskMessageStatus(token, taskChannel, existing, status, fetcher);
+    await updateTaskMessageStatus(token, taskChannel, existing, status, fetcher, event);
     return;
   }
   let permalink = `https://slack.com/archives/${sourceChannel}/p${sourceThreadTs.replace('.', '')}`;
@@ -445,6 +476,9 @@ async function ensureOpenTask(
         task_id: taskIdForKey(key),
         source_channel: sourceChannel,
         source_thread_ts: sourceThreadTs,
+        session_id: event.sessionId,
+        ...(event.prNumber ? { pr_number: String(event.prNumber) } : {}),
+        ...(event.prUrl ? { pr_url: event.prUrl } : {}),
       },
     },
     client_msg_id: `${event.eventId}:task`,
@@ -542,6 +576,23 @@ export type HarnessErrorReport = {
   occurredAt?: string;
 };
 
+function normalizedHarnessErrorPath(value: string | undefined): string {
+  const raw = singleLine(value || 'unknown');
+  try {
+    const url = new URL(raw);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return raw.replace(/[?#].*$/, '');
+  }
+}
+
+export function harnessErrorIncidentKey(report: HarnessErrorReport): string {
+  const path = normalizedHarnessErrorPath(report.path);
+  const httpStatus = report.message.match(/(?:api|http)(?:\s+error)?\s*:?\s*([45]\d{2})/i)?.[1];
+  if (httpStatus) return `${report.source}:${path}:http:${httpStatus}`;
+  return `${report.source}:${path}:${singleLine(report.message).toLowerCase()}`;
+}
+
 export async function reportHarnessErrorToSlack(
   config: CodexSlackRelayConfig,
   report: HarnessErrorReport,
@@ -551,7 +602,9 @@ export async function reportHarnessErrorToSlack(
   const message = sanitizeSlackContent(singleLine(report.message)).slice(0, 500) || '不明なエラー';
   const path = sanitizeSlackContent(singleLine(report.path || '')).slice(0, 300);
   const stack = sanitizeSlackContent(report.stack || '').split('\n').slice(0, 8).join('\n').slice(0, 1_200);
-  const fingerprint = taskIdForKey(`${report.source}:${path}:${message}`).slice(5);
+  const fingerprint = taskIdForKey(harnessErrorIncidentKey(report)).slice(5);
+  const runtimeSessionId = `runtime-${fingerprint}`;
+  const taskId = taskIdForKey(`session:${runtimeSessionId}`);
   const content = [
     `LINE Harnessがエラーを自動検知しました。`,
     `発生元：${report.source === 'worker' ? 'Worker' : '管理画面'}`,
@@ -559,12 +612,13 @@ export async function reportHarnessErrorToSlack(
     `内容：${message}`,
     stack ? `スタック：\n${stack}` : '',
     `エラーID：ERR-${fingerprint}`,
+    `TASK-ID：${taskId}`,
   ].filter(Boolean).join('\n');
   await relayCodexSlackEvent(config, {
     version: 1,
     eventId: `runtime:${fingerprint}:${Date.now()}`,
     eventType: 'approval_required',
-    sessionId: `runtime-${fingerprint}`,
+    sessionId: runtimeSessionId,
     operator: 'codex',
     content,
     occurredAt: report.occurredAt || new Date().toISOString(),
@@ -591,7 +645,9 @@ export async function relayCodexSlackEvent(
     const linkedTask = await findTaskMessage(
       token,
       config.SLACK_TASK_CHANNEL_ID,
-      requestedTaskId ? { taskId: requestedTaskId } : { key },
+      requestedTaskId
+        ? { taskId: requestedTaskId }
+        : { sessionId: event.sessionId, key },
       fetcher,
     );
     const metadata = linkedTask?.metadata?.event_payload;
