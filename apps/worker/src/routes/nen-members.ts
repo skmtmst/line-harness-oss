@@ -106,6 +106,10 @@ async function pushPetCard(c: Context<Env>, friend: FriendRow, pet: Record<strin
   const accessToken = await resolveLineCredential(
     friend.channel_access_token_encrypted,
     friend.channel_access_token,
+    {
+      lineAccountId: friend.line_account_id ?? 'unassigned',
+      field: 'channel_access_token',
+    },
   );
   await pushViaHarnessProxy(
     c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin,

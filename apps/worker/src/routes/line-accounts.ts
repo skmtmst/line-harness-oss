@@ -3,6 +3,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import {
   getLineAccounts,
   getLineAccountById,
+  getLineAccountCredentialHealth,
   createLineAccount,
   updateLineAccount,
   updateLineAccountFields,
@@ -345,6 +346,29 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+// Read-only owner diagnostic. Credential values never leave the DB layer.
+lineAccounts.get(
+  '/api/line-accounts/:id/credential-health',
+  requireRole('owner'),
+  async (c) => {
+    try {
+      const health = await getLineAccountCredentialHealth(
+        c.env.DB,
+        c.req.param('id'),
+      );
+      if (!health) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
+      return c.json({ success: true, data: health });
+    } catch {
+      // Do not serialize the underlying error: crypto/runtime errors can contain
+      // implementation details that are unnecessary for this diagnostic.
+      console.error({ event: 'line_credential_health_check_failed' });
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 // GET /api/line-accounts/:id/follower-insight - compare DB state with LINE official follower stats
 lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {

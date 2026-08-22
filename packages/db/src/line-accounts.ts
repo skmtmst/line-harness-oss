@@ -1,5 +1,9 @@
 import { jstNow } from './utils.js';
-import { decryptCredential, encryptCredential } from './credential-crypto.js';
+import {
+  CredentialEncryptionKeyError,
+  decryptCredential,
+  encryptCredential,
+} from './credential-crypto.js';
 // =============================================================================
 // LINE Accounts — Multi-Account Management
 // =============================================================================
@@ -46,6 +50,47 @@ export interface LineAccount {
   parent_line_account_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type LineCredentialField = 'channel_access_token' | 'channel_secret';
+
+export type LineCredentialFailureReason =
+  | 'key_unavailable_or_invalid'
+  | 'decrypt_failed';
+
+export interface LineCredentialContext {
+  lineAccountId: string;
+  field: LineCredentialField;
+}
+
+export interface LineCredentialHealth {
+  encrypted: boolean;
+  decryptable: boolean;
+  source: 'encrypted' | 'plaintext';
+}
+
+export interface LineAccountCredentialHealth {
+  channel_access_token: LineCredentialHealth;
+  channel_secret: LineCredentialHealth;
+}
+
+function classifyCredentialFailure(error: unknown): LineCredentialFailureReason {
+  return error instanceof CredentialEncryptionKeyError
+    ? 'key_unavailable_or_invalid'
+    : 'decrypt_failed';
+}
+
+function warnPlaintextCredentialFallback(
+  context: LineCredentialContext,
+  error: unknown,
+): void {
+  // Credential values and thrown error messages are deliberately excluded.
+  console.warn({
+    event: 'line_credential_plaintext_fallback',
+    line_account_id: context.lineAccountId,
+    field: context.field,
+    reason: classifyCredentialFailure(error),
+  });
 }
 
 export interface CreateLineAccountInput {
@@ -136,10 +181,14 @@ export async function decryptLineAccountCredentials(
     if (!encrypted) continue;
     try {
       next[plainField] = await decryptCredential(encrypted, credentialEncryptionKey);
-    } catch {
+    } catch (error) {
       if (!row[plainField]) {
         throw new Error(`Unable to decrypt ${plainField}; no legacy fallback is available`);
       }
+      warnPlaintextCredentialFallback(
+        { lineAccountId: row.id, field: plainField },
+        error,
+      );
       next[plainField] = row[plainField];
     }
   }
@@ -150,16 +199,84 @@ export async function decryptLineAccountCredentials(
 export async function resolveLineCredential(
   encrypted: string | null | undefined,
   legacyPlaintext: string | null | undefined,
+  context: LineCredentialContext,
   credentialEncryptionKey?: string,
 ): Promise<string> {
   if (!encrypted) return legacyPlaintext ?? '';
   const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
   try {
     return await decryptCredential(encrypted, encryptionKey);
-  } catch {
-    if (legacyPlaintext) return legacyPlaintext;
+  } catch (error) {
+    if (legacyPlaintext) {
+      warnPlaintextCredentialFallback(context, error);
+      return legacyPlaintext;
+    }
     throw new Error('Unable to decrypt LINE credential; no legacy fallback is available');
   }
+}
+
+async function inspectCredentialHealth(
+  encrypted: string | null | undefined,
+  legacyPlaintext: string | null | undefined,
+  credentialEncryptionKey?: string,
+): Promise<LineCredentialHealth> {
+  if (!encrypted) {
+    return { encrypted: false, decryptable: false, source: 'plaintext' };
+  }
+  try {
+    await decryptCredential(encrypted, credentialEncryptionKey);
+    return { encrypted: true, decryptable: true, source: 'encrypted' };
+  } catch {
+    return {
+      encrypted: true,
+      decryptable: false,
+      source: legacyPlaintext ? 'plaintext' : 'encrypted',
+    };
+  }
+}
+
+/** Returns credential storage/decryption state without exposing either value. */
+export async function getLineAccountCredentialHealth(
+  db: D1Database,
+  id: string,
+  credentialEncryptionKey?: string,
+): Promise<LineAccountCredentialHealth | null> {
+  const row = await db
+    .prepare(
+      `SELECT channel_access_token, channel_secret,
+              channel_access_token_encrypted, channel_secret_encrypted
+         FROM line_accounts
+        WHERE id = ?`,
+    )
+    .bind(id)
+    .first<
+      Pick<
+        LineAccount,
+        | 'channel_access_token'
+        | 'channel_secret'
+        | 'channel_access_token_encrypted'
+        | 'channel_secret_encrypted'
+      >
+    >();
+  if (!row) return null;
+
+  const encryptionKey = await resolveCredentialEncryptionKey(credentialEncryptionKey);
+  const [channelAccessToken, channelSecret] = await Promise.all([
+    inspectCredentialHealth(
+      row.channel_access_token_encrypted,
+      row.channel_access_token,
+      encryptionKey,
+    ),
+    inspectCredentialHealth(
+      row.channel_secret_encrypted,
+      row.channel_secret,
+      encryptionKey,
+    ),
+  ]);
+  return {
+    channel_access_token: channelAccessToken,
+    channel_secret: channelSecret,
+  };
 }
 
 export async function getLineAccountById(

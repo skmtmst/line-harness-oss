@@ -74,7 +74,14 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
     const chunk = rows.slice(i, i + CONCURRENCY);
     await Promise.all(chunk.map(async (row) => {
       const token = row.channel_access_token
-        ? await resolveLineCredential(row.channel_access_token_encrypted, row.channel_access_token)
+        ? await resolveLineCredential(
+            row.channel_access_token_encrypted,
+            row.channel_access_token,
+            {
+              lineAccountId: row.line_account_id ?? 'unassigned',
+              field: 'channel_access_token',
+            },
+          )
         : defaultToken;
       const client = new LineClient(token);
       try {
