@@ -1,6 +1,20 @@
 export type CodexSlackCategory = 'error' | 'idea' | 'fix' | 'decision';
 export type SlackTaskStatus = 'working' | 'review' | 'done';
 
+export type CodexSlackPrSnapshot = {
+  number: number;
+  title: string;
+  url: string;
+  author: string;
+  headRefName: string;
+  isDraft: boolean;
+  mergeStateStatus: string;
+  updatedAt: string;
+  fileCount: number;
+  overlapsWith: number[];
+  checks: 'pass' | 'pending' | 'fail' | 'none';
+};
+
 export type CodexSlackEvent = {
   version: 1;
   eventId: string;
@@ -15,6 +29,7 @@ export type CodexSlackEvent = {
   content: string;
   occurredAt: string;
   explicitCategory?: CodexSlackCategory;
+  openPrs?: CodexSlackPrSnapshot[];
 };
 
 export type CodexSlackRelayConfig = {
@@ -50,6 +65,7 @@ type SlackApiResponse = {
 
 const THREAD_METADATA_TYPE = 'line_harness_codex';
 const TASK_METADATA_TYPE = 'line_harness_task';
+const COMMAND_CENTER_METADATA_TYPE = 'line_harness_command_center';
 export const TASK_ACTION_ID = 'line_harness_task_status';
 const MAX_HISTORY_PAGES = 5;
 const MAX_SLACK_CONTENT_LENGTH = 2_500;
@@ -204,6 +220,12 @@ function buildReplyText(event: CodexSlackEvent, category: CodexSlackCategory): s
 
 function taskStatusForEvent(event: CodexSlackEvent): Exclude<SlackTaskStatus, 'done'> {
   return event.eventType === 'prompt_submitted' ? 'working' : 'review';
+}
+
+function taskEnvironment(event: CodexSlackEvent): 'development' | 'staging' | 'production' {
+  if (/(?:本番|production).{0,20}(?:反映|deploy|デプロイ)/i.test(event.content)) return 'production';
+  if (/(?:検証|staging).{0,20}(?:反映|deploy|デプロイ)/i.test(event.content)) return 'staging';
+  return 'development';
 }
 
 function taskActionValue(
@@ -365,6 +387,265 @@ async function findTaskMessage(
   return null;
 }
 
+async function listTaskMessages(
+  token: string,
+  channel: string,
+  fetcher: typeof fetch,
+): Promise<SlackMessage[]> {
+  const messages: SlackMessage[] = [];
+  let cursor = '';
+  for (let page = 0; page < MAX_HISTORY_PAGES; page += 1) {
+    const result = await slackApi(token, 'conversations.history', {
+      channel,
+      limit: 100,
+      include_all_metadata: true,
+      ...(cursor ? { cursor } : {}),
+    }, fetcher);
+    messages.push(...(result.messages || []).filter((message) => message.metadata?.event_type === TASK_METADATA_TYPE));
+    cursor = result.response_metadata?.next_cursor || '';
+    if (!cursor) break;
+  }
+  return messages;
+}
+
+async function findCommandCenterMessage(
+  token: string,
+  channel: string,
+  fetcher: typeof fetch,
+): Promise<SlackMessage | null> {
+  let cursor = '';
+  for (let page = 0; page < MAX_HISTORY_PAGES; page += 1) {
+    const result = await slackApi(token, 'conversations.history', {
+      channel,
+      limit: 100,
+      include_all_metadata: true,
+      ...(cursor ? { cursor } : {}),
+    }, fetcher);
+    const match = result.messages?.find((message) => message.metadata?.event_type === COMMAND_CENTER_METADATA_TYPE);
+    if (match?.ts) return match;
+    cursor = result.response_metadata?.next_cursor || '';
+    if (!cursor) break;
+  }
+  return null;
+}
+
+export type SlackCommandCenterTask = {
+  taskId: string;
+  status: Exclude<SlackTaskStatus, 'done'>;
+  operator: string;
+  title: string;
+  prNumber?: number;
+  sourceChannel?: string;
+  sourceThreadTs?: string;
+  workKey?: string;
+  environment: 'development' | 'staging' | 'production';
+};
+
+function commandCenterTask(message: SlackMessage): SlackCommandCenterTask | null {
+  const metadata = message.metadata?.event_payload;
+  if (!metadata) return null;
+  const status = /確認待ち/.test(message.text || '')
+    ? 'review'
+    : /作業中/.test(message.text || '')
+      ? 'working'
+      : metadata.status === 'review'
+        ? 'review'
+        : 'working';
+  const prNumber = /^\d+$/.test(metadata.pr_number || '') ? Number(metadata.pr_number) : undefined;
+  const operator = metadata.operator === 'kenta'
+    ? 'ケンタ'
+    : metadata.operator === 'masato'
+      ? 'マサト'
+      : metadata.operator === 'codex'
+        ? 'Codex'
+        : message.text?.match(/担当：([^\n]+)/)?.[1]?.replace(/:[a-z_]+:/g, '').trim() || '未設定';
+  const environment = ['development', 'staging', 'production'].includes(metadata.environment || '')
+    ? metadata.environment as SlackCommandCenterTask['environment']
+    : 'development';
+  return {
+    taskId: metadata.task_id || taskIdForKey(metadata.work_key || message.ts || 'unknown'),
+    status,
+    operator,
+    title: singleLine(metadata.title || message.text || '内容未記入').slice(0, 120),
+    prNumber,
+    sourceChannel: metadata.source_channel,
+    sourceThreadTs: metadata.source_thread_ts,
+    workKey: metadata.work_key,
+    environment,
+  };
+}
+
+function prOwner(pr: CodexSlackPrSnapshot): string {
+  if (/(?:^|\/)masato(?:-|\/|$)/i.test(pr.headRefName)) return 'マサト';
+  if (/(?:^|\/)kenta(?:-|\/|$)/i.test(pr.headRefName)) return 'ケンタ';
+  return pr.author || '未設定';
+}
+
+function checkLabel(checks: CodexSlackPrSnapshot['checks']): string {
+  if (checks === 'pass') return 'チェック✅';
+  if (checks === 'pending') return 'チェック⏳';
+  if (checks === 'fail') return 'チェック❌';
+  return 'チェックなし';
+}
+
+function prStateLabel(pr: CodexSlackPrSnapshot): string {
+  if (pr.isDraft) return 'Draft';
+  if (pr.mergeStateStatus === 'CLEAN') return '統合可能';
+  if (pr.mergeStateStatus === 'DIRTY') return '競合あり';
+  if (pr.mergeStateStatus === 'BLOCKED') return '停止中';
+  if (pr.mergeStateStatus === 'BEHIND') return '開発版より遅れ';
+  return '状態確認中';
+}
+
+function prOrderDecision(pr: CodexSlackPrSnapshot, older: CodexSlackPrSnapshot[]): string {
+  const overlapping = older.filter((candidate) => pr.overlapsWith.includes(candidate.number));
+  if (overlapping.length > 0) return `追い越し不可（#${overlapping.map((item) => item.number).join('・#')}と変更重複）`;
+  const activeOlder = older.find((candidate) => !candidate.isDraft);
+  if (activeOlder) return `追い越し不可（#${activeOlder.number}を先に確認）`;
+  if (pr.isDraft) return '保留中。後続PRは変更重複がなければ追い越し候補';
+  if (pr.checks === 'fail') return '停止中（チェック失敗）';
+  if (pr.checks === 'pending') return 'チェック完了待ち';
+  if (pr.mergeStateStatus === 'DIRTY' || pr.mergeStateStatus === 'BLOCKED') return '停止中（競合・必須条件を確認）';
+  return older.length > 0 ? '追い越し候補（古いPRはDraft、変更重複なし）' : '次に統合する候補';
+}
+
+function previousPrSection(text: string | undefined): string | null {
+  if (!text) return null;
+  const match = text.match(/\*PR順・追い越し判断\*\n([\s\S]*?)\n\*作業・停止・反映状況\*/);
+  return match?.[1]?.trim() || null;
+}
+
+function taskDuplicateLines(tasks: SlackCommandCenterTask[]): string[] {
+  const groups = new Map<string, SlackCommandCenterTask[]>();
+  for (const task of tasks) {
+    const keys = [
+      task.prNumber ? `PR #${task.prNumber}` : '',
+      task.sourceChannel && task.sourceThreadTs ? `元スレッド ${task.sourceChannel}:${task.sourceThreadTs}` : '',
+      task.workKey ? `作業キー ${task.workKey}` : '',
+    ].filter(Boolean);
+    for (const key of keys) groups.set(key, [...(groups.get(key) || []), task]);
+  }
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+  for (const [key, values] of groups) {
+    const ids = [...new Set(values.map((item) => item.taskId))];
+    if (ids.length < 2) continue;
+    const signature = ids.sort().join(':');
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+    duplicates.push(`- ⚠️ ${key} が ${ids.length}件（${ids.join(' / ')}）`);
+  }
+  return duplicates;
+}
+
+function taskStopReason(task: SlackCommandCenterTask): string {
+  if (task.status === 'review') return '確認待ち';
+  const match = task.title.match(/(競合|承認待ち|判断待ち|ロック|失敗|停止|blocked)/i)?.[1];
+  return match ? `${match}を確認` : 'なし';
+}
+
+function taskEnvironmentLabel(task: SlackCommandCenterTask): string {
+  if (task.environment === 'production') return '開発✅ 検証✅ 本番確認中';
+  if (task.environment === 'staging') return '開発✅ 検証確認中 本番—（本番未反映）';
+  return '開発中 検証— 本番—（本番未反映）';
+}
+
+function formattedJst(occurredAt: string): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(occurredAt));
+}
+
+export function buildSlackCommandCenterText(
+  openPrs: CodexSlackPrSnapshot[] | undefined,
+  tasks: SlackCommandCenterTask[],
+  occurredAt: string,
+  previousText?: string,
+): string {
+  const prs = [...(openPrs || [])].sort((a, b) => a.number - b.number).slice(0, 20);
+  const duplicateLines = taskDuplicateLines(tasks);
+  const reviewCount = tasks.filter((task) => task.status === 'review').length;
+  let prLines: string[];
+  if (openPrs) {
+    const firstActive = prs.find((pr) => !pr.isDraft);
+    const creationRule = firstActive
+      ? `新規PR作成：可。統合順は原則 #${firstActive.number} が先（重複と停止理由で再判定）`
+      : prs.length > 0
+        ? `新規PR作成：可。既存${prs.map((pr) => `#${pr.number}`).join('・')}はDraftのため、変更重複がなければ先に統合可能`
+        : '新規PR作成：可。未完了PRはありません';
+    prLines = [creationRule, ...prs.flatMap((pr, index) => [
+      `${index + 1}. <${pr.url}|#${pr.number}> ${prOwner(pr)}｜${prStateLabel(pr)}｜${checkLabel(pr.checks)}｜変更${pr.fileCount}件｜${sanitizeSlackContent(singleLine(pr.title)).slice(0, 80)}`,
+      `   ${prOrderDecision(pr, prs.slice(0, index))}｜開発PR・検証—・本番—`,
+    ])];
+  } else {
+    prLines = (previousPrSection(previousText) || 'GitHub情報は次のCodex報告で同期します').split('\n');
+  }
+  const taskLines = tasks.length === 0
+    ? ['- 未完了タスクなし']
+    : tasks.slice(0, 15).flatMap((task) => {
+      const source = task.sourceChannel && task.sourceThreadTs
+        ? `｜<https://slack.com/archives/${task.sourceChannel}/p${task.sourceThreadTs.replace('.', '')}|元スレッド>`
+        : '';
+      const related = task.prNumber ? `｜PR #${task.prNumber}` : '';
+      return [
+        `- ${task.taskId}｜${task.operator}｜${task.status === 'working' ? '作業中' : '確認待ち'}${related}${source}`,
+        `  ${taskEnvironmentLabel(task)}｜停止理由：${taskStopReason(task)}｜${task.title}`,
+      ];
+    });
+  return [
+    '*【LINE Harness 開発指令盤】*',
+    `更新：${formattedJst(occurredAt)} JST｜作業中 ${tasks.length - reviewCount}｜確認待ち ${reviewCount}｜未完了PR ${openPrs ? prs.length : '前回同期'}｜重複候補 ${duplicateLines.length}`,
+    '',
+    '*PR順・追い越し判断*',
+    ...prLines,
+    '',
+    '*作業・停止・反映状況*',
+    ...taskLines,
+    '',
+    '*重複*',
+    ...(duplicateLines.length > 0 ? duplicateLines : ['- なし']),
+    '',
+    '_PR番号は作成順です。先に上げてよいかは「変更重複・Draft・チェック・競合」で判定します。正本はGitHubです。_',
+  ].join('\n').slice(0, 3_900);
+}
+
+async function refreshSlackCommandCenter(
+  config: CodexSlackRelayConfig,
+  openPrs: CodexSlackPrSnapshot[] | undefined,
+  occurredAt: string,
+  fetcher: typeof fetch,
+): Promise<void> {
+  const token = config.SLACK_BOT_TOKEN;
+  const commandChannel = config.SLACK_COMMAND_CHANNEL_ID;
+  const taskChannel = config.SLACK_TASK_CHANNEL_ID;
+  if (!token || !commandChannel || !taskChannel) return;
+  try {
+    const [messages, existing] = await Promise.all([
+      listTaskMessages(token, taskChannel, fetcher),
+      findCommandCenterMessage(token, commandChannel, fetcher),
+    ]);
+    const tasks = messages.map(commandCenterTask).filter((task): task is SlackCommandCenterTask => Boolean(task));
+    const text = buildSlackCommandCenterText(openPrs, tasks, occurredAt, existing?.text);
+    if (existing?.ts) {
+      await slackApi(token, 'chat.update', { channel: commandChannel, ts: existing.ts, text }, fetcher);
+    } else {
+      await slackApi(token, 'chat.postMessage', {
+        channel: commandChannel,
+        text,
+        metadata: { event_type: COMMAND_CENTER_METADATA_TYPE, event_payload: { version: '1' } },
+        client_msg_id: `command-center:${Date.now()}`,
+      }, fetcher);
+    }
+  } catch (error) {
+    console.warn(JSON.stringify({ event: 'slack_command_center_refresh_failed', error: String(error) }));
+  }
+}
+
 function replaceTaskStatusText(text: string, status: Exclude<SlackTaskStatus, 'done'>): string {
   const next = `状態：${taskStatusLabel(status)}`;
   return /状態：[^\n]*/.test(text) ? text.replace(/状態：[^\n]*/, next) : `${text}\n${next}`;
@@ -399,16 +680,23 @@ function replaceTaskStatusBlocks(
 function taskMetadataForEvent(
   message: SlackMessage,
   event: CodexSlackEvent | undefined,
+  status: Exclude<SlackTaskStatus, 'done'>,
 ): SlackMessage['metadata'] | undefined {
-  if (!event || message.metadata?.event_type !== TASK_METADATA_TYPE) return undefined;
+  if (message.metadata?.event_type !== TASK_METADATA_TYPE) return undefined;
   const current = message.metadata.event_payload || {};
   return {
     event_type: TASK_METADATA_TYPE,
     event_payload: {
       ...current,
-      session_id: event.sessionId,
-      ...(event.prNumber ? { pr_number: String(event.prNumber) } : {}),
-      ...(event.prUrl ? { pr_url: event.prUrl } : {}),
+      status,
+      ...(event ? {
+        session_id: event.sessionId,
+        operator: event.operator,
+        title: sanitizeSlackContent(singleLine(event.content)).slice(0, 240),
+        environment: taskEnvironment(event),
+      } : {}),
+      ...(event?.prNumber ? { pr_number: String(event.prNumber) } : {}),
+      ...(event?.prUrl ? { pr_url: event.prUrl } : {}),
     },
   };
 }
@@ -423,7 +711,7 @@ async function updateTaskMessageStatus(
 ): Promise<void> {
   if (!message.ts) return;
   const blocks = replaceTaskStatusBlocks(message.blocks, status, event);
-  const metadata = taskMetadataForEvent(message, event);
+  const metadata = taskMetadataForEvent(message, event, status);
   await slackApi(token, 'chat.update', {
     channel,
     ts: message.ts,
@@ -478,6 +766,10 @@ async function ensureOpenTask(
         source_channel: sourceChannel,
         source_thread_ts: sourceThreadTs,
         session_id: event.sessionId,
+        status,
+        operator: event.operator,
+        title: sanitizeSlackContent(singleLine(event.content)).slice(0, 240),
+        environment: taskEnvironment(event),
         ...(event.prNumber ? { pr_number: String(event.prNumber) } : {}),
         ...(event.prUrl ? { pr_url: event.prUrl } : {}),
       },
@@ -562,10 +854,12 @@ export async function handleSlackTaskAction(
       channel: taskChannel,
       ts: payload.message.ts,
     }, fetcher);
+    await refreshSlackCommandCenter(config, undefined, new Date().toISOString(), fetcher);
     return { status: 'done' };
   }
 
   await updateTaskMessageStatus(token, taskChannel, payload.message, value.status, fetcher);
+  await refreshSlackCommandCenter(config, undefined, new Date().toISOString(), fetcher);
   return { status: value.status };
 }
 
@@ -690,6 +984,8 @@ export async function relayCodexSlackEvent(
   } else {
     await ensureOpenTask(config, event, category, key, channelId, threadTs, fetcher);
   }
+
+  await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher);
 
   return { category, channelId, threadTs };
 }

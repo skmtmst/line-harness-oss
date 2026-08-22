@@ -16,6 +16,21 @@ type GitContext = {
   branch?: string;
   prNumber?: number;
   prUrl?: string;
+  openPrs?: CodexSlackPrSnapshot[];
+};
+
+export type CodexSlackPrSnapshot = {
+  number: number;
+  title: string;
+  url: string;
+  author: string;
+  headRefName: string;
+  isDraft: boolean;
+  mergeStateStatus: string;
+  updatedAt: string;
+  fileCount: number;
+  overlapsWith: number[];
+  checks: 'pass' | 'pending' | 'fail' | 'none';
 };
 
 export const CODEX_SLACK_RELAY_TIMEOUT_MS = 20_000;
@@ -23,16 +38,82 @@ export const DEFAULT_CODEX_SLACK_RELAY_URL =
   'https://nen-line-stg.skmtmst.workers.dev/api/integrations/codex-slack/events';
 const CODEX_SLACK_KEYCHAIN_SERVICE = 'line-harness-codex-slack-relay';
 
-function run(command: string, args: string[], cwd: string): string | null {
+function run(command: string, args: string[], cwd: string, timeout = 3_000): string | null {
   try {
     return execFileSync(command, args, {
       cwd,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 3_000,
+      timeout,
     }).trim() || null;
   } catch {
     return null;
+  }
+}
+
+function checkSummary(value: unknown): CodexSlackPrSnapshot['checks'] {
+  if (!Array.isArray(value) || value.length === 0) return 'none';
+  let pending = false;
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const check = item as Record<string, unknown>;
+    const state = String(check.conclusion || check.state || '').toUpperCase();
+    const status = String(check.status || '').toUpperCase();
+    if (['FAILURE', 'FAILED', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(state)) return 'fail';
+    if ((!state && status && status !== 'COMPLETED') || ['PENDING', 'QUEUED', 'IN_PROGRESS', 'EXPECTED'].includes(state)) {
+      pending = true;
+    }
+  }
+  return pending ? 'pending' : 'pass';
+}
+
+export function parseOpenPrSnapshot(raw: string | null): CodexSlackPrSnapshot[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const rows = JSON.parse(raw) as unknown;
+    if (!Array.isArray(rows)) return undefined;
+    const parsed = rows.slice(0, 30).flatMap((value) => {
+      if (!value || typeof value !== 'object') return [];
+      const row = value as Record<string, unknown>;
+      if (!Number.isInteger(row.number) || Number(row.number) < 1 || typeof row.title !== 'string') return [];
+      const files = Array.isArray(row.files)
+        ? row.files.flatMap((file) => {
+          if (!file || typeof file !== 'object') return [];
+          const path = (file as Record<string, unknown>).path;
+          return typeof path === 'string' && !path.startsWith('docs/release-log/') ? [path] : [];
+        })
+        : [];
+      return [{
+        number: Number(row.number),
+        title: row.title.slice(0, 240),
+        url: typeof row.url === 'string' ? row.url.slice(0, 500) : '',
+        author: row.author && typeof row.author === 'object' && typeof (row.author as Record<string, unknown>).login === 'string'
+          ? String((row.author as Record<string, unknown>).login).slice(0, 100)
+          : 'unknown',
+        headRefName: typeof row.headRefName === 'string' ? row.headRefName.slice(0, 255) : '',
+        isDraft: row.isDraft === true,
+        mergeStateStatus: typeof row.mergeStateStatus === 'string' ? row.mergeStateStatus.slice(0, 30) : 'UNKNOWN',
+        updatedAt: typeof row.updatedAt === 'string' && Number.isFinite(Date.parse(row.updatedAt))
+          ? row.updatedAt
+          : new Date(0).toISOString(),
+        fileCount: files.length,
+        overlapsWith: [] as number[],
+        checks: checkSummary(row.statusCheckRollup),
+        _files: files,
+      }];
+    });
+    for (const current of parsed) {
+      const paths = new Set(current._files);
+      current.overlapsWith = parsed
+        .filter((candidate) => candidate.number !== current.number && candidate._files.some((path) => paths.has(path)))
+        .map((candidate) => candidate.number)
+        .sort((a, b) => a - b);
+    }
+    return parsed
+      .sort((a, b) => a.number - b.number)
+      .map(({ _files: _ignored, ...item }) => item);
+  } catch {
+    return undefined;
   }
 }
 
@@ -79,7 +160,11 @@ function gitContext(cwd: string): GitContext {
   const pr = run('gh', ['pr', 'view', '--json', 'number,url', '--jq', '[.number,.url]|@tsv'], cwd);
   const [rawNumber, prUrl] = pr?.split('\t') || [];
   const prNumber = rawNumber && /^\d+$/.test(rawNumber) ? Number(rawNumber) : undefined;
-  return { repository, branch, prNumber, prUrl: prUrl || undefined };
+  const openPrs = parseOpenPrSnapshot(run('gh', [
+    'pr', 'list', '--base', 'codex/development', '--state', 'open', '--limit', '30',
+    '--json', 'number,title,isDraft,mergeStateStatus,author,headRefName,url,updatedAt,files,statusCheckRollup',
+  ], cwd, 8_000));
+  return { repository, branch, prNumber, prUrl: prUrl || undefined, openPrs };
 }
 
 function contentFor(input: HookInput): string {
