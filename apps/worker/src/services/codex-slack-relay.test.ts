@@ -70,6 +70,10 @@ describe('Codex Slack relay', () => {
     }))).toBe(true);
     expect(isCodexTaskCompletion(event({
       eventType: 'turn_completed',
+      content: 'PR #249の修正が完了しました。同一エラーとして解決済みです',
+    }))).toBe(true);
+    expect(isCodexTaskCompletion(event({
+      eventType: 'turn_completed',
       content: '修正は未完了で、エラーが残っています',
     }))).toBe(false);
   });
