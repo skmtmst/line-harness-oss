@@ -16,11 +16,11 @@ describe('予約メール原文の環境分離', () => {
     expect(staging).toContain('binding = "IMAGES"\nbucket_name = "nen-line-stg-images"');
   });
 
-  it('本番の取り込みドメインを検証設定へ流用しない', () => {
+  it('本番と検証で別の取り込みドメインを使う', () => {
     const production = readFileSync(join(workerRoot, 'wrangler.toml'), 'utf8');
     const staging = readFileSync(join(workerRoot, 'wrangler.staging.toml'), 'utf8');
 
     expect(production).toMatch(/^RESTAURANT_INTAKE_DOMAIN = "r\.musubo\.jp"$/m);
-    expect(staging).not.toMatch(/^RESTAURANT_INTAKE_DOMAIN\s*=/m);
+    expect(staging).toMatch(/^RESTAURANT_INTAKE_DOMAIN = "rs\.musubo\.jp"$/m);
   });
 });
