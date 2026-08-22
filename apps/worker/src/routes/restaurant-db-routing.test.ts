@@ -9,6 +9,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const restaurantSources = [
   join(here, 'restaurant-test.ts'),
   join(here, '../services/restaurant-test.ts'),
+  join(here, '../services/restaurant-email-intake.ts'),
+  join(here, '../services/inbound-email-router.ts'),
 ];
 
 describe('飲食店向けD1ルーティング境界', () => {

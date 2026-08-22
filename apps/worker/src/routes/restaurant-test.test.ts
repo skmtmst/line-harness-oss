@@ -5,8 +5,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
+type MockStaff = {
+  id: string;
+  name: string;
+  role: 'owner' | 'admin' | 'staff';
+  access_level: 'full' | 'read_only';
+  permission_keys: string;
+  assigned_line_account_id: string | null;
+  can_access_descendant_accounts: number;
+};
+
+const authMocks = vi.hoisted(() => ({
+  getStaffByApiKey: vi.fn(async (): Promise<MockStaff | null> => null),
+}));
+
 vi.mock('@line-crm/db', () => ({
-  getStaffByApiKey: vi.fn(async () => null),
+  getStaffByApiKey: authMocks.getStaffByApiKey,
   getLineAccounts: vi.fn(async () => [{ id: 'account-1' }]),
 }));
 
@@ -26,16 +40,22 @@ function app() {
 }
 
 function request(path: string, body?: unknown) {
+  return requestAs(path, 'owner-key', body);
+}
+
+function requestAs(path: string, token: string, body?: unknown) {
   return app().request(path, body === undefined ? {
-    headers: { Authorization: 'Bearer owner-key' },
+    headers: { Authorization: `Bearer ${token}` },
   } : {
     method: 'POST',
-    headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }, env);
 }
 
 beforeEach(() => {
+  authMocks.getStaffByApiKey.mockReset();
+  authMocks.getStaffByApiKey.mockResolvedValue(null);
   testDb = createTestD1();
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
   env = {
@@ -43,6 +63,7 @@ beforeEach(() => {
     API_KEY: 'owner-key',
     IMAGES: {} as R2Bucket,
     ASSETS: {} as Fetcher,
+    RESTAURANT_INTAKE_DOMAIN: 'intake.example.test',
     LINE_CHANNEL_SECRET: 'unused', LINE_CHANNEL_ACCESS_TOKEN: 'unused',
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
@@ -99,6 +120,33 @@ describe('飲食店向けテストAPI', () => {
       storeId: store.id, provider: 'outbound', eventId: 'event-x', reservation: {},
     });
     expect(response.status).toBe(400);
+  });
+
+  it('取り込みアドレスはオーナーだけが発行でき、スタッフは拒否する', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };
+
+    const issued = await request('/api/restaurant-test/intake-addresses?account_id=account-1', { storeId: store.id });
+    expect(issued.status).toBe(201);
+    expect(await issued.json()).toMatchObject({
+      data: { address: expect.stringMatching(/^r-[a-z0-9]{32}@intake\.example\.test$/) },
+    });
+
+    authMocks.getStaffByApiKey.mockResolvedValue({
+      id: 'staff-1',
+      name: 'Staff',
+      role: 'staff',
+      access_level: 'full',
+      permission_keys: '[]',
+      assigned_line_account_id: null,
+      can_access_descendant_accounts: 0,
+    });
+    const denied = await requestAs(
+      '/api/restaurant-test/intake-addresses?account_id=account-1',
+      'staff-key',
+      { storeId: store.id },
+    );
+    expect(denied.status).toBe(403);
   });
 
   it('この組織に存在しないLINEアカウントの飲食店データへアクセスさせない', async () => {
