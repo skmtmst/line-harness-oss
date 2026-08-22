@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "screens": [
+    {
+      "id": "friend-attributes-v4-states",
+      "title": "友だち属性V4・Lステップ分析反映4状態",
+      "scope": "visual-qa-only",
+      "view": "src/components/friend-attributes-v4/friend-attributes-v4-states.tsx",
+      "routes": [
+        "/visual-qa/friend-attributes-v4-states?state=fields",
+        "/visual-qa/friend-attributes-v4-states?state=marks",
+        "/visual-qa/friend-attributes-v4-states?state=searches",
+        "/visual-qa/friend-attributes-v4-states?state=csv"
+      ],
+      "states": [
+        { "name": "友だち情報欄", "pencilNodeId": "C2g1N" },
+        { "name": "対応マーク", "pencilNodeId": "S04qZM" },
+        { "name": "保存した検索", "pencilNodeId": "WDAkW" },
+        { "name": "CSV操作", "pencilNodeId": "sJE2f" }
+      ],
+      "features": [
+        { "name": "4状態の静的Visual QA表示", "status": "added" },
+        { "name": "現行/tagsの取得・追加・編集・削除", "status": "retained" },
+        { "name": "現行/tagsの並び替え・CSV処理", "status": "retained" },
+        { "name": "現行アプリの共通サイドバー", "status": "retained" },
+        { "name": "現行CSV画面のフォルダと実データ一覧", "status": "retained" }
+      ],
+      "followUpSpec": "docs/friend-attributes-v4-production-connection-spec.md"
+    }
+  ]
+}

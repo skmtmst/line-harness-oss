@@ -16,6 +16,7 @@
     "deploy:update": "node packages/create-line-harness/dist/index.js update",
     "sandbox:create-line-harness": "bash scripts/run-create-line-harness-sandbox.sh",
     "test:scripts": "vitest run --config vitest.config.ts",
+    "check:v4-architecture": "node scripts/check-v4-architecture.mjs",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json",
     "deploy:lock": "tsx scripts/deploy/deploy-lock.ts",
     "deploy:preflight": "tsx scripts/deploy/preflight.ts",

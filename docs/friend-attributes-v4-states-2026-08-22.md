@@ -1,5 +1,11 @@
 # 友だち属性V4 追加4状態とLステップ22反映案
 
+## PR #271の範囲
+
+このPRは、Lステップ・Liny分析を反映した静的なVisual QA比較画面と設計資料までを対象とする。
+本番 `/tags` へのprops接続、共通サイドバーのV4統一、CSV画面背面の実データ比較は、
+[`friend-attributes-v4-production-connection-spec.md`](./friend-attributes-v4-production-connection-spec.md) を正本として別PRで進める。
+
 ## 対象と実ノード
 
 | 状態 | 元ノード | 分析反映ノード | 提案ページ | 現在の扱い |
@@ -59,10 +65,11 @@ Chrome DevToolsで4状態を1440px・1920pxの両方で確認し、ページ全�
 - `/visual-qa/friend-attributes-v4-states?state=searches`
 - `/visual-qa/friend-attributes-v4-states?state=csv`
 
-## 未完了ゲート
+## 別PRへ分離した本番接続
 
 - 現行機能とのprops接続と機能テスト
 - 共通サイドバーを含むグローバルシェルのV4統一
 - CSV画面背面のフォルダパネルと実データ一覧の最終画像比較
 
-この3点が終わるまで、本番 `/tags` のV4置換完了とは扱わない。
+この3点はPR #271の未完了ではなく、本番画面を置き換える別PRの受け入れ条件とする。
+PR #271では本番 `/tags` を変更しておらず、V4置換完了とは扱わない。
