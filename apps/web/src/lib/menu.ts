@@ -149,6 +149,24 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' , id: 'emergency', note: '配信の停止・再開と、異常の記録', required: true },
     ],
   },
+  {
+    // Pen R-1〜R-8を正本とする検証専用領域。既存の予約・配信とは別URLにし、
+    // 後日この区分ごと別サーバーへ切り出せる構造にする。
+    id: 'restaurant-test',
+    label: '飲食店向け（テスト）',
+    title: '飲食店向け（テスト）',
+    items: [
+      { href: '/restaurant-test/dashboard', label: '店舗ダッシュボード', icon: 'M3 3v18h18M7 16v2m4-6v6m4-10v10m4-14v14', id: 'restaurant-dashboard', note: '全店の予約・空席・売上予測・連携状態', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/organization', label: '組織・権限', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', id: 'restaurant-organization', note: '本部・店舗・スタッフの権限と連携アカウント', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/approvals', label: '承認ワークフロー', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11', id: 'restaurant-approvals', note: 'GBP投稿・LINE配信・メニュー改定の承認', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/reservations', label: '予約台帳', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', id: 'restaurant-reservations', note: '媒体別の予約、配席、顧客カルテを一元表示', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/tables', label: '座席・卓管理', icon: 'M4 6h16M6 6v12m12-12v12M4 18h16M9 10h6v4H9z', id: 'restaurant-tables', note: 'フロア、席種、収容人数、結合ルール', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/inventory', label: '予約枠・在庫', icon: 'M3 5h18v14H3zM3 10h18M8 5v14M13 5v14M18 5v14', id: 'restaurant-inventory', note: '時間帯と媒体別の受入枠を管理', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/menu', label: 'メニュー管理', icon: 'M4 6h16M4 10h16M4 14h10M4 18h10', id: 'restaurant-menu', note: 'コース・単品・価格・アレルギー情報', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/google', label: 'Google・口コミ', icon: 'M21 12a9 9 0 11-2.64-6.36M21 4v6h-6', id: 'restaurant-google', note: 'GBP口コミ返信と最新情報の下書き管理', featureKey: 'restaurant_test' },
+      { href: '/restaurant-test/line-followup', label: 'LINE来店フォロー', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', id: 'restaurant-line-followup', note: '予約前・来店後・口コミ・会員証のLINEカード', featureKey: 'restaurant_test' },
+    ],
+  },
 ]
 
 /** 区分の目印から中身を引く。 */
