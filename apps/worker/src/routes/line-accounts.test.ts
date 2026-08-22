@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 const dbMocks = {
   getLineAccounts: vi.fn(),
   getLineAccountById: vi.fn(),
+  getLineAccountCredentialHealth: vi.fn(),
   createLineAccount: vi.fn(),
   updateLineAccount: vi.fn(),
   updateLineAccountFields: vi.fn(),
@@ -87,6 +88,7 @@ beforeEach(() => {
   lineClientMocks.getFollowerIds.mockReset();
   dbMocks.getAccountSetting.mockResolvedValue(null);
   dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
+  dbMocks.getLineAccountCredentialHealth.mockResolvedValue(null);
   dbMocks.setAccountSetting.mockResolvedValue(undefined);
   dbMocks.jstNow.mockReturnValue('2026-08-10T12:00:00.000+09:00');
   lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
@@ -100,6 +102,50 @@ beforeEach(() => {
     if (url.endsWith('/v2/bot/message/quota')) return Response.json({ type: 'limited', value: 200 });
     return new Response(null, { status: 404 });
   }));
+});
+
+describe('GET /api/line-accounts/:id/credential-health', () => {
+  const health = {
+    channel_access_token: {
+      encrypted: true,
+      decryptable: false,
+      source: 'plaintext' as const,
+    },
+    channel_secret: {
+      encrypted: true,
+      decryptable: true,
+      source: 'encrypted' as const,
+    },
+  };
+
+  test('returns only credential status to an owner', async () => {
+    dbMocks.getLineAccountCredentialHealth.mockResolvedValue(health);
+    const app = setupApp('owner');
+
+    const res = await app.request('/api/line-accounts/acc-1/credential-health');
+
+    expect(res.status).toBe(200);
+    const body = await res.json() as { success: boolean; data: typeof health };
+    expect(body).toEqual({ success: true, data: health });
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('actual-access-value-must-not-return');
+    expect(serialized).not.toContain('actual-secret-value-must-not-return');
+    expect(Object.keys(body.data.channel_access_token).sort()).toEqual([
+      'decryptable',
+      'encrypted',
+      'source',
+    ]);
+  });
+
+  test.each(['admin', 'staff'] as const)('rejects %s with 403', async (role) => {
+    dbMocks.getLineAccountCredentialHealth.mockResolvedValue(health);
+    const app = setupApp(role);
+
+    const res = await app.request('/api/line-accounts/acc-1/credential-health');
+
+    expect(res.status).toBe(403);
+    expect(dbMocks.getLineAccountCredentialHealth).not.toHaveBeenCalled();
+  });
 });
 
 describe('GET /api/line-accounts/:id/follower-insight', () => {

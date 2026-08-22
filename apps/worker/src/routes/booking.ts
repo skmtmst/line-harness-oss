@@ -192,7 +192,7 @@ async function notifyForBooking(
 ): Promise<void> {
   const row = await db
     .prepare(
-      `SELECT b.starts_at,
+      `SELECT b.starts_at, b.line_account_id,
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,
@@ -208,6 +208,7 @@ async function notifyForBooking(
     .bind(bookingId)
     .first<{
       starts_at: string;
+      line_account_id: string;
       menu_name: string;
       staff_name: string;
       channel_access_token: string;
@@ -218,6 +219,7 @@ async function notifyForBooking(
   const accessToken = await resolveLineCredential(
     row.channel_access_token_encrypted,
     row.channel_access_token,
+    { lineAccountId: row.line_account_id, field: 'channel_access_token' },
   );
   await sendBookingNotification({
     channelAccessToken: accessToken,
