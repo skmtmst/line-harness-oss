@@ -44,21 +44,76 @@ function fakeRawMailBucket(): R2Bucket {
   });
   return {
     put: rawPut,
+    get: vi.fn(async (key: string) => {
+      const stored = rawObjects.get(key);
+      if (!stored) return null;
+      const bytes = new TextEncoder().encode(stored.body);
+      return {
+        key,
+        size: bytes.byteLength,
+        body: new Blob([bytes]).stream(),
+      } as unknown as R2ObjectBody;
+    }),
     delete: rawDelete,
   } as unknown as R2Bucket;
 }
 
 function email(
   to: string,
-  raw = 'Subject: Reservation\r\n\r\n2 guests',
+  raw = [
+    'From: jp_kanri@hotpepper.jp',
+    'Date: Sat, 22 Aug 2026 12:00:00 +0900',
+    'Subject: 【即予約】テスト予約の申し込み',
+    '',
+    '■予約依頼番号：HP-100',
+    '■来店日時：2026年8月30日(日) 18:30',
+    '■代表者：テスト 太郎様',
+    '■コース：テストコース',
+    '■席情報：テーブル席',
+    '■人数：2名様',
+  ].join('\r\n'),
   messageId = `<${crypto.randomUUID()}@example.test>`,
 ): ForwardableEmailMessage {
   return {
-    from: 'sender@example.test',
+    from: 'jp_kanri@hotpepper.jp',
     to,
     raw: new Blob([raw]).stream(),
     rawSize: new TextEncoder().encode(raw).byteLength,
-    headers: new Headers({ subject: 'Reservation', 'message-id': messageId }),
+    headers: new Headers({
+      subject: 'reservation',
+      date: 'Sat, 22 Aug 2026 12:00:00 +0900',
+      'message-id': messageId,
+    }),
+    setReject: vi.fn(),
+    forward: vi.fn(),
+    reply: vi.fn(),
+  } as unknown as ForwardableEmailMessage;
+}
+
+function mediaEmail(input: {
+  to: string;
+  from: string;
+  subject: string;
+  date: string;
+  body: string;
+  messageId?: string;
+}): ForwardableEmailMessage {
+  const messageId = input.messageId ?? `<${crypto.randomUUID()}@example.test>`;
+  const raw = [
+    `From: ${input.from}`,
+    `Date: ${input.date}`,
+    `Subject: ${input.subject}`,
+    `Message-ID: ${messageId}`,
+    'Content-Type: text/plain; charset=utf-8',
+    '',
+    input.body,
+  ].join('\r\n');
+  return {
+    from: input.from,
+    to: input.to,
+    raw: new Blob([raw]).stream(),
+    rawSize: new TextEncoder().encode(raw).byteLength,
+    headers: new Headers({ subject: 'reservation', date: input.date, 'message-id': messageId }),
     setReject: vi.fn(),
     forward: vi.fn(),
     reply: vi.fn(),
@@ -70,6 +125,11 @@ beforeEach(() => {
   testDb = createTestD1();
   testDb.raw.prepare("INSERT INTO rt_organizations (id, account_id, name) VALUES ('org-1', 'account-1', 'Test')").run();
   testDb.raw.prepare("INSERT INTO rt_stores (id, organization_id, name, code) VALUES ('store-1', 'org-1', 'Store', 'STORE')").run();
+  testDb.raw.exec(`INSERT INTO rt_media (id, code, name, sender_addresses, parser_key) VALUES
+    ('media-retty', 'retty', 'Retty', '["reserve@retty.me","noreply@retty.me"]', 'retty'),
+    ('media-gurunavi', 'gurunavi', 'ぐるなび', '["plan-reserve@gnavi.co.jp"]', 'gurunavi'),
+    ('media-tabelog', 'tabelog', '食べログ', '["owner_support@tabelog.com"]', 'tabelog'),
+    ('media-hotpepper', 'hotpepper', 'ホットペッパーグルメ', '["jp_kanri@hotpepper.jp"]', 'hotpepper')`);
   rawObjects = new Map();
   imagePut = vi.fn();
   env = {
@@ -100,7 +160,7 @@ describe('飲食店向けcatch-all予約メール', () => {
     const event = testDb.raw.prepare("SELECT store_id, provider, status, payload_json FROM rt_sync_events WHERE provider = 'email'").get() as {
       store_id: string; provider: string; status: string; payload_json: string;
     };
-    expect(event).toMatchObject({ store_id: 'store-1', provider: 'email', status: 'received' });
+    expect(event).toMatchObject({ store_id: 'store-1', provider: 'email', status: 'processed' });
     expect(JSON.parse(event.payload_json)).toMatchObject({ rawSize: expect.any(Number) });
     expect([...rawObjects.keys()][0]).toMatch(/^restaurant-intake\/store-1\/.+\.eml$/);
     expect(rawPut).toHaveBeenCalledOnce();
@@ -235,5 +295,156 @@ describe('飲食店向けcatch-all予約メール', () => {
     expect(row.r2_key).toMatch(/^restaurant-intake-quarantine\//);
     expect(rawObjects.has(row.r2_key)).toBe(true);
     expect(message.setReject).not.toHaveBeenCalled();
+  });
+
+  it('同じ予約番号の2通目で予約を増やさず内容を更新する', async () => {
+    const recipient = 'r-12345678901234567890123456789012@intake.example.test';
+    testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
+      VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
+    const body = (guests: number) => [
+      '■予約依頼番号：HP-UPDATE-1',
+      '■来店日時：2026年8月30日(日) 18:30',
+      '■代表者：テスト 太郎様',
+      '■コース：テストコース',
+      '■席情報：テーブル',
+      `■人数：${guests}名様`,
+    ].join('\n');
+
+    await routeInboundEmail(mediaEmail({
+      to: recipient, from: 'jp_kanri@hotpepper.jp', subject: '【即予約】テストの申し込み',
+      date: 'Sat, 22 Aug 2026 12:00:00 +0900', body: body(2),
+    }), env);
+    await routeInboundEmail(mediaEmail({
+      to: recipient, from: 'jp_kanri@hotpepper.jp', subject: '【即予約】テストの申し込み',
+      date: 'Sat, 22 Aug 2026 13:00:00 +0900', body: body(3),
+    }), env);
+
+    expect(testDb.raw.prepare(`SELECT COUNT(*) AS count FROM rt_reservations
+      WHERE external_id = 'HP-UPDATE-1'`).get()).toEqual({ count: 1 });
+    expect(testDb.raw.prepare(`SELECT guest_count FROM rt_reservations
+      WHERE external_id = 'HP-UPDATE-1'`).get()).toEqual({ guest_count: 3 });
+  });
+
+  it('source_updated_atが古い2通目は既存予約を巻き戻さない', async () => {
+    const recipient = 'r-12345678901234567890123456789012@intake.example.test';
+    testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
+      VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
+    const body = (guests: number) => [
+      '■予約依頼番号：HP-STALE-1',
+      '■来店日時：2026年8月30日(日) 18:30',
+      '■代表者：テスト 太郎様',
+      '■席情報：テーブル',
+      `■人数：${guests}名様`,
+    ].join('\n');
+
+    await routeInboundEmail(mediaEmail({
+      to: recipient, from: 'jp_kanri@hotpepper.jp', subject: '【即予約】テストの申し込み',
+      date: 'Sat, 22 Aug 2026 14:00:00 +0900', body: body(4),
+    }), env);
+    await routeInboundEmail(mediaEmail({
+      to: recipient, from: 'jp_kanri@hotpepper.jp', subject: '【即予約】テストの申し込み',
+      date: 'Sat, 22 Aug 2026 13:00:00 +0900', body: body(2),
+    }), env);
+
+    expect(testDb.raw.prepare(`SELECT guest_count, source_updated_at FROM rt_reservations
+      WHERE external_id = 'HP-STALE-1'`).get()).toEqual({
+      guest_count: 4,
+      source_updated_at: '2026-08-22T05:00:00.000Z',
+    });
+    const outcomes = testDb.raw.prepare(`SELECT payload_json FROM rt_sync_events
+      WHERE provider = 'email' ORDER BY received_at, id`).all() as Array<{ payload_json: string }>;
+    expect(outcomes.map((row) => JSON.parse(row.payload_json).outcome)).toContain('stale_ignored');
+  });
+
+  it('日次サマリーは予約を作らず件数台帳だけに記録する', async () => {
+    const recipient = 'r-12345678901234567890123456789012@intake.example.test';
+    testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
+      VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
+
+    await routeInboundEmail(mediaEmail({
+      to: recipient,
+      from: 'reserve@retty.me',
+      subject: '【予約件数 1件】本日の予約',
+      date: 'Sat, 22 Aug 2026 12:00:00 +0900',
+      body: '2026年8月30日\n【予約1】テスト 太郎',
+    }), env);
+
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_reservations').get()).toEqual({ count: 0 });
+    expect(testDb.raw.prepare(`SELECT target_date, reported_count FROM rt_email_digests`).get()).toEqual({
+      target_date: '2026-08-30',
+      reported_count: 1,
+    });
+  });
+
+  it('未知の差出人はmedia_unknownとして隔離する', async () => {
+    const recipient = 'r-12345678901234567890123456789012@intake.example.test';
+    testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
+      VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
+    const message = mediaEmail({
+      to: recipient,
+      from: 'unknown@example.test',
+      subject: '予約通知',
+      date: 'Sat, 22 Aug 2026 12:00:00 +0900',
+      body: 'ダミー本文',
+    });
+
+    await routeInboundEmail(message, env);
+
+    expect(testDb.raw.prepare(`SELECT status, quarantine_reason FROM rt_inbound_emails`).get()).toEqual({
+      status: 'quarantined',
+      quarantine_reason: 'media_unknown',
+    });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_reservations').get()).toEqual({ count: 0 });
+    expect(message.setReject).not.toHaveBeenCalled();
+  });
+
+  it('年が取得できない予約は推測せず未処理として記録する', async () => {
+    const recipient = 'r-12345678901234567890123456789012@intake.example.test';
+    testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
+      VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
+    await routeInboundEmail(mediaEmail({
+      to: recipient,
+      from: 'reserve@retty.me',
+      subject: '新規予約',
+      date: 'Sat, 22 Aug 2026 12:00:00 +0900',
+      body: [
+        '予約番号：RT-NO-YEAR',
+        '予約者氏名：テスト 太郎',
+        'ご来店日：8月30日',
+        'ご来店時間：18:30',
+        'ご予約人数：2名',
+      ].join('\n'),
+    }), env);
+
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_reservations').get()).toEqual({ count: 0 });
+    expect(testDb.raw.prepare(`SELECT status, error_message FROM rt_sync_events`).get()).toEqual({
+      status: 'failed',
+      error_message: 'unprocessed:visit_datetime_or_year_missing',
+    });
+  });
+
+  it('ぐるなびの未知状態は予約化せず未処理として記録する', async () => {
+    const recipient = 'r-12345678901234567890123456789012@intake.example.test';
+    testDb.raw.prepare(`INSERT INTO rt_intake_addresses (id, local_part, store_id)
+      VALUES ('addr-1', 'r-12345678901234567890123456789012', 'store-1')`).run();
+    await routeInboundEmail(mediaEmail({
+      to: recipient,
+      from: 'plan-reserve@gnavi.co.jp',
+      subject: '予約通知',
+      date: 'Sat, 22 Aug 2026 12:00:00 +0900',
+      body: [
+        'テスト店舗 様 (test100)',
+        '［予約番号］GN-UNKNOWN',
+        '［状態］お断り',
+        '［来店日時］2026年08月30日(日) 18時30分',
+        '［来店人数］2名',
+      ].join('\n'),
+    }), env);
+
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_reservations').get()).toEqual({ count: 0 });
+    expect(testDb.raw.prepare(`SELECT status, error_message FROM rt_sync_events`).get()).toEqual({
+      status: 'failed',
+      error_message: 'unprocessed:kind_unknown',
+    });
   });
 });
