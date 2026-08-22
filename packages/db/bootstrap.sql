@@ -1396,6 +1396,16 @@ CREATE TABLE rt_connector_status (
   UNIQUE(store_id, provider)
 );
 
+CREATE TABLE rt_email_digests (
+  id TEXT PRIMARY KEY,
+  store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
+  media_id TEXT NOT NULL REFERENCES rt_media(id),
+  target_date TEXT NOT NULL,
+  reported_count INTEGER NOT NULL CHECK (reported_count >= 0),
+  received_at TEXT NOT NULL DEFAULT (datetime('now')),
+  inbound_email_id TEXT NOT NULL UNIQUE REFERENCES rt_inbound_emails(id)
+);
+
 CREATE TABLE rt_gbp_posts (
   id TEXT PRIMARY KEY,
   store_id TEXT NOT NULL REFERENCES rt_stores(id) ON DELETE CASCADE,
@@ -1475,6 +1485,15 @@ CREATE TABLE rt_line_flows (
   UNIQUE(organization_id, store_id, flow_type)
 );
 
+CREATE TABLE rt_media (
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE CHECK (code IN ('retty', 'gurunavi', 'tabelog', 'hotpepper')),
+  name TEXT NOT NULL,
+  sender_addresses TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(sender_addresses)),
+  parser_key TEXT NOT NULL UNIQUE,
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1))
+);
+
 CREATE TABLE rt_memberships (
   id TEXT PRIMARY KEY,
   organization_id TEXT NOT NULL REFERENCES rt_organizations(id) ON DELETE CASCADE,
@@ -1534,7 +1553,7 @@ CREATE TABLE rt_reservations (
   source_updated_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, media_id TEXT REFERENCES rt_media(id), hold_expires_at TEXT, cancel_reason TEXT, stay_minutes INTEGER, media_store_code TEXT, table_label TEXT, inbound_email_id TEXT REFERENCES rt_inbound_emails(id), parser_key TEXT, parser_version TEXT);
 
 CREATE TABLE rt_resource_locks (
   resource_key TEXT PRIMARY KEY,
@@ -2399,6 +2418,9 @@ CREATE INDEX idx_rich_menu_groups_account ON rich_menu_groups(account_id, status
 CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_index);
 
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
+
+CREATE INDEX idx_rt_email_digests_store_date
+  ON rt_email_digests (store_id, target_date, media_id);
 
 CREATE INDEX idx_rt_gbp_reviews_store ON rt_gbp_reviews(store_id, reply_status, reviewed_at DESC);
 

@@ -176,7 +176,8 @@
     "167_outbound_send_idempotency.sql",
     "168_restaurant_test_foundation.sql",
     "169_restaurant_email_intake.sql",
-    "170_restaurant_inbound_emails.sql"
+    "170_restaurant_inbound_emails.sql",
+    "171_restaurant_email_parsers.sql"
   ],
-  "migrationCount": 177
+  "migrationCount": 178
 }

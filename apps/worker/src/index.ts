@@ -133,6 +133,7 @@ export type Env = {
     SUPPORT_INBOUND_EMAIL?: string;
     RESTAURANT_INTAKE_DOMAIN?: string;
     RAW_MAIL_RETENTION_DAYS?: string;
+    RESTAURANT_REQUEST_HOLD_END_HOUR?: string;
     XSERVER_MAIL_HOST?: string;
     XSERVER_MAIL_USER?: string;
     XSERVER_MAIL_PASSWORD?: string;
