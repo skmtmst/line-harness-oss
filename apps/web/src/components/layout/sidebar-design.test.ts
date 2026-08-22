@@ -27,7 +27,7 @@ const MENU_END = '/** 区分の目印から中身を引く。 */';
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
   // 上の4つは見出しを付けない。設計でも「対応」「友だち属性」の見出しは無く、
   // 毎日開くものが見出し無しでひとかたまりになっている。
-  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性', '友だち属性V3'] },
+  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性'] },
   {
     section: '配信',
     items: [
@@ -93,7 +93,6 @@ const ROUTES: Record<string, string> = {
   受信箱: '/chats',
   友だち: '/friends',
   友だち属性: '/tags',
-  友だち属性V3: '/tags-v3',
   シナリオ配信: '/scenarios',
   一斉配信: '/broadcasts',
   テンプレート: '/templates',
@@ -152,12 +151,11 @@ describe('サイドバーが V4 設計と一致する', () => {
     },
   );
 
-  it('項目の総数が設計どおり（44）', () => {
+  it('項目の総数が設計どおり（43）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 監査基準時点の34項目に飲食店向け9項目を足すと43項目。
-    // その後「友だち属性V3」が追加されたため、最新developmentでは合計44項目になる。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(44);
+    expect(total).toBe(43);
   });
 
   it('項目の行き先が仕様どおり', () => {

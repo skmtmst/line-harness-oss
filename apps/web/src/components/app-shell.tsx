@@ -8,8 +8,6 @@ import SessionLostNotice from './session-lost-notice'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const isFriendAttributesV2 = pathname === '/tags-v2' || pathname === '/visual-qa/friend-attributes-v2'
-  const isFriendAttributesV3 = pathname === '/tags-v3' || pathname === '/visual-qa/friend-attributes-v3'
 
   if (pathname === '/login' || pathname === '/login/two-factor') {
     return <>{children}</>
@@ -20,10 +18,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   if (process.env.NODE_ENV === 'development' && pathname.startsWith('/visual-qa/')) {
     return (
       <AccountProvider>
-        <div className={`flex min-h-screen ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
-          <Sidebar friendAttributesV2Mode={isFriendAttributesV2} preview={isFriendAttributesV2 || isFriendAttributesV3} />
+        <div className="flex min-h-screen">
+          <Sidebar preview />
           <main className="bg-shell min-w-0 flex-1 overflow-auto">
-            <div data-design-shell="v4-1920" className={`mx-auto w-full max-w-shell px-4 pb-6 sm:px-6 lg:px-10 lg:pb-10 ${isFriendAttributesV2 ? 'lg:pt-[32px]' : 'lg:pt-8'}`}>
+            <div data-design-shell="v4-1920" className="mx-auto w-full max-w-shell px-4 pb-6 sm:px-6 lg:px-10 lg:pb-10 lg:pt-8">
               {children}
             </div>
           </main>
@@ -42,8 +40,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               admin shell. Renders nothing while loading; one of latest/fork/
               upgrade once /admin/version + manifest resolve. */}
           <UpdateBanner />
-          <div className={`flex flex-1 min-h-0 ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
-            <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
+          <div className="flex min-h-0 flex-1">
+            <Sidebar />
             {/*
               上の余白は、狭い幅で画面の上に固定されるヘッダーのぶん。
               ヘッダーが消える境目（md）と余白を外す境目がずれていて、

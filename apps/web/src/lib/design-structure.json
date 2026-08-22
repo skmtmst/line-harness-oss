@@ -173,34 +173,30 @@
         "状態"
       ]
     },
-    "/tags-v2": {
+    "/tags": {
       "node": "xn98K",
-      "name": "V4 4-1 友だち属性・タグ（移行確認用V2）",
+      "name": "V4 4-1 友だち属性・タグ一覧",
       "visualVerification": {
         "status": "verified",
         "referenceNodeIds": ["xn98K"],
         "requiredViewports": [1440, 1920],
-        "referenceScreenshots": [
-          "docs/design-reference/friend-attributes-v2/xn98K-1920.png/xn98K.png"
-        ],
+        "referenceScreenshots": ["docs/design-reference/friend-attributes-v3/xn98K-1920.png"],
         "implementationScreenshots": [
-          "docs/design-qa/friend-attributes-v2/implementation-1440.png",
-          "docs/design-qa/friend-attributes-v2/implementation-1920.png",
-          "docs/design-qa/friend-attributes-v2/side-by-side-1920.png"
+          "docs/design-qa/friend-attributes-v3/implementation-1440.png",
+          "docs/design-qa/friend-attributes-v3/implementation-1920.png"
         ],
-        "checkedAt": "2026-08-22T13:41:42+09:00",
-        "evidence": "docs/design-qa/friend-attributes-v2/design-qa.md"
+        "checkedAt": "2026-08-22T17:54:00+07:00"
       },
       "sections": [
-        "Head",
-        "Tabs",
-        "KPIs",
         "Actions",
         "Folder",
-        "Toolbar",
+        "Head",
+        "KPIs",
+        "Pagination",
         "QuickFilters",
         "Table",
-        "Pagination"
+        "Tabs",
+        "Toolbar"
       ],
       "parts": [
         "タグ数",
@@ -213,15 +209,18 @@
         "タグを追加",
         "フォルダ",
         "タグ名・用途で検索",
-        "使用状態",
-        "付与元",
-        "表示件数",
+        "使用状態：すべて",
+        "付与元：すべて",
+        "20件表示",
         "未使用のタグ",
         "今月増えたタグ",
         "自動付与あり",
         "連動あり",
         "一覧表示",
         "タグ",
+        "友だち情報欄",
+        "対応マーク",
+        "保存した検索",
         "付与人数",
         "自動付与のもと",
         "連動（マイル・アクション）",
@@ -232,105 +231,6 @@
         "削除",
         "前へ",
         "次へ"
-      ]
-    },
-    "/tags": {
-      "node": "xn98K wdLjf KYG39 X79IHW t7Mhgl lNGcs NU4N2 FORVU",
-      "name": "V4 4-1 友だち属性（4タブ）",
-      "visualVerification": {
-        "status": "verified",
-        "referenceNodeIds": ["xn98K", "wdLjf", "KYG39", "X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
-        "requiredViewports": [1440, 1920],
-        "referenceScreenshots": [
-          "docs/design-reference/friend-attributes-v4/01-list.png/xn98K.png",
-          "docs/design-reference/friend-attributes-v4/02-create-initial.png/wdLjf.png",
-          "docs/design-reference/friend-attributes-v4/03-create-linked.png/KYG39.png",
-          "docs/design-reference/friend-attributes-v4/04-action-drawer.png/X79IHW.png",
-          "docs/design-reference/friend-attributes-v4/05-edit-existing.png/t7Mhgl.png",
-          "docs/design-reference/friend-attributes-v4/06-retroactive-dialog.png/lNGcs.png",
-          "docs/design-reference/friend-attributes-v4/07-delete-dialog.png/NU4N2.png",
-          "docs/design-reference/friend-attributes-v4/08-folder-dialog.png/FORVU.png"
-        ],
-        "implementationScreenshots": [
-          "docs/design-qa/friend-attributes-v4/01-list.png",
-          "docs/design-qa/friend-attributes-v4/02-create-initial.png",
-          "docs/design-qa/friend-attributes-v4/03-create-linked.png",
-          "docs/design-qa/friend-attributes-v4/04-action-drawer.png",
-          "docs/design-qa/friend-attributes-v4/05-edit-existing.png",
-          "docs/design-qa/friend-attributes-v4/06-retroactive-dialog.png",
-          "docs/design-qa/friend-attributes-v4/07-delete-dialog.png",
-          "docs/design-qa/friend-attributes-v4/08-folder-dialog.png"
-        ],
-        "checkedAt": "2026-08-21T18:18:00+09:00",
-        "evidence": "docs/design-qa/friend-attributes-v4/design-qa.md"
-      },
-      "sections": [
-        "Body",
-        "GroupTabs",
-        "Head",
-        "KPIs"
-      ],
-      "parts": [
-        "タグ数",
-        "付与済み友だち",
-        "今月の付与",
-        "CSV出力",
-        "並び替え",
-        "フォルダを追加",
-        "フォルダ",
-        "タグ名で検索",
-        "並び順",
-        "付与人数が多い順",
-        "保存した条件",
-        "項目を追加",
-        "回答フォームの登録先",
-        "友だち詳細のタブ",
-        "テンプレートの差し込み",
-        "気をつけること",
-        "条件の組み方",
-        "使える条件",
-        "「愛犬のお名前」「便の状態」など、友だちごとに記録したい項目を定義します。ここで作った項目が、回答フォームの登録先・友だち詳細のタブ・テンプレートの差し込みに使えます。",
-        "タグ",
-        "友だち情報欄",
-        "対応マーク",
-        "保存した検索",
-        "すべて",
-        "未分類",
-        "種別",
-        "表示",
-        "—",
-        "電話番号",
-        "選択",
-        "問い合わせの状態を表すマークを作ります。ここで決めた選択肢が、受信箱・友だち一覧・友だち詳細で使われます。",
-        "マークを追加",
-        "マークの種類",
-        "未対応",
-        "対応中",
-        "担当者あり",
-        "過去7日",
-        "マーク名",
-        "新規の初期値",
-        "いまの人数",
-        "自動で変わるとき",
-        "初期値",
-        "編集",
-        "有効",
-        "・使用中のマークを削除すると、そのマークが付いている友だちは「未対応」に戻ります",
-        "・初期値のマークは1つだけ選べます。新しい友だちにはこれが付きます",
-        "・並び順は、受信箱や一覧の絞り込みボタンの並びに反映されます",
-        "友だちの絞り込み条件に名前を付けて保存します。保存した条件は、友だち一覧・配信の宛先・オートメーションの対象から呼び出せます。",
-        "配信で使用中",
-        "該当者が0人",
-        "今月の呼び出し",
-        "すべて満たす",
-        "いずれか1つ以上",
-        "OR",
-        "・「すべて満たす」と「いずれか1つ以上満たす」の2つのグループに分けて指定します",
-        "・両方に条件を入れると、すべて満たす かつ いずれか1つ以上満たす、という意味になります",
-        "・保存できるのは50件までです",
-        "・タグ ／ 友だち情報欄 ／ 対応マーク ／ 流入経路 ／ 購読中のシナリオ",
-        "・最終接触日 ／ 友だち追加日 ／ 最終購入日 ／ 誕生日",
-        "・フォームの回答内容 ／ サイトの行動 ／ 購入履歴 ／ マイル残高"
       ]
     },
     "/templates": {

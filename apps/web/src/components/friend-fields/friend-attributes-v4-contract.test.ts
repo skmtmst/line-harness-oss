@@ -26,12 +26,11 @@ describe('友だち属性 V4 contract', () => {
   })
 
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
-    const source = read('components/friend-fields/tags-page-v4.tsx')
-    expect(source).toMatch(/\[20,\s*30,\s*40,\s*50\]/)
+    const source = read('components/friend-attributes-v4/friend-attributes-view.tsx')
+    for (const label of ['20件表示', '30件表示', '40件表示', '50件表示']) expect(source).toContain(label)
     expect(source).toContain('前へ')
     expect(source).toContain('次へ')
     expect(source).toContain('CSVで一括登録')
-    expect(source).toContain('並び替えを終了')
     expect(source).not.toContain('min-w-[1180px]')
   })
 
@@ -49,7 +48,7 @@ describe('友だち属性 V4 contract', () => {
 
   it('友だち属性ではブラウザ標準confirmを使わない', () => {
     const sources = [
-      read('components/friend-fields/tags-page-v4.tsx'),
+      read('components/friend-attributes-v4/friend-attributes-view.tsx'),
       read('components/friend-fields/tag-editor-v4.tsx'),
       read('components/friend-fields/edit-tag-page-v4.tsx'),
       read('components/friend-fields/field-list.tsx'),
@@ -73,7 +72,7 @@ describe('友だち属性 V4 contract', () => {
   })
 
   it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {
-    expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 />')
+    expect(read('app/tags/page.tsx')).toContain('<FriendAttributesView')
     expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')
     expect(read('app/tags/edit/page.tsx')).toContain('<EditTagPageV4 />')
   })

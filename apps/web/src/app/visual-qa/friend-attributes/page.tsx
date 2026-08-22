@@ -3,7 +3,7 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import TagEditorV4 from '@/components/friend-fields/tag-editor-v4'
-import TagsPageV4, { FRIEND_ATTRIBUTES_QA_GROUPS, FRIEND_ATTRIBUTES_QA_TAGS } from '@/components/friend-fields/tags-page-v4'
+import FriendAttributesV3Static, { FRIEND_ATTRIBUTES_QA_GROUPS, FRIEND_ATTRIBUTES_QA_TAGS } from '@/components/friend-attributes-v3/friend-attributes-v3-static'
 import { DeleteDialog } from '@/components/friend-fields/edit-tag-page-v4'
 import FolderEditor from '@/app/tags/folders/new/page'
 
@@ -28,9 +28,9 @@ const LINKED_ACTIONS = [
 
 function VisualQaPageInner() {
   const state = useSearchParams().get('state') ?? 'list'
-  if (state === 'list') return <TagsPageV4 fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} />
+  if (state === 'list') return <FriendAttributesV3Static />
   if (state === 'folder') return <FolderEditor />
-  if (state === 'delete') return <><TagsPageV4 fixture={{ items: FRIEND_ATTRIBUTES_QA_TAGS, groups: FRIEND_ATTRIBUTES_QA_GROUPS }} /><DeleteDialog tag={EXISTING_TAG} deleting={false} initialConfirmation={EXISTING_TAG.name} onCancel={() => {}} onDelete={() => {}} /></>
+  if (state === 'delete') return <><FriendAttributesV3Static /><DeleteDialog tag={EXISTING_TAG} deleting={false} initialConfirmation={EXISTING_TAG.name} onCancel={() => {}} onDelete={() => {}} /></>
 
   const edit = state === 'edit' || state === 'retroactive'
   const linked = state === 'linked' || state === 'drawer' || edit

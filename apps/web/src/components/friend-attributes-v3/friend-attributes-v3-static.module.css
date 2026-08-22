@@ -20,9 +20,14 @@
 .button { height: 38px; border: 1px solid #d9dde2; border-radius: 9px; background: #fff; padding: 0 14px; color: #222; font: inherit; font-weight: 650; white-space: nowrap; }
 .buttonAccent { border-color: var(--v3-accent); background: var(--v3-accent); color: #fff; }
 .buttonCompact { height: 38px; padding: 0 13px; }
+.buttonDisabled { color: #8d949a; }
+.button > button, .button > label { display: flex; width: 100%; height: 100%; align-items: center; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; font-weight: inherit; }
+.button > button:disabled { cursor: default; }
+.primaryActions a { display: inline-flex; align-items: center; text-decoration: none; }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 
 .tabs { display: flex; height: 32px; align-items: center; gap: 7px; margin-top: 12px; }
-.tabs span { display: inline-flex; height: 27px; align-items: center; border-radius: 999px; background: #eef0f2; padding: 0 11px; color: #646c74; font-size: 12px; }
+.tabs span, .tabs button { display: inline-flex; height: 27px; align-items: center; border: 0; border-radius: 999px; background: #eef0f2; padding: 0 11px; color: #646c74; font: inherit; font-size: 12px; }
 .tabs .tabActive { background: var(--v3-accent-soft); color: #079441; font-weight: 700; }
 
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 13px; }
@@ -38,8 +43,9 @@
 .folderTitle strong { font-size: 14px; }
 .folderTitle span { color: #7d858c; font-size: 11px; }
 .folderList { display: flex; flex-direction: column; gap: 2px; }
-.folderList > div { display: grid; height: 40px; grid-template-columns: 12px 1fr 34px; align-items: center; border-radius: 8px; padding: 0 8px; }
-.folderActive { background: var(--v3-accent-soft); color: #079441; font-weight: 700; }
+.folderList > div, .folderList > button { display: grid; width: 100%; height: 40px; grid-template-columns: 12px 1fr 34px; align-items: center; border: 0; border-radius: 8px; padding: 0 8px; background: transparent; color: inherit; font: inherit; text-align: left; }
+.folderList > button:disabled { opacity: 1; }
+.folderActive, .folderList > button.folderActive { background: var(--v3-accent-soft); color: #079441; font-weight: 700; }
 .folderList b { display: grid; min-width: 28px; height: 28px; place-items: center; justify-self: end; border-radius: 999px; background: #f0f1f3; color: #6e757c; font-size: 11px; }
 .folderActive b { background: #fff; color: #08a548; }
 .dot { display: inline-block; width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; }
@@ -57,8 +63,11 @@
 .countControl { align-items: center; color: #7b8289; font-size: 11px; }
 .quickFilters { display: flex; height: 43px; align-items: center; gap: 8px; overflow: hidden; white-space: nowrap; }
 .quickFilters span { color: #757d84; font-size: 11px; }
-.quickFilters b, .quickFilters i { display: inline-flex; height: 27px; align-items: center; border: 1px solid #d9dde2; border-radius: 999px; padding: 0 11px; background: #fff; color: #687078; font-size: 11px; font-style: normal; font-weight: 500; }
-.quickFilters b { border-color: var(--v3-accent); color: #079441; font-weight: 700; }
+.quickFilters b, .quickFilters i, .quickFilters button { display: inline-flex; height: 27px; align-items: center; border: 1px solid #d9dde2; border-radius: 999px; padding: 0 11px; background: #fff; color: #687078; font: inherit; font-size: 11px; font-style: normal; font-weight: 500; }
+.quickFilters b, .quickFilters .quickActive { border-color: var(--v3-accent); color: #079441; font-weight: 700; }
+.searchInput { width: 180px; font-weight: 500; }
+.searchInput::placeholder { color: #222; opacity: 1; }
+.toolbar select { appearance: none; }
 
 .table { min-width: 0; border-top: 1px solid #e3e5e8; border-bottom: 1px solid #e3e5e8; background: #fff; box-shadow: 1px 2px 1px rgb(25 32 38 / 7%); }
 .tableGrid { display: grid; grid-template-columns: 26px minmax(130px, 1.45fr) minmax(78px, .72fr) 68px minmax(90px, .8fr) minmax(130px, 1.2fr) minmax(85px, .75fr) 96px 58px 78px; align-items: center; }
@@ -66,21 +75,35 @@
 .tableHeader { height: 45px; background: #f1f2f4; color: #687078; font-size: 11px; font-weight: 650; }
 .tableRow { height: 46px; border-top: 1px solid #e5e7ea; font-size: 12px; }
 .tableRow > strong { font-weight: 500; }
-.drag { color: #aeb4b9; font-size: 15px; }
+.drag { border: 0; background: transparent; color: #aeb4b9; cursor: grab; font-size: 15px; }
 .folderBadge { display: inline-flex; width: fit-content; max-width: calc(100% - 8px); height: 30px; align-items: center; gap: 6px; border: 1px solid #d9dde2; border-radius: 8px; padding: 0 8px !important; font-weight: 650; }
 .folderBadge .dot { width: 8px; height: 8px; flex-basis: 8px; }
 .folderBadge small { margin-left: auto; color: #80878e; }
+.folderBadge select { min-width: 0; max-width: calc(100% - 20px); appearance: none; overflow: hidden; border: 0; background: transparent; color: inherit; font: inherit; font-weight: inherit; text-overflow: ellipsis; }
 .linkBadges { display: flex; align-items: center; gap: 4px; }
 .linkBadges b { border-radius: 5px; padding: 4px 7px; background: #e8f8ee; color: #079441; font-size: 10px; }
 .linkBadges b.orange { background: #fff1da; color: #b56c0a; }
 .linkBadges b.gray { background: #eef0f2; color: #7a8188; }
 .linkBadges em { color: #b4b9bd; font-style: normal; }
+.starButton { border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
 .rowActions { display: flex; gap: 10px; }
-.rowActions b { color: #079441; }
-.rowActions i { color: #d33b31; font-style: normal; }
+.rowActions a { color: #079441; font-weight: 700; text-decoration: none; }
+.rowActions button { border: 0; background: transparent; padding: 0; color: #d33b31; font: inherit; }
+.tableMessage { display: grid; min-height: 276px; place-items: center; color: var(--v3-muted); }
 .pagination { display: flex; justify-content: flex-end; gap: 6px; margin-top: 17px; }
-.pagination span, .pagination b { display: grid; min-width: 34px; height: 34px; place-items: center; border: 1px solid #dfe2e6; border-radius: 9px; background: #fff; color: #646c74; font-size: 11px; font-weight: 500; }
+.pagination span, .pagination b, .pagination button { display: grid; min-width: 34px; height: 34px; place-items: center; border: 1px solid #dfe2e6; border-radius: 9px; background: #fff; color: #646c74; font: inherit; font-size: 11px; font-weight: 500; }
 .pagination b { border-color: var(--v3-accent); background: var(--v3-accent); color: #fff; }
+.pagination button:disabled { color: #b0b5ba; }
+.error { margin: 14px 0 0; border: 1px solid #efb8b3; border-radius: 9px; background: #fff1f0; padding: 10px 12px; color: #b62820; }
+.dialogBackdrop { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: 20px; background: rgb(20 24 28 / 45%); }
+.dialog { width: min(520px, 100%); border: 1px solid var(--v3-border); border-radius: 13px; background: #fff; padding: 24px; box-shadow: 0 20px 60px rgb(20 24 28 / 20%); }
+.dialog h2 { margin: 0; font-size: 20px; }
+.dialog p { margin: 10px 0 16px; color: var(--v3-muted); line-height: 1.7; }
+.dialog input { width: 100%; height: 40px; border: 1px solid var(--v3-border); border-radius: 9px; padding: 0 12px; font: inherit; }
+.dialog > div { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.dialog button { height: 38px; border: 1px solid var(--v3-border); border-radius: 9px; background: #fff; padding: 0 14px; font: inherit; }
+.dialog .dangerButton { border-color: #d33b31; background: #d33b31; color: #fff; }
+.dialog button:disabled { opacity: .45; }
 
 @media (max-width: 1500px) {
   .workspace { grid-template-columns: 225px minmax(0, 1fr); }

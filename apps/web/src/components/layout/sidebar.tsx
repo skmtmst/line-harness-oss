@@ -40,13 +40,7 @@ function NavIcon({ d }: { d: string }) {
   )
 }
 
-export default function Sidebar({
-  friendAttributesV2Mode = false,
-  preview = false,
-}: {
-  friendAttributesV2Mode?: boolean
-  preview?: boolean
-} = {}) {
+export default function Sidebar({ preview = false }: { preview?: boolean } = {}) {
   const pathname = usePathname()
   const { selectedAccountId } = useAccount()
   const brand = useBrand()
@@ -146,16 +140,9 @@ export default function Sidebar({
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
-        // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
-        // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
-        if (friendAttributesV2Mode && item.href === '/tags') return false
-        if (friendAttributesV2Mode && item.href === '/conversions') return false
-        if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
-        // 見た目を確認するV3は、現行「友だち属性」の権限をそのまま引き継ぐ。
-        const inheritsTagsPermission = item.href === '/tags-v3' && staffPermissions.includes('/tags')
-        if (staffRole === 'staff' && !staffPermissions.includes(item.href) && !inheritsTagsPermission) return false
+        if (staffRole === 'staff' && !staffPermissions.includes(item.href)) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (
           featureKey &&
@@ -166,7 +153,6 @@ export default function Sidebar({
       }),
     }))
     .filter((section) => section.items.length > 0)
-    .filter((section) => !friendAttributesV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
 
   useEffect(() => {
     let cancelled = false
@@ -255,12 +241,8 @@ export default function Sidebar({
    * 「共通情報」(/contents/vars) を開くと「登録メディア一覧」(/contents) も
    * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
    */
-  // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
-  const activePathname = pathname === '/visual-qa/friend-attributes-v2'
-    ? '/tags-v2'
-    : pathname === '/visual-qa/friend-attributes-v3'
-      ? '/tags-v3'
-      : pathname
+  // 比較専用ルートも、実際の「友だち属性」を選択中として写す。
+  const activePathname = pathname.startsWith('/visual-qa/friend-attributes') ? '/tags' : pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {
@@ -333,16 +315,14 @@ export default function Sidebar({
         {visibleSections.map((section, si) => (
           <div key={si} className="space-y-0.5">
             {section.label && (
-              <div className={`flex px-3 ${friendAttributesV2Mode ? 'h-[20px] items-center' : 'h-[34px] items-end pb-[5px] pt-3'}`}>
+              <div className="flex h-[34px] items-end px-3 pb-[5px] pt-3">
                 <p className="text-xs font-semibold text-gray-400">{section.label}</p>
               </div>
             )}
             {section.items.map((item) => {
               const active = isActive(item.href)
               const isDanger = 'danger' in item && item.danger
-              const visibleLabel = friendAttributesV2Mode && item.href === '/tags-v2'
-                ? '友だち属性'
-                : item.label
+              const visibleLabel = item.label
               return (
                 <Link
                   key={item.href}
@@ -355,16 +335,14 @@ export default function Sidebar({
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`relative flex items-center gap-[11px] rounded-[10px] px-3 font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${friendAttributesV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} text-[13px]` : 'h-10 text-sm'} ${
+                  className={`relative flex h-10 items-center gap-[11px] rounded-[10px] px-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${
                     active
                       ? isDanger
                         ? 'bg-danger-bg text-danger'
-                        : friendAttributesV2Mode
-                          ? 'border border-accent bg-accent-soft text-accent'
-                          : 'bg-accent-soft text-accent'
+                        : 'bg-accent-soft text-accent'
                       : isDanger
                         ? 'text-red-500 hover:bg-red-50'
-                        : `${friendAttributesV2Mode ? 'border border-transparent' : ''} text-gray-600 hover:bg-gray-100 hover:text-gray-900`
+                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                 >
                   <span className="shrink-0"><NavIcon d={item.icon} /></span>
