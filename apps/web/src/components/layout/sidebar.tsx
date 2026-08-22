@@ -40,7 +40,13 @@ function NavIcon({ d }: { d: string }) {
   )
 }
 
-export default function Sidebar() {
+export default function Sidebar({
+  friendAttributesV2Mode = false,
+  preview = false,
+}: {
+  friendAttributesV2Mode?: boolean
+  preview?: boolean
+} = {}) {
   const pathname = usePathname()
   const { selectedAccountId } = useAccount()
   const brand = useBrand()
@@ -140,6 +146,11 @@ export default function Sidebar() {
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
+        // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
+        if (friendAttributesV2Mode && item.href === '/tags') return false
+        if (friendAttributesV2Mode && item.href === '/conversions') return false
+        if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
         // 移行確認用のV2は、現行「友だち属性」の権限をそのまま引き継ぐ。
@@ -155,6 +166,7 @@ export default function Sidebar() {
       }),
     }))
     .filter((section) => section.items.length > 0)
+    .filter((section) => !friendAttributesV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
 
   useEffect(() => {
     let cancelled = false
@@ -299,44 +311,60 @@ export default function Sidebar() {
         null
       )}
 
-      <AccountSwitcher />
+      {preview ? (
+        <div className="px-[13px] pb-[9px] pt-[18px]">
+          <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
+          <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] bg-accent-soft text-[14px] font-semibold text-accent">然</div>
+            <div className="ml-3 min-w-0 flex-1">
+              <p className="truncate text-[14px] font-semibold text-ink">然-NEN- TEST</p>
+              <p className="mt-0.5 truncate text-[10px] text-ink-faint">コミュニケーション</p>
+            </div>
+          </div>
+        </div>
+      ) : <AccountSwitcher />}
 
       {/* ナビゲーション */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-2">
+      <nav className={`flex-1 space-y-0.5 px-3 pb-2 ${preview ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {visibleSections.map((section, si) => (
           <div key={si} className="space-y-0.5">
             {section.label && (
-              <div className="flex h-[34px] items-end px-3 pb-[5px] pt-3">
+              <div className={`flex px-3 ${friendAttributesV2Mode ? 'h-[20px] items-center' : 'h-[34px] items-end pb-[5px] pt-3'}`}>
                 <p className="text-xs font-semibold text-gray-400">{section.label}</p>
               </div>
             )}
             {section.items.map((item) => {
               const active = isActive(item.href)
               const isDanger = 'danger' in item && item.danger
+              const visibleLabel = friendAttributesV2Mode && item.href === '/tags-v2'
+                ? '友だち属性'
+                : item.label
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
-                  title={item.label}
+                  title={visibleLabel}
                   /*
                     いま開いている項目は、薄い緑の地に濃い緑の文字。設計も
                     この形。緑で塗りつぶして白抜きにすると、色の面積が大きく
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`relative flex h-10 items-center gap-[11px] rounded-[10px] px-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${
+                  className={`relative flex items-center gap-[11px] rounded-[10px] px-3 font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${friendAttributesV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} text-[13px]` : 'h-10 text-sm'} ${
                     active
                       ? isDanger
                         ? 'bg-danger-bg text-danger'
-                        : 'bg-accent-soft text-accent'
+                        : friendAttributesV2Mode
+                          ? 'border border-accent bg-accent-soft text-accent'
+                          : 'bg-accent-soft text-accent'
                       : isDanger
                         ? 'text-red-500 hover:bg-red-50'
-                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                        : `${friendAttributesV2Mode ? 'border border-transparent' : ''} text-gray-600 hover:bg-gray-100 hover:text-gray-900`
                   }`}
                 >
                   <span className="shrink-0"><NavIcon d={item.icon} /></span>
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate">{visibleLabel}</span>
                   {badgeCount(item) > 0 && (
                     <>
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
@@ -356,21 +384,21 @@ export default function Sidebar() {
       </nav>
 
       {/* フッター */}
-      <div className="border-t border-gray-200">
-        {staffName && (
+      <div className={`border-t border-gray-200 ${preview ? 'min-h-[72px]' : ''}`}>
+        {(staffName || preview) && (
           <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
-            <div className="font-medium text-gray-700">{staffName}</div>
+            <div className="font-medium text-gray-700">{preview ? 'Kenta Kawano(Obama)' : staffName}</div>
             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
               staffRole === 'owner' ? 'bg-yellow-100 text-yellow-800' :
               staffRole === 'admin' ? 'bg-blue-100 text-blue-800' :
               staffRole === 'viewer' ? 'bg-emerald-100 text-emerald-800' :
               'bg-gray-100 text-gray-600'
             }`}>
-              {staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : staffRole === 'viewer' ? '閲覧のみ' : 'スタッフ'}
+              {preview ? '管理者' : staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : staffRole === 'viewer' ? '閲覧のみ' : 'スタッフ'}
             </span>
           </div>
         )}
-        <div className="px-6 py-4">
+        {!preview && <div className="px-6 py-4">
           <button
             onClick={async () => {
               try {
@@ -400,7 +428,7 @@ export default function Sidebar() {
             </svg>
             <span>ログアウト</span>
           </button>
-        </div>
+        </div>}
       </div>
     </>
   )
