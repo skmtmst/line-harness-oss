@@ -8,6 +8,7 @@ interface SecretsOptions {
   lineLoginChannelId: string;
   liffId: string;
   apiKey: string;
+  lineCredentialEncryptionKey: string;
 }
 
 export async function setSecrets(options: SecretsOptions): Promise<void> {
@@ -20,6 +21,7 @@ export async function setSecrets(options: SecretsOptions): Promise<void> {
     LINE_LOGIN_CHANNEL_ID: options.lineLoginChannelId,
     LIFF_URL: `https://liff.line.me/${options.liffId}`,
     API_KEY: options.apiKey,
+    LINE_CREDENTIAL_ENCRYPTION_KEY: options.lineCredentialEncryptionKey,
   };
 
   // Use secret:bulk to set all secrets at once and deploy immediately

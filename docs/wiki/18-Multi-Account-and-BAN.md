@@ -37,6 +37,8 @@ LINE公式アカウントの複数管理、UUID によるクロスアカウン�
 | name | TEXT NOT NULL | アカウント名 (表示用) |
 | channel_access_token | TEXT NOT NULL | チャネルアクセストークン |
 | channel_secret | TEXT NOT NULL | チャネルシークレット |
+| channel_access_token_encrypted | TEXT | AES-GCM暗号化済みアクセストークン（移行中は既存列も保持） |
+| channel_secret_encrypted | TEXT | AES-GCM暗号化済みチャネルシークレット（移行中は既存列も保持） |
 | is_active | INTEGER DEFAULT 1 | 有効フラグ |
 | created_at, updated_at | TEXT | JST タイムスタンプ |
 

@@ -201,12 +201,13 @@ describe('POST /api/line-accounts', () => {
       liffId: '2009624792-XXXX',
     });
 
-    const body = (await res.json()) as { success: boolean; data: { loginChannelId: string | null; liffId: string | null; loginChannelSecret: string | null } };
+    const body = (await res.json()) as { success: boolean; data: { loginChannelId: string | null; liffId: string | null; loginChannelSecret?: string | null; loginChannelSecretConfigured: boolean } };
     expect(body.success).toBe(true);
     expect(body.data.loginChannelId).toBe('2009624792');
     expect(body.data.liffId).toBe('2009624792-XXXX');
-    // serializeLineAccountFull exposes loginChannelSecret to owner-only POST response
-    expect(body.data.loginChannelSecret).toBe('login-secret');
+    // Saved credentials are never echoed to the browser after persistence.
+    expect(body.data.loginChannelSecret).toBeUndefined();
+    expect(body.data.loginChannelSecretConfigured).toBe(true);
   });
 
   test('LINE LoginとLIFFがない場合は登録しない', async () => {

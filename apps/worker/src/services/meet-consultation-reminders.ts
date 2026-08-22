@@ -1,5 +1,6 @@
 import type { HarnessProxyDispatch } from './line-proxy-send.js';
 import { pushViaHarnessProxy } from './line-proxy-send.js';
+import { resolveLineCredential } from '@line-crm/db';
 
 export type MeetReminderKind = 'day_before' | 'hour_before';
 
@@ -44,6 +45,7 @@ interface DueMeetReminderRow {
   meet_url: string;
   line_user_id: string;
   channel_access_token: string;
+  channel_access_token_encrypted: string | null;
 }
 
 const MINUTE_MS = 60_000;
@@ -247,7 +249,8 @@ export async function processDueMeetConsultationReminders(
     .prepare(
       `SELECT r.id, r.consultation_id, r.kind, r.retry_count,
               c.title, c.starts_at, c.meet_url,
-              f.line_user_id, la.channel_access_token
+              f.line_user_id, la.channel_access_token,
+              la.channel_access_token_encrypted
          FROM meet_consultation_reminders r
          INNER JOIN meet_consultations c ON c.id = r.consultation_id
          INNER JOIN friends f ON f.id = c.friend_id
@@ -270,9 +273,13 @@ export async function processDueMeetConsultationReminders(
   for (const row of due.results ?? []) {
     try {
       const text = renderMeetReminderText(row.kind, row.starts_at, row.meet_url);
+      const accessToken = await resolveLineCredential(
+        row.channel_access_token_encrypted,
+        row.channel_access_token,
+      );
       await pushViaHarnessProxy(
         options.proxyBaseUrl,
-        row.channel_access_token,
+        accessToken,
         row.line_user_id,
         [{ type: 'text', text }],
         row.id,

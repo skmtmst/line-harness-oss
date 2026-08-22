@@ -9,6 +9,7 @@ import type {
   EventBookingNotificationSender,
   EventNotificationKind,
 } from './event-booking-notifier.js';
+import { resolveLineCredential } from '@line-crm/db';
 
 export interface ComputedReminder {
   kind: EventReminderKind;
@@ -105,6 +106,7 @@ interface DueEventReminderRow {
   reminder_message_extra: string | null;
   starts_at: string;
   channel_access_token: string;
+  channel_access_token_encrypted: string | null;
   line_user_id: string;
   reminder_hours_before: number | null;
 }
@@ -137,6 +139,7 @@ export async function processDueEventReminders(
               e.reminder_message_extra, e.reminder_hours_before,
               s.starts_at,
               la.channel_access_token,
+              la.channel_access_token_encrypted,
               f.line_user_id
          FROM event_booking_reminders r
          INNER JOIN event_bookings b ON b.id = r.booking_id
@@ -173,8 +176,12 @@ export async function processDueEventReminders(
     const claimedRetry = row.retry_count + 1;
 
     try {
+      const accessToken = await resolveLineCredential(
+        row.channel_access_token_encrypted,
+        row.channel_access_token,
+      );
       await params.sender({
-        channelAccessToken: row.channel_access_token,
+        channelAccessToken: accessToken,
         toLineUserId: row.line_user_id,
         kind: notificationKindFor(row.kind),
         ctx: {

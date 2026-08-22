@@ -165,7 +165,7 @@ export function AccountFormSections({
           hint={
             showMessagingRequired
               ? undefined
-              : '空欄なら現在の値を維持。再発行した場合のみ入力'
+              : '設定済み（再発行して変更する場合のみ入力）'
           }
         />
         <TextField
@@ -174,7 +174,7 @@ export function AccountFormSections({
           onChange={(v) => update({ channelSecret: v })}
           required={showMessagingRequired}
           type="password"
-          hint={showMessagingRequired ? undefined : '空欄なら現在の値を維持'}
+          hint={showMessagingRequired ? undefined : '設定済み（変更する場合のみ入力）'}
         />
       </FormSection>
 
@@ -195,6 +195,7 @@ export function AccountFormSections({
           value={state.loginChannelSecret}
           onChange={(v) => update({ loginChannelSecret: v })}
           type="password"
+          hint={showMessagingRequired ? undefined : '保存済みの値は表示しません。変更する場合のみ入力'}
         />
       </FormSection>
 

@@ -12,6 +12,7 @@
     // package sources from outside this directory.
     "rootDir": null,
     "types": ["node"],
+    "lib": ["ES2022", "DOM"],
     "allowImportingTsExtensions": true
   },
   "include": ["**/*.ts"]

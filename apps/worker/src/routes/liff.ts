@@ -25,6 +25,7 @@ import {
   enrollFriendInScenario,
   jstNow,
   getFriendAddScenarioIds,
+  resolveLineCredential,
 } from '@line-crm/db';
 import { buildIntroMessage } from '../services/intro-message.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -1071,12 +1072,14 @@ liffRoutes.get('/api/liff/config', async (c) => {
     }
 
     const account = await c.env.DB
-      .prepare('SELECT id, name, channel_access_token FROM line_accounts WHERE liff_id = ? AND is_active = 1')
+      .prepare('SELECT id, name, channel_access_token, channel_access_token_encrypted FROM line_accounts WHERE liff_id = ? AND is_active = 1')
       .bind(liffId)
-      .first<{ id: string; name: string; channel_access_token: string }>();
+      .first<{ id: string; name: string; channel_access_token: string; channel_access_token_encrypted: string | null }>();
 
     // Fallback to default env account if liff_id not found in DB
-    const accessToken = account?.channel_access_token || c.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const accessToken = account
+      ? await resolveLineCredential(account.channel_access_token_encrypted, account.channel_access_token)
+      : c.env.LINE_CHANNEL_ACCESS_TOKEN;
     const accountName = account?.name || 'Default';
     const accountId = account?.id || 'default';
 
