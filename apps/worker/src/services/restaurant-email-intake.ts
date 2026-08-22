@@ -1,5 +1,10 @@
 import type { Env } from '../index.js';
 import { dbFor } from './db-router.js';
+import {
+  findRestaurantMediaBySender,
+  processStoredRestaurantEmail,
+  type RestaurantMediaRow,
+} from './restaurant-reservation-email.js';
 
 const LOCAL_PART_PREFIX = 'r-';
 const RANDOM_LENGTH = 32;
@@ -247,6 +252,7 @@ async function storeRestaurantReservationEmail(
   message: ForwardableEmailMessage,
   env: Env['Bindings'],
   storeId: string,
+  media: RestaurantMediaRow,
 ): Promise<{ storeId: string; quarantined: false; duplicate: boolean; objectKey: string }> {
   const externalEventId = inboundMessageId(message);
   const fingerprint = await sha256Hex(`${storeId}\n${externalEventId}`);
@@ -272,18 +278,37 @@ async function storeRestaurantReservationEmail(
   await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
     SET r2_key = ?, status = 'stored' WHERE id = ?`).bind(objectKey, claim.id).run();
 
+  const eventId = crypto.randomUUID();
   const inserted = await dbFor(env, storeId).prepare(`INSERT INTO rt_sync_events
     (id, store_id, provider, external_event_id, payload_json, status)
     VALUES (?, ?, 'email', ?, ?, 'received')
     ON CONFLICT(store_id, provider, external_event_id) DO NOTHING`).bind(
-      crypto.randomUUID(),
+      eventId,
       storeId,
       externalEventId,
-      JSON.stringify({ objectKey, rawSize: message.rawSize, recipient: message.to }),
+      JSON.stringify({
+        objectKey,
+        rawSize: message.rawSize,
+        recipient: message.to,
+        media: media.code,
+      }),
     ).run();
 
   await dbFor(env, storeId).prepare(`UPDATE rt_inbound_emails
     SET status = 'received' WHERE id = ?`).bind(claim.id).run();
+
+  if (inserted.meta.changes) {
+    await processStoredRestaurantEmail({
+      env,
+      storeId,
+      inboundEmailId: claim.id,
+      eventId,
+      objectKey,
+      media,
+      fallbackSubject: message.headers.get('subject') ?? '',
+      fallbackDate: message.headers.get('date'),
+    });
+  }
 
   return {
     storeId,
@@ -324,7 +349,11 @@ export async function receiveRestaurantIntakeEmail(
       row?.store_id ?? null,
     );
   }
-  return storeRestaurantReservationEmail(message, env, row.store_id);
+  const media = await findRestaurantMediaBySender(env, message.from, row.store_id);
+  if (!media) {
+    return quarantineRestaurantEmail(message, env, 'media_unknown', parts, row.store_id);
+  }
+  return storeRestaurantReservationEmail(message, env, row.store_id, media);
 }
 
 function rawMailRetentionDays(env: Env['Bindings']): number {

@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -10,7 +10,11 @@ const restaurantSources = [
   join(here, 'restaurant-test.ts'),
   join(here, '../services/restaurant-test.ts'),
   join(here, '../services/restaurant-email-intake.ts'),
+  join(here, '../services/restaurant-reservation-email.ts'),
   join(here, '../services/inbound-email-router.ts'),
+  ...readdirSync(join(here, '../services/parsers'))
+    .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
+    .map((file) => join(here, '../services/parsers', file)),
 ];
 
 describe('飲食店向けD1ルーティング境界', () => {
