@@ -149,6 +149,9 @@ export type Env = {
     LINE_LOGIN_CHANNEL_ID: string;
     LINE_LOGIN_CHANNEL_SECRET: string;
     TOTP_ENCRYPTION_KEY?: string;
+    // AES-GCM key for credentials stored in line_accounts. Optional so a
+    // missing secret does not stop unrelated Worker routes from starting.
+    LINE_CREDENTIAL_ENCRYPTION_KEY?: string;
     ECCUBE_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
     NEN_RICH_MENU_STORE_URL?: string;

@@ -10,6 +10,7 @@ import {
   deleteLineAccount,
 } from '@line-crm/db';
 import type { LineAccount as DbLineAccount } from '@line-crm/db';
+import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
 import { fetchBotProfile } from '../lib/bot-profile.js';
 import {
@@ -97,18 +98,19 @@ function serializeLineAccount(row: DbLineAccount) {
     parentLineAccountId: row.parent_line_account_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    // Intentionally omit channelAccessToken / channelSecret / loginChannelSecret
-    // from list responses (secrets).
+    channelAccessTokenConfigured: Boolean(
+      row.channel_access_token_encrypted || row.channel_access_token,
+    ),
+    channelSecretConfigured: Boolean(row.channel_secret_encrypted || row.channel_secret),
+    loginChannelSecretConfigured: Boolean(row.login_channel_secret),
   };
 }
 
 function serializeLineAccountFull(row: DbLineAccount) {
-  return {
-    ...serializeLineAccount(row),
-    channelAccessToken: row.channel_access_token,
-    channelSecret: row.channel_secret,
-    loginChannelSecret: row.login_channel_secret,
-  };
+  // Credential values are deliberately never returned after persistence.
+  // Owners rotate them by submitting a new value; the UI only sees whether
+  // each credential is configured.
+  return serializeLineAccount(row);
 }
 
 type WebhookEndpointState = {
@@ -326,7 +328,7 @@ lineAccounts.post(
   },
 );
 
-// GET /api/line-accounts/:id - get single (secrets only for owner/admin)
+// GET /api/line-accounts/:id - get single without persisted secret values
 lineAccounts.get('/api/line-accounts/:id', async (c) => {
   try {
     const account = await getLineAccountById(c.env.DB, c.req.param('id'));
@@ -337,12 +339,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
     if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
-    const staff = c.get('staff');
-    // 鍵は「見えること自体が権限」。役割がオーナー／管理者でも、閲覧のみの人には
-    // レスポンスに含めない。画面で隠すだけでは API を直接叩けば取得できてしまう。
-    const canSeeSecrets = !!staff && staff.role !== 'staff' && !staff.readOnly;
-    const data = canSeeSecrets ? serializeLineAccountFull(account) : serializeLineAccount(account);
-    return c.json({ success: true, data });
+    return c.json({ success: true, data: serializeLineAccount(account) });
   } catch (err) {
     console.error('GET /api/line-accounts/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -654,7 +651,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
       ogSiteName: normalizeOptionalString(body.ogSiteName) ?? null,
       ogDefaultImageUrl: normalizeOptionalString(body.ogDefaultImageUrl) ?? null,
       ogDefaultDescription: normalizeOptionalString(body.ogDefaultDescription) ?? null,
-    });
+    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
 
     if (copyFromAccountId && copyItems.length > 0) {
       try {
@@ -681,6 +678,9 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
 
     return c.json({ success: true, data: serializeLineAccountFull(account) }, 201);
   } catch (err) {
+    if (err instanceof CredentialEncryptionKeyError) {
+      return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
+    }
     // D1 surfaces UNIQUE-constraint violations as a thrown error. Surface
     // those as 409 so idempotent callers (e.g. create-line-harness retry
     // loop) can treat "already registered" as a non-fatal success.
@@ -1026,7 +1026,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
           login_channel_secret: loginChannelSecret,
           liff_id: liffId,
           is_active: body.isActive !== undefined ? (body.isActive ? 1 : 0) : undefined,
-        })
+        }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY)
       : await getLineAccountById(c.env.DB, id);
 
     if (!updated) {
@@ -1054,6 +1054,9 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
 
     return c.json({ success: true, data: serializeLineAccountFull(updated) });
   } catch (err) {
+    if (err instanceof CredentialEncryptionKeyError) {
+      return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
+    }
     console.error('PUT /api/line-accounts/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

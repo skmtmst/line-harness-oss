@@ -25,8 +25,8 @@ interface Props {
   onSaved: () => void
 }
 
-// Edit modal — reads current secrets from the secrets-allowed GET endpoint
-// (so the user can see "is the secret set?" without exposing it in the list).
+// Edit modal never reads persisted credential values. The API only returns
+// configured/not-configured flags, and replacement values start empty.
 // On save, only fields the user actually modified are sent. Empty messaging
 // credentials are NOT sent (leave server value as-is) — this lets users edit
 // just the Login/LIFF fields without re-entering Messaging credentials.

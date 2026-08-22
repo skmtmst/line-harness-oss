@@ -42,6 +42,7 @@ import {
   type EventBookingAction,
 } from '../services/event-booking-state.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { resolveLineCredential } from '@line-crm/db';
 
 const events = new Hono<Env>();
 
@@ -1234,18 +1235,23 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   try {
     const acc = await c.env.DB
       .prepare(
-        `SELECT la.channel_access_token, e.confirmation_message_extra
+        `SELECT la.channel_access_token, la.channel_access_token_encrypted,
+                e.confirmation_message_extra
            FROM line_accounts la
            JOIN events e ON e.id = ?
           WHERE la.id = ?`,
       )
       .bind(event.id, account_id)
-      .first<{ channel_access_token: string; confirmation_message_extra: string | null }>();
+      .first<{ channel_access_token: string; channel_access_token_encrypted: string | null; confirmation_message_extra: string | null }>();
     if (acc?.channel_access_token) {
+      const accessToken = await resolveLineCredential(
+        acc.channel_access_token_encrypted,
+        acc.channel_access_token,
+      );
       const kind: EventNotificationKind =
         status === 'requested' ? 'received_pending' : 'received_confirmed';
       await sendEventBookingNotification({
-        channelAccessToken: acc.channel_access_token,
+        channelAccessToken: accessToken,
         toLineUserId: callerLineUserId,
         kind,
         ctx: {
@@ -1385,6 +1391,7 @@ async function notifyBookingFriend(
                 e.confirmation_message_extra,
                 s.starts_at AS slot_starts_at,
                 la.channel_access_token,
+                la.channel_access_token_encrypted,
                 f.line_user_id
            FROM event_bookings b
            JOIN events e ON e.id = b.event_id
@@ -1401,11 +1408,16 @@ async function notifyBookingFriend(
         confirmation_message_extra: string | null;
         slot_starts_at: string;
         channel_access_token: string;
+        channel_access_token_encrypted: string | null;
         line_user_id: string;
       }>();
     if (!row || !row.channel_access_token) return;
+    const accessToken = await resolveLineCredential(
+      row.channel_access_token_encrypted,
+      row.channel_access_token,
+    );
     await sendEventBookingNotification({
-      channelAccessToken: row.channel_access_token,
+      channelAccessToken: accessToken,
       toLineUserId: row.line_user_id,
       kind,
       ctx: {

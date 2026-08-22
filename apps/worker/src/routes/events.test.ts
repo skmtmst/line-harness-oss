@@ -147,15 +147,21 @@ function makeEventDb(state: {
             const acc = (state.accounts ?? []).find((a) => a.id === id);
             return (acc ? { channel_access_token: acc.channel_access_token ?? '' } : null) as T | null;
           }
-          // immediate booking notification: SELECT la.channel_access_token, e.confirmation_message_extra
+          // immediate booking notification: SELECT la.channel_access_token,
+          //   la.channel_access_token_encrypted, e.confirmation_message_extra
           //   FROM line_accounts la JOIN events e ON e.id = ? WHERE la.id = ?
-          if (sql.startsWith('SELECT la.channel_access_token, e.confirmation_message_extra')) {
+          if (
+            sql.startsWith('SELECT la.channel_access_token,') &&
+            sql.includes('la.channel_access_token_encrypted') &&
+            sql.includes('e.confirmation_message_extra')
+          ) {
             const [event_id, account_id] = bound as [string, string];
             const acc = (state.accounts ?? []).find((a) => a.id === account_id);
             const ev = state.events.find((x) => x.id === event_id);
             if (!acc || !ev) return null as T | null;
             return {
               channel_access_token: acc.channel_access_token ?? '',
+              channel_access_token_encrypted: null,
               confirmation_message_extra: (ev as Record<string, unknown>).confirmation_message_extra ?? null,
             } as T;
           }
@@ -236,6 +242,7 @@ function makeEventDb(state: {
               confirmation_message_extra: (e as Record<string, unknown>).confirmation_message_extra ?? null,
               slot_starts_at: s.starts_at,
               channel_access_token: la.channel_access_token ?? '',
+              channel_access_token_encrypted: null,
               line_user_id: f.line_user_id,
             } as T;
           }
