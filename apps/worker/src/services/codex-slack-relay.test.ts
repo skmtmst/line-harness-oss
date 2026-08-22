@@ -6,6 +6,7 @@ import {
   harnessErrorIncidentKey,
   isCodexTaskCompletion,
   prRangeKey,
+  replaceErrorParentStatusText,
   reportHarnessErrorToSlack,
   relayCodexSlackEvent,
   resolveCodexSlackChannel,
@@ -61,6 +62,14 @@ describe('Codex Slack relay', () => {
     expect(content).not.toContain('xoxb-123456789012-abcdefghijkl');
     expect(content).not.toContain('hunter2');
     expect(content).toContain('[REDACTED]');
+  });
+
+  test('エラー報告の親投稿は残したまま状態表示を完了へ更新する', () => {
+    const original = '*【:warning: エラー報告】API 500*\n担当：Codex\n状態：:eyes: 確認待ち\n\n以降の確認・会話・Codexへの依頼は、このスレッドへ返信してください。';
+    const completed = replaceErrorParentStatusText(original, 'done');
+    expect(completed).toContain('状態：:white_check_mark: 完了');
+    expect(completed).not.toContain('状態：:eyes: 確認待ち');
+    expect(completed).toContain('以降の確認・会話・Codexへの依頼');
   });
 
   test('対応が必要な内容だけをタスク化し、未完了という報告は閉じない', () => {
@@ -438,9 +447,19 @@ describe('Codex Slack relay', () => {
         },
       },
     };
+    const errorParent = {
+      ts: '1787326497.583159',
+      text: '*【:warning: エラー報告】API 500*\n担当：Codex\n状態：:eyes: 確認待ち\n\n以降の確認・会話・Codexへの依頼は、このスレッドへ返信してください。',
+      metadata: {
+        event_type: 'line_harness_codex',
+        event_payload: { work_key: originalKey, category: 'error' },
+      },
+    };
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [errorParent] }))
+      .mockResolvedValueOnce(slackResponse({ ts: errorParent.ts }))
       .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
 
@@ -452,8 +471,10 @@ describe('Codex Slack relay', () => {
 
     expect(result).toMatchObject({ channelId: 'C0ERROR123', threadTs: '1787326497.583159' });
     const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
-    const taskUpdate = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    const parentUpdate = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    const taskUpdate = JSON.parse(String(fetcher.mock.calls[5]?.[1]?.body));
     expect(reply).toMatchObject({ channel: 'C0ERROR123', thread_ts: '1787326497.583159' });
+    expect(parentUpdate.text).toContain('状態：:large_blue_circle: 作業中');
     expect(taskUpdate.metadata.event_payload).toMatchObject({
       work_key: originalKey,
       task_id: taskId,
@@ -462,6 +483,14 @@ describe('Codex Slack relay', () => {
   });
 
   test('PR番号が後から付いてもCodexセッションから元エラータスクを完了する', async () => {
+    const errorParent = {
+      ts: '1787326497.583159',
+      text: '*【:warning: エラー報告】API 500*\n担当：Codex\n状態：:large_blue_circle: 作業中\n\n以降の確認・会話・Codexへの依頼は、このスレッドへ返信してください。',
+      metadata: {
+        event_type: 'line_harness_codex',
+        event_payload: { work_key: 'session:runtime-error', category: 'error' },
+      },
+    };
     const taskMessage = {
       ts: '300.001',
       metadata: {
@@ -478,11 +507,14 @@ describe('Codex Slack relay', () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [errorParent] }))
+      .mockResolvedValueOnce(slackResponse({ ts: errorParent.ts }))
       .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
 
     const result = await relayCodexSlackEvent({
       SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_ERROR_CHANNEL_ID: 'C0ERROR123',
       SLACK_DEFAULT_PR_CHANNEL_ID: 'C-PR',
       SLACK_TASK_CHANNEL_ID: 'C-TASK',
     }, event({
@@ -494,9 +526,11 @@ describe('Codex Slack relay', () => {
 
     expect(result).toMatchObject({ channelId: 'C0ERROR123', threadTs: '1787326497.583159' });
     const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
-    const deletion = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    const parentUpdate = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    const deletion = JSON.parse(String(fetcher.mock.calls[5]?.[1]?.body));
     expect(reply).toMatchObject({ channel: 'C0ERROR123', thread_ts: '1787326497.583159' });
     expect(reply.text).toContain('PR #249');
+    expect(parentUpdate.text).toContain('状態：:white_check_mark: 完了');
     expect(deletion).toEqual({ channel: 'C-TASK', ts: '300.001' });
   });
 
@@ -550,6 +584,50 @@ describe('Codex Slack relay', () => {
     expect(String(fetcher.mock.calls[1]?.[0])).toContain('chat.delete');
   });
 
+  test('エラーの完了ボタンは親投稿を完了表示にしてから要対応だけを消す', async () => {
+    const errorParent = {
+      ts: '1787326000.000001',
+      text: '*【:warning: エラー報告】API 500*\n担当：Codex\n状態：:eyes: 確認待ち\n\n以降の確認・会話・Codexへの依頼は、このスレッドへ返信してください。',
+      metadata: {
+        event_type: 'line_harness_codex',
+        event_payload: { work_key: 'session:runtime-error', category: 'error' },
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [errorParent] }))
+      .mockResolvedValueOnce(slackResponse({ ts: errorParent.ts }))
+      .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
+      .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
+
+    const result = await handleSlackTaskAction({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_ERROR_CHANNEL_ID: 'C0ERROR123',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+      SLACK_KENTA_USER_ID: 'U-KENTA',
+    }, {
+      user: { id: 'U-KENTA' },
+      channel: { id: 'C-TASK' },
+      message: { ts: '300.001', text: '【要対応】' },
+      actions: [{
+        action_id: TASK_ACTION_ID,
+        value: JSON.stringify({
+          status: 'done',
+          key: 'session:runtime-error',
+          sourceChannel: 'C0ERROR123',
+          sourceThreadTs: errorParent.ts,
+        }),
+      }],
+    }, fetcher);
+
+    expect(result).toEqual({ status: 'done' });
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('conversations.replies');
+    const parentUpdate = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
+    expect(parentUpdate).toMatchObject({ channel: 'C0ERROR123', ts: errorParent.ts });
+    expect(parentUpdate.text).toContain('状態：:white_check_mark: 完了');
+    expect(String(fetcher.mock.calls[2]?.[0])).toContain('chat.postMessage');
+    expect(String(fetcher.mock.calls[3]?.[0])).toContain('chat.delete');
+  });
+
   test('LINE Harnessの実行時エラーをエラー報告と要対応へ自動起票する', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [] }))
@@ -578,5 +656,6 @@ describe('Codex Slack relay', () => {
     expect(task.channel).toBe('C-TASK');
     expect(task.text).toContain('LINE Harnessがエラーを自動検知');
     expect(errorParent.text).toContain('TASK-ID');
+    expect(errorParent.text).toContain('状態：:eyes: 確認待ち');
   });
 });
