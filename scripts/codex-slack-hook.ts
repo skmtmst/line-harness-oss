@@ -123,6 +123,11 @@ export function repositoryFromRemote(remote: string | null): string | undefined 
   return match?.[1];
 }
 
+export function repositoryRemoteName(branchRemote: string | null, hasFork: boolean): string {
+  if (branchRemote && branchRemote !== '.') return branchRemote;
+  return hasFork ? 'fork' : 'origin';
+}
+
 export function hookEventType(hookEventName: string | undefined): 'prompt_submitted' | 'turn_completed' | 'approval_required' | null {
   if (hookEventName === 'UserPromptSubmit') return 'prompt_submitted';
   if (hookEventName === 'Stop') return 'turn_completed';
@@ -155,8 +160,15 @@ function keychainRelaySecret(operatorName: 'kenta' | 'masato' | 'codex', cwd: st
 }
 
 function gitContext(cwd: string): GitContext {
-  const repository = repositoryFromRemote(run('git', ['remote', 'get-url', 'origin'], cwd));
   const branch = run('git', ['branch', '--show-current'], cwd) || undefined;
+  const branchRemote = branch
+    ? run('git', ['config', '--get', `branch.${branch}.remote`], cwd)
+    : null;
+  const remoteName = repositoryRemoteName(
+    branchRemote,
+    Boolean(run('git', ['remote', 'get-url', 'fork'], cwd)),
+  );
+  const repository = repositoryFromRemote(run('git', ['remote', 'get-url', remoteName], cwd));
   const pr = run('gh', ['pr', 'view', '--json', 'number,url', '--jq', '[.number,.url]|@tsv'], cwd);
   const [rawNumber, prUrl] = pr?.split('\t') || [];
   const prNumber = rawNumber && /^\d+$/.test(rawNumber) ? Number(rawNumber) : undefined;
