@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 import {
+  buildSlackCommandCenterText,
   classifyCodexSlackEvent,
   handleSlackTaskAction,
   harnessErrorIncidentKey,
@@ -83,6 +84,100 @@ describe('Codex Slack relay', () => {
     expect(taskIdForKey('pr:220')).toMatch(/^TASK-[0-9A-F]{16}$/);
     expect(taskIdForKey('pr:220')).toBe(taskIdForKey('pr:220'));
     expect(taskIdForKey('pr:220')).not.toBe(taskIdForKey('pr:221'));
+  });
+
+  test('Slack指令盤で担当、PR順、追い越し可否、反映状況、重複を一覧化する', () => {
+    const text = buildSlackCommandCenterText([
+      {
+        number: 220,
+        title: '飲食店向けテスト管理機能',
+        url: 'https://github.com/example/repo/pull/220',
+        author: 'skmtmst',
+        headRefName: 'codex/masato-restaurant-test',
+        isDraft: true,
+        mergeStateStatus: 'UNKNOWN',
+        updatedAt: '2026-08-20T00:00:00Z',
+        fileCount: 28,
+        overlapsWith: [254],
+        checks: 'pass',
+      },
+      {
+        number: 254,
+        title: 'Slack指令盤',
+        url: 'https://github.com/example/repo/pull/254',
+        author: 'skmtmst',
+        headRefName: 'codex/kenta-slack-command-center',
+        isDraft: false,
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-08-22T00:00:00Z',
+        fileCount: 4,
+        overlapsWith: [220],
+        checks: 'pass',
+      },
+    ], [
+      {
+        taskId: 'TASK-0000000000000001',
+        status: 'working',
+        operator: 'ケンタ',
+        title: 'Slack指令盤を作成中',
+        prNumber: 254,
+        sourceChannel: 'C0SOURCE123',
+        sourceThreadTs: '1787326000.000001',
+        workKey: 'pr:254:a',
+        environment: 'development',
+      },
+      {
+        taskId: 'TASK-0000000000000002',
+        status: 'review',
+        operator: 'ケンタ',
+        title: '同じPRの確認待ち',
+        prNumber: 254,
+        sourceChannel: 'C0SOURCE999',
+        sourceThreadTs: '1787326000.000002',
+        workKey: 'pr:254:b',
+        environment: 'staging',
+      },
+    ], '2026-08-22T01:00:00.000Z');
+
+    expect(text).toContain('#220> マサト｜Draft');
+    expect(text).toContain('#254> ケンタ｜統合可能');
+    expect(text).toContain('追い越し不可（#220と変更重複）');
+    expect(text).toContain('本番未反映');
+    expect(text).toContain('停止理由：確認待ち');
+    expect(text).toContain('PR #254 が 2件');
+  });
+
+  test('古いPRがDraftで変更重複がなければ後続PRを先に統合できると表示する', () => {
+    const text = buildSlackCommandCenterText([
+      {
+        number: 220,
+        title: '保留中',
+        url: 'https://github.com/example/repo/pull/220',
+        author: 'skmtmst',
+        headRefName: 'codex/masato-hold',
+        isDraft: true,
+        mergeStateStatus: 'UNKNOWN',
+        updatedAt: '2026-08-20T00:00:00Z',
+        fileCount: 2,
+        overlapsWith: [],
+        checks: 'pass',
+      },
+      {
+        number: 254,
+        title: '先行可能',
+        url: 'https://github.com/example/repo/pull/254',
+        author: 'skmtmst',
+        headRefName: 'codex/kenta-ready',
+        isDraft: false,
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-08-22T00:00:00Z',
+        fileCount: 2,
+        overlapsWith: [],
+        checks: 'pass',
+      },
+    ], [], '2026-08-22T01:00:00.000Z');
+
+    expect(text).toContain('追い越し候補（古いPRはDraft、変更重複なし）');
   });
 
   test('同じ画面のAPI 500と未処理Promiseを同じエラーとしてまとめる', () => {
@@ -178,6 +273,67 @@ describe('Codex Slack relay', () => {
       `${TASK_ACTION_ID}_review`,
       `${TASK_ACTION_ID}_done`,
     ]);
+  });
+
+  test('Codex報告のたびに指令塔の開発指令盤を1件だけ作成・更新する', async () => {
+    const taskMessage = {
+      ts: '300.001',
+      text: '【要対応】\n状態：:large_blue_circle: 作業中\n担当：ケンタ',
+      metadata: {
+        event_type: 'line_harness_task',
+        event_payload: {
+          work_key: 'pr:254',
+          task_id: taskIdForKey('pr:254'),
+          source_channel: 'C-PR',
+          source_thread_ts: '200.001',
+          session_id: 'session-1',
+          status: 'working',
+          operator: 'kenta',
+          title: 'Slack指令盤を作成中',
+          environment: 'development',
+          pr_number: '254',
+        },
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '200.001' }))
+      .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ permalink: 'https://slack.example/source' }))
+      .mockResolvedValueOnce(slackResponse({ ts: '300.001' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '400.001' }));
+
+    await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C-PR',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+      SLACK_COMMAND_CHANNEL_ID: 'C-COMMAND',
+    }, event({
+      prNumber: 254,
+      openPrs: [{
+        number: 254,
+        title: 'Slack指令盤',
+        url: 'https://github.com/example/repo/pull/254',
+        author: 'skmtmst',
+        headRefName: 'codex/kenta-slack-command-center',
+        isDraft: false,
+        mergeStateStatus: 'CLEAN',
+        updatedAt: '2026-08-22T01:00:00Z',
+        fileCount: 4,
+        overlapsWith: [],
+        checks: 'pass',
+      }],
+    }), fetcher);
+
+    const boardRequest = JSON.parse(String(fetcher.mock.calls[8]?.[1]?.body));
+    expect(String(fetcher.mock.calls[8]?.[0])).toContain('chat.postMessage');
+    expect(boardRequest.channel).toBe('C-COMMAND');
+    expect(boardRequest.metadata.event_type).toBe('line_harness_command_center');
+    expect(boardRequest.text).toContain('#254> ケンタ｜統合可能');
+    expect(boardRequest.text).toContain(taskIdForKey('pr:254'));
   });
 
   test('元スレッドのリンク取得に失敗しても要対応タスクを起票する', async () => {

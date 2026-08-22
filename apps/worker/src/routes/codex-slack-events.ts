@@ -6,6 +6,7 @@ import {
   relayCodexSlackEvent,
   type CodexSlackCategory,
   type CodexSlackEvent,
+  type CodexSlackPrSnapshot,
 } from '../services/codex-slack-relay.js';
 import { verifySlackRequest } from '../services/slack-signature.js';
 
@@ -13,8 +14,47 @@ const MAX_BODY_BYTES = 32 * 1024;
 const ALLOWED_EVENT_TYPES = new Set(['prompt_submitted', 'turn_completed', 'approval_required']);
 const ALLOWED_OPERATORS = new Set(['kenta', 'masato', 'codex']);
 const ALLOWED_CATEGORIES = new Set(['error', 'idea', 'fix', 'decision']);
+const ALLOWED_CHECK_STATES = new Set(['pass', 'pending', 'fail', 'none']);
 
 export const codexSlackEvents = new Hono<Env>();
+
+function parseOpenPrs(value: unknown): CodexSlackPrSnapshot[] | undefined | null {
+  if (value == null) return undefined;
+  if (!Array.isArray(value) || value.length > 30) return null;
+  const result: CodexSlackPrSnapshot[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') return null;
+    const pr = item as Record<string, unknown>;
+    if (
+      !Number.isInteger(pr.number) || Number(pr.number) < 1 ||
+      typeof pr.title !== 'string' || pr.title.length < 1 || pr.title.length > 240 ||
+      typeof pr.url !== 'string' || !/^https:\/\/github\.com\//.test(pr.url) || pr.url.length > 500 ||
+      typeof pr.author !== 'string' || pr.author.length > 100 ||
+      typeof pr.headRefName !== 'string' || pr.headRefName.length > 255 ||
+      typeof pr.isDraft !== 'boolean' ||
+      typeof pr.mergeStateStatus !== 'string' || pr.mergeStateStatus.length > 30 ||
+      typeof pr.updatedAt !== 'string' || !Number.isFinite(Date.parse(pr.updatedAt)) ||
+      !Number.isInteger(pr.fileCount) || Number(pr.fileCount) < 0 ||
+      !Array.isArray(pr.overlapsWith) || pr.overlapsWith.length > 30 ||
+      pr.overlapsWith.some((number) => !Number.isInteger(number) || Number(number) < 1) ||
+      typeof pr.checks !== 'string' || !ALLOWED_CHECK_STATES.has(pr.checks)
+    ) return null;
+    result.push({
+      number: Number(pr.number),
+      title: pr.title,
+      url: pr.url,
+      author: pr.author,
+      headRefName: pr.headRefName,
+      isDraft: pr.isDraft,
+      mergeStateStatus: pr.mergeStateStatus,
+      updatedAt: pr.updatedAt,
+      fileCount: Number(pr.fileCount),
+      overlapsWith: pr.overlapsWith.map(Number),
+      checks: pr.checks as CodexSlackPrSnapshot['checks'],
+    });
+  }
+  return result;
+}
 
 function parseEvent(rawBody: string): CodexSlackEvent | null {
   let value: Record<string, unknown>;
@@ -38,6 +78,8 @@ function parseEvent(rawBody: string): CodexSlackEvent | null {
   if (value.explicitCategory != null && (
     typeof value.explicitCategory !== 'string' || !ALLOWED_CATEGORIES.has(value.explicitCategory)
   )) return null;
+  const openPrs = parseOpenPrs(value.openPrs);
+  if (openPrs === null) return null;
 
   return {
     version: 1,
@@ -55,6 +97,7 @@ function parseEvent(rawBody: string): CodexSlackEvent | null {
     content: value.content,
     occurredAt: value.occurredAt,
     explicitCategory: value.explicitCategory as CodexSlackCategory | undefined,
+    openPrs,
   };
 }
 
