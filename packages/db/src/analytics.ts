@@ -223,7 +223,7 @@ export async function getBroadcastSummary(
 ): Promise<BroadcastSummary[]> {
   const result = await db
     .prepare(
-      `SELECT b.id AS broadcast_id, b.name AS name, b.sent_at AS sent_at,
+      `SELECT b.id AS broadcast_id, b.title AS name, b.sent_at AS sent_at,
               i.delivered, i.unique_impression, i.unique_click
          FROM broadcasts b
          LEFT JOIN broadcast_insights i ON i.broadcast_id = b.id
