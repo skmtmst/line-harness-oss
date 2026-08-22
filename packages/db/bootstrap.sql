@@ -1426,6 +1426,18 @@ CREATE TABLE rt_gbp_reviews (
   UNIQUE(store_id, external_review_id)
 );
 
+CREATE TABLE rt_inbound_emails (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL UNIQUE,
+  store_id TEXT REFERENCES rt_stores(id) ON DELETE SET NULL,
+  r2_key TEXT NOT NULL DEFAULT '',
+  received_at TEXT NOT NULL DEFAULT (datetime('now')),
+  status TEXT NOT NULL DEFAULT 'storing'
+    CHECK (status IN ('storing', 'stored', 'received', 'quarantined', 'storage_failed', 'raw_deleted')),
+  size_bytes INTEGER NOT NULL DEFAULT 0 CHECK (size_bytes >= 0),
+  quarantine_reason TEXT
+);
+
 CREATE TABLE rt_intake_addresses (
   id TEXT PRIMARY KEY,
   local_part TEXT NOT NULL UNIQUE,
@@ -2389,6 +2401,12 @@ CREATE INDEX idx_rich_menu_pages_group    ON rich_menu_pages(group_id, order_ind
 CREATE INDEX idx_rt_approvals_queue ON rt_approval_requests(organization_id, status, created_at DESC);
 
 CREATE INDEX idx_rt_gbp_reviews_store ON rt_gbp_reviews(store_id, reply_status, reviewed_at DESC);
+
+CREATE INDEX idx_rt_inbound_emails_retention
+  ON rt_inbound_emails (received_at, status);
+
+CREATE INDEX idx_rt_inbound_emails_store
+  ON rt_inbound_emails (store_id, received_at DESC);
 
 CREATE INDEX idx_rt_intake_addresses_store
   ON rt_intake_addresses (store_id, status);
