@@ -142,7 +142,9 @@ export default function Sidebar() {
       items: section.items.filter((item) => {
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
-        if (staffRole === 'staff' && !staffPermissions.includes(item.href)) return false
+        // 移行確認用のV2は、現行「友だち属性」の権限をそのまま引き継ぐ。
+        const inheritsTagsPermission = item.href === '/tags-v2' && staffPermissions.includes('/tags')
+        if (staffRole === 'staff' && !staffPermissions.includes(item.href) && !inheritsTagsPermission) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (
           featureKey &&
@@ -241,13 +243,15 @@ export default function Sidebar() {
    * 「共通情報」(/contents/vars) を開くと「登録メディア一覧」(/contents) も
    * 選ばれて見えていた。当たるもののうち、いちばん長いものだけを選ぶ。
    */
+  // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
+  const activePathname = pathname === '/visual-qa/friend-attributes-v2' ? '/tags-v2' : pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {
       for (const item of section.items) {
         if (item.href === '/') continue
         const path = item.href.split('?')[0]
-        if (pathname !== path && !pathname.startsWith(path + '/')) continue
+        if (activePathname !== path && !activePathname.startsWith(path + '/')) continue
         if (best === null || path.length > best.length) best = path
       }
     }
@@ -255,7 +259,7 @@ export default function Sidebar() {
   })()
 
   const isActive = (href: string) => {
-    if (href === '/') return pathname === '/'
+    if (href === '/') return activePathname === '/'
     const [path, query = ''] = href.split('?')
     if (path !== activeHref) return false
 

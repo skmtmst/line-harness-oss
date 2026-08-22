@@ -27,7 +27,7 @@ const MENU_END = '/** 区分の目印から中身を引く。 */';
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
   // 上の4つは見出しを付けない。設計でも「対応」「友だち属性」の見出しは無く、
   // 毎日開くものが見出し無しでひとかたまりになっている。
-  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性'] },
+  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性', '友だち属性V2'] },
   {
     section: '配信',
     items: [
@@ -86,6 +86,7 @@ const ROUTES: Record<string, string> = {
   受信箱: '/chats',
   友だち: '/friends',
   友だち属性: '/tags',
+  友だち属性V2: '/tags-v2',
   シナリオ配信: '/scenarios',
   一斉配信: '/broadcasts',
   テンプレート: '/templates',
@@ -135,11 +136,11 @@ describe('サイドバーが V4 設計と一致する', () => {
     },
   );
 
-  it('項目の総数が設計どおり（34）', () => {
+  it('項目の総数が設計どおり（35）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 30 → 31 は「コンテンツ」を「共通情報」「登録メディア一覧」に分けた分。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(34);
+    expect(total).toBe(35);
   });
 
   it('項目の行き先が仕様どおり', () => {

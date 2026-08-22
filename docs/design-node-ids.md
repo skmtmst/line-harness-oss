@@ -104,6 +104,7 @@ V4の共通寸法は、1920pxフレーム、サイドバー256px、本体1664px�
 | V2 2-2 友だち | `P2guNv` | `/friends` |
 | V2 2-2-1 友だち詳細 | `B8yZio` | `/friends/detail?id=` |
 | V2 3-1 タグ管理 | `IvqXE` | `/tags` |
+| V4 4-1 友だち属性・タグ（移行確認用V2） | `xn98K` | `/tags-v2` |
 | V2 3-1-1 タグを作る | `oTvZD` | `/tags/new` |
 | V2 3-2 友だち情報欄 | `KWqHd` | `/tags?tab=fields` |
 | V2 3-2-1 項目を追加する | `nKQRg` | `/tags/fields/new` |
