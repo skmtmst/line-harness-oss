@@ -184,6 +184,20 @@ function taskStatusLabel(status: Exclude<SlackTaskStatus, 'done'>): string {
   return status === 'working' ? ':large_blue_circle: 作業中' : ':eyes: 確認待ち';
 }
 
+function errorParentStatusLabel(status: SlackTaskStatus): string {
+  return status === 'done' ? ':white_check_mark: 完了' : taskStatusLabel(status);
+}
+
+export function replaceErrorParentStatusText(text: string, status: SlackTaskStatus): string {
+  const withoutOldStatus = text.replace(/\n状態：[^\n]*/g, '');
+  const statusLine = `状態：${errorParentStatusLabel(status)}`;
+  const threadGuide = '\n\n以降の確認・会話・Codexへの依頼は、このスレッドへ返信してください。';
+  if (withoutOldStatus.includes(threadGuide)) {
+    return withoutOldStatus.replace(threadGuide, `\n${statusLine}${threadGuide}`);
+  }
+  return `${withoutOldStatus.trimEnd()}\n${statusLine}`;
+}
+
 function taskPrLabel(event: Pick<CodexSlackEvent, 'prNumber' | 'prUrl'>): string {
   if (!event.prNumber) return 'なし';
   return event.prUrl
@@ -205,7 +219,10 @@ function buildParentText(config: CodexSlackRelayConfig, event: CodexSlackEvent, 
       : `\nPR：#${event.prNumber}`
     : '';
   const branch = event.branch ? `\nブランチ：\`${event.branch}\`` : '';
-  return `*【${categoryLabel(category)}】${content}*\n担当：${operatorLabel(event.operator)}${pr}${branch}${reviewerMention(config, event, category)}\n\n以降の確認・会話・Codexへの依頼は、このスレッドへ返信してください。`;
+  const status = category === 'error'
+    ? `\n状態：${errorParentStatusLabel(isCodexTaskCompletion(event) ? 'done' : taskStatusForEvent(event))}`
+    : '';
+  return `*【${categoryLabel(category)}】${content}*\n担当：${operatorLabel(event.operator)}${pr}${branch}${reviewerMention(config, event, category)}${status}\n\n以降の確認・会話・Codexへの依頼は、このスレッドへ返信してください。`;
 }
 
 function buildReplyText(event: CodexSlackEvent, category: CodexSlackCategory): string {
@@ -332,6 +349,45 @@ async function slackApi(
     throw new Error(`SLACK_API_FAILED:${method}:${response.status}:${result.error || 'unknown'}`);
   }
   return result;
+}
+
+async function updateErrorParentStatus(
+  config: CodexSlackRelayConfig,
+  channel: string,
+  threadTs: string,
+  status: SlackTaskStatus,
+  fetcher: typeof fetch,
+): Promise<void> {
+  const token = config.SLACK_BOT_TOKEN;
+  if (!token || channel !== config.SLACK_ERROR_CHANNEL_ID) return;
+  try {
+    const replies = await slackApi(token, 'conversations.replies', {
+      channel,
+      ts: threadTs,
+      limit: 1,
+      include_all_metadata: true,
+    }, fetcher);
+    const parent = replies.messages?.find((message) => message.ts === threadTs) || replies.messages?.[0];
+    if (
+      !parent?.ts ||
+      parent.metadata?.event_type !== THREAD_METADATA_TYPE ||
+      parent.metadata.event_payload?.category !== 'error'
+    ) return;
+    await slackApi(token, 'chat.update', {
+      channel,
+      ts: parent.ts,
+      text: replaceErrorParentStatusText(parent.text || '【:warning: エラー報告】', status),
+      metadata: parent.metadata,
+    }, fetcher);
+  } catch (error) {
+    console.warn(JSON.stringify({
+      event: 'slack_error_parent_status_update_failed',
+      channel,
+      threadTs,
+      status,
+      error: String(error),
+    }));
+  }
 }
 
 async function findThreadTs(
@@ -845,6 +901,13 @@ export async function handleSlackTaskAction(
   if (!value) throw new Error('SLACK_TASK_ACTION_INVALID_VALUE');
 
   if (value.status === 'done') {
+    await updateErrorParentStatus(
+      config,
+      value.sourceChannel,
+      value.sourceThreadTs,
+      'done',
+      fetcher,
+    );
     await slackApi(token, 'chat.postMessage', {
       channel: value.sourceChannel,
       thread_ts: value.sourceThreadTs,
@@ -859,6 +922,13 @@ export async function handleSlackTaskAction(
   }
 
   await updateTaskMessageStatus(token, taskChannel, payload.message, value.status, fetcher);
+  await updateErrorParentStatus(
+    config,
+    value.sourceChannel,
+    value.sourceThreadTs,
+    value.status,
+    fetcher,
+  );
   await refreshSlackCommandCenter(config, undefined, new Date().toISOString(), fetcher);
   return { status: value.status };
 }
@@ -934,6 +1004,7 @@ export async function relayCodexSlackEvent(
   if (!channelId) throw new Error(`SLACK_CHANNEL_NOT_CONFIGURED:${category}`);
   let key = workKey(event);
   let threadTs: string | null = null;
+  let createdParent = false;
 
   const requestedTaskId = taskIdFromContent(event.content);
   if ((requestedTaskId || event.eventType === 'turn_completed') && config.SLACK_TASK_CHANNEL_ID) {
@@ -970,6 +1041,7 @@ export async function relayCodexSlackEvent(
     }, fetcher);
     if (!parent.ts) throw new Error('SLACK_PARENT_TS_MISSING');
     threadTs = parent.ts;
+    createdParent = true;
   }
 
   await slackApi(token, 'chat.postMessage', {
@@ -979,7 +1051,18 @@ export async function relayCodexSlackEvent(
     client_msg_id: event.eventId,
   }, fetcher);
 
-  if (isCodexTaskCompletion(event)) {
+  const completed = isCodexTaskCompletion(event);
+  if (!createdParent) {
+    await updateErrorParentStatus(
+      config,
+      channelId,
+      threadTs,
+      completed ? 'done' : taskStatusForEvent(event),
+      fetcher,
+    );
+  }
+
+  if (completed) {
     await closeOpenTask(config, key, fetcher);
   } else {
     await ensureOpenTask(config, event, category, key, channelId, threadTs, fetcher);
