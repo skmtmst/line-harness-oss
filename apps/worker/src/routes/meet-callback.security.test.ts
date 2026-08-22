@@ -71,6 +71,7 @@ function env(db: D1Database): Env['Bindings'] {
   return {
     DB: db,
     IMAGES: {} as R2Bucket,
+    RAW_MAIL: {} as R2Bucket,
     ASSETS: {} as Fetcher,
     MEET_CALLBACK_SECRET: 'meet-secret',
     LINE_CHANNEL_SECRET: 'line-secret',

@@ -61,6 +61,7 @@ function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
     WORKER_URL: WORKERS,
     ADMIN_PUBLIC_URL: PAGES,
     ...overrides,
+    RAW_MAIL: overrides.RAW_MAIL ?? ({} as R2Bucket),
   };
 }
 
