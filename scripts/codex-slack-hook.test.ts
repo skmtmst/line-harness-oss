@@ -5,12 +5,20 @@ import {
   parseOpenPrSnapshot,
   prNumberFromContent,
   repositoryFromRemote,
+  repositoryRemoteName,
 } from './codex-slack-hook.js';
 
 describe('Codex Slack hook', () => {
   test('GitHubのHTTPSとSSHリモートを同じリポジトリ名にする', () => {
     expect(repositoryFromRemote('https://github.com/owner/repo.git')).toBe('owner/repo');
     expect(repositoryFromRemote('git@github.com:owner/repo.git')).toBe('owner/repo');
+  });
+
+  test('現在ブランチの追跡先をPRリンクのリポジトリとして優先する', () => {
+    expect(repositoryRemoteName('fork', true)).toBe('fork');
+    expect(repositoryRemoteName('origin', true)).toBe('origin');
+    expect(repositoryRemoteName('.', true)).toBe('fork');
+    expect(repositoryRemoteName(null, false)).toBe('origin');
   });
 
   test('CodexのフックをSlack用の種別に変換する', () => {
