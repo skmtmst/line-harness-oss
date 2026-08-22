@@ -102,6 +102,28 @@ describe('媒体別予約メールパーサー', () => {
     expect(result.startsAt).not.toContain('2026-08-29');
   });
 
+  it('ホットペッパーは本文だけに変更処理完了がある場合も変更後を採用する', () => {
+    const result = parse('hotpepper', 'ご予約内容のお知らせ', [
+      '変更処理完了',
+      '■予約依頼番号： HP-104',
+      '■代表者： テスト 太郎様',
+      '【変更前】',
+      '■来店日時：2026年8月29日(土) 17:00',
+      '■人数：1名様',
+      '■ステータス：未対応',
+      '【変更後】',
+      '■来店日時：2026年8月30日(日) 20:00',
+      '■コース：本文判定コース',
+      '■人数：4名様',
+      '■ステータス：相談中',
+    ].join('\n'));
+    expect(result).toMatchObject({
+      kind: 'request', startsAt: '2026-08-30T20:00:00+09:00', guestCount: 4,
+      courseName: '本文判定コース',
+    });
+    expect(result.startsAt).not.toContain('2026-08-29');
+  });
+
   it('ホットペッパー変更後のキャンセル理由を残す', () => {
     const result = parse('hotpepper', '予約内容の変更処理完了', [
       '■予約依頼番号： HP-101',

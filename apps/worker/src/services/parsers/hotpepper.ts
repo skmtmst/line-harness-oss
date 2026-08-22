@@ -9,8 +9,12 @@ function changeBlock(body: string): string | undefined {
   return after?.split('【変更前】')[0];
 }
 
+function isChangeCompleted(subject: string, body: string): boolean {
+  return subject.includes('変更処理完了') || body.includes('変更処理完了');
+}
+
 function kindOf(subject: string, body: string): ReservationEmailKind {
-  if (subject.includes('変更処理完了')) {
+  if (isChangeCompleted(subject, body)) {
     const status = lineValue(changeBlock(body) ?? '', '■ステータス');
     if (status === '未対応' || status === '相談中') return 'request';
     if (status?.startsWith('キャンセル')) return 'cancelled';
@@ -31,7 +35,7 @@ export const hotpepperParser: ReservationEmailParser = {
     const kind = kindOf(subject, body);
     const result = baseResult(kind, input);
     if (kind === 'unknown') return result;
-    const details = subject.includes('変更処理完了') ? (changeBlock(body) ?? '') : body;
+    const details = isChangeCompleted(subject, body) ? (changeBlock(body) ?? '') : body;
     const status = lineValue(details, '■ステータス');
     return {
       ...result,
