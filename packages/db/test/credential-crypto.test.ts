@@ -5,6 +5,8 @@ import {
   decryptLineAccountCredentials,
   encryptCredential,
   createLineAccount,
+  getLineAccountCredentialHealth,
+  resolveLineCredential,
   type LineAccount,
 } from '../src/index.js';
 
@@ -61,7 +63,27 @@ describe('LINE credential AES-GCM encryption', () => {
     );
   });
 
-  it('falls back to the legacy plaintext columns when decrypt fails', async () => {
+  it('does not warn when encrypted credentials decrypt successfully', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const encryptedToken = await encryptCredential('new-token', KEY);
+    const encryptedSecret = await encryptCredential('new-secret', KEY);
+
+    const resolved = await decryptLineAccountCredentials(
+      account({
+        channel_access_token_encrypted: encryptedToken,
+        channel_secret_encrypted: encryptedSecret,
+      }),
+      KEY,
+    );
+
+    expect(resolved.channel_access_token).toBe('new-token');
+    expect(resolved.channel_secret).toBe('new-secret');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('warns with safe structured fields and falls back when decrypt fails', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const encryptedToken = await encryptCredential('new-token', KEY);
     const encryptedSecret = await encryptCredential('new-secret', KEY);
     const resolved = await decryptLineAccountCredentials(
@@ -73,16 +95,111 @@ describe('LINE credential AES-GCM encryption', () => {
     );
     expect(resolved.channel_access_token).toBe('legacy-token');
     expect(resolved.channel_secret).toBe('legacy-secret');
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0]).toEqual([{
+      event: 'line_credential_plaintext_fallback',
+      line_account_id: 'acc-1',
+      field: 'channel_access_token',
+      reason: 'decrypt_failed',
+    }]);
+    const output = JSON.stringify(warn.mock.calls);
+    for (const value of [
+      KEY,
+      OTHER_KEY,
+      encryptedToken,
+      encryptedSecret,
+      'new-token',
+      'new-secret',
+      'legacy-token',
+      'legacy-secret',
+    ]) {
+      expect(output).not.toContain(value);
+    }
+    warn.mockRestore();
+  });
+
+  it('throws as before when decrypt fails and no plaintext fallback exists', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const encryptedToken = await encryptCredential('new-token', KEY);
+
+    await expect(
+      decryptLineAccountCredentials(
+        account({
+          channel_access_token: '',
+          channel_access_token_encrypted: encryptedToken,
+        }),
+        OTHER_KEY,
+      ),
+    ).rejects.toThrow('no legacy fallback is available');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('logs a missing-key classification when a joined credential falls back', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const encryptedToken = await encryptCredential('new-token', KEY);
+
+    await expect(
+      resolveLineCredential(
+        encryptedToken,
+        'legacy-token',
+        { lineAccountId: 'acc-joined', field: 'channel_access_token' },
+        undefined,
+      ),
+    ).resolves.toBe('legacy-token');
+    expect(warn).toHaveBeenCalledWith({
+      event: 'line_credential_plaintext_fallback',
+      line_account_id: 'acc-joined',
+      field: 'channel_access_token',
+      reason: 'key_unavailable_or_invalid',
+    });
+    warn.mockRestore();
+  });
+
+  it('returns health state instead of throwing when the key is missing', async () => {
+    const encryptedToken = await encryptCredential('new-token', KEY);
+    const encryptedSecret = await encryptCredential('new-secret', KEY);
+    const db = {
+      prepare() {
+        const statement = {
+          bind() {
+            return statement;
+          },
+          async first() {
+            return account({
+              channel_access_token_encrypted: encryptedToken,
+              channel_secret_encrypted: encryptedSecret,
+            });
+          },
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+
+    await expect(getLineAccountCredentialHealth(db, 'acc-1')).resolves.toEqual({
+      channel_access_token: {
+        encrypted: true,
+        decryptable: false,
+        source: 'plaintext',
+      },
+      channel_secret: {
+        encrypted: true,
+        decryptable: false,
+        source: 'plaintext',
+      },
+    });
   });
 
   it('does not print plaintext values while encrypting or decrypting', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const encrypted = await encryptCredential('DO-NOT-LOG-TOKEN', KEY);
     await decryptCredential(encrypted, KEY);
-    const output = [...log.mock.calls, ...error.mock.calls].flat().join(' ');
+    const output = [...log.mock.calls, ...warn.mock.calls, ...error.mock.calls].flat().join(' ');
     expect(output).not.toContain('DO-NOT-LOG-TOKEN');
     log.mockRestore();
+    warn.mockRestore();
     error.mockRestore();
   });
 

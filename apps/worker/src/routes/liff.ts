@@ -1078,7 +1078,11 @@ liffRoutes.get('/api/liff/config', async (c) => {
 
     // Fallback to default env account if liff_id not found in DB
     const accessToken = account
-      ? await resolveLineCredential(account.channel_access_token_encrypted, account.channel_access_token)
+      ? await resolveLineCredential(
+          account.channel_access_token_encrypted,
+          account.channel_access_token,
+          { lineAccountId: account.id, field: 'channel_access_token' },
+        )
       : c.env.LINE_CHANNEL_ACCESS_TOKEN;
     const accountName = account?.name || 'Default';
     const accountId = account?.id || 'default';

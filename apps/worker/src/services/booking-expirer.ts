@@ -7,6 +7,7 @@ import { resolveLineCredential } from '@line-crm/db';
 
 interface StaleRow {
   id: string;
+  line_account_id: string;
   starts_at: string;
   menu_name: string;
   staff_name: string;
@@ -34,7 +35,7 @@ export async function runExpirer(
   const cutoff = new Date(params.now.getTime() - REQUEST_TTL_HOURS * 3600_000).toISOString();
   const stale = await db
     .prepare(
-      `SELECT b.id, b.starts_at,
+      `SELECT b.id, b.line_account_id, b.starts_at,
               m.name AS menu_name,
               s.display_name AS staff_name,
               la.channel_access_token,
@@ -72,6 +73,7 @@ export async function runExpirer(
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,
         row.channel_access_token,
+        { lineAccountId: row.line_account_id, field: 'channel_access_token' },
       );
       await params.sender({
         channelAccessToken: accessToken,

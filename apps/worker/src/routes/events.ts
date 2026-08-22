@@ -984,6 +984,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
   // The outer scope already returned on null, so these throws are unreachable.
   if (friend == null) throw new Error('runBookingFlow: friend missing');
   if (callerLineUserId == null) throw new Error('runBookingFlow: callerLineUserId missing');
+  if (account_id == null) throw new Error('runBookingFlow: line account missing');
 
   const event = await c.env.DB
     .prepare(
@@ -1247,6 +1248,7 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       const accessToken = await resolveLineCredential(
         acc.channel_access_token_encrypted,
         acc.channel_access_token,
+        { lineAccountId: account_id, field: 'channel_access_token' },
       );
       const kind: EventNotificationKind =
         status === 'requested' ? 'received_pending' : 'received_confirmed';
@@ -1390,6 +1392,7 @@ async function notifyBookingFriend(
         `SELECT e.name AS event_name, e.venue_name, e.venue_url,
                 e.confirmation_message_extra,
                 s.starts_at AS slot_starts_at,
+                b.line_account_id,
                 la.channel_access_token,
                 la.channel_access_token_encrypted,
                 f.line_user_id
@@ -1407,6 +1410,7 @@ async function notifyBookingFriend(
         venue_url: string | null;
         confirmation_message_extra: string | null;
         slot_starts_at: string;
+        line_account_id: string;
         channel_access_token: string;
         channel_access_token_encrypted: string | null;
         line_user_id: string;
@@ -1415,6 +1419,7 @@ async function notifyBookingFriend(
     const accessToken = await resolveLineCredential(
       row.channel_access_token_encrypted,
       row.channel_access_token,
+      { lineAccountId: row.line_account_id, field: 'channel_access_token' },
     );
     await sendEventBookingNotification({
       channelAccessToken: accessToken,

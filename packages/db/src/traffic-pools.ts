@@ -196,15 +196,24 @@ export async function getRandomPoolAccount(db: D1Database, poolId: string): Prom
   return row ? hydratePoolCredential(row) : null;
 }
 
-async function hydratePoolCredential<T extends { channel_access_token: string | null; channel_access_token_encrypted?: string | null }>(
+async function hydratePoolCredential<
+  T extends {
+    channel_access_token: string | null;
+    channel_access_token_encrypted?: string | null;
+  } & ({ active_account_id: string } | { line_account_id: string }),
+>(
   row: T,
 ): Promise<T> {
   if (!row.channel_access_token && !row.channel_access_token_encrypted) return row;
+  const lineAccountId = 'line_account_id' in row
+    ? row.line_account_id
+    : row.active_account_id;
   return {
     ...row,
     channel_access_token: await resolveLineCredential(
       row.channel_access_token_encrypted,
       row.channel_access_token,
+      { lineAccountId, field: 'channel_access_token' },
     ),
   };
 }

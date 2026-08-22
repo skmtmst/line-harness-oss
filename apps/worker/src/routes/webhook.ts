@@ -673,13 +673,14 @@ async function handleEvent(
         if (friendRecord?.user_id) {
           // Find the same user on other accounts
           const otherFriends = await db.prepare(
-            'SELECT f.line_user_id, la.channel_access_token, la.channel_access_token_encrypted FROM friends f INNER JOIN line_accounts la ON la.id = f.line_account_id WHERE f.user_id = ? AND f.line_account_id != ? AND f.is_following = 1'
-          ).bind(friendRecord.user_id, lineAccountId).all<{ line_user_id: string; channel_access_token: string; channel_access_token_encrypted: string | null }>();
+            'SELECT f.line_user_id, f.line_account_id, la.channel_access_token, la.channel_access_token_encrypted FROM friends f INNER JOIN line_accounts la ON la.id = f.line_account_id WHERE f.user_id = ? AND f.line_account_id != ? AND f.is_following = 1'
+          ).bind(friendRecord.user_id, lineAccountId).all<{ line_user_id: string; line_account_id: string; channel_access_token: string; channel_access_token_encrypted: string | null }>();
 
           for (const other of otherFriends.results) {
             const accessToken = await resolveLineCredential(
               other.channel_access_token_encrypted,
               other.channel_access_token,
+              { lineAccountId: other.line_account_id, field: 'channel_access_token' },
             );
             const otherClient = new LineClient(accessToken);
             await otherClient.pushMessage(other.line_user_id, [buildMessage('flex', JSON.stringify({

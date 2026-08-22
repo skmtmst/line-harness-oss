@@ -44,6 +44,7 @@ interface DueMeetReminderRow {
   starts_at: string;
   meet_url: string;
   line_user_id: string;
+  line_account_id: string;
   channel_access_token: string;
   channel_access_token_encrypted: string | null;
 }
@@ -249,7 +250,7 @@ export async function processDueMeetConsultationReminders(
     .prepare(
       `SELECT r.id, r.consultation_id, r.kind, r.retry_count,
               c.title, c.starts_at, c.meet_url,
-              f.line_user_id, la.channel_access_token,
+              f.line_user_id, f.line_account_id, la.channel_access_token,
               la.channel_access_token_encrypted
          FROM meet_consultation_reminders r
          INNER JOIN meet_consultations c ON c.id = r.consultation_id
@@ -276,6 +277,7 @@ export async function processDueMeetConsultationReminders(
       const accessToken = await resolveLineCredential(
         row.channel_access_token_encrypted,
         row.channel_access_token,
+        { lineAccountId: row.line_account_id, field: 'channel_access_token' },
       );
       await pushViaHarnessProxy(
         options.proxyBaseUrl,
