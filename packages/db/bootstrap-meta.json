@@ -181,7 +181,8 @@
     "172_line_account_credentials_encrypted.sql",
     "173_restaurant_store_line_account.sql",
     "174_admin_session_restaurant_store.sql",
-    "175_restaurant_terms_agreement.sql"
+    "175_restaurant_terms_agreement.sql",
+    "176_tenant_foundation.sql"
   ],
-  "migrationCount": 182
+  "migrationCount": 183
 }

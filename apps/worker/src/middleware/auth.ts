@@ -124,6 +124,8 @@ export type AuthenticatedStaff = {
   permissionKeys?: string[];
   assignedLineAccountId?: string | null;
   canAccessDescendantAccounts?: boolean;
+  /** 所属する統括。認可への実適用は後続工程で行う。 */
+  tenantId?: string | null;
 };
 
 function toAuthenticatedStaff(staff: {
@@ -134,6 +136,7 @@ function toAuthenticatedStaff(staff: {
   permission_keys?: string;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
+  tenant_id?: string | null;
 }): AuthenticatedStaff {
   let permissionKeys: string[] = [];
   try { permissionKeys = staff.permission_keys ? JSON.parse(staff.permission_keys) as string[] : []; } catch { permissionKeys = []; }
@@ -145,6 +148,7 @@ function toAuthenticatedStaff(staff: {
     permissionKeys,
     assignedLineAccountId: staff.assigned_line_account_id ?? null,
     canAccessDescendantAccounts: Boolean(staff.can_access_descendant_accounts),
+    tenantId: staff.tenant_id ?? null,
   };
 }
 

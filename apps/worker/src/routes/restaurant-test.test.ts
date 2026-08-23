@@ -13,6 +13,7 @@ type MockStaff = {
   permission_keys: string;
   assigned_line_account_id: string | null;
   can_access_descendant_accounts: number;
+  tenant_id?: string | null;
 };
 
 const authMocks = vi.hoisted(() => ({
@@ -131,6 +132,46 @@ describe('飲食店向けテストAPI', () => {
     expect(json.data.menuItems.length).toBeGreaterThan(0);
     expect(json.data.lineFlows.length).toBe(6);
     expect(JSON.stringify(json)).not.toContain('token-');
+  });
+
+  it('従来のaccount_idと新しいtenant_idが同じ組織を返す', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {
+      organizationName: '二重解決LAB',
+    });
+    const byAccount = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    const byTenant = await request(
+      '/api/restaurant-test/snapshot?tenant_id=00000000-0000-4000-8000-000000000001',
+    );
+    expect(byAccount.status).toBe(200);
+    expect(byTenant.status).toBe(200);
+    const accountJson = await byAccount.json() as { data: { organization: unknown; stores: unknown[] } };
+    const tenantJson = await byTenant.json() as { data: { organization: unknown; stores: unknown[] } };
+    expect(tenantJson.data.organization).toEqual(accountJson.data.organization);
+    expect(tenantJson.data.stores).toEqual(accountJson.data.stores);
+  });
+
+  it('tenant_idから作る統括はレガシーaccount_idにも同じ値を入れる', async () => {
+    const tenant = '00000000-0000-4000-8000-000000000001';
+    const bootstrap = await request(`/api/restaurant-test/bootstrap?tenant_id=${tenant}`, {
+      organizationName: 'LINE非依存の統括',
+    });
+    expect(bootstrap.status).toBe(201);
+    expect(testDb.raw.prepare(`SELECT account_id, tenant_id
+      FROM rt_organizations`).get()).toEqual({ account_id: tenant, tenant_id: tenant });
+  });
+
+  it('認証スタッフと異なるtenant_idは403にする', async () => {
+    authMocks.getStaffByApiKey.mockResolvedValue({
+      id: 'admin-tenant', name: 'Admin', role: 'admin', access_level: 'full',
+      permission_keys: '[]', assigned_line_account_id: null,
+      can_access_descendant_accounts: 0,
+      tenant_id: '00000000-0000-4000-8000-000000000001',
+    });
+    const response = await requestAs(
+      '/api/restaurant-test/snapshot?tenant_id=00000000-0000-4000-8000-000000000099',
+      'admin-key',
+    );
+    expect(response.status).toBe(403);
   });
 
   it('店舗未選択の管理画面セッションでは統括組織の全店舗を返す', async () => {

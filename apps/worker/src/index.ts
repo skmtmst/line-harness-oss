@@ -107,6 +107,7 @@ import { analytics } from './routes/analytics.js';
 import { dashboard } from './routes/dashboard.js';
 import { siteTracking } from './routes/site-tracking.js';
 import { restaurantTest } from './routes/restaurant-test.js';
+import { tenants } from './routes/tenants.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { clientErrors } from './routes/client-errors.js';
 import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
@@ -322,6 +323,7 @@ app.route('/', dashboard);
 app.route('/', siteTracking);
 // 飲食店向けの検証専用領域。既存NEN機能とはAPI/DB名前空間を分離する。
 app.route('/', restaurantTest);
+app.route('/', tenants);
 app.route('/', codexSlackEvents);
 app.route('/', clientErrors);
 

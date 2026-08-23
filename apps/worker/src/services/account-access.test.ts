@@ -19,7 +19,7 @@ function account(id: string, parent: string | null = null): LineAccount {
     login_channel_secret: 'secret', liff_id: '1-X', is_active: 1, country: null,
     role: null, display_order: 0, token_expires_at: null, og_site_name: null,
     og_default_image_url: null, og_default_description: null, friend_capacity: null,
-    capacity_warn_at: null, icon_url: null, created_at: '', updated_at: '',
+    capacity_warn_at: null, icon_url: null, tenant_id: null, created_at: '', updated_at: '',
   };
 }
 

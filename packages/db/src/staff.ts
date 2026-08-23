@@ -22,6 +22,7 @@ export interface StaffMember {
   totp_last_used_step: number | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
+  tenant_id: string | null;
   created_at: string;
   updated_at: string;
 }
