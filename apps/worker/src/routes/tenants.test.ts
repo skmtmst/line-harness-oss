@@ -77,7 +77,7 @@ describe('tenant boundary preview', () => {
     expect(response.status).toBe(403);
   });
 
-  it('visibleNowとwouldLoseをgetVisibleLineAccountScopeの同じ可視範囲で比較する', async () => {
+  it('境界適用後もvisibleNowとvisibleIfEnforcedが一致する', async () => {
     testDb.raw.prepare(`INSERT INTO line_accounts
       (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
       VALUES (?, ?, ?, ?, ?, ?)`).run(
@@ -93,9 +93,29 @@ describe('tenant boundary preview', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       data: {
-        visibleNow: 2,
+        visibleNow: 1,
         visibleIfEnforced: 1,
-        wouldLose: [{ id: 'account-hidden', name: '非表示店舗' }],
+        wouldLose: [],
+      },
+    });
+  });
+
+  it('tenant_idがNULLのアカウントは既定統括として可視件数に含める', async () => {
+    testDb.raw.prepare(`INSERT INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
+      VALUES (?, ?, ?, ?, ?, NULL)`).run(
+        'account-legacy', 'channel-legacy', '旧店舗', 'legacy-token', 'legacy-secret',
+      );
+
+    const response = await app(operator('admin')).request(
+      '/api/tenants/boundary-preview', {}, environment(),
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        visibleNow: 2,
+        visibleIfEnforced: 2,
+        wouldLose: [],
+        accountsWithoutTenant: 1,
       },
     });
   });

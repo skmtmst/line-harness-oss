@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LineAccount } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import {
   canAccessLineAccount,
   filterVisibleLineAccounts,
@@ -12,53 +13,96 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   return { ...actual, getLineAccounts: vi.fn(async () => accounts) };
 });
 
-function account(id: string, parent: string | null = null): LineAccount {
+function account(
+  id: string,
+  options: { parent?: string | null; tenantId?: string | null } = {},
+): LineAccount {
   return {
-    id, parent_line_account_id: parent, channel_id: id, name: id,
+    id, parent_line_account_id: options.parent ?? null, channel_id: id, name: id,
     channel_access_token: 'token', channel_secret: 'secret', login_channel_id: '1',
     login_channel_secret: 'secret', liff_id: '1-X', is_active: 1, country: null,
     role: null, display_order: 0, token_expires_at: null, og_site_name: null,
     og_default_image_url: null, og_default_description: null, friend_capacity: null,
-    capacity_warn_at: null, icon_url: null, tenant_id: null, created_at: '', updated_at: '',
+    capacity_warn_at: null, icon_url: null,
+    tenant_id: options.tenantId === undefined ? DEFAULT_TENANT_ID : options.tenantId,
+    created_at: '', updated_at: '',
   };
 }
 
-const accounts = [account('parent'), account('child', 'parent'), account('grandchild', 'child'), account('other')];
+const defaultAccounts = [
+  account('parent'),
+  account('child', { parent: 'parent' }),
+  account('grandchild', { parent: 'child' }),
+];
+const tenantBAccount = account('tenant-b-account', { tenantId: 'tenant-B' });
+let accounts = [...defaultAccounts, tenantBAccount];
+
+const staff = (tenantId: string | null = DEFAULT_TENANT_ID) => ({
+  id: 's', name: 'S', role: 'admin' as const, readOnly: false,
+  assignedLineAccountId: 'parent', canAccessDescendantAccounts: false, tenantId,
+});
 
 describe('filterVisibleLineAccounts', () => {
-  it('担当アカウントは既定値として扱い、組織内の全アカウントを返す', () => {
-    expect(filterVisibleLineAccounts(accounts, {
-      id: 's', name: 'S', role: 'admin', readOnly: false,
-      assignedLineAccountId: 'parent', canAccessDescendantAccounts: false,
-    }).map((item) => item.id)).toEqual(['parent', 'child', 'grandchild', 'other']);
+  it('既定統括のスタッフには既定統括の3アカウントだけを返す', () => {
+    expect(filterVisibleLineAccounts(accounts, staff()).map((item) => item.id))
+      .toEqual(['parent', 'child', 'grandchild']);
   });
 
-  it('スタッフも別系統のアカウントを操作できる', async () => {
-    const staff = {
-      id: 's', name: 'S', role: 'staff' as const, readOnly: false,
-      assignedLineAccountId: 'parent', canAccessDescendantAccounts: false,
-    };
-    expect(canAccessLineAccount(accounts, staff, 'other')).toBe(true);
-    await expect(getVisibleLineAccountScope({} as D1Database, staff)).resolves.toMatchObject({
-      ids: ['parent', 'child', 'grandchild', 'other'],
-      restricted: false,
+  it('tenant-Bのスタッフにはtenant-Bのアカウントだけを返す', () => {
+    expect(filterVisibleLineAccounts(accounts, staff('tenant-B')).map((item) => item.id))
+      .toEqual(['tenant-b-account']);
+  });
+
+  it('tenantIdがNULLのスタッフは既定統括として扱う', () => {
+    expect(filterVisibleLineAccounts(accounts, staff(null)).map((item) => item.id))
+      .toEqual(['parent', 'child', 'grandchild']);
+  });
+
+  it('tenant_idがNULLのアカウントは既定統括から見える', () => {
+    const legacy = account('legacy', { tenantId: null });
+    expect(filterVisibleLineAccounts([...accounts, legacy], staff()).map((item) => item.id))
+      .toContain('legacy');
+  });
+
+  it('同じ統括内では担当・親子設定にかかわらず全アカウントを操作できる', () => {
+    expect(canAccessLineAccount(accounts, staff(), 'grandchild')).toBe(true);
+    expect(canAccessLineAccount(accounts, staff(), 'tenant-b-account')).toBe(false);
+  });
+
+  it('一部の統括だけが見えるときは一覧クエリも制限対象にする', async () => {
+    await expect(getVisibleLineAccountScope({} as D1Database, staff())).resolves.toMatchObject({
+      ids: ['parent', 'child', 'grandchild'],
+      restricted: true,
     });
+  });
+
+  it('全アカウントが同じ統括なら従来の未割当行を利用できる', async () => {
+    const previous = accounts;
+    accounts = [...defaultAccounts];
+    try {
+      await expect(getVisibleLineAccountScope({} as D1Database, staff())).resolves.toMatchObject({
+        ids: ['parent', 'child', 'grandchild'],
+        restricted: false,
+      });
+    } finally {
+      accounts = previous;
+    }
   });
 });
 
 describe('validateAccountHierarchy', () => {
   it('親・子・孫の3階層を許可する', () => {
-    expect(validateAccountHierarchy(accounts, [])).toBeNull();
+    expect(validateAccountHierarchy(defaultAccounts, [])).toBeNull();
   });
 
   it('4階層目を拒否する', () => {
-    expect(validateAccountHierarchy([...accounts, account('fourth')], [
+    expect(validateAccountHierarchy([...defaultAccounts, account('fourth')], [
       { id: 'fourth', parentLineAccountId: 'grandchild' },
     ])).toMatch(/3階層/);
   });
 
   it('循環を拒否する', () => {
-    expect(validateAccountHierarchy(accounts, [
+    expect(validateAccountHierarchy(defaultAccounts, [
       { id: 'parent', parentLineAccountId: 'grandchild' },
     ])).toMatch(/循環/);
   });

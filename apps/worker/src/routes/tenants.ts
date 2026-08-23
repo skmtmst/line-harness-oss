@@ -29,10 +29,10 @@ tenants.get('/api/tenants/boundary-preview', requireRole('owner', 'admin'), asyn
   const visibleAccountIds = new Set(scope.ids);
   const visibleNow = accounts.results.filter((account) => visibleAccountIds.has(account.id));
   const visibleIfEnforced = visibleNow.filter(
-    (account) => account.tenant_id === staffTenantId,
+    (account) => (account.tenant_id ?? DEFAULT_TENANT_ID) === staffTenantId,
   );
   const wouldLose = visibleNow
-    .filter((account) => account.tenant_id !== staffTenantId)
+    .filter((account) => (account.tenant_id ?? DEFAULT_TENANT_ID) !== staffTenantId)
     .map(({ id, name }) => ({ id, name }));
 
   return c.json({
