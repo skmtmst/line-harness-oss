@@ -17,11 +17,11 @@ Cloudflare Dashboardの **Workers & Pages** から、Direct Upload方式のPages
 
 GitHubの **Settings → Environments → staging → Environment secrets** に、次の名前を登録します。値をPR、Issue、チャットへ書きません。
 
-- `CF_API_TOKEN`
+- `CLOUDFLARE_PAGES_API_TOKEN`
 - `CF_ACCOUNT_ID`
 - `PAGES_DOCS_PROJECT_NAME`
 
-Cloudflare API Tokenには、対象アカウントのPagesをデプロイするために必要な最小権限だけを付与します。ワークフローは既存のSecret名を参照し、Wranglerが認識する `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` 環境変数へ値を渡します。
+`CLOUDFLARE_PAGES_API_TOKEN` はマニュアルサイト専用です。Cloudflare API Tokenには、対象アカウントの `Cloudflare Pages: Edit` だけを付与します。D1などで利用する既存の `CF_API_TOKEN` は変更しません。ワークフローは専用Secretを参照し、Wranglerが認識する `CLOUDFLARE_API_TOKEN` 環境変数へ値を渡します。
 
 登録後、GitHubの **Settings → Secrets and variables → Actions → Variables** で `PAGES_DOCS_DEPLOY_ENABLED` を `true` にします。これは秘密値ではなく、PagesプロジェクトとSecretsが揃うまで誤配備を防ぐDocs専用の安全スイッチです。Worker・管理画面の配備に使う全体ゲート `LINE_HARNESS_CLOUDFLARE_DEPLOY` は参照せず、未設定のまま維持します。
 
