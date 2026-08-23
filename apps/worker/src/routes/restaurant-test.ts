@@ -42,6 +42,9 @@ import {
  */
 export const restaurantTest = new Hono<Env>();
 
+const RESTAURANT_TERMS_DOCUMENT_KEY = 'musubo-terms';
+const RESTAURANT_TERMS_DOCUMENT_VERSION = 'v0.1-draft';
+
 type OrganizationRow = { id: string; account_id: string; name: string; status: string };
 type OrganizationContext = OrganizationRow & { scopedStoreId: string | null };
 type RestaurantStoreRow = {
@@ -282,6 +285,70 @@ restaurantTest.get('/api/restaurant-test/store-context', requireRole('owner', 'a
   return c.json({
     success: true,
     data: { selectedStore: selectedStore ? { id: selectedStore.id, name: selectedStore.name } : null },
+  });
+});
+
+/** Return the latest agreement for the organization; credential values are unrelated and never selected. */
+restaurantTest.get('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  const organization = await organizationFor(c, { ignoreSession: true });
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const agreement = await dbFor(c.env).prepare(`SELECT document_version, agreed_at
+    FROM rt_organization_agreements
+    WHERE organization_id = ? AND document_key = ?
+    ORDER BY (document_version = ?) DESC, agreed_at DESC
+    LIMIT 1`).bind(
+      organization.id,
+      RESTAURANT_TERMS_DOCUMENT_KEY,
+      RESTAURANT_TERMS_DOCUMENT_VERSION,
+    ).first<{ document_version: string; agreed_at: string }>();
+  return c.json({
+    success: true,
+    data: {
+      documentKey: RESTAURANT_TERMS_DOCUMENT_KEY,
+      agreedVersion: agreement?.document_version ?? null,
+      agreedAt: agreement?.agreed_at ?? null,
+    },
+  });
+});
+
+/** Record one idempotent organization/version agreement without IP or other personal data. */
+restaurantTest.post('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  const organization = await organizationFor(c, { ignoreSession: true });
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const body: { documentKey?: unknown; version?: unknown } = await c.req.json().catch(() => ({}));
+  if (
+    body.documentKey !== RESTAURANT_TERMS_DOCUMENT_KEY
+    || body.version !== RESTAURANT_TERMS_DOCUMENT_VERSION
+  ) {
+    return c.json({ success: false, error: '現在の利用規約バージョンと一致しません' }, 400);
+  }
+  const staffId = c.get('staff')?.id ?? null;
+  await dbFor(c.env).prepare(`INSERT OR IGNORE INTO rt_organization_agreements
+    (id, organization_id, document_key, document_version, agreed_by_staff_id)
+    VALUES (?, ?, ?, ?, ?)`).bind(
+      crypto.randomUUID(),
+      organization.id,
+      RESTAURANT_TERMS_DOCUMENT_KEY,
+      RESTAURANT_TERMS_DOCUMENT_VERSION,
+      staffId,
+    ).run();
+  const agreement = await dbFor(c.env).prepare(`SELECT agreed_at
+    FROM rt_organization_agreements
+    WHERE organization_id = ? AND document_key = ? AND document_version = ?
+    LIMIT 1`).bind(
+      organization.id,
+      RESTAURANT_TERMS_DOCUMENT_KEY,
+      RESTAURANT_TERMS_DOCUMENT_VERSION,
+    ).first<{ agreed_at: string }>();
+  return c.json({
+    success: true,
+    data: {
+      documentKey: RESTAURANT_TERMS_DOCUMENT_KEY,
+      agreedVersion: RESTAURANT_TERMS_DOCUMENT_VERSION,
+      agreedAt: agreement?.agreed_at ?? null,
+    },
   });
 });
 

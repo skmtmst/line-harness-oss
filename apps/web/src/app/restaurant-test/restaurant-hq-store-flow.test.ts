@@ -25,8 +25,9 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(banner).not.toContain('?store=')
   })
 
-  it('Penの情報構造を引用した4ステップで、資格情報は2項目だけ入力する', () => {
+  it('規約同意を先頭にした5ステップで、資格情報は2項目だけ入力する', () => {
     for (const label of [
+      '利用規約への同意',
       '店舗の基本情報',
       'LINE公式アカウントを作る',
       'Messaging APIを有効にして接続する',
@@ -35,6 +36,7 @@ describe('飲食店向けHQと店舗追加動線', () => {
       'アカウントセットアップ実行',
       'よくある質問',
     ]) expect(wizard).toContain(label)
+    expect(wizard).toContain('ステップ {step} / 5')
     expect(wizard).toContain('チャネルID')
     expect(wizard).toContain('チャネルシークレット')
     expect(wizard).not.toContain('チャネルアクセストークン（長期）')

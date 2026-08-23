@@ -95,6 +95,7 @@ beforeEach(() => {
   ];
   testDb = createTestD1();
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
+  testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/175_restaurant_terms_agreement.sql'), 'utf8'));
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
     endpoint: 'https://worker.example.test/webhook',
     active: true,
@@ -140,6 +141,65 @@ describe('飲食店向けテストAPI', () => {
     expect(snapshot.status).toBe(200);
     const json = await snapshot.json() as { data: { stores: unknown[] } };
     expect(json.data.stores).toHaveLength(2);
+  });
+
+  it('利用規約への同意を組織・現行版ごとに冪等記録する', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const body = { documentKey: 'musubo-terms', version: 'v0.1-draft' };
+    const first = await request('/api/restaurant-test/terms-agreement?account_id=account-1', body);
+    const second = await request('/api/restaurant-test/terms-agreement?account_id=account-1', body);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({
+      success: true,
+      data: { documentKey: 'musubo-terms', agreedVersion: 'v0.1-draft' },
+    });
+    const count = testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organization_agreements').get() as { count: number };
+    expect(count.count).toBe(1);
+    const row = testDb.raw.prepare(`SELECT agreed_by_staff_id, document_key, document_version
+      FROM rt_organization_agreements`).get() as Record<string, unknown>;
+    expect(row).toEqual({
+      agreed_by_staff_id: 'env-owner',
+      document_key: 'musubo-terms',
+      document_version: 'v0.1-draft',
+    });
+  });
+
+  it('現行版以外の規約同意を拒否し、組織が無ければGET・POSTとも404にする', async () => {
+    const missingGet = await request('/api/restaurant-test/terms-agreement?account_id=account-1');
+    const missingPost = await request('/api/restaurant-test/terms-agreement?account_id=account-1', {
+      documentKey: 'musubo-terms', version: 'v0.1-draft',
+    });
+    expect(missingGet.status).toBe(404);
+    expect(missingPost.status).toBe(404);
+
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const oldVersion = await request('/api/restaurant-test/terms-agreement?account_id=account-1', {
+      documentKey: 'musubo-terms', version: 'v0.0-draft',
+    });
+    expect(oldVersion.status).toBe(400);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organization_agreements').get())
+      .toMatchObject({ count: 0 });
+  });
+
+  it('staffは規約状態を読めるが同意記録は作れない', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    authMocks.getStaffByApiKey.mockResolvedValue({
+      id: 'staff-terms', name: 'Staff', role: 'staff', access_level: 'full',
+      permission_keys: '[]', assigned_line_account_id: null,
+      can_access_descendant_accounts: 0,
+    });
+    const state = await requestAs(
+      '/api/restaurant-test/terms-agreement?account_id=account-1',
+      'staff-key',
+    );
+    const denied = await requestAs(
+      '/api/restaurant-test/terms-agreement?account_id=account-1',
+      'staff-key',
+      { documentKey: 'musubo-terms', version: 'v0.1-draft' },
+    );
+    expect(state.status).toBe(200);
+    expect(denied.status).toBe(403);
   });
 
   it('同一組織の店舗だけをセッションへ保存し、統括へ戻すと選択を消す', async () => {
