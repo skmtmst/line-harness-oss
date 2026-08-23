@@ -279,10 +279,6 @@ describe('Codex Slack relay', () => {
     const parent = {
       ts: '1787452000.000001',
       text: '*【:large_blue_circle: 修正・開発】PR #276を作成しました*\n担当：マサト\n状態：:large_blue_circle: 作業中',
-      metadata: {
-        event_type: 'line_harness_codex',
-        event_payload: { work_key: 'pr:276', category: 'fix', status: 'working' },
-      },
     };
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [task] }))
@@ -290,7 +286,6 @@ describe('Codex Slack relay', () => {
       .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
       .mockResolvedValueOnce(slackResponse({ messages: [parent] }))
       .mockResolvedValueOnce(slackResponse({ ts: parent.ts }))
-      .mockResolvedValueOnce(slackResponse({ messages: [task] }))
       .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
 
     await relayCodexSlackEvent({
@@ -308,13 +303,17 @@ describe('Codex Slack relay', () => {
       content: 'PR #276をマージし、対応が完了しました。',
     }), fetcher);
 
-    expect(fetcher).toHaveBeenCalledTimes(7);
+    expect(fetcher).toHaveBeenCalledTimes(6);
     const reply = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body));
     const parentUpdate = JSON.parse(String(fetcher.mock.calls[4]?.[1]?.body));
-    const deletion = JSON.parse(String(fetcher.mock.calls[6]?.[1]?.body));
+    const deletion = JSON.parse(String(fetcher.mock.calls[5]?.[1]?.body));
     expect(reply).toMatchObject({ channel: 'C0PR123', thread_ts: '1787452000.000001' });
     expect(parentUpdate.text).toContain('状態：:white_check_mark: 完了');
-    expect(parentUpdate.metadata.event_payload.status).toBe('done');
+    expect(parentUpdate.metadata.event_payload).toMatchObject({
+      work_key: 'pr:276',
+      category: 'fix',
+      status: 'done',
+    });
     expect(deletion).toMatchObject({ channel: 'C-TASK', ts: '300.001' });
   });
 
@@ -542,7 +541,6 @@ describe('Codex Slack relay', () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
-      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
 
     await relayCodexSlackEvent({
@@ -551,8 +549,8 @@ describe('Codex Slack relay', () => {
       SLACK_TASK_CHANNEL_ID: 'C-TASK',
     }, event({ prNumber: 220, eventType: 'turn_completed', content: 'PR #220の修正が完了しました' }), fetcher);
 
-    const deletion = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
-    expect(String(fetcher.mock.calls[3]?.[0])).toContain('chat.delete');
+    const deletion = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body));
+    expect(String(fetcher.mock.calls[2]?.[0])).toContain('chat.delete');
     expect(deletion).toEqual({ channel: 'C-TASK', ts: '300.001' });
   });
 
@@ -571,7 +569,6 @@ describe('Codex Slack relay', () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
-      .mockResolvedValueOnce(slackResponse({ messages: [taskMessage] }))
       .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
 
     await relayCodexSlackEvent({
@@ -581,10 +578,11 @@ describe('Codex Slack relay', () => {
     }, event({
       eventType: 'turn_completed',
       content: 'Slack接続確認タスクが完了しました',
+      refreshCommandCenter: false,
     }), fetcher);
 
     const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
-    const deletion = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    const deletion = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body));
     expect(reply).toMatchObject({ channel: 'C0PR123', thread_ts: '1787334034.300149' });
     expect(deletion).toEqual({ channel: 'C-TASK', ts: '300.001' });
   });
@@ -686,7 +684,7 @@ describe('Codex Slack relay', () => {
     expect(result).toMatchObject({ channelId: 'C0ERROR123', threadTs: '1787326497.583159' });
     const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
     const parentUpdate = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
-    const deletion = JSON.parse(String(fetcher.mock.calls[5]?.[1]?.body));
+    const deletion = JSON.parse(String(fetcher.mock.calls[4]?.[1]?.body));
     expect(reply).toMatchObject({ channel: 'C0ERROR123', thread_ts: '1787326497.583159' });
     expect(reply.text).toContain('PR #249');
     expect(parentUpdate.text).toContain('状態：:white_check_mark: 完了');

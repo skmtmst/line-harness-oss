@@ -387,21 +387,34 @@ async function updateTrackedParentStatus(
   status: SlackTaskStatus,
   fetcher: typeof fetch,
   strict = false,
+  expected?: { workKey: string; category: CodexSlackCategory },
 ): Promise<void> {
   const token = config.SLACK_BOT_TOKEN;
   if (!token) return;
   try {
     const parent = await readThreadParent(token, channel, threadTs, fetcher);
-    if (!parent?.ts || parent.metadata?.event_type !== THREAD_METADATA_TYPE) return;
-    const payload = parent.metadata.event_payload || {};
-    if (payload.category !== 'error' && !String(payload.work_key || '').startsWith('pr:')) return;
+    if (!parent?.ts) {
+      if (strict) throw new Error('SLACK_TRACKED_PARENT_NOT_FOUND');
+      return;
+    }
+    const tracked = parent.metadata?.event_type === THREAD_METADATA_TYPE;
+    const payload = tracked ? parent.metadata?.event_payload || {} : {};
+    if (
+      !tracked ||
+      (payload.category !== 'error' && !String(payload.work_key || '').startsWith('pr:'))
+    ) {
+      if (!strict || !expected) return;
+    }
+    const metadataPayload = tracked
+      ? payload
+      : { work_key: expected?.workKey, category: expected?.category };
     await slackApi(token, 'chat.update', {
       channel,
       ts: parent.ts,
       text: replaceErrorParentStatusText(parent.text || '【:warning: エラー報告】', status),
       metadata: {
-        ...parent.metadata,
-        event_payload: { ...payload, status },
+        event_type: THREAD_METADATA_TYPE,
+        event_payload: { ...metadataPayload, status },
       },
     }, fetcher);
   } catch (error) {
@@ -869,11 +882,14 @@ async function closeOpenTask(
   config: CodexSlackRelayConfig,
   key: string,
   fetcher: typeof fetch,
+  knownTask?: SlackMessage | null,
 ): Promise<void> {
   const token = config.SLACK_BOT_TOKEN;
   const taskChannel = config.SLACK_TASK_CHANNEL_ID;
   if (!token || !taskChannel) return;
-  const existing = await findTaskMessage(token, taskChannel, { key }, fetcher);
+  const existing = knownTask?.metadata?.event_payload?.work_key === key
+    ? knownTask
+    : await findTaskMessage(token, taskChannel, { key }, fetcher);
   if (!existing?.ts) return;
   await slackApi(token, 'chat.delete', { channel: taskChannel, ts: existing.ts }, fetcher);
 }
@@ -1091,9 +1107,17 @@ export async function relayCodexSlackEvent(
           text: buildReplyText(event, category),
           client_msg_id: event.eventId,
         }, fetcher);
-        await updateTrackedParentStatus(config, channelId, threadTs, 'done', fetcher, true);
+        await updateTrackedParentStatus(
+          config,
+          channelId,
+          threadTs,
+          'done',
+          fetcher,
+          true,
+          { workKey: key, category },
+        );
       }
-      await closeOpenTask(config, key, fetcher);
+      await closeOpenTask(config, key, fetcher, linkedTask);
     } else if (!completed && !linkedTask) {
       await ensureOpenTask(config, event, category, key, channelId, threadTs, fetcher);
     }
@@ -1145,11 +1169,12 @@ export async function relayCodexSlackEvent(
       completed ? 'done' : taskStatusForEvent(event),
       fetcher,
       completed && event.eventSource === 'github',
+      completed && event.eventSource === 'github' ? { workKey: key, category } : undefined,
     );
   }
 
   if (completed) {
-    await closeOpenTask(config, key, fetcher);
+    await closeOpenTask(config, key, fetcher, linkedTask);
   } else {
     await ensureOpenTask(config, event, category, key, channelId, threadTs, fetcher);
   }
