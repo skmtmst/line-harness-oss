@@ -34,6 +34,7 @@ describe('Cloudflare docs deployment workflow', () => {
 
   it('uses only named GitHub secrets and does not print their values', () => {
     expect(workflow).toContain("vars.PAGES_DOCS_DEPLOY_ENABLED == 'true'");
+    expect(workflow).not.toContain('LINE_HARNESS_CLOUDFLARE_DEPLOY');
     for (const name of [
       'CLOUDFLARE_API_TOKEN',
       'CLOUDFLARE_ACCOUNT_ID',
