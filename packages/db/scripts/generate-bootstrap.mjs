@@ -88,8 +88,16 @@ function buildBootstrapSql() {
       .map((row) => `${String(row.sql).trim()};`)
       .join("\n\n");
 
+    // sqlite_master contains schema objects but not migration seed rows. Fresh
+    // databases still need the fixed default tenant used by migration 176.
+    const seedData = [
+      "-- Seed data required by tenant-aware inserts on a fresh database.",
+      "INSERT OR IGNORE INTO tenants (id, name) VALUES",
+      "  ('00000000-0000-4000-8000-000000000001', '既定の統括');",
+    ].join("\n");
+
     return {
-      sql: `${header}${body}\n`,
+      sql: `${header}${body}\n\n${seedData}\n`,
       meta: {
         includedMigrations: migrationFiles,
         migrationCount: migrationFiles.length,

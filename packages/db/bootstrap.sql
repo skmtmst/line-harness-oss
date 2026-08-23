@@ -778,7 +778,7 @@ CREATE TABLE line_accounts (
   og_default_description TEXT,
   created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
+, login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id));
 
 CREATE TABLE link_clicks (
   id TEXT PRIMARY KEY,
@@ -1544,7 +1544,7 @@ CREATE TABLE rt_organizations (
   status TEXT NOT NULL DEFAULT 'test' CHECK (status IN ('test', 'active', 'archived')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
+, tenant_id TEXT REFERENCES tenants(id));
 
 CREATE TABLE rt_reservations (
   id TEXT PRIMARY KEY,
@@ -1789,7 +1789,7 @@ CREATE TABLE staff_members (
   line_linked_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0);
+, line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id));
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -1914,6 +1914,14 @@ CREATE TABLE templates (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0);
+
+CREATE TABLE tenants (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'archived')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
 
 CREATE TABLE tracked_links (
   id TEXT PRIMARY KEY,
@@ -2305,6 +2313,9 @@ CREATE INDEX idx_line_accounts_display_order
 CREATE INDEX idx_line_accounts_parent
   ON line_accounts(parent_line_account_id);
 
+CREATE INDEX idx_line_accounts_tenant
+  ON line_accounts(tenant_id);
+
 CREATE INDEX idx_link_clicks_friend ON link_clicks (friend_id);
 
 CREATE INDEX idx_link_clicks_link ON link_clicks (tracked_link_id);
@@ -2462,6 +2473,9 @@ CREATE INDEX idx_rt_org_agreements_org
 
 CREATE UNIQUE INDEX idx_rt_organizations_account ON rt_organizations(account_id);
 
+CREATE INDEX idx_rt_organizations_tenant
+  ON rt_organizations(tenant_id);
+
 CREATE UNIQUE INDEX idx_rt_reservations_external
   ON rt_reservations(store_id, source, external_id);
 
@@ -2516,6 +2530,9 @@ CREATE UNIQUE INDEX idx_staff_members_line_user_id
   WHERE line_user_id IS NOT NULL;
 
 CREATE INDEX idx_staff_members_role ON staff_members(role);
+
+CREATE INDEX idx_staff_members_tenant
+  ON staff_members(tenant_id);
 
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 
@@ -2596,3 +2613,7 @@ CREATE INDEX idx_webinar_viewers_webinar
 CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
   ON google_calendar_connections (staff_id)
   WHERE staff_id IS NOT NULL AND is_active = 1;
+
+-- Seed data required by tenant-aware inserts on a fresh database.
+INSERT OR IGNORE INTO tenants (id, name) VALUES
+  ('00000000-0000-4000-8000-000000000001', '既定の統括');

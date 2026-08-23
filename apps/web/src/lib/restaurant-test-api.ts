@@ -58,7 +58,10 @@ export type RestaurantTermsAgreement = {
 
 export type RestaurantSnapshot = {
   environment: 'staging_test'; integrationPolicy: 'inbound_only';
-  organization: { id: string; account_id: string; name: string; status: string } | null;
+  organization: {
+    id: string; account_id: string; tenant_id: string | null; tenant_name: string | null;
+    name: string; status: string
+  } | null;
   stores: RestaurantStore[]; memberships: RestaurantMembership[]; approvals: RestaurantApproval[];
   reservations: RestaurantReservation[]; tables: RestaurantTable[]; inventory: RestaurantInventory[];
   menuItems: RestaurantMenuItem[]; connectors: RestaurantConnector[]; reviews: RestaurantReview[];

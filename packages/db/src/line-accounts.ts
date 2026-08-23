@@ -48,6 +48,8 @@ export interface LineAccount {
   icon_url: string | null;
   /** LINE公式アカウント構成の上位アカウント。NULLなら未設定（ルート）。 */
   parent_line_account_id: string | null;
+  /** 所属する統括。指示Cで認可境界として有効化するまでは表示範囲を変えない。 */
+  tenant_id: string | null;
   created_at: string;
   updated_at: string;
 }

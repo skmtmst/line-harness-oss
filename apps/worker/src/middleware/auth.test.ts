@@ -15,7 +15,10 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'tags-key') return { id: 'tags-1', name: 'Tags Staff', role: 'staff', permission_keys: '["/tags"]' };
     if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
-    return { id: 'staff-1', name: 'Staff One', role: 'admin' };
+    return {
+      id: 'staff-1', name: 'Staff One', role: 'admin',
+      tenant_id: '00000000-0000-4000-8000-000000000001',
+    };
   }),
   getStaffByAdminSession: vi.fn(async (_db: unknown, tokenHash: string) => {
     if (tokenHash === 'dfac1ac3966cbe3d487761671296ced77cce526aa4ebb1cf70a1cf3f728dcd4e') {
@@ -120,7 +123,10 @@ describe('admin login cookie attributes', () => {
 
     expect(res.status).toBe(200);
     const body = await res.json() as { success: boolean; data: { id: string }; csrfToken: string };
-    expect(body.data).toMatchObject({ id: 'staff-1', role: 'admin' });
+    expect(body.data).toMatchObject({
+      id: 'staff-1', role: 'admin',
+      tenantId: '00000000-0000-4000-8000-000000000001',
+    });
     expect(body.csrfToken).toBeTruthy();
 
     const session = cookieFor(res, 'lh_admin_session') ?? '';
@@ -227,6 +233,7 @@ describe('Authenticator verification', () => {
       id: 'staff-1', name: 'Staff One', email: 'staff@example.com', role: 'admin', access_level: 'full', api_key: 'hidden', line_user_id: 'U1', is_active: 1,
       permission_keys: '[]', notification_preferences: '{}', invite_status: 'active', invite_token_hash: null, invite_expires_at: null, email_verified_at: null, line_linked_at: null,
       totp_secret_enc: await encryptTotpSecret(secret, masterKey), totp_pending_secret_enc: null, totp_enabled_at: new Date().toISOString(), totp_last_used_step: null,
+      tenant_id: '00000000-0000-4000-8000-000000000001',
       created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     });
     const step = Math.floor(Date.now() / 30_000);

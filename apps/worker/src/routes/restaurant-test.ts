@@ -27,6 +27,7 @@ import {
   type LineTokenIssueFailure,
 } from '../services/token-refresh.js';
 import { fetchBotProfile } from '../lib/bot-profile.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import {
   chooseRestaurantTable,
   isRestaurantReservationSource,
@@ -45,7 +46,14 @@ export const restaurantTest = new Hono<Env>();
 const RESTAURANT_TERMS_DOCUMENT_KEY = 'musubo-terms';
 const RESTAURANT_TERMS_DOCUMENT_VERSION = 'v0.1-draft';
 
-type OrganizationRow = { id: string; account_id: string; name: string; status: string };
+type OrganizationRow = {
+  id: string;
+  account_id: string;
+  tenant_id: string | null;
+  tenant_name: string | null;
+  name: string;
+  status: string;
+};
 type OrganizationContext = OrganizationRow & { scopedStoreId: string | null };
 type RestaurantStoreRow = {
   id: string;
@@ -75,7 +83,22 @@ function accountId(c: Context<Env>): string | null {
   return c.req.query('account_id') || null;
 }
 
+function tenantId(c: Context<Env>): string | null {
+  return c.req.query('tenant_id') || null;
+}
+
+function hasOrganizationSelector(c: Context<Env>): boolean {
+  return Boolean(accountId(c) || tenantId(c));
+}
+
 restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
+  const requestedTenant = tenantId(c);
+  const staffTenant = c.get('staff')?.tenantId ?? null;
+  if (requestedTenant && staffTenant && requestedTenant !== staffTenant) {
+    return c.json({ success: false, error: 'この統括を操作する権限がありません' }, 403);
+  }
+
+  // The existing account_id visibility check intentionally remains unchanged.
   const selectedAccount = accountId(c);
   if (!selectedAccount) return next();
   const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
@@ -91,17 +114,33 @@ restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
  * model is defined.
  */
 async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext | null> {
+  const requestedTenant = tenantId(c);
+  if (requestedTenant) {
+    const tenantOrganization = await dbFor(c.env).prepare(`SELECT
+        o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status
+      FROM rt_organizations o
+      LEFT JOIN tenants t ON t.id = o.tenant_id
+      WHERE o.tenant_id = ?
+      LIMIT 1`).bind(requestedTenant).first<OrganizationRow>();
+    return tenantOrganization ? { ...tenantOrganization, scopedStoreId: null } : null;
+  }
+
   const id = accountId(c);
   if (!id) return null;
   const organization = await dbFor(c.env).prepare(
-    'SELECT id, account_id, name, status FROM rt_organizations WHERE account_id = ? LIMIT 1',
+    `SELECT o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status
+     FROM rt_organizations o
+     LEFT JOIN tenants t ON t.id = o.tenant_id
+     WHERE o.account_id = ? LIMIT 1`,
   ).bind(id).first<OrganizationRow>();
   if (organization) return { ...organization, scopedStoreId: null };
 
   const storeOrganization = await dbFor(c.env).prepare(`SELECT
-      o.id, o.account_id, o.name, o.status, s.id AS scoped_store_id
+      o.id, o.account_id, o.tenant_id, t.name AS tenant_name,
+      o.name, o.status, s.id AS scoped_store_id
     FROM rt_stores s
     JOIN rt_organizations o ON o.id = s.organization_id
+    LEFT JOIN tenants t ON t.id = o.tenant_id
     WHERE s.line_account_id = ?
     LIMIT 1`).bind(id).first<OrganizationRow & { scoped_store_id: string }>();
   return storeOrganization
@@ -152,6 +191,8 @@ function publicOrganization(organization: OrganizationContext): OrganizationRow 
   return {
     id: organization.id,
     account_id: organization.account_id,
+    tenant_id: organization.tenant_id,
+    tenant_name: organization.tenant_name,
     name: organization.name,
     status: organization.status,
   };
@@ -251,7 +292,7 @@ function lineConnectionMessage(reason: LineTokenIssueFailure): string {
 
 /** HQ store list. Session store scope is deliberately ignored here. */
 restaurantTest.get('/api/restaurant-test/stores', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c, { ignoreSession: true });
   if (!organization) {
     return c.json({ success: true, data: { organization: null, stores: [] } });
@@ -276,7 +317,7 @@ restaurantTest.get('/api/restaurant-test/stores', requireRole('owner', 'admin', 
 
 /** Read-only context for the fixed store banner. */
 restaurantTest.get('/api/restaurant-test/store-context', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c, { ignoreSession: true });
   if (!organization) {
     return c.json({ success: true, data: { selectedStore: null } });
@@ -290,7 +331,7 @@ restaurantTest.get('/api/restaurant-test/store-context', requireRole('owner', 'a
 
 /** Return the latest agreement for the organization; credential values are unrelated and never selected. */
 restaurantTest.get('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c, { ignoreSession: true });
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const agreement = await dbFor(c.env).prepare(`SELECT document_version, agreed_at
@@ -314,7 +355,7 @@ restaurantTest.get('/api/restaurant-test/terms-agreement', requireRole('owner', 
 
 /** Record one idempotent organization/version agreement without IP or other personal data. */
 restaurantTest.post('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c, { ignoreSession: true });
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body: { documentKey?: unknown; version?: unknown } = await c.req.json().catch(() => ({}));
@@ -354,7 +395,7 @@ restaurantTest.post('/api/restaurant-test/terms-agreement', requireRole('owner',
 
 /** Save a same-organization store in the existing opaque admin session. */
 restaurantTest.post('/api/restaurant-test/stores/:id/select', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c, { ignoreSession: true });
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const storeId = c.req.param('id');
@@ -375,7 +416,7 @@ restaurantTest.post('/api/restaurant-test/stores/:id/select', requireRole('owner
 
 /** Clear store scope and return to the organization-wide HQ view. */
 restaurantTest.post('/api/restaurant-test/stores/selection/clear', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   if (!await updateSelectedRestaurantStore(c, null)) {
     return c.json({ success: false, error: '統括表示へ戻すには管理画面への再ログインが必要です' }, 409);
   }
@@ -383,7 +424,7 @@ restaurantTest.post('/api/restaurant-test/stores/selection/clear', requireRole('
 });
 
 restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) {
     return c.json({
@@ -468,17 +509,30 @@ restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin'
 /** 空の検証領域に、Pen R-1〜R-8を確認できる安全なサンプルを作る。 */
 restaurantTest.post('/api/restaurant-test/bootstrap', requireRole('owner', 'admin'), async (c) => {
   const selectedAccount = accountId(c);
-  if (!selectedAccount) return requiredAccount(c);
+  const requestedTenant = tenantId(c);
+  if (!selectedAccount && !requestedTenant) return requiredAccount(c);
   const existing = await organizationFor(c);
   if (existing) return c.json({ success: true, data: { organizationId: existing.id, created: false } });
 
   const body: { organizationName?: string } = await c.req.json<{ organizationName?: string }>().catch(() => ({}));
   const lineScope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
+  const organizationTenantId = requestedTenant
+    ?? c.get('staff')?.tenantId
+    ?? lineScope.accounts.find((item) => item.id === selectedAccount)?.tenant_id
+    ?? DEFAULT_TENANT_ID;
+  const tenantExists = await dbFor(c.env).prepare(
+    'SELECT 1 AS found FROM tenants WHERE id = ? LIMIT 1',
+  ).bind(organizationTenantId).first<{ found: number }>();
+  if (!tenantExists) {
+    return c.json({ success: false, error: '指定された統括がありません' }, 404);
+  }
   const assigned = await dbFor(c.env).prepare(`SELECT line_account_id
     FROM rt_stores WHERE line_account_id IS NOT NULL`).all<{ line_account_id: string }>();
   const assignedIds = new Set(assigned.results.map((row) => row.line_account_id));
   const availableAccounts = lineScope.accounts.filter((item) => (
-    Boolean(item.is_active) && item.id !== selectedAccount && !assignedIds.has(item.id)
+    Boolean(item.is_active)
+      && (!selectedAccount || item.id !== selectedAccount)
+      && !assignedIds.has(item.id)
   ));
   if (availableAccounts.length < 2) {
     return c.json({ success: false, error: 'LINEアカウントが不足しています' }, 409);
@@ -488,6 +542,10 @@ restaurantTest.post('/api/restaurant-test/bootstrap', requireRole('owner', 'admi
   const secondId = crypto.randomUUID();
   const tableIds = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
   const menuIds = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+  // account_id はレガシー列。統括はLINE公式アカウントに依存しないため、
+  // tenant_id 経由の作成では一意性を満たすためだけに同じ値を入れている。
+  // 後続の移行でこの列自体を廃止する。
+  const legacyAccountId = selectedAccount ?? organizationTenantId;
   const now = new Date();
   const at = (days: number, hour: number, minute = 0) => {
     const d = new Date(now);
@@ -496,7 +554,13 @@ restaurantTest.post('/api/restaurant-test/bootstrap', requireRole('owner', 'admi
     return d.toISOString();
   };
   const statements: D1PreparedStatement[] = [
-    dbFor(c.env).prepare('INSERT INTO rt_organizations (id, account_id, name) VALUES (?, ?, ?)').bind(orgId, selectedAccount, body.organizationName?.trim() || '然-NEN RESTAURANT LAB'),
+    dbFor(c.env).prepare(`INSERT INTO rt_organizations
+      (id, account_id, tenant_id, name) VALUES (?, ?, ?, ?)`).bind(
+        orgId,
+        legacyAccountId,
+        organizationTenantId,
+        body.organizationName?.trim() || '然-NEN RESTAURANT LAB',
+      ),
     dbFor(c.env, mainId).prepare('INSERT INTO rt_stores (id, organization_id, name, code, area, capacity, line_account_id, google_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(mainId, orgId, '銀座店', 'GINZA', '東京', 32, availableAccounts[0].id, 'connected'),
     dbFor(c.env, secondId).prepare('INSERT INTO rt_stores (id, organization_id, name, code, area, capacity, line_account_id, google_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').bind(secondId, orgId, '横浜店', 'YOKOHAMA', '神奈川', 24, availableAccounts[1].id, 'unconfigured'),
     dbFor(c.env).prepare('INSERT INTO rt_memberships (id, organization_id, staff_name, email, role, status) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), orgId, '本部 管理者', 'admin@example.test', 'super_admin', 'active'),
@@ -562,7 +626,7 @@ restaurantTest.post('/api/restaurant-test/bootstrap', requireRole('owner', 'admi
  * a store nor a LINE account behind.
  */
 restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c, { ignoreSession: true });
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body: {
@@ -655,7 +719,7 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
 
 /** LINE公式アカウントを必ず1つ割り当てて店舗を作成する。 */
 restaurantTest.post('/api/restaurant-test/stores', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body: {
@@ -708,7 +772,7 @@ restaurantTest.post('/api/restaurant-test/stores', requireRole('owner', 'admin')
 
 /** 店舗は削除せず、不要になった場合はarchivedへ変更する。 */
 restaurantTest.patch('/api/restaurant-test/stores/:id', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const storeId = c.req.param('id');
@@ -798,7 +862,7 @@ restaurantTest.patch('/api/restaurant-test/stores/:id', requireRole('owner', 'ad
 
 /** 店舗で現在受信できる予約メール取り込みアドレスを確認する。 */
 restaurantTest.get('/api/restaurant-test/intake-addresses', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const storeId = c.req.query('storeId') || '';
@@ -818,7 +882,7 @@ restaurantTest.get('/api/restaurant-test/intake-addresses', requireRole('owner',
 
 /** 店舗の予約メール取り込みアドレスを発行・再発行する。 */
 restaurantTest.post('/api/restaurant-test/intake-addresses', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body: { storeId?: string } = await c.req.json<{ storeId?: string }>().catch(() => ({}));
@@ -837,7 +901,7 @@ restaurantTest.post('/api/restaurant-test/intake-addresses', requireRole('owner'
 });
 
 restaurantTest.patch('/api/restaurant-test/approvals/:id', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ action?: string; comment?: string }>();
@@ -870,7 +934,7 @@ async function releaseLock(db: D1Database, key: string, owner: string): Promise<
 }
 
 restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<Record<string, unknown>>();
@@ -903,7 +967,7 @@ restaurantTest.post('/api/restaurant-test/reservations/manual', requireRole('own
  * 本接続時は媒体ごとの署名アダプターをこの前段に置く。
  */
 restaurantTest.post('/api/restaurant-test/inbound/reservations', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ storeId?: string; provider?: unknown; eventId?: string; reservation?: unknown }>();
@@ -945,7 +1009,7 @@ restaurantTest.post('/api/restaurant-test/inbound/reservations', requireRole('ow
 });
 
 restaurantTest.post('/api/restaurant-test/tables', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ storeId?: string; code?: string; label?: string; seatType?: string; minCapacity?: number; maxCapacity?: number }>();
@@ -960,7 +1024,7 @@ restaurantTest.post('/api/restaurant-test/tables', requireRole('owner', 'admin')
 });
 
 restaurantTest.post('/api/restaurant-test/memberships', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ storeId?: string | null; staffName?: string; email?: string; role?: string; lineUid?: string; googleEmail?: string }>();
@@ -978,7 +1042,7 @@ restaurantTest.post('/api/restaurant-test/memberships', requireRole('owner', 'ad
 });
 
 restaurantTest.put('/api/restaurant-test/inventory/:id', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ totalCapacity?: number; otaCapacity?: number; lineCapacity?: number; walkInCapacity?: number }>();
@@ -999,7 +1063,7 @@ restaurantTest.put('/api/restaurant-test/inventory/:id', requireRole('owner', 'a
 });
 
 restaurantTest.post('/api/restaurant-test/menu', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ storeId?: string; kind?: string; name?: string; price?: number; allergens?: string[]; servicePeriods?: string[] }>();
@@ -1012,7 +1076,7 @@ restaurantTest.post('/api/restaurant-test/menu', requireRole('owner', 'admin'), 
 });
 
 restaurantTest.post('/api/restaurant-test/gbp/posts', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ storeId?: string; postType?: string; title?: string; body?: string; ctaType?: string; ctaUrl?: string }>();
@@ -1033,7 +1097,7 @@ restaurantTest.post('/api/restaurant-test/gbp/posts', requireRole('owner', 'admi
 });
 
 restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ replyDraft?: string }>();
@@ -1050,7 +1114,7 @@ restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('ow
 });
 
 restaurantTest.put('/api/restaurant-test/line-flows/:id', requireRole('owner', 'admin'), async (c) => {
-  if (!accountId(c)) return requiredAccount(c);
+  if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body = await c.req.json<{ title?: string; body?: string; timingMinutes?: number | null; isEnabled?: boolean }>();
