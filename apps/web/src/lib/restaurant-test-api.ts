@@ -2,7 +2,9 @@ import { fetchApi } from './api'
 
 export type RestaurantStore = {
   id: string; organization_id: string; name: string; code: string; area: string | null;
-  capacity: number; status: string; line_status: string; google_status: string
+  capacity: number; timezone: string; status: 'active' | 'paused' | 'archived';
+  line_status: string; google_status: string; line_account_id: string | null;
+  line_account_name: string | null
 }
 export type RestaurantMembership = {
   id: string; store_id: string | null; staff_name: string; email: string | null; role: 'super_admin' | 'store_manager' | 'staff';
@@ -66,6 +68,8 @@ const withAccount = (path: string, accountId: string) =>
 export const restaurantTestApi = {
   snapshot: (accountId: string) => fetchApi<{ success: true; data: RestaurantSnapshot }>(withAccount('/api/restaurant-test/snapshot', accountId)),
   bootstrap: (accountId: string, organizationName?: string) => fetchApi<{ success: true; data: { organizationId: string; created: boolean } }>(withAccount('/api/restaurant-test/bootstrap', accountId), { method: 'POST', body: JSON.stringify({ organizationName }) }),
+  createStore: (accountId: string, body: { name: string; code: string; area: string; capacity: number; timezone: string; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount('/api/restaurant-test/stores', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  updateStore: (accountId: string, id: string, body: { name: string; code: string; area: string; capacity: number; status: RestaurantStore['status']; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount(`/api/restaurant-test/stores/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
   listIntakeAddresses: (accountId: string, storeId: string) => fetchApi<{ success: true; data: RestaurantIntakeAddress[] }>(withAccount(`/api/restaurant-test/intake-addresses?storeId=${encodeURIComponent(storeId)}`, accountId)),
   issueIntakeAddress: (accountId: string, storeId: string) => fetchApi<{ success: true; data: { id: string; storeId: string; localPart: string; address: string; graceDays: number } }>(withAccount('/api/restaurant-test/intake-addresses', accountId), { method: 'POST', body: JSON.stringify({ storeId }) }),
   decideApproval: (accountId: string, id: string, action: 'approve' | 'return', comment?: string) => fetchApi(withAccount(`/api/restaurant-test/approvals/${id}`, accountId), { method: 'PATCH', body: JSON.stringify({ action, comment }) }),

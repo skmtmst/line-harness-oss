@@ -1577,7 +1577,7 @@ CREATE TABLE rt_stores (
   line_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (line_status IN ('connected', 'warning', 'error', 'unconfigured')),
   google_status TEXT NOT NULL DEFAULT 'unconfigured' CHECK (google_status IN ('connected', 'warning', 'error', 'unconfigured')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')), line_account_id TEXT REFERENCES line_accounts(id),
   UNIQUE(organization_id, code)
 );
 
@@ -2448,6 +2448,9 @@ CREATE UNIQUE INDEX idx_rt_reservations_external
   ON rt_reservations(store_id, source, external_id);
 
 CREATE INDEX idx_rt_reservations_timeline ON rt_reservations(store_id, starts_at, status);
+
+CREATE UNIQUE INDEX idx_rt_stores_line_account
+  ON rt_stores (line_account_id) WHERE line_account_id IS NOT NULL;
 
 CREATE INDEX idx_rt_stores_org ON rt_stores(organization_id, status);
 

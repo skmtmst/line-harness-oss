@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import Header from '@/components/layout/header'
-import { useAccount } from '@/contexts/account-context'
+import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import {
   restaurantTestApi,
@@ -105,7 +105,7 @@ function EmptySetup({ busy, onCreate }: { busy: boolean; onCreate: () => void })
 
 export default function RestaurantConsole({ view }: { view: string }) {
   const activeView: ViewKey = view in viewMeta ? view as ViewKey : 'dashboard'
-  const { selectedAccountId } = useAccount()
+  const { accounts, selectedAccountId } = useAccount()
   const [snapshot, setSnapshot] = useState<RestaurantSnapshot | null>(null)
   const [selectedStoreId, setSelectedStoreId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -118,7 +118,9 @@ export default function RestaurantConsole({ view }: { view: string }) {
     try {
       const res = await restaurantTestApi.snapshot(selectedAccountId)
       setSnapshot(res.data)
-      setSelectedStoreId((current) => current || res.data.stores[0]?.id || '')
+      setSelectedStoreId((current) => res.data.stores.some((item) => item.id === current)
+        ? current
+        : res.data.stores[0]?.id || '')
     } catch { setNotice({ tone: 'error', text: '飲食店向けテストデータを読み込めませんでした。' }) }
     finally { setLoading(false) }
   }, [selectedAccountId])
@@ -128,7 +130,7 @@ export default function RestaurantConsole({ view }: { view: string }) {
     if (!selectedAccountId) return
     setBusy(true)
     try { await restaurantTestApi.bootstrap(selectedAccountId); await load(); setNotice({ tone: 'success', text: '専用のテスト領域を作成しました。' }) }
-    catch { setNotice({ tone: 'error', text: 'テスト領域を作成できませんでした。' }) }
+    catch (error) { setNotice({ tone: 'error', text: error instanceof Error ? error.message : 'テスト領域を作成できませんでした。' }) }
     finally { setBusy(false) }
   }
   const mutate = async (action: () => Promise<unknown>, success: string) => {
@@ -150,7 +152,16 @@ export default function RestaurantConsole({ view }: { view: string }) {
     {loading ? <div className="rounded-card border border-hairline bg-canvas p-16 text-center text-sm text-ink-faint">読み込み中…</div>
       : !snapshot?.organization ? <EmptySetup busy={busy} onCreate={() => void bootstrap()} />
       : activeView === 'dashboard' ? <Dashboard data={snapshot} />
-      : activeView === 'organization' ? <Organization accountId={selectedAccountId!} data={snapshot} selectedStoreId={selectedStoreId} busy={busy} create={(body) => mutate(() => restaurantTestApi.createMembership(selectedAccountId!, body), 'ログインユーザーを飲食店向け領域へ追加しました。')} />
+      : activeView === 'organization' ? <Organization
+        accountId={selectedAccountId!}
+        accounts={accounts}
+        data={snapshot}
+        selectedStoreId={selectedStoreId}
+        busy={busy}
+        create={(body) => mutate(() => restaurantTestApi.createMembership(selectedAccountId!, body), 'ログインユーザーを飲食店向け領域へ追加しました。')}
+        createStore={(body) => mutate(() => restaurantTestApi.createStore(selectedAccountId!, body), '店舗を追加しました。')}
+        updateStore={(id, body) => mutate(() => restaurantTestApi.updateStore(selectedAccountId!, id, body), '店舗情報を更新しました。')}
+      />
       : activeView === 'approvals' ? <Approvals data={snapshot} busy={busy} decide={(id, action) => mutate(() => restaurantTestApi.decideApproval(selectedAccountId!, id, action), action === 'approve' ? '承認しました。外部公開は行っていません。' : '差し戻しました。')} />
       : activeView === 'reservations' ? <Reservations data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createReservation(selectedAccountId!, body), '予約台帳へ登録しました。')} importInbound={(body) => mutate(() => restaurantTestApi.importReservation(selectedAccountId!, body), '受信専用データとして取り込みました。')} />
       : activeView === 'tables' ? <Tables data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createTable(selectedAccountId!, body), '卓を追加しました。')} />
@@ -295,14 +306,110 @@ function IntakeAddressPanel({ accountId, store }: { accountId: string; store: Re
   </Panel>
 }
 
-function Organization({ accountId, data, selectedStoreId, busy, create }: { accountId: string; data: RestaurantSnapshot; selectedStoreId: string; busy: boolean; create: (body: Record<string, unknown>) => void }) {
+type StoreCreateInput = {
+  name: string; code: string; area: string; capacity: number; timezone: string; lineAccountId: string
+}
+type StoreUpdateInput = {
+  name: string; code: string; area: string; capacity: number;
+  status: RestaurantStore['status']; lineAccountId: string
+}
+
+function StoreLineAccountSelect({ accounts, stores, currentStore }: { accounts: AccountWithStats[]; stores: RestaurantStore[]; currentStore?: RestaurantStore }) {
+  const usedByAccount = new Map(stores.filter((item) => item.line_account_id).map((item) => [item.line_account_id!, item.id]))
+  return <label className="text-xs font-bold text-ink-secondary">LINE公式アカウント<span className="text-danger"> *</span>
+    <select name="lineAccountId" required defaultValue={currentStore?.line_account_id || ''} className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm">
+      <option value="">選択してください</option>
+      {accounts.map((account) => {
+        const usedStoreId = usedByAccount.get(account.id)
+        const usedElsewhere = Boolean(usedStoreId && usedStoreId !== currentStore?.id)
+        return <option key={account.id} value={account.id} disabled={usedElsewhere}>
+          {account.displayName || account.name}{usedElsewhere ? '（他店舗で使用中）' : ''}
+        </option>
+      })}
+    </select>
+  </label>
+}
+
+function StoreManagement({ accounts, data, busy, createStore, updateStore }: {
+  accounts: AccountWithStats[]
+  data: RestaurantSnapshot
+  busy: boolean
+  createStore: (body: StoreCreateInput) => void
+  updateStore: (id: string, body: StoreUpdateInput) => void
+}) {
+  const [showCreate, setShowCreate] = useState(false)
+  const [editingId, setEditingId] = useState('')
+  const editingStore = data.stores.find((item) => item.id === editingId)
+  const submitCreate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    createStore({
+      name: String(form.get('name') || ''),
+      code: String(form.get('code') || ''),
+      area: String(form.get('area') || ''),
+      capacity: Number(form.get('capacity')),
+      timezone: String(form.get('timezone') || 'Asia/Tokyo'),
+      lineAccountId: String(form.get('lineAccountId') || ''),
+    })
+  }
+  const submitEdit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editingStore) return
+    const form = new FormData(event.currentTarget)
+    updateStore(editingStore.id, {
+      name: String(form.get('name') || ''),
+      code: String(form.get('code') || ''),
+      area: String(form.get('area') || ''),
+      capacity: Number(form.get('capacity')),
+      status: String(form.get('status')) as RestaurantStore['status'],
+      lineAccountId: String(form.get('lineAccountId') || ''),
+    })
+  }
+  return <Panel title="店舗管理" description="1店舗につき1つのLINE公式アカウントを割り当てます。" action={<button type="button" onClick={() => setShowCreate((value) => !value)} className="rounded-control bg-accent px-4 py-2 text-xs font-bold text-on-accent">店舗を追加</button>}>
+    <div className="space-y-4 p-5">
+      {showCreate && <InlineForm title="新しい店舗"><form onSubmit={submitCreate} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Field label="店舗名" name="name" required />
+        <Field label="店舗コード" name="code" required />
+        <Field label="エリア" name="area" />
+        <Field label="収容人数" name="capacity" type="number" defaultValue="24" required />
+        <Field label="タイムゾーン" name="timezone" defaultValue="Asia/Tokyo" required />
+        <StoreLineAccountSelect accounts={accounts} stores={data.stores} />
+        <div className="flex items-end sm:col-span-2"><button disabled={busy} className="w-full rounded-control bg-nen-green px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-50">店舗を登録</button></div>
+      </form></InlineForm>}
+      {editingStore && <InlineForm title={`${editingStore.name}を編集`}><form key={editingStore.id} onSubmit={submitEdit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Field label="店舗名" name="name" defaultValue={editingStore.name} required />
+        <Field label="店舗コード" name="code" defaultValue={editingStore.code} required />
+        <Field label="エリア" name="area" defaultValue={editingStore.area || ''} />
+        <Field label="収容人数" name="capacity" type="number" defaultValue={String(editingStore.capacity)} required />
+        <label className="text-xs font-bold text-ink-secondary">状態<select name="status" defaultValue={editingStore.status} className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm"><option value="active">有効</option><option value="paused">一時停止</option><option value="archived">アーカイブ</option></select></label>
+        <StoreLineAccountSelect accounts={accounts} stores={data.stores} currentStore={editingStore} />
+        <div className="flex items-end sm:col-span-2"><button disabled={busy} className="w-full rounded-control bg-nen-green px-4 py-2 text-sm font-bold text-on-accent disabled:opacity-50">変更を保存</button></div>
+      </form></InlineForm>}
+      <div className="divide-y divide-hairline rounded-control border border-hairline">{data.stores.map((store) => <div key={store.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <div><div className="flex items-center gap-2"><p className="font-bold text-ink">{store.name}</p><Status value={store.status} /></div><p className="mt-1 text-xs text-ink-faint">{store.code} · {store.area || 'エリア未設定'} · {store.capacity}席</p><p className="mt-1 text-xs font-semibold text-action">LINE: {store.line_account_name || '未設定'}</p></div>
+        <button type="button" onClick={() => setEditingId((value) => value === store.id ? '' : store.id)} className="rounded-control border border-action px-4 py-2 text-xs font-bold text-action">編集</button>
+      </div>)}</div>
+    </div>
+  </Panel>
+}
+
+function Organization({ accountId, accounts, data, selectedStoreId, busy, create, createStore, updateStore }: {
+  accountId: string
+  accounts: AccountWithStats[]
+  data: RestaurantSnapshot
+  selectedStoreId: string
+  busy: boolean
+  create: (body: Record<string, unknown>) => void
+  createStore: (body: StoreCreateInput) => void
+  updateStore: (id: string, body: StoreUpdateInput) => void
+}) {
   const members = selectedStoreId ? data.memberships.filter((m) => !m.store_id || m.store_id === selectedStoreId) : data.memberships
   const selectedStore = data.stores.find((item) => item.id === selectedStoreId) || null
   const [showForm, setShowForm] = useState(false)
   const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const fd = new FormData(event.currentTarget); create({ storeId: fd.get('storeId') || null, staffName: fd.get('staffName'), email: fd.get('email'), role: fd.get('role'), lineUid: fd.get('lineUid'), googleEmail: fd.get('googleEmail') }) }
   return <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
     <Panel title="組織階層"><div className="p-4"><div className="rounded-control bg-accent-soft px-4 py-3 font-bold text-accent">{data.organization?.name}</div><div className="ml-5 border-l border-hairline pl-4 pt-2">{data.stores.map((s) => <div key={s.id} className="my-2 rounded-control border border-hairline px-3 py-2 text-sm"><span className="font-semibold">{s.name}</span><Status value={s.status} /></div>)}</div></div></Panel>
-    <div className="space-y-5"><IntakeAddressPanel accountId={accountId} store={selectedStore} /><div className="grid gap-4 sm:grid-cols-3"><Metric label="所属ユーザー" value={`${members.length}名`} note="本部・店舗の合計" /><Metric label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="承認権限あり" /><Metric label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" /></div>
+    <div className="space-y-5"><StoreManagement accounts={accounts} data={data} busy={busy} createStore={createStore} updateStore={updateStore} /><IntakeAddressPanel accountId={accountId} store={selectedStore} /><div className="grid gap-4 sm:grid-cols-3"><Metric label="所属ユーザー" value={`${members.length}名`} note="本部・店舗の合計" /><Metric label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="承認権限あり" /><Metric label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" /></div>
       <div className="flex justify-end"><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent px-4 py-2 text-sm font-bold text-on-accent">ユーザーを追加</button></div>
       {showForm && <InlineForm title="飲食店向けユーザー"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="氏名" name="staffName" required /><Field label="メール" name="email" type="email" /><label className="text-xs font-bold text-ink-secondary">役割<select name="role" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm"><option value="staff">Staff</option><option value="store_manager">StoreManager</option><option value="super_admin">SuperAdmin</option></select></label><label className="text-xs font-bold text-ink-secondary">担当店舗<select name="storeId" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm"><option value="">全店舗</option>{data.stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label><Field label="LINE通知UID" name="lineUid" /><Field label="Googleメール" name="googleEmail" type="email" /><div className="sm:col-span-2 xl:col-span-6 flex justify-end"><button disabled={busy} className="rounded-control bg-accent px-5 py-2 text-sm font-bold text-on-accent">追加</button></div></form></InlineForm>}
       <Panel title="アカウント一覧" description="権限は飲食店向け領域の中だけに適用します。"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-canvas-sunken text-left text-xs text-ink-faint"><tr>{['氏名', '役割', '担当店舗', 'LINE通知UID', 'Google連携', '状態'].map((h) => <th key={h} className="px-5 py-3">{h}</th>)}</tr></thead><tbody className="divide-y divide-hairline">{members.map((m) => <tr key={m.id}><td className="px-5 py-4 font-bold">{m.staff_name}<p className="text-xs font-normal text-ink-faint">{m.email || 'メール未設定'}</p></td><td className="px-5 py-4"><span className="rounded-pill bg-action-soft px-2 py-1 text-xs font-bold text-action">{roleLabel[m.role]}</span></td><td className="px-5 py-4">{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</td><td className="px-5 py-4">{m.line_uid ? '設定済' : '未設定'}</td><td className="px-5 py-4">{m.google_email || '未設定'}</td><td className="px-5 py-4"><Status value={m.status} /></td></tr>)}</tbody></table></div></Panel>
