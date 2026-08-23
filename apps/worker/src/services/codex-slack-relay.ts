@@ -361,9 +361,14 @@ async function readThreadParent(
   threadTs: string,
   fetcher: typeof fetch,
 ): Promise<SlackMessage | null> {
-  const replies = await slackApi(token, 'conversations.replies', {
+  // Bot tokens can read channel history, but conversations.replies on public
+  // and private channel threads requires a user token. Read the exact parent
+  // timestamp from history instead so the relay keeps using the bot token.
+  const replies = await slackApi(token, 'conversations.history', {
     channel,
-    ts: threadTs,
+    oldest: threadTs,
+    latest: threadTs,
+    inclusive: true,
     limit: 1,
     include_all_metadata: true,
   }, fetcher);

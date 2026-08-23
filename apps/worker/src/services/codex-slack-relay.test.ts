@@ -779,7 +779,15 @@ describe('Codex Slack relay', () => {
     }, fetcher);
 
     expect(result).toEqual({ status: 'done' });
-    expect(String(fetcher.mock.calls[0]?.[0])).toContain('conversations.replies');
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('conversations.history');
+    expect(JSON.parse(String(fetcher.mock.calls[0]?.[1]?.body))).toMatchObject({
+      channel: 'C0ERROR123',
+      oldest: errorParent.ts,
+      latest: errorParent.ts,
+      inclusive: true,
+      limit: 1,
+      include_all_metadata: true,
+    });
     const parentUpdate = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
     expect(parentUpdate).toMatchObject({ channel: 'C0ERROR123', ts: errorParent.ts });
     expect(parentUpdate.text).toContain('状態：:white_check_mark: 完了');
