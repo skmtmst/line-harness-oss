@@ -314,6 +314,17 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
   const openPulls = allOpenPulls.filter((pull) => !isPullExcluded(pull, excludedLabels));
   const openPrs = await openPrSnapshot(options.repository, openPulls, options.githubToken, fetcher);
   let sent = 0;
+  const failures: string[] = [];
+  const attemptRelay = async (label: string, payload: RelayPayload): Promise<boolean> => {
+    try {
+      await sendRelay(options.relayUrl, options.relaySecret, payload, fetcher);
+      return true;
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'UNKNOWN';
+      failures.push(`${label}:${reason}`);
+      return false;
+    }
+  };
 
   const rawEventPull = options.eventName === 'pull_request' ? options.event?.pull_request : undefined;
   const eventPull = rawEventPull && !isPullExcluded(rawEventPull, excludedLabels) ? rawEventPull : undefined;
@@ -340,9 +351,8 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
     && (options.onlyPrNumber === undefined || eventPull.number === options.onlyPrNumber)
     && eventPull.base.ref === BASE_BRANCH
   ) {
-    await sendRelay(
-      options.relayUrl,
-      options.relaySecret,
+    const delivered = await attemptRelay(
+      `event:PR#${eventPull.number}`,
       relayPayloadForPull(
         options.repository,
         eventPull,
@@ -352,16 +362,14 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
         !dedicatedCommandCenter && candidates.length === 0,
         !dedicatedCommandCenter && candidates.length === 0 ? now.toISOString() : eventPull.updated_at,
       ),
-      fetcher,
     );
-    sent += 1;
+    if (delivered) sent += 1;
   }
 
   for (const [index, pull] of candidates.entries()) {
     const refreshCommandCenter = !dedicatedCommandCenter && index === candidates.length - 1;
-    await sendRelay(
-      options.relayUrl,
-      options.relaySecret,
+    await attemptRelay(
+      `reconcile:PR#${pull.number}`,
       relayPayloadForPull(
         options.repository,
         pull,
@@ -371,16 +379,16 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
         refreshCommandCenter,
         refreshCommandCenter ? now.toISOString() : pull.updated_at,
       ),
-      fetcher,
     );
   }
   if (dedicatedCommandCenter) {
-    await sendRelay(
-      options.relayUrl,
-      options.relaySecret,
+    await attemptRelay(
+      'command-center',
       commandCenterPayload(options.repository, openPrs, now.toISOString()),
-      fetcher,
     );
+  }
+  if (failures.length > 0) {
+    throw new Error(`SLACK_SYNC_PARTIAL_FAILURE:${failures.join(',')}`);
   }
   return { sent, reconciled: candidates.length };
 }
