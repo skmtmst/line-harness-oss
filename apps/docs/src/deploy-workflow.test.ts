@@ -36,6 +36,9 @@ describe('Cloudflare docs deployment workflow', () => {
     expect(workflow).toContain("vars.PAGES_DOCS_DEPLOY_ENABLED == 'true'");
     expect(workflow).not.toContain('LINE_HARNESS_CLOUDFLARE_DEPLOY');
     expect(workflow).toContain(
+      'CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_API_TOKEN }}',
+    );
+    expect(workflow).not.toContain(
       'CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}',
     );
     expect(workflow).toContain(
