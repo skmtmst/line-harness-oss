@@ -192,15 +192,32 @@ async function importIdPage(
   const existingById = new Map<string, ExistingFriend>();
   for (const group of chunks(validIds, LOOKUP_CHUNK_SIZE)) {
     const placeholders = group.map(() => '?').join(',');
-    const rows = await db
+    const scopedRows = await db
       .prepare(
         `SELECT line_user_id, line_account_id, is_following
            FROM friends
-          WHERE line_user_id IN (${placeholders})`,
+          WHERE line_account_id = ?
+            AND line_user_id IN (${placeholders})`,
       )
-      .bind(...group)
+      .bind(lineAccountId, ...group)
       .all<ExistingFriend>();
-    for (const row of rows.results ?? []) existingById.set(row.line_user_id, row);
+    for (const row of scopedRows.results ?? []) existingById.set(row.line_user_id, row);
+
+    // C-2bまでは、未割当行や別アカウント行を従来どおり競合として扱う。
+    // 指定アカウントで見つからなかったIDだけ無指定検索へフォールバックする。
+    const unresolved = group.filter((lineUserId) => !existingById.has(lineUserId));
+    if (unresolved.length > 0) {
+      const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
+      const fallbackRows = await db
+        .prepare(
+          `SELECT line_user_id, line_account_id, is_following
+             FROM friends
+            WHERE line_user_id IN (${unresolvedPlaceholders})`,
+        )
+        .bind(...unresolved)
+        .all<ExistingFriend>();
+      for (const row of fallbackRows.results ?? []) existingById.set(row.line_user_id, row);
+    }
   }
 
   const writableIds: string[] = [];
@@ -213,6 +230,7 @@ async function importIdPage(
       state.claimedUnassigned += 1;
       writableIds.push(lineUserId);
     } else if (existing.line_account_id !== lineAccountId) {
+      // C-2b: 複合一意制約へ移行したら、競合ではなくこのアカウント用の行を取り込む。
       state.conflicts += 1;
     } else if (existing.is_following === 0) {
       state.reactivated += 1;

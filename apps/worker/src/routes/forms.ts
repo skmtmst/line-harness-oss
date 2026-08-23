@@ -9,14 +9,14 @@ import {
   getFormSubmissions,
   getLatestFormSubmission,
   createFormSubmission,
-  getFriendByLineUserId,
+  getFriendByLineUserIdForAccount,
   getFriendById,
   getLineAccountById,
   jstNow,
 } from '@line-crm/db';
 import { enrollFriendInScenario } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
-import { verifyCallerLineUserId } from '../services/liff-auth.js';
+import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import type {
@@ -385,9 +385,13 @@ forms.post('/api/forms/:id/opened', async (c) => {
     // Open analytics may remain anonymous, but a caller can only attribute an
     // open to the LINE identity proven by its ID token. Body-supplied customer
     // IDs are intentionally ignored.
-    const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-    const friend = lineUserId
-      ? await getFriendByLineUserId(c.env.DB, lineUserId)
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    const friend = identity
+      ? await getFriendByLineUserIdForAccount(
+          c.env.DB,
+          identity.lineUserId,
+          identity.lineAccountId,
+        )
       : null;
 
     const now = jstNow();
@@ -412,12 +416,16 @@ forms.post('/api/forms/:id/opened', async (c) => {
 forms.post('/api/forms/:id/partial', async (c) => {
   try {
     const body = await c.req.json<{ data?: Record<string, unknown> }>();
-    const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-    if (!lineUserId) {
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
 
-    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
 
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
@@ -468,11 +476,15 @@ forms.post('/api/forms/:id/files', async (c) => {
       return c.json({ success: false, error: 'このフォームはファイルを受け付けていません' }, 400);
     }
 
-    const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-    if (!lineUserId) {
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
-    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
@@ -540,11 +552,15 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
       return c.json({ success: true, data: null });
     }
 
-    const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-    if (!lineUserId) {
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
-    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
     if (!friend) {
       return c.json({ success: true, data: null });
     }
@@ -586,11 +602,15 @@ forms.post('/api/forms/:id/submit', async (c) => {
 
     const submissionData = body.data ?? {};
 
-    const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-    if (!lineUserId) {
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
-    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
@@ -897,8 +917,8 @@ forms.post('/api/forms/:id/submit', async (c) => {
         (async () => {
           console.log('Form reply: starting for friendId', friendId);
           const friend = await getFriendById(db, friendId!);
-          if (!friend?.line_user_id) { console.log('Form reply: no line_user_id'); return; }
-          console.log('Form reply: sending to', friend.line_user_id);
+          if (!friend?.line_user_id) { console.log('Form reply: no LINE recipient'); return; }
+          console.log('Form reply: sending');
           const accessToken = await resolveFriendAccessToken(
             db,
             friend,

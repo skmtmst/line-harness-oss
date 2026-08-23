@@ -1,9 +1,9 @@
 import { Hono, type Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
-import { jstNow, resolveLineCredential } from '@line-crm/db';
+import { getFriendByLineUserIdForAccount, jstNow, resolveLineCredential } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
-import { verifyCallerLineUserId } from '../services/liff-auth.js';
+import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -51,14 +51,20 @@ type FriendRow = {
 };
 
 async function currentFriend(c: Context<Env>): Promise<FriendRow | null> {
-  const lineUserId = await verifyCallerLineUserId(c.req.header('Authorization'), c.env);
-  if (!lineUserId) return null;
+  const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+  if (!identity) return null;
+  const friend = await getFriendByLineUserIdForAccount(
+    c.env.DB,
+    identity.lineUserId,
+    identity.lineAccountId,
+  );
+  if (!friend?.is_following) return null;
   return c.env.DB.prepare(
     `SELECT f.id, f.line_user_id, f.display_name, f.user_id, f.line_account_id,
             a.channel_access_token, a.channel_access_token_encrypted
        FROM friends f LEFT JOIN line_accounts a ON a.id = f.line_account_id
-      WHERE f.line_user_id = ? AND f.is_following = 1 LIMIT 1`,
-  ).bind(lineUserId).first<FriendRow>();
+      WHERE f.id = ? AND f.is_following = 1 LIMIT 1`,
+  ).bind(friend.id).first<FriendRow>();
 }
 
 function dateOnly(value: unknown): string | null {

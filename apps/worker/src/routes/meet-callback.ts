@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
-import { getFriendByLineUserId } from '@line-crm/db';
+import { getFriendByLineUserIdForAccount, getScenarioById } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { verifySupportRelay } from '../services/support-relay.js';
 import { sha256Hex } from '../middleware/auth.js';
@@ -64,7 +64,12 @@ app.post('/api/meet-callback', async (c) => {
     return c.json({ success: true, duplicate: true });
   }
 
-  const friend = await getFriendByLineUserId(c.env.DB, body.line_user_id);
+  const scenario = await getScenarioById(c.env.DB, body.scenario_id);
+  const friend = await getFriendByLineUserIdForAccount(
+    c.env.DB,
+    body.line_user_id,
+    scenario?.line_account_id ?? null,
+  );
   if (!friend) {
     return c.json({ success: false, error: 'friend not found' }, 404);
   }

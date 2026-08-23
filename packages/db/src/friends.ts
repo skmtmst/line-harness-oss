@@ -112,7 +112,15 @@ export async function getFriendByLineUserIdForAccount(
       .bind(lineUserId, lineAccountId)
       .first<Friend>();
     if (scoped) return scoped;
+
+    console.warn({
+      event: 'friend_lookup_account_fallback',
+      line_account_id: lineAccountId,
+      path: 'getFriendByLineUserIdForAccount',
+    });
   }
+  // C-2b: UNIQUE(line_account_id, line_user_id) へ移行したら、この無指定
+  // フォールバックを削除する。移行前は既存の未割当行を見失わないために残す。
   return getFriendByLineUserId(db, lineUserId);
 }
 
@@ -162,6 +170,8 @@ export async function setFriendFirstTrackedLinkIfNull(
 
 export interface UpsertFriendInput {
   lineUserId: string;
+  /** 検索対象のLINE公式アカウント。C-2bまでは未割当行へのフォールバックを残す。 */
+  lineAccountId?: string | null;
   displayName?: string | null;
   pictureUrl?: string | null;
   statusMessage?: string | null;
@@ -177,7 +187,11 @@ export async function upsertFriend(
   input: UpsertFriendInput,
 ): Promise<Friend> {
   const now = jstNow();
-  const existing = await getFriendByLineUserId(db, input.lineUserId);
+  const existing = await getFriendByLineUserIdForAccount(
+    db,
+    input.lineUserId,
+    input.lineAccountId ?? null,
+  );
 
   if (existing) {
     try {
@@ -197,7 +211,7 @@ export async function upsertFriend(
              END,
              is_following = 1,
              updated_at = ?
-         WHERE line_user_id = ?`,
+         WHERE id = ?`,
       ).bind(
         'displayName' in input ? (input.displayName ?? null) : existing.display_name,
         'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
@@ -205,7 +219,7 @@ export async function upsertFriend(
         now,
         now,
         now,
-        input.lineUserId,
+        existing.id,
       ).run();
     } catch (error) {
       if (!isMissingFollowLifecycleColumn(error)) throw error;
@@ -216,17 +230,17 @@ export async function upsertFriend(
         `UPDATE friends
          SET display_name = ?, picture_url = ?, status_message = ?,
              is_following = 1, updated_at = ?
-         WHERE line_user_id = ?`,
+         WHERE id = ?`,
       ).bind(
         'displayName' in input ? (input.displayName ?? null) : existing.display_name,
         'pictureUrl' in input ? (input.pictureUrl ?? null) : existing.picture_url,
         'statusMessage' in input ? (input.statusMessage ?? null) : existing.status_message,
         now,
-        input.lineUserId,
+        existing.id,
       ).run();
     }
 
-    return (await getFriendByLineUserId(db, input.lineUserId))!;
+    return (await getFriendById(db, existing.id))!;
   }
 
   const id = crypto.randomUUID();
@@ -274,8 +288,11 @@ export async function updateFriendFollowStatus(
   db: D1Database,
   lineUserId: string,
   isFollowing: boolean,
+  lineAccountId: string | null = null,
 ): Promise<void> {
   const now = jstNow();
+  const existing = await getFriendByLineUserIdForAccount(db, lineUserId, lineAccountId);
+  if (!existing) return;
   if (isFollowing) {
     await db
       .prepare(
@@ -287,9 +304,9 @@ export async function updateFriendFollowStatus(
                 END,
                 last_followed_at = CASE WHEN is_following = 0 THEN ? ELSE last_followed_at END,
                 is_following = 1, updated_at = ?
-          WHERE line_user_id = ?`,
+          WHERE id = ?`,
       )
-      .bind(now, now, now, lineUserId)
+      .bind(now, now, now, existing.id)
       .run();
     return;
   }
@@ -301,9 +318,9 @@ export async function updateFriendFollowStatus(
               last_unfollowed_at = CASE WHEN is_following = 1 THEN ? ELSE last_unfollowed_at END,
               unfollow_count = unfollow_count + CASE WHEN is_following = 1 THEN 1 ELSE 0 END,
               updated_at = ?
-        WHERE line_user_id = ?`,
+        WHERE id = ?`,
     )
-    .bind(now, now, lineUserId)
+    .bind(now, now, existing.id)
     .run();
 }
 

@@ -19,10 +19,10 @@ import type { Env } from '../index.js';
 
 const mocks = vi.hoisted(() => ({
   getFormById: vi.fn(),
-  getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   getFriendById: vi.fn(),
   createFormSubmission: vi.fn(),
-  verifyCallerLineUserId: vi.fn(),
+  verifyCallerLineIdentity: vi.fn(),
   countFormSubmissionsByFriend: vi.fn(),
   countChoiceUsage: vi.fn(),
   attachTag: vi.fn(),
@@ -41,7 +41,7 @@ vi.mock('@line-crm/db', () => ({
   getFormSubmissions: vi.fn(),
   getLatestFormSubmission: vi.fn(),
   createFormSubmission: mocks.createFormSubmission,
-  getFriendByLineUserId: mocks.getFriendByLineUserId,
+  getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
   getFriendById: mocks.getFriendById,
   getTrackedLinkById: vi.fn(),
   getMessageTemplateById: vi.fn(),
@@ -57,7 +57,7 @@ vi.mock('@line-crm/db', () => ({
 }));
 
 vi.mock('../services/liff-auth.js', () => ({
-  verifyCallerLineUserId: mocks.verifyCallerLineUserId,
+  verifyCallerLineIdentity: mocks.verifyCallerLineIdentity,
 }));
 
 vi.mock('../services/friend-tag-attach.js', () => ({
@@ -165,8 +165,11 @@ async function errorOf(res: Response): Promise<string> {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.verifyCallerLineUserId.mockResolvedValue('U-line-user');
-  mocks.getFriendByLineUserId.mockResolvedValue({
+  mocks.verifyCallerLineIdentity.mockResolvedValue({
+    lineUserId: 'U-line-user',
+    lineAccountId: 'account-a',
+  });
+  mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
     id: 'friend-1',
     line_user_id: 'U-line-user',
     line_account_id: null,
