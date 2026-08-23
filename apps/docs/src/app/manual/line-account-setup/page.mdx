@@ -1,0 +1,73 @@
+import { manualBySlug } from '@/lib/manuals'
+import {
+  ManualFigure,
+  Step,
+  StepList,
+  Tip,
+  Troubleshooting,
+  Warning,
+} from '@/components/manual-elements'
+
+export const metadata = {
+  title: '記事テンプレート',
+  description: 'musuboマニュアルの記事テンプレートです。',
+}
+
+<article className="manual-article">
+  <nav className="breadcrumb" aria-label="パンくずリスト">
+    <a href="/">マニュアル一覧</a>
+    <span aria-hidden="true">/</span>
+    <span>{manualBySlug('line-account-setup')?.title}</span>
+  </nav>
+
+  <header className="article-header">
+    <p className="eyebrow">ARTICLE TEMPLATE</p>
+    <h1>記事テンプレート</h1>
+    <p className="article-header__lead">
+      ここには、このマニュアルでできるようになることを短く記載します。
+      以下は記事を追加するときに使える表示部品の見本です。
+    </p>
+  </header>
+
+  <section>
+    <h2>設定の手順</h2>
+    <StepList>
+      <Step>
+        <h3>最初の操作を記載します</h3>
+        <p>開く画面と、選ぶ項目が分かるように具体的に説明します。</p>
+      </Step>
+      <Step>
+        <h3>入力内容を確認します</h3>
+        <p>画面上で確認する位置や、入力例をここに記載します。</p>
+      </Step>
+      <Step>
+        <h3>設定を保存します</h3>
+        <p>完了後に表示される内容まで案内すると、利用者が安心できます。</p>
+      </Step>
+    </StepList>
+  </section>
+
+  <Warning>
+    取り消せない操作や、配信・削除など影響の大きい操作は、この枠で事前に注意を伝えます。
+  </Warning>
+
+  <Tip>
+    知っておくと便利な情報や、必須ではない設定は、この枠にまとめます。
+  </Tip>
+
+  <section>
+    <h2>画面で確認する場所</h2>
+    <p>操作対象が分かるスクリーンショットと、短い説明を組み合わせます。</p>
+    <ManualFigure
+      src="/manual/setup-placeholder.svg"
+      alt="マニュアル用の画面画像を配置する場所の見本"
+      caption="画像1：キャプションには、画像で確認してほしい点を記載します。"
+    />
+  </section>
+
+  <Troubleshooting>
+    <p>
+      よくある原因、確認する順番、解決しない場合の連絡先を、記事ごとにここへ記載します。
+    </p>
+  </Troubleshooting>
+</article>

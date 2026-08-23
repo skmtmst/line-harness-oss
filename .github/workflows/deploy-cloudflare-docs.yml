@@ -1,0 +1,52 @@
+name: Deploy Cloudflare Docs (Staging)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/development]
+    paths:
+      - 'apps/docs/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-cloudflare-docs.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-docs-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository != 'Shudesu/line-harness-oss' && vars.LINE_HARNESS_CLOUDFLARE_DEPLOY == 'true' && vars.PAGES_DOCS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build manual site
+        run: pnpm --filter docs build
+
+      - name: Verify static export
+        run: pnpm --filter docs test:export
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PAGES_DOCS_PROJECT_NAME: ${{ secrets.PAGES_DOCS_PROJECT_NAME }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$PAGES_DOCS_PROJECT_NAME"
+          npx wrangler pages deploy apps/docs/out --project-name="$PAGES_DOCS_PROJECT_NAME"
