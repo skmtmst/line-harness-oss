@@ -14,6 +14,13 @@ type D1Result<T> = {
   errors?: Array<{ message?: string }>;
 };
 
+class D1QueryError extends Error {
+  constructor() {
+    super('Credential migration query failed');
+    this.name = 'D1QueryError';
+  }
+}
+
 const apply = process.argv.includes('--apply');
 const accountId = process.env.CF_ACCOUNT_ID?.trim();
 const databaseId = process.env.D1_DATABASE_ID?.trim();
@@ -40,8 +47,9 @@ async function query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
   const body = await response.json() as D1Result<T>;
   const result = body.result?.[0];
   if (!response.ok || !body.success || !result?.success) {
-    const reason = result?.error || body.errors?.[0]?.message || `HTTP ${response.status}`;
-    throw new Error(`D1 query failed: ${reason}`);
+    // Provider errors are intentionally not forwarded. An error body can
+    // include request context; the migration log is limited to counts only.
+    throw new D1QueryError();
   }
   return result.results ?? [];
 }
@@ -57,7 +65,7 @@ async function main(): Promise<void> {
       ORDER BY id`,
   );
 
-  console.log(JSON.stringify({ mode: apply ? 'apply' : 'dry-run', pendingAccounts: rows.length }));
+  console.log(JSON.stringify({ pendingAccounts: rows.length }));
   if (!apply || rows.length === 0) return;
 
   let migrated = 0;
@@ -75,11 +83,12 @@ async function main(): Promise<void> {
     );
     migrated += 1;
   }
-  console.log(JSON.stringify({ mode: 'apply', migratedAccounts: migrated }));
+  console.log(JSON.stringify({ migratedAccounts: migrated }));
 }
 
-main().catch((error) => {
-  // Never include row data, plaintext credentials, ciphertext, or key material.
-  console.error(error instanceof Error ? error.message : 'Credential migration failed');
+main().catch(() => {
+  // Never include row data, identifiers, provider errors, credentials,
+  // ciphertext, or key material. Only an operation count is emitted.
+  console.error(JSON.stringify({ failedOperations: 1 }));
   process.exitCode = 1;
 });
