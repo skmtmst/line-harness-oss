@@ -1,34 +1,35 @@
 import { getLineAccounts, type LineAccount } from '@line-crm/db';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 /**
  * 認証済みユーザーが閲覧できるLINE公式アカウントを返す。
  *
- * このシステムは1つの組織で使う前提で、認証済みスタッフは役割にかかわらず
- * 組織内の全アカウントを操作できる。assignedLineAccountId はログイン直後に
- * 選ぶ既定値であり、認可境界には使わない。
+ * tenant_id が未設定の既存行は既定統括に属するものとして扱い、管理画面から
+ * 行方不明にならないようにする。担当アカウントや親子階層は認可に使わない。
  */
 export function filterVisibleLineAccounts(
   accounts: LineAccount[] | undefined,
-  _staff: AuthenticatedStaff | undefined,
+  staff: AuthenticatedStaff | undefined,
 ): LineAccount[] {
-  return accounts ?? [];
+  const staffTenant = staff?.tenantId ?? DEFAULT_TENANT_ID;
+  return (accounts ?? []).filter(
+    (account) => (account.tenant_id ?? DEFAULT_TENANT_ID) === staffTenant,
+  );
 }
 
 export function canAccessLineAccount(
   accounts: LineAccount[] | undefined,
-  _staff: AuthenticatedStaff | undefined,
+  staff: AuthenticatedStaff | undefined,
   accountId: string,
 ): boolean {
-  // There is no staff-assignment restriction, but the account must still
-  // belong to this installation (the organization boundary).
-  return (accounts ?? []).some((account) => account.id === accountId);
+  return filterVisibleLineAccounts(accounts, staff).some((account) => account.id === accountId);
 }
 
 export type VisibleLineAccountScope = {
   accounts: LineAccount[];
   ids: string[];
-  /** false means the caller may use legacy rows whose account is not assigned. */
+  /** false means the caller can see every account and may use unassigned legacy rows. */
   restricted: boolean;
 };
 
@@ -39,7 +40,8 @@ export async function getVisibleLineAccountScope(
 ): Promise<VisibleLineAccountScope> {
   const allAccounts = await getLineAccounts(db);
   const accounts = filterVisibleLineAccounts(allAccounts, staff);
-  return { accounts, ids: accounts.map((account) => account.id), restricted: false };
+  const restricted = accounts.length !== allAccounts.length;
+  return { accounts, ids: accounts.map((account) => account.id), restricted };
 }
 
 export type HierarchyRelationship = { id: string; parentLineAccountId: string | null };

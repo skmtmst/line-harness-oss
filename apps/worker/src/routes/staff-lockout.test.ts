@@ -85,6 +85,7 @@ describe('スタッフ招待の統括', () => {
       id: 'line-1',
       parent_line_account_id: null,
       is_active: 1,
+      tenant_id: 'tenant-inviter',
     }]);
     dbMocks.getStaffMembers.mockResolvedValue([]);
     dbMocks.createStaffMember.mockResolvedValue(row({

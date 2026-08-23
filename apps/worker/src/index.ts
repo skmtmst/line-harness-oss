@@ -32,6 +32,7 @@ import { sendBookingNotification } from './services/booking-notifier.js';
 import { DEFAULT_ACCOUNT_SETTINGS } from './services/booking-types.js';
 import { authMiddleware } from './middleware/auth.js';
 import type { AuthenticatedStaff } from './middleware/auth.js';
+import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { webhook } from './routes/webhook.js';
 import { friends } from './routes/friends.js';
@@ -248,6 +249,10 @@ app.use('*', rateLimitMiddleware);
 
 // Auth middleware — skips /webhook and /docs automatically
 app.use('*', authMiddleware);
+
+// Tenant boundary — authenticated admin APIs may only select LINE accounts
+// that belong to the signed-in staff member's tenant.
+app.use('*', tenantScopeMiddleware);
 
 // Mount route groups — MVP & Round 2
 app.route('/', webhook);
