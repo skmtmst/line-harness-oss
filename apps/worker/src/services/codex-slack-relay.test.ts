@@ -87,6 +87,12 @@ describe('Codex Slack relay', () => {
       eventType: 'turn_completed',
       content: '修正は未完了で、エラーが残っています',
     }))).toBe(false);
+    expect(isCodexTaskCompletion(event({
+      eventType: 'turn_completed',
+      eventSource: 'github',
+      prNumber: 296,
+      content: 'PR #296「Slack同期の1件失敗で後続PRを止めない」をマージし、対応が完了しました。',
+    }))).toBe(true);
   });
 
   test('同じ作業キーから同じTASK-IDを生成する', () => {

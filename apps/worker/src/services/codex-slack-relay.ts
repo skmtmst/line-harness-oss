@@ -113,6 +113,13 @@ export function shouldTrackCodexTask(event: CodexSlackEvent, category: CodexSlac
 }
 
 export function isCodexTaskCompletion(event: CodexSlackEvent): boolean {
+  // GitHub emits turn_completed only after the PR is closed or merged. Its
+  // structured state is authoritative; PR titles can legitimately contain
+  // words such as "失敗", which must not turn a completed PR back into an
+  // open Slack task.
+  if (event.eventSource === 'github' && event.prNumber && event.eventType === 'turn_completed') {
+    return true;
+  }
   return event.eventType === 'turn_completed' &&
     !INCOMPLETE_PATTERN.test(event.content) &&
     COMPLETION_PATTERN.test(event.content);
