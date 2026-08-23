@@ -33,4 +33,12 @@ describe('V2 10-2 ログインユーザーのPen表示', () => {
     expect(newStaffSource).not.toContain('山本 恭平')
     expect(newStaffSource).not.toContain('yamamoto@example.com')
   })
+
+  it('無効化を主操作にし、削除は警告と名前入力の確認を必須にする', () => {
+    expect(staffSource).toContain('このユーザーを無効にする')
+    expect(staffSource).toContain('このユーザーを有効にする')
+    expect(staffSource).toContain('このユーザーを完全に削除する')
+    expect(staffSource).toContain('削除すると元に戻せません。過去のログイン履歴・個人情報の閲覧記録が誰の操作か辿れなくなります。')
+    expect(staffSource).toContain('disabled={!canDelete}')
+  })
 })
