@@ -2884,6 +2884,8 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    loginSummary: (id: string) =>
+      fetchApi<ApiResponse<{ loginCount: number }>>(`/api/staff/${id}/login-summary`),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/staff/${id}`, { method: 'DELETE' }),
     regenerateKey: (id: string) =>

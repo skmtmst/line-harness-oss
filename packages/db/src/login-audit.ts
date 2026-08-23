@@ -90,3 +90,31 @@ export async function getLoginAudit(
     .all<LoginAuditRow>();
   return result.results;
 }
+
+/**
+ * 条件に合う監査記録の総数を返す。
+ *
+ * 一覧取得には表示負荷を抑える上限があるため、ユーザー整理の判断材料に使う
+ * 正確な件数は集計クエリで取得する。
+ */
+export async function countLoginAudit(
+  db: D1Database,
+  opts: { adminUserId?: string; action?: LoginAuditAction } = {},
+): Promise<number> {
+  const conditions: string[] = [];
+  const values: unknown[] = [];
+  if (opts.adminUserId) {
+    conditions.push('admin_user_id = ?');
+    values.push(opts.adminUserId);
+  }
+  if (opts.action) {
+    conditions.push('action = ?');
+    values.push(opts.action);
+  }
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const row = await db
+    .prepare(`SELECT COUNT(*) AS count FROM login_audit ${where}`)
+    .bind(...values)
+    .first<{ count: number }>();
+  return row?.count ?? 0;
+}

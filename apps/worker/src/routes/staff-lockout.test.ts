@@ -14,6 +14,7 @@ const dbMocks = {
   createStaffMember: vi.fn(),
   updateStaffMember: vi.fn(),
   deleteStaffMember: vi.fn(),
+  countLoginAudit: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -41,11 +42,11 @@ function row(over: Partial<Row> & { id: string }): Row {
   };
 }
 
-function send(path: string, method: 'PATCH' | 'DELETE', body?: unknown) {
+function send(path: string, method: 'GET' | 'PATCH' | 'DELETE', body?: unknown, apiKey = API_KEY) {
   return worker.fetch(
     new Request(`https://worker.example.com${path}`, {
       method,
-      headers: new Headers({ Authorization: `Bearer ${API_KEY}`, 'Content-Type': 'application/json' }),
+      headers: new Headers({ Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }),
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
     env,
@@ -57,6 +58,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.updateStaffMember.mockImplementation(async (_db: unknown, id: string) => row({ id }));
   dbMocks.deleteStaffMember.mockResolvedValue(undefined);
+  dbMocks.countLoginAudit.mockResolvedValue(0);
+  dbMocks.getStaffByApiKey.mockResolvedValue(null);
 });
 
 describe('最後の管理者を締め出さない', () => {
@@ -112,6 +115,23 @@ describe('最後の管理者を締め出さない', () => {
     expect(dbMocks.deleteStaffMember).not.toHaveBeenCalled();
   });
 
+  it('自分自身は削除できない', async () => {
+    const res = await send('/api/staff/env-owner', 'DELETE');
+
+    expect(res.status).toBe(400);
+    expect((await res.json() as { error: string }).error).toContain('自分自身は削除できません');
+    expect(dbMocks.deleteStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('閲覧のみの利用者は削除できない', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'viewer', role: 'staff', access_level: 'read_only' }));
+
+    const res = await send('/api/staff/staff-a', 'DELETE', undefined, 'viewer-key');
+
+    expect(res.status).toBe(403);
+    expect(dbMocks.deleteStaffMember).not.toHaveBeenCalled();
+  });
+
   it('管理者でない人の無効化は素通しする', async () => {
     const target = row({ id: 'staff-a', role: 'staff' });
     dbMocks.getStaffById.mockResolvedValue(target);
@@ -159,5 +179,21 @@ describe('存在しない相手', () => {
 
     expect(res.status).toBe(404);
     expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+});
+
+describe('ログイン履歴件数', () => {
+  it('対象ユーザーのログインだけを正確に数える', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'staff-a', role: 'staff' }));
+    dbMocks.countLoginAudit.mockResolvedValue(37);
+
+    const res = await send('/api/staff/staff-a/login-summary', 'GET');
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: { loginCount: 37 } });
+    expect(dbMocks.countLoginAudit).toHaveBeenCalledWith(
+      env.DB,
+      { adminUserId: 'staff-a', action: 'login' },
+    );
   });
 });
