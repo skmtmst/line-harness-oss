@@ -11,14 +11,18 @@ const script = readFileSync(
 );
 
 describe('GitHub PR Slack sync workflow safety', () => {
-  test('PRイベント、developmentへのpush、毎時、手動実行で再照合できる', () => {
+  test('PRイベント、developmentへのpush、15分ごと、手動実行で再照合できる', () => {
     expect(workflow).toContain('pull_request:');
     expect(workflow).toContain('push:');
-    expect(workflow).toContain("cron: '17 * * * *'");
+    expect(workflow).toContain("cron: '7,22,37,52 * * * *'");
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('GITHUB_SLACK_SYNC_ONLY_PR_NUMBER:');
     expect(workflow).toContain("inputs.pr_number || ''");
     expect(workflow).toContain('codex/development');
+    expect(workflow).toContain('- labeled');
+    expect(workflow).toContain('- unlabeled');
+    expect(workflow).toContain("GITHUB_SLACK_SYNC_EXCLUDED_LABELS: 'slack-sync-ignore'");
+    expect(workflow).toContain('vars.SLACK_COMMAND_CENTER_STRICT_ENABLED');
   });
 
   test('明示的な有効化まで動かず、PR headのコードを秘密値付きで実行しない', () => {

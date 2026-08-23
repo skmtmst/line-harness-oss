@@ -1,7 +1,7 @@
 name: GitHub PR Slack Sync
 
 # Codex hooks remain a supplemental progress feed. GitHub is the source of
-# truth for PR creation, updates and completion. The hourly pass repairs a
+# truth for PR creation, updates and completion. The 15-minute pass repairs a
 # missed event without creating duplicate Slack threads or replies.
 
 on:
@@ -15,14 +15,16 @@ on:
       - edited
       - ready_for_review
       - converted_to_draft
+      - labeled
+      - unlabeled
       - closed
   push:
     branches:
       - codex/development
   schedule:
-    # Avoid the busy start of the hour, when scheduled workflows are delayed
-    # more often. GitHub schedules run from the repository's default branch.
-    - cron: '17 * * * *'
+    # Avoid the busy start of each quarter-hour, when scheduled workflows are
+    # delayed more often. GitHub schedules run from the default branch.
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:
     inputs:
       pr_number:
@@ -69,6 +71,9 @@ jobs:
           GITHUB_SLACK_SYNC_MIN_PR_NUMBER: '276'
           GITHUB_SLACK_SYNC_ONLY_PR_NUMBER: ${{ inputs.pr_number || '' }}
           GITHUB_SLACK_SYNC_CLOSED_LOOKBACK_HOURS: '72'
+          GITHUB_SLACK_SYNC_EXCLUDED_LABELS: 'slack-sync-ignore'
+          # Enable only after the staging Worker understands commandCenterOnly.
+          GITHUB_SLACK_SYNC_DEDICATED_COMMAND_CENTER_ENABLED: ${{ vars.SLACK_COMMAND_CENTER_STRICT_ENABLED || 'false' }}
         run: >-
           node
           --disable-warning=ExperimentalWarning

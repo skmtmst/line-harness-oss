@@ -17,6 +17,7 @@ export type GitHubPullRequest = {
   head: { ref: string; sha: string };
   base: { ref: string };
   mergeable_state?: string;
+  labels?: Array<{ name?: string | null }>;
 };
 
 type GitHubPullRequestEvent = {
@@ -50,8 +51,8 @@ export type RelayPayload = {
   operator: 'kenta' | 'masato' | 'codex';
   repository: string;
   branch: string;
-  prNumber: number;
-  prUrl: string;
+  prNumber?: number;
+  prUrl?: string;
   content: string;
   occurredAt: string;
   explicitCategory: 'fix';
@@ -59,6 +60,7 @@ export type RelayPayload = {
   eventSource: 'github';
   syncMode: 'event' | 'reconcile';
   refreshCommandCenter: boolean;
+  commandCenterOnly?: boolean;
 };
 
 type SyncOptions = {
@@ -71,6 +73,8 @@ type SyncOptions = {
   minPrNumber: number;
   onlyPrNumber?: number;
   closedLookbackHours: number;
+  excludedLabels?: string[];
+  dedicatedCommandCenter?: boolean;
   now?: Date;
   fetcher?: typeof fetch;
 };
@@ -80,6 +84,7 @@ const MAX_OPEN_PRS = 30;
 const MAX_RECENT_CLOSED_PRS = 100;
 const IGNORED_OVERLAP_PREFIX = 'docs/release-log/';
 const RELAY_TIMEOUT_MS = 20_000;
+const DEFAULT_EXCLUDED_LABEL = 'slack-sync-ignore';
 
 function assertRepository(value: string): void {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(value)) {
@@ -185,6 +190,11 @@ function prState(pull: GitHubPullRequest): 'open' | 'merged' | 'closed' {
   return pull.state === 'closed' ? 'closed' : 'open';
 }
 
+export function isPullExcluded(pull: GitHubPullRequest, excludedLabels: string[]): boolean {
+  const excluded = new Set(excludedLabels.map((label) => label.trim().toLowerCase()).filter(Boolean));
+  return (pull.labels || []).some((label) => excluded.has(String(label.name || '').trim().toLowerCase()));
+}
+
 function contentForPull(pull: GitHubPullRequest, action: string, mode: RelayPayload['syncMode']): string {
   const title = pull.title.replace(/\s+/g, ' ').trim().slice(0, 180);
   const state = prState(pull);
@@ -209,12 +219,15 @@ export function relayPayloadForPull(
   mode: RelayPayload['syncMode'],
   openPrs: PrSnapshot[],
   refreshCommandCenter = true,
+  occurredAt = pull.updated_at,
 ): RelayPayload {
   const state = prState(pull);
   const stateToken = state === 'open' ? pull.head.sha : pull.merged_at || pull.updated_at;
   return {
     version: 1,
-    eventId: `github-pr:${pull.number}:${mode}:${action}:${stateToken}`.slice(0, 255),
+    eventId: (state === 'open'
+      ? `github-pr:${pull.number}:${mode}:${action}:${stateToken}`
+      : `github-pr:${pull.number}:complete:${state}:${stateToken}`).slice(0, 255),
     eventType: state === 'open' ? 'prompt_submitted' : 'turn_completed',
     sessionId: `github-pr-${pull.number}`,
     operator: operatorForPull(pull),
@@ -223,12 +236,32 @@ export function relayPayloadForPull(
     prNumber: pull.number,
     prUrl: pull.html_url,
     content: contentForPull(pull, action, mode),
-    occurredAt: pull.updated_at,
+    occurredAt,
     explicitCategory: 'fix',
     openPrs,
     eventSource: 'github',
     syncMode: mode,
     refreshCommandCenter,
+  };
+}
+
+function commandCenterPayload(repository: string, openPrs: PrSnapshot[], occurredAt: string): RelayPayload {
+  return {
+    version: 1,
+    eventId: `github-command-center:${occurredAt}`.slice(0, 255),
+    eventType: 'prompt_submitted',
+    sessionId: 'github-command-center',
+    operator: 'codex',
+    repository,
+    branch: BASE_BRANCH,
+    content: 'GitHubのPR状態をSlack指令塔へ同期しました。',
+    occurredAt,
+    explicitCategory: 'fix',
+    openPrs,
+    eventSource: 'github',
+    syncMode: 'reconcile',
+    refreshCommandCenter: true,
+    commandCenterOnly: true,
   };
 }
 
@@ -269,17 +302,23 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
   assertRepository(options.repository);
   const fetcher = options.fetcher || fetch;
   const now = options.now || new Date();
-  const openPulls = await githubJson<GitHubPullRequest[]>(
+  const excludedLabels = options.excludedLabels?.length
+    ? options.excludedLabels
+    : [DEFAULT_EXCLUDED_LABEL];
+  const allOpenPulls = await githubJson<GitHubPullRequest[]>(
     options.repository,
     `/pulls?state=open&base=${encodeURIComponent(BASE_BRANCH)}&sort=created&direction=asc&per_page=${MAX_OPEN_PRS}`,
     options.githubToken,
     fetcher,
   );
+  const openPulls = allOpenPulls.filter((pull) => !isPullExcluded(pull, excludedLabels));
   const openPrs = await openPrSnapshot(options.repository, openPulls, options.githubToken, fetcher);
   let sent = 0;
 
-  const eventPull = options.eventName === 'pull_request' ? options.event?.pull_request : undefined;
+  const rawEventPull = options.eventName === 'pull_request' ? options.event?.pull_request : undefined;
+  const eventPull = rawEventPull && !isPullExcluded(rawEventPull, excludedLabels) ? rawEventPull : undefined;
   const eventAction = options.event?.action || 'updated';
+  const dedicatedCommandCenter = options.dedicatedCommandCenter === true;
   const closedPulls = await githubJson<GitHubPullRequest[]>(
     options.repository,
     `/pulls?state=closed&base=${encodeURIComponent(BASE_BRANCH)}&sort=updated&direction=desc&per_page=${MAX_RECENT_CLOSED_PRS}`,
@@ -292,7 +331,9 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
     ...closedPulls.filter((pull) => (
       pull.number >= options.minPrNumber && Date.parse(pull.updated_at) >= cutoff
     )),
-  ].filter((pull) => options.onlyPrNumber === undefined || pull.number === options.onlyPrNumber);
+  ]
+    .filter((pull) => !isPullExcluded(pull, excludedLabels))
+    .filter((pull) => options.onlyPrNumber === undefined || pull.number === options.onlyPrNumber);
   if (
     eventPull
     && eventPull.number >= options.minPrNumber
@@ -302,13 +343,22 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
     await sendRelay(
       options.relayUrl,
       options.relaySecret,
-      relayPayloadForPull(options.repository, eventPull, eventAction, 'event', openPrs, candidates.length === 0),
+      relayPayloadForPull(
+        options.repository,
+        eventPull,
+        eventAction,
+        'event',
+        openPrs,
+        !dedicatedCommandCenter && candidates.length === 0,
+        !dedicatedCommandCenter && candidates.length === 0 ? now.toISOString() : eventPull.updated_at,
+      ),
       fetcher,
     );
     sent += 1;
   }
 
   for (const [index, pull] of candidates.entries()) {
+    const refreshCommandCenter = !dedicatedCommandCenter && index === candidates.length - 1;
     await sendRelay(
       options.relayUrl,
       options.relaySecret,
@@ -318,8 +368,17 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
         'reconcile',
         'reconcile',
         openPrs,
-        index === candidates.length - 1,
+        refreshCommandCenter,
+        refreshCommandCenter ? now.toISOString() : pull.updated_at,
       ),
+      fetcher,
+    );
+  }
+  if (dedicatedCommandCenter) {
+    await sendRelay(
+      options.relayUrl,
+      options.relaySecret,
+      commandCenterPayload(options.repository, openPrs, now.toISOString()),
       fetcher,
     );
   }
@@ -335,6 +394,11 @@ async function main(): Promise<void> {
   const onlyPrNumberRaw = process.env.GITHUB_SLACK_SYNC_ONLY_PR_NUMBER || '';
   const onlyPrNumber = onlyPrNumberRaw ? Number(onlyPrNumberRaw) : undefined;
   const closedLookbackHours = Number(process.env.GITHUB_SLACK_SYNC_CLOSED_LOOKBACK_HOURS || '72');
+  const excludedLabels = (process.env.GITHUB_SLACK_SYNC_EXCLUDED_LABELS || DEFAULT_EXCLUDED_LABEL)
+    .split(',')
+    .map((label) => label.trim())
+    .filter(Boolean);
+  const dedicatedCommandCenter = process.env.GITHUB_SLACK_SYNC_DEDICATED_COMMAND_CENTER_ENABLED === 'true';
   if (!githubToken || !relayUrl || !relaySecret) throw new Error('GITHUB_SLACK_SYNC_NOT_CONFIGURED');
   if (!Number.isSafeInteger(minPrNumber) || minPrNumber < 1) throw new Error('GITHUB_SLACK_SYNC_MIN_PR_INVALID');
   if (onlyPrNumber !== undefined && (!Number.isSafeInteger(onlyPrNumber) || onlyPrNumber < minPrNumber)) {
@@ -357,6 +421,8 @@ async function main(): Promise<void> {
     minPrNumber,
     onlyPrNumber,
     closedLookbackHours,
+    excludedLabels,
+    dedicatedCommandCenter,
   });
   // Aggregate counts only. PR titles, tokens, signatures and payloads are not logged.
   console.log(JSON.stringify(result));
