@@ -1527,6 +1527,16 @@ CREATE TABLE rt_menu_items (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE rt_organization_agreements (
+  id TEXT PRIMARY KEY,
+  organization_id TEXT NOT NULL REFERENCES rt_organizations(id) ON DELETE CASCADE,
+  document_key TEXT NOT NULL,
+  document_version TEXT NOT NULL,
+  agreed_by_staff_id TEXT,
+  agreed_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(organization_id, document_key, document_version)
+);
+
 CREATE TABLE rt_organizations (
   id TEXT PRIMARY KEY,
   account_id TEXT NOT NULL,
@@ -2446,6 +2456,9 @@ CREATE INDEX idx_rt_inventory_store_time ON rt_inventory_slots(store_id, starts_
 CREATE INDEX idx_rt_memberships_org ON rt_memberships(organization_id, store_id, role);
 
 CREATE INDEX idx_rt_menu_store ON rt_menu_items(store_id, status, kind);
+
+CREATE INDEX idx_rt_org_agreements_org
+  ON rt_organization_agreements(organization_id, document_key);
 
 CREATE UNIQUE INDEX idx_rt_organizations_account ON rt_organizations(account_id);
 

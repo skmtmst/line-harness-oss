@@ -52,6 +52,9 @@ export type RestaurantIntakeAddress = {
   id: string; storeId: string; localPart: string; address: string; status: 'active';
   createdAt: string; revokedAt: string | null
 }
+export type RestaurantTermsAgreement = {
+  documentKey: string; agreedVersion: string | null; agreedAt: string | null
+}
 
 export type RestaurantSnapshot = {
   environment: 'staging_test'; integrationPolicy: 'inbound_only';
@@ -71,6 +74,8 @@ export const restaurantTestApi = {
   selectStore: (accountId: string, storeId: string) => fetchApi<{ success: true; data: { selectedStore: { id: string; name: string } } }>(withAccount(`/api/restaurant-test/stores/${storeId}/select`, accountId), { method: 'POST', body: '{}' }),
   clearStoreSelection: (accountId: string) => fetchApi<{ success: true; data: { selectedStore: null } }>(withAccount('/api/restaurant-test/stores/selection/clear', accountId), { method: 'POST', body: '{}' }),
   connectStore: (accountId: string, body: { name: string; alias: string; channelId: string; channelSecret: string }) => fetchApi<{ success: true; data: { store: { id: string; name: string }; lineAccountName: string } }>(withAccount('/api/restaurant-test/stores/connect', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  termsAgreement: (accountId: string) => fetchApi<{ success: true; data: RestaurantTermsAgreement }>(withAccount('/api/restaurant-test/terms-agreement', accountId)),
+  agreeToTerms: (accountId: string, documentKey: string, version: string) => fetchApi<{ success: true; data: RestaurantTermsAgreement }>(withAccount('/api/restaurant-test/terms-agreement', accountId), { method: 'POST', body: JSON.stringify({ documentKey, version }) }),
   snapshot: (accountId: string) => fetchApi<{ success: true; data: RestaurantSnapshot }>(withAccount('/api/restaurant-test/snapshot', accountId)),
   bootstrap: (accountId: string, organizationName?: string) => fetchApi<{ success: true; data: { organizationId: string; created: boolean } }>(withAccount('/api/restaurant-test/bootstrap', accountId), { method: 'POST', body: JSON.stringify({ organizationName }) }),
   createStore: (accountId: string, body: { name: string; code: string; area: string; capacity: number; timezone: string; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount('/api/restaurant-test/stores', accountId), { method: 'POST', body: JSON.stringify(body) }),
