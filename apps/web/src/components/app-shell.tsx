@@ -5,6 +5,8 @@ import { UpdateBanner } from './update/update-banner'
 import AuthGuard from './auth-guard'
 import { AccountProvider } from '@/contexts/account-context'
 import SessionLostNotice from './session-lost-notice'
+import RootLandingGate from './root-landing-gate'
+import HqReturnButton from './hq-return-button'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -59,7 +61,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 なく共通レイアウトを正した。
               */}
               <div data-design-shell="v4-1920" className="mx-auto w-full max-w-shell px-4 pb-6 sm:px-6 lg:px-10 lg:pb-10 lg:pt-8">
-                {children}
+                <HqReturnButton />
+                <RootLandingGate>{children}</RootLandingGate>
               </div>
             </main>
           </div>

@@ -43,6 +43,25 @@ beforeEach(() => {
     );
 });
 
+describe('current tenant', () => {
+  it('認証スタッフが所属する統括名だけを返す', async () => {
+    const response = await app(operator('staff')).request('/api/tenants/me', {}, environment());
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({ success: true, data: { name: '既定の統括' } });
+    expect(text).not.toContain(DEFAULT_TENANT_ID);
+    expect(text).not.toContain('sensitive-token');
+    expect(text).not.toContain('sensitive-secret');
+    expect(text).not.toContain('channel-1');
+  });
+
+  it('存在しない統括なら404を返す', async () => {
+    const response = await app({ ...operator('staff'), tenantId: 'missing-tenant' })
+      .request('/api/tenants/me', {}, environment());
+    expect(response.status).toBe(404);
+  });
+});
+
 describe('tenant boundary preview', () => {
   it.each(['owner', 'admin'] as const)('%sは移行境界を読み取れる', async (role) => {
     const response = await app(operator(role)).request(

@@ -42,6 +42,7 @@ interface AccountContextValue {
   selectedAccountId: string | null
   selectedAccount: AccountWithStats | null
   setSelectedAccountId: (id: string) => void
+  clearSelectedAccountId: () => void
   refreshAccounts: () => Promise<void>
   loading: boolean
 }
@@ -62,6 +63,15 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const clearSelectedAccountId = useCallback(() => {
+    setSelectedAccountIdState(null)
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // localStorage unavailable
+    }
+  }, [])
+
   const refreshAccounts = useCallback(async () => {
     try {
       const res = await api.lineAccounts.list(false)
@@ -69,10 +79,11 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         const list = res.data as AccountWithStats[]
         setAccounts(list)
 
-        // If current selection is invalid (e.g. deleted), fall back to first
+        // 無効になった選択だけを解除する。未選択のときに先頭へ勝手に
+        // フォールバックすると、統括の着地点を店舗数で決められない。
         setSelectedAccountIdState((prev) => {
           if (prev && list.some((a) => a.id === prev)) return prev
-          // Restore from localStorage or default to first
+          // 保存値が有効なら復元する。保存値も無ければ未選択のままにする。
           let stored: string | null = null
           try {
             stored = localStorage.getItem(STORAGE_KEY)
@@ -80,7 +91,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
             // localStorage unavailable
           }
           const valid = stored && list.some((a) => a.id === stored)
-          return valid ? stored : list[0].id
+          return valid ? stored : null
         })
       } else {
         setAccounts([])
@@ -101,7 +112,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   return (
     <AccountContext.Provider
-      value={{ accounts, selectedAccountId, selectedAccount, setSelectedAccountId, refreshAccounts, loading }}
+      value={{ accounts, selectedAccountId, selectedAccount, setSelectedAccountId, clearSelectedAccountId, refreshAccounts, loading }}
     >
       {children}
     </AccountContext.Provider>

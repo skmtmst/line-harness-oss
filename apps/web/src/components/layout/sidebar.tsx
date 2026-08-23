@@ -7,8 +7,9 @@ import { useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
-import { orderedMenuSections, type MenuItem } from '@/lib/menu'
+import { HQ_MENU_SECTIONS, orderedMenuSections, type MenuItem } from '@/lib/menu'
 import AccountSwitcher from '@/components/accounts/account-switcher'
+import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
@@ -48,6 +49,7 @@ export default function Sidebar({
   preview?: boolean
 } = {}) {
   const pathname = usePathname()
+  const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
   const { selectedAccountId } = useAccount()
   const brand = useBrand()
   const [isOpen, setIsOpen] = useState(false)
@@ -131,21 +133,23 @@ export default function Sidebar({
     }
   }, [selectedAccountId])
   // 区分の中の並びを当ててから、区分そのものの並びを当てる。
-  const sections = orderedMenuSections(itemOrder)
+  const storeSections = orderedMenuSections(itemOrder)
   const normalizedSectionOrder = sectionOrder?.map((label) => label === 'NEN運用' ? '専用機能' : label)
-  const orderedSections = normalizedSectionOrder
+  const orderedStoreSections = normalizedSectionOrder
     ? [
         ...normalizedSectionOrder
-          .map((label) => sections.find((s) => (s.label ?? '') === label))
-          .filter((s): s is (typeof sections)[number] => Boolean(s)),
-        ...sections.filter((s) => !normalizedSectionOrder.includes(s.label ?? '')),
+          .map((label) => storeSections.find((s) => (s.label ?? '') === label))
+          .filter((s): s is (typeof storeSections)[number] => Boolean(s)),
+        ...storeSections.filter((s) => !normalizedSectionOrder.includes(s.label ?? '')),
       ]
-    : sections
+    : storeSections
+  const sections = isHq ? HQ_MENU_SECTIONS : orderedStoreSections
 
-  const visibleSections = orderedSections
+  const visibleSections = sections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        if (isHq) return true
         // 移行中のV2画面では、承認画像どおり「友だち属性」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
         if (friendAttributesV2Mode && item.href === '/tags') return false
@@ -315,7 +319,14 @@ export default function Sidebar({
         null
       )}
 
-      {preview ? (
+      {isHq ? (
+        <div className="px-3 pb-3 pt-4">
+          <div className="rounded-card border border-hairline bg-canvas px-4 py-3">
+            <p className="text-xs font-semibold text-accent">musubo</p>
+            <p className="mt-1 text-sm font-bold text-ink">統括コンソール</p>
+          </div>
+        </div>
+      ) : preview ? (
         <div className="px-[13px] pb-[9px] pt-[18px]">
           <p className="mb-[11px] text-[12px] font-normal text-ink-faint">現在のLINEアカウント</p>
           <div className="flex h-[66px] items-center rounded-[12px] border border-hairline bg-canvas px-3">
@@ -422,6 +433,7 @@ export default function Sidebar({
               localStorage.removeItem('lh_staff_name')
               localStorage.removeItem('lh_staff_role')
               localStorage.removeItem('lh_staff_permissions')
+              sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
               clearAdminSession()
               window.location.href = '/login'
             }}

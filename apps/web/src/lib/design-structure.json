@@ -2,6 +2,28 @@
   "_comment": "Pen.dev の承認済み設計から書き写した、各画面の Main 直下の並び。ダッシュボードと共通レイアウトはV4、未改修画面はV2を参照する。実装側は data-design 属性で同じ名前を付け、ずれたら design-structure.test.ts が落ちる。設計を変えたときは、ここも一緒に直す（そのとき差分に『設計を更新した』と残る）。",
   "_source": "docs/design-node-ids.md",
   "screens": {
+    "/hq": {
+      "node": "（atelle設計案・ノードID未採番）",
+      "name": "統括 店舗管理",
+      "sections": [
+        "Head",
+        "Empty",
+        "Table"
+      ],
+      "parts": [
+        "統括コンソール",
+        "LINE公式アカウントごとに店舗の管理画面へ移動できます。",
+        "＋店舗の新規アカウント登録",
+        "まだ店舗がありません",
+        "店舗",
+        "LINE ID",
+        "友だち数",
+        "Webhook状態",
+        "状態",
+        "操作",
+        "ログイン"
+      ]
+    },
     "/": {
       "node": "hmBzC kuTR2 QEThZ",
       "name": "V4 ダッシュボード（編集・QRコードを含む）",

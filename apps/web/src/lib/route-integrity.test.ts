@@ -122,6 +122,8 @@ describe('画面の一覧', () => {
     const required = [
       '/',
       '/login',
+      '/hq',
+      '/hq/settings',
       '/chats',
       '/friends',
       '/friends/detail',

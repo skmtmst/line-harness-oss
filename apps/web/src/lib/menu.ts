@@ -43,6 +43,23 @@ export interface MenuSection {
   items: MenuItem[]
 }
 
+/** 統括コンソールだけで使う、店舗横断の管理メニュー。 */
+export const HQ_MENU_SECTIONS: MenuSection[] = [
+  {
+    id: 'hq',
+    label: null,
+    title: '統括',
+    items: [
+      { href: '/hq', label: '店舗管理', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', id: 'hq-stores', note: '統括に属するLINE公式アカウントを管理します', required: true },
+      { href: '/tags', label: 'タグ', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', id: 'hq-tags', note: '既存のタグ管理を開きます', required: true },
+      { href: '/templates', label: 'テンプレート管理', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', id: 'hq-templates', note: '既存のテンプレート管理を開きます', required: true },
+      { href: '/rich-menus', label: 'リッチメニュー管理', icon: 'M4 4h6v6H4V4zm0 10h6v6H4v-6zm10-10h6v6h-6V4zm0 10h6v6h-6v-6z', id: 'hq-rich-menus', note: '既存のリッチメニュー管理を開きます', required: true },
+      { href: '/form-submissions', label: '回答フォーム管理', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', id: 'hq-forms', note: '既存の回答フォーム管理を開きます', required: true },
+      { href: '/hq/settings', label: '設定', icon: 'M4 6h16M4 12h16M4 18h7', id: 'hq-settings', note: '統括の設定を管理します', required: true },
+    ],
+  },
+]
+
 export const MENU_SECTIONS: MenuSection[] = [
   {
     /*
@@ -156,7 +173,6 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '飲食店向け（テスト）',
     title: '飲食店向け（テスト）',
     items: [
-      { href: '/restaurant-test/stores', label: '店舗一覧（統括）', icon: 'M3 21h18M5 21V7l7-4 7 4v14M9 10h2m2 0h2m-6 4h2m2 0h2m-6 4h2m2 0h2', id: 'restaurant-stores', note: '全店舗のLINE接続状態と店舗画面への切り替え', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/dashboard', label: '店舗ダッシュボード', icon: 'M3 3v18h18M7 16v2m4-6v6m4-10v10m4-14v14', id: 'restaurant-dashboard', note: '全店の予約・空席・売上予測・連携状態', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/organization', label: '組織・権限', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', id: 'restaurant-organization', note: '本部・店舗・スタッフの権限と連携アカウント', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/approvals', label: '承認ワークフロー', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11', id: 'restaurant-approvals', note: 'GBP投稿・LINE配信・メニュー改定の承認', featureKey: 'restaurant_test' },
