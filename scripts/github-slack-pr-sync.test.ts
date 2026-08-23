@@ -162,4 +162,97 @@ describe('GitHub PR Slack sync', () => {
     });
     expect(relayed[0]?.commandCenterOnly).toBeUndefined();
   });
+
+  test('即時通知が失敗しても全PRと指令塔の再照合を続けて失敗を表に出す', async () => {
+    const first = pull();
+    const second = pull({
+      number: 277,
+      html_url: 'https://github.com/skmtmst/line-harness-oss/pull/277',
+      head: { ref: 'codex/kenta-followup', sha: 'def456' },
+      user: { login: 'kentavndng' },
+    });
+    const relayed: RelayPayload[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.includes('api.github.com') && url.includes('/pulls?state=open')) return jsonResponse([first, second]);
+      if (url.includes('api.github.com') && url.includes('/pulls?state=closed')) return jsonResponse([]);
+      if (url.includes('/pulls/') && !url.includes('/files')) {
+        return jsonResponse(url.endsWith('/277') ? second : first);
+      }
+      if (url.includes('/files')) return jsonResponse([]);
+      if (url.includes('/check-runs')) return jsonResponse({ check_runs: [] });
+      if (url === 'https://relay.example.test/events') {
+        const payload = JSON.parse(String(init?.body)) as RelayPayload;
+        if (payload.syncMode === 'event') return new Response(null, { status: 400 });
+        relayed.push(payload);
+        return jsonResponse({ success: true });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    await expect(syncGitHubPullRequests({
+      repository: 'skmtmst/line-harness-oss',
+      githubToken: 'github-test-token',
+      relayUrl: 'https://relay.example.test/events',
+      relaySecret: 'relay-test-secret',
+      eventName: 'pull_request',
+      event: { action: 'opened', pull_request: first },
+      minPrNumber: 276,
+      closedLookbackHours: 72,
+      dedicatedCommandCenter: true,
+      now: new Date('2026-08-23T04:00:00.000Z'),
+      fetcher,
+    })).rejects.toThrow('SLACK_SYNC_PARTIAL_FAILURE:event:PR#276:SLACK_RELAY_FAILED:400');
+
+    expect(relayed.map((item) => [item.prNumber, item.commandCenterOnly])).toEqual([
+      [276, undefined],
+      [277, undefined],
+      [undefined, true],
+    ]);
+  });
+
+  test('1件の再照合が失敗しても後続PRと指令塔を更新する', async () => {
+    const first = pull();
+    const second = pull({
+      number: 277,
+      html_url: 'https://github.com/skmtmst/line-harness-oss/pull/277',
+      head: { ref: 'codex/kenta-followup', sha: 'def456' },
+    });
+    const relayed: RelayPayload[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.includes('api.github.com') && url.includes('/pulls?state=open')) return jsonResponse([first, second]);
+      if (url.includes('api.github.com') && url.includes('/pulls?state=closed')) return jsonResponse([]);
+      if (url.includes('/pulls/') && !url.includes('/files')) {
+        return jsonResponse(url.endsWith('/277') ? second : first);
+      }
+      if (url.includes('/files')) return jsonResponse([]);
+      if (url.includes('/check-runs')) return jsonResponse({ check_runs: [] });
+      if (url === 'https://relay.example.test/events') {
+        const payload = JSON.parse(String(init?.body)) as RelayPayload;
+        if (payload.prNumber === 276) return new Response(null, { status: 400 });
+        relayed.push(payload);
+        return jsonResponse({ success: true });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    await expect(syncGitHubPullRequests({
+      repository: 'skmtmst/line-harness-oss',
+      githubToken: 'github-test-token',
+      relayUrl: 'https://relay.example.test/events',
+      relaySecret: 'relay-test-secret',
+      eventName: 'schedule',
+      minPrNumber: 276,
+      closedLookbackHours: 72,
+      dedicatedCommandCenter: true,
+      now: new Date('2026-08-23T04:00:00.000Z'),
+      fetcher,
+    })).rejects.toThrow('SLACK_SYNC_PARTIAL_FAILURE:reconcile:PR#276:SLACK_RELAY_FAILED:400');
+
+    expect(relayed.map((item) => [item.prNumber, item.commandCenterOnly])).toEqual([
+      [277, undefined],
+      [undefined, true],
+    ]);
+  });
 });
