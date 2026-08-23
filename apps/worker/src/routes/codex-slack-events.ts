@@ -87,6 +87,7 @@ function parseEvent(rawBody: string): CodexSlackEvent | null {
     typeof value.syncMode !== 'string' || !ALLOWED_SYNC_MODES.has(value.syncMode)
   )) return null;
   if (value.refreshCommandCenter != null && typeof value.refreshCommandCenter !== 'boolean') return null;
+  if (value.commandCenterOnly != null && typeof value.commandCenterOnly !== 'boolean') return null;
   const openPrs = parseOpenPrs(value.openPrs);
   if (openPrs === null) return null;
 
@@ -112,6 +113,7 @@ function parseEvent(rawBody: string): CodexSlackEvent | null {
     refreshCommandCenter: typeof value.refreshCommandCenter === 'boolean'
       ? value.refreshCommandCenter
       : undefined,
+    commandCenterOnly: value.commandCenterOnly === true,
   };
 }
 

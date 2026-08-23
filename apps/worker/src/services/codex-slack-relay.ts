@@ -33,6 +33,7 @@ export type CodexSlackEvent = {
   eventSource?: 'codex' | 'github';
   syncMode?: 'event' | 'reconcile';
   refreshCommandCenter?: boolean;
+  commandCenterOnly?: boolean;
 };
 
 export type CodexSlackRelayConfig = {
@@ -222,7 +223,7 @@ function buildParentText(config: CodexSlackRelayConfig, event: CodexSlackEvent, 
       : `\nPR：#${event.prNumber}`
     : '';
   const branch = event.branch ? `\nブランチ：\`${event.branch}\`` : '';
-  const status = category === 'error'
+  const status = category === 'error' || event.prNumber
     ? `\n状態：${errorParentStatusLabel(isCodexTaskCompletion(event) ? 'done' : taskStatusForEvent(event))}`
     : '';
   return `*【${categoryLabel(category)}】${content}*\n担当：${operatorLabel(event.operator)}${pr}${branch}${reviewerMention(config, event, category)}${status}\n\n以降の確認・会話・Codexへの依頼は、このスレッドへ返信してください。`;
@@ -354,42 +355,59 @@ async function slackApi(
   return result;
 }
 
-async function updateErrorParentStatus(
+async function readThreadParent(
+  token: string,
+  channel: string,
+  threadTs: string,
+  fetcher: typeof fetch,
+): Promise<SlackMessage | null> {
+  const replies = await slackApi(token, 'conversations.replies', {
+    channel,
+    ts: threadTs,
+    limit: 1,
+    include_all_metadata: true,
+  }, fetcher);
+  return replies.messages?.find((message) => message.ts === threadTs) || replies.messages?.[0] || null;
+}
+
+function parentIsCompleted(parent: SlackMessage | null): boolean {
+  return parent?.metadata?.event_payload?.status === 'done' ||
+    /状態：[^\n]*完了/.test(parent?.text || '');
+}
+
+async function updateTrackedParentStatus(
   config: CodexSlackRelayConfig,
   channel: string,
   threadTs: string,
   status: SlackTaskStatus,
   fetcher: typeof fetch,
+  strict = false,
 ): Promise<void> {
   const token = config.SLACK_BOT_TOKEN;
-  if (!token || channel !== config.SLACK_ERROR_CHANNEL_ID) return;
+  if (!token) return;
   try {
-    const replies = await slackApi(token, 'conversations.replies', {
-      channel,
-      ts: threadTs,
-      limit: 1,
-      include_all_metadata: true,
-    }, fetcher);
-    const parent = replies.messages?.find((message) => message.ts === threadTs) || replies.messages?.[0];
-    if (
-      !parent?.ts ||
-      parent.metadata?.event_type !== THREAD_METADATA_TYPE ||
-      parent.metadata.event_payload?.category !== 'error'
-    ) return;
+    const parent = await readThreadParent(token, channel, threadTs, fetcher);
+    if (!parent?.ts || parent.metadata?.event_type !== THREAD_METADATA_TYPE) return;
+    const payload = parent.metadata.event_payload || {};
+    if (payload.category !== 'error' && !String(payload.work_key || '').startsWith('pr:')) return;
     await slackApi(token, 'chat.update', {
       channel,
       ts: parent.ts,
       text: replaceErrorParentStatusText(parent.text || '【:warning: エラー報告】', status),
-      metadata: parent.metadata,
+      metadata: {
+        ...parent.metadata,
+        event_payload: { ...payload, status },
+      },
     }, fetcher);
   } catch (error) {
     console.warn(JSON.stringify({
-      event: 'slack_error_parent_status_update_failed',
+      event: 'slack_parent_status_update_failed',
       channel,
       threadTs,
       status,
       error: String(error),
     }));
+    if (strict) throw error;
   }
 }
 
@@ -678,11 +696,15 @@ async function refreshSlackCommandCenter(
   openPrs: CodexSlackPrSnapshot[] | undefined,
   occurredAt: string,
   fetcher: typeof fetch,
+  strict = false,
 ): Promise<void> {
   const token = config.SLACK_BOT_TOKEN;
   const commandChannel = config.SLACK_COMMAND_CHANNEL_ID;
   const taskChannel = config.SLACK_TASK_CHANNEL_ID;
-  if (!token || !commandChannel || !taskChannel) return;
+  if (!token || !commandChannel || !taskChannel) {
+    if (strict) throw new Error('SLACK_COMMAND_CENTER_NOT_CONFIGURED');
+    return;
+  }
   try {
     const [messages, existing] = await Promise.all([
       listTaskMessages(token, taskChannel, fetcher),
@@ -702,6 +724,7 @@ async function refreshSlackCommandCenter(
     }
   } catch (error) {
     console.warn(JSON.stringify({ event: 'slack_command_center_refresh_failed', error: String(error) }));
+    if (strict) throw error;
   }
 }
 
@@ -904,13 +927,15 @@ export async function handleSlackTaskAction(
   if (!value) throw new Error('SLACK_TASK_ACTION_INVALID_VALUE');
 
   if (value.status === 'done') {
-    await updateErrorParentStatus(
-      config,
-      value.sourceChannel,
-      value.sourceThreadTs,
-      'done',
-      fetcher,
-    );
+    if (value.sourceChannel === config.SLACK_ERROR_CHANNEL_ID) {
+      await updateTrackedParentStatus(
+        config,
+        value.sourceChannel,
+        value.sourceThreadTs,
+        'done',
+        fetcher,
+      );
+    }
     await slackApi(token, 'chat.postMessage', {
       channel: value.sourceChannel,
       thread_ts: value.sourceThreadTs,
@@ -925,13 +950,15 @@ export async function handleSlackTaskAction(
   }
 
   await updateTaskMessageStatus(token, taskChannel, payload.message, value.status, fetcher);
-  await updateErrorParentStatus(
-    config,
-    value.sourceChannel,
-    value.sourceThreadTs,
-    value.status,
-    fetcher,
-  );
+  if (value.sourceChannel === config.SLACK_ERROR_CHANNEL_ID) {
+    await updateTrackedParentStatus(
+      config,
+      value.sourceChannel,
+      value.sourceThreadTs,
+      value.status,
+      fetcher,
+    );
+  }
   await refreshSlackCommandCenter(config, undefined, new Date().toISOString(), fetcher);
   return { status: value.status };
 }
@@ -1002,6 +1029,14 @@ export async function relayCodexSlackEvent(
 ): Promise<{ category: CodexSlackCategory; channelId: string; threadTs: string }> {
   const token = config.SLACK_BOT_TOKEN;
   if (!token) throw new Error('SLACK_BOT_TOKEN_NOT_CONFIGURED');
+  if (event.commandCenterOnly) {
+    await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher, true);
+    return {
+      category: 'fix',
+      channelId: config.SLACK_COMMAND_CHANNEL_ID || '',
+      threadTs: '',
+    };
+  }
   const category = classifyCodexSlackEvent(event);
   let channelId = resolveCodexSlackChannel(config, category, event.prNumber);
   if (!channelId) throw new Error(`SLACK_CHANNEL_NOT_CONFIGURED:${category}`);
@@ -1038,18 +1073,21 @@ export async function relayCodexSlackEvent(
   threadTs ||= await findThreadTs(token, channelId, key, fetcher);
   const completed = isCodexTaskCompletion(event);
 
-  // GitHub's periodic reconciliation must repair missing notifications without
-  // adding a new reply every time the workflow runs. Slack metadata is the
-  // ledger: an existing PR thread means the parent notification arrived, and
-  // an existing task card means the PR is still open.
+  // GitHub's periodic reconciliation repairs missing notifications without
+  // adding a reply on every run. The parent status is the durable completion
+  // ledger; the task card is only the list of currently open work.
   if (event.syncMode === 'reconcile' && threadTs) {
-    if (completed && linkedTask) {
-      await slackApi(token, 'chat.postMessage', {
-        channel: channelId,
-        thread_ts: threadTs,
-        text: buildReplyText(event, category),
-        client_msg_id: event.eventId,
-      }, fetcher);
+    if (completed) {
+      const parent = await readThreadParent(token, channelId, threadTs, fetcher);
+      if (!parentIsCompleted(parent)) {
+        await slackApi(token, 'chat.postMessage', {
+          channel: channelId,
+          thread_ts: threadTs,
+          text: buildReplyText(event, category),
+          client_msg_id: event.eventId,
+        }, fetcher);
+        await updateTrackedParentStatus(config, channelId, threadTs, 'done', fetcher, true);
+      }
       await closeOpenTask(config, key, fetcher);
     } else if (!completed && !linkedTask) {
       await ensureOpenTask(config, event, category, key, channelId, threadTs, fetcher);
@@ -1066,7 +1104,11 @@ export async function relayCodexSlackEvent(
       text: buildParentText(config, event, category),
       metadata: {
         event_type: THREAD_METADATA_TYPE,
-        event_payload: { work_key: key, category },
+        event_payload: {
+          work_key: key,
+          category,
+          status: completed ? 'done' : taskStatusForEvent(event),
+        },
       },
       client_msg_id: `${event.eventId}:parent`,
     }, fetcher);
@@ -1075,20 +1117,29 @@ export async function relayCodexSlackEvent(
     createdParent = true;
   }
 
-  await slackApi(token, 'chat.postMessage', {
-    channel: channelId,
-    thread_ts: threadTs,
-    text: buildReplyText(event, category),
-    client_msg_id: event.eventId,
-  }, fetcher);
+  const completionAlreadyRecorded = completed && event.eventSource === 'github' && !createdParent
+    ? parentIsCompleted(await readThreadParent(token, channelId, threadTs, fetcher))
+    : false;
+  if (!completionAlreadyRecorded) {
+    await slackApi(token, 'chat.postMessage', {
+      channel: channelId,
+      thread_ts: threadTs,
+      text: buildReplyText(event, category),
+      client_msg_id: event.eventId,
+    }, fetcher);
+  }
 
-  if (!createdParent) {
-    await updateErrorParentStatus(
+  if (
+    !createdParent &&
+    (event.eventSource === 'github' || channelId === config.SLACK_ERROR_CHANNEL_ID)
+  ) {
+    await updateTrackedParentStatus(
       config,
       channelId,
       threadTs,
       completed ? 'done' : taskStatusForEvent(event),
       fetcher,
+      completed && event.eventSource === 'github',
     );
   }
 

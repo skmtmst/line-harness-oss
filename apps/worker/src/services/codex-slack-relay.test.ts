@@ -276,9 +276,20 @@ describe('Codex Slack relay', () => {
         },
       },
     };
+    const parent = {
+      ts: '1787452000.000001',
+      text: '*【:large_blue_circle: 修正・開発】PR #276を作成しました*\n担当：マサト\n状態：:large_blue_circle: 作業中',
+      metadata: {
+        event_type: 'line_harness_codex',
+        event_payload: { work_key: 'pr:276', category: 'fix', status: 'working' },
+      },
+    };
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [task] }))
+      .mockResolvedValueOnce(slackResponse({ messages: [parent] }))
       .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [parent] }))
+      .mockResolvedValueOnce(slackResponse({ ts: parent.ts }))
       .mockResolvedValueOnce(slackResponse({ messages: [task] }))
       .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
 
@@ -297,11 +308,48 @@ describe('Codex Slack relay', () => {
       content: 'PR #276をマージし、対応が完了しました。',
     }), fetcher);
 
-    expect(fetcher).toHaveBeenCalledTimes(4);
-    const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
-    const deletion = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    expect(fetcher).toHaveBeenCalledTimes(7);
+    const reply = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body));
+    const parentUpdate = JSON.parse(String(fetcher.mock.calls[4]?.[1]?.body));
+    const deletion = JSON.parse(String(fetcher.mock.calls[6]?.[1]?.body));
     expect(reply).toMatchObject({ channel: 'C0PR123', thread_ts: '1787452000.000001' });
+    expect(parentUpdate.text).toContain('状態：:white_check_mark: 完了');
+    expect(parentUpdate.metadata.event_payload.status).toBe('done');
     expect(deletion).toMatchObject({ channel: 'C-TASK', ts: '300.001' });
+  });
+
+  test('GitHub再照合で完了表示済みなら返信を重複させない', async () => {
+    const parent = {
+      ts: '1787452000.000001',
+      text: '*【:large_blue_circle: 修正・開発】PR #276*\n状態：:white_check_mark: 完了',
+      metadata: {
+        event_type: 'line_harness_codex',
+        event_payload: { work_key: 'pr:276', category: 'fix', status: 'done' },
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ messages: [parent] }))
+      .mockResolvedValueOnce(slackResponse({ messages: [parent] }))
+      .mockResolvedValueOnce(slackResponse({ messages: [] }));
+
+    await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C0PR123',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+    }, event({
+      eventId: 'github-pr:276:complete:merged:2026-08-23T03:00:00.000Z',
+      eventType: 'turn_completed',
+      sessionId: 'github-pr-276',
+      operator: 'masato',
+      prNumber: 276,
+      syncMode: 'reconcile',
+      eventSource: 'github',
+      content: 'PR #276をマージし、対応が完了しました。',
+    }), fetcher);
+
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(fetcher.mock.calls.every((call) => !String(call[0]).includes('chat.postMessage'))).toBe(true);
   });
 
   test('親スレッドが無い場合は作ってから返信する', async () => {
@@ -417,6 +465,43 @@ describe('Codex Slack relay', () => {
     expect(boardRequest.metadata.event_type).toBe('line_harness_command_center');
     expect(boardRequest.text).toContain('#254> ケンタ｜統合可能');
     expect(boardRequest.text).toContain(taskIdForKey('pr:254'));
+  });
+
+  test('GitHubの指令塔専用イベントはPRスレッドを作らず現在時刻で更新する', async () => {
+    const existingBoard = {
+      ts: '400.001',
+      text: '*【LINE Harness 開発指令盤】*\n更新：古い時刻',
+      metadata: {
+        event_type: 'line_harness_command_center',
+        event_payload: { version: '1' },
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ messages: [existingBoard] }))
+      .mockResolvedValueOnce(slackResponse({ ts: existingBoard.ts }));
+
+    const result = await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C-PR',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+      SLACK_COMMAND_CHANNEL_ID: 'C-COMMAND',
+    }, event({
+      eventId: 'github-command-center:2026-08-23T14:30:00.000Z',
+      eventSource: 'github',
+      syncMode: 'reconcile',
+      commandCenterOnly: true,
+      refreshCommandCenter: true,
+      occurredAt: '2026-08-23T14:30:00.000Z',
+      openPrs: [],
+    }), fetcher);
+
+    expect(result).toEqual({ category: 'fix', channelId: 'C-COMMAND', threadTs: '' });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    const update = JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body));
+    expect(String(fetcher.mock.calls[2]?.[0])).toContain('chat.update');
+    expect(update.text).toContain('08/23 23:30 JST');
+    expect(update.text).toContain('未完了PR 0');
   });
 
   test('元スレッドのリンク取得に失敗しても要対応タスクを起票する', async () => {

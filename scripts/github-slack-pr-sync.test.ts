@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import {
   operatorForPull,
+  isPullExcluded,
   relayPayloadForPull,
   summarizeChecks,
   syncGitHubPullRequests,
@@ -62,6 +63,17 @@ describe('GitHub PR Slack sync', () => {
     expect(merged.eventType).toBe('turn_completed');
     expect(merged.syncMode).toBe('reconcile');
     expect(merged.content).toContain('マージし、対応が完了しました');
+    expect(merged.eventId).toBe('github-pr:276:complete:merged:2026-08-23T03:00:00.000Z');
+    expect(relayPayloadForPull('skmtmst/line-harness-oss', pull({
+      state: 'closed',
+      merged: true,
+      merged_at: '2026-08-23T03:00:00.000Z',
+    }), 'closed', 'event', []).eventId).toBe(merged.eventId);
+  });
+
+  test('除外ラベル付きPRをSlack同期対象から外す', () => {
+    expect(isPullExcluded(pull({ labels: [{ name: 'slack-sync-ignore' }] }), ['slack-sync-ignore'])).toBe(true);
+    expect(isPullExcluded(pull({ labels: [{ name: 'backend' }] }), ['slack-sync-ignore'])).toBe(false);
   });
 
   test('PRイベントを送り、その後に未通知のopen/closedを再照合する', async () => {
@@ -102,6 +114,7 @@ describe('GitHub PR Slack sync', () => {
       event: { action: 'opened', pull_request: open },
       minPrNumber: 276,
       closedLookbackHours: 72,
+      dedicatedCommandCenter: true,
       now: new Date('2026-08-23T04:00:00.000Z'),
       fetcher,
     });
@@ -111,8 +124,13 @@ describe('GitHub PR Slack sync', () => {
       [276, 'event'],
       [276, 'reconcile'],
       [277, 'reconcile'],
+      [undefined, 'reconcile'],
     ]);
-    expect(relayed.map((item) => item.refreshCommandCenter)).toEqual([false, false, true]);
+    expect(relayed.map((item) => item.refreshCommandCenter)).toEqual([false, false, false, true]);
+    expect(relayed.at(-1)).toMatchObject({
+      commandCenterOnly: true,
+      occurredAt: '2026-08-23T04:00:00.000Z',
+    });
     expect(relayed[0]?.openPrs[0]).toMatchObject({
       number: 276,
       fileCount: 1,
@@ -138,5 +156,10 @@ describe('GitHub PR Slack sync', () => {
 
     expect(singleResult).toEqual({ sent: 0, reconciled: 1 });
     expect(relayed.map((item) => [item.prNumber, item.syncMode])).toEqual([[276, 'reconcile']]);
+    expect(relayed[0]).toMatchObject({
+      refreshCommandCenter: true,
+      occurredAt: '2026-08-23T04:00:00.000Z',
+    });
+    expect(relayed[0]?.commandCenterOnly).toBeUndefined();
   });
 });
