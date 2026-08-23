@@ -5,11 +5,15 @@ import {
   handleSlackTaskAction,
   harnessErrorIncidentKey,
   isCodexTaskCompletion,
+  ensureUpcomingPrRangeChannel,
+  nextPrRangeStartToPrepare,
+  prRangeChannelName,
   prRangeKey,
   replaceErrorParentStatusText,
   reportHarnessErrorToSlack,
   relayCodexSlackEvent,
   resolveCodexSlackChannel,
+  resolveCodexSlackChannelWithProvisioning,
   sanitizeSlackContent,
   shouldTrackCodexTask,
   TASK_ACTION_ID,
@@ -51,10 +55,49 @@ describe('Codex Slack relay', () => {
     expect(prRangeKey(100)).toBe('1-100');
     expect(prRangeKey(101)).toBe('101-200');
     expect(prRangeKey(220)).toBe('201-300');
+    expect(prRangeKey(301)).toBe('301-400');
+    expect(prRangeChannelName(1)).toBe('line-harness-pr-001-100');
+    expect(prRangeChannelName(301)).toBe('line-harness-pr-301-400');
+    expect(nextPrRangeStartToPrepare(289)).toBeNull();
+    expect(nextPrRangeStartToPrepare(290)).toBe(301);
+    expect(nextPrRangeStartToPrepare(300)).toBe(301);
+    expect(nextPrRangeStartToPrepare(390)).toBe(401);
     expect(resolveCodexSlackChannel({
       SLACK_DEFAULT_PR_CHANNEL_ID: 'C-DEFAULT',
       SLACK_PR_CHANNELS_JSON: JSON.stringify({ '201-300': 'C-201-300' }),
     }, 'fix', 220)).toBe('C-201-300');
+  });
+
+  test('PR #301以降は作成済みの100件単位チャンネルを名前から解決する', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(slackResponse({
+      channels: [{ id: 'C-301-400', name: 'line-harness-pr-301-400', is_archived: false }],
+    }));
+
+    const channelId = await resolveCodexSlackChannelWithProvisioning({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C-DEFAULT',
+      SLACK_PR_CHANNELS_JSON: JSON.stringify({ '201-300': 'C-201-300' }),
+    }, 'fix', 301, fetcher);
+
+    expect(channelId).toBe('C-301-400');
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('conversations.list');
+  });
+
+  test('PR #290で301-400チャンネルを先行作成する', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ channels: [] }))
+      .mockResolvedValueOnce(slackResponse({
+        channel: { id: 'C-301-400', name: 'line-harness-pr-301-400' },
+      }));
+
+    const channelId = await ensureUpcomingPrRangeChannel({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+    }, 290, fetcher);
+
+    expect(channelId).toBe('C-301-400');
+    expect(String(fetcher.mock.calls[1]?.[0])).toContain('conversations.create');
+    const request = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
+    expect(request).toEqual({ name: 'line-harness-pr-301-400', is_private: false });
   });
 
   test('Slackに出す前に秘密値を隠す', () => {

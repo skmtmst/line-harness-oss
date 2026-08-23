@@ -18,6 +18,7 @@ Slackのアプリ候補から選んだ実際の `@Codex` メンションが必�
 ## 振り分け
 
 - PR・修正: PR番号を100件単位で振り分ける。PR #220は `#line-harness-pr-201-300`
+- 各区切りの末尾10件に入ると、次の100件用チャンネルを先行作成する。PR #290〜#300では `#line-harness-pr-301-400` を準備し、PR #301から自動で使う
 - エラー・白画面・動かない: `#line-harness-エラー報告`
 - アイデア・正本化: `#line-harness-アイデア`
 - 承認待ち・競合・完了: `#line-harness-指令塔`
@@ -64,7 +65,7 @@ Slackのアプリ候補から選んだ実際の `@Codex` メンションが必�
 Workerの秘密値:
 
 - `CODEX_SLACK_RELAY_SECRET`: Codex側と共通の十分に長いランダム値
-- `SLACK_BOT_TOKEN`: 内部SlackアプリのBot token。`chat:write` と対象チャンネルの履歴読み取り権限が必要
+- `SLACK_BOT_TOKEN`: 内部SlackアプリのBot token。`chat:write`、対象チャンネルの履歴読み取り、公開チャンネルの参照・作成（`channels:read` / `channels:manage`）権限が必要
 - `SLACK_SIGNING_SECRET`: Slackのボタン操作が本物か確認する署名秘密値
 
 Workerの非秘密設定:
@@ -73,7 +74,7 @@ Workerの非秘密設定:
 - `SLACK_ERROR_CHANNEL_ID`
 - `SLACK_IDEA_CHANNEL_ID`
 - `SLACK_DEFAULT_PR_CHANNEL_ID`
-- `SLACK_PR_CHANNELS_JSON` 例: `{"1-100":"チャンネルID","101-200":"チャンネルID","201-300":"チャンネルID"}`
+- `SLACK_PR_CHANNELS_JSON` 例: `{"1-100":"チャンネルID","101-200":"チャンネルID","201-300":"チャンネルID"}`。既存範囲の固定先に使い、PR #301以降の新しい範囲はSlackのチャンネル名から自動解決する
 - `SLACK_KENTA_USER_ID`
 - `SLACK_MASATO_USER_ID`
 - `SLACK_TASK_CHANNEL_ID`
