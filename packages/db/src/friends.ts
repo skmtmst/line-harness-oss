@@ -112,16 +112,19 @@ export async function getFriendByLineUserIdForAccount(
       .bind(lineUserId, lineAccountId)
       .first<Friend>();
     if (scoped) return scoped;
-
-    console.warn({
-      event: 'friend_lookup_account_fallback',
-      line_account_id: lineAccountId,
-      path: 'getFriendByLineUserIdForAccount',
-    });
   }
   // C-2b: UNIQUE(line_account_id, line_user_id) へ移行したら、この無指定
   // フォールバックを削除する。移行前は既存の未割当行を見失わないために残す。
-  return getFriendByLineUserId(db, lineUserId);
+  const fallback = await getFriendByLineUserId(db, lineUserId);
+  if (fallback && lineAccountId) {
+    console.warn({
+      event: 'friend_lookup_account_fallback',
+      line_account_id: lineAccountId,
+      found_line_account_id: fallback.line_account_id,
+      path: 'getFriendByLineUserIdForAccount',
+    });
+  }
+  return fallback;
 }
 
 export async function getFriendByLineUserId(
@@ -247,13 +250,14 @@ export async function upsertFriend(
   try {
     await db.prepare(
       `INSERT INTO friends
-         (id, line_user_id, display_name, picture_url, status_message, is_following,
+         (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
           first_followed_at, current_follow_started_at, last_followed_at,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
     ).bind(
       id,
       input.lineUserId,
+      input.lineAccountId ?? null,
       input.displayName ?? null,
       input.pictureUrl ?? null,
       input.statusMessage ?? null,
@@ -267,12 +271,13 @@ export async function upsertFriend(
     if (!isMissingFollowLifecycleColumn(error)) throw error;
     await db.prepare(
       `INSERT INTO friends
-         (id, line_user_id, display_name, picture_url, status_message, is_following,
+         (id, line_user_id, line_account_id, display_name, picture_url, status_message, is_following,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     ).bind(
       id,
       input.lineUserId,
+      input.lineAccountId ?? null,
       input.displayName ?? null,
       input.pictureUrl ?? null,
       input.statusMessage ?? null,
