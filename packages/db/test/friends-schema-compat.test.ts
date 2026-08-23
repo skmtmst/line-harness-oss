@@ -46,14 +46,17 @@ describe('upsertFriend schema compatibility', () => {
 
     const created = await upsertFriend(d1, {
       lineUserId: 'U-legacy',
+      lineAccountId: 'account-legacy',
       displayName: 'Before',
       pictureUrl: null,
       statusMessage: null,
     });
     expect(created.display_name).toBe('Before');
+    expect(created.line_account_id).toBe('account-legacy');
 
     const updated = await upsertFriend(d1, {
       lineUserId: 'U-legacy',
+      lineAccountId: 'account-legacy',
       displayName: 'After',
       pictureUrl: null,
       statusMessage: null,

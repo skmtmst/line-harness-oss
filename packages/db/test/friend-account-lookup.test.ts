@@ -1,12 +1,15 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { getFriendByLineUserIdForAccount } from '../src/friends.js';
+import { getFriendByLineUserIdForAccount, upsertFriend } from '../src/friends.js';
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (sql: string, params: unknown[]) => ({
     async first<T>() {
       return (sqlite.prepare(sql).get(...params) as T) ?? null;
+    },
+    async run() {
+      return { success: true, meta: sqlite.prepare(sql).run(...params) };
     },
   });
   return {
@@ -29,6 +32,11 @@ beforeEach(() => {
       picture_url TEXT,
       status_message TEXT,
       is_following INTEGER NOT NULL DEFAULT 1,
+      first_followed_at TEXT,
+      current_follow_started_at TEXT,
+      last_followed_at TEXT,
+      last_unfollowed_at TEXT,
+      unfollow_count INTEGER NOT NULL DEFAULT 0,
       user_id TEXT,
       line_account_id TEXT,
       metadata TEXT NOT NULL DEFAULT '{}',
@@ -71,8 +79,42 @@ describe('getFriendByLineUserIdForAccount', () => {
     expect(warn).toHaveBeenCalledWith({
       event: 'friend_lookup_account_fallback',
       line_account_id: 'account-missing',
+      found_line_account_id: 'account-a',
       path: 'getFriendByLineUserIdForAccount',
     });
     expect(JSON.stringify(warn.mock.calls)).not.toContain('U-shared');
+  });
+
+  test('指定アカウントにも従来検索にも無い場合は警告を出さない', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const friend = await getFriendByLineUserIdForAccount(db, 'U-new', 'account-a');
+
+    expect(friend).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('upsertFriend', () => {
+  test('新規作成時に指定したLINEアカウントを保存し、警告を出さない', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const friend = await upsertFriend(db, {
+      lineUserId: 'U-new-account',
+      lineAccountId: 'account-a',
+      displayName: '新規友だち',
+    });
+
+    expect(friend.line_account_id).toBe('account-a');
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test('LINEアカウントを渡さない新規作成は後方互換でNULLを保存する', async () => {
+    const friend = await upsertFriend(db, {
+      lineUserId: 'U-new-unassigned',
+      displayName: '未割当友だち',
+    });
+
+    expect(friend.line_account_id).toBeNull();
   });
 });
