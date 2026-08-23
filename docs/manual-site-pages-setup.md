@@ -23,7 +23,7 @@ GitHubの **Settings → Environments → staging → Environment secrets** に�
 
 Cloudflare API Tokenには、対象アカウントのPagesをデプロイするために必要な最小権限だけを付与します。
 
-登録後、GitHubの **Settings → Secrets and variables → Actions → Variables** で `PAGES_DOCS_DEPLOY_ENABLED` を `true` にします。これは秘密値ではなく、PagesプロジェクトとSecretsが揃うまで誤配備を防ぐ安全スイッチです。既存の全Cloudflare配備用スイッチ `LINE_HARNESS_CLOUDFLARE_DEPLOY` も `true` である必要があります。
+登録後、GitHubの **Settings → Secrets and variables → Actions → Variables** で `PAGES_DOCS_DEPLOY_ENABLED` を `true` にします。これは秘密値ではなく、PagesプロジェクトとSecretsが揃うまで誤配備を防ぐDocs専用の安全スイッチです。Worker・管理画面の配備に使う全体ゲート `LINE_HARNESS_CLOUDFLARE_DEPLOY` は参照せず、未設定のまま維持します。
 
 ## 3. 検証用デプロイを実行する
 
