@@ -64,7 +64,15 @@ type SlackApiResponse = {
   ts?: string;
   permalink?: string;
   messages?: SlackMessage[];
+  channels?: SlackConversation[];
+  channel?: SlackConversation;
   response_metadata?: { next_cursor?: string };
+};
+
+type SlackConversation = {
+  id?: string;
+  name?: string;
+  is_archived?: boolean;
 };
 
 const THREAD_METADATA_TYPE = 'line_harness_codex';
@@ -128,6 +136,17 @@ export function isCodexTaskCompletion(event: CodexSlackEvent): boolean {
 export function prRangeKey(prNumber: number): string {
   const start = Math.floor((Math.max(1, prNumber) - 1) / 100) * 100 + 1;
   return `${start}-${start + 99}`;
+}
+
+export function prRangeChannelName(prNumber: number): string {
+  const [start, end] = prRangeKey(prNumber).split('-').map(Number);
+  return `line-harness-pr-${String(start).padStart(3, '0')}-${String(end).padStart(3, '0')}`;
+}
+
+export function nextPrRangeStartToPrepare(prNumber: number): number | null {
+  const start = Math.floor((Math.max(1, prNumber) - 1) / 100) * 100 + 1;
+  const position = Math.max(1, prNumber) - start + 1;
+  return position >= 90 ? start + 100 : null;
 }
 
 function parsePrChannels(value: string | undefined): Record<string, string> {
@@ -360,6 +379,82 @@ async function slackApi(
     throw new Error(`SLACK_API_FAILED:${method}:${response.status}:${result.error || 'unknown'}`);
   }
   return result;
+}
+
+async function findPublicSlackChannel(
+  token: string,
+  name: string,
+  fetcher: typeof fetch,
+): Promise<SlackConversation | null> {
+  let cursor = '';
+  for (let page = 0; page < MAX_HISTORY_PAGES; page += 1) {
+    const result = await slackApi(token, 'conversations.list', {
+      types: 'public_channel',
+      exclude_archived: true,
+      limit: 200,
+      ...(cursor ? { cursor } : {}),
+    }, fetcher);
+    const match = result.channels?.find((channel) => channel.name === name && !channel.is_archived);
+    if (match?.id) return match;
+    cursor = result.response_metadata?.next_cursor || '';
+    if (!cursor) break;
+  }
+  return null;
+}
+
+async function ensurePublicSlackChannel(
+  token: string,
+  name: string,
+  fetcher: typeof fetch,
+): Promise<string> {
+  const existing = await findPublicSlackChannel(token, name, fetcher);
+  if (existing?.id) return existing.id;
+  try {
+    const created = await slackApi(token, 'conversations.create', {
+      name,
+      is_private: false,
+    }, fetcher);
+    if (!created.channel?.id) throw new Error('SLACK_CREATED_CHANNEL_ID_MISSING');
+    return created.channel.id;
+  } catch (error) {
+    // Two GitHub events can cross the threshold together. If the other event
+    // won the create race, resolve the channel that now exists.
+    if (String(error).includes('name_taken')) {
+      const raced = await findPublicSlackChannel(token, name, fetcher);
+      if (raced?.id) return raced.id;
+    }
+    throw error;
+  }
+}
+
+export async function resolveCodexSlackChannelWithProvisioning(
+  config: CodexSlackRelayConfig,
+  category: CodexSlackCategory,
+  prNumber: number | undefined,
+  fetcher: typeof fetch = fetch,
+): Promise<string | null> {
+  const configured = resolveCodexSlackChannel(config, category, prNumber);
+  if (category !== 'fix' || !prNumber || !config.SLACK_BOT_TOKEN) return configured;
+  const mapped = parsePrChannels(config.SLACK_PR_CHANNELS_JSON)[prRangeKey(prNumber)];
+  if (mapped) return mapped;
+  // Existing ranges predate automatic provisioning and keep their configured
+  // fallback. New ranges from PR #301 onward are resolved by channel name.
+  if (prNumber <= 300) return configured;
+  return ensurePublicSlackChannel(config.SLACK_BOT_TOKEN, prRangeChannelName(prNumber), fetcher);
+}
+
+export async function ensureUpcomingPrRangeChannel(
+  config: CodexSlackRelayConfig,
+  prNumber: number,
+  fetcher: typeof fetch = fetch,
+): Promise<string | null> {
+  const nextStart = nextPrRangeStartToPrepare(prNumber);
+  if (!nextStart || !config.SLACK_BOT_TOKEN) return null;
+  return ensurePublicSlackChannel(
+    config.SLACK_BOT_TOKEN,
+    prRangeChannelName(nextStart),
+    fetcher,
+  );
 }
 
 async function readThreadParent(
@@ -1066,7 +1161,12 @@ export async function relayCodexSlackEvent(
     };
   }
   const category = classifyCodexSlackEvent(event);
-  let channelId = resolveCodexSlackChannel(config, category, event.prNumber);
+  let channelId = await resolveCodexSlackChannelWithProvisioning(
+    config,
+    category,
+    event.prNumber,
+    fetcher,
+  );
   if (!channelId) throw new Error(`SLACK_CHANNEL_NOT_CONFIGURED:${category}`);
   let key = workKey(event);
   let threadTs: string | null = null;
@@ -1131,6 +1231,7 @@ export async function relayCodexSlackEvent(
     if (event.refreshCommandCenter !== false) {
       await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher);
     }
+    if (event.prNumber) await ensureUpcomingPrRangeChannel(config, event.prNumber, fetcher);
     return { category, channelId, threadTs };
   }
 
@@ -1189,6 +1290,7 @@ export async function relayCodexSlackEvent(
   if (event.refreshCommandCenter !== false) {
     await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher);
   }
+  if (event.prNumber) await ensureUpcomingPrRangeChannel(config, event.prNumber, fetcher);
 
   return { category, channelId, threadTs };
 }
