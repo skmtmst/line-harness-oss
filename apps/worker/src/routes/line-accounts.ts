@@ -31,6 +31,7 @@ import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import type { Env } from '../index.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const lineAccounts = new Hono<Env>();
 
@@ -638,6 +639,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
       ogSiteName: normalizeOptionalString(body.ogSiteName) ?? null,
       ogDefaultImageUrl: normalizeOptionalString(body.ogDefaultImageUrl) ?? null,
       ogDefaultDescription: normalizeOptionalString(body.ogDefaultDescription) ?? null,
+      tenantId: currentStaff.tenantId ?? DEFAULT_TENANT_ID,
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
 
     if (copyFromAccountId && copyItems.length > 0) {

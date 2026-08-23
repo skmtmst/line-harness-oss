@@ -25,7 +25,7 @@ function applyMigration(db: Database.Database): void {
 }
 
 describe('176 tenant foundation', () => {
-  it('既存行を既定の統括へ割り当て、安全なマイグレーション経路で再実行できる', () => {
+  it('既存行を既定の統括へ割り当て、再適用時は既存列の重複だけを許容してデータ補完を再実行する', () => {
     const db = new Database(':memory:');
     db.exec(readFileSync(join(packageRoot, 'schema.sql'), 'utf8'));
     db.exec(readFileSync(join(packageRoot, 'migrations', '168_restaurant_test_foundation.sql'), 'utf8'));
@@ -45,7 +45,7 @@ describe('176 tenant foundation', () => {
       });
     }
 
-    // 再実行前にNULLへ戻し、データ補完も再び効くことを確認する。
+    // ALTER TABLEの再適用で出る既存列エラーだけを許容し、NULL補完は再実行する。
     db.exec(`UPDATE line_accounts SET tenant_id = NULL;
       UPDATE staff_members SET tenant_id = NULL;
       UPDATE rt_organizations SET tenant_id = NULL;`);

@@ -2476,6 +2476,9 @@ CREATE UNIQUE INDEX idx_rt_organizations_account ON rt_organizations(account_id)
 CREATE INDEX idx_rt_organizations_tenant
   ON rt_organizations(tenant_id);
 
+CREATE UNIQUE INDEX idx_rt_organizations_tenant_unique
+  ON rt_organizations(tenant_id);
+
 CREATE UNIQUE INDEX idx_rt_reservations_external
   ON rt_reservations(store_id, source, external_id);
 

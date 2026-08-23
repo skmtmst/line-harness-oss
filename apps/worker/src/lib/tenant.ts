@@ -1,2 +1,1 @@
-/** Existing rows are assigned to this non-secret, environment-independent tenant. */
-export const DEFAULT_TENANT_ID = '00000000-0000-4000-8000-000000000001';
+export { DEFAULT_TENANT_ID } from '@line-crm/shared';

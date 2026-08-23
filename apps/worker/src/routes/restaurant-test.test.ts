@@ -174,6 +174,20 @@ describe('飲食店向けテストAPI', () => {
     expect(response.status).toBe(403);
   });
 
+  it('tenant_id未設定の認証スタッフも既定以外のtenant_idを拒否する', async () => {
+    authMocks.getStaffByApiKey.mockResolvedValue({
+      id: 'legacy-admin', name: 'Legacy Admin', role: 'admin', access_level: 'full',
+      permission_keys: '[]', assigned_line_account_id: null,
+      can_access_descendant_accounts: 0,
+      tenant_id: null,
+    });
+    const response = await requestAs(
+      '/api/restaurant-test/snapshot?tenant_id=00000000-0000-4000-8000-000000000099',
+      'legacy-admin-key',
+    );
+    expect(response.status).toBe(403);
+  });
+
   it('店舗未選択の管理画面セッションでは統括組織の全店舗を返す', async () => {
     await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
     const session = await createAdminSession();
@@ -510,6 +524,14 @@ describe('飲食店向けテストAPI', () => {
       .toMatchObject({ count: 1 });
     expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM line_accounts WHERE channel_id = '1234567890'").get())
       .toMatchObject({ count: 1 });
+    expect(testDb.raw.prepare(`SELECT la.tenant_id AS line_tenant, o.tenant_id AS organization_tenant
+      FROM line_accounts la
+      JOIN rt_stores s ON s.line_account_id = la.id
+      JOIN rt_organizations o ON o.id = s.organization_id
+      WHERE la.channel_id = '1234567890'`).get()).toEqual({
+        line_tenant: '00000000-0000-4000-8000-000000000001',
+        organization_tenant: '00000000-0000-4000-8000-000000000001',
+      });
   });
 
   it('LINEアカウントを指定して店舗を作成・編集でき、スタッフは操作できない', async () => {

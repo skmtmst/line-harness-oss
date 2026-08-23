@@ -11,6 +11,7 @@ import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret,
 import type { Env } from '../index.js';
 import { getLineAccounts } from '@line-crm/db';
 import { filterVisibleLineAccounts } from '../services/account-access.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const staff = new Hono<Env>();
 const INVITE_TTL_MS = 48 * 60 * 60 * 1000;
@@ -177,6 +178,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
       assigned_line_account_id: body.assignedLineAccountId,
       can_access_descendant_accounts: body.role === 'admin' && Boolean(body.canAccessDescendantAccounts),
+      tenant_id: current.tenantId ?? DEFAULT_TENANT_ID,
     });
     try {
       await sendStaffInviteEmail(c.env, {

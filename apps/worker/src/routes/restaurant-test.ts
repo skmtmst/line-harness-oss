@@ -93,8 +93,8 @@ function hasOrganizationSelector(c: Context<Env>): boolean {
 
 restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
   const requestedTenant = tenantId(c);
-  const staffTenant = c.get('staff')?.tenantId ?? null;
-  if (requestedTenant && staffTenant && requestedTenant !== staffTenant) {
+  const staffTenant = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+  if (requestedTenant && requestedTenant !== staffTenant) {
     return c.json({ success: false, error: 'この統括を操作する権限がありません' }, 403);
   }
 
@@ -671,6 +671,7 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
       name: profile.displayName.trim(),
       channelAccessToken: token.access_token,
       channelSecret,
+      tenantId: organization.tenant_id ?? DEFAULT_TENANT_ID,
     }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
     createdLineAccountId = lineAccount.id;
     const storeId = crypto.randomUUID();
