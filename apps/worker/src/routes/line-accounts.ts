@@ -29,6 +29,7 @@ import {
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
 import { IDENTITY_KEY_SQL } from '../lib/identity-key.js';
 import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
+import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import type { Env } from '../index.js';
 
 const lineAccounts = new Hono<Env>();
@@ -112,44 +113,6 @@ function serializeLineAccountFull(row: DbLineAccount) {
   // Owners rotate them by submitting a new value; the UI only sees whether
   // each credential is configured.
   return serializeLineAccount(row);
-}
-
-type WebhookEndpointState = {
-  expectedUrl: string;
-  actualUrl: string | null;
-  active: boolean | null;
-  status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown';
-};
-
-/**
- * LINE Developers に登録されている Webhook URL を読み取る。
- * 一覧の表示用なので設定変更や接続テストは行わない。
- * LINE API が一時的に応答できない場合は unknown とし、正常と誤判定しない。
- */
-async function fetchWebhookEndpointState(
-  channelAccessToken: string,
-  expectedUrl: string,
-): Promise<WebhookEndpointState> {
-  try {
-    const response = await fetch('https://api.line.me/v2/bot/channel/webhook/endpoint', {
-      headers: { Authorization: `Bearer ${channelAccessToken}` },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) {
-      return { expectedUrl, actualUrl: null, active: null, status: 'unknown' };
-    }
-    const endpoint = await response.json<{ endpoint?: string; active?: boolean }>();
-    const actualUrl = endpoint.endpoint?.trim() || null;
-    const active = endpoint.active === true;
-    const status: WebhookEndpointState['status'] = !actualUrl
-      ? 'unconfigured'
-      : actualUrl === expectedUrl && active
-        ? 'matched'
-        : 'mismatched';
-    return { expectedUrl, actualUrl, active, status };
-  } catch {
-    return { expectedUrl, actualUrl: null, active: null, status: 'unknown' };
-  }
 }
 
 // GET /api/line-accounts - list all (with LINE profile + stats)

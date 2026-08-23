@@ -17,11 +17,12 @@ type MockStaff = {
 
 const authMocks = vi.hoisted(() => ({
   getStaffByApiKey: vi.fn(async (): Promise<MockStaff | null> => null),
+  lineAccounts: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('@line-crm/db', () => ({
   getStaffByApiKey: authMocks.getStaffByApiKey,
-  getLineAccounts: vi.fn(async () => [{ id: 'account-1' }]),
+  getLineAccounts: vi.fn(async () => authMocks.lineAccounts),
 }));
 
 const { authMiddleware } = await import('../middleware/auth.js');
@@ -53,11 +54,29 @@ function requestAs(path: string, token: string, body?: unknown) {
   }, env);
 }
 
+function requestWithMethod(path: string, method: string, body?: unknown, token = 'owner-key') {
+  return app().request(path, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  }, env);
+}
+
 beforeEach(() => {
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
+  authMocks.lineAccounts = [
+    { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
+    { id: 'account-2', name: '店舗A', is_active: 1, channel_access_token: 'token-2' },
+    { id: 'account-3', name: '店舗B', is_active: 1, channel_access_token: 'token-3' },
+    { id: 'account-4', name: '予備', is_active: 1, channel_access_token: 'token-4' },
+  ];
   testDb = createTestD1();
   testDb.raw.exec(readFileSync(join(here, '../../../../packages/db/migrations/168_restaurant_test_foundation.sql'), 'utf8'));
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    endpoint: 'https://worker.example.test/webhook',
+    active: true,
+  }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
   env = {
     DB: testDb.db,
     API_KEY: 'owner-key',
@@ -87,6 +106,7 @@ describe('飲食店向けテストAPI', () => {
     expect(json.data.tables.length).toBeGreaterThan(0);
     expect(json.data.menuItems.length).toBeGreaterThan(0);
     expect(json.data.lineFlows.length).toBe(6);
+    expect(JSON.stringify(json)).not.toContain('token-');
   });
 
   it('媒体予約を一方向で冪等取込し、外部書戻しを0件のままにする', async () => {
@@ -241,8 +261,156 @@ describe('飲食店向けテストAPI', () => {
     expect(issued.status).toBe(503);
   });
 
+  it('LINEアカウント未指定では店舗を作成できない', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const response = await request('/api/restaurant-test/stores?account_id=account-1', {
+      name: '新宿店', code: 'SHINJUKU', area: '東京', capacity: 20,
+      timezone: 'Asia/Tokyo',
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('LINEアカウントを指定して店舗を作成・編集でき、スタッフは操作できない', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const created = await request('/api/restaurant-test/stores?account_id=account-1', {
+      name: '新宿店', code: 'SHINJUKU', area: '東京', capacity: 20,
+      timezone: 'Asia/Tokyo', lineAccountId: 'account-4',
+    });
+    expect(created.status).toBe(201);
+    const createdJson = await created.json() as { data: { id: string } };
+
+    const updated = await requestWithMethod(
+      `/api/restaurant-test/stores/${createdJson.data.id}?account_id=account-1`,
+      'PATCH',
+      { name: '新宿本店', status: 'paused', lineAccountId: 'account-4' },
+    );
+    expect(updated.status).toBe(200);
+    expect(testDb.raw.prepare('SELECT name, status, line_account_id FROM rt_stores WHERE id = ?').get(createdJson.data.id))
+      .toMatchObject({ name: '新宿本店', status: 'paused', line_account_id: 'account-4' });
+
+    authMocks.getStaffByApiKey.mockResolvedValue({
+      id: 'staff-1', name: 'Staff', role: 'staff', access_level: 'full',
+      permission_keys: '[]', assigned_line_account_id: null,
+      can_access_descendant_accounts: 0,
+    });
+    const denied = await requestWithMethod(
+      `/api/restaurant-test/stores/${createdJson.data.id}?account_id=account-1`,
+      'PATCH',
+      { status: 'active' },
+      'staff-key',
+    );
+    expect(denied.status).toBe(403);
+  });
+
+  it('同じLINEアカウントを2店舗へ割り当てず、同一組織の店舗コード重複も拒否する', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const used = testDb.raw.prepare("SELECT line_account_id FROM rt_stores WHERE code = 'GINZA'").get() as { line_account_id: string };
+
+    const duplicateAccount = await request('/api/restaurant-test/stores?account_id=account-1', {
+      name: '新宿店', code: 'SHINJUKU', area: '東京', capacity: 20,
+      timezone: 'Asia/Tokyo', lineAccountId: used.line_account_id,
+    });
+    expect(duplicateAccount.status).toBe(409);
+
+    const duplicateCode = await request('/api/restaurant-test/stores?account_id=account-1', {
+      name: '銀座別館', code: 'GINZA', area: '東京', capacity: 12,
+      timezone: 'Asia/Tokyo', lineAccountId: 'account-4',
+    });
+    expect(duplicateCode.status).toBe(409);
+  });
+
+  it('他組織の店舗を更新できず、不正な店舗状態も拒否する', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    testDb.raw.prepare('INSERT INTO rt_organizations (id, account_id, name) VALUES (?, ?, ?)')
+      .run('org-other', 'account-other', '別組織');
+    testDb.raw.prepare('INSERT INTO rt_stores (id, organization_id, name, code, capacity, line_account_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('store-other', 'org-other', '別店舗', 'OTHER', 10, 'account-4');
+
+    const other = await requestWithMethod(
+      '/api/restaurant-test/stores/store-other?account_id=account-1',
+      'PATCH',
+      { status: 'archived' },
+    );
+    expect(other.status).toBe(400);
+
+    const own = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const invalid = await requestWithMethod(
+      `/api/restaurant-test/stores/${own.id}?account_id=account-1`,
+      'PATCH',
+      { status: 'deleted' },
+    );
+    expect(invalid.status).toBe(400);
+  });
+
+  it('店舗LINEアカウントではその店舗だけ、統括アカウントでは全店舗を返す', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const storeView = await request('/api/restaurant-test/snapshot?account_id=account-2');
+    expect(storeView.status).toBe(200);
+    const storeJson = await storeView.json() as { data: { stores: Array<{ id: string }>; reservations: Array<{ store_id: string }>; tables: Array<{ store_id: string }> } };
+    expect(storeJson.data.stores).toHaveLength(1);
+    expect(storeJson.data.reservations.every((item) => item.store_id === storeJson.data.stores[0].id)).toBe(true);
+    expect(storeJson.data.tables.every((item) => item.store_id === storeJson.data.stores[0].id)).toBe(true);
+
+    const organizationView = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    const organizationJson = await organizationView.json() as { data: { stores: unknown[] } };
+    expect(organizationJson.data.stores).toHaveLength(2);
+  });
+
+  it('LINE未割当はunconfigured、Webhook不一致はwarningとして導出する', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const stores = testDb.raw.prepare('SELECT id, code FROM rt_stores ORDER BY code').all() as Array<{ id: string; code: string }>;
+    testDb.raw.prepare('UPDATE rt_stores SET line_account_id = NULL WHERE id = ?').run(stores[0].id);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      endpoint: 'https://different.example.test/webhook', active: true,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
+
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const response = await request('/api/restaurant-test/snapshot?account_id=account-1');
+      const json = await response.json() as { data: { stores: Array<{ id: string; line_status: string }> } };
+      expect(json.data.stores.find((item) => item.id === stores[0].id)?.line_status).toBe('unconfigured');
+      expect(json.data.stores.find((item) => item.id === stores[1].id)?.line_status).toBe('warning');
+      expect(JSON.stringify([...log.mock.calls, ...warn.mock.calls, ...error.mock.calls])).not.toContain('token-');
+    } finally {
+      log.mockRestore();
+      warn.mockRestore();
+      error.mockRestore();
+    }
+  });
+
+  it('店舗をarchivedにしても既存予約を削除せず、DELETE経路も持たない', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const before = testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_reservations WHERE store_id = ?').get(store.id) as { count: number };
+    const updated = await requestWithMethod(
+      `/api/restaurant-test/stores/${store.id}?account_id=account-1`,
+      'PATCH',
+      { status: 'archived' },
+    );
+    expect(updated.status).toBe(200);
+    const after = testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_reservations WHERE store_id = ?').get(store.id) as { count: number };
+    expect(after.count).toBe(before.count);
+
+    const deleted = await requestWithMethod(
+      `/api/restaurant-test/stores/${store.id}?account_id=account-1`,
+      'DELETE',
+    );
+    expect(deleted.status).toBe(404);
+  });
+
+  it('bootstrap時に店舗へ割り当てるLINEアカウントが不足していれば何も作らない', async () => {
+    authMocks.lineAccounts = authMocks.lineAccounts.slice(0, 2);
+    const response = await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: 'LINEアカウントが不足しています' });
+    const count = testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organizations').get() as { count: number };
+    expect(count.count).toBe(0);
+  });
+
   it('この組織に存在しないLINEアカウントの飲食店データへアクセスさせない', async () => {
-    const response = await request('/api/restaurant-test/snapshot?account_id=account-2');
+    const response = await request('/api/restaurant-test/snapshot?account_id=account-unknown');
     expect(response.status).toBe(403);
   });
 });
