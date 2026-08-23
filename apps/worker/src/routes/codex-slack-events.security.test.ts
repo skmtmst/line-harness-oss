@@ -98,6 +98,22 @@ describe('Codex Slack relay security boundary', () => {
     expect(response.status).toBe(503);
   });
 
+  test('未定義の再照合モードを署名済みでも拒否する', async () => {
+    const body = JSON.stringify({ ...payload, eventSource: 'github', syncMode: 'unknown' });
+    const response = await app().request('/api/integrations/codex-slack/events', {
+      method: 'POST', headers: await signedHeaders(body), body,
+    }, env());
+    expect(response.status).toBe(400);
+  });
+
+  test('指令盤更新フラグはboolean以外を拒否する', async () => {
+    const body = JSON.stringify({ ...payload, eventSource: 'github', refreshCommandCenter: 'yes' });
+    const response = await app().request('/api/integrations/codex-slack/events', {
+      method: 'POST', headers: await signedHeaders(body), body,
+    }, env());
+    expect(response.status).toBe(400);
+  });
+
   test('Slack署名済みの完了ボタンだけを処理する', async () => {
     const current = env();
     current.SLACK_TASK_CHANNEL_ID = 'C-TASK';

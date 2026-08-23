@@ -15,6 +15,8 @@ const ALLOWED_EVENT_TYPES = new Set(['prompt_submitted', 'turn_completed', 'appr
 const ALLOWED_OPERATORS = new Set(['kenta', 'masato', 'codex']);
 const ALLOWED_CATEGORIES = new Set(['error', 'idea', 'fix', 'decision']);
 const ALLOWED_CHECK_STATES = new Set(['pass', 'pending', 'fail', 'none']);
+const ALLOWED_EVENT_SOURCES = new Set(['codex', 'github']);
+const ALLOWED_SYNC_MODES = new Set(['event', 'reconcile']);
 
 export const codexSlackEvents = new Hono<Env>();
 
@@ -78,6 +80,13 @@ function parseEvent(rawBody: string): CodexSlackEvent | null {
   if (value.explicitCategory != null && (
     typeof value.explicitCategory !== 'string' || !ALLOWED_CATEGORIES.has(value.explicitCategory)
   )) return null;
+  if (value.eventSource != null && (
+    typeof value.eventSource !== 'string' || !ALLOWED_EVENT_SOURCES.has(value.eventSource)
+  )) return null;
+  if (value.syncMode != null && (
+    typeof value.syncMode !== 'string' || !ALLOWED_SYNC_MODES.has(value.syncMode)
+  )) return null;
+  if (value.refreshCommandCenter != null && typeof value.refreshCommandCenter !== 'boolean') return null;
   const openPrs = parseOpenPrs(value.openPrs);
   if (openPrs === null) return null;
 
@@ -98,6 +107,11 @@ function parseEvent(rawBody: string): CodexSlackEvent | null {
     occurredAt: value.occurredAt,
     explicitCategory: value.explicitCategory as CodexSlackCategory | undefined,
     openPrs,
+    eventSource: value.eventSource as CodexSlackEvent['eventSource'],
+    syncMode: value.syncMode as CodexSlackEvent['syncMode'],
+    refreshCommandCenter: typeof value.refreshCommandCenter === 'boolean'
+      ? value.refreshCommandCenter
+      : undefined,
   };
 }
 

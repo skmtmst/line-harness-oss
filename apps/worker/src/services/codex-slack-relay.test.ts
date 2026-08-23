@@ -230,6 +230,80 @@ describe('Codex Slack relay', () => {
     expect(reply).toMatchObject({ channel: 'C-201-300', thread_ts: '123.456' });
   });
 
+  test('GitHub再照合で既存スレッドと未完了カードが揃っていれば重複投稿しない', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({
+        messages: [{
+          ts: '300.001',
+          metadata: {
+            event_type: 'line_harness_task',
+            event_payload: {
+              work_key: 'pr:276',
+              source_channel: 'C0PR123',
+              source_thread_ts: '1787452000.000001',
+            },
+          },
+        }],
+      }));
+
+    const result = await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C0PR123',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+    }, event({
+      eventId: 'github-pr:276:reconcile',
+      sessionId: 'github-pr-276',
+      operator: 'masato',
+      prNumber: 276,
+      syncMode: 'reconcile',
+      eventSource: 'github',
+      content: 'PR #276のSlack通知を再照合しました。',
+    }), fetcher);
+
+    expect(result.threadTs).toBe('1787452000.000001');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  test('GitHub再照合でマージ済みなのに未完了カードが残っていれば完了させる', async () => {
+    const task = {
+      ts: '300.001',
+      metadata: {
+        event_type: 'line_harness_task',
+        event_payload: {
+          work_key: 'pr:276',
+          source_channel: 'C0PR123',
+          source_thread_ts: '1787452000.000001',
+        },
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ messages: [task] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '200.002' }))
+      .mockResolvedValueOnce(slackResponse({ messages: [task] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '300.001' }));
+
+    await relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C0PR123',
+      SLACK_TASK_CHANNEL_ID: 'C-TASK',
+    }, event({
+      eventId: 'github-pr:276:reconcile:merged',
+      eventType: 'turn_completed',
+      sessionId: 'github-pr-276',
+      operator: 'masato',
+      prNumber: 276,
+      syncMode: 'reconcile',
+      eventSource: 'github',
+      content: 'PR #276をマージし、対応が完了しました。',
+    }), fetcher);
+
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    const reply = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
+    const deletion = JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body));
+    expect(reply).toMatchObject({ channel: 'C0PR123', thread_ts: '1787452000.000001' });
+    expect(deletion).toMatchObject({ channel: 'C-TASK', ts: '300.001' });
+  });
+
   test('親スレッドが無い場合は作ってから返信する', async () => {
     const fetcher = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(slackResponse({ messages: [] }))

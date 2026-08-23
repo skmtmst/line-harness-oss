@@ -1,0 +1,71 @@
+name: GitHub PR Slack Sync
+
+# Codex hooks remain a supplemental progress feed. GitHub is the source of
+# truth for PR creation, updates and completion. The hourly pass repairs a
+# missed event without creating duplicate Slack threads or replies.
+
+on:
+  pull_request:
+    branches:
+      - codex/development
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+      - ready_for_review
+      - converted_to_draft
+      - closed
+  push:
+    branches:
+      - codex/development
+  schedule:
+    # Avoid the busy start of the hour, when scheduled workflows are delayed
+    # more often. GitHub schedules run from the repository's default branch.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+
+concurrency:
+  group: github-pr-slack-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    # This kill switch keeps a merge inert until the staging Worker has the
+    # reconciliation code and Masato deliberately enables external notices.
+    if: >-
+      vars.GITHUB_SLACK_PR_SYNC_ENABLED == 'true' &&
+      (github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Never execute code from a PR head while a relay secret is available.
+      # For pull_request events, use the already trusted base revision.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Synchronize PR state to the staging Slack relay
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CODEX_SLACK_RELAY_SECRET: ${{ secrets.CODEX_SLACK_RELAY_SECRET }}
+          CODEX_SLACK_RELAY_URL: https://nen-line-stg.skmtmst.workers.dev/api/integrations/codex-slack/events
+          # PR #275 and earlier were audited/backfilled before this workflow.
+          GITHUB_SLACK_SYNC_MIN_PR_NUMBER: '276'
+          GITHUB_SLACK_SYNC_CLOSED_LOOKBACK_HOURS: '72'
+        run: >-
+          node
+          --disable-warning=ExperimentalWarning
+          --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
+          --experimental-strip-types
+          scripts/github-slack-pr-sync.ts

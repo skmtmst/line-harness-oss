@@ -1,0 +1,125 @@
+import { describe, expect, test, vi } from 'vitest';
+import {
+  operatorForPull,
+  relayPayloadForPull,
+  summarizeChecks,
+  syncGitHubPullRequests,
+  type GitHubPullRequest,
+  type RelayPayload,
+} from './github-slack-pr-sync.ts';
+
+function pull(overrides: Partial<GitHubPullRequest> = {}): GitHubPullRequest {
+  return {
+    number: 276,
+    title: 'GitHubからSlackへ同期する',
+    html_url: 'https://github.com/skmtmst/line-harness-oss/pull/276',
+    state: 'open',
+    draft: false,
+    merged: false,
+    merged_at: null,
+    updated_at: '2026-08-23T02:00:00.000Z',
+    user: { login: 'skmtmst' },
+    head: { ref: 'codex/masato-github-slack-pr-sync', sha: 'abc123' },
+    base: { ref: 'codex/development' },
+    mergeable_state: 'clean',
+    ...overrides,
+  };
+}
+
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+describe('GitHub PR Slack sync', () => {
+  test('GitHubのチェック状態と担当者をSlack用に正規化する', () => {
+    expect(summarizeChecks([])).toBe('none');
+    expect(summarizeChecks([{ status: 'in_progress', conclusion: null }])).toBe('pending');
+    expect(summarizeChecks([{ status: 'completed', conclusion: 'success' }])).toBe('pass');
+    expect(summarizeChecks([{ status: 'completed', conclusion: 'failure' }])).toBe('fail');
+    expect(operatorForPull(pull())).toBe('masato');
+    expect(operatorForPull(pull({ user: { login: 'kentavndng' } }))).toBe('kenta');
+  });
+
+  test('通常イベントと再照合を区別し、マージを完了イベントにする', () => {
+    const opened = relayPayloadForPull('skmtmst/line-harness-oss', pull(), 'opened', 'event', []);
+    const merged = relayPayloadForPull('skmtmst/line-harness-oss', pull({
+      state: 'closed',
+      merged: true,
+      merged_at: '2026-08-23T03:00:00.000Z',
+    }), 'reconcile', 'reconcile', []);
+
+    expect(opened).toMatchObject({
+      eventType: 'prompt_submitted',
+      eventSource: 'github',
+      syncMode: 'event',
+      refreshCommandCenter: true,
+      prNumber: 276,
+    });
+    expect(opened.content).toContain('作成しました');
+    expect(merged.eventType).toBe('turn_completed');
+    expect(merged.syncMode).toBe('reconcile');
+    expect(merged.content).toContain('マージし、対応が完了しました');
+  });
+
+  test('PRイベントを送り、その後に未通知のopen/closedを再照合する', async () => {
+    const open = pull();
+    const merged = pull({
+      number: 277,
+      html_url: 'https://github.com/skmtmst/line-harness-oss/pull/277',
+      state: 'closed',
+      merged: true,
+      merged_at: '2026-08-23T03:00:00.000Z',
+      updated_at: '2026-08-23T03:00:00.000Z',
+      head: { ref: 'codex/kenta-followup', sha: 'def456' },
+      user: { login: 'kentavndng' },
+    });
+    const relayed: RelayPayload[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const url = String(input);
+      if (url.includes('api.github.com') && url.includes('/pulls?state=open')) return jsonResponse([open]);
+      if (url.endsWith('/pulls/276')) return jsonResponse(open);
+      if (url.includes('/pulls/276/files')) return jsonResponse([{ filename: 'apps/worker/src/index.ts' }]);
+      if (url.includes('/commits/abc123/check-runs')) {
+        return jsonResponse({ check_runs: [{ status: 'completed', conclusion: 'success' }] });
+      }
+      if (url.includes('api.github.com') && url.includes('/pulls?state=closed')) return jsonResponse([merged]);
+      if (url === 'https://relay.example.test/events') {
+        relayed.push(JSON.parse(String(init?.body)) as RelayPayload);
+        return jsonResponse({ success: true });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const result = await syncGitHubPullRequests({
+      repository: 'skmtmst/line-harness-oss',
+      githubToken: 'github-test-token',
+      relayUrl: 'https://relay.example.test/events',
+      relaySecret: 'relay-test-secret',
+      eventName: 'pull_request',
+      event: { action: 'opened', pull_request: open },
+      minPrNumber: 276,
+      closedLookbackHours: 72,
+      now: new Date('2026-08-23T04:00:00.000Z'),
+      fetcher,
+    });
+
+    expect(result).toEqual({ sent: 1, reconciled: 2 });
+    expect(relayed.map((item) => [item.prNumber, item.syncMode])).toEqual([
+      [276, 'event'],
+      [276, 'reconcile'],
+      [277, 'reconcile'],
+    ]);
+    expect(relayed.map((item) => item.refreshCommandCenter)).toEqual([false, false, true]);
+    expect(relayed[0]?.openPrs[0]).toMatchObject({
+      number: 276,
+      fileCount: 1,
+      checks: 'pass',
+      mergeStateStatus: 'CLEAN',
+    });
+    expect(JSON.stringify(relayed)).not.toContain('github-test-token');
+    expect(JSON.stringify(relayed)).not.toContain('relay-test-secret');
+  });
+});
