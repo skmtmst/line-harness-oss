@@ -6,6 +6,7 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { dbFor } from '../services/db-router.js';
 import {
   issueRestaurantIntakeAddress,
+  listRestaurantIntakeAddresses,
   RestaurantIntakeConfigurationError,
 } from '../services/restaurant-email-intake.js';
 import {
@@ -194,6 +195,26 @@ restaurantTest.post('/api/restaurant-test/bootstrap', requireRole('owner', 'admi
   }
   await dbFor(c.env, mainId).batch(statements);
   return c.json({ success: true, data: { organizationId: orgId, created: true } }, 201);
+});
+
+/** 店舗で現在受信できる予約メール取り込みアドレスを確認する。 */
+restaurantTest.get('/api/restaurant-test/intake-addresses', requireRole('owner', 'admin'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  const organization = await organizationFor(c);
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.query('storeId') || '';
+  if (!storeId || !await storeBelongsTo(c, organization.id, storeId)) {
+    return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  }
+  try {
+    const addresses = await listRestaurantIntakeAddresses(c.env, storeId);
+    return c.json({ success: true, data: addresses });
+  } catch (error) {
+    if (error instanceof RestaurantIntakeConfigurationError) {
+      return c.json({ success: false, error: '予約メール取り込み用ドメインが設定されていません' }, 503);
+    }
+    throw error;
+  }
 });
 
 /** 店舗の予約メール取り込みアドレスを発行・再発行する。 */

@@ -3,9 +3,11 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
+import { ApiError } from '@/lib/api'
 import {
   restaurantTestApi,
   type RestaurantApproval,
+  type RestaurantIntakeAddress,
   type RestaurantInventory,
   type RestaurantLineFlow,
   type RestaurantSnapshot,
@@ -148,7 +150,7 @@ export default function RestaurantConsole({ view }: { view: string }) {
     {loading ? <div className="rounded-card border border-hairline bg-canvas p-16 text-center text-sm text-ink-faint">読み込み中…</div>
       : !snapshot?.organization ? <EmptySetup busy={busy} onCreate={() => void bootstrap()} />
       : activeView === 'dashboard' ? <Dashboard data={snapshot} />
-      : activeView === 'organization' ? <Organization data={snapshot} selectedStoreId={selectedStoreId} busy={busy} create={(body) => mutate(() => restaurantTestApi.createMembership(selectedAccountId!, body), 'ログインユーザーを飲食店向け領域へ追加しました。')} />
+      : activeView === 'organization' ? <Organization accountId={selectedAccountId!} data={snapshot} selectedStoreId={selectedStoreId} busy={busy} create={(body) => mutate(() => restaurantTestApi.createMembership(selectedAccountId!, body), 'ログインユーザーを飲食店向け領域へ追加しました。')} />
       : activeView === 'approvals' ? <Approvals data={snapshot} busy={busy} decide={(id, action) => mutate(() => restaurantTestApi.decideApproval(selectedAccountId!, id, action), action === 'approve' ? '承認しました。外部公開は行っていません。' : '差し戻しました。')} />
       : activeView === 'reservations' ? <Reservations data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createReservation(selectedAccountId!, body), '予約台帳へ登録しました。')} importInbound={(body) => mutate(() => restaurantTestApi.importReservation(selectedAccountId!, body), '受信専用データとして取り込みました。')} />
       : activeView === 'tables' ? <Tables data={snapshot} store={store} busy={busy} create={(body) => mutate(() => restaurantTestApi.createTable(selectedAccountId!, body), '卓を追加しました。')} />
@@ -187,13 +189,120 @@ function Dashboard({ data }: { data: RestaurantSnapshot }) {
 }
 
 const roleLabel = { super_admin: 'SuperAdmin', store_manager: 'StoreManager', staff: 'Staff' }
-function Organization({ data, selectedStoreId, busy, create }: { data: RestaurantSnapshot; selectedStoreId: string; busy: boolean; create: (body: Record<string, unknown>) => void }) {
+function intakeAddressError(error: unknown): string {
+  if (error instanceof ApiError && error.status === 503) return '取り込み用ドメインが未設定です'
+  if (error instanceof ApiError && error.status === 403) return '取り込みアドレスはオーナーまたは管理者だけが確認できます。'
+  return '取り込みアドレスを読み込めませんでした。'
+}
+
+function intakeDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '日時不明'
+  return new Intl.DateTimeFormat('ja-JP', {
+    year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+  }).format(date)
+}
+
+function IntakeAddressPanel({ accountId, store }: { accountId: string; store: RestaurantStore | null }) {
+  const [addresses, setAddresses] = useState<RestaurantIntakeAddress[]>([])
+  const [loading, setLoading] = useState(false)
+  const [issuing, setIssuing] = useState(false)
+  const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [copiedId, setCopiedId] = useState('')
+  const storeId = store?.id || ''
+
+  const loadAddresses = useCallback(async () => {
+    if (!accountId || !storeId) {
+      setAddresses([])
+      setError('')
+      setActionError('')
+      setNotice('')
+      return
+    }
+    setLoading(true)
+    setError('')
+    setActionError('')
+    setNotice('')
+    try {
+      const response = await restaurantTestApi.listIntakeAddresses(accountId, storeId)
+      setAddresses(response.data)
+    } catch (caught) {
+      setAddresses([])
+      setError(intakeAddressError(caught))
+    } finally {
+      setLoading(false)
+    }
+  }, [accountId, storeId])
+
+  useEffect(() => { void loadAddresses() }, [loadAddresses])
+
+  const issue = async () => {
+    if (!storeId || error) return
+    if (addresses.length > 0 && !confirm('新しい取り込みアドレスを発行しますか？\n旧アドレスは90日後に失効します。媒体側の通知先を新しいアドレスへ変更してください。')) return
+    setIssuing(true)
+    setNotice('')
+    setActionError('')
+    try {
+      await restaurantTestApi.issueIntakeAddress(accountId, storeId)
+      await loadAddresses()
+      setNotice(addresses.length > 0 ? '新しいアドレスを発行しました。旧アドレスは90日後に失効します。' : '取り込みアドレスを発行しました。')
+    } catch (caught) {
+      setActionError(intakeAddressError(caught))
+    } finally {
+      setIssuing(false)
+    }
+  }
+
+  const copy = async (item: RestaurantIntakeAddress) => {
+    setActionError('')
+    try {
+      await navigator.clipboard.writeText(item.address)
+      setCopiedId(item.id)
+      window.setTimeout(() => setCopiedId((current) => current === item.id ? '' : current), 1500)
+    } catch {
+      setActionError('コピーできませんでした。アドレスを選択して手動でコピーしてください。')
+    }
+  }
+
+  return <Panel title="予約メール取り込みアドレス" description="予約媒体から届く通知メールの転送先として設定します。">
+    <div className="space-y-4 p-5">
+      {!store ? <p className="text-sm text-ink-secondary">上部の店舗選択から、設定する店舗を選んでください。</p>
+        : loading ? <p className="text-sm text-ink-faint">取り込みアドレスを確認中…</p>
+        : error ? <div className="rounded-control border border-danger bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">{error}</div>
+        : <>
+          <div className="rounded-control border border-warning/30 bg-warning-bg px-4 py-3 text-xs leading-5 text-warning">
+            このアドレスは予約メールの専用受信口です。第三者へ共有せず、予約媒体の通知設定だけに使用してください。
+          </div>
+          {notice && <div className="rounded-control border border-success bg-success-bg px-4 py-3 text-sm font-semibold text-success">{notice}</div>}
+          {actionError && <div className="rounded-control border border-danger bg-danger-bg px-4 py-3 text-sm font-semibold text-danger">{actionError}</div>}
+          {addresses.length === 0 ? <div className="rounded-control border border-dashed border-hairline px-4 py-6 text-center"><p className="font-bold text-ink">未発行</p></div>
+            : <div className="space-y-3">{addresses.map((item) => <div key={item.id} className="rounded-control border border-hairline bg-canvas-sunken p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-xs font-bold text-ink-secondary">{item.revokedAt ? `${intakeDate(item.revokedAt)}まで有効` : '現在使用中'}</p>
+                <Status value={item.status} />
+              </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <input aria-label={`${store.name}の取り込みアドレス`} readOnly value={item.address} className="min-w-0 flex-1 select-all rounded-control border border-hairline bg-canvas px-3 py-2 font-mono text-xs text-ink" />
+                <button type="button" onClick={() => void copy(item)} className="whitespace-nowrap rounded-control border border-action px-4 py-2 text-xs font-bold text-action hover:bg-action-soft">{copiedId === item.id ? 'コピー済み' : 'コピー'}</button>
+              </div>
+              <p className="mt-2 text-[11px] text-ink-faint">発行日時: {intakeDate(item.createdAt)}</p>
+            </div>)}</div>}
+          <div className="flex justify-end"><button type="button" disabled={issuing} onClick={() => void issue()} className="rounded-control bg-nen-green px-5 py-2.5 text-sm font-bold text-on-accent disabled:opacity-50">{issuing ? '発行中…' : 'アドレスを発行'}</button></div>
+        </>}
+    </div>
+  </Panel>
+}
+
+function Organization({ accountId, data, selectedStoreId, busy, create }: { accountId: string; data: RestaurantSnapshot; selectedStoreId: string; busy: boolean; create: (body: Record<string, unknown>) => void }) {
   const members = selectedStoreId ? data.memberships.filter((m) => !m.store_id || m.store_id === selectedStoreId) : data.memberships
+  const selectedStore = data.stores.find((item) => item.id === selectedStoreId) || null
   const [showForm, setShowForm] = useState(false)
   const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const fd = new FormData(event.currentTarget); create({ storeId: fd.get('storeId') || null, staffName: fd.get('staffName'), email: fd.get('email'), role: fd.get('role'), lineUid: fd.get('lineUid'), googleEmail: fd.get('googleEmail') }) }
   return <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
     <Panel title="組織階層"><div className="p-4"><div className="rounded-control bg-accent-soft px-4 py-3 font-bold text-accent">{data.organization?.name}</div><div className="ml-5 border-l border-hairline pl-4 pt-2">{data.stores.map((s) => <div key={s.id} className="my-2 rounded-control border border-hairline px-3 py-2 text-sm"><span className="font-semibold">{s.name}</span><Status value={s.status} /></div>)}</div></div></Panel>
-    <div className="space-y-5"><div className="grid gap-4 sm:grid-cols-3"><Metric label="所属ユーザー" value={`${members.length}名`} note="本部・店舗の合計" /><Metric label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="承認権限あり" /><Metric label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" /></div>
+    <div className="space-y-5"><IntakeAddressPanel accountId={accountId} store={selectedStore} /><div className="grid gap-4 sm:grid-cols-3"><Metric label="所属ユーザー" value={`${members.length}名`} note="本部・店舗の合計" /><Metric label="店舗管理者" value={`${members.filter((m) => m.role === 'store_manager').length}名`} note="承認権限あり" /><Metric label="連携アカウント" value={`${members.filter((m) => m.line_uid || m.google_email).length}件`} note="LINE UID / Google" /></div>
       <div className="flex justify-end"><button onClick={() => setShowForm(!showForm)} className="rounded-control bg-accent px-4 py-2 text-sm font-bold text-on-accent">ユーザーを追加</button></div>
       {showForm && <InlineForm title="飲食店向けユーザー"><form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6"><Field label="氏名" name="staffName" required /><Field label="メール" name="email" type="email" /><label className="text-xs font-bold text-ink-secondary">役割<select name="role" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm"><option value="staff">Staff</option><option value="store_manager">StoreManager</option><option value="super_admin">SuperAdmin</option></select></label><label className="text-xs font-bold text-ink-secondary">担当店舗<select name="storeId" className="mt-1 w-full rounded-control border border-hairline bg-canvas px-3 py-2 text-sm"><option value="">全店舗</option>{data.stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label><Field label="LINE通知UID" name="lineUid" /><Field label="Googleメール" name="googleEmail" type="email" /><div className="sm:col-span-2 xl:col-span-6 flex justify-end"><button disabled={busy} className="rounded-control bg-accent px-5 py-2 text-sm font-bold text-on-accent">追加</button></div></form></InlineForm>}
       <Panel title="アカウント一覧" description="権限は飲食店向け領域の中だけに適用します。"><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="bg-canvas-sunken text-left text-xs text-ink-faint"><tr>{['氏名', '役割', '担当店舗', 'LINE通知UID', 'Google連携', '状態'].map((h) => <th key={h} className="px-5 py-3">{h}</th>)}</tr></thead><tbody className="divide-y divide-hairline">{members.map((m) => <tr key={m.id}><td className="px-5 py-4 font-bold">{m.staff_name}<p className="text-xs font-normal text-ink-faint">{m.email || 'メール未設定'}</p></td><td className="px-5 py-4"><span className="rounded-pill bg-action-soft px-2 py-1 text-xs font-bold text-action">{roleLabel[m.role]}</span></td><td className="px-5 py-4">{data.stores.find((s) => s.id === m.store_id)?.name || '全店舗'}</td><td className="px-5 py-4">{m.line_uid ? '設定済' : '未設定'}</td><td className="px-5 py-4">{m.google_email || '未設定'}</td><td className="px-5 py-4"><Status value={m.status} /></td></tr>)}</tbody></table></div></Panel>

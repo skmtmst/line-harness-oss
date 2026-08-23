@@ -23,6 +23,25 @@ type IntakeAddressRow = {
   is_active: number;
 };
 
+type ListedIntakeAddressRow = {
+  id: string;
+  store_id: string;
+  local_part: string;
+  status: 'active';
+  created_at: string;
+  revoked_at: string | null;
+};
+
+export type RestaurantIntakeAddress = {
+  id: string;
+  storeId: string;
+  localPart: string;
+  address: string;
+  status: 'active';
+  createdAt: string;
+  revokedAt: string | null;
+};
+
 type InboundEmailRow = {
   id: string;
   message_id: string;
@@ -119,6 +138,38 @@ export async function issueRestaurantIntakeAddress(
     }
   }
   throw new Error('INTAKE_ADDRESS_GENERATION_FAILED');
+}
+
+/**
+ * 店舗で現在受信できる取り込みアドレスだけを返す。
+ * 再発行後の旧アドレスも、90日の猶予中は有効なので一覧に残す。
+ */
+export async function listRestaurantIntakeAddresses(
+  env: Env['Bindings'],
+  storeId: string,
+): Promise<RestaurantIntakeAddress[]> {
+  const domain = configuredDomain(env);
+  if (!domain) throw new RestaurantIntakeConfigurationError();
+
+  const { results } = await dbFor(env, storeId).prepare(`SELECT
+      id, store_id, local_part, status, created_at, revoked_at
+    FROM rt_intake_addresses
+    WHERE store_id = ?
+      AND status = 'active'
+      AND (revoked_at IS NULL OR datetime(revoked_at) > datetime('now'))
+    ORDER BY CASE WHEN revoked_at IS NULL THEN 0 ELSE 1 END, created_at DESC, id DESC`).bind(
+      storeId,
+    ).all<ListedIntakeAddressRow>();
+
+  return results.map((row) => ({
+    id: row.id,
+    storeId: row.store_id,
+    localPart: row.local_part,
+    address: `${row.local_part}@${domain}`,
+    status: row.status,
+    createdAt: row.created_at,
+    revokedAt: row.revoked_at,
+  }));
 }
 
 async function storeRawEmail(
