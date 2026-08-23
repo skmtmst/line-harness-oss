@@ -27,32 +27,75 @@ function shouldRefresh(account: LineAccount): boolean {
   return expiresAt - Date.now() < REFRESH_THRESHOLD_MS;
 }
 
-interface TokenResponse {
+export interface TokenResponse {
   access_token: string;
   expires_in: number; // seconds
   token_type: string;
 }
 
-async function issueNewToken(
+export type LineTokenIssueFailure =
+  | 'credentials'
+  | 'rate_limited'
+  | 'temporary'
+  | 'network'
+  | 'invalid_response';
+
+export class LineTokenIssueError extends Error {
+  constructor(
+    public readonly reason: LineTokenIssueFailure,
+    public readonly status: number | null = null,
+  ) {
+    super(`LINE access token could not be issued (${reason})`);
+    this.name = 'LineTokenIssueError';
+  }
+}
+
+/**
+ * Issue a channel access token through the existing LINE OAuth endpoint.
+ * Response bodies are intentionally never copied into exceptions because they
+ * may contain operational details that must not reach logs or browser errors.
+ */
+export async function issueLineAccessToken(
   channelId: string,
   channelSecret: string,
 ): Promise<TokenResponse> {
-  const res = await fetch('https://api.line.me/v2/oauth/accessToken', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: channelId,
-      client_secret: channelSecret,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`LINE token API ${res.status}: ${body}`);
+  let res: Response;
+  try {
+    res = await fetch('https://api.line.me/v2/oauth/accessToken', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: channelId,
+        client_secret: channelSecret,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new LineTokenIssueError('network');
   }
 
-  return res.json() as Promise<TokenResponse>;
+  if (!res.ok) {
+    const reason: LineTokenIssueFailure = res.status === 400 || res.status === 401
+      ? 'credentials'
+      : res.status === 429
+        ? 'rate_limited'
+        : res.status >= 500
+          ? 'temporary'
+          : 'invalid_response';
+    throw new LineTokenIssueError(reason, res.status);
+  }
+
+  try {
+    const token = await res.json<TokenResponse>();
+    if (!token.access_token || !Number.isFinite(token.expires_in)) {
+      throw new LineTokenIssueError('invalid_response', res.status);
+    }
+    return token;
+  } catch (error) {
+    if (error instanceof LineTokenIssueError) throw error;
+    throw new LineTokenIssueError('invalid_response', res.status);
+  }
 }
 
 export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
@@ -63,7 +106,7 @@ export async function refreshLineAccessTokens(db: D1Database): Promise<void> {
     if (!shouldRefresh(account)) continue;
 
     try {
-      const token = await issueNewToken(account.channel_id, account.channel_secret);
+      const token = await issueLineAccessToken(account.channel_id, account.channel_secret);
       const expiresAt = new Date(Date.now() + token.expires_in * 1000 + JST_OFFSET_MS);
       const expiresAtJst = expiresAt.toISOString().slice(0, -1) + '+09:00';
 

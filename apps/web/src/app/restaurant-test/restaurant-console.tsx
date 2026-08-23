@@ -4,6 +4,7 @@ import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from 
 import Header from '@/components/layout/header'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
+import StoreContextBanner from './stores/store-context-banner'
 import {
   restaurantTestApi,
   type RestaurantApproval,
@@ -141,12 +142,9 @@ export default function RestaurantConsole({ view }: { view: string }) {
   }
 
   const store = selectedStoreId ? snapshot?.stores.find((item) => item.id === selectedStoreId) || null : null
-  const headerAction = snapshot?.organization ? <select aria-label="表示店舗" value={store?.id || ''} onChange={(event) => setSelectedStoreId(event.target.value)} className="rounded-control border border-hairline bg-canvas px-3 py-2 text-sm font-semibold text-ink">
-    <option value="">全店舗</option>{snapshot.stores.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-  </select> : null
-
   return <>
-    <Header title={viewMeta[activeView][0]} description={viewMeta[activeView][1]} action={headerAction} />
+    <StoreContextBanner />
+    <Header title={viewMeta[activeView][0]} description={viewMeta[activeView][1]} />
     <TestBoundary />
     {notice && <div className={`mb-4 rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
     {loading ? <div className="rounded-card border border-hairline bg-canvas p-16 text-center text-sm text-ink-faint">読み込み中…</div>

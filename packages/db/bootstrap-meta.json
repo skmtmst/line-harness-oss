@@ -179,7 +179,8 @@
     "170_restaurant_inbound_emails.sql",
     "171_restaurant_email_parsers.sql",
     "172_line_account_credentials_encrypted.sql",
-    "173_restaurant_store_line_account.sql"
+    "173_restaurant_store_line_account.sql",
+    "174_admin_session_restaurant_store.sql"
   ],
-  "migrationCount": 180
+  "migrationCount": 181
 }

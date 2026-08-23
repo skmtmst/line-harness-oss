@@ -60,7 +60,8 @@ CREATE TABLE admin_sessions (
   token_hash TEXT PRIMARY KEY,
   staff_id   TEXT NOT NULL,
   expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')), selected_restaurant_store_id TEXT
+  REFERENCES rt_stores(id) ON DELETE SET NULL,
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
@@ -2101,6 +2102,10 @@ CREATE INDEX idx_ad_conversion_logs_platform ON ad_conversion_logs (ad_platform_
 CREATE INDEX idx_ad_conversion_logs_status ON ad_conversion_logs (status);
 
 CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions(expires_at);
+
+CREATE INDEX idx_admin_sessions_restaurant_store
+  ON admin_sessions(selected_restaurant_store_id)
+  WHERE selected_restaurant_store_id IS NOT NULL;
 
 CREATE INDEX idx_admin_sessions_staff_id ON admin_sessions(staff_id);
 

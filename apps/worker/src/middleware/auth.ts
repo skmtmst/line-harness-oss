@@ -43,6 +43,24 @@ function bearerToken(c: Context<Env>): string | null {
   return authHeader.slice('Bearer '.length);
 }
 
+/**
+ * Return the hash key of the existing opaque admin session for server-side
+ * session context. API-key authentication deliberately returns null because
+ * it has no admin_sessions row to update.
+ */
+export async function adminSessionTokenHashFromRequest(
+  c: Context<Env>,
+): Promise<string | null> {
+  const bearer = bearerToken(c);
+  if (bearer) {
+    if (!bearer.startsWith(ADMIN_SESSION_BEARER_PREFIX)) return null;
+    const token = bearer.slice(ADMIN_SESSION_BEARER_PREFIX.length);
+    return token ? sha256Hex(token) : null;
+  }
+  const cookie = adminSessionTokenFromCookie(c);
+  return cookie ? sha256Hex(cookie) : null;
+}
+
 export function adminSessionTokenFromCookie(c: Context<Env>): string | null {
   return parseCookieHeader(c.req.header('Cookie'))[ADMIN_AUTH_COOKIE] || null;
 }

@@ -60,7 +60,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   {
     section: '飲食店向け（テスト）',
     items: [
-      '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
+      '店舗一覧（統括）', '店舗ダッシュボード', '組織・権限', '承認ワークフロー', '予約台帳', '座席・卓管理',
       '予約枠・在庫', 'メニュー管理', 'Google・口コミ', 'LINE来店フォロー',
     ],
   },
@@ -127,6 +127,7 @@ const ROUTES: Record<string, string> = {
   機能設定: '/settings',
   データ移行: '/accounts?tab=migration',
   運用状態: '/emergency',
+  '店舗一覧（統括）': '/restaurant-test/stores',
   店舗ダッシュボード: '/restaurant-test/dashboard',
   '組織・権限': '/restaurant-test/organization',
   承認ワークフロー: '/restaurant-test/approvals',
@@ -152,12 +153,11 @@ describe('サイドバーが V4 設計と一致する', () => {
     },
   );
 
-  it('項目の総数が設計どおり（44）', () => {
+  it('項目の総数が設計どおり（45）', () => {
     // 設計に無いものを足すと、ここで気づける。
-    // 監査基準時点の34項目に飲食店向け9項目を足すと43項目。
-    // その後「友だち属性V3」が追加されたため、最新developmentでは合計44項目になる。
+    // 既存の34項目に、飲食店向け10項目と「友だち属性V3」を足して45項目。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(44);
+    expect(total).toBe(45);
   });
 
   it('項目の行き先が仕様どおり', () => {

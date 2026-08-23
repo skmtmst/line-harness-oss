@@ -1,7 +1,14 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { getLineAccounts, type LineAccount } from '@line-crm/db';
+import {
+  CredentialEncryptionKeyError,
+  createLineAccount,
+  deleteLineAccount,
+  getLineAccounts,
+  type LineAccount,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
+import { adminSessionTokenHashFromRequest } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
   canAccessLineAccount,
@@ -14,6 +21,12 @@ import {
   RestaurantIntakeConfigurationError,
 } from '../services/restaurant-email-intake.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
+import {
+  issueLineAccessToken,
+  LineTokenIssueError,
+  type LineTokenIssueFailure,
+} from '../services/token-refresh.js';
+import { fetchBotProfile } from '../lib/bot-profile.js';
 import {
   chooseRestaurantTable,
   isRestaurantReservationSource,
@@ -44,8 +57,15 @@ type RestaurantStoreRow = {
   google_status: string;
   line_account_id: string | null;
   line_account_name: string | null;
+  friend_count?: number | null;
   created_at: string;
   updated_at: string;
+};
+
+type SelectedRestaurantStore = {
+  id: string;
+  organization_id: string;
+  name: string;
 };
 
 function accountId(c: Context<Env>): string | null {
@@ -62,7 +82,12 @@ restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
   return next();
 });
 
-async function organizationFor(c: Context<Env>): Promise<OrganizationContext | null> {
+/**
+ * One authenticated operator belongs to one restaurant organization in phase
+ * A. Multi-organization membership is intentionally deferred until its access
+ * model is defined.
+ */
+async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext | null> {
   const id = accountId(c);
   if (!id) return null;
   const organization = await dbFor(c.env).prepare(
@@ -81,7 +106,35 @@ async function organizationFor(c: Context<Env>): Promise<OrganizationContext | n
     : null;
 }
 
+async function selectedRestaurantStore(
+  c: Context<Env>,
+  organizationId: string,
+): Promise<SelectedRestaurantStore | null> {
+  const tokenHash = await adminSessionTokenHashFromRequest(c);
+  if (!tokenHash) return null;
+  return dbFor(c.env).prepare(`SELECT s.id, s.organization_id, s.name
+    FROM admin_sessions session
+    JOIN rt_stores s ON s.id = session.selected_restaurant_store_id
+    WHERE session.token_hash = ?
+      AND session.expires_at > ?
+      AND s.organization_id = ?
+    LIMIT 1`).bind(tokenHash, new Date().toISOString(), organizationId)
+    .first<SelectedRestaurantStore>();
+}
+
+async function organizationFor(
+  c: Context<Env>,
+  options: { ignoreSession?: boolean } = {},
+): Promise<OrganizationContext | null> {
+  const organization = await baseOrganizationFor(c);
+  if (!organization || options.ignoreSession) return organization;
+  const selected = await selectedRestaurantStore(c, organization.id);
+  return selected ? { ...organization, scopedStoreId: selected.id } : organization;
+}
+
 async function storeBelongsTo(c: Context<Env>, organizationId: string, storeId: string): Promise<boolean> {
+  const selected = await selectedRestaurantStore(c, organizationId);
+  if (selected && selected.id !== storeId) return false;
   const row = await dbFor(c.env, storeId).prepare(
     'SELECT 1 AS ok FROM rt_stores WHERE id = ? AND organization_id = ? LIMIT 1',
   ).bind(storeId, organizationId).first<{ ok: number }>();
@@ -163,6 +216,104 @@ async function validateStoreLineAccount(
   const scope = await getVisibleLineAccountScope(dbFor(c.env), c.get('staff'));
   return canAccessLineAccount(scope.accounts, c.get('staff'), lineAccountId);
 }
+
+async function updateSelectedRestaurantStore(
+  c: Context<Env>,
+  storeId: string | null,
+): Promise<boolean> {
+  const tokenHash = await adminSessionTokenHashFromRequest(c);
+  if (!tokenHash) return false;
+  const result = await dbFor(c.env).prepare(`UPDATE admin_sessions
+    SET selected_restaurant_store_id = ?
+    WHERE token_hash = ? AND expires_at > ?`).bind(
+      storeId,
+      tokenHash,
+      new Date().toISOString(),
+    ).run();
+  return Boolean(result.meta.changes);
+}
+
+function lineConnectionMessage(reason: LineTokenIssueFailure): string {
+  if (reason === 'credentials') {
+    return 'チャネルIDまたはチャネルシークレットが違う可能性があります。LINE Developersの「チャネル基本設定」からコピーし直してください。';
+  }
+  if (reason === 'rate_limited') {
+    return 'LINE側の利用回数制限に達しました。少し時間を置いてから、もう一度お試しください。';
+  }
+  if (reason === 'network' || reason === 'temporary') {
+    return 'LINEへ一時的に接続できませんでした。通信状況を確認し、少し時間を置いてからもう一度お試しください。';
+  }
+  return 'LINEから接続確認に必要な情報を取得できませんでした。チャネルIDとチャネルシークレットを確認してください。';
+}
+
+/** HQ store list. Session store scope is deliberately ignored here. */
+restaurantTest.get('/api/restaurant-test/stores', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  const organization = await organizationFor(c, { ignoreSession: true });
+  if (!organization) {
+    return c.json({ success: true, data: { organization: null, stores: [] } });
+  }
+  const stores = await dbFor(c.env).prepare(`SELECT
+      s.*, la.name AS line_account_name,
+      CASE WHEN s.line_account_id IS NULL THEN NULL ELSE (
+        SELECT COUNT(*) FROM friends f
+        WHERE f.line_account_id = s.line_account_id AND f.is_following = 1
+      ) END AS friend_count
+    FROM rt_stores s
+    LEFT JOIN line_accounts la ON la.id = s.line_account_id
+    WHERE s.organization_id = ?
+    ORDER BY s.name COLLATE NOCASE ASC, s.id ASC`).bind(organization.id)
+    .all<RestaurantStoreRow>();
+  const withStatuses = await deriveStoreLineStatuses(c, stores.results);
+  return c.json({
+    success: true,
+    data: { organization: publicOrganization(organization), stores: withStatuses },
+  });
+});
+
+/** Read-only context for the fixed store banner. */
+restaurantTest.get('/api/restaurant-test/store-context', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  const organization = await organizationFor(c, { ignoreSession: true });
+  if (!organization) {
+    return c.json({ success: true, data: { selectedStore: null } });
+  }
+  const selectedStore = await selectedRestaurantStore(c, organization.id);
+  return c.json({
+    success: true,
+    data: { selectedStore: selectedStore ? { id: selectedStore.id, name: selectedStore.name } : null },
+  });
+});
+
+/** Save a same-organization store in the existing opaque admin session. */
+restaurantTest.post('/api/restaurant-test/stores/:id/select', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  const organization = await organizationFor(c, { ignoreSession: true });
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const storeId = c.req.param('id');
+  const store = await dbFor(c.env, storeId).prepare(
+    'SELECT id, organization_id, name, status FROM rt_stores WHERE id = ? LIMIT 1',
+  ).bind(storeId).first<SelectedRestaurantStore & { status: string }>();
+  if (!store || store.organization_id !== organization.id) {
+    return c.json({ success: false, error: 'この店舗を表示することはできません' }, 403);
+  }
+  if (store.status === 'archived') {
+    return c.json({ success: false, error: 'アーカイブ済みの店舗は表示できません' }, 409);
+  }
+  if (!await updateSelectedRestaurantStore(c, store.id)) {
+    return c.json({ success: false, error: '店舗切り替えには管理画面への再ログインが必要です' }, 409);
+  }
+  return c.json({ success: true, data: { selectedStore: { id: store.id, name: store.name } } });
+});
+
+/** Clear store scope and return to the organization-wide HQ view. */
+restaurantTest.post('/api/restaurant-test/stores/selection/clear', requireRole('owner', 'admin', 'staff'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  if (!await updateSelectedRestaurantStore(c, null)) {
+    return c.json({ success: false, error: '統括表示へ戻すには管理画面への再ログインが必要です' }, 409);
+  }
+  return c.json({ success: true, data: { selectedStore: null } });
+});
 
 restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin', 'staff'), async (c) => {
   if (!accountId(c)) return requiredAccount(c);
@@ -336,6 +487,103 @@ restaurantTest.post('/api/restaurant-test/bootstrap', requireRole('owner', 'admi
   }
   await dbFor(c.env, mainId).batch(statements);
   return c.json({ success: true, data: { organizationId: orgId, created: true } }, 201);
+});
+
+/**
+ * Complete the four-step store wizard in one server operation. Draft values
+ * stay in the browser until this request; a failed connection leaves neither
+ * a store nor a LINE account behind.
+ */
+restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 'admin'), async (c) => {
+  if (!accountId(c)) return requiredAccount(c);
+  const organization = await organizationFor(c, { ignoreSession: true });
+  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const body: {
+    name?: unknown;
+    alias?: unknown;
+    channelId?: unknown;
+    channelSecret?: unknown;
+  } = await c.req.json().catch(() => ({}));
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const alias = typeof body.alias === 'string' ? body.alias.trim() : '';
+  const channelId = typeof body.channelId === 'string' ? body.channelId.trim() : '';
+  const channelSecret = typeof body.channelSecret === 'string' ? body.channelSecret.trim() : '';
+  if (!name) return c.json({ success: false, error: '店舗名を入力してください' }, 400);
+  if (!channelId) return c.json({ success: false, error: 'チャネルIDを入力してください' }, 400);
+  if (!channelSecret) return c.json({ success: false, error: 'チャネルシークレットを入力してください' }, 400);
+
+  const code = alias || name;
+  const [sameCode, sameChannel] = await Promise.all([
+    dbFor(c.env).prepare(
+      'SELECT 1 AS found FROM rt_stores WHERE organization_id = ? AND code = ? LIMIT 1',
+    ).bind(organization.id, code).first<{ found: number }>(),
+    dbFor(c.env).prepare(
+      'SELECT 1 AS found FROM line_accounts WHERE channel_id = ? LIMIT 1',
+    ).bind(channelId).first<{ found: number }>(),
+  ]);
+  if (sameCode) return c.json({ success: false, error: '同じ店舗の略称が既に使用されています' }, 409);
+  if (sameChannel) return c.json({ success: false, error: 'このLINE公式アカウントは既に登録されています' }, 409);
+
+  let createdLineAccountId: string | null = null;
+  try {
+    const token = await issueLineAccessToken(channelId, channelSecret);
+    const profile = await fetchBotProfile(token.access_token);
+    if (!profile.displayName?.trim()) {
+      return c.json({
+        success: false,
+        error: 'LINE公式アカウントの情報を取得できませんでした。Messaging APIが有効になっているか確認してください。',
+      }, 400);
+    }
+
+    const lineAccount = await createLineAccount(dbFor(c.env), {
+      channelId,
+      name: profile.displayName.trim(),
+      channelAccessToken: token.access_token,
+      channelSecret,
+    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    createdLineAccountId = lineAccount.id;
+    const storeId = crypto.randomUUID();
+    await dbFor(c.env, storeId).prepare(`INSERT INTO rt_stores
+      (id, organization_id, name, code, capacity, timezone, line_account_id)
+      VALUES (?, ?, ?, ?, 0, 'Asia/Tokyo', ?)`).bind(
+        storeId,
+        organization.id,
+        name,
+        code,
+        lineAccount.id,
+      ).run();
+    return c.json({
+      success: true,
+      data: { store: { id: storeId, name }, lineAccountName: profile.displayName.trim() },
+    }, 201);
+  } catch (error) {
+    if (createdLineAccountId) {
+      try {
+        await deleteLineAccount(dbFor(c.env), createdLineAccountId);
+      } catch {
+        console.error(JSON.stringify({ event: 'restaurant_store_wizard_rollback_failed' }));
+      }
+    }
+    if (error instanceof LineTokenIssueError) {
+      return c.json({ success: false, error: lineConnectionMessage(error.reason) }, 400);
+    }
+    if (error instanceof CredentialEncryptionKeyError) {
+      return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
+    }
+    const conflict = uniqueStoreConflict(error);
+    if (conflict === 'line_account') {
+      return c.json({ success: false, error: 'このLINE公式アカウントは別の店舗で使用されています' }, 409);
+    }
+    if (conflict === 'code') {
+      return c.json({ success: false, error: '同じ店舗の略称が既に使用されています' }, 409);
+    }
+    const message = error instanceof Error ? error.message : '';
+    if (/UNIQUE constraint failed.*line_accounts\.channel_id/i.test(message)) {
+      return c.json({ success: false, error: 'このLINE公式アカウントは既に登録されています' }, 409);
+    }
+    console.error(JSON.stringify({ event: 'restaurant_store_wizard_failed', reason: 'internal' }));
+    return c.json({ success: false, error: '店舗を追加できませんでした。時間を置いてもう一度お試しください。' }, 500);
+  }
 });
 
 /** LINE公式アカウントを必ず1つ割り当てて店舗を作成する。 */
@@ -531,8 +779,10 @@ restaurantTest.patch('/api/restaurant-test/approvals/:id', requireRole('owner', 
   const staff = c.get('staff');
   const result = await dbFor(c.env).prepare(`UPDATE rt_approval_requests
     SET status = ?, review_comment = ?, reviewed_by = ?, updated_at = datetime('now')
-    WHERE id = ? AND organization_id = ? AND status IN ('pending', 'returned')`).bind(
+    WHERE id = ? AND organization_id = ? AND (? IS NULL OR store_id = ?)
+      AND status IN ('pending', 'returned')`).bind(
       status, body.comment?.trim() || null, staff?.name || staff?.id || '管理者', c.req.param('id'), organization.id,
+      organization.scopedStoreId, organization.scopedStoreId,
     ).run();
   if (!result.meta.changes) return c.json({ success: false, error: '対象が無いか、すでに処理済みです' }, 409);
   return c.json({ success: true, data: { id: c.req.param('id'), status } });
@@ -671,8 +921,11 @@ restaurantTest.put('/api/restaurant-test/inventory/:id', requireRole('owner', 'a
   }
   const result = await dbFor(c.env).prepare(`UPDATE rt_inventory_slots SET
     total_capacity = ?, ota_capacity = ?, line_capacity = ?, walk_in_capacity = ?, updated_at = datetime('now')
-    WHERE id = ? AND store_id IN (SELECT id FROM rt_stores WHERE organization_id = ?)`).bind(
+    WHERE id = ? AND store_id IN (
+      SELECT id FROM rt_stores WHERE organization_id = ? AND (? IS NULL OR id = ?)
+    )`).bind(
       ...values, c.req.param('id'), organization.id,
+      organization.scopedStoreId, organization.scopedStoreId,
     ).run();
   if (!result.meta.changes) return c.json({ success: false, error: '対象がありません' }, 404);
   return c.json({ success: true, data: { id: c.req.param('id') } });
@@ -719,7 +972,12 @@ restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('ow
   const body = await c.req.json<{ replyDraft?: string }>();
   if (!body.replyDraft?.trim()) return c.json({ success: false, error: '返信案が必要です' }, 400);
   const result = await dbFor(c.env).prepare(`UPDATE rt_gbp_reviews SET reply_draft = ?, reply_status = 'draft', updated_at = datetime('now')
-    WHERE id = ? AND store_id IN (SELECT id FROM rt_stores WHERE organization_id = ?)`).bind(body.replyDraft.trim(), c.req.param('id'), organization.id).run();
+    WHERE id = ? AND store_id IN (
+      SELECT id FROM rt_stores WHERE organization_id = ? AND (? IS NULL OR id = ?)
+    )`).bind(
+      body.replyDraft.trim(), c.req.param('id'), organization.id,
+      organization.scopedStoreId, organization.scopedStoreId,
+    ).run();
   if (!result.meta.changes) return c.json({ success: false, error: '対象がありません' }, 404);
   return c.json({ success: true, data: { id: c.req.param('id'), sent: false } });
 });
@@ -731,8 +989,10 @@ restaurantTest.put('/api/restaurant-test/line-flows/:id', requireRole('owner', '
   const body = await c.req.json<{ title?: string; body?: string; timingMinutes?: number | null; isEnabled?: boolean }>();
   if (!body.title?.trim() || !body.body?.trim()) return c.json({ success: false, error: 'タイトルと本文が必要です' }, 400);
   const result = await dbFor(c.env).prepare(`UPDATE rt_line_flows SET title = ?, body = ?, timing_minutes = ?, is_enabled = ?,
-    delivery_mode = 'preview_only', updated_at = datetime('now') WHERE id = ? AND organization_id = ?`).bind(
-      body.title.trim(), body.body.trim(), body.timingMinutes ?? null, body.isEnabled ? 1 : 0, c.req.param('id'), organization.id,
+    delivery_mode = 'preview_only', updated_at = datetime('now')
+    WHERE id = ? AND organization_id = ? AND (? IS NULL OR store_id = ?)`).bind(
+      body.title.trim(), body.body.trim(), body.timingMinutes ?? null, body.isEnabled ? 1 : 0,
+      c.req.param('id'), organization.id, organization.scopedStoreId, organization.scopedStoreId,
     ).run();
   if (!result.meta.changes) return c.json({ success: false, error: '対象がありません' }, 404);
   return c.json({ success: true, data: { id: c.req.param('id'), deliveryMode: 'preview_only' } });
