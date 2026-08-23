@@ -99,6 +99,9 @@ jobs:
         env:
           DB_NAME: ${{ steps.db.outputs.name }}
         run: |
+          pending_file="$RUNNER_TEMP/d1-pending-migrations.txt"
+          : > "$pending_file"
+
           npx wrangler d1 execute "$DB_NAME" --remote --command \
             "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
 
@@ -110,12 +113,11 @@ jobs:
               console.log(rows.map((r) => r.name).join('\n'));
             ")
 
-          pending=''
           count=0
           for f in $(ls packages/db/migrations/*.sql | sort); do
             name=$(basename "$f")
             if ! printf '%s\n' "$applied" | grep -qxF "$name"; then
-              pending="${pending}${name}"$'\n'
+              printf '%s\n' "$f" >> "$pending_file"
               count=$((count + 1))
             fi
           done
@@ -128,14 +130,12 @@ jobs:
             echo
             if [ "$count" -gt 0 ]; then
               echo '```'
-              printf '%s' "$pending"
+              sed 's#^packages/db/migrations/##' "$pending_file"
               echo '```'
             else
               echo "すべて適用済みです。"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-
-          printf '%s' "$pending"
 
       # 当てる前の復元点。down マイグレーションが書けない以上、
       # 戻る手段はこれだけ。取れなかったら止める。
@@ -183,24 +183,13 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Apply the pending migrations
+        id: apply
         if: inputs.mode == 'apply' && steps.pending.outputs.count != '0'
         env:
           DB_NAME: ${{ steps.db.outputs.name }}
         run: |
-          for f in $(ls packages/db/migrations/*.sql | sort); do
-            name=$(basename "$f")
-            applied=$(npx wrangler d1 execute "$DB_NAME" --remote \
-              --command "SELECT name FROM _migrations WHERE name = '${name}'" --json \
-              | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));console.log(d[0]?.results?.length||0)")
-            if [ "$applied" = "0" ]; then
-              echo "Applying: $name"
-              npx wrangler d1 execute "$DB_NAME" --remote --file="$f"
-              npx wrangler d1 execute "$DB_NAME" --remote --command \
-                "INSERT INTO _migrations (name, applied_at) VALUES ('${name}', datetime('now'))"
-            else
-              echo "Skipped: $name"
-            fi
-          done
+          bash scripts/deploy/apply-d1-migrations.sh \
+            "$DB_NAME" "$RUNNER_TEMP/d1-pending-migrations.txt"
 
       - name: Say what happened
         if: always()
@@ -213,6 +202,8 @@ jobs:
             echo "実際に当てるには mode を apply にして、もう一度実行してください。"
           elif [ "${COUNT:-0}" = "0" ]; then
             echo "未適用のものはありませんでした。"
+          elif [ "${{ steps.apply.outcome }}" != "success" ]; then
+            echo "マイグレーションは途中で停止しました。サマリーの停止位置と確認手順を見てください。"
           else
             echo "$COUNT 件を当てました。上のサマリーに復元点が出ています。"
           fi
