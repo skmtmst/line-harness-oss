@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
 
 export default function RestaurantTestIndexPage() {
-  redirect('/restaurant-test/dashboard')
+  redirect('/restaurant-test/stores')
 }

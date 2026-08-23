@@ -5,10 +5,10 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import AccountEditModal from '@/components/accounts/account-edit-modal'
+import AccountOrdering from '@/components/accounts/account-ordering'
 import { AccountSwitchDialog } from '@/components/accounts/account-switcher'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { useAccount } from '@/contexts/account-context'
-import AccountHierarchy from './account-hierarchy'
 import AccountMigration from './migration'
 
 type WebhookStatus = 'matched' | 'mismatched' | 'unconfigured' | 'unknown'
@@ -44,7 +44,6 @@ interface LineAccountListItem {
 
 const MERGED_TABS = [
   { key: 'accounts', label: 'アカウント一覧' },
-  { key: 'hierarchy', label: 'LINEアカウント構成' },
   { key: 'migration', label: 'データ移行' },
 ]
 const PAGE_SIZE = 20
@@ -203,7 +202,7 @@ function AccountsPageInner() {
               <tr><td colSpan={8} className="p-10 text-center text-ink-faint">{accounts.length === 0 ? '未設定のアカウントはありません' : '検索条件に一致するアカウントはありません'}</td></tr>
             ) : pageItems.map((account) => (
               <tr key={account.id} className="hover:bg-canvas-sunken">
-                <td className="px-2 py-3 text-center text-ink-faint" title="並び替えはLINEアカウント構成から行えます">⠇</td>
+                <td className="px-2 py-3 text-center text-ink-faint" title="並び替えは一覧の下で行えます">⠇</td>
                 <td className="px-2 py-3"><div className="flex min-w-0 items-center gap-2"><button onClick={() => account.id === selectedAccountId ? setEditing(account) : setSwitching(account)} title={account.id === selectedAccountId ? `${account.displayName}の設定を開く` : `${account.displayName}へ切り替える`} className="min-w-0 max-w-full cursor-pointer truncate whitespace-nowrap font-semibold text-accent hover:underline">{account.displayName}</button>{account.id === selectedAccountId && <span className="shrink-0 rounded-pill bg-accent-soft px-2 py-1 text-[10px] font-semibold text-success">表示中</span>}</div></td>
                 <td className="hidden truncate whitespace-nowrap px-2 py-3 text-xs text-ink-secondary lg:table-cell" title={account.basicId ?? account.channelId}>{account.basicId ?? account.channelId}</td>
                 <td className={`hidden truncate whitespace-nowrap px-2 py-3 text-xs font-medium lg:table-cell ${account.plan?.key === 'unknown' || !account.plan ? 'text-ink-faint' : 'text-ink'}`} title={account.plan?.monthlyMessageLimit == null ? 'LINEからプラン判定情報を取得できませんでした' : `LINE APIの当月送信上限 ${account.plan.monthlyMessageLimit.toLocaleString('ja-JP')}通から自動判定`}>{account.plan?.label ?? '取得できません'}</td>
@@ -224,6 +223,8 @@ function AccountsPageInner() {
           </div>
         </div>
       </div>
+
+      <AccountOrdering />
 
       {editing && <AccountEditModal
         accountId={editing.id} initialName={editing.name} initialChannelId={editing.channelId}
@@ -249,7 +250,6 @@ function Kpi({ label, value, unit, note, warning = false }: { label: string; val
 function AccountsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   const tabs = <div data-design="Tabs"><MergedTabs basePath="/accounts" paramName="tab" tabs={MERGED_TABS} active={tab} /></div>
-  if (tab === 'hierarchy') return <AccountHierarchy tabs={tabs} />
   if (tab === 'migration') return <div>
     <div data-design="Head"><Header
       title="データ移行"
@@ -261,7 +261,7 @@ function AccountsPageHost() {
   return <div>
     <div data-design="Head"><Header
       title="アカウント"
-      description="接続しているLINE公式アカウントと、アカウント同士の階層構成を管理します。チャネル設定とWebhookの状態も、この画面から確認できます。"
+      description="接続しているLINE公式アカウントと並び順を管理します。チャネル設定とWebhookの状態も、この画面から確認できます。"
       action={<div className="flex items-center gap-3"><button disabled title="マニュアルは準備中です" className="whitespace-nowrap text-xs text-ink-faint opacity-70">▫ マニュアル</button><Link href="/accounts/new" className="cursor-pointer whitespace-nowrap rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent">＋ アカウントを追加</Link></div>}
     /></div>
     {tabs}

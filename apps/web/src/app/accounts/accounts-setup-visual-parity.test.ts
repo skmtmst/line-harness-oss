@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 const directory = dirname(fileURLToPath(import.meta.url))
 const setupSource = readFileSync(join(directory, 'new/page.tsx'), 'utf8')
-const hierarchySource = readFileSync(join(directory, 'account-hierarchy.tsx'), 'utf8')
+const orderingSource = readFileSync(join(directory, '../../components/accounts/account-ordering.tsx'), 'utf8')
 const accountsSource = readFileSync(join(directory, 'page.tsx'), 'utf8')
 const switcherSource = readFileSync(join(directory, '../../components/accounts/account-switcher.tsx'), 'utf8')
 const editModalSource = readFileSync(join(directory, '../../components/accounts/account-edit-modal.tsx'), 'utf8')
@@ -44,21 +44,23 @@ describe('V2 10-1 Pen準拠のアカウントUI', () => {
     expect(setupSource).toContain('LIFF Endpoint URL')
   })
 
-  it('構成画面を未設定一覧と3階層のドロップ編集にする', () => {
+  it('アカウント一覧内の並び替えを未設定一覧と3階層のドロップ編集にする', () => {
     for (const label of ['未設定のLINEアカウント', 'LINEアカウント階層をドラッグ＆ドロップで編集', '未保存の変更', '構成を保存']) {
-      expect(hierarchySource).toContain(label)
+      expect(orderingSource).toContain(label)
     }
-    expect(hierarchySource).toContain('親・子・孫はすべてLINE公式アカウントです')
-    expect(hierarchySource).toContain('api.lineAccounts.updateHierarchy')
+    expect(orderingSource).toContain('親・子・孫はすべてLINE公式アカウントです')
+    expect(orderingSource).toContain('api.lineAccounts.updateHierarchy')
+    expect(accountsSource).toContain('<AccountOrdering />')
+    expect(accountsSource).not.toContain("key: 'hierarchy'")
   })
 
   it('空の構成にも確実にドラッグ元を渡して親候補として表示する', () => {
-    expect(hierarchySource).toContain("event.dataTransfer.setData(ACCOUNT_DRAG_TYPE, accountId)")
-    expect(hierarchySource).toContain("event.dataTransfer.getData(ACCOUNT_DRAG_TYPE)")
-    expect(hierarchySource).toContain('draggedIdRef.current')
-    expect(hierarchySource).toContain('draftRootIds.has(account.id)')
-    expect(hierarchySource).toContain('data-hierarchy-root-drop')
-    expect(hierarchySource).toContain('dropOn(event, null)')
+    expect(orderingSource).toContain("event.dataTransfer.setData(ACCOUNT_DRAG_TYPE, accountId)")
+    expect(orderingSource).toContain("event.dataTransfer.getData(ACCOUNT_DRAG_TYPE)")
+    expect(orderingSource).toContain('draggedIdRef.current')
+    expect(orderingSource).toContain('draftRootIds.has(account.id)')
+    expect(orderingSource).toContain('data-hierarchy-root-drop')
+    expect(orderingSource).toContain('dropOn(event, null)')
   })
 
   it('現在表示中のLINEアカウントを示し、確認後に管理対象を切り替える', () => {

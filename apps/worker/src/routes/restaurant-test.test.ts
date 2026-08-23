@@ -17,15 +17,21 @@ type MockStaff = {
 
 const authMocks = vi.hoisted(() => ({
   getStaffByApiKey: vi.fn(async (): Promise<MockStaff | null> => null),
+  getStaffByAdminSession: vi.fn(async (): Promise<MockStaff | null> => null),
   lineAccounts: [] as Array<Record<string, unknown>>,
 }));
 
-vi.mock('@line-crm/db', () => ({
-  getStaffByApiKey: authMocks.getStaffByApiKey,
-  getLineAccounts: vi.fn(async () => authMocks.lineAccounts),
-}));
+vi.mock('@line-crm/db', async () => {
+  const actual = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+  return {
+    ...actual,
+    getStaffByApiKey: authMocks.getStaffByApiKey,
+    getStaffByAdminSession: authMocks.getStaffByAdminSession,
+    getLineAccounts: vi.fn(async () => authMocks.lineAccounts),
+  };
+});
 
-const { authMiddleware } = await import('../middleware/auth.js');
+const { authMiddleware, sha256Hex } = await import('../middleware/auth.js');
 const { restaurantTest } = await import('./restaurant-test.js');
 type Env = import('../index.js').Env;
 
@@ -62,9 +68,25 @@ function requestWithMethod(path: string, method: string, body?: unknown, token =
   }, env);
 }
 
+async function createAdminSession(token = 'restaurant-session'): Promise<string> {
+  authMocks.getStaffByAdminSession.mockResolvedValue({
+    id: 'owner-session', name: 'Owner', role: 'owner', access_level: 'full',
+    permission_keys: '[]', assigned_line_account_id: null,
+    can_access_descendant_accounts: 1,
+  });
+  testDb.raw.prepare(
+    'INSERT INTO admin_sessions (token_hash, staff_id, expires_at) VALUES (?, ?, ?)',
+  ).run(await sha256Hex(token), 'owner-session', '2099-01-01T00:00:00.000Z');
+  return `${ADMIN_SESSION_PREFIX}${token}`;
+}
+
+const ADMIN_SESSION_PREFIX = 'lh_session:';
+
 beforeEach(() => {
   authMocks.getStaffByApiKey.mockReset();
   authMocks.getStaffByApiKey.mockResolvedValue(null);
+  authMocks.getStaffByAdminSession.mockReset();
+  authMocks.getStaffByAdminSession.mockResolvedValue(null);
   authMocks.lineAccounts = [
     { id: 'account-1', name: '統括', is_active: 1, channel_access_token: 'token-1' },
     { id: 'account-2', name: '店舗A', is_active: 1, channel_access_token: 'token-2' },
@@ -88,6 +110,7 @@ beforeEach(() => {
     LIFF_URL: 'https://example.test', LINE_CHANNEL_ID: 'unused',
     LINE_LOGIN_CHANNEL_ID: 'unused', LINE_LOGIN_CHANNEL_SECRET: 'unused',
     WORKER_URL: 'https://worker.example.test',
+    LINE_CREDENTIAL_ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
   };
 });
 
@@ -107,6 +130,53 @@ describe('飲食店向けテストAPI', () => {
     expect(json.data.menuItems.length).toBeGreaterThan(0);
     expect(json.data.lineFlows.length).toBe(6);
     expect(JSON.stringify(json)).not.toContain('token-');
+  });
+
+  it('店舗未選択の管理画面セッションでは統括組織の全店舗を返す', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const session = await createAdminSession();
+
+    const snapshot = await requestAs('/api/restaurant-test/snapshot?account_id=account-1', session);
+    expect(snapshot.status).toBe(200);
+    const json = await snapshot.json() as { data: { stores: unknown[] } };
+    expect(json.data.stores).toHaveLength(2);
+  });
+
+  it('同一組織の店舗だけをセッションへ保存し、統括へ戻すと選択を消す', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    testDb.raw.prepare('INSERT INTO rt_organizations (id, account_id, name) VALUES (?, ?, ?)')
+      .run('org-other', 'account-other', '別組織');
+    testDb.raw.prepare('INSERT INTO rt_stores (id, organization_id, name, code, capacity) VALUES (?, ?, ?, ?, ?)')
+      .run('store-other', 'org-other', '別店舗', 'OTHER', 10);
+    const own = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
+    const session = await createAdminSession();
+
+    const denied = await requestAs(
+      '/api/restaurant-test/stores/store-other/select?account_id=account-1',
+      session,
+      {},
+    );
+    expect(denied.status).toBe(403);
+
+    const selected = await requestAs(
+      `/api/restaurant-test/stores/${own.id}/select?account_id=account-1`,
+      session,
+      {},
+    );
+    expect(selected.status).toBe(200);
+    const scoped = await requestAs('/api/restaurant-test/snapshot?account_id=account-1', session);
+    const scopedJson = await scoped.json() as { data: { stores: Array<{ id: string }> } };
+    expect(scopedJson.data.stores.map((store) => store.id)).toEqual([own.id]);
+
+    const cleared = await requestAs(
+      '/api/restaurant-test/stores/selection/clear?account_id=account-1',
+      session,
+      {},
+    );
+    expect(cleared.status).toBe(200);
+    const headquarters = await requestAs('/api/restaurant-test/snapshot?account_id=account-1', session);
+    const headquartersJson = await headquarters.json() as { data: { stores: unknown[] } };
+    expect(headquartersJson.data.stores).toHaveLength(2);
   });
 
   it('媒体予約を一方向で冪等取込し、外部書戻しを0件のままにする', async () => {
@@ -268,6 +338,77 @@ describe('飲食店向けテストAPI', () => {
       timezone: 'Asia/Tokyo',
     });
     expect(response.status).toBe(400);
+  });
+
+  it('店舗名が空の場合は店舗を作成できない', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const response = await request('/api/restaurant-test/stores?account_id=account-1', {
+      name: '', code: 'EMPTY', area: '東京', capacity: 20,
+      timezone: 'Asia/Tokyo', lineAccountId: 'account-4',
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('不正なチャネルシークレットを接続エラーやログへ含めない', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const secret = 'invalid-secret-must-not-leak';
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes('/oauth/accessToken')) {
+        return new Response(JSON.stringify({ message: secret }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 500 });
+    }));
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const response = await request('/api/restaurant-test/stores/connect?account_id=account-1', {
+        name: '新店舗', alias: 'NEW', channelId: '1234567890', channelSecret: secret,
+      });
+      expect(response.status).toBe(400);
+      expect(await response.text()).not.toContain(secret);
+      expect(JSON.stringify([...log.mock.calls, ...warn.mock.calls, ...error.mock.calls])).not.toContain(secret);
+    } finally {
+      log.mockRestore();
+      warn.mockRestore();
+      error.mockRestore();
+    }
+  });
+
+  it('接続確認が成功した場合だけLINEアカウントと店舗をまとめて作成する', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const secret = 'wizard-test-secret';
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/oauth/accessToken')) {
+        return new Response(JSON.stringify({
+          access_token: 'wizard-access-token', expires_in: 2_592_000, token_type: 'Bearer',
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.includes('/v2/bot/info')) {
+        return new Response(JSON.stringify({ displayName: '新店舗公式LINE', basicId: '@newstore' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 500 });
+    }));
+
+    const response = await request('/api/restaurant-test/stores/connect?account_id=account-1', {
+      name: '新店舗', alias: 'NEW', channelId: '1234567890', channelSecret: secret,
+    });
+    expect(response.status).toBe(201);
+    const payload = await response.text();
+    expect(payload).toContain('新店舗公式LINE');
+    expect(payload).not.toContain(secret);
+    expect(payload).not.toContain('wizard-access-token');
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM rt_stores WHERE code = 'NEW'").get())
+      .toMatchObject({ count: 1 });
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM line_accounts WHERE channel_id = '1234567890'").get())
+      .toMatchObject({ count: 1 });
   });
 
   it('LINEアカウントを指定して店舗を作成・編集でき、スタッフは操作できない', async () => {
