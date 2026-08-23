@@ -34,7 +34,7 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
         },
       ],
     }));
-    const bind = vi.fn((_accountId: string) => ({ all }));
+    const bind = vi.fn((..._accountIds: string[]) => ({ all }));
     const prepare = vi.fn((_sql: string) => ({ bind }));
 
     const response = await app.request(
@@ -44,8 +44,13 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(bind).toHaveBeenCalledWith('line-account-1');
+    expect(bind).toHaveBeenCalledWith(
+      'line-account-1',
+      'line-account-1',
+      'line-account-1',
+    );
     expect(prepare.mock.calls[0]?.[0]).toContain('JOIN friends f ON f.line_user_id = sm.line_user_id');
+    expect(prepare.mock.calls[0]?.[0]).toContain('scoped.line_account_id = ?');
     expect(await response.json()).toEqual({
       success: true,
       data: [

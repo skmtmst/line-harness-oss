@@ -35,12 +35,14 @@ const dbMocks = {
       .map((s) => s.id);
   }),
   // eager module-load deps
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccounts: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000' },
+  ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
   // /auth/callback deps
-  getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   createUser: vi.fn().mockResolvedValue({ id: 'U-uuid' }),
   getUserByEmail: vi.fn().mockResolvedValue(null),
@@ -160,10 +162,22 @@ beforeEach(() => {
 
 describe('GET /auth/callback — friend_add scenario auto-enroll gating', () => {
   it('enrolls a brand-new friend in active friend_add scenarios', async () => {
-    dbMocks.getFriendByLineUserId.mockResolvedValue(null); // brand-new friend
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null); // brand-new friend
 
     await callback();
 
+    expect(dbMocks.getFriendByLineUserIdForAccount).toHaveBeenCalledWith(
+      DB,
+      'U-login',
+      'account-main',
+    );
+    expect(dbMocks.upsertFriend).toHaveBeenCalledWith(
+      DB,
+      expect.objectContaining({
+        lineUserId: 'U-login',
+        lineAccountId: 'account-main',
+      }),
+    );
     expect(dbMocks.enrollFriendInScenario).toHaveBeenCalledWith(
       expect.anything(),
       'F-1',
@@ -175,7 +189,7 @@ describe('GET /auth/callback — friend_add scenario auto-enroll gating', () => 
     // A completed enrollment doesn't block the partial UNIQUE, so without the
     // existence guard this re-login would re-create the enrollment and
     // re-send the whole welcome sequence.
-    dbMocks.getFriendByLineUserId.mockResolvedValue({
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'F-1',
       line_user_id: 'U-login',
       line_account_id: null,
@@ -192,7 +206,7 @@ describe('GET /auth/callback — friend_add scenario auto-enroll gating', () => 
     // Friend row was created without a follow event (message-first friend,
     // migrated base, or a follow webhook that died before enrolling). The
     // OAuth path is their only friend_add entry — it must still enroll them.
-    dbMocks.getFriendByLineUserId.mockResolvedValue({
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'F-1',
       line_user_id: 'U-login',
       line_account_id: null,

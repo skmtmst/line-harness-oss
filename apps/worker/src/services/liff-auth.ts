@@ -10,20 +10,25 @@ export interface VerifyEnv {
   DB: D1Database;
 }
 
-export async function verifyCallerLineUserId(
+export interface VerifiedLineIdentity {
+  lineUserId: string;
+  lineAccountId: string | null;
+}
+
+export async function verifyCallerLineIdentity(
   authHeader: string | undefined,
   env: VerifyEnv,
-): Promise<string | null> {
+): Promise<VerifiedLineIdentity | null> {
   if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
   const idToken = authHeader.slice('Bearer '.length).trim();
   if (!idToken) return null;
 
+  const dbAccounts = await getLineAccounts(env.DB);
   const candidates: string[] = [];
   if (env.LINE_LOGIN_CHANNEL_ID) candidates.push(env.LINE_LOGIN_CHANNEL_ID);
-  const dbAccounts = await getLineAccounts(env.DB);
-  for (const a of dbAccounts) {
-    const ch = (a as unknown as { login_channel_id?: string | null }).login_channel_id;
-    if (ch && !candidates.includes(ch)) candidates.push(ch);
+  for (const account of dbAccounts) {
+    const channelId = account.login_channel_id;
+    if (channelId && !candidates.includes(channelId)) candidates.push(channelId);
   }
   for (const channelId of candidates) {
     const res = await fetch('https://api.line.me/oauth2/v2.1/verify', {
@@ -33,8 +38,20 @@ export async function verifyCallerLineUserId(
     });
     if (res.ok) {
       const verified = (await res.json()) as { sub?: string };
-      if (verified.sub) return verified.sub;
+      if (verified.sub) {
+        return {
+          lineUserId: verified.sub,
+          lineAccountId: dbAccounts.find((account) => account.login_channel_id === channelId)?.id ?? null,
+        };
+      }
     }
   }
   return null;
+}
+
+export async function verifyCallerLineUserId(
+  authHeader: string | undefined,
+  env: VerifyEnv,
+): Promise<string | null> {
+  return (await verifyCallerLineIdentity(authHeader, env))?.lineUserId ?? null;
 }

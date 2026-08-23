@@ -7,12 +7,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // without a real D1 binding.
 const dbMocks = {
   // eager module-load deps (mirror affiliate-links-redirect.test.ts)
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccounts: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000' },
+  ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
   // self-serve affiliate helpers
-  getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   getAffiliateByFriendId: vi.fn(),
   createAffiliate: vi.fn(),
   createAffiliateLink: vi.fn(),
@@ -124,7 +126,7 @@ function installStore() {
     return statsByAffiliate.get(affiliateId) ?? new Map();
   });
 
-  dbMocks.getFriendByLineUserId.mockImplementation(async (_db: unknown, lineUserId: string) => {
+  dbMocks.getFriendByLineUserIdForAccount.mockImplementation(async (_db: unknown, lineUserId: string) => {
     return FRIENDS[lineUserId] ?? null;
   });
 
@@ -183,7 +185,9 @@ function installStore() {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
-  dbMocks.getLineAccounts.mockResolvedValue([]);
+  dbMocks.getLineAccounts.mockResolvedValue([
+    { id: 'account-main', login_channel_id: LOGIN_CHANNEL_ID },
+  ]);
   // No offers by default → serializeLink emits offerId/offerName = null.
   dbMocks.listAffiliateOffers.mockResolvedValue([]);
   dbMocks.getMileageSummaryForFriend.mockResolvedValue({
@@ -229,6 +233,11 @@ describe('POST /api/liff/affiliate/register — idempotency', () => {
     expect(res1.status).toBe(200);
     const body1 = (await res1.json()) as { affiliate: { id: string; name: string }; links: unknown[] };
     expect(body1.affiliate.name).toBe('Alice');
+    expect(dbMocks.getFriendByLineUserIdForAccount).toHaveBeenCalledWith(
+      DB,
+      'U-alice',
+      'account-main',
+    );
     // Registration auto-issues exactly one link.
     expect(body1.links).toHaveLength(1);
 
@@ -428,7 +437,7 @@ describe('LINE token verification', () => {
 
     // A friend that never added the bot (verified but no friend row) → 404,
     // and crucially never creates an affiliate.
-    dbMocks.getFriendByLineUserId.mockImplementationOnce(async () => null);
+    dbMocks.getFriendByLineUserIdForAccount.mockImplementationOnce(async () => null);
     const ghost = await call('/api/liff/affiliate/register', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

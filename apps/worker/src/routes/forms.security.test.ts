@@ -4,9 +4,9 @@ import type { Env } from '../index.js';
 
 const mocks = vi.hoisted(() => ({
   getFormById: vi.fn(),
-  getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   createFormSubmission: vi.fn(),
-  verifyCallerLineUserId: vi.fn(),
+  verifyCallerLineIdentity: vi.fn(),
   getLineAccountById: vi.fn(),
   dispatchLineProxyLocally: vi.fn(),
 }));
@@ -20,7 +20,7 @@ vi.mock('@line-crm/db', () => ({
   deleteForm: vi.fn(),
   getFormSubmissions: vi.fn(),
   createFormSubmission: mocks.createFormSubmission,
-  getFriendByLineUserId: mocks.getFriendByLineUserId,
+  getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
   getFriendById: vi.fn(),
   getTrackedLinkById: vi.fn(),
   getMessageTemplateById: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('@line-crm/db', () => ({
 }));
 
 vi.mock('../services/liff-auth.js', () => ({
-  verifyCallerLineUserId: mocks.verifyCallerLineUserId,
+  verifyCallerLineIdentity: mocks.verifyCallerLineIdentity,
 }));
 
 vi.mock('../services/friend-tag-attach.js', () => ({
@@ -96,8 +96,8 @@ function app(asAdmin = false) {
 
 beforeEach(() => {
   mocks.getFormById.mockResolvedValue({ ...baseForm });
-  mocks.verifyCallerLineUserId.mockResolvedValue(null);
-  mocks.getFriendByLineUserId.mockResolvedValue(null);
+  mocks.verifyCallerLineIdentity.mockResolvedValue(null);
+  mocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
   mocks.createFormSubmission.mockImplementation(async (_db, input) => ({
     id: 'submission-1',
     form_id: input.formId,
@@ -168,8 +168,8 @@ describe('LIFF identity enforcement', () => {
       on_submit_webhook_fail_message: null,
       save_to_metadata: 0,
     });
-    mocks.verifyCallerLineUserId.mockResolvedValue('line-real');
-    mocks.getFriendByLineUserId.mockResolvedValue({
+    mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'line-real', lineAccountId: 'account-a' });
+    mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'friend-real',
       line_user_id: null,
       display_name: 'Real User',
@@ -212,13 +212,13 @@ describe('LIFF identity enforcement', () => {
     }, bindings);
 
     expect(res.status).toBe(401);
-    expect(mocks.getFriendByLineUserId).not.toHaveBeenCalled();
+    expect(mocks.getFriendByLineUserIdForAccount).not.toHaveBeenCalled();
     expect(prepare).not.toHaveBeenCalled();
   });
 
   test('writes partial metadata only to the token-authenticated friend', async () => {
-    mocks.verifyCallerLineUserId.mockResolvedValue('line-real');
-    mocks.getFriendByLineUserId.mockResolvedValue({
+    mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'line-real', lineAccountId: 'account-a' });
+    mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'friend-real',
       metadata: JSON.stringify({ existing: true }),
     });
@@ -234,7 +234,11 @@ describe('LIFF identity enforcement', () => {
     }, bindings);
 
     expect(res.status).toBe(200);
-    expect(mocks.getFriendByLineUserId).toHaveBeenCalledWith(bindings.DB, 'line-real');
+    expect(mocks.getFriendByLineUserIdForAccount).toHaveBeenCalledWith(
+      bindings.DB,
+      'line-real',
+      'account-a',
+    );
     expect(bind).toHaveBeenCalledWith(
       JSON.stringify({ existing: true, score: 42 }),
       '2026-08-04T12:00:00+09:00',
@@ -255,8 +259,8 @@ describe('LIFF identity enforcement', () => {
   });
 
   test('ignores _skipWebhook and checks the webhook for the authenticated friend', async () => {
-    mocks.verifyCallerLineUserId.mockResolvedValue('line-real');
-    mocks.getFriendByLineUserId.mockResolvedValue({
+    mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'line-real', lineAccountId: 'account-a' });
+    mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'friend-real',
       line_user_id: null,
       display_name: 'Real User',
@@ -309,8 +313,8 @@ describe('LIFF identity enforcement', () => {
   });
 
   test('webhook rejection reply goes through the Harness proxy', async () => {
-    mocks.verifyCallerLineUserId.mockResolvedValue('line-real');
-    mocks.getFriendByLineUserId.mockResolvedValue({
+    mocks.verifyCallerLineIdentity.mockResolvedValue({ lineUserId: 'line-real', lineAccountId: 'account-a' });
+    mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
       id: 'friend-real',
       line_user_id: 'U-real',
       line_account_id: null,

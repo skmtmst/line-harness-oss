@@ -4,7 +4,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import {
   getLineAccounts,
-  getFriendByLineUserId,
+  getFriendByLineUserIdForAccount,
   upsertFriend,
   getChatByFriendId,
   createChat,
@@ -207,17 +207,34 @@ function requiredProxyPermission(method: string, path: string): string | null {
 async function getFriendsByLineUserIds(
   db: D1Database,
   userIds: string[],
+  lineAccountId: string | null,
 ): Promise<Map<string, Friend>> {
   const found = new Map<string, Friend>();
   for (let i = 0; i < userIds.length; i += LOOKUP_CHUNK) {
     const chunk = userIds.slice(i, i + LOOKUP_CHUNK);
     const placeholders = chunk.map(() => '?').join(',');
-    const result = await db
-      .prepare(`SELECT * FROM friends WHERE line_user_id IN (${placeholders})`)
-      .bind(...chunk)
-      .all<Friend>();
-    for (const row of result.results ?? []) {
-      found.set(row.line_user_id, row);
+    if (lineAccountId) {
+      const scoped = await db
+        .prepare(
+          `SELECT * FROM friends
+            WHERE line_account_id = ?
+              AND line_user_id IN (${placeholders})`,
+        )
+        .bind(lineAccountId, ...chunk)
+        .all<Friend>();
+      for (const row of scoped.results ?? []) found.set(row.line_user_id, row);
+    }
+
+    // C-2bで複合一意制約へ移行したら、この無指定フォールバックを削除する。
+    // 今回は既存の未割当行・他アカウント行を見失わず、挙動を維持する。
+    const unresolved = chunk.filter((lineUserId) => !found.has(lineUserId));
+    if (unresolved.length > 0) {
+      const unresolvedPlaceholders = unresolved.map(() => '?').join(',');
+      const fallback = await db
+        .prepare(`SELECT * FROM friends WHERE line_user_id IN (${unresolvedPlaceholders})`)
+        .bind(...unresolved)
+        .all<Friend>();
+      for (const row of fallback.results ?? []) found.set(row.line_user_id, row);
     }
   }
   return found;
@@ -240,11 +257,12 @@ async function createFriendForRecipient(
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      console.error('[line-proxy] getProfile failed for', userId, err);
+      console.error('[line-proxy] getProfile failed', err);
     }
 
     const friend = await upsertFriend(db, {
       lineUserId: userId,
+      lineAccountId,
       displayName: profile?.displayName ?? null,
       pictureUrl: profile?.pictureUrl ?? null,
       statusMessage: profile?.statusMessage ?? null,
@@ -260,7 +278,7 @@ async function createFriendForRecipient(
     }
     return friend;
   } catch (err) {
-    console.error('[line-proxy] friend creation failed for', userId, err);
+    console.error('[line-proxy] friend creation failed', err);
     return null;
   }
 }
@@ -343,7 +361,7 @@ async function logProxySend(
         return;
       }
       const friend =
-        (await getFriendByLineUserId(db, parsed.to)) ??
+        (await getFriendByLineUserIdForAccount(db, parsed.to, lineAccountId)) ??
         (await createFriendForRecipient(db, lineClient, parsed.to, lineAccountId));
       if (!friend) return;
       await insertLogRows(db, rowsFor(friend.id, 'push'), source);
@@ -357,7 +375,7 @@ async function logProxySend(
           parsed.to.filter((t): t is string => typeof t === 'string' && LINE_USER_ID_RE.test(t)),
         ),
       ];
-      const known = await getFriendsByLineUserIds(db, userIds);
+      const known = await getFriendsByLineUserIds(db, userIds, lineAccountId);
       const rows: LogRow[] = [];
       let created = 0;
       let skipped = 0;

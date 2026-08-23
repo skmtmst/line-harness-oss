@@ -11,7 +11,7 @@ const dbMocks = {
   deleteTrackedLink: vi.fn(),
   recordLinkClick: vi.fn(),
   getLinkClicks: vi.fn(),
-  getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   addTagToFriend: vi.fn(),
   enrollFriendInScenario: vi.fn(),
   getTrackedLinkBaseUrl: vi.fn(),
@@ -111,6 +111,27 @@ beforeEach(() => {
 });
 
 describe('GET /t/:linkId — per-account LIFF resolution', () => {
+  test('line user lookup is scoped to the account that owns the link', async () => {
+    dbMocks.getTrackedLinkByIdOrShortCode.mockResolvedValue(
+      makeLink({ line_account_id: 'acc-lookup' }),
+    );
+    dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue({ id: 'friend-1' });
+    const env = {
+      DB: makeDb({}),
+      LIFF_URL: 'https://liff.line.me/2009554425-4IMBmLQ9',
+      WORKER_URL: 'https://worker.example.com',
+    };
+
+    const res = await request(env, 'Mozilla/5.0 Safari/605.1.15', '/t/link-1?lu=U-line-user');
+
+    expect(res.status).toBe(302);
+    expect(dbMocks.getFriendByLineUserIdForAccount).toHaveBeenCalledWith(
+      env.DB,
+      'U-line-user',
+      'acc-lookup',
+    );
+  });
+
   test('link owned by an account redirects LINE in-app clicks to that account LIFF', async () => {
     dbMocks.getTrackedLinkByIdOrShortCode.mockResolvedValue(makeLink({ line_account_id: 'acc-1b' }));
     const env = {
