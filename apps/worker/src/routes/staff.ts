@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import {
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
-  createStaffMember, updateStaffMember, deleteStaffMember,
+  createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
@@ -110,6 +110,19 @@ staff.get('/api/staff', async (c) => {
     return c.json({ success: true, data: (await getStaffMembers(c.env.DB)).map(serializeStaff) });
   } catch (error) {
     console.error('GET /api/staff error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const id = c.req.param('id');
+    const member = await getStaffById(c.env.DB, id);
+    if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    const loginCount = await countLoginAudit(c.env.DB, { adminUserId: id, action: 'login' });
+    return c.json({ success: true, data: { loginCount } });
+  } catch (error) {
+    console.error('GET /api/staff/:id/login-summary error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
