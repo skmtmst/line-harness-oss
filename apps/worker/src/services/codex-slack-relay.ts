@@ -30,6 +30,9 @@ export type CodexSlackEvent = {
   occurredAt: string;
   explicitCategory?: CodexSlackCategory;
   openPrs?: CodexSlackPrSnapshot[];
+  eventSource?: 'codex' | 'github';
+  syncMode?: 'event' | 'reconcile';
+  refreshCommandCenter?: boolean;
 };
 
 export type CodexSlackRelayConfig = {
@@ -1005,10 +1008,14 @@ export async function relayCodexSlackEvent(
   let key = workKey(event);
   let threadTs: string | null = null;
   let createdParent = false;
+  let linkedTask: SlackMessage | null = null;
 
   const requestedTaskId = taskIdFromContent(event.content);
-  if ((requestedTaskId || event.eventType === 'turn_completed') && config.SLACK_TASK_CHANNEL_ID) {
-    const linkedTask = await findTaskMessage(
+  if (
+    (requestedTaskId || event.eventType === 'turn_completed' || event.syncMode === 'reconcile') &&
+    config.SLACK_TASK_CHANNEL_ID
+  ) {
+    linkedTask = await findTaskMessage(
       token,
       config.SLACK_TASK_CHANNEL_ID,
       requestedTaskId
@@ -1029,6 +1036,30 @@ export async function relayCodexSlackEvent(
   }
 
   threadTs ||= await findThreadTs(token, channelId, key, fetcher);
+  const completed = isCodexTaskCompletion(event);
+
+  // GitHub's periodic reconciliation must repair missing notifications without
+  // adding a new reply every time the workflow runs. Slack metadata is the
+  // ledger: an existing PR thread means the parent notification arrived, and
+  // an existing task card means the PR is still open.
+  if (event.syncMode === 'reconcile' && threadTs) {
+    if (completed && linkedTask) {
+      await slackApi(token, 'chat.postMessage', {
+        channel: channelId,
+        thread_ts: threadTs,
+        text: buildReplyText(event, category),
+        client_msg_id: event.eventId,
+      }, fetcher);
+      await closeOpenTask(config, key, fetcher);
+    } else if (!completed && !linkedTask) {
+      await ensureOpenTask(config, event, category, key, channelId, threadTs, fetcher);
+    }
+    if (event.refreshCommandCenter !== false) {
+      await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher);
+    }
+    return { category, channelId, threadTs };
+  }
+
   if (!threadTs) {
     const parent = await slackApi(token, 'chat.postMessage', {
       channel: channelId,
@@ -1051,7 +1082,6 @@ export async function relayCodexSlackEvent(
     client_msg_id: event.eventId,
   }, fetcher);
 
-  const completed = isCodexTaskCompletion(event);
   if (!createdParent) {
     await updateErrorParentStatus(
       config,
@@ -1068,7 +1098,9 @@ export async function relayCodexSlackEvent(
     await ensureOpenTask(config, event, category, key, channelId, threadTs, fetcher);
   }
 
-  await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher);
+  if (event.refreshCommandCenter !== false) {
+    await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher);
+  }
 
   return { category, channelId, threadTs };
 }
