@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 export interface StaffMember {
   id: string;
@@ -41,6 +42,7 @@ export interface CreateStaffInput {
   invite_expires_at?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
+  tenant_id?: string | null;
 }
 
 export interface UpdateStaffInput {
@@ -140,8 +142,8 @@ export async function createStaffMember(
        (id, name, email, role, access_level, api_key, line_user_id, is_active,
         permission_keys, notification_preferences, invite_status, invite_token_hash,
         invite_expires_at, assigned_line_account_id, can_access_descendant_accounts,
-        created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id, input.name, input.email ?? null, input.role, input.access_level ?? 'full', apiKey,
@@ -149,7 +151,8 @@ export async function createStaffMember(
       JSON.stringify(input.permission_keys ?? []), JSON.stringify(input.notification_preferences ?? {}),
       input.invite_status ?? 'active', input.invite_token_hash ?? null,
       input.invite_expires_at ?? null, input.assigned_line_account_id ?? null,
-      input.can_access_descendant_accounts ? 1 : 0, now, now,
+      input.can_access_descendant_accounts ? 1 : 0,
+      input.tenant_id ?? DEFAULT_TENANT_ID, now, now,
     )
     .run();
 

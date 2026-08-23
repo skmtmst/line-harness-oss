@@ -1,4 +1,5 @@
 import { jstNow } from './utils.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import {
   CredentialEncryptionKeyError,
   decryptCredential,
@@ -107,6 +108,7 @@ export interface CreateLineAccountInput {
   ogDefaultImageUrl?: string | null;
   ogDefaultDescription?: string | null;
   parentLineAccountId?: string | null;
+  tenantId?: string | null;
 }
 
 export async function createLineAccount(
@@ -137,9 +139,9 @@ export async function createLineAccount(
           login_channel_id, login_channel_secret, liff_id,
           is_active, display_order,
           og_site_name, og_default_image_url, og_default_description,
-          parent_line_account_id,
+          parent_line_account_id, tenant_id,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -157,6 +159,7 @@ export async function createLineAccount(
       input.ogDefaultImageUrl ?? null,
       input.ogDefaultDescription ?? null,
       input.parentLineAccountId ?? null,
+      input.tenantId ?? DEFAULT_TENANT_ID,
       now,
       now,
     )

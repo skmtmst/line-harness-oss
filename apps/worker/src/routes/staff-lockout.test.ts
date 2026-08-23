@@ -18,6 +18,12 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
+const inviteMocks = {
+  sendStaffInviteEmail: vi.fn(),
+  sendStaffLineLinkEmail: vi.fn(),
+};
+vi.mock('../services/staff-invite.js', () => inviteMocks);
+
 const worker = (await import('../index.js')).default;
 
 const API_KEY = 'test-owner-key';
@@ -33,6 +39,9 @@ type Row = {
   access_level: 'full' | 'read_only';
   is_active: number;
   line_user_id: string | null;
+  tenant_id?: string | null;
+  assigned_line_account_id?: string | null;
+  can_access_descendant_accounts?: number;
 };
 
 function row(over: Partial<Row> & { id: string }): Row {
@@ -42,7 +51,7 @@ function row(over: Partial<Row> & { id: string }): Row {
   };
 }
 
-function send(path: string, method: 'GET' | 'PATCH' | 'DELETE', body?: unknown, apiKey = API_KEY) {
+function send(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: unknown, apiKey = API_KEY) {
   return worker.fetch(
     new Request(`https://worker.example.com${path}`, {
       method,
@@ -60,6 +69,44 @@ beforeEach(() => {
   dbMocks.deleteStaffMember.mockResolvedValue(undefined);
   dbMocks.countLoginAudit.mockResolvedValue(0);
   dbMocks.getStaffByApiKey.mockResolvedValue(null);
+  dbMocks.getLineAccounts.mockResolvedValue([]);
+  inviteMocks.sendStaffInviteEmail.mockResolvedValue(undefined);
+  inviteMocks.sendStaffLineLinkEmail.mockResolvedValue(undefined);
+});
+
+describe('スタッフ招待の統括', () => {
+  it('招待者と同じtenant_idを新規スタッフへ渡す', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({
+      id: 'inviter',
+      role: 'owner',
+      tenant_id: 'tenant-inviter',
+    }));
+    dbMocks.getLineAccounts.mockResolvedValue([{
+      id: 'line-1',
+      parent_line_account_id: null,
+      is_active: 1,
+    }]);
+    dbMocks.getStaffMembers.mockResolvedValue([]);
+    dbMocks.createStaffMember.mockResolvedValue(row({
+      id: 'invited',
+      role: 'staff',
+      is_active: 0,
+      tenant_id: 'tenant-inviter',
+    }));
+
+    const res = await send('/api/staff', 'POST', {
+      name: '招待する担当者',
+      email: 'invitee@example.test',
+      role: 'staff',
+      assignedLineAccountId: 'line-1',
+    }, 'inviter-key');
+
+    expect(res.status).toBe(201);
+    expect(dbMocks.createStaffMember).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ tenant_id: 'tenant-inviter' }),
+    );
+  });
 });
 
 describe('最後の管理者を締め出さない', () => {

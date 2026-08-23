@@ -32,7 +32,7 @@ vi.mock('@line-crm/line-sdk', () => ({
 const { lineAccounts } = await import('./line-accounts.js');
 
 type TestEnv = {
-  Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean } };
+  Variables: { staff: { id: string; name: string; role: 'owner' | 'admin' | 'staff'; readOnly: boolean; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; tenantId?: string | null } };
   Bindings: { DB: D1Database };
 };
 
@@ -223,7 +223,7 @@ describe('POST /api/line-accounts', () => {
       liff_id: '2009624792-XXXX',
     });
 
-    const app = setupApp('owner');
+    const app = setupApp('owner', makeDbStub(), { tenantId: 'tenant-line-owner' });
     const res = await app.request('/api/line-accounts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -245,6 +245,7 @@ describe('POST /api/line-accounts', () => {
       loginChannelId: '2009624792',
       loginChannelSecret: 'login-secret',
       liffId: '2009624792-XXXX',
+      tenantId: 'tenant-line-owner',
     });
 
     const body = (await res.json()) as { success: boolean; data: { loginChannelId: string | null; liffId: string | null; loginChannelSecret?: string | null; loginChannelSecretConfigured: boolean } };

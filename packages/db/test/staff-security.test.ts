@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { countLoginAudit } from '../src/login-audit.js'
-import { deleteStaffMember, getStaffByApiKey } from '../src/staff.js'
+import { DEFAULT_TENANT_ID } from '@line-crm/shared'
+import { createStaffMember, deleteStaffMember, getStaffByApiKey } from '../src/staff.js'
 
 function asD1(sqlite: Database.Database): D1Database {
   const wrap = (query: string, params: unknown[]) => ({
@@ -36,6 +37,7 @@ describe('ログインユーザーの無効化と監査記録', () => {
         email_verified_at TEXT, line_linked_at TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT,
         totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT,
         can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0,
+        tenant_id TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
       CREATE TABLE login_audit (
@@ -51,6 +53,17 @@ describe('ログインユーザーの無効化と監査記録', () => {
       .run('disabled-user', '無効ユーザー', 'staff', 'disabled-key', 0, '2026-08-23T10:00:00', '2026-08-23T10:00:00')
 
     expect(await getStaffByApiKey(db, 'disabled-key')).toBeNull()
+  })
+
+  it('tenant_idを省略した新規スタッフを既定の統括へ割り当てる', async () => {
+    const created = await createStaffMember(db, {
+      name: '新規担当者',
+      role: 'staff',
+    })
+
+    expect(created.tenant_id).toBe(DEFAULT_TENANT_ID)
+    expect(sqlite.prepare('SELECT tenant_id FROM staff_members WHERE id = ?').get(created.id))
+      .toEqual({ tenant_id: DEFAULT_TENANT_ID })
   })
 
   it('ログイン件数を全件数え、ユーザー削除後も監査記録を残す', async () => {

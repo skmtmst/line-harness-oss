@@ -7,6 +7,7 @@ import {
   createLineAccount,
   getLineAccountCredentialHealth,
   resolveLineCredential,
+  DEFAULT_TENANT_ID,
   type LineAccount,
 } from '../src/index.js';
 
@@ -37,6 +38,7 @@ function account(overrides: Partial<LineAccount> = {}): LineAccount {
     capacity_warn_at: null,
     icon_url: null,
     parent_line_account_id: null,
+    tenant_id: null,
     created_at: '2026-08-23',
     updated_at: '2026-08-23',
     ...overrides,
@@ -223,6 +225,7 @@ describe('LINE credential AES-GCM encryption', () => {
                 channel_secret: String(insertValues[4]),
                 channel_access_token_encrypted: String(insertValues[5]),
                 channel_secret_encrypted: String(insertValues[6]),
+                tenant_id: String(insertValues[15]),
               });
             }
             return null;
@@ -246,6 +249,8 @@ describe('LINE credential AES-GCM encryption', () => {
     expect(insertValues[4]).toBe('secret-value');
     expect(insertValues[5]).not.toBe('token-value');
     expect(insertValues[6]).not.toBe('secret-value');
+    expect(insertValues[15]).toBe(DEFAULT_TENANT_ID);
+    expect(created.tenant_id).toBe(DEFAULT_TENANT_ID);
     expect(created.channel_access_token).toBe('token-value');
     expect(created.channel_secret).toBe('secret-value');
   });
