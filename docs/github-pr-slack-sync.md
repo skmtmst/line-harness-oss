@@ -23,7 +23,9 @@ GitHubリポジトリの `Settings` → `Secrets and variables` → `Actions` �
   - 有効化するときだけ `true`。未設定または他の値ならworkflow全体を実行しない。
 
 Secretとvariableを登録した後、`Actions` → `GitHub PR Slack Sync` → `Run workflow` で
-手動再照合を1回実行する。ログに出してよいのは送信件数と再照合件数だけである。
+手動再照合を1回実行する。テスト通知を1件だけ確認するときは `pr_number` に対象PR番号を
+入れる。空欄なら通常どおり、監査開始番号以降の未通知PRをまとめて再照合する。
+ログに出してよいのは送信件数と再照合件数だけである。
 
 ## 切り戻し
 

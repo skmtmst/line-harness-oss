@@ -121,5 +121,22 @@ describe('GitHub PR Slack sync', () => {
     });
     expect(JSON.stringify(relayed)).not.toContain('github-test-token');
     expect(JSON.stringify(relayed)).not.toContain('relay-test-secret');
+
+    relayed.length = 0;
+    const singleResult = await syncGitHubPullRequests({
+      repository: 'skmtmst/line-harness-oss',
+      githubToken: 'github-test-token',
+      relayUrl: 'https://relay.example.test/events',
+      relaySecret: 'relay-test-secret',
+      eventName: 'workflow_dispatch',
+      minPrNumber: 276,
+      onlyPrNumber: 276,
+      closedLookbackHours: 72,
+      now: new Date('2026-08-23T04:00:00.000Z'),
+      fetcher,
+    });
+
+    expect(singleResult).toEqual({ sent: 0, reconciled: 1 });
+    expect(relayed.map((item) => [item.prNumber, item.syncMode])).toEqual([[276, 'reconcile']]);
   });
 });

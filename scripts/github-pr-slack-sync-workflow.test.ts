@@ -16,6 +16,8 @@ describe('GitHub PR Slack sync workflow safety', () => {
     expect(workflow).toContain('push:');
     expect(workflow).toContain("cron: '17 * * * *'");
     expect(workflow).toContain('workflow_dispatch:');
+    expect(workflow).toContain('GITHUB_SLACK_SYNC_ONLY_PR_NUMBER:');
+    expect(workflow).toContain("inputs.pr_number || ''");
     expect(workflow).toContain('codex/development');
   });
 

@@ -69,6 +69,7 @@ type SyncOptions = {
   eventName?: string;
   event?: GitHubPullRequestEvent;
   minPrNumber: number;
+  onlyPrNumber?: number;
   closedLookbackHours: number;
   now?: Date;
   fetcher?: typeof fetch;
@@ -291,8 +292,13 @@ export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ se
     ...closedPulls.filter((pull) => (
       pull.number >= options.minPrNumber && Date.parse(pull.updated_at) >= cutoff
     )),
-  ];
-  if (eventPull && eventPull.number >= options.minPrNumber && eventPull.base.ref === BASE_BRANCH) {
+  ].filter((pull) => options.onlyPrNumber === undefined || pull.number === options.onlyPrNumber);
+  if (
+    eventPull
+    && eventPull.number >= options.minPrNumber
+    && (options.onlyPrNumber === undefined || eventPull.number === options.onlyPrNumber)
+    && eventPull.base.ref === BASE_BRANCH
+  ) {
     await sendRelay(
       options.relayUrl,
       options.relaySecret,
@@ -326,9 +332,14 @@ async function main(): Promise<void> {
   const relayUrl = process.env.CODEX_SLACK_RELAY_URL || '';
   const relaySecret = process.env.CODEX_SLACK_RELAY_SECRET || '';
   const minPrNumber = Number(process.env.GITHUB_SLACK_SYNC_MIN_PR_NUMBER || '1');
+  const onlyPrNumberRaw = process.env.GITHUB_SLACK_SYNC_ONLY_PR_NUMBER || '';
+  const onlyPrNumber = onlyPrNumberRaw ? Number(onlyPrNumberRaw) : undefined;
   const closedLookbackHours = Number(process.env.GITHUB_SLACK_SYNC_CLOSED_LOOKBACK_HOURS || '72');
   if (!githubToken || !relayUrl || !relaySecret) throw new Error('GITHUB_SLACK_SYNC_NOT_CONFIGURED');
   if (!Number.isSafeInteger(minPrNumber) || minPrNumber < 1) throw new Error('GITHUB_SLACK_SYNC_MIN_PR_INVALID');
+  if (onlyPrNumber !== undefined && (!Number.isSafeInteger(onlyPrNumber) || onlyPrNumber < minPrNumber)) {
+    throw new Error('GITHUB_SLACK_SYNC_ONLY_PR_INVALID');
+  }
   if (!Number.isFinite(closedLookbackHours) || closedLookbackHours < 1 || closedLookbackHours > 720) {
     throw new Error('GITHUB_SLACK_SYNC_LOOKBACK_INVALID');
   }
@@ -344,6 +355,7 @@ async function main(): Promise<void> {
     eventName: process.env.GITHUB_EVENT_NAME,
     event,
     minPrNumber,
+    onlyPrNumber,
     closedLookbackHours,
   });
   // Aggregate counts only. PR titles, tokens, signatures and payloads are not logged.
