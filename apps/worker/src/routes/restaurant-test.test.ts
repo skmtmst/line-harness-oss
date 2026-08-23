@@ -150,6 +150,97 @@ describe('飲食店向けテストAPI', () => {
     expect(denied.status).toBe(403);
   });
 
+  it('発行済みアドレスを管理者だけに一覧し、再発行後も旧アドレスの失効予定を返す', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      const first = await request('/api/restaurant-test/intake-addresses?account_id=account-1', { storeId: store.id });
+      const firstJson = await first.json() as { data: { address: string } };
+      const second = await request('/api/restaurant-test/intake-addresses?account_id=account-1', { storeId: store.id });
+      const secondJson = await second.json() as { data: { address: string } };
+      expect(first.status).toBe(201);
+      expect(second.status).toBe(201);
+      expect(secondJson.data.address).not.toBe(firstJson.data.address);
+
+      authMocks.getStaffByApiKey.mockResolvedValue({
+        id: 'admin-1',
+        name: 'Admin',
+        role: 'admin',
+        access_level: 'full',
+        permission_keys: '[]',
+        assigned_line_account_id: null,
+        can_access_descendant_accounts: 0,
+      });
+      const listed = await requestAs(
+        `/api/restaurant-test/intake-addresses?account_id=account-1&storeId=${encodeURIComponent(store.id)}`,
+        'admin-key',
+      );
+      expect(listed.status).toBe(200);
+      const listedJson = await listed.json() as { data: Array<Record<string, unknown>> };
+      expect(listedJson.data).toHaveLength(2);
+      for (const item of listedJson.data) {
+        expect(Object.keys(item).sort()).toEqual([
+          'address', 'createdAt', 'id', 'localPart', 'revokedAt', 'status', 'storeId',
+        ]);
+        expect(item.status).toBe('active');
+        expect(item.storeId).toBe(store.id);
+      }
+      const current = listedJson.data.find((item) => item.revokedAt === null);
+      const retiring = listedJson.data.find((item) => typeof item.revokedAt === 'string');
+      expect(current?.address).toBe(secondJson.data.address);
+      expect(retiring?.address).toBe(firstJson.data.address);
+
+      const logged = JSON.stringify([...log.mock.calls, ...warn.mock.calls, ...error.mock.calls]);
+      expect(logged).not.toContain(firstJson.data.address);
+      expect(logged).not.toContain(secondJson.data.address);
+
+      authMocks.getStaffByApiKey.mockResolvedValue({
+        id: 'staff-1',
+        name: 'Staff',
+        role: 'staff',
+        access_level: 'full',
+        permission_keys: '[]',
+        assigned_line_account_id: null,
+        can_access_descendant_accounts: 0,
+      });
+      const denied = await requestAs(
+        `/api/restaurant-test/intake-addresses?account_id=account-1&storeId=${encodeURIComponent(store.id)}`,
+        'staff-key',
+      );
+      expect(denied.status).toBe(403);
+    } finally {
+      log.mockRestore();
+      warn.mockRestore();
+      error.mockRestore();
+    }
+  });
+
+  it('別組織の店舗の取り込みアドレスは一覧できない', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    testDb.raw.prepare('INSERT INTO rt_organizations (id, account_id, name) VALUES (?, ?, ?)')
+      .run('org-other', 'account-other', '別組織');
+    testDb.raw.prepare('INSERT INTO rt_stores (id, organization_id, name, code, capacity) VALUES (?, ?, ?, ?, ?)')
+      .run('store-other', 'org-other', '別店舗', 'OTHER', 10);
+
+    const response = await request('/api/restaurant-test/intake-addresses?account_id=account-1&storeId=store-other');
+    expect(response.status).toBe(400);
+  });
+
+  it('取り込みドメイン未設定時は一覧と発行を503にする', async () => {
+    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };
+    env.RESTAURANT_INTAKE_DOMAIN = undefined;
+
+    const listed = await request(`/api/restaurant-test/intake-addresses?account_id=account-1&storeId=${encodeURIComponent(store.id)}`);
+    expect(listed.status).toBe(503);
+    const issued = await request('/api/restaurant-test/intake-addresses?account_id=account-1', { storeId: store.id });
+    expect(issued.status).toBe(503);
+  });
+
   it('この組織に存在しないLINEアカウントの飲食店データへアクセスさせない', async () => {
     const response = await request('/api/restaurant-test/snapshot?account_id=account-2');
     expect(response.status).toBe(403);

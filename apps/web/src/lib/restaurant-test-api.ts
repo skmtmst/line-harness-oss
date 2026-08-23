@@ -46,6 +46,10 @@ export type RestaurantLineFlow = {
   id: string; store_id: string | null; flow_type: string; title: string; body: string;
   timing_minutes: number | null; is_enabled: number; delivery_mode: 'preview_only' | 'disabled'
 }
+export type RestaurantIntakeAddress = {
+  id: string; storeId: string; localPart: string; address: string; status: 'active';
+  createdAt: string; revokedAt: string | null
+}
 
 export type RestaurantSnapshot = {
   environment: 'staging_test'; integrationPolicy: 'inbound_only';
@@ -62,6 +66,8 @@ const withAccount = (path: string, accountId: string) =>
 export const restaurantTestApi = {
   snapshot: (accountId: string) => fetchApi<{ success: true; data: RestaurantSnapshot }>(withAccount('/api/restaurant-test/snapshot', accountId)),
   bootstrap: (accountId: string, organizationName?: string) => fetchApi<{ success: true; data: { organizationId: string; created: boolean } }>(withAccount('/api/restaurant-test/bootstrap', accountId), { method: 'POST', body: JSON.stringify({ organizationName }) }),
+  listIntakeAddresses: (accountId: string, storeId: string) => fetchApi<{ success: true; data: RestaurantIntakeAddress[] }>(withAccount(`/api/restaurant-test/intake-addresses?storeId=${encodeURIComponent(storeId)}`, accountId)),
+  issueIntakeAddress: (accountId: string, storeId: string) => fetchApi<{ success: true; data: { id: string; storeId: string; localPart: string; address: string; graceDays: number } }>(withAccount('/api/restaurant-test/intake-addresses', accountId), { method: 'POST', body: JSON.stringify({ storeId }) }),
   decideApproval: (accountId: string, id: string, action: 'approve' | 'return', comment?: string) => fetchApi(withAccount(`/api/restaurant-test/approvals/${id}`, accountId), { method: 'PATCH', body: JSON.stringify({ action, comment }) }),
   createReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/reservations/manual', accountId), { method: 'POST', body: JSON.stringify(body) }),
   importReservation: (accountId: string, body: Record<string, unknown>) => fetchApi(withAccount('/api/restaurant-test/inbound/reservations', accountId), { method: 'POST', body: JSON.stringify(body) }),
