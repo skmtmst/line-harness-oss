@@ -11,6 +11,7 @@ on:
       - 'packages/shared/**'
       - 'packages/line-sdk/**'
       - 'packages/update-engine/**'
+      - 'scripts/deploy/apply-d1-migrations.sh'
       - '.github/workflows/deploy-cloudflare-worker.yml'
 
 jobs:
@@ -49,6 +50,9 @@ jobs:
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$D1_DATABASE_NAME"
 
+          pending_file="$RUNNER_TEMP/d1-pending-migrations.txt"
+          : > "$pending_file"
+
           npx wrangler d1 execute "$D1_DATABASE_NAME" --remote --command \
             "CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
 
@@ -59,12 +63,11 @@ jobs:
               console.log((d[0]?.results ?? []).map((r) => r.name).join('\n'));
             ")
 
-          pending=''
           count=0
           for f in $(ls packages/db/migrations/*.sql | sort); do
             name=$(basename "$f")
             if ! printf '%s\n' "$applied" | grep -qxF "$name"; then
-              pending="${pending}${name}"$'\n'
+              printf '%s\n' "$f" >> "$pending_file"
               count=$((count + 1))
             fi
           done
@@ -76,7 +79,7 @@ jobs:
             if [ "$count" -gt 0 ]; then
               echo
               echo '```'
-              printf '%s' "$pending"
+              sed 's#^packages/db/migrations/##' "$pending_file"
               echo '```'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
@@ -128,20 +131,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
         run: |
-          for f in $(ls packages/db/migrations/*.sql | sort); do
-            name=$(basename "$f")
-            applied=$(npx wrangler d1 execute "$D1_DATABASE_NAME" --remote \
-              --command "SELECT name FROM _migrations WHERE name = '${name}'" --json \
-              | node -e "const d=JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));console.log(d[0]?.results?.length||0)")
-            if [ "$applied" = "0" ]; then
-              echo "Applying: $name"
-              npx wrangler d1 execute "$D1_DATABASE_NAME" --remote --file="$f"
-              npx wrangler d1 execute "$D1_DATABASE_NAME" --remote --command \
-                "INSERT INTO _migrations (name, applied_at) VALUES ('${name}', datetime('now'))"
-            else
-              echo "Skipped: $name"
-            fi
-          done
+          bash scripts/deploy/apply-d1-migrations.sh \
+            "$D1_DATABASE_NAME" "$RUNNER_TEMP/d1-pending-migrations.txt"
 
       - name: Build Worker and LIFF assets
         run: pnpm --filter worker build
