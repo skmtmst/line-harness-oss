@@ -19,7 +19,7 @@ GitHubリポジトリの `Settings` → `Secrets and variables` → `Actions` �
 
 - Repository secret `CODEX_SLACK_RELAY_SECRET`
   - 検証Workerの同名Secretと同じ値。値をIssue、PR、ログ、チャットへ書かない。
-- Repository variable `GITHUB_SLACK_PR_SYNC_ENABLED`
+- Repository variable `SLACK_PR_SYNC_ENABLED`
   - 有効化するときだけ `true`。未設定または他の値ならworkflow全体を実行しない。
 
 Secretとvariableを登録した後、`Actions` → `GitHub PR Slack Sync` → `Run workflow` で
@@ -27,7 +27,7 @@ Secretとvariableを登録した後、`Actions` → `GitHub PR Slack Sync` → `
 
 ## 切り戻し
 
-1. `GITHUB_SLACK_PR_SYNC_ENABLED` を `false` にするか削除する。
+1. `SLACK_PR_SYNC_ENABLED` を `false` にするか削除する。
 2. 実行中のworkflowがあれば完了を待つ。`cancel-in-progress` は無効なので途中で別実行へ切り替わらない。
 3. 必要であれば実装PRをrevertする。
 

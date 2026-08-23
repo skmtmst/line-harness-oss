@@ -20,7 +20,7 @@ describe('GitHub PR Slack sync workflow safety', () => {
   });
 
   test('明示的な有効化まで動かず、PR headのコードを秘密値付きで実行しない', () => {
-    expect(workflow).toContain("vars.GITHUB_SLACK_PR_SYNC_ENABLED == 'true'");
+    expect(workflow).toContain("vars.SLACK_PR_SYNC_ENABLED == 'true'");
     expect(workflow).toContain('github.event.pull_request.head.repo.full_name == github.repository');
     expect(workflow).toContain('ref: ${{ github.event.pull_request.base.sha || github.sha }}');
     expect(workflow).toContain('CODEX_SLACK_RELAY_SECRET: ${{ secrets.CODEX_SLACK_RELAY_SECRET }}');
