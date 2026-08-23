@@ -76,9 +76,14 @@ function makeDb(initialFriends: StoredFriend[] = []) {
           throw new Error(`Unhandled first SQL: ${sql}`);
         }),
         all: vi.fn().mockImplementation(async () => {
-          if (sql.includes('WHERE line_user_id IN')) {
-            const requested = new Set(args as string[]);
-            return { results: [...friends.values()].filter((f) => requested.has(f.line_user_id)) };
+          if (sql.includes('line_user_id IN')) {
+            const scoped = sql.includes('line_account_id = ?');
+            const accountId = scoped ? args[0] as string : null;
+            const requested = new Set((scoped ? args.slice(1) : args) as string[]);
+            return {
+              results: [...friends.values()].filter((f) =>
+                requested.has(f.line_user_id) && (!scoped || f.line_account_id === accountId)),
+            };
           }
           if (sql.includes('AND display_name IS NULL')) {
             const [accountId, afterId, limit] = args as [string, string, number];

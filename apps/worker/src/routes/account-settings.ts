@@ -57,11 +57,21 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
        CASE WHEN f.line_account_id = ? THEN 1 ELSE 0 END AS same_account
      FROM staff_members sm
      JOIN friends f ON f.line_user_id = sm.line_user_id
+       AND (
+         f.line_account_id = ?
+         OR NOT EXISTS (
+           SELECT 1 FROM friends scoped
+            WHERE scoped.line_user_id = sm.line_user_id
+              AND scoped.line_account_id = ?
+         )
+       )
      WHERE sm.is_active = 1
        AND sm.line_user_id IS NOT NULL
        AND f.is_following = 1
      ORDER BY same_account DESC, sm.created_at ASC`
-  ).bind(accountId).all<{
+  // C-2bで複合一意制約へ移行したら、上のNOT EXISTSフォールバックを外す。
+  // 現在は既存の別アカウント・未割当行を候補から消さず、同じ応答を保つ。
+  ).bind(accountId, accountId, accountId).all<{
     id: string;
     display_name: string | null;
     picture_url: string | null;

@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import {
-  getFriendByLineUserId,
+  getFriendByLineUserIdForAccount,
   getAffiliateByFriendId,
   createAffiliate,
   createAffiliateLink,
@@ -94,7 +94,10 @@ async function resolveFriendFromLineToken(
   const { userId } = await prof.json<{ userId: string }>();
   if (!userId) return { status: 'invalid_token' };
 
-  const friend = await getFriendByLineUserId(db, userId);
+  const lineAccountId = dbAccounts.find(
+    (account) => account.login_channel_id === tokenClientId,
+  )?.id ?? null;
+  const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
   if (!friend) return { status: 'no_friend' };
   return { status: 'ok', friend: friend as unknown as ResolvedFriend };
 }

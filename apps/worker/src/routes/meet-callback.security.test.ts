@@ -10,16 +10,18 @@ vi.mock('@line-crm/line-sdk', () => ({
 }));
 
 vi.mock('@line-crm/db', () => ({
-  getFriendByLineUserId: vi.fn(async () => ({
+  getFriendByLineUserIdForAccount: vi.fn(async () => ({
     id: 'friend-1',
     line_user_id: 'U11111111111111111111111111111111',
     display_name: '利用者',
     metadata: '{}',
     line_account_id: null,
   })),
+  getScenarioById: vi.fn(async () => ({ id: 'scenario-1', line_account_id: 'account-1' })),
   getLineAccountById: vi.fn(async () => null),
 }));
 
+import { getFriendByLineUserIdForAccount } from '@line-crm/db';
 import { meetCallback } from './meet-callback.js';
 
 function fakeDb() {
@@ -115,6 +117,11 @@ describe('Meet callback security boundary', () => {
     expect(first.status).toBe(200);
     expect(replay.status).toBe(200);
     expect(await replay.json()).toMatchObject({ success: true, duplicate: true });
+    expect(getFriendByLineUserIdForAccount).toHaveBeenCalledWith(
+      db,
+      payload.line_user_id,
+      'account-1',
+    );
     expect(pushMessage).toHaveBeenCalledTimes(1);
   });
 });

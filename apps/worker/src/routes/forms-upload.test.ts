@@ -12,8 +12,8 @@ import type { Env } from '../index.js';
 
 const mocks = vi.hoisted(() => ({
   getFormById: vi.fn(),
-  getFriendByLineUserId: vi.fn(),
-  verifyCallerLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
+  verifyCallerLineIdentity: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
@@ -26,7 +26,7 @@ vi.mock('@line-crm/db', () => ({
   getFormSubmissions: vi.fn(),
   getLatestFormSubmission: vi.fn(),
   createFormSubmission: vi.fn(),
-  getFriendByLineUserId: mocks.getFriendByLineUserId,
+  getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
   getFriendById: vi.fn(),
   getTrackedLinkById: vi.fn(),
   getMessageTemplateById: vi.fn(),
@@ -36,7 +36,7 @@ vi.mock('@line-crm/db', () => ({
 }));
 
 vi.mock('../services/liff-auth.js', () => ({
-  verifyCallerLineUserId: mocks.verifyCallerLineUserId,
+  verifyCallerLineIdentity: mocks.verifyCallerLineIdentity,
 }));
 
 vi.mock('../services/friend-tag-attach.js', () => ({
@@ -112,8 +112,11 @@ function upload(mimeType = 'image/jpeg', bytes = 1024) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getFormById.mockResolvedValue(formWithFile());
-  mocks.verifyCallerLineUserId.mockResolvedValue('U-line-user');
-  mocks.getFriendByLineUserId.mockResolvedValue({ id: 'friend-1', line_user_id: 'U-line-user' });
+  mocks.verifyCallerLineIdentity.mockResolvedValue({
+    lineUserId: 'U-line-user',
+    lineAccountId: 'account-a',
+  });
+  mocks.getFriendByLineUserIdForAccount.mockResolvedValue({ id: 'friend-1', line_user_id: 'U-line-user' });
 });
 
 describe('回答に添付する画像を預かる', () => {
@@ -137,7 +140,7 @@ describe('回答に添付する画像を預かる', () => {
   });
 
   test('本人が確かめられないときは預からない', async () => {
-    mocks.verifyCallerLineUserId.mockResolvedValue(null);
+    mocks.verifyCallerLineIdentity.mockResolvedValue(null);
     const { bindings, put } = env();
 
     const res = await app().fetch(upload(), bindings);
@@ -146,7 +149,7 @@ describe('回答に添付する画像を預かる', () => {
   });
 
   test('友だちでない人からは預からない', async () => {
-    mocks.getFriendByLineUserId.mockResolvedValue(null);
+    mocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
     const { bindings, put } = env();
 
     const res = await app().fetch(upload(), bindings);

@@ -8,7 +8,7 @@ import {
   deleteTrackedLink,
   recordLinkClick,
   getLinkClicks,
-  getFriendByLineUserId,
+  getFriendByLineUserIdForAccount,
 } from '@line-crm/db';
 import { enrollFriendInScenario, getUrlReachConversionPoints, trackConversion } from '@line-crm/db';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
@@ -66,6 +66,18 @@ async function resolveLinkAccount(
   db: D1Database,
   link: TrackedLink,
 ): Promise<Record<string, unknown> | null> {
+  const accountId = await resolveLinkAccountId(db, link);
+  if (!accountId) return null;
+  return db
+    .prepare(`SELECT * FROM line_accounts WHERE id = ?`)
+    .bind(accountId)
+    .first<Record<string, unknown>>();
+}
+
+async function resolveLinkAccountId(
+  db: D1Database,
+  link: TrackedLink,
+): Promise<string | null> {
   let accountId: string | null = link.line_account_id ?? null;
   if (!accountId && link.scenario_id) {
     const scRow = await db
@@ -74,11 +86,7 @@ async function resolveLinkAccount(
       .first<{ line_account_id: string | null }>();
     accountId = scRow?.line_account_id ?? null;
   }
-  if (!accountId) return null;
-  return db
-    .prepare(`SELECT * FROM line_accounts WHERE id = ?`)
-    .bind(accountId)
-    .first<Record<string, unknown>>();
+  return accountId;
 }
 
 // GET /api/tracked-links — list all
@@ -329,7 +337,12 @@ trackedLinks.get('/t/:linkId', async (c) => {
 
   // Resolve friendId from LINE user ID if provided
   if (!friendId && lineUserId) {
-    const friend = await getFriendByLineUserId(c.env.DB, lineUserId);
+    const accountId = await resolveLinkAccountId(c.env.DB, link);
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      lineUserId,
+      accountId,
+    );
     if (friend) {
       friendId = friend.id;
     }

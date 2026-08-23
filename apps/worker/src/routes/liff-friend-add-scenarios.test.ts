@@ -26,12 +26,14 @@ const dbMocks = {
       .map((s) => s.id);
   }),
   // eager module-load deps
-  getLineAccounts: vi.fn().mockResolvedValue([]),
+  getLineAccounts: vi.fn().mockResolvedValue([
+    { id: 'account-main', login_channel_id: '2000000000' },
+  ]),
   getStaffByApiKey: vi.fn(),
   recoverStalledBroadcasts: vi.fn(),
   recoverStuckDeliveries: vi.fn(),
   // /auth/callback deps
-  getFriendByLineUserId: vi.fn(),
+  getFriendByLineUserIdForAccount: vi.fn(),
   upsertFriend: vi.fn(),
   createUser: vi.fn().mockResolvedValue({ id: 'U-uuid' }),
   getUserByEmail: vi.fn().mockResolvedValue(null),
@@ -134,7 +136,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   installFetchMock();
   pushImmediateFirstStep.mockResolvedValue(true);
-  dbMocks.getFriendByLineUserId.mockResolvedValue(null); // brand-new friend
+  dbMocks.getFriendByLineUserIdForAccount.mockResolvedValue(null); // brand-new friend
   dbMocks.createUser.mockResolvedValue({ id: 'U-uuid' });
   dbMocks.upsertFriend.mockResolvedValue({
     id: 'F-new',

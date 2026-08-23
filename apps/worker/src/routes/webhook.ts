@@ -9,7 +9,7 @@ import { createStickerMessageContent } from '@line-crm/shared';
 import {
   upsertFriend,
   updateFriendFollowStatus,
-  getFriendByLineUserId,
+  getFriendByLineUserIdForAccount,
   getScenarios,
   enrollFriendInScenario,
   upsertChatOnMessage,
@@ -45,7 +45,7 @@ async function ensureFriendFromWebhookUser(
   userId: string,
   lineAccountId: string | null,
 ): Promise<Friend | null> {
-  let friend = await getFriendByLineUserId(db, userId);
+  let friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
 
   if (!friend) {
     let profile: Awaited<ReturnType<LineClient['getProfile']>> | null = null;
@@ -55,19 +55,22 @@ async function ensureFriendFromWebhookUser(
       // A signed webhook already proves this user interacted with the bot.
       // If profile lookup is temporarily unavailable, keep the event processable
       // by creating the friend with the LINE userId and filling profile later.
-      console.error('[webhook] Failed to get profile for unknown user', userId, err);
+      console.error('[webhook] Failed to get profile for unknown user', err);
     }
 
     friend = await upsertFriend(db, {
       lineUserId: userId,
+      lineAccountId,
       displayName: profile?.displayName ?? null,
       pictureUrl: profile?.pictureUrl ?? null,
       statusMessage: profile?.statusMessage ?? null,
     });
-    console.log(`[webhook] auto-registered existing friend userId=${userId} friendId=${friend.id}`);
+    console.log(`[webhook] auto-registered existing friend friendId=${friend.id}`);
   }
 
   if (lineAccountId && friend.line_account_id !== lineAccountId) {
+    // C-2b: UNIQUE(line_account_id, line_user_id) へ移行したら、別アカウントの
+    // 行を「移動」せず、このアカウント用のfriend行を新規作成する。
     const now = jstNow();
     await db
       .prepare('UPDATE friends SET line_account_id = ?, is_following = 1, updated_at = ? WHERE id = ?')
@@ -197,20 +200,21 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    console.log(`[follow] userId=${userId} lineAccountId=${lineAccountId}`);
+    console.log(`[follow] lineAccountId=${lineAccountId}`);
 
     // プロフィール取得 & 友だち登録/更新
     let profile;
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      console.error('Failed to get profile for', userId, err);
+      console.error('Failed to get profile', err);
     }
 
     console.log(`[follow] profile=${profile?.displayName ?? 'null'}`);
 
     const friend = await upsertFriend(db, {
       lineUserId: userId,
+      lineAccountId,
       displayName: profile?.displayName ?? null,
       pictureUrl: profile?.pictureUrl ?? null,
       statusMessage: profile?.statusMessage ?? null,
@@ -297,13 +301,13 @@ async function handleEvent(
               skipCooldown: true,
             },
           );
-          if (sent) console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1 to ${userId}`);
+          if (sent) console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1`);
         } catch (err) {
           console.error('Failed immediate delivery for routed scenario', scenarioId, err);
         }
       }
       if (routing.suppressed) {
-        console.log(`[friend-add-routing] suppressed for ${userId} (kind=${routing.kind})`);
+        console.log(`[friend-add-routing] suppressed (kind=${routing.kind})`);
       }
     }
 
@@ -346,7 +350,7 @@ async function handleEvent(
               skipCooldown: true,
             },
           );
-          if (sent) console.log(`Immediate delivery: sent scenario ${scenario.id} step 1 to ${userId}`);
+          if (sent) console.log(`Immediate delivery: sent scenario ${scenario.id} step 1`);
         } catch (err) {
           console.error('Failed to enroll friend in scenario', scenario.id, err);
         }
@@ -404,7 +408,7 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    await updateFriendFollowStatus(db, userId, false);
+    await updateFriendFollowStatus(db, userId, false, lineAccountId);
     return;
   }
 
