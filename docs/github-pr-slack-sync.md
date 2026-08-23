@@ -33,4 +33,3 @@ Secretとvariableを登録した後、`Actions` → `GitHub PR Slack Sync` → `
 
 この切り戻しでGitHub起点の新規通知と定期再照合が止まる。Codexフックによる補助通知と、
 既存のSlackメッセージは残る。
-
