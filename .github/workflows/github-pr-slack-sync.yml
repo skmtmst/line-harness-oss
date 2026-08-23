@@ -24,6 +24,11 @@ on:
     # more often. GitHub schedules run from the repository's default branch.
     - cron: '17 * * * *'
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: '手動テストで再照合するPR番号（空なら通常どおり全件）'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -62,6 +67,7 @@ jobs:
           CODEX_SLACK_RELAY_URL: https://nen-line-stg.skmtmst.workers.dev/api/integrations/codex-slack/events
           # PR #275 and earlier were audited/backfilled before this workflow.
           GITHUB_SLACK_SYNC_MIN_PR_NUMBER: '276'
+          GITHUB_SLACK_SYNC_ONLY_PR_NUMBER: ${{ inputs.pr_number || '' }}
           GITHUB_SLACK_SYNC_CLOSED_LOOKBACK_HOURS: '72'
         run: >-
           node
