@@ -1,6 +1,27 @@
 export const ACCOUNT_SELECTION_KEY = 'lh_selected_account'
 export const AUTH_SELECTION_CLEARED_KEY = 'lh_auth_selection_cleared'
 
+export const HQ_OPEN_TARGETS = {
+  tags: { label: 'タグ', destination: '/tags' },
+  templates: { label: 'テンプレート管理', destination: '/templates' },
+  'rich-menus': { label: 'リッチメニュー管理', destination: '/rich-menus' },
+  'form-submissions': { label: '回答フォーム管理', destination: '/form-submissions' },
+} as const
+
+export type HqOpenTargetKey = keyof typeof HQ_OPEN_TARGETS
+export type HqOpenTarget = (typeof HQ_OPEN_TARGETS)[HqOpenTargetKey] & { key: HqOpenTargetKey }
+
+export function hqOpenHref(target: HqOpenTargetKey): string {
+  return `/hq/open?target=${target}`
+}
+
+/** 許可済みの値だけを行き先へ解決し、任意URLは決して受け付けない。 */
+export function resolveHqOpenTarget(value: string | null): HqOpenTarget | null {
+  if (!value || !Object.prototype.hasOwnProperty.call(HQ_OPEN_TARGETS, value)) return null
+  const key = value as HqOpenTargetKey
+  return { key, ...HQ_OPEN_TARGETS[key] }
+}
+
 export type RootLandingDecision =
   | { action: 'show-dashboard' }
   | { action: 'select-account'; accountId: string }

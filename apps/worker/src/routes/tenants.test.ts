@@ -60,6 +60,53 @@ describe('current tenant', () => {
       .request('/api/tenants/me', {}, environment());
     expect(response.status).toBe(404);
   });
+
+  it.each(['owner', 'admin'] as const)('%sは自分の統括名だけを更新できる', async (role) => {
+    const otherTenantId = '00000000-0000-4000-8000-000000000099';
+    testDb.raw.prepare('INSERT INTO tenants (id, name) VALUES (?, ?)')
+      .run(otherTenantId, '別の統括');
+
+    const response = await app(operator(role)).request('/api/tenants/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Shed Products株式会社', tenantId: otherTenantId }),
+    }, environment());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      data: { name: 'Shed Products株式会社' },
+    });
+    expect(testDb.raw.prepare('SELECT name FROM tenants WHERE id = ?').get(DEFAULT_TENANT_ID))
+      .toEqual({ name: 'Shed Products株式会社' });
+    expect(testDb.raw.prepare('SELECT name FROM tenants WHERE id = ?').get(otherTenantId))
+      .toEqual({ name: '別の統括' });
+  });
+
+  it('staffは統括名を更新できない', async () => {
+    const response = await app(operator('staff')).request('/api/tenants/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '変更不可' }),
+    }, environment());
+    expect(response.status).toBe(403);
+    expect(testDb.raw.prepare('SELECT name FROM tenants WHERE id = ?').get(DEFAULT_TENANT_ID))
+      .toEqual({ name: '既定の統括' });
+  });
+
+  it.each([
+    ['', '統括名を入力してください'],
+    ['   ', '統括名を入力してください'],
+    ['あ'.repeat(101), '統括名は100文字以内で入力してください'],
+  ])('不正な統括名を400で拒否する', async (name, error) => {
+    const response = await app(operator('admin')).request('/api/tenants/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }, environment());
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ success: false, error });
+  });
 });
 
 describe('tenant boundary preview', () => {

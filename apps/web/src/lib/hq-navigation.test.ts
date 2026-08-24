@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   ACCOUNT_SELECTION_KEY,
   AUTH_SELECTION_CLEARED_KEY,
+  HQ_OPEN_TARGETS,
   clearSelectionAfterAuthentication,
   decideRootLanding,
+  hqOpenHref,
+  resolveHqOpenTarget,
 } from './hq-navigation'
 
 function storage(initial: Record<string, string> = {}) {
@@ -33,6 +36,29 @@ describe('ログイン直後の着地点', () => {
   it('選択済みなら店舗ダッシュボードを表示する', () => {
     expect(decideRootLanding(false, 'account-2', ['account-1', 'account-2']))
       .toEqual({ action: 'show-dashboard' })
+  })
+})
+
+describe('統括から店舗画面を開く', () => {
+  it('4つの許可済み遷移先を1か所で管理する', () => {
+    expect(HQ_OPEN_TARGETS).toEqual({
+      tags: { label: 'タグ', destination: '/tags' },
+      templates: { label: 'テンプレート管理', destination: '/templates' },
+      'rich-menus': { label: 'リッチメニュー管理', destination: '/rich-menus' },
+      'form-submissions': { label: '回答フォーム管理', destination: '/form-submissions' },
+    })
+    expect(hqOpenHref('templates')).toBe('/hq/open?target=templates')
+  })
+
+  it('許可済みtargetだけを解決する', () => {
+    expect(resolveHqOpenTarget('templates')).toEqual({
+      key: 'templates',
+      label: 'テンプレート管理',
+      destination: '/templates',
+    })
+    expect(resolveHqOpenTarget('https://example.com')).toBeNull()
+    expect(resolveHqOpenTarget('../friends')).toBeNull()
+    expect(resolveHqOpenTarget(null)).toBeNull()
   })
 })
 
