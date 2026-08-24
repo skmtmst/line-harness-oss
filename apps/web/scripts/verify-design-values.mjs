@@ -121,6 +121,14 @@ export function checkShape(data) {
   if (!v6?.summary || !v6?.lastCheckedAt) {
     problems.push('$v6Verification に summary または lastCheckedAt がありません')
   }
+  if (!v6?.partResult) {
+    problems.push('$v6Verification に partResult がありません')
+  }
+  for (const id of req.v6PartNodes ?? []) {
+    if (typeof v6?.partReferences?.[id] !== 'number') {
+      problems.push(`V6部品 ${id} の参照数が記録されていません`)
+    }
+  }
 
   const tokens = Object.keys(data.tokens || {}).filter((k) => !k.startsWith('$'))
   const parts = Object.keys(data.parts || {}).filter((k) => !k.startsWith('$'))

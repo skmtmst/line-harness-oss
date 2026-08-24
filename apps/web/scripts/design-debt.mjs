@@ -227,6 +227,10 @@ export function countDebt() {
   const parts = partFiles()
   const counts = {}
   for (const full of sourceFiles()) {
+    // 正本の部品実装には、button/thなどのネイティブ要素とCSS Moduleを
+    // 組み立てるclassNameが必要。ここを直書き負債へ数えると、部品を追加した
+    // だけで基準値を緩めることになる。検査対象は部品を使う側の画面に限定する。
+    if (parts.has(full)) continue
     const perFile = analyzeSource(full, readFileSync(full, 'utf8'), parts)
     if (Object.keys(perFile).length) counts[relative(SRC, full)] = perFile
   }

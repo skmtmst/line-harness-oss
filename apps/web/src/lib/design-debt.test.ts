@@ -32,6 +32,16 @@ const { counts } = countDebt()
 const { worse, better } = compare(counts, baseline)
 
 describe('共通部品を通らない直書き', () => {
+  it('design-parts.jsonに登録した正本部品自身は負債へ数えない', () => {
+    for (const file of [
+      'components/shared/button.tsx',
+      'components/shared/summary-card.tsx',
+      'components/shared/table.tsx',
+    ]) {
+      expect(counts).not.toHaveProperty(file)
+    }
+  })
+
   it('増えていない', () => {
     // 落ちたら: 共通部品を使うか、意図があるなら
     // node apps/web/scripts/design-debt.mjs --update で基準を更新してください。

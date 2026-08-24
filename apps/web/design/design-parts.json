@@ -25,6 +25,14 @@
       "owlEd"
     ],
     "summary": "受信箱・一斉配信・リマインダ・自動応答・テンプレート・リッチメニュー・回答フォーム・予約管理・運用状態・店舗ダッシュボードのV6代表10画面で全12トークンの利用を確認",
+    "partResult": "V6代表10画面で tPTMp はV5と同じ再利用部品を54回使用。nBRKk・uzNEC・XywGrにV6専用部品はないためV5を正本とする。mNUQ3は意味が異なるため統合判断まで調査中。",
+    "partReferences": {
+      "nBRKk": 0,
+      "uzNEC": 0,
+      "XywGr": 0,
+      "mNUQ3": 4,
+      "tPTMp": 54
+    },
     "lastCheckedAt": "2026-08-24"
   },
   "$status": {
@@ -46,6 +54,13 @@
     "tokens": 12,
     "parts": 3,
     "v6RepresentativeNodes": 10,
+    "v6PartNodes": [
+      "nBRKk",
+      "uzNEC",
+      "XywGr",
+      "mNUQ3",
+      "tPTMp"
+    ],
     "pencilNodes": [
       "XywGr",
       "nBRKk",
@@ -170,7 +185,7 @@
         "XywGr"
       ],
       "role": "canonical",
-      "status": "pending",
+      "status": "implemented",
       "reviewStatus": "confirmed",
       "code": "src/components/shared/summary-card.tsx",
       "cssModule": "src/components/shared/summary-card.module.css",
@@ -180,7 +195,7 @@
       "cssPrefix": "summary-card",
       "pencilUsage": 24,
       "lastCheckedAt": "2026-08-24",
-      "note": "コード側で3系統に割れていた（角丸12/14px、余白16/20px、影あり/なし）。",
+      "note": "コード側で3系統に割れていた（角丸12/14px、余白16/20px、影あり/なし）。V6専用のXywGr代替部品は確認されていないためV5を正本とする。文字列値を持つmNUQ3とemergencyは統合判断まで対象外。",
       "declarations": [
         {
           "pencil": "XywGr height: 100",
@@ -324,7 +339,7 @@
         "uzNEC"
       ],
       "role": "canonical",
-      "status": "pending",
+      "status": "implemented",
       "reviewStatus": "confirmed",
       "code": "src/components/shared/button.tsx",
       "cssModule": "src/components/shared/button.module.css",
@@ -334,7 +349,7 @@
       "cssPrefix": "button",
       "pencilUsage": 49,
       "lastCheckedAt": "2026-08-24",
-      "note": "コード側は寸法が5通りに割れており、どれもV5と違っていた（py-2 text-sm 等。V5は高さ36px・padding [9,13]・13px）。",
+      "note": "コード側は寸法が5通りに割れており、どれもV5と違っていた（py-2 text-sm 等。V5は高さ36px・padding [9,13]・13px）。V6専用ボタン部品は確認されていないためV5を正本とする。",
       "declarations": [
         {
           "pencil": "nBRKk/uzNEC height: 36",
@@ -435,7 +450,7 @@
         "tPTMp"
       ],
       "role": "canonical",
-      "status": "pending",
+      "status": "implemented",
       "reviewStatus": "confirmed",
       "code": "src/components/shared/table.tsx",
       "cssModule": "src/components/shared/table.module.css",
@@ -446,7 +461,7 @@
       "cssPrefix": "table",
       "pencilUsage": 107,
       "lastCheckedAt": "2026-08-24",
-      "note": "6機能で最も多く使われている部品。コード側は7通り以上に割れ、設計に無い uppercase / tracking-wider が付いていた。見出し行の寸法は友だち一覧 FG391 の f9yhp から採取。",
+      "note": "6機能で最も多く使われている部品。コード側は7通り以上に割れ、設計に無い uppercase / tracking-wider が付いていた。見出し行の寸法は友だち一覧 FG391 の f9yhp から採取。V6代表10画面でも同じtPTMpを54回使用。",
       "declarations": [
         {
           "pencil": "見出し行 height: 44",
@@ -550,7 +565,7 @@
     "focus-visible": {
       "name": "フォーカス時の見え方",
       "reviewStatus": "investigating",
-      "reason": "Pencilにフォーカス状態の定義が無い。値をコード側で勝手に決めない。必要なのは Button と SummaryCard 内のリンク。操作要素ではない Th 本体と SummaryCard 本体には不要。Pencil側で定義されてから PR #2 で入れる。",
+      "reason": "Pencilにフォーカス状態の定義が無い。PR #2では Button と SummaryCard 内のリンクに outline: revert を指定し、ブラウザ既定の輪郭を消さないことだけ保証した。固有の色・太さ・間隔はPencil側で定義されるまで追加しない。操作要素ではない Th 本体と SummaryCard 本体には不要。",
       "pencilNodes": [
         "nBRKk",
         "uzNEC",
