@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import type { BookingRequest, DashboardOverview } from '@/lib/api'
+import Card, { CardHeader } from '@/components/shared/card'
 
 /**
  * 右カラムのカード。
@@ -18,15 +19,15 @@ function SideCard({
   children: ReactNode
 }) {
   return (
-    <section className="bg-canvas rounded-[18px] border-hairline border shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
-      <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
-        <h2 className="text-ink text-sm font-semibold">{title}</h2>
-        <Link href={action.href} className="text-action text-xs hover:underline">
-          {action.label}
-        </Link>
-      </div>
+    <Card overflow="hidden">
+      <CardHeader
+        size="roomy"
+        title={title}
+        action={<Link href={action.href} className="hover:underline">{action.label}</Link>}
+        actionTone="info"
+      />
       <div className="p-5">{children}</div>
-    </section>
+    </Card>
   )
 }
 
