@@ -95,12 +95,11 @@ function Panel({ title, description, action, children, className = '' }: { title
   </section>
 }
 
-function EmptySetup({ busy, onCreate }: { busy: boolean; onCreate: () => void }) {
+function EmptySetup() {
   return <div className="rounded-card border border-nen-border bg-canvas p-10 text-center">
     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-nen-ivory text-2xl text-nen-gold">然</div>
-    <h2 className="mt-5 text-xl font-bold text-nen-green">飲食店向けテスト領域を準備します</h2>
-    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-ink-secondary">既存データへ触れず、専用の組織・店舗・予約・座席・メニュー・承認・Google・LINEフォローのサンプルを作成します。</p>
-    <button disabled={busy} onClick={onCreate} className="mt-6 rounded-control bg-nen-green px-6 py-3 text-sm font-bold text-on-accent disabled:opacity-50">{busy ? '準備中…' : 'テスト領域を作成'}</button>
+    <h2 className="mt-5 text-xl font-bold text-nen-green">店舗が登録されていません</h2>
+    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-ink-secondary">統括から店舗を登録してください。</p>
   </div>
 }
 
@@ -127,13 +126,6 @@ export default function RestaurantConsole({ view }: { view: string }) {
   }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
 
-  const bootstrap = async () => {
-    if (!selectedAccountId) return
-    setBusy(true)
-    try { await restaurantTestApi.bootstrap(selectedAccountId); await load(); setNotice({ tone: 'success', text: '専用のテスト領域を作成しました。' }) }
-    catch (error) { setNotice({ tone: 'error', text: error instanceof Error ? error.message : 'テスト領域を作成できませんでした。' }) }
-    finally { setBusy(false) }
-  }
   const mutate = async (action: () => Promise<unknown>, success: string) => {
     setBusy(true)
     try { await action(); await load(); setNotice({ tone: 'success', text: success }) }
@@ -148,7 +140,7 @@ export default function RestaurantConsole({ view }: { view: string }) {
     <TestBoundary />
     {notice && <div className={`mb-4 rounded-control border px-4 py-3 text-sm ${notice.tone === 'success' ? 'border-success bg-success-bg text-success' : 'border-danger bg-danger-bg text-danger'}`}>{notice.text}</div>}
     {loading ? <div className="rounded-card border border-hairline bg-canvas p-16 text-center text-sm text-ink-faint">読み込み中…</div>
-      : !snapshot?.organization ? <EmptySetup busy={busy} onCreate={() => void bootstrap()} />
+      : !snapshot?.organization ? <EmptySetup />
       : activeView === 'dashboard' ? <Dashboard data={snapshot} />
       : activeView === 'organization' ? <Organization
         accountId={selectedAccountId!}

@@ -159,10 +159,8 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '設定',
     title: '設定',
     items: [
-      { href: '/accounts', label: 'アカウント', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2H7a2 2 0 00-2 2v2m5-7v3m4-3v3' , id: 'accounts', note: 'LINEアカウントの登録と切り替え', required: true },
       { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' , id: 'staff', note: '管理画面に入る人と、その権限', required: true },
       { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' , id: 'settings', note: 'この画面。項目の表示と並びを決めます', required: true },
-      { href: '/accounts?tab=migration', label: 'データ移行', icon: 'M7 7h10M7 7l3-3M7 7l3 3m7 7H7m10 0l-3-3m3 3l-3 3' , id: 'data-migration', note: 'UIDなど既存データの移行状況を確認します', required: true },
       { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' , id: 'emergency', note: '配信の停止・再開と、異常の記録', required: true },
     ],
   },

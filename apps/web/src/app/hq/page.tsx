@@ -1,30 +1,37 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import HqAccountList from '@/components/hq/account-list'
+import AccountEditModal from '@/components/accounts/account-edit-modal'
 
 export default function HqPage() {
   const router = useRouter()
-  const { setSelectedAccountId } = useAccount()
+  const { setSelectedAccountId, refreshAccounts } = useAccount()
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [tenantName, setTenantName] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [editingAccount, setEditingAccount] = useState<AccountWithStats | null>(null)
+
+  const load = useCallback(async () => {
+    setError('')
+    const [accountResponse, tenantResponse] = await Promise.all([
+      api.lineAccounts.list(),
+      api.tenants.me(),
+    ])
+    if (!accountResponse.success) throw new Error(accountResponse.error)
+    if (!tenantResponse.success) throw new Error(tenantResponse.error)
+    setAccounts(accountResponse.data as AccountWithStats[])
+    setTenantName(tenantResponse.data.name)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
-    void Promise.all([api.lineAccounts.list(), api.tenants.me()])
-      .then(([accountResponse, tenantResponse]) => {
-        if (cancelled) return
-        if (!accountResponse.success) throw new Error(accountResponse.error)
-        if (!tenantResponse.success) throw new Error(tenantResponse.error)
-        setAccounts(accountResponse.data as AccountWithStats[])
-        setTenantName(tenantResponse.data.name)
-      })
+    void load()
       .catch(() => {
         if (!cancelled) setError('統括の店舗情報を読み込めませんでした。時間をおいてもう一度お試しください。')
       })
@@ -32,7 +39,11 @@ export default function HqPage() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [])
+  }, [load])
+
+  const reloadAfterSave = async () => {
+    await Promise.all([load(), refreshAccounts()])
+  }
 
   const login = (accountId: string) => {
     setSelectedAccountId(accountId)
@@ -73,7 +84,25 @@ export default function HqPage() {
       ) : null}
 
       {!error && !loading && accounts.length > 0 ? (
-        <HqAccountList accounts={accounts} onSelect={login} />
+        <HqAccountList accounts={accounts} onSelect={login} onSettings={setEditingAccount} />
+      ) : null}
+
+      {editingAccount ? (
+        <AccountEditModal
+          accountId={editingAccount.id}
+          initialName={editingAccount.name}
+          initialChannelId={editingAccount.channelId}
+          initialLoginChannelId={editingAccount.loginChannelId ?? null}
+          initialLiffId={editingAccount.liffId ?? null}
+          initialOgSiteName={editingAccount.ogSiteName ?? null}
+          initialOgDefaultDescription={editingAccount.ogDefaultDescription ?? null}
+          initialOgDefaultImageUrl={editingAccount.ogDefaultImageUrl ?? null}
+          initialFriendCapacity={editingAccount.friendCapacity ?? null}
+          initialCapacityWarnAt={editingAccount.capacityWarnAt ?? null}
+          initialIconUrl={editingAccount.iconUrl ?? null}
+          onClose={() => setEditingAccount(null)}
+          onSaved={() => { void reloadAfterSave() }}
+        />
       ) : null}
     </div>
   )

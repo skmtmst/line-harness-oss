@@ -45,14 +45,14 @@ describe('表見出しの第1段階移行', () => {
     }
   })
 
-  it('今回対象外の詳細内テーブルを残し、負債基準を75セル分だけ締める', () => {
+  it('今回対象外の詳細内テーブルを残し、D-3の旧一覧転送後も基準を締める', () => {
     for (const path of targets.filter((path) => path !== 'app/affiliates/tabs.tsx')) {
       expect(sources[path]).not.toMatch(/<th\b/)
     }
     expect(sources['app/affiliates/tabs.tsx'].match(/<th\b/g)).toHaveLength(20)
 
     const debt = totals(countDebt().counts) as Record<string, number>
-    expect(debt['direct-th']).toBe(303)
+    expect(debt['direct-th']).toBe(289)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

@@ -22,10 +22,12 @@ function WebhookStatus({ status }: { status: 'matched' | 'mismatched' | 'unconfi
 export default function HqAccountList({
   accounts,
   onSelect,
+  onSettings,
   selectLabel = 'ログイン',
 }: {
   accounts: AccountWithStats[]
   onSelect: (accountId: string) => void
+  onSettings?: (account: AccountWithStats) => void
   selectLabel?: string
 }) {
   return (
@@ -55,7 +57,12 @@ export default function HqAccountList({
                 <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-ink">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')}</td>
                 <td className="px-4 py-4"><WebhookStatus status={account.webhook?.status} /></td>
                 <td className="px-4 py-4"><span className={`inline-flex rounded-pill px-3 py-1 text-xs font-semibold ${account.isActive ? 'bg-accent-soft text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{account.isActive ? '有効' : '停止中'}</span></td>
-                <td className="px-5 py-4 text-right"><Button type="button" variant="primary" onClick={() => onSelect(account.id)}>{selectLabel}</Button></td>
+                <td className="px-5 py-4 text-right">
+                  <div className="flex justify-end gap-2">
+                    {onSettings ? <Button type="button" variant="secondary" onClick={() => onSettings(account)}>設定</Button> : null}
+                    <Button type="button" variant="primary" onClick={() => onSelect(account.id)}>{selectLabel}</Button>
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

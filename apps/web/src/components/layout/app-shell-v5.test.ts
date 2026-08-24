@@ -94,8 +94,9 @@ describe('Pen.dev V5を共通レイアウトの正本にする', () => {
     expect(chats).toContain("params.get('thread')")
   })
 
-  it('V4で追加したメニューが実装から消えていない', () => {
-    for (const label of ['コンバージョン', '専用機能', 'NEN配信', '写真審査', 'EC連携', 'データ移行']) {
+  it('V4で追加した店舗運用メニューが実装から消えていない', () => {
+    // D-3で統括へ集約した「アカウント」「データ移行」は店舗メニューの対象外。
+    for (const label of ['コンバージョン', '専用機能', 'NEN配信', '写真審査', 'EC連携']) {
       expect(menu).toContain(label)
     }
   })

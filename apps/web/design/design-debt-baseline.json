@@ -2,18 +2,6 @@
   "app/accounts/migration.tsx": {
     "direct-secondary-button": 2
   },
-  "app/accounts/new/page.tsx": {
-    "direct-secondary-button": 6,
-    "direct-primary-button": 7,
-    "arbitrary-value": 8,
-    "unresolved-classname": 9
-  },
-  "app/accounts/page.tsx": {
-    "direct-secondary-button": 4,
-    "arbitrary-value": 9,
-    "direct-th": 8,
-    "direct-primary-button": 1
-  },
   "app/affiliate-offers/new/page.tsx": {
     "unresolved-classname": 8
   },
@@ -286,12 +274,6 @@
   "app/restaurant-test/stores/new/terms-consent.tsx": {
     "arbitrary-value": 1,
     "direct-primary-button": 1
-  },
-  "app/restaurant-test/stores/store-list.tsx": {
-    "direct-primary-button": 3,
-    "arbitrary-value": 1,
-    "direct-th": 6,
-    "unresolved-classname": 1
   },
   "app/rich-menus/edit/page.tsx": {
     "arbitrary-value": 10
