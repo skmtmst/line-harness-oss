@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api, type ListStats } from '@/lib/api'
+import SummaryCard, { type SummaryCardProps } from './summary-card'
 
 /**
  * 一覧画面の上部に出す数値カード4枚。
@@ -22,7 +23,13 @@ export interface KpiSpec {
   detail: string
 }
 
-export default function ListKpis({ build }: { build: (stats: ListStats) => KpiSpec[] }) {
+export default function ListKpis({
+  build,
+  variant = 'v5',
+}: {
+  build: (stats: ListStats) => KpiSpec[]
+  variant?: NonNullable<SummaryCardProps['variant']>
+}) {
   const [stats, setStats] = useState<ListStats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -52,24 +59,7 @@ export default function ListKpis({ build }: { build: (stats: ListStats) => KpiSp
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
       {cards.map((card, i) => (
-        <div key={card.title || i} className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-secondary text-xs font-medium">
-            {card.title || <span className="bg-canvas-sunken inline-block h-3 w-20 rounded" />}
-          </p>
-          <p className="mt-1 flex items-baseline gap-1">
-            {loading ? (
-              <span className="bg-canvas-sunken inline-block h-7 w-14 animate-pulse rounded" />
-            ) : (
-              <>
-                <span className="text-ink text-2xl font-bold tabular-nums">
-                  {card.value === null ? '—' : card.value.toLocaleString('ja-JP')}
-                </span>
-                <span className="text-ink-secondary text-xs">{card.unit}</span>
-              </>
-            )}
-          </p>
-          <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">{card.detail}</p>
-        </div>
+        <SummaryCard key={card.title || i} {...card} loading={loading} variant={variant} />
       ))}
     </div>
   )

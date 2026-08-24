@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import Link from 'next/link'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import KpiCard from '@/components/dashboard/kpi-card'
@@ -50,6 +49,8 @@ import Header from '@/components/layout/header'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
 
 interface ConversionReportItem {
   conversionPointId: string
@@ -147,25 +148,23 @@ function ConversionsPageInner() {
           description="何を成果として数えるか、誰の紹介か、いくら払うかを1か所でまとめて扱います。成果地点の定義と、出た成果の承認が同じ画面で完結します。"
           action={
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
                 disabled
                 title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
               >
                 マニュアル
-              </button>
-              <Link
+              </Button>
+              <Button
                 href="/conversions?tab=affiliates"
-                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
               >
                 アフィリエイターを追加
-              </Link>
-              <Link
+              </Button>
+              <Button
                 href="/conversions/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+                variant="primary"
               >
                 成果地点を追加
-              </Link>
+              </Button>
             </div>
           }
         />
@@ -234,13 +233,12 @@ function ConversionsPageInner() {
         >
           <option>今月</option>
         </select>
-        <button
+        <Button
           disabled
           title="書き出しは準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
         >
           CSVで書き出す
-        </button>
+        </Button>
       </div>
 
       {/* 設計の表は7列。報酬と状態は持っている列が無いので「—」を出す。
@@ -256,17 +254,17 @@ function ConversionsPageInner() {
       ) : (
         <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
           <table className="w-full min-w-[880px]">
-            <thead className="bg-canvas-sunken border-hairline border-b">
-              <tr>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">成果地点（CV）名</th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">種別</th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">計測方法</th>
-                <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">成果単価</th>
-                <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">CV数</th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">報酬</th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">状態</th>
-                <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">操作</th>
-              </tr>
+            <thead>
+              <TableHeadRow>
+                <Th>成果地点（CV）名</Th>
+                <Th>種別</Th>
+                <Th>計測方法</Th>
+                <Th align="right">成果単価</Th>
+                <Th align="right">CV数</Th>
+                <Th>報酬</Th>
+                <Th>状態</Th>
+                <Th align="right">操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
               {shown.map((point) => (
@@ -394,13 +392,13 @@ function ReportTab() {
   return (
     <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
       <table className="w-full min-w-[560px]">
-        <thead className="bg-canvas-sunken border-hairline border-b">
-          <tr>
-            <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">成果地点（CV）名</th>
-            <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">種別</th>
-            <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">CV数</th>
-            <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">金額</th>
-          </tr>
+        <thead>
+          <TableHeadRow>
+            <Th>成果地点（CV）名</Th>
+            <Th>種別</Th>
+            <Th align="right">CV数</Th>
+            <Th align="right">金額</Th>
+          </TableHeadRow>
         </thead>
         <tbody className="divide-hairline divide-y">
           {rows.map((r) => (

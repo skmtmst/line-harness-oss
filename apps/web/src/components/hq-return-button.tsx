@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
 
 export default function HqReturnButton() {
   const pathname = usePathname()
@@ -12,16 +13,16 @@ export default function HqReturnButton() {
 
   return (
     <div className="mb-4 flex justify-end">
-      <button
+      <Button
         type="button"
         onClick={() => {
           clearSelectedAccountId()
           router.push('/hq')
         }}
-        className="rounded-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-ink-secondary transition-colors hover:border-accent hover:text-accent"
+        variant="secondary"
       >
         統括
-      </button>
+      </Button>
     </div>
   )
 }

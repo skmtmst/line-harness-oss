@@ -1168,6 +1168,10 @@ export async function relayCodexSlackEvent(
     fetcher,
   );
   if (!channelId) throw new Error(`SLACK_CHANNEL_NOT_CONFIGURED:${category}`);
+  // Provisioning needs broader Slack scopes than posting. Run it before any
+  // message mutation so a missing scope cannot leave a partial reply that a
+  // GitHub retry would post again.
+  if (event.prNumber) await ensureUpcomingPrRangeChannel(config, event.prNumber, fetcher);
   let key = workKey(event);
   let threadTs: string | null = null;
   let createdParent = false;
@@ -1231,7 +1235,6 @@ export async function relayCodexSlackEvent(
     if (event.refreshCommandCenter !== false) {
       await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher);
     }
-    if (event.prNumber) await ensureUpcomingPrRangeChannel(config, event.prNumber, fetcher);
     return { category, channelId, threadTs };
   }
 
@@ -1290,7 +1293,5 @@ export async function relayCodexSlackEvent(
   if (event.refreshCommandCenter !== false) {
     await refreshSlackCommandCenter(config, event.openPrs, event.occurredAt, fetcher);
   }
-  if (event.prNumber) await ensureUpcomingPrRangeChannel(config, event.prNumber, fetcher);
-
   return { category, channelId, threadTs };
 }

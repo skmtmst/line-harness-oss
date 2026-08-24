@@ -13,7 +13,11 @@
     "start": "next start",
     "release-log": "node scripts/build-release-log.mjs",
     "pretest": "pnpm --filter @line-crm/shared --filter @line-crm/line-sdk build && node scripts/build-release-log.mjs",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "verify:design": "node scripts/verify-design-values.mjs",
+    "design:debt:check": "node scripts/design-debt.mjs",
+    "design:debt:update": "node scripts/design-debt.mjs --update",
+    "design:impact": "node scripts/design-impact.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

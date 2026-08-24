@@ -9,6 +9,9 @@ import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
+import Pagination from '@/components/shared/pagination'
 
 /**
  * リマインダの一覧。
@@ -238,13 +241,12 @@ export default function RemindersPage() {
           description="ゴール日時までのカウントダウン配信を作ります。予約・イベント・友だち情報欄の日付を起点にできます。"
           action={
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 disabled
                 title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
               >
                 マニュアル
-              </button>
+              </Button>
               {/* 並べ替えは表の左端を掴んで行う。ここはやり方の案内。
                   窓を開いて並べ替える形にすると、一覧と窓で同じ並びを
                   2か所に持つことになる。 */}
@@ -254,18 +256,17 @@ export default function RemindersPage() {
               >
                 ⇅ 並び替えは ⠿ を掴む
               </span>
-              <button
+              <Button
                 onClick={() => setFolderDialogOpen(true)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
                 ＋ 新しいフォルダ
-              </button>
-              <Link
+              </Button>
+              <Button
                 href="/reminders/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium transition-colors"
+                variant="primary"
               >
                 ＋ 新しいリマインダ
-              </Link>
+              </Button>
             </div>
           }
         />
@@ -283,6 +284,7 @@ export default function RemindersPage() {
 
       <div data-design="KPIs">
         <ListKpis
+          variant="v6"
           build={(s) => [
             { title: 'リマインダ', value: s.reminders.total, unit: '件', detail: `稼働中 ${s.reminders.active}` },
             { title: '配信待ち', value: s.reminders.waiting, unit: '人', detail: '登録済みで未完了' },
@@ -349,9 +351,9 @@ export default function RemindersPage() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px]">
                   <thead>
-                    <tr className="bg-canvas-sunken border-hairline border-b">
-                      <th className="w-8 px-2 py-3" aria-label="並び替え" />
-                      <th className="w-10 px-3 py-3">
+                    <TableHeadRow>
+                      <Th className="w-8" aria-label="並び替え" />
+                      <Th className="w-10">
                         <input
                           type="checkbox"
                           checked={allOnPageSelected}
@@ -368,29 +370,29 @@ export default function RemindersPage() {
                           aria-label="このページのリマインダをすべて選ぶ"
                           className="accent-green-500"
                         />
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         リマインダ名
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         配信方式
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         きっかけ
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         送る内容
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         フォルダ
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         稼働
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         登録日
-                      </th>
-                    </tr>
+                      </Th>
+                    </TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {loading ? (
@@ -523,38 +525,7 @@ export default function RemindersPage() {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <nav className="flex items-center gap-1" aria-label="ページ送り">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  aria-label="前のページ"
-                  className="border-hairline text-ink-secondary rounded-control border px-2 py-1 text-sm disabled:opacity-30"
-                >
-                  &lt;
-                </button>
-                {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setPage(n)}
-                    aria-current={n === page ? 'page' : undefined}
-                    className={`rounded-control px-3 py-1 text-sm tabular-nums ${
-                      n === page
-                        ? 'bg-accent text-on-accent'
-                        : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                  disabled={page >= pageCount}
-                  aria-label="次のページ"
-                  className="border-hairline text-ink-secondary rounded-control border px-2 py-1 text-sm disabled:opacity-30"
-                >
-                  &gt;
-                </button>
-              </nav>
+              <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
               <button
                 onClick={() => void handleDeleteSelected()}

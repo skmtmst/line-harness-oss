@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { useAccount, type AccountWithStats } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 function AccountIcon({ account }: { account: AccountWithStats }) {
   if (account.pictureUrl) {
@@ -14,11 +15,11 @@ function AccountIcon({ account }: { account: AccountWithStats }) {
   return <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-accent-soft text-sm font-bold text-accent">然</span>
 }
 
-function webhookLabel(status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' | undefined) {
-  if (status === 'matched') return { label: '正常', className: 'text-success' }
-  if (status === 'mismatched') return { label: '要確認', className: 'text-danger' }
-  if (status === 'unconfigured') return { label: '未設定', className: 'text-warning' }
-  return { label: '確認中', className: 'text-ink-faint' }
+function WebhookStatus({ status }: { status: 'matched' | 'mismatched' | 'unconfigured' | 'unknown' | undefined }) {
+  if (status === 'matched') return <span className="text-sm font-semibold text-success">正常</span>
+  if (status === 'mismatched') return <span className="text-sm font-semibold text-danger">要確認</span>
+  if (status === 'unconfigured') return <span className="text-sm font-semibold text-warning">未設定</span>
+  return <span className="text-sm font-semibold text-ink-faint">確認中</span>
 }
 
 export default function HqPage() {
@@ -63,16 +64,16 @@ export default function HqPage() {
           </h1>
           <p className="mt-1 text-sm text-ink-secondary">LINE公式アカウントごとに店舗の管理画面へ移動できます。</p>
         </div>
-        <Link href="/restaurant-test/stores/new" className="shrink-0 rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-hover">
+        <Button href="/restaurant-test/stores/new" variant="primary" className="shrink-0">
           ＋店舗の新規アカウント登録
-        </Link>
+        </Button>
       </header>
 
       {error ? <div className="rounded-card bg-danger-bg p-4 text-sm text-danger" role="alert">{error}</div> : null}
 
       {!error && loading ? (
         <div className="flex min-h-64 items-center justify-center" role="status" aria-label="店舗を読み込み中">
-          <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-hairline border-t-accent" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-hairline border-t-accent" />
         </div>
       ) : null}
 
@@ -80,42 +81,41 @@ export default function HqPage() {
         <section data-design="Empty" className="rounded-card border border-hairline bg-canvas px-6 py-16 text-center shadow-sm">
           <h2 className="text-xl font-bold text-ink">まだ店舗がありません</h2>
           <p className="mt-2 text-sm text-ink-secondary">最初のLINE公式アカウントを登録すると、ここから店舗へログインできます。</p>
-          <Link href="/restaurant-test/stores/new" className="mt-6 inline-flex rounded-control bg-accent px-6 py-3 text-sm font-semibold text-on-accent hover:bg-accent-hover">
+          <Button href="/restaurant-test/stores/new" variant="primary" className="mt-6">
             ＋店舗の新規アカウント登録
-          </Link>
+          </Button>
         </section>
       ) : null}
 
       {!error && !loading && accounts.length > 0 ? (
         <section data-design="Table" className="min-w-0 overflow-hidden rounded-card border border-hairline bg-canvas shadow-sm">
           <div className="w-full overflow-x-auto">
-            <table className="min-w-[920px] w-full text-left">
-              <thead className="border-b border-hairline bg-canvas-sunken text-xs font-semibold text-ink-faint">
-                <tr>
-                  <th className="px-5 py-3.5">店舗</th>
-                  <th className="px-4 py-3.5">LINE ID</th>
-                  <th className="px-4 py-3.5 text-right">友だち数</th>
-                  <th className="px-4 py-3.5">Webhook状態</th>
-                  <th className="px-4 py-3.5">状態</th>
-                  <th className="px-5 py-3.5 text-right">操作</th>
-                </tr>
+            <table className="min-w-max w-full text-left">
+              <thead>
+                <TableHeadRow>
+                  <Th>店舗</Th>
+                  <Th>LINE ID</Th>
+                  <Th align="right">友だち数</Th>
+                  <Th>Webhook状態</Th>
+                  <Th>状態</Th>
+                  <Th align="right">操作</Th>
+                </TableHeadRow>
               </thead>
               <tbody className="divide-y divide-hairline">
                 {accounts.map((account) => {
-                  const webhook = webhookLabel(account.webhook?.status)
                   return (
                     <tr key={account.id} className="hover:bg-canvas-sunken">
                       <td className="px-5 py-4">
                         <div className="flex min-w-0 items-center gap-3">
                           <AccountIcon account={account} />
-                          <span className="max-w-[300px] truncate text-sm font-semibold text-ink" title={account.displayName || account.name}>{account.displayName || account.name}</span>
+                          <span className="max-w-72 truncate text-sm font-semibold text-ink" title={account.displayName || account.name}>{account.displayName || account.name}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-ink-secondary"><span className="block max-w-48 truncate" title={account.basicId || account.channelId}>{account.basicId || account.channelId}</span></td>
                       <td className="px-4 py-4 text-right text-sm font-semibold tabular-nums text-ink">{(account.stats?.friendCount ?? 0).toLocaleString('ja-JP')}</td>
-                      <td className={`px-4 py-4 text-sm font-semibold ${webhook.className}`}>{webhook.label}</td>
+                      <td className="px-4 py-4"><WebhookStatus status={account.webhook?.status} /></td>
                       <td className="px-4 py-4"><span className={`inline-flex rounded-pill px-3 py-1 text-xs font-semibold ${account.isActive ? 'bg-accent-soft text-success' : 'bg-canvas-sunken text-ink-faint'}`}>{account.isActive ? '有効' : '停止中'}</span></td>
-                      <td className="px-5 py-4 text-right"><button type="button" onClick={() => login(account.id)} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-hover">ログイン</button></td>
+                      <td className="px-5 py-4 text-right"><Button type="button" variant="primary" onClick={() => login(account.id)}>ログイン</Button></td>
                     </tr>
                   )
                 })}

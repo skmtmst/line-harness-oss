@@ -63,6 +63,10 @@ jobs:
           node-version: 22
 
       - name: Synchronize PR state to the staging Slack relay
+        id: slack_sync
+        # Slack is an operational visibility aid, not a code-quality gate.
+        # Keep the failure visible in Actions, but never block a PR merge.
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CODEX_SLACK_RELAY_SECRET: ${{ secrets.CODEX_SLACK_RELAY_SECRET }}
@@ -80,3 +84,14 @@ jobs:
           --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
           --experimental-strip-types
           scripts/github-slack-pr-sync.ts
+
+      - name: Report an advisory Slack synchronization failure
+        if: steps.slack_sync.outcome == 'failure'
+        run: |
+          echo "::warning::Slack同期に失敗しました。PRの必須チェックには影響しません。定期再照合または手動実行で再試行してください。"
+          {
+            echo "### Slack同期（参考チェック）"
+            echo ""
+            echo "Slackへの同期に失敗しましたが、コードのPRは停止しません。"
+            echo "定期再照合または手動実行で再試行されます。"
+          } >> "$GITHUB_STEP_SUMMARY"

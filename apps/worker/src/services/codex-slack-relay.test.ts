@@ -100,6 +100,30 @@ describe('Codex Slack relay', () => {
     expect(request).toEqual({ name: 'line-harness-pr-301-400', is_private: false });
   });
 
+  test('次のPRチャンネル準備が失敗したらSlack投稿前に停止する', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({
+      ok: false,
+      error: 'missing_scope',
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }));
+
+    await expect(relayCodexSlackEvent({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_DEFAULT_PR_CHANNEL_ID: 'C-DEFAULT',
+      SLACK_PR_CHANNELS_JSON: JSON.stringify({ '201-300': 'C-201-300' }),
+    }, event({
+      prNumber: 290,
+      sessionId: 'github-pr-290',
+      eventSource: 'github',
+      syncMode: 'event',
+    }), fetcher)).rejects.toThrow('SLACK_API_FAILED:conversations.list:200:missing_scope');
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls.every((call) => !String(call[0]).includes('chat.postMessage'))).toBe(true);
+  });
+
   test('Slackに出す前に秘密値を隠す', () => {
     const content = sanitizeSlackContent('token=xoxb-123456789012-abcdefghijkl password=hunter2');
     expect(content).not.toContain('xoxb-123456789012-abcdefghijkl');

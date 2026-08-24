@@ -14,6 +14,9 @@ import SupportMarkList from '@/components/friend-fields/mark-list'
 import SavedSearchList from '@/components/friend-fields/saved-search-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
+import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
+import Pagination from '@/components/shared/pagination'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -327,13 +330,12 @@ function TagsPageInner() {
         action={
           tab === 'tags' ? (
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={exportCsv}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
                 CSV出力
-              </button>
+              </Button>
               <button
                 type="button"
                 aria-pressed={reorderMode}
@@ -348,7 +350,7 @@ function TagsPageInner() {
               </button>
               {/* 左のパネルの中に入力欄を出していたが、設計はここのボタン。
                   押すと名前と色を決める窓が開く。 */}
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   setEditingFolder(null)
@@ -356,22 +358,21 @@ function TagsPageInner() {
                   setGroupColor(FOLDER_COLORS[0])
                   setFolderDialogOpen(true)
                 }}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
                 フォルダを追加
-              </button>
+              </Button>
               {/* 設計の呼び名。作る場所も専用の画面（3-1-1）に寄せる。 */}
-              <Link
+              <Button
                 href="/tags/new"
-                className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
+                variant="primary"
               >
                 ＋ タグを追加
-              </Link>
+              </Button>
             </div>
           ) : tab === 'fields' ? (
-            <a href="/tags/fields/new" className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium hover:bg-accent-hover">
+            <Button href="/tags/fields/new" variant="primary">
               項目を追加
-            </a>
+            </Button>
           ) : undefined
         }
       />
@@ -385,6 +386,7 @@ function TagsPageInner() {
       <div data-design="KPIs">
       <ListKpis
         key={tab}
+        variant="v5"
         build={(s) =>
           tab === 'marks'
             ? [
@@ -582,24 +584,24 @@ function TagsPageInner() {
                   このフォルダを削除
                 </button>
               )}
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   setFolderDialogOpen(false)
                   setEditingFolder(null)
                 }}
-                className="text-ink-secondary hover:bg-canvas-sunken rounded-control ml-auto px-4 py-2 text-sm"
+                className="ml-auto"
               >
                 やめる
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => void handleSaveFolder()}
                 disabled={addingGroup || !groupName.trim()}
-                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+                variant="primary"
               >
                 {addingGroup ? '保存中…' : editingFolder ? '保存する' : '追加する'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -724,16 +726,16 @@ function TagsPageInner() {
                 倍率は「タグを作る」側にあるものなので、編集画面へ移した。
                 一覧は「どのタグが誰に何人付いているか」を見る場所に戻す。
               */}
-              <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="w-10 px-2 py-3" aria-label="並び替え" />
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ名</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち人数</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動付与のもと</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">分類</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">登録日</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">表示</th>
-                <th className="px-4 py-3" />
-              </tr>
+              <TableHeadRow>
+                <Th className="w-10" aria-label="並び替え" />
+                <Th>タグ名</Th>
+                <Th>友だち人数</Th>
+                <Th>自動付与のもと</Th>
+                <Th>分類</Th>
+                <Th>登録日</Th>
+                <Th>表示</Th>
+                <Th />
+              </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
@@ -857,27 +859,11 @@ function TagsPageInner() {
               ))}
             </select>
           </label>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-3 text-xs">
             <span className="text-ink-faint">
               {visible.length === 0 ? '0件' : `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)}件`} / {visible.length}件
             </span>
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-              className="border-hairline rounded-control border px-3 py-1.5 disabled:opacity-35"
-            >
-              前へ
-            </button>
-            <span className="text-ink-secondary min-w-16 text-center">{currentPage} / {totalPages}</span>
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-              className="border-hairline rounded-control border px-3 py-1.5 disabled:opacity-35"
-            >
-              次へ
-            </button>
+            <Pagination page={currentPage} pageCount={totalPages} onPageChange={setPage} />
           </div>
         </div>
       </div>

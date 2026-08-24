@@ -1,0 +1,936 @@
+{
+  "$説明": [
+    "Pencil V5を共通基盤とし、対象にV6がある場合はV6を優先して写した検証用スナップショット。**正本はPencilの .pen ファイル**であって、このJSONではない。",
+    "Pencilは暗号化されていてCIから読めないため、値をここへ写して機械で照合できるようにしている。",
+    "値を変えるときは必ずPencilを先に直し、そのあとここへ写す。"
+  ],
+  "$pencilFile": "4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen",
+  "$designPriority": {
+    "base": "V5",
+    "override": "対象画面・部品にV6が存在する場合はV6",
+    "tokenResult": "V6もV5と同じグローバル変数を参照しているため、PR #1の12トークンにV6専用上書きは不要",
+    "lastCheckedAt": "2026-08-24"
+  },
+  "$v6Verification": {
+    "representativeNodes": [
+      "WQhu3",
+      "G1pfMk",
+      "kAnOQ",
+      "u5zVV0",
+      "FH74x",
+      "HNUSO",
+      "MyusN",
+      "WGM4x",
+      "FawJ8",
+      "owlEd"
+    ],
+    "summary": "受信箱・一斉配信・リマインダ・自動応答・テンプレート・リッチメニュー・回答フォーム・予約管理・運用状態・店舗ダッシュボードのV6代表10画面で全12トークンの利用を確認",
+    "partResult": "V6代表10画面で tPTMp はV5と同じ再利用部品を54回使用。Blot6は受信箱を除く9画面で同じ再利用部品を使用。V6のKPIはXywGrのrefではなく直接配置だが、色トークンは共通で高さ・余白・文字だけが異なるためSummaryCardのv6 variantへ固定した。mNUQ3はbroadcast variantへ統合した。",
+    "partReferences": {
+      "nBRKk": 0,
+      "uzNEC": 0,
+      "XywGr": 0,
+      "mNUQ3": 4,
+      "tPTMp": 54,
+      "Blot6": 9
+    },
+    "lastCheckedAt": "2026-08-24"
+  },
+  "$status": {
+    "pending": "コード未実装。報告するだけで落とさない",
+    "implemented": "コードはあるが画面では未使用。CSSモジュールのソースを照合する",
+    "active": "実画面で利用中。ビルド後CSSへの配信まで確認する"
+  },
+  "$role": {
+    "canonical": "正本。これを使う",
+    "sample": "コピー元・完成見本。インスタンス利用しない",
+    "deprecated": "廃止候補。新規利用を禁止する"
+  },
+  "$reviewStatus": {
+    "confirmed": "Pencilの実ノードを読んで値を確認済み",
+    "investigating": "調査中。契約には入れない"
+  },
+  "required": {
+    "$説明": "この数を下回るとCIを落とす。項目をまとめて消して0件合格にできないようにするため。承認時の想定は35宣言だったが、font-weight 3件と border 1件を追加で固定したため39になっている。減らす方向の変更は承認が要る。",
+    "tokens": 12,
+    "parts": 4,
+    "v6RepresentativeNodes": 10,
+    "v6PartNodes": [
+      "nBRKk",
+      "uzNEC",
+      "XywGr",
+      "mNUQ3",
+      "tPTMp",
+      "Blot6"
+    ],
+    "pencilNodes": [
+      "XywGr",
+      "nBRKk",
+      "uzNEC",
+      "tPTMp",
+      "Blot6"
+    ],
+    "partDeclarations": 69
+  },
+  "baselineScreens": {
+    "$説明": "全103ページを毎回見るのは現実的ではないので、トークンと部品を代表する画面を決めておく。1440pxと1920pxで確認する。",
+    "/": "ダッシュボード。KPIカード・ボタン・カード見出し",
+    "/chats": "V6受信箱。表見出し・補足文字・入力欄・ボタン",
+    "/friends": "友だち。一覧・表見出し・詳細検索モーダル",
+    "/tags": "友だち属性。一覧・フォルダ・タブ",
+    "/scenarios": "V5シナリオ配信。broadcast variantのKPI",
+    "/reminders": "V6リマインダ。V6 KPI",
+    "/templates": "V6テンプレート。メッセージタブのV6 KPI",
+    "/affiliates": "V6成果とアフィリエイト。V6 KPI",
+    "/conversions": "V6コンバージョン分析。V6 KPIとカード内リンク",
+    "/inflow-links": "V6流入と計測。V6 KPI",
+    "/analytics": "V6分析系の代表寸法。複数タブのKPI",
+    "/broadcasts": "V6一斉配信。表見出し・KPI・状態バッジ",
+    "/tags/new": "タグを作る。入力フォームとボタン",
+    "/emergency": "V6運用状態。統合できていないローカル部品の比較用"
+  },
+  "tokens": {
+    "$説明": "PR #1 で変更または追加するトークン12件。既にV5と一致しているもの（accent, canvas, on-accent, radius-control など）は対象外。",
+    "--color-ink": {
+      "pencil": "$ink",
+      "source": "#1d1d1f",
+      "resolved": "#1d1d1f",
+      "status": "active",
+      "note": "変更。旧 #1a1c1a",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-ink-secondary": {
+      "pencil": "$ink-secondary",
+      "source": "#4a5565",
+      "resolved": "#4a5565",
+      "status": "active",
+      "note": "変更。旧 #565f59",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-ink-faint": {
+      "pencil": "$ink-faint",
+      "source": "#6e7781",
+      "resolved": "#6e7781",
+      "status": "active",
+      "note": "変更。旧 #8b938d。白地のコントラストが 3.16 → 4.55 でAAを満たす",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-hairline": {
+      "pencil": "$hairline",
+      "source": "#dadde2",
+      "resolved": "#dadde2",
+      "status": "active",
+      "note": "変更。旧 #e2e4df",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-surface-pearl": {
+      "pencil": "$surface-pearl",
+      "source": "#fafafc",
+      "resolved": "#fafafc",
+      "status": "active",
+      "note": "追加。表の見出し行の地",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--radius-tile": {
+      "pencil": "$radius-md",
+      "source": "10px",
+      "resolved": "10px",
+      "status": "active",
+      "note": "追加。--radius-md にするとTailwind標準の rounded-md(6px) を83か所で上書きするため別名",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--text-caption": {
+      "pencil": "$size-caption",
+      "source": "12px",
+      "resolved": "12px",
+      "status": "active",
+      "note": "追加。表の見出しセル",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--text-label": {
+      "pencil": "$size-label",
+      "source": "13px",
+      "resolved": "13px",
+      "status": "active",
+      "note": "追加。カード見出し・ボタンの文字",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--text-metric": {
+      "pencil": "$size-metric",
+      "source": "22px",
+      "resolved": "22px",
+      "status": "active",
+      "note": "追加。カードの大きな数字",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--text-micro": {
+      "pencil": "$size-micro",
+      "source": "11px",
+      "resolved": "11px",
+      "status": "active",
+      "note": "追加。数字の下の内訳",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--text-nano": {
+      "pencil": "$size-nano",
+      "source": "10px",
+      "resolved": "10px",
+      "status": "active",
+      "note": "追加。バッジの中の文字",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--shadow-card": {
+      "pencil": "XywGr effect",
+      "source": "1px 1px 2px #1920261a",
+      "resolved": "1px 1px 2px #1920261a",
+      "status": "active",
+      "note": "追加。@theme ではなく素の :root に置く。Tailwindは影の値をクラスへ直に埋め込むため変数が出力されない",
+      "lastCheckedAt": "2026-08-24"
+    }
+  },
+  "parts": {
+    "summary-card": {
+      "name": "共通 サマリーカード",
+      "pencilNodes": [
+        "XywGr",
+        "mNUQ3",
+        "A7GiXo",
+        "pApuT",
+        "sHvoG",
+        "ajaN0",
+        "g4PZNd"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/summary-card.tsx",
+      "cssModule": "src/components/shared/summary-card.module.css",
+      "components": [
+        "SummaryCard"
+      ],
+      "cssPrefix": "summary-card",
+      "pencilUsage": 56,
+      "lastCheckedAt": "2026-08-24",
+      "note": "コード側の3系統をSummaryCardへ集約。V5を基本とし、V6がある画面はv6、配信予定の告知はbroadcastの名前付きvariantで差を固定する。emergencyの文字列値だけは対象外。",
+      "routes": {
+        "v5": [
+          "/friends",
+          "/tags"
+        ],
+        "v6": [
+          "/analytics",
+          "/conversions",
+          "/inflow-links",
+          "/affiliates",
+          "/reminders",
+          "/templates"
+        ],
+        "broadcast": [
+          "/scenarios"
+        ]
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Pencil実ノードとCSS値は照合済み。ローカル実装はAuthGuardからLINEログインへ遷移し、同じデータ状態の画面画像を取得できないため、画面全体の画像一致は未検証。"
+      },
+      "declarations": [
+        {
+          "pencil": "XywGr height: 100",
+          "class": "card",
+          "prop": "min-height",
+          "source": "100px",
+          "resolved": "100px"
+        },
+        {
+          "pencil": "XywGr padding: [14, 16]",
+          "class": "card",
+          "prop": "padding",
+          "source": "14px 16px",
+          "resolved": "14px 16px"
+        },
+        {
+          "pencil": "XywGr stroke: $hairline / 1",
+          "class": "card",
+          "prop": "border",
+          "source": "1px solid var(--color-hairline)",
+          "resolved": "1px solid #dadde2"
+        },
+        {
+          "pencil": "XywGr cornerRadius: $radius-md",
+          "class": "card",
+          "prop": "border-radius",
+          "source": "var(--radius-tile)",
+          "resolved": "10px"
+        },
+        {
+          "pencil": "XywGr fill: $canvas",
+          "class": "card",
+          "prop": "background",
+          "source": "var(--color-canvas)",
+          "resolved": "#ffffff"
+        },
+        {
+          "pencil": "XywGr effect: #1920261A 1,1,2",
+          "class": "card",
+          "prop": "box-shadow",
+          "source": "var(--shadow-card)",
+          "resolved": "1px 1px 2px #1920261a"
+        },
+        {
+          "pencil": "ラベル fill: $ink-secondary",
+          "class": "label",
+          "prop": "color",
+          "source": "var(--color-ink-secondary)",
+          "resolved": "#4a5565"
+        },
+        {
+          "pencil": "ラベル fontSize: $size-label",
+          "class": "label",
+          "prop": "font-size",
+          "source": "var(--text-label)",
+          "resolved": "13px"
+        },
+        {
+          "pencil": "ラベル fontWeight: 600",
+          "class": "label",
+          "prop": "font-weight",
+          "source": "600",
+          "resolved": "600"
+        },
+        {
+          "pencil": "値 fill: $ink",
+          "class": "value",
+          "prop": "color",
+          "source": "var(--color-ink)",
+          "resolved": "#1d1d1f"
+        },
+        {
+          "pencil": "値 fontSize: $size-metric",
+          "class": "value",
+          "prop": "font-size",
+          "source": "var(--text-metric)",
+          "resolved": "22px"
+        },
+        {
+          "pencil": "値 fontWeight: 700",
+          "class": "value",
+          "prop": "font-weight",
+          "source": "700",
+          "resolved": "700"
+        },
+        {
+          "pencil": "説明 fill: $ink-faint",
+          "class": "detail",
+          "prop": "color",
+          "source": "var(--color-ink-faint)",
+          "resolved": "#6e7781"
+        },
+        {
+          "pencil": "説明 fontSize: $size-micro",
+          "class": "detail",
+          "prop": "font-size",
+          "source": "var(--text-micro)",
+          "resolved": "11px"
+        },
+        {
+          "pencil": "バッジ padding: [3, 8]",
+          "class": "badge",
+          "prop": "padding",
+          "source": "3px 8px",
+          "resolved": "3px 8px"
+        },
+        {
+          "pencil": "バッジ cornerRadius: $radius-md",
+          "class": "badge",
+          "prop": "border-radius",
+          "source": "var(--radius-tile)",
+          "resolved": "10px"
+        },
+        {
+          "pencil": "バッジ fill: $accent-soft",
+          "class": "badge",
+          "prop": "background",
+          "source": "var(--color-accent-soft)",
+          "resolved": "#e8f8ee"
+        },
+        {
+          "pencil": "バッジ文字 fill: $accent",
+          "class": "badge",
+          "prop": "color",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "バッジ fontSize: $size-nano",
+          "class": "badge",
+          "prop": "font-size",
+          "source": "var(--text-nano)",
+          "resolved": "10px"
+        },
+        {
+          "pencil": "V6 KPI height: 106",
+          "class": "cardV6",
+          "prop": "min-height",
+          "source": "106px",
+          "resolved": "106px"
+        },
+        {
+          "pencil": "V6 KPI padding: 16",
+          "class": "cardV6",
+          "prop": "padding",
+          "source": "16px",
+          "resolved": "16px"
+        },
+        {
+          "pencil": "V6 KPI gap: 5",
+          "class": "cardV6",
+          "prop": "gap",
+          "source": "5px",
+          "resolved": "5px"
+        },
+        {
+          "pencil": "V6 KPI label fill: $ink-faint",
+          "class": "labelV6",
+          "prop": "color",
+          "source": "var(--color-ink-faint)",
+          "resolved": "#6e7781"
+        },
+        {
+          "pencil": "V6 KPI label fontSize: $size-caption",
+          "class": "labelV6",
+          "prop": "font-size",
+          "source": "var(--text-caption)",
+          "resolved": "12px"
+        },
+        {
+          "pencil": "V6 KPI note fontWeight: 500",
+          "class": "detailV6",
+          "prop": "font-weight",
+          "source": "500",
+          "resolved": "500"
+        },
+        {
+          "pencil": "mNUQ3 padding: 18",
+          "class": "cardBroadcast",
+          "prop": "padding",
+          "source": "18px",
+          "resolved": "18px"
+        },
+        {
+          "pencil": "mNUQ3 gap: 8",
+          "class": "cardBroadcast",
+          "prop": "gap",
+          "source": "8px",
+          "resolved": "8px"
+        },
+        {
+          "pencil": "mNUQ3 label fill: $ink-faint",
+          "class": "labelBroadcast",
+          "prop": "color",
+          "source": "var(--color-ink-faint)",
+          "resolved": "#6e7781"
+        },
+        {
+          "pencil": "mNUQ3 label fontSize: $size-label",
+          "class": "labelBroadcast",
+          "prop": "font-size",
+          "source": "var(--text-label)",
+          "resolved": "13px"
+        },
+        {
+          "pencil": "mNUQ3 detail fill: $accent",
+          "class": "detailNotice",
+          "prop": "color",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "mNUQ3 detail fontSize: $size-caption",
+          "class": "detailNotice",
+          "prop": "font-size",
+          "source": "var(--text-caption)",
+          "resolved": "12px"
+        },
+        {
+          "pencil": "mNUQ3 detail fontWeight: 500",
+          "class": "detailNotice",
+          "prop": "font-weight",
+          "source": "500",
+          "resolved": "500"
+        }
+      ]
+    },
+    "button": {
+      "name": "共通 ボタン（主要・副次）",
+      "pencilNodes": [
+        "nBRKk",
+        "uzNEC"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/button.tsx",
+      "cssModule": "src/components/shared/button.module.css",
+      "components": [
+        "Button"
+      ],
+      "cssPrefix": "button",
+      "pencilUsage": 49,
+      "lastCheckedAt": "2026-08-24",
+      "note": "コード側は寸法が5通りに割れていた。第1段階で7画面の標準操作33個を共通Buttonへ移行した。V6代表10画面にnBRKk/uzNECのrefは0件でV6専用ボタン部品も無いため、V6画面でもV5の高さ36px・padding [9,13]・13pxを正本とする。",
+      "routes": {
+        "v5": {
+          "/tags": "PbCvb"
+        },
+        "v6": {
+          "/reminders": "kAnOQ",
+          "/templates": "FH74x",
+          "/affiliates": "BaLte",
+          "/conversions": "Bw4fy",
+          "/inflow-links": "EQS0v",
+          "/analytics": "XkajG"
+        }
+      },
+      "migration": {
+        "controlsMigratedInThisPr": 33,
+        "directPrimaryBefore": 168,
+        "directPrimaryMigrated": 10,
+        "directPrimaryRemaining": 158,
+        "directSecondaryBefore": 335,
+        "directSecondaryMigrated": 20,
+        "directSecondaryRemaining": 315
+      },
+      "excludedControls": "ページ切替、タブ、絞り込みピル、コンパクトな行内操作、カード全体リンクは標準ボタンと形・役割が違うため対象外。専用部品の設計根拠を確認してから扱う。",
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Pencil実ノードとビルド後CSSは照合する。ローカル実装はAuthGuardからLINEログインへ遷移するため、同じデータ状態による画面画像の横並び比較は未検証。"
+      },
+      "declarations": [
+        {
+          "pencil": "nBRKk/uzNEC height: 36",
+          "class": "button",
+          "prop": "height",
+          "source": "36px",
+          "resolved": "36px"
+        },
+        {
+          "pencil": "nBRKk/uzNEC padding: [9, 13]",
+          "class": "button",
+          "prop": "padding",
+          "source": "9px 13px",
+          "resolved": "9px 13px"
+        },
+        {
+          "pencil": "nBRKk/uzNEC gap: 6",
+          "class": "button",
+          "prop": "gap",
+          "source": "6px",
+          "resolved": "6px"
+        },
+        {
+          "pencil": "nBRKk/uzNEC strokeWidth: 1",
+          "class": "button",
+          "prop": "border",
+          "source": "1px solid",
+          "resolved": "1px solid"
+        },
+        {
+          "pencil": "nBRKk/uzNEC cornerRadius: $radius-sm",
+          "class": "button",
+          "prop": "border-radius",
+          "source": "var(--radius-control)",
+          "resolved": "0.5rem"
+        },
+        {
+          "pencil": "nBRKk/uzNEC fontSize: $size-label",
+          "class": "button",
+          "prop": "font-size",
+          "source": "var(--text-label)",
+          "resolved": "13px"
+        },
+        {
+          "pencil": "nBRKk/uzNEC fontWeight: 600",
+          "class": "button",
+          "prop": "font-weight",
+          "source": "600",
+          "resolved": "600"
+        },
+        {
+          "pencil": "nBRKk fill: $accent",
+          "class": "primary",
+          "prop": "background",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "nBRKk stroke: $accent",
+          "class": "primary",
+          "prop": "border-color",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "nBRKk ラベル fill: $on-accent",
+          "class": "primary",
+          "prop": "color",
+          "source": "var(--color-on-accent)",
+          "resolved": "#ffffff"
+        },
+        {
+          "pencil": "uzNEC fill: $canvas",
+          "class": "secondary",
+          "prop": "background",
+          "source": "var(--color-canvas)",
+          "resolved": "#ffffff"
+        },
+        {
+          "pencil": "uzNEC stroke: $hairline",
+          "class": "secondary",
+          "prop": "border-color",
+          "source": "var(--color-hairline)",
+          "resolved": "#dadde2"
+        },
+        {
+          "pencil": "uzNEC ラベル fill: $ink",
+          "class": "secondary",
+          "prop": "color",
+          "source": "var(--color-ink)",
+          "resolved": "#1d1d1f"
+        }
+      ]
+    },
+    "pagination": {
+      "name": "共通 ページネーション",
+      "pencilNodes": [
+        "Blot6"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/pagination.tsx",
+      "cssModule": "src/components/shared/pagination.module.css",
+      "components": [
+        "Pagination"
+      ],
+      "cssPrefix": "pagination",
+      "pencilUsage": 139,
+      "lastCheckedAt": "2026-08-24",
+      "note": "Pencil全体で139回参照される共通部品。V5を基本とし、V6代表10画面のうち受信箱を除く9画面でも同じBlot6を使う。第1段階ではページ番号へ直接移動できる6利用先を移行し、前後移動だけの画面は動作差を確認して次段階で移す。",
+      "routes": {
+        "v5": [
+          "/friends",
+          "/tags",
+          "/contents",
+          "/contents/vars"
+        ],
+        "v6": [
+          "/reminders"
+        ],
+        "legacyComponent": [
+          "src/components/friend-attributes-v2/tag-list-v2.tsx"
+        ]
+      },
+      "migration": {
+        "migratedInThisPr": 6,
+        "remainingBehavior": "前へ・次へと現在/総数だけを持つ画面、およびページ切替未実装の画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Pencil実ノードとビルド後CSSは照合済み。固定データの /visual-qa/friend-attributes-v2 は1440px・1920pxで描画し、ページ全体と表の横スクロールが無いことを目視確認した。実ルートはAuthGuardからLINEログインへ遷移するため、同じデータ状態によるPencil全画面との横並び比較は未検証。",
+        "checkedAt": "2026-08-24"
+      },
+      "declarations": [
+        {
+          "pencil": "Blot6 gap: 8",
+          "class": "pagination",
+          "prop": "gap",
+          "source": "8px",
+          "resolved": "8px"
+        },
+        {
+          "pencil": "Blot6 item layout",
+          "class": "item",
+          "prop": "display",
+          "source": "inline-flex",
+          "resolved": "inline-flex"
+        },
+        {
+          "pencil": "Blot6 item alignItems: center",
+          "class": "item",
+          "prop": "align-items",
+          "source": "center",
+          "resolved": "center"
+        },
+        {
+          "pencil": "Blot6 item justifyContent: center",
+          "class": "item",
+          "prop": "justify-content",
+          "source": "center",
+          "resolved": "center"
+        },
+        {
+          "pencil": "Blot6 item height: 38",
+          "class": "item",
+          "prop": "height",
+          "source": "38px",
+          "resolved": "38px"
+        },
+        {
+          "pencil": "Blot6 item stroke: $hairline / 1",
+          "class": "item",
+          "prop": "border",
+          "source": "1px solid var(--color-hairline)",
+          "resolved": "1px solid #dadde2"
+        },
+        {
+          "pencil": "Blot6 item cornerRadius: $radius-sm",
+          "class": "item",
+          "prop": "border-radius",
+          "source": "var(--radius-control)",
+          "resolved": "0.5rem"
+        },
+        {
+          "pencil": "Blot6 item fill: $canvas",
+          "class": "item",
+          "prop": "background",
+          "source": "var(--color-canvas)",
+          "resolved": "#ffffff"
+        },
+        {
+          "pencil": "Blot6 label fill: $ink",
+          "class": "item",
+          "prop": "color",
+          "source": "var(--color-ink)",
+          "resolved": "#1d1d1f"
+        },
+        {
+          "pencil": "Blot6 label fontSize: $size-caption",
+          "class": "item",
+          "prop": "font-size",
+          "source": "var(--text-caption)",
+          "resolved": "12px"
+        },
+        {
+          "pencil": "Blot6 label fontWeight: 600",
+          "class": "item",
+          "prop": "font-weight",
+          "source": "600",
+          "resolved": "600"
+        },
+        {
+          "pencil": "Blot6 prev/next width: 64",
+          "class": "control",
+          "prop": "width",
+          "source": "64px",
+          "resolved": "64px"
+        },
+        {
+          "pencil": "Blot6 page width: 38",
+          "class": "page",
+          "prop": "width",
+          "source": "38px",
+          "resolved": "38px"
+        },
+        {
+          "pencil": "Blot6 current stroke: $accent",
+          "class": "current",
+          "prop": "border-color",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "Blot6 current fill: $accent",
+          "class": "current",
+          "prop": "background",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "Blot6 current label fill: $on-accent",
+          "class": "current",
+          "prop": "color",
+          "source": "var(--color-on-accent)",
+          "resolved": "#ffffff"
+        },
+        {
+          "pencil": "Blot6 current label fontWeight: 700",
+          "class": "current",
+          "prop": "font-weight",
+          "source": "700",
+          "resolved": "700"
+        }
+      ]
+    },
+    "table": {
+      "name": "共通 表見出しセル・見出し行",
+      "pencilNodes": [
+        "tPTMp"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/table.tsx",
+      "cssModule": "src/components/shared/table.module.css",
+      "components": [
+        "Th",
+        "TableHeadRow"
+      ],
+      "cssPrefix": "table",
+      "pencilUsage": 107,
+      "lastCheckedAt": "2026-08-24",
+      "note": "6機能で最も多く使われている部品。第1段階で75セルを共通Thへ移行し、設計に無い uppercase / tracking-wider と画面別の色・余白を除いた。見出し行の寸法は友だち一覧 FG391 の f9yhp から採取。V6でも同じtPTMpを使う。",
+      "routes": {
+        "v5": {
+          "/tags": "PbCvb"
+        },
+        "v6": {
+          "/reminders": "kAnOQ",
+          "/templates": "FH74x",
+          "/affiliates": "BaLte",
+          "/conversions": "Bw4fy",
+          "/inflow-links": "EQS0v"
+        }
+      },
+      "migration": {
+        "directThBefore": 378,
+        "migratedInThisPr": 75,
+        "directThRemaining": 303
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Pencil実ノードとビルド後CSSは照合する。ローカル実装はAuthGuardからLINEログインへ遷移するため、同じデータ状態による画面画像の横並び比較は未検証。"
+      },
+      "declarations": [
+        {
+          "pencil": "見出し行 height: 44",
+          "class": "headRow",
+          "prop": "height",
+          "source": "44px",
+          "resolved": "44px"
+        },
+        {
+          "pencil": "見出し行 fill: $surface-pearl",
+          "class": "headRow",
+          "prop": "background",
+          "source": "var(--color-surface-pearl)",
+          "resolved": "#fafafc"
+        },
+        {
+          "pencil": "見出し行 stroke: $hairline",
+          "class": "headRow",
+          "prop": "border-bottom",
+          "source": "1px solid var(--color-hairline)",
+          "resolved": "1px solid #dadde2"
+        },
+        {
+          "pencil": "tPTMp padding: [0, 12]",
+          "class": "cell",
+          "prop": "padding",
+          "source": "0 12px",
+          "resolved": "0 12px"
+        },
+        {
+          "pencil": "tPTMp fill: $ink-faint",
+          "class": "cell",
+          "prop": "color",
+          "source": "var(--color-ink-faint)",
+          "resolved": "#6e7781"
+        },
+        {
+          "pencil": "tPTMp fontSize: $size-caption",
+          "class": "cell",
+          "prop": "font-size",
+          "source": "var(--text-caption)",
+          "resolved": "12px"
+        },
+        {
+          "pencil": "tPTMp fontWeight: 600",
+          "class": "cell",
+          "prop": "font-weight",
+          "source": "600",
+          "resolved": "600"
+        }
+      ]
+    }
+  },
+  "investigations": {
+    "$説明": "契約には入れない。Pencil側またはコード側の判断が済むまでここに置く。",
+    "LMiL2": {
+      "name": "配信 5ステップタブ",
+      "reviewStatus": "investigating",
+      "reason": "ルール違反。#EEF0F3（未定義の灰）と cornerRadius: 15（V5の角丸体系に無い）。gk4ne との統合も未決定。",
+      "pencilUsage": 10,
+      "lastCheckedAt": "2026-08-24"
+    },
+    "gk4ne": {
+      "name": "シナリオ作成 3ステップ",
+      "reviewStatus": "investigating",
+      "reason": "ルール違反。#EEF0F3・cornerRadius: 15 に加えて fontSize: 13/10 を直書き。LMiL2 と役割が重複している。",
+      "pencilUsage": 2,
+      "lastCheckedAt": "2026-08-24"
+    },
+    "AWHUI": {
+      "name": "標準一覧表（最終行は下線なし）",
+      "reviewStatus": "investigating",
+      "reason": "コピー利用の有無が未確認。6機能85画面で ref インスタンスは0回だが、コピーで実体化され参照が切れた可能性があり、未使用と断定できない。ハンドオフでは「必ず使う部品」の筆頭に挙がっている。",
+      "pencilUsage": 0,
+      "lastCheckedAt": "2026-08-24"
+    },
+    "emergency-summary-card": {
+      "name": "運用状態のローカル SummaryCard",
+      "reviewStatus": "investigating",
+      "reason": "src/app/emergency/page.tsx にローカル定義があり、値が文字列（\"通常運用\"）。XywGr は22pxの数字が前提の設計に見えるため、共通部品で受けてよいか未確定。名前も共通部品と衝突している。",
+      "code": "src/app/emergency/page.tsx",
+      "pencilUsage": 0,
+      "lastCheckedAt": "2026-08-24"
+    },
+    "tPTMp-contrast": {
+      "name": "共通 表見出しセルのコントラスト",
+      "reviewStatus": "investigating",
+      "reason": "設計そのものがWCAG AAを満たしていない。$ink-faint(#6E7781) の文字を $surface-pearl(#fafafc) の地に 12px で置く組み合わせで、コントラスト比 4.36。AAの4.5に届かず、12pxなので「大きい文字」の例外も使えない。$ink-secondary(#4A5565) にすると 7.25 で余裕がある。コード側で勝手に変えず、Pencil側で判断する。",
+      "pencilNodes": [
+        "tPTMp"
+      ],
+      "lastCheckedAt": "2026-08-24"
+    },
+    "focus-visible": {
+      "name": "フォーカス時の見え方",
+      "reviewStatus": "investigating",
+      "reason": "Pencilにフォーカス状態の定義が無い。PR #2では Button と SummaryCard 内のリンクに outline: revert を指定し、ブラウザ既定の輪郭を消さないことだけ保証した。固有の色・太さ・間隔はPencil側で定義されるまで追加しない。操作要素ではない Th 本体と SummaryCard 本体には不要。",
+      "pencilNodes": [
+        "nBRKk",
+        "uzNEC",
+        "XywGr",
+        "Blot6"
+      ],
+      "lastCheckedAt": "2026-08-24"
+    },
+    "button-reference-count": {
+      "name": "共通ボタンのPencil使用回数",
+      "reviewStatus": "investigating",
+      "reason": "契約作成時のpencilUsageは49回だが、2026-08-24にPencil全体をvisitorで再走査するとnBRKk/uzNECのrefは66件だった。基本部品の定義内にあるrefを含むため、画面利用数と部品定義数を分けて数える基準を決めるまで49を上書きしない。",
+      "pencilNodes": [
+        "nBRKk",
+        "uzNEC"
+      ],
+      "observedRefsIncludingComponentDefinitions": 66,
+      "lastCheckedAt": "2026-08-24"
+    }
+  }
+}

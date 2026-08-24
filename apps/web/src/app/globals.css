@@ -32,17 +32,18 @@
   --color-action-soft: #eaf4ff;
   --color-on-action: #ffffff;
 
-  /* 文字。ink が本文、ink-secondary が補足、ink-faint がラベル。
-   * 実測で最も多かった text-gray-500 / 400 / 900 に対応する。 */
-  --color-ink: #1a1c1a;
-  --color-ink-secondary: #565f59;
-  --color-ink-faint: #8b938d;
+  /* 文字。Pencil V5を共通基盤とし、V6でも同じ変数を使う。
+   * ink が本文、ink-secondary が補足、ink-faint がラベル。 */
+  --color-ink: #1d1d1f;
+  --color-ink-secondary: #4a5565;
+  --color-ink-faint: #6e7781;
 
   /* 面。canvas がカードの地、canvas-sunken が一段沈んだ面。 */
   --color-canvas: #ffffff;
   --color-canvas-sunken: #f7f7f5;
+  --color-surface-pearl: #fafafc;
   --color-shell: #f5f5f7;
-  --color-hairline: #e2e4df;
+  --color-hairline: #dadde2;
 
   /* 状態。アクセントと混ぜない。 */
   --color-success: #05913e;
@@ -72,7 +73,17 @@
    */
   --radius-card: 0.75rem;
   --radius-control: 0.5rem;
+  --radius-tile: 10px;
   --radius-pill: 9999px;
+
+  /* --- 文字サイズ ---------------------------------------------------------
+   * V5/V6の共通部品が使う意味名。既存のTailwind組み込みサイズは残し、
+   * 画面移行時にこの語彙へ寄せる。 */
+  --text-caption: 12px;
+  --text-label: 13px;
+  --text-metric: 22px;
+  --text-micro: 11px;
+  --text-nano: 10px;
 
   /* --- 本体の幅 ---------------------------------------------------------
    * 設計のフレームは幅1920pxで描かれている。そこから常時表示のサイドバー
@@ -87,6 +98,14 @@
    * サイドバー256px＋本体1664pxで、右端まで使い切っている。
    */
   --container-shell: 104rem;
+}
+
+/*
+ * Tailwindは影の値をユーティリティへ直接埋め込むため、共通部品から
+ * var()で参照できるよう、影だけは@themeの外に置く。
+ */
+:root {
+  --shadow-card: 1px 1px 2px #1920261a;
 }
 
 /*
