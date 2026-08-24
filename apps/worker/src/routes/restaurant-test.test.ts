@@ -267,19 +267,69 @@ describe('飲食店向けテストAPI', () => {
     });
   });
 
-  it('現行版以外の規約同意を拒否し、組織が無ければGET・POSTとも404にする', async () => {
-    const missingGet = await request('/api/restaurant-test/terms-agreement?account_id=account-1');
-    const missingPost = await request('/api/restaurant-test/terms-agreement?account_id=account-1', {
+  it('組織が無くてもGETは未同意を返し、行を作らない', async () => {
+    const first = await request('/api/restaurant-test/terms-agreement');
+    const second = await request('/api/restaurant-test/terms-agreement');
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    await expect(second.json()).resolves.toEqual({
+      success: true,
+      data: { documentKey: 'musubo-terms', agreedVersion: null, agreedAt: null },
+    });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organizations').get())
+      .toMatchObject({ count: 0 });
+  });
+
+  it('最初の規約同意時に認証スタッフの統括組織を1件だけ作る', async () => {
+    const tenant = '00000000-0000-4000-8000-000000000099';
+    testDb.raw.prepare('INSERT INTO tenants (id, name) VALUES (?, ?)')
+      .run(tenant, '新しい統括');
+    authMocks.getStaffByApiKey.mockResolvedValue({
+      id: 'new-owner', name: 'New Owner', role: 'owner', access_level: 'full',
+      permission_keys: '[]', assigned_line_account_id: null,
+      can_access_descendant_accounts: 0, tenant_id: tenant,
+    });
+    const body = { documentKey: 'musubo-terms', version: 'v0.1-draft' };
+    const [first, second] = await Promise.all([
+      requestAs('/api/restaurant-test/terms-agreement', 'new-owner-key', body),
+      requestAs('/api/restaurant-test/terms-agreement', 'new-owner-key', body),
+    ]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(testDb.raw.prepare(`SELECT account_id, tenant_id, name, status
+      FROM rt_organizations`).all()).toEqual([{
+      account_id: tenant,
+      tenant_id: tenant,
+      name: '新しい統括',
+      status: 'active',
+    }]);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organization_agreements').get())
+      .toMatchObject({ count: 1 });
+    const state = await requestAs('/api/restaurant-test/terms-agreement', 'new-owner-key');
+    expect(state.status).toBe(200);
+    await expect(state.json()).resolves.toMatchObject({
+      success: true,
+      data: { documentKey: 'musubo-terms', agreedVersion: 'v0.1-draft' },
+    });
+  });
+
+  it('既存組織を作り直さずに規約同意を記録する', async () => {
+    seedRestaurantFixture({ name: '既存組織' });
+    const response = await request('/api/restaurant-test/terms-agreement', {
       documentKey: 'musubo-terms', version: 'v0.1-draft',
     });
-    expect(missingGet.status).toBe(404);
-    expect(missingPost.status).toBe(404);
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare('SELECT id, name FROM rt_organizations').all())
+      .toEqual([{ id: 'org-fixture', name: '既存組織' }]);
+  });
 
-    seedRestaurantFixture();
+  it('現行版以外の規約同意を拒否し、組織も作らない', async () => {
     const oldVersion = await request('/api/restaurant-test/terms-agreement?account_id=account-1', {
       documentKey: 'musubo-terms', version: 'v0.0-draft',
     });
     expect(oldVersion.status).toBe(400);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organizations').get())
+      .toMatchObject({ count: 0 });
     expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organization_agreements').get())
       .toMatchObject({ count: 0 });
   });
@@ -541,7 +591,6 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('接続確認が成功した場合だけLINEアカウントと店舗をまとめて作成する', async () => {
-    seedRestaurantFixture();
     const secret = 'wizard-test-secret';
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -559,7 +608,7 @@ describe('飲食店向けテストAPI', () => {
       return new Response('{}', { status: 500 });
     }));
 
-    const response = await request('/api/restaurant-test/stores/connect?account_id=account-1', {
+    const response = await request('/api/restaurant-test/stores/connect', {
       name: '新店舗', alias: 'NEW', channelId: '1234567890', channelSecret: secret,
     });
     expect(response.status).toBe(201);
@@ -570,6 +619,8 @@ describe('飲食店向けテストAPI', () => {
     expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM rt_stores WHERE code = 'NEW'").get())
       .toMatchObject({ count: 1 });
     expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM line_accounts WHERE channel_id = '1234567890'").get())
+      .toMatchObject({ count: 1 });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organizations').get())
       .toMatchObject({ count: 1 });
     expect(testDb.raw.prepare(`SELECT la.tenant_id AS line_tenant, o.tenant_id AS organization_tenant
       FROM line_accounts la
