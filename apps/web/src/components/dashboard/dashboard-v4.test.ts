@@ -30,10 +30,11 @@ function booking(id: string, startsAt: string, status = 'confirmed'): BookingReq
 }
 
 describe('ダッシュボードV4の初期表示', () => {
-  it('見出しを受信箱と同じ文字サイズで表示する', () => {
+  it('見出しをV5共通ページヘッダーで表示する', () => {
     const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
-    expect(source).toContain('text-ink text-2xl font-bold tracking-tight">ダッシュボード')
-    expect(source).not.toContain('sm:text-3xl">ダッシュボード')
+    expect(source).toContain("import Header from '@/components/layout/header'")
+    expect(source).toContain('title="ダッシュボード"')
+    expect(source).not.toContain('<h1')
   })
 
   it('旧Workerが追加集計を返さなくてもダッシュボードを描画できる', () => {

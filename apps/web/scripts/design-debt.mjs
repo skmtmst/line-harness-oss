@@ -51,6 +51,9 @@ function partFiles() {
   for (const [key, part] of Object.entries(data.parts)) {
     if (key.startsWith('$')) continue
     if (part.code) files.add(join(WEB, part.code))
+    for (const implementationFile of part.implementationFiles ?? []) {
+      files.add(join(WEB, implementationFile))
+    }
   }
   return files
 }

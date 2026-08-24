@@ -85,7 +85,7 @@ export default function AccountSwitcher() {
       <button type="button" onClick={() => setOpen((value) => !value)} disabled={loading || !selectedAccount} aria-expanded={open} className="flex h-16 w-full items-center gap-1.5 rounded-xl border border-hairline bg-canvas px-2 text-left hover:border-accent disabled:cursor-not-allowed disabled:opacity-60">
         {selectedAccount && <AccountMark account={selectedAccount} compact />}
         <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-bold text-ink">{selectedAccount ? accountLabel(selectedAccount) : '読み込み中…'}</span><span className="mt-0.5 block truncate text-[10px] text-ink-faint">{selectedAccount?.plan?.label || selectedAccount?.basicId || 'LINE情報を確認中'}</span></span>
-        <span className="rounded-pill bg-accent-soft px-[5px] py-[3px] text-nano font-semibold text-accent">表示中</span>
+        <span className="rounded-pill bg-accent-soft px-1.25 py-0.75 text-nano font-semibold text-accent">表示中</span>
         <span className={`text-[10px] text-ink-faint transition-transform ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
       {open && <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-y-auto rounded-card border border-hairline bg-canvas p-2 shadow-xl">

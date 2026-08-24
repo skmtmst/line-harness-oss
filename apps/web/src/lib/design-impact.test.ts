@@ -1,6 +1,6 @@
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { allFiles, directImporters } from '../../scripts/design-impact.mjs'
+import { allFiles, directImporters, routeEntryFiles } from '../../scripts/design-impact.mjs'
 import { SRC } from '../../scripts/design-debt.mjs'
 
 describe('共通部品の影響範囲', () => {
@@ -38,5 +38,10 @@ describe('共通部品の影響範囲', () => {
       'app/tags/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
     ])
+  })
+
+  it('全画面共通枠はpageだけでなく親layoutからの到達も調べる', () => {
+    const friendsPage = join(SRC, 'app', 'friends', 'page.tsx')
+    expect(routeEntryFiles(friendsPage).map((file) => relative(SRC, file))).toContain('app/layout.tsx')
   })
 })

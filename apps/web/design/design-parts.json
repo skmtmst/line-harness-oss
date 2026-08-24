@@ -895,6 +895,9 @@
       "status": "active",
       "reviewStatus": "confirmed",
       "code": "src/components/layout/sidebar.tsx",
+      "implementationFiles": [
+        "src/components/app-shell.tsx"
+      ],
       "cssModule": "src/components/layout/sidebar.module.css",
       "components": [
         "AppShell",

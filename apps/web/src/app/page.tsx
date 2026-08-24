@@ -435,7 +435,7 @@ export default function DashboardPage() {
         <Header
           title="ダッシュボード"
           titleAction={
-            <button type="button" onClick={() => setEditorOpen(true)} className="border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex h-10 items-center gap-2 border px-[13px] text-label font-semibold">
+            <button type="button" onClick={() => setEditorOpen(true)} className="border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex h-10 items-center gap-2 border px-3.25 text-label font-semibold">
               <EditIcon />ダッシュボード編集
             </button>
           }

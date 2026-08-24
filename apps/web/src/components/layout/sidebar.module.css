@@ -50,7 +50,7 @@
 }
 
 .active:hover {
-  background: var(--color-accent-soft);
+  background-color: var(--color-accent-soft);
 }
 
 .danger {
