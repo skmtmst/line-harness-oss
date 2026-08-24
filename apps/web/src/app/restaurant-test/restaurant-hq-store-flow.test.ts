@@ -5,16 +5,28 @@ const stores = readFileSync(new URL('./stores/store-list.tsx', import.meta.url),
 const wizard = readFileSync(new URL('./stores/new/page.tsx', import.meta.url), 'utf8')
 const banner = readFileSync(new URL('./stores/store-context-banner.tsx', import.meta.url), 'utf8')
 const index = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+const storesPage = readFileSync(new URL('./stores/page.tsx', import.meta.url), 'utf8')
+const accountsPage = readFileSync(new URL('../accounts/page.tsx', import.meta.url), 'utf8')
+const accountsNewPage = readFileSync(new URL('../accounts/new/page.tsx', import.meta.url), 'utf8')
+const consolePage = readFileSync(new URL('./restaurant-console.tsx', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../../lib/restaurant-test-api.ts', import.meta.url), 'utf8')
 const manualLinks = readFileSync(new URL('../../lib/manual-links.ts', import.meta.url), 'utf8')
 
 describe('飲食店向けHQと店舗追加動線', () => {
-  it('飲食店向け入口を常に店舗一覧へ向ける', () => {
-    expect(index).toContain("redirect('/restaurant-test/stores')")
-    expect(stores).toContain('店舗一覧')
-    expect(stores).toContain('アーカイブ済みも表示')
-    expect(stores).toContain('friend_count == null')
-    expect(stores).toContain("router.push('/restaurant-test/dashboard')")
+  it('店舗一覧と追加の重複入口を統括と店舗追加ウィザードへ転送する', () => {
+    // D-3: 旧URLを消さず、店舗の一覧と追加の正本だけを1か所にする。
+    expect(index).toContain("redirect('/hq')")
+    expect(storesPage).toContain("redirect('/hq')")
+    expect(stores).toContain("router.replace('/hq')")
+    expect(accountsPage).toContain("redirect('/hq')")
+    expect(accountsNewPage).toContain("redirect('/restaurant-test/stores/new')")
+  })
+
+  it('デモ作成UIと公開bootstrap呼出しを持たず、空組織を統括へ案内する', () => {
+    expect(api).not.toContain('bootstrap:')
+    expect(consolePage).not.toContain('restaurantTestApi.bootstrap')
+    expect(consolePage).not.toContain('テスト領域を作成')
+    expect(consolePage).toContain('統括から店舗を登録してください。')
   })
 
   it('URLへ店舗識別子を付けず、サーバーセッションAPIで切り替える', () => {
@@ -22,6 +34,7 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(api).toContain('clearStoreSelection:')
     expect(banner).toContain('を表示しています')
     expect(banner).toContain('統括に戻る')
+    expect(banner).toContain("router.push('/hq')")
     expect(banner).not.toContain('?store=')
   })
 

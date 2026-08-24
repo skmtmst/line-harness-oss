@@ -18,6 +18,13 @@ export interface AccountWithStats {
   role: string | null
   displayOrder: number
   liffId?: string | null
+  loginChannelId?: string | null
+  ogSiteName?: string | null
+  ogDefaultDescription?: string | null
+  ogDefaultImageUrl?: string | null
+  friendCapacity?: number | null
+  capacityWarnAt?: number | null
+  iconUrl?: string | null
   webhook?: {
     expectedUrl: string
     actualUrl: string | null

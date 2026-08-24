@@ -1,5 +1,5 @@
-import StoreList from './store-list'
+import { redirect } from 'next/navigation'
 
 export default function RestaurantStoresPage() {
-  return <StoreList />
+  redirect('/hq')
 }

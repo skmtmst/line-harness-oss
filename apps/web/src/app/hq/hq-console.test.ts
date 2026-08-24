@@ -18,6 +18,15 @@ describe('統括コンソール', () => {
     expect(accountList).toContain('webhook?.status')
   })
 
+  it('各店舗の設定から既存編集モーダルを開き、保存後に一覧を再読込する', () => {
+    expect(page).toContain('AccountEditModal')
+    expect(page).toContain('onSettings={setEditingAccount}')
+    expect(page).toContain('initialChannelId={editingAccount.channelId}')
+    expect(page).toContain('Promise.all([load(), refreshAccounts()])')
+    expect(accountList).toContain('onSettings(account)')
+    expect(accountList).toContain('設定')
+  })
+
   it('ログインは選択中アカウントを保存して識別子なしのトップへ移動する', () => {
     expect(page).toContain('setSelectedAccountId(accountId)')
     expect(page).toContain("router.push('/')")
@@ -55,8 +64,10 @@ describe('統括コンソール', () => {
     expect(openPage).not.toContain('?store')
   })
 
-  it('旧店舗一覧画面は残し、店舗サイドバーからだけ外す', () => {
+  it('旧店舗一覧画面は残して統括へ転送し、店舗サイドバーから外す', () => {
+    // D-3: 旧URLの互換性を残しながら一覧の正本を /hq に限定する。
     expect(MENU_SECTIONS.flatMap((section) => section.items).some((item) => item.href === '/restaurant-test/stores')).toBe(false)
-    expect(readFileSync(new URL('../restaurant-test/stores/page.tsx', import.meta.url), 'utf8')).toBeTruthy()
+    expect(readFileSync(new URL('../restaurant-test/stores/page.tsx', import.meta.url), 'utf8')).toContain("redirect('/hq')")
+    expect(MENU_SECTIONS.flatMap((section) => section.items).some((item) => ['アカウント', 'データ移行'].includes(item.label))).toBe(false)
   })
 })
