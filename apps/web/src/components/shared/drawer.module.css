@@ -61,12 +61,7 @@
   line-height: 1.5;
 }
 
-.inline .title {
-  font-size: var(--text-body);
-}
-
 .inlineTitle {
-  --design-drawer-inline-title: 1;
   font-size: var(--text-body);
 }
 

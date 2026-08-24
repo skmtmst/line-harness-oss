@@ -60,7 +60,6 @@
 }
 
 .danger {
-  --design-action-menu-danger: 1;
   color: var(--color-status-danger);
 }
 
