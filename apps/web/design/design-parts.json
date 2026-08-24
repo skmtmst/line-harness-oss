@@ -1,10 +1,32 @@
 {
   "$説明": [
-    "Pencil V5 から写した検証用スナップショット。**正本はPencilの .pen ファイル**であって、このJSONではない。",
+    "Pencil V5を共通基盤とし、対象にV6がある場合はV6を優先して写した検証用スナップショット。**正本はPencilの .pen ファイル**であって、このJSONではない。",
     "Pencilは暗号化されていてCIから読めないため、値をここへ写して機械で照合できるようにしている。",
     "値を変えるときは必ずPencilを先に直し、そのあとここへ写す。"
   ],
   "$pencilFile": "4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen",
+  "$designPriority": {
+    "base": "V5",
+    "override": "対象画面・部品にV6が存在する場合はV6",
+    "tokenResult": "V6もV5と同じグローバル変数を参照しているため、PR #1の12トークンにV6専用上書きは不要",
+    "lastCheckedAt": "2026-08-24"
+  },
+  "$v6Verification": {
+    "representativeNodes": [
+      "WQhu3",
+      "G1pfMk",
+      "kAnOQ",
+      "u5zVV0",
+      "FH74x",
+      "HNUSO",
+      "MyusN",
+      "WGM4x",
+      "FawJ8",
+      "owlEd"
+    ],
+    "summary": "受信箱・一斉配信・リマインダ・自動応答・テンプレート・リッチメニュー・回答フォーム・予約管理・運用状態・店舗ダッシュボードのV6代表10画面で全12トークンの利用を確認",
+    "lastCheckedAt": "2026-08-24"
+  },
   "$status": {
     "pending": "コード未実装。報告するだけで落とさない",
     "implemented": "コードはあるが画面では未使用。CSSモジュールのソースを照合する",
@@ -23,6 +45,7 @@
     "$説明": "この数を下回るとCIを落とす。項目をまとめて消して0件合格にできないようにするため。承認時の想定は35宣言だったが、font-weight 3件と border 1件を追加で固定したため39になっている。減らす方向の変更は承認が要る。",
     "tokens": 12,
     "parts": 3,
+    "v6RepresentativeNodes": 10,
     "pencilNodes": [
       "XywGr",
       "nBRKk",
@@ -34,11 +57,12 @@
   "baselineScreens": {
     "$説明": "全103ページを毎回見るのは現実的ではないので、トークンと部品を代表する画面を決めておく。1440pxと1920pxで確認する。",
     "/": "ダッシュボード。KPIカード・ボタン・カード見出し",
+    "/chats": "V6受信箱。表見出し・補足文字・入力欄・ボタン",
     "/friends": "友だち。一覧・表見出し・詳細検索モーダル",
     "/tags": "友だち属性。一覧・フォルダ・タブ",
-    "/broadcasts": "一斉配信。表見出し・KPI・状態バッジ",
+    "/broadcasts": "V6一斉配信。表見出し・KPI・状態バッジ",
     "/tags/new": "タグを作る。入力フォームとボタン",
-    "/emergency": "運用状態。統合できていないローカル部品の比較用"
+    "/emergency": "V6運用状態。統合できていないローカル部品の比較用"
   },
   "tokens": {
     "$説明": "PR #1 で変更または追加するトークン12件。既にV5と一致しているもの（accent, canvas, on-accent, radius-control など）は対象外。",
@@ -46,7 +70,7 @@
       "pencil": "$ink",
       "source": "#1d1d1f",
       "resolved": "#1d1d1f",
-      "status": "pending",
+      "status": "active",
       "note": "変更。旧 #1a1c1a",
       "lastCheckedAt": "2026-08-24"
     },
@@ -54,7 +78,7 @@
       "pencil": "$ink-secondary",
       "source": "#4a5565",
       "resolved": "#4a5565",
-      "status": "pending",
+      "status": "active",
       "note": "変更。旧 #565f59",
       "lastCheckedAt": "2026-08-24"
     },
@@ -62,7 +86,7 @@
       "pencil": "$ink-faint",
       "source": "#6e7781",
       "resolved": "#6e7781",
-      "status": "pending",
+      "status": "active",
       "note": "変更。旧 #8b938d。白地のコントラストが 3.16 → 4.55 でAAを満たす",
       "lastCheckedAt": "2026-08-24"
     },
@@ -70,7 +94,7 @@
       "pencil": "$hairline",
       "source": "#dadde2",
       "resolved": "#dadde2",
-      "status": "pending",
+      "status": "active",
       "note": "変更。旧 #e2e4df",
       "lastCheckedAt": "2026-08-24"
     },
@@ -78,7 +102,7 @@
       "pencil": "$surface-pearl",
       "source": "#fafafc",
       "resolved": "#fafafc",
-      "status": "pending",
+      "status": "active",
       "note": "追加。表の見出し行の地",
       "lastCheckedAt": "2026-08-24"
     },
@@ -86,7 +110,7 @@
       "pencil": "$radius-md",
       "source": "10px",
       "resolved": "10px",
-      "status": "pending",
+      "status": "active",
       "note": "追加。--radius-md にするとTailwind標準の rounded-md(6px) を83か所で上書きするため別名",
       "lastCheckedAt": "2026-08-24"
     },
@@ -94,7 +118,7 @@
       "pencil": "$size-caption",
       "source": "12px",
       "resolved": "12px",
-      "status": "pending",
+      "status": "active",
       "note": "追加。表の見出しセル",
       "lastCheckedAt": "2026-08-24"
     },
@@ -102,7 +126,7 @@
       "pencil": "$size-label",
       "source": "13px",
       "resolved": "13px",
-      "status": "pending",
+      "status": "active",
       "note": "追加。カード見出し・ボタンの文字",
       "lastCheckedAt": "2026-08-24"
     },
@@ -110,7 +134,7 @@
       "pencil": "$size-metric",
       "source": "22px",
       "resolved": "22px",
-      "status": "pending",
+      "status": "active",
       "note": "追加。カードの大きな数字",
       "lastCheckedAt": "2026-08-24"
     },
@@ -118,7 +142,7 @@
       "pencil": "$size-micro",
       "source": "11px",
       "resolved": "11px",
-      "status": "pending",
+      "status": "active",
       "note": "追加。数字の下の内訳",
       "lastCheckedAt": "2026-08-24"
     },
@@ -126,7 +150,7 @@
       "pencil": "$size-nano",
       "source": "10px",
       "resolved": "10px",
-      "status": "pending",
+      "status": "active",
       "note": "追加。バッジの中の文字",
       "lastCheckedAt": "2026-08-24"
     },
@@ -134,7 +158,7 @@
       "pencil": "XywGr effect",
       "source": "1px 1px 2px #1920261a",
       "resolved": "1px 1px 2px #1920261a",
-      "status": "pending",
+      "status": "active",
       "note": "追加。@theme ではなく素の :root に置く。Tailwindは影の値をクラスへ直に埋め込むため変数が出力されない",
       "lastCheckedAt": "2026-08-24"
     }

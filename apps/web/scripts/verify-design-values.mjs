@@ -1,5 +1,5 @@
 /*
- * Pencil V5 の値と、実際のCSSを突き合わせる。
+ * Pencil V5を共通基盤とし、V6がある対象はV6を優先して、実際のCSSと突き合わせる。
  *
  * これが無かったため「35項目一致」という報告が再現できなかった。
  * 手元でその場かぎりに数えたものは証拠にならないので、ここへ置く。
@@ -98,10 +98,29 @@ function resolveVars(value, vars, depth = 0) {
 
 /* ---------- スキーマと必須件数 ------------------------------------------ */
 
-function checkShape(data) {
+export function checkShape(data) {
   const problems = []
   const req = data.required
   if (!req) return ['design-parts.json に required がありません']
+
+  const priority = data.$designPriority
+  if (!priority || priority.base !== 'V5' || !String(priority.override ?? '').includes('V6')) {
+    problems.push('設計の優先順位は「共通基盤V5、対象にV6があればV6優先」でなければなりません')
+  }
+  if (!priority?.tokenResult || !priority?.lastCheckedAt) {
+    problems.push('$designPriority に tokenResult または lastCheckedAt がありません')
+  }
+
+  const v6 = data.$v6Verification
+  const v6Nodes = v6?.representativeNodes
+  if (!Array.isArray(v6Nodes) || v6Nodes.length < (req.v6RepresentativeNodes ?? 1)) {
+    problems.push(
+      `V6代表ノードが ${Array.isArray(v6Nodes) ? v6Nodes.length : 0} 件。必須 ${req.v6RepresentativeNodes ?? 1} 件を下回っています`,
+    )
+  }
+  if (!v6?.summary || !v6?.lastCheckedAt) {
+    problems.push('$v6Verification に summary または lastCheckedAt がありません')
+  }
 
   const tokens = Object.keys(data.tokens || {}).filter((k) => !k.startsWith('$'))
   const parts = Object.keys(data.parts || {}).filter((k) => !k.startsWith('$'))
@@ -268,7 +287,7 @@ export function verify() {
 
 if (process.argv[1] && process.argv[1].endsWith('verify-design-values.mjs')) {
   const r = verify()
-  console.log('Pencil V5 とCSSの照合\n')
+  console.log('Pencil V5/V6 とCSSの照合\n')
   console.log(r.lines.join('\n'))
   console.log('\n' + '─'.repeat(60))
   console.log(`照合対象 ${r.checked} 件 / 一致 ${r.matched} / 不一致 ${r.checked - r.matched}`)
