@@ -88,8 +88,8 @@ describe('V5 B2 共通部品', () => {
     const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
 
     expect(contract.required.tokens).toBe(23)
-    expect(contract.required.parts).toBe(12)
-    expect(contract.required.partDeclarations).toBe(167)
+    expect(contract.required.parts).toBe(15)
+    expect(contract.required.partDeclarations).toBe(224)
     expect(contract.parts.card.status).toBe('active')
     expect(contract.parts['card-header'].pencilNodes).toContain('t0jk8p')
     expect(contract.parts['status-badge'].pencilNodes).toContain('xRvDB')
