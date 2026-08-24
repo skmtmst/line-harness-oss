@@ -15,6 +15,7 @@ import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AdIntegration from './ad-integration'
 import SiteScript from '@/components/inflow-links/site-script'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 interface MessageTemplate {
   id: string
@@ -642,40 +643,40 @@ function InflowLinksPageInner() {
               <col className="w-[10%]" />
               <col className="w-[7%]" />
             </colgroup>
-            <thead className="bg-canvas-sunken border-b border-hairline">
-              <tr>
-                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
+            <thead>
+              <TableHeadRow>
+                <Th>
                   流入元名
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th>
                   REF
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th>
                   Pool
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th>
                   シナリオ
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th>
                   自動付与
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th>
                   モード
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th align="right">
                   友だち追加
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th align="right">
                   クリック
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th>
                   最新追加
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-left text-[11px] font-semibold text-ink-faint">
+                </Th>
+                <Th>
                   発行URL
-                </th>
-                <th className="whitespace-nowrap px-2 py-3 text-right text-[11px] font-semibold text-ink-faint">編集</th>
-              </tr>
+                </Th>
+                <Th align="right">編集</Th>
+              </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {sortedRows.map((r) => {

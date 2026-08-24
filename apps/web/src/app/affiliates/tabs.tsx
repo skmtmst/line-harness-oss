@@ -6,6 +6,7 @@ import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
 if (!WORKER_BASE) {
@@ -311,20 +312,20 @@ export function AffiliatorsTab() {
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full min-w-[900px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">名前</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">コード</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">友だち紐付</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">リンク数</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">クリック</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">友だち追加</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">CV</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">売上</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">参考報酬</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">率</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">状態</th>
-              </tr>
+            <thead>
+              <TableHeadRow>
+                <Th>名前</Th>
+                <Th>コード</Th>
+                <Th align="center">友だち紐付</Th>
+                <Th align="right">リンク数</Th>
+                <Th align="right">クリック</Th>
+                <Th align="right">友だち追加</Th>
+                <Th align="right">CV</Th>
+                <Th align="right">売上</Th>
+                <Th align="right">参考報酬</Th>
+                <Th align="right">率</Th>
+                <Th>状態</Th>
+              </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {rows.map((row) => {
@@ -1211,19 +1212,19 @@ export function ApprovalQueue() {
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full min-w-[900px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">日時</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">友だち</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">アフィリエイター</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">案件</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CV ポイント</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">金額</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">フラグ</th>
+            <thead>
+              <TableHeadRow>
+                <Th>日時</Th>
+                <Th>友だち</Th>
+                <Th>アフィリエイター</Th>
+                <Th>案件</Th>
+                <Th>CV ポイント</Th>
+                <Th align="right">金額</Th>
+                <Th align="center">フラグ</Th>
                 {status === 'pending' && (
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">操作</th>
+                  <Th align="center">操作</Th>
                 )}
-              </tr>
+              </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {items.map((item) => (
@@ -1334,18 +1335,18 @@ function OffersList({
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full min-w-[800px]">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">案件名</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">説明</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">報酬</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">マイル</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">対象アカウント</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">成果時のタグ</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">開始するシナリオ</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">状態</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">操作</th>
-              </tr>
+            <thead>
+              <TableHeadRow>
+                <Th>案件名</Th>
+                <Th>説明</Th>
+                <Th align="right">報酬</Th>
+                <Th align="right">マイル</Th>
+                <Th>対象アカウント</Th>
+                <Th>成果時のタグ</Th>
+                <Th>開始するシナリオ</Th>
+                <Th align="center">状態</Th>
+                <Th align="center">操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {offers.map((offer) => (

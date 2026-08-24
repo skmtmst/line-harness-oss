@@ -579,7 +579,7 @@
         "tPTMp"
       ],
       "role": "canonical",
-      "status": "implemented",
+      "status": "active",
       "reviewStatus": "confirmed",
       "code": "src/components/shared/table.tsx",
       "cssModule": "src/components/shared/table.module.css",
@@ -590,7 +590,32 @@
       "cssPrefix": "table",
       "pencilUsage": 107,
       "lastCheckedAt": "2026-08-24",
-      "note": "6機能で最も多く使われている部品。コード側は7通り以上に割れ、設計に無い uppercase / tracking-wider が付いていた。見出し行の寸法は友だち一覧 FG391 の f9yhp から採取。V6代表10画面でも同じtPTMpを54回使用。",
+      "note": "6機能で最も多く使われている部品。第1段階で75セルを共通Thへ移行し、設計に無い uppercase / tracking-wider と画面別の色・余白を除いた。見出し行の寸法は友だち一覧 FG391 の f9yhp から採取。V6でも同じtPTMpを使う。",
+      "routes": {
+        "v5": {
+          "/tags": "PbCvb"
+        },
+        "v6": {
+          "/reminders": "kAnOQ",
+          "/templates": "FH74x",
+          "/affiliates": "BaLte",
+          "/conversions": "Bw4fy",
+          "/inflow-links": "EQS0v"
+        }
+      },
+      "migration": {
+        "directThBefore": 378,
+        "migratedInThisPr": 75,
+        "directThRemaining": 303
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Pencil実ノードとビルド後CSSは照合する。ローカル実装はAuthGuardからLINEログインへ遷移するため、同じデータ状態による画面画像の横並び比較は未検証。"
+      },
       "declarations": [
         {
           "pencil": "見出し行 height: 44",

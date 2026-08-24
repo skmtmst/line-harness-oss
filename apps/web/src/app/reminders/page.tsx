@@ -9,6 +9,7 @@ import Header from '@/components/layout/header'
 import ListKpis from '@/components/shared/list-kpis'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 /**
  * リマインダの一覧。
@@ -350,9 +351,9 @@ export default function RemindersPage() {
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[900px]">
                   <thead>
-                    <tr className="bg-canvas-sunken border-hairline border-b">
-                      <th className="w-8 px-2 py-3" aria-label="並び替え" />
-                      <th className="w-10 px-3 py-3">
+                    <TableHeadRow>
+                      <Th className="w-8" aria-label="並び替え" />
+                      <Th className="w-10">
                         <input
                           type="checkbox"
                           checked={allOnPageSelected}
@@ -369,29 +370,29 @@ export default function RemindersPage() {
                           aria-label="このページのリマインダをすべて選ぶ"
                           className="accent-green-500"
                         />
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         リマインダ名
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         配信方式
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         きっかけ
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         送る内容
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         フォルダ
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         稼働
-                      </th>
-                      <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">
+                      </Th>
+                      <Th>
                         登録日
-                      </th>
-                    </tr>
+                      </Th>
+                    </TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {loading ? (

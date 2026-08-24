@@ -50,6 +50,7 @@ import Header from '@/components/layout/header'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 interface ConversionReportItem {
   conversionPointId: string
@@ -256,17 +257,17 @@ function ConversionsPageInner() {
       ) : (
         <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
           <table className="w-full min-w-[880px]">
-            <thead className="bg-canvas-sunken border-hairline border-b">
-              <tr>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">成果地点（CV）名</th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">種別</th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">計測方法</th>
-                <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">成果単価</th>
-                <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">CV数</th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">報酬</th>
-                <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">状態</th>
-                <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">操作</th>
-              </tr>
+            <thead>
+              <TableHeadRow>
+                <Th>成果地点（CV）名</Th>
+                <Th>種別</Th>
+                <Th>計測方法</Th>
+                <Th align="right">成果単価</Th>
+                <Th align="right">CV数</Th>
+                <Th>報酬</Th>
+                <Th>状態</Th>
+                <Th align="right">操作</Th>
+              </TableHeadRow>
             </thead>
             <tbody className="divide-hairline divide-y">
               {shown.map((point) => (
@@ -394,13 +395,13 @@ function ReportTab() {
   return (
     <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
       <table className="w-full min-w-[560px]">
-        <thead className="bg-canvas-sunken border-hairline border-b">
-          <tr>
-            <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">成果地点（CV）名</th>
-            <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold">種別</th>
-            <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">CV数</th>
-            <th className="text-ink-faint px-4 py-3 text-right text-xs font-semibold">金額</th>
-          </tr>
+        <thead>
+          <TableHeadRow>
+            <Th>成果地点（CV）名</Th>
+            <Th>種別</Th>
+            <Th align="right">CV数</Th>
+            <Th align="right">金額</Th>
+          </TableHeadRow>
         </thead>
         <tbody className="divide-hairline divide-y">
           {rows.map((r) => (

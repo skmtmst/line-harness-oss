@@ -23,7 +23,7 @@
   },
   "app/affiliates/tabs.tsx": {
     "arbitrary-value": 12,
-    "direct-th": 48,
+    "direct-th": 20,
     "direct-primary-button": 1
   },
   "app/analytics/page.tsx": {
@@ -132,8 +132,7 @@
   "app/conversions/page.tsx": {
     "direct-secondary-button": 5,
     "direct-primary-button": 1,
-    "arbitrary-value": 8,
-    "direct-th": 12
+    "arbitrary-value": 8
   },
   "app/duplicates/page.tsx": {
     "arbitrary-value": 43,
@@ -222,8 +221,7 @@
     "unresolved-classname": 1,
     "direct-secondary-button": 8,
     "direct-primary-button": 1,
-    "arbitrary-value": 30,
-    "direct-th": 11
+    "arbitrary-value": 19
   },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 2,
@@ -276,8 +274,7 @@
   "app/reminders/page.tsx": {
     "direct-secondary-button": 5,
     "arbitrary-value": 4,
-    "direct-primary-button": 2,
-    "direct-th": 9
+    "direct-primary-button": 2
   },
   "app/restaurant-test/restaurant-console.tsx": {
     "arbitrary-value": 19,
@@ -389,8 +386,7 @@
   "app/tags/page.tsx": {
     "arbitrary-value": 3,
     "direct-secondary-button": 7,
-    "direct-primary-button": 3,
-    "direct-th": 8
+    "direct-primary-button": 3
   },
   "app/templates/carousel/page.tsx": {
     "direct-secondary-button": 4,
@@ -412,7 +408,6 @@
     "direct-secondary-button": 6,
     "direct-primary-button": 6,
     "arbitrary-value": 13,
-    "direct-th": 7,
     "unresolved-classname": 2
   },
   "app/updates/page.tsx": {
