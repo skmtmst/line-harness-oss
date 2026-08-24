@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkShape } from '../../scripts/verify-design-values.mjs'
+import { checkInventoryShape, checkShape } from '../../scripts/verify-design-values.mjs'
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const contract = JSON.parse(
@@ -16,6 +16,19 @@ const contract = JSON.parse(
   }
   required: { tokens: number; v6RepresentativeNodes: number; v6PartNodes: string[] }
   tokens: Record<string, { status?: string } | string>
+}
+const inventory = JSON.parse(
+  readFileSync(join(WEB, 'design', 'pencil-component-inventory.json'), 'utf8'),
+) as {
+  $snapshot: { reusableComponents: number }
+  families: Record<string, { props: string[]; requiredStates: string[] }>
+  components: Record<string, {
+    classification: string
+    impactRoutes: string[]
+    family: string
+    status: string
+    version: { base: string; v6: string }
+  }>
 }
 
 describe('Pencilの設計優先順位', () => {
@@ -53,5 +66,49 @@ describe('Pencilの設計優先順位', () => {
     const missingReference = structuredClone(contract)
     delete missingReference.$v6Verification.partReferences.tPTMp
     expect(checkShape(missingReference)).toContain('V6部品 tPTMp の参照数が記録されていません')
+  })
+
+  it('Pen.devの再利用部品85件を3段階に分け、状態・影響・V5/V6差を保持する', () => {
+    const components = Object.values(inventory.components)
+    expect(components).toHaveLength(85)
+    expect(inventory.$snapshot.reusableComponents).toBe(85)
+    expect(new Set(components.map((component) => component.classification))).toEqual(
+      new Set(['global', 'feature', 'screen']),
+    )
+    expect(components.every((component) => component.impactRoutes.length > 0)).toBe(true)
+    expect(components.every((component) => component.version.base === 'V5')).toBe(true)
+    expect(checkInventoryShape(contract, inventory)).toEqual([])
+  })
+
+  it('部品を消す、誤分類する、影響先を消すと契約違反になる', () => {
+    const missing = structuredClone(inventory)
+    delete missing.components.Ai3fq
+    expect(checkInventoryShape(contract, missing)).toContain(
+      'Pen.dev部品が 84 件。必須 85 件を下回っています',
+    )
+
+    const wrongClassification = structuredClone(inventory)
+    wrongClassification.components.Ai3fq.classification = 'page'
+    expect(checkInventoryShape(contract, wrongClassification)).toContain(
+      'components.Ai3fq: classification が不正です（page）',
+    )
+
+    const missingRoutes = structuredClone(inventory)
+    missingRoutes.components.Ai3fq.impactRoutes = []
+    expect(checkInventoryShape(contract, missingRoutes)).toContain(
+      'components.Ai3fq: impactRoutes がありません',
+    )
+  })
+
+  it('部品ファミリーからpropsや必須状態を消すと契約違反になる', () => {
+    const missingProps = structuredClone(inventory)
+    missingProps.families.button.props = []
+    expect(checkInventoryShape(contract, missingProps)).toContain('families.button: props がありません')
+
+    const missingStates = structuredClone(inventory)
+    missingStates.families.dialog.requiredStates = []
+    expect(checkInventoryShape(contract, missingStates)).toContain(
+      'families.dialog: requiredStates がありません',
+    )
   })
 })
