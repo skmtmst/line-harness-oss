@@ -30,6 +30,10 @@ import { parseQuestionPostback } from '../services/scenario-question.js';
 import { handleQuestionAnswer } from '../services/scenario-question-answer.js';
 import type { Env } from '../index.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import {
+  classifyLineWebhookError,
+  processLineWebhookEvents,
+} from '../services/line-webhook-events.js';
 
 const webhook = new Hono<Env>();
 
@@ -38,6 +42,22 @@ const webhook = new Hono<Env>();
 // bursty batched deliveries (~100 events × ~5 KB) while still well below the
 // 128 MB Cloudflare Workers memory ceiling.
 const MAX_WEBHOOK_BODY_SIZE = 1024 * 1024; // 1 MiB
+
+function logWebhookStepFailure(
+  stage: string,
+  error: unknown,
+  lineAccountId: string | null,
+  event?: WebhookEvent,
+): void {
+  console.error({
+    event: 'line_webhook_step_failed',
+    stage,
+    webhook_event_id: event?.webhookEventId ?? null,
+    line_account_id: lineAccountId,
+    event_type: event?.type ?? null,
+    reason: classifyLineWebhookError(error),
+  });
+}
 
 async function ensureFriendFromWebhookUser(
   db: D1Database,
@@ -55,7 +75,7 @@ async function ensureFriendFromWebhookUser(
       // A signed webhook already proves this user interacted with the bot.
       // If profile lookup is temporarily unavailable, keep the event processable
       // by creating the friend with the LINE userId and filling profile later.
-      console.error('[webhook] Failed to get profile for unknown user', err);
+      logWebhookStepFailure('unknown_user_profile', err, lineAccountId);
     }
 
     friend = await upsertFriend(db, {
@@ -65,7 +85,7 @@ async function ensureFriendFromWebhookUser(
       pictureUrl: profile?.pictureUrl ?? null,
       statusMessage: profile?.statusMessage ?? null,
     });
-    console.log(`[webhook] auto-registered existing friend friendId=${friend.id}`);
+    console.log({ event: 'line_webhook_friend_registered', line_account_id: lineAccountId });
   }
 
   if (lineAccountId && friend.line_account_id !== lineAccountId) {
@@ -170,15 +190,21 @@ webhook.post('/webhook', async (c) => {
   const lineClient = new LineClient(channelAccessToken);
 
   // 非同期処理 — LINE は ~1s 以内のレスポンスを要求
-  const processingPromise = (async () => {
-    for (const event of body.events) {
-      try {
-        await handleEvent(db, lineClient, event, channelAccessToken, matchedAccountId, c.env.WORKER_URL || new URL(c.req.url).origin, c.env.LIFF_URL, c.env.IMAGES);
-      } catch (err) {
-        console.error('Error handling webhook event:', err);
-      }
-    }
-  })();
+  const processingPromise = processLineWebhookEvents({
+    db,
+    events: body.events,
+    lineAccountId: matchedAccountId,
+    handle: (event) => handleEvent(
+      db,
+      lineClient,
+      event,
+      channelAccessToken,
+      matchedAccountId,
+      c.env.WORKER_URL || new URL(c.req.url).origin,
+      c.env.LIFF_URL,
+      c.env.IMAGES,
+    ),
+  });
 
   c.executionCtx.waitUntil(processingPromise);
 
@@ -200,17 +226,20 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
-    console.log(`[follow] lineAccountId=${lineAccountId}`);
+    console.log({
+      event: 'line_webhook_follow_received',
+      webhook_event_id: event.webhookEventId,
+      line_account_id: lineAccountId,
+      event_type: event.type,
+    });
 
     // プロフィール取得 & 友だち登録/更新
     let profile;
     try {
       profile = await lineClient.getProfile(userId);
     } catch (err) {
-      console.error('Failed to get profile', err);
+      logWebhookStepFailure('follow_profile', err, lineAccountId, event);
     }
-
-    console.log(`[follow] profile=${profile?.displayName ?? 'null'}`);
 
     const friend = await upsertFriend(db, {
       lineUserId: userId,
@@ -220,13 +249,16 @@ async function handleEvent(
       statusMessage: profile?.statusMessage ?? null,
     });
 
-    console.log(`[follow] friend.id=${friend.id} friend.line_account_id=${(friend as any).line_account_id}`);
-
     // Set line_account_id for multi-account tracking (always update on follow)
     if (lineAccountId) {
       await db.prepare('UPDATE friends SET line_account_id = ?, updated_at = ? WHERE id = ?')
         .bind(lineAccountId, jstNow(), friend.id).run();
-      console.log(`[follow] line_account_id set to ${lineAccountId} for friend ${friend.id}`);
+      console.log({
+        event: 'line_webhook_friend_account_linked',
+        webhook_event_id: event.webhookEventId,
+        line_account_id: lineAccountId,
+        event_type: event.type,
+      });
     }
 
     // 新規・再フォローのどちらでも、最初の友だち登録マイルを同じキーで非同期投入する。
@@ -303,7 +335,7 @@ async function handleEvent(
           );
           if (sent) console.log(`Immediate delivery (routed): sent scenario ${scenarioId} step 1`);
         } catch (err) {
-          console.error('Failed immediate delivery for routed scenario', scenarioId, err);
+          logWebhookStepFailure('routed_scenario_delivery', err, lineAccountId, event);
         }
       }
       if (routing.suppressed) {
@@ -352,7 +384,7 @@ async function handleEvent(
           );
           if (sent) console.log(`Immediate delivery: sent scenario ${scenario.id} step 1`);
         } catch (err) {
-          console.error('Failed to enroll friend in scenario', scenario.id, err);
+          logWebhookStepFailure('scenario_enrollment', err, lineAccountId, event);
         }
       }
     }
@@ -369,7 +401,7 @@ async function handleEvent(
             console.log(`[follow] referral intro push sent route=${referralRoute.id}`);
           }
         } catch (err) {
-          console.error('[follow] referral intro push failed', err);
+          logWebhookStepFailure('referral_intro_push', err, lineAccountId, event);
         }
       }
 
@@ -393,7 +425,7 @@ async function handleEvent(
             );
           }
         } catch (err) {
-          console.error('[follow] referral scenario enrollment failed', err);
+          logWebhookStepFailure('referral_scenario_enrollment', err, lineAccountId, event);
         }
       }
     }
@@ -453,7 +485,7 @@ async function handleEvent(
         // 「もう押せません」と自動応答の両方が届く。
         if (result.kind === 'blocked') return;
       } catch (err) {
-        console.error('Failed to handle carousel tap', err);
+        logWebhookStepFailure('carousel_tap', err, lineAccountId, event);
       }
       // カルーセルの data は運用者が組んだ文字列ではないので、自動応答の
       // キーワード照合には回さない。
@@ -473,7 +505,7 @@ async function handleEvent(
         tapLabel = tapResult.target?.label ?? null;
       } catch (err) {
         // ボタンの動きが失敗しても、下の自動応答までは止めない。
-        console.error('Failed to handle rich menu tap', err);
+        logWebhookStepFailure('rich_menu_tap', err, lineAccountId, event);
       }
     }
     const postbackData = tap ? (tap.inner ?? '') : rawPostbackData;
@@ -524,7 +556,7 @@ async function handleEvent(
         .bind(crypto.randomUUID(), friend.id, postbackLogText, lineAccountId ?? null, jstNow())
         .run();
     } catch (err) {
-      console.error('Failed to log incoming postback', err);
+      logWebhookStepFailure('incoming_postback_log', err, lineAccountId, event);
     }
 
     // postback data を auto_replies にマッチさせて返信 (テキスト経路と共通)。
@@ -722,7 +754,7 @@ async function handleEvent(
           return;
         }
       } catch (err) {
-        console.error('Cross-account trigger error:', err);
+        logWebhookStepFailure('cross_account_trigger', err, lineAccountId, event);
       }
     }
 

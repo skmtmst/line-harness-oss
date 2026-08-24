@@ -27,6 +27,9 @@ vi.mock('@line-crm/db', () => ({
   getEntryRouteByRefCode: vi.fn(),
   getMessageTemplateById: vi.fn(),
   getTemplateById: vi.fn(),
+  reserveLineWebhookEvent: vi.fn().mockResolvedValue(true),
+  markLineWebhookEventSucceeded: vi.fn().mockResolvedValue(undefined),
+  markLineWebhookEventFailed: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@line-crm/line-sdk', async () => {
@@ -64,6 +67,7 @@ import {
   getScenarioSteps,
   getScenarios,
   jstNow,
+  reserveLineWebhookEvent,
   resolveStepContent,
   updateFriendFollowStatus,
   upsertChatOnMessage,
@@ -184,6 +188,50 @@ describe('POST /webhook — DoS defenses (#104)', () => {
     expect(res.status).toBe(200);
     // Fast-rejected before any crypto / DB work.
     expect(verifySignature).not.toHaveBeenCalled();
+  });
+
+  test('台帳の記録が失敗してもLINEへの応答は200のまま', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(reserveLineWebhookEvent).mockRejectedValueOnce(new Error('raw database details'));
+    const executionCtx = {
+      waitUntil: vi.fn(),
+      passThroughOnException: vi.fn(),
+      props: {},
+    } as unknown as ExecutionContext;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const res = await setupApp().request(
+      '/webhook',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Line-Signature': 'A'.repeat(43) + '=',
+        },
+        body: JSON.stringify({
+          destination: 'bot',
+          events: [{
+            type: 'unfollow',
+            timestamp: 0,
+            source: { type: 'user', userId: 'U-sensitive' },
+            webhookEventId: 'evt-ledger-failure',
+            deliveryContext: { isRedelivery: false },
+            mode: 'active',
+          }],
+        }),
+      },
+      baseEnv,
+      executionCtx,
+    );
+
+    expect(res.status).toBe(200);
+    const processing = vi.mocked(executionCtx.waitUntil).mock.calls[0]?.[0] as Promise<unknown>;
+    await expect(processing).resolves.toBeUndefined();
+    expect(updateFriendFollowStatus).not.toHaveBeenCalled();
+    const output = JSON.stringify(errorSpy.mock.calls);
+    expect(output).not.toContain('raw database details');
+    expect(output).not.toContain('U-sensitive');
+    errorSpy.mockRestore();
   });
 });
 
