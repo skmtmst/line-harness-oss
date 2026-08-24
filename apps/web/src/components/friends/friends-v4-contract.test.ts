@@ -9,6 +9,7 @@ const TABLE = readFileSync(join(HERE, 'friend-list-table.tsx'), 'utf8')
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
 const KPIS = readFileSync(join(HERE, 'friend-kpis.tsx'), 'utf8')
 const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'summary-card.module.css'), 'utf8')
+const PAGINATION = readFileSync(join(HERE, '..', 'shared', 'pagination.tsx'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
 const TIMELINE = readFileSync(join(HERE, 'friend-timeline.tsx'), 'utf8')
 const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'detail', 'page.tsx'), 'utf8')
@@ -36,8 +37,9 @@ describe('友だちV4の画面契約', () => {
 
   it('表示件数10〜50件と省略ページングを持つ', () => {
     expect(PAGE).toContain('const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50]')
-    expect(PAGE).toContain('compactPages')
-    expect(PAGE).toContain("result.push('ellipsis')")
+    expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
+    expect(PAGINATION).toContain('paginationItems')
+    expect(PAGINATION).toContain("return [1, 'ellipsis', current, 'ellipsis', total]")
     expect(PAGE).toContain('Math.ceil(total / pageSize)')
   })
 

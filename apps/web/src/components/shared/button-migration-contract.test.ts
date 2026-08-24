@@ -84,11 +84,11 @@ describe('標準ボタンの第1段階移行', () => {
     }
   })
 
-  it('標準ボタン負債を30件締め、形の違う操作を残す', () => {
+  it('標準ボタン移行後の基準を、ページ切替の共通化後も締める', () => {
     const debt = totals(countDebt().counts) as Record<string, number>
-    expect(debt['direct-primary-button']).toBe(158)
-    expect(debt['direct-secondary-button']).toBe(315)
-    expect(debt['arbitrary-value']).toBe(1495)
+    expect(debt['direct-primary-button']).toBe(154)
+    expect(debt['direct-secondary-button']).toBe(301)
+    expect(debt['arbitrary-value']).toBe(1482)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

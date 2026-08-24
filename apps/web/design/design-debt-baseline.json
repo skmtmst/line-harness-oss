@@ -107,9 +107,9 @@
     "direct-secondary-button": 3
   },
   "app/contents/page.tsx": {
-    "direct-secondary-button": 8,
+    "direct-secondary-button": 5,
     "arbitrary-value": 10,
-    "direct-primary-button": 2
+    "direct-primary-button": 1
   },
   "app/contents/vars/edit/page.tsx": {
     "direct-th": 3,
@@ -120,9 +120,9 @@
     "direct-primary-button": 1
   },
   "app/contents/vars/page.tsx": {
-    "direct-secondary-button": 8,
+    "direct-secondary-button": 5,
     "arbitrary-value": 3,
-    "direct-primary-button": 3,
+    "direct-primary-button": 2,
     "direct-th": 6
   },
   "app/conversions/new/page.tsx": {
@@ -190,7 +190,7 @@
   },
   "app/friends/page.tsx": {
     "unresolved-classname": 6,
-    "arbitrary-value": 89
+    "arbitrary-value": 76
   },
   "app/health/page.tsx": {
     "unresolved-classname": 5,
@@ -269,9 +269,7 @@
     "unresolved-classname": 11
   },
   "app/reminders/page.tsx": {
-    "arbitrary-value": 3,
-    "direct-secondary-button": 3,
-    "direct-primary-button": 1
+    "arbitrary-value": 3
   },
   "app/restaurant-test/restaurant-console.tsx": {
     "arbitrary-value": 19,
@@ -382,7 +380,7 @@
   },
   "app/tags/page.tsx": {
     "arbitrary-value": 3,
-    "direct-secondary-button": 5
+    "direct-secondary-button": 3
   },
   "app/templates/carousel/page.tsx": {
     "direct-secondary-button": 4,
@@ -577,10 +575,10 @@
     "direct-secondary-button": 1
   },
   "components/friend-attributes-v2/tag-list-v2.tsx": {
-    "direct-secondary-button": 9,
-    "direct-primary-button": 4,
     "arbitrary-value": 94,
+    "direct-secondary-button": 6,
     "unresolved-classname": 6,
+    "direct-primary-button": 3,
     "direct-th": 10
   },
   "components/friend-attributes-v3/friend-attributes-v3-static.tsx": {

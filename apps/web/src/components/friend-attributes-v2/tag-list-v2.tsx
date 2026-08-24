@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, type ListStats } from '@/lib/api'
+import Pagination from '@/components/shared/pagination'
 
 const UNGROUPED = '__ungrouped__'
 const SHADOW = '[box-shadow:1px_1px_1px_rgba(29,29,31,0.13)]'
@@ -77,11 +78,8 @@ function parseCsvLine(line: string): string[] {
 }
 
 function Pager({ page, pages, onChange }: { page: number; pages: number; onChange: (page: number) => void }) {
-  const values = pages <= 5 ? Array.from({ length: pages }, (_, index) => index + 1) : [1, 2, 3, -1, pages]
-  return <div data-design="Pagination" className="mt-4 flex justify-end gap-1 bg-shell text-xs">
-    <button type="button" disabled={page === 1} onClick={() => onChange(page - 1)} className="h-8 rounded-md border border-hairline px-3 disabled:opacity-40">前へ</button>
-    {values.map((value, index) => value < 0 ? <span key={index} className="px-1 py-2 text-ink-faint">…</span> : <button key={value} type="button" onClick={() => onChange(value)} className={`h-8 min-w-8 rounded-md px-2 ${page === value ? 'bg-accent font-bold text-on-accent' : 'border border-hairline'}`}>{value}</button>)}
-    <button type="button" disabled={page === pages} onClick={() => onChange(page + 1)} className="h-8 rounded-md border border-hairline px-3 disabled:opacity-40">次へ</button>
+  return <div data-design="Pagination" className="mt-4 flex justify-end">
+    <Pagination page={page} pageCount={pages} onPageChange={onChange} ariaLabel="ページ送り（前へ・次へ）" />
   </div>
 }
 

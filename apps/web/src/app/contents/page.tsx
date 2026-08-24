@@ -5,6 +5,7 @@ import type { MediaItem, MediaUsage } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Header from '@/components/layout/header'
 import { formatStamp } from '@/lib/common-vars'
+import Pagination from '@/components/shared/pagination'
 
 /**
  * 登録メディア一覧。
@@ -472,38 +473,7 @@ export default function MediaLibraryPage() {
       )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex items-center gap-1" aria-label="ページ送り">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            aria-label="前のページ"
-            className="border-hairline text-ink-secondary rounded-control border px-2 py-1 text-sm disabled:opacity-30"
-          >
-            &lt;
-          </button>
-          {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-            <button
-              key={n}
-              onClick={() => setPage(n)}
-              aria-current={n === page ? 'page' : undefined}
-              className={`rounded-control px-3 py-1 text-sm tabular-nums ${
-                n === page
-                  ? 'bg-accent text-on-accent'
-                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-              }`}
-            >
-              {n}
-            </button>
-          ))}
-          <button
-            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-            disabled={page >= pageCount}
-            aria-label="次のページ"
-            className="border-hairline text-ink-secondary rounded-control border px-2 py-1 text-sm disabled:opacity-30"
-          >
-            &gt;
-          </button>
-        </nav>
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-ink-secondary flex items-center gap-1.5 text-sm">

@@ -5,12 +5,34 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import Button from './button'
+import Pagination, { paginationItems } from './pagination'
 import SummaryCard from './summary-card'
 import { TableHeadRow, Th } from './table'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const read = (name: string) => readFileSync(join(HERE, name), 'utf8')
 const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
+
+describe('共通Pagination', () => {
+  it('ページ数に応じてPencilの5枠へ省略する', () => {
+    expect(paginationItems(1, 12)).toEqual([1, 2, 3, 'ellipsis', 12])
+    expect(paginationItems(6, 12)).toEqual([1, 'ellipsis', 6, 'ellipsis', 12])
+    expect(paginationItems(12, 12)).toEqual([1, 'ellipsis', 10, 11, 12])
+    expect(paginationItems(2, 4)).toEqual([1, 2, 3, 4])
+  })
+
+  it('現在地と前後の無効状態を出す', () => {
+    const html = renderToStaticMarkup(
+      <Pagination page={1} pageCount={12} onPageChange={() => undefined} ariaLabel="一覧のページ" />,
+    )
+
+    expect(html).toContain('aria-label="一覧のページ"')
+    expect(html).toContain('aria-current="page"')
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-label="前のページ"/)
+    expect(html).toContain('aria-label="12ページ目へ"')
+    expect(html).toContain('>…</span>')
+  })
+})
 
 describe('共通Button', () => {
   it('通常ボタンのpropsとhidden属性を実要素へ渡す', () => {
@@ -101,7 +123,7 @@ describe('部品のCSS境界', () => {
   })
 
   it('生の色・ローカル変数・Pencilに無い大文字化や字間を持たない', () => {
-    for (const name of ['button.module.css', 'summary-card.module.css', 'table.module.css']) {
+    for (const name of ['button.module.css', 'pagination.module.css', 'summary-card.module.css', 'table.module.css']) {
       const css = withoutComments(read(name))
       expect(css, `${name} に生の色がある`).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(css, `${name} がローカル変数を定義している`).not.toMatch(/^\s*--(?!tw-)[a-z-]+:/m)
