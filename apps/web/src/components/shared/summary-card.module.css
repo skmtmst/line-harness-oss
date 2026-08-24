@@ -1,0 +1,78 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-card);
+}
+
+.card[hidden] {
+  display: none;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.label {
+  color: var(--color-ink-secondary);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: var(--radius-tile);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: var(--text-nano);
+  font-weight: 600;
+}
+
+.link {
+  flex-shrink: 0;
+  color: var(--color-action);
+  font-size: var(--text-nano);
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.link:focus-visible {
+  outline: revert;
+}
+
+.value {
+  color: var(--color-ink);
+  font-size: var(--text-metric);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail {
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+}
+
+.skeleton {
+  width: 96px;
+  height: var(--text-metric);
+  border-radius: 4px;
+  background: var(--color-canvas-sunken);
+  animation: summary-card-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes summary-card-pulse {
+  50% {
+    opacity: 0.5;
+  }
+}

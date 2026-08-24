@@ -9,8 +9,12 @@ const contract = JSON.parse(
   readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'),
 ) as {
   $designPriority: { base: string; override: string }
-  $v6Verification: { representativeNodes: string[] }
-  required: { tokens: number; v6RepresentativeNodes: number }
+  $v6Verification: {
+    representativeNodes: string[]
+    partResult: string
+    partReferences: Record<string, number>
+  }
+  required: { tokens: number; v6RepresentativeNodes: number; v6PartNodes: string[] }
   tokens: Record<string, { status?: string } | string>
 }
 
@@ -39,5 +43,15 @@ describe('Pencilの設計優先順位', () => {
     const missingV6 = structuredClone(contract)
     missingV6.$v6Verification.representativeNodes = []
     expect(checkShape(missingV6)).toContain('V6代表ノードが 0 件。必須 10 件を下回っています')
+  })
+
+  it('V6で使われている共通部品の調査記録を消すと契約違反になる', () => {
+    expect(contract.$v6Verification.partResult).toContain('tPTMp')
+    expect(contract.$v6Verification.partReferences.tPTMp).toBe(54)
+    expect(contract.$v6Verification.partReferences.mNUQ3).toBe(4)
+
+    const missingReference = structuredClone(contract)
+    delete missingReference.$v6Verification.partReferences.tPTMp
+    expect(checkShape(missingReference)).toContain('V6部品 tPTMp の参照数が記録されていません')
   })
 })
