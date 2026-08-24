@@ -63,6 +63,7 @@ type SlackApiResponse = {
   error?: string;
   ts?: string;
   permalink?: string;
+  members?: string[];
   messages?: SlackMessage[];
   channels?: SlackConversation[];
   channel?: SlackConversation;
@@ -402,26 +403,68 @@ async function findPublicSlackChannel(
   return null;
 }
 
+function configuredPrChannelMembers(config: CodexSlackRelayConfig): string[] {
+  return [...new Set([
+    config.SLACK_KENTA_USER_ID,
+    config.SLACK_MASATO_USER_ID,
+  ].filter((value): value is string => Boolean(value)))];
+}
+
+async function ensureSlackChannelMembers(
+  token: string,
+  channel: string,
+  desiredMembers: string[],
+  fetcher: typeof fetch,
+): Promise<void> {
+  if (desiredMembers.length === 0) return;
+  const currentMembers = new Set<string>();
+  let cursor = '';
+  for (let page = 0; page < MAX_HISTORY_PAGES; page += 1) {
+    const result = await slackApi(token, 'conversations.members', {
+      channel,
+      limit: 200,
+      ...(cursor ? { cursor } : {}),
+    }, fetcher);
+    for (const member of result.members || []) currentMembers.add(member);
+    cursor = result.response_metadata?.next_cursor || '';
+    if (!cursor) break;
+  }
+  const missingMembers = desiredMembers.filter((member) => !currentMembers.has(member));
+  if (missingMembers.length === 0) return;
+  await slackApi(token, 'conversations.invite', {
+    channel,
+    users: missingMembers.join(','),
+  }, fetcher);
+}
+
 async function ensurePublicSlackChannel(
   token: string,
   name: string,
+  desiredMembers: string[],
   fetcher: typeof fetch,
 ): Promise<string> {
   const existing = await findPublicSlackChannel(token, name, fetcher);
-  if (existing?.id) return existing.id;
+  if (existing?.id) {
+    await ensureSlackChannelMembers(token, existing.id, desiredMembers, fetcher);
+    return existing.id;
+  }
   try {
     const created = await slackApi(token, 'conversations.create', {
       name,
       is_private: false,
     }, fetcher);
     if (!created.channel?.id) throw new Error('SLACK_CREATED_CHANNEL_ID_MISSING');
+    await ensureSlackChannelMembers(token, created.channel.id, desiredMembers, fetcher);
     return created.channel.id;
   } catch (error) {
     // Two GitHub events can cross the threshold together. If the other event
     // won the create race, resolve the channel that now exists.
     if (String(error).includes('name_taken')) {
       const raced = await findPublicSlackChannel(token, name, fetcher);
-      if (raced?.id) return raced.id;
+      if (raced?.id) {
+        await ensureSlackChannelMembers(token, raced.id, desiredMembers, fetcher);
+        return raced.id;
+      }
     }
     throw error;
   }
@@ -440,7 +483,12 @@ export async function resolveCodexSlackChannelWithProvisioning(
   // Existing ranges predate automatic provisioning and keep their configured
   // fallback. New ranges from PR #301 onward are resolved by channel name.
   if (prNumber <= 300) return configured;
-  return ensurePublicSlackChannel(config.SLACK_BOT_TOKEN, prRangeChannelName(prNumber), fetcher);
+  return ensurePublicSlackChannel(
+    config.SLACK_BOT_TOKEN,
+    prRangeChannelName(prNumber),
+    configuredPrChannelMembers(config),
+    fetcher,
+  );
 }
 
 export async function ensureUpcomingPrRangeChannel(
@@ -453,6 +501,7 @@ export async function ensureUpcomingPrRangeChannel(
   return ensurePublicSlackChannel(
     config.SLACK_BOT_TOKEN,
     prRangeChannelName(nextStart),
+    configuredPrChannelMembers(config),
     fetcher,
   );
 }
