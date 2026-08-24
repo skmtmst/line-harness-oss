@@ -79,6 +79,19 @@ type SelectedRestaurantStore = {
   name: string;
 };
 
+async function organizationByTenantId(
+  c: Context<Env>,
+  id: string,
+): Promise<OrganizationContext | null> {
+  const organization = await dbFor(c.env).prepare(`SELECT
+      o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status
+    FROM rt_organizations o
+    LEFT JOIN tenants t ON t.id = o.tenant_id
+    WHERE o.tenant_id = ?
+    LIMIT 1`).bind(id).first<OrganizationRow>();
+  return organization ? { ...organization, scopedStoreId: null } : null;
+}
+
 function accountId(c: Context<Env>): string | null {
   return c.req.query('account_id') || null;
 }
@@ -89,6 +102,10 @@ function tenantId(c: Context<Env>): string | null {
 
 function hasOrganizationSelector(c: Context<Env>): boolean {
   return Boolean(accountId(c) || tenantId(c));
+}
+
+function authenticatedTenantId(c: Context<Env>): string {
+  return c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 }
 
 restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
@@ -116,13 +133,7 @@ restaurantTest.use('/api/restaurant-test/*', async (c, next) => {
 async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext | null> {
   const requestedTenant = tenantId(c);
   if (requestedTenant) {
-    const tenantOrganization = await dbFor(c.env).prepare(`SELECT
-        o.id, o.account_id, o.tenant_id, t.name AS tenant_name, o.name, o.status
-      FROM rt_organizations o
-      LEFT JOIN tenants t ON t.id = o.tenant_id
-      WHERE o.tenant_id = ?
-      LIMIT 1`).bind(requestedTenant).first<OrganizationRow>();
-    return tenantOrganization ? { ...tenantOrganization, scopedStoreId: null } : null;
+    return organizationByTenantId(c, requestedTenant);
   }
 
   const id = accountId(c);
@@ -146,6 +157,35 @@ async function baseOrganizationFor(c: Context<Env>): Promise<OrganizationContext
   return storeOrganization
     ? { ...storeOrganization, scopedStoreId: storeOrganization.scoped_store_id }
     : null;
+}
+
+/**
+ * Create only the real organization required by a write operation. The
+ * tenant-scoped unique index and the legacy account_id unique index make this
+ * safe when two requests arrive together; the SELECT after INSERT returns the
+ * winning row in either case.
+ */
+async function ensureOrganizationForAuthenticatedTenant(
+  c: Context<Env>,
+): Promise<OrganizationContext | null> {
+  const staffTenantId = authenticatedTenantId(c);
+  const existing = await organizationByTenantId(c, staffTenantId);
+  if (existing) return existing;
+
+  const tenant = await dbFor(c.env).prepare(
+    'SELECT name FROM tenants WHERE id = ? LIMIT 1',
+  ).bind(staffTenantId).first<{ name: string }>();
+  if (!tenant) return null;
+
+  await dbFor(c.env).prepare(`INSERT OR IGNORE INTO rt_organizations
+    (id, account_id, tenant_id, name, status)
+    VALUES (?, ?, ?, ?, 'active')`).bind(
+      crypto.randomUUID(),
+      staffTenantId,
+      staffTenantId,
+      tenant.name,
+    ).run();
+  return organizationByTenantId(c, staffTenantId);
 }
 
 async function selectedRestaurantStore(
@@ -331,9 +371,19 @@ restaurantTest.get('/api/restaurant-test/store-context', requireRole('owner', 'a
 
 /** Return the latest agreement for the organization; credential values are unrelated and never selected. */
 restaurantTest.get('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin', 'staff'), async (c) => {
-  if (!hasOrganizationSelector(c)) return requiredAccount(c);
-  const organization = await organizationFor(c, { ignoreSession: true });
-  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
+  const organization = hasOrganizationSelector(c)
+    ? await organizationFor(c, { ignoreSession: true })
+    : await organizationByTenantId(c, authenticatedTenantId(c));
+  if (!organization) {
+    return c.json({
+      success: true,
+      data: {
+        documentKey: RESTAURANT_TERMS_DOCUMENT_KEY,
+        agreedVersion: null,
+        agreedAt: null,
+      },
+    });
+  }
   const agreement = await dbFor(c.env).prepare(`SELECT document_version, agreed_at
     FROM rt_organization_agreements
     WHERE organization_id = ? AND document_key = ?
@@ -355,9 +405,6 @@ restaurantTest.get('/api/restaurant-test/terms-agreement', requireRole('owner', 
 
 /** Record one idempotent organization/version agreement without IP or other personal data. */
 restaurantTest.post('/api/restaurant-test/terms-agreement', requireRole('owner', 'admin'), async (c) => {
-  if (!hasOrganizationSelector(c)) return requiredAccount(c);
-  const organization = await organizationFor(c, { ignoreSession: true });
-  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body: { documentKey?: unknown; version?: unknown } = await c.req.json().catch(() => ({}));
   if (
     body.documentKey !== RESTAURANT_TERMS_DOCUMENT_KEY
@@ -365,6 +412,8 @@ restaurantTest.post('/api/restaurant-test/terms-agreement', requireRole('owner',
   ) {
     return c.json({ success: false, error: '現在の利用規約バージョンと一致しません' }, 400);
   }
+  const organization = await ensureOrganizationForAuthenticatedTenant(c);
+  if (!organization) return c.json({ success: false, error: '統括情報を確認できません' }, 404);
   const staffId = c.get('staff')?.id ?? null;
   await dbFor(c.env).prepare(`INSERT OR IGNORE INTO rt_organization_agreements
     (id, organization_id, document_key, document_version, agreed_by_staff_id)
@@ -512,9 +561,6 @@ restaurantTest.get('/api/restaurant-test/snapshot', requireRole('owner', 'admin'
  * a store nor a LINE account behind.
  */
 restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 'admin'), async (c) => {
-  if (!hasOrganizationSelector(c)) return requiredAccount(c);
-  const organization = await organizationFor(c, { ignoreSession: true });
-  if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const body: {
     name?: unknown;
     alias?: unknown;
@@ -528,6 +574,9 @@ restaurantTest.post('/api/restaurant-test/stores/connect', requireRole('owner', 
   if (!name) return c.json({ success: false, error: '店舗名を入力してください' }, 400);
   if (!channelId) return c.json({ success: false, error: 'チャネルIDを入力してください' }, 400);
   if (!channelSecret) return c.json({ success: false, error: 'チャネルシークレットを入力してください' }, 400);
+
+  const organization = await ensureOrganizationForAuthenticatedTenant(c);
+  if (!organization) return c.json({ success: false, error: '統括情報を確認できません' }, 404);
 
   const code = alias || name;
   const [sameCode, sameChannel] = await Promise.all([

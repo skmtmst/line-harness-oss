@@ -57,6 +57,14 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(wizard).toContain('type="password"')
   })
 
+  it('店舗未選択の新しい統括でも規約同意から店舗登録まで進める', () => {
+    expect(api).toContain('withOptionalAccount')
+    expect(wizard).toContain('restaurantTestApi.termsAgreement(selectedAccountId)')
+    expect(wizard).not.toContain("if (!selectedAccountId) throw new Error")
+    expect(wizard).not.toContain('disabled={!selectedAccountId || saving}')
+    expect(wizard).toContain('統括の店舗一覧へ')
+  })
+
   it('マニュアルURLをJSXへ直書きせず、空の間は非活性にする', () => {
     expect(wizard).toContain('MANUAL_LINKS')
     expect(wizard).toContain('マニュアルは準備中です')

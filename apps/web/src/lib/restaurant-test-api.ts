@@ -71,14 +71,17 @@ export type RestaurantSnapshot = {
 const withAccount = (path: string, accountId: string) =>
   `${path}${path.includes('?') ? '&' : '?'}account_id=${encodeURIComponent(accountId)}`
 
+const withOptionalAccount = (path: string, accountId: string | null) =>
+  accountId ? withAccount(path, accountId) : path
+
 export const restaurantTestApi = {
   listStores: (accountId: string) => fetchApi<{ success: true; data: { organization: RestaurantSnapshot['organization']; stores: RestaurantStore[] } }>(withAccount('/api/restaurant-test/stores', accountId)),
   storeContext: (accountId: string) => fetchApi<{ success: true; data: { selectedStore: { id: string; name: string } | null } }>(withAccount('/api/restaurant-test/store-context', accountId)),
   selectStore: (accountId: string, storeId: string) => fetchApi<{ success: true; data: { selectedStore: { id: string; name: string } } }>(withAccount(`/api/restaurant-test/stores/${storeId}/select`, accountId), { method: 'POST', body: '{}' }),
   clearStoreSelection: (accountId: string) => fetchApi<{ success: true; data: { selectedStore: null } }>(withAccount('/api/restaurant-test/stores/selection/clear', accountId), { method: 'POST', body: '{}' }),
-  connectStore: (accountId: string, body: { name: string; alias: string; channelId: string; channelSecret: string }) => fetchApi<{ success: true; data: { store: { id: string; name: string }; lineAccountName: string } }>(withAccount('/api/restaurant-test/stores/connect', accountId), { method: 'POST', body: JSON.stringify(body) }),
-  termsAgreement: (accountId: string) => fetchApi<{ success: true; data: RestaurantTermsAgreement }>(withAccount('/api/restaurant-test/terms-agreement', accountId)),
-  agreeToTerms: (accountId: string, documentKey: string, version: string) => fetchApi<{ success: true; data: RestaurantTermsAgreement }>(withAccount('/api/restaurant-test/terms-agreement', accountId), { method: 'POST', body: JSON.stringify({ documentKey, version }) }),
+  connectStore: (accountId: string | null, body: { name: string; alias: string; channelId: string; channelSecret: string }) => fetchApi<{ success: true; data: { store: { id: string; name: string }; lineAccountName: string } }>(withOptionalAccount('/api/restaurant-test/stores/connect', accountId), { method: 'POST', body: JSON.stringify(body) }),
+  termsAgreement: (accountId: string | null) => fetchApi<{ success: true; data: RestaurantTermsAgreement }>(withOptionalAccount('/api/restaurant-test/terms-agreement', accountId)),
+  agreeToTerms: (accountId: string | null, documentKey: string, version: string) => fetchApi<{ success: true; data: RestaurantTermsAgreement }>(withOptionalAccount('/api/restaurant-test/terms-agreement', accountId), { method: 'POST', body: JSON.stringify({ documentKey, version }) }),
   snapshot: (accountId: string) => fetchApi<{ success: true; data: RestaurantSnapshot }>(withAccount('/api/restaurant-test/snapshot', accountId)),
   createStore: (accountId: string, body: { name: string; code: string; area: string; capacity: number; timezone: string; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount('/api/restaurant-test/stores', accountId), { method: 'POST', body: JSON.stringify(body) }),
   updateStore: (accountId: string, id: string, body: { name: string; code: string; area: string; capacity: number; status: RestaurantStore['status']; lineAccountId: string }) => fetchApi<{ success: true; data: { id: string } }>(withAccount(`/api/restaurant-test/stores/${id}`, accountId), { method: 'PATCH', body: JSON.stringify(body) }),
