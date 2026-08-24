@@ -277,6 +277,7 @@ export default function TemplatesPage() {
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       <div data-design="KPIs">
       {activeSection === 'message' && <ListKpis
+        variant="v6"
         build={(s) => [
             { title: 'テンプレート', value: s.templates.total, unit: '件', detail: `使用中 ${s.templates.inUse}` },
             {

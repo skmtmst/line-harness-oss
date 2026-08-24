@@ -14,6 +14,19 @@
   display: none;
 }
 
+.cardV6 {
+  justify-content: flex-start;
+  min-height: 106px;
+  gap: 5px;
+  padding: 16px;
+}
+
+.cardBroadcast {
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 18px;
+}
+
 .head {
   display: flex;
   align-items: center;
@@ -25,6 +38,24 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-label);
   font-weight: 600;
+}
+
+.labelV6 {
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+.labelBroadcast {
+  color: var(--color-ink-faint);
+  font-size: var(--text-label);
+}
+
+.labelSkeleton {
+  display: inline-block;
+  width: 80px;
+  height: var(--text-caption);
+  border-radius: 4px;
+  background: var(--color-canvas-sunken);
 }
 
 .badge {
@@ -61,6 +92,16 @@
 .detail {
   color: var(--color-ink-faint);
   font-size: var(--text-micro);
+}
+
+.detailV6 {
+  font-weight: 500;
+}
+
+.detailNotice {
+  color: var(--color-accent);
+  font-size: var(--text-caption);
+  font-weight: 500;
 }
 
 .skeleton {

@@ -8,6 +8,7 @@ const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'page.tsx'), 
 const TABLE = readFileSync(join(HERE, 'friend-list-table.tsx'), 'utf8')
 const ROW = readFileSync(join(HERE, 'friend-list-row.tsx'), 'utf8')
 const KPIS = readFileSync(join(HERE, 'friend-kpis.tsx'), 'utf8')
+const SUMMARY_CARD_CSS = readFileSync(join(HERE, '..', 'shared', 'summary-card.module.css'), 'utf8')
 const ADVANCED = readFileSync(join(HERE, 'advanced-search-dialog.tsx'), 'utf8')
 const TIMELINE = readFileSync(join(HERE, 'friend-timeline.tsx'), 'utf8')
 const DETAIL = readFileSync(join(HERE, '..', '..', 'app', 'friends', 'detail', 'page.tsx'), 'utf8')
@@ -48,9 +49,11 @@ describe('友だちV4の画面契約', () => {
   })
 
   it('V4のカード影と操作色を守る', () => {
-    for (const source of [PAGE, TABLE, KPIS]) {
+    for (const source of [PAGE, TABLE]) {
       expect(source).toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
     }
+    expect(KPIS).toContain("import SummaryCard from '@/components/shared/summary-card'")
+    expect(SUMMARY_CARD_CSS).toContain('box-shadow: var(--shadow-card)')
     expect(PAGE).toContain('#0067D9')
     expect(PAGE).toContain('#07C653')
   })

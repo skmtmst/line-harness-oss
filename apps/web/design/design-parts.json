@@ -25,7 +25,7 @@
       "owlEd"
     ],
     "summary": "受信箱・一斉配信・リマインダ・自動応答・テンプレート・リッチメニュー・回答フォーム・予約管理・運用状態・店舗ダッシュボードのV6代表10画面で全12トークンの利用を確認",
-    "partResult": "V6代表10画面で tPTMp はV5と同じ再利用部品を54回使用。nBRKk・uzNEC・XywGrにV6専用部品はないためV5を正本とする。mNUQ3は意味が異なるため統合判断まで調査中。",
+    "partResult": "V6代表10画面で tPTMp はV5と同じ再利用部品を54回使用。V6のKPIはXywGrのrefではなく直接配置だが、色トークンは共通で高さ・余白・文字だけが異なるためSummaryCardのv6 variantへ固定した。mNUQ3はbroadcast variantへ統合した。",
     "partReferences": {
       "nBRKk": 0,
       "uzNEC": 0,
@@ -67,7 +67,7 @@
       "uzNEC",
       "tPTMp"
     ],
-    "partDeclarations": 39
+    "partDeclarations": 52
   },
   "baselineScreens": {
     "$説明": "全103ページを毎回見るのは現実的ではないので、トークンと部品を代表する画面を決めておく。1440pxと1920pxで確認する。",
@@ -75,6 +75,13 @@
     "/chats": "V6受信箱。表見出し・補足文字・入力欄・ボタン",
     "/friends": "友だち。一覧・表見出し・詳細検索モーダル",
     "/tags": "友だち属性。一覧・フォルダ・タブ",
+    "/scenarios": "V5シナリオ配信。broadcast variantのKPI",
+    "/reminders": "V6リマインダ。V6 KPI",
+    "/templates": "V6テンプレート。メッセージタブのV6 KPI",
+    "/affiliates": "V6成果とアフィリエイト。V6 KPI",
+    "/conversions": "V6コンバージョン分析。V6 KPIとカード内リンク",
+    "/inflow-links": "V6流入と計測。V6 KPI",
+    "/analytics": "V6分析系の代表寸法。複数タブのKPI",
     "/broadcasts": "V6一斉配信。表見出し・KPI・状態バッジ",
     "/tags/new": "タグを作る。入力フォームとボタン",
     "/emergency": "V6運用状態。統合できていないローカル部品の比較用"
@@ -182,10 +189,16 @@
     "summary-card": {
       "name": "共通 サマリーカード",
       "pencilNodes": [
-        "XywGr"
+        "XywGr",
+        "mNUQ3",
+        "A7GiXo",
+        "pApuT",
+        "sHvoG",
+        "ajaN0",
+        "g4PZNd"
       ],
       "role": "canonical",
-      "status": "implemented",
+      "status": "active",
       "reviewStatus": "confirmed",
       "code": "src/components/shared/summary-card.tsx",
       "cssModule": "src/components/shared/summary-card.module.css",
@@ -193,9 +206,34 @@
         "SummaryCard"
       ],
       "cssPrefix": "summary-card",
-      "pencilUsage": 24,
+      "pencilUsage": 56,
       "lastCheckedAt": "2026-08-24",
-      "note": "コード側で3系統に割れていた（角丸12/14px、余白16/20px、影あり/なし）。V6専用のXywGr代替部品は確認されていないためV5を正本とする。文字列値を持つmNUQ3とemergencyは統合判断まで対象外。",
+      "note": "コード側の3系統をSummaryCardへ集約。V5を基本とし、V6がある画面はv6、配信予定の告知はbroadcastの名前付きvariantで差を固定する。emergencyの文字列値だけは対象外。",
+      "routes": {
+        "v5": [
+          "/friends",
+          "/tags"
+        ],
+        "v6": [
+          "/analytics",
+          "/conversions",
+          "/inflow-links",
+          "/affiliates",
+          "/reminders",
+          "/templates"
+        ],
+        "broadcast": [
+          "/scenarios"
+        ]
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Pencil実ノードとCSS値は照合済み。ローカル実装はAuthGuardからLINEログインへ遷移し、同じデータ状態の画面画像を取得できないため、画面全体の画像一致は未検証。"
+      },
       "declarations": [
         {
           "pencil": "XywGr height: 100",
@@ -329,6 +367,97 @@
           "prop": "font-size",
           "source": "var(--text-nano)",
           "resolved": "10px"
+        },
+        {
+          "pencil": "V6 KPI height: 106",
+          "class": "cardV6",
+          "prop": "min-height",
+          "source": "106px",
+          "resolved": "106px"
+        },
+        {
+          "pencil": "V6 KPI padding: 16",
+          "class": "cardV6",
+          "prop": "padding",
+          "source": "16px",
+          "resolved": "16px"
+        },
+        {
+          "pencil": "V6 KPI gap: 5",
+          "class": "cardV6",
+          "prop": "gap",
+          "source": "5px",
+          "resolved": "5px"
+        },
+        {
+          "pencil": "V6 KPI label fill: $ink-faint",
+          "class": "labelV6",
+          "prop": "color",
+          "source": "var(--color-ink-faint)",
+          "resolved": "#6e7781"
+        },
+        {
+          "pencil": "V6 KPI label fontSize: $size-caption",
+          "class": "labelV6",
+          "prop": "font-size",
+          "source": "var(--text-caption)",
+          "resolved": "12px"
+        },
+        {
+          "pencil": "V6 KPI note fontWeight: 500",
+          "class": "detailV6",
+          "prop": "font-weight",
+          "source": "500",
+          "resolved": "500"
+        },
+        {
+          "pencil": "mNUQ3 padding: 18",
+          "class": "cardBroadcast",
+          "prop": "padding",
+          "source": "18px",
+          "resolved": "18px"
+        },
+        {
+          "pencil": "mNUQ3 gap: 8",
+          "class": "cardBroadcast",
+          "prop": "gap",
+          "source": "8px",
+          "resolved": "8px"
+        },
+        {
+          "pencil": "mNUQ3 label fill: $ink-faint",
+          "class": "labelBroadcast",
+          "prop": "color",
+          "source": "var(--color-ink-faint)",
+          "resolved": "#6e7781"
+        },
+        {
+          "pencil": "mNUQ3 label fontSize: $size-label",
+          "class": "labelBroadcast",
+          "prop": "font-size",
+          "source": "var(--text-label)",
+          "resolved": "13px"
+        },
+        {
+          "pencil": "mNUQ3 detail fill: $accent",
+          "class": "detailNotice",
+          "prop": "color",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "mNUQ3 detail fontSize: $size-caption",
+          "class": "detailNotice",
+          "prop": "font-size",
+          "source": "var(--text-caption)",
+          "resolved": "12px"
+        },
+        {
+          "pencil": "mNUQ3 detail fontWeight: 500",
+          "class": "detailNotice",
+          "prop": "font-weight",
+          "source": "500",
+          "resolved": "500"
         }
       ]
     },
@@ -517,13 +646,6 @@
   },
   "investigations": {
     "$説明": "契約には入れない。Pencil側またはコード側の判断が済むまでここに置く。",
-    "mNUQ3": {
-      "name": "配信 KPIカード",
-      "reviewStatus": "investigating",
-      "reason": "XywGr と統合するか未決定。3行目が色($ink-faint と $accent)・大きさ(11px と 12px)・太さ(normal と 500)のすべてで違い、意味も違う（説明 と 予定の告知）。統合するなら detailVariant=\"description\"|\"notice\" のような意味名で固定する。",
-      "pencilUsage": 12,
-      "lastCheckedAt": "2026-08-24"
-    },
     "LMiL2": {
       "name": "配信 5ステップタブ",
       "reviewStatus": "investigating",

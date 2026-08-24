@@ -12,6 +12,8 @@ export type SummaryCardProps = {
   badge?: string
   action?: { label: string; href: string }
   loading?: boolean
+  /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
+  variant?: 'v5' | 'v6' | 'broadcast'
   className?: string
   hidden?: boolean
   id?: string
@@ -19,8 +21,7 @@ export type SummaryCardProps = {
 }
 
 /**
- * Pencil V5 の `XywGr` を正本にした数値サマリーカード。
- * 文字列値と告知色を持つ `mNUQ3` は意味が異なるため、判断が終わるまで統合しない。
+ * Pencil V5 の `XywGr` を基本に、V6のKPIと配信告知の差を名前付きvariantで固定したカード。
  */
 export default function SummaryCard({
   title,
@@ -30,15 +31,29 @@ export default function SummaryCard({
   badge,
   action,
   loading = false,
+  variant = 'v5',
   className,
   ...cardProps
 }: SummaryCardProps) {
-  const classes = [styles.card, className].filter(Boolean).join(' ')
+  const variantClass = {
+    v5: undefined,
+    v6: styles.cardV6,
+    broadcast: styles.cardBroadcast,
+  }[variant]
+  const labelVariantClass = {
+    v5: undefined,
+    v6: styles.labelV6,
+    broadcast: styles.labelBroadcast,
+  }[variant]
+  const detailVariantClass = variant === 'broadcast' ? styles.detailNotice : variant === 'v6' ? styles.detailV6 : undefined
+  const classes = [styles.card, variantClass, className].filter(Boolean).join(' ')
 
   return (
-    <div className={classes} aria-busy={loading || undefined} {...cardProps}>
+    <div className={classes} aria-busy={loading || undefined} data-design-version={variant} {...cardProps}>
       <div className={styles.head}>
-        <p className={styles.label}>{title}</p>
+        <p className={[styles.label, labelVariantClass].filter(Boolean).join(' ')}>
+          {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
+        </p>
         {badge ? (
           <span className={styles.badge}>{badge}</span>
         ) : action ? (
@@ -57,7 +72,7 @@ export default function SummaryCard({
         </p>
       )}
 
-      <p className={styles.detail}>{detail}</p>
+      <p className={[styles.detail, detailVariantClass].filter(Boolean).join(' ')}>{detail}</p>
     </div>
   )
 }
