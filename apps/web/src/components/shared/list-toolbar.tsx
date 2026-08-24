@@ -1,5 +1,8 @@
 'use client'
 
+import SearchField from './search-field'
+import Select from './select'
+
 /**
  * 一覧の上に置く、フォルダ・検索・並び順の帯。
  *
@@ -54,30 +57,31 @@ export default function ListToolbar({
       )}
 
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
-        <input
-          type="search"
+        <SearchField
           placeholder={searchPlaceholder}
           aria-label={searchPlaceholder}
           value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          onChange={onSearchChange}
+          onClear={() => onSearchChange('')}
+          className="min-w-0 flex-1"
         />
         <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
+        <Select
+          aria-label="並び順"
+          value="default"
+          options={[{ value: 'default', label: sortLabel }]}
+          onChange={() => {}}
           disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>{sortLabel}</option>
-        </select>
+        />
         <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
-        <select
+        <Select
+          aria-label="表示件数"
+          value="20"
+          options={[{ value: '20', label: '20件表示' }]}
+          onChange={() => {}}
+          size="page-size"
           disabled
-          title="表示件数の切り替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>20件</option>
-        </select>
+        />
         <button
           disabled
           title="保存した条件は準備中です"

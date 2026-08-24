@@ -1,4 +1,10 @@
-import type { ReactNode } from 'react'
+import React, { forwardRef } from 'react'
+import type {
+  InputHTMLAttributes,
+  ReactNode,
+  TextareaHTMLAttributes,
+} from 'react'
+import styles from './form-controls.module.css'
 
 /**
  * 入力欄まわりの共通部品。
@@ -15,32 +21,75 @@ export function Field({
   htmlFor,
   required,
   note,
+  error,
   children,
 }: {
   label: string
   htmlFor?: string
   required?: boolean
   note?: ReactNode
+  error?: ReactNode
   children: ReactNode
 }) {
   return (
-    <div>
-      <label htmlFor={htmlFor} className="text-ink-secondary mb-1 block text-sm font-medium">
+    <div className={styles.field}>
+      <label htmlFor={htmlFor} className={styles.label}>
         {label}
         {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
             何も伝わらない。 */}
         {required && (
-          <span className="bg-danger-bg text-danger rounded-pill ml-1.5 px-1.5 py-0.5 text-[10px]">
+          <span className={styles.required}>
             必須
           </span>
         )}
       </label>
       {children}
-      {note && <p className="text-ink-faint mt-1 text-xs leading-relaxed">{note}</p>}
+      {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {!error && note ? <p className={styles.note}>{note}</p> : null}
     </div>
   )
 }
 
+type TextInputProps = InputHTMLAttributes<HTMLInputElement> & {
+  invalid?: boolean
+}
+
+/** Pencil V5 `ytG7l` を正本にした1行入力。 */
+export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function TextInput(
+  { className, invalid = false, ...props },
+  ref,
+) {
+  return (
+    <input
+      ref={ref}
+      className={[styles.control, styles.input, className].filter(Boolean).join(' ')}
+      aria-invalid={invalid || undefined}
+      data-design-node="ytG7l"
+      {...props}
+    />
+  )
+})
+
+type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement> & {
+  invalid?: boolean
+}
+
+/** Pencil V5 `keKe3` を正本にした複数行入力。 */
+export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea(
+  { className, invalid = false, ...props },
+  ref,
+) {
+  return (
+    <textarea
+      ref={ref}
+      className={[styles.control, styles.textarea, className].filter(Boolean).join(' ')}
+      aria-invalid={invalid || undefined}
+      data-design-node="keKe3"
+      {...props}
+    />
+  )
+})
+
 /** 入力欄の見た目。画面ごとに枠線の色が変わらないようにする。 */
 export const inputClass =
-  'border-hairline rounded-control focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
+  'border-hairline rounded-control focus-visible:ring-accent w-full border px-3 py-2 text-sm focus-visible:ring-2'

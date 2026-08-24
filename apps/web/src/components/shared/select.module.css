@@ -1,0 +1,157 @@
+.root {
+  position: relative;
+  min-width: 0;
+}
+
+.standard {
+  width: 176px;
+}
+
+.pageSize {
+  width: 128px;
+}
+
+.full {
+  width: 100%;
+}
+
+.trigger {
+  box-sizing: border-box;
+  display: flex;
+  width: 100%;
+  height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 13px;
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trigger:focus-visible,
+.option:focus-visible {
+  outline: revert;
+}
+
+.closedTrigger {
+  border-radius: var(--radius-control);
+}
+
+.openTrigger {
+  border-color: var(--color-accent);
+  border-radius: var(--radius-control) var(--radius-control) 0 0;
+}
+
+.invalid .trigger {
+  border-color: var(--color-danger);
+}
+
+.disabled {
+  opacity: 0.5;
+}
+
+.disabled .trigger {
+  cursor: not-allowed;
+}
+
+.value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--color-ink-faint);
+}
+
+.listbox {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% - 1px);
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-accent);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-control) var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.option {
+  display: flex;
+  width: 100%;
+  height: 38px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--text-label);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover,
+.option[data-active='true'] {
+  background: var(--color-canvas-sunken);
+}
+
+.option:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.selectedBackground {
+  background: var(--color-accent-soft);
+}
+
+.selected {
+  font-weight: 700;
+}
+
+.selectedBackground:hover,
+.selectedBackground[data-active='true'] {
+  background: var(--color-accent-soft);
+}
+
+.check {
+  box-sizing: border-box;
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-icon);
+  background: var(--color-canvas);
+}
+
+.checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.checkIcon {
+  width: 13px;
+  height: 13px;
+}
+
+.error {
+  margin-top: 4px;
+  color: var(--color-danger);
+  font-size: var(--text-caption);
+}

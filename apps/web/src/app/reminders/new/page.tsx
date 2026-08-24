@@ -10,6 +10,7 @@ import CreatePage, {
   FormSection,
   inputClass,
 } from '@/components/shared/create-page'
+import { TextArea } from '@/components/shared/form-controls'
 
 const TRIGGERS: Array<{ key: ReminderTriggerType; label: string }> = [
   { key: 'manual', label: '手動で対象を登録' },
@@ -167,12 +168,11 @@ export default function NewReminderPage() {
         </Field>
 
         <Field label="説明" htmlFor="rm-desc" note="管理用のメモです。">
-          <textarea
+          <TextArea
             id="rm-desc"
             rows={2}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className={`${inputClass} resize-y`}
           />
         </Field>
       </FormSection>

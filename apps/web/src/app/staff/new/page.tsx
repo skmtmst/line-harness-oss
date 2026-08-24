@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api } from '@/lib/api'
-import CreatePage, { AsideCard, FormSection, Field, inputClass } from '@/components/shared/create-page'
+import CreatePage, { AsideCard, FormSection, Field } from '@/components/shared/create-page'
+import { TextInput } from '@/components/shared/form-controls'
+import Select from '@/components/shared/select'
 import NotificationSwitch from '@/components/ui/notification-switch'
 
 type Role = 'admin' | 'staff' | 'viewer'
@@ -64,8 +66,8 @@ export default function NewStaffPage() {
   >
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="名前" htmlFor="staff-name" required><input id="staff-name" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} /></Field>
-        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><input id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} /></Field>
+        <Field label="名前" htmlFor="staff-name" required><TextInput id="staff-name" value={name} onChange={(e) => setName(e.target.value)} /></Field>
+        <Field label="メールアドレス" htmlFor="staff-email" required note="このアドレスに招待メールが届きます。"><TextInput id="staff-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
       </div>
     </FormSection>
 
@@ -75,10 +77,17 @@ export default function NewStaffPage() {
 
     <FormSection step={3} label="最初に表示するLINEアカウント" note="ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。">
       <Field label="最初に表示するアカウント" htmlFor="staff-account" required>
-        <select id="staff-account" value={assignedLineAccountId} onChange={(event) => setAssignedLineAccountId(event.target.value)} className={inputClass}>
-          <option value="">選択してください</option>
-          {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-        </select>
+        <Select
+          id="staff-account"
+          aria-label="最初に表示するアカウント"
+          size="full"
+          value={assignedLineAccountId}
+          onChange={setAssignedLineAccountId}
+          options={[
+            { value: '', label: '選択してください' },
+            ...accounts.map((account) => ({ value: account.id, label: account.name })),
+          ]}
+        />
       </Field>
     </FormSection>
 
