@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import Link from 'next/link'
 import { api, type ConversionApprovalItem } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import KpiCard from '@/components/dashboard/kpi-card'
@@ -51,6 +50,7 @@ import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
 
 interface ConversionReportItem {
   conversionPointId: string
@@ -148,25 +148,23 @@ function ConversionsPageInner() {
           description="何を成果として数えるか、誰の紹介か、いくら払うかを1か所でまとめて扱います。成果地点の定義と、出た成果の承認が同じ画面で完結します。"
           action={
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
                 disabled
                 title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
               >
                 マニュアル
-              </button>
-              <Link
+              </Button>
+              <Button
                 href="/conversions?tab=affiliates"
-                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
               >
                 アフィリエイターを追加
-              </Link>
-              <Link
+              </Button>
+              <Button
                 href="/conversions/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+                variant="primary"
               >
                 成果地点を追加
-              </Link>
+              </Button>
             </div>
           }
         />
@@ -235,13 +233,12 @@ function ConversionsPageInner() {
         >
           <option>今月</option>
         </select>
-        <button
+        <Button
           disabled
           title="書き出しは準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
         >
           CSVで書き出す
-        </button>
+        </Button>
       </div>
 
       {/* 設計の表は7列。報酬と状態は持っている列が無いので「—」を出す。

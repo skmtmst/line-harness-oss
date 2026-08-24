@@ -8,6 +8,7 @@ import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
 
 interface Template {
   id: string
@@ -223,34 +224,31 @@ export default function TemplatesPage() {
         description="配信で使うメッセージを管理します。友だち情報や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
         action={activeSection === 'message' ? (
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <Button
               disabled
               title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
             >
               マニュアル
-            </button>
-            <button
+            </Button>
+            <Button
               disabled
               title="並び替えは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
             >
               並び替え
-            </button>
+            </Button>
             {/* folders は 099 で入っているが templates.folder_id が無い。 */}
-            <button
+            <Button
               disabled
               title="フォルダの追加は準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
             >
               フォルダを追加
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => setShowCreate(true)}
-              className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+              variant="primary"
             >
               + 新規テンプレート
-            </button>
+            </Button>
           </div>
         ) : undefined}
       />
@@ -332,9 +330,9 @@ export default function TemplatesPage() {
         <select disabled title="並び替えは準備中です" className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50">
           <option>使用回数が多い順</option>
         </select>
-        <button disabled title="保存した条件は準備中です" className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50">
+        <Button disabled title="保存した条件は準備中です">
           保存した条件
-        </button>
+        </Button>
       </div>
 
 
@@ -447,19 +445,18 @@ export default function TemplatesPage() {
             {formError && <p className="text-xs text-red-600">{formError}</p>}
 
             <div className="flex gap-2">
-              <button
+              <Button
                 onClick={handleCreate}
                 disabled={saving}
-                className="bg-accent text-on-accent transition-colors hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium disabled:opacity-50"
+                variant="primary"
               >
                 {saving ? '作成中...' : '作成'}
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => { setShowCreate(false); setFormError('') }}
-                className="px-4 py-2 text-sm font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-lg"
               >
                 キャンセル
-              </button>
+              </Button>
             </div>
           </div>
         </div>

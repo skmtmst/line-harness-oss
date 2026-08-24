@@ -16,6 +16,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import AdIntegration from './ad-integration'
 import SiteScript from '@/components/inflow-links/site-script'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
 
 interface MessageTemplate {
   id: string
@@ -431,32 +432,29 @@ function InflowLinksPageInner() {
           description="どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。"
           action={
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
                 disabled
                 title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
               >
                 マニュアル
-              </button>
-              <button
+              </Button>
+              <Button
                 disabled
                 title="並び替えは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
               >
                 並び替え
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={() => setEditingGenre('new')}
-                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium"
               >
                 フォルダを追加
-              </button>
-              <Link
+              </Button>
+              <Button
                 href="/inflow-links/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+                variant="primary"
               >
                 URLを発行
-              </Link>
+              </Button>
             </div>
           }
         />

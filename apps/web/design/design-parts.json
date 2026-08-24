@@ -468,7 +468,7 @@
         "uzNEC"
       ],
       "role": "canonical",
-      "status": "implemented",
+      "status": "active",
       "reviewStatus": "confirmed",
       "code": "src/components/shared/button.tsx",
       "cssModule": "src/components/shared/button.module.css",
@@ -478,7 +478,38 @@
       "cssPrefix": "button",
       "pencilUsage": 49,
       "lastCheckedAt": "2026-08-24",
-      "note": "コード側は寸法が5通りに割れており、どれもV5と違っていた（py-2 text-sm 等。V5は高さ36px・padding [9,13]・13px）。V6専用ボタン部品は確認されていないためV5を正本とする。",
+      "note": "コード側は寸法が5通りに割れていた。第1段階で7画面の標準操作33個を共通Buttonへ移行した。V6代表10画面にnBRKk/uzNECのrefは0件でV6専用ボタン部品も無いため、V6画面でもV5の高さ36px・padding [9,13]・13pxを正本とする。",
+      "routes": {
+        "v5": {
+          "/tags": "PbCvb"
+        },
+        "v6": {
+          "/reminders": "kAnOQ",
+          "/templates": "FH74x",
+          "/affiliates": "BaLte",
+          "/conversions": "Bw4fy",
+          "/inflow-links": "EQS0v",
+          "/analytics": "XkajG"
+        }
+      },
+      "migration": {
+        "controlsMigratedInThisPr": 33,
+        "directPrimaryBefore": 168,
+        "directPrimaryMigrated": 10,
+        "directPrimaryRemaining": 158,
+        "directSecondaryBefore": 335,
+        "directSecondaryMigrated": 20,
+        "directSecondaryRemaining": 315
+      },
+      "excludedControls": "ページ切替、タブ、絞り込みピル、コンパクトな行内操作、カード全体リンクは標準ボタンと形・役割が違うため対象外。専用部品の設計根拠を確認してから扱う。",
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Pencil実ノードとビルド後CSSは照合する。ローカル実装はAuthGuardからLINEログインへ遷移するため、同じデータ状態による画面画像の横並び比較は未検証。"
+      },
       "declarations": [
         {
           "pencil": "nBRKk/uzNEC height: 36",
@@ -718,6 +749,17 @@
         "uzNEC",
         "XywGr"
       ],
+      "lastCheckedAt": "2026-08-24"
+    },
+    "button-reference-count": {
+      "name": "共通ボタンのPencil使用回数",
+      "reviewStatus": "investigating",
+      "reason": "契約作成時のpencilUsageは49回だが、2026-08-24にPencil全体をvisitorで再走査するとnBRKk/uzNECのrefは66件だった。基本部品の定義内にあるrefを含むため、画面利用数と部品定義数を分けて数える基準を決めるまで49を上書きしない。",
+      "pencilNodes": [
+        "nBRKk",
+        "uzNEC"
+      ],
+      "observedRefsIncludingComponentDefinitions": 66,
       "lastCheckedAt": "2026-08-24"
     }
   }

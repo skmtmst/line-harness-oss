@@ -10,6 +10,7 @@ import ListKpis from '@/components/shared/list-kpis'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
 
 /**
  * リマインダの一覧。
@@ -239,13 +240,12 @@ export default function RemindersPage() {
           description="ゴール日時までのカウントダウン配信を作ります。予約・イベント・友だち情報欄の日付を起点にできます。"
           action={
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 disabled
                 title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
               >
                 マニュアル
-              </button>
+              </Button>
               {/* 並べ替えは表の左端を掴んで行う。ここはやり方の案内。
                   窓を開いて並べ替える形にすると、一覧と窓で同じ並びを
                   2か所に持つことになる。 */}
@@ -255,18 +255,17 @@ export default function RemindersPage() {
               >
                 ⇅ 並び替えは ⠿ を掴む
               </span>
-              <button
+              <Button
                 onClick={() => setFolderDialogOpen(true)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
                 ＋ 新しいフォルダ
-              </button>
-              <Link
+              </Button>
+              <Button
                 href="/reminders/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex min-h-[44px] items-center px-4 py-2 text-sm font-medium transition-colors"
+                variant="primary"
               >
                 ＋ 新しいリマインダ
-              </Link>
+              </Button>
             </div>
           }
         />
