@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
+import ActionMenu from '@/components/shared/action-menu'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Notice from '@/components/shared/notice'
 import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
 import SavedSearchList from './saved-search-list'
@@ -48,17 +52,76 @@ export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
   createdAt: '2026-01-13T00:00:00.000Z',
 }))
 
-function FolderList({ groups, items, active, onSelect }: { groups: TagGroup[]; items: Tag[]; active: string; onSelect: (id: string) => void }) {
+function FolderList({ groups, items, active, onSelect, onChanged }: { groups: TagGroup[]; items: Tag[]; active: string; onSelect: (id: string) => void; onChanged: () => void }) {
+  const [menuId, setMenuId] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [menuError, setMenuError] = useState('')
+  const [deleteGroup, setDeleteGroup] = useState<TagGroup | null>(null)
   const rows = [
     { id: '', name: 'すべて', count: items.length, color: '#06c755' },
     ...groups.map((group) => ({ id: group.id, name: group.name, count: items.filter((tag) => tag.groupId === group.id).length, color: group.color ?? '#8b938d' })),
     { id: UNGROUPED, name: '未分類', count: items.filter((tag) => !tag.groupId).length, color: '#c3c8c4' },
   ]
+  const move = async (group: TagGroup, direction: -1 | 1) => {
+    const index = groups.findIndex((item) => item.id === group.id)
+    const other = groups[index + direction]
+    if (!other || busy) return
+    setBusy(true); setMenuError('')
+    try {
+      const [currentResult, otherResult] = await Promise.all([
+        api.tagGroups.update(group.id, { sortOrder: index + direction }),
+        api.tagGroups.update(other.id, { sortOrder: index }),
+      ])
+      if (!currentResult.success) throw new Error(currentResult.error)
+      if (!otherResult.success) throw new Error(otherResult.error)
+      onChanged()
+    } catch (reason) {
+      setMenuError(reason instanceof Error ? reason.message : '並び順を変更できませんでした')
+    } finally {
+      setBusy(false)
+    }
+  }
+  const remove = async (group: TagGroup) => {
+    if (busy) return
+    setBusy(true); setMenuError('')
+    try {
+      const result = await api.tagGroups.delete(group.id)
+      if (!result.success) throw new Error(result.error)
+      if (active === group.id) onSelect('')
+      setDeleteGroup(null)
+      onChanged()
+    } catch (reason) {
+      setMenuError(reason instanceof Error ? reason.message : 'フォルダを削除できませんでした')
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
-    <aside className={`h-fit overflow-hidden rounded-card border border-hairline bg-canvas ${cardShadow}`}>
+    <aside className={`h-fit rounded-card border border-hairline bg-canvas ${cardShadow}`}>
       <div className="flex items-center justify-between border-b border-hairline px-4 py-3"><h2 className="text-sm font-bold text-ink">フォルダ</h2><span className="text-xs text-ink-faint">{items.length}件</span></div>
-      <nav className="p-2">{rows.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row.id)} className={`flex w-full items-center gap-2 rounded-control px-3 py-2.5 text-left text-sm ${active === row.id ? 'bg-accent-soft font-semibold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate">{row.name}</span><span className="text-xs tabular-nums text-ink-faint">{row.count}</span></button>)}</nav>
+      <nav className="p-2">{rows.map((row) => {
+        const group = groups.find((item) => item.id === row.id)
+        const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
+        return <div key={row.id} className="relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-sm ${active === row.id ? 'bg-accent-soft font-semibold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate">{row.name}</span><span className="text-xs tabular-nums text-ink-faint">{row.count}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className="ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline"><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+          { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
+          { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
+          { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
+          { id: 'down', label: '並び順を下へ', icon: <ArrowDown size={15} />, disabled: busy || groupIndex === groups.length - 1, onSelect: () => void move(group, 1) },
+          { id: 'delete', label: 'フォルダを削除', icon: <Trash2 size={15} />, tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => setDeleteGroup(group) },
+        ]} /> : null}</div>
+      })}</nav>
+      {menuError ? <Notice className="mx-2 mb-2" tone="error" message={menuError} onClose={() => setMenuError('')} /> : null}
       <p className="border-t border-hairline px-4 py-3 text-[11px] leading-5 text-ink-faint">フォルダを削除しても、中のタグは未分類として残ります。</p>
+      <ConfirmDialog
+        open={Boolean(deleteGroup)}
+        title={deleteGroup ? `「${deleteGroup.name}」を削除しますか？` : 'フォルダを削除しますか？'}
+        description="削除しても、中のタグは未分類に残ります。この操作は元に戻せません。"
+        confirmLabel="フォルダを削除"
+        destructive
+        busy={busy}
+        onCancel={() => setDeleteGroup(null)}
+        onConfirm={() => { if (deleteGroup) void remove(deleteGroup) }}
+      />
     </aside>
   )
 }
@@ -182,7 +245,7 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
         ].map(([title, value, unit, detail]) => <section key={String(title)} className={`rounded-card border border-hairline bg-canvas p-4 ${cardShadow}`}><p className="text-xs font-medium text-ink-secondary">{title}</p><p className="mt-1 text-2xl font-bold tabular-nums text-ink">{value}<span className="ml-1 text-xs font-normal text-ink-secondary">{unit}</span></p><p className="mt-1 text-[11px] text-ink-faint">{detail}</p></section>)}</div>
         {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         <div className="grid min-w-0 gap-4 xl:grid-cols-[270px_minmax(0,1fr)]">
-          <FolderList groups={groups} items={items} active={folder} onSelect={setFolder} />
+          <FolderList groups={groups} items={items} active={folder} onSelect={setFolder} onChanged={() => void load()} />
           <main className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center gap-2"><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="min-w-[260px] flex-1 rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm outline-none focus:border-accent" /><select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm"><option value="all">付与元：すべて</option><option value="manual">手動のみ</option></select><select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="rounded-control border border-hairline bg-canvas px-3 py-2.5 text-sm">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select><span className="text-xs tabular-nums text-ink-faint">{filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filtered.length)} / {filtered.length}件</span></div>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs"><span className="text-ink-faint">よく使う</span>{[['unused','未使用のタグ'],['linked','連動あり'],['recent','今月増えた']].map(([key,label]) => <button key={key} type="button" onClick={() => setQuick(quick === key ? '' : key)} className={`rounded-pill border px-3 py-1.5 ${quick === key ? 'border-accent bg-accent-soft text-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}>{label}</button>)}</div>
