@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
+import { clearSelectionAfterAuthentication } from '@/lib/hq-navigation'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -34,6 +35,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
         if (data.data.role) localStorage.setItem('lh_staff_role', data.data.role)
         localStorage.setItem('lh_staff_permissions', JSON.stringify(data.data.permissionKeys ?? []))
         if (data.csrfToken) localStorage.setItem('lh_csrf', data.csrfToken)
+        clearSelectionAfterAuthentication(localStorage, sessionStorage)
         if (!cancelled) setChecked(true)
       } catch {
         if (!cancelled) router.replace('/login')

@@ -1923,6 +1923,9 @@ export const api = {
     get: () =>
       fetchApi<ApiResponse<{ name: string | null; iconUrl: string | null }>>('/api/public/brand'),
   },
+  tenants: {
+    me: () => fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me'),
+  },
   lineAccounts: {
     list: (live = true) =>
       fetchApi<ApiResponse<LineAccount[]>>(`/api/line-accounts${live ? '' : '?live=0'}`),

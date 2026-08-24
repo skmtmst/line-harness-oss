@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useBrand } from '@/lib/use-brand'
+import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
 
 /** 看板が取れないときに出す名前。 */
 const FALLBACK_NAME = '然-NEN- LINE管理システム'
@@ -21,6 +22,7 @@ export default function LoginPage() {
 
   const handleLogin = () => {
     setLoading(true)
+    sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     if (!apiUrl) return setLoading(false)
     window.location.assign(`${apiUrl}/api/auth/line`)

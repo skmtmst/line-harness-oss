@@ -14,6 +14,17 @@ type BoundaryAccount = {
 /** Read-only migration diagnostics. This route never returns LINE credentials. */
 export const tenants = new Hono<Env>();
 
+/** 統括コンソールの見出しに使う名前だけを返す。 */
+tenants.get('/api/tenants/me', async (c) => {
+  const db = dbFor(c.env);
+  const staffTenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+  const tenant = await db.prepare(`SELECT name FROM tenants WHERE id = ?`)
+    .bind(staffTenantId)
+    .first<{ name: string }>();
+  if (!tenant) return c.json({ success: false, error: 'tenant not found' }, 404);
+  return c.json({ success: true, data: { name: tenant.name } });
+});
+
 tenants.get('/api/tenants/boundary-preview', requireRole('owner', 'admin'), async (c) => {
   const db = dbFor(c.env);
   const staffTenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
