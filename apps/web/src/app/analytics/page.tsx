@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
+import Button from '@/components/shared/button'
 
 const TABS = [
   { key: 'messages', label: '送信数' },
@@ -226,13 +227,12 @@ function MessagesTab() {
         </select>
         <span className="text-ink-faint text-xs whitespace-nowrap">期間</span>
         <RangePicker days={days} onChange={setDays} />
-        <button
+        <Button
           disabled
           title="書き出しは準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
         >
           CSVで書き出す
-        </button>
+        </Button>
       </div>
 
       {loading ? (
@@ -481,22 +481,20 @@ function ClicksTab() {
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
         <RangePicker days={days} onChange={setDays} />
-        <button
+        <Button
           disabled
           title="書き出しは準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
         >
           CSVで書き出す
-        </button>
+        </Button>
         {/* 短縮URLはテンプレートの編集で自動的に作られる。手で登録する
             専用の画面はまだ無いので、押せる先が無い。 */}
-        <button
+        <Button
           disabled
           title="URLの手動登録は準備中です。短縮URLはテンプレート編集で自動的に作られます"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
         >
           URLを登録
-        </button>
+        </Button>
       </div>
 
       <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
@@ -1404,19 +1402,18 @@ function FunnelForm({
       {error && <p className="text-danger text-sm">{error}</p>}
 
       <div className="flex gap-2">
-        <button
+        <Button
           onClick={save}
           disabled={saving}
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+          variant="primary"
         >
           {saving ? '保存中...' : '作成'}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={onCancel}
-          className="text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-control px-4 py-2 text-sm font-medium"
         >
           キャンセル
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -1432,27 +1429,24 @@ function AnalyticsInner() {
           description="配信した数と、その反応をまとめて見ます。送信数はLINEの課金対象と直結するため、残枠と合わせて確認してください。"
           action={
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
                 disabled
                 title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
               >
                 マニュアル
-              </button>
-              <button
+              </Button>
+              <Button
                 disabled
                 title="レポートの保存は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
               >
                 レポートを保存
-              </button>
-              <button
+              </Button>
+              <Button
                 disabled
                 title="書き出しは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
               >
                 CSVで書き出す
-              </button>
+              </Button>
             </div>
           }
         />

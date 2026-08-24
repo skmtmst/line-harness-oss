@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Link from 'next/link'
 import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
 if (!WORKER_BASE) {
@@ -1501,12 +1501,12 @@ export function OffersTab() {
         </div>
         {/* 作るのは 6-1-3 の独立した画面。同じフォームがモーダルにもあると、
             片方だけ直しても気づけない。モーダルは編集のときだけ開く。 */}
-        <Link
+        <Button
           href="/affiliate-offers/new"
-          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
+          variant="primary"
         >
           案件を作る
-        </Link>
+        </Button>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -15,6 +15,7 @@ import SavedSearchList from '@/components/friend-fields/saved-search-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import Button from '@/components/shared/button'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -328,13 +329,12 @@ function TagsPageInner() {
         action={
           tab === 'tags' ? (
             <div className="flex flex-wrap items-center gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={exportCsv}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
                 CSV出力
-              </button>
+              </Button>
               <button
                 type="button"
                 aria-pressed={reorderMode}
@@ -349,7 +349,7 @@ function TagsPageInner() {
               </button>
               {/* 左のパネルの中に入力欄を出していたが、設計はここのボタン。
                   押すと名前と色を決める窓が開く。 */}
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   setEditingFolder(null)
@@ -357,22 +357,21 @@ function TagsPageInner() {
                   setGroupColor(FOLDER_COLORS[0])
                   setFolderDialogOpen(true)
                 }}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
               >
                 フォルダを追加
-              </button>
+              </Button>
               {/* 設計の呼び名。作る場所も専用の画面（3-1-1）に寄せる。 */}
-              <Link
+              <Button
                 href="/tags/new"
-                className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium transition-colors hover:bg-accent-hover"
+                variant="primary"
               >
                 ＋ タグを追加
-              </Link>
+              </Button>
             </div>
           ) : tab === 'fields' ? (
-            <a href="/tags/fields/new" className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium hover:bg-accent-hover">
+            <Button href="/tags/fields/new" variant="primary">
               項目を追加
-            </a>
+            </Button>
           ) : undefined
         }
       />
@@ -584,24 +583,24 @@ function TagsPageInner() {
                   このフォルダを削除
                 </button>
               )}
-              <button
+              <Button
                 type="button"
                 onClick={() => {
                   setFolderDialogOpen(false)
                   setEditingFolder(null)
                 }}
-                className="text-ink-secondary hover:bg-canvas-sunken rounded-control ml-auto px-4 py-2 text-sm"
+                className="ml-auto"
               >
                 やめる
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => void handleSaveFolder()}
                 disabled={addingGroup || !groupName.trim()}
-                className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
+                variant="primary"
               >
                 {addingGroup ? '保存中…' : editingFolder ? '保存する' : '追加する'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
