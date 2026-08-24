@@ -274,28 +274,25 @@ async function sendRelay(
   const body = JSON.stringify(payload);
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signature = createHmac('sha256', relaySecret).update(`${timestamp}.${body}`).digest('hex');
-  let lastStatus = 0;
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      const response = await fetcher(relayUrl, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-nen-timestamp': timestamp,
-          'x-nen-signature': signature,
-        },
-        body,
-        signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
-      });
-      if (response.ok) return;
-      lastStatus = response.status;
-      if (response.status < 500 || attempt === 3) break;
-    } catch {
-      if (attempt === 3) throw new Error('SLACK_RELAY_NETWORK_FAILED');
-    }
-    await new Promise((resolve) => setTimeout(resolve, attempt * 1_000));
+  // The relay can fail after Slack accepted an earlier mutation. Retrying the
+  // whole request would then multiply the same thread reply. The scheduled
+  // reconciliation is the safe repair path, so delivery is at-most-once here.
+  let response: Response;
+  try {
+    response = await fetcher(relayUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-nen-timestamp': timestamp,
+        'x-nen-signature': signature,
+      },
+      body,
+      signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
+    });
+  } catch {
+    throw new Error('SLACK_RELAY_NETWORK_FAILED');
   }
-  throw new Error(`SLACK_RELAY_FAILED:${lastStatus || 'network'}`);
+  if (!response.ok) throw new Error(`SLACK_RELAY_FAILED:${response.status}`);
 }
 
 export async function syncGitHubPullRequests(options: SyncOptions): Promise<{ sent: number; reconciled: number }> {
