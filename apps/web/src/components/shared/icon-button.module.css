@@ -1,0 +1,32 @@
+.button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-icon);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--color-surface-pearl);
+  color: var(--color-ink);
+}
+
+.button:focus-visible {
+  outline: revert;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.button > :is(svg, img) {
+  width: 18px;
+  height: 18px;
+}

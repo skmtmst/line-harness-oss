@@ -80,7 +80,7 @@
   "components/broadcasts/test-send-section.tsx": 9,
   "components/chats/friend-info-sidebar.tsx": 60,
   "components/dashboard/qr-dialog.tsx": 1,
-  "components/dashboard/shipment-panel.tsx": 26,
+  "components/dashboard/shipment-panel.tsx": 15,
   "components/emergency/release-log-panel.tsx": 32,
   "components/events/event-form.tsx": 235,
   "components/events/event-wizard.tsx": 2,

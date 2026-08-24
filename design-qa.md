@@ -47,6 +47,42 @@ final result: passed
 
 ---
 
+# Design QA — ダッシュボード V5 B2 共通部品
+
+## 比較対象
+
+- Pencil実ノード: `fJ2hc`（ダッシュボード）、`t0jk8p`（カード見出し）、`xRvDB`（状態バッジ）、`H0V8EK`（アイコン操作）。
+- 参照画像: `docs/design-reference/dashboard-v5/01-dashboard-1920.png/fJ2hc.png`（3840×3224pxを1920×1612pxへ正規化）。
+- 実装画像: `docs/design-reference/dashboard-v5/qa-b2/implementation-1920.png`、`implementation-1440.png`。
+- 同一画像での比較: `docs/design-reference/dashboard-v5/qa-b2/reference-vs-implementation-1920.png`。左が参照、右が実装。
+- 状態: ローカルの固定データだけを使用。API、DB、開発・本番データは変更していない。
+
+## 確認条件
+
+- 1920×1612pxで参照と実装を同じ画像へ並べ、カードの位置、寸法、余白、枠、角丸、影、文字、状態色を目視比較した。
+- 1440×1200pxでは `scrollWidth === clientWidth === 1440` を確認し、ページ全体の横スクロールがないことを確認した。
+- B2の対象はCard、CardHeader、StatusBadgeとし、ダッシュボード全機能・全状態のV5移行完了判定は行っていない。
+
+## 確認結果
+
+- P0 / P1の未解決差分なし。
+- Card: 白地、1pxの枠、10px角丸、共通影、16px/18pxの余白が参照と一致する。
+- CardHeader: 48pxの標準見出しと58pxのダッシュボード見出しを名前付きsizeで固定し、題、件数、右操作の位置と文字階層が一致する。
+- StatusBadge: neutral、info、warning、success、dangerの意味色と、表内のcompactサイズを共通propsで再現できる。
+- 既存のダッシュボード機能とデータ取得は残し、外側の直書きカードだけを共通部品へ載せ替えた。
+- 任意値記法は今回の対象4ファイルで18件減り、全体1432件まで基準を締めた。カードの18px直書きと影の直書きも対象ファイルから除去した。
+- 1440px、1920pxともカードの重なり、文字の途中改行、ページ全体の横スクロールはない。
+
+## 残る範囲
+
+- `H0V8EK`のIconButtonはコード実装済みだが、実画面への適用と画像比較は次の対象に残す。
+- 参照画像にある通知、表示件数変更、番号ページ切替、全右サイドカード、友だち追加リンクはB3〜B5またはダッシュボード画面移行で扱う。
+- 比較用アカウント欄は固定データを持たないため読み込み表示。B2の部品判定には含めない。
+
+final result: passed
+
+---
+
 # Design QA — 受信箱・友だち V4
 
 ## 比較対象
