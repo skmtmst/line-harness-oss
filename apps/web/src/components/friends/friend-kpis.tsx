@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import SummaryCard from '@/components/shared/summary-card'
 
-/** V4の上部カード。数え方はダッシュボードと共通にしている。 */
+/** Pencil V5（FG391）の上部カード。数え方は既存APIのままにする。 */
 export default function FriendKpis() {
   const { selectedAccountId } = useAccount()
   const [stats, setStats] = useState<FriendStats | null>(null)
@@ -62,22 +63,7 @@ export default function FriendKpis() {
   return (
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4" data-design="V4FriendKpis">
       {cards.map((card) => (
-        <div key={card.title} className="rounded-[14px] border border-[#DADDE2] bg-white p-4 shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
-          <p className="text-xs font-medium text-[#565F59]">{card.title}</p>
-          <p className="mt-1 flex items-baseline gap-1">
-            {loading ? (
-              <span className="inline-block h-7 w-14 animate-pulse rounded bg-[#F6F6F8]" />
-            ) : (
-              <>
-                <span className="text-2xl font-bold tabular-nums text-[#1D1D1F]">
-                  {card.value === null ? '—' : card.value.toLocaleString('ja-JP')}
-                </span>
-                <span className="text-xs text-[#565F59]">{card.unit}</span>
-              </>
-            )}
-          </p>
-          <p className="mt-1 text-[11px] leading-relaxed text-[#8B938D]">{card.detail}</p>
-        </div>
+        <SummaryCard key={card.title} {...card} loading={loading} variant="v5" />
       ))}
     </div>
   )

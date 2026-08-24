@@ -220,6 +220,7 @@ export default function ScenariosPage() {
       {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
       <div data-design="KPIs">
       <ListKpis
+        variant="broadcast"
         build={(s) => [
             { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
             { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '重複を含む' },

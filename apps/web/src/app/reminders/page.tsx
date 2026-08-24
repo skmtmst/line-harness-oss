@@ -283,6 +283,7 @@ export default function RemindersPage() {
 
       <div data-design="KPIs">
         <ListKpis
+          variant="v6"
           build={(s) => [
             { title: 'リマインダ', value: s.reminders.total, unit: '件', detail: `稼働中 ${s.reminders.active}` },
             { title: '配信待ち', value: s.reminders.waiting, unit: '人', detail: '登録済みで未完了' },

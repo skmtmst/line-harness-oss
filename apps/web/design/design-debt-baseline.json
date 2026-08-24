@@ -534,9 +534,6 @@
     "direct-th": 6,
     "arbitrary-value": 3
   },
-  "components/dashboard/kpi-card.tsx": {
-    "arbitrary-value": 1
-  },
   "components/dashboard/qr-dialog.tsx": {
     "arbitrary-value": 9,
     "direct-secondary-button": 3
@@ -630,9 +627,6 @@
   },
   "components/friends/advanced-search-dialog.tsx": {
     "arbitrary-value": 60
-  },
-  "components/friends/friend-kpis.tsx": {
-    "arbitrary-value": 9
   },
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 2,
@@ -749,9 +743,6 @@
     "direct-primary-button": 1
   },
   "components/shared/form-controls.tsx": {
-    "arbitrary-value": 1
-  },
-  "components/shared/list-kpis.tsx": {
     "arbitrary-value": 1
   },
   "components/shared/list-toolbar.tsx": {

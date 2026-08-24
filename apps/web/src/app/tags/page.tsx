@@ -385,6 +385,7 @@ function TagsPageInner() {
       <div data-design="KPIs">
       <ListKpis
         key={tab}
+        variant="v5"
         build={(s) =>
           tab === 'marks'
             ? [
