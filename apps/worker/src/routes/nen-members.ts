@@ -477,17 +477,17 @@ nenMembers.post('/api/liff/nen/consultations', async (c) => {
 // Admin APIs
 nenMembers.get('/api/nen-members/overview', async (c) => {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  const accountWhere = scope.restricted
-    ? scope.ids.length
-      ? `AND f.line_account_id IN (${scope.ids.map(() => '?').join(',')})`
-      : 'AND 1 = 0'
-    : '';
+  const accountWhere = scope.allowedAccountIds.length
+    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    : scope.canSeeUnassigned
+      ? 'AND f.line_account_id IS NULL'
+      : 'AND 1 = 0';
   const countScoped = async (table: string, alias: string, extra = '') =>
     c.env.DB.prepare(
       `SELECT COUNT(*) count FROM ${table} ${alias}
        JOIN friends f ON f.id = ${alias}.friend_id
        WHERE 1 = 1 ${extra} ${accountWhere}`,
-    ).bind(...(scope.restricted ? scope.ids : [])).first<{ count: number }>();
+    ).bind(...scope.allowedAccountIds).first<{ count: number }>();
   const [pets, logs, care, photos, members, consultations] = await Promise.all([
     countScoped('nen_pet_profiles', 'p'),
     countScoped('nen_health_logs', 'h'),

@@ -298,12 +298,13 @@ export async function getActivityDigest(
     });
   }
 
-  const unansweredByAccount = new Map<string, { accountId: string; accountName: string; count: number }>();
+  const unansweredByAccount = new Map<string, { accountId: string | null; accountName: string; count: number }>();
   let oldestUnansweredAt: string | null = null;
   for (const row of unanswered.rows) {
-    const current = unansweredByAccount.get(row.accountId);
+    const key = row.accountId ?? '__unassigned__';
+    const current = unansweredByAccount.get(key);
     if (current) current.count += 1;
-    else unansweredByAccount.set(row.accountId, {
+    else unansweredByAccount.set(key, {
       accountId: row.accountId,
       accountName: row.accountName,
       count: 1,

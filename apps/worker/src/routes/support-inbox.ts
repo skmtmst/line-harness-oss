@@ -126,8 +126,11 @@ supportInbox.get('/api/support/summary', async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const [line, email] = await Promise.all([
-      countUnanswered(c.env.DB, { allowedAccountIds: scope.restricted ? scope.ids : undefined }),
-      scope.restricted ? Promise.resolve(null) : c.env.DB.prepare(
+      countUnanswered(c.env.DB, {
+        allowedAccountIds: scope.allowedAccountIds,
+        canSeeUnassigned: scope.canSeeUnassigned,
+      }),
+      !scope.canSeeUnassigned ? Promise.resolve(null) : c.env.DB.prepare(
         `SELECT
            SUM(CASE WHEN status != 'resolved' THEN 1 ELSE 0 END) AS open_count,
            SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unread_count,
@@ -175,8 +178,8 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     let lineTotal = 0;
 
     // Email threads have no account key in the legacy schema. Until a thread
-    // is explicitly attributed, only unrestricted operators may view them.
-    if (channel !== 'line' && !scope.restricted) {
+    // is explicitly attributed, only the default tenant may view them.
+    if (channel !== 'line' && scope.canSeeUnassigned) {
       const statusSql = status === 'all'
         ? '1=1'
         : status === 'resolved'
@@ -244,7 +247,8 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
         q: query || undefined,
         page: 1,
         pageSize: fetchLimit,
-        allowedAccountIds: scope.restricted ? scope.ids : undefined,
+        allowedAccountIds: scope.allowedAccountIds,
+        canSeeUnassigned: scope.canSeeUnassigned,
       });
       lineTotal = line.total;
       for (const row of line.rows) {
@@ -301,7 +305,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
 
 supportInbox.use('/api/support/email/*', async (c, next) => {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  if (scope.restricted) {
+  if (!scope.canSeeUnassigned) {
     return c.json({ success: false, error: 'Thread not found' }, 404);
   }
   return next();

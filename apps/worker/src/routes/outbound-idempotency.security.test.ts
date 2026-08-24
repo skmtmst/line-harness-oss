@@ -3,7 +3,9 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 vi.mock('../services/account-access.js', () => ({
-  getVisibleLineAccountScope: vi.fn(async () => ({ accounts: [], ids: [], restricted: false })),
+  getVisibleLineAccountScope: vi.fn(async () => ({
+    accounts: [], ids: [], allowedAccountIds: [], canSeeUnassigned: true,
+  })),
 }));
 
 import { chats } from './chats.js';
