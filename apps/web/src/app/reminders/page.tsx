@@ -11,6 +11,7 @@ import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import Pagination from '@/components/shared/pagination'
 
 /**
  * リマインダの一覧。
@@ -524,38 +525,7 @@ export default function RemindersPage() {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <nav className="flex items-center gap-1" aria-label="ページ送り">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  aria-label="前のページ"
-                  className="border-hairline text-ink-secondary rounded-control border px-2 py-1 text-sm disabled:opacity-30"
-                >
-                  &lt;
-                </button>
-                {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setPage(n)}
-                    aria-current={n === page ? 'page' : undefined}
-                    className={`rounded-control px-3 py-1 text-sm tabular-nums ${
-                      n === page
-                        ? 'bg-accent text-on-accent'
-                        : 'border-hairline text-ink-secondary hover:bg-canvas-sunken border'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                  disabled={page >= pageCount}
-                  aria-label="次のページ"
-                  className="border-hairline text-ink-secondary rounded-control border px-2 py-1 text-sm disabled:opacity-30"
-                >
-                  &gt;
-                </button>
-              </nav>
+              <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
               <button
                 onClick={() => void handleDeleteSelected()}

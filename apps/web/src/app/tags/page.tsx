@@ -16,6 +16,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import Pagination from '@/components/shared/pagination'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -858,27 +859,11 @@ function TagsPageInner() {
               ))}
             </select>
           </label>
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-3 text-xs">
             <span className="text-ink-faint">
               {visible.length === 0 ? '0件' : `${(currentPage - 1) * pageSize + 1}〜${Math.min(currentPage * pageSize, visible.length)}件`} / {visible.length}件
             </span>
-            <button
-              type="button"
-              disabled={currentPage <= 1}
-              onClick={() => setPage((value) => Math.max(1, value - 1))}
-              className="border-hairline rounded-control border px-3 py-1.5 disabled:opacity-35"
-            >
-              前へ
-            </button>
-            <span className="text-ink-secondary min-w-16 text-center">{currentPage} / {totalPages}</span>
-            <button
-              type="button"
-              disabled={currentPage >= totalPages}
-              onClick={() => setPage((value) => Math.min(totalPages, value + 1))}
-              className="border-hairline rounded-control border px-3 py-1.5 disabled:opacity-35"
-            >
-              次へ
-            </button>
+            <Pagination page={currentPage} pageCount={totalPages} onPageChange={setPage} />
           </div>
         </div>
       </div>

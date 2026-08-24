@@ -25,13 +25,14 @@
       "owlEd"
     ],
     "summary": "受信箱・一斉配信・リマインダ・自動応答・テンプレート・リッチメニュー・回答フォーム・予約管理・運用状態・店舗ダッシュボードのV6代表10画面で全12トークンの利用を確認",
-    "partResult": "V6代表10画面で tPTMp はV5と同じ再利用部品を54回使用。V6のKPIはXywGrのrefではなく直接配置だが、色トークンは共通で高さ・余白・文字だけが異なるためSummaryCardのv6 variantへ固定した。mNUQ3はbroadcast variantへ統合した。",
+    "partResult": "V6代表10画面で tPTMp はV5と同じ再利用部品を54回使用。Blot6は受信箱を除く9画面で同じ再利用部品を使用。V6のKPIはXywGrのrefではなく直接配置だが、色トークンは共通で高さ・余白・文字だけが異なるためSummaryCardのv6 variantへ固定した。mNUQ3はbroadcast variantへ統合した。",
     "partReferences": {
       "nBRKk": 0,
       "uzNEC": 0,
       "XywGr": 0,
       "mNUQ3": 4,
-      "tPTMp": 54
+      "tPTMp": 54,
+      "Blot6": 9
     },
     "lastCheckedAt": "2026-08-24"
   },
@@ -52,22 +53,24 @@
   "required": {
     "$説明": "この数を下回るとCIを落とす。項目をまとめて消して0件合格にできないようにするため。承認時の想定は35宣言だったが、font-weight 3件と border 1件を追加で固定したため39になっている。減らす方向の変更は承認が要る。",
     "tokens": 12,
-    "parts": 3,
+    "parts": 4,
     "v6RepresentativeNodes": 10,
     "v6PartNodes": [
       "nBRKk",
       "uzNEC",
       "XywGr",
       "mNUQ3",
-      "tPTMp"
+      "tPTMp",
+      "Blot6"
     ],
     "pencilNodes": [
       "XywGr",
       "nBRKk",
       "uzNEC",
-      "tPTMp"
+      "tPTMp",
+      "Blot6"
     ],
-    "partDeclarations": 52
+    "partDeclarations": 69
   },
   "baselineScreens": {
     "$説明": "全103ページを毎回見るのは現実的ではないので、トークンと部品を代表する画面を決めておく。1440pxと1920pxで確認する。",
@@ -604,6 +607,172 @@
         }
       ]
     },
+    "pagination": {
+      "name": "共通 ページネーション",
+      "pencilNodes": [
+        "Blot6"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/pagination.tsx",
+      "cssModule": "src/components/shared/pagination.module.css",
+      "components": [
+        "Pagination"
+      ],
+      "cssPrefix": "pagination",
+      "pencilUsage": 139,
+      "lastCheckedAt": "2026-08-24",
+      "note": "Pencil全体で139回参照される共通部品。V5を基本とし、V6代表10画面のうち受信箱を除く9画面でも同じBlot6を使う。第1段階ではページ番号へ直接移動できる6利用先を移行し、前後移動だけの画面は動作差を確認して次段階で移す。",
+      "routes": {
+        "v5": [
+          "/friends",
+          "/tags",
+          "/contents",
+          "/contents/vars"
+        ],
+        "v6": [
+          "/reminders"
+        ],
+        "legacyComponent": [
+          "src/components/friend-attributes-v2/tag-list-v2.tsx"
+        ]
+      },
+      "migration": {
+        "migratedInThisPr": 6,
+        "remainingBehavior": "前へ・次へと現在/総数だけを持つ画面、およびページ切替未実装の画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Pencil実ノードとビルド後CSSは照合済み。固定データの /visual-qa/friend-attributes-v2 は1440px・1920pxで描画し、ページ全体と表の横スクロールが無いことを目視確認した。実ルートはAuthGuardからLINEログインへ遷移するため、同じデータ状態によるPencil全画面との横並び比較は未検証。",
+        "checkedAt": "2026-08-24"
+      },
+      "declarations": [
+        {
+          "pencil": "Blot6 gap: 8",
+          "class": "pagination",
+          "prop": "gap",
+          "source": "8px",
+          "resolved": "8px"
+        },
+        {
+          "pencil": "Blot6 item layout",
+          "class": "item",
+          "prop": "display",
+          "source": "inline-flex",
+          "resolved": "inline-flex"
+        },
+        {
+          "pencil": "Blot6 item alignItems: center",
+          "class": "item",
+          "prop": "align-items",
+          "source": "center",
+          "resolved": "center"
+        },
+        {
+          "pencil": "Blot6 item justifyContent: center",
+          "class": "item",
+          "prop": "justify-content",
+          "source": "center",
+          "resolved": "center"
+        },
+        {
+          "pencil": "Blot6 item height: 38",
+          "class": "item",
+          "prop": "height",
+          "source": "38px",
+          "resolved": "38px"
+        },
+        {
+          "pencil": "Blot6 item stroke: $hairline / 1",
+          "class": "item",
+          "prop": "border",
+          "source": "1px solid var(--color-hairline)",
+          "resolved": "1px solid #dadde2"
+        },
+        {
+          "pencil": "Blot6 item cornerRadius: $radius-sm",
+          "class": "item",
+          "prop": "border-radius",
+          "source": "var(--radius-control)",
+          "resolved": "0.5rem"
+        },
+        {
+          "pencil": "Blot6 item fill: $canvas",
+          "class": "item",
+          "prop": "background",
+          "source": "var(--color-canvas)",
+          "resolved": "#ffffff"
+        },
+        {
+          "pencil": "Blot6 label fill: $ink",
+          "class": "item",
+          "prop": "color",
+          "source": "var(--color-ink)",
+          "resolved": "#1d1d1f"
+        },
+        {
+          "pencil": "Blot6 label fontSize: $size-caption",
+          "class": "item",
+          "prop": "font-size",
+          "source": "var(--text-caption)",
+          "resolved": "12px"
+        },
+        {
+          "pencil": "Blot6 label fontWeight: 600",
+          "class": "item",
+          "prop": "font-weight",
+          "source": "600",
+          "resolved": "600"
+        },
+        {
+          "pencil": "Blot6 prev/next width: 64",
+          "class": "control",
+          "prop": "width",
+          "source": "64px",
+          "resolved": "64px"
+        },
+        {
+          "pencil": "Blot6 page width: 38",
+          "class": "page",
+          "prop": "width",
+          "source": "38px",
+          "resolved": "38px"
+        },
+        {
+          "pencil": "Blot6 current stroke: $accent",
+          "class": "current",
+          "prop": "border-color",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "Blot6 current fill: $accent",
+          "class": "current",
+          "prop": "background",
+          "source": "var(--color-accent)",
+          "resolved": "#06c755"
+        },
+        {
+          "pencil": "Blot6 current label fill: $on-accent",
+          "class": "current",
+          "prop": "color",
+          "source": "var(--color-on-accent)",
+          "resolved": "#ffffff"
+        },
+        {
+          "pencil": "Blot6 current label fontWeight: 700",
+          "class": "current",
+          "prop": "font-weight",
+          "source": "700",
+          "resolved": "700"
+        }
+      ]
+    },
     "table": {
       "name": "共通 表見出しセル・見出し行",
       "pencilNodes": [
@@ -747,7 +916,8 @@
       "pencilNodes": [
         "nBRKk",
         "uzNEC",
-        "XywGr"
+        "XywGr",
+        "Blot6"
       ],
       "lastCheckedAt": "2026-08-24"
     },

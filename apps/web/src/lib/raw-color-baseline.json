@@ -25,7 +25,7 @@
   "app/form-submissions/page.tsx": 97,
   "app/friend-add-settings/page.tsx": 1,
   "app/friends/detail/page.tsx": 5,
-  "app/friends/page.tsx": 24,
+  "app/friends/page.tsx": 20,
   "app/health/page.tsx": 74,
   "app/inflow-links/_components/create-genre-modal.tsx": 13,
   "app/inflow-links/_components/edit-route-modal.tsx": 31,

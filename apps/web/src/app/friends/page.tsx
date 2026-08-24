@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { Tag } from '@line-crm/shared'
 import { api, type FriendListItem } from '@/lib/api'
@@ -14,6 +14,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
+import Pagination from '@/components/shared/pagination'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 const CARD_SHADOW = 'shadow-[1px_1px_2px_rgba(29,29,31,0.13)]'
@@ -28,18 +29,6 @@ const MERGED_TABS = [
   { key: 'duplicates', label: '重複の検出' },
   { key: 'merged', label: '統合ユーザー' },
 ]
-
-function compactPages(current: number, total: number): Array<number | 'ellipsis'> {
-  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1)
-  const pages = new Set([1, total, current - 1, current, current + 1])
-  const ordered = [...pages].filter((page) => page >= 1 && page <= total).sort((a, b) => a - b)
-  const result: Array<number | 'ellipsis'> = []
-  ordered.forEach((page, index) => {
-    if (index > 0 && page - ordered[index - 1] > 1) result.push('ellipsis')
-    result.push(page)
-  })
-  return result
-}
 
 function FriendsPageInner({
   onNotice,
@@ -66,7 +55,6 @@ function FriendsPageInner({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const pageItems = useMemo(() => compactPages(page, totalPages), [page, totalPages])
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((previous) => {
@@ -270,13 +258,12 @@ function FriendsPageInner({
 
       {!loading && total > 0 ? (
         <div className="flex flex-wrap items-center justify-end gap-3">
-          <nav aria-label="友だち一覧のページ" className="flex items-center gap-1">
-            <button type="button" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1} className="h-9 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs text-[#0067D9] disabled:text-[#B8BCC2]">前へ</button>
-            {pageItems.map((item, index) => item === 'ellipsis' ? <span key={`ellipsis-${index}`} className="px-1 text-xs text-[#8B938D]">…</span> : (
-              <button key={item} type="button" onClick={() => setPage(item)} aria-current={item === page ? 'page' : undefined} className={`h-9 min-w-9 rounded-[8px] px-2 text-xs font-medium ${item === page ? 'bg-[#07C653] text-white' : 'border border-[#DADDE2] bg-white text-[#0067D9]'}`}>{item}</button>
-            ))}
-            <button type="button" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page === totalPages} className="h-9 rounded-[8px] border border-[#DADDE2] bg-white px-3 text-xs text-[#0067D9] disabled:text-[#B8BCC2]">次へ</button>
-          </nav>
+          <Pagination
+            page={page}
+            pageCount={totalPages}
+            onPageChange={setPage}
+            ariaLabel="友だち一覧のページ"
+          />
         </div>
       ) : null}
 
