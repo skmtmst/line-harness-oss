@@ -7,6 +7,7 @@ import ListKpis from '@/components/shared/list-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 interface Template {
   id: string
@@ -488,21 +489,21 @@ export default function TemplatesPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px]">
               <thead>
-                <tr className="bg-canvas-sunken border-b border-hairline">
+                <TableHeadRow>
                   {/*
                     列は設計 `V2 4-3 テンプレート` の並び。
                     「カテゴリ」を「本文」に替えた。名前だけでは中身が
                     分からず、開かないと選べない。冒頭が見えていれば
                     一覧のまま選べる。
                   */}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">種別</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">名前</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">本文</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">使われている配信</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">ヒット数</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">登録日</th>
-                  <th className="px-4 py-3" />
-                </tr>
+                  <Th>種別</Th>
+                  <Th>名前</Th>
+                  <Th>本文</Th>
+                  <Th>使われている配信</Th>
+                  <Th>ヒット数</Th>
+                  <Th>登録日</Th>
+                  <Th />
+                </TableHeadRow>
               </thead>
               <tbody className="divide-y divide-hairline">
                 {filteredTemplates.map((t) => (

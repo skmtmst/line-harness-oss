@@ -14,6 +14,7 @@ import SupportMarkList from '@/components/friend-fields/mark-list'
 import SavedSearchList from '@/components/friend-fields/saved-search-list'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -725,16 +726,16 @@ function TagsPageInner() {
                 倍率は「タグを作る」側にあるものなので、編集画面へ移した。
                 一覧は「どのタグが誰に何人付いているか」を見る場所に戻す。
               */}
-              <tr className="bg-canvas-sunken border-b border-hairline">
-                <th className="w-10 px-2 py-3" aria-label="並び替え" />
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">タグ名</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">友だち人数</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動付与のもと</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">分類</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">登録日</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">表示</th>
-                <th className="px-4 py-3" />
-              </tr>
+              <TableHeadRow>
+                <Th className="w-10" aria-label="並び替え" />
+                <Th>タグ名</Th>
+                <Th>友だち人数</Th>
+                <Th>自動付与のもと</Th>
+                <Th>分類</Th>
+                <Th>登録日</Th>
+                <Th>表示</Th>
+                <Th />
+              </TableHeadRow>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
