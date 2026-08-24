@@ -25,6 +25,7 @@ import { countDebt } from './design-debt.mjs'
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 const SRC = join(WEB, 'src')
 const PARTS = join(WEB, 'design', 'design-parts.json')
+const INVENTORY = join(WEB, 'design', 'pencil-component-inventory.json')
 const MAX_DEPTH = 12
 
 const UTILITY =
@@ -104,6 +105,7 @@ function main() {
   const kind = args[0]
   const target = args[1]
   const data = JSON.parse(readFileSync(PARTS, 'utf8'))
+  const inventory = JSON.parse(readFileSync(INVENTORY, 'utf8'))
 
   if (!['--token', '--part'].includes(kind) || !target) {
     console.log('使い方:')
@@ -114,7 +116,7 @@ function main() {
   }
 
   /* --- 何を探すか決める --- */
-  let title, meta, patterns, partFile, searchDescription
+  let title, meta, patterns, partFile, searchDescription, inventoryEntry
   if (kind === '--token') {
     const t = data.tokens[target]
     if (!t) { console.log(`design-parts.json に ${target} がありません。`); process.exit(2) }
@@ -134,16 +136,40 @@ function main() {
   } else {
     const [key, part] =
       Object.entries(data.parts).find(([k, p]) => k === target || (p.pencilNodes ?? []).includes(target)) ?? []
-    if (!part) { console.log(`design-parts.json の parts に ${target} がありません。`); process.exit(2) }
+    const inventoryEntries = Object.entries(inventory.components ?? {})
+    const inventoryMatch =
+      inventoryEntries.find(([nodeId]) => nodeId === target) ??
+      inventoryEntries.find(([nodeId]) => (part?.pencilNodes ?? []).includes(nodeId)) ??
+      inventoryEntries.find(([, component]) =>
+        component.name === target || component.migration?.target === target,
+      )
+    if (!part && !inventoryMatch) {
+      console.log(`design-parts.json と部品棚卸しに ${target} がありません。`)
+      process.exit(2)
+    }
+    inventoryEntry = inventoryMatch
     patterns = []
-    partFile = resolveFile(join(WEB, part.code))
-    searchDescription = `import先が ${part.code} と一致`
-    title = `部品 ${part.name}（${part.pencilNodes.join(' / ')}）`
-    meta = [
-      `Pencilでの使用回数  ${part.pencilUsage} 回`,
-      `コード              ${part.code}`,
-      `状態                ${part.status} / ${part.role} / ${part.reviewStatus}`,
-    ]
+    partFile = part ? resolveFile(join(WEB, part.code)) : null
+    searchDescription = part ? `import先が ${part.code} と一致` : '未実装のため、コード上のimport先はまだありません'
+    const [nodeId, component] = inventoryMatch ?? []
+    title = part
+      ? `部品 ${part.name}（${part.pencilNodes.join(' / ')}）`
+      : `部品候補 ${component.name}（${nodeId}）`
+    meta = part
+      ? [
+          `Pencilでの使用回数  ${part.pencilUsage} 回`,
+          `コード              ${part.code}`,
+          `状態                ${part.status} / ${part.role} / ${part.reviewStatus}`,
+        ]
+      : []
+    if (component) {
+      meta.push(
+        `分類                ${component.classification} / ${component.family}`,
+        `設計状態            ${component.designState}`,
+        `版                  V5基準 / V6 ${component.version.v6}`,
+        `移行                ${component.migration.action} → ${component.migration.target}`,
+      )
+    }
   }
 
   /* --- 参照しているファイル --- */
@@ -211,6 +237,15 @@ function main() {
   console.log(`\n  参照しているファイル ${hits.length} / 到達するルート ${reached.size}`)
   for (const r of [...reached].sort().slice(0, 20)) console.log(`    ${r}`)
   if (reached.size > 20) console.log(`    …ほか ${reached.size - 20} ルート`)
+
+  if (inventoryEntry) {
+    const [, component] = inventoryEntry
+    console.log('\n  契約上の影響候補')
+    for (const route of component.impactRoutes) {
+      console.log(`    ${route === '*' ? '* 全管理画面' : route}`)
+    }
+    console.log('    ※ 実装後は上の実到達ルートと照合する')
+  }
 
   console.log('\n  共通部品を通らない直書き（この変更では直らない）')
   for (const [k, n] of Object.entries(debt).sort()) console.log(`    ${k.padEnd(26)}${String(n).padStart(5)} か所`)

@@ -11,6 +11,18 @@
     "tokenResult": "V6もV5と同じグローバル変数を参照しているため、PR #1の12トークンにV6専用上書きは不要",
     "lastCheckedAt": "2026-08-24"
   },
+  "$componentInventory": {
+    "file": "design/pencil-component-inventory.json",
+    "requiredCount": 85,
+    "requiredClassifications": [
+      "global",
+      "feature",
+      "screen"
+    ],
+    "requiredVersionBase": "V5",
+    "summary": "Pen.devの再利用部品85件を、全画面共通・機能群共通・画面専用へ分類し、状態・props・V5/V6差・影響候補ルート・移行方針を固定する。",
+    "lastCheckedAt": "2026-08-24"
+  },
   "$v6Verification": {
     "representativeNodes": [
       "WQhu3",
@@ -54,6 +66,7 @@
     "$説明": "この数を下回るとCIを落とす。項目をまとめて消して0件合格にできないようにするため。承認時の想定は35宣言だったが、font-weight 3件と border 1件を追加で固定したため39になっている。減らす方向の変更は承認が要る。",
     "tokens": 12,
     "parts": 4,
+    "componentInventory": 85,
     "v6RepresentativeNodes": 10,
     "v6PartNodes": [
       "nBRKk",

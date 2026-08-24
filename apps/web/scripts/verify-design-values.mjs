@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 
 const WEB = join(dirname(fileURLToPath(import.meta.url)), '..')
 const PARTS = join(WEB, 'design', 'design-parts.json')
+const INVENTORY = join(WEB, 'design', 'pencil-component-inventory.json')
 const BUILT_CSS_DIR = join(WEB, '.next', 'static', 'css')
 
 /* ---------- 値の正規化 ---------------------------------------------------
@@ -174,15 +175,113 @@ export function checkShape(data) {
   return problems
 }
 
+/** Pen.devの再利用部品一覧が、移行判断に必要な情報を保っているか確認する。 */
+export function checkInventoryShape(data, inventory) {
+  const problems = []
+  const declaration = data.$componentInventory
+  const requiredCount = data.required?.componentInventory ?? declaration?.requiredCount ?? 1
+  const components = inventory?.components
+  const families = inventory?.families
+
+  if (!declaration) return ['design-parts.json に $componentInventory がありません']
+  if (declaration.file !== 'design/pencil-component-inventory.json') {
+    problems.push('$componentInventory.file が design/pencil-component-inventory.json ではありません')
+  }
+  if (!declaration.lastCheckedAt) problems.push('$componentInventory.lastCheckedAt がありません')
+  if (inventory?.$pencilFile !== data.$pencilFile) {
+    problems.push('部品棚卸しのPencilファイルが design-parts.json と一致しません')
+  }
+  if (!components || typeof components !== 'object' || Array.isArray(components)) {
+    return [...problems, 'pencil-component-inventory.json に components がありません']
+  }
+  if (!families || typeof families !== 'object' || Array.isArray(families)) {
+    return [...problems, 'pencil-component-inventory.json に families がありません']
+  }
+
+  const entries = Object.entries(components)
+  if (entries.length < requiredCount) {
+    problems.push(`Pen.dev部品が ${entries.length} 件。必須 ${requiredCount} 件を下回っています`)
+  }
+  if (inventory?.$snapshot?.reusableComponents !== entries.length) {
+    problems.push(`部品棚卸しの件数 ${entries.length} 件と snapshot ${inventory?.$snapshot?.reusableComponents ?? 0} 件が一致しません`)
+  }
+
+  const CLASSIFICATION = declaration.requiredClassifications ?? ['global', 'feature', 'screen']
+  const STATUS = ['pending', 'implemented', 'active']
+  const ROLE = ['canonical', 'sample', 'deprecated']
+  const V6 = ['same', 'variant', 'unverified']
+  const ACTION = ['reuse', 'implement', 'merge', 'replace', 'investigate']
+  const usedClassifications = new Set()
+  const activePencilNodes = Object.entries(data.parts ?? {})
+    .filter(([key, part]) => !key.startsWith('$') && part.status === 'active')
+    .flatMap(([, part]) => part.pencilNodes ?? [])
+  const investigationIds = new Set(
+    Object.keys(data.investigations ?? {}).filter((key) => !key.startsWith('$')),
+  )
+
+  for (const [familyName, family] of Object.entries(families)) {
+    if (!Array.isArray(family.props) || family.props.length === 0) {
+      problems.push(`families.${familyName}: props がありません`)
+    }
+    if (!Array.isArray(family.requiredStates) || family.requiredStates.length === 0) {
+      problems.push(`families.${familyName}: requiredStates がありません`)
+    }
+  }
+
+  for (const [nodeId, component] of entries) {
+    const prefix = `components.${nodeId}`
+    usedClassifications.add(component.classification)
+    for (const field of ['name', 'family', 'classification', 'designState', 'role', 'status', 'lastCheckedAt']) {
+      if (typeof component[field] !== 'string' || !component[field]) {
+        problems.push(`${prefix}: ${field} がありません`)
+      }
+    }
+    if (!families[component.family]) problems.push(`${prefix}: family ${component.family} が定義されていません`)
+    if (!CLASSIFICATION.includes(component.classification)) {
+      problems.push(`${prefix}: classification が不正です（${component.classification}）`)
+    }
+    if (!STATUS.includes(component.status)) problems.push(`${prefix}: status が不正です（${component.status}）`)
+    if (!ROLE.includes(component.role)) problems.push(`${prefix}: role が不正です（${component.role}）`)
+    if (component.version?.base !== declaration.requiredVersionBase) {
+      problems.push(`${prefix}: version.base は ${declaration.requiredVersionBase} でなければなりません`)
+    }
+    if (!V6.includes(component.version?.v6)) {
+      problems.push(`${prefix}: version.v6 が不正です（${component.version?.v6}）`)
+    }
+    if (!Array.isArray(component.impactRoutes) || component.impactRoutes.length === 0) {
+      problems.push(`${prefix}: impactRoutes がありません`)
+    }
+    if (component.classification === 'global' && !component.impactRoutes?.includes('*')) {
+      problems.push(`${prefix}: 全画面共通部品の impactRoutes には * が必要です`)
+    }
+    if (!ACTION.includes(component.migration?.action) || !component.migration?.target) {
+      problems.push(`${prefix}: migration.action または target が不正です`)
+    }
+    if (component.status === 'active' && !activePencilNodes.includes(nodeId)) {
+      problems.push(`${prefix}: active ですが design-parts.json のactive部品に含まれていません`)
+    }
+    if (component.migration?.action === 'investigate' && !investigationIds.has(nodeId)) {
+      problems.push(`${prefix}: investigate ですが design-parts.json の investigations にありません`)
+    }
+  }
+  for (const classification of CLASSIFICATION) {
+    if (!usedClassifications.has(classification)) {
+      problems.push(`部品棚卸しに classification=${classification} がありません`)
+    }
+  }
+  return problems
+}
+
 /* ---------- 本体 -------------------------------------------------------- */
 
 const pad = (s, n) => String(s).padEnd(n)
 
 export function verify() {
   const data = JSON.parse(readFileSync(PARTS, 'utf8'))
+  const inventory = JSON.parse(readFileSync(INVENTORY, 'utf8'))
   const lines = []
   const failures = []
-  const shape = checkShape(data)
+  const shape = [...checkShape(data), ...checkInventoryShape(data, inventory)]
 
   const built = loadBuiltCss()
   const builtVars = built ? collectVariables(built) : {}
@@ -290,7 +389,15 @@ export function verify() {
     }
   }
 
-  return { lines, failures, shape, checked, matched, waiting }
+  return {
+    lines,
+    failures,
+    shape,
+    checked,
+    matched,
+    waiting,
+    inventoryCount: Object.keys(inventory.components ?? {}).length,
+  }
 }
 
 if (process.argv[1] && process.argv[1].endsWith('verify-design-values.mjs')) {
@@ -300,6 +407,7 @@ if (process.argv[1] && process.argv[1].endsWith('verify-design-values.mjs')) {
   console.log('\n' + '─'.repeat(60))
   console.log(`照合対象 ${r.checked} 件 / 一致 ${r.matched} / 不一致 ${r.checked - r.matched}`)
   console.log(`未実装   ${r.waiting} 件`)
+  console.log(`部品棚卸し ${r.inventoryCount} 件`)
   if (r.shape.length) {
     console.log('\n契約の形が壊れています:')
     for (const p of r.shape) console.log(`  ${p}`)
