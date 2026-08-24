@@ -56,8 +56,9 @@ describe('共通部品を通らない直書き', () => {
 })
 
 describe('表示制御クラスの見分け方', () => {
-  it('前置きが何段あっても基底で判断する', () => {
+  it('前置きが何段あっても、重要度の印が前でも後ろでも基底で判断する', () => {
     // 前置きを列挙すると、重ねがけや新しい前置きを見逃す。
+    // 重要度の印は Tailwind v3 が先頭、v4 が末尾。
     for (const name of [
       'hidden',
       'md:hidden',
@@ -66,6 +67,8 @@ describe('表示制御クラスの見分け方', () => {
       'data-[open]:hidden',
       'group-has-[:checked]:flex',
       '!hidden',
+      'hidden!',
+      'md:flex!',
       'dark:lg:inline-flex',
     ]) {
       expect(isDisplayClass(name), `${name} を見逃しています`).toBe(true)

@@ -37,8 +37,10 @@ const DISPLAY_BASE = new Set([
 ])
 
 export function isDisplayClass(className) {
-  // `!hidden` のような重要度の印を外し、前置きを落として基底だけにする。
-  const base = className.replace(/^!/, '').split(':').pop()
+  // 前置きを落として基底だけにし、重要度の印を外す。
+  // 印は Tailwind v3 が先頭（`!hidden`）、v4 が末尾（`hidden!`）で、
+  // 前置きの後ろに付く形（`md:flex!`）もある。両方に対応する。
+  const base = className.split(':').pop()?.replace(/^!|!$/g, '')
   return DISPLAY_BASE.has(base)
 }
 
