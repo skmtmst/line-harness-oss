@@ -6,6 +6,7 @@ import AuthGuard from './auth-guard'
 import { AccountProvider } from '@/contexts/account-context'
 import SessionLostNotice from './session-lost-notice'
 import RootLandingGate from './root-landing-gate'
+import StoreSelectionGate from './store-selection-gate'
 import HqReturnButton from './hq-return-button'
 import styles from './app-shell.module.css'
 
@@ -51,7 +52,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               {/* V5正式共通メニュー J33xq と同じ256pxサイドバーを基準にする。 */}
               <div data-design-shell="v5-1920" data-design-node="J33xq" className={styles.content}>
                 <HqReturnButton />
-                <RootLandingGate>{children}</RootLandingGate>
+                <RootLandingGate><StoreSelectionGate>{children}</StoreSelectionGate></RootLandingGate>
               </div>
             </main>
           </div>

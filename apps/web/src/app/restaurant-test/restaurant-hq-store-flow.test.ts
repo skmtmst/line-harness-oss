@@ -51,4 +51,10 @@ describe('飲食店向けHQと店舗追加動線', () => {
     expect(manualLinks).toContain("enableMessagingApi: ''")
     expect(manualLinks).toContain("findChannelCredentials: ''")
   })
+
+  it('店舗ごとに別のLINEプロバイダーを作る理由を利用者向けに案内する', () => {
+    expect(wizard).toContain('店舗ごとに、新しいプロバイダーを作ってください。')
+    expect(wizard).toContain('同じお客様を店舗ごとに別々に管理できなくなります。')
+    expect(wizard).not.toContain('一意制約')
+  })
 })

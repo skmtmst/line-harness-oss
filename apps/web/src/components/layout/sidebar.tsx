@@ -172,6 +172,12 @@ export default function Sidebar({
     .filter((section) => !friendAttributesV2Mode || !['自動化', '予約', '設定'].includes(section.label ?? ''))
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setUnansweredCount(0)
+      setPendingPhotoCount(0)
+      setOperationIssueCount(0)
+      return
+    }
     let cancelled = false
     // 連続操作で fetch が並走した際、遅い古いレスポンスが新しい値を上書きしない
     // ように発行順 seq でガードする。
@@ -220,7 +226,7 @@ export default function Sidebar({
       clearInterval(id)
       window.removeEventListener(UNANSWERED_REFRESH_EVENT, onRefresh)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => { setIsOpen(false) }, [pathname])
   useEffect(() => {
