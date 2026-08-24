@@ -1,7 +1,9 @@
 # Pen.dev V5/V6 画面移行の準備状況と開始チェックリスト
 
-作成日: 2026-08-24  
-対象: LINE Harness 管理画面  
+作成日: 2026-08-24
+
+対象: LINE Harness 管理画面
+
 設計の正本: Pen.devを保存している Pencil ファイル `4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen`
 
 ## 1. 結論
