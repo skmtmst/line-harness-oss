@@ -25,6 +25,24 @@ tenants.get('/api/tenants/me', async (c) => {
   return c.json({ success: true, data: { name: tenant.name } });
 });
 
+/** 認証スタッフ自身が所属する統括の表示名だけを更新する。 */
+tenants.patch('/api/tenants/me', requireRole('owner', 'admin'), async (c) => {
+  const body = await c.req.json<{ name?: unknown }>().catch(() => null);
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  if (!name) return c.json({ success: false, error: '統括名を入力してください' }, 400);
+  if (name.length > 100) return c.json({ success: false, error: '統括名は100文字以内で入力してください' }, 400);
+
+  const db = dbFor(c.env);
+  const staffTenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
+  const result = await db.prepare(`UPDATE tenants
+    SET name = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+    WHERE id = ?`)
+    .bind(name, staffTenantId)
+    .run();
+  if (!result.meta.changes) return c.json({ success: false, error: 'tenant not found' }, 404);
+  return c.json({ success: true, data: { name } });
+});
+
 tenants.get('/api/tenants/boundary-preview', requireRole('owner', 'admin'), async (c) => {
   const db = dbFor(c.env);
   const staffTenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;

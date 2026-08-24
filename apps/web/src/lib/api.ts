@@ -1925,6 +1925,11 @@ export const api = {
   },
   tenants: {
     me: () => fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me'),
+    updateName: (name: string) =>
+      fetchApi<ApiResponse<{ name: string }>>('/api/tenants/me', {
+        method: 'PATCH',
+        body: JSON.stringify({ name }),
+      }),
   },
   lineAccounts: {
     list: (live = true) =>
