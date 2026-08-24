@@ -9,6 +9,7 @@ import Header from '@/components/layout/header'
 import { Field, inputClass } from '@/components/shared/create-page'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import EditTagPageV4 from '@/components/friend-fields/edit-tag-page-v4'
+import Breadcrumb from '@/components/layout/breadcrumb'
 
 /**
  * タグを編集する。
@@ -168,13 +169,11 @@ function EditTagInner() {
 
   return (
     <div>
-      <nav className="text-ink-faint mb-2 text-xs">
-        <Link href="/tags" className="hover:underline">
-          友だち属性
-        </Link>
-        <span className="mx-1.5">/</span>
-        <span>タグを編集</span>
-      </nav>
+      <Breadcrumb items={[
+        { label: '友だち', href: '/friends' },
+        { label: '友だち属性', href: '/tags' },
+        { label: 'タグ編集' },
+      ]} />
 
       <Header
         title="タグを編集"

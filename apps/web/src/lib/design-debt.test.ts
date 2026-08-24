@@ -34,6 +34,7 @@ const { worse, better } = compare(counts, baseline)
 describe('共通部品を通らない直書き', () => {
   it('design-parts.jsonに登録した正本部品自身は負債へ数えない', () => {
     for (const file of [
+      'components/app-shell.tsx',
       'components/shared/button.tsx',
       'components/shared/pagination.tsx',
       'components/shared/summary-card.tsx',

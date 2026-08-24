@@ -12,7 +12,7 @@ const FRIEND_TREND = join(ROOT, '..', 'dashboard', 'friend-trend-table.tsx')
 const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
 const MENU = join(ROOT, '..', '..', 'lib', 'menu.ts')
 
-describe('Pen.dev V4を共通レイアウトの正本にする', () => {
+describe('Pen.dev V5を共通レイアウトの正本にする', () => {
   const shell = readFileSync(APP_SHELL, 'utf8')
   const dashboard = readFileSync(DASHBOARD, 'utf8')
   const dashboardEditor = readFileSync(DASHBOARD_EDITOR, 'utf8')
@@ -21,11 +21,10 @@ describe('Pen.dev V4を共通レイアウトの正本にする', () => {
   const chats = readFileSync(CHATS, 'utf8')
   const menu = readFileSync(MENU, 'utf8')
 
-  it('1920pxでサイドバー256px・本体1664px・左右40pxになる', () => {
-    expect(shell).toContain('data-design-shell="v4-1920"')
-    expect(shell).toContain('max-w-shell')
-    expect(shell).toContain('lg:px-10')
-    expect(shell).not.toContain('lg:px-8')
+  it('1920pxでV5正式共通メニューと本体幅の契約を使う', () => {
+    expect(shell).toContain('data-design-shell="v5-1920"')
+    expect(shell).toContain('data-design-node="J33xq"')
+    expect(shell).toContain('styles.content')
   })
 
   it('V4の上段と主要カードが実装から消えていない', () => {
@@ -72,9 +71,10 @@ describe('Pen.dev V4を共通レイアウトの正本にする', () => {
     expect(dashboard).not.toContain('運用状況です。')
   })
 
-  it('見出しと受信一覧の余白を詰める', () => {
-    expect(dashboard).toContain('data-design="Head" className="mb-4 flex')
-    expect(dashboard).not.toContain('min-h-[76px]')
+  it('ダッシュボード見出しをV5共通ヘッダーへ載せる', () => {
+    expect(dashboard).toContain('<Header')
+    expect(dashboard).toContain('title="ダッシュボード"')
+    expect(dashboard).toContain('titleAction=')
     expect(pendingInbox).toContain('h-[61px]')
   })
 

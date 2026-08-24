@@ -98,6 +98,21 @@ function routeOf(file) {
   return route === '' ? '/' : route
 }
 
+/** Next.jsの画面へ実際に届く入口。page自身に加え、親のlayoutも辿る。 */
+export function routeEntryFiles(file) {
+  const app = join(SRC, 'app')
+  const rel = relative(app, file)
+  if (rel.startsWith('..') || !/(^|\/)page\.tsx$/.test(rel)) return [file]
+
+  const layouts = []
+  const segments = dirname(rel) === '.' ? [] : dirname(rel).split('/')
+  for (let depth = 0; depth <= segments.length; depth += 1) {
+    const layout = join(app, ...segments.slice(0, depth), 'layout.tsx')
+    if (existsSync(layout)) layouts.push(layout)
+  }
+  return [file, ...layouts]
+}
+
 function main() {
   // `pnpm --filter web design:impact -- --token X` の形で渡されると、
   // 先頭に余分な `--` が残ることがある。どちらの書き方でも動くようにする。
@@ -212,7 +227,7 @@ function main() {
     const route = routeOf(file)
     if (!route) continue
     const seen = new Set()
-    const stack = [[file, 0]]
+    const stack = routeEntryFiles(file).map((entry) => [entry, 0])
     while (stack.length) {
       const [current, depth] = stack.pop()
       if (seen.has(current)) continue

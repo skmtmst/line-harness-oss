@@ -1,0 +1,44 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.workspace {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.main {
+  min-width: 0;
+  flex: 1;
+  overflow: auto;
+  background: var(--color-shell);
+  padding-top: 72px;
+}
+
+.content {
+  width: 100%;
+  max-width: var(--container-shell);
+  margin-inline: auto;
+  padding: 24px 16px;
+}
+
+@media (min-width: 640px) {
+  .content {
+    padding-inline: 24px;
+  }
+}
+
+@media (min-width: 768px) {
+  .main {
+    padding-top: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .content {
+    padding: 32px 40px 40px;
+  }
+}

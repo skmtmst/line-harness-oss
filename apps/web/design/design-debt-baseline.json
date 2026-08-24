@@ -459,9 +459,6 @@
   "components/accounts/test-recipients-setting.tsx": {
     "arbitrary-value": 2
   },
-  "components/app-shell.tsx": {
-    "arbitrary-value": 2
-  },
   "components/auth-guard.tsx": {
     "arbitrary-value": 1
   },
@@ -648,9 +645,6 @@
     "direct-secondary-button": 5,
     "arbitrary-value": 1,
     "direct-th": 3
-  },
-  "components/layout/sidebar.tsx": {
-    "arbitrary-value": 30
   },
   "components/legal/terms-document.tsx": {
     "arbitrary-value": 1,

@@ -23,6 +23,7 @@ import DashboardEditor, {
   type DashboardCardId,
   type DashboardPreferences,
 } from '@/components/dashboard/dashboard-editor'
+import Header from '@/components/layout/header'
 
 const PERIODS = [
   { key: 'today', label: '今日' },
@@ -430,28 +431,32 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <header data-design="Head" className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-ink text-2xl font-bold tracking-tight">ダッシュボード</h1>
-          <button type="button" onClick={() => setEditorOpen(true)} className="border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken rounded-control mt-0.5 inline-flex items-center gap-2 border px-3 py-2 text-xs font-medium">
-            <EditIcon />ダッシュボード編集
-          </button>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
-          <div className="flex gap-2">
-            {PERIODS.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setPeriod(item.key)}
-                aria-pressed={period === item.key}
-                className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
-              >{item.label}</button>
-            ))}
-          </div>
-        </div>
-      </header>
+      <div data-design="Head">
+        <Header
+          title="ダッシュボード"
+          titleAction={
+            <button type="button" onClick={() => setEditorOpen(true)} className="border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex h-10 items-center gap-2 border px-3.25 text-label font-semibold">
+              <EditIcon />ダッシュボード編集
+            </button>
+          }
+          action={
+            <div className="flex flex-wrap items-center justify-end gap-2.5">
+              <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
+              <div className="flex gap-2">
+                {PERIODS.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setPeriod(item.key)}
+                    aria-pressed={period === item.key}
+                    className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
+                  >{item.label}</button>
+                ))}
+              </div>
+            </div>
+          }
+        />
+      </div>
 
       {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
       {data?.partialFailures?.length ? (
