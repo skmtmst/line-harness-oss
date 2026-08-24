@@ -27,7 +27,7 @@ export default function NewPoolPage() {
     <CreatePage
       title="プールを作る"
       description="複数のLINE公式アカウントをひとまとめにして、友だちの追加先を自動で振り分けます。"
-      parent={['LINEアカウント', '/accounts?tab=pools']}
+      parent={['プール', '/pools']}
       validate={() => {
         if (!name.trim()) return '名前を入力してください'
         if (!SLUG_PATTERN.test(slug)) {

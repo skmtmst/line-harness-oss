@@ -32,7 +32,7 @@ export default function StoreContextBanner() {
     try {
       await restaurantTestApi.clearStoreSelection(selectedAccountId)
       setStore(null)
-      router.push('/restaurant-test/stores')
+      router.push('/hq')
     } finally {
       setBusy(false)
     }

@@ -56,7 +56,8 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   { section: '予約', items: ['予約管理', '予約設定', 'イベント予約'] },
   // LINE通知はV4作成前から運用中の承認済み追加機能なので、専用機能の末尾に残す。
   { section: '専用機能', items: ['NEN配信', '写真審査', 'EC連携', 'LINE通知'] },
-  { section: '設定', items: ['アカウント', 'ログインユーザー', '機能設定', 'データ移行', '運用状態'] },
+  // D-3: 店舗の追加・設定・一覧は統括へ集約し、店舗側の重複導線を戻さない。
+  { section: '設定', items: ['ログインユーザー', '機能設定', '運用状態'] },
   {
     section: '飲食店向け（テスト）',
     items: [
@@ -121,10 +122,8 @@ const ROUTES: Record<string, string> = {
   写真審査: '/nen-members',
   EC連携: '/ec-commerce',
   LINE通知: '/line-notifications',
-  アカウント: '/accounts',
   ログインユーザー: '/staff',
   機能設定: '/settings',
-  データ移行: '/accounts?tab=migration',
   運用状態: '/emergency',
   店舗ダッシュボード: '/restaurant-test/dashboard',
   '組織・権限': '/restaurant-test/organization',
@@ -151,11 +150,11 @@ describe('サイドバーが V5正式共通メニューの契約と一致する'
     },
   );
 
-  it('項目の総数が設計どおり（43）', () => {
+  it('項目の総数が設計どおり（41）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 統括一覧を独立した /hq へ移し、店舗側は飲食店向け9項目を維持する。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(43);
+    expect(total).toBe(41);
   });
 
   it('項目の行き先が仕様どおり', () => {

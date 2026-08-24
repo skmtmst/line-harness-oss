@@ -160,7 +160,7 @@ export default function NewRestaurantStorePage() {
   }
 
   return <div>
-    <Header title="店舗を追加" description="利用規約の確認からLINE公式アカウントの接続まで、5つの手順で進めます。" action={<Link href="/restaurant-test/stores" className="text-sm font-semibold text-action">店舗一覧へ戻る</Link>} />
+    <Header title="店舗を追加" description="利用規約の確認からLINE公式アカウントの接続まで、5つの手順で進めます。" action={<Link href="/hq" className="text-sm font-semibold text-action">統括へ戻る</Link>} />
     <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
       <ol className="rounded-card border border-hairline bg-canvas p-4">{steps.map(([title, description], index) => {
         const number = index + 1

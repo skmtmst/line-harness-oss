@@ -40,6 +40,59 @@ const here = dirname(fileURLToPath(import.meta.url));
 let testDb: SqliteD1;
 let env: Env['Bindings'];
 
+/** HTTPで公開しない、ルート試験専用の最小データ。 */
+function seedRestaurantFixture({
+  accountId = 'account-1',
+  tenantId = '00000000-0000-4000-8000-000000000001',
+  name = '飲食店LAB',
+}: {
+  accountId?: string;
+  tenantId?: string;
+  name?: string;
+} = {}): void {
+  testDb.raw.prepare(
+    'INSERT INTO rt_organizations (id, account_id, tenant_id, name) VALUES (?, ?, ?, ?)',
+  ).run('org-fixture', accountId, tenantId, name);
+  testDb.raw.prepare(
+    'INSERT INTO rt_stores (id, organization_id, name, code, area, capacity, line_account_id, google_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run('store-ginza', 'org-fixture', '銀座店', 'GINZA', '東京', 32, 'account-2', 'connected');
+  testDb.raw.prepare(
+    'INSERT INTO rt_stores (id, organization_id, name, code, area, capacity, line_account_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run('store-yokohama', 'org-fixture', '横浜店', 'YOKOHAMA', '神奈川', 24, 'account-3');
+  testDb.raw.prepare(
+    'INSERT INTO rt_tables (id, store_id, code, label, seat_type, min_capacity, max_capacity) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run('table-ginza', 'store-ginza', 'T-01', 'テーブル1', 'table', 1, 4);
+  testDb.raw.prepare(
+    'INSERT INTO rt_menu_items (id, store_id, kind, name, price) VALUES (?, ?, ?, ?, ?)',
+  ).run('menu-ginza', 'store-ginza', 'course', 'テストコース', 8800);
+  testDb.raw.prepare(
+    'INSERT INTO rt_reservations (id, store_id, source, external_id, customer_name, guest_count, starts_at, ends_at, table_id, course_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(
+    'reservation-ginza',
+    'store-ginza',
+    'restaurant_board',
+    'RB-FIXTURE',
+    '検証 太郎',
+    2,
+    '2026-08-25T09:00:00.000Z',
+    '2026-08-25T11:00:00.000Z',
+    'table-ginza',
+    'menu-ginza',
+  );
+  for (const [index, flowType] of [
+    'reservation_24h',
+    'reservation_2h',
+    'post_visit',
+    'review_request',
+    'member_card',
+    'one_tap_booking',
+  ].entries()) {
+    testDb.raw.prepare(
+      'INSERT INTO rt_line_flows (id, organization_id, store_id, flow_type, title, body) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(`flow-${index}`, 'org-fixture', 'store-ginza', flowType, `テスト${index}`, 'テスト本文');
+  }
+}
+
 function app() {
   const instance = new Hono<Env>();
   instance.use('*', authMiddleware);
@@ -118,8 +171,7 @@ beforeEach(() => {
 
 describe('飲食店向けテストAPI', () => {
   it('既存領域と分離したテストデータを準備してR-1〜R-8の読取モデルを返す', async () => {
-    const bootstrap = await request('/api/restaurant-test/bootstrap?account_id=account-1', { organizationName: '飲食店LAB' });
-    expect(bootstrap.status).toBe(201);
+    seedRestaurantFixture({ name: '飲食店LAB' });
 
     const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
     expect(snapshot.status).toBe(200);
@@ -135,9 +187,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('従来のaccount_idと新しいtenant_idが同じ組織を返す', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {
-      organizationName: '二重解決LAB',
-    });
+    seedRestaurantFixture({ name: '二重解決LAB' });
     const byAccount = await request('/api/restaurant-test/snapshot?account_id=account-1');
     const byTenant = await request(
       '/api/restaurant-test/snapshot?tenant_id=00000000-0000-4000-8000-000000000001',
@@ -152,10 +202,7 @@ describe('飲食店向けテストAPI', () => {
 
   it('tenant_idから作る統括はレガシーaccount_idにも同じ値を入れる', async () => {
     const tenant = '00000000-0000-4000-8000-000000000001';
-    const bootstrap = await request(`/api/restaurant-test/bootstrap?tenant_id=${tenant}`, {
-      organizationName: 'LINE非依存の統括',
-    });
-    expect(bootstrap.status).toBe(201);
+    seedRestaurantFixture({ accountId: tenant, tenantId: tenant, name: 'LINE非依存の統括' });
     expect(testDb.raw.prepare(`SELECT account_id, tenant_id
       FROM rt_organizations`).get()).toEqual({ account_id: tenant, tenant_id: tenant });
   });
@@ -189,7 +236,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('店舗未選択の管理画面セッションでは統括組織の全店舗を返す', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const session = await createAdminSession();
 
     const snapshot = await requestAs('/api/restaurant-test/snapshot?account_id=account-1', session);
@@ -199,7 +246,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('利用規約への同意を組織・現行版ごとに冪等記録する', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const body = { documentKey: 'musubo-terms', version: 'v0.1-draft' };
     const first = await request('/api/restaurant-test/terms-agreement?account_id=account-1', body);
     const second = await request('/api/restaurant-test/terms-agreement?account_id=account-1', body);
@@ -228,7 +275,7 @@ describe('飲食店向けテストAPI', () => {
     expect(missingGet.status).toBe(404);
     expect(missingPost.status).toBe(404);
 
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const oldVersion = await request('/api/restaurant-test/terms-agreement?account_id=account-1', {
       documentKey: 'musubo-terms', version: 'v0.0-draft',
     });
@@ -238,7 +285,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('staffは規約状態を読めるが同意記録は作れない', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     authMocks.getStaffByApiKey.mockResolvedValue({
       id: 'staff-terms', name: 'Staff', role: 'staff', access_level: 'full',
       permission_keys: '[]', assigned_line_account_id: null,
@@ -258,7 +305,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('同一組織の店舗だけをセッションへ保存し、統括へ戻すと選択を消す', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     testDb.raw.prepare('INSERT INTO rt_organizations (id, account_id, name) VALUES (?, ?, ?)')
       .run('org-other', 'account-other', '別組織');
     testDb.raw.prepare('INSERT INTO rt_stores (id, organization_id, name, code, capacity) VALUES (?, ?, ?, ?, ?)')
@@ -295,7 +342,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('媒体予約を一方向で冪等取込し、外部書戻しを0件のままにする', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const store = testDb.raw.prepare('SELECT id FROM rt_stores ORDER BY code LIMIT 1').get() as { id: string };
     const payload = {
       storeId: store.id,
@@ -320,7 +367,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('双方向を示す未知の媒体値を拒否する', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };
     const response = await request('/api/restaurant-test/inbound/reservations?account_id=account-1', {
       storeId: store.id, provider: 'outbound', eventId: 'event-x', reservation: {},
@@ -329,7 +376,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('取り込みアドレスはオーナーだけが発行でき、スタッフは拒否する', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };
 
     const issued = await request('/api/restaurant-test/intake-addresses?account_id=account-1', { storeId: store.id });
@@ -356,7 +403,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('発行済みアドレスを管理者だけに一覧し、再発行後も旧アドレスの失効予定を返す', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -425,7 +472,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('別組織の店舗の取り込みアドレスは一覧できない', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     testDb.raw.prepare('INSERT INTO rt_organizations (id, account_id, name) VALUES (?, ?, ?)')
       .run('org-other', 'account-other', '別組織');
     testDb.raw.prepare('INSERT INTO rt_stores (id, organization_id, name, code, capacity) VALUES (?, ?, ?, ?, ?)')
@@ -436,7 +483,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('取り込みドメイン未設定時は一覧と発行を503にする', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const store = testDb.raw.prepare('SELECT id FROM rt_stores LIMIT 1').get() as { id: string };
     env.RESTAURANT_INTAKE_DOMAIN = undefined;
 
@@ -447,7 +494,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('LINEアカウント未指定では店舗を作成できない', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const response = await request('/api/restaurant-test/stores?account_id=account-1', {
       name: '新宿店', code: 'SHINJUKU', area: '東京', capacity: 20,
       timezone: 'Asia/Tokyo',
@@ -456,7 +503,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('店舗名が空の場合は店舗を作成できない', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const response = await request('/api/restaurant-test/stores?account_id=account-1', {
       name: '', code: 'EMPTY', area: '東京', capacity: 20,
       timezone: 'Asia/Tokyo', lineAccountId: 'account-4',
@@ -465,7 +512,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('不正なチャネルシークレットを接続エラーやログへ含めない', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const secret = 'invalid-secret-must-not-leak';
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).includes('/oauth/accessToken')) {
@@ -494,7 +541,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('接続確認が成功した場合だけLINEアカウントと店舗をまとめて作成する', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const secret = 'wizard-test-secret';
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -535,7 +582,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('LINEアカウントを指定して店舗を作成・編集でき、スタッフは操作できない', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const created = await request('/api/restaurant-test/stores?account_id=account-1', {
       name: '新宿店', code: 'SHINJUKU', area: '東京', capacity: 20,
       timezone: 'Asia/Tokyo', lineAccountId: 'account-4',
@@ -567,7 +614,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('同じLINEアカウントを2店舗へ割り当てず、同一組織の店舗コード重複も拒否する', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const used = testDb.raw.prepare("SELECT line_account_id FROM rt_stores WHERE code = 'GINZA'").get() as { line_account_id: string };
 
     const duplicateAccount = await request('/api/restaurant-test/stores?account_id=account-1', {
@@ -584,7 +631,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('他組織の店舗を更新できず、不正な店舗状態も拒否する', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     testDb.raw.prepare('INSERT INTO rt_organizations (id, account_id, name) VALUES (?, ?, ?)')
       .run('org-other', 'account-other', '別組織');
     testDb.raw.prepare('INSERT INTO rt_stores (id, organization_id, name, code, capacity, line_account_id) VALUES (?, ?, ?, ?, ?, ?)')
@@ -607,7 +654,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('店舗LINEアカウントではその店舗だけ、統括アカウントでは全店舗を返す', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const storeView = await request('/api/restaurant-test/snapshot?account_id=account-2');
     expect(storeView.status).toBe(200);
     const storeJson = await storeView.json() as { data: { stores: Array<{ id: string }>; reservations: Array<{ store_id: string }>; tables: Array<{ store_id: string }> } };
@@ -621,7 +668,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('LINE未割当はunconfigured、Webhook不一致はwarningとして導出する', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const stores = testDb.raw.prepare('SELECT id, code FROM rt_stores ORDER BY code').all() as Array<{ id: string; code: string }>;
     testDb.raw.prepare('UPDATE rt_stores SET line_account_id = NULL WHERE id = ?').run(stores[0].id);
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
@@ -645,7 +692,7 @@ describe('飲食店向けテストAPI', () => {
   });
 
   it('店舗をarchivedにしても既存予約を削除せず、DELETE経路も持たない', async () => {
-    await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
+    seedRestaurantFixture();
     const store = testDb.raw.prepare("SELECT id FROM rt_stores WHERE code = 'GINZA'").get() as { id: string };
     const before = testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_reservations WHERE store_id = ?').get(store.id) as { count: number };
     const updated = await requestWithMethod(
@@ -664,13 +711,10 @@ describe('飲食店向けテストAPI', () => {
     expect(deleted.status).toBe(404);
   });
 
-  it('bootstrap時に店舗へ割り当てるLINEアカウントが不足していれば何も作らない', async () => {
-    authMocks.lineAccounts = authMocks.lineAccounts.slice(0, 2);
+  it('デモ用bootstrap APIを公開しない', async () => {
+    // D-3: テストデータ作成を管理画面や公開APIへ戻さないための退行防止。
     const response = await request('/api/restaurant-test/bootstrap?account_id=account-1', {});
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ error: 'LINEアカウントが不足しています' });
-    const count = testDb.raw.prepare('SELECT COUNT(*) AS count FROM rt_organizations').get() as { count: number };
-    expect(count.count).toBe(0);
+    expect(response.status).toBe(404);
   });
 
   it('この組織に存在しないLINEアカウントの飲食店データへアクセスさせない', async () => {
