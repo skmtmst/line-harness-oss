@@ -79,7 +79,6 @@ export default function NewRestaurantStorePage() {
     let active = true
     setTermsAgreedAt(null)
     setStep(STEP.TERMS)
-    if (!selectedAccountId) return () => { active = false }
     void restaurantTestApi.termsAgreement(selectedAccountId).then((response) => {
       if (!active) return
       const nextStep = initialWizardStep(response.data.agreedVersion)
@@ -94,7 +93,6 @@ export default function NewRestaurantStorePage() {
   }, [selectedAccountId])
 
   const agreeToCurrentTerms = async () => {
-    if (!selectedAccountId) throw new Error('LINEアカウントを選択してから、もう一度お試しください。')
     const response = await restaurantTestApi.agreeToTerms(
       selectedAccountId,
       TERMS_DOCUMENT.key,
@@ -124,7 +122,7 @@ export default function NewRestaurantStorePage() {
   }
 
   const connect = async () => {
-    if (!selectedAccountId || saving) return
+    if (saving) return
     setSaving(true)
     setConnectionError('')
     try {
@@ -219,11 +217,13 @@ export default function NewRestaurantStorePage() {
             {created ? <div className="rounded-card border border-accent bg-accent-soft p-5">
               <p className="text-lg font-bold text-success">接続できました</p>
               <p className="mt-2 text-sm leading-6 text-ink-secondary">「{created.storeName}」とLINE公式アカウント「{created.lineAccountName}」を登録しました。</p>
-              <button type="button" disabled={saving} onClick={() => void enterStore()} className="mt-5 rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:opacity-50">この店舗の管理画面へ</button>
+              {selectedAccountId
+                ? <button type="button" disabled={saving} onClick={() => void enterStore()} className="mt-5 rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:opacity-50">この店舗の管理画面へ</button>
+                : <Link href="/hq" className="mt-5 inline-flex text-sm font-semibold text-action">統括の店舗一覧へ</Link>}
             </div> : <>
               <div className="rounded-card bg-canvas-sunken p-5 text-sm leading-6 text-ink-secondary"><p className="font-semibold text-ink">以下のLINE公式アカウントのセットアップを行います。</p><p className="mt-1">トークンとボット表示名を取得できた場合だけ、店舗とLINE公式アカウントをまとめて登録します。</p><dl className="mt-4 grid gap-2"><div><dt className="text-xs text-ink-faint">店舗名</dt><dd className="font-semibold text-ink">{name}</dd></div><div><dt className="text-xs text-ink-faint">店舗の略称</dt><dd className="font-semibold text-ink">{alias || name}</dd></div></dl></div>
               {connectionError && <div role="alert" className="mt-4 rounded-control border border-danger bg-danger-bg px-4 py-3 text-sm leading-6 text-danger">{connectionError}</div>}
-              <div className="mt-5 flex justify-between gap-3"><button type="button" disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">戻る</button><button type="button" disabled={!selectedAccountId || saving} onClick={() => void connect()} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</button></div>
+              <div className="mt-5 flex justify-between gap-3"><button type="button" disabled={saving} onClick={() => setStep(STEP.CREDENTIALS)} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-semibold text-ink disabled:opacity-40">戻る</button><button type="button" disabled={saving} onClick={() => void connect()} className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">{saving ? '接続を確認中…' : 'アカウントセットアップ実行'}</button></div>
             </>}
           </div>}
         </main>
