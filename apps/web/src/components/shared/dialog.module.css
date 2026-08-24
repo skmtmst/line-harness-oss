@@ -1,0 +1,146 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--color-ink) 40%, transparent);
+  padding: 16px;
+}
+
+.panel {
+  display: flex;
+  width: min(844px, 100%);
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-panel);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-card);
+  padding: 18px;
+  color: var(--color-ink);
+}
+
+.standardPanel {
+  padding: 18px;
+}
+
+.panel:focus-visible,
+.button:focus-visible {
+  outline: revert;
+}
+
+.title {
+  margin: 0;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.standardTitle {
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+}
+
+.destructiveTitle {
+  font-size: var(--text-body);
+}
+
+.description {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.callout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--color-status-danger-soft);
+  border-radius: var(--radius-tile);
+  background: var(--color-status-danger-soft);
+  padding: 16px;
+}
+
+.callout .title,
+.callout .description {
+  color: var(--color-status-danger);
+}
+
+.callout .title {
+  font-size: var(--text-body);
+}
+
+.content {
+  min-width: 0;
+}
+
+.error {
+  border-radius: var(--radius-control);
+  background: var(--color-status-danger-soft);
+  padding: 10px 12px;
+  color: var(--color-status-danger);
+  font-size: var(--text-caption);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.button {
+  display: inline-flex;
+  width: 112px;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid;
+  border-radius: var(--radius-control);
+  padding: 8px 12px;
+  font-size: var(--text-caption);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.designButton {
+  width: 112px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.cancel {
+  border-color: var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+}
+
+.confirm {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.danger {
+  border-color: var(--color-status-danger);
+  background: var(--color-status-danger);
+  color: var(--color-on-accent);
+}
+
+@media (max-width: 560px) {
+  .panel {
+    padding: 16px;
+  }
+
+  .actions,
+  .button {
+    width: 100%;
+  }
+}

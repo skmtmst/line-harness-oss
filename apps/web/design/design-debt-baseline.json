@@ -580,9 +580,9 @@
   },
   "components/friend-fields/tag-editor-v4.tsx": {
     "direct-primary-button": 4,
-    "arbitrary-value": 19,
     "direct-secondary-button": 6,
-    "unresolved-classname": 17
+    "unresolved-classname": 17,
+    "arbitrary-value": 17
   },
   "components/friend-fields/tags-page-v4.tsx": {
     "unresolved-classname": 3,
@@ -691,11 +691,6 @@
     "direct-secondary-button": 7,
     "direct-primary-button": 2,
     "unresolved-classname": 14
-  },
-  "components/shared/confirm-dialog.tsx": {
-    "arbitrary-value": 1,
-    "direct-secondary-button": 1,
-    "direct-primary-button": 1
   },
   "components/shared/create-page.tsx": {
     "unresolved-classname": 1,

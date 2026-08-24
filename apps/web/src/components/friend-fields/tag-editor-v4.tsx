@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { Tag, TagGroup } from '@line-crm/shared'
+import Drawer from '@/components/shared/drawer'
+import Notice from '@/components/shared/notice'
 
 export type LinkedAction = {
   id: string
@@ -89,17 +91,24 @@ function ActionDrawer({ onClose, onAdd, referenceState = false }: { onClose: () 
   const [message, setMessage] = useState('ご登録ありがとうございます。')
 
   return (
-    <div className="fixed inset-0 z-[80] bg-ink/35" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <aside className="absolute inset-y-0 right-0 flex w-full max-w-[660px] flex-col border-l border-hairline bg-canvas shadow-2xl" role="dialog" aria-modal="true" aria-label="連動アクションを追加">
-        <header className="flex items-start justify-between border-b border-hairline px-7 py-6">
-          <div>
-            <h2 className="text-xl font-bold text-ink">連動アクションを追加</h2>
-            <p className="mt-1 text-sm text-ink-secondary">タグが付いた直後に実行する処理を選びます。</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-control px-3 py-2 text-ink-faint hover:bg-canvas-sunken" aria-label="閉じる">×</button>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
+    <Drawer
+      open
+      title="連動アクションを追加"
+      description="タグが付いた直後に実行する処理を選びます。"
+      onClose={onClose}
+      footer={(
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-control border border-hairline px-5 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
+          <button
+            type="button"
+            onClick={() => onAdd({ id: crypto.randomUUID(), type: selected[1], label: selected[0] === 'テキスト送信' ? message : selected[0], timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後` })}
+            className="rounded-control bg-accent px-5 py-2.5 text-sm font-bold text-on-accent hover:bg-accent-hover"
+          >
+            このアクションを追加
+          </button>
+        </div>
+      )}
+    >
           <section>
             <h3 className="mb-3 text-sm font-bold text-ink">1. アクションの種類</h3>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -151,20 +160,7 @@ function ActionDrawer({ onClose, onAdd, referenceState = false }: { onClose: () 
             <label className="mb-1 block text-sm font-semibold text-ink">4. 追加する位置</label>
             <select className={inputClass}><option>いちばん最後に追加</option><option>選択中のアクションの前</option></select>
           </section>
-        </div>
-
-        <footer className="flex justify-end gap-2 border-t border-hairline bg-canvas px-7 py-4">
-          <button type="button" onClick={onClose} className="rounded-control border border-hairline px-5 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
-          <button
-            type="button"
-            onClick={() => onAdd({ id: crypto.randomUUID(), type: selected[1], label: selected[0] === 'テキスト送信' ? message : selected[0], timing: timing === 'immediate' ? 'すぐに' : `${delay}${delayUnit === 'minutes' ? '分' : delayUnit === 'hours' ? '時間' : '日'}後` })}
-            className="rounded-control bg-accent px-5 py-2.5 text-sm font-bold text-on-accent hover:bg-accent-hover"
-          >
-            このアクションを追加
-          </button>
-        </footer>
-      </aside>
-    </div>
+    </Drawer>
   )
 }
 
@@ -290,8 +286,8 @@ export default function TagEditorV4({
         </div>
       </header>
 
-      {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-4 rounded-control border border-success/20 bg-success-bg p-3 text-sm text-success">{notice}</p>}
+      {error && <Notice className="mb-4" tone="error" message={error} />}
+      {notice && <Notice className="mb-4" tone="success" message={notice} />}
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_470px]">
         <main className="min-w-0 space-y-4">

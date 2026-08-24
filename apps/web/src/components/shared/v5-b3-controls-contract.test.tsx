@@ -87,8 +87,8 @@ describe('V5 B3 入力・検索・選択部品', () => {
   it('契約はB3の実ノード・部品・宣言数を下限として持つ', () => {
     const contract = JSON.parse(readFileSync(join(WEB, 'design', 'design-parts.json'), 'utf8'))
     const inventory = JSON.parse(readFileSync(join(WEB, 'design', 'pencil-component-inventory.json'), 'utf8'))
-    expect(contract.required.parts).toBe(15)
-    expect(contract.required.partDeclarations).toBe(224)
+    expect(contract.required.parts).toBe(20)
+    expect(contract.required.partDeclarations).toBe(301)
     expect(contract.parts['form-control'].pencilNodes).toEqual(['ytG7l', 'keKe3'])
     expect(contract.parts['search-field'].pencilNodes).toEqual(['phlR1'])
     expect(contract.parts.select.pencilNodes).toEqual(['rpot9', 'Gfsb4', 'niGPF', 'QB99A'])

@@ -119,6 +119,7 @@
  */
 :root {
   --shadow-card: 1px 1px 2px #1920261a;
+  --shadow-float: 0 6px 18px #19202626;
 }
 
 /*
