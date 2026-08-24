@@ -279,6 +279,7 @@ const pad = (s, n) => String(s).padEnd(n)
 export function verify() {
   const data = JSON.parse(readFileSync(PARTS, 'utf8'))
   const inventory = JSON.parse(readFileSync(INVENTORY, 'utf8'))
+  const inventoryComponents = Object.values(inventory.components ?? {})
   const lines = []
   const failures = []
   const shape = [...checkShape(data), ...checkInventoryShape(data, inventory)]
@@ -396,7 +397,9 @@ export function verify() {
     checked,
     matched,
     waiting,
-    inventoryCount: Object.keys(inventory.components ?? {}).length,
+    inventoryCount: inventoryComponents.length,
+    inventoryActive: inventoryComponents.filter((component) => component.status === 'active').length,
+    inventoryPending: inventoryComponents.filter((component) => component.status === 'pending').length,
   }
 }
 
@@ -407,7 +410,7 @@ if (process.argv[1] && process.argv[1].endsWith('verify-design-values.mjs')) {
   console.log('\n' + '─'.repeat(60))
   console.log(`照合対象 ${r.checked} 件 / 一致 ${r.matched} / 不一致 ${r.checked - r.matched}`)
   console.log(`未実装   ${r.waiting} 件`)
-  console.log(`部品棚卸し ${r.inventoryCount} 件`)
+  console.log(`部品棚卸し ${r.inventoryCount} 件（利用中 ${r.inventoryActive} / 未実装 ${r.inventoryPending}）`)
   if (r.shape.length) {
     console.log('\n契約の形が壊れています:')
     for (const p of r.shape) console.log(`  ${p}`)
