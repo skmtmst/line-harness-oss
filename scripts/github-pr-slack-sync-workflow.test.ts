@@ -40,4 +40,12 @@ describe('GitHub PR Slack sync workflow safety', () => {
     expect(script).not.toMatch(/console\.(?:log|error)\([^\n]*(?:githubToken|relaySecret|signature|payload)/);
     expect(script).toContain('console.log(JSON.stringify(result));');
   });
+
+  test('Slack同期の失敗を見える状態に保ちつつPRを止めない', () => {
+    expect(workflow).toContain('id: slack_sync');
+    expect(workflow).toContain('continue-on-error: true');
+    expect(workflow).toContain("if: steps.slack_sync.outcome == 'failure'");
+    expect(workflow).toContain('::warning::Slack同期に失敗しました。PRの必須チェックには影響しません。');
+    expect(workflow).toContain('>> "$GITHUB_STEP_SUMMARY"');
+  });
 });
