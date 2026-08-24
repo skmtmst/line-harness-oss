@@ -15,10 +15,11 @@ import {
   SIDEBAR_FEATURE_BY_HREF,
   SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
+import styles from './sidebar.module.css'
 
 // ─── メニュー定義 ───
 //
-// Pen.dev の V4 設計（`hmBzC` のサイドバー）に合わせている。
+// Pen.dev の V5正式共通メニュー（`J33xq`）に合わせている。
 // 区分・並び・呼び名は設計が出どころで、勝手に足したり並べ替えたりしない。
 //
 // 行き先（href）は実装側の都合で決まる。設計は画面の名前しか持たないので、
@@ -157,9 +158,7 @@ export default function Sidebar({
         if (friendAttributesV2Mode && item.href === '/analytics') return false
         if (item.href === '/staff' && staffRole !== 'owner' && staffRole !== 'admin') return false
         if (item.href === '/accounts' && staffRole === 'staff') return false
-        // 見た目を確認するV3は、現行「友だち属性」の権限をそのまま引き継ぐ。
-        const inheritsTagsPermission = item.href === '/tags-v3' && staffPermissions.includes('/tags')
-        if (staffRole === 'staff' && !staffPermissions.includes(item.href) && !inheritsTagsPermission) return false
+        if (staffRole === 'staff' && !staffPermissions.includes(item.href)) return false
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (
           featureKey &&
@@ -262,9 +261,7 @@ export default function Sidebar({
   // 比較専用ルートも、実際に確認する「友だち属性V2」を選択中として写す。
   const activePathname = pathname === '/visual-qa/friend-attributes-v2'
     ? '/tags-v2'
-    : pathname === '/visual-qa/friend-attributes-v3'
-      ? '/tags-v3'
-      : pathname
+    : pathname
   const activeHref = (() => {
     let best: string | null = null
     for (const section of sections) {
@@ -340,12 +337,12 @@ export default function Sidebar({
       ) : <AccountSwitcher />}
 
       {/* ナビゲーション */}
-      <nav className={`flex-1 space-y-0.5 px-3 pb-2 ${preview ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+      <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
         {visibleSections.map((section, si) => (
-          <div key={si} className="space-y-0.5">
+          <div key={si} className={styles.section}>
             {section.label && (
-              <div className={`flex px-3 ${friendAttributesV2Mode ? 'h-[20px] items-center' : 'h-[34px] items-end pb-[5px] pt-3'}`}>
-                <p className="text-xs font-semibold text-gray-400">{section.label}</p>
+              <div className={friendAttributesV2Mode ? 'flex h-[20px] items-center px-3' : styles.sectionHeading}>
+                <p>{section.label}</p>
               </div>
             )}
             {section.items.map((item) => {
@@ -366,16 +363,16 @@ export default function Sidebar({
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`relative flex items-center gap-[11px] rounded-[10px] px-3 font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset ${friendAttributesV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} text-[13px]` : 'h-10 text-sm'} ${
+                  className={`${styles.item} ${friendAttributesV2Mode ? `${section.label ? 'h-[36px]' : 'h-[42px]'} border border-transparent text-[13px]` : ''} ${
                     active
                       ? isDanger
-                        ? 'bg-danger-bg text-danger'
+                        ? `${styles.active} ${styles.danger}`
                         : friendAttributesV2Mode
-                          ? 'border border-accent bg-accent-soft text-accent'
-                          : 'bg-accent-soft text-accent'
+                          ? `${styles.active} border-accent`
+                          : styles.active
                       : isDanger
-                        ? 'text-red-500 hover:bg-red-50'
-                        : `${friendAttributesV2Mode ? 'border border-transparent' : ''} text-gray-600 hover:bg-gray-100 hover:text-gray-900`
+                        ? styles.danger
+                        : ''
                   }`}
                 >
                   <span className="shrink-0"><NavIcon d={item.icon} /></span>
@@ -385,7 +382,7 @@ export default function Sidebar({
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}
                       {/* 地が薄い緑になったので、選ばれていても札の色は変えない。
                           緑ベタの上に置いていたころは白抜きにする必要があった。 */}
-                      <span className="bg-red-500 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
+                      <span className={styles.badge}>
                         {badgeCount(item) > 99 ? '99+' : badgeCount(item)}
                       </span>
                       <span className="sr-only">{badgeCount(item)} 件</span>
@@ -399,7 +396,7 @@ export default function Sidebar({
       </nav>
 
       {/* フッター */}
-      <div className={`border-t border-gray-200 ${preview ? 'min-h-[72px]' : ''}`}>
+      <div className={`${styles.footer} ${preview ? 'min-h-[72px]' : ''}`}>
         {(staffName || preview) && (
           <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
             <div className="font-medium text-gray-700">{preview ? 'Kenta Kawano(Obama)' : staffName}</div>
@@ -452,7 +449,7 @@ export default function Sidebar({
   return (
     <>
       {/* モバイル: ハンバーガーヘッダー */}
-      <div className="xl:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
+      <div className={`${styles.mobileHeader} ${styles.mobileOnly}`}>
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
@@ -480,7 +477,7 @@ export default function Sidebar({
       </div>
 
       {/* オーバーレイ。ドロワーが開くのは xl 未満 */}
-      {isOpen && <div className="xl:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setIsOpen(false)} />}
+      {isOpen && <div className={`${styles.scrim} ${styles.mobileOnly}`} onClick={() => setIsOpen(false)} />}
 
       {/*
         スライドインするメニュー。
@@ -492,7 +489,7 @@ export default function Sidebar({
       */}
       <aside
         aria-label="管理メニュー"
-        className={`xl:hidden fixed top-0 left-0 z-50 flex h-dvh w-[min(88vw,20rem)] flex-col border-r border-gray-200 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        className={`${styles.drawer} ${styles.mobileOnly} ${isOpen ? '' : styles.drawerClosed}`}
       >
         <div className="absolute right-3 top-2.5 z-10">
           <button onClick={() => setIsOpen(false)} className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100" aria-label="閉じる">
@@ -514,7 +511,7 @@ export default function Sidebar({
 
         中身は常に展開表示。幅で文字を出し分ける必要がなくなった。
       */}
-      <aside className="hidden xl:flex w-64 bg-white border-r border-gray-200 flex-col h-screen sticky top-0">
+      <aside className={styles.desktop} data-design-node="J33xq">
         {sidebarContent(false)}
       </aside>
     </>

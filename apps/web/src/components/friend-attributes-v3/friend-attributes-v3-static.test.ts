@@ -10,9 +10,9 @@ const page = readFileSync(join(here, '..', '..', 'app', 'tags-v3', 'page.tsx'), 
 const menu = readFileSync(join(here, '..', '..', 'lib', 'menu.ts'), 'utf8')
 
 describe('友だち属性V3の静的デザイン契約', () => {
-  it('V2の入口を外し、V3の入口と独立ページを用意する', () => {
+  it('V2・V3の通常メニュー入口を外し、V3の比較用ページだけを残す', () => {
     expect(menu).not.toContain("href: '/tags-v2', label: '友だち属性V2'")
-    expect(menu).toContain("href: '/tags-v3', label: '友だち属性V3'")
+    expect(menu).not.toContain("href: '/tags-v3', label: '友だち属性V3'")
     expect(page).toContain('FriendAttributesV3Static')
   })
 

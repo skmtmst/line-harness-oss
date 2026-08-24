@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import styles from './merged-tabs.module.css'
 
 /**
  * 関連する画面をURL付きで切り替える共通タブ。
@@ -29,11 +30,13 @@ export default function MergedTabs({
   tabs,
   active,
   defaultKey,
+  variant = 'underline',
+  disabledKeys = [],
 }: {
   basePath: string
   /** クエリの名前。受信箱だけ channel を使う。 */
   paramName?: string
-  tabs: MergedTab[]
+  tabs: readonly MergedTab[]
   active: string
   /**
    * クエリ無しで開いたときのタブ。省略すると先頭。
@@ -43,14 +46,24 @@ export default function MergedTabs({
    * 並びを設計に合わせたまま、素のURLで主役を開けるようにする。
    */
   defaultKey?: string
+  variant?: 'underline' | 'segmented'
+  disabledKeys?: readonly string[]
 }) {
   const router = useRouter()
   const home = defaultKey ?? tabs[0].key
   return (
-    <div className="border-hairline mb-5 flex flex-wrap gap-1 border-b">
+    <div
+      className={variant === 'segmented' ? styles.segmented : styles.root}
+      role="tablist"
+      data-design-node={variant === 'segmented' ? 'z9TQJ' : 'VPn1F ISA1Q'}
+    >
       {tabs.map((t) => (
         <button
           key={t.key}
+          type="button"
+          role="tab"
+          aria-selected={active === t.key}
+          disabled={disabledKeys.includes(t.key)}
           onClick={() =>
             // 既定のタブはクエリを付けずに素のパスへ戻す。
             // ?tab=xxx が residue として残ると、共有したURLが分かりにくい。
@@ -58,11 +71,7 @@ export default function MergedTabs({
               t.href ?? (t.key === home ? basePath : `${basePath}?${paramName}=${t.key}`),
             )
           }
-          className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-            active === t.key
-              ? 'border-accent text-accent'
-              : 'text-ink-secondary hover:text-ink border-transparent'
-          }`}
+          className={`${styles.tab} ${variant === 'segmented' ? styles.segmentedTab : ''} ${active === t.key ? `${styles.selected} ${variant === 'segmented' ? styles.segmentedSelected : ''}` : ''}`}
         >
           {t.label}
         </button>
@@ -73,7 +82,7 @@ export default function MergedTabs({
 
 /** クエリから今のタブを読む。知らない値は既定（省略時は先頭）のタブに寄せる。 */
 export function useMergedTab(
-  tabs: MergedTab[],
+  tabs: readonly MergedTab[],
   paramName = 'tab',
   defaultKey?: string,
 ): string {

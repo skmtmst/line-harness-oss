@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * サイドバーが Pen.dev の V4 設計（hmBzC）と一致していることを確かめる。
+ * サイドバーが Pen.dev の V5正式共通メニュー（J33xq）と一致していることを確かめる。
  *
  * 設計（`V2 1-1 ダッシュボード` のサイドバー）が出どころで、
  * 区分・並び・呼び名を勝手に変えないための歯止め。
@@ -23,11 +23,11 @@ const MENU = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'lib', 'm
 const MENU_START = 'export const MENU_SECTIONS: MenuSection[] = [';
 const MENU_END = '/** 区分の目印から中身を引く。 */';
 
-/** Pen.dev の V4 設計から書き写した区分と項目。並びも設計どおり。 */
+/** Pen.dev V5を基本に、運用中の承認済み追加機能を含めた区分と項目。 */
 const DESIGN: Array<{ section: string | null; items: string[] }> = [
   // 上の4つは見出しを付けない。設計でも「対応」「友だち属性」の見出しは無く、
   // 毎日開くものが見出し無しでひとかたまりになっている。
-  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性', '友だち属性V3'] },
+  { section: null, items: ['ダッシュボード', '受信箱', '友だち', '友だち属性'] },
   {
     section: '配信',
     items: [
@@ -93,7 +93,6 @@ const ROUTES: Record<string, string> = {
   受信箱: '/chats',
   友だち: '/friends',
   友だち属性: '/tags',
-  友だち属性V3: '/tags-v3',
   シナリオ配信: '/scenarios',
   一斉配信: '/broadcasts',
   テンプレート: '/templates',
@@ -138,7 +137,7 @@ const ROUTES: Record<string, string> = {
   LINE来店フォロー: '/restaurant-test/line-followup',
 };
 
-describe('サイドバーが V4 設計と一致する', () => {
+describe('サイドバーが V5正式共通メニューの契約と一致する', () => {
   const actual = readSidebar();
 
   it('区分の数と並びが設計どおり', () => {
@@ -152,11 +151,11 @@ describe('サイドバーが V4 設計と一致する', () => {
     },
   );
 
-  it('項目の総数が設計どおり（44）', () => {
+  it('項目の総数が設計どおり（43）', () => {
     // 設計に無いものを足すと、ここで気づける。
     // 統括一覧を独立した /hq へ移し、店舗側は飲食店向け9項目を維持する。
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
-    expect(total).toBe(44);
+    expect(total).toBe(43);
   });
 
   it('項目の行き先が仕様どおり', () => {
@@ -215,7 +214,7 @@ describe('レスポンシブのメニュー名を維持する', () => {
     expect(source).not.toContain('countryFlag');
   });
 
-  it('PCの先頭はV4どおりLINEアカウント切替から始まる', () => {
+  it('PCの先頭はV5どおりLINEアカウント切替から始まる', () => {
     expect(source).toContain('null');
     expect(source).not.toContain('PCの先頭はアカウント切替ではなく');
   });

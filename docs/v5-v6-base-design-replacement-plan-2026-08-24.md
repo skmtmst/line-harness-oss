@@ -4,7 +4,7 @@
 
 対象: LINE Harness 管理画面全体
 
-状態: **B0完了、B1着手待ち**
+状態: **B0完了、B1実装中**
 
 ## 1. 結論
 
@@ -174,6 +174,8 @@ Pen.devにfocus状態がない場合、コードだけで見た目を決めず�
 B7を通過した後に、ダッシュボードV5、受信箱V6等を1画面ずつ移行する。
 
 B0の85件の分類、統合判断、CI条件は `docs/v5-v6-component-inventory-2026-08-24.md` と `apps/web/design/pencil-component-inventory.json` に記録した。
+
+B1はダッシュボードV5 `fJ2hc`、受信箱V6 `WQhu3`、友だちV5 `FG391`、友だち属性V5 `PbCvb`を実証用4画面とする。確認手順は `docs/v5-v6-four-screen-transfer-pilot-2026-08-24.md` に記録する。
 
 ### 6-2. 既存ページへの載せ替え
 

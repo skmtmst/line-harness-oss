@@ -65,7 +65,7 @@
   "required": {
     "$説明": "この数を下回るとCIを落とす。項目をまとめて消して0件合格にできないようにするため。承認時の想定は35宣言だったが、font-weight 3件と border 1件を追加で固定したため39になっている。減らす方向の変更は承認が要る。",
     "tokens": 12,
-    "parts": 4,
+    "parts": 8,
     "componentInventory": 85,
     "v6RepresentativeNodes": 10,
     "v6PartNodes": [
@@ -81,9 +81,14 @@
       "nBRKk",
       "uzNEC",
       "tPTMp",
-      "Blot6"
+      "Blot6",
+      "J33xq",
+      "R098Z",
+      "z9TQJ",
+      "VPn1F",
+      "ISA1Q"
     ],
-    "partDeclarations": 69
+    "partDeclarations": 115
   },
   "baselineScreens": {
     "$説明": "全103ページを毎回見るのは現実的ではないので、トークンと部品を代表する画面を決めておく。1440pxと1920pxで確認する。",
@@ -879,6 +884,179 @@
           "source": "600",
           "resolved": "600"
         }
+      ]
+    },
+    "app-shell": {
+      "name": "V5 正式共通メニュー",
+      "pencilNodes": [
+        "J33xq"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/layout/sidebar.tsx",
+      "cssModule": "src/components/layout/sidebar.module.css",
+      "components": [
+        "AppShell",
+        "Sidebar"
+      ],
+      "cssPrefix": "sidebar",
+      "pencilUsage": "未計測（全体ref走査は未検証）",
+      "lastCheckedAt": "2026-08-24",
+      "note": "V5 J33xqを正本とし、既存の権限非表示・アカウント切替・件数バッジ・モバイルドロワーを残した。V6差は未確認のため、確認できるまでV5を使う。",
+      "routes": {
+        "pilot": [
+          "/",
+          "/chats",
+          "/friends",
+          "/tags"
+        ],
+        "impact": "ログイン以外の全管理画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "CSS値と機能契約を照合する。4画面の同一状態画像は実証ゲートで取得する。"
+      },
+      "declarations": [
+        { "pencil": "J33xq width: 256", "class": "desktop", "prop": "width", "source": "256px", "resolved": "256px" },
+        { "pencil": "J33xq fill: $canvas", "class": "desktop", "prop": "background", "source": "var(--color-canvas)", "resolved": "#ffffff" },
+        { "pencil": "J33xq stroke: $hairline / 1", "class": "desktop", "prop": "border-right", "source": "1px solid var(--color-hairline)", "resolved": "1px solid #dadde2" },
+        { "pencil": "J33xq menu item height: 40", "class": "item", "prop": "height", "source": "40px", "resolved": "40px" },
+        { "pencil": "J33xq menu item gap: 11", "class": "item", "prop": "gap", "source": "11px", "resolved": "11px" },
+        { "pencil": "J33xq menu item padding: [0,12]", "class": "item", "prop": "padding", "source": "0 12px", "resolved": "0 12px" },
+        { "pencil": "J33xq menu item cornerRadius: $radius-md", "class": "item", "prop": "border-radius", "source": "var(--radius-tile)", "resolved": "10px" },
+        { "pencil": "J33xq menu label fontSize: $size-body", "class": "item", "prop": "font-size", "source": "14px", "resolved": "14px" },
+        { "pencil": "J33xq menu label fontWeight: 600", "class": "item", "prop": "font-weight", "source": "600", "resolved": "600" },
+        { "pencil": "J33xq selected fill: $accent-soft", "class": "active", "prop": "background", "source": "var(--color-accent-soft)", "resolved": "#e8f8ee" },
+        { "pencil": "J33xq selected label fill: $accent", "class": "active", "prop": "color", "source": "var(--color-accent)", "resolved": "#06c755" },
+        { "pencil": "J33xq selected label fontWeight: 700", "class": "active", "prop": "font-weight", "source": "700", "resolved": "700" },
+        { "pencil": "J33xq section height: 34", "class": "sectionHeading", "prop": "height", "source": "34px", "resolved": "34px" },
+        { "pencil": "J33xq section padding: [12,12,5,12]", "class": "sectionHeading", "prop": "padding", "source": "12px 12px 5px", "resolved": "12px 12px 5px" },
+        { "pencil": "J33xq section fill: $ink-faint", "class": "sectionHeading", "prop": "color", "source": "var(--color-ink-faint)", "resolved": "#6e7781" },
+        { "pencil": "J33xq section fontSize: $size-caption", "class": "sectionHeading", "prop": "font-size", "source": "var(--text-caption)", "resolved": "12px" },
+        { "pencil": "J33xq section fontWeight: 600", "class": "sectionHeading", "prop": "font-weight", "source": "600", "resolved": "600" }
+      ]
+    },
+    "page-header": {
+      "name": "V5 共通ページヘッダー",
+      "pencilNodes": [
+        "RWNQP"
+      ],
+      "role": "sample",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/layout/header.tsx",
+      "cssModule": "src/components/layout/header.module.css",
+      "components": [
+        "Header"
+      ],
+      "cssPrefix": "header",
+      "pencilUsage": "画面内配置のためref参照なし",
+      "lastCheckedAt": "2026-08-24",
+      "note": "ダッシュボードV5のHeader RWNQPから共通化。長い題と複数操作は折り返し、機能を削らない。",
+      "routes": {
+        "pilot": ["/", "/chats", "/friends", "/tags"],
+        "impact": "Headerを使う管理画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [1440, 1920],
+        "reason": "4画面の同一状態画像は実証ゲートで取得する。"
+      },
+      "declarations": [
+        { "pencil": "RWNQP height: 76", "class": "root", "prop": "min-height", "source": "76px", "resolved": "76px" },
+        { "pencil": "RWNQP alignItems: center", "class": "root", "prop": "align-items", "source": "center", "resolved": "center" },
+        { "pencil": "RWNQP justifyContent: space_between", "class": "root", "prop": "justify-content", "source": "space-between", "resolved": "space-between" },
+        { "pencil": "RWNQP title fill: $ink", "class": "title", "prop": "color", "source": "var(--color-ink)", "resolved": "#1d1d1f" },
+        { "pencil": "RWNQP title fontSize: $size-display", "class": "title", "prop": "font-size", "source": "30px", "resolved": "30px" },
+        { "pencil": "RWNQP title fontWeight: 600", "class": "title", "prop": "font-weight", "source": "600", "resolved": "600" },
+        { "pencil": "V5 description fill: $ink-secondary", "class": "description", "prop": "color", "source": "var(--color-ink-secondary)", "resolved": "#4a5565" },
+        { "pencil": "V5 description fontSize: $size-body", "class": "description", "prop": "font-size", "source": "14px", "resolved": "14px" }
+      ]
+    },
+    "breadcrumb": {
+      "name": "V5 共通パンくず",
+      "pencilNodes": [
+        "R098Z"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/layout/breadcrumb.tsx",
+      "cssModule": "src/components/layout/breadcrumb.module.css",
+      "components": [
+        "Breadcrumb"
+      ],
+      "cssPrefix": "breadcrumb",
+      "pencilUsage": "未計測（全体ref走査は未検証）",
+      "lastCheckedAt": "2026-08-24",
+      "note": "長い階層はmaxItemsで中間だけ省略し、先頭・現在地・フォーカスを残す。",
+      "routes": {
+        "active": ["/tags/edit"],
+        "impact": "階層を持つ編集・詳細画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [1440, 1920],
+        "reason": "タグ編集への適用を画像比較する。"
+      },
+      "declarations": [
+        { "pencil": "R098Z gap: 8", "class": "root", "prop": "gap", "source": "8px", "resolved": "8px" },
+        { "pencil": "R098Z fill: $ink-faint", "class": "root", "prop": "color", "source": "var(--color-ink-faint)", "resolved": "#6e7781" },
+        { "pencil": "R098Z fontSize: $size-caption", "class": "root", "prop": "font-size", "source": "var(--text-caption)", "resolved": "12px" },
+        { "pencil": "R098Z fontWeight: 500", "class": "root", "prop": "font-weight", "source": "500", "resolved": "500" },
+        { "pencil": "R098Z current fill: $ink", "class": "current", "prop": "color", "source": "var(--color-ink)", "resolved": "#1d1d1f" },
+        { "pencil": "R098Z current fontWeight: 700", "class": "current", "prop": "font-weight", "source": "700", "resolved": "700" },
+        { "pencil": "R098Z separator fill: $ink-faint", "class": "separator", "prop": "color", "source": "var(--color-ink-faint)", "resolved": "#6e7781" }
+      ]
+    },
+    "tabs": {
+      "name": "V5 共通ページ内タブ",
+      "pencilNodes": [
+        "z9TQJ",
+        "VPn1F",
+        "ISA1Q"
+      ],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/layout/merged-tabs.tsx",
+      "cssModule": "src/components/layout/merged-tabs.module.css",
+      "components": [
+        "MergedTabs"
+      ],
+      "cssPrefix": "merged-tabs",
+      "pencilUsage": "未計測（全体ref走査は未検証）",
+      "lastCheckedAt": "2026-08-24",
+      "note": "VPn1F/ISA1Qの下線タブとz9TQJの分割タブを同じURL連動APIの名前付きvariantへ統合した。",
+      "routes": {
+        "pilot": ["/friends", "/tags"],
+        "impact": "MergedTabsを使う画面"
+      },
+      "visualVerification": {
+        "status": "unverified",
+        "requiredViewports": [1440, 1920],
+        "reason": "友だちと友だち属性の同一状態画像を比較する。"
+      },
+      "declarations": [
+        { "pencil": "VPn1F/ISA1Q height: 44", "class": "tab", "prop": "height", "source": "44px", "resolved": "44px" },
+        { "pencil": "VPn1F/ISA1Q padding: [0,4]", "class": "tab", "prop": "padding", "source": "0 4px", "resolved": "0 4px" },
+        { "pencil": "VPn1F/ISA1Q fontSize: $size-body", "class": "tab", "prop": "font-size", "source": "14px", "resolved": "14px" },
+        { "pencil": "ISA1Q fontWeight: 500", "class": "tab", "prop": "font-weight", "source": "500", "resolved": "500" },
+        { "pencil": "VPn1F stroke: $accent / bottom 2", "class": "selected", "prop": "border-bottom-color", "source": "var(--color-accent)", "resolved": "#06c755" },
+        { "pencil": "VPn1F fill: $accent", "class": "selected", "prop": "color", "source": "var(--color-accent)", "resolved": "#06c755" },
+        { "pencil": "VPn1F fontWeight: 700", "class": "selected", "prop": "font-weight", "source": "700", "resolved": "700" },
+        { "pencil": "z9TQJ height: 50", "class": "segmented", "prop": "height", "source": "50px", "resolved": "50px" },
+        { "pencil": "z9TQJ gap: 5", "class": "segmented", "prop": "gap", "source": "5px", "resolved": "5px" },
+        { "pencil": "z9TQJ padding: 4", "class": "segmented", "prop": "padding", "source": "4px", "resolved": "4px" },
+        { "pencil": "z9TQJ fill: $canvas-parchment", "class": "segmented", "prop": "background", "source": "var(--color-shell)", "resolved": "#f5f5f7" },
+        { "pencil": "z9TQJ cornerRadius: $radius-md", "class": "segmented", "prop": "border-radius", "source": "var(--radius-tile)", "resolved": "10px" },
+        { "pencil": "z9TQJ item height: 42", "class": "segmentedTab", "prop": "height", "source": "42px", "resolved": "42px" },
+        { "pencil": "z9TQJ item cornerRadius: $radius-sm", "class": "segmentedTab", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" }
       ]
     }
   },

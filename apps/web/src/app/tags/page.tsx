@@ -17,6 +17,7 @@ import TagsPageV4 from '@/components/friend-fields/tags-page-v4'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
+import MergedTabs from '@/components/layout/merged-tabs'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -444,21 +445,7 @@ function TagsPageInner() {
       <div data-design="Body">
 
       {/* タブはURLに出す。直リンクとブラウザバックが効くようにするため。 */}
-      <div className="border-hairline mb-5 flex gap-1 border-b">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => router.replace(`/tags?tab=${t.key}`)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t.key
-                ? 'border-accent text-accent'
-                : 'text-ink-secondary hover:text-ink border-transparent'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <MergedTabs basePath="/tags" tabs={TABS} active={tab} variant="segmented" />
 
       {/*
         タブごとの説明（設計 `V2 3-1〜3-4`）。
