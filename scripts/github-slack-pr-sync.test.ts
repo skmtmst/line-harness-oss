@@ -255,4 +255,37 @@ describe('GitHub PR Slack sync', () => {
       [undefined, true],
     ]);
   });
+
+  test('Relayが500を返しても同じSlack通知を再送しない', async () => {
+    const open = pull();
+    let relayAttempts = 0;
+    const fetcher = vi.fn<typeof fetch>(async (input) => {
+      const url = String(input);
+      if (url.includes('api.github.com') && url.includes('/pulls?state=open')) return jsonResponse([open]);
+      if (url.includes('api.github.com') && url.includes('/pulls?state=closed')) return jsonResponse([]);
+      if (url.endsWith('/pulls/276')) return jsonResponse(open);
+      if (url.includes('/pulls/276/files')) return jsonResponse([]);
+      if (url.includes('/commits/abc123/check-runs')) return jsonResponse({ check_runs: [] });
+      if (url === 'https://relay.example.test/events') {
+        relayAttempts += 1;
+        return new Response(null, { status: 500 });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    await expect(syncGitHubPullRequests({
+      repository: 'skmtmst/line-harness-oss',
+      githubToken: 'github-test-token',
+      relayUrl: 'https://relay.example.test/events',
+      relaySecret: 'relay-test-secret',
+      eventName: 'workflow_dispatch',
+      minPrNumber: 276,
+      onlyPrNumber: 276,
+      closedLookbackHours: 72,
+      now: new Date('2026-08-23T04:00:00.000Z'),
+      fetcher,
+    })).rejects.toThrow('SLACK_SYNC_PARTIAL_FAILURE:reconcile:PR#276:SLACK_RELAY_FAILED:500');
+
+    expect(relayAttempts).toBe(1);
+  });
 });
