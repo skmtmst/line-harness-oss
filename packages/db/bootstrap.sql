@@ -780,6 +780,21 @@ CREATE TABLE line_accounts (
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id));
 
+CREATE TABLE line_webhook_events (
+  webhook_event_id TEXT PRIMARY KEY,
+  line_account_id  TEXT,
+  event_type       TEXT NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'received'
+                     CHECK (status IN ('received', 'processing', 'succeeded', 'failed')),
+  attempts         INTEGER NOT NULL DEFAULT 0,
+  last_error       TEXT CHECK (
+                     last_error IS NULL OR
+                     last_error IN ('line_api_error', 'db_error', 'unknown')
+                   ),
+  received_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
 CREATE TABLE link_clicks (
   id TEXT PRIMARY KEY,
   tracked_link_id TEXT NOT NULL REFERENCES tracked_links (id) ON DELETE CASCADE,
@@ -2315,6 +2330,12 @@ CREATE INDEX idx_line_accounts_parent
 
 CREATE INDEX idx_line_accounts_tenant
   ON line_accounts(tenant_id);
+
+CREATE INDEX idx_line_webhook_events_account
+  ON line_webhook_events(line_account_id, received_at DESC);
+
+CREATE INDEX idx_line_webhook_events_status
+  ON line_webhook_events(status, received_at);
 
 CREATE INDEX idx_link_clicks_friend ON link_clicks (friend_id);
 

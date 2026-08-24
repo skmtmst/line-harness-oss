@@ -111,6 +111,7 @@ import { restaurantTest } from './routes/restaurant-test.js';
 import { tenants } from './routes/tenants.js';
 import { codexSlackEvents } from './routes/codex-slack-events.js';
 import { clientErrors } from './routes/client-errors.js';
+import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
@@ -331,6 +332,7 @@ app.route('/', restaurantTest);
 app.route('/', tenants);
 app.route('/', codexSlackEvents);
 app.route('/', clientErrors);
+app.route('/', lineWebhookEvents);
 
 // Phase 5 (upgrade flow) — public build metadata endpoint. Mounted under
 // /admin/ but intentionally unauthenticated: the dashboard fetches /admin/version
