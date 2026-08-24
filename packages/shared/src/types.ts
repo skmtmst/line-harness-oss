@@ -1324,3 +1324,48 @@ export const FRIEND_ADD_ROUTING_DEFAULT: FriendAddRouting = {
   },
   criteria: { firstTime: "unfollow_count_zero" },
 };
+
+/** V6の友だち追加履歴。Pencil共通デザインはこの契約だけを見て描画する。 */
+export type FriendAddEventKind = "first_time" | "returning";
+export type FriendAddEventAttributionStatus = "captured" | "unavailable";
+export type FriendAddEventRoutingStatus = "pending" | "completed" | "failed" | "suppressed";
+
+export interface FriendAddEventItem {
+  id: string;
+  friendId: string;
+  displayName: string | null;
+  pictureUrl: string | null;
+  kind: FriendAddEventKind;
+  /** LINEの参考値。正確な初回・再追加判定には使わない。 */
+  isUnblockedHint: boolean | null;
+  attributionStatus: FriendAddEventAttributionStatus;
+  refCode: string | null;
+  entryRouteId: string | null;
+  entryRouteName: string | null;
+  routingStatus: FriendAddEventRoutingStatus;
+  occurredAt: string;
+  processedAt: string | null;
+}
+
+export interface FriendAddEventSummary {
+  total: number;
+  firstTime: number;
+  returning: number;
+  captured: number;
+  unavailable: number;
+  pending: number;
+  failed: number;
+}
+
+export interface FriendAddEventList {
+  items: FriendAddEventItem[];
+  summary: FriendAddEventSummary;
+  nextCursor: string | null;
+}
+
+/** 見た目から独立した画面状態。V6の共通スケルトン・空表示・エラー表示へ対応する。 */
+export type FriendAddEventViewState =
+  | { status: "loading" }
+  | { status: "empty"; summary: FriendAddEventSummary }
+  | { status: "ready"; data: FriendAddEventList }
+  | { status: "error"; message: string };

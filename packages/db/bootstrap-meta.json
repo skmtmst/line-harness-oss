@@ -184,7 +184,8 @@
     "175_restaurant_terms_agreement.sql",
     "176_tenant_foundation.sql",
     "177_tenant_backfill_and_unique.sql",
-    "178_line_webhook_events.sql"
+    "178_line_webhook_events.sql",
+    "179_friend_add_event_ledger.sql"
   ],
-  "migrationCount": 185
+  "migrationCount": 186
 }

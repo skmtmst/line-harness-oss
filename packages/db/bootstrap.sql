@@ -579,6 +579,42 @@ CREATE TABLE forms (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 , on_submit_message_type TEXT CHECK (on_submit_message_type IN ('text', 'flex')) DEFAULT NULL, on_submit_message_content TEXT DEFAULT NULL, on_submit_webhook_url TEXT, on_submit_webhook_headers TEXT, on_submit_webhook_fail_message TEXT, og_title TEXT, og_description TEXT, og_image_url TEXT, layout TEXT);
 
+CREATE TABLE friend_add_attribution_candidates (
+  id                   TEXT PRIMARY KEY,
+  line_account_id      TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id            TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  ref_code             TEXT NOT NULL,
+  entry_route_id       TEXT REFERENCES entry_routes(id) ON DELETE SET NULL,
+  source               TEXT NOT NULL CHECK (source IN ('line_login', 'liff', 'short_link')),
+  status               TEXT NOT NULL DEFAULT 'pending'
+                         CHECK (status IN ('pending', 'consumed', 'expired', 'late')),
+  occurred_at          TEXT NOT NULL,
+  consumed_by_event_id TEXT,
+  expires_at           TEXT NOT NULL,
+  created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE friend_add_events (
+  id                    TEXT PRIMARY KEY,
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  friend_id             TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  webhook_event_id      TEXT NOT NULL,
+  friend_kind           TEXT NOT NULL CHECK (friend_kind IN ('first_time', 'returning')),
+  is_unblocked_hint     INTEGER CHECK (is_unblocked_hint IS NULL OR is_unblocked_hint IN (0, 1)),
+  attribution_status    TEXT NOT NULL DEFAULT 'unavailable'
+                          CHECK (attribution_status IN ('captured', 'unavailable')),
+  ref_code              TEXT,
+  entry_route_id        TEXT REFERENCES entry_routes(id) ON DELETE SET NULL,
+  candidate_id          TEXT REFERENCES friend_add_attribution_candidates(id) ON DELETE SET NULL,
+  routing_rule_id       TEXT,
+  routing_status        TEXT NOT NULL DEFAULT 'pending'
+                          CHECK (routing_status IN ('pending', 'completed', 'failed', 'suppressed')),
+  occurred_at           TEXT NOT NULL,
+  processed_at          TEXT,
+  created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  UNIQUE (line_account_id, webhook_event_id)
+);
+
 CREATE TABLE friend_daily_snapshots (
   -- JST の日付（YYYY-MM-DD）。LINEアカウントごとに1行。
   date              TEXT NOT NULL,
@@ -2273,6 +2309,21 @@ CREATE INDEX idx_form_submissions_form_friend
   ON form_submissions (form_id, friend_id);
 
 CREATE INDEX idx_form_submissions_friend ON form_submissions (friend_id);
+
+CREATE INDEX idx_friend_add_candidates_expiry
+  ON friend_add_attribution_candidates(status, expires_at);
+
+CREATE INDEX idx_friend_add_candidates_match
+  ON friend_add_attribution_candidates(line_account_id, friend_id, status, occurred_at DESC);
+
+CREATE INDEX idx_friend_add_events_account_state
+  ON friend_add_events(line_account_id, friend_kind, attribution_status, routing_status);
+
+CREATE INDEX idx_friend_add_events_account_time
+  ON friend_add_events(line_account_id, occurred_at DESC, id DESC);
+
+CREATE INDEX idx_friend_add_events_friend
+  ON friend_add_events(line_account_id, friend_id, occurred_at DESC);
 
 CREATE INDEX idx_friend_daily_snapshots_date
   ON friend_daily_snapshots (line_account_id, date);

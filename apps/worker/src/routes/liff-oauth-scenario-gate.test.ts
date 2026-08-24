@@ -49,6 +49,7 @@ const dbMocks = {
   linkFriendToUser: vi.fn().mockResolvedValue(undefined),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   recordRefTracking: vi.fn().mockResolvedValue(undefined),
+  recordFriendAddAttributionCandidate: vi.fn().mockResolvedValue({ status: 'pending' }),
   getTrackedLinkById: vi.fn().mockResolvedValue(null),
   getMessageTemplateById: vi.fn().mockResolvedValue(null),
   getAffiliateLinkByRefCode: vi.fn().mockResolvedValue(null),

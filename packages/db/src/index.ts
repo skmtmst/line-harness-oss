@@ -15,6 +15,7 @@ export * from './conversions';
 export * from './affiliates';
 export * from './webhooks';
 export * from './line-webhook-events';
+export * from './friend-add-events';
 export * from './calendar';
 export * from './reminders';
 export * from './scoring';

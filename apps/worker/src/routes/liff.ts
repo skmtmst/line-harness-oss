@@ -7,6 +7,7 @@ import {
   upsertFriend,
   getEntryRouteByRefCode,
   recordRefTracking,
+  recordFriendAddAttributionCandidate,
   addTagToFriend,
   getLineAccountByChannelId,
   getLineAccountById,
@@ -54,6 +55,32 @@ function decodeState(encoded: string): string {
 }
 
 const liffRoutes = new Hono<Env>();
+
+async function saveFriendAddCandidate(
+  db: D1Database,
+  input: {
+    lineAccountId: string | null;
+    friendId: string;
+    refCode?: string | null;
+    source: 'line_login' | 'liff' | 'short_link';
+  },
+): Promise<void> {
+  const refCode = input.refCode?.trim();
+  if (!input.lineAccountId || !refCode || refCode.startsWith('xh:')) return;
+  try {
+    const route = await getEntryRouteByRefCode(db, refCode);
+    await recordFriendAddAttributionCandidate(db, {
+      lineAccountId: input.lineAccountId,
+      friendId: input.friendId,
+      refCode,
+      entryRouteId: route?.id ?? null,
+      source: input.source,
+    });
+  } catch (err) {
+    // 既存のLIFF連携を止めない。台帳だけ監視ログへ残して再調査できるようにする。
+    console.error({ event: 'friend_add_candidate_record_failed', reason: String(err) });
+  }
+}
 
 // Persist ig_igsid on the LINE friend and notify IG Harness.
 // Used anywhere a LIFF/OAuth flow resolves with a known IGSID so existing
@@ -771,6 +798,14 @@ liffRoutes.get('/auth/callback', async (c) => {
       statusMessage: null,
     });
 
+    // OAuth型の追加導線は /api/liff/link を通らないため、ここでも今回リンクを記録する。
+    await saveFriendAddCandidate(db, {
+      lineAccountId: loginLineAccountId,
+      friendId: friend.id,
+      refCode: ref,
+      source: 'line_login',
+    });
+
     // IG cross-platform UUID linkage (OAuth path — new friends & returning users
     // going through /auth/callback). Existing friends who bypass OAuth hit the
     // same helper from /api/liff/link and /api/liff/send-form-link.
@@ -1159,6 +1194,59 @@ liffRoutes.post('/api/liff/profile', async (c) => {
   }
 });
 
+// POST /api/liff/friend-add-intent - 「今回開いたリンク」を追加イベント候補として記録
+liffRoutes.post('/api/liff/friend-add-intent', async (c) => {
+  try {
+    const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (!identity) return c.json({ success: false, error: 'Invalid ID token' }, 401);
+    if (!identity.lineAccountId) {
+      return c.json({ success: false, error: 'LINEアカウントを特定できません' }, 409);
+    }
+
+    const body = await c.req.json<{
+      ref?: string;
+      source?: 'line_login' | 'liff' | 'short_link';
+    }>();
+    const refCode = body.ref?.trim() ?? '';
+    if (!refCode || refCode.length > 256 || refCode.startsWith('xh:')) {
+      return c.json({ success: false, error: 'ref が正しくありません' }, 400);
+    }
+    const source = body.source ?? 'liff';
+    if (!['line_login', 'liff', 'short_link'].includes(source)) {
+      return c.json({ success: false, error: 'source が正しくありません' }, 400);
+    }
+
+    const friend = await getFriendByLineUserIdForAccount(
+      c.env.DB,
+      identity.lineUserId,
+      identity.lineAccountId,
+    );
+    if (!friend || friend.line_account_id !== identity.lineAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
+    const route = await getEntryRouteByRefCode(c.env.DB, refCode);
+    const candidate = await recordFriendAddAttributionCandidate(c.env.DB, {
+      lineAccountId: identity.lineAccountId,
+      friendId: friend.id,
+      refCode,
+      entryRouteId: route?.id ?? null,
+      source,
+    });
+    return c.json({
+      success: true,
+      data: {
+        status: candidate.status,
+        refCode: candidate.refCode,
+        entryRouteId: candidate.entryRouteId,
+        expiresAt: candidate.expiresAt,
+      },
+    });
+  } catch (err) {
+    console.error('POST /api/liff/friend-add-intent error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // POST /api/liff/link - link friend to user UUID (public, verified via LINE ID token)
 liffRoutes.post('/api/liff/link', async (c) => {
   try {
@@ -1249,6 +1337,12 @@ liffRoutes.post('/api/liff/link', async (c) => {
     if (igLinkOk) await saveIgAccountMeta(db, friend.id, body.iga || '', body.igan || '');
 
     if (linkedUserId) {
+      await saveFriendAddCandidate(db, {
+        lineAccountId: matchedAccount?.id ?? null,
+        friendId: friend.id,
+        refCode: body.ref,
+        source: 'liff',
+      });
       // Still save ref even if already linked (but never persist xh: tokens as ref_code)
       if (body.ref && !body.ref.startsWith('xh:')) {
         await db.prepare('UPDATE friends SET ref_code = ? WHERE id = ? AND ref_code IS NULL')
@@ -1321,6 +1415,13 @@ liffRoutes.post('/api/liff/link', async (c) => {
     }
 
     await linkFriendToUser(db, friend.id, userId);
+
+    await saveFriendAddCandidate(db, {
+      lineAccountId: matchedAccount?.id ?? null,
+      friendId: friend.id,
+      refCode: body.ref,
+      source: 'liff',
+    });
 
     // Save ref_code from LIFF (first touch wins)
     // xh: refs are X Harness one-time tokens — never persist as ref_code
