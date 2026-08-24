@@ -63,9 +63,9 @@
     "investigating": "調査中。契約には入れない"
   },
   "required": {
-    "$説明": "この数を下回るとCIを落とす。項目をまとめて消して0件合格にできないようにするため。承認時の想定は35宣言だったが、font-weight 3件と border 1件を追加で固定したため39になっている。減らす方向の変更は承認が要る。",
-    "tokens": 12,
-    "parts": 8,
+    "$説明": "この数を下回るとCIを落とす。B2ではカード・カード見出し・状態バッジ・アイコン操作まで契約へ追加した。減らす方向の変更は承認が要る。",
+    "tokens": 23,
+    "parts": 12,
     "componentInventory": 85,
     "v6RepresentativeNodes": 10,
     "v6PartNodes": [
@@ -86,9 +86,15 @@
       "R098Z",
       "z9TQJ",
       "VPn1F",
-      "ISA1Q"
+      "ISA1Q",
+      "X34VF",
+      "u1o8G",
+      "l3VZqA",
+      "t0jk8p",
+      "xRvDB",
+      "H0V8EK"
     ],
-    "partDeclarations": 115
+    "partDeclarations": 167
   },
   "baselineScreens": {
     "$説明": "全103ページを毎回見るのは現実的ではないので、トークンと部品を代表する画面を決めておく。1440pxと1920pxで確認する。",
@@ -203,6 +209,94 @@
       "resolved": "1px 1px 2px #1920261a",
       "status": "active",
       "note": "追加。@theme ではなく素の :root に置く。Tailwindは影の値をクラスへ直に埋め込むため変数が出力されない",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-status-info": {
+      "pencil": "$status-info",
+      "source": "#175cd3",
+      "resolved": "#175cd3",
+      "status": "active",
+      "note": "状態バッジの情報色",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-status-info-soft": {
+      "pencil": "$status-info-soft",
+      "source": "#e9f1ff",
+      "resolved": "#e9f1ff",
+      "status": "active",
+      "note": "状態バッジの情報背景",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-status-warning": {
+      "pencil": "$status-warn-deep",
+      "source": "#a15c00",
+      "resolved": "#a15c00",
+      "status": "active",
+      "note": "状態バッジの注意色",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-status-warning-soft": {
+      "pencil": "$status-warn-soft",
+      "source": "#fff7e6",
+      "resolved": "#fff7e6",
+      "status": "active",
+      "note": "状態バッジの注意背景",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-status-danger": {
+      "pencil": "$status-danger",
+      "source": "#e5484d",
+      "resolved": "#e5484d",
+      "status": "active",
+      "note": "状態バッジの危険色",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--color-status-danger-soft": {
+      "pencil": "$status-danger-soft",
+      "source": "#fef0f0",
+      "resolved": "#fef0f0",
+      "status": "active",
+      "note": "状態バッジの危険背景",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--radius-panel": {
+      "pencil": "$radius-panel",
+      "source": "12px",
+      "resolved": "12px",
+      "status": "active",
+      "note": "大きなパネルとドロワーの角丸",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--radius-icon": {
+      "pencil": "$radius-xxs",
+      "source": "3px",
+      "resolved": "3px",
+      "status": "active",
+      "note": "アイコンだけの操作の角丸",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--text-body": {
+      "pencil": "$size-body",
+      "source": "14px",
+      "resolved": "14px",
+      "status": "active",
+      "note": "本文の文字サイズ",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--text-lead": {
+      "pencil": "$size-lead",
+      "source": "16px",
+      "resolved": "16px",
+      "status": "active",
+      "note": "カード見出しの文字サイズ",
+      "lastCheckedAt": "2026-08-24"
+    },
+    "--text-display": {
+      "pencil": "$size-display",
+      "source": "30px",
+      "resolved": "30px",
+      "status": "active",
+      "note": "ページ見出しの文字サイズ",
       "lastCheckedAt": "2026-08-24"
     }
   },
@@ -1060,6 +1154,130 @@
         { "pencil": "z9TQJ cornerRadius: $radius-md", "class": "segmented", "prop": "border-radius", "source": "var(--radius-tile)", "resolved": "10px" },
         { "pencil": "z9TQJ item height: 42", "class": "segmentedTab", "prop": "height", "source": "42px", "resolved": "42px" },
         { "pencil": "z9TQJ item cornerRadius: $radius-sm", "class": "segmentedTab", "prop": "border-radius", "source": "var(--radius-control)", "resolved": "0.5rem" }
+      ]
+    },
+    "card": {
+      "name": "V5 共通カード",
+      "pencilNodes": ["X34VF", "u1o8G", "l3VZqA"],
+      "role": "sample",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/card.tsx",
+      "cssModule": "src/components/shared/card.module.css",
+      "components": ["Card"],
+      "cssPrefix": "card",
+      "pencilUsage": "ダッシュボード内の直接配置カード",
+      "lastCheckedAt": "2026-08-24",
+      "note": "V5ダッシュボードに繰り返し現れる面・縦配置・余白を名前付きpropsへ固定した。",
+      "routes": { "active": ["/"], "impact": "カードを使う管理画面" },
+      "visualVerification": { "status": "unverified", "requiredViewports": [1440, 1920], "reason": "B2の同一状態画像を比較する。" },
+      "declarations": [
+        { "pencil": "X34VF stroke: $hairline / 1", "class": "card", "prop": "border", "source": "1px solid var(--color-hairline)", "resolved": "1px solid #dadde2" },
+        { "pencil": "X34VF cornerRadius: $radius-md", "class": "card", "prop": "border-radius", "source": "var(--radius-tile)", "resolved": "10px" },
+        { "pencil": "X34VF fill: $canvas", "class": "card", "prop": "background", "source": "var(--color-canvas)", "resolved": "#ffffff" },
+        { "pencil": "X34VF effect: #1920261A 1,1,2", "class": "card", "prop": "box-shadow", "source": "var(--shadow-card)", "resolved": "1px 1px 2px #1920261a" },
+        { "pencil": "dashboard card layout: vertical", "class": "vertical", "prop": "display", "source": "flex", "resolved": "flex" },
+        { "pencil": "dashboard card layout: vertical", "class": "vertical", "prop": "flex-direction", "source": "column", "resolved": "column" },
+        { "pencil": "today card padding: 16", "class": "paddingDefault", "prop": "padding", "source": "16px", "resolved": "16px" },
+        { "pencil": "roomy card padding: 18", "class": "paddingRoomy", "prop": "padding", "source": "18px", "resolved": "18px" }
+      ]
+    },
+    "card-header": {
+      "name": "V5 共通カード見出し",
+      "pencilNodes": ["t0jk8p"],
+      "role": "canonical",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/card.tsx",
+      "cssModule": "src/components/shared/card.module.css",
+      "components": ["CardHeader"],
+      "cssPrefix": "card",
+      "pencilUsage": "未計測（ダッシュボードへ適用開始）",
+      "lastCheckedAt": "2026-08-24",
+      "note": "標準48pxとダッシュボード用58pxを名前付きsizeへ固定し、長い見出しを省略する。",
+      "routes": { "active": ["/"], "impact": "カード見出しを使う管理画面" },
+      "visualVerification": { "status": "unverified", "requiredViewports": [1440, 1920], "reason": "B2の同一状態画像を比較する。" },
+      "declarations": [
+        { "pencil": "t0jk8p height: 48", "class": "header", "prop": "min-height", "source": "48px", "resolved": "48px" },
+        { "pencil": "t0jk8p alignItems: center", "class": "header", "prop": "align-items", "source": "center", "resolved": "center" },
+        { "pencil": "t0jk8p justifyContent: space_between", "class": "header", "prop": "justify-content", "source": "space-between", "resolved": "space-between" },
+        { "pencil": "t0jk8p gap: 12", "class": "header", "prop": "gap", "source": "12px", "resolved": "12px" },
+        { "pencil": "t0jk8p padding: [0,16]", "class": "header", "prop": "padding", "source": "0 16px", "resolved": "0 16px" },
+        { "pencil": "dashboard roomy header height: 58", "class": "headerRoomy", "prop": "min-height", "source": "58px", "resolved": "58px" },
+        { "pencil": "dashboard roomy header padding: [0,18]", "class": "headerRoomy", "prop": "padding", "source": "0 18px", "resolved": "0 18px" },
+        { "pencil": "t0jk8p title group layout", "class": "titleGroup", "prop": "display", "source": "flex", "resolved": "flex" },
+        { "pencil": "t0jk8p title group alignItems: baseline", "class": "titleGroup", "prop": "align-items", "source": "baseline", "resolved": "baseline" },
+        { "pencil": "t0jk8p title group gap: 8", "class": "titleGroup", "prop": "gap", "source": "8px", "resolved": "8px" },
+        { "pencil": "t0jk8p title fill: $ink", "class": "title", "prop": "color", "source": "var(--color-ink)", "resolved": "#1d1d1f" },
+        { "pencil": "t0jk8p title fontSize: $size-lead", "class": "title", "prop": "font-size", "source": "var(--text-lead)", "resolved": "16px" },
+        { "pencil": "t0jk8p title fontWeight: 700", "class": "title", "prop": "font-weight", "source": "700", "resolved": "700" },
+        { "pencil": "t0jk8p action fill: $accent", "class": "action", "prop": "color", "source": "var(--color-accent)", "resolved": "#06c755" },
+        { "pencil": "t0jk8p action layout", "class": "action", "prop": "display", "source": "flex", "resolved": "flex" },
+        { "pencil": "t0jk8p action fixed width behavior", "class": "action", "prop": "flex-shrink", "source": "0", "resolved": "0" },
+        { "pencil": "t0jk8p action alignItems: center", "class": "action", "prop": "align-items", "source": "center", "resolved": "center" },
+        { "pencil": "t0jk8p action fontSize: $size-label", "class": "action", "prop": "font-size", "source": "var(--text-label)", "resolved": "13px" },
+        { "pencil": "t0jk8p action fontWeight: 600", "class": "action", "prop": "font-weight", "source": "600", "resolved": "600" }
+      ]
+    },
+    "status-badge": {
+      "name": "V5 共通状態バッジ",
+      "pencilNodes": ["xRvDB"],
+      "role": "sample",
+      "status": "active",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/status-badge.tsx",
+      "cssModule": "src/components/shared/status-badge.module.css",
+      "components": ["StatusBadge"],
+      "cssPrefix": "status-badge",
+      "pencilUsage": "ダッシュボードへ適用開始",
+      "lastCheckedAt": "2026-08-24",
+      "note": "意味をtoneで固定し、通常とダッシュボード表内compactの2サイズを持つ。",
+      "routes": { "active": ["/"], "impact": "状態表示を持つ管理画面" },
+      "visualVerification": { "status": "unverified", "requiredViewports": [1440, 1920], "reason": "B2の同一状態画像を比較する。" },
+      "declarations": [
+        { "pencil": "xRvDB cornerRadius: $radius-full", "class": "badge", "prop": "border-radius", "source": "var(--radius-pill)", "resolved": "9999px" },
+        { "pencil": "xRvDB padding: [7,12]", "class": "badge", "prop": "padding", "source": "7px 12px", "resolved": "7px 12px" },
+        { "pencil": "xRvDB fontSize: $size-caption", "class": "badge", "prop": "font-size", "source": "var(--text-caption)", "resolved": "12px" },
+        { "pencil": "xRvDB fontWeight: 700", "class": "badge", "prop": "font-weight", "source": "700", "resolved": "700" },
+        { "pencil": "dashboard compact padding: [5,8]", "class": "compact", "prop": "padding", "source": "5px 8px", "resolved": "5px 8px" },
+        { "pencil": "dashboard compact fontSize: $size-nano", "class": "compact", "prop": "font-size", "source": "var(--text-nano)", "resolved": "10px" },
+        { "pencil": "neutral fill: $canvas-parchment", "class": "neutral", "prop": "background", "source": "var(--color-shell)", "resolved": "#f5f5f7" },
+        { "pencil": "neutral label: $ink-secondary", "class": "neutral", "prop": "color", "source": "var(--color-ink-secondary)", "resolved": "#4a5565" },
+        { "pencil": "info fill: $status-info-soft", "class": "info", "prop": "background", "source": "var(--color-status-info-soft)", "resolved": "#e9f1ff" },
+        { "pencil": "info label: $status-info", "class": "info", "prop": "color", "source": "var(--color-status-info)", "resolved": "#175cd3" },
+        { "pencil": "warning fill: $status-warn-soft", "class": "warning", "prop": "background", "source": "var(--color-status-warning-soft)", "resolved": "#fff7e6" },
+        { "pencil": "warning label: $status-warn-deep", "class": "warning", "prop": "color", "source": "var(--color-status-warning)", "resolved": "#a15c00" },
+        { "pencil": "success fill: $accent-soft", "class": "success", "prop": "background", "source": "var(--color-accent-soft)", "resolved": "#e8f8ee" },
+        { "pencil": "success label: $accent", "class": "success", "prop": "color", "source": "var(--color-accent)", "resolved": "#06c755" },
+        { "pencil": "danger fill: $status-danger-soft", "class": "danger", "prop": "background", "source": "var(--color-status-danger-soft)", "resolved": "#fef0f0" },
+        { "pencil": "danger label: $status-danger", "class": "danger", "prop": "color", "source": "var(--color-status-danger)", "resolved": "#e5484d" }
+      ]
+    },
+    "icon-button": {
+      "name": "V5 共通アイコン操作",
+      "pencilNodes": ["H0V8EK"],
+      "role": "canonical",
+      "status": "implemented",
+      "reviewStatus": "confirmed",
+      "code": "src/components/shared/icon-button.tsx",
+      "cssModule": "src/components/shared/icon-button.module.css",
+      "components": ["IconButton"],
+      "cssPrefix": "icon-button",
+      "pencilUsage": "画面適用待ち",
+      "lastCheckedAt": "2026-08-24",
+      "note": "見える文字がないためaria-labelを必須にし、フォーカスとdisabledをコード側で補う。",
+      "routes": { "implemented": [], "impact": "アイコンだけの操作を持つ管理画面" },
+      "visualVerification": { "status": "unverified", "requiredViewports": [1440, 1920], "reason": "実画面へ適用したPRで比較する。" },
+      "declarations": [
+        { "pencil": "H0V8EK width: 32", "class": "button", "prop": "width", "source": "32px", "resolved": "32px" },
+        { "pencil": "H0V8EK height: 32", "class": "button", "prop": "height", "source": "32px", "resolved": "32px" },
+        { "pencil": "H0V8EK fixed size: 32", "class": "button", "prop": "flex", "source": "0 0 32px", "resolved": "0 0 32px" },
+        { "pencil": "H0V8EK alignItems: center", "class": "button", "prop": "align-items", "source": "center", "resolved": "center" },
+        { "pencil": "H0V8EK justifyContent: center", "class": "button", "prop": "justify-content", "source": "center", "resolved": "center" },
+        { "pencil": "H0V8EK stroke: none", "class": "button", "prop": "border", "source": "0", "resolved": "0" },
+        { "pencil": "H0V8EK cornerRadius: $radius-xxs", "class": "button", "prop": "border-radius", "source": "var(--radius-icon)", "resolved": "3px" },
+        { "pencil": "H0V8EK fill: transparent", "class": "button", "prop": "background", "source": "transparent", "resolved": "transparent" },
+        { "pencil": "H0V8EK icon fill: $ink-faint", "class": "button", "prop": "color", "source": "var(--color-ink-faint)", "resolved": "#6e7781" }
       ]
     }
   },

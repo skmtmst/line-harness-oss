@@ -24,6 +24,7 @@ import DashboardEditor, {
   type DashboardPreferences,
 } from '@/components/dashboard/dashboard-editor'
 import Header from '@/components/layout/header'
+import Card, { CardHeader } from '@/components/shared/card'
 
 const PERIODS = [
   { key: 'today', label: '今日' },
@@ -53,14 +54,6 @@ function EditIcon() {
   )
 }
 
-function DashboardCard({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return (
-    <section className={`bg-canvas rounded-[18px] border-hairline border shadow-[1px_1px_2px_rgba(29,29,31,0.13)] ${className}`}>
-      {children}
-    </section>
-  )
-}
-
 function TodayTaskCard({
   title,
   href,
@@ -77,7 +70,7 @@ function TodayTaskCard({
   status: string
 }) {
   return (
-    <DashboardCard className="flex h-[112px] min-w-0 flex-col p-4">
+    <Card layout="vertical" padding="default" className="h-[132px] min-w-0">
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-ink text-sm font-semibold">{title}</h3>
         <Link href={href} className="text-action shrink-0 text-xs font-medium hover:underline">{action}</Link>
@@ -89,7 +82,7 @@ function TodayTaskCard({
         <span className="text-ink-faint truncate text-xs" title={detail}>{detail}</span>
         <span className="text-success shrink-0 text-xs font-medium">{status}</span>
       </div>
-    </DashboardCard>
+    </Card>
   )
 }
 
@@ -131,7 +124,7 @@ function FriendAddLinkCard() {
   }
 
   return (
-    <DashboardCard className="p-[18px]">
+    <Card padding="roomy">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-ink text-sm font-semibold">友だち追加リンク</h2>
@@ -176,31 +169,35 @@ function FriendAddLinkCard() {
         baseLink={baseLink}
         initialRouteId={routeId}
       />
-    </DashboardCard>
+    </Card>
   )
 }
 
 function FriendTrendCard({ data, loading }: { data: DashboardOverview | null; loading: boolean }) {
   return (
-    <DashboardCard>
-      <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
-        <h2 className="text-ink text-sm font-semibold">友だち数の推移</h2>
-        <Link href="/analytics" className="text-action text-xs hover:underline">さらに詳しく →</Link>
-      </div>
+    <Card overflow="hidden">
+      <CardHeader
+        size="roomy"
+        title="友だち数の推移"
+        action={<Link href="/analytics" className="hover:underline">さらに詳しく →</Link>}
+        actionTone="info"
+      />
       <FriendTrendTable trend={data?.trend ?? []} loading={loading} />
-    </DashboardCard>
+    </Card>
   )
 }
 
 function EmptyDataCard({ title, href, linkLabel }: { title: string; href: string; linkLabel: string }) {
   return (
-    <DashboardCard>
-      <div className="border-hairline flex items-center justify-between border-b px-5 py-3.5">
-        <h2 className="text-ink text-sm font-semibold">{title}</h2>
-        <Link href={href} className="text-action text-xs hover:underline">{linkLabel} →</Link>
-      </div>
+    <Card overflow="hidden">
+      <CardHeader
+        size="roomy"
+        title={title}
+        action={<Link href={href} className="hover:underline">{linkLabel} →</Link>}
+        actionTone="info"
+      />
       <p className="text-ink-faint px-5 py-8 text-center text-sm">このカードで表示できるデータはまだありません。</p>
-    </DashboardCard>
+    </Card>
   )
 }
 
@@ -210,7 +207,7 @@ function LiveDataCard({
   title: string; href: string; linkLabel: string; value: number | null; unit?: string; detail: string
 }) {
   return (
-    <DashboardCard className="p-[18px]">
+    <Card padding="roomy">
       <div className="flex items-start justify-between gap-3">
         <h2 className="text-ink text-sm font-semibold">{title}</h2>
         <Link href={href} className="text-action text-xs hover:underline">{linkLabel} →</Link>
@@ -219,7 +216,7 @@ function LiveDataCard({
         {value === null ? '—' : value.toLocaleString('ja-JP')}<span className="ml-1 text-sm font-medium">{unit}</span>
       </p>
       <p className="text-ink-faint mt-2 truncate text-xs" title={detail}>{detail}</p>
-    </DashboardCard>
+    </Card>
   )
 }
 
@@ -228,7 +225,7 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
   const limit = delivery?.quotaLimit ?? null
   const remaining = used !== null && limit !== null ? Math.max(0, limit - used) : null
   const remainingRate = remaining !== null && limit ? Math.max(0, Math.min(100, remaining / limit * 100)) : null
-  return <DashboardCard className="min-h-[128px] p-[18px]">
+  return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
       <h2 className="text-ink text-base font-bold">今月の送信枠</h2>
       <span className="text-ink-faint text-xs">月初リセット</span>
@@ -241,7 +238,7 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
       <span className="text-success">{remainingRate === null ? '残りを確認中' : `残り ${remainingRate.toFixed(1)}%`}</span>
       <Link href="/accounts" className="text-action font-medium hover:underline">配信設定へ →</Link>
     </div>
-  </DashboardCard>
+  </Card>
 }
 
 function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null }) {
@@ -249,7 +246,7 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk
   // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
   // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
   const count = risk === null ? null : currentHealthIssue ? Math.max(1, healthIssues ?? 1) : 0
-  return <DashboardCard className="min-h-[128px] p-[18px]">
+  return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
       <h2 className="text-ink text-base font-bold">運用アラート</h2>
       <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `${count}件`}</span>
@@ -259,20 +256,20 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk
       <p>・未対応の最長待ち：{oldestWaitMinutes === null ? '確認中' : `${formatDurationMinutes(oldestWaitMinutes)}（受信箱で確認）`}</p>
     </div>
     <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
-  </DashboardCard>
+  </Card>
 }
 
 function ConnectionStatusCard({ account, risk, activeFriends }: { account: ReturnType<typeof useAccount>['selectedAccount']; risk: HealthRisk; activeFriends: number | null }) {
   const webhook = account?.webhook?.status
   const webhookLabel = webhook === 'matched' ? '正常' : webhook === 'mismatched' || webhook === 'unconfigured' ? '要確認' : '確認中'
-  return <DashboardCard className="min-h-[128px] p-[18px]">
+  return <Card padding="roomy" className="min-h-[128px]">
     <h2 className="text-ink text-base font-bold">接続状態</h2>
     <dl className="mt-3 space-y-2 text-xs">
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">LINE Webhook</dt><dd className={webhookLabel === '正常' ? 'text-success font-semibold' : webhookLabel === '要確認' ? 'text-danger font-semibold' : 'text-ink-faint'}>{webhookLabel}</dd></div>
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">自動処理</dt><dd className={risk === 'normal' ? 'text-success font-semibold' : risk ? 'text-danger font-semibold' : 'text-ink-faint'}>{risk === 'normal' ? '稼働中' : risk ? '要確認' : '確認中'}</dd></div>
       <div className="flex justify-between gap-3"><dt className="text-ink-faint">有効友だち</dt><dd className="text-success font-semibold">{activeFriends === null ? '—' : `${activeFriends.toLocaleString('ja-JP')}人`}</dd></div>
     </dl>
-  </DashboardCard>
+  </Card>
 }
 
 export default function DashboardPage() {

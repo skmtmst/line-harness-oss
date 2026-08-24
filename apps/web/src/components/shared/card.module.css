@@ -1,0 +1,80 @@
+.card {
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-tile);
+  background: var(--color-canvas);
+  box-shadow: var(--shadow-card);
+}
+
+.vertical {
+  display: flex;
+  flex-direction: column;
+}
+
+.overflowHidden {
+  overflow: hidden;
+}
+
+.paddingDefault {
+  padding: 16px;
+}
+
+.paddingRoomy {
+  padding: 18px;
+}
+
+.header {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.headerRoomy {
+  min-height: 58px;
+  padding: 0 18px;
+}
+
+.titleGroup {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-lead);
+  font-weight: 700;
+  line-height: 1.43;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  flex: 0 0 auto;
+  color: var(--color-accent, currentColor);
+  font-size: var(--text-caption);
+  font-weight: 700;
+}
+
+.action {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--color-accent);
+  font-size: var(--text-label);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.actionInfo {
+  color: var(--color-status-info);
+}
+
+.action :is(a, button):focus-visible {
+  outline: revert;
+}

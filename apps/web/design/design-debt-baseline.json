@@ -251,10 +251,10 @@
     "arbitrary-value": 1
   },
   "app/page.tsx": {
-    "unresolved-classname": 2,
-    "arbitrary-value": 17,
+    "arbitrary-value": 10,
     "direct-secondary-button": 4,
-    "direct-primary-button": 2
+    "direct-primary-button": 2,
+    "unresolved-classname": 1
   },
   "app/pools/new/page.tsx": {
     "unresolved-classname": 3
@@ -525,13 +525,12 @@
     "direct-secondary-button": 3
   },
   "components/dashboard/shipment-panel.tsx": {
-    "unresolved-classname": 2,
-    "arbitrary-value": 9,
+    "arbitrary-value": 4,
     "direct-th": 6
   },
   "components/dashboard/side-cards.tsx": {
-    "arbitrary-value": 6,
-    "unresolved-classname": 1
+    "unresolved-classname": 1,
+    "arbitrary-value": 4
   },
   "components/emergency/release-log-panel.tsx": {
     "arbitrary-value": 3,
@@ -740,7 +739,7 @@
     "arbitrary-value": 43
   },
   "components/support/pending-inbox-card.tsx": {
-    "arbitrary-value": 12,
+    "arbitrary-value": 8,
     "direct-th": 4,
     "direct-secondary-button": 2
   },

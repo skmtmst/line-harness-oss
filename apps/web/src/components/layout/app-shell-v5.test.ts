@@ -11,6 +11,7 @@ const PENDING_INBOX = join(ROOT, '..', 'support', 'pending-inbox-card.tsx')
 const FRIEND_TREND = join(ROOT, '..', 'dashboard', 'friend-trend-table.tsx')
 const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
 const MENU = join(ROOT, '..', '..', 'lib', 'menu.ts')
+const CARD = join(ROOT, '..', 'shared', 'card.module.css')
 
 describe('Pen.dev V5を共通レイアウトの正本にする', () => {
   const shell = readFileSync(APP_SHELL, 'utf8')
@@ -20,6 +21,7 @@ describe('Pen.dev V5を共通レイアウトの正本にする', () => {
   const friendTrend = readFileSync(FRIEND_TREND, 'utf8')
   const chats = readFileSync(CHATS, 'utf8')
   const menu = readFileSync(MENU, 'utf8')
+  const card = readFileSync(CARD, 'utf8')
 
   it('1920pxでV5正式共通メニューと本体幅の契約を使う', () => {
     expect(shell).toContain('data-design-shell="v5-1920"')
@@ -42,9 +44,10 @@ describe('Pen.dev V5を共通レイアウトの正本にする', () => {
     ]) expect(dashboard).toContain(label)
   })
 
-  it('V4カードの影は右1px・下1pxで統一する', () => {
-    expect(dashboard).toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
-    expect(dashboard).not.toContain('shadow-[1px_2px_2px_rgba(29,29,31,0.13)]')
+  it('カードの影はV5共通部品から右1px・下1pxで統一する', () => {
+    expect(dashboard).toContain("import Card, { CardHeader } from '@/components/shared/card'")
+    expect(card).toContain('box-shadow: var(--shadow-card)')
+    expect(dashboard).not.toContain('shadow-[1px_1px_2px_rgba(29,29,31,0.13)]')
   })
 
   it('編集画面は矢印ではなくドラッグ・表示切替・プレビューで操作する', () => {

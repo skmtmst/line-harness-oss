@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { fetchApi } from '@/lib/api'
+import Card, { CardHeader } from '@/components/shared/card'
+import StatusBadge from '@/components/shared/status-badge'
 
 /**
  * 対応が必要な受信（設計 `V2 1-1 ダッシュボード` の `card 対応が必要な受信`）。
@@ -93,18 +95,14 @@ export default function PendingInboxCard({
   }, [load])
 
   return (
-    <section className="bg-canvas rounded-[18px] border-hairline flex h-fit min-w-0 flex-col overflow-hidden border shadow-[1px_1px_2px_rgba(29,29,31,0.13)]">
-      <div className="border-hairline flex h-[50px] shrink-0 items-center justify-between border-b px-5">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-ink text-sm font-semibold">対応が必要な受信</h2>
-          {summary && summary.total > 0 && (
-            <span className="text-success text-xs font-medium tabular-nums">{summary.total}件</span>
-          )}
-        </div>
-        <Link href="/chats" className="text-action text-xs hover:underline">
-          受信箱をすべて見る
-        </Link>
-      </div>
+    <Card layout="vertical" overflow="hidden" className="h-fit min-w-0">
+      <CardHeader
+        size="roomy"
+        title="対応が必要な受信"
+        meta={summary && summary.total > 0 ? `${summary.total}件` : undefined}
+        action={<Link href="/chats" className="hover:underline">受信箱をすべて見る</Link>}
+        actionTone="info"
+      />
 
       {!summary || summary.total === 0 ? (
         <p className="text-ink-faint flex min-h-24 items-center justify-center px-5 py-6 text-center text-sm">
@@ -150,9 +148,7 @@ export default function PendingInboxCard({
                       {elapsed(item.lastIncomingAt)}
                     </td>
                     <td className="px-5 py-2.5 whitespace-nowrap">
-                      <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-[10px] font-medium">
-                        未確認
-                      </span>
+                      <StatusBadge tone="success" size="compact">未確認</StatusBadge>
                     </td>
                   </tr>
                 ))}
@@ -189,6 +185,6 @@ export default function PendingInboxCard({
           ) : null}
         </div>
       )}
-    </section>
+    </Card>
   )
 }

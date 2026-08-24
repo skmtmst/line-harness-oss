@@ -36,7 +36,10 @@ describe('共通部品を通らない直書き', () => {
     for (const file of [
       'components/app-shell.tsx',
       'components/shared/button.tsx',
+      'components/shared/card.tsx',
+      'components/shared/icon-button.tsx',
       'components/shared/pagination.tsx',
+      'components/shared/status-badge.tsx',
       'components/shared/summary-card.tsx',
       'components/shared/table.tsx',
     ]) {
