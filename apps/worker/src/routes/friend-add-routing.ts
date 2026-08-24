@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { getTags } from '@line-crm/db';
+import { getTags, listFriendAddEvents } from '@line-crm/db';
+import type {
+  FriendAddKind,
+  FriendAddAttributionStatus,
+  FriendAddRoutingStatus,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
@@ -12,6 +17,7 @@ import {
   classifyFriend,
 } from '../services/friend-add-routing.js';
 import { FRIEND_ADD_ROUTING_DEFAULT } from '@line-crm/shared';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 /**
  * 友だち追加時の配信の振り分け（設計 V2 4-6）。
@@ -21,9 +27,56 @@ import { FRIEND_ADD_ROUTING_DEFAULT } from '@line-crm/shared';
  */
 const friendAddRouting = new Hono<Env>();
 
+const EVENT_KINDS = new Set<FriendAddKind>(['first_time', 'returning']);
+const ATTRIBUTION_STATUSES = new Set<FriendAddAttributionStatus>(['captured', 'unavailable']);
+const ROUTING_STATUSES = new Set<FriendAddRoutingStatus>(['pending', 'completed', 'failed', 'suppressed']);
+
 function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') || null;
 }
+
+/** V6の履歴一覧。設定画面とは別に、共通Pencilデザインが直接使える形で返す。 */
+friendAddRouting.get(
+  '/api/friend-add-routing/events',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const accountId = getAccountId(c);
+    if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+
+    const rawKind = c.req.query('kind');
+    const rawAttribution = c.req.query('attribution_status');
+    const rawRouting = c.req.query('routing_status');
+    if (rawKind && !EVENT_KINDS.has(rawKind as FriendAddKind)) {
+      return c.json({ success: false, error: 'kind が正しくありません' }, 400);
+    }
+    if (rawAttribution && !ATTRIBUTION_STATUSES.has(rawAttribution as FriendAddAttributionStatus)) {
+      return c.json({ success: false, error: 'attribution_status が正しくありません' }, 400);
+    }
+    if (rawRouting && !ROUTING_STATUSES.has(rawRouting as FriendAddRoutingStatus)) {
+      return c.json({ success: false, error: 'routing_status が正しくありません' }, 400);
+    }
+
+    try {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.ids.includes(accountId)) {
+        return c.json({ success: false, error: '対象のLINEアカウントが見つかりません' }, 404);
+      }
+      const rawLimit = Number.parseInt(c.req.query('limit') ?? '50', 10);
+      const data = await listFriendAddEvents(c.env.DB, {
+        lineAccountId: accountId,
+        limit: Number.isFinite(rawLimit) ? rawLimit : 50,
+        cursor: c.req.query('cursor') || null,
+        kind: rawKind as FriendAddKind | undefined,
+        attributionStatus: rawAttribution as FriendAddAttributionStatus | undefined,
+        routingStatus: rawRouting as FriendAddRoutingStatus | undefined,
+      });
+      return c.json({ success: true, data });
+    } catch (err) {
+      console.error('GET /api/friend-add-routing/events error:', err);
+      return c.json({ success: false, error: '友だち追加履歴を取得できませんでした' }, 500);
+    }
+  },
+);
 
 /**
  * 画面1枚ぶんをまとめて返す。

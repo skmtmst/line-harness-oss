@@ -19,6 +19,10 @@ import {
   getMessageTemplateById,
   getFriendAddScenarioIds,
   resolveLineCredential,
+  recordFriendAddEvent,
+  captureFriendAddEventAttribution,
+  markFriendAddEventRouting,
+  toJstString,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
 import { applyFriendAddRouting } from '../services/friend-add-routing.js';
@@ -249,6 +253,28 @@ async function handleEvent(
       statusMessage: profile?.statusMessage ?? null,
     });
 
+    // V6台帳はWebhookイベント単位。初回流入 friends.ref_code とは分離し、
+    // 再追加でも「今回開いたリンク」が取れた場合だけ候補を結び付ける。
+    let friendAddEventId: string | null = null;
+    if (lineAccountId) {
+      try {
+        friendAddEventId = await recordFriendAddEvent(db, {
+          lineAccountId,
+          friendId: friend.id,
+          webhookEventId: event.webhookEventId,
+          friendKind: (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time',
+          isUnblockedHint:
+            typeof (event as unknown as { follow?: { isUnblocked?: unknown } }).follow?.isUnblocked === 'boolean'
+              ? Boolean((event as unknown as { follow: { isUnblocked: boolean } }).follow.isUnblocked)
+              : null,
+          occurredAt: toJstString(new Date(event.timestamp)),
+        });
+      } catch (err) {
+        // 台帳の移行が遅れても、既存の友だち追加配信は止めない。
+        logWebhookStepFailure('friend_add_event_record', err, lineAccountId, event);
+      }
+    }
+
     // Set line_account_id for multi-account tracking (always update on follow)
     if (lineAccountId) {
       await db.prepare('UPDATE friends SET line_account_id = ?, updated_at = ? WHERE id = ?')
@@ -281,7 +307,26 @@ async function handleEvent(
     // otherwise override mode and intro pushes silently fall back to the
     // account default whenever the webhook wins the race.
     const { getFriendById } = await import('@line-crm/db');
-    let friendRefCode = (friend as { ref_code?: string | null }).ref_code ?? null;
+    let currentAttribution: { refCode: string; entryRouteId: string | null } | null = null;
+    if (friendAddEventId && lineAccountId) {
+      for (let attempt = 0; attempt < 5 && !currentAttribution; attempt++) {
+        try {
+          currentAttribution = await captureFriendAddEventAttribution(db, {
+            eventId: friendAddEventId,
+            lineAccountId,
+            friendId: friend.id,
+          });
+        } catch (err) {
+          logWebhookStepFailure('friend_add_attribution_capture', err, lineAccountId, event);
+          break;
+        }
+        if (!currentAttribution) await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    }
+
+    let friendRefCode = currentAttribution?.refCode
+      ?? (friend as { ref_code?: string | null }).ref_code
+      ?? null;
     if (!friendRefCode) {
       for (let attempt = 0; attempt < 5; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 200));
@@ -307,12 +352,39 @@ async function handleEvent(
     // **保存されていないアカウントは routed:false が返る。** そのときは下の
     // いままでどおりの経路（有効な friend_add シナリオを全部流す）に落ちる。
     // ここを既定で絞ると、設定していないアカウントで配信が止まる。
-    const routing = runAccountScenarios
-      ? await applyFriendAddRouting(db, lineAccountId, friend, {
-          defaultAccessToken: lineAccessToken,
-          workerUrl,
-        })
-      : null;
+    let routing: Awaited<ReturnType<typeof applyFriendAddRouting>> | null = null;
+    try {
+      routing = runAccountScenarios
+        ? await applyFriendAddRouting(db, lineAccountId, friend, {
+            defaultAccessToken: lineAccessToken,
+            workerUrl,
+          })
+        : null;
+    } catch (err) {
+      if (friendAddEventId && lineAccountId) {
+        try {
+          await markFriendAddEventRouting(db, {
+            eventId: friendAddEventId,
+            lineAccountId,
+            status: 'failed',
+          });
+        } catch (ledgerErr) {
+          logWebhookStepFailure('friend_add_event_mark_failed', ledgerErr, lineAccountId, event);
+        }
+      }
+      throw err;
+    }
+    if (friendAddEventId && lineAccountId) {
+      try {
+        await markFriendAddEventRouting(db, {
+          eventId: friendAddEventId,
+          lineAccountId,
+          status: routing?.suppressed ? 'suppressed' : 'completed',
+        });
+      } catch (err) {
+        logWebhookStepFailure('friend_add_event_mark_complete', err, lineAccountId, event);
+      }
+    }
 
     if (routing?.routed) {
       for (const { scenarioId, enrollment, resumed } of routing.enrollments) {

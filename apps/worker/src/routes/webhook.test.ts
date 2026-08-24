@@ -13,6 +13,7 @@ vi.mock('@line-crm/db', () => ({
   upsertFriend: vi.fn(),
   updateFriendFollowStatus: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
+  getFriendById: vi.fn(),
   getScenarios: vi.fn(),
   enrollFriendInScenario: vi.fn(),
   getScenarioSteps: vi.fn(),
@@ -30,6 +31,10 @@ vi.mock('@line-crm/db', () => ({
   reserveLineWebhookEvent: vi.fn().mockResolvedValue(true),
   markLineWebhookEventSucceeded: vi.fn().mockResolvedValue(undefined),
   markLineWebhookEventFailed: vi.fn().mockResolvedValue(undefined),
+  recordFriendAddEvent: vi.fn().mockResolvedValue('friend-add-event-1'),
+  captureFriendAddEventAttribution: vi.fn().mockResolvedValue(null),
+  markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
+  toJstString: vi.fn().mockReturnValue('2026-08-24T12:00:00.000+09:00'),
 }));
 
 vi.mock('@line-crm/line-sdk', async () => {
@@ -44,6 +49,14 @@ vi.mock('@line-crm/line-sdk', async () => {
 vi.mock('../services/event-bus.js', () => ({
   fireEvent: vi.fn().mockResolvedValue(undefined),
   logOutgoingMessage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../services/friend-add-routing.js', () => ({
+  applyFriendAddRouting: vi.fn().mockResolvedValue({ routed: false, suppressed: false, enrollments: [] }),
+}));
+
+vi.mock('../services/activity-mileage.js', () => ({
+  awardActivityMileage: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../services/step-delivery.js', () => ({
@@ -72,6 +85,9 @@ import {
   updateFriendFollowStatus,
   upsertChatOnMessage,
   upsertFriend,
+  recordFriendAddEvent,
+  captureFriendAddEventAttribution,
+  markFriendAddEventRouting,
 } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { webhook } from './webhook.js';
@@ -82,8 +98,18 @@ function setupApp() {
   return app;
 }
 
+const stubDb = {
+  prepare: vi.fn(() => ({
+    bind: vi.fn(() => ({
+      run: vi.fn().mockResolvedValue({ meta: { changes: 1 } }),
+      first: vi.fn().mockResolvedValue(null),
+      all: vi.fn().mockResolvedValue({ results: [] }),
+    })),
+  })),
+} as unknown as D1Database;
+
 const baseEnv = {
-  DB: {} as D1Database,
+  DB: stubDb,
   LINE_CHANNEL_SECRET: 'env-default-secret',
   LINE_CHANNEL_ACCESS_TOKEN: 'env-default-token',
 } as Record<string, unknown>;
@@ -97,6 +123,52 @@ const baseExecutionCtx = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getLineAccounts).mockResolvedValue([]);
+});
+
+describe('POST /webhook — V6 friend-add ledger', () => {
+  test('再追加と今回リンクをWebhookイベント単位で記録する', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(getLineAccounts).mockResolvedValue([{
+      id: 'account-main', channel_secret: 'env-default-secret',
+      channel_access_token: 'account-token', is_active: 1,
+    } as never]);
+    lineClientMocks.getProfile.mockResolvedValue({ displayName: '田中さん' });
+    vi.mocked(upsertFriend).mockResolvedValue({
+      id: 'friend-1', line_user_id: 'U-1', line_account_id: 'account-main',
+      unfollow_count: 1, created_at: '2026-01-01T00:00:00.000+09:00',
+      first_followed_at: '2026-01-01T00:00:00.000+09:00',
+    } as never);
+    vi.mocked(captureFriendAddEventAttribution).mockResolvedValue({
+      refCode: 'summer', entryRouteId: 'route-1',
+    });
+    vi.mocked(getEntryRouteByRefCode).mockResolvedValue(null);
+    vi.mocked(getScenarios).mockResolvedValue([]);
+
+    const waitUntil = vi.fn();
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ events: [{
+        type: 'follow', webhookEventId: 'webhook-follow-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-1' }, replyToken: 'reply-1',
+        follow: { isUnblocked: true },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    const processing = waitUntil.mock.calls[0]?.[0] as Promise<void>;
+    await processing;
+
+    expect(recordFriendAddEvent).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      lineAccountId: 'account-main', friendId: 'friend-1', webhookEventId: 'webhook-follow-1',
+      friendKind: 'returning', isUnblockedHint: true,
+    }));
+    expect(captureFriendAddEventAttribution).toHaveBeenCalledWith(baseEnv.DB, {
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main', friendId: 'friend-1',
+    });
+    expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
+      eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'completed',
+    }));
+  });
 });
 
 describe('POST /webhook — DoS defenses (#104)', () => {

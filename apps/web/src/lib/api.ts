@@ -3,6 +3,10 @@ import type { SegmentCondition } from './segment-condition'
 import type {
   Friend,
   FriendAddRouting,
+  FriendAddEventList,
+  FriendAddEventKind,
+  FriendAddEventAttributionStatus,
+  FriendAddEventRoutingStatus,
   Tag,
   TagGroup,
   FriendField,
@@ -2550,6 +2554,22 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ friendId }),
       }),
+    /** V6履歴。Pencil共通デザイン側はこの返り値から各表示状態を組み立てる。 */
+    events: (accountId: string, params?: {
+      limit?: number
+      cursor?: string
+      kind?: FriendAddEventKind
+      attributionStatus?: FriendAddEventAttributionStatus
+      routingStatus?: FriendAddEventRoutingStatus
+    }) => {
+      const query = new URLSearchParams({ account_id: accountId })
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.cursor) query.set('cursor', params.cursor)
+      if (params?.kind) query.set('kind', params.kind)
+      if (params?.attributionStatus) query.set('attribution_status', params.attributionStatus)
+      if (params?.routingStatus) query.set('routing_status', params.routingStatus)
+      return fetchApi<ApiResponse<FriendAddEventList>>(`/api/friend-add-routing/events?${query}`)
+    },
   },
   nenCampaigns: {
     overview: () => fetchApi<ApiResponse<{

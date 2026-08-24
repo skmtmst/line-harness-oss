@@ -26,6 +26,7 @@ const dbMocks = {
   getAffiliateById: vi.fn().mockResolvedValue(null),
   addTagToFriend: vi.fn().mockResolvedValue(undefined),
   recordRefTracking: vi.fn().mockResolvedValue(undefined),
+  recordFriendAddAttributionCandidate: vi.fn().mockResolvedValue({ status: 'pending' }),
   getLineAccountByChannelId: vi.fn().mockResolvedValue(null),
   getLineAccountById: vi.fn().mockResolvedValue(null),
 };

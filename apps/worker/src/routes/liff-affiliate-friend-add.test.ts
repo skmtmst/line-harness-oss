@@ -26,6 +26,7 @@ const dbMocks = {
   linkFriendToUser: vi.fn().mockResolvedValue(undefined),
   getEntryRouteByRefCode: vi.fn().mockResolvedValue(null),
   recordRefTracking: vi.fn().mockResolvedValue(undefined),
+  recordFriendAddAttributionCandidate: vi.fn().mockResolvedValue({ status: 'pending' }),
   getTrackedLinkById: vi.fn().mockResolvedValue(null),
   getMessageTemplateById: vi.fn().mockResolvedValue(null),
   getAffiliateLinkByRefCode: vi.fn().mockResolvedValue(null),
@@ -147,6 +148,15 @@ describe('GET /auth/callback — affiliate friend-add notification', () => {
       expect.anything(),
       'AFF-1',
       '案件A',
+    );
+    expect(dbMocks.recordFriendAddAttributionCandidate).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        lineAccountId: 'account-main',
+        friendId: 'F-new',
+        refCode: 'aff-ref',
+        source: 'line_login',
+      }),
     );
   });
 
