@@ -169,6 +169,19 @@ export function shouldStopCodexQueueRetry(
 
 export type CodexMonitorErrorClassification = 'db_error' | 'slack_api_error' | 'unknown';
 
+export function createCodexQueueFailureLog(input: {
+  kind: string;
+  slackEventId: string;
+  reason: CodexMonitorErrorClassification;
+  attempts: number;
+  stopped: boolean;
+}) {
+  return {
+    event: 'codex_cloud_monitor_queue_failed',
+    ...input,
+  };
+}
+
 /** Never persist or log exception bodies; reduce them to an operational class. */
 export function classifyCodexMonitorError(error: unknown): CodexMonitorErrorClassification {
   const candidate = error as {
