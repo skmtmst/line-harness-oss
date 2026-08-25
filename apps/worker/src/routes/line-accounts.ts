@@ -317,9 +317,17 @@ lineAccounts.get(
   requireRole('owner'),
   async (c) => {
     try {
+      const account = await getLineAccountById(c.env.DB, c.req.param('id'));
+      if (!account) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
+      const allAccounts = await getLineAccounts(c.env.DB);
+      if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
       const health = await getLineAccountCredentialHealth(
         c.env.DB,
-        c.req.param('id'),
+        account.id,
       );
       if (!health) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
