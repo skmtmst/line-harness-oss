@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { Env } from '../index.js';
 import {
   classifyCodexMonitorError,
+  createCodexQueueFailureLog,
   classifyOfficialCodexMessage,
   extractChatGptTaskUrl,
   hasActualSlackMention,
@@ -222,6 +223,17 @@ describe('Codex cloud monitor event classification', () => {
     expect(shouldStopCodexQueueRetry(4, '5')).toBe(false);
     expect(shouldStopCodexQueueRetry(5, '5')).toBe(true);
     expect(shouldStopCodexQueueRetry(5, 'invalid')).toBe(true);
+  });
+
+  test('Queue失敗ログで再試行の終了有無を区別できる', () => {
+    const base = {
+      kind: 'inspect',
+      slackEventId: 'Ev-test',
+      reason: 'unknown',
+      attempts: 5,
+    } as const;
+    expect(createCodexQueueFailureLog({ ...base, stopped: true })).toMatchObject({ stopped: true });
+    expect(createCodexQueueFailureLog({ ...base, stopped: false })).toMatchObject({ stopped: false });
   });
 
   test('公式受領がなければ許可済み投稿をUser OAuthで1回中継する', async () => {

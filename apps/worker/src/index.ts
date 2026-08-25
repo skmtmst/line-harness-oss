@@ -117,6 +117,7 @@ import { routeInboundEmail } from './services/inbound-email-router.js';
 import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
 import {
   classifyCodexMonitorError,
+  createCodexQueueFailureLog,
   markCodexMentionFailed,
   processCodexMentionMessage,
   shouldStopCodexQueueRetry,
@@ -1426,14 +1427,18 @@ export default {
         message.ack();
       } catch (error) {
         const reason = classifyCodexMonitorError(error);
-        console.error(JSON.stringify({
-          event: 'codex_cloud_monitor_queue_failed',
+        const stopped = shouldStopCodexQueueRetry(
+          message.attempts,
+          env.CODEX_QUEUE_MAX_ATTEMPTS,
+        );
+        console.error(JSON.stringify(createCodexQueueFailureLog({
           kind: message.body.kind,
           slackEventId: message.body.slackEventId,
           reason,
           attempts: message.attempts,
-        }));
-        if (shouldStopCodexQueueRetry(message.attempts, env.CODEX_QUEUE_MAX_ATTEMPTS)) {
+          stopped,
+        })));
+        if (stopped) {
           try {
             await markCodexMentionFailed(env.DB, message.body.slackEventId);
           } catch {
