@@ -10,6 +10,14 @@ const dbMocks = {
   getLineAccountById: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('../services/account-access.js', () => ({
+  getVisibleLineAccountScope: vi.fn(async () => ({
+    accounts: [],
+    ids: ['account-1'],
+    allowedAccountIds: ['account-1'],
+    canSeeUnassigned: true,
+  })),
+}));
 
 const { broadcasts } = await import('./broadcasts.js');
 

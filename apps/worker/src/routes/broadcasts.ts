@@ -26,10 +26,40 @@ import {
   buildWarnings,
   hasRecentSimilarBroadcast,
 } from '../services/broadcast-preflight.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
+import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 const broadcasts = new Hono<Env>();
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
+
+/** All account references must belong to the staff tenant; null means unassigned. */
+async function canAccessAllBroadcastAccounts(
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+  accountIds: Array<string | null | undefined>,
+): Promise<boolean> {
+  const scope = await getVisibleLineAccountScope(db, staff);
+  return accountIds.every((accountId) => accountId == null
+    ? scope.canSeeUnassigned
+    : scope.allowedAccountIds.includes(accountId));
+}
+
+function broadcastAccountIds(broadcast: DbBroadcast): Array<string | null> {
+  const raw = broadcast as unknown as Record<string, unknown>;
+  return broadcast.target_type === 'multi-account-dedup'
+    ? (parseJsonArray(raw.account_ids) ?? [null])
+    : [(raw.line_account_id as string | null | undefined) ?? null];
+}
+
+async function canAccessBroadcast(
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+  broadcast: DbBroadcast,
+): Promise<boolean> {
+  return canAccessAllBroadcastAccounts(db, staff, broadcastAccountIds(broadcast));
+}
 
 function unsupportedVariablesError(content: string): string | null {
   const unsupported = getUnsupportedBroadcastVariables(content);
@@ -169,6 +199,9 @@ broadcasts.get('/api/broadcasts/:id', async (c) => {
     if (!broadcast) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
 
     return c.json({ success: true, data: serializeBroadcast(broadcast) });
   } catch (err) {
@@ -186,6 +219,9 @@ broadcasts.get('/api/broadcasts/:id/preview-count', async (c) => {
     const id = c.req.param('id');
     const broadcast = await getBroadcastById(c.env.DB, id);
     if (!broadcast) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
@@ -283,6 +319,9 @@ broadcasts.get('/api/broadcasts/:id/per-account-stats', async (c) => {
     const id = c.req.param('id');
     const broadcast = await getBroadcastById(c.env.DB, id);
     if (!broadcast) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
@@ -385,6 +424,12 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
     }>();
 
     const targetType = String(body.targetType ?? 'all');
+    const requestedAccountIds = targetType === 'multi-account-dedup'
+      ? (Array.isArray(body.accountIds) ? body.accountIds.map(String) : [null])
+      : [body.lineAccountId == null ? null : String(body.lineAccountId)];
+    if (!await canAccessAllBroadcastAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
     /*
      * 条件が読めないときは数えない。
      *
@@ -448,6 +493,13 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
         { success: false, error: 'title, messageType, messageContent, and targetType are required' },
         400,
       );
+    }
+
+    const requestedAccountIds = body.targetType === 'multi-account-dedup'
+      ? (Array.isArray(body.accountIds) ? body.accountIds : [null])
+      : [body.lineAccountId ?? null];
+    if (!await canAccessAllBroadcastAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
 
     if (body.messageBubbles !== undefined && (!Array.isArray(body.messageBubbles) || body.messageBubbles.length < 1 || body.messageBubbles.length > 3)) {
@@ -589,6 +641,9 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
     if (!existing) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
 
     if (existing.status !== 'draft' && existing.status !== 'scheduled') {
       return c.json({ success: false, error: 'Only draft or scheduled broadcasts can be updated' }, 400);
@@ -604,7 +659,20 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       trackLinks?: boolean;
       folderId?: string | null;
       measureOpens?: boolean;
+      lineAccountId?: string | null;
+      accountIds?: string[];
     }>();
+
+    const existingRaw = existing as unknown as Record<string, unknown>;
+    const resultingTargetType = body.targetType ?? existing.target_type;
+    const requestedAccountIds = resultingTargetType === 'multi-account-dedup'
+      ? (body.accountIds ?? parseJsonArray(existingRaw.account_ids) ?? [null])
+      : [body.lineAccountId !== undefined
+          ? body.lineAccountId
+          : (existingRaw.line_account_id as string | null | undefined) ?? null];
+    if (!await canAccessAllBroadcastAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
 
     if (body.messageContent !== undefined) {
       const variableError = unsupportedVariablesError(body.messageContent);
@@ -673,6 +741,10 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
 broadcasts.delete('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    const existing = await getBroadcastById(c.env.DB, id);
+    if (!existing || !await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
     await deleteBroadcast(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
@@ -695,6 +767,9 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
     const existing = await getBroadcastById(c.env.DB, id);
 
     if (!existing) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
@@ -1023,6 +1098,9 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requireRole('owner', 'admin'
     if (!existing) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
+    if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
 
     const body = await c.req.json<{ conditions: SegmentCondition }>();
 
@@ -1083,6 +1161,10 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requireRole('owner', 'admin'
 broadcasts.get('/api/broadcasts/:id/insight', async (c) => {
   try {
     const id = c.req.param('id');
+    const broadcast = await getBroadcastById(c.env.DB, id);
+    if (!broadcast || !await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
     const insight = await c.env.DB.prepare(
       'SELECT * FROM broadcast_insights WHERE broadcast_id = ? ORDER BY created_at DESC LIMIT 1'
     ).bind(id).first<Record<string, unknown>>();
@@ -1117,6 +1199,9 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requireRole('owner', 'admin
     const id = c.req.param('id');
     const broadcast = await getBroadcastById(c.env.DB, id);
     if (!broadcast) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
+    if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
     if (broadcast.status !== 'sent') {
@@ -1282,6 +1367,9 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
   try {
     const broadcast = await getBroadcastById(c.env.DB, id);
     if (!broadcast) return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
+      return c.json({ success: false, error: 'Broadcast not found' }, 404);
+    }
     if (broadcast.status !== 'draft') {
       return c.json({ success: false, error: 'Only draft broadcasts can be test-sent' }, 400);
     }
@@ -1380,6 +1468,9 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
   const id = c.req.param('id');
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (!broadcast) return c.json({ success: false, error: 'Not found' }, 404);
+  if (!await canAccessBroadcast(c.env.DB, c.get('staff'), broadcast)) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
 
   const raw = broadcast as unknown as Record<string, unknown>;
   return c.json({
@@ -1397,6 +1488,9 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
 broadcasts.post('/api/segments/count', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ conditions: unknown; accountId?: string }>();
   try {
+    if (!await canAccessAllBroadcastAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
+      return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+    }
     const { buildSegmentQuery } = await import('../services/segment-query.js');
     const { sql, bindings } = buildSegmentQuery(body.conditions as SegmentCondition);
 
