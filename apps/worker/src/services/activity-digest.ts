@@ -1,5 +1,6 @@
 import {
   computeUnansweredInbox,
+  type UnansweredInboxOptions,
   type UnansweredInboxResult,
 } from './unanswered-inbox.js';
 
@@ -8,11 +9,15 @@ const MAX_HOURS = 24 * 7;
 const CATEGORY_LIMIT = 500;
 
 export interface ActivityDigestOptions {
+  /** Restrict output to accounts visible to the authenticated caller. */
+  allowedAccountIds: readonly string[];
+  /** Include legacy rows whose account assignment is missing. */
+  canSeeUnassigned: boolean;
   hours?: number;
   now?: Date;
   unansweredLoader?: (
     db: D1Database,
-    options: { page: number; pageSize: number },
+    options: UnansweredInboxOptions,
   ) => Promise<UnansweredInboxResult>;
 }
 
@@ -134,9 +139,34 @@ function takeCategory<T>(rows: T[]): { items: T[]; truncated: boolean } {
   };
 }
 
+function accountScopeSql(
+  accountExpression: string,
+  allowedAccountIds: readonly string[],
+  canSeeUnassigned: boolean,
+): { clause: string; bindings: string[] } {
+  if (allowedAccountIds.length === 0) {
+    return canSeeUnassigned
+      ? { clause: `AND ${accountExpression} IS NULL`, bindings: [] }
+      : { clause: 'AND 1 = 0', bindings: [] };
+  }
+  const placeholders = allowedAccountIds.map(() => '?').join(', ');
+  return {
+    clause: `AND (${accountExpression} IN (${placeholders})${canSeeUnassigned ? ` OR ${accountExpression} IS NULL` : ''})`,
+    bindings: [...allowedAccountIds],
+  };
+}
+
+function isVisibleAccount(
+  accountId: string | null,
+  allowedAccountIds: ReadonlySet<string>,
+  canSeeUnassigned: boolean,
+): boolean {
+  return accountId === null ? canSeeUnassigned : allowedAccountIds.has(accountId);
+}
+
 export async function getActivityDigest(
   db: D1Database,
-  options: ActivityDigestOptions = {},
+  options: ActivityDigestOptions,
 ) {
   const hours = options.hours ?? DEFAULT_HOURS;
   if (!Number.isSafeInteger(hours) || hours < 1 || hours > MAX_HOURS) {
@@ -149,6 +179,21 @@ export async function getActivityDigest(
   const sinceJst = formatJstSqlTimestamp(since);
   const queryLimit = CATEGORY_LIMIT + 1;
   const unansweredLoader = options.unansweredLoader ?? computeUnansweredInbox;
+  const allowedAccountIds = new Set(options.allowedAccountIds);
+  const friendsScope = accountScopeSql(
+    'f.line_account_id', options.allowedAccountIds, options.canSeeUnassigned,
+  );
+  const messagesScope = accountScopeSql(
+    'COALESCE(ml.line_account_id, f.line_account_id)',
+    options.allowedAccountIds,
+    options.canSeeUnassigned,
+  );
+  const formsScope = accountScopeSql(
+    'f.line_account_id', options.allowedAccountIds, options.canSeeUnassigned,
+  );
+  const bookingsScope = accountScopeSql(
+    'b.line_account_id', options.allowedAccountIds, options.canSeeUnassigned,
+  );
 
   const [
     friendsResult,
@@ -165,9 +210,10 @@ export async function getActivityDigest(
          FROM friends f
          LEFT JOIN line_accounts la ON la.id = f.line_account_id
         WHERE julianday(f.created_at) >= julianday(?)
+          ${friendsScope.clause}
         ORDER BY f.created_at DESC
         LIMIT ?`,
-    ).bind(sinceJst, queryLimit).all<RawFriendRow>(),
+    ).bind(sinceJst, ...friendsScope.bindings, queryLimit).all<RawFriendRow>(),
     db.prepare(
       `/* activity-digest:messages */
        SELECT ml.id, ml.friend_id, f.display_name,
@@ -180,9 +226,10 @@ export async function getActivityDigest(
            ON la.id = COALESCE(ml.line_account_id, f.line_account_id)
         WHERE ml.direction = 'incoming'
           AND julianday(ml.created_at) >= julianday(?)
+          ${messagesScope.clause}
         ORDER BY ml.created_at DESC
         LIMIT ?`,
-    ).bind(sinceJst, queryLimit).all<RawMessageRow>(),
+    ).bind(sinceJst, ...messagesScope.bindings, queryLimit).all<RawMessageRow>(),
     db.prepare(
       `/* activity-digest:forms */
        SELECT fs.id, fs.form_id, fm.name AS form_name,
@@ -193,9 +240,10 @@ export async function getActivityDigest(
          LEFT JOIN friends f ON f.id = fs.friend_id
          LEFT JOIN line_accounts la ON la.id = f.line_account_id
         WHERE julianday(fs.created_at) >= julianday(?)
+          ${formsScope.clause}
         ORDER BY fs.created_at DESC
         LIMIT ?`,
-    ).bind(sinceJst, queryLimit).all<RawFormSubmissionRow>(),
+    ).bind(sinceJst, ...formsScope.bindings, queryLimit).all<RawFormSubmissionRow>(),
     db.prepare(
       `/* activity-digest:bookings */
        SELECT b.id, b.friend_id, f.display_name,
@@ -208,9 +256,10 @@ export async function getActivityDigest(
          LEFT JOIN friends f ON f.id = b.friend_id
          LEFT JOIN line_accounts la ON la.id = b.line_account_id
         WHERE julianday(b.requested_at) >= julianday(?)
+          ${bookingsScope.clause}
         ORDER BY b.requested_at DESC
         LIMIT ?`,
-    ).bind(sinceUtc, queryLimit).all<RawBookingRow>(),
+    ).bind(sinceUtc, ...bookingsScope.bindings, queryLimit).all<RawBookingRow>(),
     db.prepare(
       `/* activity-digest:event-bookings */
        SELECT b.id, b.friend_id, f.display_name,
@@ -223,19 +272,33 @@ export async function getActivityDigest(
          LEFT JOIN friends f ON f.id = b.friend_id
          LEFT JOIN line_accounts la ON la.id = b.line_account_id
         WHERE julianday(b.requested_at) >= julianday(?)
+          ${bookingsScope.clause}
         ORDER BY b.requested_at DESC
         LIMIT ?`,
-    ).bind(sinceUtc, queryLimit).all<RawEventBookingRow>(),
-    unansweredLoader(db, { page: 1, pageSize: 2000 }),
+    ).bind(sinceUtc, ...bookingsScope.bindings, queryLimit).all<RawEventBookingRow>(),
+    unansweredLoader(db, {
+      page: 1,
+      pageSize: 2000,
+      allowedAccountIds: options.allowedAccountIds,
+      canSeeUnassigned: options.canSeeUnassigned,
+    }),
   ]);
 
-  const friends = takeCategory((friendsResult.results ?? []).map((row) => ({
+  const friends = takeCategory((friendsResult.results ?? [])
+    .filter((row) => isVisibleAccount(
+      row.line_account_id, allowedAccountIds, options.canSeeUnassigned,
+    ))
+    .map((row) => ({
     id: row.id,
     displayName: row.display_name,
     ...accountRef(row),
     occurredAt: normalizeJstTimestamp(row.created_at),
-  })));
-  const incomingMessages = takeCategory((messagesResult.results ?? []).map((row) => ({
+    })));
+  const incomingMessages = takeCategory((messagesResult.results ?? [])
+    .filter((row) => isVisibleAccount(
+      row.line_account_id, allowedAccountIds, options.canSeeUnassigned,
+    ))
+    .map((row) => ({
     id: row.id,
     friendId: row.friend_id,
     displayName: row.display_name,
@@ -244,8 +307,12 @@ export async function getActivityDigest(
     content: row.content,
     source: row.source,
     occurredAt: normalizeJstTimestamp(row.created_at),
-  })));
-  const formSubmissions = takeCategory((formsResult.results ?? []).map((row) => ({
+    })));
+  const formSubmissions = takeCategory((formsResult.results ?? [])
+    .filter((row) => isVisibleAccount(
+      row.line_account_id, allowedAccountIds, options.canSeeUnassigned,
+    ))
+    .map((row) => ({
     id: row.id,
     formId: row.form_id,
     formName: row.form_name,
@@ -254,8 +321,12 @@ export async function getActivityDigest(
     ...accountRef(row),
     data: parseJsonObject(row.data),
     occurredAt: normalizeJstTimestamp(row.created_at),
-  })));
-  const bookingRequests = takeCategory((bookingsResult.results ?? []).map((row) => ({
+    })));
+  const bookingRequests = takeCategory((bookingsResult.results ?? [])
+    .filter((row) => isVisibleAccount(
+      row.line_account_id, allowedAccountIds, options.canSeeUnassigned,
+    ))
+    .map((row) => ({
     id: row.id,
     friendId: row.friend_id,
     displayName: row.display_name,
@@ -266,8 +337,12 @@ export async function getActivityDigest(
     status: row.status,
     customerNote: row.customer_note,
     occurredAt: normalizeUtcTimestamp(row.requested_at),
-  })));
-  const eventBookingRequests = takeCategory((eventBookingsResult.results ?? []).map((row) => ({
+    })));
+  const eventBookingRequests = takeCategory((eventBookingsResult.results ?? [])
+    .filter((row) => isVisibleAccount(
+      row.line_account_id, allowedAccountIds, options.canSeeUnassigned,
+    ))
+    .map((row) => ({
     id: row.id,
     friendId: row.friend_id,
     displayName: row.display_name,
@@ -277,7 +352,7 @@ export async function getActivityDigest(
     status: row.status,
     customerNote: row.customer_note,
     occurredAt: normalizeUtcTimestamp(row.requested_at),
-  })));
+    })));
 
   const actionGroups = [
     friends.items,

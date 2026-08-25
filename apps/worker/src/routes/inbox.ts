@@ -9,6 +9,7 @@ import {
   getActivityDigest,
   parseActivityDigestHours,
 } from '../services/activity-digest.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 export const inbox = new Hono<Env>();
 
@@ -25,7 +26,12 @@ inbox.get('/api/inbox/activity-digest', async (c) => {
   }
 
   try {
-    const data = await getActivityDigest(c.env.DB, { hours });
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const data = await getActivityDigest(c.env.DB, {
+      hours,
+      allowedAccountIds: scope.allowedAccountIds,
+      canSeeUnassigned: scope.canSeeUnassigned,
+    });
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/inbox/activity-digest error:', err);
@@ -35,6 +41,7 @@ inbox.get('/api/inbox/activity-digest', async (c) => {
 
 inbox.get('/api/inbox/unanswered', async (c) => {
   try {
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const q = c.req.query('q');
     const account = c.req.query('account') || undefined;
     const minWaitMinutesStr = c.req.query('minWaitMinutes');
@@ -47,6 +54,8 @@ inbox.get('/api/inbox/unanswered', async (c) => {
       minWaitMinutes: minWaitMinutesStr ? Number.parseInt(minWaitMinutesStr, 10) : undefined,
       page: pageStr ? Number.parseInt(pageStr, 10) : undefined,
       pageSize: pageSizeStr ? Number.parseInt(pageSizeStr, 10) : undefined,
+      allowedAccountIds: scope.allowedAccountIds,
+      canSeeUnassigned: scope.canSeeUnassigned,
     };
 
     const result = await computeUnansweredInbox(c.env.DB, opts);
@@ -59,7 +68,11 @@ inbox.get('/api/inbox/unanswered', async (c) => {
 
 inbox.get('/api/inbox/unanswered/count', async (c) => {
   try {
-    const result = await countUnanswered(c.env.DB);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const result = await countUnanswered(c.env.DB, {
+      allowedAccountIds: scope.allowedAccountIds,
+      canSeeUnassigned: scope.canSeeUnassigned,
+    });
     return c.json({ success: true, data: result });
   } catch (err) {
     console.error('GET /api/inbox/unanswered/count error:', err);

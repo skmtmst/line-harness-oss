@@ -95,6 +95,8 @@ describe('getActivityDigest', () => {
     };
 
     const result = await getActivityDigest(db, {
+      allowedAccountIds: ['account-1'],
+      canSeeUnassigned: true,
       hours: 3,
       now: new Date('2026-08-05T09:00:00Z'),
       unansweredLoader: async () => unanswered,
@@ -117,11 +119,11 @@ describe('getActivityDigest', () => {
     ]);
     expect(result.unanswered.oldestWaitMinutes).toBe(15);
     expect(bindings).toEqual([
-      ['2026-08-05T15:00:00.000', 501],
-      ['2026-08-05T15:00:00.000', 501],
-      ['2026-08-05T15:00:00.000', 501],
-      ['2026-08-05T06:00:00.000Z', 501],
-      ['2026-08-05T06:00:00.000Z', 501],
+      ['2026-08-05T15:00:00.000', 'account-1', 501],
+      ['2026-08-05T15:00:00.000', 'account-1', 501],
+      ['2026-08-05T15:00:00.000', 'account-1', 501],
+      ['2026-08-05T06:00:00.000Z', 'account-1', 501],
+      ['2026-08-05T06:00:00.000Z', 'account-1', 501],
     ]);
   });
 
@@ -140,6 +142,8 @@ describe('getActivityDigest', () => {
     const db = mockDb({ messages }, []);
 
     const result = await getActivityDigest(db, {
+      allowedAccountIds: ['account-1'],
+      canSeeUnassigned: true,
       now: new Date('2026-08-05T09:00:00Z'),
       unansweredLoader: async () => noUnanswered,
     });
@@ -147,5 +151,51 @@ describe('getActivityDigest', () => {
     expect(result.newActions.incomingMessages.items).toHaveLength(500);
     expect(result.newActions.incomingMessages.truncated).toBe(true);
     expect(result.summary.totalNewActions).toBe(500);
+  });
+
+  test('filters every digest category to the caller scope and handles zero-account tenants', async () => {
+    const messages = [
+      {
+        id: 'default', friend_id: 'friend-default', display_name: '既定',
+        line_account_id: 'account-default', account_name: '既定店', message_type: 'text',
+        content: 'default', source: null, created_at: '2026-08-05T17:45:00.000',
+      },
+      {
+        id: 'tenant-b', friend_id: 'friend-b', display_name: 'B',
+        line_account_id: 'account-b', account_name: 'B店', message_type: 'text',
+        content: 'tenant-b', source: null, created_at: '2026-08-05T17:44:00.000',
+      },
+      {
+        id: 'unassigned', friend_id: 'friend-unassigned', display_name: '未割当',
+        line_account_id: null, account_name: null, message_type: 'text',
+        content: 'unassigned', source: null, created_at: '2026-08-05T17:43:00.000',
+      },
+    ];
+    const db = mockDb({ messages }, []);
+    const common = {
+      now: new Date('2026-08-05T09:00:00Z'),
+      unansweredLoader: async () => noUnanswered,
+    };
+
+    const tenantB = await getActivityDigest(db, {
+      ...common,
+      allowedAccountIds: ['account-b'],
+      canSeeUnassigned: false,
+    });
+    expect(tenantB.newActions.incomingMessages.items.map((row) => row.id)).toEqual(['tenant-b']);
+
+    const emptyTenant = await getActivityDigest(db, {
+      ...common,
+      allowedAccountIds: [],
+      canSeeUnassigned: false,
+    });
+    expect(emptyTenant.summary.totalNewActions).toBe(0);
+
+    const defaultTenant = await getActivityDigest(db, {
+      ...common,
+      allowedAccountIds: ['account-default', 'account-b'],
+      canSeeUnassigned: true,
+    });
+    expect(defaultTenant.summary.incomingMessages).toBe(3);
   });
 });
