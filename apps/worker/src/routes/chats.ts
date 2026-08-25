@@ -157,9 +157,6 @@ async function resolveFriendAndAccessToken(
   return { friend, accessToken: account.channel_access_token };
 }
 
-chats.use('/api/chats/:id', requireVisibleChat);
-chats.use('/api/chats/:id/*', requireVisibleChat);
-
 // ========== オペレーターCRUD ==========
 
 chats.get('/api/operators', async (c) => {
@@ -473,9 +470,9 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   }
 });
 
-chats.get('/api/chats/:id', async (c) => {
+chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
   try {
-    const rawId = c.req.param('id');
+    const rawId = c.req.param('id')!;
 
     // id は chats.id または friend.id のどちらでもOK。
     // 優先順: chats.id 一致 → friend.id のとき chats.friend_id 最新行 → 何も無ければ friend のみで synthetic
@@ -563,7 +560,7 @@ chats.get('/api/chats/:id', async (c) => {
 });
 
 // 開いた担当者だけを既読にする。対応状態は共有だが、既読位置は共有しない。
-chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
     const resolved = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
     if (!resolved) return c.json({ success: false, error: 'Chat not found' }, 404);
@@ -639,7 +636,7 @@ chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
 });
 
 // チャットのアサイン/ステータス更新/ノート更新
-chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
     const id = c.req.param('id');
     const resolved = await resolveOrCreateChat(c.env.DB, id);
@@ -660,7 +657,7 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
 });
 
 // オペレーター入力中のローディング表示を開始
-chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
     const chatId = c.req.param('id');
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
@@ -697,7 +694,7 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), asy
 });
 
 // オペレーターからメッセージ送信
-chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();

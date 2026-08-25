@@ -131,6 +131,15 @@ describe('A-6 account tenant scope', () => {
     expect((await app(route).request(path)).status).toBe(200);
   });
 
+  test.each([
+    ['chat stats', '/api/chats/stats', 'GET'],
+    ['mark all chats read', '/api/chats/read-all', 'POST'],
+  ] as const)('%s fixed route is not treated as a chat id', async (_name, path, method) => {
+    const response = await app(chats).request(path, request(method));
+    expect(response.status).not.toBe(404);
+    expect(mocks.getChatById).not.toHaveBeenCalled();
+  });
+
   test('auto-reply update permits null to clear scope but rejects an empty account id', async () => {
     expect((await app(autoReplies).request(
       '/api/auto-replies/auto-reply',
