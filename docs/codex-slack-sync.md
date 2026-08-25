@@ -98,7 +98,7 @@ Workerの非秘密設定:
 - `CODEX_SLACK_USER_ID`: 監視対象の公式CodexユーザーID。LINE 然では `U0BRUBQMV9Q`
 - `CODEX_ALLOWED_TEAM_IDS`: 監視を許可するSlack workspaceのteam ID。カンマ区切り
 - `CODEX_ALLOWED_CHANNEL_IDS`: Masato名義の自動中継を許可するSlack channel ID。カンマ区切り。完全一致したIDはSlack API照合なしで許可する
-- `CODEX_ALLOWED_CHANNEL_NAME_PREFIXES`: 自動生成される帯チャンネル名の許可接頭辞。カンマ区切り。Slack APIの `conversations.info` で取得した実名だけを照合し、未設定・API失敗・不一致は拒否する
+- `CODEX_ALLOWED_CHANNEL_NAME_PREFIXES`: 自動生成される帯チャンネル名の許可接頭辞。カンマ区切り。Slack APIの `conversations.info` で取得した実名が「接頭辞＋3桁-3桁」で終わる場合だけ許可し、未設定・API失敗・不一致は拒否する
 - `CODEX_RELAY_SOURCE_USER_IDS`: `[claude->codex]` 投稿を許可する投稿者ID。ClaudeがMasato名義で投稿する構成ではMasatoのSlack user IDだけを設定する
 - `CODEX_RELAY_ENABLED`: 自動中継のキルスイッチ。`true` / `1` のときだけ中継し、検証配備時の初期値は `false`
 - `CODEX_QUEUE_MAX_ATTEMPTS`: Queue失敗をD1の `failed` として確定する試行回数。検証環境はQueue設定と同じ `5`
