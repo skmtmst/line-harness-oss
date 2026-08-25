@@ -172,12 +172,14 @@ describe('PUT /api/affiliate-offers/:id', () => {
   });
 
   it('rejects an empty name with 400', async () => {
+    dbMocks.getAffiliateOfferById.mockResolvedValue(OFFER_ROW);
     const res = await req('PUT', '/api/affiliate-offers/off-1', { name: '   ' });
     expect(res.status).toBe(400);
     expect(dbMocks.updateAffiliateOffer).not.toHaveBeenCalled();
   });
 
   it('rejects a negative rewardAmount with 400', async () => {
+    dbMocks.getAffiliateOfferById.mockResolvedValue(OFFER_ROW);
     const res = await req('PUT', '/api/affiliate-offers/off-1', { rewardAmount: -5 });
     expect(res.status).toBe(400);
   });

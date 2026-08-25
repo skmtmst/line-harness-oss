@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   getAutomations,
   getAutomationById,
@@ -9,8 +10,21 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const automations = new Hono<Env>();
+
+async function requireVisibleAutomation(c: Context<Env>, next: () => Promise<void>) {
+  const item = await getAutomationById(c.env.DB, c.req.param('id')!);
+  if (!item || !await canAccessAllLineAccounts(
+    c.env.DB,
+    c.get('staff'),
+    [item.line_account_id ?? null],
+  )) {
+    return c.json({ success: false, error: 'Automation not found' }, 404);
+  }
+  await next();
+}
 
 // ========== 自動化ルールCRUD ==========
 
@@ -54,6 +68,8 @@ automations.get('/api/automations', async (c) => {
   }
 });
 
+automations.use('/api/automations/:id', requireVisibleAutomation);
+automations.use('/api/automations/:id/*', requireVisibleAutomation);
 automations.get('/api/automations/:id', async (c) => {
   try {
     const item = await getAutomationById(c.env.DB, c.req.param('id'));
@@ -105,6 +121,11 @@ automations.post('/api/automations', requireRole('owner', 'admin'), async (c) =>
     }>();
     if (!body.name || !body.eventType || !body.actions) {
       return c.json({ success: false, error: 'name, eventType, actions are required' }, 400);
+    }
+    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+      && (!body.lineAccountId
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     let item = await createAutomation(c.env.DB, body);
     // Save line_account_id if provided
