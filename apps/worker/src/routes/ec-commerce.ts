@@ -7,7 +7,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { logOutgoingMessage } from '../services/event-bus.js';
 import { EC_EVENT_TYPES, type EcEvent } from './ec-integrations.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const ecCommerce = new Hono<Env>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
@@ -273,6 +273,9 @@ ecCommerce.post('/api/ec-commerce/test-send', requireRole('owner', 'admin'), asy
       || !isValidHttpsUrl(body.buttonUrl.trim())
       || !isValidHttpsUrl(body.imageUrl.trim())) {
     return c.json({ success: false, error: 'Invalid button or image' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   const account = await getLineAccountById(c.env.DB, body.accountId);
   if (!account?.channel_access_token) return c.json({ success: false, error: 'LINE account is not configured' }, 400);

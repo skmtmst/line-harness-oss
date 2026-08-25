@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getReminders,
   reorderReminders,
@@ -15,8 +15,21 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const reminders = new Hono<Env>();
+
+async function requireVisibleReminder(c: Context<Env>, next: () => Promise<void>) {
+  const reminder = await getReminderById(c.env.DB, c.req.param('id')!);
+  if (!reminder || !await canAccessAllLineAccounts(
+    c.env.DB,
+    c.get('staff'),
+    [(reminder as { line_account_id?: string | null }).line_account_id ?? null],
+  )) {
+    return c.json({ success: false, error: 'Reminder not found' }, 404);
+  }
+  await next();
+}
 
 const TRIGGER_TYPES = ['manual', 'booking', 'event', 'friend_field'] as const;
 const DELIVERY_MODES = ['time', 'countdown'] as const;
@@ -186,6 +199,8 @@ reminders.get('/api/reminders', async (c) => {
   }
 });
 
+reminders.use('/api/reminders/:id', requireVisibleReminder);
+reminders.use('/api/reminders/:id/*', requireVisibleReminder);
 reminders.get('/api/reminders/:id', async (c) => {
   try {
     const id = c.req.param('id');
@@ -238,6 +253,10 @@ reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
       lineAccountId?: string | null;
     } & Record<string, unknown>>();
     if (!body.name) return c.json({ success: false, error: 'name is required' }, 400);
+    if (body.lineAccountId
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
     const trigger = readTriggerInput(body);
     if (!trigger.ok) return c.json({ success: false, error: trigger.error }, 400);
     const item = await createReminder(c.env.DB, { ...body, ...trigger.value });

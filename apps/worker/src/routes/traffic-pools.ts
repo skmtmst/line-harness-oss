@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getTrafficPools,
   getTrafficPoolById,
@@ -14,8 +14,17 @@ import {
 import type { TrafficPoolWithAccount, PoolAccountWithDetails } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const trafficPools = new Hono<Env>();
+
+async function requireVisibleTrafficPool(c: Context<Env>, next: () => Promise<void>) {
+  const pool = await getTrafficPoolById(c.env.DB, c.req.param('id')!);
+  if (!pool || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [pool.active_account_id])) {
+    return c.json({ success: false, error: 'Traffic pool not found' }, 404);
+  }
+  await next();
+}
 
 function serialize(pool: TrafficPoolWithAccount) {
   return {
@@ -77,6 +86,9 @@ trafficPools.post('/api/traffic-pools', requireRole('owner'), async (c) => {
     if (!body.slug || !body.name || !body.activeAccountId) {
       return c.json({ success: false, error: 'slug, name, and activeAccountId are required' }, 400);
     }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.activeAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
 
     const pool = await createTrafficPool(c.env.DB, {
       slug: body.slug,
@@ -90,6 +102,9 @@ trafficPools.post('/api/traffic-pools', requireRole('owner'), async (c) => {
   }
 });
 
+trafficPools.use('/api/traffic-pools/:id', requireVisibleTrafficPool);
+trafficPools.use('/api/traffic-pools/:id/*', requireVisibleTrafficPool);
+
 // PUT /api/traffic-pools/:id — update (switch account here)
 trafficPools.put('/api/traffic-pools/:id', requireRole('owner'), async (c) => {
   try {
@@ -99,6 +114,11 @@ trafficPools.put('/api/traffic-pools/:id', requireRole('owner'), async (c) => {
       activeAccountId?: string;
       isActive?: boolean;
     }>();
+
+    if (body.activeAccountId
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.activeAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
 
     const updated = await updateTrafficPool(c.env.DB, id, {
       name: body.name,
@@ -167,6 +187,9 @@ trafficPools.post('/api/traffic-pools/:id/accounts', requireRole('owner'), async
     const body = await c.req.json<{ lineAccountId: string }>();
     if (!body.lineAccountId) {
       return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     const account = await addPoolAccount(c.env.DB, c.req.param('id'), body.lineAccountId);
     return c.json({ success: true, data: account }, 201);
