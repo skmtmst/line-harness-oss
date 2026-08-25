@@ -343,6 +343,8 @@ export async function authMiddleware(c: Context<Env>, next: Next): Promise<Respo
     path === '/api/integrations/codex-slack/events' ||
     // Slack button actions are verified with the Slack app signing secret.
     path === '/api/integrations/slack/actions' ||
+    // Slack Events are also verified with the Slack app signing secret.
+    path === '/api/integrations/slack/events' ||
     path.match(/^\/api\/webhooks\/incoming\/[^/]+\/receive$/) ||
     path === '/api/meet-callback' || // Meet Harness completion callback
     path === '/api/qr' || // Public QR proxy — used by desktop landing pages

@@ -326,6 +326,33 @@ CREATE TABLE chats (
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , line_account_id TEXT, first_replied_at TEXT, last_incoming_at TEXT);
 
+CREATE TABLE codex_cloud_tasks (
+  slack_event_id               TEXT PRIMARY KEY,
+  team_id                      TEXT NOT NULL,
+  channel_id                   TEXT NOT NULL,
+  message_ts                   TEXT NOT NULL,
+  thread_ts                    TEXT NOT NULL,
+  requester_user_id            TEXT NOT NULL,
+  status                       TEXT NOT NULL DEFAULT 'detected'
+                                 CHECK (status IN (
+                                   'detected',
+                                   'official_running',
+                                   'official_failed',
+                                   'fallback_starting',
+                                   'fallback_running',
+                                   'fallback_suspended',
+                                   'duplicate_risk',
+                                   'completed',
+                                   'failed'
+                                 )),
+  official_task_url            TEXT,
+  fallback_run_id              TEXT,
+  fallback_conversation_url    TEXT,
+  detected_at                  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at                   TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (channel_id, message_ts)
+);
+
 CREATE TABLE common_var_schedules (
   id             TEXT PRIMARY KEY,
   var_id         TEXT NOT NULL REFERENCES common_vars(id) ON DELETE CASCADE,
@@ -2234,6 +2261,12 @@ CREATE UNIQUE INDEX idx_chats_friend_unique ON chats (friend_id);
 CREATE INDEX idx_chats_operator ON chats (operator_id);
 
 CREATE INDEX idx_chats_status ON chats (status);
+
+CREATE INDEX idx_codex_cloud_tasks_status
+  ON codex_cloud_tasks(status, updated_at DESC);
+
+CREATE INDEX idx_codex_cloud_tasks_thread
+  ON codex_cloud_tasks(channel_id, thread_ts, detected_at DESC);
 
 CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 

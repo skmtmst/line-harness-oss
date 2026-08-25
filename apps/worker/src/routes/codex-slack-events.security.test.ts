@@ -45,6 +45,37 @@ function env(): Env['Bindings'] {
   };
 }
 
+function monitorEnv(options: { inserted?: boolean } = {}): {
+  bindings: Env['Bindings'];
+  queueSend: ReturnType<typeof vi.fn>;
+  prepare: ReturnType<typeof vi.fn>;
+} {
+  const run = vi.fn().mockResolvedValue({ meta: { changes: options.inserted === false ? 0 : 1 } });
+  const bind = vi.fn().mockReturnValue({ run });
+  const prepare = vi.fn().mockReturnValue({ bind });
+  const queueSend = vi.fn().mockResolvedValue(undefined);
+  return {
+    bindings: {
+      ...env(),
+      DB: { prepare } as unknown as D1Database,
+      SLACK_SIGNING_SECRET: 'slack-signing-secret',
+      CODEX_SLACK_USER_ID: 'U-CODEX',
+      CODEX_MENTION_QUEUE: { send: queueSend } as unknown as Queue,
+    },
+    queueSend,
+    prepare,
+  };
+}
+
+async function slackHeaders(body: string) {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  return {
+    'content-type': 'application/json',
+    'x-slack-request-timestamp': timestamp,
+    'x-slack-signature': await signSlackRequest('slack-signing-secret', timestamp, body),
+  };
+}
+
 async function signedHeaders(body: string) {
   const timestamp = String(Math.floor(Date.now() / 1000));
   return {
@@ -174,5 +205,80 @@ describe('Codex Slack relay security boundary', () => {
       body: 'payload=%7B%7D',
     }, current);
     expect(response.status).toBe(401);
+  });
+
+  test('Slack URL verificationへ署名確認後にchallengeを返す', async () => {
+    const current = monitorEnv();
+    const body = JSON.stringify({ type: 'url_verification', challenge: 'challenge-value' });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('challenge-value');
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('実メンションを台帳へ記録して30秒後の確認だけを予約する', async () => {
+    const current = monitorEnv();
+    const body = JSON.stringify({
+      type: 'event_callback',
+      event_id: 'Ev-1',
+      team_id: 'T-1',
+      event: {
+        type: 'app_mention',
+        user: 'U-MASATO',
+        text: '<@U-CODEX> D-8を確認してください',
+        channel: 'C-1',
+        ts: '1787619782.181509',
+      },
+    });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, queued: true });
+    expect(current.prepare).toHaveBeenCalledTimes(1);
+    expect(current.queueSend).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'inspect_official',
+      slackEventId: 'Ev-1',
+      threadTs: '1787619782.181509',
+    }), { delaySeconds: 30 });
+  });
+
+  test('Slack再送で同じmessage_tsが記録済みなら二重予約しない', async () => {
+    const current = monitorEnv({ inserted: false });
+    const body = JSON.stringify({
+      type: 'event_callback',
+      event_id: 'Ev-retry',
+      team_id: 'T-1',
+      event: {
+        type: 'message', user: 'U-MASATO', text: '<@U-CODEX> D-8',
+        channel: 'C-1', ts: '1787619782.181509',
+      },
+    });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, queued: false });
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('文字列の@Codexや署名のないイベントは監視へ入れない', async () => {
+    const current = monitorEnv();
+    const body = JSON.stringify({
+      type: 'event_callback', event_id: 'Ev-2', team_id: 'T-1',
+      event: { type: 'message', user: 'U-MASATO', text: '@Codex D-8', channel: 'C-1', ts: '2.0' },
+    });
+    const signed = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(signed.status).toBe(200);
+    expect(current.prepare).not.toHaveBeenCalled();
+    const unsigned = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body,
+    }, current.bindings);
+    expect(unsigned.status).toBe(401);
+    expect(current.queueSend).not.toHaveBeenCalled();
   });
 });

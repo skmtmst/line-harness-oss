@@ -185,7 +185,8 @@
     "176_tenant_foundation.sql",
     "177_tenant_backfill_and_unique.sql",
     "178_line_webhook_events.sql",
-    "179_friend_add_event_ledger.sql"
+    "179_friend_add_event_ledger.sql",
+    "180_codex_cloud_tasks.sql"
   ],
-  "migrationCount": 186
+  "migrationCount": 187
 }

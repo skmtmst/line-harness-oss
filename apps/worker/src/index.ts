@@ -115,6 +115,10 @@ import { lineWebhookEvents } from './routes/line-webhook-events.js';
 import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
+import {
+  processCodexMentionMessage,
+  type CodexMentionQueueMessage,
+} from './services/codex-cloud-monitor.js';
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
 import { isLinkPreviewBot } from './lib/og-bot.js';
 import { buildOgHtml } from './lib/og-html.js';
@@ -201,6 +205,15 @@ export type Env = {
     SLACK_MASATO_USER_ID?: string;
     SLACK_TASK_CHANNEL_ID?: string;
     SLACK_SIGNING_SECRET?: string;
+    SLACK_USER_TOKEN?: string;
+    // Slack mention -> official Codex receipt -> Workspace Agent fallback.
+    // User ids and grace time are non-secret vars. Tokens and signing secret
+    // must be stored with `wrangler secret put`.
+    CODEX_SLACK_USER_ID?: string;
+    CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS?: string;
+    WORKSPACE_AGENT_TRIGGER_ID?: string;
+    WORKSPACE_AGENT_ACCESS_TOKEN?: string;
+    CODEX_MENTION_QUEUE?: Queue<CodexMentionQueueMessage>;
   };
   Variables: {
     // 役割と読み取り専用は別の軸。middleware/auth.ts の AuthenticatedStaff と揃える。
@@ -1395,6 +1408,25 @@ async function scheduled(
 export default {
   fetch: app.fetch,
   scheduled,
+  async queue(
+    batch: MessageBatch<CodexMentionQueueMessage>,
+    env: Env['Bindings'],
+  ): Promise<void> {
+    for (const message of batch.messages) {
+      try {
+        await processCodexMentionMessage(env, message.body);
+        message.ack();
+      } catch (error) {
+        console.error(JSON.stringify({
+          event: 'codex_cloud_monitor_queue_failed',
+          kind: message.body.kind,
+          slackEventId: message.body.slackEventId,
+          error: String(error),
+        }));
+        message.retry({ delaySeconds: 60 });
+      }
+    }
+  },
   async email(
     message: ForwardableEmailMessage,
     env: Env['Bindings'],

@@ -91,6 +91,7 @@ function app() {
   a.post('/api/forms/:id/opened', (c) => c.json({ success: true }));
   a.post('/api/integrations/codex-slack/events', (c) => c.json({ success: true }));
   a.post('/api/integrations/slack/actions', (c) => c.json({ success: true }));
+  a.post('/api/integrations/slack/events', (c) => c.json({ success: true }));
   a.get('/api/public/brand', (c) => c.json({ success: true, staff: c.get('staff') ?? null }));
   for (const path of [
     '/api/support', '/api/operators', '/api/support-marks', '/api/saved-searches',
@@ -416,6 +417,7 @@ describe('署名検証を持つSlack連携入口', () => {
   test.each([
     '/api/integrations/codex-slack/events',
     '/api/integrations/slack/actions',
+    '/api/integrations/slack/events',
   ])('%s は管理者認証より前へ通す', async (path) => {
     const res = await app().request(path, { method: 'POST' }, crossSiteEnv());
     expect(res.status).toBe(200);
