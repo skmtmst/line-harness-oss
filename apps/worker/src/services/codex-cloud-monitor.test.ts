@@ -1,17 +1,23 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { Env } from '../index.js';
 import {
+  classifyCodexMonitorError,
   classifyOfficialCodexMessage,
   extractChatGptTaskUrl,
   hasActualSlackMention,
+  isAllowedRelaySource,
+  isAutomaticCodexRelay,
+  isCodexRelayEnabled,
   parseSlackEventEnvelope,
   processCodexMentionMessage,
+  requiresExplicitApproval,
+  shouldStopCodexQueueRetry,
   type CodexMonitorStatus,
 } from './codex-cloud-monitor.js';
 
 afterEach(() => vi.unstubAllGlobals());
 
-function queueTestEnv(status: 'detected' | 'official_running' = 'detected'): {
+function queueTestEnv(status: CodexMonitorStatus = 'detected'): {
   env: Env['Bindings'];
   queueSend: ReturnType<typeof vi.fn>;
   prepare: ReturnType<typeof vi.fn>;
@@ -61,8 +67,10 @@ function queueTestEnv(status: 'detected' | 'official_running' = 'detected'): {
       SLACK_BOT_TOKEN: 'xoxb-test',
       SLACK_USER_TOKEN: 'xoxp-test',
       CODEX_SLACK_USER_ID: 'U-CODEX',
-      WORKSPACE_AGENT_TRIGGER_ID: 'agtch_test',
-      WORKSPACE_AGENT_ACCESS_TOKEN: 'agent-access-token',
+      CODEX_ALLOWED_TEAM_IDS: 'T-1',
+      CODEX_ALLOWED_CHANNEL_IDS: 'C-1',
+      CODEX_RELAY_SOURCE_USER_IDS: 'U-CLAUDE,U-OTHER-BOT',
+      CODEX_RELAY_ENABLED: 'true',
       CODEX_MENTION_QUEUE: { send: queueSend } as unknown as Queue,
     },
     queueSend,
@@ -77,8 +85,8 @@ const inspectMessage = {
   channelId: 'C-1',
   messageTs: '100.1',
   threadTs: '100.1',
-  requesterUserId: 'U-MASATO',
-  prompt: '<@U-CODEX> D-8を確認してください',
+  requesterUserId: 'U-CLAUDE',
+  prompt: '[claude->codex]\n<@U-CODEX> D-8を確認してください',
 };
 
 describe('Codex cloud monitor event classification', () => {
@@ -110,33 +118,58 @@ describe('Codex cloud monitor event classification', () => {
     expect(parseSlackEventEnvelope('{"type":"event_callback"}')).toEqual({ type: 'event_callback' });
   });
 
-  test('公式受領がなければ冪等キー付きでWorkspace Agentを1回起動する', async () => {
+  test('自動中継マーカー、許可元、承認対象を判定する', () => {
+    expect(isAutomaticCodexRelay('【Claude依頼の自動中継】\n<@U-CODEX>')).toBe(true);
+    expect(isAutomaticCodexRelay('<@U-CODEX> 通常依頼')).toBe(false);
+    expect(isAllowedRelaySource('U-CLAUDE, U-OTHER', 'U-CLAUDE')).toBe(true);
+    expect(isAllowedRelaySource('U-CLAUDE, U-OTHER', 'U-MASATO')).toBe(false);
+    expect(isCodexRelayEnabled('true')).toBe(true);
+    expect(isCodexRelayEnabled('false')).toBe(false);
+    expect(requiresExplicitApproval('開発環境で型検査をしてください')).toBe(false);
+    expect(requiresExplicitApproval('本番DBを更新してください')).toBe(true);
+    expect(requiresExplicitApproval('対象は開発のみ。本番には変更を加えないでください')).toBe(false);
+    expect(requiresExplicitApproval('Slack OAuth設定はMasatoの承認後に行ってください')).toBe(false);
+  });
+
+  test('例外本文を保持せず運用分類だけへ変換する', () => {
+    expect(classifyCodexMonitorError(Object.assign(new Error('private row'), { name: 'D1Error' }))).toBe('db_error');
+    expect(classifyCodexMonitorError(new Error('SLACK_USER_RELAY_FAILED:token_revoked'))).toBe('slack_api_error');
+    expect(classifyCodexMonitorError(new Error('private prompt text'))).toBe('unknown');
+  });
+
+  test('Queueは設定回数に達したときだけ再試行を終了する', () => {
+    expect(shouldStopCodexQueueRetry(4, '5')).toBe(false);
+    expect(shouldStopCodexQueueRetry(5, '5')).toBe(true);
+    expect(shouldStopCodexQueueRetry(5, 'invalid')).toBe(true);
+  });
+
+  test('公式受領がなければ許可済み投稿をUser OAuthで1回中継する', async () => {
     const current = queueTestEnv();
     const fetcher = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, messages: [] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        conversation_url: 'https://chatgpt.com/c/fallback-1',
-        agent_trigger_run_id: 'run-1',
-      }), { status: 202 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
 
     await processCodexMentionMessage(current.env, inspectMessage);
 
-    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(fetcher).toHaveBeenCalledTimes(2);
     expect(String(fetcher.mock.calls[0]?.[0])).toContain('https://slack.com/api/conversations.replies?');
-    const triggerRequest = fetcher.mock.calls[1] as [string, RequestInit];
-    expect(triggerRequest[0]).toContain('/workspace_agents/agtch_test/trigger');
-    expect(new Headers(triggerRequest[1].headers).get('idempotency-key')).toBe('slack:T-1:C-1:100.1');
-    expect(JSON.parse(String(triggerRequest[1].body))).toMatchObject({
-      conversation_key: 'slack:T-1:C-1:100.1',
+    const relayRequest = fetcher.mock.calls[1] as [string, RequestInit];
+    expect(relayRequest[0]).toBe('https://slack.com/api/chat.postMessage');
+    expect(new Headers(relayRequest[1].headers).get('authorization')).toBe('Bearer xoxp-test');
+    expect(JSON.parse(String(relayRequest[1].body))).toMatchObject({
+      channel: 'C-1',
+      thread_ts: '100.1',
     });
+    expect(String(JSON.parse(String(relayRequest[1].body)).text)).toContain('【Claude依頼の自動中継】');
+    expect(String(JSON.parse(String(relayRequest[1].body)).text)).toContain('<@U-CODEX>');
+    expect(String(JSON.parse(String(relayRequest[1].body)).text)).toContain('下書きPR');
     expect(current.queueSend).toHaveBeenCalledWith(expect.objectContaining({
-      kind: 'inspect_fallback', runId: 'run-1', attempt: 1,
-    }), { delaySeconds: 60 });
+      kind: 'inspect_relay', slackEventId: 'Ev-1',
+    }), { delaySeconds: 300 });
   });
 
-  test('公式Codexが受領済みならWorkspace Agentを起動しない', async () => {
+  test('公式Codexが受領済みなら自動中継しない', async () => {
     const current = queueTestEnv('official_running');
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);
@@ -145,7 +178,18 @@ describe('Codex cloud monitor event classification', () => {
     expect(current.queueSend).not.toHaveBeenCalled();
   });
 
-  test('フォールバック直前のSlack再照合で公式タスクを見つけたら起動しない', async () => {
+  test('中継後のQueue送信結果が不明でも中継を再投稿せず受領確認だけを復元する', async () => {
+    const current = queueTestEnv('fallback_running');
+    const fetcher = vi.fn();
+    vi.stubGlobal('fetch', fetcher);
+    await processCodexMentionMessage(current.env, inspectMessage);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(current.queueSend).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'inspect_relay', slackEventId: 'Ev-1',
+    }), { delaySeconds: 300 });
+  });
+
+  test('自動中継直前のSlack再照合で公式タスクを見つけたら中継しない', async () => {
     const current = queueTestEnv();
     const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
       ok: true,
@@ -162,9 +206,9 @@ describe('Codex cloud monitor event classification', () => {
     expect(current.queueSend).not.toHaveBeenCalled();
   });
 
-  test('Workspace Agent設定が欠けていれば実行せずSlackへ設定待ちを通知する', async () => {
+  test('User OAuth設定が欠けていれば中継せずSlackへ設定待ちを通知する', async () => {
     const current = queueTestEnv();
-    delete current.env.WORKSPACE_AGENT_ACCESS_TOKEN;
+    delete current.env.SLACK_USER_TOKEN;
     const fetcher = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 }),
     );
@@ -172,6 +216,54 @@ describe('Codex cloud monitor event classification', () => {
     await processCodexMentionMessage(current.env, inspectMessage);
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(String(fetcher.mock.calls[0]?.[0])).toBe('https://slack.com/api/chat.postMessage');
+    expect(new Headers((fetcher.mock.calls[0]?.[1] as RequestInit).headers).get('authorization')).toBe('Bearer xoxb-test');
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('許可リスト外の投稿者は公式Codexへ中継しない', async () => {
+    const current = queueTestEnv();
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    await processCodexMentionMessage(current.env, {
+      ...inspectMessage,
+      requesterUserId: 'U-NOT-ALLOWED',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(new Headers((fetcher.mock.calls[0]?.[1] as RequestInit).headers).get('authorization')).toBe('Bearer xoxb-test');
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('明示承認が必要な依頼は自動中継せず承認待ちにする', async () => {
+    const current = queueTestEnv();
+    const fetcher = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetcher);
+    await processCodexMentionMessage(current.env, {
+      ...inspectMessage,
+      prompt: '[claude->codex]\n<@U-CODEX> 本番DBを更新してください',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(JSON.parse(String((fetcher.mock.calls[0]?.[1] as RequestInit).body)).text)).toContain('【承認待ち】');
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('中継後5分で公式受領がなければ再中継せず通知する', async () => {
+    const current = queueTestEnv('fallback_running');
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, messages: [] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    await processCodexMentionMessage(current.env, {
+      kind: 'inspect_relay',
+      slackEventId: 'Ev-1',
+      channelId: 'C-1',
+      threadTs: '100.1',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(String(JSON.parse(String((fetcher.mock.calls[1]?.[1] as RequestInit).body)).text)).toContain('【受領未確認】');
     expect(current.queueSend).not.toHaveBeenCalled();
   });
 });

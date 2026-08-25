@@ -1,8 +1,7 @@
 import type { Env } from '../index.js';
 
-const CHATGPT_API_BASE = 'https://api.chatgpt.com/v1';
-const WORKSPACE_AGENT_BETA = 'workspace_agent_runs=v1';
-const MAX_RUN_AGE_MS = 24 * 60 * 60 * 1000;
+const AUTO_RELAY_MARKER = '【Claude依頼の自動中継】';
+const RELAY_RECEIPT_WAIT_SECONDS = 300;
 
 export type CodexMonitorStatus =
   | 'detected'
@@ -27,13 +26,10 @@ export type CodexMentionQueueMessage =
       prompt: string;
     }
   | {
-      kind: 'inspect_fallback';
+      kind: 'inspect_relay';
       slackEventId: string;
       channelId: string;
       threadTs: string;
-      runId: string;
-      attempt: number;
-      startedAt: string;
     }
   | {
       kind: 'notify_duplicate';
@@ -70,17 +66,6 @@ type MonitorRow = {
   fallback_conversation_url: string | null;
 };
 
-type WorkspaceAgentTriggerResponse = {
-  conversation_url?: string;
-  agent_trigger_run_id?: string;
-  run_id?: string;
-};
-
-type WorkspaceAgentRunResponse = {
-  status?: string;
-  conversation_url?: string;
-};
-
 type SlackRepliesResponse = {
   ok?: boolean;
   error?: string;
@@ -92,6 +77,73 @@ type SlackRepliesResponse = {
 
 export function hasActualSlackMention(text: string, userId: string): boolean {
   return text.includes(`<@${userId}>`);
+}
+
+export function isAutomaticCodexRelay(text: string): boolean {
+  return text.includes(AUTO_RELAY_MARKER);
+}
+
+export function hasClaudeToCodexMarker(text: string): boolean {
+  const firstLine = text.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0] ?? '';
+  return firstLine.trimStart().startsWith('[claude->codex]');
+}
+
+export function isAllowedRelaySource(configuredIds: string | undefined, userId: string): boolean {
+  if (!configuredIds) return false;
+  return configuredIds
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .includes(userId);
+}
+
+export function isCodexRelayEnabled(value: string | undefined): boolean {
+  return value === '1' || value?.toLowerCase() === 'true';
+}
+
+export function shouldStopCodexQueueRetry(
+  attempts: number,
+  configuredMax: string | undefined,
+): boolean {
+  const parsed = Number.parseInt(configuredMax ?? '5', 10);
+  const maxAttempts = Number.isFinite(parsed) ? Math.min(100, Math.max(1, parsed)) : 5;
+  return attempts >= maxAttempts;
+}
+
+export type CodexMonitorErrorClassification = 'db_error' | 'slack_api_error' | 'unknown';
+
+/** Never persist or log exception bodies; reduce them to an operational class. */
+export function classifyCodexMonitorError(error: unknown): CodexMonitorErrorClassification {
+  const candidate = error as {
+    name?: unknown;
+    message?: unknown;
+    status?: unknown;
+    statusCode?: unknown;
+  } | null;
+  const name = typeof candidate?.name === 'string' ? candidate.name.toLowerCase() : '';
+  const message = typeof candidate?.message === 'string' ? candidate.message.toLowerCase() : '';
+  const status = candidate?.status ?? candidate?.statusCode;
+  if (
+    name.includes('d1') ||
+    name.includes('sqlite') ||
+    message.includes('d1_error') ||
+    message.includes('sqlite')
+  ) return 'db_error';
+  if (
+    name.includes('slack') ||
+    message.includes('slack_') ||
+    message.includes('slack api') ||
+    (typeof status === 'number' && status >= 400 && status <= 599)
+  ) return 'slack_api_error';
+  return 'unknown';
+}
+
+export function requiresExplicitApproval(text: string): boolean {
+  const risky = /(?:\bmain\b|本番|production|prod\b|DB(?:更新|変更|削除|移行)|データベース(?:更新|変更|削除|移行)|\bDELETE\b|\bDROP\b|削除してください|配備|deploy|\.env|環境変数|Webhook|OAuth|Cron|外部通信|決済|返金|秘密(?:値|情報)|API(?:キー| key)|トークン)/i;
+  const explicitlyExcluded = /(?:しない|行わない|加えない|含まない|不要|対象外|禁止|承認後|承認を得てから|変更なし)/i;
+  return text
+    .split(/[。\n、,；;]/)
+    .some((clause) => risky.test(clause) && !explicitlyExcluded.test(clause));
 }
 
 export function extractChatGptTaskUrl(text: string): string | undefined {
@@ -146,6 +198,17 @@ export async function recordSlackMention(
   return Number(result.meta.changes ?? 0) === 1;
 }
 
+export async function markCodexMentionFailed(
+  db: D1Database,
+  slackEventId: string,
+): Promise<void> {
+  await db.prepare(`
+    UPDATE codex_cloud_tasks
+       SET status = 'failed', updated_at = datetime('now')
+     WHERE slack_event_id = ? AND status NOT IN ('completed', 'official_running')
+  `).bind(slackEventId).run();
+}
+
 async function getMonitorRow(db: D1Database, slackEventId: string): Promise<MonitorRow | null> {
   return db.prepare(`
     SELECT slack_event_id, channel_id, message_ts, thread_ts, status,
@@ -174,16 +237,14 @@ export async function observeOfficialCodexReply(
   `).bind(channelId, threadTs).first<{ slack_event_id: string; status: CodexMonitorStatus }>();
   if (!row) return { tracked: false, duplicateRisk: false, taskUrl: classification.taskUrl };
 
-  const duplicateRisk = row.status === 'fallback_starting' ||
-    row.status === 'fallback_running' ||
-    row.status === 'fallback_suspended';
-  const nextStatus: CodexMonitorStatus = duplicateRisk
-    ? 'duplicate_risk'
-    : classification.state === 'failed'
-      ? 'official_failed'
-      : classification.state === 'completed'
-        ? 'completed'
-        : 'official_running';
+  // fallback_running means that the user-authored relay was posted and the
+  // official Codex receipt is the expected next event, not a duplicate run.
+  const duplicateRisk = false;
+  const nextStatus: CodexMonitorStatus = classification.state === 'failed'
+    ? 'official_failed'
+    : classification.state === 'completed'
+      ? 'completed'
+      : 'official_running';
   await env.DB.prepare(`
     UPDATE codex_cloud_tasks
        SET status = ?,
@@ -257,61 +318,50 @@ async function postSlackThread(
   }
 }
 
-async function triggerWorkspaceAgent(
+async function postSlackThreadAsUser(
   env: Env['Bindings'],
-  message: Extract<CodexMentionQueueMessage, { kind: 'inspect_official' }>,
-): Promise<WorkspaceAgentTriggerResponse> {
-  if (!env.WORKSPACE_AGENT_TRIGGER_ID || !env.WORKSPACE_AGENT_ACCESS_TOKEN) {
-    throw new Error('WORKSPACE_AGENT_NOT_CONFIGURED');
-  }
-  const response = await fetch(
-    `${CHATGPT_API_BASE}/workspace_agents/${encodeURIComponent(env.WORKSPACE_AGENT_TRIGGER_ID)}/trigger`,
-    {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${env.WORKSPACE_AGENT_ACCESS_TOKEN}`,
-        'content-type': 'application/json',
-        'idempotency-key': `slack:${message.teamId}:${message.channelId}:${message.messageTs}`,
-        'openai-beta': WORKSPACE_AGENT_BETA,
-      },
-      body: JSON.stringify({
-        input: [
-          'Slackの公式Codexが有効な受領を返さなかったため、クラウドフォールバックとして依頼を処理してください。',
-          `Slack team=${message.teamId} channel=${message.channelId} thread_ts=${message.threadTs}`,
-          '依頼本文:',
-          message.prompt,
-          '変更操作の直前に、同じSlackスレッドに公式Codexのタスクリンクまたは着手返信が増えていないか再確認してください。増えていれば二重実行を避けるため停止し、現在状態だけを報告してください。',
-          'GitHub Issue・仕様書・PRとリポジトリのAGENTS.mdを正本とし、承認ゲートを省略しないでください。',
-          '完了または承認待ちになった場合は、可能なら元Slackスレッドへ結果を報告してください。',
-        ].join('\n'),
-        conversation_key: `slack:${message.teamId}:${message.channelId}:${message.threadTs}`,
-      }),
+  channelId: string,
+  threadTs: string,
+  text: string,
+): Promise<void> {
+  if (!env.SLACK_USER_TOKEN) throw new Error('SLACK_USER_TOKEN_MISSING');
+  const response = await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${env.SLACK_USER_TOKEN}`,
+      'content-type': 'application/json; charset=utf-8',
     },
-  );
-  if (response.status !== 202) {
-    throw new Error(`WORKSPACE_AGENT_TRIGGER_FAILED:${response.status}`);
+    body: JSON.stringify({
+      channel: channelId,
+      thread_ts: threadTs,
+      text,
+      unfurl_links: false,
+      unfurl_media: false,
+    }),
+  });
+  const result = await response.json<{ ok?: boolean; error?: string }>();
+  if (!response.ok || result.ok !== true) {
+    throw new Error(`SLACK_USER_RELAY_FAILED:${result.error ?? response.status}`);
   }
-  return response.json<WorkspaceAgentTriggerResponse>();
 }
 
-async function getWorkspaceAgentRun(
-  env: Env['Bindings'],
-  runId: string,
-): Promise<WorkspaceAgentRunResponse> {
-  if (!env.WORKSPACE_AGENT_TRIGGER_ID || !env.WORKSPACE_AGENT_ACCESS_TOKEN) {
-    throw new Error('WORKSPACE_AGENT_NOT_CONFIGURED');
-  }
-  const response = await fetch(
-    `${CHATGPT_API_BASE}/workspace_agents/${encodeURIComponent(env.WORKSPACE_AGENT_TRIGGER_ID)}/runs/${encodeURIComponent(runId)}`,
-    {
-      headers: {
-        authorization: `Bearer ${env.WORKSPACE_AGENT_ACCESS_TOKEN}`,
-        'openai-beta': WORKSPACE_AGENT_BETA,
-      },
-    },
-  );
-  if (!response.ok) throw new Error(`WORKSPACE_AGENT_RUN_FAILED:${response.status}`);
-  return response.json<WorkspaceAgentRunResponse>();
+function relayText(
+  message: Extract<CodexMentionQueueMessage, { kind: 'inspect_official' }>,
+  codexUserId: string,
+): string {
+  const withoutMarker = message.prompt.split(/\r?\n/).slice(1).join('\n');
+  const original = withoutMarker.replaceAll(`<@${codexUserId}>`, '').trim();
+  return [
+    AUTO_RELAY_MARKER,
+    `<@${codexUserId}> 以下は許可済みのClaude投稿を、MasatoのUser OAuthで同じスレッドへ中継した依頼です。`,
+    `元投稿者: <@${message.requesterUserId}>`,
+    '',
+    original,
+    '',
+    'GitHub Issue・仕様書・PRとリポジトリのAGENTS.mdを正本としてください。',
+    '通常のコード変更は専用ブランチで実装・検証し、codex/development宛ての下書きPRまで進めてください。',
+    'この自動中継はmain統合、本番変更、DB更新、配備、外部設定変更、秘密情報の操作を承認するものではありません。該当する場合は作業せず、このスレッドでMasatoの承認を求めてください。',
+  ].join('\n');
 }
 
 async function transitionStatus(
@@ -357,17 +407,13 @@ async function releaseFallbackStart(db: D1Database, slackEventId: string): Promi
 async function finishFallbackStart(
   db: D1Database,
   slackEventId: string,
-  runId: string | undefined,
-  conversationUrl: string,
 ): Promise<boolean> {
   const result = await db.prepare(`
     UPDATE codex_cloud_tasks
        SET status = 'fallback_running',
-           fallback_run_id = COALESCE(?, fallback_run_id),
-           fallback_conversation_url = ?,
            updated_at = datetime('now')
      WHERE slack_event_id = ? AND status = 'fallback_starting'
-  `).bind(runId ?? null, conversationUrl, slackEventId).run();
+  `).bind(slackEventId).run();
   return Number(result.meta.changes ?? 0) === 1;
 }
 
@@ -379,17 +425,29 @@ async function processOfficialInspection(
   if (!row || row.status === 'official_running' || row.status === 'completed' || row.status === 'duplicate_risk') {
     return;
   }
+  if (row.status === 'fallback_running') {
+    // If the producer response was lost after the user relay succeeded, the
+    // original message may be retried. Recreate only the idempotent receipt
+    // inspection; never post the user relay a second time.
+    await env.CODEX_MENTION_QUEUE?.send({
+      kind: 'inspect_relay',
+      slackEventId: message.slackEventId,
+      channelId: message.channelId,
+      threadTs: message.threadTs,
+    }, { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
+    return;
+  }
   if (
     row.status === 'fallback_starting' ||
-    row.status === 'fallback_running' ||
     row.status === 'fallback_suspended'
   ) return;
 
   if (
-    !env.WORKSPACE_AGENT_TRIGGER_ID ||
-    !env.WORKSPACE_AGENT_ACCESS_TOKEN ||
     !env.SLACK_USER_TOKEN ||
-    !env.CODEX_SLACK_USER_ID
+    !env.CODEX_SLACK_USER_ID ||
+    !env.CODEX_ALLOWED_TEAM_IDS ||
+    !env.CODEX_ALLOWED_CHANNEL_IDS ||
+    !env.CODEX_RELAY_SOURCE_USER_IDS
   ) {
     const changed = await transitionStatus(env.DB, message.slackEventId, 'failed');
     if (changed) {
@@ -397,7 +455,51 @@ async function processOfficialInspection(
         env,
         message.channelId,
         message.threadTs,
-        '【設定待ち】公式Slack Codexの有効な受領を確認できませんでしたが、Workspace Agent API設定が未完了のためフォールバックを開始せず停止しました。',
+        '【設定待ち】公式Slack Codexの受領を確認できませんでしたが、Slack User OAuth中継の設定が未完了のため自動中継せず停止しました。',
+      );
+    }
+    return;
+  }
+
+  if (!isCodexRelayEnabled(env.CODEX_RELAY_ENABLED)) {
+    const changed = await transitionStatus(env.DB, message.slackEventId, 'failed');
+    if (changed) {
+      await postSlackThread(
+        env,
+        message.channelId,
+        message.threadTs,
+        '【自動中継停止中】キルスイッチが無効のため、公式Codexへ中継せず停止しました。',
+      );
+    }
+    return;
+  }
+
+  if (
+    !isAllowedRelaySource(env.CODEX_ALLOWED_TEAM_IDS, message.teamId) ||
+    !isAllowedRelaySource(env.CODEX_ALLOWED_CHANNEL_IDS, message.channelId) ||
+    !isAllowedRelaySource(env.CODEX_RELAY_SOURCE_USER_IDS, message.requesterUserId) ||
+    !hasClaudeToCodexMarker(message.prompt)
+  ) {
+    const changed = await transitionStatus(env.DB, message.slackEventId, 'failed');
+    if (changed) {
+      await postSlackThread(
+        env,
+        message.channelId,
+        message.threadTs,
+        '【中継対象外】許可されたworkspace、channel、投稿者、または `[claude->codex]` マーカーの条件を満たさないため、公式Codexへ中継せず停止しました。',
+      );
+    }
+    return;
+  }
+
+  if (requiresExplicitApproval(message.prompt)) {
+    const changed = await transitionStatus(env.DB, message.slackEventId, 'fallback_suspended');
+    if (changed) {
+      await postSlackThread(
+        env,
+        message.channelId,
+        message.threadTs,
+        '【承認待ち】本番、DB、配備、外部設定、秘密情報など明示承認が必要な可能性を検知したため、自動中継せず停止しました。対象・影響・実施範囲を確認してMasatoが承認してください。',
       );
     }
     return;
@@ -431,120 +533,74 @@ async function processOfficialInspection(
   const latest = await getMonitorRow(env.DB, message.slackEventId);
   if (!latest || latest.status !== 'fallback_starting') return;
 
-  let trigger: WorkspaceAgentTriggerResponse;
+  const started = await finishFallbackStart(env.DB, message.slackEventId);
+  if (!started) return;
+
   try {
-    trigger = await triggerWorkspaceAgent(env, message);
+    await postSlackThreadAsUser(
+      env,
+      message.channelId,
+      message.threadTs,
+      relayText(message, env.CODEX_SLACK_USER_ID),
+    );
   } catch (error) {
-    await releaseFallbackStart(env.DB, message.slackEventId);
-    throw error;
-  }
-  const runId = trigger.agent_trigger_run_id ?? trigger.run_id;
-  const conversationUrl = trigger.conversation_url;
-  if (!conversationUrl || !runId) {
-    await releaseFallbackStart(env.DB, message.slackEventId);
-    throw new Error('WORKSPACE_AGENT_RUN_REFERENCE_MISSING');
-  }
-  const changed = await finishFallbackStart(
-    env.DB,
-    message.slackEventId,
-    runId,
-    conversationUrl,
-  );
-  if (changed) {
+    await transitionStatus(env.DB, message.slackEventId, 'failed');
     await postSlackThread(
       env,
       message.channelId,
       message.threadTs,
-      `【クラウドフォールバック】公式Slack Codexの有効な受領を確認できなかったため、Workspace Agentを開始しました。\n<${conversationUrl}|ChatGPTで進捗を確認>`,
+      '【中継失敗】Slack User OAuthによる公式Codexへの自動中継に失敗しました。重複防止のため再送せず停止しています。',
     );
-  } else {
-    await transitionStatus(env.DB, message.slackEventId, 'duplicate_risk', {
-      runId,
-      conversationUrl,
-    });
-    await postSlackThread(
-      env,
-      message.channelId,
-      message.threadTs,
-      `【二重実行リスク】Workspace Agentの起動と同時に公式Slack Codexの受領を検知しました。クラウドタスクは安全な区切りで停止させてください。\n<${conversationUrl}|ChatGPTで状態を確認>`,
-    );
-  }
-  if (changed) {
-    await env.CODEX_MENTION_QUEUE?.send({
-      kind: 'inspect_fallback',
+    console.error(JSON.stringify({
+      event: 'codex_user_relay_failed',
       slackEventId: message.slackEventId,
-      channelId: message.channelId,
-      threadTs: message.threadTs,
-      runId,
-      attempt: 1,
-      startedAt: new Date().toISOString(),
-    }, { delaySeconds: 60 });
+      reason: classifyCodexMonitorError(error),
+    }));
+    return;
   }
+
+  await env.CODEX_MENTION_QUEUE?.send({
+    kind: 'inspect_relay',
+    slackEventId: message.slackEventId,
+    channelId: message.channelId,
+    threadTs: message.threadTs,
+  }, { delaySeconds: RELAY_RECEIPT_WAIT_SECONDS });
 }
 
-async function processFallbackInspection(
+async function processRelayInspection(
   env: Env['Bindings'],
-  message: Extract<CodexMentionQueueMessage, { kind: 'inspect_fallback' }>,
+  message: Extract<CodexMentionQueueMessage, { kind: 'inspect_relay' }>,
 ): Promise<void> {
   const row = await getMonitorRow(env.DB, message.slackEventId);
-  if (!row || row.status === 'completed' || row.status === 'failed' || row.status === 'duplicate_risk') return;
-  const result = await getWorkspaceAgentRun(env, message.runId);
-  const status = result.status;
-  const conversationUrl = result.conversation_url ?? row.fallback_conversation_url;
+  if (!row || row.status !== 'fallback_running') return;
 
-  if (status === 'completed') {
-    const changed = await transitionStatus(env.DB, message.slackEventId, 'completed', {
-      conversationUrl: conversationUrl ?? undefined,
-    });
-    if (changed) {
-      await postSlackThread(
-        env,
-        message.channelId,
-        message.threadTs,
-        `【クラウドフォールバック】Workspace Agentが完了しました。${conversationUrl ? `\n<${conversationUrl}|実施結果を確認>` : ''}`,
-      );
-    }
+  const receipt = await inspectOfficialCodexThread(env, message.channelId, message.threadTs);
+  if (receipt.state === 'running' || receipt.state === 'completed') {
+    await env.DB.prepare(`
+      UPDATE codex_cloud_tasks
+         SET status = ?,
+             official_task_url = COALESCE(?, official_task_url),
+             updated_at = datetime('now')
+       WHERE slack_event_id = ? AND status = 'fallback_running'
+    `).bind(
+      receipt.state === 'completed' ? 'completed' : 'official_running',
+      receipt.taskUrl ?? null,
+      message.slackEventId,
+    ).run();
     return;
   }
-  if (status === 'failed') {
-    const changed = await transitionStatus(env.DB, message.slackEventId, 'failed', {
-      conversationUrl: conversationUrl ?? undefined,
-    });
-    if (changed) {
-      await postSlackThread(
-        env,
-        message.channelId,
-        message.threadTs,
-        `【クラウドフォールバック】Workspace Agentが失敗しました。再実行せず停止しています。${conversationUrl ? `\n<${conversationUrl}|状態を確認>` : ''}`,
-      );
-    }
-    return;
-  }
-  if (status === 'suspended') {
-    const changed = await transitionStatus(env.DB, message.slackEventId, 'fallback_suspended', {
-      conversationUrl: conversationUrl ?? undefined,
-    });
-    if (changed) {
-      await postSlackThread(
-        env,
-        message.channelId,
-        message.threadTs,
-        `【承認待ち】Workspace Agentが判断を待っています。${conversationUrl ? `\n<${conversationUrl}|ChatGPTで内容を確認して承認>` : ''}`,
-      );
-    }
-  }
-  const startedAt = Date.parse(message.startedAt);
-  if (!Number.isFinite(startedAt) || Date.now() - startedAt >= MAX_RUN_AGE_MS) {
-    const changed = await transitionStatus(env.DB, message.slackEventId, 'failed');
-    if (changed) {
-      await postSlackThread(env, message.channelId, message.threadTs, '【クラウドフォールバック】24時間以内に完了を確認できなかったため、監視を停止しました。');
-    }
-    return;
-  }
-  await env.CODEX_MENTION_QUEUE?.send({
-    ...message,
-    attempt: message.attempt + 1,
-  }, { delaySeconds: status === 'suspended' ? 300 : 60 });
+
+  const nextStatus: CodexMonitorStatus = receipt.state === 'failed' ? 'official_failed' : 'failed';
+  const changed = await transitionStatus(env.DB, message.slackEventId, nextStatus);
+  if (!changed) return;
+  await postSlackThread(
+    env,
+    message.channelId,
+    message.threadTs,
+    receipt.state === 'failed'
+      ? '【公式Codex失敗】自動中継後に公式Slack Codexの失敗返信を検知しました。再中継せず停止しています。'
+      : '【受領未確認】自動中継後5分以内に公式Slack Codexのタスクリンク、着手返信、完了返信を確認できませんでした。重複防止のため再中継せず停止しています。',
+  );
 }
 
 export async function processCodexMentionMessage(
@@ -555,8 +611,8 @@ export async function processCodexMentionMessage(
     await processOfficialInspection(env, message);
     return;
   }
-  if (message.kind === 'inspect_fallback') {
-    await processFallbackInspection(env, message);
+  if (message.kind === 'inspect_relay') {
+    await processRelayInspection(env, message);
     return;
   }
   await postSlackThread(

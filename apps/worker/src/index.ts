@@ -116,7 +116,10 @@ import { reportHarnessErrorToSlack } from './services/codex-slack-relay.js';
 import { routeInboundEmail } from './services/inbound-email-router.js';
 import { deleteExpiredRestaurantRawEmails } from './services/restaurant-email-intake.js';
 import {
+  classifyCodexMonitorError,
+  markCodexMentionFailed,
   processCodexMentionMessage,
+  shouldStopCodexQueueRetry,
   type CodexMentionQueueMessage,
 } from './services/codex-cloud-monitor.js';
 import { isQrDataAllowed, normalizeQrSize, qrResponseHeaders, normalizeQrFormat } from './lib/qr-response.js';
@@ -206,13 +209,16 @@ export type Env = {
     SLACK_TASK_CHANNEL_ID?: string;
     SLACK_SIGNING_SECRET?: string;
     SLACK_USER_TOKEN?: string;
-    // Slack mention -> official Codex receipt -> Workspace Agent fallback.
+    // Slack mention -> official Codex receipt -> user-authored Slack relay.
     // User ids and grace time are non-secret vars. Tokens and signing secret
     // must be stored with `wrangler secret put`.
     CODEX_SLACK_USER_ID?: string;
+    CODEX_ALLOWED_TEAM_IDS?: string;
+    CODEX_ALLOWED_CHANNEL_IDS?: string;
+    CODEX_RELAY_SOURCE_USER_IDS?: string;
+    CODEX_RELAY_ENABLED?: string;
+    CODEX_QUEUE_MAX_ATTEMPTS?: string;
     CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS?: string;
-    WORKSPACE_AGENT_TRIGGER_ID?: string;
-    WORKSPACE_AGENT_ACCESS_TOKEN?: string;
     CODEX_MENTION_QUEUE?: Queue<CodexMentionQueueMessage>;
   };
   Variables: {
@@ -1417,13 +1423,29 @@ export default {
         await processCodexMentionMessage(env, message.body);
         message.ack();
       } catch (error) {
+        const reason = classifyCodexMonitorError(error);
         console.error(JSON.stringify({
           event: 'codex_cloud_monitor_queue_failed',
           kind: message.body.kind,
           slackEventId: message.body.slackEventId,
-          error: String(error),
+          reason,
+          attempts: message.attempts,
         }));
-        message.retry({ delaySeconds: 60 });
+        if (shouldStopCodexQueueRetry(message.attempts, env.CODEX_QUEUE_MAX_ATTEMPTS)) {
+          try {
+            await markCodexMentionFailed(env.DB, message.body.slackEventId);
+          } catch {
+            console.error(JSON.stringify({
+              event: 'codex_cloud_monitor_queue_ledger_failed',
+              kind: message.body.kind,
+              slackEventId: message.body.slackEventId,
+              reason: 'db_error',
+            }));
+          }
+          message.ack();
+        } else {
+          message.retry({ delaySeconds: 60 });
+        }
       }
     }
   },

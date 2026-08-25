@@ -10,7 +10,12 @@ import {
 } from '../services/codex-slack-relay.js';
 import { verifySlackRequest } from '../services/slack-signature.js';
 import {
+  hasClaudeToCodexMarker,
   hasActualSlackMention,
+  isAllowedRelaySource,
+  isAutomaticCodexRelay,
+  isCodexRelayEnabled,
+  markCodexMentionFailed,
   observeOfficialCodexReply,
   parseSlackEventEnvelope,
   recordSlackMention,
@@ -223,6 +228,9 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
   if (envelope.type !== 'event_callback' || !envelope.event_id || !envelope.team_id) {
     return c.json({ success: true, ignored: true });
   }
+  if (!isAllowedRelaySource(c.env.CODEX_ALLOWED_TEAM_IDS, envelope.team_id)) {
+    return c.json({ success: true, ignored: true });
+  }
   const event = envelope.event;
   if (
     !event ||
@@ -233,6 +241,9 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     !event.ts ||
     typeof event.text !== 'string'
   ) {
+    return c.json({ success: true, ignored: true });
+  }
+  if (!isAllowedRelaySource(c.env.CODEX_ALLOWED_CHANNEL_IDS, event.channel)) {
     return c.json({ success: true, ignored: true });
   }
 
@@ -251,6 +262,12 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     return c.json({ success: true, observed: observed.tracked });
   }
 
+  // The relay itself contains a real Codex mention. Ignore the explicit marker
+  // before mention detection so the Worker cannot recursively relay its own post.
+  if (isAutomaticCodexRelay(event.text)) {
+    return c.json({ success: true, ignored: true });
+  }
+
   if (!hasActualSlackMention(event.text, c.env.CODEX_SLACK_USER_ID)) {
     return c.json({ success: true, ignored: true });
   }
@@ -265,6 +282,14 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     prompt: event.text,
   };
   const inserted = await recordSlackMention(c.env.DB, message);
+  if (
+    !hasClaudeToCodexMarker(event.text) ||
+    !isAllowedRelaySource(c.env.CODEX_RELAY_SOURCE_USER_IDS, event.user) ||
+    !isCodexRelayEnabled(c.env.CODEX_RELAY_ENABLED)
+  ) {
+    if (inserted) await markCodexMentionFailed(c.env.DB, envelope.event_id);
+    return c.json({ success: true, recorded: inserted, queued: false });
+  }
   if (inserted) {
     const configuredGrace = Number.parseInt(c.env.CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS ?? '30', 10);
     const delaySeconds = Number.isFinite(configuredGrace)
