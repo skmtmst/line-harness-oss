@@ -60,6 +60,10 @@ function monitorEnv(options: { inserted?: boolean } = {}): {
       DB: { prepare } as unknown as D1Database,
       SLACK_SIGNING_SECRET: 'slack-signing-secret',
       CODEX_SLACK_USER_ID: 'U-CODEX',
+      CODEX_ALLOWED_TEAM_IDS: 'T-1',
+      CODEX_ALLOWED_CHANNEL_IDS: 'C-1',
+      CODEX_RELAY_SOURCE_USER_IDS: 'U-MASATO',
+      CODEX_RELAY_ENABLED: 'true',
       CODEX_MENTION_QUEUE: { send: queueSend } as unknown as Queue,
     },
     queueSend,
@@ -227,7 +231,7 @@ describe('Codex Slack relay security boundary', () => {
       event: {
         type: 'app_mention',
         user: 'U-MASATO',
-        text: '<@U-CODEX> D-8を確認してください',
+        text: '[claude->codex]\n<@U-CODEX> D-8を確認してください',
         channel: 'C-1',
         ts: '1787619782.181509',
       },
@@ -245,6 +249,80 @@ describe('Codex Slack relay security boundary', () => {
     }), { delaySeconds: 30 });
   });
 
+  test('許可されていないteamまたはchannelのイベントを記録せず捨てる', async () => {
+    for (const [teamId, channelId] of [['T-OTHER', 'C-1'], ['T-1', 'C-OTHER']]) {
+      const current = monitorEnv();
+      const body = JSON.stringify({
+        type: 'event_callback', event_id: `Ev-${teamId}-${channelId}`, team_id: teamId,
+        event: {
+          type: 'app_mention', user: 'U-MASATO',
+          text: '[claude->codex]\n<@U-CODEX> D-8', channel: channelId, ts: '3.0',
+        },
+      });
+      const response = await app().request('/api/integrations/slack/events', {
+        method: 'POST', headers: await slackHeaders(body), body,
+      }, current.bindings);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ success: true, ignored: true });
+      expect(current.prepare).not.toHaveBeenCalled();
+      expect(current.queueSend).not.toHaveBeenCalled();
+    }
+  });
+
+  test('マーカーなしの実メンションは台帳へ記録するが中継予約しない', async () => {
+    const current = monitorEnv();
+    const body = JSON.stringify({
+      type: 'event_callback', event_id: 'Ev-no-marker', team_id: 'T-1',
+      event: {
+        type: 'app_mention', user: 'U-MASATO', text: '<@U-CODEX> 手動の会話',
+        channel: 'C-1', ts: '4.0',
+      },
+    });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, recorded: true, queued: false });
+    expect(current.prepare).toHaveBeenCalledTimes(2);
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('キルスイッチ無効時はマーカー付きでも台帳記録だけにする', async () => {
+    const current = monitorEnv();
+    current.bindings.CODEX_RELAY_ENABLED = 'false';
+    const body = JSON.stringify({
+      type: 'event_callback', event_id: 'Ev-kill-switch', team_id: 'T-1',
+      event: {
+        type: 'app_mention', user: 'U-MASATO',
+        text: '[claude->codex]\n<@U-CODEX> D-8', channel: 'C-1', ts: '4.5',
+      },
+    });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, recorded: true, queued: false });
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('Worker自身の自動中継マーカーを再検知しても台帳へ記録しない', async () => {
+    const current = monitorEnv();
+    const body = JSON.stringify({
+      type: 'event_callback', event_id: 'Ev-relay-loop', team_id: 'T-1',
+      event: {
+        type: 'app_mention', user: 'U-MASATO',
+        text: '【Claude依頼の自動中継】\n<@U-CODEX> 中継済み', channel: 'C-1', ts: '5.0',
+      },
+    });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, ignored: true });
+    expect(current.prepare).not.toHaveBeenCalled();
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
   test('Slack再送で同じmessage_tsが記録済みなら二重予約しない', async () => {
     const current = monitorEnv({ inserted: false });
     const body = JSON.stringify({
@@ -252,7 +330,7 @@ describe('Codex Slack relay security boundary', () => {
       event_id: 'Ev-retry',
       team_id: 'T-1',
       event: {
-        type: 'message', user: 'U-MASATO', text: '<@U-CODEX> D-8',
+        type: 'message', user: 'U-MASATO', text: '[claude->codex]\n<@U-CODEX> D-8',
         channel: 'C-1', ts: '1787619782.181509',
       },
     });
