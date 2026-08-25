@@ -26,25 +26,13 @@ import {
   buildWarnings,
   hasRecentSimilarBroadcast,
 } from '../services/broadcast-preflight.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import type { AuthenticatedStaff } from '../middleware/auth.js';
 
 const broadcasts = new Hono<Env>();
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
-
-/** All account references must belong to the staff tenant; null means unassigned. */
-async function canAccessAllBroadcastAccounts(
-  db: D1Database,
-  staff: AuthenticatedStaff | undefined,
-  accountIds: Array<string | null | undefined>,
-): Promise<boolean> {
-  const scope = await getVisibleLineAccountScope(db, staff);
-  return accountIds.every((accountId) => accountId == null
-    ? scope.canSeeUnassigned
-    : scope.allowedAccountIds.includes(accountId));
-}
 
 function broadcastAccountIds(broadcast: DbBroadcast): Array<string | null> {
   const raw = broadcast as unknown as Record<string, unknown>;
@@ -58,7 +46,7 @@ async function canAccessBroadcast(
   staff: AuthenticatedStaff | undefined,
   broadcast: DbBroadcast,
 ): Promise<boolean> {
-  return canAccessAllBroadcastAccounts(db, staff, broadcastAccountIds(broadcast));
+  return canAccessAllLineAccounts(db, staff, broadcastAccountIds(broadcast));
 }
 
 function unsupportedVariablesError(content: string): string | null {
@@ -427,7 +415,7 @@ broadcasts.post('/api/broadcasts/preflight', requireRole('owner', 'admin'), asyn
     const requestedAccountIds = targetType === 'multi-account-dedup'
       ? (Array.isArray(body.accountIds) ? body.accountIds.map(String) : [null])
       : [body.lineAccountId == null ? null : String(body.lineAccountId)];
-    if (!await canAccessAllBroadcastAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
     /*
@@ -498,7 +486,7 @@ broadcasts.post('/api/broadcasts', requireRole('owner', 'admin'), async (c) => {
     const requestedAccountIds = body.targetType === 'multi-account-dedup'
       ? (Array.isArray(body.accountIds) ? body.accountIds : [null])
       : [body.lineAccountId ?? null];
-    if (!await canAccessAllBroadcastAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
 
@@ -670,7 +658,7 @@ broadcasts.put('/api/broadcasts/:id', requireRole('owner', 'admin'), async (c) =
       : [body.lineAccountId !== undefined
           ? body.lineAccountId
           : (existingRaw.line_account_id as string | null | undefined) ?? null];
-    if (!await canAccessAllBroadcastAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), requestedAccountIds)) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
 
@@ -1488,7 +1476,7 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
 broadcasts.post('/api/segments/count', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ conditions: unknown; accountId?: string }>();
   try {
-    if (!await canAccessAllBroadcastAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
     const { buildSegmentQuery } = await import('../services/segment-query.js');

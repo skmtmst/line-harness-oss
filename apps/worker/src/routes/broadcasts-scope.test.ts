@@ -18,7 +18,19 @@ vi.mock('@line-crm/db', () => ({
   deleteBroadcast: mocks.deleteBroadcast,
   getLineAccountById: vi.fn(),
 }));
-vi.mock('../services/account-access.js', () => ({ getVisibleLineAccountScope: mocks.scope }));
+vi.mock('../services/account-access.js', () => ({
+  getVisibleLineAccountScope: mocks.scope,
+  canAccessAllLineAccounts: async (
+    _db: D1Database,
+    _staff: unknown,
+    accountIds: Array<string | null | undefined>,
+  ) => {
+    const scope = await mocks.scope();
+    return accountIds.every((id) => id == null
+      ? scope.canSeeUnassigned
+      : scope.allowedAccountIds.includes(id));
+  },
+}));
 vi.mock('@line-crm/line-sdk', () => ({ LineClient: mocks.lineClient }));
 
 const { broadcasts } = await import('./broadcasts.js');

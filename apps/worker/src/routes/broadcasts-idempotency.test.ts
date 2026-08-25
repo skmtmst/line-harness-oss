@@ -11,6 +11,7 @@ const dbMocks = {
 };
 vi.mock('@line-crm/db', () => dbMocks);
 vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: vi.fn(async () => true),
   getVisibleLineAccountScope: vi.fn(async () => ({
     accounts: [],
     ids: ['account-1'],

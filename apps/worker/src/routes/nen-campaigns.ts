@@ -9,12 +9,14 @@ import {
   queueColumnDelivery,
 } from '../services/nen-engagement.js';
 import { syncNenPetTags } from '../services/nen-tag-sync.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
   'arrival_check', 'review_request', 'cross_sell', 'column', 'birthday_coupon',
 ]);
 const MAX_BODY_BYTES = 256 * 1024;
+const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
 
 function isUrl(value: string): boolean {
   if (!value) return true;
@@ -116,6 +118,9 @@ nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'),
   if (!body?.campaignKey || !CAMPAIGN_KEYS.has(body.campaignKey) || !body.accountId || !body.friendId) {
     return c.json({ success: false, error: 'campaignKey, accountId and friendId are required' }, 400);
   }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
   const [campaign, account, friend] = await Promise.all([
     getNenCampaign(c.env.DB, body.campaignKey),
     getLineAccountById(c.env.DB, body.accountId),
@@ -180,6 +185,9 @@ nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
 nenCampaigns.post('/api/nen-campaigns/columns/:id/deliver', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ accountId?: string; scheduledAt?: string }>().catch(() => null);
   if (!body?.accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
+  }
   const when = body.scheduledAt && Number.isFinite(Date.parse(body.scheduledAt))
     ? new Date(body.scheduledAt).toISOString().slice(0, 19).replace('T', ' ')
     : new Date().toISOString().slice(0, 19).replace('T', ' ');
