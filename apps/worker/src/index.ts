@@ -213,6 +213,7 @@ export type Env = {
     // User ids and grace time are non-secret vars. Tokens and signing secret
     // must be stored with `wrangler secret put`.
     CODEX_SLACK_USER_ID?: string;
+    CODEX_SLACK_MONITOR_SIGNING_SECRET?: string;
     CODEX_ALLOWED_TEAM_IDS?: string;
     CODEX_ALLOWED_CHANNEL_IDS?: string;
     CODEX_ALLOWED_CHANNEL_NAME_PREFIXES?: string;

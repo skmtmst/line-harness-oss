@@ -206,7 +206,8 @@ codexSlackEvents.post('/api/integrations/slack/actions', async (c) => {
 });
 
 codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
-  if (!c.env.SLACK_SIGNING_SECRET || !c.env.CODEX_SLACK_USER_ID || !c.env.CODEX_MENTION_QUEUE) {
+  const signingSecret = c.env.CODEX_SLACK_MONITOR_SIGNING_SECRET ?? c.env.SLACK_SIGNING_SECRET;
+  if (!signingSecret || !c.env.CODEX_SLACK_USER_ID || !c.env.CODEX_MENTION_QUEUE) {
     return c.json({ success: false, error: 'Slack event monitor not configured' }, 503);
   }
   const rawBody = await c.req.text();
@@ -214,7 +215,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
   const verified = await verifySlackRequest(
-    c.env.SLACK_SIGNING_SECRET,
+    signingSecret,
     c.req.header('x-slack-request-timestamp'),
     c.req.header('x-slack-signature'),
     rawBody,
