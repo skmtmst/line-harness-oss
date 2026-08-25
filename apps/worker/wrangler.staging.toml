@@ -33,6 +33,17 @@ bucket_name = "musubo-raw-mail-stg"
 [ai]
 binding = "AI"
 
+[[queues.producers]]
+binding = "CODEX_MENTION_QUEUE"
+queue = "nen-codex-mentions-stg"
+
+[[queues.consumers]]
+queue = "nen-codex-mentions-stg"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+retry_delay = 60
+
 [vars]
 WORKER_NAME = "nen-line-stg"
 ADMIN_PAGES_PROJECT = "nen-line-stg-admin"
@@ -54,3 +65,5 @@ XSERVER_RELAY_URL = "https://stg.nen-petfood.com/_system/support-mail-relay.php"
 SEARCH_CONSOLE_SITE_URL = "sc-domain:nen-petfood.com"
 RESTAURANT_INTAKE_DOMAIN = "rs.musubo.jp"
 RAW_MAIL_RETENTION_DAYS = "90"
+CODEX_SLACK_USER_ID = "U0BRUBQMV9Q"
+CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS = "30"

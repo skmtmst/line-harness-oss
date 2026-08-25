@@ -34,6 +34,19 @@ Slackのアプリ候補から選んだ実際の `@Codex` メンションが必�
 4. Slackの `TASK-ID` からCodexセッションを記録し、後からPR番号が付いても元スレッドと要対応カードを更新する。
 5. トークンやパスワードらしき文字は投稿前に伏せる。
 
+## Slackメンションのイベント駆動監視
+
+5分ごとのSlack検索は使わない。内部SlackアプリがSlack Eventsを受け取った時だけ、次の処理を起動する。
+
+1. `POST /api/integrations/slack/events` でSlack署名を検証する。
+2. 本文に実際のCodexユーザーID `<@U0BRUBQMV9Q>` がある投稿だけをD1台帳へ記録する。文字列の `@Codex` は無視する。
+3. Slackの再送や `app_mention` / `message` の重複は `(channel_id, message_ts)` で1件にまとめる。依頼本文はD1へ保存しない。
+4. Cloudflare Queueで30秒後に状態を確認する。この猶予中に公式Slack Codexのタスクリンク、明示的な着手返信、完了返信を受信したら何もしない。
+5. 公式Codexが接続・環境選択エラー、失敗、停止を返した場合、または有効な受領を返さなかった場合だけWorkspace Agent APIを起動する。同じSlack投稿の再送は `Idempotency-Key` と `conversation_key` で同じクラウドタスクへ束ねる。
+6. Workspace Agentの承認待ち・完了・失敗は同じSlackスレッドへ返信する。普段の待機中にCodexモデルは起動しない。
+
+フォールバック開始後に公式Slack Codexも開始した場合は台帳を `duplicate_risk` に変え、同じスレッドへ二重実行リスクを通知する。自動で本番変更・DB更新・承認操作へ進むことはない。
+
 ## 要対応タスク
 
 - 修正、エラー、承認待ちなど、対応が必要な投稿は `#line-harness-要対応` に自動表示する。
@@ -67,6 +80,7 @@ Workerの秘密値:
 - `CODEX_SLACK_RELAY_SECRET`: Codex側と共通の十分に長いランダム値
 - `SLACK_BOT_TOKEN`: 内部SlackアプリのBot token。`chat:write`、対象チャンネルの履歴読み取り、公開チャンネルの参照・作成（`channels:read` / `channels:manage`）権限が必要
 - `SLACK_SIGNING_SECRET`: Slackのボタン操作が本物か確認する署名秘密値
+- `WORKSPACE_AGENT_ACCESS_TOKEN`: 公開済みWorkspace Agentを起動するAPI access token
 
 Workerの非秘密設定:
 
@@ -78,6 +92,26 @@ Workerの非秘密設定:
 - `SLACK_KENTA_USER_ID`
 - `SLACK_MASATO_USER_ID`
 - `SLACK_TASK_CHANNEL_ID`
+- `CODEX_SLACK_USER_ID`: 監視対象の公式CodexユーザーID。LINE 然では `U0BRUBQMV9Q`
+- `CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS`: 公式Slack Codexの受領を待つ秒数。既定は30秒、許容範囲は10〜300秒
+- `WORKSPACE_AGENT_TRIGGER_ID`: 公開済みWorkspace AgentのAPI trigger ID（`agtch_...`）
+
+Slackアプリの Event Subscriptions:
+
+- Request URL: `<Worker URL>/api/integrations/slack/events`
+- User events（MasatoのOAuth認可）: `message.channels`, `message.groups`, `message.im`, `message.mpim`
+- User token scopes: `channels:history`, `groups:history`, `im:history`, `mpim:history`
+- Bot token scope: `chat:write`。状態通知を投稿するチャンネルには内部Slackアプリを参加させる
+- `app_mention` は「その内部Slackアプリ自身」へのメンションだけを送るため、別アプリである公式Codexの監視には使わない
+- 設定変更後はMasatoのOAuth認可とワークスペースへの再インストールを行う。認可したユーザーが見られない非公開チャンネルやDMは監視対象にならない
+
+Cloudflare検証環境:
+
+- Queue: `nen-codex-mentions-stg`
+- Producer / Consumer binding: `CODEX_MENTION_QUEUE`
+- D1 migration: `180_codex_cloud_tasks.sql`
+
+Queue作成、D1適用、Worker secrets登録、OAuth再認可、Event Subscription登録は外部状態を変える。コードのPRとは分け、対象環境・バックアップ・切り戻しを確認してから検証環境だけへ適用する。
 
 Slackアプリの Interactivity Request URL:
 
@@ -95,6 +129,14 @@ macOSでは、Codexアプリが環境変数をまだ引き継いでいない場�
 自動で確認する。完了報告に `PR #246` のような番号がある場合は、その番号の100件単位チャンネルへ送る。
 
 秘密値はリポジトリやSlackへ書かない。両名の環境設定が終わったらCodexを再起動し、プロジェクトフックを信頼済みにする。
+
+## PCとスマホからの確認
+
+- 共通の正本は、メンションを書いた元Slackスレッド。公式CodexまたはフォールバックのChatGPTクラウドタスクリンク、承認待ち、完了、失敗が同じ場所に残る。
+- PCのCodexアプリから確認するときは、Slackスレッド内のChatGPTリンクを開く。Slack起動のクラウドタスクがCodexデスクトップのタスク一覧へ必ず同期されるとは限らないため、リンクを確実な入口にする。
+- PC上のCodexが機械的に一覧確認する場合は、検証Workerの `GET /api/integrations/codex-monitor/status?limit=20` を使う。`Authorization: Bearer <API_KEY>` が必須で、依頼本文や秘密値は返さない。
+- スマホはSlackアプリの同じスレッドから通知と状態を確認し、リンクをChatGPTアプリまたはブラウザで開く。承認待ちの場合も同じリンクから判断する。
+- Workspace Agent APIは実行結果本文をAPIで取得しないため、最終内容はChatGPTクラウドタスクとSlack報告で確認する。
 
 ## セキュリティと承認
 

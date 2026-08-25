@@ -9,6 +9,13 @@ import {
   type CodexSlackPrSnapshot,
 } from '../services/codex-slack-relay.js';
 import { verifySlackRequest } from '../services/slack-signature.js';
+import {
+  hasActualSlackMention,
+  observeOfficialCodexReply,
+  parseSlackEventEnvelope,
+  recordSlackMention,
+  type CodexMentionQueueMessage,
+} from '../services/codex-cloud-monitor.js';
 
 const MAX_BODY_BYTES = 32 * 1024;
 const ALLOWED_EVENT_TYPES = new Set(['prompt_submitted', 'turn_completed', 'approval_required']);
@@ -190,4 +197,97 @@ codexSlackEvents.post('/api/integrations/slack/actions', async (c) => {
     console.error(JSON.stringify({ event: 'slack_task_action_failed', error: message }));
     return c.json({ success: false, error: 'Slack task action failed' }, 502);
   }
+});
+
+codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
+  if (!c.env.SLACK_SIGNING_SECRET || !c.env.CODEX_SLACK_USER_ID || !c.env.CODEX_MENTION_QUEUE) {
+    return c.json({ success: false, error: 'Slack event monitor not configured' }, 503);
+  }
+  const rawBody = await c.req.text();
+  if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
+    return c.json({ success: false, error: 'Payload too large' }, 413);
+  }
+  const verified = await verifySlackRequest(
+    c.env.SLACK_SIGNING_SECRET,
+    c.req.header('x-slack-request-timestamp'),
+    c.req.header('x-slack-signature'),
+    rawBody,
+  );
+  if (!verified) return c.json({ success: false, error: 'Invalid Slack signature' }, 401);
+
+  const envelope = parseSlackEventEnvelope(rawBody);
+  if (!envelope) return c.json({ success: false, error: 'Invalid Slack payload' }, 400);
+  if (envelope.type === 'url_verification' && typeof envelope.challenge === 'string') {
+    return c.text(envelope.challenge);
+  }
+  if (envelope.type !== 'event_callback' || !envelope.event_id || !envelope.team_id) {
+    return c.json({ success: true, ignored: true });
+  }
+  const event = envelope.event;
+  if (
+    !event ||
+    (event.type !== 'app_mention' && event.type !== 'message') ||
+    event.subtype === 'message_changed' ||
+    !event.user ||
+    !event.channel ||
+    !event.ts ||
+    typeof event.text !== 'string'
+  ) {
+    return c.json({ success: true, ignored: true });
+  }
+
+  const threadTs = event.thread_ts ?? event.ts;
+  if (event.user === c.env.CODEX_SLACK_USER_ID && event.thread_ts) {
+    const observed = await observeOfficialCodexReply(c.env, event.channel, threadTs, event.text);
+    if (observed.duplicateRisk) {
+      await c.env.CODEX_MENTION_QUEUE.send({
+        kind: 'notify_duplicate',
+        slackEventId: envelope.event_id,
+        channelId: event.channel,
+        threadTs,
+        officialTaskUrl: observed.taskUrl,
+      });
+    }
+    return c.json({ success: true, observed: observed.tracked });
+  }
+
+  if (!hasActualSlackMention(event.text, c.env.CODEX_SLACK_USER_ID)) {
+    return c.json({ success: true, ignored: true });
+  }
+  const message: Extract<CodexMentionQueueMessage, { kind: 'inspect_official' }> = {
+    kind: 'inspect_official',
+    slackEventId: envelope.event_id,
+    teamId: envelope.team_id,
+    channelId: event.channel,
+    messageTs: event.ts,
+    threadTs,
+    requesterUserId: event.user,
+    prompt: event.text,
+  };
+  const inserted = await recordSlackMention(c.env.DB, message);
+  if (inserted) {
+    const configuredGrace = Number.parseInt(c.env.CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS ?? '30', 10);
+    const delaySeconds = Number.isFinite(configuredGrace)
+      ? Math.min(300, Math.max(10, configuredGrace))
+      : 30;
+    await c.env.CODEX_MENTION_QUEUE.send(message, { delaySeconds });
+  }
+  return c.json({ success: true, queued: inserted });
+});
+
+codexSlackEvents.get('/api/integrations/codex-monitor/status', async (c) => {
+  const authorization = c.req.header('authorization');
+  if (!c.env.API_KEY || authorization !== `Bearer ${c.env.API_KEY}`) {
+    return c.json({ success: false, error: 'Unauthorized' }, 401);
+  }
+  const parsedLimit = Number.parseInt(c.req.query('limit') ?? '20', 10);
+  const limit = Number.isFinite(parsedLimit) ? Math.min(100, Math.max(1, parsedLimit)) : 20;
+  const result = await c.env.DB.prepare(`
+    SELECT slack_event_id, team_id, channel_id, message_ts, thread_ts, status,
+           official_task_url, fallback_conversation_url, detected_at, updated_at
+      FROM codex_cloud_tasks
+     ORDER BY detected_at DESC
+     LIMIT ?
+  `).bind(limit).all();
+  return c.json({ success: true, tasks: result.results });
 });
