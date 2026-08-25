@@ -1,5 +1,28 @@
 import { describe, expect, test } from 'vitest';
-import { computeUnansweredInbox, countUnanswered } from './unanswered-inbox.js';
+import {
+  computeUnansweredInbox as computeUnansweredInboxImpl,
+  countUnanswered as countUnansweredImpl,
+  type UnansweredInboxOptions,
+} from './unanswered-inbox.js';
+
+const DEFAULT_SCOPE = {
+  allowedAccountIds: ['a1', 'a2', 'a3'],
+  canSeeUnassigned: true,
+} as const;
+
+function computeUnansweredInbox(
+  db: D1Database,
+  options: Partial<UnansweredInboxOptions> = {},
+) {
+  return computeUnansweredInboxImpl(db, { ...DEFAULT_SCOPE, ...options });
+}
+
+function countUnanswered(
+  db: D1Database,
+  options: Partial<Pick<UnansweredInboxOptions, 'allowedAccountIds' | 'canSeeUnassigned'>> = {},
+) {
+  return countUnansweredImpl(db, { ...DEFAULT_SCOPE, ...options });
+}
 
 // 候補 friend のメタ + タイムスタンプ
 interface InboxRow {

@@ -195,9 +195,9 @@ export interface UnansweredInboxOptions {
   page?: number;
   pageSize?: number;
   /** Restrict output to accounts visible to the authenticated caller. */
-  allowedAccountIds?: readonly string[];
+  allowedAccountIds: readonly string[];
   /** Include legacy friends whose account assignment is missing. */
-  canSeeUnassigned?: boolean;
+  canSeeUnassigned: boolean;
 }
 
 interface RawCandidateRow {
@@ -219,14 +219,11 @@ interface RawIncomingRow {
 }
 
 function applyFilters(rows: UnansweredRow[], opts: UnansweredInboxOptions): UnansweredRow[] {
-  let filtered = rows;
-  if (opts.allowedAccountIds) {
-    const allowed = new Set(opts.allowedAccountIds);
-    filtered = filtered.filter(
-      (r) => (r.accountId !== null && allowed.has(r.accountId))
-        || (opts.canSeeUnassigned && r.accountId === null),
-    );
-  }
+  const allowed = new Set(opts.allowedAccountIds);
+  let filtered = rows.filter(
+    (r) => (r.accountId !== null && allowed.has(r.accountId))
+      || (opts.canSeeUnassigned && r.accountId === null),
+  );
   if (opts.account) {
     filtered = filtered.filter((r) => r.accountId === opts.account);
   }
@@ -327,7 +324,7 @@ async function getAllUnansweredRows(db: D1Database): Promise<UnansweredRow[]> {
 
 export async function computeUnansweredInbox(
   db: D1Database,
-  opts: UnansweredInboxOptions = {},
+  opts: UnansweredInboxOptions,
 ): Promise<UnansweredInboxResult> {
   const page = Math.max(1, opts.page ?? 1);
   const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, opts.pageSize ?? DEFAULT_PAGE_SIZE));
@@ -367,7 +364,7 @@ export async function getUnansweredFriendIds(db: D1Database): Promise<Set<string
 
 export async function countUnanswered(
   db: D1Database,
-  opts: Pick<UnansweredInboxOptions, 'allowedAccountIds' | 'canSeeUnassigned'> = {},
+  opts: Pick<UnansweredInboxOptions, 'allowedAccountIds' | 'canSeeUnassigned'>,
 ): Promise<UnansweredCount> {
   const allRows = applyFilters(await getAllUnansweredRows(db), opts);
 
