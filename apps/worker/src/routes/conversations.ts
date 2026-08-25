@@ -19,13 +19,13 @@ conversations.get('/api/conversations', async (c) => {
     if (accountId && !scope.ids.includes(accountId)) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
-    const accountIds = accountId ? [accountId] : scope.restricted ? scope.ids : null;
-
-    const whereAccount = accountIds
-      ? accountIds.length > 0
-        ? `AND f.line_account_id IN (${accountIds.map(() => '?').join(',')})`
-        : 'AND 1 = 0'
-      : '';
+    const accountIds = accountId ? [accountId] : scope.allowedAccountIds;
+    const includeUnassigned = !accountId && scope.canSeeUnassigned;
+    const whereAccount = accountIds.length > 0
+      ? `AND (f.line_account_id IN (${accountIds.map(() => '?').join(',')})${includeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+      : includeUnassigned
+        ? 'AND f.line_account_id IS NULL'
+        : 'AND 1 = 0';
     const whereMaxHours =
       maxHoursSince !== null
         ? `AND ((strftime('%s', 'now') - strftime('%s', li.at)) / 3600.0) <= ?`
@@ -102,7 +102,7 @@ conversations.get('/api/conversations', async (c) => {
 
     const bindings: (string | number)[] = [minHoursSince];
     if (maxHoursSince !== null) bindings.push(maxHoursSince);
-    if (accountIds) bindings.push(...accountIds);
+    bindings.push(...accountIds);
     bindings.push(limit, offset);
 
     const { results } = await c.env.DB.prepare(sql)
@@ -135,7 +135,7 @@ conversations.get('/api/conversations', async (c) => {
     `;
     const countBindings: (string | number)[] = [minHoursSince];
     if (maxHoursSince !== null) countBindings.push(maxHoursSince);
-    if (accountIds) countBindings.push(...accountIds);
+    countBindings.push(...accountIds);
 
     const countRow = await c.env.DB.prepare(countSql)
       .bind(...countBindings)
@@ -215,7 +215,10 @@ conversations.get('/api/conversations/:friendId', async (c) => {
       return c.json({ success: false, error: 'friend not found' }, 404);
     }
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    if (scope.restricted && (!friend.line_account_id || !scope.ids.includes(friend.line_account_id))) {
+    const canReadFriend = friend.line_account_id
+      ? scope.allowedAccountIds.includes(friend.line_account_id)
+      : scope.canSeeUnassigned;
+    if (!canReadFriend) {
       return c.json({ success: false, error: 'friend not found' }, 404);
     }
 

@@ -1,17 +1,19 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 
 vi.mock('@line-crm/db', () => ({
   getLineAccounts: vi.fn(async () => [
-    { id: 'account-1', parent_line_account_id: null },
-    { id: 'account-2', parent_line_account_id: null },
+    { id: 'account-1', parent_line_account_id: null, tenant_id: DEFAULT_TENANT_ID },
+    { id: 'account-2', parent_line_account_id: null, tenant_id: DEFAULT_TENANT_ID },
+    { id: 'account-b', parent_line_account_id: null, tenant_id: 'tenant-B' },
   ]),
 }));
 
 import { conversations } from './conversations.js';
 
-function dbWithFriend(lineAccountId: string) {
+function dbWithFriend(lineAccountId: string | null) {
   return {
     prepare() {
       const statement = {
@@ -28,12 +30,13 @@ function dbWithFriend(lineAccountId: string) {
   } as unknown as D1Database;
 }
 
-function app() {
+function app(tenantId?: string) {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.set('staff', {
       id: 'staff-1', name: '担当者', role: 'staff', readOnly: false,
       assignedLineAccountId: 'account-1', canAccessDescendantAccounts: false,
+      tenantId,
     });
     return next();
   });
@@ -46,4 +49,18 @@ test('staff can read another account transcript in the same organization', async
     DB: dbWithFriend('account-2'),
   } as Env['Bindings']);
   expect(response.status).toBe(200);
+});
+
+test('default tenant can read an unassigned transcript', async () => {
+  const response = await app().request('/api/conversations/friend-2', {}, {
+    DB: dbWithFriend(null),
+  } as Env['Bindings']);
+  expect(response.status).toBe(200);
+});
+
+test('non-default tenant cannot read an unassigned transcript', async () => {
+  const response = await app('tenant-B').request('/api/conversations/friend-2', {}, {
+    DB: dbWithFriend(null),
+  } as Env['Bindings']);
+  expect(response.status).toBe(404);
 });

@@ -6,7 +6,7 @@ interface InboxRow {
   friend_id: string;
   display_name: string | null;
   picture_url: string | null;
-  line_account_id: string;
+  line_account_id: string | null;
   account_name: string;
   last_incoming: string;
   last_manual: string | null;
@@ -96,6 +96,40 @@ function stubDB(canned: {
 }
 
 describe('computeUnansweredInbox', () => {
+  test('許可アカウントを常に絞り、未割当は明示的に許可された場合だけ返す', async () => {
+    const db = stubDB({
+      rows: [
+        {
+          friend_id: 'assigned', display_name: '担当あり', picture_url: null,
+          line_account_id: 'a1', account_name: 'L ①',
+          last_incoming: '2026-08-25T08:00:00+09:00', last_manual: null, last_machine: null,
+          last_incoming_content: 'assigned',
+        },
+        {
+          friend_id: 'unassigned', display_name: '未割当', picture_url: null,
+          line_account_id: null, account_name: '(未分類)',
+          last_incoming: '2026-08-25T08:01:00+09:00', last_manual: null, last_machine: null,
+          last_incoming_content: 'unassigned',
+        },
+      ],
+    });
+
+    const defaultTenant = await computeUnansweredInbox(db, {
+      allowedAccountIds: ['a1'], canSeeUnassigned: true,
+    });
+    expect(defaultTenant.rows.map((row) => row.friendId)).toEqual(['unassigned', 'assigned']);
+
+    const otherTenant = await computeUnansweredInbox(db, {
+      allowedAccountIds: ['a1'], canSeeUnassigned: false,
+    });
+    expect(otherTenant.rows.map((row) => row.friendId)).toEqual(['assigned']);
+
+    const emptyTenant = await computeUnansweredInbox(db, {
+      allowedAccountIds: [], canSeeUnassigned: false,
+    });
+    expect(emptyTenant).toMatchObject({ total: 0, rows: [] });
+  });
+
   test('incoming のみ / manual 無しの friend は 1 行として返る', async () => {
     const db = stubDB({
       rows: [

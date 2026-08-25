@@ -64,9 +64,10 @@ health.get('/api/accounts/migrations', async (c) => {
   try {
     const items = await getAccountMigrations(c.env.DB);
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const visible = scope.restricted
-      ? items.filter((item) => scope.ids.includes(item.from_account_id) && scope.ids.includes(item.to_account_id))
-      : items;
+    const visible = items.filter(
+      (item) => scope.allowedAccountIds.includes(item.from_account_id)
+        && scope.allowedAccountIds.includes(item.to_account_id),
+    );
     return c.json({
       success: true,
       data: visible.map((m) => ({
@@ -134,7 +135,8 @@ health.get('/api/accounts/migrations/:migrationId', async (c) => {
     const item = await getAccountMigrationById(c.env.DB, c.req.param('migrationId'));
     if (!item) return c.json({ success: false, error: 'Migration not found' }, 404);
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    if (scope.restricted && (!scope.ids.includes(item.from_account_id) || !scope.ids.includes(item.to_account_id))) {
+    if (!scope.allowedAccountIds.includes(item.from_account_id)
+      || !scope.allowedAccountIds.includes(item.to_account_id)) {
       return c.json({ success: false, error: 'Migration not found' }, 404);
     }
     return c.json({

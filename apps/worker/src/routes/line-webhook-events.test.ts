@@ -40,7 +40,9 @@ function app(role: AuthenticatedStaff['role']) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.scope.mockResolvedValue({ accounts: [], ids: ['account-1'], restricted: false });
+  mocks.scope.mockResolvedValue({
+    accounts: [], ids: ['account-1'], allowedAccountIds: ['account-1'], canSeeUnassigned: true,
+  });
   mocks.list.mockResolvedValue([]);
   mocks.get.mockResolvedValue({
     webhook_event_id: 'evt-1',

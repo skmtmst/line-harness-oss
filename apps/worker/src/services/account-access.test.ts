@@ -69,24 +69,26 @@ describe('filterVisibleLineAccounts', () => {
     expect(canAccessLineAccount(accounts, staff(), 'tenant-b-account')).toBe(false);
   });
 
-  it('一部の統括だけが見えるときは一覧クエリも制限対象にする', async () => {
+  it('既定統括は自分のアカウントと未割当行を閲覧できる', async () => {
     await expect(getVisibleLineAccountScope({} as D1Database, staff())).resolves.toMatchObject({
+      allowedAccountIds: ['parent', 'child', 'grandchild'],
       ids: ['parent', 'child', 'grandchild'],
-      restricted: true,
+      canSeeUnassigned: true,
     });
   });
 
-  it('全アカウントが同じ統括なら従来の未割当行を利用できる', async () => {
-    const previous = accounts;
-    accounts = [...defaultAccounts];
-    try {
-      await expect(getVisibleLineAccountScope({} as D1Database, staff())).resolves.toMatchObject({
-        ids: ['parent', 'child', 'grandchild'],
-        restricted: false,
-      });
-    } finally {
-      accounts = previous;
-    }
+  it('既定統括以外は自分のアカウントだけを閲覧し、未割当行を閲覧できない', async () => {
+    await expect(getVisibleLineAccountScope({} as D1Database, staff('tenant-B'))).resolves.toMatchObject({
+      allowedAccountIds: ['tenant-b-account'],
+      canSeeUnassigned: false,
+    });
+  });
+
+  it('アカウントが0件の統括には空の一覧を返す', async () => {
+    await expect(getVisibleLineAccountScope({} as D1Database, staff('tenant-empty'))).resolves.toMatchObject({
+      allowedAccountIds: [],
+      canSeeUnassigned: false,
+    });
   });
 });
 

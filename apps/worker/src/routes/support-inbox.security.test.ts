@@ -11,21 +11,23 @@ const computeUnansweredInbox = vi.hoisted(() => vi.fn(async () => ({
     lastMachineAt: null, lastIncomingType: 'text', lastIncomingContent: '相談です',
   }],
 })));
+const countUnanswered = vi.hoisted(() => vi.fn(async () => ({
+  total: 0, byAccount: [], oldestWaitMinutes: null,
+})));
+const getVisibleLineAccountScope = vi.hoisted(() => vi.fn());
 
 vi.mock('../services/unanswered-inbox.js', () => ({
   computeUnansweredInbox,
-  countUnanswered: vi.fn(),
+  countUnanswered,
 }));
 
 vi.mock('../services/account-access.js', () => ({
-  getVisibleLineAccountScope: vi.fn(async () => ({
-    accounts: [{ id: 'account-1' }, { id: 'account-2' }], ids: ['account-1', 'account-2'], restricted: false,
-  })),
+  getVisibleLineAccountScope,
 }));
 
 import { supportInbox } from './support-inbox.js';
 
-test('organization-wide support inbox does not add an account restriction', async () => {
+function app() {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
     c.set('staff', {
@@ -36,19 +38,68 @@ test('organization-wide support inbox does not add an account restriction', asyn
     return next();
   });
   app.route('/', supportInbox);
+  return app;
+}
+
+function db() {
   const statement = {
     bind() { return statement; },
     all: async () => ({ results: [] }),
+    first: async () => ({ open_count: 0, unread_count: 0, oldest_at: null }),
   };
-  const response = await app.request('/api/support/inbox?status=open&limit=5', {}, {
-    DB: { prepare: () => statement } as unknown as D1Database,
+  return { prepare: () => statement } as unknown as D1Database;
+}
+
+test('default tenant always filters LINE accounts and can read unassigned email threads', async () => {
+  getVisibleLineAccountScope.mockResolvedValue({
+    accounts: [{ id: 'account-1' }, { id: 'account-2' }],
+    ids: ['account-1', 'account-2'],
+    allowedAccountIds: ['account-1', 'account-2'],
+    canSeeUnassigned: true,
+  });
+  const response = await app().request('/api/support/inbox?status=open&limit=5', {}, {
+    DB: db(),
   } as Env['Bindings']);
   expect(response.status).toBe(200);
   expect(computeUnansweredInbox).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({ allowedAccountIds: undefined }),
+    expect.objectContaining({
+      allowedAccountIds: ['account-1', 'account-2'], canSeeUnassigned: true,
+    }),
   );
   const body = await response.json() as { data: { items: Array<{ channel: string }>; summary: { email: number } } };
   expect(body.data.items.map((item) => item.channel)).toEqual(['line']);
   expect(body.data.summary.email).toBe(0);
+});
+
+test('non-default tenant cannot read unassigned email threads', async () => {
+  getVisibleLineAccountScope.mockResolvedValue({
+    accounts: [{ id: 'account-2' }], ids: ['account-2'],
+    allowedAccountIds: ['account-2'], canSeeUnassigned: false,
+  });
+  const response = await app().request('/api/support/inbox?status=open&limit=5', {}, {
+    DB: db(),
+  } as Env['Bindings']);
+  expect(response.status).toBe(200);
+  expect(computeUnansweredInbox).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({ allowedAccountIds: ['account-2'], canSeeUnassigned: false }),
+  );
+  const body = await response.json() as { data: { items: Array<{ channel: string }> } };
+  expect(body.data.items.every((item) => item.channel === 'line')).toBe(true);
+});
+
+test('tenant with no accounts gets an empty LINE filter without errors', async () => {
+  getVisibleLineAccountScope.mockResolvedValue({
+    accounts: [], ids: [], allowedAccountIds: [], canSeeUnassigned: false,
+  });
+  computeUnansweredInbox.mockResolvedValueOnce({ total: 0, page: 1, pageSize: 5, rows: [] });
+  const response = await app().request('/api/support/inbox?status=open&limit=5', {}, {
+    DB: db(),
+  } as Env['Bindings']);
+  expect(response.status).toBe(200);
+  expect(computeUnansweredInbox).toHaveBeenLastCalledWith(
+    expect.anything(),
+    expect.objectContaining({ allowedAccountIds: [], canSeeUnassigned: false }),
+  );
 });

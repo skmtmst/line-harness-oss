@@ -28,9 +28,12 @@ export function canAccessLineAccount(
 
 export type VisibleLineAccountScope = {
   accounts: LineAccount[];
+  /** Account IDs that every scoped query must filter against. */
+  allowedAccountIds: string[];
+  /** Only the default tenant may see legacy rows without an account assignment. */
+  canSeeUnassigned: boolean;
+  /** Kept for account-specific authorization call sites. */
   ids: string[];
-  /** false means the caller can see every account and may use unassigned legacy rows. */
-  restricted: boolean;
 };
 
 /** Resolve account visibility once at a route boundary and reuse it in every query. */
@@ -40,8 +43,14 @@ export async function getVisibleLineAccountScope(
 ): Promise<VisibleLineAccountScope> {
   const allAccounts = await getLineAccounts(db);
   const accounts = filterVisibleLineAccounts(allAccounts, staff);
-  const restricted = accounts.length !== allAccounts.length;
-  return { accounts, ids: accounts.map((account) => account.id), restricted };
+  const allowedAccountIds = accounts.map((account) => account.id);
+  const staffTenant = staff?.tenantId ?? DEFAULT_TENANT_ID;
+  return {
+    accounts,
+    allowedAccountIds,
+    canSeeUnassigned: staffTenant === DEFAULT_TENANT_ID,
+    ids: allowedAccountIds,
+  };
 }
 
 export type HierarchyRelationship = { id: string; parentLineAccountId: string | null };

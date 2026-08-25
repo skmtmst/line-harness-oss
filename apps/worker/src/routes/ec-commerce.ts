@@ -380,11 +380,11 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
   // 取り出してから、算出した日付で並べ替えて limit で切る。
   const scanLimit = Math.min(limit * 5, 200);
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  const accountWhere = scope.restricted
-    ? scope.ids.length
-      ? `AND f.line_account_id IN (${scope.ids.map(() => '?').join(',')})`
-      : 'AND 1 = 0'
-    : '';
+  const accountWhere = scope.allowedAccountIds.length
+    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    : scope.canSeeUnassigned
+      ? 'AND f.line_account_id IS NULL'
+      : 'AND 1 = 0';
   const placeholders = SHIPMENT_EVENT_TYPES.map(() => '?').join(', ');
   const rows = await c.env.DB.prepare(
     `SELECT e.id, e.event_type, e.friend_id, e.received_at,
@@ -402,7 +402,7 @@ ecCommerce.get('/api/ec-commerce/shipments', requireRole('owner', 'admin', 'staf
       ORDER BY e.received_at DESC
       LIMIT ?`,
   )
-    .bind(...SHIPMENT_EVENT_TYPES, ...(scope.restricted ? scope.ids : []), scanLimit)
+    .bind(...SHIPMENT_EVENT_TYPES, ...scope.allowedAccountIds, scanLimit)
     .all<ShipmentRow>();
 
   const todayJst = toJstMoment(new Date().toISOString())?.date ?? '';

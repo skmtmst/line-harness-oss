@@ -166,7 +166,7 @@ export interface UnansweredRow {
   friendId: string;
   displayName: string | null;
   pictureUrl: string | null;
-  accountId: string;
+  accountId: string | null;
   accountName: string;
   lastIncomingAt: string;
   lastManualAt: string | null;
@@ -196,13 +196,15 @@ export interface UnansweredInboxOptions {
   pageSize?: number;
   /** Restrict output to accounts visible to the authenticated caller. */
   allowedAccountIds?: readonly string[];
+  /** Include legacy friends whose account assignment is missing. */
+  canSeeUnassigned?: boolean;
 }
 
 interface RawCandidateRow {
   friend_id: string;
   display_name: string | null;
   picture_url: string | null;
-  line_account_id: string;
+  line_account_id: string | null;
   account_name: string;
   last_incoming: string;
   last_manual: string | null;
@@ -220,7 +222,10 @@ function applyFilters(rows: UnansweredRow[], opts: UnansweredInboxOptions): Unan
   let filtered = rows;
   if (opts.allowedAccountIds) {
     const allowed = new Set(opts.allowedAccountIds);
-    filtered = filtered.filter((r) => allowed.has(r.accountId));
+    filtered = filtered.filter(
+      (r) => (r.accountId !== null && allowed.has(r.accountId))
+        || (opts.canSeeUnassigned && r.accountId === null),
+    );
   }
   if (opts.account) {
     filtered = filtered.filter((r) => r.accountId === opts.account);
@@ -362,7 +367,7 @@ export async function getUnansweredFriendIds(db: D1Database): Promise<Set<string
 
 export async function countUnanswered(
   db: D1Database,
-  opts: Pick<UnansweredInboxOptions, 'allowedAccountIds'> = {},
+  opts: Pick<UnansweredInboxOptions, 'allowedAccountIds' | 'canSeeUnassigned'> = {},
 ): Promise<UnansweredCount> {
   const allRows = applyFilters(await getAllUnansweredRows(db), opts);
 
