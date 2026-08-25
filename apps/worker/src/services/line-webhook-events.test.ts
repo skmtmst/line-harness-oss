@@ -84,6 +84,44 @@ describe('processLineWebhookEvents', () => {
     expect(dbMocks.failed).not.toHaveBeenCalled();
   });
 
+  test('台帳予約が2回失敗しても台帳なしの印を残して処理する', async () => {
+    dbMocks.reserve.mockRejectedValue(new Error('private database detail'));
+    const handle = vi.fn().mockResolvedValue(undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await processLineWebhookEvents({
+      db: {} as D1Database,
+      events: [event('evt-ledger-down')],
+      lineAccountId: 'account-1',
+      handle,
+    });
+
+    expect(dbMocks.reserve).toHaveBeenCalledTimes(2);
+    expect(handle).toHaveBeenCalledOnce();
+    expect(dbMocks.succeeded).not.toHaveBeenCalled();
+    expect(JSON.stringify(warnSpy.mock.calls)).toContain('line_webhook_ledger_unavailable_processed');
+    expect(JSON.stringify(warnSpy.mock.calls)).not.toContain('個人情報を含む本文');
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  test('初回の台帳予約だけ失敗した場合は再試行して通常どおり記録する', async () => {
+    dbMocks.reserve.mockRejectedValueOnce(new Error('temporary')).mockResolvedValueOnce(true);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await processLineWebhookEvents({
+      db: {} as D1Database,
+      events: [event('evt-recovered')],
+      lineAccountId: 'account-1',
+      handle: vi.fn().mockResolvedValue(undefined),
+    });
+
+    expect(dbMocks.reserve).toHaveBeenCalledTimes(2);
+    expect(dbMocks.succeeded).toHaveBeenCalledWith(expect.anything(), 'evt-recovered');
+    errorSpy.mockRestore();
+  });
+
   test('分類できない生の例外本文はunknownへ丸める', () => {
     expect(classifyLineWebhookError(new Error('raw database row and personal text'))).toBe('unknown');
     expect(classifyLineWebhookError(Object.assign(new Error('failure'), { name: 'D1Error' }))).toBe('db_error');

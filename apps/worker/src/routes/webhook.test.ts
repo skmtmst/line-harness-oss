@@ -262,7 +262,7 @@ describe('POST /webhook — DoS defenses (#104)', () => {
     expect(verifySignature).not.toHaveBeenCalled();
   });
 
-  test('台帳の記録が失敗してもLINEへの応答は200のまま', async () => {
+  test('台帳の初回記録が失敗しても再試行し、LINEへの応答は200のまま', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(reserveLineWebhookEvent).mockRejectedValueOnce(new Error('raw database details'));
     const executionCtx = {
@@ -299,7 +299,8 @@ describe('POST /webhook — DoS defenses (#104)', () => {
     expect(res.status).toBe(200);
     const processing = vi.mocked(executionCtx.waitUntil).mock.calls[0]?.[0] as Promise<unknown>;
     await expect(processing).resolves.toBeUndefined();
-    expect(updateFriendFollowStatus).not.toHaveBeenCalled();
+    expect(reserveLineWebhookEvent).toHaveBeenCalledTimes(2);
+    expect(updateFriendFollowStatus).toHaveBeenCalledOnce();
     const output = JSON.stringify(errorSpy.mock.calls);
     expect(output).not.toContain('raw database details');
     expect(output).not.toContain('U-sensitive');

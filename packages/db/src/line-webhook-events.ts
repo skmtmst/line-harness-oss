@@ -91,9 +91,14 @@ export async function getLineWebhookEvent(
 
 export async function listLineWebhookEvents(
   db: D1Database,
-  input: { status?: LineWebhookEventStatus; lineAccountIds: string[]; limit?: number },
+  input: {
+    status?: LineWebhookEventStatus;
+    lineAccountIds: string[];
+    includeUnassigned: boolean;
+    limit?: number;
+  },
 ): Promise<LineWebhookEventSafeView[]> {
-  if (input.lineAccountIds.length === 0) return [];
+  if (input.lineAccountIds.length === 0 && !input.includeUnassigned) return [];
 
   const limit = Math.max(1, Math.min(input.limit ?? 100, 200));
   // D1のバインド変数上限に余裕を持たせる。多数店舗の統括でも一覧を壊さない。
@@ -103,6 +108,25 @@ export async function listLineWebhookEvents(
   }
 
   const rows: LineWebhookEventRow[] = [];
+  if (input.includeUnassigned) {
+    const statusClause = input.status ? 'AND status = ?' : '';
+    const bindings: Array<string | number> = [];
+    if (input.status) bindings.push(input.status);
+    bindings.push(limit);
+    const result = await db
+      .prepare(
+        `SELECT webhook_event_id, line_account_id, event_type, status, attempts,
+                last_error, received_at, updated_at
+           FROM line_webhook_events
+          WHERE line_account_id IS NULL
+            ${statusClause}
+          ORDER BY received_at DESC
+          LIMIT ?`,
+      )
+      .bind(...bindings)
+      .all<LineWebhookEventRow>();
+    rows.push(...result.results);
+  }
   for (const accountIds of accountChunks) {
     const placeholders = accountIds.map(() => '?').join(', ');
     const statusClause = input.status ? 'AND status = ?' : '';
