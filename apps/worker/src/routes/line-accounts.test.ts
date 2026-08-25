@@ -118,7 +118,8 @@ describe('GET /api/line-accounts/:id/credential-health', () => {
     },
   };
 
-  test('returns only credential status to an owner', async () => {
+  test('returns only credential status for an account in the owner scope', async () => {
+    dbMocks.getLineAccountById.mockResolvedValue(fakeAccount);
     dbMocks.getLineAccountCredentialHealth.mockResolvedValue(health);
     const app = setupApp('owner');
 
@@ -135,6 +136,34 @@ describe('GET /api/line-accounts/:id/credential-health', () => {
       'encrypted',
       'source',
     ]);
+  });
+
+  test('returns the same not-found response for an account outside the owner scope', async () => {
+    const otherAccount = {
+      ...fakeAccount,
+      id: 'acc-other',
+      tenant_id: 'other-organization',
+      parent_line_account_id: null,
+    };
+    dbMocks.getLineAccountById.mockResolvedValue(otherAccount);
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, parent_line_account_id: null },
+      otherAccount,
+    ]);
+    dbMocks.getLineAccountCredentialHealth.mockResolvedValue(health);
+    const app = setupApp('owner', makeDbStub(), {
+      assignedLineAccountId: 'acc-1',
+      canAccessDescendantAccounts: true,
+    });
+
+    const res = await app.request('/api/line-accounts/acc-other/credential-health');
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: 'LINE account not found',
+    });
+    expect(dbMocks.getLineAccountCredentialHealth).not.toHaveBeenCalled();
   });
 
   test.each(['admin', 'staff'] as const)('rejects %s with 403', async (role) => {
