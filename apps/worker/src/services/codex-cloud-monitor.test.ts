@@ -136,29 +136,44 @@ describe('Codex cloud monitor event classification', () => {
     expect(requiresExplicitApproval('Slack OAuth設定はMasatoの承認後に行ってください')).toBe(false);
   });
 
-  test('帯チャンネルはSlackの実名が許可接頭辞に一致するときだけ許可する', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
-      ok: true,
-      channel: { name: 'line-harness-pr-401-500', is_archived: false },
-    }), { status: 200 }));
+  test('帯チャンネルは設定した接頭辞と3桁-3桁だけからなる実名を許可する', async () => {
+    const names = [
+      'line-harness-pr-301-400',
+      'custom.range+401-500',
+      'line-harness-pr-test',
+      'line-harness-pr-',
+      'line-harness-pr-1-2',
+    ];
+    const fetcher = vi.fn<typeof fetch>();
+    for (const name of names) {
+      fetcher.mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: true,
+        channel: { name, is_archived: false },
+      }), { status: 200 }));
+    }
     const config = {
       SLACK_BOT_TOKEN: 'xoxb-test',
       CODEX_ALLOWED_CHANNEL_IDS: 'C-301-400',
-      CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-',
+      CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-, custom.range+',
     };
 
-    expect(await isAllowedRelayChannel(config, 'C-401-500', fetcher)).toBe(true);
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(String(fetcher.mock.calls[0]?.[0])).toContain('conversations.info?channel=C-401-500');
+    expect(await isAllowedRelayChannel(config, 'C-RANGE-1', fetcher)).toBe(true);
+    expect(await isAllowedRelayChannel(config, 'C-RANGE-2', fetcher)).toBe(true);
+    expect(await isAllowedRelayChannel(config, 'C-TEST', fetcher)).toBe(false);
+    expect(await isAllowedRelayChannel(config, 'C-EMPTY', fetcher)).toBe(false);
+    expect(await isAllowedRelayChannel(config, 'C-SHORT', fetcher)).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(5);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('conversations.info?channel=C-RANGE-1');
   });
 
-  test('許可チャンネル設定の未設定・不一致・Slack照合失敗は閉じる', async () => {
+  test('接頭辞の未設定・不一致・Slack照合失敗・アーカイブ済みは閉じる', async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
       ok: true,
       channel: { name: 'general', is_archived: false },
     }), { status: 200 }));
     expect(hasConfiguredRelayChannelGate(undefined, undefined)).toBe(false);
     expect(await isAllowedRelayChannel({}, 'C-OTHER', fetcher)).toBe(false);
+    expect(fetcher).not.toHaveBeenCalled();
     expect(await isAllowedRelayChannel({
       SLACK_BOT_TOKEN: 'xoxb-test',
       CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-',
@@ -169,6 +184,24 @@ describe('Codex cloud monitor event classification', () => {
       SLACK_BOT_TOKEN: 'xoxb-test',
       CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-',
     }, 'C-OTHER', rejected)).toBe(false);
+
+    const failed = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      ok: false,
+      error: 'channel_not_found',
+    }), { status: 200 }));
+    expect(await isAllowedRelayChannel({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-',
+    }, 'C-OTHER', failed)).toBe(false);
+
+    const archived = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      ok: true,
+      channel: { name: 'line-harness-pr-301-400', is_archived: true },
+    }), { status: 200 }));
+    expect(await isAllowedRelayChannel({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-',
+    }, 'C-OTHER', archived)).toBe(false);
   });
 
   test('完全一致IDはSlack APIを呼ばずに許可する', async () => {
