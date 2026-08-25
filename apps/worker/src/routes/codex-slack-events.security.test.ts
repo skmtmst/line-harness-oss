@@ -269,6 +269,30 @@ describe('Codex Slack relay security boundary', () => {
     }
   });
 
+  test('新しい帯チャンネルはSlack実名の接頭辞照合後に監視へ入る', async () => {
+    const current = monitorEnv();
+    current.bindings.CODEX_ALLOWED_CHANNEL_NAME_PREFIXES = 'line-harness-pr-';
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      ok: true,
+      channel: { name: 'line-harness-pr-401-500', is_archived: false },
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+    const body = JSON.stringify({
+      type: 'event_callback', event_id: 'Ev-next-band', team_id: 'T-1',
+      event: {
+        type: 'app_mention', user: 'U-MASATO',
+        text: '[claude->codex]\n<@U-CODEX> 次の帯を確認', channel: 'C-401-500', ts: '3.1',
+      },
+    });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, queued: true });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(current.prepare).toHaveBeenCalledTimes(1);
+  });
+
   test('マーカーなしの実メンションは台帳へ記録するが中継予約しない', async () => {
     const current = monitorEnv();
     const body = JSON.stringify({

@@ -73,7 +73,7 @@ describe('Codex Slack relay', () => {
       .mockResolvedValueOnce(slackResponse({
         channels: [{ id: 'C-301-400', name: 'line-harness-pr-301-400', is_archived: false }],
       }))
-      .mockResolvedValueOnce(slackResponse({ members: ['U-KENTA'] }))
+      .mockResolvedValueOnce(slackResponse({ members: ['U-KENTA', 'U-MASATO'] }))
       .mockResolvedValueOnce(slackResponse({}));
 
     const channelId = await resolveCodexSlackChannelWithProvisioning({
@@ -82,6 +82,7 @@ describe('Codex Slack relay', () => {
       SLACK_PR_CHANNELS_JSON: JSON.stringify({ '201-300': 'C-201-300' }),
       SLACK_KENTA_USER_ID: 'U-KENTA',
       SLACK_MASATO_USER_ID: 'U-MASATO',
+      CODEX_SLACK_USER_ID: 'U-CODEX',
     }, 'fix', 301, fetcher);
 
     expect(channelId).toBe('C-301-400');
@@ -90,7 +91,7 @@ describe('Codex Slack relay', () => {
     expect(String(fetcher.mock.calls[2]?.[0])).toContain('conversations.invite');
     expect(JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body))).toEqual({
       channel: 'C-301-400',
-      users: 'U-MASATO',
+      users: 'U-CODEX',
     });
   });
 
@@ -118,6 +119,33 @@ describe('Codex Slack relay', () => {
     expect(JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body))).toEqual({
       channel: 'C-301-400',
       users: 'U-KENTA,U-MASATO',
+    });
+  });
+
+  test('PR #390で401-500チャンネルを先行作成しCodexも招待する', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({ channels: [] }))
+      .mockResolvedValueOnce(slackResponse({
+        channel: { id: 'C-401-500', name: 'line-harness-pr-401-500' },
+      }))
+      .mockResolvedValueOnce(slackResponse({ members: [] }))
+      .mockResolvedValueOnce(slackResponse({}));
+
+    const channelId = await ensureUpcomingPrRangeChannel({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_KENTA_USER_ID: 'U-KENTA',
+      SLACK_MASATO_USER_ID: 'U-MASATO',
+      CODEX_SLACK_USER_ID: 'U-CODEX',
+    }, 390, fetcher);
+
+    expect(channelId).toBe('C-401-500');
+    expect(JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body))).toEqual({
+      name: 'line-harness-pr-401-500',
+      is_private: false,
+    });
+    expect(JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body))).toEqual({
+      channel: 'C-401-500',
+      users: 'U-KENTA,U-MASATO,U-CODEX',
     });
   });
 

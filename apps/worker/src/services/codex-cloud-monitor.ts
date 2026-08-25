@@ -75,6 +75,14 @@ type SlackRepliesResponse = {
   }>;
 };
 
+type SlackChannelInfoResponse = {
+  ok?: boolean;
+  channel?: {
+    name?: string;
+    is_archived?: boolean;
+  };
+};
+
 export function hasActualSlackMention(text: string, userId: string): boolean {
   return slackMentionPattern(userId).test(text);
 }
@@ -100,6 +108,50 @@ export function isAllowedRelaySource(configuredIds: string | undefined, userId: 
     .map((value) => value.trim())
     .filter(Boolean)
     .includes(userId);
+}
+
+function configuredRelayValues(value: string | undefined): string[] {
+  return value
+    ?.split(',')
+    .map((item) => item.trim())
+    .filter(Boolean) ?? [];
+}
+
+export function hasConfiguredRelayChannelGate(
+  configuredIds: string | undefined,
+  configuredPrefixes: string | undefined,
+): boolean {
+  return configuredRelayValues(configuredIds).length > 0 ||
+    configuredRelayValues(configuredPrefixes).length > 0;
+}
+
+/**
+ * Exact channel IDs are accepted without a network request. Range channels
+ * may instead be admitted by a fail-closed name-prefix check against Slack's
+ * authoritative conversations.info response.
+ */
+export async function isAllowedRelayChannel(
+  config: Pick<Env['Bindings'],
+    'SLACK_BOT_TOKEN' | 'CODEX_ALLOWED_CHANNEL_IDS' | 'CODEX_ALLOWED_CHANNEL_NAME_PREFIXES'>,
+  channelId: string,
+  fetcher: typeof fetch = fetch,
+): Promise<boolean> {
+  if (isAllowedRelaySource(config.CODEX_ALLOWED_CHANNEL_IDS, channelId)) return true;
+  const allowedPrefixes = configuredRelayValues(config.CODEX_ALLOWED_CHANNEL_NAME_PREFIXES);
+  if (!config.SLACK_BOT_TOKEN || allowedPrefixes.length === 0) return false;
+
+  try {
+    const query = new URLSearchParams({ channel: channelId });
+    const response = await fetcher(`https://slack.com/api/conversations.info?${query}`, {
+      headers: { authorization: `Bearer ${config.SLACK_BOT_TOKEN}` },
+    });
+    const result = await response.json<SlackChannelInfoResponse>();
+    const name = result.channel?.name;
+    return response.ok && result.ok === true && result.channel?.is_archived !== true &&
+      typeof name === 'string' && allowedPrefixes.some((prefix) => name.startsWith(prefix));
+  } catch {
+    return false;
+  }
 }
 
 export function isCodexRelayEnabled(value: string | undefined): boolean {
@@ -451,7 +503,10 @@ async function processOfficialInspection(
     !env.SLACK_USER_TOKEN ||
     !env.CODEX_SLACK_USER_ID ||
     !env.CODEX_ALLOWED_TEAM_IDS ||
-    !env.CODEX_ALLOWED_CHANNEL_IDS ||
+    !hasConfiguredRelayChannelGate(
+      env.CODEX_ALLOWED_CHANNEL_IDS,
+      env.CODEX_ALLOWED_CHANNEL_NAME_PREFIXES,
+    ) ||
     !env.CODEX_RELAY_SOURCE_USER_IDS
   ) {
     const changed = await transitionStatus(env.DB, message.slackEventId, 'failed');
@@ -481,7 +536,7 @@ async function processOfficialInspection(
 
   if (
     !isAllowedRelaySource(env.CODEX_ALLOWED_TEAM_IDS, message.teamId) ||
-    !isAllowedRelaySource(env.CODEX_ALLOWED_CHANNEL_IDS, message.channelId) ||
+    !await isAllowedRelayChannel(env, message.channelId) ||
     !isAllowedRelaySource(env.CODEX_RELAY_SOURCE_USER_IDS, message.requesterUserId) ||
     !hasClaudeToCodexMarker(message.prompt)
   ) {

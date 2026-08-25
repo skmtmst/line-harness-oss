@@ -45,6 +45,7 @@ export type CodexSlackRelayConfig = {
   SLACK_PR_CHANNELS_JSON?: string;
   SLACK_KENTA_USER_ID?: string;
   SLACK_MASATO_USER_ID?: string;
+  CODEX_SLACK_USER_ID?: string;
   SLACK_TASK_CHANNEL_ID?: string;
 };
 
@@ -407,6 +408,7 @@ function configuredPrChannelMembers(config: CodexSlackRelayConfig): string[] {
   return [...new Set([
     config.SLACK_KENTA_USER_ID,
     config.SLACK_MASATO_USER_ID,
+    config.CODEX_SLACK_USER_ID,
   ].filter((value): value is string => Boolean(value)))];
 }
 
