@@ -117,6 +117,10 @@ function configuredRelayValues(value: string | undefined): string[] {
     .filter(Boolean) ?? [];
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function hasConfiguredRelayChannelGate(
   configuredIds: string | undefined,
   configuredPrefixes: string | undefined,
@@ -127,7 +131,7 @@ export function hasConfiguredRelayChannelGate(
 
 /**
  * Exact channel IDs are accepted without a network request. Range channels
- * may instead be admitted by a fail-closed name-prefix check against Slack's
+ * may instead be admitted by a fail-closed range-name check against Slack's
  * authoritative conversations.info response.
  */
 export async function isAllowedRelayChannel(
@@ -148,7 +152,8 @@ export async function isAllowedRelayChannel(
     const result = await response.json<SlackChannelInfoResponse>();
     const name = result.channel?.name;
     return response.ok && result.ok === true && result.channel?.is_archived !== true &&
-      typeof name === 'string' && allowedPrefixes.some((prefix) => name.startsWith(prefix));
+      typeof name === 'string' && allowedPrefixes.some((prefix) =>
+        new RegExp(`^${escapeRegExp(prefix)}\\d{3}-\\d{3}$`).test(name));
   } catch {
     return false;
   }
