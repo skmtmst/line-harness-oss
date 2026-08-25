@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   getAutoReplies,
   getAutoReplyById,
@@ -12,8 +13,21 @@ import type { AutoReply as DbAutoReply } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { currentMonthRange } from '../lib/jst-range.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const autoReplies = new Hono<Env>();
+
+async function requireVisibleAutoReply(c: Context<Env>, next: () => Promise<void>) {
+  const item = await getAutoReplyById(c.env.DB, c.req.param('id')!);
+  if (!item || !await canAccessAllLineAccounts(
+    c.env.DB,
+    c.get('staff'),
+    [item.line_account_id ?? null],
+  )) {
+    return c.json({ success: false, error: 'Auto-reply not found' }, 404);
+  }
+  await next();
+}
 
 /** LINE から届くメッセージの種別。ここに無いものは対象にできない。 */
 const MESSAGE_KINDS = ['text', 'image', 'video', 'audio', 'file', 'location', 'sticker', 'postback'];
@@ -398,6 +412,8 @@ autoReplies.get('/api/auto-replies', async (c) => {
 });
 
 // GET /api/auto-replies/:id — get by ID
+autoReplies.use('/api/auto-replies/:id', requireVisibleAutoReply);
+autoReplies.use('/api/auto-replies/:id/*', requireVisibleAutoReply);
 autoReplies.get('/api/auto-replies/:id', async (c) => {
   try {
     const id = c.req.param('id');
@@ -438,6 +454,11 @@ autoReplies.post('/api/auto-replies', requireRole('owner', 'admin'), async (c) =
     // ただし列は NOT NULL なので、空文字を入れておく。
     if (!body.keyword && body.respondToAll !== true) {
       return c.json({ success: false, error: 'keyword is required' }, 400);
+    }
+    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+      && (!body.lineAccountId
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
     // template_id があれば content は空でも OK (template から resolve される)。
     // silent も content 不要。それ以外は inline content 必須。
@@ -535,7 +556,15 @@ autoReplies.put('/api/auto-replies/:id', requireRole('owner', 'admin'), async (c
     if (body.responseType !== undefined) input.responseType = body.responseType;
     if (body.responseContent !== undefined) input.responseContent = body.responseContent;
     if ('templateId' in body) input.templateId = body.templateId;
-    if ('lineAccountId' in body) input.lineAccountId = body.lineAccountId;
+    if ('lineAccountId' in body) {
+      if (body.lineAccountId !== null && body.lineAccountId !== undefined) {
+        if (!body.lineAccountId
+          || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+          return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+        }
+      }
+      input.lineAccountId = body.lineAccountId;
+    }
     if (body.isActive !== undefined) input.isActive = body.isActive;
     if ('activeFrom' in body) {
       const parsed = parseHhmm(body.activeFrom);

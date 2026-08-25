@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import {
   createAffiliateOffer,
   updateAffiliateOffer,
@@ -9,6 +10,7 @@ import {
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 /**
  * Admin-side affiliate offer (案件) CRUD. Mounted under `/api/affiliate-offers`,
@@ -18,6 +20,18 @@ import { requireRole } from '../middleware/role-guard.js';
  * routes/affiliates.ts's serializeAffiliate.
  */
 const affiliateOffers = new Hono<Env>();
+
+async function requireVisibleAffiliateOffer(c: Context<Env>, next: () => Promise<void>) {
+  const item = await getAffiliateOfferById(c.env.DB, c.req.param('id')!);
+  if (!item || !await canAccessAllLineAccounts(
+    c.env.DB,
+    c.get('staff'),
+    [item.line_account_id ?? null],
+  )) {
+    return c.json({ success: false, error: 'Offer not found' }, 404);
+  }
+  await next();
+}
 
 function serializeOffer(row: AffiliateOffer) {
   return {
@@ -53,6 +67,8 @@ affiliateOffers.get('/api/affiliate-offers', async (c) => {
 });
 
 // GET /api/affiliate-offers/:id - get single
+affiliateOffers.use('/api/affiliate-offers/:id', requireVisibleAffiliateOffer);
+affiliateOffers.use('/api/affiliate-offers/:id/*', requireVisibleAffiliateOffer);
 affiliateOffers.get('/api/affiliate-offers/:id', async (c) => {
   try {
     const item = await getAffiliateOfferById(c.env.DB, c.req.param('id'));
@@ -97,6 +113,11 @@ affiliateOffers.post('/api/affiliate-offers', requireRole('owner', 'admin'), asy
         { success: false, error: 'rewardMiles must be a non-negative integer' },
         400,
       );
+    }
+    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+      && (!body.lineAccountId
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
     const offer = await createAffiliateOffer(c.env.DB, {
@@ -147,6 +168,11 @@ affiliateOffers.put('/api/affiliate-offers/:id', requireRole('owner', 'admin'), 
         { success: false, error: 'rewardMiles must be a non-negative integer' },
         400,
       );
+    }
+    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+      && (!body.lineAccountId
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
     const existing = await getAffiliateOfferById(c.env.DB, id);

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { Message } from '@line-crm/line-sdk';
 import { extractFlexAltText } from '../utils/flex-alt-text.js';
 import {
@@ -24,8 +25,33 @@ import {
   isValidIdempotencyKey,
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const chats = new Hono<Env>();
+
+async function requireVisibleChat(c: Context<Env>, next: () => Promise<void>) {
+  // Let the route return its stable 400 response without touching D1. No send or
+  // record mutation is possible until a valid idempotency key is present.
+  if (c.req.path.endsWith('/send')
+    && !isValidIdempotencyKey(c.req.header('Idempotency-Key')?.trim())) {
+    await next();
+    return;
+  }
+  const id = c.req.param('id')!;
+  const chat = await getChatById(c.env.DB, id);
+  const friend = await getFriendById(c.env.DB, chat?.friend_id ?? id);
+  const lineAccountId = (chat as { line_account_id?: string | null } | null)?.line_account_id
+    ?? friend?.line_account_id
+    ?? null;
+  if ((!chat && !friend) || !await canAccessAllLineAccounts(
+    c.env.DB,
+    c.get('staff'),
+    [lineAccountId],
+  )) {
+    return c.json({ success: false, error: 'Chat not found' }, 404);
+  }
+  await next();
+}
 
 function clampLoadingSeconds(value: number | undefined): number {
   const n = Number.isFinite(value) ? Math.floor(value as number) : 5;
@@ -444,9 +470,9 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   }
 });
 
-chats.get('/api/chats/:id', async (c) => {
+chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
   try {
-    const rawId = c.req.param('id');
+    const rawId = c.req.param('id')!;
 
     // id は chats.id または friend.id のどちらでもOK。
     // 優先順: chats.id 一致 → friend.id のとき chats.friend_id 最新行 → 何も無ければ friend のみで synthetic
@@ -534,7 +560,7 @@ chats.get('/api/chats/:id', async (c) => {
 });
 
 // 開いた担当者だけを既読にする。対応状態は共有だが、既読位置は共有しない。
-chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
     const resolved = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
     if (!resolved) return c.json({ success: false, error: 'Chat not found' }, 404);
@@ -591,6 +617,11 @@ chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const body = await c.req.json<{ friendId: string; operatorId?: string; lineAccountId?: string | null }>();
     if (!body.friendId) return c.json({ success: false, error: 'friendId is required' }, 400);
+    if (body.lineAccountId !== null && body.lineAccountId !== undefined
+      && (!body.lineAccountId
+        || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId]))) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
     const item = await createChat(c.env.DB, body);
     // Save line_account_id if provided
     if (body.lineAccountId) {
@@ -605,7 +636,7 @@ chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
 });
 
 // チャットのアサイン/ステータス更新/ノート更新
-chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
     const id = c.req.param('id');
     const resolved = await resolveOrCreateChat(c.env.DB, id);
@@ -626,7 +657,7 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
 });
 
 // オペレーター入力中のローディング表示を開始
-chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
     const chatId = c.req.param('id');
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
@@ -663,7 +694,7 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), asy
 });
 
 // オペレーターからメッセージ送信
-chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async (c) => {
+chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
@@ -682,6 +713,14 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), async 
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+
+    if (!await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [friend.line_account_id ?? null],
+    )) {
+      return c.json({ success: false, error: 'Chat not found' }, 404);
+    }
 
     // LINE APIでメッセージ送信
     const { LineClient } = await import('@line-crm/line-sdk');
