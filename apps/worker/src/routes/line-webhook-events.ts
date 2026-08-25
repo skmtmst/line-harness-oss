@@ -32,7 +32,8 @@ lineWebhookEvents.get(
       const scope = await getVisibleLineAccountScope(db, c.get('staff'));
       const data = await listLineWebhookEvents(db, {
         status: rawStatus as LineWebhookEventStatus | undefined,
-        lineAccountIds: scope.ids,
+        lineAccountIds: scope.allowedAccountIds,
+        includeUnassigned: scope.canSeeUnassigned,
       });
       return c.json({ success: true, data });
     } catch {
@@ -50,7 +51,10 @@ lineWebhookEvents.post(
       const db = dbFor(c.env);
       const scope = await getVisibleLineAccountScope(db, c.get('staff'));
       const row = await getLineWebhookEvent(db, c.req.param('id'));
-      if (!row || !row.line_account_id || !scope.ids.includes(row.line_account_id)) {
+      const isVisible = row && (row.line_account_id
+        ? scope.allowedAccountIds.includes(row.line_account_id)
+        : scope.canSeeUnassigned);
+      if (!isVisible) {
         return c.json({ success: false, error: '対象のWebhookイベントが見つかりません' }, 404);
       }
 

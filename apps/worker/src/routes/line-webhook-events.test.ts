@@ -82,6 +82,31 @@ describe('LINE Webhook台帳API', () => {
     expect(mocks.list).toHaveBeenCalledWith(expect.anything(), {
       status: 'failed',
       lineAccountIds: ['account-1'],
+      includeUnassigned: true,
+    });
+  });
+
+  test('既定統括の一覧は未割り当てイベントを含める条件で取得する', async () => {
+    await app('owner').request('/api/line-webhook-events', {}, { DB: {} as D1Database } as Env['Bindings']);
+
+    expect(mocks.list).toHaveBeenCalledWith(expect.anything(), {
+      status: undefined,
+      lineAccountIds: ['account-1'],
+      includeUnassigned: true,
+    });
+  });
+
+  test('既定統括でない統括の一覧は未割り当てイベントを含めない', async () => {
+    mocks.scope.mockResolvedValue({
+      accounts: [], ids: ['account-2'], allowedAccountIds: ['account-2'], canSeeUnassigned: false,
+    });
+
+    await app('owner').request('/api/line-webhook-events', {}, { DB: {} as D1Database } as Env['Bindings']);
+
+    expect(mocks.list).toHaveBeenCalledWith(expect.anything(), {
+      status: undefined,
+      lineAccountIds: ['account-2'],
+      includeUnassigned: false,
     });
   });
 
@@ -102,5 +127,40 @@ describe('LINE Webhook台帳API', () => {
     expect(text).toContain('WEBHOOK_PAYLOAD_UNAVAILABLE');
     expect(text).not.toContain('lineUserId');
     expect(text).not.toContain('messageContent');
+  });
+
+  test('既定統括の未割り当てイベントは404ではなくcannot retryを返す', async () => {
+    mocks.get.mockResolvedValue({
+      webhook_event_id: 'evt-unassigned', line_account_id: null, event_type: 'unknown',
+      status: 'failed', attempts: 1, last_error: 'unknown',
+      received_at: '2026-08-24T12:00:00.000', updated_at: '2026-08-24T12:00:01.000',
+    });
+
+    const response = await app('owner').request(
+      '/api/line-webhook-events/evt-unassigned/retry',
+      { method: 'POST' },
+      { DB: {} as D1Database } as Env['Bindings'],
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.text()).toContain('WEBHOOK_PAYLOAD_UNAVAILABLE');
+  });
+
+  test('既定統括でない統括には未割り当てイベントを404で隠す', async () => {
+    mocks.scope.mockResolvedValue({
+      accounts: [], ids: ['account-2'], allowedAccountIds: ['account-2'], canSeeUnassigned: false,
+    });
+    mocks.get.mockResolvedValue({
+      webhook_event_id: 'evt-unassigned', line_account_id: null, event_type: 'unknown',
+      status: 'failed', attempts: 1, last_error: 'unknown',
+      received_at: '2026-08-24T12:00:00.000', updated_at: '2026-08-24T12:00:01.000',
+    });
+
+    const response = await app('owner').request(
+      '/api/line-webhook-events/evt-unassigned/retry',
+      { method: 'POST' },
+      { DB: {} as D1Database } as Env['Bindings'],
+    );
+    expect(response.status).toBe(404);
   });
 });

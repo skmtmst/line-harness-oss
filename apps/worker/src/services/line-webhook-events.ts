@@ -73,28 +73,45 @@ export async function processLineWebhookEvents(input: {
       event_type: webhookEvent.type,
     };
 
-    let acquired = false;
-    try {
-      acquired = await reserveLineWebhookEvent(input.db, {
-        webhookEventId: webhookEvent.webhookEventId,
-        lineAccountId: input.lineAccountId,
-        eventType: webhookEvent.type,
-      });
-    } catch {
-      safeLog('error', { ...logBase, event: 'line_webhook_ledger_reserve_failed', reason: 'db_error' });
-      continue;
+    const reservation = {
+      webhookEventId: webhookEvent.webhookEventId,
+      lineAccountId: input.lineAccountId,
+      eventType: webhookEvent.type,
+    };
+    let acquired: boolean | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        acquired = await reserveLineWebhookEvent(input.db, reservation);
+        break;
+      } catch {
+        safeLog('error', { ...logBase, event: 'line_webhook_ledger_reserve_failed', reason: 'db_error' });
+      }
     }
 
     if (!acquired) {
-      safeLog('log', { ...logBase, event: 'line_webhook_duplicate_skipped' });
-      continue;
+      if (acquired === null) {
+        // 台帳が使えず重複防止が効かないが、イベントを失わないため本処理を優先する。
+        safeLog('warn', {
+          ...logBase,
+          event: 'line_webhook_ledger_unavailable_processed',
+          reason: 'db_error',
+        });
+      } else {
+        safeLog('log', { ...logBase, event: 'line_webhook_duplicate_skipped' });
+        continue;
+      }
     }
 
     try {
       await input.handle(webhookEvent);
+      if (acquired === null) continue;
       await markLineWebhookEventSucceeded(input.db, webhookEvent.webhookEventId);
     } catch (error) {
       const reason = classifyLineWebhookError(error);
+      if (acquired === null) {
+        safeLog('error', { ...logBase, event: 'line_webhook_event_failed', reason });
+        continue;
+      }
       try {
         await markLineWebhookEventFailed(input.db, webhookEvent.webhookEventId, reason);
       } catch {
