@@ -36,8 +36,21 @@ import type {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const scenarios = new Hono<Env>();
+
+async function requireVisibleScenario(c: Context<Env>, next: () => Promise<void>) {
+  const scenario = await getScenarioById(c.env.DB, c.req.param('id')!);
+  if (!scenario || !await canAccessAllLineAccounts(
+    c.env.DB,
+    c.get('staff'),
+    [(scenario as { line_account_id?: string | null }).line_account_id ?? null],
+  )) {
+    return c.json({ success: false, error: 'Scenario not found' }, 404);
+  }
+  await next();
+}
 
 /** Convert D1 snake_case Scenario row to shared camelCase shape */
 function serializeScenario(row: DbScenario) {
@@ -360,6 +373,8 @@ scenarios.get('/api/scenarios', async (c) => {
 });
 
 // GET /api/scenarios/:id - get with steps
+scenarios.use('/api/scenarios/:id', requireVisibleScenario);
+scenarios.use('/api/scenarios/:id/*', requireVisibleScenario);
 scenarios.get('/api/scenarios/:id', async (c) => {
   try {
     const id = c.req.param('id');
@@ -398,6 +413,11 @@ scenarios.post('/api/scenarios', requireRole('owner', 'admin'), async (c) => {
 
     if (!body.name || !body.triggerType) {
       return c.json({ success: false, error: 'name and triggerType are required' }, 400);
+    }
+
+    if (body.lineAccountId
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
     }
 
     const deliveryMode = body.deliveryMode ?? 'relative';
