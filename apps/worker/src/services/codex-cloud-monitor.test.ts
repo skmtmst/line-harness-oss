@@ -6,6 +6,7 @@ import {
   hasActualSlackMention,
   parseSlackEventEnvelope,
   processCodexMentionMessage,
+  type CodexMonitorStatus,
 } from './codex-cloud-monitor.js';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -15,20 +16,31 @@ function queueTestEnv(status: 'detected' | 'official_running' = 'detected'): {
   queueSend: ReturnType<typeof vi.fn>;
   prepare: ReturnType<typeof vi.fn>;
 } {
+  let currentStatus: CodexMonitorStatus = status;
   const row = {
     slack_event_id: 'Ev-1',
     channel_id: 'C-1',
     message_ts: '100.1',
     thread_ts: '100.1',
-    status,
     official_task_url: null,
     fallback_run_id: null,
     fallback_conversation_url: null,
   };
   const prepare = vi.fn().mockImplementation((sql: string) => ({
     bind: vi.fn().mockReturnValue({
-      first: vi.fn().mockResolvedValue(sql.includes('SELECT slack_event_id') ? row : null),
-      run: vi.fn().mockResolvedValue({ meta: { changes: 1 } }),
+      first: vi.fn().mockImplementation(async () => (
+        sql.includes('SELECT slack_event_id') ? { ...row, status: currentStatus } : null
+      )),
+      run: vi.fn().mockImplementation(async () => {
+        if (sql.includes("SET status = 'fallback_starting'")) {
+          if (currentStatus !== 'detected') return { meta: { changes: 0 } };
+          currentStatus = 'fallback_starting';
+        } else if (sql.includes("SET status = 'fallback_running'")) {
+          if (currentStatus !== 'fallback_starting') return { meta: { changes: 0 } };
+          currentStatus = 'fallback_running';
+        }
+        return { meta: { changes: 1 } };
+      }),
     }),
   }));
   const queueSend = vi.fn().mockResolvedValue(undefined);
@@ -47,6 +59,8 @@ function queueTestEnv(status: 'detected' | 'official_running' = 'detected'): {
       LINE_LOGIN_CHANNEL_SECRET: 'login-secret',
       WORKER_URL: 'https://worker.example.test',
       SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_USER_TOKEN: 'xoxp-test',
+      CODEX_SLACK_USER_ID: 'U-CODEX',
       WORKSPACE_AGENT_TRIGGER_ID: 'agtch_test',
       WORKSPACE_AGENT_ACCESS_TOKEN: 'agent-access-token',
       CODEX_MENTION_QUEUE: { send: queueSend } as unknown as Queue,
@@ -99,6 +113,7 @@ describe('Codex cloud monitor event classification', () => {
   test('公式受領がなければ冪等キー付きでWorkspace Agentを1回起動する', async () => {
     const current = queueTestEnv();
     const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, messages: [] }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
         conversation_url: 'https://chatgpt.com/c/fallback-1',
         agent_trigger_run_id: 'run-1',
@@ -108,8 +123,9 @@ describe('Codex cloud monitor event classification', () => {
 
     await processCodexMentionMessage(current.env, inspectMessage);
 
-    expect(fetcher).toHaveBeenCalledTimes(2);
-    const triggerRequest = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('https://slack.com/api/conversations.replies?');
+    const triggerRequest = fetcher.mock.calls[1] as [string, RequestInit];
     expect(triggerRequest[0]).toContain('/workspace_agents/agtch_test/trigger');
     expect(new Headers(triggerRequest[1].headers).get('idempotency-key')).toBe('slack:T-1:C-1:100.1');
     expect(JSON.parse(String(triggerRequest[1].body))).toMatchObject({
@@ -126,6 +142,23 @@ describe('Codex cloud monitor event classification', () => {
     vi.stubGlobal('fetch', fetcher);
     await processCodexMentionMessage(current.env, inspectMessage);
     expect(fetcher).not.toHaveBeenCalled();
+    expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('フォールバック直前のSlack再照合で公式タスクを見つけたら起動しない', async () => {
+    const current = queueTestEnv();
+    const fetcher = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({
+      ok: true,
+      messages: [{
+        user: 'U-CODEX',
+        text: 'On it — https://chatgpt.com/s/cd_existing',
+      }],
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetcher);
+
+    await processCodexMentionMessage(current.env, inspectMessage);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
     expect(current.queueSend).not.toHaveBeenCalled();
   });
 

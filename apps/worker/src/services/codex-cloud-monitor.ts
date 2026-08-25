@@ -8,6 +8,7 @@ export type CodexMonitorStatus =
   | 'detected'
   | 'official_running'
   | 'official_failed'
+  | 'fallback_starting'
   | 'fallback_running'
   | 'fallback_suspended'
   | 'duplicate_risk'
@@ -78,6 +79,15 @@ type WorkspaceAgentTriggerResponse = {
 type WorkspaceAgentRunResponse = {
   status?: string;
   conversation_url?: string;
+};
+
+type SlackRepliesResponse = {
+  ok?: boolean;
+  error?: string;
+  messages?: Array<{
+    user?: string;
+    text?: string;
+  }>;
 };
 
 export function hasActualSlackMention(text: string, userId: string): boolean {
@@ -164,7 +174,9 @@ export async function observeOfficialCodexReply(
   `).bind(channelId, threadTs).first<{ slack_event_id: string; status: CodexMonitorStatus }>();
   if (!row) return { tracked: false, duplicateRisk: false, taskUrl: classification.taskUrl };
 
-  const duplicateRisk = row.status === 'fallback_running' || row.status === 'fallback_suspended';
+  const duplicateRisk = row.status === 'fallback_starting' ||
+    row.status === 'fallback_running' ||
+    row.status === 'fallback_suspended';
   const nextStatus: CodexMonitorStatus = duplicateRisk
     ? 'duplicate_risk'
     : classification.state === 'failed'
@@ -185,6 +197,37 @@ export async function observeOfficialCodexReply(
     duplicateRisk,
     taskUrl: classification.taskUrl,
   };
+}
+
+async function inspectOfficialCodexThread(
+  env: Env['Bindings'],
+  channelId: string,
+  threadTs: string,
+): Promise<ReturnType<typeof classifyOfficialCodexMessage>> {
+  if (!env.SLACK_USER_TOKEN || !env.CODEX_SLACK_USER_ID) {
+    throw new Error('SLACK_THREAD_RECHECK_NOT_CONFIGURED');
+  }
+  const query = new URLSearchParams({
+    channel: channelId,
+    ts: threadTs,
+    inclusive: 'true',
+    limit: '100',
+  });
+  const response = await fetch(`https://slack.com/api/conversations.replies?${query}`, {
+    headers: { authorization: `Bearer ${env.SLACK_USER_TOKEN}` },
+  });
+  const result = await response.json<SlackRepliesResponse>();
+  if (!response.ok || result.ok !== true) {
+    throw new Error(`SLACK_THREAD_RECHECK_FAILED:${result.error ?? response.status}`);
+  }
+
+  let latest: ReturnType<typeof classifyOfficialCodexMessage> = { state: 'unknown' };
+  for (const message of result.messages ?? []) {
+    if (message.user !== env.CODEX_SLACK_USER_ID || typeof message.text !== 'string') continue;
+    const classification = classifyOfficialCodexMessage(message.text);
+    if (classification.state !== 'unknown') latest = classification;
+  }
+  return latest;
 }
 
 async function postSlackThread(
@@ -294,6 +337,40 @@ async function transitionStatus(
   return Number(result.meta.changes ?? 0) === 1;
 }
 
+async function claimFallbackStart(db: D1Database, slackEventId: string): Promise<boolean> {
+  const result = await db.prepare(`
+    UPDATE codex_cloud_tasks
+       SET status = 'fallback_starting', updated_at = datetime('now')
+     WHERE slack_event_id = ? AND status IN ('detected', 'official_failed')
+  `).bind(slackEventId).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
+async function releaseFallbackStart(db: D1Database, slackEventId: string): Promise<void> {
+  await db.prepare(`
+    UPDATE codex_cloud_tasks
+       SET status = 'detected', updated_at = datetime('now')
+     WHERE slack_event_id = ? AND status = 'fallback_starting'
+  `).bind(slackEventId).run();
+}
+
+async function finishFallbackStart(
+  db: D1Database,
+  slackEventId: string,
+  runId: string | undefined,
+  conversationUrl: string,
+): Promise<boolean> {
+  const result = await db.prepare(`
+    UPDATE codex_cloud_tasks
+       SET status = 'fallback_running',
+           fallback_run_id = COALESCE(?, fallback_run_id),
+           fallback_conversation_url = ?,
+           updated_at = datetime('now')
+     WHERE slack_event_id = ? AND status = 'fallback_starting'
+  `).bind(runId ?? null, conversationUrl, slackEventId).run();
+  return Number(result.meta.changes ?? 0) === 1;
+}
+
 async function processOfficialInspection(
   env: Env['Bindings'],
   message: Extract<CodexMentionQueueMessage, { kind: 'inspect_official' }>,
@@ -302,9 +379,18 @@ async function processOfficialInspection(
   if (!row || row.status === 'official_running' || row.status === 'completed' || row.status === 'duplicate_risk') {
     return;
   }
-  if (row.status === 'fallback_running' || row.status === 'fallback_suspended') return;
+  if (
+    row.status === 'fallback_starting' ||
+    row.status === 'fallback_running' ||
+    row.status === 'fallback_suspended'
+  ) return;
 
-  if (!env.WORKSPACE_AGENT_TRIGGER_ID || !env.WORKSPACE_AGENT_ACCESS_TOKEN) {
+  if (
+    !env.WORKSPACE_AGENT_TRIGGER_ID ||
+    !env.WORKSPACE_AGENT_ACCESS_TOKEN ||
+    !env.SLACK_USER_TOKEN ||
+    !env.CODEX_SLACK_USER_ID
+  ) {
     const changed = await transitionStatus(env.DB, message.slackEventId, 'failed');
     if (changed) {
       await postSlackThread(
@@ -317,14 +403,53 @@ async function processOfficialInspection(
     return;
   }
 
-  const trigger = await triggerWorkspaceAgent(env, message);
+  const claimed = await claimFallbackStart(env.DB, message.slackEventId);
+  if (!claimed) return;
+
+  let receipt: ReturnType<typeof classifyOfficialCodexMessage>;
+  try {
+    receipt = await inspectOfficialCodexThread(env, message.channelId, message.threadTs);
+  } catch (error) {
+    await releaseFallbackStart(env.DB, message.slackEventId);
+    throw error;
+  }
+  if (receipt.state === 'running' || receipt.state === 'completed') {
+    await env.DB.prepare(`
+      UPDATE codex_cloud_tasks
+         SET status = ?,
+             official_task_url = COALESCE(?, official_task_url),
+             updated_at = datetime('now')
+       WHERE slack_event_id = ? AND status = 'fallback_starting'
+    `).bind(
+      receipt.state === 'completed' ? 'completed' : 'official_running',
+      receipt.taskUrl ?? null,
+      message.slackEventId,
+    ).run();
+    return;
+  }
+
+  const latest = await getMonitorRow(env.DB, message.slackEventId);
+  if (!latest || latest.status !== 'fallback_starting') return;
+
+  let trigger: WorkspaceAgentTriggerResponse;
+  try {
+    trigger = await triggerWorkspaceAgent(env, message);
+  } catch (error) {
+    await releaseFallbackStart(env.DB, message.slackEventId);
+    throw error;
+  }
   const runId = trigger.agent_trigger_run_id ?? trigger.run_id;
   const conversationUrl = trigger.conversation_url;
-  if (!conversationUrl) throw new Error('WORKSPACE_AGENT_CONVERSATION_URL_MISSING');
-  const changed = await transitionStatus(env.DB, message.slackEventId, 'fallback_running', {
+  if (!conversationUrl || !runId) {
+    await releaseFallbackStart(env.DB, message.slackEventId);
+    throw new Error('WORKSPACE_AGENT_RUN_REFERENCE_MISSING');
+  }
+  const changed = await finishFallbackStart(
+    env.DB,
+    message.slackEventId,
     runId,
     conversationUrl,
-  });
+  );
   if (changed) {
     await postSlackThread(
       env,
@@ -332,8 +457,19 @@ async function processOfficialInspection(
       message.threadTs,
       `【クラウドフォールバック】公式Slack Codexの有効な受領を確認できなかったため、Workspace Agentを開始しました。\n<${conversationUrl}|ChatGPTで進捗を確認>`,
     );
+  } else {
+    await transitionStatus(env.DB, message.slackEventId, 'duplicate_risk', {
+      runId,
+      conversationUrl,
+    });
+    await postSlackThread(
+      env,
+      message.channelId,
+      message.threadTs,
+      `【二重実行リスク】Workspace Agentの起動と同時に公式Slack Codexの受領を検知しました。クラウドタスクは安全な区切りで停止させてください。\n<${conversationUrl}|ChatGPTで状態を確認>`,
+    );
   }
-  if (runId) {
+  if (changed) {
     await env.CODEX_MENTION_QUEUE?.send({
       kind: 'inspect_fallback',
       slackEventId: message.slackEventId,

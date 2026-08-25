@@ -33,6 +33,11 @@ describe('180_codex_cloud_tasks', () => {
     expect(() => db.prepare(`
       INSERT INTO codex_cloud_tasks (
         slack_event_id, team_id, channel_id, message_ts, thread_ts, requester_user_id, status
+      ) VALUES ('Ev-start', 'T1', 'C1', '101.1', '101.1', 'U1', 'fallback_starting')
+    `).run()).not.toThrow();
+    expect(() => db.prepare(`
+      INSERT INTO codex_cloud_tasks (
+        slack_event_id, team_id, channel_id, message_ts, thread_ts, requester_user_id, status
       ) VALUES ('Ev1', 'T1', 'C1', '100.1', '100.1', 'U1', 'unknown')
     `).run()).toThrow(/CHECK constraint failed/);
     const columns = db.prepare("PRAGMA table_info('codex_cloud_tasks')").all() as Array<{ name: string }>;

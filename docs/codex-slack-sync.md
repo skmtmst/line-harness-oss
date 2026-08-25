@@ -80,6 +80,7 @@ Workerの秘密値:
 - `CODEX_SLACK_RELAY_SECRET`: Codex側と共通の十分に長いランダム値
 - `SLACK_BOT_TOKEN`: 内部SlackアプリのBot token。`chat:write`、対象チャンネルの履歴読み取り、公開チャンネルの参照・作成（`channels:read` / `channels:manage`）権限が必要
 - `SLACK_SIGNING_SECRET`: Slackのボタン操作が本物か確認する署名秘密値
+- `SLACK_USER_TOKEN`: MasatoのOAuth認可で発行されたUser token。フォールバック開始直前に同じSlackスレッドを再照合する読み取りだけに使う
 - `WORKSPACE_AGENT_ACCESS_TOKEN`: 公開済みWorkspace Agentを起動するAPI access token
 
 Workerの非秘密設定:
@@ -100,7 +101,7 @@ Slackアプリの Event Subscriptions:
 
 - Request URL: `<Worker URL>/api/integrations/slack/events`
 - User events（MasatoのOAuth認可）: `message.channels`, `message.groups`, `message.im`, `message.mpim`
-- User token scopes: `channels:history`, `groups:history`, `im:history`, `mpim:history`
+- User token scopes: `channels:history`, `groups:history`, `im:history`, `mpim:history`。発行されたUser tokenは `SLACK_USER_TOKEN` としてWorker secretに保存する
 - Bot token scope: `chat:write`。状態通知を投稿するチャンネルには内部Slackアプリを参加させる
 - `app_mention` は「その内部Slackアプリ自身」へのメンションだけを送るため、別アプリである公式Codexの監視には使わない
 - 設定変更後はMasatoのOAuth認可とワークスペースへの再インストールを行う。認可したユーザーが見られない非公開チャンネルやDMは監視対象にならない

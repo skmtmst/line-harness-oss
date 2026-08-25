@@ -205,6 +205,7 @@ export type Env = {
     SLACK_MASATO_USER_ID?: string;
     SLACK_TASK_CHANNEL_ID?: string;
     SLACK_SIGNING_SECRET?: string;
+    SLACK_USER_TOKEN?: string;
     // Slack mention -> official Codex receipt -> Workspace Agent fallback.
     // User ids and grace time are non-secret vars. Tokens and signing secret
     // must be stored with `wrangler secret put`.

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS codex_cloud_tasks (
                                    'detected',
                                    'official_running',
                                    'official_failed',
+                                   'fallback_starting',
                                    'fallback_running',
                                    'fallback_suspended',
                                    'duplicate_risk',
