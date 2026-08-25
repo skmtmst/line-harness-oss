@@ -1,10 +1,13 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import type { AuthenticatedStaff } from './auth.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { tenantScopeMiddleware } from './tenant-scope.js';
+import { ACCOUNT_QUERY_KEYS, tenantScopeMiddleware } from './tenant-scope.js';
 
 let testDb: SqliteD1;
 let warn: ReturnType<typeof vi.spyOn>;
@@ -42,6 +45,21 @@ function insertAccount(id: string, tenantId: string | null): void {
     );
 }
 
+const ACCOUNT_QUERY_KEY_PATTERN = /^(?:account|account_?id|line_?account_?id)$/i;
+
+function uncoveredAccountQueryKeys(
+  sources: string[],
+  allowedKeys: readonly string[],
+): string[] {
+  const usedKeys = sources.flatMap((source) =>
+    [...source.matchAll(/c\.req\.query\(['"]([^'"]+)['"]\)/g)].map((match) => match[1]),
+  );
+  return [...new Set(usedKeys)]
+    .filter((key) => ACCOUNT_QUERY_KEY_PATTERN.test(key))
+    .filter((key) => !allowedKeys.includes(key))
+    .sort();
+}
+
 beforeEach(() => {
   warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   testDb = createTestD1();
@@ -56,7 +74,7 @@ afterEach(() => {
 });
 
 describe('tenantScopeMiddleware', () => {
-  it.each(['account_id', 'lineAccountId', 'line_account_id'])(
+  it.each(ACCOUNT_QUERY_KEYS)(
     '%sで別統括のアカウントを指定すると403にする',
     async (key) => {
       const response = await app(defaultStaff).request(
@@ -72,13 +90,29 @@ describe('tenantScopeMiddleware', () => {
     },
   );
 
-  it('同じ統括のアカウント指定は通す', async () => {
+  it('accountIdで同じ統括のアカウントを指定した場合は通す', async () => {
     const response = await app(defaultStaff).request(
-      '/api/friends?lineAccountId=default-2',
+      '/api/friends?accountId=default-2',
       {},
       environment(),
     );
     expect(response.status).toBe(200);
+  });
+
+  it('ルートで使うアカウントIDらしいクエリ名をすべて検査対象にする', () => {
+    const routesDirectory = fileURLToPath(new URL('../routes', import.meta.url));
+    const routeSources = readdirSync(routesDirectory)
+      .filter((name) => name.endsWith('.ts'))
+      .map((name) => readFileSync(join(routesDirectory, name), 'utf8'));
+
+    expect(uncoveredAccountQueryKeys(routeSources, ACCOUNT_QUERY_KEYS)).toEqual([]);
+  });
+
+  it('新しいアカウントIDのクエリ名を一覧へ足し忘れた場合は検出する', () => {
+    const sourceWithUnlistedKey = "const id = c.req.query('accountID');";
+
+    expect(uncoveredAccountQueryKeys([sourceWithUnlistedKey], ACCOUNT_QUERY_KEYS))
+      .toEqual(['accountID']);
   });
 
   it('tenant-Bのスタッフにはtenant-Bのアカウントだけを通す', async () => {

@@ -3,7 +3,13 @@ import type { Env } from '../index.js';
 import { dbFor } from '../services/db-router.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 
-const ACCOUNT_QUERY_KEYS = ['account_id', 'lineAccountId', 'line_account_id'] as const;
+export const ACCOUNT_QUERY_KEYS = [
+  'account_id',
+  'accountId',
+  'lineAccountId',
+  'line_account_id',
+  'account',
+] as const;
 
 /**
  * 認証済みの管理APIが、別の統括に属するLINEアカウントをクエリで指定するのを防ぐ。
