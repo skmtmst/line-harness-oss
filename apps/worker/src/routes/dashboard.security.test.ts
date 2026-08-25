@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
@@ -40,8 +40,13 @@ function env(): Env['Bindings'] {
 describe('dashboard organization account policy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({})));
     dbMocks.getLineAccounts.mockResolvedValue([account('account-1'), account('account-2')]);
     dbMocks.getLineAccountById.mockImplementation(async (_db: unknown, id: string) => account(id));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   test('staff can select another account in the same organization', async () => {
