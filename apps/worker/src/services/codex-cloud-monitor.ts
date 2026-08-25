@@ -76,7 +76,12 @@ type SlackRepliesResponse = {
 };
 
 export function hasActualSlackMention(text: string, userId: string): boolean {
-  return text.includes(`<@${userId}>`);
+  return slackMentionPattern(userId).test(text);
+}
+
+function slackMentionPattern(userId: string, flags = ''): RegExp {
+  const escapedUserId = userId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`<@${escapedUserId}(?:\\|[^>]+)?>`, flags);
 }
 
 export function isAutomaticCodexRelay(text: string): boolean {
@@ -350,7 +355,7 @@ function relayText(
   codexUserId: string,
 ): string {
   const withoutMarker = message.prompt.split(/\r?\n/).slice(1).join('\n');
-  const original = withoutMarker.replaceAll(`<@${codexUserId}>`, '').trim();
+  const original = withoutMarker.replace(slackMentionPattern(codexUserId, 'g'), '').trim();
   return [
     AUTO_RELAY_MARKER,
     `<@${codexUserId}> 以下は許可済みのClaude投稿を、MasatoのUser OAuthで同じスレッドへ中継した依頼です。`,
