@@ -96,7 +96,8 @@ Workerの非秘密設定:
 - `SLACK_TASK_CHANNEL_ID`
 - `CODEX_SLACK_USER_ID`: 監視対象の公式CodexユーザーID。LINE 然では `U0BRUBQMV9Q`
 - `CODEX_ALLOWED_TEAM_IDS`: 監視を許可するSlack workspaceのteam ID。カンマ区切り
-- `CODEX_ALLOWED_CHANNEL_IDS`: Masato名義の自動中継を許可するSlack channel ID。カンマ区切り
+- `CODEX_ALLOWED_CHANNEL_IDS`: Masato名義の自動中継を許可するSlack channel ID。カンマ区切り。完全一致したIDはSlack API照合なしで許可する
+- `CODEX_ALLOWED_CHANNEL_NAME_PREFIXES`: 自動生成される帯チャンネル名の許可接頭辞。カンマ区切り。Slack APIの `conversations.info` で取得した実名だけを照合し、未設定・API失敗・不一致は拒否する
 - `CODEX_RELAY_SOURCE_USER_IDS`: `[claude->codex]` 投稿を許可する投稿者ID。ClaudeがMasato名義で投稿する構成ではMasatoのSlack user IDだけを設定する
 - `CODEX_RELAY_ENABLED`: 自動中継のキルスイッチ。`true` / `1` のときだけ中継し、検証配備時の初期値は `false`
 - `CODEX_QUEUE_MAX_ATTEMPTS`: Queue失敗をD1の `failed` として確定する試行回数。検証環境はQueue設定と同じ `5`
@@ -108,6 +109,7 @@ Slackアプリの Event Subscriptions:
 - User events（MasatoのOAuth認可）: `message.channels`, `message.groups`, `message.im`, `message.mpim`
 - User token scopes: `channels:history`, `groups:history`, `im:history`, `mpim:history`, `chat:write`。発行されたUser tokenは `SLACK_USER_TOKEN` としてWorker secretに保存する
 - Bot token scope: `chat:write`。状態通知を投稿するチャンネルには内部Slackアプリを参加させる
+- 帯チャンネルの自動作成時は `SLACK_KENTA_USER_ID`、`SLACK_MASATO_USER_ID` に加えて、設定済みなら `CODEX_SLACK_USER_ID` も招待する。Codex ID未設定時は従来の2人だけで継続する
 - `app_mention` は「その内部Slackアプリ自身」へのメンションだけを送るため、別アプリである公式Codexの監視には使わない
 - 設定変更後はMasatoのOAuth認可とワークスペースへの再インストールを行う。認可したユーザーが見られない非公開チャンネルやDMは監視対象にならない
 

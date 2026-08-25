@@ -5,6 +5,8 @@ import {
   classifyOfficialCodexMessage,
   extractChatGptTaskUrl,
   hasActualSlackMention,
+  hasConfiguredRelayChannelGate,
+  isAllowedRelayChannel,
   isAllowedRelaySource,
   isAutomaticCodexRelay,
   isCodexRelayEnabled,
@@ -132,6 +134,49 @@ describe('Codex cloud monitor event classification', () => {
     expect(requiresExplicitApproval('本番DBを更新してください')).toBe(true);
     expect(requiresExplicitApproval('対象は開発のみ。本番には変更を加えないでください')).toBe(false);
     expect(requiresExplicitApproval('Slack OAuth設定はMasatoの承認後に行ってください')).toBe(false);
+  });
+
+  test('帯チャンネルはSlackの実名が許可接頭辞に一致するときだけ許可する', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      ok: true,
+      channel: { name: 'line-harness-pr-401-500', is_archived: false },
+    }), { status: 200 }));
+    const config = {
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      CODEX_ALLOWED_CHANNEL_IDS: 'C-301-400',
+      CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-',
+    };
+
+    expect(await isAllowedRelayChannel(config, 'C-401-500', fetcher)).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain('conversations.info?channel=C-401-500');
+  });
+
+  test('許可チャンネル設定の未設定・不一致・Slack照合失敗は閉じる', async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      ok: true,
+      channel: { name: 'general', is_archived: false },
+    }), { status: 200 }));
+    expect(hasConfiguredRelayChannelGate(undefined, undefined)).toBe(false);
+    expect(await isAllowedRelayChannel({}, 'C-OTHER', fetcher)).toBe(false);
+    expect(await isAllowedRelayChannel({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-',
+    }, 'C-OTHER', fetcher)).toBe(false);
+
+    const rejected = vi.fn<typeof fetch>().mockRejectedValue(new Error('network contains secret'));
+    expect(await isAllowedRelayChannel({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      CODEX_ALLOWED_CHANNEL_NAME_PREFIXES: 'line-harness-pr-',
+    }, 'C-OTHER', rejected)).toBe(false);
+  });
+
+  test('完全一致IDはSlack APIを呼ばずに許可する', async () => {
+    const fetcher = vi.fn<typeof fetch>();
+    expect(await isAllowedRelayChannel({
+      CODEX_ALLOWED_CHANNEL_IDS: 'C-301-400,C-401-500',
+    }, 'C-401-500', fetcher)).toBe(true);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   test('例外本文を保持せず運用分類だけへ変換する', () => {

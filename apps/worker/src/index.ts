@@ -215,6 +215,7 @@ export type Env = {
     CODEX_SLACK_USER_ID?: string;
     CODEX_ALLOWED_TEAM_IDS?: string;
     CODEX_ALLOWED_CHANNEL_IDS?: string;
+    CODEX_ALLOWED_CHANNEL_NAME_PREFIXES?: string;
     CODEX_RELAY_SOURCE_USER_IDS?: string;
     CODEX_RELAY_ENABLED?: string;
     CODEX_QUEUE_MAX_ATTEMPTS?: string;

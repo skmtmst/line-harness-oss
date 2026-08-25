@@ -12,6 +12,7 @@ import { verifySlackRequest } from '../services/slack-signature.js';
 import {
   hasClaudeToCodexMarker,
   hasActualSlackMention,
+  isAllowedRelayChannel,
   isAllowedRelaySource,
   isAutomaticCodexRelay,
   isCodexRelayEnabled,
@@ -243,7 +244,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
   ) {
     return c.json({ success: true, ignored: true });
   }
-  if (!isAllowedRelaySource(c.env.CODEX_ALLOWED_CHANNEL_IDS, event.channel)) {
+  if (!await isAllowedRelayChannel(c.env, event.channel)) {
     return c.json({ success: true, ignored: true });
   }
 
