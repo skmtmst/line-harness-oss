@@ -92,6 +92,9 @@ const inspectMessage = {
 describe('Codex cloud monitor event classification', () => {
   test('Slackの実メンションだけを対象にする', () => {
     expect(hasActualSlackMention('<@U-CODEX> D-8を確認してください', 'U-CODEX')).toBe(true);
+    expect(hasActualSlackMention('<@U-CODEX|Codex> D-8を確認してください', 'U-CODEX')).toBe(
+      true,
+    );
     expect(hasActualSlackMention('@Codex D-8を確認してください', 'U-CODEX')).toBe(false);
     expect(hasActualSlackMention('<@U-OTHER> D-8を確認してください', 'U-CODEX')).toBe(false);
   });
@@ -150,7 +153,10 @@ describe('Codex cloud monitor event classification', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
     vi.stubGlobal('fetch', fetcher);
 
-    await processCodexMentionMessage(current.env, inspectMessage);
+    await processCodexMentionMessage(current.env, {
+      ...inspectMessage,
+      prompt: '[claude->codex]\n<@U-CODEX|Codex> D-8を確認してください',
+    });
 
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(String(fetcher.mock.calls[0]?.[0])).toContain('https://slack.com/api/conversations.replies?');
@@ -163,6 +169,7 @@ describe('Codex cloud monitor event classification', () => {
     });
     expect(String(JSON.parse(String(relayRequest[1].body)).text)).toContain('【Claude依頼の自動中継】');
     expect(String(JSON.parse(String(relayRequest[1].body)).text)).toContain('<@U-CODEX>');
+    expect(String(JSON.parse(String(relayRequest[1].body)).text)).not.toContain('|Codex>');
     expect(String(JSON.parse(String(relayRequest[1].body)).text)).toContain('下書きPR');
     expect(current.queueSend).toHaveBeenCalledWith(expect.objectContaining({
       kind: 'inspect_relay', slackEventId: 'Ev-1',
