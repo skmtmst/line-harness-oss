@@ -71,12 +71,12 @@ function monitorEnv(options: { inserted?: boolean } = {}): {
   };
 }
 
-async function slackHeaders(body: string) {
+async function slackHeaders(body: string, secret = 'slack-signing-secret') {
   const timestamp = String(Math.floor(Date.now() / 1000));
   return {
     'content-type': 'application/json',
     'x-slack-request-timestamp': timestamp,
-    'x-slack-signature': await signSlackRequest('slack-signing-secret', timestamp, body),
+    'x-slack-signature': await signSlackRequest(secret, timestamp, body),
   };
 }
 
@@ -220,6 +220,25 @@ describe('Codex Slack relay security boundary', () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe('challenge-value');
     expect(current.queueSend).not.toHaveBeenCalled();
+  });
+
+  test('Codex監視専用の署名秘密を既存Slackアプリの署名秘密から分離する', async () => {
+    const current = monitorEnv();
+    current.bindings.CODEX_SLACK_MONITOR_SIGNING_SECRET = 'codex-monitor-signing-secret';
+    const body = JSON.stringify({ type: 'url_verification', challenge: 'monitor-challenge' });
+
+    const oldApp = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(oldApp.status).toBe(401);
+
+    const monitorApp = await app().request('/api/integrations/slack/events', {
+      method: 'POST',
+      headers: await slackHeaders(body, 'codex-monitor-signing-secret'),
+      body,
+    }, current.bindings);
+    expect(monitorApp.status).toBe(200);
+    expect(await monitorApp.text()).toBe('monitor-challenge');
   });
 
   test('実メンションを台帳へ記録して30秒後の確認だけを予約する', async () => {

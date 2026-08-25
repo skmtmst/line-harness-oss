@@ -82,6 +82,7 @@ Workerの秘密値:
 - `CODEX_SLACK_RELAY_SECRET`: Codex側と共通の十分に長いランダム値
 - `SLACK_BOT_TOKEN`: 内部SlackアプリのBot token。`chat:write`、対象チャンネルの履歴読み取り、公開チャンネルの参照・作成（`channels:read` / `channels:manage`）権限が必要
 - `SLACK_SIGNING_SECRET`: Slackのボタン操作が本物か確認する署名秘密値
+- `CODEX_SLACK_MONITOR_SIGNING_SECRET`: Codex監視専用SlackアプリのEvents API署名秘密値。設定時は `/api/integrations/slack/events` だけで優先し、既存アプリの `SLACK_SIGNING_SECRET` を変更しない
 - `SLACK_USER_TOKEN`: MasatoのOAuth認可で発行されたUser token。同じSlackスレッドの再照合と、許可済みClaude依頼の公式Codexへの中継だけに使う
 
 Workerの非秘密設定:
