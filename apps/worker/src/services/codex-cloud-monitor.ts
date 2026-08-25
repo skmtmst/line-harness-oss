@@ -1,4 +1,8 @@
 import type { Env } from '../index.js';
+import {
+  processCodexAutoMerge,
+  type CodexAutoMergeMessage,
+} from './codex-auto-merge.js';
 
 const AUTO_RELAY_MARKER = '【Claude依頼の自動中継】';
 const RELAY_RECEIPT_WAIT_SECONDS = 300;
@@ -15,6 +19,7 @@ export type CodexMonitorStatus =
   | 'failed';
 
 export type CodexMentionQueueMessage =
+  | CodexAutoMergeMessage
   | {
       kind: 'inspect_official';
       slackEventId: string;
@@ -685,6 +690,10 @@ export async function processCodexMentionMessage(
   env: Env['Bindings'],
   message: CodexMentionQueueMessage,
 ): Promise<void> {
+  if (message.kind === 'auto_merge') {
+    await processCodexAutoMerge(env, message);
+    return;
+  }
   if (message.kind === 'inspect_official') {
     await processOfficialInspection(env, message);
     return;
