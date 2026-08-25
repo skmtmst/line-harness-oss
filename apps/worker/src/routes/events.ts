@@ -43,8 +43,10 @@ import {
 } from '../services/event-booking-state.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { resolveLineCredential } from '@line-crm/db';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const events = new Hono<Env>();
+const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
 
 // ----------------------------------------------------------------
 // Helpers
@@ -165,6 +167,11 @@ events.post('/api/events/admin/events', requireRole('owner', 'admin'), async (c)
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const v = validateEventInput(body, true);
   if (!v.ok) return bad(c, v.code, 422);
+
+  if (Array.isArray(body.account_ids)
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), body.account_ids as string[])) {
+    return bad(c, ACCOUNT_ACCESS_ERROR, 403);
+  }
 
   const id = crypto.randomUUID();
   const targetType = (body.target_type as EventTargetType | undefined) ?? 'single';
@@ -304,6 +311,11 @@ events.put('/api/events/admin/events/:id', requireRole('owner', 'admin'), async 
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const v = validateEventInput(body, false);
   if (!v.ok) return bad(c, v.code, 422);
+
+  if (Array.isArray(body.account_ids)
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), body.account_ids as string[])) {
+    return bad(c, ACCOUNT_ACCESS_ERROR, 403);
+  }
 
   const updatable = [
     'name',

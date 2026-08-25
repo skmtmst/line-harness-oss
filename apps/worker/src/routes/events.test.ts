@@ -93,6 +93,7 @@ interface LineAccount {
   id: string;
   liff_id: string;
   is_active: number;
+  tenant_id?: string | null;
   channel_access_token?: string;
 }
 
@@ -483,6 +484,9 @@ function makeEventDb(state: {
           return null;
         },
         async all<T>() {
+          if (sql.startsWith('SELECT * FROM line_accounts')) {
+            return { results: state.accounts ?? [] } as { results: T[] };
+          }
           // admin events list (must come before event_slots branch since
           // its sub-queries also reference event_slots s)
           if (sql.startsWith('SELECT\n         e.*') || (sql.includes('FROM events e') && (sql.includes('e.line_account_id') || sql.includes('e.target_type')))) {
@@ -838,7 +842,7 @@ function setupApp(state: Parameters<typeof makeEventDb>[0]) {
   const app = new Hono<TestEnv>();
   const db = makeEventDb(state);
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', role: 'owner' });
+    c.set('staff', { id: 'staff-1', role: 'owner', tenantId: 'tenant-a' } as never);
     c.env = { DB: db } as TestEnv['Bindings'];
     await next();
   });
@@ -968,7 +972,13 @@ describe('POST /api/events/admin/events', () => {
   });
 
   test('multi-account-dedup creates event with account_ids JSON', async () => {
-    const state = { events: [] as EventRow[] };
+    const state = {
+      events: [] as EventRow[],
+      accounts: [
+        { id: 'la1', liff_id: 'liff1', is_active: 1, tenant_id: 'tenant-a' },
+        { id: 'la2', liff_id: 'liff2', is_active: 1, tenant_id: 'tenant-a' },
+      ],
+    };
     const app = setupApp(state);
     const res = await app.request('/api/events/admin/events?account_id=la1', {
       method: 'POST',
@@ -985,6 +995,27 @@ describe('POST /api/events/admin/events', () => {
     expect(typeof body.account_ids === 'string' ? JSON.parse(body.account_ids) : body.account_ids).toEqual(['la1', 'la2']);
     // sentinel: line_account_id = account_ids[0]
     expect(body.line_account_id).toBe('la1');
+  });
+
+  test('403 when one multi-account body account belongs to another tenant', async () => {
+    const state = {
+      events: [] as EventRow[],
+      accounts: [
+        { id: 'la1', liff_id: 'liff1', is_active: 1, tenant_id: 'tenant-a' },
+        { id: 'la2', liff_id: 'liff2', is_active: 1, tenant_id: 'tenant-a' },
+        { id: 'other', liff_id: 'liff3', is_active: 1, tenant_id: 'tenant-b' },
+      ],
+    };
+    const res = await setupApp(state).request('/api/events/admin/events?account_id=la1', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        name: 'X', target_type: 'multi-account-dedup', account_ids: ['la1', 'other'],
+      }),
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'このLINEアカウントを操作する権限がありません' });
+    expect(state.events).toHaveLength(0);
   });
 
   test('422 invalid_target_type', async () => {
@@ -1161,6 +1192,25 @@ describe('PUT /api/events/admin/events/:id', () => {
       body: JSON.stringify({ name: 'x' }),
     });
     expect(res.status).toBe(404);
+  });
+
+  test('403 when an update adds one account from another tenant', async () => {
+    const state = {
+      events: [baseEvent({ id: 'e1', line_account_id: 'la1' })],
+      accounts: [
+        { id: 'la1', liff_id: 'liff1', is_active: 1, tenant_id: 'tenant-a' },
+        { id: 'other', liff_id: 'liff2', is_active: 1, tenant_id: 'tenant-b' },
+      ],
+    };
+    const res = await setupApp(state).request('/api/events/admin/events/e1?account_id=la1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        target_type: 'multi-account-dedup', account_ids: ['la1', 'other'],
+      }),
+    });
+    expect(res.status).toBe(403);
+    expect(state.events[0].target_type).not.toBe('multi-account-dedup');
   });
 
   test('422 invalid description', async () => {

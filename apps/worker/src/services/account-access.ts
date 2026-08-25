@@ -53,6 +53,18 @@ export async function getVisibleLineAccountScope(
   };
 }
 
+/** Return true only when every account reference belongs to the staff tenant. */
+export async function canAccessAllLineAccounts(
+  db: D1Database,
+  staff: AuthenticatedStaff | undefined,
+  accountIds: Array<string | null | undefined>,
+): Promise<boolean> {
+  const scope = await getVisibleLineAccountScope(db, staff);
+  return accountIds.every((accountId) => accountId == null
+    ? scope.canSeeUnassigned
+    : scope.allowedAccountIds.includes(accountId));
+}
+
 export type HierarchyRelationship = { id: string; parentLineAccountId: string | null };
 
 /** 親子関係が循環せず、親・子・孫の3階層以内に収まることを検証する。 */
