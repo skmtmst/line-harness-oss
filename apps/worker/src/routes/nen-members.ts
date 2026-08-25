@@ -6,7 +6,7 @@ import { requireRole } from '../middleware/role-guard.js';
 import { verifyCallerLineIdentity } from '../services/liff-auth.js';
 import { pushViaHarnessProxy } from '../services/line-proxy-send.js';
 import { dispatchLineProxyLocally } from '../services/local-line-proxy.js';
-import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { installNenRichMenu } from '../services/nen-rich-menu.js';
 import { attachTagAndFireSideEffects } from '../services/friend-tag-attach.js';
 import {
@@ -475,13 +475,18 @@ nenMembers.post('/api/liff/nen/consultations', async (c) => {
 });
 
 // Admin APIs
-nenMembers.get('/api/nen-members/overview', async (c) => {
+async function adminAccountScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  const accountWhere = scope.allowedAccountIds.length
+  const where = scope.allowedAccountIds.length
     ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
     : scope.canSeeUnassigned
       ? 'AND f.line_account_id IS NULL'
       : 'AND 1 = 0';
+  return { scope, where };
+}
+
+nenMembers.get('/api/nen-members/overview', async (c) => {
+  const { scope, where: accountWhere } = await adminAccountScope(c);
   const countScoped = async (table: string, alias: string, extra = '') =>
     c.env.DB.prepare(
       `SELECT COUNT(*) count FROM ${table} ${alias}
@@ -500,16 +505,17 @@ nenMembers.get('/api/nen-members/overview', async (c) => {
 });
 
 nenMembers.get('/api/nen-members/care-flags', async (c) => {
-  const rows = await c.env.DB.prepare(`SELECT cf.*, p.name pet_name, f.display_name owner_name FROM nen_care_flags cf JOIN nen_pet_profiles p ON p.id=cf.pet_id JOIN friends f ON f.id=cf.friend_id ORDER BY cf.status='active' DESC, cf.detected_at DESC LIMIT 200`).all<Record<string, unknown>>();
+  const { scope, where } = await adminAccountScope(c);
+  const rows = await c.env.DB.prepare(`SELECT cf.*, p.name pet_name, f.display_name owner_name FROM nen_care_flags cf JOIN nen_pet_profiles p ON p.id=cf.pet_id JOIN friends f ON f.id=cf.friend_id WHERE 1 = 1 ${where} ORDER BY cf.status='active' DESC, cf.detected_at DESC LIMIT 200`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 
 nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   const body = await c.req.json<{ status?: string; adviceReady?: boolean }>().catch(() => null);
   if (!body || !['active', 'resolved'].includes(String(body.status))) return c.json({ success: false, error: 'Invalid status' }, 400);
-  const flag = await c.env.DB.prepare(`SELECT friend_id FROM nen_care_flags WHERE id=?`)
-    .bind(c.req.param('id')).first<{ friend_id: string }>();
-  if (!flag) return c.json({ success: false, error: 'Not found' }, 404);
+  const flag = await c.env.DB.prepare(`SELECT cf.friend_id, f.line_account_id FROM nen_care_flags cf JOIN friends f ON f.id=cf.friend_id WHERE cf.id=?`)
+    .bind(c.req.param('id')).first<{ friend_id: string; line_account_id: string | null }>();
+  if (!flag || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [flag.line_account_id])) return c.json({ success: false, error: 'Not found' }, 404);
   await c.env.DB.prepare(`UPDATE nen_care_flags SET status=?, advice_ready=?, resolved_at=CASE WHEN ?='resolved' THEN ? ELSE NULL END, updated_at=? WHERE id=?`)
     .bind(body.status, body.adviceReady === false ? 0 : 1, body.status, jstNow(), jstNow(), c.req.param('id')).run();
   await syncNenHealthTags(c.env.DB, flag.friend_id);
@@ -517,7 +523,8 @@ nenMembers.put('/api/nen-members/care-flags/:id', requireRole('owner', 'admin', 
 });
 
 nenMembers.get('/api/nen-members/photos', async (c) => {
-  const rows = await c.env.DB.prepare(`SELECT ps.*, p.name pet_name, f.display_name owner_name FROM nen_photo_submissions ps JOIN nen_pet_profiles p ON p.id=ps.pet_id JOIN friends f ON f.id=ps.friend_id ORDER BY ps.created_at DESC LIMIT 200`).all<Record<string, unknown>>();
+  const { scope, where } = await adminAccountScope(c);
+  const rows = await c.env.DB.prepare(`SELECT ps.*, p.name pet_name, f.display_name owner_name FROM nen_photo_submissions ps JOIN nen_pet_profiles p ON p.id=ps.pet_id JOIN friends f ON f.id=ps.friend_id WHERE 1 = 1 ${where} ORDER BY ps.created_at DESC LIMIT 200`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 
@@ -525,10 +532,10 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
   const body = await c.req.json<{ status?: string; points?: number }>().catch(() => null);
   const status = String(body?.status || '');
   if (!['adopted', 'rejected'].includes(status)) return c.json({ success: false, error: 'Invalid review' }, 400);
-  const photo = await c.env.DB.prepare(`SELECT ps.*, s.customer_id
-    FROM nen_photo_submissions ps LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
+  const photo = await c.env.DB.prepare(`SELECT ps.*, s.customer_id, f.line_account_id
+    FROM nen_photo_submissions ps JOIN friends f ON f.id = ps.friend_id LEFT JOIN nen_ec_member_snapshots s ON s.friend_id = ps.friend_id
     WHERE ps.id=?`).bind(c.req.param('id')).first<Record<string, unknown>>();
-  if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  if (!photo || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [photo.line_account_id as string | null])) return c.json({ success: false, error: 'Not found' }, 404);
   if (photo.status !== 'pending') return c.json({ success: false, error: 'Already reviewed' }, 409);
   let awarded = 0;
   let pointBalance: number | null = null;
@@ -568,7 +575,11 @@ nenMembers.put('/api/nen-members/photos/:id/review', requireRole('owner', 'admin
 nenMembers.post('/api/nen-members/tags/resync', requireRole('owner', 'admin'), async (c) => {
   const body: { limit?: number } = await c.req.json<{ limit?: number }>().catch(() => ({}));
   const limit = Number.isFinite(body.limit) ? Number(body.limit) : 500;
-  const result = await refreshAllNenTags(c.env.DB, limit);
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const result = await refreshAllNenTags(c.env.DB, [
+    ...scope.allowedAccountIds,
+    ...(scope.canSeeUnassigned ? [null] : []),
+  ], limit);
   return c.json({ success: true, data: result });
 });
 
@@ -581,7 +592,7 @@ nenMembers.get('/api/nen-members/friends/:friendId', async (c) => {
        LEFT JOIN line_accounts la ON la.id = f.line_account_id
       WHERE f.id = ?`,
   ).bind(friendId).first<Record<string, unknown>>();
-  if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
+  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id as string | null])) return c.json({ success: false, error: 'Friend not found' }, 404);
 
   const [member, pets, healthLogs, photos, pointLedger, ecEvents] = await Promise.all([
     c.env.DB.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friendId).first<Record<string, unknown>>(),
@@ -607,18 +618,23 @@ nenMembers.get('/api/nen-members/friends/:friendId', async (c) => {
 });
 
 nenMembers.get('/api/nen-members/ranks', async (c) => {
-  const rows = await c.env.DB.prepare(`SELECT s.*, f.display_name, f.line_user_id FROM nen_ec_member_snapshots s JOIN friends f ON f.id=s.friend_id ORDER BY s.purchase_amount DESC LIMIT 300`).all<Record<string, unknown>>();
+  const { scope, where } = await adminAccountScope(c);
+  const rows = await c.env.DB.prepare(`SELECT s.*, f.display_name, f.line_user_id FROM nen_ec_member_snapshots s JOIN friends f ON f.id=s.friend_id WHERE 1 = 1 ${where} ORDER BY s.purchase_amount DESC LIMIT 300`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 
 nenMembers.get('/api/nen-members/consultations', async (c) => {
-  const rows = await c.env.DB.prepare(`SELECT cl.*, p.name pet_name, f.display_name owner_name FROM nen_consultation_logs_v2 cl LEFT JOIN nen_pet_profiles p ON p.id=cl.pet_id JOIN friends f ON f.id=cl.friend_id ORDER BY cl.created_at DESC LIMIT 300`).all<Record<string, unknown>>();
+  const { scope, where } = await adminAccountScope(c);
+  const rows = await c.env.DB.prepare(`SELECT cl.*, p.name pet_name, f.display_name owner_name FROM nen_consultation_logs_v2 cl LEFT JOIN nen_pet_profiles p ON p.id=cl.pet_id JOIN friends f ON f.id=cl.friend_id WHERE 1 = 1 ${where} ORDER BY cl.created_at DESC LIMIT 300`).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results });
 });
 
-nenMembers.post('/api/nen-members/rich-menu/install', async (c) => {
+nenMembers.post('/api/nen-members/rich-menu/install', requireRole('owner', 'admin'), async (c) => {
   const body = await c.req.json<{ accountId?: string }>().catch(() => null);
   if (!body?.accountId) return c.json({ success: false, error: 'accountId is required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
   try {
     const result = await installNenRichMenu(c.env, body.accountId);
     return c.json({ success: true, data: result }, 201);

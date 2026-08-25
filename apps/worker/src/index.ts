@@ -1200,7 +1200,8 @@ async function scheduled(
   if (event.cron === '0 */6 * * *') {
     try {
       const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
-      const result = await refreshAllNenTags(env.DB, 500, new Date());
+      const accounts = await env.DB.prepare(`SELECT id FROM line_accounts`).all<{ id: string }>();
+      const result = await refreshAllNenTags(env.DB, [...accounts.results.map(({ id }) => id), null], 500, new Date());
       if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
     } catch (e) {
       console.error('nen-tag refresh error:', e);
