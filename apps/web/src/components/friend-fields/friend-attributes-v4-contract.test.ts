@@ -98,6 +98,45 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain("status === 'forbidden' ? null : (")
   })
 
+  it('取れていない値を「0件」や「手動」で埋めない', () => {
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    // 自動付与のもと。サーバーは断定できないものを省く（`getTagsWithUsage`）。
+    // ここで「手動」と埋めると、断定できなかったものを断定したことになる。
+    expect(source).toContain("tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'")
+    // 使用先。`withCounts=1` で読んでいるので、無いのは0件＝「未使用」。
+    expect(source).toContain("api.tags.list({ withCounts: true })")
+    expect(source).toContain("if (!tag.usedIn) return '未使用'")
+    // 連動の「他N」。0件のときサーバーは省くので「他0」は出ない。
+    expect(source).toContain('if (tag.otherActionCount) chips.push(')
+    // 整理候補は「未使用＋重複名」で、未使用の数とは別物。まだ返らない。
+    expect(source).toMatch(/title: '整理候補', value: null/)
+    // 削除の確認に固定値を書かない。
+    expect(source).not.toMatch(/参照<\/dt><dd[^>]*>3件/)
+    expect(source).toContain("{ name: '積んだマイル', value: '—'")
+  })
+
+  it('「よく使う」は設計の5つで、どれも絞り込みに効く', () => {
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    for (const label of ['未使用のタグ', '今月増えたタグ', '自動付与あり', '連動あり', '★のみ表示']) {
+      expect(source, `よく使うに「${label}」が無い`).toContain(label)
+    }
+    // 2026-08-26: 「今月増えた」は札だけあって、絞り込みに枝が無く
+    // **押しても何も起きなかった**。5つとも枝があることを見る。
+    for (const key of ['unused', 'recent', 'auto', 'linked', 'starred']) {
+      expect(source, `よく使う「${key}」に絞り込みの枝が無い`).toContain(`key === '${key}'`)
+    }
+  })
+
+  it('CSVは押したとおりのことをして、名前が毎回変わる', () => {
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    // 設計の文言は「CSVで一括登録」だが、取り込みの画面もAPIもまだ無い。
+    // 取り込みと書いて出力するのは嘘なので、いまは「出力」と書く。
+    expect(source).toContain('CSVで出力')
+    // `tags.csv` 固定だと、2回目から `tags (1).csv` になって区別が付かない。
+    expect(source).not.toContain("download = 'tags.csv'")
+    expect(source).toContain("['タグ一覧', scope, today]")
+  })
+
   it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {
     expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 />')
     expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')

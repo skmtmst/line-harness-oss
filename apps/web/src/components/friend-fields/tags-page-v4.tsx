@@ -8,6 +8,7 @@ import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import ListKpis from '@/components/shared/list-kpis'
@@ -98,39 +99,80 @@ function FolderSelect({ tag, groups, onChanged }: { tag: Tag; groups: TagGroup[]
 /**
  * 連動の札。設計 `B9QCB3`（緑）／`IoiWQ`（黄）／`Ws7fo`（灰）。
  *
- * **設計にある「他1」「他3」の灰色の札は、まだ出せない。**
- * あれはマイル以外の連動アクション（テキスト送信・テンプレート送信・
- * シナリオ開始など）の数だが、`Tag` が持っているのはマイルの3つだけで、
- * 数える口が無い。0件なのか取れていないのかを区別できないまま
- * 「他0」と出すと、設定してあるのに無いように見える。
- *
- * 数が返るようになったら、ここに1行足す:
- *   if (tag.otherActionCount) chips.push({ label: `他${tag.otherActionCount}`, tone: 'bg-canvas-sunken text-ink-faint' })
+ * 灰色の「他N」は、マイル以外の連動アクション（テキスト送信・
+ * テンプレート送信・シナリオ開始など）の数。0件のときサーバーは
+ * `otherActionCount` を省くので、**「他0」は出さない**。
  */
 function linkChips(tag: Tag): Array<{ label: string; tone: string }> {
   const chips: Array<{ label: string; tone: string }> = []
   if (tag.mileageReward) chips.push({ label: `本人+${tag.mileageReward}`, tone: 'bg-accent-soft text-accent' })
   if (tag.referralMileageReward) chips.push({ label: `紹介+${tag.referralMileageReward}`, tone: 'bg-accent-soft text-accent' })
   if (tag.mileageMultiplierBps) chips.push({ label: `${tag.mileageMultiplierBps / 10000}倍`, tone: 'bg-status-warn-soft text-status-warn-deep' })
+  if (tag.otherActionCount) chips.push({ label: `他${tag.otherActionCount}`, tone: 'bg-canvas-sunken text-ink-faint' })
   return chips
 }
 
-/**
- * 自動付与のもと。**まだサーバーが返していない。**
- * 設計は「EC連携／LINE Login／回答フォーム／EC購入／手動／誕生日ルール」を出す。
- * 返るようになるまで、連動の有無だけで分かる2つに留める。
- * 推測で6種類を出し分けると、間違った出どころを見せることになる。
- */
-function sourceLabel(tag: Tag): string {
-  return tag.mileageReward || tag.referralMileageReward || tag.mileageMultiplierBps ? 'LINE Login' : '手動'
+/** 設計 `tuisA` ほかの6種。サーバーの `assignSource` と1対1。 */
+const SOURCE_LABELS: Record<NonNullable<Tag['assignSource']>, string> = {
+  ec: 'EC連携',
+  line_login: 'LINE Login',
+  form: '回答フォーム',
+  ec_purchase: 'EC購入',
+  manual: '手動',
+  birthday: '誕生日ルール',
 }
 
 /**
- * 使用先。**まだサーバーが返していない。**
- * 設計は「配信3・フォーム1」のように数まで出す。
+ * 自動付与のもと。
+ *
+ * **無いときは `—`。「手動」と書かない。** サーバーは「いまのデータから
+ * 出どころを断定できるものだけ」を返す（`friend_tags` に付与元が
+ * 残っていないため、一般のタグを manual と推測しない）。
+ * ここで「手動」と埋めると、断定できなかったものを断定したことになる。
  */
-function usageLabel(_tag: Tag): string {
-  return '—'
+function sourceLabel(tag: Tag): string {
+  return tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'
+}
+
+/** 設計 `lML5Q`「配信3・フォーム1」の呼び分けと並び順。 */
+const USAGE_LABELS: Array<[keyof NonNullable<Tag['usedIn']>, string]> = [
+  ['broadcasts', '配信'],
+  ['forms', 'フォーム'],
+  ['scenarios', 'シナリオ'],
+  ['autoReplies', '自動応答'],
+  ['savedSearches', '保存検索'],
+]
+
+/**
+ * 使用先。設計は「配信3・フォーム1」のように数まで出す。
+ *
+ * **`withCounts=1` で読んでいるので、`usedIn` が無いのは「0件」。**
+ * 集計していないわけではないので、`—` ではなく「未使用」と言い切ってよい。
+ * （`withCounts` を付けずに読む画面でこの関数を使うときは、この前提が崩れる）
+ */
+function usageLabel(tag: Tag): string {
+  if (!tag.usedIn) return '未使用'
+  const parts = USAGE_LABELS
+    .map(([key, label]) => (tag.usedIn?.[key] ? `${label}${tag.usedIn[key]}` : null))
+    .filter(Boolean)
+  return parts.length ? parts.join('・') : '未使用'
+}
+
+/** 連動が1つでもあるか。「連動あり」の絞り込みと削除の確認で使う。 */
+function hasLinkedActions(tag: Tag): boolean {
+  return Boolean(tag.mileageReward || tag.referralMileageReward || tag.mileageMultiplierBps || tag.otherActionCount)
+}
+
+/**
+ * 今月（日本時間）に作られたか。「今月増えたタグ」の判定。
+ *
+ * サーバーは UTC の ISO で返す。日本時間で数えないと、月初と月末の
+ * 9時間ぶんがずれる（8/1 の朝に作ったタグが7月扱いになる）。
+ */
+function isThisMonth(value: string): boolean {
+  const month = (d: Date) =>
+    new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit' }).format(d)
+  return month(new Date(value)) === month(new Date())
 }
 
 /** 登録日。設計は `2026/01/11`（0埋め）。 */
@@ -139,6 +181,20 @@ function formatDate(value: string): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}/${p(d.getMonth() + 1)}/${p(d.getDate())}`
 }
+
+/**
+ * 設計 `UOmne` の「よく使う」。**5つとも効く。**
+ *
+ * 2026-08-26 まで3つしか無く、しかも「今月増えた」は絞り込みの中に
+ * 対応する枝が無くて**押しても何も起きなかった**。
+ */
+const QUICK_FILTERS: Array<[string, string]> = [
+  ['unused', '未使用のタグ'],
+  ['recent', '今月増えたタグ'],
+  ['auto', '自動付与あり'],
+  ['linked', '連動あり'],
+  ['starred', '★のみ表示'],
+]
 
 const cardShadow = '[box-shadow:1px_1px_1px_rgba(15,23,42,0.14)]'
 
@@ -245,10 +301,52 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
   )
 }
 
+/**
+ * 設計 `★ V6 4-1-F タグ削除の確認ダイアログ`（`dKlkz`）の影響5行。
+ *
+ * 「名前・値・結果」の3列。**値が取れないときは `—`。0とは書かない。**
+ * 何が起きるか（結果）は設定によらず決まっているので、値が取れなくても出す。
+ */
+function deleteImpactRows(tag: Tag): Array<{ name: string; value: string; result: string }> {
+  const used = tag.usedIn
+  const manualRefs = [
+    used?.broadcasts ? `一斉配信${used.broadcasts}` : null,
+    used?.forms ? `回答フォーム${used.forms}` : null,
+  ].filter(Boolean).join('・')
+  const autoRefs = [
+    used?.scenarios ? `シナリオ${used.scenarios}` : null,
+    used?.autoReplies ? `自動応答${used.autoReplies}` : null,
+    used?.savedSearches ? `保存検索${used.savedSearches}` : null,
+  ].filter(Boolean).join('・')
+  const linked = [
+    tag.mileageReward ? `本人+${tag.mileageReward}` : null,
+    tag.referralMileageReward ? `紹介者+${tag.referralMileageReward}` : null,
+    tag.mileageMultiplierBps ? `${tag.mileageMultiplierBps / 10000}倍` : null,
+    tag.otherActionCount ? `アクション${tag.otherActionCount}件` : null,
+  ].filter(Boolean).join('／')
+
+  return [
+    { name: '付与人数', value: `${(tag.friendCount ?? 0).toLocaleString('ja-JP')}人`, result: 'タグが外れます' },
+    { name: '参照先', value: manualRefs || 'なし', result: '絞り込み条件から外れます' },
+    { name: '参照先（自動）', value: autoRefs || 'なし', result: '開始条件が空になります' },
+    { name: '連動の停止', value: linked || 'なし', result: '以後は実行されません' },
+    /*
+      積んだマイルの合計を返す口がまだ無い（設計の絵は「1,450 mile」）。
+      0 と書くと「積んでいない」ことになるので `—` にする。
+    */
+    { name: '積んだマイル', value: '—', result: '戻りません' },
+  ]
+}
+
 function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () => void; onDeleted: () => void }) {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /*
+    共通の作法に寄せる。Escapeで閉じ、Tabが外へ出ず、**背景がスクロールしない**。
+    自前で組むと毎回どれかが抜ける。実際、背景が裏で動いていた。
+  */
+  const dialogRef = useOverlayFocus(true, onCancel, saving)
   const remove = async () => {
     if (text !== tag.name || saving) return
     setSaving(true)
@@ -262,14 +360,48 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
     }
   }
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4">
+    <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete">
       <section className="w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
-        <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2><p className="mt-2 text-sm text-ink-secondary">削除前に、影響する人数と参照先を確認してください。</p>
-        <dl className="mt-5 divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm"><div className="flex justify-between px-4 py-3"><dt>タグが付いている友だち</dt><dd className="font-bold">{tag.friendCount ?? 0}人</dd></div><div className="flex justify-between px-4 py-3"><dt>配信・シナリオなどの参照</dt><dd className="font-bold">3件</dd></div><div className="flex justify-between px-4 py-3"><dt>自動付与の参照</dt><dd className="font-bold">1件</dd></div><div className="flex justify-between px-4 py-3"><dt>連動アクション</dt><dd className="font-bold">停止</dd></div><div className="flex justify-between px-4 py-3"><dt>すでに積んだマイル</dt><dd className="font-bold">そのまま残る</dd></div></dl>
-        <p className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm font-medium text-danger">外部連携で使用中の場合は削除できません。この操作は元に戻せません。</p>
-        <label className="mt-5 block"><span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため「{tag.name}」と入力してください</span><input value={text} onChange={(event) => setText(event.target.value)} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger" /></label>
-        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
-        <div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">キャンセル</button><button type="button" disabled={saving || text !== tag.name} onClick={() => void remove()} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '削除中…' : 'タグを削除'}</button></div>
+        <div className="flex items-start gap-3">
+          {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-control bg-danger-bg text-danger">
+            <TrashIcon />
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-ink">「{tag.name}」を削除しますか？</h2>
+            <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。</p>
+          </div>
+        </div>
+
+        {/* 設計 `X3Lkr`。名前・値・結果の3列。 */}
+        <dl className="mt-5 divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">
+          {deleteImpactRows(tag).map((row) => (
+            <div key={row.name} className="flex items-baseline gap-3 px-4 py-3">
+              <dt className="w-[130px] shrink-0 text-ink-secondary">{row.name}</dt>
+              <dd className="min-w-0 flex-1 font-bold text-ink">{row.value}</dd>
+              <span className="shrink-0 text-xs text-ink-faint">{row.result}</span>
+            </div>
+          ))}
+        </dl>
+
+        {/* 設計 `WrDxu`。 */}
+        <div className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">
+          <p className="font-bold">アフィリエイトのオファーで使用中のタグは削除できません</p>
+          <p className="mt-1 text-ink-secondary">その場合は、先にオファー側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p>
+        </div>
+
+        {/* 設計 `seGRS`。 */}
+        <label className="mt-5 block">
+          <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
+          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger" />
+        </label>
+        {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
+
+        {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
+          <button type="button" disabled={saving || text !== tag.name} onClick={() => void remove()} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '削除中…' : 'このタグを削除する'}</button>
+        </div>
       </section>
     </div>
   )
@@ -291,7 +423,11 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
   const [folder, setFolder] = useState('')
   const [usageFilter, setUsageFilter] = useState('all')
   const [sourceFilter, setSourceFilter] = useState('all')
-  const [quick, setQuick] = useState('')
+  /**
+   * 設計 `UOmne` の「よく使う」5つ。**複数えらべる。**
+   * 1つずつしか選べないと、「未使用」かつ「今月増えた」が出せない。
+   */
+  const [quick, setQuick] = useState<string[]>([])
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -318,12 +454,21 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
     if (query && !tag.name.toLowerCase().includes(query.toLowerCase())) return false
     if (folder === UNGROUPED && tag.groupId) return false
     if (folder && folder !== UNGROUPED && tag.groupId !== folder) return false
-    const linked = Boolean(tag.mileageReward || tag.referralMileageReward || tag.mileageMultiplierBps)
+    const linked = hasLinkedActions(tag)
+    // 「未使用」は**使用先が無いこと**。付与人数0とは別物で、
+    // 「誰にも付いていないが配信で使っている」タグを消させないため。
+    const unused = !tag.usedIn
     if (usageFilter === 'linked' && !linked) return false
-    if (usageFilter === 'unused' && (tag.friendCount ?? 0) > 0) return false
-    if (sourceFilter === 'manual' && linked) return false
-    if (quick === 'unused' && (tag.friendCount ?? 0) > 0) return false
-    if (quick === 'linked' && !linked) return false
+    if (usageFilter === 'unused' && !unused) return false
+    if (sourceFilter !== 'all' && tag.assignSource !== sourceFilter) return false
+    for (const key of quick) {
+      if (key === 'unused' && !unused) return false
+      if (key === 'recent' && !isThisMonth(tag.createdAt)) return false
+      // 「自動付与あり」は手動を含まない。手動は自動ではない。
+      if (key === 'auto' && (!tag.assignSource || tag.assignSource === 'manual')) return false
+      if (key === 'linked' && !linked) return false
+      if (key === 'starred' && !tag.isStarred) return false
+    }
     return true
   }), [items, query, folder, usageFilter, sourceFilter, quick])
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -361,11 +506,36 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
     }
   }
 
+  /**
+   * いま画面に出ている絞り込み結果を、そのままCSVにする。
+   *
+   * **名前は毎回変える。** `tags.csv` 固定だと、2回目からブラウザが
+   * `tags (1).csv` を作り、どの日のどの絞り込みか分からなくなる。
+   * 絞り込みの中身（フォルダ名）も名前に入れる。
+   */
   const exportCsv = () => {
-    const rows = filtered.map((tag) => [tag.name, tag.friendCount ?? 0, groups.find((group) => group.id === tag.groupId)?.name ?? '未分類'])
-    const csv = [['タグ名', '付与人数', 'フォルダ'], ...rows].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const rows = filtered.map((tag) => [
+      tag.name,
+      groups.find((group) => group.id === tag.groupId)?.name ?? '未分類',
+      tag.friendCount ?? 0,
+      sourceLabel(tag),
+      usageLabel(tag),
+      linkChips(tag).map((chip) => chip.label).join('／') || 'なし',
+      formatDate(tag.createdAt),
+      tag.isStarred ? '一覧に表示' : '非表示',
+    ])
+    const csv = [
+      ['タグ名', 'フォルダ', '付与人数', '自動付与のもと', '使用先', '連動', '登録日', '友だち一覧への表示'],
+      ...rows,
+    ].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const scope = folder === UNGROUPED ? '未分類' : folder ? groups.find((group) => group.id === folder)?.name ?? '' : ''
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date())
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'tags.csv'; anchor.click(); URL.revokeObjectURL(url)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = ['タグ一覧', scope, today].filter(Boolean).join('-') + '.csv'
+    anchor.click()
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -384,8 +554,16 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
           onClick: () => fixture ? setFixtureTab(key) : router.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`),
         }))}
         actions={tab === 'tags' && status !== 'forbidden' ? (
-          // 設計 `Sn86o` はここに CSV だけ。作る操作は KPI の下（`HWP5R`）。
-          <Button type="button" onClick={exportCsv}>CSVで一括登録</Button>
+          /*
+            設計 `Sn86o` はここに CSV だけ。作る操作は KPI の下（`HWP5R`）。
+
+            **設計の文言は「CSVで一括登録」だが、押すと出力される。**
+            取り込みは別画面（設計 `★ V6 4-1-H タグCSV一括登録`）で、
+            受け口のAPIもまだ無い。取り込みと書いて出力するのは嘘なので、
+            いまは「出力」と書く。4-1-H と取り込みAPIができたら、
+            この枠を取り込みへ渡し、出力の置き場所を決め直す。
+          */
+          <Button type="button" onClick={exportCsv}>CSVで出力</Button>
         ) : undefined}
       />
 
@@ -401,9 +579,15 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
           titles={['タグ数', '付与済み友だち', '今月の付与', '整理候補']}
           build={(stats) => [
             { title: 'タグ数', value: stats.tags.total, unit: '件', detail: `未使用 ${stats.tags.unused}件` },
-            { title: '付与済み友だち', value: stats.tags.taggedFriends, unit: '人', detail: '1つ以上のタグあり' },
-            { title: '今月の付与', value: stats.tags.assignedThisMonth, unit: '回', detail: '手動・自動の合計' },
-            { title: '整理候補', value: stats.tags.unused, unit: '件', detail: '未使用・確認待ち' },
+            { title: '付与済み友だち', value: stats.tags.taggedFriends, unit: '人', detail: '1つ以上付与' },
+            { title: '今月の付与', value: stats.tags.assignedThisMonth, unit: '回', detail: '手動・自動' },
+            /*
+              設計 `qN3YX` の「整理候補」は **未使用＋重複名**（絵は 26件で、
+              未使用の 24件とは別の数）。サーバーはまだこの数を返さない。
+              未使用の数を置くと、重複名のぶんだけ少ない数を「整理候補」として
+              見せることになるので、取れるまで `—`。
+            */
+            { title: '整理候補', value: null, unit: '', detail: '未使用・重複名' },
           ]}
         />
 
@@ -419,11 +603,42 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
           </div>
         )}
         {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
+        {/* 設計 `HrwyW` は gap 14、フォルダは 240 固定（`DgeL8`）。 */}
+        <div className="grid min-w-0 gap-[14px] xl:grid-cols-[240px_minmax(0,1fr)]">
           <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
           <main className="min-w-0">
-            <div className="mb-3 flex flex-wrap items-center gap-2"><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="min-w-[260px] flex-1 rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label outline-none focus:border-accent" /><select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink"><option value="all">付与元：すべて</option><option value="manual">手動のみ</option></select><select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select><span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span></div>
-            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs"><span className="text-ink-faint">よく使う</span>{[['unused','未使用のタグ'],['linked','連動あり'],['recent','今月増えた']].map(([key,label]) => <button key={key} type="button" onClick={() => setQuick(quick === key ? '' : key)} className={`rounded-pill border px-3 py-1.5 ${quick === key ? 'border-accent bg-accent-soft text-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}>{label}</button>)}</div>
+            {/*
+              設計 `XchZz タグツールバー`。左に検索群（`RAlQh` 405px＝
+              検索144・使用状態129・付与元116）、右に表示件数と範囲（`Olp2S`）。
+              **検索欄を伸ばさない。** 伸ばすと右の2つが端へ飛んで、
+              設計の並びと変わる。
+            */}
+            <div className="mb-[10px] flex flex-wrap items-center gap-2">
+              <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="h-9 w-[144px] rounded-control border border-hairline bg-canvas px-2 text-label outline-none focus:border-accent" />
+              <select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select v6-select-tight h-9 w-[129px] rounded-control border border-hairline bg-canvas text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select>
+              <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select v6-select-tight h-9 w-[116px] rounded-control border border-hairline bg-canvas text-label font-semibold text-ink"><option value="all">付与元：すべて</option>{Object.entries(SOURCE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+              <span className="flex-1" />
+              <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select h-9 rounded-control border border-hairline bg-canvas pl-3 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select>
+              <span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span>
+            </div>
+            {/* 設計 `UOmne`。**5つ。押した数だけ重ねて絞る。** */}
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-ink-faint">よく使う</span>
+              {QUICK_FILTERS.map(([key, label]) => {
+                const on = quick.includes(key)
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setQuick((current) => on ? current.filter((k) => k !== key) : [...current, key])}
+                    className={`rounded-pill border px-3 py-1.5 ${on ? 'border-accent bg-accent-soft text-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
             {/*
               中身が詰まったら**表だけ**横スクロールさせる。
               画面ごと横に伸ばすと、共通ルール §1-8 の「1440でも横スクロールを
@@ -537,15 +752,19 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
                 設計 `Blot6`。共通部品を使う。ここで自前に組むと、
                 高さ38・角丸・現在ページの緑がほかの一覧とずれる。
               */}
-              {/* 中身を出せていないときは出さない。ページ番号があると読めているように見える。 */}
-              {ready ? (
-                <div className="flex items-center justify-end border-t border-hairline px-4 py-3">
-                  <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} />
-                </div>
-              ) : null}
             </div>
           </main>
         </div>
+        {/*
+          設計 `rvzSw タグ フッター`。**表の枠の外**、本体の幅いっぱいで右寄せ。
+          枠の中に入れると、フォルダの列だけ高さが余ったときに位置がずれる。
+          中身を出せていないときは出さない（ページ番号があると読めて見える）。
+        */}
+        {ready ? (
+          <div className="mt-[14px] flex items-center justify-end">
+            <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} />
+          </div>
+        ) : null}
       </> : tab === 'fields' ? <FriendFieldList /> : tab === 'marks' ? <SupportMarkList /> : <SavedSearchList />}
       {deleteTarget && <DeleteTagDialog tag={deleteTarget} onCancel={() => setDeleteTarget(null)} onDeleted={() => { setDeleteTarget(null); void load() }} />}
     </div>

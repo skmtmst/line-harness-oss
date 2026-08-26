@@ -41,13 +41,14 @@ export const TAG_GROUPS = [
  * `mileageMultiplierBps` は 10000 で 1.0倍。設計の「1.2倍」は 12000。
  */
 const DESIGN_ROWS = [
-  ['EC顧客連携済み', 'g-purchase', 64, 10, 0, 12000, true, '2026-01-11T00:00:00.000Z'],
-  ['LINEログイン連携済み', 'g-member', 198, 0, 0, null, true, '2026-01-13T00:00:00.000Z'],
-  ['NEN会員', 'g-member', 128, 10, 5, 15000, false, '2026-01-13T00:00:00.000Z'],
-  ['商品到着確認対象', 'g-purchase', 41, 3, 0, null, false, '2026-01-13T00:00:00.000Z'],
-  ['未契約', '', 37, 0, 0, null, false, '2026-01-13T00:00:00.000Z'],
-  ['誕生日クーポン対象', 'g-vip', 0, 20, 0, null, false, '2026-01-13T00:00:00.000Z'],
-].map(([name, groupId, friendCount, mileageReward, referralMileageReward, mileageMultiplierBps, isStarred, createdAt], index) => ({
+  // 名前, フォルダ, 付与人数, 本人マイル, 紹介マイル, 倍率, ★, 登録日, 付与元, 使用先, 他N
+  ['EC顧客連携済み', 'g-purchase', 64, 10, 0, 12000, true, '2026-01-11T00:00:00.000Z', 'ec', { broadcasts: 3, forms: 1 }, 1],
+  ['LINEログイン連携済み', 'g-member', 198, 0, 0, null, true, '2026-01-13T00:00:00.000Z', 'line_login', { scenarios: 2 }, 0],
+  ['NEN会員', 'g-member', 128, 10, 5, 15000, false, '2026-01-13T00:00:00.000Z', 'form', { broadcasts: 4 }, 3],
+  ['商品到着確認対象', 'g-purchase', 41, 3, 0, null, false, '2026-01-13T00:00:00.000Z', 'ec_purchase', { autoReplies: 1 }, 1],
+  ['未契約', '', 37, 0, 0, null, true, '2026-01-13T00:00:00.000Z', 'manual', { savedSearches: 2 }, 0],
+  ['誕生日クーポン対象', 'g-vip', 0, 20, 0, null, false, '2026-01-13T00:00:00.000Z', 'birthday', { broadcasts: 1 }, 2],
+].map(([name, groupId, friendCount, mileageReward, referralMileageReward, mileageMultiplierBps, isStarred, createdAt, assignSource, usedIn, otherActionCount], index) => ({
   id: `tag-${index}`,
   name: String(name),
   color: '#8b938d',
@@ -60,6 +61,14 @@ const DESIGN_ROWS = [
   isStarred: Boolean(isStarred),
   displayOrder: index,
   createdAt: String(createdAt),
+  /*
+    サーバーは **0件・断定できないものを省く**。ここでも省く。
+    省かずに 0 を入れると、画面が「未使用」と「取れていない」を
+    言い分けられているかを確かめられなくなる。
+  */
+  assignSource: String(assignSource),
+  ...(Object.keys(usedIn).length ? { usedIn } : {}),
+  ...(otherActionCount ? { otherActionCount: Number(otherActionCount) } : {}),
 }))
 
 /**
@@ -88,6 +97,11 @@ export const TAGS = (() => {
         groupId,
         // 埋め草にも人数を入れる。0 にすると「整理候補」が跳ね上がる。
         friendCount: 3 + ((n * 7) % 40),
+        /*
+          埋め草は `assignSource` も `usedIn` も持たない。
+          設計の6行が「EC連携」「配信3・フォーム1」を出すのに対し、
+          埋め草は「—」「未使用」になる。**両方の見え方を1枚で確かめる。**
+        */
         mileageReward: 0,
         referralMileageReward: 0,
         mileageMultiplierBps: null,

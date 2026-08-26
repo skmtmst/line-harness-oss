@@ -72,12 +72,13 @@ export default function ListKpis({
         value: null,
         unit: '',
         detail: failed && titles ? '取得できませんでした' : '',
-        key: i,
-      }) as KpiSpec)
+      }))
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
       {cards.map((card, i) => (
+        // key は props に混ぜない。混ぜて spread すると React が
+        // 「key を spread で渡すな」と毎回警告を出す。
         <SummaryCard key={card.title || i} {...card} loading={loading} variant={variant} />
       ))}
     </div>

@@ -169,3 +169,14 @@
   background-position: right 10px center;
   padding-right: 30px;
 }
+
+/*
+ * 幅が設計で決まっている絞り込み（★V6 4-1 `XchZz` の 129px・116px など）。
+ * 既定の左右あわせて 42px は、その幅では文字を食う。実際
+ * 「使用状態：すべて」が「使用状態：すべ」で切れて、矢印に重なった。
+ */
+.v6-select-tight {
+  background-position: right 6px center;
+  padding-left: 8px;
+  padding-right: 22px;
+}
