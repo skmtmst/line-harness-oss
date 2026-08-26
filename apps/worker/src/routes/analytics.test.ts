@@ -21,6 +21,10 @@ const mocks = {
   createFunnelResultAudience: vi.fn(),
   createAnalyticsCrossRun: vi.fn(),
   getAnalyticsCrossRun: vi.fn(),
+  getAnalyticsFriendsOverview: vi.fn(),
+  getAnalyticsReactionsOverview: vi.fn(),
+  getAnalyticsRoutesOverview: vi.fn(),
+  getAnalyticsUsageOverview: vi.fn(),
   createAnalyticsCrossAudience: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
@@ -47,7 +51,7 @@ const mocks = {
 };
 vi.mock('@line-crm/db', () => mocks);
 
-const { analytics } = await import('./analytics.js');
+const { analytics, readAnalyticsOverviewRange } = await import('./analytics.js');
 
 const app = new Hono<Env>();
 app.use('*', async (c, next) => {
@@ -110,6 +114,10 @@ beforeEach(() => {
     result: { state: 'available', cells: [], totalValue: 0 },
     createdAt: '2026-08-26T00:00:00.000Z',
   });
+  mocks.getAnalyticsFriendsOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
+  mocks.getAnalyticsReactionsOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
+  mocks.getAnalyticsRoutesOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
+  mocks.getAnalyticsUsageOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.createAnalyticsCrossAudience.mockResolvedValue({
     id: 'audience-cross-1', memberCount: 2, expiresAt: '2026-08-27T00:00:00.000Z',
   });
@@ -156,6 +164,56 @@ describe('期間の指定', () => {
     // 期間を長くするほど走査する行が増える。
     const res = await req(`/api/analytics/messages?${ACCOUNT}&from=2020-01-01&to=2026-08-16`);
     expect(res.status).toBe(400);
+  });
+});
+
+describe('V6分析の概要API', () => {
+  it('既定はアカウントの現地日付で30日、夏時間の日境界も保つ', () => {
+    const result = readAnalyticsOverviewRange(
+      () => undefined,
+      'America/New_York',
+      new Date('2026-03-20T12:00:00.000Z'),
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: expect.objectContaining({
+        fromDate: '2026-02-19',
+        toDate: '2026-03-20',
+        from: '2026-02-19T05:00:00.000Z',
+        toExclusive: '2026-03-21T04:00:00.000Z',
+      }),
+    });
+  });
+
+  it.each([
+    ['friends', 'getAnalyticsFriendsOverview'],
+    ['reactions', 'getAnalyticsReactionsOverview'],
+    ['routes', 'getAnalyticsRoutesOverview'],
+    ['usage', 'getAnalyticsUsageOverview'],
+  ] as const)('%s は選択中アカウントと期間を渡す', async (path, mockName) => {
+    const res = await req(
+      `/api/analytics/${path}?${ACCOUNT}&from=2026-08-01&to=2026-08-30`,
+    );
+    expect(res.status).toBe(200);
+    expect(mocks[mockName]).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        lineAccountId: 'account-a',
+        timeZone: 'Asia/Tokyo',
+        fromDate: '2026-08-01',
+        toDate: '2026-08-30',
+        from: '2026-07-31T15:00:00.000Z',
+        toExclusive: '2026-08-30T15:00:00.000Z',
+      }),
+    );
+  });
+
+  it('存在しない日付と13か月を超える期間を弾く', async () => {
+    expect((await req(`/api/analytics/friends?${ACCOUNT}&from=2026-02-31`)).status).toBe(400);
+    expect((await req(
+      `/api/analytics/friends?${ACCOUNT}&from=2025-01-01&to=2026-08-30`,
+    )).status).toBe(400);
+    expect(mocks.getAnalyticsFriendsOverview).not.toHaveBeenCalled();
   });
 });
 

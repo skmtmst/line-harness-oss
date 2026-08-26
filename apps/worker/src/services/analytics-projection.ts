@@ -40,7 +40,7 @@ export async function refreshRecentAnalyticsProjections(
       const projection = await rebuildAnalyticsDailyMetrics(db, {
         accountId: account.id,
         timeZone: account.timezone || 'Asia/Tokyo',
-        range: recentAnalyticsProjectionRange(now, account.timezone || 'Asia/Tokyo', 7),
+        range: recentAnalyticsProjectionRange(now, account.timezone || 'Asia/Tokyo', 31),
         dataCutoffAt: cutoffAt,
       });
       if (projection.status === 'matched') result.matched += 1;

@@ -21,10 +21,15 @@ import {
   getAnalyticsCrossRun,
   createAnalyticsCrossAudience,
   getCurrentFunnelVersion,
+  getAnalyticsFriendsOverview,
+  getAnalyticsReactionsOverview,
+  getAnalyticsRoutesOverview,
+  getAnalyticsUsageOverview,
   getLineAccountById,
   FUNNEL_STEP_KINDS,
   type Funnel,
   type FunnelStepKind,
+  type AnalyticsOverviewContext,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -88,6 +93,111 @@ function readRange(
   return { ok: true, value: { from: fromRaw, to: `${toRaw}T23:59:59.999` } };
 }
 
+const MAX_OVERVIEW_RANGE_DAYS = 397;
+
+function isDateOnly(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function addDateDays(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function dateInZone(value: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function zoneOffsetMs(value: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(value);
+  const number = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((item) => item.type === type)?.value ?? 0);
+  return Date.UTC(
+    number('year'), number('month') - 1, number('day'),
+    number('hour'), number('minute'), number('second'),
+  ) - value.getTime();
+}
+
+function zonedDateStart(value: string, timeZone: string): string {
+  const [year, month, day] = value.split('-').map(Number);
+  const target = Date.UTC(year, month - 1, day);
+  let guess = target;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    guess = target - zoneOffsetMs(new Date(guess), timeZone);
+  }
+  return new Date(guess).toISOString();
+}
+
+export function readAnalyticsOverviewRange(
+  query: (key: string) => string | undefined,
+  timeZone: string,
+  now = new Date(),
+): { ok: true; value: Omit<AnalyticsOverviewContext, 'lineAccountId'> } |
+   { ok: false; error: string } {
+  const toDate = query('to') ?? dateInZone(now, timeZone);
+  const fromDate = query('from') ?? addDateDays(toDate, -29);
+  if (!isDateOnly(fromDate) || !isDateOnly(toDate)) {
+    return { ok: false, error: '期間は 2026-08-01 の形で指定してください' };
+  }
+  if (fromDate > toDate) {
+    return { ok: false, error: '開始日が終了日より後になっています' };
+  }
+  const days = Math.round(
+    (Date.parse(`${toDate}T00:00:00.000Z`) - Date.parse(`${fromDate}T00:00:00.000Z`)) /
+      86_400_000,
+  ) + 1;
+  if (days > MAX_OVERVIEW_RANGE_DAYS) {
+    return { ok: false, error: '詳細な分析は13か月までにしてください' };
+  }
+  return {
+    ok: true,
+    value: {
+      timeZone,
+      fromDate,
+      toDate,
+      from: zonedDateStart(fromDate, timeZone),
+      toExclusive: zonedDateStart(addDateDays(toDate, 1), timeZone),
+      dataCutoffAt: now.toISOString(),
+    },
+  };
+}
+
+async function overviewContext(
+  c: Context<Env>,
+  accountId: string,
+): Promise<{ ok: true; value: AnalyticsOverviewContext } | { ok: false; response: Response }> {
+  const selected = await getLineAccountById(c.env.DB, accountId);
+  if (!selected) return { ok: false, response: c.json({ success: false, error: 'Not found' }, 404) };
+  const range = readAnalyticsOverviewRange(
+    (key) => c.req.query(key),
+    selected.timezone || 'Asia/Tokyo',
+  );
+  if (!range.ok) {
+    return { ok: false, response: c.json({ success: false, error: range.error }, 400) };
+  }
+  return { ok: true, value: { lineAccountId: accountId, ...range.value } };
+}
+
 function serializeFunnel(f: Funnel) {
   return {
     id: f.id,
@@ -110,6 +220,58 @@ function funnelErrorStatus(error: unknown): 404 | 422 | 500 {
   if (message.startsWith('analytics_funnel_') || message.startsWith('analytics_cross_')) return 422;
   return 500;
 }
+
+analytics.get('/api/analytics/friends', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const context = await overviewContext(c, account.accountId);
+    if (!context.ok) return context.response;
+    return c.json({ success: true, data: await getAnalyticsFriendsOverview(c.env.DB, context.value) });
+  } catch (error) {
+    console.error('GET /api/analytics/friends error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+analytics.get('/api/analytics/reactions', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const context = await overviewContext(c, account.accountId);
+    if (!context.ok) return context.response;
+    return c.json({ success: true, data: await getAnalyticsReactionsOverview(c.env.DB, context.value) });
+  } catch (error) {
+    console.error('GET /api/analytics/reactions error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+analytics.get('/api/analytics/routes', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const context = await overviewContext(c, account.accountId);
+    if (!context.ok) return context.response;
+    return c.json({ success: true, data: await getAnalyticsRoutesOverview(c.env.DB, context.value) });
+  } catch (error) {
+    console.error('GET /api/analytics/routes error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+analytics.get('/api/analytics/usage', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const context = await overviewContext(c, account.accountId);
+    if (!context.ok) return context.response;
+    return c.json({ success: true, data: await getAnalyticsUsageOverview(c.env.DB, context.value) });
+  } catch (error) {
+    console.error('GET /api/analytics/usage error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
 
 // GET /api/analytics/messages — 日ごとの送受信数
 analytics.get('/api/analytics/messages', async (c) => {
