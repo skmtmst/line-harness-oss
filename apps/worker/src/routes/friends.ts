@@ -1,8 +1,7 @@
-import { Hono } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getFriends,
   getFriendById,
-  getFriendCount,
   getFriendAddBreakdown,
   addTagToFriend,
   removeTagFromFriend,
@@ -20,6 +19,7 @@ import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   completeOutboundSendStatement,
   hashOutboundPayload,
@@ -28,6 +28,35 @@ import {
 } from '../services/outbound-idempotency.js';
 
 const friends = new Hono<Env>();
+
+async function adminAccountScope(c: Context<Env>, alias = '') {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const column = `${alias}line_account_id`;
+  const where = scope.allowedAccountIds.length
+    ? `(${column} IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
+    : scope.canSeeUnassigned
+      ? `${column} IS NULL`
+      : '1 = 0';
+  return { scope, where };
+}
+
+const requireVisibleFriend: MiddlewareHandler<Env> = async (c, next) => {
+  const friend = await getFriendById(c.env.DB, c.req.param('id') ?? '');
+  const accountId = friend
+    ? ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null
+    : null;
+  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'Friend not found' }, 404);
+  }
+  await next();
+};
+
+const requireIdempotencyKey: MiddlewareHandler<Env> = async (c, next) => {
+  if (!isValidIdempotencyKey(c.req.header('Idempotency-Key')?.trim())) {
+    return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+  }
+  await next();
+};
 
 /**
  * Convert a D1 snake_case Friend row to the shared camelCase shape.
@@ -140,6 +169,10 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     if (lineAccountId) {
       conditions.push('f.line_account_id = ?');
       binds.push(lineAccountId);
+    } else {
+      const { scope, where } = await adminAccountScope(c, 'f.');
+      conditions.push(where);
+      binds.push(...scope.allowedAccountIds);
     }
     if (search) {
       conditions.push('f.display_name LIKE ?');
@@ -455,11 +488,22 @@ friends.get('/api/friends/add-breakdown', async (c) => {
   try {
     const days = Number(c.req.query('days') ?? '30');
     const lineAccountId = c.req.query('lineAccountId') ?? null;
-    const data = await getFriendAddBreakdown(
-      c.env.DB,
-      Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30,
-      lineAccountId,
-    );
+    const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
+    if (lineAccountId) {
+      const data = await getFriendAddBreakdown(c.env.DB, safeDays, lineAccountId);
+      return c.json({ success: true, data });
+    }
+    const { scope, where } = await adminAccountScope(c);
+    const row = await c.env.DB.prepare(`SELECT
+      SUM(CASE WHEN COALESCE(unfollow_count, 0) = 0 THEN 1 ELSE 0 END) AS first_time,
+      SUM(CASE WHEN COALESCE(unfollow_count, 0) > 0 THEN 1 ELSE 0 END) AS returning_count
+      FROM friends WHERE julianday('now', '+9 hours') - julianday(created_at) <= ? AND ${where}`)
+      .bind(safeDays, ...scope.allowedAccountIds).first<{ first_time: number | null; returning_count: number | null }>();
+    const unblocked = await c.env.DB.prepare(`SELECT COUNT(*) AS count FROM friends
+      WHERE is_following = 1 AND COALESCE(unfollow_count, 0) > 0 AND last_followed_at IS NOT NULL
+      AND julianday('now', '+9 hours') - julianday(last_followed_at) <= ? AND ${where}`)
+      .bind(safeDays, ...scope.allowedAccountIds).first<{ count: number | null }>();
+    const data = { days: safeDays, firstTime: Number(row?.first_time ?? 0), returning: Number(row?.returning_count ?? 0), unblocked: Number(unblocked?.count ?? 0) };
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/friends/add-breakdown error:', err);
@@ -476,7 +520,10 @@ friends.get('/api/friends/count', async (c) => {
         .bind(lineAccountId).first<{ count: number }>();
       count = row?.count ?? 0;
     } else {
-      count = await getFriendCount(c.env.DB);
+      const { scope, where } = await adminAccountScope(c);
+      const row = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM friends WHERE is_following = 1 AND ${where}`)
+        .bind(...scope.allowedAccountIds).first<{ count: number }>();
+      count = row?.count ?? 0;
     }
     return c.json({ success: true, data: { count } });
   } catch (err) {
@@ -489,15 +536,16 @@ friends.get('/api/friends/count', async (c) => {
 friends.get('/api/friends/ref-stats', async (c) => {
   try {
     const lineAccountId = c.req.query('lineAccountId');
-    const where = lineAccountId ? 'WHERE line_account_id = ?' : 'WHERE ref_code IS NOT NULL';
-    const binds = lineAccountId ? [lineAccountId] : [];
+    const accountScope = lineAccountId ? null : await adminAccountScope(c);
+    const where = lineAccountId ? 'line_account_id = ?' : accountScope!.where;
+    const binds = lineAccountId ? [lineAccountId] : accountScope!.scope.allowedAccountIds;
     const stmt = c.env.DB.prepare(
-      `SELECT ref_code, COUNT(*) as count FROM friends ${where} AND ref_code IS NOT NULL GROUP BY ref_code ORDER BY count DESC`,
+      `SELECT ref_code, COUNT(*) as count FROM friends WHERE ${where} AND ref_code IS NOT NULL GROUP BY ref_code ORDER BY count DESC`,
     );
     const result = await (binds.length > 0 ? stmt.bind(...binds) : stmt).all<{ ref_code: string; count: number }>();
     const total = await c.env.DB.prepare(
-      `SELECT COUNT(*) as count FROM friends ${lineAccountId ? 'WHERE line_account_id = ?' : ''} ${lineAccountId ? 'AND' : 'WHERE'} ref_code IS NOT NULL`,
-    ).bind(...(lineAccountId ? [lineAccountId] : [])).first<{ count: number }>();
+      `SELECT COUNT(*) as count FROM friends WHERE ${where} AND ref_code IS NOT NULL`,
+    ).bind(...binds).first<{ count: number }>();
     return c.json({
       success: true,
       data: {
@@ -512,7 +560,7 @@ friends.get('/api/friends/ref-stats', async (c) => {
 });
 
 // GET /api/friends/:id/mileage - admin wallet summary + recent ledger history
-friends.get('/api/friends/:id/mileage', async (c) => {
+friends.get('/api/friends/:id/mileage', requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const friend = await getFriendById(c.env.DB, friendId);
@@ -544,7 +592,40 @@ friends.get('/api/friends/:id/mileage', async (c) => {
 friends.get('/api/friends/stats', async (c) => {
   try {
     const { getFriendStats } = await import('@line-crm/db');
-    const stats = await getFriendStats(c.env.DB, c.req.query('accountId') ?? null);
+    const accountId = c.req.query('accountId') ?? null;
+    if (accountId) {
+      const stats = await getFriendStats(c.env.DB, accountId);
+      return c.json({ success: true as const, data: stats });
+    }
+    const { scope, where } = await adminAccountScope(c, 'f.');
+    const friend = await c.env.DB.prepare(`SELECT COUNT(*) total,
+      SUM(CASE WHEN is_following = 1 AND is_hidden = 0 THEN 1 ELSE 0 END) active,
+      SUM(CASE WHEN is_following = 0 THEN 1 ELSE 0 END) blocked_by_them,
+      SUM(CASE WHEN is_following = 1 AND is_hidden = 1 THEN 1 ELSE 0 END) hidden_by_us
+      FROM friends f WHERE ${where}`).bind(...scope.allowedAccountIds)
+      .first<{ total: number; active: number; blocked_by_them: number; hidden_by_us: number }>();
+    const inbox = await c.env.DB.prepare(`SELECT
+      SUM(CASE WHEN c.status = 'unread' THEN 1 ELSE 0 END) unanswered,
+      SUM(CASE WHEN c.status = 'resolved' THEN 1 ELSE 0 END) resolved
+      FROM chats c JOIN friends f ON f.id = c.friend_id WHERE ${where}`)
+      .bind(...scope.allowedAccountIds).first<{ unanswered: number; resolved: number }>();
+    const now = new Date(Date.now() + 9 * 3600_000);
+    const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    const previous = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    const lastMonth = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, '0')}`;
+    const countMonth = async (month: string) => {
+      const start = `${month}-01`;
+      const date = new Date(`${start}T00:00:00Z`);
+      date.setUTCMonth(date.getUTCMonth() + 1);
+      const end = date.toISOString().slice(0, 10);
+      const row = await c.env.DB.prepare(`SELECT COUNT(*) count FROM friends f WHERE created_at >= ? AND created_at < ? AND ${where}`)
+        .bind(start, end, ...scope.allowedAccountIds).first<{ count: number }>();
+      return row?.count ?? 0;
+    };
+    const [addedThisMonth, addedLastMonth] = await Promise.all([countMonth(thisMonth), countMonth(lastMonth)]);
+    const stats = { active: friend?.active ?? 0, total: friend?.total ?? 0, blockedByThem: friend?.blocked_by_them ?? 0,
+      hiddenByUs: friend?.hidden_by_us ?? 0, unanswered: inbox?.unanswered ?? 0, resolved: inbox?.resolved ?? 0,
+      addedThisMonth, addedLastMonth };
     return c.json({ success: true as const, data: stats });
   } catch (err) {
     console.error('GET /api/friends/stats error:', err);
@@ -552,7 +633,7 @@ friends.get('/api/friends/stats', async (c) => {
   }
 });
 
-friends.get('/api/friends/:id', async (c) => {
+friends.get('/api/friends/:id', requireVisibleFriend, async (c) => {
   try {
     const id = c.req.param('id');
     const db = c.env.DB;
@@ -618,7 +699,7 @@ friends.get('/api/friends/:id', async (c) => {
 });
 
 // POST /api/friends/:id/tags - add tag
-friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), async (c) => {
+friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const body = await c.req.json<{ tagId: string }>();
@@ -657,7 +738,7 @@ friends.post('/api/friends/:id/tags', requireRole('owner', 'admin', 'staff'), as
 });
 
 // DELETE /api/friends/:id/tags/:tagId - remove tag
-friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'staff'), async (c) => {
+friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const tagId = c.req.param('tagId');
@@ -675,7 +756,7 @@ friends.delete('/api/friends/:id/tags/:tagId', requireRole('owner', 'admin', 'st
 });
 
 // PUT /api/friends/:id/metadata - merge metadata fields
-friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'), async (c) => {
+friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'), requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const db = c.env.DB;
@@ -712,7 +793,7 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
 });
 
 // GET /api/friends/:id/messages - get message history
-friends.get('/api/friends/:id/messages', async (c) => {
+friends.get('/api/friends/:id/messages', requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     // Fetch the latest 200 messages (DESC) then reverse to ASC for display.
@@ -737,7 +818,7 @@ friends.get('/api/friends/:id/messages', async (c) => {
 });
 
 // POST /api/friends/:id/messages - send message to friend
-friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), async (c) => {
+friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff'), requireIdempotencyKey, requireVisibleFriend, async (c) => {
   try {
     const friendId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
