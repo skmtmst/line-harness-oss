@@ -96,7 +96,6 @@ describe('共通部品への移管実証', () => {
   const tagEdit = read('src', 'app', 'tags', 'edit', 'page.tsx')
 
   it.each([
-    ['友だち', friends],
     ['友だち属性', tags],
   ])('%sが共通Headerを使う', (_name, source) => {
     expect(source).toContain("import Header from '@/components/layout/header'")
@@ -106,6 +105,7 @@ describe('共通部品への移管実証', () => {
   it.each([
     ['ダッシュボード', dashboard],
     ['受信箱', chats],
+    ['友だち', friends],
   ])('%sは共通トップバーと重なる本文Headerを置かない', (_name, source) => {
     expect(source).not.toContain("import Header from '@/components/layout/header'")
     expect(source).not.toContain('<Header')

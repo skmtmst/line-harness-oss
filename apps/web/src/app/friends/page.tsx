@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { Tag } from '@line-crm/shared'
 import { api, type FriendListItem } from '@/lib/api'
-import Header from '@/components/layout/header'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
 import AdvancedSearchDialog, { type AdvancedSearchResult } from '@/components/friends/advanced-search-dialog'
@@ -26,8 +25,9 @@ type Notice = { title: string; message: string } | null
 
 const MERGED_TABS = [
   { key: 'list', label: '友だち一覧' },
-  { key: 'duplicates', label: '重複の検出' },
+  { key: 'duplicates', label: '重複検出' },
   { key: 'merged', label: '統合ユーザー' },
+  { key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' },
 ]
 
 function FriendsPageInner({
@@ -301,22 +301,25 @@ function FriendsPageHost() {
   const registerExporter = useCallback((exporter: () => void) => setExportCurrentPage(() => exporter), [])
 
   return (
-    <div data-friends-page="v4">
-      <div data-design="V4Head">
-      <Header
-        title="友だち"
-        action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button type="button" onClick={() => setNotice({ title: 'マニュアル', message: '友だち管理のマニュアルは準備中です。公開後、このボタンから開けるようにします。' })} className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm font-medium text-[#565F59] hover:bg-[#F6F6F8]">マニュアル</button>
-            <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage || tab !== 'list'} className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm font-medium text-[#0067D9] hover:bg-[#F3F8FF] disabled:text-[#B8BCC2]">CSVで書き出す</button>
-            <Link href="/accounts?tab=migration" className="rounded-[9px] border border-[#DADDE2] bg-white px-3 py-2 text-sm font-medium text-[#0067D9] hover:bg-[#F3F8FF]">UID移行</Link>
-          </div>
-        }
-      />
-      </div>
-
-      <div className="mb-4" data-design="V4Tabs">
-        <MergedTabs basePath="/friends" paramName="tab" tabs={MERGED_TABS} active={tab} />
+    <div data-friends-page="v6" data-design-node="PhxG6">
+      {/*
+        画面名は共通トップバーだけに置く。本文側のタイトル・説明・マニュアルは
+        重複させない（Pencil `PhxG6` / トップバー `cBSCb`）。
+        操作は独立した見出し行にせず、タブ `JB0Ki` の右端へ置く。
+      */}
+      <div className="mb-4" data-design="V6Tabs" data-design-node="JB0Ki">
+        <MergedTabs
+          basePath="/friends"
+          paramName="tab"
+          tabs={MERGED_TABS}
+          active={tab}
+          actions={(
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-[38px] rounded-[9px] border border-[#DADDE2] bg-white px-4 text-sm font-semibold text-[#565F59] hover:bg-[#F6F6F8] disabled:text-[#B8BCC2]">CSVで書き出す</button> : null}
+              <Link href="/accounts?tab=migration" className="flex h-[38px] items-center rounded-[9px] border border-[#DADDE2] bg-white px-4 text-sm font-semibold text-[#0067D9] hover:bg-[#F3F8FF]">UID移行</Link>
+            </div>
+          )}
+        />
       </div>
       {tab === 'list' ? <FriendsPageInner onNotice={setNotice} onExportReady={registerExporter} /> : null}
       {tab === 'duplicates' ? <EmbeddedPageProvider><DuplicatesPage /></EmbeddedPageProvider> : null}
