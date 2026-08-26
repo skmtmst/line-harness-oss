@@ -16,6 +16,11 @@ const dbMocks = {
   assignTagToGroup: vi.fn(),
   updateTag: vi.fn(),
   reorderTags: vi.fn(),
+  normalizeTagNameForCleanup: (name: string) => name
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLocaleLowerCase('ja-JP'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -40,6 +45,14 @@ function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
 function patch(path: string, body: unknown, role: 'owner' | 'admin' | 'staff' = 'owner') {
   return app(role).request(path, {
     method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+function post(path: string, body: unknown, role: 'owner' | 'admin' | 'staff' = 'owner') {
+  return app(role).request(path, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -98,7 +111,7 @@ function tagDeleteImpact(overrides: {
 
 describe('GET /api/tags', () => {
   beforeEach(() => {
-    for (const fn of Object.values(dbMocks)) fn.mockReset();
+    for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
   });
 
   test('管理一覧では人数と使用先をまとめて取得する', async () => {
@@ -184,9 +197,133 @@ describe('GET /api/tags', () => {
   });
 });
 
+describe('POST /api/tags/import', () => {
+  const GROUP_ROW = {
+    id: 'folder-sales',
+    name: '販売',
+    color: '#3B82F6',
+    sort_order: 0,
+    created_at: '2026-08-21T00:00:00.000Z',
+    updated_at: '2026-08-21T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
+    dbMocks.getTags.mockResolvedValue([]);
+    dbMocks.getTagGroups.mockResolvedValue([GROUP_ROW]);
+    dbMocks.createTag.mockImplementation(async (_db, input: { name: string; groupId: string | null }) => ({
+      ...TAG_ROW,
+      id: `tag-${input.name}`,
+      name: input.name,
+      folder_id: input.groupId,
+    }));
+  });
+
+  test('保存せず、既存・CSV内重複・フォルダ不明・空欄を行ごとに判定する', async () => {
+    dbMocks.getTags.mockResolvedValue([{ ...TAG_ROW, name: 'VIP' }]);
+
+    const res = await post('/api/tags/import/preview', { rows: [
+      { line: 2, name: '新規', folderName: '販売' },
+      { line: 3, name: ' ＶＩＰ ' },
+      { line: 4, name: 'Ｎｅｗ' },
+      { line: 5, name: 'new' },
+      { line: 6, name: '別タグ', folderName: '不明' },
+      { line: 7, name: '' },
+      { line: 8, name: 'x'.repeat(61) },
+    ] });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.createTag).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: {
+        summary: { total: 7, ready: 2, created: 0, skipped: 2, invalid: 3, failed: 0 },
+        rows: [
+          { line: 2, status: 'ready' },
+          { line: 3, status: 'skipped', code: 'already_exists' },
+          { line: 4, status: 'ready' },
+          { line: 5, status: 'skipped', code: 'duplicate_in_file' },
+          { line: 6, status: 'invalid', code: 'folder_not_found' },
+          { line: 7, status: 'invalid', code: 'name_required' },
+          { line: 8, status: 'invalid', code: 'name_too_long' },
+        ],
+      },
+    });
+  });
+
+  test('500件を超える要求はDBを読まずに断る', async () => {
+    const res = await post('/api/tags/import/preview', {
+      rows: Array.from({ length: 501 }, (_, index) => ({ name: `タグ${index}` })),
+    });
+    expect(res.status).toBe(422);
+    expect(dbMocks.getTags).not.toHaveBeenCalled();
+    expect(dbMocks.getTagGroups).not.toHaveBeenCalled();
+  });
+
+  test('閲覧だけの人はプレビューも登録もできない', async () => {
+    expect((await post('/api/tags/import/preview', { rows: [{ name: 'A' }] }, 'staff')).status)
+      .toBe(403);
+    expect((await post('/api/tags/import', { rows: [{ name: 'A' }] }, 'staff')).status)
+      .toBe(403);
+    expect(dbMocks.getTags).not.toHaveBeenCalled();
+  });
+
+  test('一部失敗しても残りを登録し、失敗行を返す', async () => {
+    dbMocks.createTag.mockImplementation(async (_db, input: { name: string; groupId: string | null }) => {
+      if (input.name === '失敗') throw new Error('D1 unavailable');
+      return { ...TAG_ROW, id: `tag-${input.name}`, name: input.name, folder_id: input.groupId };
+    });
+
+    const res = await post('/api/tags/import', { rows: [
+      { line: 2, name: '成功', folderName: '販売' },
+      { line: 3, name: '不明フォルダ', folderName: '不明' },
+      { line: 4, name: '失敗' },
+      { line: 5, name: '次も成功' },
+    ] });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.createTag).toHaveBeenCalledTimes(3);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: {
+        outcome: 'partial',
+        summary: { total: 4, ready: 0, created: 2, skipped: 0, invalid: 1, failed: 1 },
+        rows: [
+          { line: 2, status: 'created' },
+          { line: 3, status: 'invalid', code: 'folder_not_found' },
+          { line: 4, status: 'failed', code: 'create_failed' },
+          { line: 5, status: 'created' },
+        ],
+      },
+    });
+  });
+
+  test('確認後に同名タグが作られても失敗ではなく見送りにする', async () => {
+    dbMocks.createTag.mockRejectedValue(new Error('UNIQUE constraint failed: tags.name'));
+    const res = await post('/api/tags/import', { rows: [{ name: '競合' }] });
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      data: {
+        outcome: 'success',
+        summary: { created: 0, skipped: 1, invalid: 0, failed: 0 },
+        rows: [{ status: 'skipped', code: 'already_exists' }],
+      },
+    });
+  });
+
+  test('登録できる行がなく入力不備だけなら失敗結果にする', async () => {
+    const res = await post('/api/tags/import', { rows: [{ name: '', folderName: '不明' }] });
+    await expect(res.json()).resolves.toMatchObject({
+      data: { outcome: 'failed', summary: { created: 0, invalid: 1 } },
+    });
+    expect(dbMocks.createTag).not.toHaveBeenCalled();
+  });
+});
+
 describe('GET /api/tags/:id/delete-impact', () => {
   beforeEach(() => {
-    for (const fn of Object.values(dbMocks)) fn.mockReset();
+    for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
   });
 
   test('削除前に友だち人数と運用設定の参照を返す', async () => {
@@ -247,7 +384,7 @@ describe('GET /api/tags/:id/delete-impact', () => {
 
 describe('DELETE /api/tags/:id', () => {
   beforeEach(() => {
-    for (const fn of Object.values(dbMocks)) fn.mockReset();
+    for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
   });
 
   test('運用設定から参照中のタグはAPIを直接呼んでも削除しない', async () => {
@@ -317,7 +454,7 @@ describe('DELETE /api/tags/:id', () => {
 
 describe('PATCH /api/tags/reorder', () => {
   beforeEach(() => {
-    for (const fn of Object.values(dbMocks)) fn.mockReset();
+    for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
     dbMocks.updateTag.mockResolvedValue(null);
   });
 
@@ -377,7 +514,7 @@ describe('PATCH /api/tags/:id/mileage', () => {
   };
 
   beforeEach(() => {
-    for (const fn of Object.values(dbMocks)) fn.mockReset();
+    for (const fn of Object.values(dbMocks)) if ('mockReset' in fn) fn.mockReset();
     dbMocks.updateTagMileageSettings.mockResolvedValue(storedTag);
     dbMocks.enqueueHistoricTagMileage.mockResolvedValue(12);
   });

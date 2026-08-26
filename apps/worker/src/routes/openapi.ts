@@ -88,6 +88,44 @@ const spec = {
           canDelete: { type: 'boolean' },
         },
       },
+      TagCsvImportRow: {
+        type: 'object',
+        required: ['line', 'name', 'folderName', 'status'],
+        properties: {
+          line: { type: 'integer', minimum: 1 },
+          name: { type: 'string' },
+          folderName: { type: 'string' },
+          status: {
+            type: 'string',
+            enum: ['ready', 'created', 'skipped', 'invalid', 'failed'],
+          },
+          code: {
+            type: 'string',
+            enum: [
+              'name_required', 'name_too_long', 'already_exists', 'duplicate_in_file',
+              'folder_not_found', 'folder_ambiguous', 'folder_changed', 'create_failed',
+            ],
+          },
+          message: { type: 'string' },
+          tagId: { type: 'string' },
+        },
+      },
+      TagCsvImportData: {
+        type: 'object',
+        required: ['summary', 'rows'],
+        properties: {
+          outcome: { type: 'string', enum: ['success', 'partial', 'failed'] },
+          summary: {
+            type: 'object',
+            required: ['total', 'ready', 'created', 'skipped', 'invalid', 'failed'],
+            properties: Object.fromEntries(
+              ['total', 'ready', 'created', 'skipped', 'invalid', 'failed']
+                .map((key) => [key, { type: 'integer', minimum: 0 }]),
+            ),
+          },
+          rows: { type: 'array', items: { $ref: '#/components/schemas/TagCsvImportRow' } },
+        },
+      },
       Scenario: {
         type: 'object',
         properties: {
@@ -259,6 +297,58 @@ const spec = {
         summary: 'タグ作成',
         requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, color: { type: 'string' } }, required: ['name'] } } } },
         responses: { '201': { description: 'Tag created' } },
+      },
+    },
+    '/api/tags/import/preview': {
+      post: {
+        tags: ['Tags'],
+        summary: 'CSV一括登録の事前確認',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['rows'],
+                properties: {
+                  rows: {
+                    type: 'array',
+                    minItems: 1,
+                    maxItems: 500,
+                    items: {
+                      type: 'object',
+                      required: ['name'],
+                      properties: {
+                        line: { type: 'integer', minimum: 1 },
+                        name: { type: 'string' },
+                        folderName: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: '行ごとの登録可否', content: { 'application/json': { schema: { $ref: '#/components/schemas/TagCsvImportData' } } } },
+          '400': { description: 'Invalid request' },
+          '403': { description: 'Owner or admin role required' },
+          '422': { description: 'Too many rows' },
+        },
+      },
+    },
+    '/api/tags/import': {
+      post: {
+        tags: ['Tags'],
+        summary: 'CSVからタグを一括登録',
+        requestBody: { $ref: '#/paths/~1api~1tags~1import~1preview/post/requestBody' },
+        responses: {
+          '200': { description: '行ごとの登録結果', content: { 'application/json': { schema: { $ref: '#/components/schemas/TagCsvImportData' } } } },
+          '400': { description: 'Invalid request' },
+          '403': { description: 'Owner or admin role required' },
+          '422': { description: 'Too many rows' },
+        },
       },
     },
     '/api/tags/{id}': {
