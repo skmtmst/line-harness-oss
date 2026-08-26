@@ -1,19 +1,36 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import { getFriendById, getLineAccountById } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const richMenus = new Hono<Env>();
 
-/** Resolve LINE access token — uses accountId query param if provided, otherwise default */
-async function resolveLineClient(c: { env: Env['Bindings']; req: { query(key: string): string | undefined } }): Promise<LineClient> {
+class LineAccountRequiredError extends Error {}
+
+/** Resolve LINE access token only after confirming the requested/default account is visible. */
+async function resolveLineClient(c: Context<Env>): Promise<LineClient> {
   const accountId = c.req.query('accountId');
   if (accountId) {
     const account = await getLineAccountById(c.env.DB, accountId);
     if (account) return new LineClient(account.channel_access_token);
+    throw new LineAccountRequiredError('LINE account not found');
+  }
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!scope.canSeeUnassigned) {
+    throw new LineAccountRequiredError('accountId is required');
   }
   return new LineClient(c.env.LINE_CHANNEL_ACCESS_TOKEN);
+}
+
+function richMenuError(c: Context<Env>, prefix: string, err: unknown) {
+  const message = err instanceof Error ? err.message : String(err);
+  if (err instanceof LineAccountRequiredError) {
+    return c.json({ success: false, error: message }, 400);
+  }
+  console.error(`${prefix}:`, message);
+  return c.json({ success: false, error: `${prefix}: ${message}` }, 500);
 }
 
 // GET /api/rich-menus — list all rich menus from LINE API
@@ -23,9 +40,7 @@ richMenus.get('/api/rich-menus', async (c) => {
     const result = await lineClient.getRichMenuList();
     return c.json({ success: true, data: result.richmenus ?? [] });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('GET /api/rich-menus error:', message);
-    return c.json({ success: false, error: `Failed to fetch rich menus: ${message}` }, 500);
+    return richMenuError(c, 'Failed to fetch rich menus', err);
   }
 });
 
@@ -37,9 +52,7 @@ richMenus.post('/api/rich-menus', requireRole('owner', 'admin'), async (c) => {
     const result = await lineClient.createRichMenu(body);
     return c.json({ success: true, data: result }, 201);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('POST /api/rich-menus error:', message);
-    return c.json({ success: false, error: `Failed to create rich menu: ${message}` }, 500);
+    return richMenuError(c, 'Failed to create rich menu', err);
   }
 });
 
@@ -51,9 +64,7 @@ richMenus.delete('/api/rich-menus/:id', requireRole('owner', 'admin'), async (c)
     await lineClient.deleteRichMenu(richMenuId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('DELETE /api/rich-menus/:id error:', message);
-    return c.json({ success: false, error: `Failed to delete rich menu: ${message}` }, 500);
+    return richMenuError(c, 'Failed to delete rich menu', err);
   }
 });
 
@@ -65,9 +76,7 @@ richMenus.post('/api/rich-menus/:id/default', requireRole('owner', 'admin'), asy
     await lineClient.setDefaultRichMenu(richMenuId);
     return c.json({ success: true, data: null });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('POST /api/rich-menus/:id/default error:', message);
-    return c.json({ success: false, error: `Failed to set default rich menu: ${message}` }, 500);
+    return richMenuError(c, 'Failed to set default rich menu', err);
   }
 });
 
@@ -239,8 +248,6 @@ richMenus.post('/api/rich-menus/:id/image', requireRole('owner', 'admin'), async
 
     return c.json({ success: true, data: null });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error('POST /api/rich-menus/:id/image error:', message);
-    return c.json({ success: false, error: `Failed to upload rich menu image: ${message}` }, 500);
+    return richMenuError(c, 'Failed to upload rich menu image', err);
   }
 });

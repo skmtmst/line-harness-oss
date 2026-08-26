@@ -40,6 +40,7 @@ import { safeRedirectTarget } from '../lib/safe-redirect.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { verifyCrossAccountToken } from '../lib/cross-account-token.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 
 // OAuth state base64 helpers. btoa() only accepts Latin-1, so a single
@@ -55,6 +56,17 @@ function decodeState(encoded: string): string {
 }
 
 const liffRoutes = new Hono<Env>();
+
+async function analyticsAccountScope(c: Context<Env>, lineAccountId?: string) {
+  if (lineAccountId) return { where: 'AND f.line_account_id = ?', binds: [lineAccountId] };
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const where = scope.allowedAccountIds.length
+    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    : scope.canSeeUnassigned
+      ? 'AND f.line_account_id IS NULL'
+      : 'AND 1 = 0';
+  return { where, binds: scope.allowedAccountIds };
+}
 
 async function saveFriendAddCandidate(
   db: D1Database,
@@ -1491,8 +1503,7 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
   try {
     const db = c.env.DB;
     const lineAccountId = c.req.query('lineAccountId');
-    const accountFilter = lineAccountId ? 'AND f.line_account_id = ?' : '';
-    const accountBinds = lineAccountId ? [lineAccountId] : [];
+    const accountScope = await analyticsAccountScope(c, lineAccountId);
 
     // friends 起点で集計することで、entry_routes に登録されていない ref
     // (例えば X Harness が発行する UUID ref) も summary に拾えるようにする。
@@ -1510,11 +1521,11 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
         LEFT JOIN entry_routes er ON er.ref_code = f.ref_code
         LEFT JOIN ref_tracking rt ON rt.ref_code = f.ref_code AND rt.friend_id = f.id
         WHERE f.ref_code IS NOT NULL AND f.ref_code != ''
-          ${accountFilter ? `${accountFilter}` : ''}
+          ${accountScope.where}
         GROUP BY f.ref_code, er.name
         ORDER BY friend_count DESC`,
       )
-      .bind(...accountBinds)
+      .bind(...accountScope.binds)
       .all<{
         ref_code: string;
         name: string;
@@ -1523,14 +1534,14 @@ liffRoutes.get('/api/analytics/ref-summary', async (c) => {
         latest_at: string | null;
       }>();
 
-    const totalStmt = lineAccountId
-      ? db.prepare(`SELECT COUNT(*) as count FROM friends WHERE line_account_id = ?`).bind(lineAccountId)
-      : db.prepare(`SELECT COUNT(*) as count FROM friends`);
+    const totalStmt = db
+      .prepare(`SELECT COUNT(*) as count FROM friends f WHERE 1 = 1 ${accountScope.where}`)
+      .bind(...accountScope.binds);
     const totalFriendsRes = await totalStmt.first<{ count: number }>();
 
-    const refStmt = lineAccountId
-      ? db.prepare(`SELECT COUNT(*) as count FROM friends WHERE ref_code IS NOT NULL AND ref_code != '' AND line_account_id = ?`).bind(lineAccountId)
-      : db.prepare(`SELECT COUNT(*) as count FROM friends WHERE ref_code IS NOT NULL AND ref_code != ''`);
+    const refStmt = db
+      .prepare(`SELECT COUNT(*) as count FROM friends f WHERE ref_code IS NOT NULL AND ref_code != '' ${accountScope.where}`)
+      .bind(...accountScope.binds);
     const friendsWithRefRes = await refStmt.first<{ count: number }>();
 
     const totalFriends = totalFriendsRes?.count ?? 0;
@@ -1576,8 +1587,8 @@ liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
       .first<{ ref_code: string; name: string }>();
 
     const lineAccountId = c.req.query('lineAccountId');
-    const accountFilter = lineAccountId ? 'AND f.line_account_id = ?' : '';
-    const binds = lineAccountId ? [refCode, refCode, lineAccountId] : [refCode, refCode];
+    const accountScope = await analyticsAccountScope(c, lineAccountId);
+    const binds = [refCode, refCode, ...accountScope.binds];
 
     const friends = await db
       .prepare(
@@ -1588,7 +1599,7 @@ liffRoutes.get('/api/analytics/ref/:refCode', async (c) => {
           rt.created_at as tracked_at
         FROM friends f
         LEFT JOIN ref_tracking rt ON f.id = rt.friend_id AND rt.ref_code = ?
-        WHERE f.ref_code = ? ${accountFilter}
+        WHERE f.ref_code = ? ${accountScope.where}
         ORDER BY rt.created_at DESC`,
       )
       .bind(...binds)
