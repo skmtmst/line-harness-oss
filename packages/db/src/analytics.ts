@@ -135,6 +135,8 @@ export interface TrackedLinkStat {
   isActive: boolean;
   clicks: number;
   uniqueFriends: number;
+  firstClickedAt: string | null;
+  lastClickedAt: string | null;
 }
 
 /**
@@ -163,7 +165,9 @@ export async function getTrackedLinkStats(
               s.name AS scenario_name,
               l.is_active AS is_active,
               COUNT(c.id) AS clicks,
-              COUNT(DISTINCT c.friend_id) AS unique_friends
+              COUNT(DISTINCT c.friend_id) AS unique_friends,
+              MIN(c.clicked_at) AS first_clicked_at,
+              MAX(c.clicked_at) AS last_clicked_at
          FROM tracked_links l
          LEFT JOIN link_clicks c
                 ON c.tracked_link_id = l.id
@@ -186,6 +190,8 @@ export async function getTrackedLinkStats(
       is_active: number;
       clicks: number;
       unique_friends: number;
+      first_clicked_at: string | null;
+      last_clicked_at: string | null;
     }>();
   return result.results.map((r) => ({
     trackedLinkId: r.tracked_link_id,
@@ -197,6 +203,8 @@ export async function getTrackedLinkStats(
     isActive: r.is_active === 1,
     clicks: Number(r.clicks ?? 0),
     uniqueFriends: Number(r.unique_friends ?? 0),
+    firstClickedAt: r.first_clicked_at,
+    lastClickedAt: r.last_clicked_at,
   }));
 }
 

@@ -9,6 +9,7 @@ import {
   getAnalyticsFriendsOverview,
   getAnalyticsReactionsOverview,
   getAnalyticsRoutesOverview,
+  getAnalyticsUrlClicksOverview,
   getAnalyticsUsageOverview,
   type AnalyticsOverviewContext,
 } from '../src/analytics-overviews.js';
@@ -234,5 +235,117 @@ describe('V6分析の概要4画面', () => {
     expect(templates?.inUse.value).toBe(1);
     expect(mediaVars?.created).toMatchObject({ value: null, state: 'unavailable' });
     expect(result.data).toMatchObject({ state: 'partial', automaticDeletion: false });
+  });
+
+  it('URLクリックは取得開始前の到達人数を0件と断定しない', async () => {
+    sqlite.prepare(
+      `INSERT INTO tracked_links (id, name, original_url, line_account_id, short_code)
+       VALUES ('link-a','申込URL','https://example.com','account-a','apply')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO link_clicks (id, tracked_link_id, friend_id, clicked_at)
+       VALUES ('click-a','link-a','friend-a','2026-08-10T03:00:00.000Z')`,
+    ).run();
+
+    const result = await getAnalyticsUrlClicksOverview(db, CONTEXT);
+    expect(result.data).toMatchObject({ state: 'unavailable' });
+    expect(result.data.links[0]).toMatchObject({
+      clicks: { value: 1, state: 'available' },
+      deliveredPeople: { value: null, state: 'unavailable' },
+      clickRate: { value: null, state: 'unavailable' },
+    });
+  });
+
+  it('URLクリック率は送信後に押した既知の友だちだけを分子にする', async () => {
+    sqlite.prepare(
+      `INSERT INTO analytics_event_coverage (
+         line_account_id, event_type, available_from, state, updated_at
+       ) VALUES ('account-a','url_exposed','2026-07-01T00:00:00.000Z','available','2026-08-30')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO tracked_links (id, name, original_url, line_account_id, short_code)
+       VALUES ('link-a','申込URL','https://example.com','account-a','apply'),
+              ('link-zero','未クリックURL','https://example.com/zero','account-a','zero'),
+              ('link-x','別店舗URL','https://example.com/x','account-b','other')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO analytics_url_exposures (
+         line_account_id, message_id, friend_id, tracked_link_id,
+         source_kind, sent_at, created_at
+       ) VALUES ('account-a','m1','friend-a','link-a','broadcast','2026-08-10T02:00:00.000Z','2026-08-10'),
+                ('account-a','m2','friend-b','link-a','broadcast','2026-08-10T02:00:00.000Z','2026-08-10'),
+                ('account-b','mx','friend-x','link-x','broadcast','2026-08-10T02:00:00.000Z','2026-08-10')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO link_clicks (id, tracked_link_id, friend_id, clicked_at)
+       VALUES ('before','link-a','friend-a','2026-08-10T01:00:00.000Z'),
+              ('after','link-a','friend-a','2026-08-10T03:00:00.000Z'),
+              ('anonymous','link-a',NULL,'2026-08-10T04:00:00.000Z'),
+              ('other-account','link-x','friend-x','2026-08-10T04:00:00.000Z')`,
+    ).run();
+
+    const result = await getAnalyticsUrlClicksOverview(db, CONTEXT);
+    const link = result.data.links.find((item) => item.trackedLinkId === 'link-a');
+    expect(result.data.state).toBe('available');
+    expect(link).toMatchObject({
+      clicks: { value: 3 },
+      knownClickPeople: { value: 1 },
+      deliveredPeople: { value: 2, state: 'available' },
+      clickedAfterExposurePeople: { value: 1 },
+      clickRate: { value: 0.5, state: 'available' },
+      usageLocations: ['broadcast'],
+    });
+    expect(result.data.links.find((item) => item.trackedLinkId === 'link-zero'))
+      .toMatchObject({ clicks: { value: 0 }, deliveredPeople: { value: 0 } });
+    expect(result.data.links.some((item) => item.trackedLinkId === 'link-x')).toBe(false);
+  });
+
+  it('URL露出の取得開始が期間途中なら一部取得と明示する', async () => {
+    sqlite.prepare(
+      `INSERT INTO analytics_event_coverage (
+         line_account_id, event_type, available_from, state, updated_at
+       ) VALUES ('account-a','url_exposed','2026-08-20T00:00:00.000Z','available','2026-08-30')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO tracked_links (id, name, original_url, line_account_id)
+       VALUES ('link-a','申込URL','https://example.com','account-a')`,
+    ).run();
+
+    const result = await getAnalyticsUrlClicksOverview(db, CONTEXT);
+    expect(result.data).toMatchObject({
+      state: 'partial',
+      exposureAvailableFrom: '2026-08-20T00:00:00.000Z',
+    });
+    expect(result.data.links[0]).toMatchObject({
+      deliveredPeople: { value: 0, state: 'partial' },
+      clickRate: { value: null, state: 'partial' },
+    });
+  });
+
+  it('受信者一覧を取れないLINE全員配信は到達0件にしない', async () => {
+    sqlite.prepare(
+      `INSERT INTO analytics_event_coverage (
+         line_account_id, event_type, available_from, state, updated_at
+       ) VALUES ('account-a','url_exposed','2026-07-01T00:00:00.000Z','available','2026-08-30')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO tracked_links (id, name, original_url, line_account_id)
+       VALUES ('link-a','全員向けURL','https://example.com','account-a')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO analytics_url_exposures (
+         line_account_id, message_id, friend_id, tracked_link_id,
+         source_kind, audience_state, sent_at, created_at
+       ) VALUES ('account-a','line-broadcast:b1',NULL,'link-a',
+                 'broadcast_all','unknown','2026-08-10T02:00:00.000Z','2026-08-10')`,
+    ).run();
+
+    const result = await getAnalyticsUrlClicksOverview(db, CONTEXT);
+    expect(result.data.links[0]).toMatchObject({
+      deliveredPeople: { value: null, state: 'unavailable' },
+      clickedAfterExposurePeople: { value: null, state: 'unavailable' },
+      clickRate: { value: null, state: 'unavailable' },
+      usageLocations: ['broadcast_all'],
+    });
   });
 });

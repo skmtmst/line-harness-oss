@@ -24,6 +24,7 @@ import {
   getAnalyticsFriendsOverview,
   getAnalyticsReactionsOverview,
   getAnalyticsRoutesOverview,
+  getAnalyticsUrlClicksOverview,
   getAnalyticsUsageOverview,
   getLineAccountById,
   FUNNEL_STEP_KINDS,
@@ -256,6 +257,27 @@ analytics.get('/api/analytics/routes', async (c) => {
     return c.json({ success: true, data: await getAnalyticsRoutesOverview(c.env.DB, context.value) });
   } catch (error) {
     console.error('GET /api/analytics/routes error:', error);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+analytics.get('/api/analytics/url-clicks', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const context = await overviewContext(c, account.accountId);
+    if (!context.ok) return context.response;
+    const limitRaw = c.req.query('limit');
+    const limit = limitRaw === undefined ? 200 : Number(limitRaw);
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      return c.json({ success: false, error: '表示件数は1〜200で指定してください' }, 400);
+    }
+    return c.json({
+      success: true,
+      data: await getAnalyticsUrlClicksOverview(c.env.DB, context.value, limit),
+    });
+  } catch (error) {
+    console.error('GET /api/analytics/url-clicks error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
