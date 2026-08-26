@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getDailyMessageCounts,
   getLinkClickSummary,
@@ -18,6 +18,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 /**
  * 集計。
@@ -26,6 +27,23 @@ import { requireRole } from '../middleware/role-guard.js';
  * 外部APIも叩かないので、ここが外の障害で落ちることはない。
  */
 const analytics = new Hono<Env>();
+
+async function resolveAccount(c: Context<Env>): Promise<
+  { ok: true; accountId: string } | { ok: false; response: Response }
+> {
+  const accountId = c.req.query('account_id')?.trim();
+  if (!accountId) {
+    return {
+      ok: false,
+      response: c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400),
+    };
+  }
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!scope.allowedAccountIds.includes(accountId)) {
+    return { ok: false, response: c.json({ success: false, error: 'Not found' }, 404) };
+  }
+  return { ok: true, accountId };
+}
 
 /**
  * 期間を読む。
@@ -72,9 +90,11 @@ function serializeFunnel(f: Funnel) {
 // GET /api/analytics/messages — 日ごとの送受信数
 analytics.get('/api/analytics/messages', async (c) => {
   try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
     const range = readRange(c);
     if (!range.ok) return c.json({ success: false, error: range.error }, 400);
-    const items = await getDailyMessageCounts(c.env.DB, range.value);
+    const items = await getDailyMessageCounts(c.env.DB, account.accountId, range.value);
     return c.json({ success: true, data: items });
   } catch (err) {
     console.error('GET /api/analytics/messages error:', err);
@@ -86,9 +106,11 @@ analytics.get('/api/analytics/messages', async (c) => {
 // link-clicks と違い、1回も押されていないURLも返す。
 analytics.get('/api/analytics/tracked-links', async (c) => {
   try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
     const range = readRange(c);
     if (!range.ok) return c.json({ success: false, error: range.error }, 400);
-    const items = await getTrackedLinkStats(c.env.DB, range.value);
+    const items = await getTrackedLinkStats(c.env.DB, account.accountId, range.value);
     return c.json({ success: true, data: items });
   } catch (err) {
     console.error('GET /api/analytics/tracked-links error:', err);
@@ -99,9 +121,11 @@ analytics.get('/api/analytics/tracked-links', async (c) => {
 // GET /api/analytics/link-clicks — リンクごとのクリック
 analytics.get('/api/analytics/link-clicks', async (c) => {
   try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
     const range = readRange(c);
     if (!range.ok) return c.json({ success: false, error: range.error }, 400);
-    const items = await getLinkClickSummary(c.env.DB, range.value);
+    const items = await getLinkClickSummary(c.env.DB, account.accountId, range.value);
     return c.json({ success: true, data: items });
   } catch (err) {
     console.error('GET /api/analytics/link-clicks error:', err);
@@ -112,9 +136,11 @@ analytics.get('/api/analytics/link-clicks', async (c) => {
 // GET /api/analytics/broadcasts — 配信ごとの成績
 analytics.get('/api/analytics/broadcasts', async (c) => {
   try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
     const range = readRange(c);
     if (!range.ok) return c.json({ success: false, error: range.error }, 400);
-    const items = await getBroadcastSummary(c.env.DB, range.value);
+    const items = await getBroadcastSummary(c.env.DB, account.accountId, range.value);
     return c.json({ success: true, data: items });
   } catch (err) {
     console.error('GET /api/analytics/broadcasts error:', err);
@@ -125,9 +151,11 @@ analytics.get('/api/analytics/broadcasts', async (c) => {
 // GET /api/analytics/cross?fieldId=... — タグ × 情報欄の値
 analytics.get('/api/analytics/cross', async (c) => {
   try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
     const fieldId = c.req.query('fieldId');
     if (!fieldId) return c.json({ success: false, error: 'fieldId が必要です' }, 400);
-    const cells = await getTagFieldCross(c.env.DB, fieldId);
+    const cells = await getTagFieldCross(c.env.DB, account.accountId, fieldId);
     return c.json({ success: true, data: cells });
   } catch (err) {
     console.error('GET /api/analytics/cross error:', err);
@@ -139,7 +167,9 @@ analytics.get('/api/analytics/cross', async (c) => {
 
 analytics.get('/api/funnels', async (c) => {
   try {
-    const items = await getFunnels(c.env.DB);
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const items = await getFunnels(c.env.DB, account.accountId);
     return c.json({ success: true, data: items.map(serializeFunnel) });
   } catch (err) {
     console.error('GET /api/funnels error:', err);
@@ -149,6 +179,8 @@ analytics.get('/api/funnels', async (c) => {
 
 analytics.post('/api/funnels', requireRole('owner', 'admin'), async (c) => {
   try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
     const body = await c.req.json<{
       name?: unknown;
       windowDays?: unknown;
@@ -181,7 +213,12 @@ analytics.post('/api/funnels', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: '期間は1〜365日で指定してください' }, 422);
     }
 
-    const funnel = await createFunnel(c.env.DB, { name, windowDays, steps });
+    const funnel = await createFunnel(c.env.DB, {
+      lineAccountId: account.accountId,
+      name,
+      windowDays,
+      steps,
+    });
     return c.json({ success: true, data: serializeFunnel(funnel) }, 201);
   } catch (err) {
     console.error('POST /api/funnels error:', err);
@@ -191,7 +228,9 @@ analytics.post('/api/funnels', requireRole('owner', 'admin'), async (c) => {
 
 analytics.delete('/api/funnels/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    await deleteFunnel(c.env.DB, c.req.param('id'));
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    await deleteFunnel(c.env.DB, account.accountId, c.req.param('id'));
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/funnels/:id error:', err);
@@ -202,7 +241,9 @@ analytics.delete('/api/funnels/:id', requireRole('owner', 'admin'), async (c) =>
 // GET /api/funnels/:id/result — 段ごとの到達人数
 analytics.get('/api/funnels/:id/result', async (c) => {
   try {
-    const funnel = await getFunnelById(c.env.DB, c.req.param('id'));
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const funnel = await getFunnelById(c.env.DB, account.accountId, c.req.param('id'));
     if (!funnel) return c.json({ success: false, error: 'Not found' }, 404);
 
     const range = readRange(c);
@@ -217,6 +258,7 @@ analytics.get('/api/funnels/:id/result', async (c) => {
       const reached = await countFunnelStep(c.env.DB, step, {
         from: range.value.from,
         to: range.value.to,
+        lineAccountId: account.accountId,
         friendIds: scope,
       });
       reachedPerStep.push(reached);

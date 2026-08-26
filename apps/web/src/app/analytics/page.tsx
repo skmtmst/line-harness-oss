@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { FriendField } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -8,6 +8,7 @@ import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import { useAccount } from '@/contexts/account-context'
 
 const TABS = [
   { key: 'messages', label: '送信数' },
@@ -87,7 +88,7 @@ function weekdayOf(date: string): string {
   return WEEKDAY_JP[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]
 }
 
-function MessagesTab() {
+function MessagesTab({ accountId }: { accountId: string }) {
   const [days, setDays] = useState(28)
   const [rows, setRows] = useState<
     Array<{
@@ -113,24 +114,26 @@ function MessagesTab() {
   >([])
   const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    let active = true
     setLoading(true)
+    setRows([])
+    setBroadcasts([])
     const range = rangeFor(days)
-    try {
-      const [msg, bc] = await Promise.all([
-        api.analytics.messages(range),
-        api.analytics.broadcasts(range),
-      ])
+    void Promise.all([
+      api.analytics.messages(accountId, range),
+      api.analytics.broadcasts(accountId, range),
+    ]).then(([msg, bc]) => {
+      if (!active) return
       if (msg.success) setRows(msg.data)
       if (bc.success) setBroadcasts(bc.data)
-    } finally {
-      setLoading(false)
+    }).finally(() => {
+      if (active) setLoading(false)
+    })
+    return () => {
+      active = false
     }
-  }, [days])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  }, [accountId, days])
 
   const totals = useMemo(
     () =>
@@ -344,7 +347,7 @@ function MessagesTab() {
 
 type ClickFilter = 'all' | 'active' | 'zero'
 
-function ClicksTab() {
+function ClicksTab({ accountId }: { accountId: string }) {
   const [days, setDays] = useState(28)
   const [rows, setRows] = useState<
     Array<{
@@ -365,15 +368,22 @@ function ClicksTab() {
   const [picked, setPicked] = useState<string | null>(null)
 
   useEffect(() => {
+    let active = true
     setLoading(true)
     setPicked(null)
+    setRows([])
     void api.analytics
-      .trackedLinks(rangeFor(days))
+      .trackedLinks(accountId, rangeFor(days))
       .then((res) => {
-        if (res.success) setRows(res.data)
+        if (active && res.success) setRows(res.data)
       })
-      .finally(() => setLoading(false))
-  }, [days])
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [accountId, days])
 
   const counts = useMemo(
     () => ({
@@ -615,7 +625,7 @@ function ClicksTab() {
   )
 }
 
-function CrossTab() {
+function CrossTab({ accountId }: { accountId: string }) {
   const [fields, setFields] = useState<FriendField[]>([])
   const [fieldId, setFieldId] = useState('')
   const [cells, setCells] = useState<Array<{ row: string; col: string; count: number }>>([])
@@ -633,15 +643,22 @@ function CrossTab() {
 
   useEffect(() => {
     if (!fieldId) return
+    let active = true
     setLoading(true)
     setPicked(null)
+    setCells([])
     void api.analytics
-      .cross(fieldId)
+      .cross(accountId, fieldId)
       .then((res) => {
-        if (res.success) setCells(res.data)
+        if (active && res.success) setCells(res.data)
       })
-      .finally(() => setLoading(false))
-  }, [fieldId])
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [accountId, fieldId])
 
   const rows = useMemo(() => [...new Set(cells.map((c) => c.row))], [cells])
   const cols = useMemo(() => [...new Set(cells.map((c) => c.col))], [cells])
@@ -928,7 +945,7 @@ function CrossTab() {
   )
 }
 
-function FunnelTab() {
+function FunnelTab({ accountId }: { accountId: string }) {
   const [funnels, setFunnels] = useState<
     Array<{ id: string; name: string; windowDays: number; createdAt: string }>
   >([])
@@ -944,24 +961,40 @@ function FunnelTab() {
   const [picked, setPicked] = useState<number | null>(null)
 
   useEffect(() => {
+    let active = true
+    setLoading(true)
+    setFunnels([])
+    setSelected('')
+    setResult(null)
+    setPicked(null)
     void api.funnels
-      .list()
+      .list(accountId)
       .then((res) => {
-        if (res.success) {
+        if (active && res.success) {
           setFunnels(res.data)
           if (res.data.length > 0) setSelected(res.data[0].id)
         }
       })
-      .finally(() => setLoading(false))
-  }, [])
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [accountId])
 
   useEffect(() => {
     if (!selected) return
+    let active = true
     setPicked(null)
-    void api.funnels.result(selected).then((res) => {
-      if (res.success) setResult(res.data.steps)
+    setResult(null)
+    void api.funnels.result(accountId, selected).then((res) => {
+      if (active && res.success) setResult(res.data.steps)
     })
-  }, [selected])
+    return () => {
+      active = false
+    }
+  }, [accountId, selected])
 
   // いちばん落ちる段。人数の差ではなく、落ちた割合で選ぶ。母数の大きい段が
   // いつも1位になってしまうため。
@@ -1009,10 +1042,11 @@ function FunnelTab() {
 
       {creating ? (
         <FunnelForm
+          accountId={accountId}
           onCancel={() => setCreating(false)}
           onCreated={(id) => {
             setCreating(false)
-            void api.funnels.list().then((res) => {
+            void api.funnels.list(accountId).then((res) => {
               if (res.success) setFunnels(res.data)
             })
             setSelected(id)
@@ -1243,9 +1277,11 @@ function FunnelTab() {
  * 入れてもらう。番号を振らせると、抜けや重複を毎回確かめることになる。
  */
 function FunnelForm({
+  accountId,
   onCancel,
   onCreated,
 }: {
+  accountId: string
   onCancel: () => void
   onCreated: (id: string) => void
 }) {
@@ -1287,7 +1323,7 @@ function FunnelForm({
     setSaving(true)
     setError('')
     try {
-      const res = await api.funnels.create({
+      const res = await api.funnels.create(accountId, {
         name: name.trim(),
         steps: steps.map((s) => ({
           label: s.label.trim(),
@@ -1421,6 +1457,13 @@ function FunnelForm({
 
 function AnalyticsInner() {
   const tab = useMergedTab(TABS)
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  if (accountLoading) {
+    return <div className="text-ink-faint p-8 text-center text-sm">分析を読み込んでいます</div>
+  }
+  if (!selectedAccountId) {
+    return <div className="text-ink-faint p-8 text-center text-sm">LINE公式アカウントを選んでください</div>
+  }
   return (
     <div>
       <div data-design="Head">
@@ -1452,10 +1495,10 @@ function AnalyticsInner() {
         />
       </div>
       <MergedTabs basePath="/analytics" tabs={TABS} active={tab} />
-      {tab === 'messages' && <MessagesTab />}
-      {tab === 'clicks' && <ClicksTab />}
-      {tab === 'cross' && <CrossTab />}
-      {tab === 'funnel' && <FunnelTab />}
+      {tab === 'messages' && <MessagesTab accountId={selectedAccountId} />}
+      {tab === 'clicks' && <ClicksTab accountId={selectedAccountId} />}
+      {tab === 'cross' && <CrossTab accountId={selectedAccountId} />}
+      {tab === 'funnel' && <FunnelTab accountId={selectedAccountId} />}
       {/* 表示名をGoogle Analyticsに統一した既存検索分析は /search-console にある。 */}
       {tab === 'search' && (
         <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
