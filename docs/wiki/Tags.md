@@ -140,6 +140,11 @@ curl -s "https://your-worker.your-subdomain.workers.dev/api/tags" \
   -H "Authorization: Bearer YOUR_API_KEY" | jq
 ```
 
+管理画面では `?withCounts=1` を付けると、付与人数・使用先に加えて
+`cleanupReasons` が返ります。`unused` は友だちへの付与と18種類の運用設定への
+参照がどちらも0件、`duplicate_name` は全角・空白・大文字小文字をそろえると
+同じ名前になるタグです。両方に当てはまっても、タグID単位では1件として数えます。
+
 レスポンス:
 
 ```json

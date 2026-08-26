@@ -48,7 +48,10 @@ describe('タグの使用先集計', () => {
              ('nen-tag-member-line-linked', 'LINEログイン連携済み', 'account-1', 3),
              ('nen-tag-member-ec-linked', 'EC顧客連携済み', 'account-1', 4),
              ('nen-tag-purchase-first', '初回購入', 'account-1', 5),
-             ('nen-tag-pet-birthday-this-month', '誕生日が今月', 'account-1', 6);
+             ('nen-tag-pet-birthday-this-month', '誕生日が今月', 'account-1', 6),
+             ('tag-reminder-only', 'リマインダ専用', 'account-1', 7),
+             ('tag-duplicate-wide', 'ＶＩＰ　顧客', 'account-1', 8),
+             ('tag-duplicate-lower', 'vip 顧客', 'account-1', 9);
 
       INSERT INTO friends (id, line_user_id, line_account_id)
       VALUES ('friend-1', 'U1', 'account-1'), ('friend-2', 'U2', 'account-1');
@@ -99,6 +102,8 @@ describe('タグの使用先集計', () => {
         (id, name, original_url, tag_id, created_at, updated_at)
       VALUES ('link-1', '申込リンク', 'https://example.com', 'tag-main',
               datetime('now'), datetime('now'));
+      INSERT INTO reminders (id, name, target_tag_id)
+      VALUES ('reminder-only', '前日の案内', 'tag-reminder-only');
 
       INSERT INTO automation_definitions
         (id, line_account_id, name, status)
@@ -142,6 +147,7 @@ describe('タグの使用先集計', () => {
     expect(rows.find((row) => row.id === 'tag-main-extra')).toMatchObject({
       used_in_broadcasts: 1,
       used_in_forms: 0,
+      cleanup_reasons: [],
     });
   });
 
@@ -155,7 +161,24 @@ describe('タグの使用先集計', () => {
       used_in_auto_replies: 0,
       used_in_saved_searches: 0,
       other_action_count: 0,
+      cleanup_reasons: ['unused'],
     });
+  });
+
+  it('友だち0人でも運用設定に使うタグは未使用にしない', async () => {
+    const rows = await getTagsWithUsage(db);
+    expect(rows.find((row) => row.id === 'tag-reminder-only')).toMatchObject({
+      friend_count: 0,
+      cleanup_reasons: [],
+    });
+  });
+
+  it('全角・空白・大文字小文字だけ違う名前を重複候補にする', async () => {
+    const rows = await getTagsWithUsage(db);
+    expect(rows.find((row) => row.id === 'tag-duplicate-wide')?.cleanup_reasons)
+      .toEqual(['unused', 'duplicate_name']);
+    expect(rows.find((row) => row.id === 'tag-duplicate-lower')?.cleanup_reasons)
+      .toEqual(['unused', 'duplicate_name']);
   });
 
   it('システム管理タグだけは実装上の付与元を返す', async () => {
