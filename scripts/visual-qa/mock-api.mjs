@@ -77,6 +77,9 @@ const ARRAY_PATHS = [
   '/api/line-accounts',
 ]
 
+/** 前方一致で配列を返す口（`/api/scenarios/…` のように後ろが変わるもの）。 */
+const ARRAY_PREFIXES = ['/api/scenarios', '/api/rich-menus', '/api/templates', '/api/media/', '/api/common-vars/']
+
 /** 機能のオン／オフ。全部オンにして、どの画面も出るようにする。 */
 const FEATURE_KEYS = [
   'scenarios', 'broadcasts', 'templates', 'reminders', 'auto_replies',
@@ -135,6 +138,9 @@ function bodyFor(pathname) {
   if (ARRAY_PATHS.some((p) => pathname === p)) {
     return { success: true, data: [] }
   }
+  if (ARRAY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))) {
+    return { success: true, data: [] }
+  }
   return { success: true, data: EMPTY_PAGE }
 }
 
@@ -176,6 +182,23 @@ const server = createServer((req, res) => {
     return
   }
   res.writeHead(200).end(JSON.stringify(bodyFor(url.pathname)))
+})
+
+/*
+ * 落ちないようにする。
+ *
+ * 画像比較は24件を並べて走らせるので、途中で1回でも落ちると、そこから先の
+ * 画面が全部ログインへ飛ぶ。そして「ログイン画面を撮って通過」になる。
+ * 実際に一度そうなった（2026-08-26）。
+ */
+server.on('clientError', (_error, socket) => {
+  if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n')
+})
+server.on('error', (error) => {
+  console.error('[visual-qa] サーバーの取りこぼし:', error.message)
+})
+process.on('uncaughtException', (error) => {
+  console.error('[visual-qa] 落ちずに続ける:', error.message)
 })
 
 server.listen(PORT, HOST, () => {
