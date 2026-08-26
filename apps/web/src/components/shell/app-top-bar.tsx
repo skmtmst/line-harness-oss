@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
 import { useAccount } from '@/contexts/account-context'
@@ -30,8 +30,14 @@ export function defaultTitleForPath(pathname: string): string {
   return ''
 }
 
+/**
+ * 権限の呼び名。**`owner` は「統括」**。
+ *
+ * 「オーナー」ではない。V6 の設計（Pencil `cBSCb`）が「統括」で、
+ * 画面にもともと浮いていた「統括」ボタンは、この印へ畳んだ。
+ */
 const ROLE_LABELS: Record<string, string> = {
-  owner: 'オーナー',
+  owner: '統括',
   admin: '管理者',
   viewer: '閲覧のみ',
   staff: 'スタッフ',
@@ -40,7 +46,8 @@ const ROLE_LABELS: Record<string, string> = {
 export default function AppTopBar() {
   const pathname = usePathname() ?? '/'
   const { title, } = usePageChrome()
-  const { accounts, selectedAccountId, setSelectedAccountId } = useAccount()
+  const router = useRouter()
+  const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId } = useAccount()
   const [staffName, setStaffName] = useState('')
   const [staffRole, setStaffRole] = useState('')
 
@@ -60,6 +67,19 @@ export default function AppTopBar() {
     () => accounts.map((a) => ({ id: a.id, label: a.displayName || a.name })),
     [accounts],
   )
+
+  /**
+   * 統括の印を押したら、店舗の一覧へ戻る。
+   *
+   * 2026-08-26 まで、本文の右上に「統括」ボタンが浮いていた（`HqReturnButton`）。
+   * バーの印と同じ言葉が2つ並ぶので、印のほうへ畳んだ。統括以外は押せない。
+   * すでに統括の画面にいるときも押せない。
+   */
+  const canReturnToHq = staffRole === 'owner' && !pathname.startsWith('/hq')
+  const returnToHq = () => {
+    clearSelectedAccountId()
+    router.push('/hq')
+  }
 
   const logout = async () => {
     try {
@@ -97,6 +117,7 @@ export default function AppTopBar() {
       selectedAccountId={selectedAccountId ?? ''}
       onAccountChange={setSelectedAccountId}
       roleLabel={ROLE_LABELS[staffRole] ?? ''}
+      onRoleClick={canReturnToHq ? returnToHq : undefined}
       userName={staffName}
       onLogout={logout}
     />

@@ -29,7 +29,7 @@ describe('共通部品の影響範囲', () => {
       'app/tags/page.tsx',
       'app/templates/page.tsx',
       'components/automations/common-action-editor.tsx',
-      'components/hq-return-button.tsx',
+      'components/friend-fields/tags-page-v4.tsx',
       'components/hq/account-list.tsx',
       'components/store-selection-gate.tsx',
     ])
@@ -48,6 +48,7 @@ describe('共通部品の影響範囲', () => {
       'app/reminders/page.tsx',
       'app/tags/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
+      'components/friend-fields/tags-page-v4.tsx',
     ])
   })
 

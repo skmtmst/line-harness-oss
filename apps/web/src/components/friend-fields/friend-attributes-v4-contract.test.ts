@@ -28,10 +28,15 @@ describe('友だち属性 V4 contract', () => {
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
     expect(source).toMatch(/\[20,\s*30,\s*40,\s*50\]/)
-    expect(source).toContain('前へ')
-    expect(source).toContain('次へ')
+    // 2026-08-26: ページ送りは共通部品 `Pagination`（設計 `Blot6`）へ寄せた。
+    // 自前で組むと、高さ38・角丸・現在ページの緑がほかの一覧とずれる。
+    expect(source).toContain('<Pagination')
+    expect(source).not.toContain("'前へ'")
     expect(source).toContain('CSVで一括登録')
-    expect(source).toContain('並び替えを終了')
+    // 2026-08-26: 「並び替え」ボタンは設計に無い。つまみを常に出して、
+    // いつでも並び替えられるようにした（docs/v6-shell-contract.md の 4-1 基準）。
+    expect(source).not.toContain('並び替えを終了')
+    expect(source).toContain('ドラッグして並び替え')
     expect(source).not.toContain('min-w-[1180px]')
   })
 

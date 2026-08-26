@@ -18,6 +18,7 @@
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
 import { createServer } from 'node:http'
+import { LIST_STATS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -70,8 +71,6 @@ const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
 const ARRAY_PATHS = [
   '/api/chats',
   '/api/operators',
-  '/api/tags',
-  '/api/tag-groups',
   '/api/folders',
   '/api/staff',
   '/api/feature-settings',
@@ -122,6 +121,11 @@ function bodyFor(pathname) {
   if (pathname === '/api/line-accounts') {
     return { success: true, data: [ACCOUNT] }
   }
+  // 設計と画像で比べるための中身。空の表しか描けないと、
+  // 「空の状態」だけを見て一致したと言えてしまう。
+  if (pathname === '/api/tags') return { success: true, data: TAGS }
+  if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
+  if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
   if (/^\/api\/accounts\/[^/]+\/health$/.test(pathname)) {
     return { success: true, data: { status: 'ok', checks: [] } }
   }
