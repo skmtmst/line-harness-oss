@@ -64,6 +64,14 @@ function insertFriend(
   }
 }
 
+function insertAccount(id: string): void {
+  sqlite.prepare(
+    `INSERT INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret)
+     VALUES (?, ?, ?, 'token', 'secret')`,
+  ).run(id, `channel-${id}`, id);
+}
+
 beforeEach(() => {
   sqlite = new Database(':memory:');
   sqlite.exec(readFileSync(join(PKG_ROOT, 'bootstrap.sql'), 'utf8'));
@@ -153,13 +161,9 @@ describe('友だち数の推移', () => {
     expect(trend.every((d) => d.estimated)).toBe(true);
   });
 
-  test('統括ごとの表示では全社合計の日次記録を使わず、その統括だけを逆算する', async () => {
+  test('2つのアカウントを記録し、自分の統括の実測値だけを返す', async () => {
     for (const id of ['account-own', 'account-other']) {
-      sqlite.prepare(
-        `INSERT INTO line_accounts
-          (id, channel_id, name, channel_access_token, channel_secret)
-         VALUES (?, ?, ?, 'token', 'secret')`,
-      ).run(id, `channel-${id}`, id);
+      insertAccount(id);
     }
     insertFriend('own', { lineAccountId: 'account-own' });
     insertFriend('other', { lineAccountId: 'account-other' });
@@ -171,8 +175,51 @@ describe('友だち数の推移', () => {
     });
     const today = trend.find((d) => d.date === jstDate(0));
 
-    expect(today?.estimated).toBe(true);
+    expect(today?.estimated).toBe(false);
     expect(today?.active).toBe(1);
+  });
+
+  test('未割り当ては旧合計行と別に記録し、既定統括に1回だけ数える', async () => {
+    insertAccount('account-own');
+    insertFriend('own', { lineAccountId: 'account-own' });
+    insertFriend('unassigned');
+    await recordFriendSnapshot(db, null);
+
+    const snapshotKeys = sqlite.prepare(
+      'SELECT line_account_id FROM friend_daily_snapshots ORDER BY line_account_id',
+    ).all() as Array<{ line_account_id: string }>;
+    expect(snapshotKeys.map((row) => row.line_account_id)).toEqual([
+      '__unassigned__',
+      'account-own',
+    ]);
+
+    const { trend } = await getDashboardOverview(db, 'today', {
+      allowedAccountIds: ['account-own'],
+      includeUnassigned: true,
+    });
+    expect(trend.find((d) => d.date === jstDate(0))).toMatchObject({
+      active: 2,
+      estimated: false,
+    });
+  });
+
+  test('過去の空文字の全社合計行はどの範囲でも読まない', async () => {
+    insertAccount('account-own');
+    insertFriend('own', { lineAccountId: 'account-own' });
+    await recordFriendSnapshot(db, null);
+    sqlite.prepare(
+      `INSERT INTO friend_daily_snapshots
+        (date, line_account_id, active, total, blocked_by_them, hidden_by_us, added, blocked)
+       VALUES (?, '', 99, 99, 0, 0, 99, 0)`,
+    ).run(jstDate(0));
+
+    for (const scope of [
+      { allTenants: true } as const,
+      { allowedAccountIds: ['account-own'], includeUnassigned: false },
+    ]) {
+      const { trend } = await getDashboardOverview(db, 'today', scope);
+      expect(trend.find((d) => d.date === jstDate(0))?.active).toBe(1);
+    }
   });
 
   test('記録のある日と無い日が混ざる', async () => {
