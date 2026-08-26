@@ -192,12 +192,17 @@ export async function setFriendSupportMarkBulk(
   markId: string | null,
 ): Promise<number> {
   if (friendIds.length === 0) return 0;
-  const placeholders = friendIds.map(() => '?').join(',');
-  const result = await db
-    .prepare(`UPDATE friends SET support_mark_id = ? WHERE id IN (${placeholders})`)
-    .bind(markId, ...friendIds)
-    .run();
-  return result.meta?.changes ?? 0;
+  let changes = 0;
+  for (let offset = 0; offset < friendIds.length; offset += 90) {
+    const chunk = friendIds.slice(offset, offset + 90);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await db
+      .prepare(`UPDATE friends SET support_mark_id = ? WHERE id IN (${placeholders})`)
+      .bind(markId, ...chunk)
+      .run();
+    changes += result.meta?.changes ?? 0;
+  }
+  return changes;
 }
 
 /**

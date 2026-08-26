@@ -54,13 +54,21 @@ async function findTrackedLinkIds(
   keys: string[],
 ): Promise<string[]> {
   if (keys.length === 0) return [];
-  const placeholders = keys.map(() => '?').join(',');
-  const rows = await db.prepare(
-    `SELECT id FROM tracked_links
-      WHERE line_account_id = ?
-        AND (short_code IN (${placeholders}) OR (short_code IS NULL AND id IN (${placeholders})))`,
-  ).bind(lineAccountId, ...keys, ...keys).all<{ id: string }>();
-  return rows.results.map((row) => row.id);
+  const ids = new Set<string>();
+  for (let offset = 0; offset < keys.length; offset += 90) {
+    const chunk = keys.slice(offset, offset + 90);
+    const placeholders = chunk.map(() => '?').join(',');
+    const byShortCode = await db.prepare(
+      `SELECT id FROM tracked_links
+        WHERE line_account_id = ? AND short_code IN (${placeholders})`,
+    ).bind(lineAccountId, ...chunk).all<{ id: string }>();
+    const byId = await db.prepare(
+      `SELECT id FROM tracked_links
+        WHERE line_account_id = ? AND short_code IS NULL AND id IN (${placeholders})`,
+    ).bind(lineAccountId, ...chunk).all<{ id: string }>();
+    for (const row of [...byShortCode.results, ...byId.results]) ids.add(row.id);
+  }
+  return [...ids];
 }
 
 function sourceOf(message: QueuedMessage): { kind: string; id: string | null } {

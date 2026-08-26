@@ -578,9 +578,12 @@ export async function getAnalyticsUrlClicksOverview(
     sourceKinds: string[];
   }>();
   if (stats.length > 0) {
-    const placeholders = stats.map(() => '?').join(',');
-    const rows = await db.prepare(
-      `SELECT e.tracked_link_id,
+    for (let offset = 0; offset < stats.length; offset += 90) {
+      const chunk = stats.slice(offset, offset + 90);
+      const placeholders = chunk.map(() => '?').join(',');
+      const rows = await db
+        .prepare(
+          `SELECT e.tracked_link_id,
               COUNT(*) AS messages,
               COUNT(DISTINCT e.friend_id) AS delivered_people,
               COUNT(DISTINCT CASE WHEN e.friend_id IS NOT NULL AND EXISTS (
@@ -601,33 +604,36 @@ export async function getAnalyticsUrlClicksOverview(
           AND julianday(e.sent_at) < julianday(?)
           AND e.tracked_link_id IN (${placeholders})
         GROUP BY e.tracked_link_id`,
-    ).bind(
-      context.from,
-      context.toExclusive,
-      context.lineAccountId,
-      context.from,
-      context.toExclusive,
-      ...stats.map((item) => item.trackedLinkId),
-    ).all<{
-      tracked_link_id: string;
-      messages: number;
-      delivered_people: number;
-      clicked_people: number;
-      unknown_audiences: number;
-      first_sent_at: string | null;
-      last_sent_at: string | null;
-      source_kinds: string | null;
-    }>();
-    for (const row of rows.results) {
-      exposureByLink.set(row.tracked_link_id, {
-        messages: Number(row.messages ?? 0),
-        deliveredPeople: Number(row.delivered_people ?? 0),
-        clickedPeople: Number(row.clicked_people ?? 0),
-        unknownAudiences: Number(row.unknown_audiences ?? 0),
-        firstSentAt: row.first_sent_at,
-        lastSentAt: row.last_sent_at,
-        sourceKinds: row.source_kinds?.split(',').filter(Boolean) ?? [],
-      });
+        )
+        .bind(
+          context.from,
+          context.toExclusive,
+          context.lineAccountId,
+          context.from,
+          context.toExclusive,
+          ...chunk.map((item) => item.trackedLinkId),
+        )
+        .all<{
+          tracked_link_id: string;
+          messages: number;
+          delivered_people: number;
+          clicked_people: number;
+          unknown_audiences: number;
+          first_sent_at: string | null;
+          last_sent_at: string | null;
+          source_kinds: string | null;
+        }>();
+      for (const row of rows.results) {
+        exposureByLink.set(row.tracked_link_id, {
+          messages: Number(row.messages ?? 0),
+          deliveredPeople: Number(row.delivered_people ?? 0),
+          clickedPeople: Number(row.clicked_people ?? 0),
+          unknownAudiences: Number(row.unknown_audiences ?? 0),
+          firstSentAt: row.first_sent_at,
+          lastSentAt: row.last_sent_at,
+          sourceKinds: row.source_kinds?.split(',').filter(Boolean) ?? [],
+        });
+      }
     }
   }
 
