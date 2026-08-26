@@ -44,7 +44,7 @@ export interface Friend {
    *   resolved     対応済み (デフォルト. chats 行がない friend もここ)
    * 一覧 API の chat-status hydration が有効なときのみ付与.
    */
-  chatStatus?: 'unread' | 'in_progress' | 'resolved';
+  chatStatus?: 'unread' | 'in_progress' | 'on_hold' | 'resolved';
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */
@@ -1027,8 +1027,9 @@ export interface Chat {
   id: string;
   friendId: string;
   operatorId: string | null;
-  status: "unread" | "in_progress" | "resolved";
+  status: "unread" | "in_progress" | "on_hold" | "resolved";
   notes: string | null;
+  revision: number;
   lastMessageAt: string | null;
   createdAt: string;
   updatedAt: string;

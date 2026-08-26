@@ -88,10 +88,10 @@
     "unresolved-classname": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 125,
+    "arbitrary-value": 121,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
-    "direct-secondary-button": 3
+    "direct-secondary-button": 2
   },
   "app/contents/page.tsx": {
     "direct-secondary-button": 5,

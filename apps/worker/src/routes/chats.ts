@@ -15,6 +15,13 @@ import {
   getLineAccountById,
   updateChat,
   markInboxConversationRead,
+  getSavedSearches,
+  getSavedSearchById,
+  createSavedSearch,
+  updateSavedSearch,
+  deleteSavedSearch,
+  validateInboxSavedViewConditions,
+  type SavedSearch,
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -25,7 +32,14 @@ import {
   isValidIdempotencyKey,
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  inboxEventStatement,
+  inboxNoteStatement,
+  isInboxStatus,
+  acquireInboxReplyLease,
+  releaseInboxReplyLease,
+} from '../services/inbox-events.js';
 
 const chats = new Hono<Env>();
 
@@ -91,7 +105,21 @@ type ChatLike = {
   last_message_at: string | null;
   created_at: string;
   updated_at: string;
+  revision: number;
 };
+
+function serializeInboxSavedView(row: SavedSearch) {
+  return {
+    id: row.id,
+    name: row.name,
+    scope: row.scope,
+    conditions: JSON.parse(row.conditions_json) as unknown,
+    createdBy: row.created_by,
+    isShared: Boolean(row.is_shared),
+    displayOrder: row.display_order,
+    createdAt: row.created_at,
+  };
+}
 
 // id は chats.id もしくは friend.id のどちらか。friend.id のときは chats 行を遅延作成する。
 // push / broadcast / scenario 配信だけを受けた友だちもチャット画面に現れるため、ここで lazy create が必要。
@@ -241,6 +269,11 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     const status = c.req.query('status') ?? undefined;
     const operatorId = c.req.query('operatorId') ?? undefined;
     const lineAccountId = c.req.query('lineAccountId') ?? undefined;
+    const query = (c.req.query('q') ?? '').trim().slice(0, 200);
+    const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
+    if (lineAccountId && !visibleScope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: '受信箱が見つかりません' }, 404);
+    }
     const unansweredOnly =
       c.req.query('unansweredOnly') === 'true' || c.req.query('unansweredOnly') === '1';
 
@@ -272,9 +305,24 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     //   - content は text のみ先頭 200 文字まで切り詰めて返す (flex/image など raw JSON を
     //     返すと broadcast 後の rows で multi-MB レスポンスになる)。
     //   - lineAccountId 指定時は messages_log スキャンを対象アカの friend に絞る。
-    const accountFilterSql = lineAccountId
-      ? `friend_id IN (SELECT id FROM friends WHERE line_account_id = ?)`
-      : `1=1`;
+    const accountFilterBindings: string[] = [];
+    let accountFilterSql: string;
+    if (lineAccountId) {
+      accountFilterSql = `friend_id IN (SELECT id FROM friends WHERE line_account_id = ?)`;
+      accountFilterBindings.push(lineAccountId);
+    } else {
+      const accountClauses: string[] = [];
+      if (visibleScope.allowedAccountIds.length > 0) {
+        accountClauses.push(
+          `line_account_id IN (${visibleScope.allowedAccountIds.map(() => '?').join(', ')})`,
+        );
+        accountFilterBindings.push(...visibleScope.allowedAccountIds);
+      }
+      if (visibleScope.canSeeUnassigned) accountClauses.push('line_account_id IS NULL');
+      accountFilterSql = accountClauses.length > 0
+        ? `friend_id IN (SELECT id FROM friends WHERE ${accountClauses.join(' OR ')})`
+        : '0=1';
+    }
 
     // unansweredOnly は取得後に unansweredMap と突合して絞るため全件必要。
     // SQLite は LIMIT に負値を渡すと「無制限」になる (documented 挙動)。
@@ -305,6 +353,18 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     if (lineAccountId) {
       conditions.push('f.line_account_id = ?');
       conditionBindings.push(lineAccountId);
+    }
+    if (query) {
+      conditions.push(`(
+        f.display_name LIKE ? OR EXISTS (
+          SELECT 1 FROM messages_log mq
+          WHERE mq.friend_id = f.id
+            AND (mq.delivery_type IS NULL OR mq.delivery_type != 'test')
+            AND mq.content LIKE ?
+        )
+      )`);
+      const like = `%${query}%`;
+      conditionBindings.push(like, like);
     }
     // status / operator filter は chats を参照するので、その時だけ page CTE 側でも
     // chats を lookup する (無条件時は 全friend × chats lookup を省く)。
@@ -393,6 +453,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
         f.line_account_id,
         c.operator_id,
         COALESCE(c.status, 'resolved') AS status,
+        COALESCE(c.revision, 0) AS revision,
         c.notes,
         COALESCE(rm.preview_at, d.last_message_at) AS last_message_at,
         rm.content AS last_message_content,
@@ -423,7 +484,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
     // page 条件 → cursor (beforeAt ×2 + beforeId) → LIMIT。
     // any_agg は page で friend が確定済みのため account filter 不要。
     const allBindings: unknown[] = [];
-    if (lineAccountId) allBindings.push(lineAccountId, lineAccountId);
+    allBindings.push(...accountFilterBindings, ...accountFilterBindings);
     allBindings.push(...conditionBindings);
     if (useCursor) allBindings.push(beforeAt, beforeAt, beforeId);
     allBindings.push(limit, staff.id);
@@ -436,6 +497,7 @@ chats.get('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
       friendPictureUrl: ch.picture_url || null,
       operatorId: ch.operator_id,
       status: ch.status,
+      revision: Number(ch.revision ?? 0),
       notes: ch.notes,
       lastMessageAt: ch.last_message_at,
       lastMessageContent: ch.last_message_content || null,
@@ -492,7 +554,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
       const existing = await c.env.DB
         .prepare(`SELECT * FROM chats WHERE friend_id = ? ORDER BY created_at DESC LIMIT 1`)
         .bind(friendRow.id)
-        .first<{ id: string; friend_id: string; operator_id: string | null; status: string; notes: string | null; last_message_at: string | null; created_at: string; updated_at: string }>();
+        .first<{ id: string; friend_id: string; operator_id: string | null; status: string; notes: string | null; last_message_at: string | null; created_at: string; updated_at: string; revision: number }>();
       if (existing) {
         chatRow = existing as Awaited<ReturnType<typeof getChatById>>;
       }
@@ -504,6 +566,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
     const operatorId = chatRow?.operator_id ?? null;
     const status = chatRow?.status ?? 'resolved';
     const notes = chatRow?.notes ?? null;
+    const revision = chatRow?.revision ?? 0;
     const lastMessageAt = chatRow?.last_message_at ?? null;
     const createdAt = chatRow?.created_at ?? null;
 
@@ -542,6 +605,7 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
         operatorId,
         status,
         notes,
+        revision,
         lastMessageAt,
         createdAt,
         messages: (messages.results as Record<string, unknown>[]).map((m) => ({
@@ -596,26 +660,158 @@ chats.post('/api/chats/:id/read', requireRole('owner', 'admin', 'staff'), requir
 chats.post('/api/chats/read-all', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const now = jstNow();
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const clauses: string[] = [];
+    const accountBindings: string[] = [];
+    if (scope.allowedAccountIds.length > 0) {
+      clauses.push(`f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(', ')})`);
+      accountBindings.push(...scope.allowedAccountIds);
+    }
+    if (scope.canSeeUnassigned) clauses.push('f.line_account_id IS NULL');
+    if (clauses.length === 0) return c.json({ success: true, data: { marked: true } });
     await c.env.DB
       .prepare(
         `INSERT INTO inbox_staff_reads
            (staff_id, channel, conversation_id, last_read_at, updated_at)
-         SELECT ?, 'line', friend_id, MAX(created_at), ?
-         FROM messages_log
-         WHERE direction = 'incoming'
-           AND (delivery_type IS NULL OR delivery_type != 'test')
-         GROUP BY friend_id
+         SELECT ?, 'line', m.friend_id, MAX(m.created_at), ?
+         FROM messages_log m
+         INNER JOIN friends f ON f.id = m.friend_id
+         WHERE m.direction = 'incoming'
+           AND (m.delivery_type IS NULL OR m.delivery_type != 'test')
+           AND (${clauses.join(' OR ')})
+         GROUP BY m.friend_id
          ON CONFLICT(staff_id, channel, conversation_id) DO UPDATE SET
            last_read_at = excluded.last_read_at,
            updated_at = excluded.updated_at`,
       )
-      .bind(c.get('staff').id, now)
+      .bind(c.get('staff').id, now, ...accountBindings)
       .run();
     return c.json({ success: true, data: { marked: true } });
   } catch (err) {
     console.error('POST /api/chats/read-all error:', err);
     return c.json({ success: false, error: '既読状態を更新できませんでした' }, 500);
   }
+});
+
+chats.get(
+  '/api/chats/:id/events',
+  requireRole('owner', 'admin', 'staff'),
+  requireVisibleChat,
+  async (c) => {
+    const resolved = await resolveOrCreateChat(c.env.DB, c.req.param('id'));
+    if (!resolved) return c.json({ success: false, error: 'Chat not found' }, 404);
+    const rows = await c.env.DB.prepare(
+      `SELECT id, event_type, before_json, after_json, actor_staff_id,
+              (SELECT name FROM staff_members sm WHERE sm.id = e.actor_staff_id) AS actor_staff_name,
+              reason, correlation_id, created_at
+       FROM inbox_conversation_events e
+       WHERE channel = 'line' AND conversation_id = ?
+       ORDER BY created_at DESC, id DESC LIMIT 200`,
+    ).bind(resolved.friend_id).all<Record<string, unknown>>();
+    return c.json({
+      success: true,
+      data: rows.results.map((row) => ({
+        id: row.id,
+        eventType: row.event_type,
+        before: row.before_json ? JSON.parse(String(row.before_json)) : null,
+        after: row.after_json ? JSON.parse(String(row.after_json)) : null,
+        actorStaffId: row.actor_staff_id,
+        actorStaffName: row.actor_staff_name,
+        reason: row.reason,
+        correlationId: row.correlation_id,
+        createdAt: row.created_at,
+      })),
+    });
+  },
+);
+
+chats.get('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const staff = c.get('staff');
+  const rows = await getSavedSearches(c.env.DB, 'chats');
+  return c.json({
+    success: true,
+    data: rows
+      .filter((row) => Boolean(row.is_shared) || row.created_by === staff.id)
+      .map(serializeInboxSavedView),
+  });
+});
+
+chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const staff = c.get('staff');
+  const body: Record<string, unknown> = await c.req
+    .json<Record<string, unknown>>()
+    .catch((): Record<string, unknown> => ({}));
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
+  if (name.length > 40) return c.json({ success: false, error: '名前は40文字以内で入力してください' }, 400);
+  const conditions = validateInboxSavedViewConditions(body.conditions);
+  if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
+  const isShared = body.isShared === true;
+  if (isShared && staff.role === 'staff') {
+    return c.json({ success: false, error: '共有の検索を作る権限がありません' }, 403);
+  }
+  const rows = await getSavedSearches(c.env.DB, 'chats');
+  if (rows.filter((row) => row.created_by === staff.id).length >= 50) {
+    return c.json({ success: false, error: '保存できる検索は50件までです' }, 422);
+  }
+  if (rows.some((row) => row.created_by === staff.id && row.name === name)) {
+    return c.json({ success: false, error: '同じ名前の保存検索があります' }, 409);
+  }
+  const saved = await createSavedSearch(c.env.DB, {
+    name,
+    scope: 'chats',
+    conditions: conditions.value,
+    createdBy: staff.id,
+    isShared,
+  });
+  return c.json({ success: true, data: serializeInboxSavedView(saved) }, 201);
+});
+
+chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const staff = c.get('staff');
+  const existing = await getSavedSearchById(c.env.DB, c.req.param('id'));
+  if (!existing || existing.scope !== 'chats') {
+    return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
+  }
+  if (existing.created_by !== staff.id && staff.role === 'staff') {
+    return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
+  }
+  const body: Record<string, unknown> = await c.req
+    .json<Record<string, unknown>>()
+    .catch((): Record<string, unknown> => ({}));
+  const patch: Parameters<typeof updateSavedSearch>[2] = {};
+  if (body.name !== undefined) {
+    const name = String(body.name).trim();
+    if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
+    if (name.length > 40) return c.json({ success: false, error: '名前は40文字以内で入力してください' }, 400);
+    const rows = await getSavedSearches(c.env.DB, 'chats');
+    if (rows.some((row) => row.id !== existing.id && row.created_by === existing.created_by && row.name === name)) {
+      return c.json({ success: false, error: '同じ名前の保存検索があります' }, 409);
+    }
+    patch.name = name;
+  }
+  if (body.conditions !== undefined) {
+    const conditions = validateInboxSavedViewConditions(body.conditions);
+    if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
+    patch.conditions = conditions.value;
+  }
+  if (body.isShared !== undefined) {
+    if (staff.role === 'staff') return c.json({ success: false, error: '共有設定を変える権限がありません' }, 403);
+    patch.isShared = body.isShared === true;
+  }
+  const saved = await updateSavedSearch(c.env.DB, existing.id, patch);
+  return c.json({ success: true, data: serializeInboxSavedView(saved!) });
+});
+
+chats.delete('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const staff = c.get('staff');
+  const existing = await getSavedSearchById(c.env.DB, c.req.param('id'));
+  if (!existing || existing.scope !== 'chats'
+      || (existing.created_by !== staff.id && staff.role === 'staff')) {
+    return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
+  }
+  await deleteSavedSearch(c.env.DB, existing.id);
+  return c.json({ success: true, data: null });
 });
 
 chats.post('/api/chats', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -646,14 +842,114 @@ chats.put('/api/chats/:id', requireRole('owner', 'admin', 'staff'), requireVisib
     const id = c.req.param('id');
     const resolved = await resolveOrCreateChat(c.env.DB, id);
     if (!resolved) return c.json({ success: false, error: 'Not found' }, 404);
-    const body = await c.req.json<{ operatorId?: string | null; status?: string; notes?: string }>();
-    await updateChat(c.env.DB, resolved.id, body);
+    const body = await c.req.json<{
+      operatorId?: string | null;
+      status?: string;
+      notes?: string;
+      revision?: number;
+      reason?: string;
+    }>();
+    if (body.status !== undefined && !isInboxStatus(body.status)) {
+      return c.json({ success: false, error: '対応状態が正しくありません' }, 400);
+    }
+    if (body.notes !== undefined && body.notes.length > 10_000) {
+      return c.json({ success: false, error: '内部メモは10,000文字以内で入力してください' }, 400);
+    }
+    if (body.operatorId) {
+      const operator = await getOperatorById(c.env.DB, body.operatorId);
+      if (!operator || !operator.is_active) {
+        return c.json({ success: false, error: '担当者が見つかりません' }, 400);
+      }
+    }
+
+    const expectedRevision = body.revision ?? resolved.revision;
+    if (expectedRevision !== resolved.revision) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が先に更新しました。最新の内容を確認してください',
+        code: 'REVISION_CONFLICT',
+        data: { revision: resolved.revision },
+      }, 409);
+    }
+
+    const sets: string[] = [];
+    const bindings: unknown[] = [];
+    const events: D1PreparedStatement[] = [];
+    const now = jstNow();
+    const correlationId = crypto.randomUUID();
+    const eventGuard = {
+      table: 'chats' as const,
+      id: resolved.id,
+      revision: expectedRevision + 1,
+      updatedAt: now,
+    };
+    if (body.operatorId !== undefined && body.operatorId !== resolved.operator_id) {
+      sets.push('operator_id = ?');
+      bindings.push(body.operatorId);
+      events.push(inboxEventStatement(c.env.DB, {
+        channel: 'line', conversationId: resolved.friend_id, eventType: 'assignment',
+        before: { operatorId: resolved.operator_id }, after: { operatorId: body.operatorId },
+        actorStaffId: c.get('staff').id, reason: body.reason, correlationId, createdAt: now,
+        guard: eventGuard,
+      }));
+    }
+    if (body.status !== undefined && body.status !== resolved.status) {
+      sets.push('status = ?');
+      bindings.push(body.status);
+      events.push(inboxEventStatement(c.env.DB, {
+        channel: 'line', conversationId: resolved.friend_id, eventType: 'status',
+        before: { status: resolved.status }, after: { status: body.status },
+        actorStaffId: c.get('staff').id, reason: body.reason, correlationId, createdAt: now,
+        guard: eventGuard,
+      }));
+    }
+    if (body.notes !== undefined && body.notes !== (resolved.notes ?? '')) {
+      const notes = body.notes.trim();
+      sets.push('notes = ?');
+      bindings.push(notes || null);
+      events.push(inboxEventStatement(c.env.DB, {
+        channel: 'line', conversationId: resolved.friend_id, eventType: 'note',
+        before: { hasNote: Boolean(resolved.notes) }, after: { hasNote: Boolean(notes) },
+        actorStaffId: c.get('staff').id, reason: body.reason, correlationId, createdAt: now,
+        guard: eventGuard,
+      }));
+      if (notes) {
+        events.push(inboxNoteStatement(c.env.DB, {
+          channel: 'line', conversationId: resolved.friend_id, body: notes,
+          actorStaffId: c.get('staff').id, createdAt: now, guard: eventGuard,
+        }));
+      }
+    }
+    if (sets.length > 0) {
+      sets.push('revision = revision + 1', 'updated_at = ?');
+      bindings.push(now, resolved.id, expectedRevision);
+      const [updateResult] = await c.env.DB.batch([
+        c.env.DB.prepare(
+          `UPDATE chats SET ${sets.join(', ')} WHERE id = ? AND revision = ?`,
+        ).bind(...bindings),
+        ...events,
+      ]);
+      if ((updateResult.meta?.changes ?? 0) !== 1) {
+        return c.json({
+          success: false,
+          error: 'ほかの担当者が先に更新しました。最新の内容を確認してください',
+          code: 'REVISION_CONFLICT',
+        }, 409);
+      }
+    }
     const updated = await getChatById(c.env.DB, resolved.id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
       // 公開 ID は friend_id に統一
-      data: { id: updated.friend_id, friendId: updated.friend_id, operatorId: updated.operator_id, status: updated.status, notes: updated.notes },
+      data: {
+        id: updated.friend_id,
+        friendId: updated.friend_id,
+        operatorId: updated.operator_id,
+        status: updated.status,
+        notes: updated.notes,
+        revision: updated.revision,
+      },
     });
   } catch (err) {
     console.error('PUT /api/chats/:id error:', err);
@@ -700,6 +996,7 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), req
 
 // オペレーターからメッセージ送信
 chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requireVisibleChat, async (c) => {
+  let leasedConversationId: string | null = null;
   try {
     const chatId = c.req.param('id');
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
@@ -709,8 +1006,16 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const chat = await resolveOrCreateChat(c.env.DB, chatId);
     if (!chat) return c.json({ success: false, error: 'Chat not found' }, 404);
 
-    const body = await c.req.json<{ messageType?: string; content: string }>();
+    const body = await c.req.json<{ messageType?: string; content: string; revision?: number }>();
     if (!body.content) return c.json({ success: false, error: 'content is required' }, 400);
+    if (body.revision !== undefined && body.revision !== chat.revision) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が先に更新しました。最新の会話を確認してください',
+        code: 'REVISION_CONFLICT',
+        data: { revision: chat.revision },
+      }, 409);
+    }
 
     const { friend, accessToken } = await resolveFriendAndAccessToken(
       c.env.DB,
@@ -726,6 +1031,25 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     )) {
       return c.json({ success: false, error: 'Chat not found' }, 404);
     }
+
+    const leaseNow = new Date();
+    const lease = await acquireInboxReplyLease(c.env.DB, {
+      channel: 'line',
+      conversationId: friend.id,
+      staffId: c.get('staff').id,
+      conversationRevision: chat.revision,
+      now: leaseNow.toISOString(),
+      expiresAt: new Date(leaseNow.getTime() + 60_000).toISOString(),
+    });
+    if (!lease.acquired) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が返信中です。送信せず、少し待って最新の会話を確認してください',
+        code: 'REPLY_LEASE_CONFLICT',
+        data: { staffId: lease.staffId, expiresAt: lease.expiresAt },
+      }, 409);
+    }
+    leasedConversationId = friend.id;
 
     // LINE APIでメッセージ送信
     const { LineClient } = await import('@line-crm/line-sdk');
@@ -748,6 +1072,10 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
         previewImageUrl: parsed.previewImageUrl,
       };
     } else {
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+      });
+      leasedConversationId = null;
       return c.json({ success: false, error: 'messageType is not supported' }, 400);
     }
 
@@ -763,18 +1091,25 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       now: new Date().toISOString(),
     });
     if (reservation.kind === 'conflict') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
       return c.json({ success: false, error: '同じ送信キーを別の内容には使用できません' }, 409);
     }
     if (reservation.kind === 'in_progress') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
       return c.json({ success: false, error: '同じメッセージを送信中です' }, 409);
     }
     if (reservation.kind === 'replay') {
+      await releaseInboxReplyLease(c.env.DB, { channel: 'line', conversationId: friend.id, staffId: c.get('staff').id });
+      leasedConversationId = null;
       return c.json({
         success: true,
         data: {
           sent: true,
           messageId: reservation.responseId,
           sentByStaffName: c.get('staff').name,
+          revision: chat.revision,
           replayed: true,
         },
       });
@@ -789,8 +1124,19 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
     const sentAt = jstNow();
     await c.env.DB.batch([
       c.env.DB
-        .prepare(`INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, source, sent_by_staff_id, created_at) VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?)`)
-        .bind(logId, friend.id, messageType, body.content, c.get('staff').id, sentAt),
+        .prepare(`INSERT OR IGNORE INTO messages_log
+          (id, friend_id, direction, message_type, content, source, line_account_id,
+           sent_by_staff_id, created_at)
+          VALUES (?, ?, 'outgoing', ?, ?, 'manual', ?, ?, ?)`)
+        .bind(
+          logId,
+          friend.id,
+          messageType,
+          body.content,
+          friend.line_account_id ?? null,
+          c.get('staff').id,
+          sentAt,
+        ),
       completeOutboundSendStatement(c.env.DB, {
         key: idempotencyKey,
         responseId: logId,
@@ -800,6 +1146,17 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
 
     // チャットの最終メッセージ日時を更新（chat.id を直接使う — friend_id で呼ばれても resolveOrCreateChat 済み）
     await updateChat(c.env.DB, chat.id, { status: 'in_progress', lastMessageAt: sentAt });
+    const updatedChat = await getChatById(c.env.DB, chat.id);
+    await inboxEventStatement(c.env.DB, {
+      channel: 'line',
+      conversationId: friend.id,
+      eventType: 'send',
+      before: null,
+      after: { messageId: logId, status: 'in_progress', source: 'manual' },
+      actorStaffId: c.get('staff').id,
+      correlationId: idempotencyKey,
+      createdAt: sentAt,
+    }).run();
 
     // 初回返信の時刻を残す（107）。
     //
@@ -820,11 +1177,26 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       console.error('first_replied_at update error:', e);
     }
 
+    await releaseInboxReplyLease(c.env.DB, {
+      channel: 'line', conversationId: friend.id, staffId: c.get('staff').id,
+    });
+    leasedConversationId = null;
+
     return c.json({
       success: true,
-      data: { sent: true, messageId: logId, sentByStaffName: c.get('staff').name },
+      data: {
+        sent: true,
+        messageId: logId,
+        sentByStaffName: c.get('staff').name,
+        revision: updatedChat?.revision ?? chat.revision + 1,
+      },
     });
   } catch (err) {
+    if (leasedConversationId) {
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'line', conversationId: leasedConversationId, staffId: c.get('staff').id,
+      }).catch(() => undefined);
+    }
     console.error('POST /api/chats/:id/send error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }

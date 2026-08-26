@@ -18,6 +18,10 @@ export interface ChatRow {
   status: string;
   notes: string | null;
   last_message_at: string | null;
+  revision?: number;
+  last_customer_message_at?: string | null;
+  last_operator_message_at?: string | null;
+  next_response_due_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -125,6 +129,11 @@ export async function updateChat(
   if (updates.notes !== undefined) { sets.push('notes = ?'); values.push(updates.notes); }
   if (updates.lastMessageAt !== undefined) { sets.push('last_message_at = ?'); values.push(updates.lastMessageAt); }
   if (sets.length === 0) return;
+  sets.push('revision = revision + 1');
+  if (updates.status === 'in_progress' && updates.lastMessageAt !== undefined) {
+    sets.push('last_operator_message_at = ?');
+    values.push(updates.lastMessageAt);
+  }
   sets.push('updated_at = ?');
   values.push(jstNow());
   values.push(id);
@@ -138,7 +147,7 @@ export async function upsertChatOnMessage(db: D1Database, friendId: string): Pro
   // 受信時の更新 (resolved→unread, last_message_at) を適用する。挿入直後の自行にも
   // 適用されるが no-op 相当なので害はない。
   const chat = (await getChatByFriendId(db, friendId)) ?? (await createChat(db, { friendId }));
-  const newStatus = chat.status === 'resolved' ? 'unread' : chat.status;
+  const newStatus = chat.status === 'resolved' || chat.status === 'on_hold' ? 'unread' : chat.status;
   await updateChat(db, chat.id, { status: newStatus, lastMessageAt: now });
 
   // 受信の時刻を残し、初回返信の時計を巻き直す（107）。
@@ -150,8 +159,12 @@ export async function upsertChatOnMessage(db: D1Database, friendId: string): Pro
   // 更新に失敗しても受信そのものは成立しているので、握りつぶさず投げる。
   // ここが落ちるのは列が無いときで、それは配布の抜けなので気づきたい。
   await db
-    .prepare(`UPDATE chats SET last_incoming_at = ?, first_replied_at = NULL WHERE id = ?`)
-    .bind(now, chat.id)
+    .prepare(
+      `UPDATE chats
+       SET last_incoming_at = ?, last_customer_message_at = ?, first_replied_at = NULL
+       WHERE id = ?`,
+    )
+    .bind(now, now, chat.id)
     .run();
 
   return (await getChatById(db, chat.id))!;

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
-import { api, fetchApi } from '@/lib/api'
+import { api, ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -18,6 +18,7 @@ import { Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
+import Button from '@/components/shared/button'
 
 interface Chat {
   id: string
@@ -25,7 +26,8 @@ interface Chat {
   friendName: string
   friendPictureUrl: string | null
   operatorId: string | null
-  status: 'unread' | 'in_progress' | 'resolved'
+  status: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
+  revision: number
   notes: string | null
   lastMessageAt: string | null
   lastMessageContent: string | null
@@ -56,7 +58,7 @@ interface ChatDetail extends Chat {
   messages?: ChatMessage[]
 }
 
-type StatusFilter = 'all' | 'unread' | 'in_progress' | 'resolved'
+type StatusFilter = 'all' | 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 
 /** 受信箱に混ぜるメールの1件（/api/support/inbox の email ぶん）。 */
 interface EmailInboxItem {
@@ -67,7 +69,8 @@ interface EmailInboxItem {
   customerIdentifier?: string
   subject: string
   preview: string
-  status: 'unread' | 'in_progress' | 'resolved'
+  status: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
+  revision: number
   assignedStaffId?: string | null
   assignedStaffName?: string | null
   lastIncomingAt: string
@@ -77,6 +80,7 @@ interface EmailInboxItem {
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
   unread: { label: '未対応', className: 'bg-danger-bg text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
+  on_hold: { label: '保留', className: 'bg-info-bg text-info' },
   resolved: { label: '対応済', className: 'bg-success-bg text-success' },
 }
 
@@ -84,8 +88,30 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'all', label: '全て' },
   { key: 'unread', label: '未対応' },
   { key: 'in_progress', label: '対応中' },
+  { key: 'on_hold', label: '保留' },
   { key: 'resolved', label: '対応済' },
 ]
+
+type InboxSavedViewConditions = {
+  version: 1
+  query: string
+  channels: Array<'line' | 'email'>
+  statuses: Array<'unread' | 'in_progress' | 'on_hold' | 'resolved'>
+  assignees: string[]
+  unread: 'all' | 'mine'
+  messageTypes: string[]
+  receivedFrom: string | null
+  receivedTo: string | null
+  sort: 'newest' | 'waiting_desc'
+}
+
+type InboxSavedView = {
+  id: string
+  name: string
+  conditions: InboxSavedViewConditions
+  createdBy: string | null
+  isShared: boolean
+}
 
 function ChannelBadge({ channel }: { channel: 'line' | 'email' }) {
   return channel === 'line' ? (
@@ -359,6 +385,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
+  const [debouncedNameQuery, setDebouncedNameQuery] = useState('')
+  const [savedViews, setSavedViews] = useState<InboxSavedView[]>([])
+  const [savedViewsOpen, setSavedViewsOpen] = useState(false)
+  const [savedViewName, setSavedViewName] = useState('')
+  const [savedViewError, setSavedViewError] = useState('')
+  const [savingView, setSavingView] = useState(false)
   // 担当の選択肢（設計 `TalkPane` の「担当」）。
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
   /*
@@ -447,32 +479,44 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // (offset 方式だと新着で行が押し下げられた分が欠落する)。
   const nextCursorRef = useRef<{ at: string; id: string } | null>(null)
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedNameQuery(nameQuery.trim()), 250)
+    return () => window.clearTimeout(timer)
+  }, [nameQuery])
+
   const buildListParams = useCallback((cursor: { at: string; id: string } | null) => {
     const params: {
-      status?: string; accountId?: string;
+      status?: string; accountId?: string; q?: string;
       limit?: number; beforeAt?: string; beforeId?: string;
     } = {}
     if (statusFilter !== 'all') params.status = statusFilter
     if (selectedAccountId) params.accountId = selectedAccountId
+    if (debouncedNameQuery) params.q = debouncedNameQuery
     params.limit = CHAT_PAGE_SIZE
     if (cursor) {
       params.beforeAt = cursor.at
       params.beforeId = cursor.id
     }
     return params
-  }, [statusFilter, selectedAccountId])
+  }, [statusFilter, selectedAccountId, debouncedNameQuery])
 
   /** メールの問い合わせを取る。LINEと同じ一覧に混ぜるため。 */
   const loadEmails = useCallback(async () => {
     try {
       const res = await fetchApi<{ success: boolean; data: { items: EmailInboxItem[] } }>(
-        '/api/support/inbox?channel=email&status=all&limit=200',
+        `/api/support/inbox?${new URLSearchParams({
+          channel: 'email',
+          status: statusFilter,
+          limit: '200',
+          ...(debouncedNameQuery ? { q: debouncedNameQuery } : {}),
+          ...(selectedAccountId ? { lineAccountId: selectedAccountId } : {}),
+        })}`,
       )
       if (res.success) setEmailItems(res.data.items)
     } catch {
       // メールが出ないだけ。LINEのトークは使える。
     }
-  }, [])
+  }, [statusFilter, debouncedNameQuery, selectedAccountId])
 
   useEffect(() => {
     void loadEmails()
@@ -550,6 +594,76 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       if (saved === 'enter' || saved === 'shift-enter') setSendMode(saved)
     } catch { /* localStorage unavailable */ }
   }, [])
+
+  const loadSavedViews = useCallback(async () => {
+    try {
+      const response = await api.chats.savedViews.list()
+      if (response.success) setSavedViews(response.data as unknown as InboxSavedView[])
+    } catch {
+      setSavedViewError('保存した検索を読み込めませんでした')
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadSavedViews()
+  }, [loadSavedViews])
+
+  const currentSavedViewConditions = (): InboxSavedViewConditions => ({
+    version: 1,
+    query: nameQuery.trim(),
+    channels: channel === 'all' ? ['line', 'email'] : [channel],
+    statuses: statusFilter === 'all'
+      ? ['unread', 'in_progress', 'on_hold', 'resolved']
+      : [statusFilter],
+    assignees: assigneeFilter === 'all' ? [] : [assigneeFilter],
+    unread: 'all',
+    messageTypes: [],
+    receivedFrom: null,
+    receivedTo: null,
+    sort: 'newest',
+  })
+
+  const createSavedView = async () => {
+    if (savingView) return
+    const name = savedViewName.trim()
+    if (!name) {
+      setSavedViewError('名前を入力してください')
+      return
+    }
+    setSavingView(true)
+    setSavedViewError('')
+    try {
+      const response = await api.chats.savedViews.create({
+        name,
+        conditions: currentSavedViewConditions(),
+      })
+      if (!response.success) {
+        setSavedViewError(response.error || '保存できませんでした')
+        return
+      }
+      setSavedViewName('')
+      await loadSavedViews()
+    } catch (savedViewCreateError) {
+      setSavedViewError(
+        savedViewCreateError instanceof Error
+          ? savedViewCreateError.message
+          : '保存できませんでした',
+      )
+    } finally {
+      setSavingView(false)
+    }
+  }
+
+  const applySavedView = (view: InboxSavedView) => {
+    const conditions = view.conditions
+    setNameQuery(conditions.query ?? '')
+    setStatusFilter(conditions.statuses.length === 1 ? conditions.statuses[0] : 'all')
+    setAssigneeFilter(conditions.assignees.length === 1 ? conditions.assignees[0] : 'all')
+    setQuickFilter('all')
+    const nextChannel = conditions.channels.length === 1 ? conditions.channels[0] : 'all'
+    router.push(nextChannel === 'all' ? '/chats' : `/chats?channel=${nextChannel}`)
+    setSavedViewsOpen(false)
+  }
   useEffect(() => {
     try { localStorage.setItem('chat.sendMode', sendMode) } catch { /* ignore */ }
   }, [sendMode])
@@ -643,6 +757,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         operatorId: chatDetail.operatorId ?? null,
         status: chatDetail.status,
         notes: chatDetail.notes ?? null,
+        revision: chatDetail.revision,
         lastMessageAt: chatDetail.lastMessageAt ?? lastMsg?.createdAt ?? null,
         lastMessageContent: chatDetail.lastMessageContent ?? lastMsg?.content ?? null,
         lastMessageDirection: chatDetail.lastMessageDirection ?? lastMsg?.direction ?? null,
@@ -722,6 +837,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setSending(true)
     try {
       const now = new Date().toISOString()
+      let currentRevision = chatDetail?.revision
       // --- Image send path (runs first when image is present) ---
       if (pendingImage && pendingImage.mode === 'line-image') {
         const imgPayload = JSON.stringify({
@@ -730,9 +846,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         })
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'image', content: imgPayload })
         const sendResult = await api.chats.send(sendingChatId,
-          { messageType: 'image', content: imgPayload },
+          { messageType: 'image', content: imgPayload, revision: currentRevision },
           sendKeysRef.current.get(signature),
         )
+        if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         setPendingImage(null)
         // Optimistic update for image
@@ -740,6 +857,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           ...prev,
           lastMessageAt: now,
           status: 'in_progress',
+          revision: sendResult.success ? sendResult.data.revision : prev.revision,
           messages: [
             ...(prev.messages ?? []),
             {
@@ -779,9 +897,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         const content = messageContent.trim()
         const signature = JSON.stringify({ chatId: sendingChatId, messageType: 'text', content })
         const sendResult = await api.chats.send(sendingChatId,
-          { content },
+          { content, revision: currentRevision },
           sendKeysRef.current.get(signature),
         )
+        if (sendResult.success) currentRevision = sendResult.data.revision
         sendKeysRef.current.clear(signature)
         setMessageContent('')
         // Optimistic update: append message locally instead of refetching (prevents scroll jump / full reload feel)
@@ -790,6 +909,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           ...prev,
           lastMessageAt: now,
           status: 'in_progress',
+          revision: sendResult.success ? sendResult.data.revision : prev.revision,
           messages: [
             ...(prev.messages ?? []),
             {
@@ -830,8 +950,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
       }
       // 手動返信で未対応が 1 件減るので、サイドバーのバッジを即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
-    } catch {
-      setError('メッセージの送信に失敗しました。')
+    } catch (sendError) {
+      setError(
+        sendError instanceof ApiError && sendError.status === 409
+          ? 'ほかの担当者による更新または返信を確認しました。送信せず、会話を読み直してください。'
+          : 'メッセージの送信に失敗しました。',
+      )
     } finally {
       setSending(false)
       sendLockRef.current = false
@@ -840,9 +964,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   /** 担当を付け替える（設計 `TalkPane` の「担当」）。 */
   const handleOperatorUpdate = async (operatorId: string | null) => {
-    if (!selectedChatId) return
+    if (!selectedChatId || !chatDetail) return
     try {
-      await api.chats.update(selectedChatId, { operatorId })
+      await api.chats.update(selectedChatId, { operatorId, revision: chatDetail.revision })
       loadChatDetail(selectedChatId)
       loadChats()
     } catch {
@@ -868,9 +992,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }, [])
 
   const handleStatusUpdate = async (newStatus: Chat['status']) => {
-    if (!selectedChatId) return
+    if (!selectedChatId || !chatDetail) return
     try {
-      await api.chats.update(selectedChatId, { status: newStatus })
+      await api.chats.update(selectedChatId, { status: newStatus, revision: chatDetail.revision })
       loadChatDetail(selectedChatId)
       loadChats()
       // 対応済/未読の切替は未対応バッジに影響するので即時更新させる
@@ -886,10 +1010,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setMemoError('')
     try {
       const notes = memoDraft.trim() || null
-      const response = await api.chats.update(selectedChatId, { notes })
+      const response = await api.chats.update(selectedChatId, {
+        notes,
+        revision: chatDetail?.revision,
+      })
       if (!response.success) throw new Error(response.error || '内部メモを保存できませんでした')
       setChatDetail((current) => current && current.id === selectedChatId
-        ? { ...current, notes }
+        ? { ...current, notes, revision: response.data.revision }
         : current)
       setChats((current) => current.map((chat) => chat.id === selectedChatId
         ? { ...chat, notes }
@@ -965,15 +1092,6 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCounts[filter.key]}</span>
           </button>
         ))}
-        <button
-          type="button"
-          disabled
-          title="お気に入り機能は準備中です"
-          aria-label="お気に入り（準備中）"
-          className="border-[#E5E7EB] text-[#667085] rounded-full border bg-canvas px-3 py-1.5 text-xs disabled:cursor-not-allowed"
-        >
-          ☆
-        </button>
         <details className="relative ml-auto">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]">
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
@@ -988,9 +1106,76 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           </div>
         </details>
-        <button type="button" disabled title="保存した検索は準備中です" className="rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] disabled:cursor-not-allowed">
-          保存した検索
-        </button>
+        <div className="relative">
+          <Button
+            type="button"
+            onClick={() => {
+              setSavedViewsOpen((open) => !open)
+              setSavedViewError('')
+            }}
+            aria-expanded={savedViewsOpen}
+          >
+            保存した検索
+          </Button>
+          {savedViewsOpen && (
+            <div className="border-hairline absolute top-full right-0 z-40 mt-1.5 w-80 rounded-xl border bg-canvas p-4 shadow-xl">
+              <p className="text-ink text-sm font-bold">保存した検索</p>
+              <div className="mt-3 space-y-1">
+                {savedViews.length === 0 ? (
+                  <p className="bg-canvas-sunken text-ink-faint rounded-lg px-3 py-3 text-xs">
+                    まだ保存した検索はありません。
+                  </p>
+                ) : savedViews.map((view) => (
+                  <div key={view.id} className="hover:bg-canvas-sunken flex items-center gap-2 rounded-lg px-2 py-1.5">
+                    <button
+                      type="button"
+                      onClick={() => applySavedView(view)}
+                      className="text-ink min-w-0 flex-1 truncate text-left text-xs font-semibold"
+                      title={view.name}
+                    >
+                      {view.name}{view.isShared ? '（共有）' : ''}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await api.chats.savedViews.delete(view.id)
+                        await loadSavedViews()
+                      }}
+                      className="text-danger hover:bg-danger-bg shrink-0 rounded px-1.5 py-1 text-xs"
+                      aria-label={`${view.name}を削除`}
+                    >
+                      削除
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="border-hairline mt-3 border-t pt-3">
+                <label htmlFor="saved-inbox-view-name" className="text-ink-faint text-xs font-semibold">
+                  現在の条件を保存
+                </label>
+                <div className="mt-1.5 flex gap-2">
+                  <input
+                    id="saved-inbox-view-name"
+                    value={savedViewName}
+                    onChange={(event) => setSavedViewName(event.target.value)}
+                    maxLength={40}
+                    placeholder="例：自分の未対応"
+                    className="border-hairline focus:ring-accent min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none focus:border-accent focus:ring-2"
+                  />
+                  <Button
+                    variant="primary"
+                    type="button"
+                    onClick={() => void createSavedView()}
+                    disabled={savingView}
+                  >
+                    {savingView ? '保存中' : '保存'}
+                  </Button>
+                </div>
+                {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
       <div
@@ -1392,6 +1577,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     >
                       <option value="unread">未対応</option>
                       <option value="in_progress">対応中</option>
+                      <option value="on_hold">保留</option>
                       <option value="resolved">対応済</option>
                     </select>
                   </label>
@@ -1934,24 +2120,7 @@ function ChatsPageHost() {
   return (
     <div className="space-y-3">
       <div data-design="Head">
-        <Header
-          title="受信箱"
-          action={
-            <div className="flex items-center">
-              {/*
-                設計にあるボタン。行き先の文書がまだ無いので押せなくしている。
-                リンク先を仮置きすると行き止まりになる（route-integrity が落ちる）。
-              */}
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-            </div>
-          }
-        />
+        <Header title="受信箱" action={<Button href="/support">マニュアル</Button>} />
       </div>
 
       <div data-design="KPIs" data-inbox-v4="summary">

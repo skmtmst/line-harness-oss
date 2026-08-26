@@ -197,7 +197,8 @@
     "188_analytics_funnels.sql",
     "189_analytics_cross.sql",
     "190_analytics_url_exposures.sql",
-    "191_dashboard_preferences.sql"
+    "191_dashboard_preferences.sql",
+    "192_inbox_v6_foundation.sql"
   ],
-  "migrationCount": 198
+  "migrationCount": 199
 }

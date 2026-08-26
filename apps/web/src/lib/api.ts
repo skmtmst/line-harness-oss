@@ -383,7 +383,7 @@ export type FriendListParams = {
   createdFrom?: string
   createdTo?: string
   /** 対応マーク。 */
-  chatStatus?: 'unread' | 'in_progress' | 'resolved'
+  chatStatus?: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
   /** 表示設定。未指定は全部。 */
   visibility?: 'following' | 'blocked'
 }
@@ -421,7 +421,7 @@ export type FriendDetail = FriendWithTags & {
   formSubmissions: FriendFormSubmission[]
   /** 対応の状況。やり取りがまだ無い友だちでは null。 */
   support: {
-    status: 'unread' | 'in_progress' | 'resolved'
+    status: 'unread' | 'in_progress' | 'on_hold' | 'resolved'
     operatorName: string | null
     notes: string | null
   } | null
@@ -2789,11 +2789,12 @@ export const api = {
     installRichMenu: (accountId: string) => fetchApi<ApiResponse<{ richMenuId: string; liffId: string }>>('/api/nen-members/rich-menu/install', { method: 'POST', body: JSON.stringify({ accountId }) }),
   },
   chats: {
-    list: (params?: { status?: string; operatorId?: string; accountId?: string; unansweredOnly?: boolean; limit?: number; beforeAt?: string; beforeId?: string }) => {
+    list: (params?: { status?: string; operatorId?: string; accountId?: string; q?: string; unansweredOnly?: boolean; limit?: number; beforeAt?: string; beforeId?: string }) => {
       const query: Record<string, string> = {}
       if (params?.status) query.status = params.status
       if (params?.operatorId) query.operatorId = params.operatorId
       if (params?.accountId) query.lineAccountId = params.accountId
+      if (params?.q) query.q = params.q
       if (params?.unansweredOnly) query.unansweredOnly = '1'
       if (params?.limit !== undefined) query.limit = String(params.limit)
       // カーソルページング: (lastMessageAt, friendId) の複合カーソルより古い行を返す
@@ -2812,13 +2813,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { operatorId?: string | null; status?: Chat['status']; notes?: string | null }) =>
+    update: (id: string, data: { operatorId?: string | null; status?: Chat['status']; notes?: string | null; revision?: number; reason?: string }) =>
       fetchApi<ApiResponse<Chat>>(`/api/chats/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    send: (id: string, data: { content: string; messageType?: string }, idempotencyKey: string) =>
-      fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string }>>(`/api/chats/${id}/send`, {
+    send: (id: string, data: { content: string; messageType?: string; revision?: number }, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ sent: true; messageId: string; sentByStaffName: string; revision: number }>>(`/api/chats/${id}/send`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
         body: JSON.stringify(data),
@@ -2831,6 +2832,33 @@ export const api = {
       fetchApi<ApiResponse<{ marked: true }>>('/api/chats/read-all', {
         method: 'POST',
       }),
+    events: (id: string) =>
+      fetchApi<ApiResponse<Array<{
+        id: string
+        eventType: 'assignment' | 'status' | 'note' | 'read' | 'send' | 'conflict' | 'unsend'
+        before: unknown
+        after: unknown
+        actorStaffId: string | null
+        actorStaffName: string | null
+        reason: string | null
+        correlationId: string
+        createdAt: string
+      }>>>(`/api/chats/${id}/events`),
+    savedViews: {
+      list: () => fetchApi<ApiResponse<SavedSearch[]>>('/api/inbox/saved-views'),
+      create: (data: { name: string; conditions: unknown; isShared?: boolean }) =>
+        fetchApi<ApiResponse<SavedSearch>>('/api/inbox/saved-views', {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }),
+      update: (id: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
+        fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(data),
+        }),
+      delete: (id: string) =>
+        fetchApi<ApiResponse<null>>(`/api/inbox/saved-views/${id}`, { method: 'DELETE' }),
+    },
   },
   reminders: {
     /** 161: 渡した順に並べ替える。見えているものだけ送る。 */
