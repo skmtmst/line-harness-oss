@@ -11,6 +11,7 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const accountSettings = new Hono<Env>();
+const MAX_TEST_RECIPIENTS = 90;
 
 // GET /api/account-settings/test-recipients?accountId=xxx
 accountSettings.get('/api/account-settings/test-recipients', async (c) => {
@@ -66,6 +67,12 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
            SELECT 1 FROM friends scoped
             WHERE scoped.line_user_id = sm.line_user_id
               AND scoped.line_account_id = ?
+         ) AND (
+           EXISTS (
+             SELECT 1 FROM line_accounts fallback_account
+              WHERE fallback_account.id = f.line_account_id
+                AND COALESCE(fallback_account.tenant_id, ?) = ?
+           ) OR (f.line_account_id IS NULL AND ? = ?)
          )
        )
      WHERE sm.is_active = 1
@@ -75,7 +82,17 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
      ORDER BY same_account DESC, sm.created_at ASC`
   // C-2bで複合一意制約へ移行したら、上のNOT EXISTSフォールバックを外す。
   // 現在は既存の別アカウント・未割当行を候補から消さず、同じ応答を保つ。
-  ).bind(accountId, accountId, accountId, DEFAULT_TENANT_ID, tenantId).all<{
+  ).bind(
+    accountId,
+    accountId,
+    accountId,
+    DEFAULT_TENANT_ID,
+    tenantId,
+    tenantId,
+    DEFAULT_TENANT_ID,
+    DEFAULT_TENANT_ID,
+    tenantId,
+  ).all<{
     id: string;
     display_name: string | null;
     picture_url: string | null;
@@ -99,8 +116,28 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
 accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'), async (c) => {
   const body = await c.req.json<{ accountId: string; friendIds: string[] }>();
   if (!body.accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!Array.isArray(body.friendIds)) {
+    return c.json({ success: false, error: 'friendIds must be an array' }, 400);
+  }
+  if (body.friendIds.length > MAX_TEST_RECIPIENTS) {
+    return c.json({ success: false, error: `friendIds must contain at most ${MAX_TEST_RECIPIENTS} items` }, 400);
+  }
+  if (body.friendIds.some((friendId) => typeof friendId !== 'string' || friendId.length === 0)) {
+    return c.json({ success: false, error: 'friendIds must contain non-empty strings' }, 400);
+  }
   if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
     return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
+
+  const uniqueFriendIds = [...new Set(body.friendIds)];
+  if (uniqueFriendIds.length > 0) {
+    const placeholders = uniqueFriendIds.map(() => '?').join(',');
+    const matchingFriends = await c.env.DB.prepare(
+      `SELECT id FROM friends WHERE line_account_id = ? AND id IN (${placeholders})`
+    ).bind(body.accountId, ...uniqueFriendIds).all<{ id: string }>();
+    if (matchingFriends.results.length !== uniqueFriendIds.length) {
+      return c.json({ success: false, error: 'One or more friendIds are invalid for this account' }, 400);
+    }
   }
 
   const id = crypto.randomUUID();
