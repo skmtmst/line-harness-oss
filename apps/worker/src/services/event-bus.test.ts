@@ -7,7 +7,7 @@ interface CapturedInsert {
 }
 
 function fakeDb(opts: {
-  friend?: { line_user_id: string };
+  friend?: { line_user_id?: string; line_account_id?: string | null };
   capturedInserts: CapturedInsert[];
 }): D1Database {
   return {
@@ -67,6 +67,11 @@ vi.mock('@line-crm/line-sdk', () => {
 
 vi.mock('./ad-conversion.js', () => ({
   sendAdConversions: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./outgoing-webhook-delivery.js', () => ({
+  deliverWebhook: vi.fn().mockResolvedValue({ ok: true, attempts: 1, lastStatus: 200 }),
+  recordDeliveryOutcome: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./automation-triggers.js', () => ({
@@ -278,5 +283,57 @@ describe('fireEvent — V6分析イベント', () => {
     }, undefined, 'account-a');
 
     expect(dbModule.recordAnalyticsEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe('fireEvent — 送信Webhookのアカウント解決', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const dbModule = await import('@line-crm/db');
+    (dbModule.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([]);
+    (dbModule.getActiveOutgoingWebhooksByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([]);
+  });
+
+  it('明示されたアカウントをそのまま送信Webhookの絞り込みへ渡す', async () => {
+    const dbModule = await import('@line-crm/db');
+    const db = fakeDb({ capturedInserts: [] });
+
+    await fireEvent(db, 'message_received', { friendId: 'friend-1' }, undefined, 'account-a');
+
+    expect(dbModule.getActiveOutgoingWebhooksByEvent)
+      .toHaveBeenCalledWith(db, 'message_received', 'account-a');
+  });
+
+  it('アカウント未指定時はfriendIdから一度だけ解決する', async () => {
+    const dbModule = await import('@line-crm/db');
+    const db = fakeDb({
+      friend: { line_account_id: 'account-from-friend' },
+      capturedInserts: [],
+    });
+
+    await fireEvent(db, 'tag_change', { friendId: 'friend-1' });
+
+    expect(dbModule.getActiveOutgoingWebhooksByEvent)
+      .toHaveBeenCalledWith(db, 'tag_change', 'account-from-friend');
+  });
+
+  it('アカウントもfriendIdも無いイベントはNULL所属だけを検索できる値を渡す', async () => {
+    const dbModule = await import('@line-crm/db');
+    const deliveryModule = await import('./outgoing-webhook-delivery.js');
+    const db = fakeDb({ capturedInserts: [] });
+    (dbModule.getActiveOutgoingWebhooksByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([{
+        id: 'legacy-webhook',
+        event_types: '["*"]',
+        max_retries: 0,
+      }]);
+
+    await fireEvent(db, 'incoming_webhook.custom', { eventData: { webhookId: 'webhook-1' } });
+
+    expect(dbModule.getActiveOutgoingWebhooksByEvent)
+      .toHaveBeenCalledWith(db, 'incoming_webhook.custom', undefined);
+    expect(deliveryModule.recordDeliveryOutcome).toHaveBeenCalledWith(db, 'legacy-webhook', true);
   });
 });
