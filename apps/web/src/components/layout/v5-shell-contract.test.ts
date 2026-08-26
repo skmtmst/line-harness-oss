@@ -88,7 +88,7 @@ describe('V5共通ヘッダー・パンくず・タブ', () => {
   })
 })
 
-describe('4画面の移管実証', () => {
+describe('共通部品への移管実証', () => {
   const dashboard = read('src', 'app', 'page.tsx')
   const chats = read('src', 'app', 'chats', 'page.tsx')
   const friends = read('src', 'app', 'friends', 'page.tsx')
@@ -97,12 +97,16 @@ describe('4画面の移管実証', () => {
 
   it.each([
     ['ダッシュボード', dashboard],
-    ['受信箱', chats],
     ['友だち', friends],
     ['友だち属性', tags],
   ])('%sが共通Headerを使う', (_name, source) => {
     expect(source).toContain("import Header from '@/components/layout/header'")
     expect(source).toContain('<Header')
+  })
+
+  it('受信箱は共通トップバーと重なる本文Headerを置かない', () => {
+    expect(chats).not.toContain("import Header from '@/components/layout/header'")
+    expect(chats).not.toContain('<Header title="受信箱"')
   })
 
   it('友だちと友だち属性が共通タブを使う', () => {

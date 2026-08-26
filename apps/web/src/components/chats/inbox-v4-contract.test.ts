@@ -51,6 +51,12 @@ describe('受信箱V4で既存機能を失わない', () => {
 })
 
 describe('受信箱V4の画面契約', () => {
+  it('V6共通トップバーと重なる本文タイトル・マニュアルを置かない', () => {
+    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
+    expect(PAGE).not.toContain('<Header title="受信箱"')
+    expect(PAGE).not.toContain('<Button href="/support">マニュアル</Button>')
+  })
+
   it('承認済みV4の主要領域を持つ', () => {
     for (const marker of [
       'data-inbox-v4="summary"',
