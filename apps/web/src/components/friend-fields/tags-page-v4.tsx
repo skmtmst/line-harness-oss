@@ -164,18 +164,13 @@ function usageLabel(tag: Tag): string {
 }
 
 /**
- * 整理候補の理由。サーバーがタグごとに返す（Codex実装中）。
+ * 整理候補の理由。サーバーがタグごとに返す。
  *
  * `unused` … 友だち0人**かつ**全18種の参照0件
  * `duplicate_name` … 正規化した名前が他のタグと重なる
  *   （NFKC → 前後空白除去 → 連続空白を1つ → 小文字化）
  *
- * **`packages/shared` の `Tag` に入るまでの仮置き。** 入ったらこの型を消す。
- * `packages/shared` はCodexの担当なので、こちらからは触らない。
  */
-type CleanupReason = 'unused' | 'duplicate_name'
-type TagWithCleanup = Tag & { cleanupReasons?: CleanupReason[] }
-
 /**
  * 整理候補の数え方が**サーバーから来ているか**。
  *
@@ -186,7 +181,7 @@ type TagWithCleanup = Tag & { cleanupReasons?: CleanupReason[] }
  * `cleanupReasons` は `withCounts=1` のとき**理由が無くても `[]` で必ず返す**
  * 約束（`docs/v6-4-1-handoff.md` §0-1）。省略＝未取得。
  */
-function cleanupKnown(items: TagWithCleanup[], ready: boolean): boolean {
+function cleanupKnown(items: Tag[], ready: boolean): boolean {
   // 読み込み中の空配列と、取得済みの0件を区別する。後者は `0件` と出せる。
   return ready && items.every((tag) => Array.isArray(tag.cleanupReasons))
 }
@@ -200,7 +195,7 @@ function cleanupKnown(items: TagWithCleanup[], ready: boolean): boolean {
  * サーバーが `cleanupReasons` を返しているならそれに従う。**画面とサーバーで
  * 別々に数えない**（別々に数えると、同じ画面のKPIと絞り込みで数が食い違う）。
  */
-function isUnused(tag: TagWithCleanup): boolean {
+function isUnused(tag: Tag): boolean {
   if (Array.isArray(tag.cleanupReasons)) return tag.cleanupReasons.includes('unused')
   return !tag.usedIn && (tag.friendCount ?? 0) === 0
 }
@@ -620,7 +615,7 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
     整理候補の数。**未取得は `null`（画面では `—`）、取得できて0件は `0`。**
     `—` と `0件` を混ぜない（`docs/v6-4-1-handoff.md` §0-1）。
   */
-  const cleanupItems = items as TagWithCleanup[]
+  const cleanupItems = items
   const cleanupCount = cleanupKnown(cleanupItems, ready)
     ? cleanupItems.filter((tag) => (tag.cleanupReasons?.length ?? 0) > 0).length
     : null

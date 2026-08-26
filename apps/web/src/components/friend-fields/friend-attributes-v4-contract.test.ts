@@ -143,6 +143,8 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain('items.every((tag) => Array.isArray(tag.cleanupReasons))')
     // 読み込み中の空配列は未取得、取得済みの空配列は0件。
     expect(source).toContain('return ready && items.every((tag) => Array.isArray(tag.cleanupReasons))')
+    // #384で共通Tag型へ入ったため、画面だけの仮型へ戻さない。
+    expect(source).not.toContain('TagWithCleanup')
     // 未取得は `—`、取得できて0件は `0件`。
     expect(source).toContain("`未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`")
     expect(source).toContain("unit: cleanupCount === null ? '' : '件'")
