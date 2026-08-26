@@ -35,6 +35,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 /**
  * 対応マーク・保存した検索・汎用フォルダ。
@@ -386,7 +387,8 @@ friendAttributes.get('/api/login-audit', requireRole('owner', 'admin'), async (c
       action,
       limit: Number(c.req.query('limit') ?? 100),
     });
-    const staffById = new Map((await getStaffMembers(c.env.DB)).map((member) => [member.id, member]));
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const staffById = new Map((await getStaffMembers(c.env.DB, tenantId)).map((member) => [member.id, member]));
     return c.json({
       success: true,
       data: items.map((row: LoginAuditRow) => ({

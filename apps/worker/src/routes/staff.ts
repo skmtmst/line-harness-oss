@@ -54,6 +54,17 @@ function canAdminister(row: StaffMember): boolean {
   return Boolean(row.is_active) && row.role !== 'staff' && row.access_level !== 'read_only';
 }
 
+function currentTenantId(c: { get: (key: 'staff') => Env['Variables']['staff'] }): string {
+  return c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+}
+
+function isInCurrentTenant(
+  c: { get: (key: 'staff') => Env['Variables']['staff'] },
+  member: StaffMember,
+): boolean {
+  return (member.tenant_id ?? DEFAULT_TENANT_ID) === currentTenantId(c);
+}
+
 /**
  * 管理画面から誰も入れなくなる操作を止める。
  *
@@ -66,6 +77,7 @@ function canAdminister(row: StaffMember): boolean {
 async function guardLastAdmin(
   db: D1Database,
   target: StaffMember,
+  tenantId: string,
   change: { isActive?: boolean; role?: 'admin' | 'staff' | 'viewer'; self: boolean },
 ): Promise<string | null> {
   if (!canAdminister(target)) return null;
@@ -78,7 +90,7 @@ async function guardLastAdmin(
 
   if (change.self) return '自分自身の管理者権限は外せません。他の管理者に依頼してください。';
 
-  const others = (await getStaffMembers(db)).filter((row) => row.id !== target.id && canAdminister(row));
+  const others = (await getStaffMembers(db, tenantId)).filter((row) => row.id !== target.id && canAdminister(row));
   if (others.length > 0) return null;
   return '管理者が一人もいなくなります。先に別の管理者を有効にしてください。';
 }
@@ -108,7 +120,7 @@ staff.get('/api/staff/me', async (c) => {
 
 staff.get('/api/staff', async (c) => {
   try {
-    return c.json({ success: true, data: (await getStaffMembers(c.env.DB)).map(serializeStaff) });
+    return c.json({ success: true, data: (await getStaffMembers(c.env.DB, currentTenantId(c))).map(serializeStaff) });
   } catch (error) {
     console.error('GET /api/staff error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -119,7 +131,7 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
   try {
     const id = c.req.param('id');
     const member = await getStaffById(c.env.DB, id);
-    if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
+    if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
     const loginCount = await countLoginAudit(c.env.DB, { adminUserId: id, action: 'login' });
     return c.json({ success: true, data: { loginCount } });
   } catch (error) {
@@ -130,7 +142,9 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
 
 staff.get('/api/staff/:id', async (c) => {
   const member = await getStaffById(c.env.DB, c.req.param('id'));
-  return member ? c.json({ success: true, data: serializeStaff(member) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+  return member && isInCurrentTenant(c, member)
+    ? c.json({ success: true, data: serializeStaff(member) })
+    : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
 staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
@@ -161,7 +175,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     if (body.canAccessDescendantAccounts && !canGrantDescendants) {
       return c.json({ success: false, error: '自分が持っていない他アカウント権限は付与できません' }, 403);
     }
-    if ((await getStaffMembers(c.env.DB)).some((item) => item.email?.toLowerCase() === email)) {
+    if ((await getStaffMembers(c.env.DB, currentTenantId(c))).some((item) => item.email?.toLowerCase() === email)) {
       return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
     }
 
@@ -222,7 +236,7 @@ staff.patch('/api/staff/:id', async (c) => {
   }>();
 
   const target = await getStaffById(c.env.DB, id);
-  if (!target) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   const current = c.get('staff');
   const administrator = current.role === 'owner' || current.role === 'admin';
   if (!administrator && current.id !== id) {
@@ -239,12 +253,12 @@ staff.patch('/api/staff/:id', async (c) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return c.json({ success: false, error: '正しいメールアドレスを入力してください' }, 400);
     }
-    const duplicate = (await getStaffMembers(c.env.DB)).some((member) => member.id !== id && member.email?.toLowerCase() === email);
+    const duplicate = (await getStaffMembers(c.env.DB, currentTenantId(c))).some((member) => member.id !== id && member.email?.toLowerCase() === email);
     if (duplicate) return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
     body.email = email;
   }
 
-  const guard = await guardLastAdmin(c.env.DB, target, {
+  const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), {
     isActive: body.isActive,
     role: body.role,
     self: id === c.get('staff').id,
@@ -300,11 +314,11 @@ function totpMasterKey(c: { env: Env['Bindings'] }): string | null {
 
 staff.post('/api/staff/:id/two-factor/setup', async (c) => {
   const id = c.req.param('id');
+  const member = await getStaffById(c.env.DB, id);
+  if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
-  const member = await getStaffById(c.env.DB, id);
-  if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
 
   const secret = generateTotpSecret();
   await updateStaffMember(c.env.DB, id, {
@@ -321,10 +335,11 @@ staff.post('/api/staff/:id/two-factor/setup', async (c) => {
 
 staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
   const id = c.req.param('id');
+  const member = await getStaffById(c.env.DB, id);
+  if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ設定できます' }, 403);
   const key = totpMasterKey(c);
   if (!key) return c.json({ success: false, error: '二段階認証の暗号鍵が設定されていません' }, 503);
-  const member = await getStaffById(c.env.DB, id);
   if (!member?.totp_pending_secret_enc) return c.json({ success: false, error: '先にQRコードを表示してください' }, 400);
   const body = await c.req.json<{ code?: string }>().catch(() => ({} as { code?: string }));
   const encrypted = member.totp_pending_secret_enc;
@@ -341,6 +356,8 @@ staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
 
 staff.delete('/api/staff/:id/two-factor', async (c) => {
   const id = c.req.param('id');
+  const member = await getStaffById(c.env.DB, id);
+  if (!member || !isInCurrentTenant(c, member)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ解除できます' }, 403);
   const updated = await updateStaffMember(c.env.DB, id, {
     totp_secret_enc: null,
@@ -355,8 +372,8 @@ staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   const id = c.req.param('id');
   if (id === c.get('staff').id) return c.json({ success: false, error: '自分自身は削除できません' }, 400);
   const target = await getStaffById(c.env.DB, id);
-  if (!target) return c.json({ success: false, error: 'Staff member not found' }, 404);
-  const guard = await guardLastAdmin(c.env.DB, target, { isActive: false, self: false });
+  if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
+  const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), { isActive: false, self: false });
   if (guard) return c.json({ success: false, error: guard }, 400);
   await deleteStaffMember(c.env.DB, id);
   return c.json({ success: true, data: null });

@@ -111,9 +111,10 @@ export async function getStaffByLineUserIdIncludingInactive(
     .first<StaffMember>();
 }
 
-export async function getStaffMembers(db: D1Database): Promise<StaffMember[]> {
+export async function getStaffMembers(db: D1Database, tenantId: string): Promise<StaffMember[]> {
   const result = await db
-    .prepare('SELECT * FROM staff_members ORDER BY created_at ASC')
+    .prepare('SELECT * FROM staff_members WHERE COALESCE(tenant_id, ?) = ? ORDER BY created_at ASC')
+    .bind(DEFAULT_TENANT_ID, tenantId)
     .all<StaffMember>();
   return result.results;
 }
