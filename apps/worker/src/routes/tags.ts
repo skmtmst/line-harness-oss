@@ -252,6 +252,9 @@ tags.patch('/api/tags/reorder', requireRole('owner', 'admin'), async (c) => {
     if (body.ids.length > 500) {
       return c.json({ success: false, error: 'too many ids' }, 400);
     }
+    if (new Set(body.ids).size !== body.ids.length) {
+      return c.json({ success: false, error: 'ids must not contain duplicates' }, 400);
+    }
     await reorderTags(c.env.DB, body.ids as string[]);
     return c.json({ success: true, data: { updated: body.ids.length } });
   } catch (err) {

@@ -161,6 +161,12 @@ describe('PATCH /api/tags/reorder', () => {
     expect(dbMocks.reorderTags).not.toHaveBeenCalled();
   });
 
+  test('同じIDが重複していたら断る', async () => {
+    const res = await patch('/api/tags/reorder', { ids: ['a', 'b', 'a'] });
+    expect(res.status).toBe(400);
+    expect(dbMocks.reorderTags).not.toHaveBeenCalled();
+  });
+
   test('閲覧だけの人は並び替えられない', async () => {
     const res = await patch('/api/tags/reorder', { ids: ['a'] }, 'staff');
     expect(res.status).toBe(403);
