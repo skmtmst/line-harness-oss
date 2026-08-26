@@ -254,9 +254,12 @@ describe('V6オートメーション実行エンジン', () => {
     testDb.raw.prepare(
       `INSERT INTO common_action_versions
          (id, common_action_id, version_number, status, action_config, published_at)
-       VALUES ('common-v1', 'common-1', 1, 'published', '[]', ?),
-              ('common-v2', 'common-1', 2, 'published', '[]', ?)`,
-    ).run(T0, T0);
+       VALUES ('common-v1', 'common-1', 1, 'published', ?, ?),
+              ('common-v2', 'common-1', 2, 'published', ?, ?)`,
+    ).run(
+      JSON.stringify([action('inside-v1')]), T0,
+      JSON.stringify([action('inside-v2')]), T0,
+    );
     testDb.raw.prepare(
       `INSERT INTO common_action_bindings
          (id, line_account_id, common_action_id, common_action_version_id,
@@ -268,17 +271,56 @@ describe('V6オートメーション実行エンジン', () => {
     testDb.raw.prepare(
       `UPDATE common_action_bindings SET common_action_version_id = 'common-v2' WHERE id = 'binding-1'`,
     ).run();
-    const pinned: Array<string | null> = [];
+    const seen: string[] = [];
     expect(await processAutomationRun(testDb.db, created.runId!, {
       now: T0,
       executors: {
-        common_action: async ({ commonActionVersionId }) => {
-          pinned.push(commonActionVersionId);
-        },
+        record: async ({ action: current }) => { seen.push(current.id); },
       },
     })).toBe('success');
 
-    expect(pinned).toEqual(['common-v1']);
+    expect(seen).toEqual(['shared/inside-v1']);
+    expect(testDb.raw.prepare(
+      `SELECT step_key, action_type, common_action_version_id
+         FROM automation_run_steps WHERE automation_run_id = ? ORDER BY rowid`,
+    ).all(created.runId)).toEqual([
+      { step_key: 'shared', action_type: 'common_action_marker', common_action_version_id: 'common-v1' },
+      { step_key: 'shared/inside-v1', action_type: 'record', common_action_version_id: null },
+    ]);
+  });
+
+  it('共通アクション内の待機後も固定した計画の続きから再開する', async () => {
+    const setup = addPublishedAutomation(testDb.raw, {
+      actions: [action('shared', 'common_action', { commonActionId: 'common-wait' })],
+    });
+    testDb.raw.prepare(
+      `INSERT INTO common_actions (id, line_account_id, name, status)
+       VALUES ('common-wait', ?, '待機を含む共通処理', 'published')`,
+    ).run(setup.lineAccountId);
+    testDb.raw.prepare(
+      `INSERT INTO common_action_versions
+         (id, common_action_id, version_number, status, action_config, published_at)
+       VALUES ('common-wait-v1', 'common-wait', 1, 'published', ?, ?)`,
+    ).run(JSON.stringify([
+      action('pause', 'wait', { durationMinutes: 5 }),
+      action('after-wait'),
+    ]), T0);
+    testDb.raw.prepare(
+      `INSERT INTO common_action_bindings
+         (id, line_account_id, common_action_id, common_action_version_id,
+          consumer_type, consumer_id, consumer_path)
+       VALUES ('binding-wait', ?, 'common-wait', 'common-wait-v1', 'automation', ?, 'shared')`,
+    ).run(setup.lineAccountId, setup.automationId);
+
+    const created = await start(testDb.db, setup);
+    const seen: string[] = [];
+    const executors = { record: async ({ action: current }: { action: ActionDefinition }) => { seen.push(current.id); } };
+    expect(await processAutomationRun(testDb.db, created.runId!, { now: T0, executors })).toBe('waiting');
+    expect(seen).toEqual([]);
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: '2026-08-26T01:05:00.000Z', executors,
+    })).toBe('success');
+    expect(seen).toEqual(['shared/after-wait']);
   });
 
   it('途中終了した処理を同じ実行IDで再取得する', async () => {

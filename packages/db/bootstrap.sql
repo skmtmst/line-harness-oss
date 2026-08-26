@@ -236,7 +236,7 @@ CREATE TABLE automation_runs (
   is_test               INTEGER NOT NULL DEFAULT 0 CHECK (is_test IN (0, 1)),
   started_at            TEXT,
   completed_at          TEXT,
-  created_at            TEXT NOT NULL DEFAULT (datetime('now')), lease_expires_at TEXT,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')), lease_expires_at TEXT, execution_plan_json TEXT,
   UNIQUE (line_account_id, automation_id, idempotency_key)
 );
 
