@@ -10,6 +10,7 @@ import NoteBar from '@/components/shared/note-bar'
 import PageHeader from '@/components/shared/page-header'
 import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
+import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 
 const ACTION_LABELS: Record<string, string> = {
@@ -152,23 +153,28 @@ function CommonActionVersionsInner() {
             <p className="text-ink-faint mt-1 text-sm">公開した版は書き換えられません。</p>
           </div>
         </div>
-        <div className="border-hairline rounded-card overflow-hidden border bg-canvas">
-          <table className="w-full table-fixed text-left text-sm">
-            <thead className="bg-canvas-sunken text-ink-faint text-xs">
-              <tr><th className="w-[14%] px-4 py-3">版</th><th className="w-[18%] px-4 py-3">状態</th><th className="w-[18%] px-4 py-3">中の処理</th><th className="w-[28%] px-4 py-3">公開日時</th><th className="w-[22%] px-4 py-3">操作</th></tr>
+        <DataTable>
+            <thead>
+              <TableHeadRow>
+                <Th style={{ width: '14%' }}>版</Th>
+                <Th style={{ width: '18%' }}>状態</Th>
+                <Th style={{ width: '18%' }}>中の処理</Th>
+                <Th style={{ width: '28%' }}>公開日時</Th>
+                <Th style={{ width: '22%' }}>操作</Th>
+              </TableHeadRow>
             </thead>
-            <tbody className="divide-hairline divide-y">
+            <tbody>
               {detail.versions.map((version) => (
-                <tr key={version.id}>
-                  <td className="text-ink px-4 py-3 font-semibold">v{version.versionNumber}</td>
-                  <td className="px-4 py-3">
+                <Tr key={version.id}>
+                  <Td className="text-ink font-semibold">v{version.versionNumber}</Td>
+                  <Td>
                     <StatusBadge tone={version.status === 'published' ? 'success' : 'neutral'} size="compact">
                       {version.status === 'published' ? '公開済み' : '下書き'}
                     </StatusBadge>
-                  </td>
-                  <td className="text-ink-secondary px-4 py-3">{version.actions.length}個の処理</td>
-                  <td className="text-ink-secondary px-4 py-3">{version.publishedAt ? new Date(version.publishedAt).toLocaleString('ja-JP') : '—'}</td>
-                  <td className="px-4 py-3">
+                  </Td>
+                  <Td className="text-ink-secondary">{version.actions.length}個の処理</Td>
+                  <Td className="text-ink-secondary">{version.publishedAt ? new Date(version.publishedAt).toLocaleString('ja-JP') : '—'}</Td>
+                  <ActionCell>
                     {!canManage ? <span className="text-ink-faint">閲覧のみ</span> : version.status === 'draft' ? (
                       <button
                         type="button"
@@ -196,12 +202,11 @@ function CommonActionVersionsInner() {
                         この版をもとに新版を作る
                       </button>
                     ) : <span className="text-ink-faint">下書き編集中</span>}
-                  </td>
-                </tr>
+                  </ActionCell>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       </section>
 
       <section className="mt-6">
@@ -210,25 +215,30 @@ function CommonActionVersionsInner() {
         {detail.bindings.length === 0 ? (
           <div className="border-hairline rounded-card mt-3 border bg-canvas p-8 text-center text-sm text-ink-faint">まだ呼ばれている場所はありません。</div>
         ) : (
-          <div className="border-hairline rounded-card mt-3 overflow-hidden border bg-canvas">
-            <table className="w-full table-fixed text-left text-sm">
-              <thead className="bg-canvas-sunken text-ink-faint text-xs">
-                <tr><th className="w-[35%] px-4 py-3">利用先</th><th className="w-[15%] px-4 py-3">固定中の版</th><th className="w-[14%] px-4 py-3">実行中</th><th className="w-[14%] px-4 py-3">待機中</th><th className="w-[22%] px-4 py-3">操作</th></tr>
+          <DataTable className="mt-3">
+              <thead>
+                <TableHeadRow>
+                  <Th style={{ width: '35%' }}>利用先</Th>
+                  <Th style={{ width: '15%' }}>固定中の版</Th>
+                  <Th style={{ width: '14%' }}>実行中</Th>
+                  <Th style={{ width: '14%' }}>待機中</Th>
+                  <Th style={{ width: '22%' }}>操作</Th>
+                </TableHeadRow>
               </thead>
-              <tbody className="divide-hairline divide-y">
+              <tbody>
                 {detail.bindings.map((binding) => (
-                  <tr key={binding.id}>
-                    <td className="px-4 py-3">
-                      <p className="text-ink truncate font-semibold" title={binding.consumerId}>{binding.consumerType}</p>
-                      <p className="text-ink-faint mt-1 truncate text-xs" title={binding.consumerPath}>{binding.consumerPath || '全体'}</p>
-                    </td>
-                    <td className="px-4 py-3">
+                  <Tr key={binding.id}>
+                    <NameCell
+                      name={<span className="truncate" title={binding.consumerId}>{binding.consumerType}</span>}
+                      sub={<span className="truncate" title={binding.consumerPath}>{binding.consumerPath || '全体'}</span>}
+                    />
+                    <Td>
                       <span className="text-ink-secondary">v{binding.versionNumber}</span>
                       {binding.hasNewerVersion ? <StatusBadge tone="warning" size="compact" className="ml-2">新版あり</StatusBadge> : null}
-                    </td>
-                    <td className="text-ink-secondary px-4 py-3">{binding.runningCount ?? '—'}</td>
-                    <td className="text-ink-secondary px-4 py-3">{binding.waitingCount ?? '—'}</td>
-                    <td className="px-4 py-3">
+                    </Td>
+                    <Td className="text-ink-secondary">{binding.runningCount ?? '—'}</Td>
+                    <Td className="text-ink-secondary">{binding.waitingCount ?? '—'}</Td>
+                    <ActionCell>
                       {canManage && binding.hasNewerVersion && published ? (
                         <button
                           type="button"
@@ -239,12 +249,11 @@ function CommonActionVersionsInner() {
                           v{published.versionNumber}への変更内容を確認
                         </button>
                       ) : <span className="text-ink-faint">{binding.hasNewerVersion ? '編集権限が必要' : '最新版を使用中'}</span>}
-                    </td>
-                  </tr>
+                    </ActionCell>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </DataTable>
         )}
       </section>
 

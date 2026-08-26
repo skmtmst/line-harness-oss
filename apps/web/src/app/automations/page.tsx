@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 
 type AutomationEventType = "friend_add" | "tag_change" | "score_threshold" | "cv_fire" | "message_received" | "postback_received" | "calendar_booked" | "ec.order.confirmed" | "ec.order.shipped" | "ec.subscription.upcoming" | "ec.subscription.payment_failed" | "ec.subscription.cancelled"
 
@@ -237,24 +238,11 @@ export default function AutomationsPage() {
           description="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。"
           action={
             <div className="flex flex-wrap gap-2">
-              <a
-                href="/common-actions"
-                className="border-hairline text-ink-secondary rounded-control border px-3 py-2 text-sm font-medium"
-              >
-                共通アクションを見る
-              </a>
-              <button
-                onClick={() => setShowCreate(true)}
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium transition-colors"
-              >
+              <Button href="/common-actions">共通アクションを見る</Button>
+              <Button variant="primary" onClick={() => setShowCreate(true)}>
                 ルールを作成
-              </button>
-              <a
-                href="/support"
-                className="border-hairline text-ink-secondary rounded-control border px-3 py-2 text-sm font-medium"
-              >
-                マニュアル
-              </a>
+              </Button>
+              <Button href="/support">マニュアル</Button>
             </div>
           }
         />

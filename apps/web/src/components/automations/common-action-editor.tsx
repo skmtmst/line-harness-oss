@@ -2,6 +2,10 @@
 
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
+import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import SelectField from '@/components/shared/select-field'
+import { TextArea, TextField } from '@/components/shared/text-field'
 
 const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> = [
   { value: 'add_tag', label: 'タグを付ける' },
@@ -17,8 +21,6 @@ const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> 
   { value: 'wait', label: '待つ' },
   { value: 'common_action', label: '別の共通アクションを呼ぶ' },
 ]
-
-const inputClass = 'border-hairline rounded-control min-h-10 w-full border bg-canvas px-3 text-sm text-ink focus:border-action focus:outline-none'
 
 function defaultParams(type: CommonActionStep['type']): Record<string, unknown> {
   if (type === 'wait') return { durationMinutes: 5 }
@@ -62,42 +64,42 @@ export default function CommonActionEditor({
           <div className="mb-3 flex items-center justify-between gap-3">
             <h3 className="text-ink font-semibold">{index + 1}. {ACTION_OPTIONS.find((item) => item.value === step.type)?.label}</h3>
             <div className="flex items-center gap-1">
-              <button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目の処理を上へ`} className="border-hairline rounded-control border p-2 disabled:opacity-30">
+              <IconButton onClick={() => move(index, -1)} disabled={index === 0} aria-label={`${index + 1}番目の処理を上へ`}>
                 <ArrowUp size={16} aria-hidden />
-              </button>
-              <button type="button" onClick={() => move(index, 1)} disabled={index === value.length - 1} aria-label={`${index + 1}番目の処理を下へ`} className="border-hairline rounded-control border p-2 disabled:opacity-30">
+              </IconButton>
+              <IconButton onClick={() => move(index, 1)} disabled={index === value.length - 1} aria-label={`${index + 1}番目の処理を下へ`}>
                 <ArrowDown size={16} aria-hidden />
-              </button>
-              <button type="button" onClick={() => onChange(value.filter((_, stepIndex) => stepIndex !== index))} aria-label={`${index + 1}番目の処理を削除`} className="border-danger text-danger rounded-control border p-2">
+              </IconButton>
+              <IconButton onClick={() => onChange(value.filter((_, stepIndex) => stepIndex !== index))} aria-label={`${index + 1}番目の処理を削除`}>
                 <Trash2 size={16} aria-hidden />
-              </button>
+              </IconButton>
             </div>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-2">
             <label className="text-ink-secondary text-sm">
               処理
-              <select
+              <SelectField
                 value={step.type}
                 onChange={(event) => update(index, {
                   type: event.target.value as CommonActionStep['type'],
                   params: defaultParams(event.target.value as CommonActionStep['type']),
                 })}
-                className={`${inputClass} mt-1`}
-              >
-                {ACTION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
+                className="mt-1 w-full"
+                options={ACTION_OPTIONS}
+              />
             </label>
             <label className="text-ink-secondary text-sm">
               失敗したとき
-              <select
+              <SelectField
                 value={step.onFailure}
                 onChange={(event) => update(index, { onFailure: event.target.value as 'stop' | 'continue' })}
-                className={`${inputClass} mt-1`}
-              >
-                <option value="stop">ここで止める</option>
-                <option value="continue">次の処理へ進む</option>
-              </select>
+                className="mt-1 w-full"
+                options={[
+                  { value: 'stop', label: 'ここで止める' },
+                  { value: 'continue', label: '次の処理へ進む' },
+                ]}
+              />
             </label>
           </div>
 
@@ -110,14 +112,12 @@ export default function CommonActionEditor({
           </div>
         </section>
       ))}
-      <button
-        type="button"
+      <Button
         onClick={() => onChange([...value, newCommonActionStep()])}
-        className="border-action text-action rounded-control inline-flex min-h-10 items-center gap-2 border px-4 text-sm font-semibold"
       >
         <Plus size={16} aria-hidden />
         処理を追加
-      </button>
+      </Button>
     </div>
   )
 }
@@ -136,10 +136,12 @@ function ResourceSelect({
   return (
     <label className="text-ink-secondary block text-sm">
       {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className={`${inputClass} mt-1`}>
-        <option value="">{label}を選ぶ</option>
-        {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
-      </select>
+      <SelectField
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 w-full"
+        options={[{ value: '', label: `${label}を選ぶ` }, ...options.map((option) => ({ value: option.id, label: option.name }))]}
+      />
       {options.length === 0 ? <span className="text-warning mt-1 block text-xs">選べる{label}がありません</span> : null}
     </label>
   )
@@ -173,7 +175,7 @@ function ActionParams({
     return (
       <label className="text-ink-secondary block max-w-xs text-sm">
         待つ時間（5分単位）
-        <input type="number" min={5} step={5} max={525600} value={Number(step.params.durationMinutes ?? 5)} onChange={(event) => onChange({ durationMinutes: Number(event.target.value) })} className={`${inputClass} mt-1`} />
+        <TextField type="number" min={5} step={5} max={525600} value={Number(step.params.durationMinutes ?? 5)} onChange={(event) => onChange({ durationMinutes: Number(event.target.value) })} className="mt-1" />
       </label>
     )
   }
@@ -185,7 +187,7 @@ function ActionParams({
         {!templateId ? (
           <label className="text-ink-secondary block text-sm">
             送る本文
-            <textarea value={String(step.params.content ?? '')} onChange={(event) => onChange({ content: event.target.value })} rows={4} className={`${inputClass} mt-1 py-2`} placeholder="友だちに送る文章を入力" />
+            <TextArea value={String(step.params.content ?? '')} onChange={(event) => onChange({ content: event.target.value })} rows={4} className="mt-1" placeholder="友だちに送る文章を入力" />
           </label>
         ) : null}
       </div>
@@ -196,8 +198,8 @@ function ActionParams({
     const [key = '', value = ''] = entries[0] ?? []
     return (
       <div className="grid gap-3 lg:grid-cols-2">
-        <label className="text-ink-secondary text-sm">項目名<input value={key} onChange={(event) => onChange({ values: { [event.target.value]: value } })} className={`${inputClass} mt-1`} placeholder="例：来店店舗" /></label>
-        <label className="text-ink-secondary text-sm">入れる内容<input value={String(value)} onChange={(event) => onChange({ values: { [key]: event.target.value } })} className={`${inputClass} mt-1`} placeholder="例：新宿店" /></label>
+        <label className="text-ink-secondary text-sm">項目名<TextField value={key} onChange={(event) => onChange({ values: { [event.target.value]: value } })} className="mt-1" placeholder="例：来店店舗" /></label>
+        <label className="text-ink-secondary text-sm">入れる内容<TextField value={String(value)} onChange={(event) => onChange({ values: { [key]: event.target.value } })} className="mt-1" placeholder="例：新宿店" /></label>
       </div>
     )
   }

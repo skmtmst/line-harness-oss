@@ -13,6 +13,7 @@ import StatusBadge from '@/components/shared/status-badge'
 import SummaryCard from '@/components/shared/summary-card'
 import { Tabs } from '@/components/shared/tabs'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import { ActionCell, DataTable, NameCell, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 type Filter = 'all' | 'published' | 'draft' | 'old_version' | 'unused'
 
@@ -134,31 +135,27 @@ export default function CommonActionsPage() {
           placeholder="名前や説明で検索"
           aria-label="共通アクションを検索"
           loading={loading && query !== deferredQuery}
-          className="min-w-[280px] flex-1"
+          className="min-w-72 flex-1"
         />
-        <button
-          type="button"
+        <Button
           onClick={() => void load()}
-          className="border-hairline text-ink-secondary rounded-control inline-flex min-h-10 items-center gap-2 border px-3 text-sm"
         >
           <RefreshCw size={16} aria-hidden />
           一覧を更新
-        </button>
+        </Button>
       </div>
 
       <div className="mb-3 flex flex-wrap gap-2" aria-label="状態で絞り込む">
         {FILTERS.map((option) => (
-          <button
+          <label
             key={option.value}
-            type="button"
-            onClick={() => setFilter(option.value)}
-            aria-pressed={filter === option.value}
             className={filter === option.value
               ? 'bg-success-bg text-success rounded-pill border border-success px-3 py-1.5 text-xs font-semibold'
               : 'border-hairline text-ink-secondary rounded-pill border bg-canvas px-3 py-1.5 text-xs'}
           >
+            <input className="sr-only" type="radio" name="common-action-filter" value={option.value} checked={filter === option.value} onChange={() => setFilter(option.value)} />
             {option.label}
-          </button>
+          </label>
         ))}
       </div>
 
@@ -186,43 +183,37 @@ export default function CommonActionsPage() {
           ) : null}
         </div>
       ) : (
-        <div className="border-hairline rounded-card overflow-hidden border bg-canvas">
-          <table className="w-full table-fixed text-left text-sm">
+        <DataTable>
             <thead className="bg-canvas-sunken text-ink-faint text-xs">
-              <tr>
-                <th className="w-[28%] px-4 py-3 font-medium">アクション名</th>
-                <th className="w-[12%] px-4 py-3 font-medium">状態</th>
-                <th className="w-[18%] px-4 py-3 font-medium">中の処理</th>
-                <th className="w-[16%] px-4 py-3 font-medium">呼び出し元</th>
-                <th className="w-[8%] px-4 py-3 font-medium">版</th>
-                <th className="w-[18%] px-4 py-3 font-medium">操作</th>
-              </tr>
+              <TableHeadRow>
+                <Th style={{ width: '28%' }}>アクション名</Th>
+                <Th style={{ width: '12%' }}>状態</Th>
+                <Th style={{ width: '18%' }}>中の処理</Th>
+                <Th style={{ width: '16%' }}>呼び出し元</Th>
+                <Th style={{ width: '8%' }}>版</Th>
+                <Th style={{ width: '18%' }}>操作</Th>
+              </TableHeadRow>
             </thead>
-            <tbody className="divide-hairline divide-y">
+            <tbody>
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-canvas-sunken/60">
-                  <td className="px-4 py-3">
-                    <p className="text-ink truncate font-semibold" title={item.name}>{item.name}</p>
-                    <p className="text-ink-faint mt-1 truncate text-xs" title={item.description ?? undefined}>
-                      {item.description || '説明はありません'}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3">
+                <Tr key={item.id}>
+                  <NameCell name={<span className="truncate" title={item.name}>{item.name}</span>} sub={<span className="truncate" title={item.description ?? undefined}>{item.description || '説明はありません'}</span>} />
+                  <Td>
                     <StatusBadge tone={item.status === 'published' ? 'success' : 'neutral'} size="compact">
                       {STATUS_LABEL[item.status]}
                     </StatusBadge>
-                  </td>
-                  <td className="text-ink-secondary px-4 py-3">{item.actionCount}個の処理</td>
-                  <td className="px-4 py-3">
+                  </Td>
+                  <Td>{item.actionCount}個の処理</Td>
+                  <Td>
                     <span className="text-ink-secondary">{item.bindingCount}か所</span>
                     {item.oldVersionBindingCount > 0 ? (
                       <span className="text-warning ml-2 text-xs">古い版 {item.oldVersionBindingCount}</span>
                     ) : null}
-                  </td>
-                  <td className="text-ink-secondary px-4 py-3">
+                  </Td>
+                  <Td>
                     {item.publishedVersion ? `v${item.publishedVersion}` : '—'}
-                  </td>
-                  <td className="px-4 py-3">
+                  </Td>
+                  <ActionCell>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                     <a
                       href={`/common-actions/versions?id=${encodeURIComponent(item.id)}`}
@@ -236,12 +227,11 @@ export default function CommonActionsPage() {
                       </button>
                     ) : null}
                     </div>
-                  </td>
-                </tr>
+                  </ActionCell>
+                </Tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </DataTable>
       )}
     </div>
   )

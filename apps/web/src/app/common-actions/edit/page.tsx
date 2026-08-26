@@ -14,12 +14,11 @@ import Button from '@/components/shared/button'
 import PageHeader from '@/components/shared/page-header'
 import StickyBar from '@/components/shared/sticky-bar'
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
+import { TextArea, TextField } from '@/components/shared/text-field'
 
 const EMPTY_RESOURCES: CommonActionResources = {
   tags: [], scenarios: [], templates: [], webhooks: [], richMenus: [], commonActions: [],
 }
-const inputClass = 'border-hairline rounded-control min-h-10 w-full border bg-canvas px-3 text-sm text-ink focus:border-action focus:outline-none'
-
 function EditCommonActionInner() {
   const canManage = useCanManageCommonActions()
   const searchParams = useSearchParams()
@@ -119,13 +118,13 @@ function EditCommonActionInner() {
         </div>
       ) : (
         <>
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+          <div className="common-action-editor-grid grid items-start gap-4">
             <div className="space-y-4">
               <section className="border-hairline rounded-card border bg-canvas p-5">
                 <h2 className="text-ink font-semibold">名前と説明</h2>
                 <div className="mt-4 space-y-4">
-                  <label className="text-ink-secondary block text-sm">共通アクション名<input value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className={`${inputClass} mt-1`} /></label>
-                  <label className="text-ink-secondary block text-sm">説明<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className={`${inputClass} mt-1 py-2`} /></label>
+                  <label className="text-ink-secondary block text-sm">共通アクション名<TextField value={name} onChange={(event) => setName(event.target.value)} maxLength={120} className="mt-1" /></label>
+                  <label className="text-ink-secondary block text-sm">説明<TextArea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="mt-1" /></label>
                 </div>
               </section>
               <section>
@@ -154,6 +153,7 @@ function EditCommonActionInner() {
               </>
             )}
           />
+          <style jsx>{`@media (min-width: 1280px) { .common-action-editor-grid { grid-template-columns: minmax(0, 1fr) 390px; } }`}</style>
         </>
       )}
     </div>
