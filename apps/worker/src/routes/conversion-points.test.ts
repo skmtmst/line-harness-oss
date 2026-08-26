@@ -18,6 +18,13 @@ const mocks = {
 };
 vi.mock('@line-crm/db', () => mocks);
 vi.mock('../services/affiliate-notifier.js', () => ({ notifyAffiliateApproval: vi.fn() }));
+vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: vi.fn(async () => true),
+  getVisibleLineAccountScope: vi.fn(async () => ({
+    allowedAccountIds: [],
+    canSeeUnassigned: true,
+  })),
+}));
 
 const { conversions } = await import('./conversions.js');
 const app = new Hono<Env>();
@@ -26,7 +33,14 @@ app.use('*', async (c, next) => {
   return next();
 });
 app.route('/', conversions);
-const env = { DB: {} as D1Database };
+const env = {
+  DB: {
+    prepare: vi.fn(() => ({
+      bind: vi.fn().mockReturnThis(),
+      all: vi.fn(async () => ({ results: [{ id: 'cp-1' }] })),
+    })),
+  } as unknown as D1Database,
+};
 
 function req(path: string, method: string, body?: unknown) {
   return app.fetch(
