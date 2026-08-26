@@ -1,5 +1,6 @@
 import type { Env } from '../index.js';
 import {
+  githubFailureDetails,
   processCodexAutoMerge,
   type CodexAutoMergeMessage,
 } from './codex-auto-merge.js';
@@ -178,7 +179,7 @@ export function shouldStopCodexQueueRetry(
   return attempts >= maxAttempts;
 }
 
-export type CodexMonitorErrorClassification = 'db_error' | 'slack_api_error' | 'unknown';
+export type CodexMonitorErrorClassification = 'db_error' | 'slack_api_error' | 'github_api_error' | 'unknown';
 
 export function createCodexQueueFailureLog(input: {
   kind: string;
@@ -186,10 +187,14 @@ export function createCodexQueueFailureLog(input: {
   reason: CodexMonitorErrorClassification;
   attempts: number;
   stopped: boolean;
+  error?: unknown;
 }) {
+  const github = githubFailureDetails(input.error);
+  const { error: _error, ...safeInput } = input;
   return {
     event: 'codex_cloud_monitor_queue_failed',
-    ...input,
+    ...safeInput,
+    ...(github ? { githubStatus: github.status, githubPath: github.path } : {}),
   };
 }
 
@@ -204,6 +209,9 @@ export function classifyCodexMonitorError(error: unknown): CodexMonitorErrorClas
   const name = typeof candidate?.name === 'string' ? candidate.name.toLowerCase() : '';
   const message = typeof candidate?.message === 'string' ? candidate.message.toLowerCase() : '';
   const status = candidate?.status ?? candidate?.statusCode;
+  if (message.includes('github_api_failed') || message.includes('github_ledger_write_failed')) {
+    return 'github_api_error';
+  }
   if (
     name.includes('d1') ||
     name.includes('sqlite') ||
