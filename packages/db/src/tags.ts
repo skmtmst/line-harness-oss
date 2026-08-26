@@ -397,13 +397,35 @@ export async function updateTag(
  * 1件ずつ当てると、10件動かしたときに10往復する。その途中で誰かが
  * 一覧を開くと、半分だけ入れ替わった並びが見える。まとめて送る。
  *
- * 渡された順に 0,1,2… を振る。画面で見えている並びをそのまま写す形なので、
- * 抜けや重複を気にしなくてよい。
+ * 絞り込み中は、画面に見えているタグのIDだけが渡る。指定されたタグが
+ * 現在占めている位置だけを入れ替え、指定されていないタグはその場に残す。
+ * 最後に全体へ一意の順番を振るので、部分的な並び替えでも順番が重複しない。
  */
 export async function reorderTags(db: D1Database, ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
+  if (ids.length < 2) return;
+
+  const current = await db
+    .prepare(
+      `SELECT t.id
+         FROM tags t
+         LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+        GROUP BY t.id
+        ORDER BY t.display_order ASC, COUNT(ft.friend_id) DESC, t.name ASC`,
+    )
+    .all<{ id: string }>();
+
+  const existing = new Set(current.results.map((tag) => tag.id));
+  const requested = ids.filter((id) => existing.has(id));
+  if (requested.length < 2) return;
+
+  const requestedSet = new Set(requested);
+  let requestedIndex = 0;
+  const nextOrder = current.results.map((tag) =>
+    requestedSet.has(tag.id) ? requested[requestedIndex++] : tag.id,
+  );
+
   await db.batch(
-    ids.map((id, i) =>
+    nextOrder.map((id, i) =>
       db.prepare(`UPDATE tags SET display_order = ? WHERE id = ?`).bind(i, id),
     ),
   );
