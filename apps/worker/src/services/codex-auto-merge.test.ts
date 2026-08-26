@@ -17,6 +17,7 @@ const message: CodexAutoMergeMessage = {
   threadTs: '1787000000.000001',
   requesterUserId: 'U-CLAUDE',
   prNumber: 344,
+  approvedHeadSha: '1111111111111111111111111111111111111111',
 };
 
 function env(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
@@ -60,7 +61,7 @@ function pullRequest(overrides: Record<string, unknown> = {}) {
     title: 'safe change',
     html_url: 'https://github.com/skmtmst/line-harness-oss/pull/344',
     base: { ref: 'codex/development', sha: 'base-sha' },
-    head: { sha: 'head-sha' },
+    head: { sha: message.approvedHeadSha },
     labels: [],
     ...overrides,
   };
@@ -85,13 +86,13 @@ function postedText(fetcher: ReturnType<typeof vi.fn>): string {
 describe('Codex監査合格合図', () => {
   test('固定された2行を含む投稿だけからPR番号を読む', () => {
     expect(parseCodexAuditApproval(
-      '[claude->codex]\n確認済みです\n【監査結果】PR #344 合格・統合可',
-    )).toBe(344);
-    expect(parseCodexAuditApproval('前置き\n[claude->codex]\n【監査結果】PR #344 合格・統合可')).toBeNull();
+      '[claude->codex]\n確認済みです\n【監査結果】PR #344 HEAD 1111111111111111111111111111111111111111 合格・統合可',
+    )).toEqual({ prNumber: 344, headSha: '1111111111111111111111111111111111111111' });
+    expect(parseCodexAuditApproval('前置き\n[claude->codex]\n【監査結果】PR #344 HEAD 1111111111111111111111111111111111111111 合格・統合可')).toBeNull();
     expect(parseCodexAuditApproval('[claude->codex]\n【監査結果】PR #344 条件付き合格')).toBeNull();
     expect(parseCodexAuditApproval('[claude->codex]\n【監査結果】 PR #344 合格・統合可')).toBeNull();
     expect(parseCodexAuditApproval(
-      '[claude->codex]\n【監査結果】PR #344 合格・統合可\n【監査結果】PR #345 合格・統合可',
+      '[claude->codex]\n【監査結果】PR #344 HEAD 1111111111111111111111111111111111111111 合格・統合可\n【監査結果】PR #345 HEAD 2222222222222222222222222222222222222222 合格・統合可',
     )).toBeNull();
   });
 
@@ -179,6 +180,16 @@ describe('Codex自動マージ処理', () => {
     expect(postedText(fetcher)).toContain('検知のみ');
   });
 
+  test('監査後にHEADが変わったPRは再監査を求めてマージしない', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(parentResponse())
+      .mockResolvedValueOnce(json(pullRequest({ head: { sha: '2222222222222222222222222222222222222222' } })))
+      .mockResolvedValueOnce(json({ ok: true }));
+    await processCodexAutoMerge(env(), message, fetcher as typeof fetch);
+    expect(postedText(fetcher)).toContain('監査後にPRの差分が変わった');
+    expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/pulls/344/merge'))).toBe(false);
+  });
+
   test('台帳に記録済みなら二度目のマージをしない', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(parentResponse())
@@ -243,7 +254,7 @@ describe('Codex自動マージ処理', () => {
     expect((mergeCall?.[1] as RequestInit).method).toBe('PUT');
     expect(JSON.parse(String((mergeCall?.[1] as RequestInit).body))).toMatchObject({
       merge_method: 'merge',
-      sha: 'head-sha',
+      sha: message.approvedHeadSha,
     });
     const ledgerCall = fetcher.mock.calls.find(([url, init]) => (
       String(url).endsWith('/issues/344/comments') && (init as RequestInit).method === 'POST'

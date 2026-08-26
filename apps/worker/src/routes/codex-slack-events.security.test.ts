@@ -411,7 +411,7 @@ describe('Codex Slack relay security boundary', () => {
       type: 'event_callback', event_id: 'Ev-audit-344', team_id: 'T-1',
       event: {
         type: 'message', user: 'U-CLAUDE',
-        text: '[claude->codex]\n【監査結果】PR #344 合格・統合可',
+        text: '[claude->codex]\n【監査結果】PR #344 HEAD 1111111111111111111111111111111111111111 合格・統合可',
         channel: 'C-1', ts: '6.0', thread_ts: '5.0',
       },
     });
@@ -428,6 +428,7 @@ describe('Codex Slack relay security boundary', () => {
       threadTs: '5.0',
       requesterUserId: 'U-CLAUDE',
       prNumber: 344,
+      approvedHeadSha: '1111111111111111111111111111111111111111',
     });
     expect(current.prepare).not.toHaveBeenCalled();
   });
@@ -435,7 +436,7 @@ describe('Codex Slack relay security boundary', () => {
   test.each([
     ['合図なし', 'U-CLAUDE', '[claude->codex]\nPR #344をお願いします'],
     ['書式違い', 'U-CLAUDE', '[claude->codex]\n【監査結果】PR #344 条件付き合格'],
-    ['許可リスト外', 'U-OTHER', '[claude->codex]\n【監査結果】PR #344 合格・統合可'],
+    ['許可リスト外', 'U-OTHER', '[claude->codex]\n【監査結果】PR #344 HEAD 1111111111111111111111111111111111111111 合格・統合可'],
   ])('%sなら自動マージ確認へ予約しない', async (_case, user, text) => {
     const current = monitorEnv();
     current.bindings.CODEX_RELAY_SOURCE_USER_IDS = 'U-CLAUDE';
