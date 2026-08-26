@@ -115,6 +115,8 @@ export interface Tag {
   };
   /** このタグが付いた後に動く、マイル以外のアクション数。0件なら省略する。 */
   otherActionCount?: number;
+  /** タグ管理の整理候補に入る理由。withCounts=1 のときだけ返る。 */
+  cleanupReasons?: Array<"unused" | "duplicate_name">;
 }
 
 /** 友だち情報欄の種類 */
