@@ -3,10 +3,43 @@ import { beforeAll, afterEach, describe, expect, it, vi } from 'vitest'
 let fetchApi: typeof import('./api').fetchApi
 let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
+let eventsApi: typeof import('./api').eventsApi
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
-  ;({ fetchApi, ApiError, extractApiErrorMessage } = await import('./api'))
+  ;({ fetchApi, ApiError, extractApiErrorMessage, eventsApi } = await import('./api'))
+})
+
+describe('eventsApi.createSlots', () => {
+  const slots = Array.from({ length: 900 }, (_, index) => ({
+    starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),
+    ends_at: new Date(Date.UTC(2099, 0, 1, 0, index + 1)).toISOString(),
+    capacity: null,
+  }))
+
+  it('900 slots are posted sequentially in 400/400/100 chunks', async () => {
+    const fetchSpy = vi.fn(async (_url: string, init?: RequestInit) => {
+      const sent = JSON.parse(init?.body as string) as { slots: unknown[] }
+      return new Response(JSON.stringify({ items: sent.slots }), { status: 201 })
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+
+    const response = await eventsApi.createSlots('account', 'event', slots)
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3)
+    expect(fetchSpy.mock.calls.map((call) => JSON.parse(call[1]?.body as string).slots.length)).toEqual([400, 400, 100])
+    expect(response.items).toHaveLength(900)
+  })
+
+  it('reports how many slots were added when a later chunk fails', async () => {
+    const fetchSpy = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: slots.slice(0, 400) }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await expect(eventsApi.createSlots('account', 'event', slots)).rejects.toThrow('400件まで追加されました')
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+  })
 })
 
 afterEach(() => {
