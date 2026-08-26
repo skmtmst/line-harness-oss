@@ -150,11 +150,12 @@ function SectionHead({
 }
 
 /** 対応マーク。やり取りがまだ無い友だちは、未対応でも対応済みでもない。 */
-function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'resolved' }) {
+function SupportMarkBadge({ status }: { status?: 'unread' | 'in_progress' | 'on_hold' | 'resolved' }) {
   if (!status) return <span className="text-ink-faint text-xs">やり取りなし</span>
   const map = {
     unread: { label: '未対応', className: 'bg-warning-bg text-warning' },
     in_progress: { label: '対応中', className: 'bg-info-bg text-info' },
+    on_hold: { label: '保留', className: 'bg-indigo-100 text-indigo-700' },
     resolved: { label: '対応済', className: 'bg-success-bg text-success' },
   } as const
   const s = map[status]

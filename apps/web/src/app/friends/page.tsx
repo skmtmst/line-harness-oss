@@ -119,7 +119,13 @@ function FriendsPageInner({
     const header = ['友だち名', '対応', 'シナリオ', '最新メッセージ', '登録日']
     const rows = friends.map((friend) => [
       friend.displayName,
-      friend.chatStatus === 'unread' ? '未対応' : friend.chatStatus === 'in_progress' ? '対応中' : '対応済み',
+      friend.chatStatus === 'unread'
+        ? '未対応'
+        : friend.chatStatus === 'in_progress'
+          ? '対応中'
+          : friend.chatStatus === 'on_hold'
+            ? '保留'
+            : '対応済み',
       friend.activeScenario?.name ?? '',
       friend.latestIncomingMessage?.content ?? '',
       friend.createdAt.slice(0, 10),

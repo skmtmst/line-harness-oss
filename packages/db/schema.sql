@@ -830,11 +830,15 @@ CREATE TABLE IF NOT EXISTS chats (
   id            TEXT PRIMARY KEY,
   friend_id     TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
   operator_id   TEXT REFERENCES operators (id) ON DELETE SET NULL,
-  status        TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'in_progress', 'resolved')),
+  status        TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'in_progress', 'on_hold', 'resolved')),
   notes         TEXT,
   last_message_at TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  revision                 INTEGER NOT NULL DEFAULT 0,
+  last_customer_message_at TEXT,
+  last_operator_message_at TEXT,
+  next_response_due_at     TEXT
 );
 
 -- 1 friend = 1 chat 行 (048_chats_friend_unique)。
@@ -1317,14 +1321,18 @@ CREATE TABLE IF NOT EXISTS support_email_threads (
   subject            TEXT NOT NULL,
   normalized_subject TEXT NOT NULL,
   status             TEXT NOT NULL DEFAULT 'unread'
-                     CHECK (status IN ('unread', 'in_progress', 'resolved')),
+                     CHECK (status IN ('unread', 'in_progress', 'on_hold', 'resolved')),
   assigned_staff_id  TEXT,
   last_message_at    TEXT NOT NULL,
   last_incoming_at   TEXT NOT NULL,
   last_outgoing_at   TEXT,
   resolved_at        TEXT,
   created_at         TEXT NOT NULL,
-  updated_at         TEXT NOT NULL
+  updated_at         TEXT NOT NULL,
+  revision                 INTEGER NOT NULL DEFAULT 0,
+  last_customer_message_at TEXT,
+  last_operator_message_at TEXT,
+  next_response_due_at     TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_support_email_threads_status_last
