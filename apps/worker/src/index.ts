@@ -1542,6 +1542,7 @@ export default {
           reason,
           attempts: message.attempts,
           stopped,
+          error,
         })));
         if (stopped) {
           try {

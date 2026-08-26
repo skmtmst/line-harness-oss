@@ -71,6 +71,23 @@ export type PullRequestBlockReason =
   | 'environment_file'
   | 'secret_addition';
 
+export type GitHubFailureDetails = {
+  kind: 'api' | 'ledger';
+  status: number;
+  path: string;
+};
+
+export function githubFailureDetails(error: unknown): GitHubFailureDetails | null {
+  const message = error instanceof Error ? error.message : '';
+  const match = /^GITHUB_(API_FAILED|LEDGER_WRITE_FAILED):(\d{3}):(\/[^\s]*)$/.exec(message);
+  if (!match) return null;
+  return {
+    kind: match[1] === 'LEDGER_WRITE_FAILED' ? 'ledger' : 'api',
+    status: Number(match[2]),
+    path: match[3],
+  };
+}
+
 type GitHubResponse<T> = {
   response: Response;
   value: T;
@@ -126,7 +143,17 @@ export function prohibitedPullRequestChange(
     if (normalized.startsWith('packages/db/migrations/')) {
       return { reason: 'migration', filename: normalized };
     }
-    if (['auth.ts', 'tenant-scope.ts', 'account-access.ts'].includes(basename)) {
+    if (
+      [
+        'auth.ts',
+        'tenant-scope.ts',
+        'account-access.ts',
+        'codex-auto-merge.ts',
+        'codex-slack-events.ts',
+        'codex-cloud-monitor.ts',
+        'slack-text.ts',
+      ].includes(basename) || /^wrangler[^/]*\.toml$/i.test(basename)
+    ) {
       return { reason: 'protected_file', filename: normalized };
     }
     if (
@@ -330,7 +357,7 @@ function blockMessage(prNumber: number, reason: string): string {
 function prohibitedReasonText(blocked: { reason: PullRequestBlockReason; filename: string }): string {
   const labels: Record<PullRequestBlockReason, string> = {
     migration: 'DBマイグレーションが含まれます',
-    protected_file: '認証・テナント境界の保護対象ファイルが含まれます',
+    protected_file: '人がマージする保護対象ファイル（認証・テナント境界または自動マージの仕組み自体）が含まれます',
     environment_file: '環境設定ファイルが含まれます',
     secret_addition: '秘密値またはsecret追加の疑いがある差分を検知しました',
   };
@@ -374,6 +401,32 @@ export async function processCodexAutoMerge(
     return;
   }
 
+  try {
+    await processCodexAutoMergeWithGitHub(env, message, token, fetcher);
+  } catch (error) {
+    const failure = githubFailureDetails(error);
+    if (!failure) throw error;
+    console.error(JSON.stringify({
+      event: 'codex_auto_merge_github_failed',
+      status: failure.status,
+      path: failure.path,
+      ledgerWrite: failure.kind === 'ledger',
+    }));
+    const reason = failure.kind === 'ledger'
+      ? `マージ済みですが台帳に記録できませんでした。二重マージ防止の記録がないため、人が確認してください (${failure.status} ${failure.path})`
+      : `GitHub APIが失敗しました (${failure.status} ${failure.path})`;
+    await postSlackResult(env, message, failure.kind === 'ledger'
+      ? `【自動マージ要確認】PR #${message.prNumber} は${reason}`
+      : blockMessage(message.prNumber, reason), fetcher);
+  }
+}
+
+async function processCodexAutoMergeWithGitHub(
+  env: Env['Bindings'],
+  message: CodexAutoMergeMessage,
+  token: string,
+  fetcher: typeof fetch,
+): Promise<void> {
   const repoPath = `/repos/${EXPECTED_REPOSITORY}`;
   const prPath = `${repoPath}/pulls/${message.prNumber}`;
   const pullRequest = await githubJson<GitHubPullRequest>(token, prPath, fetcher);
@@ -421,7 +474,7 @@ export async function processCodexAutoMerge(
       fetcher,
     );
     if (!recoveredLedger.response.ok) {
-      throw new Error(`GITHUB_LEDGER_WRITE_FAILED:${recoveredLedger.response.status}`);
+      throw new Error(`GITHUB_LEDGER_WRITE_FAILED:${recoveredLedger.response.status}:${repoPath}/issues/${message.prNumber}/comments`);
     }
     await postSlackResult(env, message, blockMessage(message.prNumber, 'GitHubで既にマージ済みです。再マージせず台帳へ記録しました'), fetcher);
     return;
@@ -521,7 +574,9 @@ export async function processCodexAutoMerge(
     },
     fetcher,
   );
-  if (!ledger.response.ok) throw new Error(`GITHUB_LEDGER_WRITE_FAILED:${ledger.response.status}`);
+  if (!ledger.response.ok) {
+    throw new Error(`GITHUB_LEDGER_WRITE_FAILED:${ledger.response.status}:${repoPath}/issues/${message.prNumber}/comments`);
+  }
   await postSlackResult(
     env,
     message,
