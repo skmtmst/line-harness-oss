@@ -402,4 +402,53 @@ describe('Codex Slack relay security boundary', () => {
     expect(unsigned.status).toBe(401);
     expect(current.queueSend).not.toHaveBeenCalled();
   });
+
+  test('許可済み投稿者の固定監査合図だけを自動マージ確認へ予約する', async () => {
+    const current = monitorEnv();
+    current.bindings.CODEX_RELAY_SOURCE_USER_IDS = 'U-CLAUDE';
+    current.bindings.CODEX_RELAY_ENABLED = 'false';
+    const body = JSON.stringify({
+      type: 'event_callback', event_id: 'Ev-audit-344', team_id: 'T-1',
+      event: {
+        type: 'message', user: 'U-CLAUDE',
+        text: '[claude->codex]\n【監査結果】PR #344 合格・統合可',
+        channel: 'C-1', ts: '6.0', thread_ts: '5.0',
+      },
+    });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, autoMergeQueued: true });
+    expect(current.queueSend).toHaveBeenCalledTimes(1);
+    expect(current.queueSend).toHaveBeenCalledWith({
+      kind: 'auto_merge',
+      slackEventId: 'Ev-audit-344',
+      channelId: 'C-1',
+      threadTs: '5.0',
+      requesterUserId: 'U-CLAUDE',
+      prNumber: 344,
+    });
+    expect(current.prepare).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['合図なし', 'U-CLAUDE', '[claude->codex]\nPR #344をお願いします'],
+    ['書式違い', 'U-CLAUDE', '[claude->codex]\n【監査結果】PR #344 条件付き合格'],
+    ['許可リスト外', 'U-OTHER', '[claude->codex]\n【監査結果】PR #344 合格・統合可'],
+  ])('%sなら自動マージ確認へ予約しない', async (_case, user, text) => {
+    const current = monitorEnv();
+    current.bindings.CODEX_RELAY_SOURCE_USER_IDS = 'U-CLAUDE';
+    const body = JSON.stringify({
+      type: 'event_callback', event_id: `Ev-reject-${user}`, team_id: 'T-1',
+      event: { type: 'message', user, text, channel: 'C-1', ts: '6.1', thread_ts: '5.0' },
+    });
+    const response = await app().request('/api/integrations/slack/events', {
+      method: 'POST', headers: await slackHeaders(body), body,
+    }, current.bindings);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, ignored: true });
+    expect(current.queueSend).not.toHaveBeenCalled();
+    expect(current.prepare).not.toHaveBeenCalled();
+  });
 });
