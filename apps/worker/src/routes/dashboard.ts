@@ -8,7 +8,7 @@ import {
   type DashboardOverview,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { canAccessLineAccount } from '../services/account-access.js';
+import { canAccessLineAccount, getVisibleLineAccountScope } from '../services/account-access.js';
 
 /**
  * ダッシュボードが1回で読む数。
@@ -75,8 +75,14 @@ dashboard.get('/api/dashboard/overview', async (c) => {
       return c.json({ success: false as const, error: 'LINE account not found' }, 404);
     }
 
-    const overview: DashboardOverview = await getDashboardOverview(c.env.DB, period, accountId);
-    const quota = await fetchQuota(selectedAccount?.channel_access_token ?? c.env.LINE_CHANNEL_ACCESS_TOKEN);
+    const visibleScope = await getVisibleLineAccountScope(c.env.DB, staff);
+    const statsScope = accountId
+      ? { allowedAccountIds: [accountId], includeUnassigned: false }
+      : { allowedAccountIds: visibleScope.allowedAccountIds, includeUnassigned: visibleScope.canSeeUnassigned };
+    const overview: DashboardOverview = await getDashboardOverview(c.env.DB, period, statsScope);
+    const quotaToken = selectedAccount?.channel_access_token
+      ?? (visibleScope.canSeeUnassigned ? c.env.LINE_CHANNEL_ACCESS_TOKEN : undefined);
+    const quota = await fetchQuota(quotaToken);
     if (quota.failed) overview.partialFailures.push('quota');
 
     return c.json({
@@ -100,7 +106,11 @@ dashboard.get('/api/dashboard/overview', async (c) => {
  */
 dashboard.get('/api/list-stats', async (c) => {
   try {
-    return c.json({ success: true as const, data: await getListStats(c.env.DB) });
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    return c.json({ success: true as const, data: await getListStats(c.env.DB, {
+      allowedAccountIds: accountScope.allowedAccountIds,
+      includeUnassigned: accountScope.canSeeUnassigned,
+    }) });
   } catch (err) {
     console.error('GET /api/list-stats error:', err);
     return c.json({ success: false as const, error: '集計を取得できませんでした' }, 500);

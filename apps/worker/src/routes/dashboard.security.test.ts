@@ -20,12 +20,13 @@ const account = (id: string) => ({
   channel_secret: 'secret', is_active: 1, parent_line_account_id: null,
 });
 
-function app() {
+function app(tenantId?: string) {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.set('staff', {
       id: 'staff-1', name: '担当者', role: 'staff', readOnly: false,
       assignedLineAccountId: 'account-1', canAccessDescendantAccounts: false,
+      tenantId,
     });
     return next();
   });
@@ -53,13 +54,38 @@ describe('dashboard organization account policy', () => {
     dbMocks.getDashboardOverview.mockResolvedValue({ delivery: {}, partialFailures: [] });
     const response = await app().request('/api/dashboard/overview?accountId=account-2', {}, env());
     expect(response.status).toBe(200);
-    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', 'account-2');
+    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
+      allowedAccountIds: ['account-2'], includeUnassigned: false,
+    });
   });
 
-  test('staff can request the organization-wide overview without an explicit account', async () => {
+  test('staff can request only their visible account scope without an explicit account', async () => {
     dbMocks.getDashboardOverview.mockResolvedValue({ delivery: {}, partialFailures: [] });
     const response = await app().request('/api/dashboard/overview', {}, env());
     expect(response.status).toBe(200);
-    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', null);
+    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
+      allowedAccountIds: ['account-1', 'account-2'], includeUnassigned: true,
+    });
+  });
+
+  test('non-default tenant skips the default quota token while dashboard numbers still succeed', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...account('account-1'), tenant_id: 'tenant-b' },
+      { ...account('account-2'), tenant_id: 'tenant-a' },
+    ]);
+    dbMocks.getDashboardOverview.mockResolvedValue({
+      delivery: { sent: 12, broadcasts: 3 }, partialFailures: [],
+    });
+    const response = await app('tenant-b').request('/api/dashboard/overview', {}, env());
+
+    expect(response.status).toBe(200);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
+      allowedAccountIds: ['account-1'], includeUnassigned: false,
+    });
+    const body = await response.json() as { data: { delivery: Record<string, unknown> } };
+    expect(body.data.delivery).toMatchObject({
+      sent: 12, broadcasts: 3, quotaLimit: null, quotaUsed: null,
+    });
   });
 });
