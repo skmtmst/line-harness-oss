@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 const dbMocks = {
   getTags: vi.fn(),
   getTagsWithUsage: vi.fn(),
+  getTagDeleteImpact: vi.fn(),
   createTag: vi.fn(),
   deleteTag: vi.fn(),
   updateTagMileageSettings: vi.fn(),
@@ -119,6 +120,67 @@ describe('GET /api/tags', () => {
     expect(res.status).toBe(200);
     expect(dbMocks.getTags).toHaveBeenCalledWith(expect.anything());
     expect(dbMocks.getTagsWithUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/tags/:id/delete-impact', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) fn.mockReset();
+  });
+
+  test('削除前に友だち人数と運用設定の参照を返す', async () => {
+    dbMocks.getTagDeleteImpact.mockResolvedValue({
+      tag: { id: 'tag-1', name: 'VIP' },
+      friendCount: 5,
+      references: {
+        broadcasts: 2,
+        forms: 0,
+        scenarios: 1,
+        autoReplies: 0,
+        savedSearches: 0,
+        automations: 0,
+        commonActions: 0,
+        richMenus: 0,
+        templates: 0,
+        webinars: 0,
+        reminders: 0,
+        entryRoutes: 0,
+        trackedLinks: 0,
+        bookingMenus: 0,
+        affiliateOffers: 0,
+        events: 0,
+        analyticsFunnels: 0,
+        friendAddSettings: 0,
+      },
+      blockingReferenceCount: 3,
+      canDelete: false,
+    });
+
+    const res = await app().request('/api/tags/tag-1/delete-impact');
+    expect(res.status).toBe(200);
+    expect(dbMocks.getTagDeleteImpact).toHaveBeenCalledWith(expect.anything(), 'tag-1');
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: { friendCount: 5, blockingReferenceCount: 3, canDelete: false },
+    });
+  });
+
+  test('存在しないタグは404にする', async () => {
+    dbMocks.getTagDeleteImpact.mockResolvedValue(null);
+    const res = await app().request('/api/tags/missing/delete-impact');
+    expect(res.status).toBe(404);
+  });
+
+  test('閲覧だけの人には削除影響を見せない', async () => {
+    const res = await app('staff').request('/api/tags/tag-1/delete-impact');
+    expect(res.status).toBe(403);
+    expect(dbMocks.getTagDeleteImpact).not.toHaveBeenCalled();
+  });
+
+  test('集計失敗を空の影響として扱わない', async () => {
+    dbMocks.getTagDeleteImpact.mockRejectedValue(new Error('D1 unavailable'));
+    const res = await app().request('/api/tags/tag-1/delete-impact');
+    expect(res.status).toBe(500);
   });
 });
 
