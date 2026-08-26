@@ -1,6 +1,7 @@
 import {
   rebuildAnalyticsDailyMetrics,
   recentAnalyticsProjectionRange,
+  ensureAnalyticsEventCoverage,
   type LineAccount,
 } from '@line-crm/db';
 
@@ -27,6 +28,15 @@ export async function refreshRecentAnalyticsProjections(
     if (account.is_active !== 1) continue;
     result.processed += 1;
     try {
+      // 現在のWorkerが受付開始から欠けなく記録できる種類だけを「取得可能」にする。
+      // 未接続のフォーム・購入などを0件として見せないため、全種類は登録しない。
+      await ensureAnalyticsEventCoverage(db, {
+        lineAccountId: account.id,
+        eventTypes: [
+          'friend_add', 'friend_unfollow', 'message_received', 'postback_received',
+        ],
+        availableFrom: now.toISOString(),
+      });
       const projection = await rebuildAnalyticsDailyMetrics(db, {
         accountId: account.id,
         timeZone: account.timezone || 'Asia/Tokyo',
