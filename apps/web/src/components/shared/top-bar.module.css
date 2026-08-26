@@ -74,10 +74,13 @@
   cursor: pointer;
 }
 
-/* URLが決まっていない間。押せないことを見た目で示し、リンクにしない。 */
+/*
+ * URLが決まっていない間。**文字は黒のまま太字**（設計 `LoVfp` は $ink / 700）。
+ * 文字まで薄くすると、URLが入ったあとと見た目が変わってしまう。
+ * 押せないことは、枠の薄さとカーソルで示す。
+ */
 .manualDisabled {
   border-color: var(--color-divider-soft);
-  color: var(--color-ink-faint);
   cursor: default;
 }
 
