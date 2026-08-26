@@ -25,22 +25,35 @@ export interface KpiSpec {
 
 export default function ListKpis({
   build,
+  titles,
   variant = 'v5',
 }: {
   build: (stats: ListStats) => KpiSpec[]
+  /**
+   * 数が取れなかったときに残す見出し。
+   *
+   * 渡さないと、失敗したあとのカードは**見出しも消えて「—」だけ**になる。
+   * どの枠が何の数なのか分からなくなるので、4枚の名前だけは残す。
+   * `build` は数が要るので呼べない（数の無いところに嘘を入れないため）。
+   */
+  titles?: [string, string, string, string]
   variant?: NonNullable<SummaryCardProps['variant']>
 }) {
   const [stats, setStats] = useState<ListStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         const res = await api.listStats.get()
-        if (!cancelled && res.success) setStats(res.data)
+        if (cancelled) return
+        if (res.success) setStats(res.data)
+        else setFailed(true)
       } catch {
-        // 数が出ないだけで一覧は使える。
+        // 数が出ないだけで一覧は使える。**0 とは出さない。**
+        if (!cancelled) setFailed(true)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -54,7 +67,13 @@ export default function ListKpis({
   // 下の一覧を読んでいる途中で位置がずれる。
   const cards: KpiSpec[] = stats
     ? build(stats)
-    : [0, 1, 2, 3].map((i) => ({ title: '', value: null, unit: '', detail: '', key: i }) as KpiSpec)
+    : [0, 1, 2, 3].map((i) => ({
+        title: failed ? titles?.[i] ?? '' : '',
+        value: null,
+        unit: '',
+        detail: failed && titles ? '取得できませんでした' : '',
+        key: i,
+      }) as KpiSpec)
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">

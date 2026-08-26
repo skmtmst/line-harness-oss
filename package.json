@@ -25,7 +25,7 @@
     "deploy:staging": "bash scripts/deploy/staging-deploy.sh",
     "build:bundle": "tsx scripts/release/build-bundle.ts",
     "qa:mock": "node scripts/visual-qa/mock-api.mjs",
-    "qa:web": "NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web dev",
+    "qa:web": "NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web exec next dev --port 3101",
     "qa:shot": "playwright test scripts/visual-qa/capture.spec.mjs"
   },
   "packageManager": "pnpm@9.15.4",

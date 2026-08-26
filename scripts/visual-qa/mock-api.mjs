@@ -18,6 +18,7 @@
  *   PORT=9000 node scripts/visual-qa/mock-api.mjs
  */
 import { createServer } from 'node:http'
+import { readArrayGetPaths } from './api-shapes.mjs'
 import { LIST_STATS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
@@ -67,18 +68,68 @@ const ACCOUNT = {
  */
 const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
 
-/** 一覧を配列で返すことがはっきりしているもの。 */
-const ARRAY_PATHS = [
-  '/api/chats',
-  '/api/operators',
-  '/api/folders',
-  '/api/staff',
-  '/api/feature-settings',
-  '/api/line-accounts',
-]
+/** 期間の端。**時計を読まない**（読むと画像が毎回変わる）。 */
+const FIXED_FROM = '2026-01-01'
+const FIXED_TO = '2026-01-13'
 
-/** 前方一致で配列を返す口（`/api/scenarios/…` のように後ろが変わるもの）。 */
-const ARRAY_PREFIXES = ['/api/scenarios', '/api/rich-menus', '/api/templates', '/api/media/', '/api/common-vars/']
+/**
+ * ダッシュボードの器（`DashboardOverview`）。
+ *
+ * 数はすべて0。**「取れなかった」ではなく「0件」として描かせる**ための器で、
+ * ここに嘘の実績を入れない。`trend` は空配列のままにする（作り物の折れ線を
+ * 入れると、動いていない画面を動いていると読み違える）。
+ */
+const DASHBOARD_OVERVIEW = {
+  period: 'last7',
+  generatedAt: `${FIXED_TO}T00:00:00.000Z`,
+  friends: { active: 0, total: 0, blockedByThem: 0, hiddenByUs: 0, blockedBoth: 0 },
+  inbox: { unanswered: 0, inProgress: 0, resolved: 0, oldestUnansweredMinutes: null, averageFirstReplyMinutes: null },
+  delivery: { sent: 0, push: 0, reply: 0, broadcasts: 0, quotaLimit: null, quotaUsed: null },
+  trend: [],
+  conversions: { total: 0, byPoint: [] },
+  partialFailures: [],
+  operations: {
+    scenarios: { active: 0, paused: 0 },
+    migrations: { active: 0, completed: 0 },
+    bookings: { pending: 0, upcoming: 0 },
+    inflowTop: [],
+    funnelAlerts: 0,
+    automationFailures: 0,
+  },
+}
+
+/**
+ * 一覧を配列で返す口。**`api.ts` から読む。手で並べない。**
+ *
+ * 手で並べていたときは6件しか無く、足りない口が `{items:[],total:0}` に
+ * 落ちて、ダッシュボード・分析・一斉配信・リッチメニュー・
+ * オートメーションの5画面が `xxx.filter is not a function` で真っ白だった。
+ */
+const ARRAY_PATHS = readArrayGetPaths()
+
+/**
+ * `api.ts` を通らない口。**足すのは、落ちた画面を見てから。**
+ *
+ * 受信箱の担当者一覧は `api.ts` に無く、自動では拾えない。
+ * 消したら `operators.map is not a function` で受信箱が真っ白になった。
+ */
+for (const extra of ['/api/operators', '/api/feature-settings']) ARRAY_PATHS.add(extra)
+
+/**
+ * 後ろが変わる口（`/api/scenarios/{id}/steps` など）。
+ * ここは `api.ts` から機械的には決められないので、**落ちた画面を見て足す**。
+ */
+const ARRAY_PREFIXES = [
+  '/api/scenarios/',
+  '/api/automations/',
+  '/api/media/',
+  '/api/common-vars/',
+  '/api/entry-routes/',
+  '/api/affiliates/',
+  '/api/traffic-pools/',
+  '/api/ad-platforms/',
+  '/api/users/',
+]
 
 /** 機能のオン／オフ。全部オンにして、どの画面も出るようにする。 */
 const FEATURE_KEYS = [
@@ -105,8 +156,36 @@ const SHAPES = {
     parentChildMode: false,
     specializedFeatureKeys: [],
   },
-  '/api/inbox/unanswered/count': { count: 0 },
-  '/api/nen-members/overview': { total: 0, active: 0, items: [] },
+  '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
+  '/api/nen-members/overview': { pets: 0, healthLogs: 0, activeCare: 0, pendingPhotos: 0, members: 0, consultations: 0 },
+
+  /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
+  '/api/booking/admin/requests': { requests: [] },
+
+  /* EC の出荷予定（`EcShipmentList`）。`soon`/`later` は配列で要る。 */
+  '/api/ec-commerce/shipments': {
+    today: FIXED_TO,
+    tomorrow: '2026-01-14',
+    soon: [],
+    later: [],
+    soonCount: 0,
+    laterCount: 0,
+    scanned: 0,
+    scanLimit: 0,
+  },
+
+  /*
+   * ダッシュボード（`DashboardOverview`）。**入れ子の数まで置く。**
+   * `friends` や `inbox` を欠くと `undefined.toLocaleString()` で
+   * 画面ごと落ちる。日付は固定（毎回同じ画像にするため）。
+   */
+  '/api/dashboard/overview': DASHBOARD_OVERVIEW,
+  '/api/dashboard/organization-overview': DASHBOARD_OVERVIEW,
+
+  /* リッチメニュー。LINE側にある実物の一覧と、押された回数。 */
+  '/api/rich-menu-groups/external': { currentDefault: null, lineMenus: [] },
+  '/api/rich-menu-groups/tap-stats': { from: FIXED_FROM, to: FIXED_TO, byArea: [], byGroup: [], total: 0 },
+
 }
 
 /** `success` の器に入れず、そのまま返すもの。 */
@@ -130,15 +209,16 @@ function bodyFor(pathname) {
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
   if (/^\/api\/accounts\/[^/]+\/health$/.test(pathname)) {
-    return { success: true, data: { status: 'ok', checks: [] } }
+    // `{status,checks}` ではない。ダッシュボードは `logs` を数える。
+    return { success: true, data: { riskLevel: 'ok', logs: [] } }
   }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }
   }
-  if (ARRAY_PATHS.some((p) => pathname === p)) {
+  if (ARRAY_PATHS.has(pathname)) {
     return { success: true, data: [] }
   }
-  if (ARRAY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p))) {
+  if (ARRAY_PREFIXES.some((p) => pathname.startsWith(p))) {
     return { success: true, data: [] }
   }
   return { success: true, data: EMPTY_PAGE }
@@ -195,6 +275,16 @@ server.on('clientError', (_error, socket) => {
   if (socket.writable) socket.end('HTTP/1.1 400 Bad Request\r\n\r\n')
 })
 server.on('error', (error) => {
+  /*
+   * **ポートが埋まっているときは止まる。**
+   *
+   * ここで握ると、古いモックが動いたまま新しいほうが「起動した」顔をする。
+   * 直したはずの中身が反映されず、しかもどこにも出ない。一度そうなった。
+   */
+  if (error.code === 'EADDRINUSE') {
+    console.error(`[visual-qa] ${HOST}:${PORT} は使用中。先に動いているモックを止める。`)
+    process.exit(1)
+  }
   console.error('[visual-qa] サーバーの取りこぼし:', error.message)
 })
 process.on('uncaughtException', (error) => {
