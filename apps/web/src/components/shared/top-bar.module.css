@@ -47,7 +47,7 @@
   flex-shrink: 0;
   align-items: center;
   gap: 7px;
-  border: 1px solid var(--color-hairline);
+  border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--color-canvas);
   /* 設計 `LoVfp` `B8gqJ` は $ink（黒）。青いリンク色にしない。 */
@@ -59,7 +59,10 @@
   text-decoration: none;
 }
 
-.manual:hover,
+.manual:hover {
+  background: var(--color-canvas-sunken);
+}
+
 .logout:hover {
   border-color: var(--color-accent);
 }
@@ -70,17 +73,21 @@
   outline-offset: 2px;
 }
 
+/*
+ * ログアウトだけ枠を残す。押すと画面から出るので、
+ * ほかの操作と同じ見た目にしない。
+ */
 .logout {
+  border-color: var(--color-hairline);
   cursor: pointer;
 }
 
 /*
  * URLが決まっていない間。**文字は黒のまま太字**（設計 `LoVfp` は $ink / 700）。
  * 文字まで薄くすると、URLが入ったあとと見た目が変わってしまう。
- * 押せないことは、枠の薄さとカーソルで示す。
+ * 押せないことはカーソルで示す。
  */
 .manualDisabled {
-  border-color: var(--color-divider-soft);
   cursor: default;
 }
 

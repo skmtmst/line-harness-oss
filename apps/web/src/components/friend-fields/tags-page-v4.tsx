@@ -83,7 +83,18 @@ function FolderSelect({ tag, groups, onChanged }: { tag: Tag; groups: TagGroup[]
   )
 }
 
-/** 連動の札。設計 `B9QCB3`（緑）／`IoiWQ`（黄）／`Ws7fo`（灰）。 */
+/**
+ * 連動の札。設計 `B9QCB3`（緑）／`IoiWQ`（黄）／`Ws7fo`（灰）。
+ *
+ * **設計にある「他1」「他3」の灰色の札は、まだ出せない。**
+ * あれはマイル以外の連動アクション（テキスト送信・テンプレート送信・
+ * シナリオ開始など）の数だが、`Tag` が持っているのはマイルの3つだけで、
+ * 数える口が無い。0件なのか取れていないのかを区別できないまま
+ * 「他0」と出すと、設定してあるのに無いように見える。
+ *
+ * 数が返るようになったら、ここに1行足す:
+ *   if (tag.otherActionCount) chips.push({ label: `他${tag.otherActionCount}`, tone: 'bg-canvas-sunken text-ink-faint' })
+ */
 function linkChips(tag: Tag): Array<{ label: string; tone: string }> {
   const chips: Array<{ label: string; tone: string }> = []
   if (tag.mileageReward) chips.push({ label: `本人+${tag.mileageReward}`, tone: 'bg-accent-soft text-accent' })
