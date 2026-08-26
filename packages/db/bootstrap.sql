@@ -1450,7 +1450,7 @@ CREATE TABLE outgoing_webhooks (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT);
+, max_retries INTEGER NOT NULL DEFAULT 0, consecutive_failures INTEGER NOT NULL DEFAULT 0, last_failed_at TEXT, line_account_id TEXT REFERENCES line_accounts(id));
 
 CREATE TABLE pool_accounts (
   id TEXT PRIMARY KEY,
@@ -2100,7 +2100,7 @@ CREATE TABLE tags (
   mileage_multiplier_bps      INTEGER CHECK (mileage_multiplier_bps IS NULL OR mileage_multiplier_bps BETWEEN 1000 AND 100000),
   mileage_multiplier_priority INTEGER NOT NULL DEFAULT 0,
   created_at                  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, group_id TEXT REFERENCES tag_groups(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, is_starred INTEGER NOT NULL DEFAULT 0, display_order INTEGER NOT NULL DEFAULT 0);
+, group_id TEXT REFERENCES tag_groups(id) ON DELETE SET NULL, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, is_starred INTEGER NOT NULL DEFAULT 0, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id));
 
 CREATE TABLE templates (
   id              TEXT PRIMARY KEY,
@@ -2117,7 +2117,7 @@ CREATE TABLE templates (
   carousel_tap_limit_text TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0);
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id));
 
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
@@ -2696,6 +2696,9 @@ CREATE INDEX idx_operation_audit_kind_date
 CREATE INDEX idx_outbound_send_requests_created
   ON outbound_send_requests(created_at);
 
+CREATE INDEX idx_outgoing_webhooks_line_account
+  ON outgoing_webhooks(line_account_id, is_active, updated_at DESC);
+
 CREATE INDEX idx_ref_tracking_friend ON ref_tracking (friend_id);
 
 CREATE INDEX idx_ref_tracking_friend_created ON ref_tracking(friend_id, created_at);
@@ -2833,9 +2836,15 @@ CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
 
 CREATE INDEX idx_tags_group ON tags(group_id, name);
 
+CREATE INDEX idx_tags_line_account
+  ON tags(line_account_id, display_order, id);
+
 CREATE INDEX idx_tags_order ON tags (folder_id, display_order);
 
 CREATE INDEX idx_templates_category ON templates (category);
+
+CREATE INDEX idx_templates_line_account
+  ON templates(line_account_id, display_order, id);
 
 CREATE UNIQUE INDEX idx_tracked_links_dedup_key
   ON tracked_links (dedup_key) WHERE dedup_key IS NOT NULL;
