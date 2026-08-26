@@ -149,17 +149,16 @@
       ]
     },
     "/friends": {
-      "node": "Wi50h",
-      "name": "V4 3-1 友だち（提案・1920）",
+      "node": "PhxG6",
+      "name": "V6 3-1 友だち（1920）",
       "visualVerification": {
         "status": "unverified",
-        "referenceNodeIds": ["Wi50h"],
+        "referenceNodeIds": ["PhxG6"],
         "requiredViewports": [1440, 1920],
-        "reason": "一覧・詳細検索・一括操作・重複・統合の全状態を同条件で比較した証拠が未登録"
+        "reason": "トップバー・タブ・操作行以外の一覧本体と全状態は、V6と同条件で比較した証拠が未登録"
       },
       "sections": [
-        "V4Head",
-        "V4Tabs",
+        "V6Tabs",
         "V4FriendKpis",
         "V4SearchPanel",
         "V4BulkBar",
@@ -170,7 +169,6 @@
         "ブロック / 非表示",
         "未対応",
         "今月の追加",
-        "マニュアル",
         "CSVで書き出す",
         "UID移行",
         "一括アクション",

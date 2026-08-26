@@ -97,7 +97,7 @@ describe('標準ボタンの第1段階移行', () => {
       1040px の最小幅・絞り込みの 144/129/116px・間隔 14/10px）。
       **増やしたぶんはここに記録して止める。** 減ったら締め直す。
     */
-    expect(debt['arbitrary-value']).toBe(1414)
+    expect(debt['arbitrary-value']).toBe(1412)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
