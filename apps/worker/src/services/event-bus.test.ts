@@ -52,6 +52,7 @@ vi.mock('@line-crm/db', async () => {
     jstNow: () => '2026-05-08T00:00:00.000+09:00',
     getFriendScore: vi.fn().mockResolvedValue(0),
     getTemplateById: vi.fn().mockResolvedValue(null),
+    recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
   };
 });
 
@@ -66,6 +67,10 @@ vi.mock('@line-crm/line-sdk', () => {
 
 vi.mock('./ad-conversion.js', () => ({
   sendAdConversions: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./automation-triggers.js', () => ({
+  dispatchAutomationEventWithLogging: vi.fn().mockResolvedValue([]),
 }));
 
 describe('fireEvent — send_message action logging', () => {
@@ -223,5 +228,55 @@ describe('fireEvent — send_message action logging', () => {
     // log には template から取得した messageType / content が記録される
     expect(captured[0].binds[2]).toBe('flex');
     expect(String(captured[0].binds[3])).toContain('from-template');
+  });
+});
+
+describe('fireEvent — V6分析イベント', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('発生元ID・時刻・アカウントがそろったイベントだけを追記基盤へ渡す', async () => {
+    const dbModule = await import('@line-crm/db');
+    (dbModule.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([]);
+    const db = fakeDb({ capturedInserts: [] });
+
+    await fireEvent(db, 'message_received', {
+      sourceEventId: 'webhook-1',
+      sourceKind: 'line_webhook',
+      occurredAt: '2026-08-26T00:00:00.000Z',
+      friendId: 'friend-1',
+      eventData: { text: '保存してはいけない本文', messageType: 'text', matched: true },
+    }, undefined, 'account-a');
+
+    expect(dbModule.recordAnalyticsEvent).toHaveBeenCalledWith(db, {
+      lineAccountId: 'account-a',
+      friendId: 'friend-1',
+      eventType: 'message_received',
+      sourceKind: 'line_webhook',
+      sourceId: 'webhook-1',
+      occurredAt: '2026-08-26T00:00:00.000Z',
+      dimensions: {
+        text: '保存してはいけない本文',
+        messageType: 'text',
+        matched: true,
+        currentScore: 0,
+      },
+      numericValue: undefined,
+    });
+  });
+
+  it('発生元時刻がない旧イベントは推測して記録しない', async () => {
+    const dbModule = await import('@line-crm/db');
+    (dbModule.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([]);
+    const db = fakeDb({ capturedInserts: [] });
+
+    await fireEvent(db, 'tag_change', {
+      sourceEventId: 'legacy-1', friendId: 'friend-1', eventData: { tagId: 'tag-1' },
+    }, undefined, 'account-a');
+
+    expect(dbModule.recordAnalyticsEvent).not.toHaveBeenCalled();
   });
 });

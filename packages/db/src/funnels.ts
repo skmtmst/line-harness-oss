@@ -44,6 +44,31 @@ export async function getFunnels(db: D1Database, lineAccountId: string): Promise
   return result.results;
 }
 
+/**
+ * 現行画面で扱える旧形式のファネルだけを返す。
+ *
+ * V6の版付きファネルは段の保存形式が異なるため、旧画面へ混ぜると
+ * 「段が0件」の壊れた分析に見える。V6画面へ切り替わるまで一覧を分ける。
+ */
+export async function getLegacyFunnels(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<Funnel[]> {
+  const result = await db
+    .prepare(
+      `SELECT f.*
+       FROM funnels f
+       WHERE f.line_account_id = ?
+         AND NOT EXISTS (
+           SELECT 1 FROM analytics_funnel_versions v WHERE v.funnel_id = f.id
+         )
+       ORDER BY f.created_at DESC`,
+    )
+    .bind(lineAccountId)
+    .all<Funnel>();
+  return result.results;
+}
+
 export async function getFunnelById(
   db: D1Database,
   lineAccountId: string,
