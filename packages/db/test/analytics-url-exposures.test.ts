@@ -11,39 +11,9 @@ import {
   processPendingAnalyticsUrlExposures,
   recordUnknownAnalyticsUrlExposures,
 } from '../src/analytics-url-exposures.js';
+import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-
-function asD1(sqlite: Database.Database): D1Database {
-  function prepare(query: string): D1PreparedStatement {
-    const statement = sqlite.prepare(query);
-    const make = (params: unknown[]): D1PreparedStatement => ({
-      bind: (...next: unknown[]) => make(next),
-      async all<T>() {
-        return { results: statement.all(...params) as T[], success: true, meta: {} };
-      },
-      async first<T>() {
-        return (statement.get(...params) as T | undefined) ?? null;
-      },
-      async run<T>() {
-        const info = statement.run(...params);
-        return { success: true, meta: { changes: info.changes }, results: [] } as T;
-      },
-      raw: async () => [],
-    } as unknown as D1PreparedStatement);
-    return make([]);
-  }
-  return {
-    prepare,
-    async batch<T>(statements: D1PreparedStatement[]) {
-      const results: unknown[] = [];
-      sqlite.transaction(() => {
-        for (const statement of statements) results.push(statement.run());
-      })();
-      return Promise.all(results) as T;
-    },
-  } as unknown as D1Database;
-}
 
 describe('V6 URL露出投影', () => {
   let sqlite: Database.Database;
@@ -122,6 +92,38 @@ describe('V6 URL露出投影', () => {
       tracked_link_id: 'link-a',
       source_kind: 'manual',
     }]);
+  });
+
+  it('50個のキーを短縮コードとIDの両方から見つけて重複なく記録する', async () => {
+    const insert = sqlite.prepare(
+      `INSERT INTO tracked_links (id, name, original_url, line_account_id, short_code)
+       VALUES (?, ?, ?, 'account-a', ?)`,
+    );
+    const keys: string[] = [];
+    for (let index = 0; index < 25; index += 1) {
+      const key = `code-${index}`;
+      keys.push(key);
+      insert.run(`short-link-${index}`, key, `https://example.com/s/${index}`, key);
+    }
+    for (let index = 0; index < 25; index += 1) {
+      const key = `id-link-${index}`;
+      keys.push(key);
+      insert.run(key, key, `https://example.com/i/${index}`, null);
+    }
+
+    await expect(recordUnknownAnalyticsUrlExposures(db, {
+      lineAccountId: 'account-a',
+      messageId: 'line-broadcast:bulk',
+      content: keys.map((key) => `https://h.example/t/${key}`).join(' '),
+      sourceKind: 'broadcast_all',
+      sentAt: '2026-08-26T01:00:00.000Z',
+    })).resolves.toBe(50);
+    const ids = sqlite.prepare(
+      `SELECT tracked_link_id FROM analytics_url_exposures ORDER BY tracked_link_id`,
+    ).all().map((row) => (row as { tracked_link_id: string }).tracked_link_id);
+    expect(ids).toHaveLength(50);
+    expect(ids).toContain('short-link-0');
+    expect(ids).toContain('id-link-0');
   });
 
   it('取得開始日は初回値を固定し、後から過去へ広げない', async () => {
