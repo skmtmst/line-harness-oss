@@ -208,9 +208,20 @@ describe('レスポンシブのメニュー名を維持する', () => {
     expect(source).toContain('aria-label="管理メニュー"');
   });
 
-  it('固定見出しの下に現在のLINEアカウント切替を表示し、国旗は表示しない', () => {
-    expect(source).toContain('AccountSwitcher');
+  it('先頭は会社名とバージョン。アカウント切替はトップバーへ移した', () => {
+    // 2026-08-26 にアカウント切替・名前・権限・ログアウトをトップバーへ移した。
+    // ここに残すと二重に出る（docs/v6-shell-contract.md §8）。
+    expect(source).toContain('SidebarIdentity');
+    expect(source).not.toContain('AccountSwitcher');
     expect(source).not.toContain('countryFlag');
+  });
+
+  it('下端に名前・権限・ログアウトを置かない', () => {
+    // コメントには残るので、実際に描く要素と処理で見る。
+    // `lh_staff_role` はメニューの出し分けに要るので、ここでは見ない。
+    expect(source).not.toContain('<span>ログアウト</span>');
+    expect(source).not.toContain('auth/logout');
+    expect(source).not.toContain('clearAdminSession');
   });
 
   it('PCの先頭はV5どおりLINEアカウント切替から始まる', () => {

@@ -115,6 +115,62 @@ export interface Tag {
   };
   /** このタグが付いた後に動く、マイル以外のアクション数。0件なら省略する。 */
   otherActionCount?: number;
+  /** タグ管理の整理候補に入る理由。withCounts=1 のときだけ返る。 */
+  cleanupReasons?: Array<"unused" | "duplicate_name">;
+}
+
+/** CSV一括登録で画面からAPIへ渡す1行。lineは見出しを含む元CSVの行番号。 */
+export interface TagCsvImportInputRow {
+  line?: number;
+  name: string;
+  folderName?: string;
+}
+
+export type TagCsvImportRowStatus =
+  | "ready"
+  | "created"
+  | "skipped"
+  | "invalid"
+  | "failed";
+
+export type TagCsvImportRowCode =
+  | "name_required"
+  | "name_too_long"
+  | "invalid_character"
+  | "already_exists"
+  | "duplicate_in_file"
+  | "folder_not_found"
+  | "folder_ambiguous"
+  | "folder_changed"
+  | "create_failed";
+
+/** 事前確認・実行結果で共通して返す1行。失敗行CSVを画面で作れる情報を残す。 */
+export interface TagCsvImportRowResult {
+  line: number;
+  name: string;
+  folderName: string;
+  status: TagCsvImportRowStatus;
+  code?: TagCsvImportRowCode;
+  message?: string;
+  tagId?: string;
+}
+
+export interface TagCsvImportSummary {
+  total: number;
+  ready: number;
+  created: number;
+  skipped: number;
+  invalid: number;
+  failed: number;
+}
+
+export interface TagCsvImportPreview {
+  summary: TagCsvImportSummary;
+  rows: TagCsvImportRowResult[];
+}
+
+export interface TagCsvImportResult extends TagCsvImportPreview {
+  outcome: "success" | "partial" | "failed";
 }
 
 /** 友だち情報欄の種類 */

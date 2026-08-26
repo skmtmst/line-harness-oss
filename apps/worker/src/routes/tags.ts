@@ -1,9 +1,10 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getTags,
   getTagsWithUsage,
   getTagDeleteImpact,
   createTag,
+  createTagsBulk,
   deleteTag,
   updateTagMileageSettings,
   enqueueHistoricTagMileage,
@@ -14,8 +15,16 @@ import {
   assignTagToGroup,
   updateTag,
   reorderTags,
+  normalizeTagNameForCleanup,
 } from '@line-crm/db';
 import type { Tag as DbTag, TagGroup as DbTagGroup, TagWithUsage } from '@line-crm/db';
+import type {
+  TagCsvImportInputRow,
+  TagCsvImportPreview,
+  TagCsvImportResult,
+  TagCsvImportRowResult,
+  TagCsvImportSummary,
+} from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 
@@ -79,6 +88,9 @@ function serializeTag(row: DbTag & Partial<TagWithUsage>) {
     ...((row.other_action_count ?? 0) > 0
       ? { otherActionCount: Number(row.other_action_count) }
       : {}),
+    ...(row.cleanup_reasons !== undefined
+      ? { cleanupReasons: row.cleanup_reasons }
+      : {}),
   };
 }
 
@@ -96,6 +108,176 @@ function serializeTagGroup(row: DbTagGroup) {
 
 /** 色は #RRGGBB だけ。名前付きの色を混ぜると画面での見た目が揃わない。 */
 const GROUP_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+const TAG_IMPORT_MAX_ROWS = 500;
+const TAG_NAME_MAX_LENGTH = 60;
+const TAG_NAME_CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F]/u;
+
+type PlannedTagImportRow = TagCsvImportRowResult & { groupId?: string | null };
+
+function importSummary(rows: TagCsvImportRowResult[]): TagCsvImportSummary {
+  return {
+    total: rows.length,
+    ready: rows.filter((row) => row.status === 'ready').length,
+    created: rows.filter((row) => row.status === 'created').length,
+    skipped: rows.filter((row) => row.status === 'skipped').length,
+    invalid: rows.filter((row) => row.status === 'invalid').length,
+    failed: rows.filter((row) => row.status === 'failed').length,
+  };
+}
+
+function importOutcome(summary: TagCsvImportSummary): TagCsvImportResult['outcome'] {
+  const rejected = summary.invalid + summary.failed;
+  if (summary.created > 0 && rejected > 0) return 'partial';
+  if (summary.created === 0 && rejected > 0) return 'failed';
+  return 'success';
+}
+
+function parseImportRows(body: unknown):
+  | { ok: true; rows: TagCsvImportInputRow[] }
+  | { ok: false; status: 400 | 422; error: string } {
+  if (!body || typeof body !== 'object' || !Array.isArray((body as { rows?: unknown }).rows)) {
+    return { ok: false, status: 400, error: 'rows is required' };
+  }
+  const rows = (body as { rows: unknown[] }).rows;
+  if (rows.length === 0) {
+    return { ok: false, status: 400, error: 'rows must not be empty' };
+  }
+  if (rows.length > TAG_IMPORT_MAX_ROWS) {
+    return {
+      ok: false,
+      status: 422,
+      error: `一度に登録できるのは${TAG_IMPORT_MAX_ROWS}件までです`,
+    };
+  }
+  return {
+    ok: true,
+    rows: rows.map((raw, index) => {
+      const source = raw && typeof raw === 'object'
+        ? raw as { line?: unknown; name?: unknown; folderName?: unknown }
+        : {};
+      const line = Number(source.line);
+      return {
+        line: Number.isInteger(line) && line > 0 ? line : index + 2,
+        name: typeof source.name === 'string' ? source.name : '',
+        folderName: typeof source.folderName === 'string' ? source.folderName : '',
+      };
+    }),
+  };
+}
+
+function planTagImport(
+  inputRows: TagCsvImportInputRow[],
+  existingTags: DbTag[],
+  groups: DbTagGroup[],
+): PlannedTagImportRow[] {
+  const existingNames = new Set(
+    existingTags.map((tag) => normalizeTagNameForCleanup(tag.name)).filter(Boolean),
+  );
+  const groupsByName = new Map<string, DbTagGroup[]>();
+  for (const group of groups) {
+    const key = normalizeTagNameForCleanup(group.name);
+    groupsByName.set(key, [...(groupsByName.get(key) ?? []), group]);
+  }
+  const acceptedNames = new Set<string>();
+
+  return inputRows.map((input, index) => {
+    const line = input.line ?? index + 2;
+    const name = input.name.trim();
+    const folderName = (input.folderName ?? '').trim();
+    const base = { line, name, folderName };
+    if (!name) {
+      return { ...base, status: 'invalid', code: 'name_required', message: 'タグ名を入力してください' };
+    }
+    const nameCharacters = Array.from(name);
+    if (nameCharacters.length > TAG_NAME_MAX_LENGTH) {
+      return {
+        ...base,
+        status: 'invalid',
+        code: 'name_too_long',
+        message: `タグ名は${TAG_NAME_MAX_LENGTH}文字以内にしてください`,
+      };
+    }
+    const invalidCharacterIndex = nameCharacters.findIndex((character) =>
+      TAG_NAME_CONTROL_CHARACTER_PATTERN.test(character));
+    if (invalidCharacterIndex >= 0) {
+      return {
+        ...base,
+        status: 'invalid',
+        code: 'invalid_character',
+        message: `改行や制御文字はタグ名に使えません（${invalidCharacterIndex + 1}文字目）`,
+      };
+    }
+
+    const normalizedName = normalizeTagNameForCleanup(name);
+    if (existingNames.has(normalizedName)) {
+      return {
+        ...base,
+        status: 'skipped',
+        code: 'already_exists',
+        message: '同じ名前のタグがすでにあります',
+      };
+    }
+    if (acceptedNames.has(normalizedName)) {
+      return {
+        ...base,
+        status: 'skipped',
+        code: 'duplicate_in_file',
+        message: 'CSV内で同じタグ名が重複しています',
+      };
+    }
+
+    let groupId: string | null = null;
+    if (folderName) {
+      const matches = groupsByName.get(normalizeTagNameForCleanup(folderName)) ?? [];
+      if (matches.length === 0) {
+        acceptedNames.add(normalizedName);
+        return {
+          ...base,
+          status: 'ready',
+          code: 'folder_not_found',
+          message: 'フォルダが見つからないため、未分類として登録します',
+          groupId: null,
+        };
+      }
+      if (matches.length > 1) {
+        return {
+          ...base,
+          status: 'invalid',
+          code: 'folder_ambiguous',
+          message: '同じ名前のフォルダが複数あるため選べません',
+        };
+      }
+      groupId = matches[0].id;
+    }
+
+    acceptedNames.add(normalizedName);
+    return { ...base, status: 'ready', groupId };
+  });
+}
+
+async function loadTagImportPlan(
+  db: D1Database,
+  inputRows: TagCsvImportInputRow[],
+): Promise<PlannedTagImportRow[]> {
+  const [existingTags, groups] = await Promise.all([getTags(db), getTagGroups(db)]);
+  return planTagImport(inputRows, existingTags, groups);
+}
+
+function publicImportRow(row: PlannedTagImportRow): TagCsvImportRowResult {
+  const { groupId: _groupId, ...result } = row;
+  return result;
+}
+
+async function readImportRows(c: Context<Env>): Promise<
+  | { ok: true; rows: TagCsvImportInputRow[] }
+  | { ok: false; status: 400 | 422; error: string }
+> {
+  try {
+    return parseImportRows(await c.req.json<unknown>());
+  } catch {
+    return { ok: false, status: 400, error: 'JSON形式のrowsを送ってください' };
+  }
+}
 
 // --- タグの親分類 ---------------------------------------------------------
 //
@@ -233,6 +415,70 @@ tags.get('/api/tags', async (c) => {
     return c.json({ success: true, data: items.map(serializeTag) });
   } catch (err) {
     console.error('GET /api/tags error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/tags/import/preview - CSVから読み取った行を保存せずに検査する
+tags.post('/api/tags/import/preview', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const input = await readImportRows(c);
+    if (!input.ok) {
+      return c.json({ success: false, error: input.error }, input.status);
+    }
+    const planned = await loadTagImportPlan(c.env.DB, input.rows);
+    const rows = planned.map(publicImportRow);
+    const data: TagCsvImportPreview = { summary: importSummary(rows), rows };
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('POST /api/tags/import/preview error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// POST /api/tags/import - 検査をやり直し、登録可能な行だけを登録する
+tags.post('/api/tags/import', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const input = await readImportRows(c);
+    if (!input.ok) {
+      return c.json({ success: false, error: input.error }, input.status);
+    }
+    const planned = await loadTagImportPlan(c.env.DB, input.rows);
+    const readyRows = planned.filter((row) => row.status === 'ready');
+    const created = readyRows.length > 0
+      ? await createTagsBulk(
+          c.env.DB,
+          readyRows.map((row) => ({ name: row.name, groupId: row.groupId ?? null })),
+        )
+      : [];
+    let createIndex = 0;
+    const rows: TagCsvImportRowResult[] = planned.map((row) => {
+      if (row.status !== 'ready') return publicImportRow(row);
+      const result = created[createIndex++];
+      if (result?.status === 'created') {
+        return { ...publicImportRow(row), status: 'created', tagId: result.tagId };
+      }
+      if (result?.status === 'skipped') {
+        return {
+          ...publicImportRow(row),
+          status: 'skipped',
+          code: 'already_exists',
+          message: '同じ名前のタグが先に登録されたため見送りました',
+        };
+      }
+      return {
+        ...publicImportRow(row),
+        status: 'failed',
+        code: 'create_failed',
+        message: 'タグを登録できませんでした',
+      };
+    });
+
+    const summary = importSummary(rows);
+    const data: TagCsvImportResult = { summary, rows, outcome: importOutcome(summary) };
+    return c.json({ success: true, data });
+  } catch (err) {
+    console.error('POST /api/tags/import error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -414,11 +660,29 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
 });
 
 // DELETE /api/tags/:id - delete tag
-// friend_tags rows cascade via FK (ON DELETE CASCADE), but affiliate_offers.tag_id
-// references tags without a cascade — D1 enforces it, so surface that as 409.
+// 画面を通さず直接APIを呼ばれても、運用設定から参照中のタグは消さない。
+// friend_tags rows cascade via FK (ON DELETE CASCADE) and do not block deletion;
+// the delete-impact response still reports their count as a warning.
+// The FK error remains a second guard for references created between this check
+// and the DELETE, or references that are not yet covered by the impact query.
 tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    const impact = await getTagDeleteImpact(c.env.DB, id);
+    if (!impact) {
+      return c.json({ success: false, error: 'tag not found' }, 404);
+    }
+    if (!impact.canDelete) {
+      return c.json({
+        success: false,
+        code: 'TAG_IN_USE',
+        error: 'tag is referenced by active settings',
+        data: {
+          blockingReferenceCount: impact.blockingReferenceCount,
+          references: impact.references,
+        },
+      }, 409);
+    }
     await deleteTag(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {

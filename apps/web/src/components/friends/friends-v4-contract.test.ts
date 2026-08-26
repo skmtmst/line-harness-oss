@@ -22,8 +22,9 @@ describe('友だちV4の画面契約', () => {
   it('見出し下の説明を外して一覧を上へ詰める', () => {
     expect(PAGE).not.toContain('友だちの状態・配信状況・対応履歴を、1画面で確認して操作できます。')
   })
-  it('V2の固定値ではなくV4を画面の正本にする', () => {
-    expect(PAGE).toContain('data-friends-page="v4"')
+  it('V2の固定値ではなくV6を画面の正本にする', () => {
+    expect(PAGE).toContain('data-friends-page="v6"')
+    expect(PAGE).toContain('data-design-node="PhxG6"')
     expect(PAGE).toContain('data-friends-design="v4"')
     expect(PAGE).not.toContain('V2 2-2')
     expect(TABLE).not.toContain('V2 2-2')
@@ -31,8 +32,20 @@ describe('友だちV4の画面契約', () => {
     expect(KPIS).not.toContain('V2 2-2')
     expect(DETAIL).not.toContain('V2 2-2')
     expect(DETAIL).toContain('data-friends-detail-design="v4"')
-    expect(STRUCTURE).toContain('"node": "Wi50h"')
+    expect(STRUCTURE).toContain('"node": "PhxG6"')
     expect(STRUCTURE).toContain('"node": "hsWaL"')
+  })
+
+  it('画面名はトップバーだけに置き、V6のタブと操作を同じ行に置く', () => {
+    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
+    expect(PAGE).not.toContain('<Header')
+    expect(PAGE).toContain('data-design="V6Tabs"')
+    expect(PAGE).toContain('data-design-node="JB0Ki"')
+    expect(PAGE).toContain("{ key: 'duplicates', label: '重複検出' }")
+    expect(PAGE).toContain("{ key: 'uid-migration', label: 'UID移行', href: '/accounts?tab=migration' }")
+    expect(PAGE).toContain('actions={')
+    expect(PAGE).toContain('CSVで書き出す')
+    expect(PAGE).not.toContain('友だち管理のマニュアルは準備中です')
   })
 
   it('表示件数10〜50件と省略ページングを持つ', () => {

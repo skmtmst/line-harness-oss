@@ -5,11 +5,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
-import { adminSessionHeaders, clearAdminSession } from '@/lib/admin-session'
 import { useBrand } from '@/lib/use-brand'
 import { HQ_MENU_SECTIONS, orderedMenuSections, type MenuItem } from '@/lib/menu'
-import AccountSwitcher from '@/components/accounts/account-switcher'
-import { AUTH_SELECTION_CLEARED_KEY } from '@/lib/hq-navigation'
+import SidebarIdentity from './sidebar-identity'
 import {
   FEATURE_SETTINGS_UPDATED_EVENT,
   SIDEBAR_FEATURE_BY_HREF,
@@ -340,7 +338,10 @@ export default function Sidebar({
             </div>
           </div>
         </div>
-      ) : <AccountSwitcher />}
+      ) : <SidebarIdentity />}
+
+      {/* 会社名とメニューの間の線。Pencil `J33xq/pN2aM`。 */}
+      <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
       <nav className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq">
@@ -401,54 +402,12 @@ export default function Sidebar({
         ))}
       </nav>
 
-      {/* フッター */}
-      <div className={`${styles.footer} ${preview ? 'min-h-[72px]' : ''}`}>
-        {(staffName || preview) && (
-          <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-100">
-            <div className="font-medium text-gray-700">{preview ? 'Kenta Kawano(Obama)' : staffName}</div>
-            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
-              staffRole === 'owner' ? 'bg-yellow-100 text-yellow-800' :
-              staffRole === 'admin' ? 'bg-blue-100 text-blue-800' :
-              staffRole === 'viewer' ? 'bg-emerald-100 text-emerald-800' :
-              'bg-gray-100 text-gray-600'
-            }`}>
-              {preview ? '管理者' : staffRole === 'owner' ? 'オーナー' : staffRole === 'admin' ? '管理者' : staffRole === 'viewer' ? '閲覧のみ' : 'スタッフ'}
-            </span>
-          </div>
-        )}
-        {!preview && <div className="px-6 py-4">
-          <button
-            onClick={async () => {
-              try {
-                const apiUrl = process.env.NEXT_PUBLIC_API_URL
-                if (apiUrl) {
-                  await fetch(`${apiUrl}/api/auth/logout`, {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: adminSessionHeaders(),
-                  })
-                }
-              } catch {
-                // Local cleanup still logs the browser out if the network call fails.
-              }
-              localStorage.removeItem('lh_api_key')
-              localStorage.removeItem('lh_csrf')
-              localStorage.removeItem('lh_staff_name')
-              localStorage.removeItem('lh_staff_role')
-              localStorage.removeItem('lh_staff_permissions')
-              sessionStorage.removeItem(AUTH_SELECTION_CLEARED_KEY)
-              clearAdminSession()
-              window.location.href = '/login'
-            }}
-            className="flex w-full items-center gap-2 text-xs text-gray-400 hover:text-red-500 transition-colors justify-start"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span>ログアウト</span>
-          </button>
-        </div>}
-      </div>
+      {/*
+        名前・権限・ログアウトは、2026-08-26 に共通トップバーへ移した。
+        ここに残すと二重に出る（`docs/v6-shell-contract.md` §8）。
+        枠だけ残すのは、下端の余白がメニューの最後の項目に食い込まないため。
+      */}
+      <div className={styles.footer} />
     </>
   )
 

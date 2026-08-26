@@ -221,6 +221,7 @@ export default function ScenariosPage() {
       <div data-design="KPIs">
       <ListKpis
         variant="broadcast"
+        titles={['シナリオ', '購読中', '読了済', '今週の配信']}
         build={(s) => [
             { title: 'シナリオ', value: s.scenarios.total, unit: '件', detail: `稼働中 ${s.scenarios.active}` },
             { title: '購読中', value: s.scenarios.subscribers, unit: '人', detail: '重複を含む' },

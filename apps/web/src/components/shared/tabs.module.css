@@ -11,10 +11,28 @@
 
 .list {
   display: flex;
-  align-items: center;
-  gap: 20px;
+  align-items: flex-end; /* alignItems: end */
+  justify-content: space-between; /* justifyContent: space_between */
+  gap: 26px; /* gap: 26 */
   height: 44px; /* 種別タブ height: 44 */
   border-bottom: 1px solid var(--color-hairline);
+}
+
+/* タブそのものの並び。`aToSv/AzW1B`。 */
+.items {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  gap: 26px;
+}
+
+/* タブ行の右端。ヘッダー操作を独立した行にしない。 */
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px; /* `Sn86o` gap: 8 */
+  padding-bottom: 4px;
 }
 
 .tab {

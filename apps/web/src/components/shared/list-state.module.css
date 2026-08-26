@@ -1,0 +1,83 @@
+/*
+ * 一覧の「中身が出せないとき」の1枚。
+ *
+ * Pencil の3部品の実測値をそのまま持つ。
+ *   `BDOJu` データがありません
+ *   `sZE9Q` 読み込んでいます
+ *   `OLMp0` 表示できませんでした
+ * どれも 高さ132・$surface-pearl・$radius-md(10)・padding 24・gap 8・中央寄せ で、
+ * 変わるのは **絵・見出しの色・文言だけ**。数字を変えるときは Pencil を先に直す。
+ */
+.root {
+  display: flex;
+  min-height: 132px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--radius-tile);
+  background: var(--color-surface-pearl);
+  padding: 24px;
+  text-align: center;
+}
+
+/* `hqTfD` / `u2ArlH` / `ZAkSe`。24px の線画。 */
+.icon {
+  flex-shrink: 0;
+  color: var(--color-ink-faint);
+}
+
+/* `ZAkSe` だけ $status-danger。 */
+.iconDanger {
+  color: var(--color-status-danger);
+}
+
+/* `PzPQY` ほか。$size-label 13 / 700。 */
+.title {
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* `NJaoP` は見出しごと赤。 */
+.titleDanger {
+  color: var(--color-status-danger);
+}
+
+/*
+ * `U5haB` ほか。$size-micro 11 / 行間1.4 / **幅220で折り返す**。
+ * 幅を切らずに1行で流すと、広い画面で文が横に伸びて読みにくくなる。
+ */
+.description {
+  max-width: 220px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* 作成導線つきのとき（`fRgeK` の `a3d3Ku`）。設計は高さ40。 */
+.action {
+  margin-top: 4px;
+}
+
+/*
+ * 読み込み中の輪。**`prefers-reduced-motion` では回さない。**
+ * 回らなくても文言で伝わる。
+ */
+.spin {
+  animation: list-state-spin 1.1s linear infinite;
+}
+
+@keyframes list-state-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

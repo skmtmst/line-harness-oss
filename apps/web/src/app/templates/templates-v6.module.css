@@ -1,0 +1,26 @@
+.createActions,
+.body {
+  margin-top: 18px;
+}
+
+.contentLayout {
+  display: flex;
+  min-width: 0;
+  gap: 16px;
+}
+
+.folderRail {
+  width: 252px;
+  flex: 0 0 252px;
+}
+
+@media (max-width: 900px) {
+  .contentLayout {
+    flex-direction: column;
+  }
+
+  .folderRail {
+    width: 100%;
+    flex-basis: auto;
+  }
+}

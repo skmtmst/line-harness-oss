@@ -70,6 +70,8 @@ export interface TagWithCount extends Tag {
   friend_count: number;
 }
 
+export type TagCleanupReason = 'unused' | 'duplicate_name';
+
 export type TagAssignSource =
   | 'ec'
   | 'line_login'
@@ -86,6 +88,26 @@ export interface TagWithUsage extends TagWithCount {
   used_in_auto_replies: number;
   used_in_saved_searches: number;
   other_action_count: number;
+  /** 一覧の「整理候補」に入る理由。複数理由でもタグ自体は1件として数える。 */
+  cleanup_reasons: TagCleanupReason[];
+}
+
+type TagWithUsageRow = Omit<TagWithUsage, 'cleanup_reasons'> & {
+  has_operational_references: number;
+};
+
+/**
+ * 見た目だけ違う同名タグをまとめて見つけるための比較名。
+ *
+ * 保存している名前自体は変えない。全角英数字・全角空白、前後や連続する空白、
+ * 大文字小文字だけを比較時にそろえる。
+ */
+export function normalizeTagNameForCleanup(name: string): string {
+  return name
+    .normalize('NFKC')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLocaleLowerCase('ja-JP');
 }
 
 export async function getTagsWithCounts(
@@ -231,6 +253,136 @@ export async function getTagsWithUsage(
           WHERE a.event_type IN ('tag_change', 'tag_added')
             AND condition_value.type = 'text'
        ),
+       -- 「未使用」は友だち0人だけでは決めない。削除確認と同じ18種類の
+       -- 運用設定を一覧1回分のSQLで調べ、どこにも参照がない場合だけ候補にする。
+       -- 実行履歴は運用設定ではないため含めない。
+       blocking_refs(tag_id) AS (
+         SELECT tag_id FROM broadcast_refs
+         UNION
+         SELECT tag_id FROM form_refs
+         UNION
+         SELECT tag_id FROM scenario_refs
+         UNION
+         SELECT tag_id FROM auto_reply_refs
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM saved_searches s,
+                json_tree(CASE WHEN json_valid(s.conditions_json)
+                               THEN s.conditions_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM automation_versions v,
+                json_tree(CASE WHEN json_valid(v.trigger_config)
+                               THEN v.trigger_config ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM automation_versions v,
+                json_tree(CASE WHEN json_valid(v.condition_config)
+                               THEN v.condition_config ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM automation_versions v,
+                json_tree(CASE WHEN json_valid(v.action_config)
+                               THEN v.action_config ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM automations a,
+                json_tree(CASE WHEN json_valid(a.conditions)
+                               THEN a.conditions ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM automations a,
+                json_tree(CASE WHEN json_valid(a.actions)
+                               THEN a.actions ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM common_action_versions v,
+                json_tree(CASE WHEN json_valid(v.action_config)
+                               THEN v.action_config ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM rich_menu_groups g,
+                json_tree(CASE WHEN json_valid(g.targeting_condition)
+                               THEN g.targeting_condition ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM rich_menu_areas a,
+                json_tree(CASE WHEN json_valid(a.tag_ids)
+                               THEN a.tag_ids ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM templates mt,
+                json_tree(CASE WHEN json_valid(mt.carousel_actions_json)
+                               THEN mt.carousel_actions_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT tag_on_attend FROM webinars WHERE tag_on_attend IS NOT NULL
+         UNION
+         SELECT tag_on_cta_click FROM webinars WHERE tag_on_cta_click IS NOT NULL
+         UNION
+         SELECT target_tag_id FROM reminders WHERE target_tag_id IS NOT NULL
+         UNION
+         SELECT tag_id FROM entry_routes WHERE tag_id IS NOT NULL
+         UNION
+         SELECT tag_id FROM tracked_links WHERE tag_id IS NOT NULL
+         UNION
+         SELECT auto_tag_id FROM menus WHERE auto_tag_id IS NOT NULL
+         UNION
+         SELECT tag_id FROM affiliate_offers WHERE tag_id IS NOT NULL
+         UNION
+         SELECT visible_tag_id FROM events WHERE visible_tag_id IS NOT NULL
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM funnels f,
+                json_tree(CASE WHEN json_valid(f.segment_json)
+                               THEN f.segment_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM funnel_steps fs,
+                json_tree(CASE WHEN json_valid(fs.match_json)
+                               THEN fs.match_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM analytics_funnel_versions v,
+                json_tree(CASE WHEN json_valid(v.steps_json)
+                               THEN v.steps_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM analytics_funnel_versions v,
+                json_tree(CASE WHEN json_valid(v.segment_json)
+                               THEN v.segment_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM analytics_funnel_versions v,
+                json_tree(CASE WHEN json_valid(v.comparison_groups_json)
+                               THEN v.comparison_groups_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT)
+           FROM account_settings s,
+                json_tree(CASE WHEN json_valid(s.value)
+                               THEN s.value ELSE 'null' END) j
+          WHERE s.key = 'friend_add_routing' AND j.type = 'text'
+       ),
+       blocking_tag_ids AS (
+         SELECT r.tag_id
+           FROM blocking_refs r
+           JOIN tags known ON known.id = r.tag_id
+          GROUP BY r.tag_id
+       ),
        broadcast_counts AS (
          SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
            FROM broadcast_refs r JOIN tags known ON known.id = r.tag_id
@@ -283,7 +435,9 @@ export async function getTagsWithUsage(
               COALESCE(sc.count, 0) AS used_in_scenarios,
               COALESCE(ac.count, 0) AS used_in_auto_replies,
               COALESCE(ssc.count, 0) AS used_in_saved_searches,
-              COALESCE(act.count, 0) AS other_action_count
+              COALESCE(act.count, 0) AS other_action_count,
+              CASE WHEN bri.tag_id IS NULL THEN 0 ELSE 1 END
+                AS has_operational_references
          FROM tags t
          LEFT JOIN friend_tags ft ON ft.tag_id = t.id
          LEFT JOIN folders fo ON fo.id = t.folder_id
@@ -293,11 +447,28 @@ export async function getTagsWithUsage(
          LEFT JOIN auto_reply_counts ac ON ac.tag_id = t.id
          LEFT JOIN saved_search_counts ssc ON ssc.tag_id = t.id
          LEFT JOIN action_counts act ON act.tag_id = t.id
+         LEFT JOIN blocking_tag_ids bri ON bri.tag_id = t.id
         GROUP BY t.id
         ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
     )
-    .all<TagWithUsage>();
-  return result.results;
+    .all<TagWithUsageRow>();
+
+  const duplicateCounts = new Map<string, number>();
+  for (const row of result.results) {
+    const normalizedName = normalizeTagNameForCleanup(row.name);
+    duplicateCounts.set(normalizedName, (duplicateCounts.get(normalizedName) ?? 0) + 1);
+  }
+
+  return result.results.map(({ has_operational_references, ...row }) => {
+    const cleanupReasons: TagCleanupReason[] = [];
+    if (Number(row.friend_count) === 0 && Number(has_operational_references) === 0) {
+      cleanupReasons.push('unused');
+    }
+    if ((duplicateCounts.get(normalizeTagNameForCleanup(row.name)) ?? 0) > 1) {
+      cleanupReasons.push('duplicate_name');
+    }
+    return { ...row, cleanup_reasons: cleanupReasons };
+  });
 }
 
 export interface TagDeleteImpactReferences {
@@ -570,6 +741,20 @@ export interface CreateTagInput {
   groupId?: string | null;
 }
 
+export interface CreateTagsBulkInput {
+  name: string;
+  groupId?: string | null;
+}
+
+export interface CreateTagsBulkResult {
+  status: 'created' | 'skipped' | 'failed';
+  tagId?: string;
+}
+
+// D1 は1文につき100個までしか値を束縛できない。このINSERTは1行4個なので、
+// 25行でちょうど100個。500行でも20文に収まり、無料枠の1実行50クエリを超えない。
+const TAGS_PER_BULK_INSERT = 25;
+
 export async function createTag(
   db: D1Database,
   input: CreateTagInput,
@@ -591,6 +776,62 @@ export async function createTag(
     .prepare(`SELECT * FROM tags WHERE id = ?`)
     .bind(id)
     .first<Tag>())!;
+}
+
+/**
+ * CSVからのタグ登録を、D1の1実行あたりのクエリ上限内でまとめて書く。
+ *
+ * - idを先に作り、RETURNINGで実際に入った行だけを判別する。
+ * - 同名が先に作られた行はINSERT OR IGNOREで見送りにする。
+ * - 確認後にフォルダが消えた場合は、外部キー違反にせず未分類で登録する。
+ * - 1文が失敗しても、ほかの25行単位の文は続ける。
+ */
+export async function createTagsBulk(
+  db: D1Database,
+  inputs: CreateTagsBulkInput[],
+): Promise<CreateTagsBulkResult[]> {
+  const results: CreateTagsBulkResult[] = Array.from(
+    { length: inputs.length },
+    () => ({ status: 'failed' }),
+  );
+  const now = jstNow();
+
+  for (let offset = 0; offset < inputs.length; offset += TAGS_PER_BULK_INSERT) {
+    const chunk = inputs.slice(offset, offset + TAGS_PER_BULK_INSERT);
+    const prepared = chunk.map((input) => ({
+      id: crypto.randomUUID(),
+      name: input.name,
+      groupId: input.groupId ?? null,
+    }));
+    const values = prepared
+      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?)")
+      .join(', ');
+    const binds = prepared.flatMap((row) => [row.id, row.name, row.groupId, now]);
+
+    try {
+      const inserted = await db
+        .prepare(
+          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at)
+           VALUES ${values}
+           RETURNING id`,
+        )
+        .bind(...binds)
+        .run<{ id: string }>();
+      const insertedIds = new Set((inserted.results ?? []).map((row) => row.id));
+      prepared.forEach((row, index) => {
+        results[offset + index] = insertedIds.has(row.id)
+          ? { status: 'created', tagId: row.id }
+          : { status: 'skipped' };
+      });
+    } catch (error) {
+      console.error(`createTagsBulk rows ${offset + 1}-${offset + chunk.length} error:`, error);
+      prepared.forEach((_row, index) => {
+        results[offset + index] = { status: 'failed' };
+      });
+    }
+  }
+
+  return results;
 }
 
 /**

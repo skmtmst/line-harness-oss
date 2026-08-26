@@ -9,6 +9,9 @@ import type {
   FriendAddEventRoutingStatus,
   Tag,
   TagGroup,
+  TagCsvImportInputRow,
+  TagCsvImportPreview,
+  TagCsvImportResult,
   FriendField,
   FriendFieldType,
   SupportMark,
@@ -54,6 +57,43 @@ import type {
   PoolAccount,
   FormLayout,
 } from '@line-crm/shared'
+
+/**
+ * タグを消したときに失われるもの（`GET /api/tags/:id/delete-impact`）。
+ *
+ * 実体は `packages/db` の `TagDeleteImpact`。web からは `packages/db` を
+ * 読めないので、ここに写している。**増減したら両方直す。**
+ */
+export type TagDeleteImpactReferences = {
+  broadcasts: number
+  forms: number
+  scenarios: number
+  autoReplies: number
+  savedSearches: number
+  automations: number
+  commonActions: number
+  richMenus: number
+  templates: number
+  webinars: number
+  reminders: number
+  entryRoutes: number
+  trackedLinks: number
+  bookingMenus: number
+  affiliateOffers: number
+  events: number
+  analyticsFunnels: number
+  friendAddSettings: number
+}
+
+export type TagDeleteImpact = {
+  tag: { id: string; name: string }
+  /** タグを外される友だちの人数。**これだけでは削除を止めない。** */
+  friendCount: number
+  /** このタグIDをいまも保存している運用設定の件数。 */
+  references: TagDeleteImpactReferences
+  blockingReferenceCount: number
+  canDelete: boolean
+}
 
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
@@ -1046,6 +1086,28 @@ export const api = {
     /** withCounts で friendCount 付き (JOIN 集計 — タグ管理ページ用)。 */
     list: (params?: { withCounts?: boolean }) =>
       fetchApi<ApiResponse<Tag[]>>(`/api/tags${params?.withCounts ? '?withCounts=1' : ''}`),
+    /** CSVを保存せずに検査し、行ごとの扱いを返す。 */
+    importPreview: (rows: TagCsvImportInputRow[]) =>
+      fetchApi<ApiResponse<TagCsvImportPreview>>('/api/tags/import/preview', {
+        method: 'POST',
+        body: JSON.stringify({ rows }),
+      }),
+    /** 保存直前に再検査し、登録できる行だけをまとめて作る。 */
+    importCsv: (rows: TagCsvImportInputRow[]) =>
+      fetchApi<ApiResponse<TagCsvImportResult>>('/api/tags/import', {
+        method: 'POST',
+        body: JSON.stringify({ rows }),
+      }),
+    /**
+     * 削除する前に、何が失われるかを数えて返す（PR #381）。
+     *
+     * **DELETE 側にはまだ強制停止が入っていない。** 止めるのは画面の役目で、
+     * `canDelete: false` のときにボタンを押せなくする。取れなかったときも
+     * 押せなくする（「参照0件」と読み違えて消させないため）。
+     * 権限は owner / admin。
+     */
+    deleteImpact: (id: string) =>
+      fetchApi<ApiResponse<TagDeleteImpact>>(`/api/tags/${id}/delete-impact`),
     // 色は受け取らない。印の色はフォルダ（tagGroups）に付く。
     create: (data: { name: string; groupId?: string | null }) =>
       fetchApi<ApiResponse<Tag>>('/api/tags', {

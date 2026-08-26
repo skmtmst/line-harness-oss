@@ -10,7 +10,7 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする20ファイルだけを利用先に数える', () => {
+  it('共通Buttonを直接importする23ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -25,11 +25,14 @@ describe('共通部品の影響範囲', () => {
       'app/hq/page.tsx',
       'app/hq/settings/page.tsx',
       'app/inflow-links/page.tsx',
+      'app/page.tsx',
       'app/reminders/page.tsx',
       'app/tags/page.tsx',
       'app/templates/page.tsx',
       'components/automations/common-action-editor.tsx',
-      'components/hq-return-button.tsx',
+      'components/broadcasts/broadcast-asset-manager.tsx',
+      'components/friend-fields/tag-csv-import-dialog.tsx',
+      'components/friend-fields/tags-page-v4.tsx',
       'components/hq/account-list.tsx',
       'components/store-selection-gate.tsx',
     ])
@@ -48,6 +51,7 @@ describe('共通部品の影響範囲', () => {
       'app/reminders/page.tsx',
       'app/tags/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
+      'components/friend-fields/tags-page-v4.tsx',
     ])
   })
 
