@@ -1,5 +1,7 @@
 import { jstNow } from './utils.js';
 
+const LOOKUP_CHUNK = 90;
+
 /**
  * ファネル分析。
  *
@@ -148,86 +150,85 @@ export async function countFunnelStep(
   opts: { from: string; to: string; lineAccountId: string; friendIds?: string[] },
 ): Promise<string[]> {
   const match = JSON.parse(step.match_json) as Record<string, unknown>;
-  const scope = opts.friendIds;
-  // 前の段の通過者だけを見る。1段目は全員が対象。
-  const scopeClause =
-    scope && scope.length > 0 ? `AND friend_id IN (${scope.map(() => '?').join(',')})` : '';
-  const scopeValues = scope ?? [];
   const accountClause = `AND friend_id IN (SELECT id FROM friends WHERE line_account_id = ?)`;
+
+  // D1 は1文あたりの bind 変数が100個までなので、前段の通過者を分割して調べる。
+  // 未指定と空配列は従来どおり「絞り込みなし」として、クエリを1回だけ実行する。
+  const queryScoped = async (query: string, values: unknown[]): Promise<string[]> => {
+    const uniqueScope = opts.friendIds ? [...new Set(opts.friendIds)] : [];
+    const chunks = uniqueScope.length === 0
+      ? [[]]
+      : Array.from(
+          { length: Math.ceil(uniqueScope.length / LOOKUP_CHUNK) },
+          (_, index) => uniqueScope.slice(index * LOOKUP_CHUNK, (index + 1) * LOOKUP_CHUNK),
+        );
+    const friendIds: string[] = [];
+    for (const chunk of chunks) {
+      const scopeClause = chunk.length > 0
+        ? `AND friend_id IN (${chunk.map(() => '?').join(',')})`
+        : '';
+      const result = await db
+        .prepare(`${query} ${accountClause} ${scopeClause}`)
+        .bind(...values, opts.lineAccountId, ...chunk)
+        .all<{ friend_id: string }>();
+      friendIds.push(...result.results.map((row) => row.friend_id));
+    }
+    return friendIds;
+  };
 
   switch (step.kind) {
     case 'tag': {
-      const result = await db
-        .prepare(
-          `SELECT DISTINCT friend_id FROM friend_tags
-            WHERE tag_id = ? AND assigned_at >= ? AND assigned_at <= ? ${accountClause} ${scopeClause}`,
-        )
-        .bind(String(match.tagId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
-        .all<{ friend_id: string }>();
-      return result.results.map((r) => r.friend_id);
+      return queryScoped(
+        `SELECT DISTINCT friend_id FROM friend_tags
+          WHERE tag_id = ? AND assigned_at >= ? AND assigned_at <= ?`,
+        [String(match.tagId), opts.from, opts.to],
+      );
     }
     case 'field': {
-      const result = await db
-        .prepare(
-          `SELECT DISTINCT friend_id FROM friend_field_values
-            WHERE field_id = ? AND value IS NOT NULL AND value != ''
-              AND updated_at >= ? AND updated_at <= ? ${accountClause} ${scopeClause}`,
-        )
-        .bind(String(match.fieldId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
-        .all<{ friend_id: string }>();
-      return result.results.map((r) => r.friend_id);
+      return queryScoped(
+        `SELECT DISTINCT friend_id FROM friend_field_values
+          WHERE field_id = ? AND value IS NOT NULL AND value != ''
+            AND updated_at >= ? AND updated_at <= ?`,
+        [String(match.fieldId), opts.from, opts.to],
+      );
     }
     case 'site_event': {
-      const result = await db
-        .prepare(
-          `SELECT DISTINCT friend_id FROM site_events
-            WHERE event_type = ? AND friend_id IS NOT NULL
-              AND (? IS NULL OR path = ?)
-              AND occurred_at >= ? AND occurred_at <= ? ${accountClause} ${scopeClause}`,
-        )
-        .bind(
+      return queryScoped(
+        `SELECT DISTINCT friend_id FROM site_events
+          WHERE event_type = ? AND friend_id IS NOT NULL
+            AND (? IS NULL OR path = ?)
+            AND occurred_at >= ? AND occurred_at <= ?`,
+        [
           String(match.eventType ?? 'page_view'),
           match.path ?? null,
           match.path ?? null,
           opts.from,
           opts.to,
-          opts.lineAccountId,
-          ...scopeValues,
-        )
-        .all<{ friend_id: string }>();
-      return result.results.map((r) => r.friend_id);
+        ],
+      );
     }
     case 'conversion': {
-      const result = await db
-        .prepare(
-          `SELECT DISTINCT friend_id FROM conversion_events
-            WHERE conversion_point_id = ? AND created_at >= ? AND created_at <= ? ${accountClause} ${scopeClause}`,
-        )
-        .bind(String(match.conversionPointId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
-        .all<{ friend_id: string }>();
-      return result.results.map((r) => r.friend_id);
+      return queryScoped(
+        `SELECT DISTINCT friend_id FROM conversion_events
+          WHERE conversion_point_id = ? AND created_at >= ? AND created_at <= ?`,
+        [String(match.conversionPointId), opts.from, opts.to],
+      );
     }
     case 'link_click': {
-      const result = await db
-        .prepare(
-          `SELECT DISTINCT friend_id FROM link_clicks
-            WHERE tracked_link_id = ? AND friend_id IS NOT NULL
-              AND clicked_at >= ? AND clicked_at <= ? ${accountClause} ${scopeClause}`,
-        )
-        .bind(String(match.trackedLinkId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
-        .all<{ friend_id: string }>();
-      return result.results.map((r) => r.friend_id);
+      return queryScoped(
+        `SELECT DISTINCT friend_id FROM link_clicks
+          WHERE tracked_link_id = ? AND friend_id IS NOT NULL
+            AND clicked_at >= ? AND clicked_at <= ?`,
+        [String(match.trackedLinkId), opts.from, opts.to],
+      );
     }
     case 'form': {
-      const result = await db
-        .prepare(
-          `SELECT DISTINCT friend_id FROM form_submissions
-            WHERE form_id = ? AND friend_id IS NOT NULL
-              AND created_at >= ? AND created_at <= ? ${accountClause} ${scopeClause}`,
-        )
-        .bind(String(match.formId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
-        .all<{ friend_id: string }>();
-      return result.results.map((r) => r.friend_id);
+      return queryScoped(
+        `SELECT DISTINCT friend_id FROM form_submissions
+          WHERE form_id = ? AND friend_id IS NOT NULL
+            AND created_at >= ? AND created_at <= ?`,
+        [String(match.formId), opts.from, opts.to],
+      );
     }
     default:
       // 知らない種類は「誰も通らなかった」として扱う。例外にすると
