@@ -60,6 +60,42 @@ const TAG_ROW = {
   created_at: '2026-08-21T00:00:00.000Z',
 };
 
+const EMPTY_TAG_REFERENCES = {
+  broadcasts: 0,
+  forms: 0,
+  scenarios: 0,
+  autoReplies: 0,
+  savedSearches: 0,
+  automations: 0,
+  commonActions: 0,
+  richMenus: 0,
+  templates: 0,
+  webinars: 0,
+  reminders: 0,
+  entryRoutes: 0,
+  trackedLinks: 0,
+  bookingMenus: 0,
+  affiliateOffers: 0,
+  events: 0,
+  analyticsFunnels: 0,
+  friendAddSettings: 0,
+};
+
+function tagDeleteImpact(overrides: {
+  friendCount?: number;
+  references?: Partial<typeof EMPTY_TAG_REFERENCES>;
+} = {}) {
+  const references = { ...EMPTY_TAG_REFERENCES, ...overrides.references };
+  const blockingReferenceCount = Object.values(references).reduce((sum, count) => sum + count, 0);
+  return {
+    tag: { id: 'tag-1', name: 'VIP' },
+    friendCount: overrides.friendCount ?? 0,
+    references,
+    blockingReferenceCount,
+    canDelete: blockingReferenceCount === 0,
+  };
+}
+
 describe('GET /api/tags', () => {
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) fn.mockReset();
@@ -206,6 +242,76 @@ describe('GET /api/tags/:id/delete-impact', () => {
     dbMocks.getTagDeleteImpact.mockRejectedValue(new Error('D1 unavailable'));
     const res = await app().request('/api/tags/tag-1/delete-impact');
     expect(res.status).toBe(500);
+  });
+});
+
+describe('DELETE /api/tags/:id', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) fn.mockReset();
+  });
+
+  test('運用設定から参照中のタグはAPIを直接呼んでも削除しない', async () => {
+    dbMocks.getTagDeleteImpact.mockResolvedValue(tagDeleteImpact({
+      references: { broadcasts: 2, automations: 1 },
+    }));
+
+    const res = await app().request('/api/tags/tag-1', { method: 'DELETE' });
+
+    expect(res.status).toBe(409);
+    expect(dbMocks.deleteTag).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({
+      success: false,
+      code: 'TAG_IN_USE',
+      data: {
+        blockingReferenceCount: 3,
+        references: { broadcasts: 2, automations: 1 },
+      },
+    });
+  });
+
+  test('友だちへの付与だけなら警告対象のまま削除できる', async () => {
+    dbMocks.getTagDeleteImpact.mockResolvedValue(tagDeleteImpact({ friendCount: 12 }));
+    dbMocks.deleteTag.mockResolvedValue(undefined);
+
+    const res = await app().request('/api/tags/tag-1', { method: 'DELETE' });
+
+    expect(res.status).toBe(200);
+    expect(dbMocks.deleteTag).toHaveBeenCalledWith(expect.anything(), 'tag-1');
+  });
+
+  test('存在しないタグは削除しない', async () => {
+    dbMocks.getTagDeleteImpact.mockResolvedValue(null);
+
+    const res = await app().request('/api/tags/missing', { method: 'DELETE' });
+
+    expect(res.status).toBe(404);
+    expect(dbMocks.deleteTag).not.toHaveBeenCalled();
+  });
+
+  test('影響を確認できないときは安全側に止める', async () => {
+    dbMocks.getTagDeleteImpact.mockRejectedValue(new Error('D1 unavailable'));
+
+    const res = await app().request('/api/tags/tag-1', { method: 'DELETE' });
+
+    expect(res.status).toBe(500);
+    expect(dbMocks.deleteTag).not.toHaveBeenCalled();
+  });
+
+  test('影響確認後に外部キー競合が起きても409で止める', async () => {
+    dbMocks.getTagDeleteImpact.mockResolvedValue(tagDeleteImpact());
+    dbMocks.deleteTag.mockRejectedValue(new Error('FOREIGN KEY constraint failed'));
+
+    const res = await app().request('/api/tags/tag-1', { method: 'DELETE' });
+
+    expect(res.status).toBe(409);
+  });
+
+  test('閲覧だけの人は影響確認にも削除にも進めない', async () => {
+    const res = await app('staff').request('/api/tags/tag-1', { method: 'DELETE' });
+
+    expect(res.status).toBe(403);
+    expect(dbMocks.getTagDeleteImpact).not.toHaveBeenCalled();
+    expect(dbMocks.deleteTag).not.toHaveBeenCalled();
   });
 });
 

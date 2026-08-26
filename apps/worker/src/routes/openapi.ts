@@ -266,7 +266,12 @@ const spec = {
         tags: ['Tags'],
         summary: 'タグ削除',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '200': { description: 'Tag deleted' } },
+        responses: {
+          '200': { description: 'Tag deleted' },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Tag not found' },
+          '409': { description: 'Tag is referenced by active settings' },
+        },
       },
     },
     '/api/tags/{id}/delete-impact': {

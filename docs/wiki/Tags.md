@@ -208,7 +208,9 @@ curl -X DELETE "https://your-worker.your-subdomain.workers.dev/api/tags/TAG_UUID
 { "success": true, "data": null }
 ```
 
-注意: タグを削除すると、friend_tags テーブルの関連レコードも削除されます。
+タグが配信や自動化などの運用設定から参照されている場合は削除されず、`409 TAG_IN_USE` が返ります。
+友だちに付いているだけのタグは削除でき、その友だちとの紐づきも削除されます。削除前に
+`GET /api/tags/:id/delete-impact` で影響を確認してください。
 
 ### POST /api/friends/:id/tags — 友だちにタグ付与
 
