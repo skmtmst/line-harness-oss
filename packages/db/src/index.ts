@@ -26,6 +26,7 @@ export * from './notifications';
 export * from './stripe';
 export * from './health';
 export * from './automations';
+export * from './automation-migration';
 export * from './entry-routes';
 export * from './entry-route-genres';
 export * from './tracked-links';
