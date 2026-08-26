@@ -11,6 +11,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import ListKpis from '@/components/shared/list-kpis'
+import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import { Tabs } from '@/components/shared/tabs'
 import FriendFieldList from './field-list'
@@ -25,6 +26,17 @@ const TABS = [
 ] as const
 type TabKey = (typeof TABS)[number][0]
 const UNGROUPED = '__ungrouped__'
+
+/**
+ * 一覧に中身を出せるかどうか。
+ *
+ * **`items.length === 0` だけを見て「ありません」と出さない**ための状態。
+ * 読み込みに失敗しても同じ文が出ていて、運用する人からは「登録したものが
+ * 消えた」ように見えていた（PR #216 と同じ壊れ方）。403 も分ける。
+ * 「見せてよい人ではない」を「表示できませんでした」と出すと、
+ * 直らない再読み込みを繰り返させることになる。
+ */
+type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
 
 /* ---- 4-1 の表のための小物。設計 `HrwyW` の値をそのまま持つ ---- */
 
@@ -159,7 +171,7 @@ export const FRIEND_ATTRIBUTES_QA_TAGS: Tag[] = [
   createdAt: '2026-01-13T00:00:00.000Z',
 }))
 
-function FolderList({ groups, items, active, onSelect, onChanged }: { groups: TagGroup[]; items: Tag[]; active: string; onSelect: (id: string) => void; onChanged: () => void }) {
+function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }: { groups: TagGroup[]; items: Tag[]; countsKnown: boolean; active: string; onSelect: (id: string) => void; onChanged: () => void }) {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [menuError, setMenuError] = useState('')
@@ -205,11 +217,11 @@ function FolderList({ groups, items, active, onSelect, onChanged }: { groups: Ta
   }
   return (
     <aside className={`h-fit rounded-card border border-hairline bg-canvas ${cardShadow}`}>
-      <div className="flex items-center justify-between border-b border-hairline px-4 py-3"><h2 className="text-sm font-bold text-ink">フォルダ</h2><span className="text-xs text-ink-faint">{items.length}件</span></div>
+      <div className="flex items-center justify-between border-b border-hairline px-4 py-3"><h2 className="text-sm font-bold text-ink">フォルダ</h2><span className="text-xs text-ink-faint">{countsKnown ? `${items.length}件` : '—'}</span></div>
       <nav className="p-2">{rows.map((row) => {
         const group = groups.find((item) => item.id === row.id)
         const groupIndex = group ? groups.findIndex((item) => item.id === group.id) : -1
-        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate">{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent' : 'bg-canvas-sunken text-ink-faint'}`}>{row.count}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
+        return <div key={row.id} className="group relative flex items-center"><button type="button" onClick={() => onSelect(row.id)} className={`flex min-w-0 flex-1 items-center gap-2 rounded-control px-3 py-2.5 text-left text-label ${active === row.id ? 'bg-accent-soft font-bold text-accent' : 'font-semibold text-ink hover:bg-canvas-sunken'}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: row.color }} /><span className="min-w-0 flex-1 truncate">{row.name}</span><span className={`inline-flex h-[26px] shrink-0 items-center rounded-pill px-[9px] text-caption font-semibold tabular-nums ${active === row.id ? 'bg-canvas text-accent' : 'bg-canvas-sunken text-ink-faint'}`}>{countsKnown ? row.count : '—'}</span></button>{group ? <button type="button" aria-label={`${group.name}の操作`} aria-expanded={menuId === group.id} onClick={() => setMenuId((current) => current === group.id ? null : group.id)} className={`ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-control text-ink-faint hover:bg-canvas-sunken focus-visible:outline ${active === row.id ? '' : 'invisible group-hover:visible'}`}><MoreHorizontal aria-hidden="true" size={16} /></button> : null}{group ? <ActionMenu open={menuId === group.id} onClose={() => setMenuId(null)} ariaLabel={`${group.name}の操作`} note="削除しても、中のタグは未分類に残ります。" items={[
           { id: 'rename', label: '名前を変更', icon: <Pencil size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'color', label: '色を変える', icon: <Palette size={15} />, onSelect: () => window.location.assign(`/tags/folders/new?id=${group.id}`) },
           { id: 'up', label: '並び順を上へ', icon: <ArrowUp size={15} />, disabled: busy || groupIndex === 0, onSelect: () => void move(group, -1) },
@@ -272,7 +284,8 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
   const tab = fixture ? fixtureTab : routeTab
   const [items, setItems] = useState<Tag[]>(fixture?.items ?? [])
   const [groups, setGroups] = useState<TagGroup[]>(fixture?.groups ?? [])
-  const [loading, setLoading] = useState(!fixture)
+  const [status, setStatus] = useState<LoadStatus>(fixture ? 'ready' : 'loading')
+  // 操作の失敗（並び替え・★・フォルダ）。**読み込みの失敗とは別物**なので混ぜない。
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [folder, setFolder] = useState('')
@@ -281,22 +294,22 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
   const [quick, setQuick] = useState('')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
-  const [reordering, setReordering] = useState(false)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
 
   const load = useCallback(async () => {
     if (fixture) return
-    setLoading(true)
+    setStatus('loading')
     setError('')
     try {
       const [tags, folders] = await Promise.all([api.tags.list({ withCounts: true }), api.tagGroups.list()])
-      if (tags.success) setItems(tags.data)
+      // `success: false` を黙って捨てない。捨てると空の表を「0件」として見せる。
+      if (!tags.success) throw new Error(tags.error)
+      setItems(tags.data)
       if (folders.success) setGroups(folders.data)
-    } catch {
-      setError('読み込みに失敗しました')
-    } finally {
-      setLoading(false)
+      setStatus('ready')
+    } catch (reason) {
+      setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
   }, [fixture])
   useEffect(() => { void load() }, [load])
@@ -317,6 +330,12 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
   const currentPage = Math.min(page, pages)
   const visible = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   useEffect(() => setPage(1), [query, folder, usageFilter, sourceFilter, quick, pageSize])
+
+  /**
+   * 中身を出してよいか。**読み込み中・失敗・権限不足のあいだは数を出さない。**
+   * 0件と出すと「登録したものが消えた」ように見える。`—` に留める。
+   */
+  const ready = status === 'ready'
 
   const move = async (targetId: string) => {
     if (!dragId || dragId === targetId) return setDragId(null)
@@ -364,7 +383,7 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
           current: tab === key,
           onClick: () => fixture ? setFixtureTab(key) : router.replace(key === 'tags' ? '/tags' : `/tags?tab=${key}`),
         }))}
-        actions={tab === 'tags' ? (
+        actions={tab === 'tags' && status !== 'forbidden' ? (
           // 設計 `Sn86o` はここに CSV だけ。作る操作は KPI の下（`HWP5R`）。
           <Button type="button" onClick={exportCsv}>CSVで一括登録</Button>
         ) : undefined}
@@ -379,6 +398,7 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
           設計 `mfmn3` の4枚。
         */}
         <ListKpis
+          titles={['タグ数', '付与済み友だち', '今月の付与', '整理候補']}
           build={(stats) => [
             { title: 'タグ数', value: stats.tags.total, unit: '件', detail: `未使用 ${stats.tags.unused}件` },
             { title: '付与済み友だち', value: stats.tags.taggedFriends, unit: '人', detail: '1つ以上のタグあり' },
@@ -387,18 +407,23 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
           ]}
         />
 
-        {/* 設計 `HWP5R`。作る操作はここ。左に置く（`v6-common-rules.md` §1-5）。 */}
-        <div className="mb-4 flex items-center gap-2">
-          <Button href="/tags/folders/new">フォルダを追加</Button>
-          <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
-        </div>
+        {/*
+          設計 `HWP5R`。作る操作はここ。左に置く（`v6-common-rules.md` §1-5）。
+          **権限が無いときは出さない。** 押せるように見せてから断ると、
+          何が足りないのかが分からないまま拒まれることになる。
+        */}
+        {status === 'forbidden' ? null : (
+          <div className="mb-4 flex items-center gap-2">
+            <Button href="/tags/folders/new">フォルダを追加</Button>
+            <Button href="/tags/new" variant="primary">＋ タグを追加</Button>
+          </div>
+        )}
         {error && <p className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p>}
         <div className="grid min-w-0 gap-4 xl:grid-cols-[240px_minmax(0,1fr)]">
-          <FolderList groups={groups} items={items} active={folder} onSelect={setFolder} onChanged={() => void load()} />
+          <FolderList groups={groups} items={items} countsKnown={ready} active={folder} onSelect={setFolder} onChanged={() => void load()} />
           <main className="min-w-0">
-            <div className="mb-3 flex flex-wrap items-center gap-2"><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="min-w-[260px] flex-1 rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label outline-none focus:border-accent" /><select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink"><option value="all">付与元：すべて</option><option value="manual">手動のみ</option></select><select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select><span className="text-xs tabular-nums text-ink-faint">{filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filtered.length)} / {filtered.length}件</span></div>
+            <div className="mb-3 flex flex-wrap items-center gap-2"><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="タグ名・用途で検索" className="min-w-[260px] flex-1 rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label outline-none focus:border-accent" /><select value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink"><option value="all">使用状態：すべて</option><option value="linked">連動あり</option><option value="unused">未使用</option></select><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink"><option value="all">付与元：すべて</option><option value="manual">手動のみ</option></select><select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))} className="v6-select rounded-control border border-hairline bg-canvas px-3 py-2.5 text-label font-semibold text-ink">{[20,30,40,50].map((size) => <option key={size} value={size}>{size}件表示</option>)}</select><span className="text-xs tabular-nums text-ink-faint">{ready ? `${filtered.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, filtered.length)} / ${filtered.length}件` : '—'}</span></div>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs"><span className="text-ink-faint">よく使う</span>{[['unused','未使用のタグ'],['linked','連動あり'],['recent','今月増えた']].map(([key,label]) => <button key={key} type="button" onClick={() => setQuick(quick === key ? '' : key)} className={`rounded-pill border px-3 py-1.5 ${quick === key ? 'border-accent bg-accent-soft text-accent' : 'border-hairline bg-canvas text-ink-secondary'}`}>{label}</button>)}</div>
-            {reordering && <p className="mb-3 rounded-control bg-action-soft px-3 py-2 text-xs text-action">左端のつまみをドラッグすると、その場で順番を保存します。</p>}
             {/*
               中身が詰まったら**表だけ**横スクロールさせる。
               画面ごと横に伸ばすと、共通ルール §1-8 の「1440でも横スクロールを
@@ -423,10 +448,24 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
-                  {loading ? (
-                    <tr><td colSpan={10} className="p-8 text-center text-ink-faint">読み込み中…</td></tr>
+                  {/*
+                    **4状態を言い分ける。** 設計 ★V6 4-2-C `yKEdO` は、見出し行を
+                    残したまま本文のところへ 132px の1枚を出す。
+                    `visible.length === 0` だけを見て「ありません」と出すと、
+                    読み込みに失敗したときも同じ文が出る（PR #216 と同じ壊れ方）。
+                  */}
+                  {status === 'loading' ? (
+                    <tr><td colSpan={10} className="p-0"><ListState kind="loading" /></td></tr>
+                  ) : status === 'forbidden' ? (
+                    <tr><td colSpan={10} className="p-0"><ListState kind="forbidden" description="タグを見るには権限が要ります。オーナーか管理者に追加を依頼してください。" /></td></tr>
+                  ) : status === 'error' ? (
+                    <tr><td colSpan={10} className="p-0"><ListState kind="error" description="タグを読み込めませんでした。再読み込みしても直らない場合はエラー報告へ。" /></td></tr>
+                  ) : items.length === 0 ? (
+                    // まだ1件も作っていない。「条件を変える」は言えない。
+                    <tr><td colSpan={10} className="p-0"><ListState kind="empty" title="まだタグがありません" description="「＋ タグを追加」から最初の1つを作ると、ここに並びます。" /></td></tr>
                   ) : visible.length === 0 ? (
-                    <tr><td colSpan={10} className="p-8 text-center text-ink-faint">条件に合うタグはありません</td></tr>
+                    // 作ってはあるが、いまの絞り込みに合うものが無い。
+                    <tr><td colSpan={10} className="p-0"><ListState kind="empty" title="条件に合うタグはありません" description="検索語・フォルダ・絞り込みを変えてください。" /></td></tr>
                   ) : visible.map((tag) => {
                     const group = groups.find((item) => item.id === tag.groupId)
                     const chips = linkChips(tag)
@@ -498,9 +537,12 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
                 設計 `Blot6`。共通部品を使う。ここで自前に組むと、
                 高さ38・角丸・現在ページの緑がほかの一覧とずれる。
               */}
-              <div className="flex items-center justify-end border-t border-hairline px-4 py-3">
-                <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} />
-              </div>
+              {/* 中身を出せていないときは出さない。ページ番号があると読めているように見える。 */}
+              {ready ? (
+                <div className="flex items-center justify-end border-t border-hairline px-4 py-3">
+                  <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} />
+                </div>
+              ) : null}
             </div>
           </main>
         </div>
