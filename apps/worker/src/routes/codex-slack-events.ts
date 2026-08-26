@@ -9,6 +9,7 @@ import {
   type CodexSlackPrSnapshot,
 } from '../services/codex-slack-relay.js';
 import { verifySlackRequest } from '../services/slack-signature.js';
+import { parseCodexAuditApproval } from '../services/codex-auto-merge.js';
 import {
   hasClaudeToCodexMarker,
   hasActualSlackMention,
@@ -270,8 +271,25 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     return c.json({ success: true, ignored: true });
   }
 
+  const autoMergePrNumber = parseCodexAuditApproval(event.text);
+  let autoMergeQueued = false;
+  if (
+    autoMergePrNumber !== null &&
+    isAllowedRelaySource(c.env.CODEX_RELAY_SOURCE_USER_IDS, event.user)
+  ) {
+    await c.env.CODEX_MENTION_QUEUE.send({
+      kind: 'auto_merge',
+      slackEventId: envelope.event_id,
+      channelId: event.channel,
+      threadTs,
+      requesterUserId: event.user,
+      prNumber: autoMergePrNumber,
+    });
+    autoMergeQueued = true;
+  }
+
   if (!hasActualSlackMention(event.text, c.env.CODEX_SLACK_USER_ID)) {
-    return c.json({ success: true, ignored: true });
+    return c.json({ success: true, ignored: !autoMergeQueued, autoMergeQueued });
   }
   const message: Extract<CodexMentionQueueMessage, { kind: 'inspect_official' }> = {
     kind: 'inspect_official',
@@ -299,7 +317,7 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
       : 30;
     await c.env.CODEX_MENTION_QUEUE.send(message, { delaySeconds });
   }
-  return c.json({ success: true, queued: inserted });
+  return c.json({ success: true, queued: inserted, autoMergeQueued });
 });
 
 codexSlackEvents.get('/api/integrations/codex-monitor/status', async (c) => {
