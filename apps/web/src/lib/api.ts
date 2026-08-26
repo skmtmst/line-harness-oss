@@ -3999,11 +3999,23 @@ export const eventsApi = {
     accountId: string,
     eventId: string,
     slots: Array<{ starts_at: string; ends_at: string; capacity: number | null; is_active?: number; sort_order?: number }>,
-  ) =>
-    fetchApi<{ items: EventSlot[] }>(
-      withAccount(`/api/events/admin/events/${eventId}/slots`, accountId),
-      { method: 'POST', body: JSON.stringify({ slots }) },
-    ),
+  ) => (async () => {
+    const items: EventSlot[] = []
+    for (let offset = 0; offset < slots.length; offset += 400) {
+      const chunk = slots.slice(offset, offset + 400)
+      try {
+        const response = await fetchApi<{ items: EventSlot[] }>(
+          withAccount(`/api/events/admin/events/${eventId}/slots`, accountId),
+          { method: 'POST', body: JSON.stringify({ slots: chunk }) },
+        )
+        items.push(...response.items)
+      } catch (error) {
+        const detail = error instanceof Error ? `（${error.message}）` : ''
+        throw new Error(`${items.length}件まで追加されました。残りを確認してから、もう一度追加してください${detail}`, { cause: error })
+      }
+    }
+    return { items }
+  })(),
   updateSlot: (accountId: string, eventId: string, slotId: string, body: Partial<EventSlot>) =>
     fetchApi<EventSlot>(
       withAccount(`/api/events/admin/events/${eventId}/slots/${slotId}`, accountId),

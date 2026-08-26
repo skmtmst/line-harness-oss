@@ -575,7 +575,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // Previously fetched 800 friends in parallel with chats, which blocked the initial render.
   const loadAllFriends = useCallback(async () => {
     try {
-      const friendRes = await api.friends.list({ accountId: selectedAccountId || undefined, limit: '800' })
+      // The new-DM picker never renders tags, so avoid one tag query per friend.
+      const friendRes = await api.friends.list({ accountId: selectedAccountId || undefined, limit: '800', includeTags: false })
       if (friendRes.success) {
         setAllFriends((friendRes.data as unknown as { items: FriendItem[] }).items)
       }
