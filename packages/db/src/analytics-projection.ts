@@ -213,17 +213,27 @@ function monthsBefore(now: Date, months: number): string {
 export async function purgeExpiredAnalyticsReadData(
   db: D1Database,
   now: Date,
-): Promise<{ events: number; dailyMetrics: number; reconciliationRuns: number }> {
+): Promise<{
+  events: number;
+  dailyMetrics: number;
+  reconciliationRuns: number;
+  funnelRuns: number;
+  audiences: number;
+}> {
   const eventCutoff = monthsBefore(now, 13);
   const dailyCutoff = monthsBefore(now, 25).slice(0, 10);
   const results = await db.batch([
     db.prepare(`DELETE FROM analytics_events WHERE occurred_at < ?`).bind(eventCutoff),
     db.prepare(`DELETE FROM analytics_daily_metrics WHERE metric_date < ?`).bind(dailyCutoff),
     db.prepare(`DELETE FROM analytics_reconciliation_runs WHERE completed_at < ?`).bind(eventCutoff),
+    db.prepare(`DELETE FROM analytics_result_audiences WHERE expires_at <= ?`).bind(now.toISOString()),
+    db.prepare(`DELETE FROM analytics_funnel_runs WHERE created_at < ?`).bind(eventCutoff),
   ]);
   return {
     events: Number(results[0]?.meta?.changes ?? 0),
     dailyMetrics: Number(results[1]?.meta?.changes ?? 0),
     reconciliationRuns: Number(results[2]?.meta?.changes ?? 0),
+    audiences: Number(results[3]?.meta?.changes ?? 0),
+    funnelRuns: Number(results[4]?.meta?.changes ?? 0),
   };
 }

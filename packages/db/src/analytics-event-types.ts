@@ -5,6 +5,7 @@ export const ANALYTICS_EVENT_TYPE_LIST = [
   'message_sent',
   'postback_received',
   'tag_change',
+  'field_change',
   'scenario_started',
   'scenario_completed',
   'form_submitted',

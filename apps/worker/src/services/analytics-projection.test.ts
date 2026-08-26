@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   rebuildAnalyticsDailyMetrics: vi.fn(),
   recentAnalyticsProjectionRange: vi.fn(),
+  ensureAnalyticsEventCoverage: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', async () => ({
@@ -18,6 +19,7 @@ beforeEach(() => {
     fromDate: '2026-08-20', toDate: '2026-08-26',
   });
   mocks.rebuildAnalyticsDailyMetrics.mockResolvedValue({ status: 'matched' });
+  mocks.ensureAnalyticsEventCoverage.mockResolvedValue(undefined);
 });
 
 describe('分析の日別投影更新', () => {
@@ -38,6 +40,13 @@ describe('分析の日別投影更新', () => {
     expect(mocks.rebuildAnalyticsDailyMetrics).toHaveBeenCalledWith(
       {},
       expect.objectContaining({ accountId: 'account-a', timeZone: 'Asia/Tokyo' }),
+    );
+    expect(mocks.ensureAnalyticsEventCoverage).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        lineAccountId: 'account-a',
+        eventTypes: expect.arrayContaining(['friend_add', 'message_received']),
+      }),
     );
   });
 

@@ -1256,7 +1256,10 @@ async function scheduled(
     try {
       const { purgeExpiredAnalyticsReadData } = await import('@line-crm/db');
       const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
-      if (purged.events + purged.dailyMetrics + purged.reconciliationRuns > 0) {
+      if (
+        purged.events + purged.dailyMetrics + purged.reconciliationRuns
+        + purged.funnelRuns + purged.audiences > 0
+      ) {
         console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
       }
     } catch (e) {

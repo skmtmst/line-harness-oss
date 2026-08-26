@@ -66,5 +66,7 @@ export * from './analytics-events';
 export * from './analytics-event-types';
 export * from './analytics-projection';
 export * from './analytics-migration';
+export * from './analytics-funnels';
+export * from './analytics-funnel-migration';
 export * from './dashboard';
 export * from './operation-audit';

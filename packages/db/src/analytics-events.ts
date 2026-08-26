@@ -9,6 +9,7 @@ const DIMENSION_KEYS: Partial<Record<AnalyticsEventType, readonly string[]>> = {
   message_sent: ['messageType', 'deliveryType', 'source'],
   postback_received: ['matched'],
   tag_change: ['tagId', 'action'],
+  field_change: ['fieldId', 'choiceKey', 'action'],
   scenario_started: ['scenarioId'],
   scenario_completed: ['scenarioId'],
   form_submitted: ['formId'],
@@ -54,6 +55,32 @@ export interface RecordAnalyticsEventInput {
   numericValue?: number | null;
   currency?: string | null;
   idempotencyKey?: string;
+}
+
+export async function ensureAnalyticsEventCoverage(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    eventTypes: string[];
+    availableFrom: string;
+  },
+): Promise<void> {
+  const lineAccountId = requiredText(input.lineAccountId, 'analytics_coverage_account_required');
+  const availableFrom = normalizeOccurredAt(input.availableFrom);
+  const eventTypes = [...new Set(input.eventTypes)];
+  for (const eventType of eventTypes) {
+    if (!ANALYTICS_EVENT_TYPES.has(eventType)) {
+      throw new Error(`analytics_event_type_unknown:${eventType}`);
+    }
+  }
+  if (eventTypes.length === 0) return;
+  await db.batch(eventTypes.map((eventType) => db.prepare(
+    `INSERT INTO analytics_event_coverage (
+       line_account_id, event_type, available_from, state, updated_at
+     ) VALUES (?, ?, ?, 'available', ?)
+     ON CONFLICT(line_account_id, event_type) DO UPDATE SET
+       updated_at = excluded.updated_at`,
+  ).bind(lineAccountId, eventType, availableFrom, new Date().toISOString())));
 }
 
 function requiredText(value: string, code: string): string {

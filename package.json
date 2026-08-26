@@ -14,6 +14,7 @@
     "db:migrate-line-credentials": "tsx scripts/migrate-line-account-credentials.ts",
     "db:dry-run-v6-automations": "tsx scripts/dry-run-v6-automations.ts",
     "db:dry-run-v6-analytics": "tsx scripts/dry-run-v6-analytics.ts",
+    "db:dry-run-v6-funnels": "tsx scripts/dry-run-v6-funnels.ts",
     "deploy:setup": "node packages/create-line-harness/dist/index.js",
     "deploy:update": "node packages/create-line-harness/dist/index.js update",
     "sandbox:create-line-harness": "bash scripts/run-create-line-harness-sandbox.sh",
