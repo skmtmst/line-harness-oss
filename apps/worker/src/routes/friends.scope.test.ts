@@ -108,4 +108,23 @@ describe('A-8 friends tenant scope', () => {
     const response = await createApp([]).request('/api/friends/friend/mileage');
     expect(response.status).toBe(200);
   });
+
+  test('/api/friends/stats keeps the existing response shape after using the shared query', async () => {
+    const response = await createApp([]).request('/api/friends/stats');
+    expect(await response.json()).toEqual({
+      success: true,
+      data: {
+        active: 0, total: 0, blockedByThem: 0, hiddenByUs: 0,
+        unanswered: 0, resolved: 0, addedThisMonth: 0, addedLastMonth: 0,
+      },
+    });
+  });
+
+  test('/api/friends/add-breakdown keeps the existing response shape after using the shared query', async () => {
+    const response = await createApp([]).request('/api/friends/add-breakdown?days=30');
+    expect(await response.json()).toEqual({
+      success: true,
+      data: { days: 30, firstTime: 0, returning: 0, unblocked: 0 },
+    });
+  });
 });

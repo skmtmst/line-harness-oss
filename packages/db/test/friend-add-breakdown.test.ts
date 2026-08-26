@@ -69,7 +69,9 @@ describe('getFriendAddBreakdown', () => {
     insertFriend('returning-blocked', 'account-a', { unfollowCount: 1, isFollowing: 0 });
     insertFriend('other-account', 'account-b');
 
-    await expect(getFriendAddBreakdown(db, 30, 'account-a')).resolves.toEqual({
+    await expect(getFriendAddBreakdown(db, 30, {
+      allowedAccountIds: ['account-a'], includeUnassigned: false,
+    })).resolves.toEqual({
       days: 30,
       firstTime: 1,
       returning: 2,
