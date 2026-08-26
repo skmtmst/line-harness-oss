@@ -8,6 +8,13 @@ import { verifySupportRelay } from '../services/support-relay.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { markInboxConversationRead } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  inboxEventStatement,
+  inboxNoteStatement,
+  isInboxStatus,
+  acquireInboxReplyLease,
+  releaseInboxReplyLease,
+} from '../services/inbox-events.js';
 
 export const supportInbox = new Hono<Env>();
 
@@ -111,7 +118,8 @@ type EmailThreadRow = {
   customer_email: string;
   customer_name: string | null;
   subject: string;
-  status: 'unread' | 'in_progress' | 'resolved';
+  status: 'unread' | 'in_progress' | 'on_hold' | 'resolved';
+  revision: number;
   last_message_at: string;
   last_incoming_at: string;
   last_outgoing_at: string | null;
@@ -167,6 +175,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
     const channel = c.req.query('channel') || 'all';
     const status = c.req.query('status') || 'open';
     const query = (c.req.query('q') || '').trim();
+    const selectedLineAccountId = (c.req.query('lineAccountId') || '').trim();
     const limit = Math.min(200, Math.max(1, Number.parseInt(c.req.query('limit') || '100', 10) || 100));
     const offset = Math.max(0, Number.parseInt(c.req.query('offset') || '0', 10) || 0);
     // LINEとメールを待ち時間順で統合してからページを切るため、要求ページの末尾まで
@@ -179,17 +188,17 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
 
     // Email threads have no account key in the legacy schema. Until a thread
     // is explicitly attributed, only the default tenant may view them.
-    if (channel !== 'line' && scope.canSeeUnassigned) {
+    if (channel !== 'line' && scope.canSeeUnassigned && !selectedLineAccountId) {
       const statusSql = status === 'all'
         ? '1=1'
         : status === 'resolved'
           ? `t.status = 'resolved'`
-          : status === 'unread' || status === 'in_progress'
+          : status === 'unread' || status === 'in_progress' || status === 'on_hold'
             ? 't.status = ?'
             : `t.status != 'resolved'`;
       // SQL 上は read join の staff_id が最初の placeholder。
       const bindings: Array<string | number> = [c.get('staff').id];
-      if (status === 'unread' || status === 'in_progress') bindings.push(status);
+      if (status === 'unread' || status === 'in_progress' || status === 'on_hold') bindings.push(status);
       let searchSql = '';
       if (query) {
         searchSql = 'AND (t.customer_email LIKE ? OR t.customer_name LIKE ? OR t.subject LIKE ?)';
@@ -198,7 +207,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       }
       bindings.push(fetchLimit);
       const emailRows = await c.env.DB.prepare(
-        `SELECT t.id, t.customer_email, t.customer_name, t.subject, t.status,
+        `SELECT t.id, t.customer_email, t.customer_name, t.subject, t.status, t.revision,
                 COUNT(*) OVER() AS total_count,
                 SUM(CASE WHEN t.status = 'unread' THEN 1 ELSE 0 END) OVER() AS unread_count,
                 t.assigned_staff_id,
@@ -216,7 +225,12 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           AND sr.conversation_id = t.id
           AND sr.staff_id = ?
          WHERE ${statusSql} ${searchSql}
-         ORDER BY CASE t.status WHEN 'unread' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
+         ORDER BY CASE t.status
+                    WHEN 'unread' THEN 0
+                    WHEN 'in_progress' THEN 1
+                    WHEN 'on_hold' THEN 2
+                    ELSE 3
+                  END,
                   t.last_message_at DESC
          LIMIT ?`,
       ).bind(...bindings).all<EmailThreadRow>();
@@ -232,6 +246,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           subject: row.subject,
           preview: row.preview || '(本文なし)',
           status: row.status,
+          revision: row.revision,
           assignedStaffId: row.assigned_staff_id,
           assignedStaffName: row.assigned_staff_name,
           lastMessageAt: row.last_message_at,
@@ -242,7 +257,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       }
     }
 
-    if (channel !== 'email' && status !== 'resolved' && status !== 'in_progress') {
+    if (channel !== 'email' && status !== 'resolved' && status !== 'in_progress' && status !== 'on_hold') {
       const line = await computeUnansweredInbox(c.env.DB, {
         q: query || undefined,
         page: 1,
@@ -270,7 +285,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
       }
     }
 
-    const statusPriority = { unread: 0, in_progress: 1, resolved: 2 } as const;
+    const statusPriority = { unread: 0, in_progress: 1, on_hold: 2, resolved: 3 } as const;
     items.sort((a, b) => {
       const priority = statusPriority[a.status as keyof typeof statusPriority]
         - statusPriority[b.status as keyof typeof statusPriority];
@@ -315,7 +330,7 @@ supportInbox.get('/api/support/email/threads/:id', async (c) => {
   const id = c.req.param('id');
   const thread = await c.env.DB.prepare(
     `SELECT id, customer_email, customer_name, subject, status, assigned_staff_id, notes,
-            last_message_at, last_incoming_at, last_outgoing_at, resolved_at
+            last_message_at, last_incoming_at, last_outgoing_at, resolved_at, revision
      FROM support_email_threads WHERE id = ?`,
   ).bind(id).first();
   if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
@@ -375,32 +390,58 @@ supportInbox.post(
 
 supportInbox.patch('/api/support/email/threads/:id/status', requireRole('owner', 'admin', 'staff'), async (c) => {
   const id = c.req.param('id');
-  const body: { status?: string } = await c.req.json<{ status?: string }>().catch(() => ({}));
-  if (!body.status || !['unread', 'in_progress', 'resolved'].includes(body.status)) {
-    return c.json({ success: false, error: 'Invalid status' }, 400);
+  const body: { status?: string; revision?: number; reason?: string } = await c.req
+    .json<{ status?: string; revision?: number; reason?: string }>()
+    .catch(() => ({}));
+  if (!isInboxStatus(body.status)) {
+    return c.json({ success: false, error: '対応状態が正しくありません' }, 400);
   }
   const staff = c.get('staff');
   const now = new Date().toISOString();
+  const current = await c.env.DB.prepare(
+    `SELECT status, revision, assigned_staff_id FROM support_email_threads WHERE id = ?`,
+  ).bind(id).first<{ status: string; revision: number; assigned_staff_id: string | null }>();
+  if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+  const expectedRevision = body.revision ?? current.revision;
+  if (expectedRevision !== current.revision) {
+    return c.json({
+      success: false,
+      error: 'ほかの担当者が先に更新しました。最新の内容を確認してください',
+      code: 'REVISION_CONFLICT',
+      data: { revision: current.revision },
+    }, 409);
+  }
+  if (current.status === body.status) {
+    return c.json({ success: true, data: { status: current.status, revision: current.revision } });
+  }
   // 担当は「まだ誰も付いていないとき」だけ、操作した人を入れる。
   //
   // 以前は毎回 staff.id で上書きしていた。担当を選べるようにすると、
   // 対応を変えるたびに担当が勝手に別の人へ移ってしまう。
-  const result = await c.env.DB.prepare(
-    `UPDATE support_email_threads
-     SET status = ?,
-         assigned_staff_id = COALESCE(assigned_staff_id, ?),
-         resolved_at = ?,
-         updated_at = ?
-     WHERE id = ?`,
-  ).bind(
-    body.status,
-    staff.id,
-    body.status === 'resolved' ? now : null,
-    now,
-    id,
-  ).run();
-  if (!result.meta.changes) return c.json({ success: false, error: 'Thread not found' }, 404);
-  return c.json({ success: true });
+  const nextRevision = expectedRevision + 1;
+  const correlationId = crypto.randomUUID();
+  const [result] = await c.env.DB.batch([
+    c.env.DB.prepare(
+      `UPDATE support_email_threads
+       SET status = ?, assigned_staff_id = COALESCE(assigned_staff_id, ?),
+           resolved_at = ?, revision = revision + 1, updated_at = ?
+       WHERE id = ? AND revision = ?`,
+    ).bind(body.status, staff.id, body.status === 'resolved' ? now : null, now, id, expectedRevision),
+    inboxEventStatement(c.env.DB, {
+      channel: 'email', conversationId: id, eventType: 'status',
+      before: { status: current.status }, after: { status: body.status },
+      actorStaffId: staff.id, reason: body.reason, correlationId, createdAt: now,
+      guard: { table: 'support_email_threads', id, revision: nextRevision, updatedAt: now },
+    }),
+  ]);
+  if (!result.meta.changes) {
+    return c.json({
+      success: false,
+      error: 'ほかの担当者が先に更新しました。最新の内容を確認してください',
+      code: 'REVISION_CONFLICT',
+    }, 409);
+  }
+  return c.json({ success: true, data: { status: body.status, revision: nextRevision } });
 });
 
 /**
@@ -414,8 +455,8 @@ supportInbox.patch(
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     const id = c.req.param('id');
-    const body: { staffId?: string | null } = await c.req
-      .json<{ staffId?: string | null }>()
+    const body: { staffId?: string | null; revision?: number; reason?: string } = await c.req
+      .json<{ staffId?: string | null; revision?: number; reason?: string }>()
       .catch(() => ({}));
     const staffId = body.staffId ? String(body.staffId) : null;
 
@@ -427,13 +468,37 @@ supportInbox.patch(
       if (!exists) return c.json({ success: false, error: '担当者が見つかりません' }, 400);
     }
 
-    const result = await c.env.DB.prepare(
-      `UPDATE support_email_threads SET assigned_staff_id = ?, updated_at = ? WHERE id = ?`,
-    )
-      .bind(staffId, new Date().toISOString(), id)
-      .run();
-    if (!result.meta.changes) return c.json({ success: false, error: 'Thread not found' }, 404);
-    return c.json({ success: true });
+    const current = await c.env.DB.prepare(
+      `SELECT assigned_staff_id, revision FROM support_email_threads WHERE id = ?`,
+    ).bind(id).first<{ assigned_staff_id: string | null; revision: number }>();
+    if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+    const expectedRevision = body.revision ?? current.revision;
+    if (expectedRevision !== current.revision) {
+      return c.json({ success: false, error: 'ほかの担当者が先に更新しました。最新の内容を確認してください', code: 'REVISION_CONFLICT' }, 409);
+    }
+    if (staffId === current.assigned_staff_id) {
+      return c.json({ success: true, data: { assignedStaffId: staffId, revision: current.revision } });
+    }
+    const now = new Date().toISOString();
+    const nextRevision = expectedRevision + 1;
+    const [result] = await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE support_email_threads
+         SET assigned_staff_id = ?, revision = revision + 1, updated_at = ?
+         WHERE id = ? AND revision = ?`,
+      ).bind(staffId, now, id, expectedRevision),
+      inboxEventStatement(c.env.DB, {
+        channel: 'email', conversationId: id, eventType: 'assignment',
+        before: { staffId: current.assigned_staff_id }, after: { staffId },
+        actorStaffId: c.get('staff').id, reason: body.reason,
+        correlationId: crypto.randomUUID(), createdAt: now,
+        guard: { table: 'support_email_threads', id, revision: nextRevision, updatedAt: now },
+      }),
+    ]);
+    if (!result.meta.changes) {
+      return c.json({ success: false, error: 'ほかの担当者が先に更新しました。最新の内容を確認してください', code: 'REVISION_CONFLICT' }, 409);
+    }
+    return c.json({ success: true, data: { assignedStaffId: staffId, revision: nextRevision } });
   },
 );
 
@@ -447,15 +512,85 @@ supportInbox.patch(
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     const id = c.req.param('id');
-    const body: { notes?: string } = await c.req.json<{ notes?: string }>().catch(() => ({}));
-    const notes = (body.notes ?? '').slice(0, 10_000);
-    const result = await c.env.DB.prepare(
-      `UPDATE support_email_threads SET notes = ?, updated_at = ? WHERE id = ?`,
-    )
-      .bind(notes || null, new Date().toISOString(), id)
-      .run();
-    if (!result.meta.changes) return c.json({ success: false, error: 'Thread not found' }, 404);
-    return c.json({ success: true });
+    const body: { notes?: string; revision?: number; reason?: string } = await c.req
+      .json<{ notes?: string; revision?: number; reason?: string }>()
+      .catch(() => ({}));
+    const notes = (body.notes ?? '').trim();
+    if (notes.length > 10_000) {
+      return c.json({ success: false, error: '内部メモは10,000文字以内で入力してください' }, 400);
+    }
+    const current = await c.env.DB.prepare(
+      `SELECT notes, revision FROM support_email_threads WHERE id = ?`,
+    ).bind(id).first<{ notes: string | null; revision: number }>();
+    if (!current) return c.json({ success: false, error: 'Thread not found' }, 404);
+    const expectedRevision = body.revision ?? current.revision;
+    if (expectedRevision !== current.revision) {
+      return c.json({ success: false, error: 'ほかの担当者が先に更新しました。最新の内容を確認してください', code: 'REVISION_CONFLICT' }, 409);
+    }
+    if (notes === (current.notes ?? '')) {
+      return c.json({ success: true, data: { notes, revision: current.revision } });
+    }
+    const now = new Date().toISOString();
+    const nextRevision = expectedRevision + 1;
+    const guard = { table: 'support_email_threads' as const, id, revision: nextRevision, updatedAt: now };
+    const statements = [
+      c.env.DB.prepare(
+        `UPDATE support_email_threads
+         SET notes = ?, revision = revision + 1, updated_at = ?
+         WHERE id = ? AND revision = ?`,
+      ).bind(notes || null, now, id, expectedRevision),
+      inboxEventStatement(c.env.DB, {
+        channel: 'email', conversationId: id, eventType: 'note',
+        before: { hasNote: Boolean(current.notes) }, after: { hasNote: Boolean(notes) },
+        actorStaffId: c.get('staff').id, reason: body.reason,
+        correlationId: crypto.randomUUID(), createdAt: now, guard,
+      }),
+    ];
+    if (notes) {
+      statements.push(inboxNoteStatement(c.env.DB, {
+        channel: 'email', conversationId: id, body: notes,
+        actorStaffId: c.get('staff').id, createdAt: now, guard,
+      }));
+    }
+    const [result] = await c.env.DB.batch(statements);
+    if (!result.meta.changes) {
+      return c.json({ success: false, error: 'ほかの担当者が先に更新しました。最新の内容を確認してください', code: 'REVISION_CONFLICT' }, 409);
+    }
+    return c.json({ success: true, data: { notes, revision: nextRevision } });
+  },
+);
+
+supportInbox.get(
+  '/api/support/email/threads/:id/events',
+  requireRole('owner', 'admin', 'staff'),
+  async (c) => {
+    const id = c.req.param('id');
+    const exists = await c.env.DB.prepare(`SELECT 1 FROM support_email_threads WHERE id = ?`)
+      .bind(id)
+      .first();
+    if (!exists) return c.json({ success: false, error: 'Thread not found' }, 404);
+    const rows = await c.env.DB.prepare(
+      `SELECT id, event_type, before_json, after_json, actor_staff_id,
+              (SELECT name FROM staff_members sm WHERE sm.id = e.actor_staff_id) AS actor_staff_name,
+              reason, correlation_id, created_at
+       FROM inbox_conversation_events e
+       WHERE channel = 'email' AND conversation_id = ?
+       ORDER BY created_at DESC, id DESC LIMIT 200`,
+    ).bind(id).all<Record<string, unknown>>();
+    return c.json({
+      success: true,
+      data: rows.results.map((row) => ({
+        id: row.id,
+        eventType: row.event_type,
+        before: row.before_json ? JSON.parse(String(row.before_json)) : null,
+        after: row.after_json ? JSON.parse(String(row.after_json)) : null,
+        actorStaffId: row.actor_staff_id,
+        actorStaffName: row.actor_staff_name,
+        reason: row.reason,
+        correlationId: row.correlation_id,
+        createdAt: row.created_at,
+      })),
+    });
   },
 );
 
@@ -465,12 +600,43 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
   if (!isValidIdempotencyKey(idempotencyKey)) {
     return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
   }
-  const body: { body?: string } = await c.req.json<{ body?: string }>().catch(() => ({}));
+  const body: { body?: string; revision?: number } = await c.req
+    .json<{ body?: string; revision?: number }>()
+    .catch(() => ({}));
   const content = body.body?.trim() || '';
   if (!content || content.length > 50_000) {
     return c.json({ success: false, error: '本文は1〜50,000文字で入力してください' }, 400);
   }
+  let leaseAcquired = false;
   try {
+    const thread = await c.env.DB.prepare(
+      `SELECT revision FROM support_email_threads WHERE id = ?`,
+    ).bind(id).first<{ revision: number }>();
+    if (!thread) return c.json({ success: false, error: 'Thread not found' }, 404);
+    if (body.revision !== undefined && body.revision !== thread.revision) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が先に更新しました。最新の会話を確認してください',
+        code: 'REVISION_CONFLICT',
+        data: { revision: thread.revision },
+      }, 409);
+    }
+    const leaseNow = new Date();
+    const lease = await acquireInboxReplyLease(c.env.DB, {
+      channel: 'email', conversationId: id, staffId: c.get('staff').id,
+      conversationRevision: thread.revision,
+      now: leaseNow.toISOString(),
+      expiresAt: new Date(leaseNow.getTime() + 60_000).toISOString(),
+    });
+    if (!lease.acquired) {
+      return c.json({
+        success: false,
+        error: 'ほかの担当者が返信中です。送信せず、少し待って最新の会話を確認してください',
+        code: 'REPLY_LEASE_CONFLICT',
+        data: { staffId: lease.staffId, expiresAt: lease.expiresAt },
+      }, 409);
+    }
+    leaseAcquired = true;
     const result = await sendSupportEmailReply(c.env, id, content, c.get('staff').id, idempotencyKey);
     return c.json({ success: true, data: result });
   } catch (error) {
@@ -488,5 +654,11 @@ supportInbox.post('/api/support/email/threads/:id/reply', requireRole('owner', '
     }
     console.error(JSON.stringify({ event: 'support_email_reply_failed', threadId: id, error: String(error) }));
     return c.json({ success: false, error: 'メール送信に失敗しました' }, 502);
+  } finally {
+    if (leaseAcquired) {
+      await releaseInboxReplyLease(c.env.DB, {
+        channel: 'email', conversationId: id, staffId: c.get('staff').id,
+      }).catch(() => undefined);
+    }
   }
 });

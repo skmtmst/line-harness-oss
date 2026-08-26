@@ -13,39 +13,10 @@ import {
   getAnalyticsUsageOverview,
   type AnalyticsOverviewContext,
 } from '../src/analytics-overviews.js';
+import { setFriendSupportMarkBulk } from '../src/support-marks.js';
+import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-
-function asD1(sqlite: Database.Database): D1Database {
-  function prepare(query: string): D1PreparedStatement {
-    const statement = sqlite.prepare(query);
-    const make = (params: unknown[]): D1PreparedStatement => ({
-      bind: (...next: unknown[]) => make(next),
-      async all<T>() {
-        return { results: statement.all(...params) as T[], success: true, meta: {} };
-      },
-      async first<T>() {
-        return (statement.get(...params) as T | undefined) ?? null;
-      },
-      async run<T>() {
-        const info = statement.run(...params);
-        return { success: true, meta: { changes: info.changes }, results: [] } as T;
-      },
-      raw: async () => [],
-    } as unknown as D1PreparedStatement);
-    return make([]);
-  }
-  return {
-    prepare,
-    async batch<T>(statements: D1PreparedStatement[]) {
-      const results: unknown[] = [];
-      sqlite.transaction(() => {
-        for (const statement of statements) results.push(statement.run());
-      })();
-      return Promise.all(results) as T;
-    },
-  } as unknown as D1Database;
-}
 
 const CONTEXT: AnalyticsOverviewContext = {
   lineAccountId: 'account-a',
@@ -298,6 +269,55 @@ describe('V6分析の概要4画面', () => {
     expect(result.data.links.find((item) => item.trackedLinkId === 'link-zero'))
       .toMatchObject({ clicks: { value: 0 }, deliveredPeople: { value: 0 } });
     expect(result.data.links.some((item) => item.trackedLinkId === 'link-x')).toBe(false);
+  });
+
+  it('150本の計測リンクのURL露出を同じ値のまま分割集計する', async () => {
+    sqlite.prepare(
+      `INSERT INTO analytics_event_coverage (
+         line_account_id, event_type, available_from, state, updated_at
+       ) VALUES ('account-a','url_exposed','2026-07-01T00:00:00.000Z','available','2026-08-30')`,
+    ).run();
+    const insertLink = sqlite.prepare(
+      `INSERT INTO tracked_links (id, name, original_url, line_account_id, short_code)
+       VALUES (?, ?, ?, 'account-a', ?)`,
+    );
+    const insertExposure = sqlite.prepare(
+      `INSERT INTO analytics_url_exposures (
+         line_account_id, message_id, friend_id, tracked_link_id,
+         source_kind, sent_at, created_at
+       ) VALUES ('account-a', ?, 'friend-a', ?, 'broadcast',
+                 '2026-08-10T02:00:00.000Z', '2026-08-10')`,
+    );
+    for (let index = 0; index < 150; index += 1) {
+      const id = `bulk-link-${String(index).padStart(3, '0')}`;
+      insertLink.run(id, id, `https://example.com/${id}`, id);
+      insertExposure.run(`message-${index}`, id);
+    }
+
+    const result = await getAnalyticsUrlClicksOverview(db, CONTEXT);
+    expect(result.data.links).toHaveLength(150);
+    expect(result.data.hasMore).toBe(false);
+    expect(result.data.links.every((link) => (
+      link.deliveredPeople.value === 1 && link.usageLocations.includes('broadcast')
+    ))).toBe(true);
+  });
+
+  it('150人の対応マークを分割更新し実際の更新件数を返す', async () => {
+    sqlite.prepare(
+      `INSERT INTO support_marks (id, name, color, display_order, created_at)
+       VALUES ('mark_working', '対応中', '#3B82F6', 1, '2026-08-26')`,
+    ).run();
+    const insert = sqlite.prepare(
+      `INSERT INTO friends (id, line_user_id, line_account_id) VALUES (?, ?, 'account-a')`,
+    );
+    const friendIds = Array.from({ length: 150 }, (_, index) => `bulk-friend-${index}`);
+    for (const id of friendIds) insert.run(id, `U-${id}`);
+
+    await expect(setFriendSupportMarkBulk(db, friendIds, 'mark_working')).resolves.toBe(150);
+    const updated = sqlite.prepare(
+      `SELECT COUNT(*) AS count FROM friends WHERE support_mark_id = 'mark_working'`,
+    ).get() as { count: number };
+    expect(updated.count).toBe(150);
   });
 
   it('URL露出の取得開始が期間途中なら一部取得と明示する', async () => {

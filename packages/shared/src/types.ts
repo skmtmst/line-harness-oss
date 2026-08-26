@@ -44,7 +44,7 @@ export interface Friend {
    *   resolved     対応済み (デフォルト. chats 行がない friend もここ)
    * 一覧 API の chat-status hydration が有効なときのみ付与.
    */
-  chatStatus?: 'unread' | 'in_progress' | 'resolved';
+  chatStatus?: 'unread' | 'in_progress' | 'on_hold' | 'resolved';
   /** 作成日時 (ISO 8601) */
   createdAt: string;
   /** 更新日時 (ISO 8601) */
@@ -103,6 +103,18 @@ export interface Tag {
   createdAt: string;
   /** このタグが付与されている友だち数 (GET /api/tags のみ付与) */
   friendCount?: number;
+  /** 自動付与のきっかけ。履歴から断定できない場合は省略する。 */
+  assignSource?: "ec" | "line_login" | "form" | "ec_purchase" | "manual" | "birthday";
+  /** このタグを参照している機能と件数。0件の機能は省略する。 */
+  usedIn?: {
+    broadcasts?: number;
+    forms?: number;
+    scenarios?: number;
+    autoReplies?: number;
+    savedSearches?: number;
+  };
+  /** このタグが付いた後に動く、マイル以外のアクション数。0件なら省略する。 */
+  otherActionCount?: number;
 }
 
 /** 友だち情報欄の種類 */
@@ -1027,8 +1039,9 @@ export interface Chat {
   id: string;
   friendId: string;
   operatorId: string | null;
-  status: "unread" | "in_progress" | "resolved";
+  status: "unread" | "in_progress" | "on_hold" | "resolved";
   notes: string | null;
+  revision: number;
   lastMessageAt: string | null;
   createdAt: string;
   updatedAt: string;

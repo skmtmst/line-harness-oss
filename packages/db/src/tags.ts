@@ -70,6 +70,24 @@ export interface TagWithCount extends Tag {
   friend_count: number;
 }
 
+export type TagAssignSource =
+  | 'ec'
+  | 'line_login'
+  | 'form'
+  | 'ec_purchase'
+  | 'manual'
+  | 'birthday';
+
+export interface TagWithUsage extends TagWithCount {
+  assign_source: TagAssignSource | null;
+  used_in_broadcasts: number;
+  used_in_forms: number;
+  used_in_scenarios: number;
+  used_in_auto_replies: number;
+  used_in_saved_searches: number;
+  other_action_count: number;
+}
+
 export async function getTagsWithCounts(
   db: D1Database,
 ): Promise<TagWithCount[]> {
@@ -85,6 +103,200 @@ export async function getTagsWithCounts(
        ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
     )
     .all<TagWithCount>();
+  return result.results;
+}
+
+/**
+ * タグ一覧の「どこで使われているか」を、一覧1回分のSQLで返す。
+ *
+ * JSON列は部分一致で探さない。たとえば tag-1 を探すときに tag-10 まで
+ * 数えてしまうため、json_tree の文字列値とタグIDが完全一致した行だけを見る。
+ * 壊れた旧JSONは「参照なし」とし、一覧全体を500にしない。
+ *
+ * assign_source は、現在のデータから出どころを断定できるものだけを返す。
+ * friend_tags には付与元が残っていないので、一般タグを manual と推測しない。
+ */
+export async function getTagsWithUsage(
+  db: D1Database,
+): Promise<TagWithUsage[]> {
+  const result = await db
+    .prepare(
+      `WITH
+       broadcast_refs(tag_id, entity_id) AS (
+         SELECT target_tag_id, id FROM broadcasts WHERE target_tag_id IS NOT NULL
+         UNION
+         SELECT CAST(j.value AS TEXT), b.id
+           FROM broadcasts b,
+                json_tree(CASE WHEN json_valid(b.segment_conditions)
+                               THEN b.segment_conditions ELSE 'null' END) j
+          WHERE j.type = 'text'
+       ),
+       form_refs(tag_id, entity_id) AS (
+         SELECT on_submit_tag_id, id FROM forms WHERE on_submit_tag_id IS NOT NULL
+         UNION
+         SELECT CAST(j.value AS TEXT), f.id
+           FROM forms f,
+                json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END) j
+          WHERE j.type = 'text'
+       ),
+       scenario_refs(tag_id, entity_id) AS (
+         SELECT trigger_tag_id, id FROM scenarios WHERE trigger_tag_id IS NOT NULL
+         UNION
+         SELECT CAST(j.value AS TEXT), s.id
+           FROM scenarios s,
+                json_tree(CASE WHEN json_valid(s.audience_condition_json)
+                               THEN s.audience_condition_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT tag_id, scenario_id FROM scenario_triggers WHERE tag_id IS NOT NULL
+         UNION
+         SELECT on_reach_tag_id, scenario_id
+           FROM scenario_steps WHERE on_reach_tag_id IS NOT NULL
+         UNION
+         SELECT CAST(j.value AS TEXT), a.scenario_id
+           FROM scenario_actions a,
+                json_tree(CASE WHEN json_valid(a.config_json)
+                               THEN a.config_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT), a.scenario_id
+           FROM scenario_actions a,
+                json_tree(CASE WHEN json_valid(a.condition_json)
+                               THEN a.condition_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+       ),
+       auto_reply_refs(tag_id, entity_id) AS (
+         SELECT CAST(j.value AS TEXT), a.id
+           FROM auto_replies a,
+                json_tree(CASE WHEN json_valid(a.actions_json)
+                               THEN a.actions_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+         UNION
+         SELECT CAST(j.value AS TEXT), a.id
+           FROM auto_replies a,
+                json_tree(CASE WHEN json_valid(a.friend_conditions_json)
+                               THEN a.friend_conditions_json ELSE 'null' END) j
+          WHERE j.type = 'text'
+       ),
+       saved_search_refs(tag_id, entity_id) AS (
+         SELECT CAST(j.value AS TEXT), s.id
+           FROM saved_searches s,
+                json_tree(CASE WHEN json_valid(s.conditions_json)
+                               THEN s.conditions_json ELSE 'null' END) j
+          WHERE s.scope = 'friends' AND j.type = 'text'
+       ),
+       action_refs(tag_id, action_key) AS (
+         -- 「他N」は、このタグを付ける設定ではなく、このタグが付いた後に
+         -- 動くもの。旧列と複数トリガー表の両方に同じシナリオがあっても、
+         -- action_key を同じにして1件だけ数える。
+         SELECT trigger_tag_id, 'scenario:' || id
+           FROM scenarios
+          WHERE trigger_type = 'tag_added' AND trigger_tag_id IS NOT NULL
+         UNION
+         SELECT tag_id, 'scenario:' || scenario_id
+           FROM scenario_triggers
+          WHERE kind = 'tag_added' AND tag_id IS NOT NULL
+         UNION
+         -- 公開中のV6自動化は、tag_change の条件にタグIDがあり、かつ
+         -- 実際に実行するアクションがある場合だけ。配列の1要素を1件とする。
+         SELECT CAST(trigger_value.value AS TEXT),
+                'automation:' || d.id || ':' || action.key
+           FROM automation_definitions d
+           JOIN automation_versions v
+             ON v.id = d.current_published_version_id
+            AND v.automation_id = d.id
+            AND v.status = 'published',
+                json_tree(CASE WHEN json_valid(v.trigger_config)
+                               THEN v.trigger_config ELSE 'null' END) trigger_value,
+                json_each(CASE
+                  WHEN json_valid(v.action_config)
+                   AND json_type(CASE WHEN json_valid(v.action_config)
+                                      THEN v.action_config ELSE 'null' END) = 'array'
+                  THEN v.action_config ELSE '[]' END) action
+          WHERE v.trigger_type = 'tag_change'
+            AND trigger_value.type = 'text'
+         UNION
+         -- 旧自動化も、タグ変更の条件にIDが明記され、actions が配列のとき
+         -- だけ数える。付与元を記録していない行から推測はしない。
+         SELECT CAST(condition_value.value AS TEXT),
+                'legacy-automation:' || a.id || ':' || action.key
+           FROM automations a,
+                json_tree(CASE WHEN json_valid(a.conditions)
+                               THEN a.conditions ELSE 'null' END) condition_value,
+                json_each(CASE
+                  WHEN json_valid(a.actions)
+                   AND json_type(CASE WHEN json_valid(a.actions)
+                                      THEN a.actions ELSE 'null' END) = 'array'
+                  THEN a.actions ELSE '[]' END) action
+          WHERE a.event_type IN ('tag_change', 'tag_added')
+            AND condition_value.type = 'text'
+       ),
+       broadcast_counts AS (
+         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
+           FROM broadcast_refs r JOIN tags known ON known.id = r.tag_id
+          GROUP BY r.tag_id
+       ),
+       form_counts AS (
+         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
+           FROM form_refs r JOIN tags known ON known.id = r.tag_id
+          GROUP BY r.tag_id
+       ),
+       scenario_counts AS (
+         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
+           FROM scenario_refs r JOIN tags known ON known.id = r.tag_id
+          GROUP BY r.tag_id
+       ),
+       auto_reply_counts AS (
+         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
+           FROM auto_reply_refs r JOIN tags known ON known.id = r.tag_id
+          GROUP BY r.tag_id
+       ),
+       saved_search_counts AS (
+         SELECT r.tag_id, COUNT(DISTINCT r.entity_id) count
+           FROM saved_search_refs r JOIN tags known ON known.id = r.tag_id
+          GROUP BY r.tag_id
+       ),
+       action_counts AS (
+         SELECT r.tag_id, COUNT(DISTINCT r.action_key) count
+           FROM action_refs r JOIN tags known ON known.id = r.tag_id
+          GROUP BY r.tag_id
+       )
+       SELECT t.*, fo.color AS folder_color,
+              COUNT(DISTINCT ft.friend_id) AS friend_count,
+              CASE
+                WHEN t.id IN (
+                  'nen-tag-pet-birthday-this-month',
+                  'nen-tag-pet-birthday-next-month',
+                  'nen-tag-delivery-birthday'
+                ) THEN 'birthday'
+                WHEN t.id = 'nen-tag-member-line-linked' THEN 'line_login'
+                WHEN t.id LIKE 'nen-tag-purchase-%'
+                  OR t.id LIKE 'nen-tag-payment-%'
+                  OR t.id LIKE 'nen-tag-product-%' THEN 'ec_purchase'
+                WHEN t.id LIKE 'nen-tag-member-%'
+                  OR t.id LIKE 'nen-tag-subscription-%' THEN 'ec'
+                WHEN COALESCE(fc.count, 0) > 0 THEN 'form'
+                ELSE NULL
+              END AS assign_source,
+              COALESCE(bc.count, 0) AS used_in_broadcasts,
+              COALESCE(fc.count, 0) AS used_in_forms,
+              COALESCE(sc.count, 0) AS used_in_scenarios,
+              COALESCE(ac.count, 0) AS used_in_auto_replies,
+              COALESCE(ssc.count, 0) AS used_in_saved_searches,
+              COALESCE(act.count, 0) AS other_action_count
+         FROM tags t
+         LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+         LEFT JOIN folders fo ON fo.id = t.folder_id
+         LEFT JOIN broadcast_counts bc ON bc.tag_id = t.id
+         LEFT JOIN form_counts fc ON fc.tag_id = t.id
+         LEFT JOIN scenario_counts sc ON sc.tag_id = t.id
+         LEFT JOIN auto_reply_counts ac ON ac.tag_id = t.id
+         LEFT JOIN saved_search_counts ssc ON ssc.tag_id = t.id
+         LEFT JOIN action_counts act ON act.tag_id = t.id
+        GROUP BY t.id
+        ORDER BY t.display_order ASC, friend_count DESC, t.name ASC`,
+    )
+    .all<TagWithUsage>();
   return result.results;
 }
 
@@ -185,13 +397,35 @@ export async function updateTag(
  * 1件ずつ当てると、10件動かしたときに10往復する。その途中で誰かが
  * 一覧を開くと、半分だけ入れ替わった並びが見える。まとめて送る。
  *
- * 渡された順に 0,1,2… を振る。画面で見えている並びをそのまま写す形なので、
- * 抜けや重複を気にしなくてよい。
+ * 絞り込み中は、画面に見えているタグのIDだけが渡る。指定されたタグが
+ * 現在占めている位置だけを入れ替え、指定されていないタグはその場に残す。
+ * 最後に全体へ一意の順番を振るので、部分的な並び替えでも順番が重複しない。
  */
 export async function reorderTags(db: D1Database, ids: string[]): Promise<void> {
-  if (ids.length === 0) return;
+  if (ids.length < 2) return;
+
+  const current = await db
+    .prepare(
+      `SELECT t.id
+         FROM tags t
+         LEFT JOIN friend_tags ft ON ft.tag_id = t.id
+        GROUP BY t.id
+        ORDER BY t.display_order ASC, COUNT(ft.friend_id) DESC, t.name ASC`,
+    )
+    .all<{ id: string }>();
+
+  const existing = new Set(current.results.map((tag) => tag.id));
+  const requested = ids.filter((id) => existing.has(id));
+  if (requested.length < 2) return;
+
+  const requestedSet = new Set(requested);
+  let requestedIndex = 0;
+  const nextOrder = current.results.map((tag) =>
+    requestedSet.has(tag.id) ? requested[requestedIndex++] : tag.id,
+  );
+
   await db.batch(
-    ids.map((id, i) =>
+    nextOrder.map((id, i) =>
       db.prepare(`UPDATE tags SET display_order = ? WHERE id = ?`).bind(i, id),
     ),
   );

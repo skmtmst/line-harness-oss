@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 
 const dbMocks = {
   getTags: vi.fn(),
-  getTagsWithCounts: vi.fn(),
+  getTagsWithUsage: vi.fn(),
   createTag: vi.fn(),
   deleteTag: vi.fn(),
   updateTagMileageSettings: vi.fn(),
@@ -44,6 +44,84 @@ function patch(path: string, body: unknown, role: 'owner' | 'admin' | 'staff' = 
   });
 }
 
+const TAG_ROW = {
+  id: 'tag-1',
+  name: 'VIP',
+  color: '#3B82F6',
+  group_id: null,
+  folder_id: null,
+  mileage_reward: 0,
+  referral_mileage_reward: 0,
+  mileage_multiplier_bps: null,
+  mileage_multiplier_priority: 0,
+  is_starred: 0,
+  display_order: 0,
+  created_at: '2026-08-21T00:00:00.000Z',
+};
+
+describe('GET /api/tags', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(dbMocks)) fn.mockReset();
+  });
+
+  test('管理一覧では人数と使用先をまとめて取得する', async () => {
+    dbMocks.getTagsWithUsage.mockResolvedValue([{
+      ...TAG_ROW,
+      friend_count: 5,
+      assign_source: 'form',
+      used_in_broadcasts: 2,
+      used_in_forms: 1,
+      used_in_scenarios: 0,
+      used_in_auto_replies: 0,
+      used_in_saved_searches: 0,
+      other_action_count: 3,
+    }]);
+
+    const res = await app().request('/api/tags?withCounts=1');
+    expect(res.status).toBe(200);
+    expect(dbMocks.getTagsWithUsage).toHaveBeenCalledWith(expect.anything());
+    expect(dbMocks.getTags).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      data: [{
+        id: 'tag-1',
+        friendCount: 5,
+        assignSource: 'form',
+        usedIn: { broadcasts: 2, forms: 1 },
+        otherActionCount: 3,
+      }],
+    });
+  });
+
+  test('0件と未取得を画面用の値として水増ししない', async () => {
+    dbMocks.getTagsWithUsage.mockResolvedValue([{
+      ...TAG_ROW,
+      friend_count: 0,
+      assign_source: null,
+      used_in_broadcasts: 0,
+      used_in_forms: 0,
+      used_in_scenarios: 0,
+      used_in_auto_replies: 0,
+      used_in_saved_searches: 0,
+      other_action_count: 0,
+    }]);
+
+    const res = await app().request('/api/tags?withCounts=1');
+    const body = await res.json() as { data: Array<Record<string, unknown>> };
+    expect(body.data[0]).not.toHaveProperty('assignSource');
+    expect(body.data[0]).not.toHaveProperty('usedIn');
+    expect(body.data[0]).not.toHaveProperty('otherActionCount');
+  });
+
+  test('選択部品向けの通常取得は軽い一覧のまま', async () => {
+    dbMocks.getTags.mockResolvedValue([TAG_ROW]);
+    const res = await app().request('/api/tags');
+    expect(res.status).toBe(200);
+    expect(dbMocks.getTags).toHaveBeenCalledWith(expect.anything());
+    expect(dbMocks.getTagsWithUsage).not.toHaveBeenCalled();
+  });
+});
+
 describe('PATCH /api/tags/reorder', () => {
   beforeEach(() => {
     for (const fn of Object.values(dbMocks)) fn.mockReset();
@@ -83,6 +161,12 @@ describe('PATCH /api/tags/reorder', () => {
     expect(dbMocks.reorderTags).not.toHaveBeenCalled();
   });
 
+  test('同じIDが重複していたら断る', async () => {
+    const res = await patch('/api/tags/reorder', { ids: ['a', 'b', 'a'] });
+    expect(res.status).toBe(400);
+    expect(dbMocks.reorderTags).not.toHaveBeenCalled();
+  });
+
   test('閲覧だけの人は並び替えられない', async () => {
     const res = await patch('/api/tags/reorder', { ids: ['a'] }, 'staff');
     expect(res.status).toBe(403);
@@ -92,18 +176,11 @@ describe('PATCH /api/tags/reorder', () => {
 
 describe('PATCH /api/tags/:id/mileage', () => {
   const storedTag = {
-    id: 'tag-1',
-    name: 'VIP',
-    color: '#3B82F6',
-    group_id: null,
-    folder_id: null,
+    ...TAG_ROW,
     mileage_reward: 100,
     referral_mileage_reward: 20,
     mileage_multiplier_bps: 15000,
     mileage_multiplier_priority: 1,
-    is_starred: 0,
-    display_order: 0,
-    created_at: '2026-08-21T00:00:00.000Z',
   };
 
   beforeEach(() => {

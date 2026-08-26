@@ -16,7 +16,7 @@ import TemplatePicker from '@/components/chats/template-picker'
  * 部品にして、LINEのトークと同じ場所に出せるようにした。
  */
 
-type ThreadStatus = 'unread' | 'in_progress' | 'resolved'
+type ThreadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
 
 type EmailDetail = {
   thread: {
@@ -27,6 +27,7 @@ type EmailDetail = {
     status: ThreadStatus
     assigned_staff_id: string | null
     notes: string | null
+    revision: number
   }
   messages: Array<{
     id: string
@@ -139,7 +140,7 @@ export default function EmailThread({
     try {
       const res = await fetchApi<{ success: boolean; error?: string }>(
         `/api/support/email/threads/${encodeURIComponent(threadId)}/status`,
-        { method: 'PATCH', body: JSON.stringify({ status }) },
+        { method: 'PATCH', body: JSON.stringify({ status, revision: detail?.thread.revision }) },
       )
       if (!res.success) {
         setError(res.error || '状態を変えられませんでした')
@@ -158,7 +159,7 @@ export default function EmailThread({
     try {
       const res = await fetchApi<{ success: boolean; error?: string }>(
         `/api/support/email/threads/${encodeURIComponent(threadId)}/assignee`,
-        { method: 'PATCH', body: JSON.stringify({ staffId }) },
+        { method: 'PATCH', body: JSON.stringify({ staffId, revision: detail?.thread.revision }) },
       )
       if (!res.success) {
         setError(res.error || '担当を変えられませんでした')
@@ -183,7 +184,7 @@ export default function EmailThread({
       await fetchApi(`/api/support/email/threads/${encodeURIComponent(threadId)}/reply`, {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
-        body: JSON.stringify({ body: content }),
+        body: JSON.stringify({ body: content, revision: detail?.thread.revision }),
       })
       sendKeysRef.current.clear(signature)
       setReply('')
@@ -192,7 +193,7 @@ export default function EmailThread({
     } catch (sendError) {
       setError(
         sendError instanceof ApiError && sendError.status === 409
-          ? '送信結果を確認中です。二重送信を避けるため再送せず、受信履歴を確認してください'
+          ? '二重送信を避けるため送信を止めました。会話を読み直し、他担当者の返信と送信履歴を確認してください'
           : '返信を送れませんでした',
       )
     } finally {
@@ -219,7 +220,7 @@ export default function EmailThread({
     try {
       const res = await fetchApi<{ success: boolean; error?: string }>(
         `/api/support/email/threads/${encodeURIComponent(threadId)}/notes`,
-        { method: 'PATCH', body: JSON.stringify({ notes: memoDraft }) },
+        { method: 'PATCH', body: JSON.stringify({ notes: memoDraft, revision: detail.thread.revision }) },
       )
       if (!res.success) {
         setMemoError(res.error || '内部メモを保存できませんでした')
@@ -266,6 +267,7 @@ export default function EmailThread({
             >
               <option value="unread">未対応</option>
               <option value="in_progress">対応中</option>
+              <option value="on_hold">保留</option>
               <option value="resolved">対応済</option>
             </select>
           </label>
