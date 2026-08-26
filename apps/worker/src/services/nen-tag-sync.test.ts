@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { deriveEcTagIds, derivePetTagIds, NEN_TAG } from './nen-tag-sync.js';
+import { deriveEcTagIds, derivePetTagIds, NEN_TAG, refreshAllNenTags } from './nen-tag-sync.js';
+
+function queryCaptureDb() {
+  const queries: Array<{ sql: string; bindings: unknown[] }> = [];
+  const db = {
+    prepare(sql: string) {
+      const query = { sql, bindings: [] as unknown[] };
+      queries.push(query);
+      return {
+        bind(...bindings: unknown[]) {
+          query.bindings = bindings;
+          return this;
+        },
+        async all() { return { results: [] }; },
+      };
+    },
+  } as unknown as D1Database;
+  return { db, queries };
+}
 
 describe('NEN automatic tag rules', () => {
   const now = new Date('2026-08-11T03:00:00Z');
@@ -60,5 +78,26 @@ describe('NEN automatic tag rules', () => {
 
   it('marks a user with no pets as unregistered', () => {
     expect(derivePetTagIds([], now)).toEqual(new Set([NEN_TAG.petUnregistered]));
+  });
+});
+
+describe('NEN bulk refresh scope', () => {
+  it('uses only the LIMIT binding when all tenants are requested', async () => {
+    const { db, queries } = queryCaptureDb();
+
+    await refreshAllNenTags(db, { allTenants: true }, 500);
+
+    expect(queries[0].sql).not.toContain('line_account_id');
+    expect(queries[0].bindings).toEqual([500]);
+  });
+
+  it('keeps account filtering when an explicit account list is requested', async () => {
+    const { db, queries } = queryCaptureDb();
+
+    await refreshAllNenTags(db, ['account-1', 'account-2', null], 500);
+
+    expect(queries[0].sql).toContain('line_account_id IN (?,?)');
+    expect(queries[0].sql).toContain('OR line_account_id IS NULL');
+    expect(queries[0].bindings).toEqual(['account-1', 'account-2', 500]);
   });
 });

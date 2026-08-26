@@ -399,12 +399,23 @@ export async function syncAllNenTagsForFriend(db: D1Database, friendId: string, 
   return results.reduce((total, result) => ({ added: total.added + result.added, removed: total.removed + result.removed }), { added: 0, removed: 0 });
 }
 
-export async function refreshAllNenTags(db: D1Database, limit = 500, now = new Date()): Promise<{ friends: number; added: number; removed: number }> {
+export type NenTagScope = Array<string | null> | { allTenants: true };
+
+export async function refreshAllNenTags(db: D1Database, scope: NenTagScope, limit = 500, now = new Date()): Promise<{ friends: number; added: number; removed: number }> {
+  const allTenants = !Array.isArray(scope);
+  const allowedAccountIds = allTenants ? [] : scope;
+  const assignedIds = allowedAccountIds.filter((id): id is string => id !== null);
+  const accountWhere = allTenants
+    ? null
+    : assignedIds.length
+      ? `(line_account_id IN (${assignedIds.map(() => '?').join(',')})${allowedAccountIds.includes(null) ? ' OR line_account_id IS NULL' : ''})`
+      : allowedAccountIds.includes(null) ? 'line_account_id IS NULL' : '1 = 0';
   const friends = await db.prepare(
     `SELECT id FROM friends
       WHERE is_following = 1 AND user_id IS NOT NULL AND user_id <> ''
+        ${accountWhere ? `AND ${accountWhere}` : ''}
       ORDER BY updated_at DESC LIMIT ?`,
-  ).bind(Math.max(1, Math.min(limit, 1000))).all<{ id: string }>();
+  ).bind(...assignedIds, Math.max(1, Math.min(limit, 1000))).all<{ id: string }>();
   let added = 0;
   let removed = 0;
   for (const friend of friends.results) {

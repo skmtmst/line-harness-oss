@@ -1205,7 +1205,7 @@ async function scheduled(
   if (event.cron === '0 */6 * * *') {
     try {
       const { refreshAllNenTags } = await import('./services/nen-tag-sync.js');
-      const result = await refreshAllNenTags(env.DB, 500, new Date());
+      const result = await refreshAllNenTags(env.DB, { allTenants: true }, 500, new Date());
       if (result.added + result.removed > 0) console.log(JSON.stringify({ event: 'nen_tag_refresh', ...result }));
     } catch (e) {
       console.error('nen-tag refresh error:', e);
