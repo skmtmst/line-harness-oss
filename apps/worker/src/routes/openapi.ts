@@ -53,6 +53,36 @@ const spec = {
           createdAt: { type: 'string', format: 'date-time' },
         },
       },
+      TagDeleteImpact: {
+        type: 'object',
+        required: ['tag', 'friendCount', 'references', 'blockingReferenceCount', 'canDelete'],
+        properties: {
+          tag: {
+            type: 'object',
+            required: ['id', 'name'],
+            properties: { id: { type: 'string' }, name: { type: 'string' } },
+          },
+          friendCount: { type: 'integer', minimum: 0 },
+          references: {
+            type: 'object',
+            additionalProperties: false,
+            required: [
+              'broadcasts', 'forms', 'scenarios', 'autoReplies', 'savedSearches',
+              'automations', 'commonActions', 'richMenus', 'templates', 'webinars',
+              'reminders', 'entryRoutes', 'trackedLinks', 'bookingMenus',
+              'affiliateOffers', 'events', 'analyticsFunnels', 'friendAddSettings',
+            ],
+            properties: Object.fromEntries([
+              'broadcasts', 'forms', 'scenarios', 'autoReplies', 'savedSearches',
+              'automations', 'commonActions', 'richMenus', 'templates', 'webinars',
+              'reminders', 'entryRoutes', 'trackedLinks', 'bookingMenus',
+              'affiliateOffers', 'events', 'analyticsFunnels', 'friendAddSettings',
+            ].map((key) => [key, { type: 'integer', minimum: 0 }])),
+          },
+          blockingReferenceCount: { type: 'integer', minimum: 0 },
+          canDelete: { type: 'boolean' },
+        },
+      },
       Scenario: {
         type: 'object',
         properties: {
@@ -232,6 +262,32 @@ const spec = {
         summary: 'タグ削除',
         parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
         responses: { '200': { description: 'Tag deleted' } },
+      },
+    },
+    '/api/tags/{id}/delete-impact': {
+      get: {
+        tags: ['Tags'],
+        summary: 'タグ削除前の影響確認',
+        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+        responses: {
+          '200': {
+            description: '友だちへの付与人数と運用設定の参照件数',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['success', 'data'],
+                  properties: {
+                    success: { type: 'boolean', const: true },
+                    data: { $ref: '#/components/schemas/TagDeleteImpact' },
+                  },
+                },
+              },
+            },
+          },
+          '403': { description: 'Owner or admin role required' },
+          '404': { description: 'Tag not found' },
+        },
       },
     },
     // ── Scenarios ────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   getTags,
   getTagsWithUsage,
+  getTagDeleteImpact,
   createTag,
   deleteTag,
   updateTagMileageSettings,
@@ -235,6 +236,22 @@ tags.get('/api/tags', async (c) => {
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
+
+// GET /api/tags/:id/delete-impact - 削除前に失われる付与と設定を確認する
+tags.get(
+  '/api/tags/:id/delete-impact',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    try {
+      const impact = await getTagDeleteImpact(c.env.DB, c.req.param('id'));
+      if (!impact) return c.json({ success: false, error: 'Not found' }, 404);
+      return c.json({ success: true, data: impact });
+    } catch (err) {
+      console.error('GET /api/tags/:id/delete-impact error:', err);
+      return c.json({ success: false, error: 'Internal server error' }, 500);
+    }
+  },
+);
 
 /**
  * PATCH /api/tags/reorder — 並び順をまとめて書く。
