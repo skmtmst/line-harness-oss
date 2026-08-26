@@ -118,6 +118,72 @@ export type BroadcastMessageAsset = {
   updatedAt: string;
 };
 
+export type CommonActionStep = {
+  id: string;
+  type: 'add_tag' | 'remove_tag' | 'set_metadata' | 'start_scenario' | 'stop_scenario'
+    | 'resume_scenario' | 'send_message' | 'send_webhook' | 'switch_rich_menu'
+    | 'remove_rich_menu' | 'wait' | 'common_action';
+  params: Record<string, unknown>;
+  onFailure: 'stop' | 'continue';
+};
+
+export type CommonActionSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: 'draft' | 'published' | 'archived';
+  draftVersion: number | null;
+  publishedVersion: number | null;
+  actionCount: number;
+  bindingCount: number;
+  oldVersionBindingCount: number;
+  updatedAt: string;
+};
+
+export type CommonActionVersion = {
+  id: string;
+  versionNumber: number;
+  status: 'draft' | 'published';
+  actions: CommonActionStep[];
+  createdBy: string | null;
+  createdAt: string;
+  publishedAt: string | null;
+};
+
+export type CommonActionBinding = {
+  id: string;
+  consumerType: string;
+  consumerId: string;
+  consumerPath: string;
+  versionId: string;
+  versionNumber: number;
+  latestVersionNumber: number | null;
+  hasNewerVersion: boolean;
+  runningCount: number | null;
+  waitingCount: number | null;
+  updatedAt: string;
+};
+
+export type CommonActionDetail = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: 'draft' | 'published' | 'archived';
+  currentDraftVersionId: string | null;
+  currentPublishedVersionId: string | null;
+  versions: CommonActionVersion[];
+  bindings: CommonActionBinding[];
+};
+
+export type CommonActionResources = {
+  tags: Array<{ id: string; name: string }>;
+  scenarios: Array<{ id: string; name: string }>;
+  templates: Array<{ id: string; name: string }>;
+  webhooks: Array<{ id: string; name: string }>;
+  richMenus: Array<{ id: string; name: string }>;
+  commonActions: Array<{ id: string; name: string; version: number }>;
+};
+
 export type BroadcastInsight = {
   broadcastId?: string
   delivered: number | null
@@ -866,10 +932,11 @@ export type SearchConsoleSetup = {
 }
 
 /** 集計の期間をクエリにする。省略時はサーバー側の既定（直近30日）に任せる。 */
-function rangeQuery(params?: { from?: string; to?: string }): string {
+function rangeQuery(params?: { from?: string; to?: string; accountId?: string }): string {
   const q = new URLSearchParams()
   if (params?.from) q.set('from', params.from)
   if (params?.to) q.set('to', params.to)
+  if (params?.accountId) q.set('account_id', params.accountId)
   const s = q.toString()
   return s ? `?${s}` : ''
 }
@@ -1169,7 +1236,7 @@ export const api = {
    * 外部APIを叩かないので、ここが外の障害で落ちることはない。
    */
   analytics: {
-    messages: (params?: { from?: string; to?: string }) =>
+    messages: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1184,9 +1251,9 @@ export const api = {
             fromScenario: number
           }>
         >
-      >(`/api/analytics/messages${rangeQuery(params)}`),
+      >(`/api/analytics/messages${rangeQuery({ ...params, accountId })}`),
     /** 測定中のURL。1回も押されていないものも返る */
-    trackedLinks: (params?: { from?: string; to?: string }) =>
+    trackedLinks: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1201,14 +1268,14 @@ export const api = {
             uniqueFriends: number
           }>
         >
-      >(`/api/analytics/tracked-links${rangeQuery(params)}`),
-    linkClicks: (params?: { from?: string; to?: string }) =>
+      >(`/api/analytics/tracked-links${rangeQuery({ ...params, accountId })}`),
+    linkClicks: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
           Array<{ trackedLinkId: string; name: string; clicks: number; uniqueFriends: number }>
         >
-      >(`/api/analytics/link-clicks${rangeQuery(params)}`),
-    broadcasts: (params?: { from?: string; to?: string }) =>
+      >(`/api/analytics/link-clicks${rangeQuery({ ...params, accountId })}`),
+    broadcasts: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1222,10 +1289,10 @@ export const api = {
             suppressedByAudienceSize: boolean
           }>
         >
-      >(`/api/analytics/broadcasts${rangeQuery(params)}`),
-    cross: (fieldId: string) =>
+      >(`/api/analytics/broadcasts${rangeQuery({ ...params, accountId })}`),
+    cross: (accountId: string, fieldId: string) =>
       fetchApi<ApiResponse<Array<{ row: string; col: string; count: number }>>>(
-        `/api/analytics/cross?fieldId=${encodeURIComponent(fieldId)}`,
+        `/api/analytics/cross?account_id=${encodeURIComponent(accountId)}&fieldId=${encodeURIComponent(fieldId)}`,
       ),
   },
   /**
@@ -1361,21 +1428,24 @@ export const api = {
       >(`/api/friends/${friendId}/site-events`),
   },
   funnels: {
-    list: () =>
+    list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; windowDays: number; createdAt: string }>>>(
-        '/api/funnels',
+        `/api/funnels?account_id=${encodeURIComponent(accountId)}`,
       ),
-    create: (data: {
+    create: (accountId: string, data: {
       name: string
       windowDays?: number
       steps: Array<{ label: string; kind: string; match: unknown }>
     }) =>
-      fetchApi<ApiResponse<{ id: string }>>('/api/funnels', {
+      fetchApi<ApiResponse<{ id: string }>>(`/api/funnels?account_id=${encodeURIComponent(accountId)}`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    delete: (id: string) => fetchApi<ApiResponse<null>>(`/api/funnels/${id}`, { method: 'DELETE' }),
-    result: (id: string, params?: { from?: string; to?: string }) =>
+    delete: (accountId: string, id: string) => fetchApi<ApiResponse<null>>(
+      `/api/funnels/${id}?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'DELETE' },
+    ),
+    result: (accountId: string, id: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<{
           funnel: { id: string; name: string }
@@ -1386,7 +1456,7 @@ export const api = {
             conversionFromPrevious: number
           }>
         }>
-      >(`/api/funnels/${id}/result${rangeQuery(params)}`),
+      >(`/api/funnels/${id}/result${rangeQuery({ ...params, accountId })}`),
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {
@@ -2464,6 +2534,64 @@ export const api = {
     logs: (id: string, limit?: number) =>
       fetchApi<ApiResponse<AutomationLog[]>>(
         `/api/automations/${id}/logs` + (limit ? `?limit=${limit}` : ''),
+      ),
+  },
+  commonActions: {
+    resources: (accountId: string, excludeId?: string) => {
+      const query = new URLSearchParams({ account_id: accountId });
+      if (excludeId) query.set('exclude_id', excludeId);
+      return fetchApi<ApiResponse<CommonActionResources>>(`/api/common-actions/resources?${query}`);
+    },
+    list: (params: {
+      accountId: string;
+      status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
+      query?: string;
+    }) => {
+      const query = new URLSearchParams({ account_id: params.accountId });
+      if (params.status && params.status !== 'all') query.set('status', params.status);
+      if (params.query) query.set('query', params.query);
+      return fetchApi<ApiResponse<CommonActionSummary[]>>(`/api/common-actions?${query}`);
+    },
+    get: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonActionDetail>>(
+        `/api/common-actions/${id}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    duplicate: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; draftVersionId: string; versionNumber: number }>>(
+        `/api/common-actions/${id}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    create: (accountId: string, data: {
+      name: string;
+      description?: string | null;
+      actions: CommonActionStep[];
+    }) => fetchApi<ApiResponse<{ id: string; draftVersionId: string; versionNumber: number }>>(
+      `/api/common-actions?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    updateDraft: (id: string, accountId: string, data: {
+      expectedDraftVersionId: string;
+      name: string;
+      description?: string | null;
+      actions: CommonActionStep[];
+    }) => fetchApi<ApiResponse<{ updated: true }>>(
+      `/api/common-actions/${id}/draft?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
+    createDraft: (id: string, accountId: string, fromVersionId?: string) =>
+      fetchApi<ApiResponse<{ draftVersionId: string; versionNumber: number }>>(
+        `/api/common-actions/${id}/versions?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ fromVersionId }) },
+      ),
+    publish: (id: string, accountId: string, versionId: string) =>
+      fetchApi<ApiResponse<{ versionId: string; versionNumber: number }>>(
+        `/api/common-actions/${id}/versions/${versionId}/publish?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    updateBinding: (id: string, accountId: string, bindingId: string, versionId: string) =>
+      fetchApi<ApiResponse<{ updated: true }>>(
+        `/api/common-actions/${id}/bindings/${bindingId}/version?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ versionId }) },
       ),
   },
   chatStats: {

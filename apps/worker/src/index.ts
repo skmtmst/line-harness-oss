@@ -70,6 +70,7 @@ import { conversations } from './routes/conversations.js';
 import { stripe } from './routes/stripe.js';
 import { health } from './routes/health.js';
 import { automations } from './routes/automations.js';
+import { commonActions } from './routes/common-actions.js';
 import { richMenus } from './routes/rich-menus.js';
 import { trackedLinks } from './routes/tracked-links.js';
 import { entryRoutes } from './routes/entry-routes.js';
@@ -317,6 +318,7 @@ app.route('/', conversations);
 app.route('/', stripe);
 app.route('/', health);
 app.route('/', automations);
+app.route('/', commonActions);
 app.route('/', richMenus);
 app.route('/', trackedLinks);
 app.route('/', entryRoutes);
@@ -1248,6 +1250,44 @@ async function scheduled(
     }
   }
 
+  // 人を特定できる分析イベントと保存照合は13か月、日別集計は25か月。
+  // 業務の正本は触らず、分析用の読取データだけを期限で削除する。
+  if (event.cron === '0 */6 * * *') {
+    try {
+      const { purgeExpiredAnalyticsReadData } = await import('@line-crm/db');
+      const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
+      if (
+        purged.events + purged.dailyMetrics + purged.reconciliationRuns
+        + purged.funnelRuns + purged.crossRuns + purged.audiences > 0
+      ) {
+        console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
+      }
+    } catch (e) {
+      console.error('analytics retention purge error:', e);
+    }
+  }
+
+  // クロス分析は最大50×20・15条件を扱うため、HTTP要求の中では計算しない。
+  // 毎分1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
+  if (event.cron === '* * * * *') {
+    try {
+      const {
+        processPendingAnalyticsCrossRuns,
+        recoverStalledAnalyticsCrossRuns,
+      } = await import('@line-crm/db');
+      const recovered = await recoverStalledAnalyticsCrossRuns(
+        env.DB,
+        new Date(event.scheduledTime),
+      );
+      const result = await processPendingAnalyticsCrossRuns(env.DB, 1);
+      if (recovered + result.processed + result.failed > 0) {
+        console.log(JSON.stringify({ event: 'analytics_cross_tick', recovered, ...result }));
+      }
+    } catch (e) {
+      console.error('analytics cross cron error:', e);
+    }
+  }
+
   // 飲食店向け予約メールの原文は、既定90日で非公開R2から破棄する。
   // D1の台帳行は残し、r2_keyとstatusで破棄済みを追跡する。
   if (event.cron === '0 */6 * * *') {
@@ -1392,6 +1432,18 @@ async function scheduled(
           console.log(
             `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
           );
+        }
+      }),
+    );
+    jobs.push(
+      import('./services/analytics-projection.js').then(async ({ refreshRecentAnalyticsProjections }) => {
+        const result = await refreshRecentAnalyticsProjections(
+          env.DB,
+          dbAccounts,
+          new Date(event.scheduledTime),
+        );
+        if (result.processed > 0) {
+          console.log(JSON.stringify({ event: 'analytics_projection_tick', ...result }));
         }
       }),
     );

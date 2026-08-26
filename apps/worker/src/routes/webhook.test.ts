@@ -34,6 +34,8 @@ vi.mock('@line-crm/db', () => ({
   recordFriendAddEvent: vi.fn().mockResolvedValue('friend-add-event-1'),
   captureFriendAddEventAttribution: vi.fn().mockResolvedValue(null),
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
+  recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
+  recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
   toJstString: vi.fn().mockReturnValue('2026-08-24T12:00:00.000+09:00'),
 }));
 
@@ -57,6 +59,10 @@ vi.mock('../services/friend-add-routing.js', () => ({
 
 vi.mock('../services/activity-mileage.js', () => ({
   awardActivityMileage: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../services/carousel-tap.js', () => ({
+  handleCarouselTap: vi.fn().mockResolvedValue({ kind: 'ran', executed: 0 }),
 }));
 
 vi.mock('../services/step-delivery.js', () => ({
@@ -88,8 +94,10 @@ import {
   recordFriendAddEvent,
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
+  recordAnalyticsEvent,
 } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
+import { handleCarouselTap } from '../services/carousel-tap.js';
 import { webhook } from './webhook.js';
 
 function setupApp() {
@@ -168,6 +176,44 @@ describe('POST /webhook — V6 friend-add ledger', () => {
     expect(markFriendAddEventRouting).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({
       eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'completed',
     }));
+  });
+});
+
+describe('POST /webhook — V6分析イベント', () => {
+  test('友だち解除をWebhookの発生時刻とIDで記録する', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(getLineAccounts).mockResolvedValue([{
+      id: 'account-main', channel_secret: 'env-default-secret',
+      channel_access_token: 'account-token', is_active: 1,
+    } as never]);
+    vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue({
+      id: 'friend-1', line_user_id: 'U-1', line_account_id: 'account-main',
+    } as never);
+    const waitUntil = vi.fn();
+
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ events: [{
+        type: 'unfollow', webhookEventId: 'webhook-unfollow-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-1' },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+
+    expect(updateFriendFollowStatus).toHaveBeenCalledWith(
+      baseEnv.DB, 'U-1', false, 'account-main',
+    );
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(baseEnv.DB, {
+      lineAccountId: 'account-main',
+      friendId: 'friend-1',
+      eventType: 'friend_unfollow',
+      sourceKind: 'line_webhook',
+      sourceId: 'webhook-unfollow-1',
+      occurredAt: new Date(1787530800000).toISOString(),
+      dimensions: undefined,
+    });
   });
 });
 
@@ -309,6 +355,48 @@ describe('POST /webhook — DoS defenses (#104)', () => {
 });
 
 describe('POST /webhook — postback events', () => {
+  test('records a carousel tap without firing catch-all automations', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(getLineAccounts).mockResolvedValue([{
+      id: 'account-main', channel_secret: 'env-default-secret',
+      channel_access_token: 'account-token', is_active: 1,
+    } as never]);
+    vi.mocked(getFriendByLineUserIdForAccount).mockResolvedValue({
+      id: 'friend-1', line_user_id: 'U-existing', line_account_id: 'account-main',
+    } as never);
+    const waitUntil = vi.fn();
+    const timestamp = 1787530800000;
+
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ events: [{
+        type: 'postback',
+        replyToken: 'reply-token-carousel',
+        postback: { data: 'ctpl=template-1&c=0&a=1' },
+        timestamp,
+        source: { type: 'user', userId: 'U-existing' },
+        webhookEventId: 'event-carousel-1',
+        deliveryContext: { isRedelivery: false },
+        mode: 'active',
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+    expect(handleCarouselTap).toHaveBeenCalledOnce();
+    expect(recordAnalyticsEvent).toHaveBeenCalledWith(baseEnv.DB, {
+      lineAccountId: 'account-main',
+      friendId: 'friend-1',
+      eventType: 'postback_received',
+      sourceKind: 'line_webhook',
+      sourceId: 'event-carousel-1',
+      occurredAt: new Date(timestamp).toISOString(),
+      dimensions: { matched: true },
+    });
+    expect(fireEvent).not.toHaveBeenCalled();
+  });
+
   test('fires postback_received with postback.data so IF-THEN automations run on rich menu taps', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(jstNow).mockReturnValue('2026-07-19T12:00:00.000+09:00');
@@ -381,6 +469,9 @@ describe('POST /webhook — postback events', () => {
       db,
       'postback_received',
       {
+        sourceEventId: 'event-postback-1',
+        sourceKind: 'line_webhook',
+        occurredAt: expect.any(String),
         friendId: 'friend-1',
         eventData: { text: 'tag:premium', matched: false },
         replyToken: 'reply-token-postback',
@@ -475,6 +566,9 @@ describe('POST /webhook — postback events', () => {
       db,
       'postback_received',
       {
+        sourceEventId: 'event-postback-2',
+        sourceKind: 'line_webhook',
+        occurredAt: expect.any(String),
         friendId: 'friend-1',
         eventData: { text: 'tag:premium', matched: true },
         replyToken: 'reply-token-postback',

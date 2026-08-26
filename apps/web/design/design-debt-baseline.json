@@ -29,8 +29,7 @@
     "unresolved-classname": 6
   },
   "app/automations/page.tsx": {
-    "direct-secondary-button": 1,
-    "direct-primary-button": 2,
+    "direct-primary-button": 1,
     "arbitrary-value": 3,
     "unresolved-classname": 1
   },

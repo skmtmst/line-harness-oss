@@ -27,6 +27,8 @@ export interface ActionDefinition {
   type: string;
   params: Record<string, unknown>;
   onFailure: FailureMode;
+  /** 実行開始時に固定した共通アクション版。実行計画だけが持つ。 */
+  commonActionVersionId?: string | null;
 }
 
 interface RunRow {
@@ -42,6 +44,7 @@ interface RunRow {
   input_event_json: string;
   is_test: number;
   action_config: string;
+  execution_plan_json: string | null;
 }
 
 interface StepRow {
@@ -161,7 +164,10 @@ function parseActions(text: string): ActionDefinition[] {
       throw new AutomationActionError('duplicate_action_id', `処理ID ${id} が重複しています`, false);
     }
     ids.add(id);
-    return { id, type, params, onFailure };
+    const commonActionVersionId = typeof item.commonActionVersionId === 'string'
+      ? item.commonActionVersionId.trim() || null
+      : null;
+    return { id, type, params, onFailure, commonActionVersionId };
   });
 }
 
@@ -169,7 +175,8 @@ async function getRun(db: D1Database, runId: string): Promise<RunRow | null> {
   return db.prepare(
     `SELECT r.id, r.line_account_id, r.automation_id, r.automation_version_id,
             r.friend_id, r.source_event_id, r.idempotency_key, r.status,
-            r.current_step, r.input_event_json, r.is_test, v.action_config
+            r.current_step, r.input_event_json, r.is_test, v.action_config,
+            r.execution_plan_json
        FROM automation_runs r
        JOIN automation_versions v
          ON v.id = r.automation_version_id AND v.automation_id = r.automation_id
@@ -220,10 +227,83 @@ async function resolveCommonActionVersion(
   return binding?.id ?? null;
 }
 
+async function buildExecutionPlan(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    automationId: string;
+    actions: ActionDefinition[];
+    prefix?: string;
+    depth?: number;
+    budget?: { count: number };
+  },
+): Promise<ActionDefinition[]> {
+  const depth = input.depth ?? 0;
+  const budget = input.budget ?? { count: 0 };
+  if (depth > 20) {
+    throw new AutomationActionError('common_action_too_deep', '共通アクションの呼び出しが深すぎます', false);
+  }
+  const plan: ActionDefinition[] = [];
+  for (const action of input.actions) {
+    budget.count += 1;
+    if (budget.count > 1_000) {
+      throw new AutomationActionError('execution_plan_too_large', '実行する処理が多すぎます', false);
+    }
+    const stepKey = input.prefix ? `${input.prefix}/${action.id}` : action.id;
+    if (action.type !== 'common_action') {
+      const params = action.type === 'wait' && action.params.durationMinutes === undefined
+        ? { ...action.params, durationMinutes: action.params.minutes }
+        : action.params;
+      plan.push({ ...action, id: stepKey, params });
+      continue;
+    }
+
+    const commonActionVersionId = await resolveCommonActionVersion(db, {
+      lineAccountId: input.lineAccountId,
+      automationId: input.automationId,
+      action,
+    });
+    if (!commonActionVersionId) {
+      throw new AutomationActionError(
+        'common_action_version_not_pinned',
+        '公開済みの共通アクション版を固定できませんでした',
+        false,
+      );
+    }
+    const version = await db.prepare(
+      `SELECT cav.action_config
+         FROM common_action_versions cav
+         JOIN common_actions ca ON ca.id = cav.common_action_id
+        WHERE cav.id = ? AND cav.status = 'published' AND ca.line_account_id = ?`,
+    ).bind(commonActionVersionId, input.lineAccountId).first<{ action_config: string }>();
+    if (!version) {
+      throw new AutomationActionError('common_action_version_not_found', '固定した共通アクション版が見つかりません', false);
+    }
+
+    // 利用版を実行履歴に1行残し、その後ろへ実際の処理を展開する。
+    plan.push({
+      id: stepKey,
+      type: 'common_action_marker',
+      params: { commonActionId: action.params.commonActionId },
+      onFailure: action.onFailure,
+      commonActionVersionId,
+    });
+    plan.push(...await buildExecutionPlan(db, {
+      lineAccountId: input.lineAccountId,
+      automationId: input.automationId,
+      actions: parseActions(version.action_config),
+      prefix: stepKey,
+      depth: depth + 1,
+      budget,
+    }));
+  }
+  return plan;
+}
+
 async function precreateSteps(db: D1Database, run: RunRow, actions: ActionDefinition[]): Promise<void> {
   for (const action of actions) {
     const stepId = crypto.randomUUID();
-    const commonActionVersionId = await resolveCommonActionVersion(db, {
+    const commonActionVersionId = action.commonActionVersionId ?? await resolveCommonActionVersion(db, {
       lineAccountId: run.line_account_id,
       automationId: run.automation_id,
       action,
@@ -269,12 +349,29 @@ export async function startAutomationRun(
 
   const runId = crypto.randomUUID();
   const status: RunStatus = input.conditionMatched ? 'queued' : 'skipped_condition';
+  let executionPlan: ActionDefinition[] = [];
+  if (status === 'queued') {
+    try {
+      executionPlan = await buildExecutionPlan(db, {
+        lineAccountId: input.lineAccountId,
+        automationId: input.automationId,
+        actions: parseActions(published.action_config),
+      });
+    } catch (error) {
+      const failure = normalizeError(error);
+      executionPlan = [{
+        id: '__configuration__', type: 'invalid_configuration', params: {
+          errorCode: failure.code, errorMessage: failure.message,
+        }, onFailure: 'stop',
+      }];
+    }
+  }
   const inserted = await db.prepare(
     `INSERT OR IGNORE INTO automation_runs
        (id, line_account_id, automation_id, automation_version_id, friend_id,
         source_event_id, idempotency_key, status, input_event_json, is_test,
-        completed_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        completed_at, created_at, execution_plan_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     runId,
     input.lineAccountId,
@@ -288,6 +385,7 @@ export async function startAutomationRun(
     input.isTest ? 1 : 0,
     status === 'skipped_condition' ? now : null,
     now,
+    status === 'queued' ? JSON.stringify(executionPlan) : null,
   ).run();
 
   if ((inserted.meta?.changes ?? 0) !== 1) {
@@ -313,7 +411,13 @@ export async function startAutomationRun(
     const run = await getRun(db, runId);
     if (!run) throw new Error('automation_run_insert_failed');
     try {
-      await precreateSteps(db, run, parseActions(published.action_config));
+      if (executionPlan[0]?.type === 'invalid_configuration') {
+        const errorCode = String(executionPlan[0].params.errorCode ?? 'invalid_configuration');
+        const errorMessage = String(executionPlan[0].params.errorMessage ?? '実行計画を作れませんでした');
+        await failConfiguration(db, runId, now, errorCode, errorMessage);
+        return { kind: 'created', runId, status: 'failed', automationVersionId: published.version_id };
+      }
+      await precreateSteps(db, run, executionPlan);
     } catch (error) {
       const failure = normalizeError(error);
       await failConfiguration(db, runId, now, failure.code, failure.message);
@@ -496,7 +600,7 @@ export async function processAutomationRun(
   let actions: ActionDefinition[];
   let inputEvent: Record<string, unknown>;
   try {
-    actions = parseActions(run.action_config);
+    actions = parseActions(run.execution_plan_json ?? run.action_config);
     inputEvent = parseObject(run.input_event_json);
   } catch (error) {
     const failure = normalizeError(error);
@@ -558,6 +662,17 @@ export async function processAutomationRun(
       if (action.type === 'wait') {
         await scheduleWait(db, run, step, action, now);
         return 'waiting';
+      }
+      if (action.type === 'common_action_marker') {
+        await db.prepare(
+          `UPDATE automation_run_steps
+              SET status = 'success', output_json = ?, completed_at = ?,
+                  retry_at = NULL, lease_expires_at = NULL
+            WHERE id = ? AND status = 'running'`,
+        ).bind(JSON.stringify({ versionId: step.common_action_version_id }), now, step.id).run();
+        await db.prepare(`UPDATE automation_runs SET current_step = ? WHERE id = ?`)
+          .bind(index + 1, run.id).run();
+        continue;
       }
       if (action.type === 'common_action' && !step.common_action_version_id) {
         throw new AutomationActionError(

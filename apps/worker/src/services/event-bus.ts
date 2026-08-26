@@ -19,6 +19,7 @@ import {
   enrollFriendInScenario,
   jstNow,
   getFriendScore,
+  recordAnalyticsEvent,
 } from '@line-crm/db';
 import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
@@ -34,6 +35,10 @@ import {
 export interface EventPayload {
   /** 再配達されても同じ出来事と判定できる、発生元の不変ID。 */
   sourceEventId?: string;
+  /** 発生元の台帳名。分析の冪等キーに使う。 */
+  sourceKind?: string;
+  /** 推測せず、発生元が持つタイムゾーン付き時刻を渡す。 */
+  occurredAt?: string;
   friendId?: string;
   eventData?: Record<string, unknown>;
   conversionEventName?: string;
@@ -78,7 +83,36 @@ export async function fireEvent(
           currentScore: await getFriendScore(db, payload.friendId),
         },
       }
-    : payload;
+      : payload;
+
+  // 業務の正本は既存台帳のまま。発生元ID・時刻・アカウントがそろった事実だけを
+  // 分析用の追記台帳へ写す。失敗しても送信やタグ処理は巻き添えにしない。
+  if (lineAccountId && enrichedPayload.sourceEventId && enrichedPayload.occurredAt) {
+    const mappedType = eventType === 'cv_fire'
+      ? 'conversion_created'
+      : eventType === 'calendar_booked'
+        ? 'booking_confirmed'
+        : eventType;
+    try {
+      await recordAnalyticsEvent(db, {
+        lineAccountId,
+        friendId: enrichedPayload.friendId,
+        eventType: mappedType,
+        sourceKind: enrichedPayload.sourceKind ?? 'event_bus',
+        sourceId: enrichedPayload.sourceEventId,
+        occurredAt: enrichedPayload.occurredAt,
+        dimensions: enrichedPayload.eventData,
+        numericValue: enrichedPayload.conversionValue,
+      });
+    } catch (error) {
+      console.error(JSON.stringify({
+        event: 'analytics_event_record_failed',
+        line_account_id: lineAccountId,
+        event_type: mappedType,
+        reason: error instanceof Error ? error.message : 'unknown',
+      }));
+    }
+  }
 
   // Phase 2: evaluate automations.
   await processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);

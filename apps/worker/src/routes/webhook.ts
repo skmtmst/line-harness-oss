@@ -23,6 +23,7 @@ import {
   captureFriendAddEventAttribution,
   markFriendAddEventRouting,
   toJstString,
+  recordAnalyticsEvent,
 } from '@line-crm/db';
 import type { EntryRoute, Friend } from '@line-crm/db';
 import { applyFriendAddRouting } from '../services/friend-add-routing.js';
@@ -61,6 +62,32 @@ function logWebhookStepFailure(
     event_type: event?.type ?? null,
     reason: classifyLineWebhookError(error),
   });
+}
+
+async function recordWebhookAnalyticsEvent(
+  db: D1Database,
+  lineAccountId: string | null,
+  event: WebhookEvent,
+  input: {
+    friendId?: string | null;
+    eventType: string;
+    dimensions?: Record<string, unknown>;
+  },
+): Promise<void> {
+  if (!lineAccountId) return;
+  try {
+    await recordAnalyticsEvent(db, {
+      lineAccountId,
+      friendId: input.friendId,
+      eventType: input.eventType,
+      sourceKind: 'line_webhook',
+      sourceId: event.webhookEventId,
+      occurredAt: new Date(event.timestamp).toISOString(),
+      dimensions: input.dimensions,
+    });
+  } catch (error) {
+    logWebhookStepFailure('analytics_event_record', error, lineAccountId, event);
+  }
 }
 
 async function ensureFriendFromWebhookUser(
@@ -503,7 +530,17 @@ async function handleEvent(
     }
 
     // イベントバス発火: friend_add（replyToken は Step 0 で使用済みの可能性あり）
-    await fireEvent(db, 'friend_add', { friendId: friend.id, eventData: { displayName: friend.display_name } }, lineAccessToken, lineAccountId);
+    await fireEvent(db, 'friend_add', {
+      sourceEventId: event.webhookEventId,
+      sourceKind: 'line_webhook',
+      occurredAt: new Date(event.timestamp).toISOString(),
+      friendId: friend.id,
+      eventData: {
+        displayName: friend.display_name,
+        friendKind: (friend.unfollow_count ?? 0) > 0 ? 'returning' : 'first_time',
+        attributionStatus: currentAttribution ? 'captured' : 'unavailable',
+      },
+    }, lineAccessToken, lineAccountId);
     return;
   }
 
@@ -512,7 +549,12 @@ async function handleEvent(
       event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
+    const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
     await updateFriendFollowStatus(db, userId, false, lineAccountId);
+    await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+      friendId: friend?.id,
+      eventType: 'friend_unfollow',
+    });
     return;
   }
 
@@ -548,6 +590,11 @@ async function handleEvent(
      */
     const carouselTap = parseCarouselPostbackData(rawPostbackData);
     if (carouselTap) {
+      await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+        friendId: friend.id,
+        eventType: 'postback_received',
+        dimensions: { matched: true },
+      });
       try {
         const result = await handleCarouselTap(db, lineClient, friend, carouselTap, {
           lineAccountId,
@@ -607,6 +654,9 @@ async function handleEvent(
       );
       if (answered.handled) {
         await fireEvent(db, 'postback_received', {
+          sourceEventId: event.webhookEventId,
+          sourceKind: 'line_webhook',
+          occurredAt: new Date(event.timestamp).toISOString(),
           friendId: friend.id,
           eventData: { text: postbackData, matched: true },
           replyToken: answered.replyTokenConsumed ? undefined : postbackReplyToken,
@@ -656,6 +706,9 @@ async function handleEvent(
     // なお upsertChatOnMessage は呼ばない: メニュータップは自発メッセージでは
     // ないので、未対応 inbox を汚さないのが正しい (テキスト経路との意図的な差分)。
     await fireEvent(db, 'postback_received', {
+      sourceEventId: event.webhookEventId,
+      sourceKind: 'line_webhook',
+      occurredAt: new Date(event.timestamp).toISOString(),
       friendId: friend.id,
       // data が無いボタンでも、ボタン名でオートメーションを組めるようにする。
       eventData: { text: postbackData || tapLabel || '', matched: postbackMatched },
@@ -723,10 +776,10 @@ async function handleEvent(
     const logId = crypto.randomUUID();
     await db
       .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
-         VALUES (?, ?, 'incoming', ?, ?, NULL, NULL, 'user', ?)`,
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
+         VALUES (?, ?, 'incoming', ?, ?, NULL, NULL, 'user', ?, ?)`,
       )
-      .bind(logId, friend.id, msg.type, finalContent, jstNow())
+      .bind(logId, friend.id, msg.type, finalContent, lineAccountId, jstNow())
       .run();
     await awardActivityMileage(db, {
       eventType: 'message_received',
@@ -740,6 +793,11 @@ async function handleEvent(
     // 画像だけ送ってきた友だち」をバッジ・未対応一覧から永久に落としてしまう。
     // 非 text は auto_reply keyword にマッチし得ないので常に要対応扱いで正しい。
     await upsertChatOnMessage(db, friend.id);
+    await recordWebhookAnalyticsEvent(db, lineAccountId, event, {
+      friendId: friend.id,
+      eventType: 'message_received',
+      dimensions: { messageType: msg.type, matched: false },
+    });
     return;
   }
 
@@ -759,10 +817,10 @@ async function handleEvent(
     // 受信メッセージをログに記録
     await db
       .prepare(
-        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
-         VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'user', ?)`,
+        `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
+         VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'user', ?, ?)`,
       )
-      .bind(logId, friend.id, incomingText, now)
+      .bind(logId, friend.id, incomingText, lineAccountId, now)
       .run();
 
     await awardActivityMileage(db, {
@@ -851,6 +909,9 @@ async function handleEvent(
     // イベントバス発火: message_received
     // Pass replyToken only when auto_reply didn't actually consume it
     await fireEvent(db, 'message_received', {
+      sourceEventId: event.webhookEventId,
+      sourceKind: 'line_webhook',
+      occurredAt: new Date(event.timestamp).toISOString(),
       friendId: friend.id,
       eventData: { text: incomingText, matched },
       replyToken: replyTokenConsumed ? undefined : event.replyToken,
