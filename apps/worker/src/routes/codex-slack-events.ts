@@ -271,10 +271,10 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
     return c.json({ success: true, ignored: true });
   }
 
-  const autoMergePrNumber = parseCodexAuditApproval(event.text);
+  const autoMergeApproval = parseCodexAuditApproval(event.text);
   let autoMergeQueued = false;
   if (
-    autoMergePrNumber !== null &&
+    autoMergeApproval !== null &&
     isAllowedRelaySource(c.env.CODEX_RELAY_SOURCE_USER_IDS, event.user)
   ) {
     await c.env.CODEX_MENTION_QUEUE.send({
@@ -283,7 +283,8 @@ codexSlackEvents.post('/api/integrations/slack/events', async (c) => {
       channelId: event.channel,
       threadTs,
       requesterUserId: event.user,
-      prNumber: autoMergePrNumber,
+      prNumber: autoMergeApproval.prNumber,
+      approvedHeadSha: autoMergeApproval.headSha,
     });
     autoMergeQueued = true;
   }

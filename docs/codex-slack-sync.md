@@ -55,11 +55,11 @@ Slackのアプリ候補から選んだ実際の `@Codex` メンションが必�
 
 ```text
 [claude->codex]
-【監査結果】PR #NNN 合格・統合可
+【監査結果】PR #NNN HEAD <40桁のコミットSHA> 合格・統合可
 ```
 
 - Slack署名、workspace、channel、投稿者の既存許可リストをすべて通過した投稿だけをQueueへ送る。合格行が無い、書式が違う、投稿者が許可外なら処理しない。
-- Slack親メッセージの `line_harness_codex` metadataにある `work_key=pr:NNN` と、合図のPR番号が完全一致しなければ停止理由をスレッドへ返す。
+- Slack親メッセージの `line_harness_codex` metadataにある `work_key=pr:NNN` と、合図のPR番号が完全一致しなければ停止理由をスレッドへ返す。合格合図には監査したHEADの40桁SHAも必須とし、現在のPR HEADと一致しなければ再監査を求めて停止する。
 - PRのbaseは `codex/development` 固定。`main` を指定または更新する経路はない。
 - DBマイグレーション、認証・テナント境界ファイル、環境ファイル、秘密値・secret追加の疑いがある差分は停止する。
 - `Required PR gate` と、Slack同期を除く最新check run・commit statusが完了・成功しており、GitHubの競合判定が `clean` または参考用Slack同期だけによる `unstable` の場合だけマージする。マージ直前にもbase SHA、head SHA、チェックを再確認する。

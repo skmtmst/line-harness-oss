@@ -1,7 +1,7 @@
 import type { Env } from '../index.js';
 
 const AUDIT_MARKER = '[claude->codex]';
-const AUDIT_LINE_PATTERN = /^【監査結果】PR #(\d+) 合格・統合可$/;
+const AUDIT_LINE_PATTERN = /^【監査結果】PR #(\d+) HEAD ([0-9a-f]{40}) 合格・統合可$/i;
 const EXPECTED_REPOSITORY = 'skmtmst/line-harness-oss';
 const TARGET_BRANCH = 'codex/development';
 const REQUIRED_GATE_NAME = 'required-pr-gate';
@@ -61,6 +61,7 @@ export type CodexAutoMergeMessage = {
   threadTs: string;
   requesterUserId: string;
   prNumber: number;
+  approvedHeadSha: string;
 };
 
 export type PullRequestBlockReason =
@@ -74,7 +75,7 @@ type GitHubResponse<T> = {
   value: T;
 };
 
-export function parseCodexAuditApproval(text: string): number | null {
+export function parseCodexAuditApproval(text: string): { prNumber: number; headSha: string } | null {
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
   if (lines[0] !== AUDIT_MARKER) return null;
   const matches = lines
@@ -82,7 +83,9 @@ export function parseCodexAuditApproval(text: string): number | null {
     .filter((match): match is RegExpExecArray => match !== null);
   if (matches.length !== 1) return null;
   const prNumber = Number(matches[0][1]);
-  return Number.isSafeInteger(prNumber) && prNumber > 0 ? prNumber : null;
+  return Number.isSafeInteger(prNumber) && prNumber > 0
+    ? { prNumber, headSha: matches[0][2].toLowerCase() }
+    : null;
 }
 
 export function isCodexAutoMergeEnabled(value: string | undefined): boolean {
@@ -372,6 +375,15 @@ export async function processCodexAutoMerge(
   const pullRequest = await githubJson<GitHubPullRequest>(token, prPath, fetcher);
   if (pullRequest.number !== message.prNumber || pullRequest.base.ref !== TARGET_BRANCH) {
     await postSlackResult(env, message, blockMessage(message.prNumber, `向き先が ${TARGET_BRANCH} ではありません`), fetcher);
+    return;
+  }
+  if (pullRequest.head.sha.toLowerCase() !== message.approvedHeadSha.toLowerCase()) {
+    await postSlackResult(
+      env,
+      message,
+      blockMessage(message.prNumber, 'Claude監査後にPRの差分が変わったため、現在のHEADを再監査してください'),
+      fetcher,
+    );
     return;
   }
   const comments = await githubPages<GitHubIssueComment>(
