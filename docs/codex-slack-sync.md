@@ -49,6 +49,25 @@ Slackのアプリ候補から選んだ実際の `@Codex` メンションが必�
 
 `CODEX_RELAY_ENABLED=false` で、コード変更なしに自動中継を止められる。Queueは最大5回まで試行し、最終失敗時は例外本文を保存・出力せず `db_error` / `slack_api_error` / `unknown` だけをログへ出し、D1を `failed` にして明示的に終了する。普段の待機中にCodexモデルは起動せず、追加のOpenAI API課金も使用しない。
 
+## Claude監査合格PRの自動マージ
+
+自動中継とは別の機能として、Claudeの監査合格合図だけを `skmtmst/line-harness-oss` の `codex/development` へ統合できる。1行目と合格行は次の完全一致書式に限定する。
+
+```text
+[claude->codex]
+【監査結果】PR #NNN 合格・統合可
+```
+
+- Slack署名、workspace、channel、投稿者の既存許可リストをすべて通過した投稿だけをQueueへ送る。合格行が無い、書式が違う、投稿者が許可外なら処理しない。
+- Slack親メッセージの `line_harness_codex` metadataにある `work_key=pr:NNN` と、合図のPR番号が完全一致しなければ停止理由をスレッドへ返す。
+- PRのbaseは `codex/development` 固定。`main` を指定または更新する経路はない。
+- DBマイグレーション、認証・テナント境界ファイル、環境ファイル、秘密値・secret追加の疑いがある差分は停止する。
+- `Required PR gate` と、Slack同期を除く最新check run・commit statusが完了・成功しており、GitHubの競合判定が `clean` または参考用Slack同期だけによる `unstable` の場合だけマージする。マージ直前にもbase SHA、head SHA、チェックを再確認する。
+- GitHub PRコメントの `codex-auto-merge-ledger:v1` マーカーとGitHubのマージ状態を台帳として使う。同じPRを再マージしない。DBテーブルとマイグレーションは追加しない。
+- `codex-auto-merge-excluded` ラベルまたはdraft状態のPRは自動対象外。仕組み自体を導入するM-1 PRにはこのラベルを付け、Masatoが手動で統合する。
+
+`CODEX_AUTO_MERGE_ENABLED` は `CODEX_RELAY_ENABLED` と独立している。未設定・`false` のときも合格合図とスレッドのPR番号までは検知するが、GitHubを呼ばず「検知のみ」と報告する。検証環境の初期値は `false`。有効化はM-1 PRの手動統合と検証確認の後、別の外部設定変更として行う。本番では有効化しない。
+
 ## 要対応タスク
 
 - 修正、エラー、承認待ちなど、対応が必要な投稿は `#line-harness-要対応` に自動表示する。
@@ -84,6 +103,7 @@ Workerの秘密値:
 - `SLACK_SIGNING_SECRET`: Slackのボタン操作が本物か確認する署名秘密値
 - `CODEX_SLACK_MONITOR_SIGNING_SECRET`: Codex監視専用SlackアプリのEvents API署名秘密値。設定時は `/api/integrations/slack/events` だけで優先し、既存アプリの `SLACK_SIGNING_SECRET` を変更しない
 - `SLACK_USER_TOKEN`: MasatoのOAuth認可で発行されたUser token。同じSlackスレッドの再照合と、許可済みClaude依頼の公式Codexへの中継だけに使う
+- `CODEX_AUTO_MERGE_GITHUB_TOKEN`: `skmtmst/line-harness-oss` だけに限定したfine-grained GitHub token。ContentsとPull requestsのwrite、Checksのreadだけを許可し、値はリポジトリやSlackへ書かない
 
 Workerの非秘密設定:
 
@@ -101,6 +121,8 @@ Workerの非秘密設定:
 - `CODEX_ALLOWED_CHANNEL_NAME_PREFIXES`: 自動生成される帯チャンネル名の許可接頭辞。カンマ区切り。Slack APIの `conversations.info` で取得した実名が「接頭辞＋3桁-3桁」で終わる場合だけ許可し、未設定・API失敗・不一致は拒否する
 - `CODEX_RELAY_SOURCE_USER_IDS`: `[claude->codex]` 投稿を許可する投稿者ID。ClaudeがMasato名義で投稿する構成ではMasatoのSlack user IDだけを設定する
 - `CODEX_RELAY_ENABLED`: 自動中継のキルスイッチ。`true` / `1` のときだけ中継し、検証配備時の初期値は `false`
+- `CODEX_AUTO_MERGE_ENABLED`: 監査合格PRマージの独立スイッチ。`true` / `1` のときだけマージし、未設定・`false` は検知のみ。検証環境の初期値は `false`
+- `CODEX_AUTO_MERGE_REPOSITORY`: 固定値 `skmtmst/line-harness-oss`。別の値は停止する
 - `CODEX_QUEUE_MAX_ATTEMPTS`: Queue失敗をD1の `failed` として確定する試行回数。検証環境はQueue設定と同じ `5`
 - `CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS`: 公式Slack Codexの受領を待つ秒数。既定は30秒、許容範囲は10〜300秒
 
@@ -120,7 +142,7 @@ Cloudflare検証環境:
 - Producer / Consumer binding: `CODEX_MENTION_QUEUE`
 - D1 migration: `180_codex_cloud_tasks.sql`
 
-Queue作成、D1適用、Worker secrets登録、OAuth再認可、Event Subscription登録は外部状態を変える。コードのPRとは分け、対象環境・バックアップ・切り戻しを確認してから検証環境だけへ適用する。
+Queue作成、D1適用、Worker secrets登録、OAuth再認可、Event Subscription登録、自動マージスイッチの有効化は外部状態を変える。コードのPRとは分け、対象環境・バックアップ・切り戻しを確認してから検証環境だけへ適用する。M-1のコード配備ではDB更新を行わず、`CODEX_AUTO_MERGE_ENABLED=false` を維持する。
 
 Slackアプリの Interactivity Request URL:
 

@@ -220,6 +220,11 @@ export type Env = {
     CODEX_ALLOWED_CHANNEL_NAME_PREFIXES?: string;
     CODEX_RELAY_SOURCE_USER_IDS?: string;
     CODEX_RELAY_ENABLED?: string;
+    // Claude監査合格のSlack合図 -> codex/development専用マージ。
+    // GitHub tokenはWorker secret。未設定・falseなら検知のみで停止する。
+    CODEX_AUTO_MERGE_ENABLED?: string;
+    CODEX_AUTO_MERGE_REPOSITORY?: string;
+    CODEX_AUTO_MERGE_GITHUB_TOKEN?: string;
     CODEX_QUEUE_MAX_ATTEMPTS?: string;
     CODEX_OFFICIAL_RECEIPT_GRACE_SECONDS?: string;
     CODEX_MENTION_QUEUE?: Queue<CodexMentionQueueMessage>;
@@ -1440,7 +1445,9 @@ export default {
         })));
         if (stopped) {
           try {
-            await markCodexMentionFailed(env.DB, message.body.slackEventId);
+            if (message.body.kind !== 'auto_merge') {
+              await markCodexMentionFailed(env.DB, message.body.slackEventId);
+            }
           } catch {
             console.error(JSON.stringify({
               event: 'codex_cloud_monitor_queue_ledger_failed',
