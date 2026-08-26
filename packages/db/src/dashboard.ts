@@ -142,9 +142,10 @@ async function count(db: D1Database, sql: string, ...binds: unknown[]): Promise<
 async function friendBreakdown(
   db: D1Database,
   accountId: string | null,
+  explicitScope?: { sql: string; binds: string[] },
 ): Promise<DashboardOverview['friends']> {
-  const where = accountId ? 'WHERE line_account_id = ?' : '';
-  const binds = accountId ? [accountId] : [];
+  const where = explicitScope ? `WHERE ${explicitScope.sql}` : accountId ? 'WHERE line_account_id = ?' : '';
+  const binds = explicitScope?.binds ?? (accountId ? [accountId] : []);
   const row = await db
     .prepare(
       `SELECT
@@ -172,9 +173,24 @@ async function friendBreakdown(
   };
 }
 
-async function inboxState(db: D1Database, accountId: string | null = null): Promise<DashboardOverview['inbox']> {
-  const accountWhere = accountId ? 'WHERE f.line_account_id = ?' : '';
-  const accountBinds = accountId ? [accountId] : [];
+export type AccountStatsScope =
+  | { allowedAccountIds: readonly string[]; includeUnassigned: boolean }
+  | { allTenants: true };
+
+function accountScopeSql(scope: AccountStatsScope, column: string): { sql: string; binds: string[] } {
+  if ('allTenants' in scope) return { sql: '1 = 1', binds: [] };
+  const placeholders = scope.allowedAccountIds.map(() => '?').join(', ');
+  if (placeholders) {
+    return {
+      sql: `(${column} IN (${placeholders})${scope.includeUnassigned ? ` OR ${column} IS NULL` : ''})`,
+      binds: [...scope.allowedAccountIds],
+    };
+  }
+  return { sql: scope.includeUnassigned ? `${column} IS NULL` : '1 = 0', binds: [] };
+}
+
+async function inboxState(db: D1Database, scope: AccountStatsScope): Promise<DashboardOverview['inbox']> {
+  const account = accountScopeSql(scope, 'f.line_account_id');
   const row = await db
     .prepare(
       `SELECT
@@ -184,9 +200,9 @@ async function inboxState(db: D1Database, accountId: string | null = null): Prom
          MIN(CASE WHEN status = 'unread' THEN last_message_at END) AS oldest
        FROM chats c
        JOIN friends f ON f.id = c.friend_id
-       ${accountWhere}`,
+       WHERE ${account.sql}`,
     )
-    .bind(...accountBinds)
+    .bind(...account.binds)
     .first<{ unanswered: number; in_progress: number; resolved: number; oldest: string | null }>();
 
   // 受信から初回返信までの平均。JSTの過去7日。
@@ -202,9 +218,9 @@ async function inboxState(db: D1Database, accountId: string | null = null): Prom
             AND last_incoming_at IS NOT NULL
             AND first_replied_at > last_incoming_at
             AND first_replied_at >= ?
-            ${accountId ? 'AND f.line_account_id = ?' : ''}`,
+            AND ${account.sql}`,
       )
-      .bind(jstDate(-6), ...(accountId ? [accountId] : []))
+      .bind(jstDate(-6), ...account.binds)
       .first<{ m: number | null }>();
     averageFirstReply = avg?.m == null ? null : Math.round(avg.m);
   } catch {
@@ -308,30 +324,31 @@ const TREND_DAYS = 7;
  */
 async function friendTrend(
   db: D1Database,
-  accountId: string | null,
+  scope: AccountStatsScope,
 ): Promise<DashboardOverview['trend']> {
   const days = TREND_DAYS;
   const start = jstDate(-(TREND_DAYS - 1));
-  const key = accountId ?? '';
+  const snapshotScope = accountScopeSql(scope, 'line_account_id');
 
   const recorded = await db
     .prepare(
-      `SELECT date, active, added, blocked
+      `SELECT date, SUM(active) AS active, SUM(added) AS added, SUM(blocked) AS blocked
          FROM friend_daily_snapshots
-        WHERE line_account_id = ? AND date >= ?
+        WHERE ${snapshotScope.sql} AND date >= ?
+        GROUP BY date
         ORDER BY date`,
     )
-    .bind(key, start)
+    .bind(...snapshotScope.binds, start)
     .all<{ date: string; active: number; added: number; blocked: number }>();
   const byDate = new Map(recorded.results.map((r) => [r.date, r]));
 
-  const where = accountId ? 'AND line_account_id = ?' : '';
-  const binds = accountId ? [start, accountId] : [start];
+  const friends = accountScopeSql(scope, 'line_account_id');
+  const binds = [start, ...friends.binds];
   const addedRows = await db
     .prepare(
       `SELECT substr(created_at, 1, 10) AS d, COUNT(*) AS n
          FROM friends
-        WHERE created_at >= ? ${where}
+        WHERE created_at >= ? AND ${friends.sql}
         GROUP BY d`,
     )
     .bind(...binds)
@@ -343,7 +360,7 @@ async function friendTrend(
             COUNT(*) AS n
        FROM friends f
        LEFT JOIN entry_routes er ON er.ref_code = f.ref_code
-      WHERE f.created_at >= ? ${where}
+      WHERE f.created_at >= ? AND ${accountScopeSql(scope, 'f.line_account_id').sql}
       GROUP BY d, name
       ORDER BY n DESC`,
   ).bind(...binds).all<{ d: string; name: string; n: number }>();
@@ -354,7 +371,7 @@ async function friendTrend(
     sourcesByDate.set(row.d, list);
   }
 
-  const now = await friendBreakdown(db, accountId);
+  const now = await friendBreakdown(db, null, accountScopeSql(scope, 'line_account_id'));
   const out: DashboardOverview['trend'] = [];
   let running = now.active;
   for (let i = 0; i < days; i += 1) {
@@ -380,15 +397,16 @@ async function friendTrend(
 async function conversionSummary(
   db: D1Database,
   period: DashboardPeriod,
-  accountId: string | null,
+  scope: AccountStatsScope,
 ): Promise<DashboardOverview['conversions']> {
   const start = periodStart(period);
+  const account = accountScopeSql(scope, 'f.line_account_id');
   const total = await count(
     db,
     `SELECT COUNT(*) AS n FROM conversion_events ce
       JOIN friends f ON f.id = ce.friend_id
-     WHERE ce.created_at >= ? ${accountId ? 'AND f.line_account_id = ?' : ''}`,
-    start, ...(accountId ? [accountId] : []),
+     WHERE ce.created_at >= ? AND ${account.sql}`,
+    start, ...account.binds,
   );
   const byPoint = await db
     .prepare(
@@ -396,12 +414,12 @@ async function conversionSummary(
          FROM conversion_events c
          JOIN conversion_points cp ON cp.id = c.conversion_point_id
          JOIN friends f ON f.id = c.friend_id
-        WHERE c.created_at >= ? ${accountId ? 'AND f.line_account_id = ?' : ''}
+        WHERE c.created_at >= ? AND ${account.sql}
         GROUP BY cp.id
         ORDER BY count DESC
         LIMIT 5`,
     )
-    .bind(start, ...(accountId ? [accountId] : []))
+    .bind(start, ...account.binds)
     .all<{ name: string; count: number }>();
   return { total, byPoint: byPoint.results };
 }
@@ -415,7 +433,7 @@ async function conversionSummary(
 export async function getDashboardOverview(
   db: D1Database,
   period: DashboardPeriod,
-  accountId: string | null,
+  scope: AccountStatsScope,
 ): Promise<DashboardOverview> {
   const start = periodStart(period);
   const partialFailures: string[] = [];
@@ -428,20 +446,17 @@ export async function getDashboardOverview(
       return fallback;
     }
   };
-  const messageAccountWhere = accountId ? 'AND ml.line_account_id = ?' : '';
-  const broadcastAccountWhere = accountId
-    ? `AND (
-         b.line_account_id = ?
-         OR (
-           b.target_type = 'multi-account-dedup'
-           AND b.account_ids IS NOT NULL
-           AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE value = ?)
-         )
-       )`
-    : '';
-
-  const accountClause = accountId ? 'AND f.line_account_id = ?' : '';
-  const accountBinds = accountId ? [accountId] : [];
+  const friendAccount = accountScopeSql(scope, 'f.line_account_id');
+  const messageAccount = accountScopeSql(scope, 'ml.line_account_id');
+  const bookingAccount = accountScopeSql(scope, 'line_account_id');
+  const migrationFrom = accountScopeSql(scope, 'from_account_id');
+  const migrationTo = accountScopeSql(scope, 'to_account_id');
+  const broadcastAccount = accountScopeSql(scope, 'b.line_account_id');
+  const broadcastJsonAccount = accountScopeSql(scope, 'value');
+  const broadcastScope = `(${broadcastAccount.sql} OR (
+    b.target_type = 'multi-account-dedup' AND b.account_ids IS NOT NULL
+    AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE ${broadcastJsonAccount.sql})
+  ))`;
   const emptyOperations: DashboardOverview['operations'] = {
     scenarios: { active: 0, paused: 0 }, migrations: { active: 0, completed: 0 },
     bookings: { pending: 0, upcoming: 0 }, inflowTop: [], funnelAlerts: 0,
@@ -452,38 +467,38 @@ export async function getDashboardOverview(
       `SELECT SUM(CASE WHEN fs.status='active' THEN 1 ELSE 0 END) active,
               SUM(CASE WHEN fs.status='paused' THEN 1 ELSE 0 END) paused
          FROM friend_scenarios fs JOIN friends f ON f.id=fs.friend_id
-        WHERE 1=1 ${accountClause}`,
-    ).bind(...accountBinds).first<{ active: number | null; paused: number | null }>(),
+        WHERE ${friendAccount.sql}`,
+    ).bind(...friendAccount.binds).first<{ active: number | null; paused: number | null }>(),
     db.prepare(
       `SELECT SUM(CASE WHEN status IN ('pending','in_progress') THEN 1 ELSE 0 END) active,
               SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed
          FROM account_migrations
-        WHERE 1=1 ${accountId ? 'AND (from_account_id = ? OR to_account_id = ?)' : ''}`,
-    ).bind(...(accountId ? [accountId, accountId] : [])).first<{ active: number | null; completed: number | null }>(),
+        WHERE (${migrationFrom.sql} OR ${migrationTo.sql})`,
+    ).bind(...migrationFrom.binds, ...migrationTo.binds).first<{ active: number | null; completed: number | null }>(),
     db.prepare(
       `SELECT SUM(CASE WHEN status='requested' THEN 1 ELSE 0 END) pending,
               SUM(CASE WHEN status IN ('requested','confirmed') AND starts_at >= ? THEN 1 ELSE 0 END) upcoming
-         FROM bookings WHERE 1=1 ${accountId ? 'AND line_account_id = ?' : ''}`,
-    ).bind(new Date().toISOString(), ...accountBinds).first<{ pending: number | null; upcoming: number | null }>(),
+         FROM bookings WHERE ${bookingAccount.sql}`,
+    ).bind(new Date().toISOString(), ...bookingAccount.binds).first<{ pending: number | null; upcoming: number | null }>(),
     db.prepare(
       `SELECT COALESCE(er.name, '経路不明') name, COUNT(*) count
          FROM friends f LEFT JOIN entry_routes er ON er.ref_code=f.ref_code
-        WHERE f.created_at >= ? ${accountClause}
+        WHERE f.created_at >= ? AND ${friendAccount.sql}
         GROUP BY name ORDER BY count DESC LIMIT 3`,
-    ).bind(start, ...accountBinds).all<{ name: string; count: number }>(),
+    ).bind(start, ...friendAccount.binds).all<{ name: string; count: number }>(),
     count(db,
       `WITH funnel AS (
          SELECT f.ref_code, COUNT(DISTINCT f.id) additions, COUNT(ce.id) conversions
            FROM friends f LEFT JOIN conversion_events ce ON ce.friend_id=f.id
-          WHERE f.created_at >= ? ${accountClause}
+          WHERE f.created_at >= ? AND ${friendAccount.sql}
           GROUP BY f.ref_code
        ) SELECT COUNT(*) n FROM funnel WHERE additions >= 3 AND conversions = 0`,
-      start, ...accountBinds),
+      start, ...friendAccount.binds),
     count(db,
       `SELECT COUNT(*) n FROM automation_logs al
         JOIN friends f ON f.id=al.friend_id
-       WHERE al.status IN ('partial','failed') AND al.created_at >= ? ${accountClause}`,
-      start, ...accountBinds),
+       WHERE al.status IN ('partial','failed') AND al.created_at >= ? AND ${friendAccount.sql}`,
+      start, ...friendAccount.binds),
   ]).then(([scenarios, migrations, bookings, inflow, funnelAlerts, automationFailures]) => ({
     scenarios: { active: scenarios?.active ?? 0, paused: scenarios?.paused ?? 0 },
     migrations: { active: migrations?.active ?? 0, completed: migrations?.completed ?? 0 },
@@ -494,14 +509,14 @@ export async function getDashboardOverview(
   }));
 
   const [friends, inbox, trend, conversions, sent, broadcasts, operations] = await Promise.all([
-    safe('friends', friendBreakdown(db, accountId), {
+    safe('friends', friendBreakdown(db, null, accountScopeSql(scope, 'line_account_id')), {
       active: 0,
       total: 0,
       blockedByThem: 0,
       hiddenByUs: 0,
       blockedBoth: 0,
     }),
-    safe('inbox', inboxState(db, accountId), {
+    safe('inbox', inboxState(db, scope), {
       unanswered: 0,
       inProgress: 0,
       resolved: 0,
@@ -509,8 +524,8 @@ export async function getDashboardOverview(
       averageFirstReplyMinutes: null,
     }),
     // 推移だけは period を渡さない。上の切り替えに関わらず直近7日で見る。
-    safe('trend', friendTrend(db, accountId), []),
-    safe('conversions', conversionSummary(db, period, accountId), { total: 0, byPoint: [] }),
+    safe('trend', friendTrend(db, scope), []),
+    safe('conversions', conversionSummary(db, period, scope), { total: 0, byPoint: [] }),
     // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
     // source は 028 で入っている。auto_reply と manual が応答。
     db
@@ -519,17 +534,17 @@ export async function getDashboardOverview(
            COUNT(*) AS sent,
            SUM(CASE WHEN source IN ('auto_reply','manual') THEN 1 ELSE 0 END) AS reply
          FROM messages_log ml
-          WHERE direction = 'outgoing' AND ml.created_at >= ? ${messageAccountWhere}`,
+          WHERE direction = 'outgoing' AND ml.created_at >= ? AND ${messageAccount.sql}`,
       )
-      .bind(start, ...(accountId ? [accountId] : []))
+      .bind(start, ...messageAccount.binds)
       .first<{ sent: number; reply: number }>()
       .then((value) => value)
       .catch((error) => { partialFailures.push('delivery'); console.error('[dashboard] delivery failed', error); return null; }),
     safe('broadcasts', count(
       db,
       `SELECT COUNT(*) AS n FROM broadcasts b
-        WHERE status = 'sent' AND b.created_at >= ? ${broadcastAccountWhere}`,
-      start, ...(accountId ? [accountId, accountId] : []),
+        WHERE status = 'sent' AND b.created_at >= ? AND ${broadcastScope}`,
+      start, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
     ), 0),
     safe('operations', operationsPromise, emptyOperations),
   ]);
@@ -583,28 +598,32 @@ export interface InboxStats {
 export async function getInboxStats(
   db: D1Database,
   operatorId: string | null,
+  scope: AccountStatsScope,
 ): Promise<InboxStats> {
   const hourAgo = new Date(Date.now() - 3600_000).toISOString();
   const today = jstDate(0);
 
+  const friendScope = accountScopeSql(scope, 'f.line_account_id');
+  const messageScope = accountScopeSql(scope, 'line_account_id');
   const waiting = await db
     .prepare(
       `SELECT
          COUNT(*) AS n,
          SUM(CASE WHEN last_message_at < ? THEN 1 ELSE 0 END) AS over_hour,
          CAST((julianday('now') - julianday(MIN(last_message_at))) * 1440 AS INTEGER) AS oldest_minutes
-       FROM chats WHERE status = 'unread'`,
+       FROM chats c JOIN friends f ON f.id = c.friend_id
+       WHERE c.status = 'unread' AND ${friendScope.sql}`,
     )
-    .bind(hourAgo)
+    .bind(hourAgo, ...friendScope.binds)
     .first<{ n: number; over_hour: number; oldest_minutes: number | null }>();
 
   const mine = operatorId
     ? await count(
         db,
-        `SELECT COUNT(*) AS n FROM chats WHERE status = 'in_progress' AND operator_id = ?`,
-        operatorId,
+        `SELECT COUNT(*) AS n FROM chats c JOIN friends f ON f.id = c.friend_id WHERE c.status = 'in_progress' AND c.operator_id = ? AND ${friendScope.sql}`,
+        operatorId, ...friendScope.binds,
       )
-    : await count(db, `SELECT COUNT(*) AS n FROM chats WHERE status = 'in_progress'`);
+    : await count(db, `SELECT COUNT(*) AS n FROM chats c JOIN friends f ON f.id = c.friend_id WHERE c.status = 'in_progress' AND ${friendScope.sql}`, ...friendScope.binds);
 
   // source は 'line' 以外にメール由来などが入る。line 以外をまとめてメール扱いに
   // すると、将来 source が増えたときに黙って混ざる。line と email だけを数える。
@@ -615,12 +634,12 @@ export async function getInboxStats(
          SUM(CASE WHEN source = 'email' THEN 1 ELSE 0 END) AS email_n,
          COUNT(*) AS total
        FROM messages_log
-        WHERE direction = 'incoming' AND created_at >= ? AND created_at < ?`,
+        WHERE direction = 'incoming' AND created_at >= ? AND created_at < ? AND ${messageScope.sql}`,
     )
-    .bind(today, nextDate(today))
+    .bind(today, nextDate(today), ...messageScope.binds)
     .first<{ line_n: number; email_n: number; total: number }>();
 
-  const inbox = await inboxState(db);
+  const inbox = await inboxState(db, scope);
 
   return {
     averageFirstReplyMinutes: inbox.averageFirstReplyMinutes,
@@ -654,10 +673,12 @@ export interface FriendStats {
  */
 export async function getFriendStats(
   db: D1Database,
-  accountId: string | null,
+  scope: AccountStatsScope,
 ): Promise<FriendStats> {
-  const breakdown = await friendBreakdown(db, accountId);
-  const inbox = await inboxState(db);
+  const friendScope = accountScopeSql(scope, 'line_account_id');
+  const breakdownScope = accountScopeSql(scope, 'line_account_id');
+  const breakdown = await friendBreakdown(db, null, breakdownScope);
+  const inbox = await inboxState(db, scope);
 
   // JST の月の頭。月をまたぐ集計は UTC のままだと9時間ずれる。
   const now = new Date(Date.now() + 9 * 3600_000);
@@ -665,11 +686,10 @@ export async function getFriendStats(
   const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
   const lastMonth = `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, '0')}`;
 
-  const where = accountId ? 'AND line_account_id = ?' : '';
-  const bindsFor = (month: string) => (accountId ? [`${month}-01`, `${nextMonth(month)}-01`, accountId] : [`${month}-01`, `${nextMonth(month)}-01`]);
+  const bindsFor = (month: string) => [`${month}-01`, `${nextMonth(month)}-01`, ...friendScope.binds];
   const [addedThisMonth, addedLastMonth] = await Promise.all([
-    count(db, `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? ${where}`, ...bindsFor(thisMonth)),
-    count(db, `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? ${where}`, ...bindsFor(lastMonth)),
+    count(db, `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? AND ${friendScope.sql}`, ...bindsFor(thisMonth)),
+    count(db, `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? AND ${friendScope.sql}`, ...bindsFor(lastMonth)),
   ]);
 
   return {
@@ -794,9 +814,13 @@ export interface ListStats {
   reminders: { total: number; active: number; waiting: number; sentThisMonth: number };
 }
 
-export async function getListStats(db: D1Database): Promise<ListStats> {
+export async function getListStats(db: D1Database, scope: AccountStatsScope): Promise<ListStats> {
   const monthStart = jstDate(0).slice(0, 7);
   const ninetyDaysAgo = jstDate(-90);
+  const friendScope = accountScopeSql(scope, 'f.line_account_id');
+  const messageScope = accountScopeSql(scope, 'line_account_id');
+  const scenarioScope = accountScopeSql(scope, 'line_account_id');
+  const reminderScope = accountScopeSql(scope, 'line_account_id');
 
   const safe = async <T>(run: () => Promise<T>, fallback: T): Promise<T> => {
     try {
@@ -814,10 +838,10 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
           `SELECT
              (SELECT COUNT(*) FROM tags) AS total,
              (SELECT COUNT(*) FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM friend_tags)) AS unused,
-             (SELECT COUNT(DISTINCT friend_id) FROM friend_tags) AS tagged,
-             (SELECT COUNT(*) FROM friend_tags WHERE assigned_at >= ? AND assigned_at < ?) AS this_month`,
+             (SELECT COUNT(DISTINCT ft.friend_id) FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id WHERE ${friendScope.sql}) AS tagged,
+             (SELECT COUNT(*) FROM friend_tags ft JOIN friends f ON f.id = ft.friend_id WHERE ft.assigned_at >= ? AND ft.assigned_at < ? AND ${friendScope.sql}) AS this_month`,
         )
-        .bind(`${monthStart}-01`, `${nextMonth(monthStart)}-01`)
+        .bind(...friendScope.binds, `${monthStart}-01`, `${nextMonth(monthStart)}-01`, ...friendScope.binds)
         .first<{ total: number; unused: number; tagged: number; this_month: number }>();
       return {
         total: row?.total ?? 0,
@@ -832,10 +856,11 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
         .prepare(
           `SELECT
              (SELECT COUNT(*) FROM support_marks) AS total,
-             (SELECT COUNT(DISTINCT support_mark_id) FROM friends WHERE support_mark_id IS NOT NULL) AS in_use`,
+             (SELECT COUNT(DISTINCT f.support_mark_id) FROM friends f WHERE f.support_mark_id IS NOT NULL AND ${friendScope.sql}) AS in_use`,
         )
+        .bind(...friendScope.binds)
         .first<{ total: number; in_use: number }>();
-      const inbox = await inboxState(db);
+      const inbox = await inboxState(db, scope);
       // 設計の「対応済 26人・過去7日」。110 の操作記録から出す。
       const changedLast7 = await countOperations(db, 'support_mark', 'changed', jstDate(-6));
       return {
@@ -865,9 +890,9 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
              (SELECT COUNT(*) FROM messages_log
                WHERE direction = 'outgoing'
                  AND template_id_at_send IS NOT NULL
-                 AND created_at >= ? AND created_at < ?) AS sent`,
+                 AND created_at >= ? AND created_at < ? AND ${messageScope.sql}) AS sent`,
         )
-        .bind(`${monthStart}-01`, `${nextMonth(monthStart)}-01`)
+        .bind(`${monthStart}-01`, `${nextMonth(monthStart)}-01`, ...messageScope.binds)
         .first<{ total: number; sent: number }>();
       // 「使用中」は、シナリオのステップか自動応答から参照されているもの。
       const used = await count(
@@ -888,7 +913,8 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
         const clicks = await count(
           db,
           `SELECT COALESCE(SUM(click_count), 0) AS n FROM tracked_links
-            WHERE template_id IS NOT NULL`,
+            WHERE template_id IS NOT NULL AND ${accountScopeSql(scope, 'line_account_id').sql}`,
+          ...accountScopeSql(scope, 'line_account_id').binds,
         );
         const sent = row?.sent ?? 0;
         clickRate = sent > 0 ? Math.min(100, Math.round((clicks / sent) * 1000) / 10) : null;
@@ -908,18 +934,19 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
       const row = await db
         .prepare(
           `SELECT
-             (SELECT COUNT(*) FROM scenarios) AS total,
-             (SELECT COUNT(*) FROM scenarios WHERE is_active = 1) AS active,
-             (SELECT COUNT(*) FROM friend_scenarios WHERE status = 'active') AS subscribers,
-             (SELECT COUNT(*) FROM friend_scenarios WHERE status = 'completed') AS completed`,
+             (SELECT COUNT(*) FROM scenarios WHERE ${scenarioScope.sql}) AS total,
+             (SELECT COUNT(*) FROM scenarios WHERE is_active = 1 AND ${scenarioScope.sql}) AS active,
+             (SELECT COUNT(*) FROM friend_scenarios fs JOIN friends f ON f.id = fs.friend_id WHERE fs.status = 'active' AND ${friendScope.sql}) AS subscribers,
+             (SELECT COUNT(*) FROM friend_scenarios fs JOIN friends f ON f.id = fs.friend_id WHERE fs.status = 'completed' AND ${friendScope.sql}) AS completed`,
         )
+        .bind(...scenarioScope.binds, ...scenarioScope.binds, ...friendScope.binds, ...friendScope.binds)
         .first<{ total: number; active: number; subscribers: number; completed: number }>();
       // シナリオ由来の送信。source は 028 で入っている。
       const sentThisWeek = await count(
         db,
         `SELECT COUNT(*) AS n FROM messages_log
-          WHERE source = 'scenario' AND created_at >= ?`,
-        jstDate(-6),
+          WHERE source = 'scenario' AND created_at >= ? AND ${messageScope.sql}`,
+        jstDate(-6), ...messageScope.binds,
       );
       return {
         total: row?.total ?? 0,
@@ -934,17 +961,18 @@ export async function getListStats(db: D1Database): Promise<ListStats> {
       const row = await db
         .prepare(
           `SELECT
-             (SELECT COUNT(*) FROM reminders) AS total,
-             (SELECT COUNT(*) FROM reminders WHERE is_active = 1) AS active,
-             (SELECT COUNT(*) FROM friend_reminders WHERE status = 'active') AS waiting`,
+             (SELECT COUNT(*) FROM reminders WHERE ${reminderScope.sql}) AS total,
+             (SELECT COUNT(*) FROM reminders WHERE is_active = 1 AND ${reminderScope.sql}) AS active,
+             (SELECT COUNT(*) FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.status = 'active' AND ${friendScope.sql}) AS waiting`,
         )
+        .bind(...reminderScope.binds, ...reminderScope.binds, ...friendScope.binds)
         .first<{ total: number; active: number; waiting: number }>();
       // リマインダ由来の送信。source は 028 で入っている。
       const sentThisMonth = await count(
         db,
         `SELECT COUNT(*) AS n FROM messages_log
-          WHERE source = 'reminder' AND created_at >= ? AND created_at < ?`,
-        `${monthStart}-01`, `${nextMonth(monthStart)}-01`,
+          WHERE source = 'reminder' AND created_at >= ? AND created_at < ? AND ${messageScope.sql}`,
+        `${monthStart}-01`, `${nextMonth(monthStart)}-01`, ...messageScope.binds,
       );
       return {
         total: row?.total ?? 0,
