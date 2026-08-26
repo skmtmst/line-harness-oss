@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作33個を共通Buttonへ移行する', () => {
+  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,7 +45,7 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    expect(openings).toHaveLength(33)
+    expect(openings).toHaveLength(29)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
   })
 
@@ -89,8 +89,8 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-08-26: 4-1（友だち属性）のヘッダー操作を共通Buttonへ替え、
     // ページ送りも共通部品へ寄せた。主要2・副次7が減った。
     // 減ったら必ずここも締める。
-    expect(debt['direct-primary-button']).toBe(139)
-    expect(debt['direct-secondary-button']).toBe(281)
+    expect(debt['direct-primary-button']).toBe(137)
+    expect(debt['direct-secondary-button']).toBe(280)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
@@ -108,7 +108,7 @@ describe('標準ボタンの第1段階移行', () => {
     expect(part.routes.v5).toEqual({ '/tags': 'PbCvb' })
     expect(part.routes.v6).toEqual({
       '/reminders': 'kAnOQ',
-      '/templates': 'FH74x',
+      '/templates': 'W7LBc',
       '/affiliates': 'BaLte',
       '/conversions': 'Bw4fy',
       '/inflow-links': 'EQS0v',

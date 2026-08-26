@@ -118,7 +118,7 @@
     "/tags": "友だち属性。一覧・フォルダ・タブ",
     "/scenarios": "V5シナリオ配信。broadcast variantのKPI",
     "/reminders": "V6リマインダ。V6 KPI",
-    "/templates": "V6テンプレート。メッセージタブのV6 KPI",
+    "/templates": "V6テンプレート。下線タブ・フォルダ列・一覧",
     "/affiliates": "V6成果とアフィリエイト。V6 KPI",
     "/conversions": "V6コンバージョン分析。V6 KPIとカード内リンク",
     "/inflow-links": "V6流入と計測。V6 KPI",
@@ -622,7 +622,7 @@
         },
         "v6": {
           "/reminders": "kAnOQ",
-          "/templates": "FH74x",
+          "/templates": "W7LBc",
           "/affiliates": "BaLte",
           "/conversions": "Bw4fy",
           "/inflow-links": "EQS0v",
@@ -931,7 +931,7 @@
         },
         "v6": {
           "/reminders": "kAnOQ",
-          "/templates": "FH74x",
+          "/templates": "W7LBc",
           "/affiliates": "BaLte",
           "/conversions": "Bw4fy",
           "/inflow-links": "EQS0v"
