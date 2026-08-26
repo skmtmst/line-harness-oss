@@ -1,8 +1,8 @@
 /*
- * パンくず。Pencil V5 の `WNfXv`「共通 パンくず」。★V5 で111回。
+ * パンくず。Pencil V6 の `R098Z`「共通 パンくず」。
  *
  * 途中の階層はリンク（`$status-info`）、いま開いている場所は
- * リンクではない（`$ink-faint`）。区切りは `chevron-right` 13px。
+ * リンクではない（`$ink`）。区切りは `chevron-right` 13px。
  */
 
 .list {
@@ -28,7 +28,8 @@
 
 /* いま開いている場所。押せない。 */
 .current {
-  color: var(--color-ink-faint); /* fill: $ink-faint */
+  color: var(--color-ink); /* fill: $ink */
+  font-weight: 700;
 }
 
 .separator {

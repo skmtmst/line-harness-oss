@@ -190,7 +190,8 @@
     "181_automation_v6_foundation.sql",
     "182_automation_v6_runtime.sql",
     "183_automation_action_account_scope.sql",
-    "184_line_account_timezone.sql"
+    "184_line_account_timezone.sql",
+    "185_automation_execution_plan.sql"
   ],
-  "migrationCount": 191
+  "migrationCount": 192
 }

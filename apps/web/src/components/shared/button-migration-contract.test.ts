@@ -86,8 +86,8 @@ describe('標準ボタンの第1段階移行', () => {
 
   it('標準ボタン移行後の基準を、D-3の旧画面転送後も締める', () => {
     const debt = totals(countDebt().counts) as Record<string, number>
-    expect(debt['direct-primary-button']).toBe(142)
-    expect(debt['direct-secondary-button']).toBe(290)
+    expect(debt['direct-primary-button']).toBe(141)
+    expect(debt['direct-secondary-button']).toBe(289)
     expect(debt['arbitrary-value']).toBe(1410)
   })
 

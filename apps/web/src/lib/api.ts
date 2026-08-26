@@ -118,6 +118,72 @@ export type BroadcastMessageAsset = {
   updatedAt: string;
 };
 
+export type CommonActionStep = {
+  id: string;
+  type: 'add_tag' | 'remove_tag' | 'set_metadata' | 'start_scenario' | 'stop_scenario'
+    | 'resume_scenario' | 'send_message' | 'send_webhook' | 'switch_rich_menu'
+    | 'remove_rich_menu' | 'wait' | 'common_action';
+  params: Record<string, unknown>;
+  onFailure: 'stop' | 'continue';
+};
+
+export type CommonActionSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: 'draft' | 'published' | 'archived';
+  draftVersion: number | null;
+  publishedVersion: number | null;
+  actionCount: number;
+  bindingCount: number;
+  oldVersionBindingCount: number;
+  updatedAt: string;
+};
+
+export type CommonActionVersion = {
+  id: string;
+  versionNumber: number;
+  status: 'draft' | 'published';
+  actions: CommonActionStep[];
+  createdBy: string | null;
+  createdAt: string;
+  publishedAt: string | null;
+};
+
+export type CommonActionBinding = {
+  id: string;
+  consumerType: string;
+  consumerId: string;
+  consumerPath: string;
+  versionId: string;
+  versionNumber: number;
+  latestVersionNumber: number | null;
+  hasNewerVersion: boolean;
+  runningCount: number | null;
+  waitingCount: number | null;
+  updatedAt: string;
+};
+
+export type CommonActionDetail = {
+  id: string;
+  name: string;
+  description: string | null;
+  status: 'draft' | 'published' | 'archived';
+  currentDraftVersionId: string | null;
+  currentPublishedVersionId: string | null;
+  versions: CommonActionVersion[];
+  bindings: CommonActionBinding[];
+};
+
+export type CommonActionResources = {
+  tags: Array<{ id: string; name: string }>;
+  scenarios: Array<{ id: string; name: string }>;
+  templates: Array<{ id: string; name: string }>;
+  webhooks: Array<{ id: string; name: string }>;
+  richMenus: Array<{ id: string; name: string }>;
+  commonActions: Array<{ id: string; name: string; version: number }>;
+};
+
 export type BroadcastInsight = {
   broadcastId?: string
   delivered: number | null
@@ -2464,6 +2530,64 @@ export const api = {
     logs: (id: string, limit?: number) =>
       fetchApi<ApiResponse<AutomationLog[]>>(
         `/api/automations/${id}/logs` + (limit ? `?limit=${limit}` : ''),
+      ),
+  },
+  commonActions: {
+    resources: (accountId: string, excludeId?: string) => {
+      const query = new URLSearchParams({ account_id: accountId });
+      if (excludeId) query.set('exclude_id', excludeId);
+      return fetchApi<ApiResponse<CommonActionResources>>(`/api/common-actions/resources?${query}`);
+    },
+    list: (params: {
+      accountId: string;
+      status?: 'all' | 'draft' | 'published' | 'archived' | 'old_version' | 'unused';
+      query?: string;
+    }) => {
+      const query = new URLSearchParams({ account_id: params.accountId });
+      if (params.status && params.status !== 'all') query.set('status', params.status);
+      if (params.query) query.set('query', params.query);
+      return fetchApi<ApiResponse<CommonActionSummary[]>>(`/api/common-actions?${query}`);
+    },
+    get: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonActionDetail>>(
+        `/api/common-actions/${id}?account_id=${encodeURIComponent(accountId)}`,
+      ),
+    duplicate: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<{ id: string; draftVersionId: string; versionNumber: number }>>(
+        `/api/common-actions/${id}/duplicate?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    create: (accountId: string, data: {
+      name: string;
+      description?: string | null;
+      actions: CommonActionStep[];
+    }) => fetchApi<ApiResponse<{ id: string; draftVersionId: string; versionNumber: number }>>(
+      `/api/common-actions?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+    updateDraft: (id: string, accountId: string, data: {
+      expectedDraftVersionId: string;
+      name: string;
+      description?: string | null;
+      actions: CommonActionStep[];
+    }) => fetchApi<ApiResponse<{ updated: true }>>(
+      `/api/common-actions/${id}/draft?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'PUT', body: JSON.stringify(data) },
+    ),
+    createDraft: (id: string, accountId: string, fromVersionId?: string) =>
+      fetchApi<ApiResponse<{ draftVersionId: string; versionNumber: number }>>(
+        `/api/common-actions/${id}/versions?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ fromVersionId }) },
+      ),
+    publish: (id: string, accountId: string, versionId: string) =>
+      fetchApi<ApiResponse<{ versionId: string; versionNumber: number }>>(
+        `/api/common-actions/${id}/versions/${versionId}/publish?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: '{}' },
+      ),
+    updateBinding: (id: string, accountId: string, bindingId: string, versionId: string) =>
+      fetchApi<ApiResponse<{ updated: true }>>(
+        `/api/common-actions/${id}/bindings/${bindingId}/version?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ versionId }) },
       ),
   },
   chatStats: {
