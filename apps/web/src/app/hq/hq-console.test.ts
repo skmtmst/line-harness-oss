@@ -7,6 +7,7 @@ const accountList = readFileSync(new URL('../../components/hq/account-list.tsx',
 const openPage = readFileSync(new URL('./open/page.tsx', import.meta.url), 'utf8')
 const shell = readFileSync(new URL('../../components/app-shell.tsx', import.meta.url), 'utf8')
 const sidebar = readFileSync(new URL('../../components/layout/sidebar.tsx', import.meta.url), 'utf8')
+const topBar = readFileSync(new URL('../../components/shell/app-top-bar.tsx', import.meta.url), 'utf8')
 
 describe('統括コンソール', () => {
   it('既存のLINEアカウント一覧APIだけで店舗一覧を作る', () => {
@@ -34,8 +35,14 @@ describe('統括コンソール', () => {
     expect(page).not.toContain('?store')
   })
 
-  it('統括へ戻る共通ボタンと着地点ゲートを全店舗画面に置く', () => {
-    expect(shell).toContain('<HqReturnButton />')
+  it('統括へ戻る道と着地点ゲートを全店舗画面に置く', () => {
+    // 2026-08-26: 本文に浮いていた「統括」ボタンは、共通トップバーの
+    // 権限バッジへ畳んだ。同じ言葉が画面に2つ出ていたため。
+    // 戻れること自体は変えていないので、置き場所を見張る先だけ移す。
+    expect(shell).toContain('<AppTopBar />')
+    expect(shell).not.toContain('<HqReturnButton />')
+    expect(topBar).toContain("router.push('/hq')")
+    expect(topBar).toContain('clearSelectedAccountId')
     expect(shell).toContain('<RootLandingGate><StoreSelectionGate>{children}</StoreSelectionGate></RootLandingGate>')
   })
 

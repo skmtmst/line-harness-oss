@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import type { ReactNode } from 'react'
 import { Tabs } from '../shared/tabs'
 import styles from './merged-tabs.module.css'
 
@@ -32,6 +33,7 @@ export default function MergedTabs({
   active,
   defaultKey,
   variant = 'underline',
+  actions,
   disabledKeys = [],
 }: {
   basePath: string
@@ -48,6 +50,8 @@ export default function MergedTabs({
    */
   defaultKey?: string
   variant?: 'underline' | 'segmented'
+  /** タブ行の右端に置くもの。underline のときだけ効く。 */
+  actions?: ReactNode
   disabledKeys?: readonly string[]
 }) {
   const router = useRouter()
@@ -62,6 +66,7 @@ export default function MergedTabs({
   if (variant === 'underline') {
     return (
       <Tabs
+        actions={actions}
         className={styles.shared}
         items={tabs.map((tab) => ({
           label: tab.label,

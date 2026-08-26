@@ -13,7 +13,7 @@ const CHATS = join(ROOT, '..', '..', 'app', 'chats', 'page.tsx')
 const MENU = join(ROOT, '..', '..', 'lib', 'menu.ts')
 const CARD = join(ROOT, '..', 'shared', 'card.module.css')
 
-describe('Pen.dev V5を共通レイアウトの正本にする', () => {
+describe('Pen.dev V6を共通レイアウトの正本にする', () => {
   const shell = readFileSync(APP_SHELL, 'utf8')
   const dashboard = readFileSync(DASHBOARD, 'utf8')
   const dashboardEditor = readFileSync(DASHBOARD_EDITOR, 'utf8')
@@ -24,7 +24,7 @@ describe('Pen.dev V5を共通レイアウトの正本にする', () => {
   const card = readFileSync(CARD, 'utf8')
 
   it('1920pxでV5正式共通メニューと本体幅の契約を使う', () => {
-    expect(shell).toContain('data-design-shell="v5-1920"')
+    expect(shell).toContain('data-design-shell="v6-1920"')
     expect(shell).toContain('data-design-node="J33xq"')
     expect(shell).toContain('styles.content')
   })

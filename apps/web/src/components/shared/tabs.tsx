@@ -22,12 +22,27 @@ export interface TabItem {
  *
  * 形と色はここが持つ。**幅は持たない**。
  */
-export function Tabs({ items, className }: { items: TabItem[]; className?: string }) {
+export function Tabs({
+  items,
+  actions,
+  className,
+}: {
+  items: TabItem[]
+  /**
+   * タブ行の右端に置くもの。ヘッダー操作を独立した行にしないため
+   * （`docs/v6-common-rules.md` §1-4、Pencil `aToSv` は space_between）。
+   */
+  actions?: ReactNode
+  className?: string
+}) {
   return (
     <nav className={[styles.list, className].filter(Boolean).join(' ')}>
-      {items.map((item) => (
-        <Tab key={item.label} {...item} />
-      ))}
+      <span className={styles.items}>
+        {items.map((item) => (
+          <Tab key={item.label} {...item} />
+        ))}
+      </span>
+      {actions ? <span className={styles.actions}>{actions}</span> : null}
     </nav>
   )
 }

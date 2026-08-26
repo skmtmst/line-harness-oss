@@ -90,6 +90,8 @@
   --radius-tile: 10px;
   --radius-panel: 12px;
   --radius-icon: 3px;
+  /* Pencil `$radius-xs`(6px)。行の中の小さな札（フォルダ・連動）。 */
+  --radius-mini: 6px;
   --radius-tiny: 3px;
   --radius-pill: 9999px;
 
@@ -100,6 +102,13 @@
   --text-label: 13px;
   --text-body: 14px;
   --text-lead: 16px;
+  /*
+   * Pencil `$size-title`(20)/`$size-heading`(18)。
+   * 2026-08-26 に足した。共通トップバーの画面名が `var(--text-title)` を
+   * 読んでいたが未定義で、16px に落ちていた（4-1 の画像比較で発覚）。
+   */
+  --text-heading: 18px;
+  --text-title: 20px;
   --text-display: 30px;
   --text-metric: 22px;
   --text-micro: 11px;
@@ -144,4 +153,30 @@
     width: 260px !important;
     flex: 0 0 260px;
   }
+}
+
+/*
+ * 素の `select` の矢印。
+ *
+ * ブラウザが描く三角は右端ぎりぎりに出るので、枠にくっついて
+ * はみ出して見える。矢印を自前で描き、右に余白を確保する。
+ * 4-1（友だち属性）の画像比較で見つかった（2026-08-26）。
+ */
+.v6-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234A5565' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+/*
+ * 幅が設計で決まっている絞り込み（★V6 4-1 `XchZz` の 129px・116px など）。
+ * 既定の左右あわせて 42px は、その幅では文字を食う。実際
+ * 「使用状態：すべて」が「使用状態：すべ」で切れて、矢印に重なった。
+ */
+.v6-select-tight {
+  background-position: right 6px center;
+  padding-left: 8px;
+  padding-right: 22px;
 }

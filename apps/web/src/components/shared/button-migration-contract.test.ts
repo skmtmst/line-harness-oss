@@ -86,9 +86,18 @@ describe('標準ボタンの第1段階移行', () => {
 
   it('標準ボタン移行後の基準を、D-3の旧画面転送後も締める', () => {
     const debt = totals(countDebt().counts) as Record<string, number>
-    expect(debt['direct-primary-button']).toBe(141)
-    expect(debt['direct-secondary-button']).toBe(288)
-    expect(debt['arbitrary-value']).toBe(1406)
+    // 2026-08-26: 4-1（友だち属性）のヘッダー操作を共通Buttonへ替え、
+    // ページ送りも共通部品へ寄せた。主要2・副次7が減った。
+    // 減ったら必ずここも締める。
+    expect(debt['direct-primary-button']).toBe(139)
+    expect(debt['direct-secondary-button']).toBe(281)
+    /*
+      4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
+      書いてある数で、トークンには無い（26px の札・7px の余白・
+      1040px の最小幅・絞り込みの 144/129/116px・間隔 14/10px）。
+      **増やしたぶんはここに記録して止める。** 減ったら締め直す。
+    */
+    expect(debt['arbitrary-value']).toBe(1414)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

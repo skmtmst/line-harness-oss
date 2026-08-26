@@ -34,3 +34,7 @@ apps/worker/dist/
 # `pretypecheck` / `pretest` / `prebuild` / `predev` で毎回作り直すので、
 # 置いておく必要が無い。
 apps/web/src/generated/release-log.json
+
+# 画像比較の差分と結果。基準画像だけを版に残す。
+test-results/
+playwright-report/

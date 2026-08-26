@@ -29,8 +29,8 @@
     "unresolved-classname": 6
   },
   "app/automations/page.tsx": {
-    "direct-primary-button": 1,
     "arbitrary-value": 3,
+    "direct-primary-button": 1,
     "unresolved-classname": 1
   },
   "app/booking/bookings/detail/page.tsx": {
@@ -585,10 +585,9 @@
   },
   "components/friend-fields/tags-page-v4.tsx": {
     "unresolved-classname": 3,
-    "arbitrary-value": 18,
-    "direct-secondary-button": 9,
-    "direct-primary-button": 2,
-    "direct-th": 9
+    "arbitrary-value": 26,
+    "direct-secondary-button": 2,
+    "direct-th": 10
   },
   "components/friends/advanced-search-dialog.tsx": {
     "arbitrary-value": 60
@@ -624,6 +623,9 @@
     "direct-secondary-button": 5,
     "arbitrary-value": 1,
     "direct-th": 3
+  },
+  "components/layout/sidebar-identity.tsx": {
+    "unresolved-classname": 5
   },
   "components/legal/terms-document.tsx": {
     "arbitrary-value": 1,
@@ -705,6 +707,9 @@
   "components/shared/folder-add-dialog.tsx": {
     "direct-primary-button": 1
   },
+  "components/shared/list-state.tsx": {
+    "unresolved-classname": 5
+  },
   "components/shared/list-toolbar.tsx": {
     "direct-primary-button": 1,
     "direct-secondary-button": 2
@@ -728,7 +733,7 @@
     "unresolved-classname": 3
   },
   "components/shared/tabs.tsx": {
-    "unresolved-classname": 4
+    "unresolved-classname": 6
   },
   "components/shared/text-field.tsx": {
     "unresolved-classname": 2
@@ -737,7 +742,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 12
+    "unresolved-classname": 21
   },
   "components/staff/login-audit.tsx": {
     "arbitrary-value": 1,

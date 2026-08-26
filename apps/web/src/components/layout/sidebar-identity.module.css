@@ -1,0 +1,46 @@
+/* Pencil `J33xq/V2WbXF`。高さ76・padding [14,16]・gap 10。 */
+.root {
+  display: flex;
+  min-width: 0;
+  height: 76px;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.mark {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-control);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-lead);
+  font-weight: 700;
+}
+
+.text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.name {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.version {
+  color: var(--color-ink-faint);
+  font-size: var(--text-nano);
+  font-weight: 600;
+  line-height: 1.4;
+}
