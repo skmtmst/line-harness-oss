@@ -255,7 +255,14 @@ export interface FriendDailySnapshot {
 }
 
 /**
- * その日の友だち数を記録する。1日1行。
+ * 日次記録で「未割り当て」を表す専用キー。
+ *
+ * 空文字は旧仕様の全社合計行なので再利用しない。
+ */
+const UNASSIGNED_SNAPSHOT_ACCOUNT_ID = '__unassigned__';
+
+/**
+ * 1つのLINEアカウント（または未割り当て）のその日の友だち数を記録する。
  *
  * cron から毎日呼ぶ。同じ日に何度呼んでも最後の値で上書きする
  * （日中に呼んでも、その日の終わりに呼び直せば正しくなる）。
@@ -266,14 +273,27 @@ export async function recordFriendSnapshot(
   date?: string,
 ): Promise<void> {
   const day = date ?? jstDate(0);
-  const key = accountId ?? '';
-  const counts = await friendBreakdown(db, accountId);
-  const where = accountId ? 'AND line_account_id = ?' : '';
-  const binds = accountId ? [day, nextDate(day), accountId] : [day, nextDate(day)];
+  if (accountId === null) {
+    const accounts = await db
+      .prepare('SELECT id FROM line_accounts')
+      .all<{ id: string }>();
+    await Promise.all([
+      ...accounts.results.map((account) => recordFriendSnapshot(db, account.id, day)),
+      recordFriendSnapshot(db, UNASSIGNED_SNAPSHOT_ACCOUNT_ID, day),
+    ]);
+    return;
+  }
+
+  const unassigned = accountId === UNASSIGNED_SNAPSHOT_ACCOUNT_ID;
+  const accountWhere = unassigned ? 'line_account_id IS NULL' : 'line_account_id = ?';
+  const accountBinds = unassigned ? [] : [accountId];
+  const counts = await friendBreakdown(db, null, { sql: accountWhere, binds: accountBinds });
   const added = await count(
     db,
-    `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? ${where}`,
-    ...binds,
+    `SELECT COUNT(*) AS n FROM friends WHERE created_at >= ? AND created_at < ? AND ${accountWhere}`,
+    day,
+    nextDate(day),
+    ...accountBinds,
   );
 
   await db
@@ -291,7 +311,7 @@ export async function recordFriendSnapshot(
     )
     .bind(
       day,
-      key,
+      accountId,
       counts.active,
       counts.total,
       counts.blockedByThem,
@@ -311,6 +331,20 @@ export async function recordFriendSnapshot(
  */
 const TREND_DAYS = 7;
 
+/** 旧全社合計行（空文字）を必ず除き、記録用の未割り当てキーを可視範囲に変換する。 */
+function snapshotScopeSql(scope: AccountStatsScope): { sql: string; binds: string[] } {
+  if ('allTenants' in scope) return { sql: 'line_account_id <> ?', binds: [''] };
+  const accountIds = [
+    ...scope.allowedAccountIds,
+    ...(scope.includeUnassigned ? [UNASSIGNED_SNAPSHOT_ACCOUNT_ID] : []),
+  ];
+  if (accountIds.length === 0) return { sql: '1 = 0', binds: [] };
+  return {
+    sql: `line_account_id IN (${accountIds.map(() => '?').join(', ')})`,
+    binds: accountIds,
+  };
+}
+
 /**
  * 友だち数の推移。今日から遡って7日ぶん。
  *
@@ -328,7 +362,7 @@ async function friendTrend(
 ): Promise<DashboardOverview['trend']> {
   const days = TREND_DAYS;
   const start = jstDate(-(TREND_DAYS - 1));
-  const snapshotScope = accountScopeSql(scope, 'line_account_id');
+  const snapshotScope = snapshotScopeSql(scope);
 
   const recorded = await db
     .prepare(
