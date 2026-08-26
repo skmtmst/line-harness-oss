@@ -489,21 +489,13 @@ friends.get('/api/friends/add-breakdown', async (c) => {
     const days = Number(c.req.query('days') ?? '30');
     const lineAccountId = c.req.query('lineAccountId') ?? null;
     const safeDays = Number.isFinite(days) && days > 0 ? Math.min(days, 365) : 30;
-    if (lineAccountId) {
-      const data = await getFriendAddBreakdown(c.env.DB, safeDays, lineAccountId);
-      return c.json({ success: true, data });
-    }
-    const { scope, where } = await adminAccountScope(c);
-    const row = await c.env.DB.prepare(`SELECT
-      SUM(CASE WHEN COALESCE(unfollow_count, 0) = 0 THEN 1 ELSE 0 END) AS first_time,
-      SUM(CASE WHEN COALESCE(unfollow_count, 0) > 0 THEN 1 ELSE 0 END) AS returning_count
-      FROM friends WHERE julianday('now', '+9 hours') - julianday(created_at) <= ? AND ${where}`)
-      .bind(safeDays, ...scope.allowedAccountIds).first<{ first_time: number | null; returning_count: number | null }>();
-    const unblocked = await c.env.DB.prepare(`SELECT COUNT(*) AS count FROM friends
-      WHERE is_following = 1 AND COALESCE(unfollow_count, 0) > 0 AND last_followed_at IS NOT NULL
-      AND julianday('now', '+9 hours') - julianday(last_followed_at) <= ? AND ${where}`)
-      .bind(safeDays, ...scope.allowedAccountIds).first<{ count: number | null }>();
-    const data = { days: safeDays, firstTime: Number(row?.first_time ?? 0), returning: Number(row?.returning_count ?? 0), unblocked: Number(unblocked?.count ?? 0) };
+    const statsScope = lineAccountId
+      ? { allowedAccountIds: [lineAccountId], includeUnassigned: false }
+      : await getVisibleLineAccountScope(c.env.DB, c.get('staff')).then((scope) => ({
+          allowedAccountIds: scope.allowedAccountIds,
+          includeUnassigned: scope.canSeeUnassigned,
+        }));
+    const data = await getFriendAddBreakdown(c.env.DB, safeDays, statsScope);
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/friends/add-breakdown error:', err);
@@ -593,39 +585,13 @@ friends.get('/api/friends/stats', async (c) => {
   try {
     const { getFriendStats } = await import('@line-crm/db');
     const accountId = c.req.query('accountId') ?? null;
-    if (accountId) {
-      const stats = await getFriendStats(c.env.DB, accountId);
-      return c.json({ success: true as const, data: stats });
-    }
-    const { scope, where } = await adminAccountScope(c, 'f.');
-    const friend = await c.env.DB.prepare(`SELECT COUNT(*) total,
-      SUM(CASE WHEN is_following = 1 AND is_hidden = 0 THEN 1 ELSE 0 END) active,
-      SUM(CASE WHEN is_following = 0 THEN 1 ELSE 0 END) blocked_by_them,
-      SUM(CASE WHEN is_following = 1 AND is_hidden = 1 THEN 1 ELSE 0 END) hidden_by_us
-      FROM friends f WHERE ${where}`).bind(...scope.allowedAccountIds)
-      .first<{ total: number; active: number; blocked_by_them: number; hidden_by_us: number }>();
-    const inbox = await c.env.DB.prepare(`SELECT
-      SUM(CASE WHEN c.status = 'unread' THEN 1 ELSE 0 END) unanswered,
-      SUM(CASE WHEN c.status = 'resolved' THEN 1 ELSE 0 END) resolved
-      FROM chats c JOIN friends f ON f.id = c.friend_id WHERE ${where}`)
-      .bind(...scope.allowedAccountIds).first<{ unanswered: number; resolved: number }>();
-    const now = new Date(Date.now() + 9 * 3600_000);
-    const thisMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-    const previous = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-    const lastMonth = `${previous.getUTCFullYear()}-${String(previous.getUTCMonth() + 1).padStart(2, '0')}`;
-    const countMonth = async (month: string) => {
-      const start = `${month}-01`;
-      const date = new Date(`${start}T00:00:00Z`);
-      date.setUTCMonth(date.getUTCMonth() + 1);
-      const end = date.toISOString().slice(0, 10);
-      const row = await c.env.DB.prepare(`SELECT COUNT(*) count FROM friends f WHERE created_at >= ? AND created_at < ? AND ${where}`)
-        .bind(start, end, ...scope.allowedAccountIds).first<{ count: number }>();
-      return row?.count ?? 0;
-    };
-    const [addedThisMonth, addedLastMonth] = await Promise.all([countMonth(thisMonth), countMonth(lastMonth)]);
-    const stats = { active: friend?.active ?? 0, total: friend?.total ?? 0, blockedByThem: friend?.blocked_by_them ?? 0,
-      hiddenByUs: friend?.hidden_by_us ?? 0, unanswered: inbox?.unanswered ?? 0, resolved: inbox?.resolved ?? 0,
-      addedThisMonth, addedLastMonth };
+    const statsScope = accountId
+      ? { allowedAccountIds: [accountId], includeUnassigned: false }
+      : await getVisibleLineAccountScope(c.env.DB, c.get('staff')).then((scope) => ({
+          allowedAccountIds: scope.allowedAccountIds,
+          includeUnassigned: scope.canSeeUnassigned,
+        }));
+    const stats = await getFriendStats(c.env.DB, statsScope);
     return c.json({ success: true as const, data: stats });
   } catch (err) {
     console.error('GET /api/friends/stats error:', err);

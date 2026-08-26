@@ -7,7 +7,6 @@ const dbMocks = {
   getMileageSummaryForFriend: vi.fn(),
   getMileageHistoryForFriend: vi.fn(),
   getFriends: vi.fn(),
-  getFriendCount: vi.fn(),
   addTagToFriend: vi.fn(),
   removeTagFromFriend: vi.fn(),
   getFriendTags: vi.fn(),
