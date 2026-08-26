@@ -1,10 +1,21 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { resolveLineCredential } from '@line-crm/db';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const profileRefresh = new Hono<Env>();
+
+async function adminAccountScope(c: Context<Env>) {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const where = scope.allowedAccountIds.length
+    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    : scope.canSeeUnassigned
+      ? 'AND f.line_account_id IS NULL'
+      : 'AND 1 = 0';
+  return { scope, where };
+}
 
 /**
  * 友だち全員のプロフィール (display_name / picture_url / status_message) を
@@ -28,6 +39,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
   }
 
   const db = c.env.DB;
+  const adminScope = accountIdFilter ? null : await adminAccountScope(c);
 
   // 対象 friend を line_account_id 込みで取得。既に block 済 (is_following=0)
   // も含めるか? → 含めない。送信対象だけリフレッシュすれば十分で、ブロック済は
@@ -39,7 +51,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
     LEFT JOIN line_accounts a ON a.id = f.line_account_id
     WHERE f.is_following = 1
       AND f.line_user_id IS NOT NULL
-      ${accountIdFilter ? 'AND f.line_account_id = ?' : ''}
+      ${accountIdFilter ? 'AND f.line_account_id = ?' : adminScope?.where}
     ORDER BY f.id
     LIMIT ? OFFSET ?
   `;
@@ -47,7 +59,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
   const stmt = db.prepare(baseQuery);
   const bound = accountIdFilter
     ? stmt.bind(accountIdFilter, limit, offset)
-    : stmt.bind(limit, offset);
+    : stmt.bind(...(adminScope?.scope.allowedAccountIds ?? []), limit, offset);
 
   const batch = await bound.all<{
     id: string;
