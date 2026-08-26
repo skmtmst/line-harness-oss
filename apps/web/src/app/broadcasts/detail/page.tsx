@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api, type ApiBroadcast } from '@/lib/api'
 import Header from '@/components/layout/header'
+import { useAccount } from '@/contexts/account-context'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '下書き',
@@ -15,6 +16,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 function BroadcastDetailInner() {
   const params = useSearchParams()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   const id = params.get('id') ?? ''
   const [broadcast, setBroadcast] = useState<ApiBroadcast | null>(null)
   const [insight, setInsight] = useState<{
@@ -26,7 +28,14 @@ function BroadcastDetailInner() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!id) {
+    let active = true
+    setBroadcast(null)
+    setInsight(null)
+    setLoading(true)
+    if (!id || accountLoading) {
+      return
+    }
+    if (!selectedAccountId) {
       setLoading(false)
       return
     }
@@ -34,18 +43,22 @@ function BroadcastDetailInner() {
       try {
         const [detail, stats] = await Promise.all([
           api.broadcasts.get(id),
-          api.analytics.broadcasts(),
+          api.analytics.broadcasts(selectedAccountId),
         ])
+        if (!active) return
         if (detail.success) setBroadcast(detail.data)
         if (stats.success) {
           const found = stats.data.find((b) => b.broadcastId === id)
           if (found) setInsight(found)
         }
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     })()
-  }, [id])
+    return () => {
+      active = false
+    }
+  }, [accountLoading, id, selectedAccountId])
 
   if (!id) {
     return (

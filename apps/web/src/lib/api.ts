@@ -932,10 +932,11 @@ export type SearchConsoleSetup = {
 }
 
 /** 集計の期間をクエリにする。省略時はサーバー側の既定（直近30日）に任せる。 */
-function rangeQuery(params?: { from?: string; to?: string }): string {
+function rangeQuery(params?: { from?: string; to?: string; accountId?: string }): string {
   const q = new URLSearchParams()
   if (params?.from) q.set('from', params.from)
   if (params?.to) q.set('to', params.to)
+  if (params?.accountId) q.set('account_id', params.accountId)
   const s = q.toString()
   return s ? `?${s}` : ''
 }
@@ -1235,7 +1236,7 @@ export const api = {
    * 外部APIを叩かないので、ここが外の障害で落ちることはない。
    */
   analytics: {
-    messages: (params?: { from?: string; to?: string }) =>
+    messages: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1250,9 +1251,9 @@ export const api = {
             fromScenario: number
           }>
         >
-      >(`/api/analytics/messages${rangeQuery(params)}`),
+      >(`/api/analytics/messages${rangeQuery({ ...params, accountId })}`),
     /** 測定中のURL。1回も押されていないものも返る */
-    trackedLinks: (params?: { from?: string; to?: string }) =>
+    trackedLinks: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1267,14 +1268,14 @@ export const api = {
             uniqueFriends: number
           }>
         >
-      >(`/api/analytics/tracked-links${rangeQuery(params)}`),
-    linkClicks: (params?: { from?: string; to?: string }) =>
+      >(`/api/analytics/tracked-links${rangeQuery({ ...params, accountId })}`),
+    linkClicks: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
           Array<{ trackedLinkId: string; name: string; clicks: number; uniqueFriends: number }>
         >
-      >(`/api/analytics/link-clicks${rangeQuery(params)}`),
-    broadcasts: (params?: { from?: string; to?: string }) =>
+      >(`/api/analytics/link-clicks${rangeQuery({ ...params, accountId })}`),
+    broadcasts: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1288,10 +1289,10 @@ export const api = {
             suppressedByAudienceSize: boolean
           }>
         >
-      >(`/api/analytics/broadcasts${rangeQuery(params)}`),
-    cross: (fieldId: string) =>
+      >(`/api/analytics/broadcasts${rangeQuery({ ...params, accountId })}`),
+    cross: (accountId: string, fieldId: string) =>
       fetchApi<ApiResponse<Array<{ row: string; col: string; count: number }>>>(
-        `/api/analytics/cross?fieldId=${encodeURIComponent(fieldId)}`,
+        `/api/analytics/cross?account_id=${encodeURIComponent(accountId)}&fieldId=${encodeURIComponent(fieldId)}`,
       ),
   },
   /**
@@ -1427,21 +1428,24 @@ export const api = {
       >(`/api/friends/${friendId}/site-events`),
   },
   funnels: {
-    list: () =>
+    list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; windowDays: number; createdAt: string }>>>(
-        '/api/funnels',
+        `/api/funnels?account_id=${encodeURIComponent(accountId)}`,
       ),
-    create: (data: {
+    create: (accountId: string, data: {
       name: string
       windowDays?: number
       steps: Array<{ label: string; kind: string; match: unknown }>
     }) =>
-      fetchApi<ApiResponse<{ id: string }>>('/api/funnels', {
+      fetchApi<ApiResponse<{ id: string }>>(`/api/funnels?account_id=${encodeURIComponent(accountId)}`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    delete: (id: string) => fetchApi<ApiResponse<null>>(`/api/funnels/${id}`, { method: 'DELETE' }),
-    result: (id: string, params?: { from?: string; to?: string }) =>
+    delete: (accountId: string, id: string) => fetchApi<ApiResponse<null>>(
+      `/api/funnels/${id}?account_id=${encodeURIComponent(accountId)}`,
+      { method: 'DELETE' },
+    ),
+    result: (accountId: string, id: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<{
           funnel: { id: string; name: string }
@@ -1452,7 +1456,7 @@ export const api = {
             conversionFromPrevious: number
           }>
         }>
-      >(`/api/funnels/${id}/result${rangeQuery(params)}`),
+      >(`/api/funnels/${id}/result${rangeQuery({ ...params, accountId })}`),
   },
   /** メディアライブラリ。1か所に置いて使い回す。 */
   media: {

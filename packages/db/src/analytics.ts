@@ -40,6 +40,7 @@ export interface DailyMessageCount {
  */
 export async function getDailyMessageCounts(
   db: D1Database,
+  lineAccountId: string,
   range: DateRange,
 ): Promise<DailyMessageCount[]> {
   const result = await db
@@ -52,11 +53,11 @@ export async function getDailyMessageCounts(
               SUM(CASE WHEN direction = 'outgoing' AND broadcast_id IS NOT NULL THEN 1 ELSE 0 END) AS from_broadcast,
               SUM(CASE WHEN direction = 'outgoing' AND scenario_step_id IS NOT NULL THEN 1 ELSE 0 END) AS from_scenario
          FROM messages_log
-        WHERE created_at >= ? AND created_at <= ?
+        WHERE line_account_id = ? AND created_at >= ? AND created_at <= ?
         GROUP BY substr(created_at, 1, 10)
         ORDER BY date ASC`,
     )
-    .bind(range.from, range.to)
+    .bind(lineAccountId, range.from, range.to)
     .all<{
       date: string;
       outgoing: number;
@@ -93,6 +94,7 @@ export interface LinkClickSummary {
  */
 export async function getLinkClickSummary(
   db: D1Database,
+  lineAccountId: string,
   range: DateRange,
   limit = 50,
 ): Promise<LinkClickSummary[]> {
@@ -103,13 +105,13 @@ export async function getLinkClickSummary(
               COUNT(*) AS clicks,
               COUNT(DISTINCT c.friend_id) AS unique_friends
          FROM link_clicks c
-         LEFT JOIN tracked_links l ON l.id = c.tracked_link_id
-        WHERE c.clicked_at >= ? AND c.clicked_at <= ?
+         JOIN tracked_links l ON l.id = c.tracked_link_id
+        WHERE l.line_account_id = ? AND c.clicked_at >= ? AND c.clicked_at <= ?
         GROUP BY c.tracked_link_id
         ORDER BY clicks DESC
         LIMIT ?`,
     )
-    .bind(range.from, range.to, limit)
+    .bind(lineAccountId, range.from, range.to, limit)
     .all<{ tracked_link_id: string; name: string; clicks: number; unique_friends: number }>();
   return result.results.map((r) => ({
     trackedLinkId: r.tracked_link_id,
@@ -147,6 +149,7 @@ export interface TrackedLinkStat {
  */
 export async function getTrackedLinkStats(
   db: D1Database,
+  lineAccountId: string,
   range: DateRange,
   limit = 200,
 ): Promise<TrackedLinkStat[]> {
@@ -167,11 +170,12 @@ export async function getTrackedLinkStats(
                AND c.clicked_at >= ? AND c.clicked_at <= ?
          LEFT JOIN tags t ON t.id = l.tag_id
          LEFT JOIN scenarios s ON s.id = l.scenario_id
+        WHERE l.line_account_id = ?
         GROUP BY l.id
         ORDER BY clicks DESC, l.name ASC
         LIMIT ?`,
     )
-    .bind(range.from, range.to, limit)
+    .bind(range.from, range.to, lineAccountId, limit)
     .all<{
       tracked_link_id: string;
       name: string;
@@ -218,6 +222,7 @@ export const INSIGHT_MIN_AUDIENCE = 20;
  */
 export async function getBroadcastSummary(
   db: D1Database,
+  lineAccountId: string,
   range: DateRange,
   limit = 50,
 ): Promise<BroadcastSummary[]> {
@@ -227,11 +232,12 @@ export async function getBroadcastSummary(
               i.delivered, i.unique_impression, i.unique_click
          FROM broadcasts b
          LEFT JOIN broadcast_insights i ON i.broadcast_id = b.id
-        WHERE b.sent_at IS NOT NULL AND b.sent_at >= ? AND b.sent_at <= ?
+        WHERE b.line_account_id = ?
+          AND b.sent_at IS NOT NULL AND b.sent_at >= ? AND b.sent_at <= ?
         ORDER BY b.sent_at DESC
         LIMIT ?`,
     )
-    .bind(range.from, range.to, limit)
+    .bind(lineAccountId, range.from, range.to, limit)
     .all<{
       broadcast_id: string;
       name: string;
@@ -269,6 +275,7 @@ export interface CrossCell {
  */
 export async function getTagFieldCross(
   db: D1Database,
+  lineAccountId: string,
   fieldId: string,
   limit = 400,
 ): Promise<CrossCell[]> {
@@ -276,14 +283,16 @@ export async function getTagFieldCross(
     .prepare(
       `SELECT t.name AS row_label, v.value AS col_label, COUNT(*) AS c
          FROM friend_field_values v
+         JOIN friends f ON f.id = v.friend_id
          JOIN friend_tags ft ON ft.friend_id = v.friend_id
          JOIN tags t ON t.id = ft.tag_id
-        WHERE v.field_id = ? AND v.value IS NOT NULL AND v.value != ''
+        WHERE f.line_account_id = ?
+          AND v.field_id = ? AND v.value IS NOT NULL AND v.value != ''
         GROUP BY t.name, v.value
         ORDER BY c DESC
         LIMIT ?`,
     )
-    .bind(fieldId, limit)
+    .bind(lineAccountId, fieldId, limit)
     .all<{ row_label: string; col_label: string; c: number }>();
   return result.results.map((r) => ({
     row: r.row_label,
