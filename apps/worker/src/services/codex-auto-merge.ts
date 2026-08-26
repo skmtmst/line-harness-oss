@@ -342,11 +342,14 @@ export async function processCodexAutoMerge(
   message: CodexAutoMergeMessage,
   fetcher: typeof fetch = fetch,
 ): Promise<void> {
+  if (!env.SLACK_BOT_TOKEN) {
+    console.error('Codex auto-merge stopped: SLACK_BOT_TOKEN is not configured');
+    return;
+  }
+
   const threadPrNumber = await readThreadPrNumber(env, message, fetcher);
-  if (threadPrNumber !== message.prNumber) {
-    const reason = threadPrNumber === null
-      ? 'このSlackスレッドの対象PRを確認できません'
-      : `合図のPR番号がスレッド対象のPR #${threadPrNumber} と一致しません`;
+  if (threadPrNumber !== null && threadPrNumber !== message.prNumber) {
+    const reason = `合図のPR番号がスレッド対象のPR #${threadPrNumber} と一致しません`;
     await postSlackResult(env, message, blockMessage(message.prNumber, reason), fetcher);
     return;
   }

@@ -50,6 +50,13 @@ function parentResponse(prNumber = 344): Response {
   });
 }
 
+function parentResponseWithoutMetadata(): Response {
+  return json({
+    ok: true,
+    messages: [{ ts: message.threadTs }],
+  });
+}
+
 function pullRequest(overrides: Record<string, unknown> = {}) {
   return {
     number: 344,
@@ -170,6 +177,32 @@ describe('必須チェック', () => {
 });
 
 describe('Codex自動マージ処理', () => {
+  test('親メッセージにPR宣言がなければ合図のPR番号で処理を続ける', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(parentResponseWithoutMetadata())
+      .mockResolvedValueOnce(json({ ok: true }));
+    await processCodexAutoMerge(
+      env({ CODEX_AUTO_MERGE_ENABLED: undefined }),
+      message,
+      fetcher as typeof fetch,
+    );
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(postedText(fetcher)).toContain('検知のみ');
+  });
+
+  test('親メッセージのPR宣言と合図が一致すれば処理を続ける', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(parentResponse())
+      .mockResolvedValueOnce(json({ ok: true }));
+    await processCodexAutoMerge(
+      env({ CODEX_AUTO_MERGE_ENABLED: undefined }),
+      message,
+      fetcher as typeof fetch,
+    );
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(postedText(fetcher)).toContain('検知のみ');
+  });
+
   test('スレッドのPR番号と合図が違えばGitHubを呼ばず理由を報告する', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(parentResponse(343))
@@ -177,6 +210,21 @@ describe('Codex自動マージ処理', () => {
     await processCodexAutoMerge(env(), message, fetcher as typeof fetch);
     expect(fetcher).toHaveBeenCalledTimes(2);
     expect(postedText(fetcher)).toContain('PR #343 と一致しません');
+  });
+
+  test('Slack Bot tokenが未設定でも例外にせず停止理由をログへ残す', async () => {
+    const fetcher = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(processCodexAutoMerge(
+      env({ SLACK_BOT_TOKEN: undefined }),
+      message,
+      fetcher as typeof fetch,
+    )).resolves.toBeUndefined();
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('SLACK_BOT_TOKEN'));
+    error.mockRestore();
   });
 
   test('スイッチが未設定なら検知だけを報告しGitHubを呼ばない', async () => {
