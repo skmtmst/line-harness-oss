@@ -25,6 +25,9 @@ export type AuditAction =
   | 'affiliate.delete'
   | 'affiliate.offer.create'
   | 'affiliate.offer.update'
+  | 'dashboard.preference.update'
+  | 'dashboard.preference.reset'
+  | 'dashboard.preference.default.update'
   | 'conversion.approval.update';
 
 export function auditLog(

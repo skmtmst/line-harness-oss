@@ -750,6 +750,21 @@ export type DashboardOverview = {
     funnelAlerts: number
     automationFailures: number
   }
+  sections?: Record<
+    'friends' | 'inbox' | 'delivery' | 'quota' | 'trend' | 'conversions' | 'operations',
+    {
+      status: 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated'
+      asOf: string
+      period: 'today' | 'last7' | 'last28' | 'latest' | 'last7-fixed' | 'this-month'
+    }
+  >
+}
+
+export type DashboardPreferenceResponse = {
+  source: 'personal' | 'account-default' | 'builtin'
+  version: number
+  cards: unknown
+  updatedAt: string | null
 }
 
 export type EcCommerceOverview = {
@@ -2610,12 +2625,32 @@ export const api = {
       ),
   },
   dashboard: {
-    overview: (params?: { period?: 'today' | 'last7' | 'last28'; accountId?: string }) => {
+    overview: (params: { period?: 'today' | 'last7' | 'last28'; accountId: string }) => {
       const query = new URLSearchParams()
       if (params?.period) query.set('period', params.period)
-      if (params?.accountId) query.set('accountId', params.accountId)
+      query.set('account_id', params.accountId)
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/overview${suffix}`)
+    },
+    organizationOverview: (params?: { period?: 'today' | 'last7' | 'last28' }) => {
+      const query = new URLSearchParams()
+      if (params?.period) query.set('period', params.period)
+      const suffix = query.size ? `?${query}` : ''
+      return fetchApi<ApiResponse<DashboardOverview>>(`/api/dashboard/organization-overview${suffix}`)
+    },
+    preferences: {
+      get: (accountId: string) => fetchApi<ApiResponse<DashboardPreferenceResponse>>(
+        `/api/dashboard/preferences?account_id=${encodeURIComponent(accountId)}`,
+      ),
+      save: (accountId: string, data: { version: number; cards: unknown }) =>
+        fetchApi<ApiResponse<DashboardPreferenceResponse>>(
+          `/api/dashboard/preferences?account_id=${encodeURIComponent(accountId)}`,
+          { method: 'PUT', body: JSON.stringify(data) },
+        ),
+      reset: (accountId: string) => fetchApi<ApiResponse<null>>(
+        `/api/dashboard/preferences?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE' },
+      ),
     },
   },
   ecCommerce: {

@@ -6,6 +6,11 @@ const dbMocks = vi.hoisted(() => ({
   getDashboardOverview: vi.fn(),
   getLineAccounts: vi.fn(),
   getLineAccountById: vi.fn(),
+  getDashboardPreference: vi.fn(),
+  getDashboardDefaultPreference: vi.fn(),
+  saveDashboardPreference: vi.fn(),
+  deleteDashboardPreference: vi.fn(),
+  saveDashboardDefaultPreference: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
@@ -20,11 +25,11 @@ const account = (id: string) => ({
   channel_secret: 'secret', is_active: 1, parent_line_account_id: null,
 });
 
-function app(tenantId?: string) {
+function app(tenantId?: string, role: 'owner' | 'admin' | 'staff' = 'staff') {
   const instance = new Hono<Env>();
   instance.use('*', async (c, next) => {
     c.set('staff', {
-      id: 'staff-1', name: '担当者', role: 'staff', readOnly: false,
+      id: 'staff-1', name: '担当者', role, readOnly: false,
       assignedLineAccountId: 'account-1', canAccessDescendantAccounts: false,
       tenantId,
     });
@@ -36,6 +41,14 @@ function app(tenantId?: string) {
 
 function env(): Env['Bindings'] {
   return { DB: {} as D1Database, LINE_CHANNEL_ACCESS_TOKEN: 'env-token' } as Env['Bindings'];
+}
+
+function overview(delivery: Record<string, unknown> = {}) {
+  return {
+    delivery,
+    partialFailures: [],
+    sections: { quota: { status: 'unavailable', asOf: '2026-08-26T10:00:00+09:00', period: 'this-month' } },
+  };
 }
 
 describe('dashboard organization account policy', () => {
@@ -51,7 +64,7 @@ describe('dashboard organization account policy', () => {
   });
 
   test('staff can select another account in the same organization', async () => {
-    dbMocks.getDashboardOverview.mockResolvedValue({ delivery: {}, partialFailures: [] });
+    dbMocks.getDashboardOverview.mockResolvedValue(overview());
     const response = await app().request('/api/dashboard/overview?accountId=account-2', {}, env());
     expect(response.status).toBe(200);
     expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
@@ -59,33 +72,75 @@ describe('dashboard organization account policy', () => {
     });
   });
 
-  test('staff can request only their visible account scope without an explicit account', async () => {
-    dbMocks.getDashboardOverview.mockResolvedValue({ delivery: {}, partialFailures: [] });
+  test('an explicit account is required instead of silently aggregating visible accounts', async () => {
     const response = await app().request('/api/dashboard/overview', {}, env());
-    expect(response.status).toBe(200);
-    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
-      allowedAccountIds: ['account-1', 'account-2'], includeUnassigned: true,
-    });
+    expect(response.status).toBe(400);
+    expect(dbMocks.getDashboardOverview).not.toHaveBeenCalled();
   });
 
-  test('non-default tenant skips the default quota token while dashboard numbers still succeed', async () => {
+  test('non-default tenant uses only the explicitly selected account token for quota', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([
       { ...account('account-1'), tenant_id: 'tenant-b' },
       { ...account('account-2'), tenant_id: 'tenant-a' },
     ]);
-    dbMocks.getDashboardOverview.mockResolvedValue({
-      delivery: { sent: 12, broadcasts: 3 }, partialFailures: [],
-    });
-    const response = await app('tenant-b').request('/api/dashboard/overview', {}, env());
+    dbMocks.getDashboardOverview.mockResolvedValue(overview({ sent: 12, broadcasts: 3 }));
+    const response = await app('tenant-b').request('/api/dashboard/overview?accountId=account-1', {}, env());
 
     expect(response.status).toBe(200);
-    expect(fetch).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({
+      headers: { Authorization: 'Bearer account-1-token' },
+    }));
     expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
       allowedAccountIds: ['account-1'], includeUnassigned: false,
     });
     const body = await response.json() as { data: { delivery: Record<string, unknown> } };
     expect(body.data.delivery).toMatchObject({
       sent: 12, broadcasts: 3, quotaLimit: null, quotaUsed: null,
+    });
+  });
+
+  test('loads the signed-in staff preference for the selected account', async () => {
+    dbMocks.getDashboardPreference.mockResolvedValue({
+      version: 2,
+      cards: JSON.stringify({
+        today: [{ id: 'today-inbox', visible: true }],
+        main: [{ id: 'friend-trend', visible: true }],
+        right: [{ id: 'send-quota', visible: true }],
+      }),
+      updated_at: '2026-08-26T10:00:00+09:00',
+    });
+    const response = await app().request('/api/dashboard/preferences?account_id=account-1', {}, env());
+    expect(response.status).toBe(200);
+    expect(dbMocks.getDashboardPreference).toHaveBeenCalledWith(expect.anything(), 'staff-1', 'account-1');
+    expect(await response.json()).toMatchObject({ data: { source: 'personal', version: 2 } });
+  });
+
+  test('rejects unknown cards instead of persisting arbitrary JSON', async () => {
+    const response = await app().request('/api/dashboard/preferences?account_id=account-1', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        version: 0,
+        cards: { today: [{ id: 'unknown', visible: true }], main: [], right: [] },
+      }),
+    }, env());
+    expect(response.status).toBe(400);
+    expect(dbMocks.saveDashboardPreference).not.toHaveBeenCalled();
+  });
+
+  test('organization totals are available only to owners and stay inside their tenant', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...account('account-1'), tenant_id: 'tenant-b' },
+      { ...account('account-2'), tenant_id: 'tenant-a' },
+    ]);
+    dbMocks.getDashboardOverview.mockResolvedValue(overview());
+    expect((await app('tenant-b').request('/api/dashboard/organization-overview', {}, env())).status).toBe(403);
+
+    const response = await app('tenant-b', 'owner').request('/api/dashboard/organization-overview', {}, env());
+    expect(response.status).toBe(200);
+    expect(dbMocks.getDashboardOverview).toHaveBeenCalledWith(expect.anything(), 'today', {
+      allowedAccountIds: ['account-1'], includeUnassigned: false,
     });
   });
 });

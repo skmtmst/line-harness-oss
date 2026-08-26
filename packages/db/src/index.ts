@@ -72,4 +72,5 @@ export * from './analytics-cross';
 export * from './analytics-overviews';
 export * from './analytics-url-exposures';
 export * from './dashboard';
+export * from './dashboard-preferences';
 export * from './operation-audit';

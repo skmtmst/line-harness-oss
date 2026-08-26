@@ -196,7 +196,8 @@
     "187_analytics_read_model.sql",
     "188_analytics_funnels.sql",
     "189_analytics_cross.sql",
-    "190_analytics_url_exposures.sql"
+    "190_analytics_url_exposures.sql",
+    "191_dashboard_preferences.sql"
   ],
-  "migrationCount": 197
+  "migrationCount": 198
 }
