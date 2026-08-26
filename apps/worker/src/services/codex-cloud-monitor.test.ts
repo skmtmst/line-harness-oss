@@ -223,6 +223,8 @@ describe('Codex cloud monitor event classification', () => {
   test('例外本文を保持せず運用分類だけへ変換する', () => {
     expect(classifyCodexMonitorError(Object.assign(new Error('private row'), { name: 'D1Error' }))).toBe('db_error');
     expect(classifyCodexMonitorError(new Error('SLACK_USER_RELAY_FAILED:token_revoked'))).toBe('slack_api_error');
+    expect(classifyCodexMonitorError(new Error('GITHUB_API_FAILED:401:/repos/example/pulls/1'))).toBe('github_api_error');
+    expect(classifyCodexMonitorError(new Error('GITHUB_LEDGER_WRITE_FAILED:403:/repos/example/issues/1/comments'))).toBe('github_api_error');
     expect(classifyCodexMonitorError(new Error('private prompt text'))).toBe('unknown');
   });
 
@@ -241,6 +243,19 @@ describe('Codex cloud monitor event classification', () => {
     } as const;
     expect(createCodexQueueFailureLog({ ...base, stopped: true })).toMatchObject({ stopped: true });
     expect(createCodexQueueFailureLog({ ...base, stopped: false })).toMatchObject({ stopped: false });
+  });
+
+  test('GitHub失敗ログには状態コードとパスだけを追加し秘密を残さない', () => {
+    const log = createCodexQueueFailureLog({
+      kind: 'auto_merge',
+      slackEventId: 'Ev-test',
+      reason: 'github_api_error',
+      attempts: 1,
+      stopped: false,
+      error: new Error('GITHUB_API_FAILED:401:/repos/example/pulls/1'),
+    });
+    expect(log).toMatchObject({ githubStatus: 401, githubPath: '/repos/example/pulls/1' });
+    expect(JSON.stringify(log)).not.toContain('Error');
   });
 
   test('公式受領がなければ許可済み投稿をUser OAuthで1回中継する', async () => {
