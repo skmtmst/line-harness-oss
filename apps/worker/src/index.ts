@@ -1258,12 +1258,33 @@ async function scheduled(
       const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
       if (
         purged.events + purged.dailyMetrics + purged.reconciliationRuns
-        + purged.funnelRuns + purged.audiences > 0
+        + purged.funnelRuns + purged.crossRuns + purged.audiences > 0
       ) {
         console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
       }
     } catch (e) {
       console.error('analytics retention purge error:', e);
+    }
+  }
+
+  // クロス分析は最大50×20・15条件を扱うため、HTTP要求の中では計算しない。
+  // 毎分1件だけ処理し、10分止まった実行は同じ定義のまま再開する。
+  if (event.cron === '* * * * *') {
+    try {
+      const {
+        processPendingAnalyticsCrossRuns,
+        recoverStalledAnalyticsCrossRuns,
+      } = await import('@line-crm/db');
+      const recovered = await recoverStalledAnalyticsCrossRuns(
+        env.DB,
+        new Date(event.scheduledTime),
+      );
+      const result = await processPendingAnalyticsCrossRuns(env.DB, 1);
+      if (recovered + result.processed + result.failed > 0) {
+        console.log(JSON.stringify({ event: 'analytics_cross_tick', recovered, ...result }));
+      }
+    } catch (e) {
+      console.error('analytics cross cron error:', e);
     }
   }
 

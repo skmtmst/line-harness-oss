@@ -197,15 +197,26 @@ describe('V6分析イベントと日別投影', () => {
     `);
     metricInsert.run('2024-07-25', 'old');
     metricInsert.run('2024-07-27', 'kept');
+    const crossInsert = sqlite.prepare(`
+      INSERT INTO analytics_cross_runs (
+        id, line_account_id, query_json, state, result_json, period_from, period_to,
+        time_zone, data_cutoff_at, created_at
+      ) VALUES (?, 'account-a', '{}', 'available', '{}', '2025-07-01', '2025-07-07',
+                'Asia/Tokyo', '2025-07-08', ?)
+    `);
+    crossInsert.run('old-cross', '2025-07-25T00:00:00.000Z');
+    crossInsert.run('kept-cross', '2025-07-27T00:00:00.000Z');
 
     const result = await purgeExpiredAnalyticsReadData(
       db,
       new Date('2026-08-26T00:00:00.000Z'),
     );
 
-    expect(result).toMatchObject({ events: 1, dailyMetrics: 1 });
+    expect(result).toMatchObject({ events: 1, dailyMetrics: 1, crossRuns: 1 });
     expect(sqlite.prepare(`SELECT id FROM analytics_events`).all()).toEqual([{ id: 'kept-event' }]);
     expect(sqlite.prepare(`SELECT metric_key FROM analytics_daily_metrics`).all())
       .toEqual([{ metric_key: 'kept' }]);
+    expect(sqlite.prepare(`SELECT id FROM analytics_cross_runs`).all())
+      .toEqual([{ id: 'kept-cross' }]);
   });
 });

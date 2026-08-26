@@ -218,6 +218,7 @@ export async function purgeExpiredAnalyticsReadData(
   dailyMetrics: number;
   reconciliationRuns: number;
   funnelRuns: number;
+  crossRuns: number;
   audiences: number;
 }> {
   const eventCutoff = monthsBefore(now, 13);
@@ -228,6 +229,7 @@ export async function purgeExpiredAnalyticsReadData(
     db.prepare(`DELETE FROM analytics_reconciliation_runs WHERE completed_at < ?`).bind(eventCutoff),
     db.prepare(`DELETE FROM analytics_result_audiences WHERE expires_at <= ?`).bind(now.toISOString()),
     db.prepare(`DELETE FROM analytics_funnel_runs WHERE created_at < ?`).bind(eventCutoff),
+    db.prepare(`DELETE FROM analytics_cross_runs WHERE created_at < ?`).bind(eventCutoff),
   ]);
   return {
     events: Number(results[0]?.meta?.changes ?? 0),
@@ -235,5 +237,6 @@ export async function purgeExpiredAnalyticsReadData(
     reconciliationRuns: Number(results[2]?.meta?.changes ?? 0),
     audiences: Number(results[3]?.meta?.changes ?? 0),
     funnelRuns: Number(results[4]?.meta?.changes ?? 0),
+    crossRuns: Number(results[5]?.meta?.changes ?? 0),
   };
 }
