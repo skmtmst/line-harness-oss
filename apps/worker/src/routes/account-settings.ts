@@ -7,6 +7,8 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const accountSettings = new Hono<Env>();
 
@@ -47,6 +49,7 @@ accountSettings.get('/api/account-settings/test-recipients', async (c) => {
 accountSettings.get('/api/account-settings/test-recipient-login-users', async (c) => {
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  const tenantId = c.get('staff')?.tenantId ?? DEFAULT_TENANT_ID;
 
   const result = await c.env.DB.prepare(
     `SELECT
@@ -66,12 +69,13 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
          )
        )
      WHERE sm.is_active = 1
+       AND COALESCE(sm.tenant_id, ?) = ?
        AND sm.line_user_id IS NOT NULL
        AND f.is_following = 1
      ORDER BY same_account DESC, sm.created_at ASC`
   // C-2bで複合一意制約へ移行したら、上のNOT EXISTSフォールバックを外す。
   // 現在は既存の別アカウント・未割当行を候補から消さず、同じ応答を保つ。
-  ).bind(accountId, accountId, accountId).all<{
+  ).bind(accountId, accountId, accountId, DEFAULT_TENANT_ID, tenantId).all<{
     id: string;
     display_name: string | null;
     picture_url: string | null;
@@ -95,6 +99,9 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
 accountSettings.put('/api/account-settings/test-recipients', requireRole('owner'), async (c) => {
   const body = await c.req.json<{ accountId: string; friendIds: string[] }>();
   if (!body.accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+    return c.json({ success: false, error: 'Forbidden' }, 403);
+  }
 
   const id = crypto.randomUUID();
   const now = new Date(Date.now() + 9 * 60 * 60_000).toISOString().replace('Z', '+09:00');
