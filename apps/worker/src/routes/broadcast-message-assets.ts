@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   createBroadcastMessageAsset,
   deleteBroadcastMessageAsset,
@@ -11,9 +11,28 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { storeBroadcastMedia } from '../services/broadcast-media-storage.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const broadcastMessageAssets = new Hono<Env>();
 const ASSET_KINDS = new Set<BroadcastMessageAssetKind>(['rich_message', 'card_message', 'coupon', 'research']);
+
+async function adminAccountScope(c: Context<Env>) {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const where = scope.allowedAccountIds.length
+    ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+    : scope.canSeeUnassigned
+      ? 'line_account_id IS NULL'
+      : '1 = 0';
+  return { scope, where };
+}
+
+const requireVisibleAsset: MiddlewareHandler<Env> = async (c, next) => {
+  const asset = await getBroadcastMessageAsset(c.env.DB, c.req.param('id') ?? '');
+  if (!asset || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [asset.line_account_id])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  await next();
+};
 
 function serialize(row: BroadcastMessageAsset) {
   return {
@@ -42,7 +61,17 @@ function validatePayload(kind: BroadcastMessageAssetKind, payload: unknown): str
 broadcastMessageAssets.get('/api/broadcast-message-assets', async (c) => {
   const kind = c.req.query('kind') as BroadcastMessageAssetKind | undefined;
   if (kind && !ASSET_KINDS.has(kind)) return c.json({ success: false, error: 'Invalid kind' }, 400);
-  const rows = await listBroadcastMessageAssets(c.env.DB, c.req.query('lineAccountId'), kind);
+  const lineAccountId = c.req.query('lineAccountId');
+  if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+  }
+  let rows = await listBroadcastMessageAssets(c.env.DB, lineAccountId, kind);
+  if (!lineAccountId) {
+    const { scope } = await adminAccountScope(c);
+    rows = rows.filter((row) => row.line_account_id === null
+      ? scope.canSeeUnassigned
+      : scope.allowedAccountIds.includes(row.line_account_id));
+  }
   return c.json({ success: true, data: rows.map(serialize) });
 });
 
@@ -50,6 +79,9 @@ broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner'
   const body = await c.req.json<{ lineAccountId?: string | null; kind?: BroadcastMessageAssetKind; name?: string; payload?: unknown }>();
   if (!body.kind || !ASSET_KINDS.has(body.kind) || !body.name?.trim()) {
     return c.json({ success: false, error: 'kind and name are required' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
+    return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   const payloadError = validatePayload(body.kind, body.payload);
   if (payloadError) return c.json({ success: false, error: payloadError }, 400);
@@ -62,7 +94,7 @@ broadcastMessageAssets.post('/api/broadcast-message-assets', requireRole('owner'
   return c.json({ success: true, data: row ? serialize(row) : null }, 201);
 });
 
-broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), async (c) => {
+broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), requireVisibleAsset, async (c) => {
   const existing = await getBroadcastMessageAsset(c.env.DB, c.req.param('id'));
   if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
   const body = await c.req.json<{ name?: string; payload?: unknown }>();
@@ -76,7 +108,7 @@ broadcastMessageAssets.put('/api/broadcast-message-assets/:id', requireRole('own
   return c.json({ success: true, data: row ? serialize(row) : null });
 });
 
-broadcastMessageAssets.delete('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), async (c) => {
+broadcastMessageAssets.delete('/api/broadcast-message-assets/:id', requireRole('owner', 'admin'), requireVisibleAsset, async (c) => {
   const deleted = await deleteBroadcastMessageAsset(c.env.DB, c.req.param('id'));
   return deleted
     ? c.json({ success: true, data: null })

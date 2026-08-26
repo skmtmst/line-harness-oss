@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getConversionPoints,
   getConversionPointById,
@@ -18,10 +18,54 @@ import { notifyAffiliateApproval } from '../services/affiliate-notifier.js';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 import type { ConversionPoint, ConversionMeasureMethod } from '@line-crm/db';
 
 const conversions = new Hono<Env>();
+
+async function adminAccountScope(c: Context<Env>, alias = '') {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const column = `${alias}line_account_id`;
+  const where = scope.allowedAccountIds.length
+    ? `(${column} IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
+    : scope.canSeeUnassigned
+      ? `${column} IS NULL`
+      : '1 = 0';
+  return { scope, where };
+}
+
+const requireVisibleConversionPoint: MiddlewareHandler<Env> = async (c, next) => {
+  const point = await getConversionPointById(c.env.DB, c.req.param('id') ?? '');
+  if (!point || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [point.line_account_id])) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  await next();
+};
+
+const requireVisibleConversionEvent: MiddlewareHandler<Env> = async (c, next) => {
+  const row = await c.env.DB.prepare(
+    `SELECT cp.line_account_id FROM conversion_events ce
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+      WHERE ce.id = ?`,
+  ).bind(c.req.param('id')).first<{ line_account_id: string | null }>();
+  if (!row || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [row.line_account_id])) {
+    return c.json({ success: false, error: 'Attributed conversion event not found' }, 404);
+  }
+  await next();
+};
+
+async function visibleConversionIds(c: Context<Env>, table: 'conversion_points' | 'conversion_events') {
+  const { scope, where } = await adminAccountScope(c, 'cp.');
+  const id = table === 'conversion_points' ? 'cp.id' : 'ce.id';
+  const from = table === 'conversion_points'
+    ? 'conversion_points cp'
+    : 'conversion_events ce JOIN conversion_points cp ON cp.id = ce.conversion_point_id';
+  const rows = await c.env.DB.prepare(`SELECT ${id} AS id FROM ${from} WHERE ${where}`)
+    .bind(...scope.allowedAccountIds)
+    .all<{ id: string }>();
+  return new Set(rows.results.map((row) => row.id));
+}
 
 const MEASURE_METHODS: ConversionMeasureMethod[] = ['url_reach', 'webhook', 'manual'];
 
@@ -117,7 +161,8 @@ function readMeasureOptions(
 // GET /api/conversions/points - list all
 conversions.get('/api/conversions/points', async (c) => {
   try {
-    const items = await getConversionPoints(c.env.DB);
+    const visibleIds = await visibleConversionIds(c, 'conversion_points');
+    const items = (await getConversionPoints(c.env.DB)).filter((item) => visibleIds.has(item.id));
     return c.json({
       success: true,
       data: items.map(serializeConversionPoint),
@@ -139,6 +184,9 @@ conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async
 
     const options = readMeasureOptions(body);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [options.value.lineAccountId as string | null])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
 
     const point = await createConversionPoint(c.env.DB, {
       name: String(body.name),
@@ -155,7 +203,7 @@ conversions.post('/api/conversions/points', requireRole('owner', 'admin'), async
 
 // PUT /api/conversions/points/:id - update
 // 送られた項目だけを触る。画面が「計測方法だけ変える」ような部分更新をするため。
-conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), async (c) => {
+conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
   try {
     const id = c.req.param('id');
     const current = await getConversionPointById(c.env.DB, id);
@@ -164,6 +212,10 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), as
     const body = await c.req.json<ConversionPointBody>();
     const options = readMeasureOptions(body, current);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    if ('lineAccountId' in options.value
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [options.value.lineAccountId as string | null])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
 
     const patch: Record<string, unknown> = { ...options.value };
     if (body.name !== undefined) {
@@ -186,7 +238,7 @@ conversions.put('/api/conversions/points/:id', requireRole('owner', 'admin'), as
 });
 
 // DELETE /api/conversions/points/:id - delete
-conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'), async (c) => {
+conversions.delete('/api/conversions/points/:id', requireRole('owner', 'admin'), requireVisibleConversionPoint, async (c) => {
   try {
     await deleteConversionPoint(c.env.DB, c.req.param('id'));
     return c.json({ success: true, data: null });
@@ -245,7 +297,8 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
 // GET /api/conversions/events - list events with filters
 conversions.get('/api/conversions/events', async (c) => {
   try {
-    const events = await getConversionEvents(c.env.DB, {
+    const visibleIds = await visibleConversionIds(c, 'conversion_events');
+    const events = (await getConversionEvents(c.env.DB, {
       conversionPointId: c.req.query('conversionPointId'),
       friendId: c.req.query('friendId'),
       affiliateCode: c.req.query('affiliateCode'),
@@ -253,7 +306,7 @@ conversions.get('/api/conversions/events', async (c) => {
       endDate: c.req.query('endDate'),
       limit: Number(c.req.query('limit') ?? '100'),
       offset: Number(c.req.query('offset') ?? '0'),
-    });
+    })).filter((event) => visibleIds.has(event.id));
 
     return c.json({
       success: true,
@@ -276,10 +329,11 @@ conversions.get('/api/conversions/events', async (c) => {
 // GET /api/conversions/report - aggregated report
 conversions.get('/api/conversions/report', requireRole('owner', 'admin'), async (c) => {
   try {
-    const report = await getConversionReport(c.env.DB, {
+    const visibleIds = await visibleConversionIds(c, 'conversion_points');
+    const report = (await getConversionReport(c.env.DB, {
       startDate: c.req.query('startDate'),
       endDate: c.req.query('endDate'),
-    });
+    })).filter((row) => visibleIds.has(row.conversionPointId));
 
     return c.json({ success: true, data: report });
   } catch (err) {
@@ -308,12 +362,13 @@ conversions.get('/api/conversions/approvals', async (c) => {
     const limit = Math.min(500, Math.max(1, Number.parseInt(c.req.query('limit') ?? '', 10) || 200));
     const offset = Math.max(0, Number.parseInt(c.req.query('offset') ?? '', 10) || 0);
 
-    const rows = await getConversionApprovalQueue(c.env.DB, {
+    const visibleIds = await visibleConversionIds(c, 'conversion_events');
+    const rows = (await getConversionApprovalQueue(c.env.DB, {
       status: status as 'pending' | 'approved' | 'rejected',
       identityKeySql: IDENTITY_KEY_SQL,
       limit,
       offset,
-    });
+    })).filter((row) => visibleIds.has(row.eventId));
 
     return c.json({ success: true, data: rows });
   } catch (err) {
@@ -323,7 +378,7 @@ conversions.get('/api/conversions/approvals', async (c) => {
 });
 
 // PATCH /api/conversions/events/:id/approval - approve/reject an attributed CV
-conversions.patch('/api/conversions/events/:id/approval', requireRole('owner', 'admin'), async (c) => {
+conversions.patch('/api/conversions/events/:id/approval', requireRole('owner', 'admin'), requireVisibleConversionEvent, async (c) => {
   auditLog(c, 'conversion.approval.update', { kind: 'conversion_event', id: c.req.param('id') });
   try {
     const body = await c.req
