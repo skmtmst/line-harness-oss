@@ -4,4 +4,3 @@
 
 ALTER TABLE line_accounts
   ADD COLUMN timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo';
-
