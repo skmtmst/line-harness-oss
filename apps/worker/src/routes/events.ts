@@ -42,11 +42,20 @@ import {
   type EventBookingAction,
 } from '../services/event-booking-state.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const events = new Hono<Env>();
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
+
+function optionalExecutionCtx(c: Context<Env>): ExecutionContext | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
 
 // ----------------------------------------------------------------
 // Helpers
@@ -1242,6 +1251,18 @@ events.post('/api/liff/events/:id/bookings', async (c) => {
       friendId: friend.id,
       startsAtIso: slot.starts_at as string,
     }).catch((err) => console.error('reminder enroll (event) failed:', err));
+    optionalExecutionCtx(c)?.waitUntil(
+      dispatchAutomationEventWithLogging(c.env.DB, {
+        lineAccountId: account_id,
+        eventType: 'calendar_booked',
+        sourceEventId: id,
+        friendId: friend.id,
+        eventData: {
+          bookingType: 'event', bookingId: id, eventId: event.id, slotId: slot.id,
+        },
+      })
+        .catch((error) => console.error('event booking automation event failed:', error)),
+    );
   }
 
   // best-effort notification: do not fail the booking if push fails.
@@ -1513,6 +1534,19 @@ events.post('/api/events/admin/events/:id/bookings/:bookingId/decide', requireRo
       });
       await insertRemindersForBooking(c.env.DB, booking.id, reminders);
     }
+    optionalExecutionCtx(c)?.waitUntil(
+      dispatchAutomationEventWithLogging(c.env.DB, {
+        lineAccountId: booking.line_account_id,
+        eventType: 'calendar_booked',
+        sourceEventId: booking.id,
+        friendId: booking.friend_id,
+        eventData: {
+          bookingType: 'event', bookingId: booking.id,
+          eventId: booking.event_id, slotId: booking.slot_id,
+        },
+      })
+        .catch((error) => console.error('event booking automation event failed:', error)),
+    );
   }
 
   await notifyBookingFriend(c.env.DB, booking.id, action === 'confirm' ? 'confirmed' : 'rejected');
