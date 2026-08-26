@@ -268,6 +268,11 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
       );
     }
 
+    const point = await getConversionPointById(c.env.DB, body.conversionPointId);
+    if (!point || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [point.line_account_id])) {
+      return c.json({ success: false, error: 'Conversion point not found' }, 404);
+    }
+
     const event = await trackConversion(c.env.DB, {
       conversionPointId: body.conversionPointId,
       friendId: body.friendId,
@@ -297,8 +302,8 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
 // GET /api/conversions/events - list events with filters
 conversions.get('/api/conversions/events', async (c) => {
   try {
-    const visibleIds = await visibleConversionIds(c, 'conversion_events');
-    const events = (await getConversionEvents(c.env.DB, {
+    const { scope } = await adminAccountScope(c);
+    const events = await getConversionEvents(c.env.DB, {
       conversionPointId: c.req.query('conversionPointId'),
       friendId: c.req.query('friendId'),
       affiliateCode: c.req.query('affiliateCode'),
@@ -306,7 +311,9 @@ conversions.get('/api/conversions/events', async (c) => {
       endDate: c.req.query('endDate'),
       limit: Number(c.req.query('limit') ?? '100'),
       offset: Number(c.req.query('offset') ?? '0'),
-    })).filter((event) => visibleIds.has(event.id));
+      allowedAccountIds: scope.allowedAccountIds,
+      canSeeUnassigned: scope.canSeeUnassigned,
+    });
 
     return c.json({
       success: true,
@@ -362,13 +369,15 @@ conversions.get('/api/conversions/approvals', async (c) => {
     const limit = Math.min(500, Math.max(1, Number.parseInt(c.req.query('limit') ?? '', 10) || 200));
     const offset = Math.max(0, Number.parseInt(c.req.query('offset') ?? '', 10) || 0);
 
-    const visibleIds = await visibleConversionIds(c, 'conversion_events');
-    const rows = (await getConversionApprovalQueue(c.env.DB, {
+    const { scope } = await adminAccountScope(c);
+    const rows = await getConversionApprovalQueue(c.env.DB, {
       status: status as 'pending' | 'approved' | 'rejected',
       identityKeySql: IDENTITY_KEY_SQL,
       limit,
       offset,
-    })).filter((row) => visibleIds.has(row.eventId));
+      allowedAccountIds: scope.allowedAccountIds,
+      canSeeUnassigned: scope.canSeeUnassigned,
+    });
 
     return c.json({ success: true, data: rows });
   } catch (err) {

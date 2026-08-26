@@ -269,30 +269,41 @@ export async function getConversionEvents(
     endDate?: string;
     limit?: number;
     offset?: number;
+    allowedAccountIds?: string[];
+    canSeeUnassigned?: boolean;
   } = {},
 ): Promise<ConversionEvent[]> {
   const conditions: string[] = [];
   const values: unknown[] = [];
 
   if (opts.conversionPointId) {
-    conditions.push('conversion_point_id = ?');
+    conditions.push('ce.conversion_point_id = ?');
     values.push(opts.conversionPointId);
   }
   if (opts.friendId) {
-    conditions.push('friend_id = ?');
+    conditions.push('ce.friend_id = ?');
     values.push(opts.friendId);
   }
   if (opts.affiliateCode) {
-    conditions.push('affiliate_code = ?');
+    conditions.push('ce.affiliate_code = ?');
     values.push(opts.affiliateCode);
   }
   if (opts.startDate) {
-    conditions.push('created_at >= ?');
+    conditions.push('ce.created_at >= ?');
     values.push(opts.startDate);
   }
   if (opts.endDate) {
-    conditions.push('created_at <= ?');
+    conditions.push('ce.created_at <= ?');
     values.push(opts.endDate);
+  }
+  if (opts.allowedAccountIds) {
+    const accountClauses: string[] = [];
+    if (opts.allowedAccountIds.length > 0) {
+      accountClauses.push(`cp.line_account_id IN (${opts.allowedAccountIds.map(() => '?').join(',')})`);
+      values.push(...opts.allowedAccountIds);
+    }
+    if (opts.canSeeUnassigned) accountClauses.push('cp.line_account_id IS NULL');
+    conditions.push(accountClauses.length > 0 ? `(${accountClauses.join(' OR ')})` : '1 = 0');
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -303,7 +314,9 @@ export async function getConversionEvents(
 
   const result = await db
     .prepare(
-      `SELECT * FROM conversion_events ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT ce.* FROM conversion_events ce
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+       ${where} ORDER BY ce.created_at DESC LIMIT ? OFFSET ?`,
     )
     .bind(...values)
     .all<ConversionEvent>();

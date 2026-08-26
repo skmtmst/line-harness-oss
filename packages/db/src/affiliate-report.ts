@@ -715,11 +715,25 @@ export async function getConversionApprovalQueue(
     identityKeySql: string;
     limit?: number;
     offset?: number;
+    allowedAccountIds?: string[];
+    canSeeUnassigned?: boolean;
   },
 ): Promise<ConversionApprovalRow[]> {
   const { status, identityKeySql } = opts;
   const limit = opts.limit ?? 200;
   const offset = opts.offset ?? 0;
+  const accountClauses: string[] = [];
+  const accountBindings: string[] = [];
+  if (opts.allowedAccountIds) {
+    if (opts.allowedAccountIds.length > 0) {
+      accountClauses.push(`cp.line_account_id IN (${opts.allowedAccountIds.map(() => '?').join(',')})`);
+      accountBindings.push(...opts.allowedAccountIds);
+    }
+    if (opts.canSeeUnassigned) accountClauses.push('cp.line_account_id IS NULL');
+  }
+  const accountWhere = opts.allowedAccountIds
+    ? `AND ${accountClauses.length > 0 ? `(${accountClauses.join(' OR ')})` : '1 = 0'}`
+    : '';
 
   // dup_keys: identity_keys shared by >=2 distinct attributed-conversion friends
   // WITHIN the same affiliate. Computed over the whole attributed-CV set (not
@@ -733,7 +747,9 @@ export async function getConversionApprovalQueue(
                 (${identityKeySql}) AS identity_key
            FROM conversion_events ce
            JOIN friends ON friends.id = ce.friend_id
+           JOIN conversion_points cp ON cp.id = ce.conversion_point_id
           WHERE ce.affiliate_id IS NOT NULL
+            ${accountWhere}
        ),
        dup_keys AS (
          SELECT affiliate_id, identity_key
@@ -767,10 +783,11 @@ export async function getConversionApprovalQueue(
              AND dk.identity_key = (${identityKeySql})
       WHERE ce.affiliate_id IS NOT NULL
         AND ce.approval_status = ?
+        ${accountWhere}
       ORDER BY julianday(ce.created_at) DESC, ce.id DESC
       LIMIT ? OFFSET ?`,
     )
-    .bind(status, limit, offset)
+    .bind(...accountBindings, status, ...accountBindings, limit, offset)
     .all<{
       event_id: string;
       created_at: string;

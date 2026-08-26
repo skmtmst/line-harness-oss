@@ -8,6 +8,7 @@ import {
   createConversionPoint,
   updateConversionPoint,
   getUrlReachConversionPoints,
+  getConversionEvents,
   trackConversion,
 } from '../src/conversions.js';
 
@@ -91,6 +92,31 @@ let db: D1Database;
 beforeEach(() => {
   sqlite = setupDb();
   db = asD1(sqlite);
+});
+
+describe('成果一覧の統括絞り込み', () => {
+  test('アカウント絞り込みをページングより先に適用する', async () => {
+    const insertAccount = sqlite.prepare(
+      `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+       VALUES (?, ?, ?, 'secret', 'token')`,
+    );
+    insertAccount.run('own', 'Own', 'channel-own');
+    insertAccount.run('other', 'Other', 'channel-other');
+    const own = await createConversionPoint(db, { name: '自統括', eventType: 'purchase', lineAccountId: 'own' });
+    const other = await createConversionPoint(db, { name: '別統括', eventType: 'purchase', lineAccountId: 'other' });
+    insertFriend(sqlite, 'friend');
+    const insert = sqlite.prepare(
+      `INSERT INTO conversion_events (id, conversion_point_id, friend_id, created_at)
+       VALUES (?, ?, 'friend', ?)`,
+    );
+    insert.run('older-own', own.id, '2026-02-01T00:00:00.000+09:00');
+    insert.run('newer-other', other.id, '2026-02-02T00:00:00.000+09:00');
+
+    const rows = await getConversionEvents(db, {
+      limit: 1, offset: 0, allowedAccountIds: ['own'], canSeeUnassigned: false,
+    });
+    expect(rows.map((row) => row.id)).toEqual(['older-own']);
+  });
 });
 
 describe('既定値', () => {

@@ -97,11 +97,11 @@ function insertAffiliate(s: Database.Database, id: string): void {
   ).run(id, `Aff ${id}`, `code-${id}`);
 }
 
-function insertPoint(s: Database.Database, id: string, value: number): void {
+function insertPoint(s: Database.Database, id: string, value: number, lineAccountId: string | null = null): void {
   s.prepare(
-    `INSERT INTO conversion_points (id, name, event_type, value, created_at)
-     VALUES (?, ?, 'purchase', ?, '2026-01-01T00:00:00.000+09:00')`,
-  ).run(id, `Point ${id}`, value);
+    `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, created_at)
+     VALUES (?, ?, 'purchase', ?, ?, '2026-01-01T00:00:00.000+09:00')`,
+  ).run(id, `Point ${id}`, value, lineAccountId);
 }
 
 function insertOfferAndLink(
@@ -150,6 +150,33 @@ beforeEach(() => {
 });
 
 describe('getConversionApprovalQueue', () => {
+  test('applies account scope before limit and offset', async () => {
+    const insertAccount = sqlite.prepare(
+      `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
+       VALUES (?, ?, ?, 'secret', 'token')`,
+    );
+    insertAccount.run('own', 'Own', 'channel-own');
+    insertAccount.run('other', 'Other', 'channel-other');
+    insertFriend(sqlite, 'f1', { userId: 'uid-a' });
+    insertAffiliate(sqlite, 'aff1');
+    insertPoint(sqlite, 'other-point', 100, 'other');
+    insertPoint(sqlite, 'own-point', 100, 'own');
+    insertConversion(sqlite, {
+      id: 'newer-other', pointId: 'other-point', friendId: 'f1', affiliateId: 'aff1', refCode: null,
+      approvalStatus: 'pending', createdAt: '2026-02-02T00:00:00.000+09:00',
+    });
+    insertConversion(sqlite, {
+      id: 'older-own', pointId: 'own-point', friendId: 'f1', affiliateId: 'aff1', refCode: null,
+      approvalStatus: 'pending', createdAt: '2026-02-01T00:00:00.000+09:00',
+    });
+
+    const rows = await getConversionApprovalQueue(db, {
+      status: 'pending', identityKeySql: IDENTITY_KEY_SQL, limit: 1, offset: 0,
+      allowedAccountIds: ['own'], canSeeUnassigned: false,
+    });
+    expect(rows.map((row) => row.eventId)).toEqual(['older-own']);
+  });
+
   test('filters by status and resolves friend/affiliate/offer/point + value', async () => {
     insertFriend(sqlite, 'f1', { displayName: 'Alice', userId: 'uid-a' });
     insertAffiliate(sqlite, 'aff1');

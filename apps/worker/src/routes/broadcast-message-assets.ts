@@ -65,13 +65,11 @@ broadcastMessageAssets.get('/api/broadcast-message-assets', async (c) => {
   if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
-  let rows = await listBroadcastMessageAssets(c.env.DB, lineAccountId, kind);
-  if (!lineAccountId) {
-    const { scope } = await adminAccountScope(c);
-    rows = rows.filter((row) => row.line_account_id === null
+  const { scope } = await adminAccountScope(c);
+  const rows = (await listBroadcastMessageAssets(c.env.DB, lineAccountId, kind)).filter((row) =>
+    row.line_account_id === null
       ? scope.canSeeUnassigned
       : scope.allowedAccountIds.includes(row.line_account_id));
-  }
   return c.json({ success: true, data: rows.map(serialize) });
 });
 
