@@ -35,6 +35,7 @@ import {
   type BookingStatus,
 } from '../services/booking-types.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 
 const booking = new Hono<Env>();
 
@@ -1032,6 +1033,18 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
       console.error('booking notify (proxy-create) failed:', err),
     ),
   );
+  c.executionCtx.waitUntil(
+    dispatchAutomationEventWithLogging(c.env.DB, {
+      lineAccountId: accountId,
+      eventType: 'calendar_booked',
+      sourceEventId: bookingId,
+      friendId: body.friend_id,
+      eventData: {
+        bookingType: 'salon', bookingId, menuId: body.menu_id, staffId: body.staff_id,
+      },
+    })
+      .catch((error) => console.error('booking automation event failed:', error)),
+  );
   return c.json({ booking_id: bookingId, status: 'confirmed', calendar_sync: calendarSync }, 201);
 });
 
@@ -1522,9 +1535,19 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
   const id = c.req.param('id');
   const b = await c.req.json<{ action: BookingAction }>();
   const row = await c.env.DB
-    .prepare(`SELECT id, status, starts_at FROM bookings WHERE id = ? AND line_account_id = ?`)
+    .prepare(
+      `SELECT id, status, starts_at, friend_id, menu_id, staff_id
+         FROM bookings WHERE id = ? AND line_account_id = ?`,
+    )
     .bind(id, accountId)
-    .first<{ id: string; status: BookingStatus; starts_at: string }>();
+    .first<{
+      id: string;
+      status: BookingStatus;
+      starts_at: string;
+      friend_id: string;
+      menu_id: string;
+      staff_id: string;
+    }>();
   if (!row) return c.json({ error: 'not_found' }, 404);
   if (!canTransition(row.status, b.action)) {
     return c.json({ error: 'invalid_transition' }, 409);
@@ -1559,6 +1582,18 @@ booking.patch('/api/booking/admin/requests/:id', requireRole('owner', 'admin', '
       notifyForBooking(c.env.DB, id, 'approved').catch((err) =>
         console.error('booking notify (approved) failed:', err),
       ),
+    );
+    c.executionCtx.waitUntil(
+      dispatchAutomationEventWithLogging(c.env.DB, {
+        lineAccountId: accountId,
+        eventType: 'calendar_booked',
+        sourceEventId: id,
+        friendId: row.friend_id,
+        eventData: {
+          bookingType: 'salon', bookingId: id, menuId: row.menu_id, staffId: row.staff_id,
+        },
+      })
+        .catch((error) => console.error('booking automation event failed:', error)),
     );
   } else if (next === 'rejected') {
     c.executionCtx.waitUntil(

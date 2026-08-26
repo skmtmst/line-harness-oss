@@ -20,6 +20,7 @@ import { buildOgHtml } from '../lib/og-html.js';
 import { resolveOgForTrackedLink } from '../lib/og-resolver.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 
 const trackedLinks = new Hono<Env>();
 
@@ -366,6 +367,16 @@ trackedLinks.get('/t/:linkId', async (c) => {
             metadata: { trackedLinkId: link.id, linkName: link.name },
             occurredAt: click.clicked_at,
           });
+          const accountId = await resolveLinkAccountId(c.env.DB, link);
+          if (accountId) {
+            await dispatchAutomationEventWithLogging(c.env.DB, {
+              lineAccountId: accountId,
+              eventType: 'link_clicked',
+              sourceEventId: click.id,
+              friendId,
+              eventData: { trackedLinkId: link.id, clickId: click.id },
+            });
+          }
         }
 
         // Run automatic actions if a friend is identified
