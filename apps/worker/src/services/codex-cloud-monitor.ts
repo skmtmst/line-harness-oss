@@ -3,6 +3,7 @@ import {
   processCodexAutoMerge,
   type CodexAutoMergeMessage,
 } from './codex-auto-merge.js';
+import { decodeSlackTextEntities } from './slack-text.js';
 
 const AUTO_RELAY_MARKER = '【Claude依頼の自動中継】';
 const RELAY_RECEIPT_WAIT_SECONDS = 300;
@@ -102,7 +103,7 @@ export function isAutomaticCodexRelay(text: string): boolean {
 }
 
 export function hasClaudeToCodexMarker(text: string): boolean {
-  const firstLine = text.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0] ?? '';
+  const firstLine = decodeSlackTextEntities(text).replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0] ?? '';
   return firstLine.trimStart().startsWith('[claude->codex]');
 }
 

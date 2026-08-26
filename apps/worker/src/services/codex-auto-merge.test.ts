@@ -84,6 +84,12 @@ function postedText(fetcher: ReturnType<typeof vi.fn>): string {
 }
 
 describe('Codex監査合格合図', () => {
+  test('Slackでエスケープされた合図からPR番号とSHAを読む', () => {
+    expect(parseCodexAuditApproval(
+      '[claude-&gt;codex]\n【監査結果】PR #344 HEAD 1111111111111111111111111111111111111111 合格・統合可',
+    )).toEqual({ prNumber: 344, headSha: '1111111111111111111111111111111111111111' });
+  });
+
   test('固定された2行を含む投稿だけからPR番号を読む', () => {
     expect(parseCodexAuditApproval(
       '[claude->codex]\n確認済みです\n【監査結果】PR #344 HEAD 1111111111111111111111111111111111111111 合格・統合可',
@@ -101,6 +107,12 @@ describe('Codex監査合格合図', () => {
     expect(isCodexAutoMergeEnabled('false')).toBe(false);
     expect(isCodexAutoMergeEnabled('true')).toBe(true);
     expect(isCodexAutoMergeEnabled('1')).toBe(true);
+  });
+
+  test('二重エスケープされた合図を誤認しない', () => {
+    expect(parseCodexAuditApproval(
+      '[claude-&amp;gt;codex]\n【監査結果】PR #344 HEAD 1111111111111111111111111111111111111111 合格・統合可',
+    )).toBeNull();
   });
 });
 

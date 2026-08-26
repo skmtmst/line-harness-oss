@@ -1,4 +1,5 @@
 import type { Env } from '../index.js';
+import { decodeSlackTextEntities } from './slack-text.js';
 
 const AUDIT_MARKER = '[claude->codex]';
 const AUDIT_LINE_PATTERN = /^【監査結果】PR #(\d+) HEAD ([0-9a-f]{40}) 合格・統合可$/i;
@@ -76,7 +77,7 @@ type GitHubResponse<T> = {
 };
 
 export function parseCodexAuditApproval(text: string): { prNumber: number; headSha: string } | null {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
+  const lines = decodeSlackTextEntities(text).replace(/^\uFEFF/, '').split(/\r?\n/);
   if (lines[0] !== AUDIT_MARKER) return null;
   const matches = lines
     .map((line) => AUDIT_LINE_PATTERN.exec(line))
