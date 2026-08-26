@@ -50,6 +50,16 @@ vi.mock('../services/friend-tag-attach.js', () => tagMock);
 const localProxyMock = { dispatchLineProxyLocally: vi.fn() };
 vi.mock('../services/local-line-proxy.js', () => localProxyMock);
 
+const accountAccessMock = {
+  canAccessAllLineAccounts: vi.fn(async (
+    _db: D1Database, _staff: unknown, _ids: Array<string | null>,
+  ) => true),
+  getVisibleLineAccountScope: vi.fn(async () => ({
+    allowedAccountIds: ['account-a'], canSeeUnassigned: false,
+  })),
+};
+vi.mock('../services/account-access.js', () => accountAccessMock);
+
 const { webinarRoutes } = await import('./webinars.js');
 const { signWebinarToken } = await import('../lib/webinar-token.js');
 
@@ -123,6 +133,72 @@ beforeEach(() => {
   dbMocks.recordWebinarPickerOpen.mockResolvedValue(undefined);
   dbMocks.applyMileageRulesForEvent.mockResolvedValue({
     event: { id: 'mileage-event-1' }, granted: [],
+  });
+  accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(true);
+  accountAccessMock.getVisibleLineAccountScope.mockResolvedValue({
+    allowedAccountIds: ['account-a'], canSeeUnassigned: false,
+  });
+});
+
+describe('admin webinar tenant scope', () => {
+  test('一覧はリクエスト元の統括から見えるアカウントだけをSQLで絞る', async () => {
+    const all = vi.fn(async () => ({ results: [makeWebinar({ account_id: 'account-a' })] }));
+    const bind = vi.fn(() => ({ all }));
+    const prepare = vi.fn((_sql: string) => ({ bind }));
+    const originalDb = env.DB;
+    env.DB = { prepare } as unknown as D1Database;
+
+    const res = await adminReq('/api/webinars');
+
+    env.DB = originalDb;
+    expect(res.status).toBe(200);
+    expect(String(prepare.mock.calls[0]?.[0])).toContain('account_id IN (?)');
+    expect(bind).toHaveBeenCalledWith('account-a');
+    expect((await res.json() as { data: unknown[] }).data).toHaveLength(1);
+  });
+
+  test.each([
+    ['GET', '/api/webinars/w-other'],
+    ['PUT', '/api/webinars/w-other'],
+    ['DELETE', '/api/webinars/w-other'],
+    ['GET', '/api/webinars/w-other/comments'],
+    ['PUT', '/api/webinars/w-other/comments'],
+    ['GET', '/api/webinars/w-other/ctas'],
+    ['PUT', '/api/webinars/w-other/ctas'],
+    ['GET', '/api/webinars/w-other/analytics'],
+    ['GET', '/api/webinars/w-other/user-comments'],
+  ])('%s %s は別統括のウェビナーを404にする', async (method, path) => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ id: 'w-other', account_id: 'account-b' }));
+    accountAccessMock.canAccessAllLineAccounts.mockResolvedValue(false);
+
+    const res = await adminReq(path, {
+      method,
+      headers: method === 'PUT' ? { 'Content-Type': 'application/json' } : undefined,
+      body: method === 'PUT' ? '{}' : undefined,
+    });
+
+    expect(res.status).toBe(404);
+  });
+
+  test('作成と更新は別統括のaccountIdを保存前に403にする', async () => {
+    dbMocks.getWebinarById.mockResolvedValue(makeWebinar({ account_id: 'account-a' }));
+    accountAccessMock.canAccessAllLineAccounts.mockImplementation(async (_db, _staff, ids) => (
+      ids[0] !== 'account-b'
+    ));
+
+    const create = await adminReq('/api/webinars', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: '拒否', slug: 'denied', accountId: 'account-b' }),
+    });
+    const update = await adminReq('/api/webinars/w1', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-b' }),
+    });
+
+    expect(create.status).toBe(403);
+    expect(update.status).toBe(403);
+    expect(dbMocks.createWebinar).not.toHaveBeenCalled();
+    expect(dbMocks.updateWebinar).not.toHaveBeenCalled();
   });
 });
 
