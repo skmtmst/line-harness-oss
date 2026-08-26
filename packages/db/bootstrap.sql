@@ -213,7 +213,7 @@ CREATE TABLE automation_run_steps (
   retry_at                 TEXT,
   started_at               TEXT,
   completed_at             TEXT,
-  created_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at               TEXT NOT NULL DEFAULT (datetime('now')), lease_expires_at TEXT,
   UNIQUE (automation_run_id, step_key, attempt_number)
 );
 
@@ -236,7 +236,7 @@ CREATE TABLE automation_runs (
   is_test               INTEGER NOT NULL DEFAULT 0 CHECK (is_test IN (0, 1)),
   started_at            TEXT,
   completed_at          TEXT,
-  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')), lease_expires_at TEXT,
   UNIQUE (line_account_id, automation_id, idempotency_key)
 );
 
@@ -2356,6 +2356,9 @@ CREATE INDEX idx_automation_definitions_account_status
 
 CREATE INDEX idx_automation_logs_automation ON automation_logs (automation_id);
 
+CREATE UNIQUE INDEX idx_automation_run_steps_one_per_step
+  ON automation_run_steps(automation_run_id, step_key);
+
 CREATE INDEX idx_automation_run_steps_retry
   ON automation_run_steps(status, retry_at)
   WHERE status IN ('queued', 'waiting', 'failed');
@@ -2368,6 +2371,10 @@ CREATE INDEX idx_automation_runs_account_status_created
 
 CREATE INDEX idx_automation_runs_automation_created
   ON automation_runs(automation_id, created_at DESC);
+
+CREATE INDEX idx_automation_runs_due
+  ON automation_runs(status, resume_at, lease_expires_at)
+  WHERE status IN ('queued', 'waiting', 'running');
 
 CREATE INDEX idx_automation_runs_friend_created
   ON automation_runs(friend_id, created_at DESC);
