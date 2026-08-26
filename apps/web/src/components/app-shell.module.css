@@ -10,6 +10,22 @@
   flex: 1;
 }
 
+/*
+ * 共通メニューの右側。縦に「トップバー」と「本文」。
+ *
+ * `min-height` にする。**高さを 1080px と書かない。** ★V6 の画面の高さは
+ * 12種類あり（1080が180枚、1136が49枚、1840が17枚…）、絵の高さは中身の量を
+ * 表しているだけで寸法の指定ではない。固定にすると、縦の短いPCで中身が
+ * 無いのに縦スクロールが出る（`docs/v6-shell-contract.md` §5）。
+ */
+.side {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
 .main {
   min-width: 0;
   flex: 1;
@@ -25,6 +41,14 @@
   padding: 24px 16px;
 }
 
+/*
+ * 受信箱のような3カラム全画面用。ページが `useFullWidthPage()` を
+ * 呼んだときだけ効く。**ルート名で自動判定しない**（§11-3）。
+ */
+.contentFull {
+  max-width: none;
+}
+
 @media (min-width: 640px) {
   .content {
     padding-inline: 24px;
@@ -38,7 +62,12 @@
 }
 
 @media (min-width: 1024px) {
+  /* 本文の上余白は14px。★V6 260枚すべてで例外がなかった値（§4）。 */
   .content {
-    padding: 32px 40px 40px;
+    padding: 14px 40px 32px;
+  }
+
+  .contentFull {
+    padding: 14px 40px 32px;
   }
 }

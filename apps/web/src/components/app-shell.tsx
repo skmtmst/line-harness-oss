@@ -8,6 +8,8 @@ import SessionLostNotice from './session-lost-notice'
 import RootLandingGate from './root-landing-gate'
 import StoreSelectionGate from './store-selection-gate'
 import HqReturnButton from './hq-return-button'
+import AppTopBar from './shell/app-top-bar'
+import { PageChromeProvider, usePageChrome } from './shell/page-chrome'
 import styles from './app-shell.module.css'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -27,7 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
           <Sidebar friendAttributesV2Mode={isFriendAttributesV2} preview={isFriendAttributesV2 || isFriendAttributesV3} />
           <main className={styles.main}>
-            <div data-design-shell="v5-1920" data-design-node="J33xq" className={`${styles.content} ${isFriendAttributesV2 ? 'lg:pt-[32px]' : ''}`}>
+            <div data-design-shell="v6-1920" data-design-node="J33xq" className={`${styles.content} ${isFriendAttributesV2 ? 'lg:pt-[32px]' : ''}`}>
               {children}
             </div>
           </main>
@@ -39,25 +41,50 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
       <AccountProvider>
-        <div className={styles.shell}>
-          {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
-          <SessionLostNotice />
-          {/* Phase 6: banner above sidebar+header so it pins to the top of the
-              admin shell. Renders nothing while loading; one of latest/fork/
-              upgrade once /admin/version + manifest resolve. */}
-          <UpdateBanner />
-          <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
-            <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
-            <main className={styles.main}>
-              {/* V5正式共通メニュー J33xq と同じ256pxサイドバーを基準にする。 */}
-              <div data-design-shell="v5-1920" data-design-node="J33xq" className={styles.content}>
+        <PageChromeProvider>
+          <div className={styles.shell}>
+            {/* Cookieが届いていないときの案内。全画面で同じものを1つだけ出す。 */}
+            <SessionLostNotice />
+            {/* Phase 6: banner above sidebar+header so it pins to the top of the
+                admin shell. Renders nothing while loading; one of latest/fork/
+                upgrade once /admin/version + manifest resolve. */}
+            <UpdateBanner />
+            <div className={`${styles.workspace} ${isFriendAttributesV2 ? 'friend-attributes-v2-shell' : ''}`}>
+              <Sidebar friendAttributesV2Mode={isFriendAttributesV2} />
+              <Workspace>
                 <HqReturnButton />
                 <RootLandingGate><StoreSelectionGate>{children}</StoreSelectionGate></RootLandingGate>
-              </div>
-            </main>
+              </Workspace>
+            </div>
           </div>
-        </div>
+        </PageChromeProvider>
       </AccountProvider>
     </AuthGuard>
+  )
+}
+
+/**
+ * 共通メニューの右側。上にトップバー、下に本文。
+ *
+ * `PageChromeProvider` の中でしか使えない（`usePageChrome` を読むため）。
+ * 本文の幅は既定で `--container-shell` までにし、**ページが明示したときだけ**外す。
+ * ルート名で自動判定しない（`docs/v6-shell-contract.md` §11-3）。
+ */
+function Workspace({ children }: { children: React.ReactNode }) {
+  const { fullWidth } = usePageChrome()
+  return (
+    <div className={styles.side}>
+      <AppTopBar />
+      <main className={styles.main}>
+        {/* V6 共通メニュー J33xq と同じ256pxサイドバーを基準にする。 */}
+        <div
+          data-design-shell="v6-1920"
+          data-design-node="J33xq"
+          className={`${styles.content} ${fullWidth ? styles.contentFull : ''}`}
+        >
+          {children}
+        </div>
+      </main>
+    </div>
   )
 }

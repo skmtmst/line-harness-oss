@@ -131,3 +131,9 @@
     display: flex;
   }
 }
+
+/* 会社名とメニューの間の線。Pencil `J33xq/pN2aM`。 */
+.identityRule {
+  height: 1px;
+  background: var(--color-hairline);
+}

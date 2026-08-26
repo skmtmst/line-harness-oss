@@ -28,6 +28,7 @@
 }
 
 .manual,
+.manualDisabled,
 .logout {
   flex-shrink: 0;
   border: 0;
@@ -45,8 +46,7 @@
 }
 
 .manual:focus-visible,
-.logout:focus-visible,
-.accountField select:focus-visible {
+.logout:focus-visible {
   outline: 2px solid var(--color-status-info);
   outline-offset: 2px;
 }
@@ -66,15 +66,67 @@
   font-weight: 600;
 }
 
-.accountField select {
-  width: 176px;
+/* Pencil `cBSCb/xvrTI`。白い札に「印 ＋ 名前 ＋ ▾」。 */
+.accountPill {
+  position: relative;
+  display: flex;
+  min-width: 0;
   height: 36px;
+  align-items: center;
+  gap: 8px;
   border: 1px solid var(--color-hairline);
   border-radius: var(--radius-control);
   background: var(--color-canvas);
+  padding: 0 10px;
+}
+
+.accountMark {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-mini);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-nano);
+  font-weight: 700;
+}
+
+.accountName {
+  max-width: 148px;
+  overflow: hidden;
   color: var(--color-ink);
   font-size: var(--text-label);
-  padding: 0 28px 0 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountChevron {
+  flex-shrink: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-nano);
+}
+
+/* 札の上に敷く。見た目は札が持ち、操作と読み上げは select が持つ。 */
+.accountSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: none;
+  color: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.accountPill:focus-within {
+  border-color: var(--color-status-info);
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
 }
 
 .separator {
@@ -114,6 +166,12 @@
 .logout {
   color: var(--color-ink-secondary);
   cursor: pointer;
+}
+
+/* URLが決まっていない間。押せないことを見た目で示し、リンクにしない。 */
+.manualDisabled {
+  color: var(--color-ink-faint);
+  cursor: default;
 }
 
 @media (max-width: 1439px) {
