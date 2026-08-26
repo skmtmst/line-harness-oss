@@ -86,15 +86,15 @@ describe('標準ボタンの第1段階移行', () => {
 
   it('標準ボタン移行後の基準を、D-3の旧画面転送後も締める', () => {
     const debt = totals(countDebt().counts) as Record<string, number>
-    // 2026-08-26: 4-1（友だち属性）のヘッダー操作を共通Buttonへ替えて
-    // 主要2・副次5・任意値2 が減った。減ったら必ずここも締める。
+    // 2026-08-26: 4-1（友だち属性）のヘッダー操作を共通Buttonへ替え、
+    // ページ送りも共通部品へ寄せた。主要2・副次7が減った。
+    // 減ったら必ずここも締める。
     expect(debt['direct-primary-button']).toBe(139)
-    // ページ送りを共通部品へ寄せて、さらに2つ減った
-    expect(debt['direct-secondary-button']).toBe(282)
-    // 4-1 の表を設計どおりに組み直して、素の値が4つ増えた
-    // （26px の札・7px の余白・1040px の最小幅）。設計 `HrwyW` の実測値で、
-    // トークンに無い数。増やしたぶんはここに記録して止める。
-    expect(debt['arbitrary-value']).toBe(1412)
+    expect(debt['direct-secondary-button']).toBe(281)
+    // 4-1 の表を設計どおりに組み直して素の値が4つ増え（26px の札・
+    // 7px の余白・1040px の最小幅。設計 `HrwyW` の実測値で、トークンに無い数）、
+    // 取り込み先で別に4つ減って、差し引き据え置き。
+    expect(debt['arbitrary-value']).toBe(1408)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {
