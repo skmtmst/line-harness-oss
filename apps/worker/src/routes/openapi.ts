@@ -51,6 +51,11 @@ const spec = {
           name: { type: 'string' },
           color: { type: 'string' },
           createdAt: { type: 'string', format: 'date-time' },
+          cleanupReasons: {
+            type: 'array',
+            items: { type: 'string', enum: ['unused', 'duplicate_name'] },
+            description: 'withCounts=1 のときに返す整理候補の理由',
+          },
         },
       },
       TagDeleteImpact: {

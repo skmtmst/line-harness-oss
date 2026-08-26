@@ -76,6 +76,7 @@ describe('GET /api/tags', () => {
       used_in_auto_replies: 0,
       used_in_saved_searches: 0,
       other_action_count: 3,
+      cleanup_reasons: ['duplicate_name'],
     }]);
 
     const res = await app().request('/api/tags?withCounts=1');
@@ -90,6 +91,7 @@ describe('GET /api/tags', () => {
         assignSource: 'form',
         usedIn: { broadcasts: 2, forms: 1 },
         otherActionCount: 3,
+        cleanupReasons: ['duplicate_name'],
       }],
     });
   });
@@ -105,6 +107,7 @@ describe('GET /api/tags', () => {
       used_in_auto_replies: 0,
       used_in_saved_searches: 0,
       other_action_count: 0,
+      cleanup_reasons: ['unused'],
     }]);
 
     const res = await app().request('/api/tags?withCounts=1');
@@ -112,6 +115,26 @@ describe('GET /api/tags', () => {
     expect(body.data[0]).not.toHaveProperty('assignSource');
     expect(body.data[0]).not.toHaveProperty('usedIn');
     expect(body.data[0]).not.toHaveProperty('otherActionCount');
+    expect(body.data[0]).toHaveProperty('cleanupReasons', ['unused']);
+  });
+
+  test('集計済みで候補なしは空配列を返し、未取得と区別する', async () => {
+    dbMocks.getTagsWithUsage.mockResolvedValue([{
+      ...TAG_ROW,
+      friend_count: 1,
+      assign_source: null,
+      used_in_broadcasts: 0,
+      used_in_forms: 0,
+      used_in_scenarios: 0,
+      used_in_auto_replies: 0,
+      used_in_saved_searches: 0,
+      other_action_count: 0,
+      cleanup_reasons: [],
+    }]);
+
+    const res = await app().request('/api/tags?withCounts=1');
+    const body = await res.json() as { data: Array<Record<string, unknown>> };
+    expect(body.data[0]).toHaveProperty('cleanupReasons', []);
   });
 
   test('選択部品向けの通常取得は軽い一覧のまま', async () => {
@@ -120,6 +143,8 @@ describe('GET /api/tags', () => {
     expect(res.status).toBe(200);
     expect(dbMocks.getTags).toHaveBeenCalledWith(expect.anything());
     expect(dbMocks.getTagsWithUsage).not.toHaveBeenCalled();
+    const body = await res.json() as { data: Array<Record<string, unknown>> };
+    expect(body.data[0]).not.toHaveProperty('cleanupReasons');
   });
 });
 

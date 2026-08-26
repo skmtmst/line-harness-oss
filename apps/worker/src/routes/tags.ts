@@ -79,6 +79,9 @@ function serializeTag(row: DbTag & Partial<TagWithUsage>) {
     ...((row.other_action_count ?? 0) > 0
       ? { otherActionCount: Number(row.other_action_count) }
       : {}),
+    ...(row.cleanup_reasons !== undefined
+      ? { cleanupReasons: row.cleanup_reasons }
+      : {}),
   };
 }
 
