@@ -1,0 +1,33 @@
+/*
+ * 下部追従バー。Pencil V5 の `Ai3fq`「共通 編集追従バー」と、
+ * 作成・編集画面すべての最下段。
+ *
+ * **作成・編集画面の保存はここにしか置かない。** ヘッダーにも置くと、
+ * どちらを押せばよいか分からなくなる。
+ *
+ * 左に状態（「下書き・最終保存 10:24」など）、右にボタン。
+ * ボタンの並びは「やめる → 下書き → 実行」で、実行がいちばん右。
+ */
+
+.bar {
+  display: flex;
+  align-items: center; /* alignItems: center */
+  justify-content: space-between; /* justifyContent: space_between */
+  height: 72px; /* height: 72 */
+  padding: 0 20px; /* padding: [0, 20] */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
+  background: var(--color-canvas); /* fill: $canvas */
+}
+
+.status {
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  font-weight: 600; /* fontWeight: 600 */
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* gap: 8 */
+}

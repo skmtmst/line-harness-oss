@@ -1,0 +1,50 @@
+/*
+ * 案内帯。「この画面は何をするところか」を一行で言う帯。
+ *
+ * **1画面に1本だけ。** 2本並ぶと、どちらが大事なのか分からなくなる。
+ * 注意が要るときは色を変える（`tone`）。増やすのではなく差し替える。
+ *
+ * 置き場所は タブ か 数値カードの帯 の次。一覧の中には入れない。
+ */
+
+.note {
+  display: flex;
+  align-items: center; /* alignItems: center */
+  gap: 8px; /* gap: 8 */
+  padding: 10px 12px; /* padding: [10, 12] */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  font-weight: 600; /* fontWeight: 600 */
+}
+
+.icon {
+  width: 15px; /* width: 15 */
+  height: 15px;
+  flex: none;
+}
+
+/* ふつうの案内。 */
+.info {
+  background: var(--color-status-info-soft); /* fill: $status-info-soft */
+  color: var(--color-status-info); /* fill: $status-info */
+}
+
+/* 気をつけてほしいこと。 */
+.warn {
+  border: 1px solid var(--color-status-warn);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+
+/* 止めたほうがよいこと。 */
+.danger {
+  border: 1px solid var(--color-status-danger);
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
+
+/* 帯の右に置く操作（「この1件だけを見る」など）。 */
+.action {
+  margin-left: auto;
+  flex: none;
+}
