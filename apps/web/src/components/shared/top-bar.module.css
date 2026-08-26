@@ -1,0 +1,141 @@
+.root {
+  display: flex;
+  height: 56px;
+  min-width: 0;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-surface-chrome);
+}
+
+.titleGroup {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  max-width: 420px;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manual,
+.logout {
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  color: var(--color-status-info);
+  font-size: var(--text-caption);
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.manual:hover,
+.logout:hover {
+  text-decoration: underline;
+}
+
+.manual:focus-visible,
+.logout:focus-visible,
+.accountField select:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.spacer {
+  min-width: 16px;
+  flex: 1;
+}
+
+.accountField {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.accountField select {
+  width: 176px;
+  height: 36px;
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: var(--text-label);
+  padding: 0 28px 0 10px;
+}
+
+.separator {
+  width: 1px;
+  height: 24px;
+  flex-shrink: 0;
+  background: var(--color-hairline);
+}
+
+.identity {
+  display: flex;
+  min-width: 0;
+  max-width: 220px;
+  align-items: center;
+  gap: 8px;
+}
+
+.role {
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+  font-size: var(--text-nano);
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.user {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout {
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+@media (max-width: 1439px) {
+  .root {
+    gap: 12px;
+    padding: 0 16px;
+  }
+
+  .title {
+    max-width: 260px;
+  }
+
+  .accountField > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .identity {
+    max-width: 160px;
+  }
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Tabs } from '../shared/tabs'
 import styles from './merged-tabs.module.css'
 
 /**
@@ -51,6 +52,27 @@ export default function MergedTabs({
 }) {
   const router = useRouter()
   const home = defaultKey ?? tabs[0].key
+
+  const goTo = (tab: MergedTab) => {
+    router.replace(
+      tab.href ?? (tab.key === home ? basePath : `${basePath}?${paramName}=${tab.key}`),
+    )
+  }
+
+  if (variant === 'underline') {
+    return (
+      <Tabs
+        className={styles.shared}
+        items={tabs.map((tab) => ({
+          label: tab.label,
+          current: active === tab.key,
+          disabled: disabledKeys.includes(tab.key),
+          onClick: () => goTo(tab),
+        }))}
+      />
+    )
+  }
+
   return (
     <div
       className={variant === 'segmented' ? styles.segmented : styles.root}
@@ -67,9 +89,7 @@ export default function MergedTabs({
           onClick={() =>
             // 既定のタブはクエリを付けずに素のパスへ戻す。
             // ?tab=xxx が residue として残ると、共有したURLが分かりにくい。
-            router.replace(
-              t.href ?? (t.key === home ? basePath : `${basePath}?${paramName}=${t.key}`),
-            )
+            goTo(t)
           }
           className={`${styles.tab} ${variant === 'segmented' ? styles.segmentedTab : ''} ${active === t.key ? `${styles.selected} ${variant === 'segmented' ? styles.segmentedSelected : ''}` : ''}`}
         >
