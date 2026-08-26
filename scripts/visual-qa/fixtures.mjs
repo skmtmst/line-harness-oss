@@ -113,6 +113,33 @@ export const TAGS = (() => {
       n += 1
     }
   }
+  /*
+    整理候補の理由を付ける。**設計の絵に合わせて 未使用24・整理候補26。**
+
+    サーバーは `withCounts=1` のとき、理由が無くても `[]` を必ず返す約束
+    （`docs/v6-4-1-handoff.md` §0-1）。省略＝未取得なので、ここでも全件に付ける。
+    1件でも欠けると画面は「未取得」と判断し、KPIが `—` になる。
+
+    - 未使用 … 友だち0人**かつ**全参照0件。**後ろの24件**に寄せてある
+      （1ページ目の見た目を変えず、KPIの数だけ設計に合わせるため）
+    - 重複名 … 正規化して同じになる2件。**前後の空白違い**にしてあるので、
+      `NFKC → 前後空白除去 → 連続空白を1つ → 小文字化` が効いていないと数が合わない
+  */
+  const UNUSED_COUNT = 24
+  for (const row of rows) row.cleanupReasons = []
+
+  for (const row of rows.slice(-UNUSED_COUNT)) {
+    row.friendCount = 0
+    delete row.usedIn
+    row.cleanupReasons = ['unused']
+  }
+
+  // 重複名の2件。未使用と重ならない位置に置く（重なると26にならない）。
+  const dup = rows.filter((row) => row.cleanupReasons.length === 0).slice(40, 42)
+  dup[0].name = '長期未購入フォロー'
+  dup[1].name = '長期未購入フォロー　'
+  for (const row of dup) row.cleanupReasons = ['duplicate_name']
+
   return rows
 })()
 

@@ -105,14 +105,47 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain("tag.assignSource ? SOURCE_LABELS[tag.assignSource] : '—'")
     // 使用先。`withCounts=1` で読んでいるので、無いのは0件＝「未使用」。
     expect(source).toContain("api.tags.list({ withCounts: true })")
-    expect(source).toContain("if (!tag.usedIn) return '未使用'")
+    expect(source).toContain("if (!tag.usedIn) return 'なし'")
+    /*
+      「未使用」は **友だち0人かつ全参照0件**（kenta 確定 2026-08-26）。
+      参照だけで判断すると、200人に付いているタグまで整理候補に入る。
+      使用先の列で「未使用」と書かないのも同じ理由（言葉に2つの意味を持たせない）。
+    */
+    expect(source).toContain('return !tag.usedIn && (tag.friendCount ?? 0) === 0')
+    expect(source).toContain('const unused = isUnused(tag)')
     // 連動の「他N」。0件のときサーバーは省くので「他0」は出ない。
     expect(source).toContain('if (tag.otherActionCount) chips.push(')
-    // 整理候補は「未使用＋重複名」で、未使用の数とは別物。まだ返らない。
-    expect(source).toMatch(/title: '整理候補', value: null/)
+    // 整理候補は「未使用＋重複名」。未取得は `—`（value: null）、
+    // 取得できて0件は `0件`。単位の出し分けで見分ける。
+    expect(source).toContain("{ title: '整理候補', value: cleanupCount")
     // 削除の確認に固定値を書かない。
     expect(source).not.toMatch(/参照<\/dt><dd[^>]*>3件/)
-    expect(source).toContain("{ name: '積んだマイル', value: '—'")
+    // 積んだマイルは口を待たず、「そのまま残る」で固定（2026-08-26）。
+    // `—` に戻すと「まだ数えている」ように見え、いつまでも埋まらない欄になる。
+    expect(source).toContain("{ name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' }")
+  })
+
+  it('整理候補と未使用は、サーバーの cleanupReasons だけを数える', () => {
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    /*
+      同じ画面でKPI・絞り込み・使用先が別々に数えると、数が食い違った
+      理由を誰も追えなくなる。数え方は1つに寄せる。
+    */
+    // **読んでいない**ことを見る。コメントで名前に触れるのは構わない
+    // （文字列そのものを禁じると、理由を書いた注釈で落ちる）。
+    expect(source).not.toMatch(/\$\{stats\.tags\.unused\}/)
+    expect(source).not.toMatch(/value:\s*stats\.tags\.unused/)
+    expect(source).toContain("tag.cleanupReasons.includes('unused')")
+    expect(source).toContain("cleanupItems.filter((tag) => tag.cleanupReasons?.includes('unused')).length")
+    // 整理候補は「理由が1つでもある」タグ。両方に当たっても1つと数える。
+    expect(source).toContain('(tag.cleanupReasons?.length ?? 0) > 0')
+    // **1件でも欠けたら未取得。** 揃わないまま数えると少なく出る。
+    expect(source).toContain('items.every((tag) => Array.isArray(tag.cleanupReasons))')
+    // 読み込み中の空配列は未取得、取得済みの空配列は0件。
+    expect(source).toContain('return ready && items.every((tag) => Array.isArray(tag.cleanupReasons))')
+    // 未取得は `—`、取得できて0件は `0件`。
+    expect(source).toContain("`未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`")
+    expect(source).toContain("unit: cleanupCount === null ? '' : '件'")
   })
 
   it('「よく使う」は設計の5つで、どれも絞り込みに効く', () => {
@@ -155,6 +188,10 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain('影響を確認しています')
     expect(source).toContain('影響を確認できませんでした')
     expect(source).toContain('使用中のため削除できません')
+    // 消せるタグに赤い警告を出さない。以前は三項演算子の else で
+    // 「アフィリエイトのオファーで使用中」と誤表示していた。
+    expect(source).toContain("impactStatus === 'ready' && impact && !impact.canDelete && (")
+    expect(source).not.toContain('アフィリエイトのオファーで使用中のタグは削除できません')
   })
 
   it('参照先は0件のものを出さず、取れないときは「0」と書かない', () => {

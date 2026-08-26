@@ -258,6 +258,10 @@ for (const width of WIDTHS) {
       // **押せる／押せないが狙いどおりか。** 絵だけ見ていると見落とす。
       const remove = dialog.getByRole('button', { name: 'このタグを削除する' })
       if (item.canDelete) {
+        // 消せるのに赤い「使用中」警告を出さない。ボタンだけを見る試験では
+        // この誤表示を見逃したため、表示も同時に固定する。
+        await expect(dialog.locator('[data-qa="tag-delete-blocked-warning"]')).toHaveCount(0)
+        await expect(dialog.getByText('使用中のため、このタグは削除できません', { exact: true })).toHaveCount(0)
         // 名前を入れるまでは押せない。入れたら押せる。
         await expect(remove).toBeDisabled()
         await dialog.locator('input[type="text"], input:not([type])').first().fill(item.tag)
@@ -268,6 +272,7 @@ for (const width of WIDTHS) {
         // 使用中は、名前を入れても押せない。確認欄自体を使えなくしてある。
         await expect(remove).toBeDisabled()
         await expect(dialog.locator('input[type="text"], input:not([type])').first()).toBeDisabled()
+        await expect(dialog.locator('[data-qa="tag-delete-blocked-warning"]')).toBeVisible()
         await expect(dialog.getByText('使用中のため削除できません', { exact: false })).toBeVisible()
       }
 

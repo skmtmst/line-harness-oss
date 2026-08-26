@@ -147,15 +147,62 @@ const USAGE_LABELS: Array<[keyof NonNullable<Tag['usedIn']>, string]> = [
  * 使用先。設計は「配信3・フォーム1」のように数まで出す。
  *
  * **`withCounts=1` で読んでいるので、`usedIn` が無いのは「0件」。**
- * 集計していないわけではないので、`—` ではなく「未使用」と言い切ってよい。
+ * 集計していないわけではないので、`—` ではなく言い切ってよい。
  * （`withCounts` を付けずに読む画面でこの関数を使うときは、この前提が崩れる）
+ *
+ * **「なし」であって「未使用」ではない。** 2026-08-26 に「未使用」の定義が
+ * 「友だち0人**かつ**全参照0件」で確定した。この列が見ているのは参照だけなので、
+ * 友だち200人・参照0件のタグをここで「未使用」と書くと、絞り込みやKPIの
+ * 「未使用」と別の意味になる。同じ画面で1つの言葉に2つの意味を持たせない。
  */
 function usageLabel(tag: Tag): string {
-  if (!tag.usedIn) return '未使用'
+  if (!tag.usedIn) return 'なし'
   const parts = USAGE_LABELS
     .map(([key, label]) => (tag.usedIn?.[key] ? `${label}${tag.usedIn[key]}` : null))
     .filter(Boolean)
-  return parts.length ? parts.join('・') : '未使用'
+  return parts.length ? parts.join('・') : 'なし'
+}
+
+/**
+ * 整理候補の理由。サーバーがタグごとに返す（Codex実装中）。
+ *
+ * `unused` … 友だち0人**かつ**全18種の参照0件
+ * `duplicate_name` … 正規化した名前が他のタグと重なる
+ *   （NFKC → 前後空白除去 → 連続空白を1つ → 小文字化）
+ *
+ * **`packages/shared` の `Tag` に入るまでの仮置き。** 入ったらこの型を消す。
+ * `packages/shared` はCodexの担当なので、こちらからは触らない。
+ */
+type CleanupReason = 'unused' | 'duplicate_name'
+type TagWithCleanup = Tag & { cleanupReasons?: CleanupReason[] }
+
+/**
+ * 整理候補の数え方が**サーバーから来ているか**。
+ *
+ * **1つでも欠けていたら「来ていない」とみなす。** 揃っていないまま数えると、
+ * 欠けたぶんだけ少ない数を出すことになる。少なめに出た「未使用」は、
+ * 「整理するものは無い」と読まれて放置される。
+ *
+ * `cleanupReasons` は `withCounts=1` のとき**理由が無くても `[]` で必ず返す**
+ * 約束（`docs/v6-4-1-handoff.md` §0-1）。省略＝未取得。
+ */
+function cleanupKnown(items: TagWithCleanup[], ready: boolean): boolean {
+  // 読み込み中の空配列と、取得済みの0件を区別する。後者は `0件` と出せる。
+  return ready && items.every((tag) => Array.isArray(tag.cleanupReasons))
+}
+
+/**
+ * 未使用。**友だち0人かつ全18種の参照0件**（kenta 確定 2026-08-26）。
+ *
+ * 参照だけを見ていた頃は、200人に付いているタグまで「未使用」に入り、
+ * 整理候補として消させるところだった。
+ *
+ * サーバーが `cleanupReasons` を返しているならそれに従う。**画面とサーバーで
+ * 別々に数えない**（別々に数えると、同じ画面のKPIと絞り込みで数が食い違う）。
+ */
+function isUnused(tag: TagWithCleanup): boolean {
+  if (Array.isArray(tag.cleanupReasons)) return tag.cleanupReasons.includes('unused')
+  return !tag.usedIn && (tag.friendCount ?? 0) === 0
 }
 
 /** 連動が1つでもあるか。「連動あり」の絞り込みと削除の確認で使う。 */
@@ -373,10 +420,14 @@ function deleteImpactRows(
     { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件が空になります' },
     { name: '連動の停止', value: linked || 'なし', result: '以後は実行されません' },
     /*
-      積んだマイルの合計を返す口がまだ無い（設計の絵は「1,450 mile」）。
-      0 と書くと「積んでいない」ことになるので `—` にする。
+      **数は出さない。口も待たない。**（kenta 判断 2026-08-26）
+
+      設計の絵は「1,450 mile」だが、運用者がここで知りたいのは
+      「消したら取り上げられるのか」であって、何マイルかではない。
+      数が無くても判断はできる。`—` のままにすると「まだ数えている」
+      ように見え、いつまでも埋まらない欄になる。
     */
-    { name: '積んだマイル', value: '—', result: '戻りません' },
+    { name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' },
   ]
 }
 
@@ -464,13 +515,13 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
           ))}
         </dl>
 
-        {/* 設計 `WrDxu`。使用中で止まっているときは、その理由をここに出す。 */}
-        <div className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">
-          <p className="font-bold">{impactStatus === 'ready' && impact && !impact.canDelete
-            ? '使用中のため、このタグは削除できません'
-            : 'アフィリエイトのオファーで使用中のタグは削除できません'}</p>
-          <p className="mt-1 text-ink-secondary">その場合は、先に参照している側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p>
-        </div>
+        {/* 設計 `WrDxu`。使用中で止まっているときだけ、その理由をここに出す。 */}
+        {impactStatus === 'ready' && impact && !impact.canDelete && (
+          <div data-qa="tag-delete-blocked-warning" className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">
+            <p className="font-bold">使用中のため、このタグは削除できません</p>
+            <p className="mt-1 text-ink-secondary">先に参照している側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p>
+          </div>
+        )}
 
         {/* 設計 `seGRS`。 */}
         <label className="mt-5 block">
@@ -538,9 +589,9 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
     if (folder === UNGROUPED && tag.groupId) return false
     if (folder && folder !== UNGROUPED && tag.groupId !== folder) return false
     const linked = hasLinkedActions(tag)
-    // 「未使用」は**使用先が無いこと**。付与人数0とは別物で、
-    // 「誰にも付いていないが配信で使っている」タグを消させないため。
-    const unused = !tag.usedIn
+    // 「未使用」は**友だち0人かつ全参照0件**（`isUnused`）。
+    // 参照だけで判断すると、200人に付いているタグまで整理候補に入る。
+    const unused = isUnused(tag)
     if (usageFilter === 'linked' && !linked) return false
     if (usageFilter === 'unused' && !unused) return false
     if (sourceFilter !== 'all' && tag.assignSource !== sourceFilter) return false
@@ -564,6 +615,18 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
    * 0件と出すと「登録したものが消えた」ように見える。`—` に留める。
    */
   const ready = status === 'ready'
+
+  /*
+    整理候補の数。**未取得は `null`（画面では `—`）、取得できて0件は `0`。**
+    `—` と `0件` を混ぜない（`docs/v6-4-1-handoff.md` §0-1）。
+  */
+  const cleanupItems = items as TagWithCleanup[]
+  const cleanupCount = cleanupKnown(cleanupItems, ready)
+    ? cleanupItems.filter((tag) => (tag.cleanupReasons?.length ?? 0) > 0).length
+    : null
+  const unusedCount = cleanupKnown(cleanupItems, ready)
+    ? cleanupItems.filter((tag) => tag.cleanupReasons?.includes('unused')).length
+    : null
 
   const move = async (targetId: string) => {
     if (!dragId || dragId === targetId) return setDragId(null)
@@ -658,19 +721,28 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
           「今月の付与」も、いま画面に出ている一覧からは分からない。
           設計 `mfmn3` の4枚。
         */}
+        {/*
+          「未使用」と「整理候補」は **`cleanupReasons` から数える**。
+          `stats.tags.unused` は読まない。同じ画面のKPI・絞り込み・使用先が
+          別々の数え方をすると、数が食い違った理由を誰も追えなくなる。
+
+          設計 `qN3YX` の絵は 26件（未使用 24件とは別の数）。
+          整理候補 = 未使用 ∪ 重複名で、両方に当たっても**タグ1つ**と数える。
+          `cleanupReasons` がタグごとに返るので、重複除外は自動で効く。
+        */}
         <ListKpis
           titles={['タグ数', '付与済み友だち', '今月の付与', '整理候補']}
           build={(stats) => [
-            { title: 'タグ数', value: stats.tags.total, unit: '件', detail: `未使用 ${stats.tags.unused}件` },
+            {
+              title: 'タグ数',
+              value: stats.tags.total,
+              unit: '件',
+              // 未取得は `—`、取得できて0件なら `0件`。
+              detail: `未使用 ${unusedCount === null ? '—' : `${unusedCount}件`}`,
+            },
             { title: '付与済み友だち', value: stats.tags.taggedFriends, unit: '人', detail: '1つ以上付与' },
             { title: '今月の付与', value: stats.tags.assignedThisMonth, unit: '回', detail: '手動・自動' },
-            /*
-              設計 `qN3YX` の「整理候補」は **未使用＋重複名**（絵は 26件で、
-              未使用の 24件とは別の数）。サーバーはまだこの数を返さない。
-              未使用の数を置くと、重複名のぶんだけ少ない数を「整理候補」として
-              見せることになるので、取れるまで `—`。
-            */
-            { title: '整理候補', value: null, unit: '', detail: '未使用・重複名' },
+            { title: '整理候補', value: cleanupCount, unit: cleanupCount === null ? '' : '件', detail: '未使用・重複名' },
           ]}
         />
 
