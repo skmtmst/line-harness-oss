@@ -18,6 +18,7 @@ import { Suspense } from 'react'
 import { createPortal } from 'react-dom'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
+import Button from '@/components/shared/button'
 
 interface Chat {
   id: string
@@ -79,7 +80,7 @@ interface EmailInboxItem {
 const statusConfig: Record<Chat['status'], { label: string; className: string }> = {
   unread: { label: '未対応', className: 'bg-danger-bg text-danger' },
   in_progress: { label: '対応中', className: 'bg-warning-bg text-warning' },
-  on_hold: { label: '保留', className: 'bg-[#EEF2FF] text-[#4338CA]' },
+  on_hold: { label: '保留', className: 'bg-info-bg text-info' },
   resolved: { label: '対応済', className: 'bg-success-bg text-success' },
 }
 
@@ -1106,31 +1107,30 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           </div>
         </details>
         <div className="relative">
-          <button
+          <Button
             type="button"
             onClick={() => {
               setSavedViewsOpen((open) => !open)
               setSavedViewError('')
             }}
             aria-expanded={savedViewsOpen}
-            className="rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#2563EB] hover:bg-[#F7F8F6]"
           >
             保存した検索
-          </button>
+          </Button>
           {savedViewsOpen && (
-            <div className="absolute top-[calc(100%+6px)] right-0 z-40 w-80 rounded-xl border border-[#E5E7EB] bg-canvas p-4 shadow-xl">
-              <p className="text-sm font-bold text-[#1F2937]">保存した検索</p>
+            <div className="border-hairline absolute top-full right-0 z-40 mt-1.5 w-80 rounded-xl border bg-canvas p-4 shadow-xl">
+              <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
                 {savedViews.length === 0 ? (
-                  <p className="rounded-lg bg-[#F7F8F6] px-3 py-3 text-xs text-[#667085]">
+                  <p className="bg-canvas-sunken text-ink-faint rounded-lg px-3 py-3 text-xs">
                     まだ保存した検索はありません。
                   </p>
                 ) : savedViews.map((view) => (
-                  <div key={view.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-[#F7F8F6]">
+                  <div key={view.id} className="hover:bg-canvas-sunken flex items-center gap-2 rounded-lg px-2 py-1.5">
                     <button
                       type="button"
                       onClick={() => applySavedView(view)}
-                      className="min-w-0 flex-1 truncate text-left text-xs font-semibold text-[#344054]"
+                      className="text-ink min-w-0 flex-1 truncate text-left text-xs font-semibold"
                       title={view.name}
                     >
                       {view.name}{view.isShared ? '（共有）' : ''}
@@ -1141,7 +1141,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                         await api.chats.savedViews.delete(view.id)
                         await loadSavedViews()
                       }}
-                      className="shrink-0 rounded px-1.5 py-1 text-[11px] text-[#B42318] hover:bg-[#FEF3F2]"
+                      className="text-danger hover:bg-danger-bg shrink-0 rounded px-1.5 py-1 text-xs"
                       aria-label={`${view.name}を削除`}
                     >
                       削除
@@ -1149,8 +1149,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 ))}
               </div>
-              <div className="mt-3 border-t border-[#E5E7EB] pt-3">
-                <label htmlFor="saved-inbox-view-name" className="text-[11px] font-semibold text-[#667085]">
+              <div className="border-hairline mt-3 border-t pt-3">
+                <label htmlFor="saved-inbox-view-name" className="text-ink-faint text-xs font-semibold">
                   現在の条件を保存
                 </label>
                 <div className="mt-1.5 flex gap-2">
@@ -1160,16 +1160,16 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     onChange={(event) => setSavedViewName(event.target.value)}
                     maxLength={40}
                     placeholder="例：自分の未対応"
-                    className="min-w-0 flex-1 rounded-lg border border-[#D0D5DD] px-3 py-2 text-xs outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
+                    className="border-hairline focus:ring-accent min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none focus:border-accent focus:ring-2"
                   />
-                  <button
+                  <Button
+                    variant="primary"
                     type="button"
                     onClick={() => void createSavedView()}
                     disabled={savingView}
-                    className="rounded-lg bg-[#06C755] px-3 py-2 text-xs font-semibold text-on-accent disabled:opacity-50"
                   >
                     {savingView ? '保存中' : '保存'}
-                  </button>
+                  </Button>
                 </div>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
@@ -2120,7 +2120,7 @@ function ChatsPageHost() {
   return (
     <div className="space-y-3">
       <div data-design="Head">
-        <Header title="受信箱" />
+        <Header title="受信箱" action={<Button href="/support">マニュアル</Button>} />
       </div>
 
       <div data-design="KPIs" data-inbox-v4="summary">

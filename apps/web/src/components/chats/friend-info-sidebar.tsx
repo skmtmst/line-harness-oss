@@ -61,7 +61,7 @@ function formatDate(iso: string | null): string {
 const statusLabels: Record<NonNullable<ChatStatusInfo['status']>, { label: string; className: string }> = {
   unread: { label: '未対応', className: 'bg-red-100 text-red-700' },
   in_progress: { label: '対応中', className: 'bg-yellow-100 text-yellow-700' },
-  on_hold: { label: '保留', className: 'bg-indigo-100 text-indigo-700' },
+  on_hold: { label: '保留', className: 'bg-action-soft text-action' },
   resolved: { label: '対応済', className: 'bg-success-bg text-success' },
 }
 
