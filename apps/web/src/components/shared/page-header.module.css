@@ -1,0 +1,42 @@
+/*
+ * ページヘッダー。★V5 227枚すべての先頭にある帯。
+ *
+ * 中身は パンくず ／ 題 ／ 一行の説明 ／ 右に操作。
+ * V5では左を「見出し」、右を「ヘッダー操作」と呼ぶ。以前は画面によって
+ * 「左」「右操作」という名前も混ざっていたが、V5で1つに決めた。
+ *
+ * **操作の最後は必ず「マニュアル」。** どの画面からでも同じ位置にある。
+ */
+
+.header {
+  display: flex;
+  align-items: center; /* alignItems: center */
+  justify-content: space-between; /* justifyContent: space_between */
+  gap: 16px;
+}
+
+.heading {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 5px; /* gap: 5 */
+  min-width: 0;
+}
+
+.title {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-display); /* fontSize: $size-display */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.description {
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  font-weight: 500; /* fontWeight: 500 */
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* gap: 8 */
+  flex: none;
+}

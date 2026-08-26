@@ -1,0 +1,51 @@
+/*
+ * 標準プルダウン。Pencil V5 の `rpot9`「共通 標準プルダウン（閉）」。★V5 で176回。
+ * 3番目に多い部品なのに、これまでコード側に受け皿が無かった。
+ *
+ * 一覧の上に置く件数切り替え `niGPF`「20件表示」も**同じ形**で、
+ * 高さ42px・角丸8px・余白 [0,13]・文字13px まで一致する。
+ * 違うのは既定の幅（176 と 128）だけなので、幅は呼び出し側から渡す。
+ *
+ * `<select>` を素で使う。見た目を合わせるために `appearance: none` にして、
+ * 矢印は背景画像で描く（要素を重ねるとキーボード操作の邪魔になる）。
+ */
+
+.select {
+  display: block;
+  width: 100%;
+  height: 42px; /* height: 42 */
+  padding: 0 34px 0 13px; /* padding: [0, 13] ＋ 矢印のぶん右を空ける */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline / strokeWidth: 1 */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background-color: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 600; /* fontWeight: 600 */
+  appearance: none;
+  cursor: pointer;
+
+  /* chevron-down 16px / $ink-faint(#6e7781) */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236e7781' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+  background-size: 16px 16px; /* 下向き 16 */
+}
+
+.select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+/* 呼び出し側で幅を決めないときの既定。 */
+.default {
+  width: 176px; /* rpot9 width: 176 */
+}
+
+.compact {
+  width: 128px; /* niGPF width: 128 */
+}

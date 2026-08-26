@@ -1,0 +1,63 @@
+/*
+ * 一覧の行に置くアイコン操作。Pencil V5 の
+ *   `K65Uhe` 一覧 並び替えハンドル（75回）
+ *   `Ls12y`  一覧 削除（赤いゴミ箱）（75回）
+ *   `H0V8EK` 共通 その他操作（…）（14回）
+ *
+ * 3つとも 32×32 の当たり、中のアイコンは18px。地も枠も無い。
+ * 色だけが違う（ハンドルと … は `$ink-faint`、削除は `$status-danger`）。
+ *
+ * **並び替えハンドルは行の先頭に置く。** 右の操作列に混ぜると、
+ * 「押す」ものと「つかむ」ものが同じ列に並んで押し間違える。
+ */
+
+.action {
+  display: inline-flex;
+  width: 32px; /* width: 32 */
+  height: 32px; /* height: 32 */
+  align-items: center; /* alignItems: center */
+  justify-content: center; /* justifyContent: center */
+  border: none;
+  border-radius: var(--radius-tiny); /* cornerRadius: $radius-xxs */
+  background: none;
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  cursor: pointer;
+  flex: none;
+}
+
+.action:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.icon {
+  width: 18px; /* width: 18 */
+  height: 18px; /* height: 18 */
+}
+
+/* Ls12y 一覧 削除（赤いゴミ箱） */
+.danger {
+  color: var(--color-status-danger); /* fill: $status-danger */
+}
+
+.danger:hover:not(:disabled) {
+  background: var(--color-status-danger-soft);
+}
+
+/* K65Uhe 一覧 並び替えハンドル。押すものではなく、つかむもの。 */
+.grip {
+  cursor: grab;
+}
+
+.grip:active {
+  cursor: grabbing;
+}
