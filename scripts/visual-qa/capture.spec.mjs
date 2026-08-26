@@ -28,6 +28,15 @@ const FAILURE_TEXTS = [
   'Application error',
 ]
 
+/**
+ * ログイン画面に出る文字。**これが出ていたら、その画面は見ていない。**
+ *
+ * 2026-08-26: 文言だけ見ていたら、24件すべてログイン画面を撮ったまま
+ * 「通過」していた。`AuthGuard` が `router.replace('/login')` で飛ばすので、
+ * エラーの文言はどこにも出ない。**行き先のURLを必ず見る。**
+ */
+const LOGIN_TEXT = 'LINEでログイン'
+
 test.describe.configure({ mode: 'parallel' })
 
 for (const width of WIDTHS) {
@@ -48,25 +57,34 @@ for (const width of WIDTHS) {
 
       await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle' })
 
-      // 1. 描けているか
+      // 1. そのページに居るか。ログインへ飛ばされていたら、見ているのは別の画面。
+      const landed = new URL(page.url()).pathname
+      expect(landed, `${route.path} から ${landed} へ飛ばされた`).toBe(route.path)
+
+      // 2. 描けているか
       const body = await page.locator('body').innerText()
+      expect(body, `${route.path} がログイン画面になっている`).not.toContain(LOGIN_TEXT)
       for (const bad of FAILURE_TEXTS) {
         expect(body, `${route.path} が「${bad}」で止まっている`).not.toContain(bad)
       }
 
-      // 2. 横スクロールが出ていないか。V6共通ルール §1-8。
+      // 3. 横スクロールが出ていないか。V6共通ルール §1-8。
       //    1px の誤差は端数なので許す。2px 以上はレイアウトの破れ。
       const overflow = await page.evaluate(() =>
         document.documentElement.scrollWidth - document.documentElement.clientWidth,
       )
       expect(overflow, `${route.path} に横スクロールが出ている（${overflow}px）`).toBeLessThan(2)
 
-      // 3. 前回と変わっていないか
+      // 4. 前回と変わっていないか
+      //
+      //    Next.js の開発表示（左下の丸い印）は毎回わずかに違う絵を描く。
+      //    写し込むと3〜4%ずれて、毎回赤くなる。隠して比べる。
       await expect(page).toHaveScreenshot(`${route.name}-${width}.png`, {
         fullPage: true,
         // 文字のにじみで毎回わずかに違う。0.2%までは同じとみなす。
         maxDiffPixelRatio: 0.002,
         animations: 'disabled',
+        mask: [page.locator('nextjs-portal')],
       })
     })
   }
