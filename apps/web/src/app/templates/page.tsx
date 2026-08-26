@@ -277,6 +277,7 @@ export default function TemplatesPage() {
       <div data-design="KPIs">
       {activeSection === 'message' && <ListKpis
         variant="v6"
+        titles={['テンプレート', '今月の送信', '未使用', '使用中']}
         build={(s) => [
             { title: 'テンプレート', value: s.templates.total, unit: '件', detail: `使用中 ${s.templates.inUse}` },
             {
