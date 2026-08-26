@@ -4,7 +4,7 @@ import type { Env } from '../index.js';
 
 const mocks = {
   getTags: vi.fn(),
-  getTagsWithCounts: vi.fn(),
+  getTagsWithUsage: vi.fn(),
   createTag: vi.fn(),
   deleteTag: vi.fn(),
   updateTagMileageSettings: vi.fn(),
