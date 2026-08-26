@@ -1,0 +1,111 @@
+/*
+ * 右カラム（幅390px）に置く2枚のカード。
+ *
+ *   つながる先     この画面から呼ぶ・呼ばれる機能を並べる
+ *   気をつけること  先に知らないと事故になることを並べる
+ *
+ * **順番は「つながる先 → 気をつけること」で固定。** 気をつけることを
+ * 最後に置くのは、読み終わりに残したいのがそちらだから。
+ *
+ * つながる先は「相手の機能名」と「ひとこと」の2つだけ。ここに操作を
+ * 足さない。足すと画面ごとに形が割れる。
+ */
+
+.card {
+  display: flex;
+  flex-direction: column; /* layout: vertical */
+  gap: 12px; /* gap: 12 */
+  padding: 16px; /* padding: 16 */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
+  background: var(--color-canvas); /* fill: $canvas */
+}
+
+.title {
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+/* --- つながる先 ------------------------------------------------------- */
+
+.linkRow {
+  display: flex;
+  align-items: center; /* alignItems: center */
+  justify-content: space-between; /* justifyContent: space_between */
+  gap: 10px; /* gap: 10 */
+}
+
+.linkName {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px; /* gap: 6 */
+  color: var(--color-status-info); /* fill: $status-info */
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.linkName:hover {
+  text-decoration: underline;
+}
+
+.linkName:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.linkIcon {
+  width: 13px; /* width: 13 */
+  height: 13px;
+  flex: none;
+}
+
+.linkNote {
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-micro); /* fontSize: $size-micro */
+  font-weight: 500; /* fontWeight: 500 */
+  text-align: right;
+}
+
+/* --- 気をつけること --------------------------------------------------- */
+
+.careCard {
+  gap: 10px; /* gap: 10 */
+  border-color: var(--color-status-warn); /* stroke: $status-warn */
+  background: var(--color-status-warn-soft); /* fill: $status-warn-soft */
+}
+
+.careTitle {
+  color: var(--color-status-warn-deep); /* fill: $status-warn-deep */
+}
+
+.careRow {
+  display: flex;
+  gap: 8px; /* gap: 8 */
+}
+
+.careIcon {
+  width: 15px; /* width: 15 */
+  height: 15px;
+  flex: none;
+  color: var(--color-status-warn-deep);
+}
+
+.careText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px; /* gap: 1 */
+  min-width: 0;
+}
+
+.careHead {
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-caption); /* fontSize: $size-caption */
+  font-weight: 700;
+}
+
+.careNote {
+  color: var(--color-status-warn-deep);
+  font-size: var(--text-micro); /* fontSize: $size-micro */
+  font-weight: 500;
+}

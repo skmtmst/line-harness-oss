@@ -1,0 +1,54 @@
+/*
+ * 入力欄。Pencil V5 の `ytG7l`「共通 入力欄」（102回）と
+ * `keKe3`「共通 入力欄（複数行）」（22回）。
+ *
+ * 1行と複数行で、地・枠・角丸・文字は同じ。違うのは高さと余白だけ。
+ *   1行   高さ40px  余白 [0,12]
+ *   複数行 高さ120px 余白 14px  行間1.7
+ */
+
+.field {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-control); /* cornerRadius: $radius-sm */
+  background: var(--color-canvas); /* fill: $canvas */
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 400; /* fontWeight: normal */
+  font-family: inherit;
+}
+
+.field::placeholder {
+  color: var(--color-ink-faint);
+}
+
+.field:disabled {
+  cursor: not-allowed;
+  background: var(--color-canvas-sunken);
+  opacity: 0.6;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+/* ytG7l 共通 入力欄 */
+.single {
+  height: 40px; /* height: 40 */
+  padding: 0 12px; /* padding: [0, 12] */
+}
+
+/* keKe3 共通 入力欄（複数行） */
+.multi {
+  min-height: 120px; /* height: 120 */
+  padding: 14px; /* padding: 14 */
+  line-height: 1.7; /* lineHeight: 1.7 */
+  resize: vertical;
+}
+
+/* 入力が正しくないとき。枠を赤くするだけで、文字色は変えない。 */
+.invalid {
+  border-color: var(--color-status-danger);
+}

@@ -687,6 +687,12 @@
     "direct-secondary-button": 1,
     "direct-primary-button": 1
   },
+  "components/shared/breadcrumb.tsx": {
+    "unresolved-classname": 4
+  },
+  "components/shared/chip.tsx": {
+    "unresolved-classname": 1
+  },
   "components/shared/condition-builder.tsx": {
     "direct-secondary-button": 7,
     "direct-primary-button": 2,
@@ -703,6 +709,36 @@
   "components/shared/list-toolbar.tsx": {
     "direct-primary-button": 1,
     "direct-secondary-button": 2
+  },
+  "components/shared/note-bar.tsx": {
+    "unresolved-classname": 4
+  },
+  "components/shared/page-header.tsx": {
+    "unresolved-classname": 5
+  },
+  "components/shared/row-actions.tsx": {
+    "unresolved-classname": 4
+  },
+  "components/shared/select-field.tsx": {
+    "unresolved-classname": 1
+  },
+  "components/shared/side-cards.tsx": {
+    "unresolved-classname": 14
+  },
+  "components/shared/sticky-bar.tsx": {
+    "unresolved-classname": 3
+  },
+  "components/shared/tabs.tsx": {
+    "unresolved-classname": 4
+  },
+  "components/shared/text-field.tsx": {
+    "unresolved-classname": 2
+  },
+  "components/shared/toggle.tsx": {
+    "unresolved-classname": 1
+  },
+  "components/shared/top-bar.tsx": {
+    "unresolved-classname": 12
   },
   "components/staff/login-audit.tsx": {
     "arbitrary-value": 1,

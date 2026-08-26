@@ -1,0 +1,55 @@
+/*
+ * 印（チップ）。Pencil V5 の一覧・カードの中で、状態や区分を1語で示す小さな札。
+ *
+ * 色は5種類だけ。**緑（accent）は「オン・正常」にだけ使う。**
+ * 状態表示にアクセント色を混ぜると、ブランド色を変えたときに意味が壊れる。
+ *
+ * 高さ17pxは Pencil の印と同じ。文字は10px(nano)。
+ */
+
+.chip {
+  display: inline-flex;
+  align-items: center; /* alignItems: center */
+  height: 17px; /* height: 17 */
+  padding: 0 7px; /* padding: [0, 7] */
+  border: 1px solid;
+  border-radius: var(--radius-pill); /* cornerRadius: $radius-full */
+  font-size: var(--text-nano); /* fontSize: $size-nano */
+  font-weight: 700; /* fontWeight: 700 */
+  white-space: nowrap;
+}
+
+/* 落ち着いた印。「同じスイッチ」など、注意ではない補足。 */
+.neutral {
+  border-color: var(--color-hairline);
+  background: var(--color-surface-pearl);
+  color: var(--color-ink-faint);
+}
+
+/* 数や行き先を示す印。 */
+.info {
+  border-color: var(--color-status-info);
+  background: var(--color-status-info-soft);
+  color: var(--color-status-info);
+}
+
+/* オン・正常。 */
+.ok {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-deep);
+}
+
+/* 気をつけること。文字は warn-deep。warn(#f5c56b) のままだと読めない。 */
+.warn {
+  border-color: var(--color-status-warn);
+  background: var(--color-status-warn-soft);
+  color: var(--color-status-warn-deep);
+}
+
+/* 止まっている・失敗した。 */
+.danger {
+  border-color: var(--color-status-danger);
+  background: var(--color-status-danger-soft);
+  color: var(--color-status-danger);
+}
