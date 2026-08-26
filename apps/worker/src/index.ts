@@ -26,6 +26,9 @@ import { processDueReminders } from './services/booking-reminders.js';
 import { runExpirer } from './services/booking-expirer.js';
 import { processDueEventReminders } from './services/event-booking-reminders.js';
 import { processDueMeetConsultationReminders } from './services/meet-consultation-reminders.js';
+import { processDueAutomationRuns } from './services/automation-engine.js';
+import { createAutomationActionExecutors } from './services/automation-action-executors.js';
+import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
 import { sendBookingNotification } from './services/booking-notifier.js';
@@ -1102,6 +1105,39 @@ async function scheduled(
     await refreshLineAccessTokens(env.DB);
   } catch (e) {
     console.error('token refresh error:', e);
+  }
+
+  // V6オートメーションの日時指定を起動し、待機・一時失敗中の実行を再開する。
+  // 同じ5分Cronにまとめても、実行・処理ごとの冪等キーで二重実行を防ぐ。
+  try {
+    const now = new Date(event.scheduledTime).toISOString();
+    const executors = createAutomationActionExecutors({
+      credentialEncryptionKey: env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    });
+    const scheduledResult = await processScheduledAutomationTriggers(env.DB, {
+      now, executors, limit: 100,
+    });
+    for (const result of scheduledResult.results) {
+      if (result.kind === 'configuration_error') {
+        console.error(JSON.stringify({
+          event: 'automation_v6_scheduled_trigger_failed',
+          automationId: result.automationId,
+          reason: result.error,
+        }));
+      }
+    }
+    const dueResult = await processDueAutomationRuns(env.DB, {
+      now, executors, limit: 100,
+    });
+    if (scheduledResult.results.length + dueResult.processed > 0) {
+      console.log(JSON.stringify({
+        event: 'automation_v6_cron',
+        scheduled: scheduledResult.results.length,
+        resumed: dueResult.processed,
+      }));
+    }
+  } catch (e) {
+    console.error('automation-v6 cron error:', e);
   }
 
   // XServerメールボックスを5分Cronごとに確認し、LINEと同じ未対応一覧へ取り込む。

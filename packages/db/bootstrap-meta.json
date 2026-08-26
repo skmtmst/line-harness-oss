@@ -188,7 +188,9 @@
     "179_friend_add_event_ledger.sql",
     "180_codex_cloud_tasks.sql",
     "181_automation_v6_foundation.sql",
-    "182_automation_v6_runtime.sql"
+    "182_automation_v6_runtime.sql",
+    "183_automation_action_account_scope.sql",
+    "184_line_account_timezone.sql"
   ],
-  "migrationCount": 189
+  "migrationCount": 191
 }

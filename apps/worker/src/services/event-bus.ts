@@ -24,6 +24,7 @@ import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delive
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
+import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
 
 import {
   applyRichMenuTargeting,
@@ -31,6 +32,8 @@ import {
 } from './rich-menu-targeting.js';
 
 export interface EventPayload {
+  /** 再配達されても同じ出来事と判定できる、発生元の不変ID。 */
+  sourceEventId?: string;
   friendId?: string;
   eventData?: Record<string, unknown>;
   conversionEventName?: string;
@@ -79,6 +82,20 @@ export async function fireEvent(
 
   // Phase 2: evaluate automations.
   await processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+
+  // V6は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
+  // 旧イベントの時刻などからIDを推測すると再配達で二重実行になるため、
+  // 接続元が明示していないイベントは移行PRで接続するまで実行しない。
+  if (lineAccountId && enrichedPayload.sourceEventId) {
+    await dispatchAutomationEventWithLogging(db, {
+      lineAccountId,
+      eventType,
+      sourceEventId: enrichedPayload.sourceEventId,
+      friendId: enrichedPayload.friendId,
+      eventData: enrichedPayload.eventData,
+      lineAccessToken,
+    });
+  }
 
   // Phase 3: リッチメニューの出し分けを見直す。
   //
