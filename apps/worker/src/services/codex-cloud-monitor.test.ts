@@ -6,6 +6,7 @@ import {
   classifyOfficialCodexMessage,
   extractChatGptTaskUrl,
   hasActualSlackMention,
+  hasClaudeToCodexMarker,
   hasConfiguredRelayChannelGate,
   isAllowedRelayChannel,
   isAllowedRelaySource,
@@ -93,6 +94,12 @@ const inspectMessage = {
 };
 
 describe('Codex cloud monitor event classification', () => {
+  test('生とSlackエスケープ済みのClaude合図を対象にする', () => {
+    expect(hasClaudeToCodexMarker('[claude->codex]\n依頼')).toBe(true);
+    expect(hasClaudeToCodexMarker('[claude-&gt;codex]\n依頼')).toBe(true);
+    expect(hasClaudeToCodexMarker('[claude-&amp;gt;codex]\n依頼')).toBe(false);
+  });
+
   test('Slackの実メンションだけを対象にする', () => {
     expect(hasActualSlackMention('<@U-CODEX> D-8を確認してください', 'U-CODEX')).toBe(true);
     expect(hasActualSlackMention('<@U-CODEX|Codex> D-8を確認してください', 'U-CODEX')).toBe(
