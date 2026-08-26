@@ -12,9 +12,8 @@
 //
 // See: docs/superpowers/specs/2026-07-29-auto-webinar-design.md
 
-import { Hono, type Context } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
-  getWebinars,
   getWebinarById,
   getWebinarBySlug,
   createWebinar,
@@ -58,6 +57,7 @@ import {
 } from '../services/webinar-mileage.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const webinarRoutes = new Hono<Env>();
 
@@ -639,6 +639,30 @@ webinarRoutes.get('/webinar-assets/:token/:slug/*', async (c) => {
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
+async function adminAccountScope(c: Context<Env>) {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const column = 'account_id';
+  const where = scope.allowedAccountIds.length
+    ? `(${column} IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${column} IS NULL` : ''})`
+    : scope.canSeeUnassigned
+      ? `${column} IS NULL`
+      : '1 = 0';
+  return { scope, where };
+}
+
+const requireVisibleWebinar: MiddlewareHandler<Env> = async (c, next) => {
+  const webinar = await getWebinarById(c.env.DB, c.req.param('id') ?? '');
+  if (!webinar || !await canAccessAllLineAccounts(
+    c.env.DB, c.get('staff'), [webinar.account_id ?? null],
+  )) {
+    return c.json({ success: false, error: 'Not found' }, 404);
+  }
+  await next();
+};
+
+webinarRoutes.use('/api/webinars/:id', requireVisibleWebinar);
+webinarRoutes.use('/api/webinars/:id/*', requireVisibleWebinar);
+
 function serializeWebinar(row: Webinar) {
   return {
     id: row.id,
@@ -730,8 +754,11 @@ function validateWebinarBody(
 
 webinarRoutes.get('/api/webinars', async (c) => {
   try {
-    const items = await getWebinars(c.env.DB);
-    return c.json({ success: true, data: items.map(serializeWebinar) });
+    const { scope, where } = await adminAccountScope(c);
+    const items = await c.env.DB.prepare(
+      `SELECT * FROM webinars WHERE ${where} ORDER BY created_at DESC`,
+    ).bind(...scope.allowedAccountIds).all<Webinar>();
+    return c.json({ success: true, data: items.results.map(serializeWebinar) });
   } catch (err) {
     console.error('GET /api/webinars error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -741,6 +768,9 @@ webinarRoutes.get('/api/webinars', async (c) => {
 webinarRoutes.post('/api/webinars', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<WebinarBody>();
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
     const input = validateWebinarBody(body, { requireCore: true });
     if (typeof input === 'string') return c.json({ success: false, error: input }, 400);
     const existing = await getWebinarBySlug(c.env.DB, body.slug!);
@@ -772,6 +802,11 @@ webinarRoutes.put('/api/webinars/:id', requireRole('owner', 'admin'), async (c) 
     const row = await getWebinarById(c.env.DB, id);
     if (!row) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<WebinarBody>();
+    if (body.accountId !== undefined && !await canAccessAllLineAccounts(
+      c.env.DB, c.get('staff'), [body.accountId],
+    )) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
     const input = validateWebinarBody(body, { requireCore: false });
     if (typeof input === 'string') return c.json({ success: false, error: input }, 400);
     if (body.slug && body.slug !== row.slug) {

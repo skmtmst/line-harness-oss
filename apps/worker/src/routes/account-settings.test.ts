@@ -1,8 +1,21 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
-import { accountSettings } from './account-settings.js';
+import type { Env } from '../index.js';
 
-const app = new Hono();
+const accessMocks = vi.hoisted(() => ({ canAccess: vi.fn(async () => true) }));
+vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: accessMocks.canAccess,
+}));
+
+const { accountSettings } = await import('./account-settings.js');
+
+const app = new Hono<Env>();
+app.use('*', async (c, next) => {
+  c.set('staff', {
+    id: 'owner', name: 'Owner', role: 'owner', readOnly: false, tenantId: 'tenant-a',
+  });
+  await next();
+});
 app.route('/', accountSettings);
 
 describe('GET /api/account-settings/test-recipient-login-users', () => {
@@ -48,9 +61,12 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
       'line-account-1',
       'line-account-1',
       'line-account-1',
+      '00000000-0000-4000-8000-000000000001',
+      'tenant-a',
     );
     expect(prepare.mock.calls[0]?.[0]).toContain('JOIN friends f ON f.line_user_id = sm.line_user_id');
     expect(prepare.mock.calls[0]?.[0]).toContain('scoped.line_account_id = ?');
+    expect(prepare.mock.calls[0]?.[0]).toContain('COALESCE(sm.tenant_id, ?) = ?');
     expect(await response.json()).toEqual({
       success: true,
       data: [
@@ -70,5 +86,35 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
         },
       ],
     });
+  });
+
+  test('SQLでリクエスト元職員の統括だけに絞る', async () => {
+    const all = vi.fn(async () => ({ results: [] }));
+    const bind = vi.fn(() => ({ all }));
+    const prepare = vi.fn(() => ({ bind }));
+
+    await app.request(
+      '/api/account-settings/test-recipient-login-users?accountId=line-account-1',
+      {}, { DB: { prepare } },
+    );
+
+    expect(bind.mock.calls[0]?.slice(-2)).toEqual([
+      '00000000-0000-4000-8000-000000000001', 'tenant-a',
+    ]);
+  });
+});
+
+describe('PUT /api/account-settings/test-recipients', () => {
+  test('別統括のアカウントは保存前に403にする', async () => {
+    accessMocks.canAccess.mockResolvedValueOnce(false);
+    const prepare = vi.fn();
+
+    const response = await app.request('/api/account-settings/test-recipients', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'other-account', friendIds: [] }),
+    }, { DB: { prepare } });
+
+    expect(response.status).toBe(403);
+    expect(prepare).not.toHaveBeenCalled();
   });
 });
