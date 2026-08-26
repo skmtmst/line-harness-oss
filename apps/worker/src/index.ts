@@ -1250,6 +1250,20 @@ async function scheduled(
     }
   }
 
+  // 人を特定できる分析イベントと保存照合は13か月、日別集計は25か月。
+  // 業務の正本は触らず、分析用の読取データだけを期限で削除する。
+  if (event.cron === '0 */6 * * *') {
+    try {
+      const { purgeExpiredAnalyticsReadData } = await import('@line-crm/db');
+      const purged = await purgeExpiredAnalyticsReadData(env.DB, new Date(event.scheduledTime));
+      if (purged.events + purged.dailyMetrics + purged.reconciliationRuns > 0) {
+        console.log(JSON.stringify({ event: 'analytics_retention_purged', ...purged }));
+      }
+    } catch (e) {
+      console.error('analytics retention purge error:', e);
+    }
+  }
+
   // 飲食店向け予約メールの原文は、既定90日で非公開R2から破棄する。
   // D1の台帳行は残し、r2_keyとstatusで破棄済みを追跡する。
   if (event.cron === '0 */6 * * *') {
@@ -1394,6 +1408,18 @@ async function scheduled(
           console.log(
             `[mileage-queue] processed=${result.processed} failed=${result.failed} granted=${result.granted}`,
           );
+        }
+      }),
+    );
+    jobs.push(
+      import('./services/analytics-projection.js').then(async ({ refreshRecentAnalyticsProjections }) => {
+        const result = await refreshRecentAnalyticsProjections(
+          env.DB,
+          dbAccounts,
+          new Date(event.scheduledTime),
+        );
+        if (result.processed > 0) {
+          console.log(JSON.stringify({ event: 'analytics_projection_tick', ...result }));
         }
       }),
     );
