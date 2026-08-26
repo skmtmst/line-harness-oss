@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   rebuildAnalyticsDailyMetrics: vi.fn(),
   recentAnalyticsProjectionRange: vi.fn(),
   ensureAnalyticsEventCoverage: vi.fn(),
+  ensureAnalyticsUrlExposureCoverage: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', async () => ({
@@ -20,6 +21,7 @@ beforeEach(() => {
   });
   mocks.rebuildAnalyticsDailyMetrics.mockResolvedValue({ status: 'matched' });
   mocks.ensureAnalyticsEventCoverage.mockResolvedValue(undefined);
+  mocks.ensureAnalyticsUrlExposureCoverage.mockResolvedValue(undefined);
 });
 
 describe('分析の日別投影更新', () => {
@@ -47,6 +49,10 @@ describe('分析の日別投影更新', () => {
         lineAccountId: 'account-a',
         eventTypes: expect.arrayContaining(['friend_add', 'message_received']),
       }),
+    );
+    expect(mocks.ensureAnalyticsUrlExposureCoverage).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ lineAccountId: 'account-a' }),
     );
   });
 

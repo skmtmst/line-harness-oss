@@ -278,6 +278,34 @@ CREATE TABLE analytics_result_audiences (
   created_at          TEXT NOT NULL
 );
 
+CREATE TABLE analytics_url_exposure_queue (
+  message_id            TEXT PRIMARY KEY,
+  line_account_id       TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  status                TEXT NOT NULL DEFAULT 'pending'
+                          CHECK (status IN ('pending','processing','processed','failed')),
+  attempts              INTEGER NOT NULL DEFAULT 0,
+  available_at          TEXT NOT NULL,
+  processing_started_at TEXT,
+  processed_at          TEXT,
+  last_error            TEXT,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL
+);
+
+CREATE TABLE analytics_url_exposures (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  message_id      TEXT NOT NULL,
+  friend_id       TEXT REFERENCES friends(id) ON DELETE SET NULL,
+  tracked_link_id TEXT NOT NULL,
+  source_kind     TEXT NOT NULL,
+  source_id       TEXT,
+  audience_state  TEXT NOT NULL DEFAULT 'known'
+                  CHECK (audience_state IN ('known','unknown')),
+  sent_at         TEXT NOT NULL,
+  created_at      TEXT NOT NULL,
+  PRIMARY KEY (line_account_id, message_id, tracked_link_id)
+);
+
 CREATE TABLE auto_replies (
   id               TEXT PRIMARY KEY,
   keyword          TEXT NOT NULL,
@@ -2535,6 +2563,17 @@ CREATE INDEX idx_analytics_reconciliation_account_time
 CREATE INDEX idx_analytics_result_audiences_expiry
   ON analytics_result_audiences(line_account_id, expires_at);
 
+CREATE INDEX idx_analytics_url_exposure_queue_due
+  ON analytics_url_exposure_queue(status, available_at, created_at)
+  WHERE status IN ('pending','failed');
+
+CREATE INDEX idx_analytics_url_exposures_friend_time
+  ON analytics_url_exposures(line_account_id, friend_id, sent_at)
+  WHERE friend_id IS NOT NULL;
+
+CREATE INDEX idx_analytics_url_exposures_link_time
+  ON analytics_url_exposures(line_account_id, tracked_link_id, sent_at, friend_id);
+
 CREATE INDEX idx_auto_replies_template_id ON auto_replies(template_id);
 
 CREATE INDEX idx_auto_reply_hits_friend ON auto_reply_hits(auto_reply_id, friend_id);
@@ -3158,6 +3197,26 @@ CREATE TRIGGER trg_common_action_published_version_no_delete
 BEFORE DELETE ON common_action_versions
 WHEN OLD.status = 'published'
 BEGIN SELECT RAISE(ABORT, 'published common action version cannot be deleted'); END;
+
+CREATE TRIGGER trg_messages_log_queue_url_exposure
+AFTER INSERT ON messages_log
+WHEN NEW.direction = 'outgoing'
+ AND instr(NEW.content, '/t/') > 0
+ AND COALESCE(
+       NEW.line_account_id,
+       (SELECT line_account_id FROM friends WHERE id = NEW.friend_id)
+     ) IS NOT NULL
+BEGIN
+  INSERT OR IGNORE INTO analytics_url_exposure_queue (
+    message_id, line_account_id, status, attempts, available_at, created_at, updated_at
+  ) VALUES (
+    NEW.id,
+    COALESCE(
+      NEW.line_account_id,
+      (SELECT line_account_id FROM friends WHERE id = NEW.friend_id)
+    ),
+    'pending', 0, NEW.created_at, NEW.created_at, NEW.created_at
+  ); END;
 
 -- Seed data required by tenant-aware inserts on a fresh database.
 INSERT OR IGNORE INTO tenants (id, name) VALUES

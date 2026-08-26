@@ -206,17 +206,41 @@ describe('V6分析イベントと日別投影', () => {
     `);
     crossInsert.run('old-cross', '2025-07-25T00:00:00.000Z');
     crossInsert.run('kept-cross', '2025-07-27T00:00:00.000Z');
+    sqlite.prepare(
+      `INSERT INTO analytics_url_exposure_queue (
+         message_id, line_account_id, status, attempts, available_at,
+         processed_at, created_at, updated_at
+       ) VALUES ('old-message','account-a','processed',1,'2025-07-25','2025-07-25','2025-07-25','2025-07-25'),
+                ('kept-message','account-a','processed',1,'2025-07-27','2025-07-27','2025-07-27','2025-07-27')`,
+    ).run();
+    sqlite.prepare(
+      `INSERT INTO analytics_url_exposures (
+         line_account_id, message_id, friend_id, tracked_link_id,
+         source_kind, sent_at, created_at
+       ) VALUES ('account-a','old-message',NULL,'old-link','message','2025-07-25','2025-07-25'),
+                ('account-a','kept-message',NULL,'kept-link','message','2025-07-27','2025-07-27')`,
+    ).run();
 
     const result = await purgeExpiredAnalyticsReadData(
       db,
       new Date('2026-08-26T00:00:00.000Z'),
     );
 
-    expect(result).toMatchObject({ events: 1, dailyMetrics: 1, crossRuns: 1 });
+    expect(result).toMatchObject({
+      events: 1,
+      dailyMetrics: 1,
+      crossRuns: 1,
+      urlExposures: 1,
+      urlExposureQueue: 1,
+    });
     expect(sqlite.prepare(`SELECT id FROM analytics_events`).all()).toEqual([{ id: 'kept-event' }]);
     expect(sqlite.prepare(`SELECT metric_key FROM analytics_daily_metrics`).all())
       .toEqual([{ metric_key: 'kept' }]);
     expect(sqlite.prepare(`SELECT id FROM analytics_cross_runs`).all())
       .toEqual([{ id: 'kept-cross' }]);
+    expect(sqlite.prepare(`SELECT message_id FROM analytics_url_exposures`).all())
+      .toEqual([{ message_id: 'kept-message' }]);
+    expect(sqlite.prepare(`SELECT message_id FROM analytics_url_exposure_queue`).all())
+      .toEqual([{ message_id: 'kept-message' }]);
   });
 });

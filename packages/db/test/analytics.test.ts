@@ -159,6 +159,8 @@ describe('getBroadcastSummary', () => {
         isActive: true,
         clicks: 1,
         uniqueFriends: 1,
+        firstClickedAt: '2026-08-22T10:00:00.000',
+        lastClickedAt: '2026-08-22T10:00:00.000',
       },
     ]);
   });

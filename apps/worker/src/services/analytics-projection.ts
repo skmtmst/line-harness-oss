@@ -2,6 +2,7 @@ import {
   rebuildAnalyticsDailyMetrics,
   recentAnalyticsProjectionRange,
   ensureAnalyticsEventCoverage,
+  ensureAnalyticsUrlExposureCoverage,
   type LineAccount,
 } from '@line-crm/db';
 
@@ -36,6 +37,11 @@ export async function refreshRecentAnalyticsProjections(
           'friend_add', 'friend_unfollow', 'message_received', 'postback_received',
         ],
         availableFrom: now.toISOString(),
+      });
+      await ensureAnalyticsUrlExposureCoverage(db, {
+        lineAccountId: account.id,
+        availableFrom: now.toISOString(),
+        updatedAt: cutoffAt,
       });
       const projection = await rebuildAnalyticsDailyMetrics(db, {
         accountId: account.id,
