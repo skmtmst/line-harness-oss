@@ -1,5 +1,7 @@
 import { jstNow } from './utils.js';
 
+const LOOKUP_CHUNK = 90;
+
 /**
  * メディアライブラリ。
  *
@@ -193,13 +195,18 @@ export async function pruneStaleMediaUsages(
   mediaIds: string[],
 ): Promise<number> {
   if (mediaIds.length === 0) return 0;
-  const placeholders = mediaIds.map(() => '?').join(',');
-  const result = await db
-    .prepare(
-      `DELETE FROM media_usages
-        WHERE scanned_at < ? AND media_id IN (${placeholders})`,
-    )
-    .bind(scannedBefore, ...mediaIds)
-    .run();
-  return result.meta?.changes ?? 0;
+  let changes = 0;
+  for (let index = 0; index < mediaIds.length; index += LOOKUP_CHUNK) {
+    const chunk = mediaIds.slice(index, index + LOOKUP_CHUNK);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await db
+      .prepare(
+        `DELETE FROM media_usages
+          WHERE scanned_at < ? AND media_id IN (${placeholders})`,
+      )
+      .bind(scannedBefore, ...chunk)
+      .run();
+    changes += result.meta?.changes ?? 0;
+  }
+  return changes;
 }
