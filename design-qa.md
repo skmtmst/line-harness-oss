@@ -285,3 +285,99 @@ final result: passed
 3. 実装画像を再取得し、全体比較と内部メモ重点比較で指定箇所が解消していることを確認した。
 
 final result: passed
+
+---
+
+# V6 4-1 タグCSV一括登録 Design QA
+
+## 比較対象
+
+- source visual truth: `/Users/kentakenta/.pencil/documents/4b332ccf-fe84-4df8-9e23-6554f2bef197/pencil-new.pen`
+- Pencil実Node:
+  - 選択 `H374MR`
+  - 確認 `sfTEW`
+  - 完了 `op1rh`
+  - 一部失敗 `QzRsJ`
+- implementation route: `/tags` の「CSVで一括登録」から開く実フロー
+- implementation screenshots:
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-select-1920-darwin.png`
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-preview-1920-darwin.png`
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-success-1920-darwin.png`
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/tags-csv-partial-1920-darwin.png`
+  - 同名の `1440` 版4枚
+
+## 正規化
+
+- source: 1920 x 1080 px、Pencilの1920画面、density 1相当
+- implementation: 1920 x 1080 CSS px / 1440 x 1080 CSS px、Playwright `deviceScaleFactor: 1`
+- 1920は同じ画面全体・同じモックデータ・同じ状態で比較した。
+- 1440はPencilに同幅の正本がないため、レスポンシブ安全性として左右の見切れとページ全体の横スクロールがないことを検査した。
+- ブラウザUIや端末枠は含めていない。
+
+## Full-view comparison evidence
+
+- Pencilの4 Nodeを `TakeScreenshot` で取得し、各1920実装画像と同じ比較入力で確認した。
+- モーダル面の実測値を正本へ合わせた。
+  - 選択: 620 x 455
+  - 確認: 1200 x 696
+  - 完了: 620 x 245
+  - 一部失敗: 1000 x 511
+- オーバーレイ、面の角丸、内側余白、見出し、説明、集計、状態色、表、下部操作の構成を確認した。
+- 1440 / 1920の8画像を3回連続で差分0として確認した。
+- 既存ルートと4-1の空・読込・失敗・権限不足・削除を含む全44画像も通過した。
+
+## Focused region comparison evidence
+
+- 選択欄: ブラウザ標準の英語入力を使わず、「CSVを選ぶ」「ファイル未選択」「UTF-8・最大500件」を正本どおり日本語で分離した。
+- 確認表: 新規・見送り・入力確認を同じ画面で確認し、60文字上限・改行禁止・未分類への移動を表示した。
+- 結果面: 全件成功と一部失敗を別Node・別画像で確認した。
+- 一部失敗: 入らなかった行だけの一覧とCSV書き出し操作を確認した。
+- 画像・ロゴ・独自イラストはこの4状態に存在しない。アイコンは既存のLucideを使用した。
+
+## Required fidelity surfaces
+
+- Fonts and typography: 既存のV6管理画面フォント、20px見出し、13px説明、12px表文字、太さと1行省略を確認した。
+- Spacing and layout rhythm: 4面の幅・高さ、28px内側余白、18px間隔、12px角丸、中央配置を確認した。
+- Colors and visual tokens: canvas / hairline / ink / accent / info / warning / danger の既存トークンを使用した。生の状態色は追加していない。
+- Image quality and asset fidelity: 対象画面に画像資産はない。状態アイコンはベクターのLucideで鮮明に表示される。
+- Copy and content: 内部語を出さず、未取得と0件、見送りと入力確認、成功と一部失敗を別の言葉で表示した。
+
+## Comparison history
+
+1. [P1] 確認面の500行が他領域を押しつぶした。
+   - fix: 面の高さを696pxへ固定し、見出し・集計・絞り込み・下部操作を縮ませず、表だけをスクロール領域にした。
+   - post-fix: `tags-csv-preview-1920-darwin.png` で集計4枚と操作が正しく表示されることを確認した。
+2. [P1] 選択欄がブラウザ標準の英語 `Choose File / No file chosen` を表示した。
+   - fix: 入力はアクセシブルに隠し、日本語の選択ボタン・ファイル名・条件を表示した。
+   - post-fix: `tags-csv-select-1440-darwin.png` と1920版で確認した。
+3. [P1] ファイル選択直後にPortalが移動すると、選択内容が失われる競合があった。
+   - fix: マウント完了前は描画せず、開くたびにダイアログを新規マウントする形へ変更した。
+   - post-fix: 8画像を3回連続で実操作から通した。
+4. [P2] 確認画像の先頭行が新規だけで、見送り・入力確認を目視できなかった。
+   - fix: 件数を変えず、代表行を先頭に並べるVisual QAデータへ変更した。
+   - post-fix: 状態バッジと理由を同じ確認画像で確認した。
+5. [P2] 直接の表見出しを9個追加し、共通部品の契約に反した。
+   - fix: 既存の `TableHeadRow` / `Th` を再利用した。
+   - post-fix: Web全632件、全44画像、本番用Webビルドを通した。
+
+## Findings
+
+- P0 / P1 / P2: 残件なし。
+- P3: なし。正本にない装飾は追加しない。
+
+## Primary interactions tested
+
+- CSV選択、BOM付きUTF-8解析、引用符・カンマ・改行、500行上限、1MB上限
+- dry-run確認、状態別絞り込み、登録、全件成功、一部失敗
+- 入らなかった行だけのCSV書き出し、数式注入対策
+- Escape / 背景クリック / 処理中の閉じ防止 / フォーカス管理
+- 1440 / 1920でページ全体の横スクロールとモーダル見切れがないこと
+
+## Console errors checked
+
+- Visual QAの44試験で、対象画面の500・ログイン遷移・`準備中`停止がないことを確認した。
+- 対象操作に起因するブラウザエラーなし。
+
+## Final result
+
+final result: passed

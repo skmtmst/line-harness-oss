@@ -18,6 +18,7 @@ import { Tabs } from '@/components/shared/tabs'
 import FriendFieldList from './field-list'
 import SupportMarkList from './mark-list'
 import SavedSearchList from './saved-search-list'
+import TagCsvImportDialog from './tag-csv-import-dialog'
 
 const TABS = [
   ['tags', 'タグ'],
@@ -561,6 +562,7 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
   const [page, setPage] = useState(1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Tag | null>(null)
+  const [csvOpen, setCsvOpen] = useState(false)
 
   const load = useCallback(async () => {
     if (fixture) return
@@ -647,38 +649,6 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
     }
   }
 
-  /**
-   * いま画面に出ている絞り込み結果を、そのままCSVにする。
-   *
-   * **名前は毎回変える。** `tags.csv` 固定だと、2回目からブラウザが
-   * `tags (1).csv` を作り、どの日のどの絞り込みか分からなくなる。
-   * 絞り込みの中身（フォルダ名）も名前に入れる。
-   */
-  const exportCsv = () => {
-    const rows = filtered.map((tag) => [
-      tag.name,
-      groups.find((group) => group.id === tag.groupId)?.name ?? '未分類',
-      tag.friendCount ?? 0,
-      sourceLabel(tag),
-      usageLabel(tag),
-      linkChips(tag).map((chip) => chip.label).join('／') || 'なし',
-      formatDate(tag.createdAt),
-      tag.isStarred ? '一覧に表示' : '非表示',
-    ])
-    const csv = [
-      ['タグ名', 'フォルダ', '付与人数', '自動付与のもと', '使用先', '連動', '登録日', '友だち一覧への表示'],
-      ...rows,
-    ].map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\r\n')
-    const scope = folder === UNGROUPED ? '未分類' : folder ? groups.find((group) => group.id === folder)?.name ?? '' : ''
-    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Tokyo' }).format(new Date())
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = ['タグ一覧', scope, today].filter(Boolean).join('-') + '.csv'
-    anchor.click()
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <div>
       {/*
@@ -697,16 +667,20 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
         actions={tab === 'tags' && status !== 'forbidden' ? (
           /*
             設計 `Sn86o` はここに CSV だけ。作る操作は KPI の下（`HWP5R`）。
-
-            **設計の文言は「CSVで一括登録」だが、押すと出力される。**
-            取り込みは別画面（設計 `★ V6 4-1-H タグCSV一括登録`）で、
-            受け口のAPIもまだ無い。取り込みと書いて出力するのは嘘なので、
-            いまは「出力」と書く。4-1-H と取り込みAPIができたら、
-            この枠を取り込みへ渡し、出力の置き場所を決め直す。
+            `H374MR` から確認 `sfTEW`、完了 `op1rh`、一部失敗 `QzRsJ`
+            まで同じ操作の中で進む。
           */
-          <Button type="button" onClick={exportCsv}>CSVで出力</Button>
+          <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
         ) : undefined}
       />
+
+      {csvOpen ? (
+        <TagCsvImportDialog
+          open
+          onClose={() => setCsvOpen(false)}
+          onCompleted={() => void load()}
+        />
+      ) : null}
 
       {tab === 'tags' ? <>
         {/*

@@ -9,6 +9,9 @@ import type {
   FriendAddEventRoutingStatus,
   Tag,
   TagGroup,
+  TagCsvImportInputRow,
+  TagCsvImportPreview,
+  TagCsvImportResult,
   FriendField,
   FriendFieldType,
   SupportMark,
@@ -1083,6 +1086,18 @@ export const api = {
     /** withCounts で friendCount 付き (JOIN 集計 — タグ管理ページ用)。 */
     list: (params?: { withCounts?: boolean }) =>
       fetchApi<ApiResponse<Tag[]>>(`/api/tags${params?.withCounts ? '?withCounts=1' : ''}`),
+    /** CSVを保存せずに検査し、行ごとの扱いを返す。 */
+    importPreview: (rows: TagCsvImportInputRow[]) =>
+      fetchApi<ApiResponse<TagCsvImportPreview>>('/api/tags/import/preview', {
+        method: 'POST',
+        body: JSON.stringify({ rows }),
+      }),
+    /** 保存直前に再検査し、登録できる行だけをまとめて作る。 */
+    importCsv: (rows: TagCsvImportInputRow[]) =>
+      fetchApi<ApiResponse<TagCsvImportResult>>('/api/tags/import', {
+        method: 'POST',
+        body: JSON.stringify({ rows }),
+      }),
     /**
      * 削除する前に、何が失われるかを数えて返す（PR #381）。
      *
