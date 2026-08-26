@@ -53,12 +53,24 @@ function ruleBody(css, selector) {
   return bodies.join(';')
 }
 
-/** ビルド後は `.summary-card_card__A1b2` のようにハッシュが付く。 */
-function builtRuleBody(css, prefix, cls) {
-  const re = new RegExp(`\\.${prefix}_${cls}__[A-Za-z0-9_-]+\\s*\\{([^}]*)\\}`, 'g')
+/**
+ * ビルド後は `.summary-card_card__A1b2` のようにハッシュが付く。
+ *
+ * CSS最適化は、同じ宣言を持つクラスを
+ * `.breadcrumb_root__A,.sticky_actions__B{display:flex;gap:8px}` のように
+ * 1つへ束ねる。単独セレクタだけを探すと、実際には配信されている宣言を
+ * 「宣言なし」と誤判定するため、カンマ区切りのセレクタも読む。
+ */
+export function builtRuleBody(css, prefix, cls) {
+  const escaped = `${prefix}_${cls}__`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  // hover・[hidden]・子孫指定は別状態なので、基準状態の完全一致だけを拾う。
+  const target = new RegExp(`^\\.${escaped}[A-Za-z0-9_-]+$`)
+  const re = /([^{}]+)\{([^{}]*)\}/g
   const bodies = []
   let m
-  while ((m = re.exec(css))) bodies.push(m[1])
+  while ((m = re.exec(css))) {
+    if (m[1].split(',').some((selector) => target.test(selector.trim()))) bodies.push(m[2])
+  }
   return bodies.join(';')
 }
 

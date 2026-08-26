@@ -162,14 +162,19 @@ describe('友だち属性 V4 contract', () => {
     }
   })
 
-  it('CSVは押したとおりのことをして、名前が毎回変わる', () => {
+  it('CSV一括登録は選択・確認・完了・一部失敗を同じ操作で通す', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
-    // 設計の文言は「CSVで一括登録」だが、取り込みの画面もAPIもまだ無い。
-    // 取り込みと書いて出力するのは嘘なので、いまは「出力」と書く。
-    expect(source).toContain('CSVで出力')
-    // `tags.csv` 固定だと、2回目から `tags (1).csv` になって区別が付かない。
-    expect(source).not.toContain("download = 'tags.csv'")
-    expect(source).toContain("['タグ一覧', scope, today]")
+    const dialog = read('components/friend-fields/tag-csv-import-dialog.tsx')
+    expect(source).toContain('<TagCsvImportDialog')
+    expect(source).toContain('CSVで一括登録')
+    expect(source).not.toContain('CSVで出力')
+    expect(dialog).toContain('api.tags.importPreview(rows)')
+    expect(dialog).toContain('api.tags.importCsv(rows)')
+    for (const nodeId of ['H374MR', 'sfTEW', 'op1rh', 'QzRsJ']) {
+      expect(dialog).toContain(`'${nodeId}'`)
+    }
+    expect(dialog).toContain('入らなかった')
+    expect(dialog).toContain('failedTagRowsCsv(result.rows)')
   })
 
   it('使用中のタグを、画面が削除させない', () => {
