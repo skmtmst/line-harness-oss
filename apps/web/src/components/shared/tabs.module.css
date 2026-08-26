@@ -1,0 +1,66 @@
+/*
+ * ページ内タブ。Pencil V5 の `VPn1F`（選択中）と `ISA1Q`（通常）。
+ *
+ * ★V5 227枚のうち 278回使われていて、共通メニュー・サマリーカードに次いで多い。
+ * 2つは高さ・余白・文字サイズがまったく同じで、**下線の色と文字の色・太さだけ**が違う。
+ * なので枠を `.tab` に置き、違いを `.current` で足す。
+ *
+ * 通常のタブにも下線を 2px 引く（色は透明）。引かないと、選択中に切り替わった
+ * ときだけ 2px 背が高くなって、タブ全体が 2px 上下する。
+ */
+
+.list {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 44px; /* 種別タブ height: 44 */
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center; /* alignItems: center */
+  height: 44px; /* height: 44 */
+  padding: 0 4px; /* padding: [0, 4] */
+  border-bottom: 2px solid transparent; /* strokeWidth: {bottom: 2} / stroke: #00000000 */
+  color: var(--color-ink-secondary); /* fill: $ink-secondary */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  font-weight: 500; /* fontWeight: 500 */
+  white-space: nowrap;
+  cursor: pointer;
+  background: none;
+}
+
+.tab:hover:not(.current) {
+  color: var(--color-ink);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--color-status-info);
+  outline-offset: 2px;
+}
+
+.tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* VPn1F 共通 ページ内タブ項目（選択中） */
+.current {
+  border-bottom-color: var(--color-accent); /* stroke: $accent */
+  color: var(--color-accent); /* fill: $accent */
+  font-weight: 700; /* fontWeight: 700 */
+  cursor: default;
+}
+
+/* 件数。タブの文字の右に置く。 */
+.count {
+  margin-left: 6px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+  font-weight: 600;
+}
+
+.current .count {
+  color: var(--color-accent);
+}

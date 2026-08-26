@@ -5,6 +5,10 @@
   border-bottom: 1px solid var(--color-hairline);
 }
 
+.shared {
+  margin-bottom: 20px;
+}
+
 .tab {
   display: inline-flex;
   height: 44px;

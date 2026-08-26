@@ -1,0 +1,71 @@
+/* ---------------------------------------------------------------------
+ * 一覧表の外枠と行。Pencil V5 の `RwC76`「共通 標準一覧表」。★V5 で60回。
+ *
+ * 外枠は角丸10px・枠線1px・はみ出しを切る。角を丸めた枠の中に表を
+ * 入れるので、`border-collapse: separate` にして角が欠けないようにする。
+ *
+ * 行の高さは58px。見出し行だけ44px。行と行の間は上側に1本。
+ * ------------------------------------------------------------------- */
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--color-canvas); /* fill: $canvas */
+  table-layout: fixed;
+}
+
+.frame {
+  overflow: hidden; /* clip: true */
+  border: 1px solid var(--color-hairline); /* stroke: $hairline */
+  border-radius: var(--radius-tile); /* cornerRadius: $radius-md */
+}
+
+.row {
+  height: 58px; /* 行 height: 58 */
+}
+
+.row + .row .bodyCell {
+  border-top: 1px solid var(--color-hairline); /* strokeWidth: {top: 1} */
+}
+
+.bodyCell {
+  padding: 0 12px; /* padding: [0, 12] */
+  color: var(--color-ink); /* fill: $ink */
+  font-size: var(--text-body); /* fontSize: $size-body */
+  vertical-align: middle; /* justifyContent: center */
+}
+
+/* 名前のセル。名前・副題・注記の3段。副題と注記は無くてよい。 */
+.name {
+  font-weight: 700; /* fontWeight: 700 */
+}
+
+.sub {
+  margin-top: 2px; /* gap: 2 */
+  color: var(--color-ink-faint); /* fill: $ink-faint */
+  font-size: var(--text-label); /* fontSize: $size-label */
+  font-weight: 400;
+}
+
+.memo {
+  margin-top: 2px;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro); /* fontSize: $size-micro */
+  font-weight: 400;
+}
+
+/* 並び替えハンドルの列。行の先頭に置く。幅40px・中央。 */
+.handleCell {
+  width: 40px; /* width: 40 */
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* 右端の操作列。ボタンを2つ以上置くときは幅を切らない。 */
+.actionCell {
+  padding: 0 12px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
