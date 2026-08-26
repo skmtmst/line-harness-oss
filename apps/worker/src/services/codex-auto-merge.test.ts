@@ -127,17 +127,25 @@ describe('PR禁止差分', () => {
   test.each([
     ['packages/db/migrations/0099.sql', 'migration'],
     ['apps/worker/src/middleware/auth.ts', 'protected_file'],
+    ['apps/worker/src/middleware/tenant-scope.ts', 'protected_file'],
+    ['apps/worker/src/services/account-access.ts', 'protected_file'],
+    ['apps/worker/src/services/codex-auto-merge.ts', 'protected_file'],
+    ['apps/worker/src/services/codex-slack-events.ts', 'protected_file'],
+    ['apps/worker/src/services/codex-cloud-monitor.ts', 'protected_file'],
+    ['apps/worker/src/services/slack-text.ts', 'protected_file'],
+    ['apps/worker/wrangler.toml', 'protected_file'],
+    ['apps/worker/wrangler.staging.toml', 'protected_file'],
     ['apps/worker/.dev.vars', 'environment_file'],
     ['apps/worker/.env.staging', 'environment_file'],
   ])('%s を拒否する', (filename, reason) => {
     expect(prohibitedPullRequestChange([{ filename }])).toMatchObject({ reason, filename });
   });
 
-  test('wranglerへの秘密値とGitHub secret追加を拒否し、通常のfalse設定は許可する', () => {
+  test('wranglerは内容にかかわらず保護し、GitHub secret追加も拒否する', () => {
     expect(prohibitedPullRequestChange([{
       filename: 'apps/worker/wrangler.staging.toml',
       patch: '+API_TOKEN = "actual-sensitive-value"',
-    }])?.reason).toBe('secret_addition');
+    }])?.reason).toBe('protected_file');
     expect(prohibitedPullRequestChange([{
       filename: '.github/workflows/deploy.yml',
       patch: '+          token: ${{ secrets.NEW_DEPLOY_TOKEN }}',
@@ -145,7 +153,7 @@ describe('PR禁止差分', () => {
     expect(prohibitedPullRequestChange([{
       filename: 'apps/worker/wrangler.staging.toml',
       patch: '+CODEX_AUTO_MERGE_ENABLED = "false"',
-    }])).toBeNull();
+    }])?.reason).toBe('protected_file');
   });
 });
 
@@ -177,6 +185,24 @@ describe('必須チェック', () => {
 });
 
 describe('Codex自動マージ処理', () => {
+  test.each([401, 403])('GitHub APIが %i なら秘密をログに出さずSlackへ停止理由を返す', async (status) => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(parentResponse())
+      .mockResolvedValueOnce(json({ message: 'token github-token rejected' }, status))
+      .mockResolvedValueOnce(json({ ok: true }));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(processCodexAutoMerge(env(), message, fetcher as typeof fetch)).resolves.toBeUndefined();
+
+    expect(postedText(fetcher)).toContain(`GitHub APIが失敗しました (${status} /repos/skmtmst/line-harness-oss/pulls/344)`);
+    const logged = error.mock.calls.flat().join(' ');
+    expect(logged).toContain(`"status":${status}`);
+    expect(logged).toContain('"path":"/repos/skmtmst/line-harness-oss/pulls/344"');
+    expect(logged).not.toContain('github-token');
+    expect(logged).not.toContain('token github-token rejected');
+    error.mockRestore();
+  });
+
   test('親メッセージにPR宣言がなければ合図のPR番号で処理を続ける', async () => {
     const fetcher = vi.fn()
       .mockResolvedValueOnce(parentResponseWithoutMetadata())
@@ -321,5 +347,28 @@ describe('Codex自動マージ処理', () => {
     ));
     expect(String((ledgerCall?.[1] as RequestInit).body)).toContain('codex-auto-merge-ledger:v1');
     expect(postedText(fetcher)).toContain('自動マージ完了');
+  });
+
+  test('マージ後の台帳書き込みだけが失敗したらマージ済み・台帳未記録を報告する', async () => {
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(parentResponse())
+      .mockResolvedValueOnce(json(pullRequest()))
+      .mockResolvedValueOnce(json([]))
+      .mockResolvedValueOnce(json([{ filename: 'apps/worker/src/routes/example.ts' }]))
+      .mockResolvedValueOnce(json(passedChecks()))
+      .mockResolvedValueOnce(json({ statuses: [] }))
+      .mockResolvedValueOnce(json(pullRequest()))
+      .mockResolvedValueOnce(json(passedChecks()))
+      .mockResolvedValueOnce(json({ statuses: [] }))
+      .mockResolvedValueOnce(json({ merged: true, sha: 'merge-sha' }))
+      .mockResolvedValueOnce(json({ message: 'forbidden' }, 403))
+      .mockResolvedValueOnce(json({ ok: true }));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(processCodexAutoMerge(env(), message, fetcher as typeof fetch)).resolves.toBeUndefined();
+
+    expect(postedText(fetcher)).toContain('マージ済みですが台帳に記録できませんでした');
+    expect(postedText(fetcher)).toContain('二重マージ防止の記録がない');
+    error.mockRestore();
   });
 });
