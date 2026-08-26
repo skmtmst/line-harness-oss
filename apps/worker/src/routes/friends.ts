@@ -878,10 +878,12 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
     const sentAt = jstNow();
     await db.batch([
       db.prepare(
-        `INSERT OR IGNORE INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, created_at)
-         VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'manual', ?)`,
+        `INSERT OR IGNORE INTO messages_log (
+           id, friend_id, direction, message_type, content, broadcast_id,
+           scenario_step_id, source, line_account_id, created_at
+         ) VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, 'manual', ?, ?)`,
       )
-        .bind(logId, friend.id, messageType, body.content, sentAt),
+        .bind(logId, friend.id, tracked.messageType, tracked.content, friendAccountId, sentAt),
       completeOutboundSendStatement(db, {
         key: idempotencyKey,
         responseId: logId,

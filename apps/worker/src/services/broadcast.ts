@@ -257,6 +257,21 @@ export async function processBroadcastSend(
       );
       const { requestId } = await lineClient.broadcast([message], retryKey);
       await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
+      if (broadcastAccountId) {
+        try {
+          const { recordUnknownAnalyticsUrlExposures } = await import('@line-crm/db');
+          await recordUnknownAnalyticsUrlExposures(db, {
+            lineAccountId: broadcastAccountId,
+            messageId: `line-broadcast:${broadcast.id}`,
+            content: finalContent,
+            sourceKind: 'broadcast_all',
+            sourceId: broadcast.id,
+            sentAt: jstNow(),
+          });
+        } catch (error) {
+          console.error('analytics URL exposure record failed:', error);
+        }
+      }
       // We don't have exact count for broadcast API, set as 0 (unknown)
       totalCount = 0;
       successCount = 0;
@@ -309,7 +324,7 @@ export async function processBroadcastSend(
             db.prepare(
               `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
                VALUES (?, ?, 'outgoing', ?, ?, ?, NULL, 'broadcast', ?, ?)`,
-            ).bind(crypto.randomUUID(), friend.id, broadcast.message_type, broadcast.message_content, broadcastId, broadcastAccount, now),
+            ).bind(crypto.randomUUID(), friend.id, finalType, finalContent, broadcastId, broadcastAccount, now),
           );
           await db.batch(logStmts);
         } catch (err) {

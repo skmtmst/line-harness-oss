@@ -24,6 +24,7 @@ const mocks = {
   getAnalyticsFriendsOverview: vi.fn(),
   getAnalyticsReactionsOverview: vi.fn(),
   getAnalyticsRoutesOverview: vi.fn(),
+  getAnalyticsUrlClicksOverview: vi.fn(),
   getAnalyticsUsageOverview: vi.fn(),
   createAnalyticsCrossAudience: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
@@ -117,6 +118,7 @@ beforeEach(() => {
   mocks.getAnalyticsFriendsOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.getAnalyticsReactionsOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.getAnalyticsRoutesOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
+  mocks.getAnalyticsUrlClicksOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.getAnalyticsUsageOverview.mockResolvedValue({ lineAccountId: 'account-a', data: {} });
   mocks.createAnalyticsCrossAudience.mockResolvedValue({
     id: 'audience-cross-1', memberCount: 2, expiresAt: '2026-08-27T00:00:00.000Z',
@@ -214,6 +216,28 @@ describe('V6分析の概要API', () => {
       `/api/analytics/friends?${ACCOUNT}&from=2025-01-01&to=2026-08-30`,
     )).status).toBe(400);
     expect(mocks.getAnalyticsFriendsOverview).not.toHaveBeenCalled();
+  });
+
+  it('URLクリックは期間と表示件数を渡す', async () => {
+    const res = await req(
+      `/api/analytics/url-clicks?${ACCOUNT}&from=2026-08-01&to=2026-08-30&limit=50`,
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.getAnalyticsUrlClicksOverview).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        lineAccountId: 'account-a',
+        fromDate: '2026-08-01',
+        toDate: '2026-08-30',
+      }),
+      50,
+    );
+  });
+
+  it.each(['0', '201', '1.5', 'abc'])('URLクリックの不正な表示件数 %s を弾く', async (limit) => {
+    const res = await req(`/api/analytics/url-clicks?${ACCOUNT}&limit=${limit}`);
+    expect(res.status).toBe(400);
+    expect(mocks.getAnalyticsUrlClicksOverview).not.toHaveBeenCalled();
   });
 });
 

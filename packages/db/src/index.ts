@@ -70,5 +70,6 @@ export * from './analytics-funnels';
 export * from './analytics-funnel-migration';
 export * from './analytics-cross';
 export * from './analytics-overviews';
+export * from './analytics-url-exposures';
 export * from './dashboard';
 export * from './operation-audit';

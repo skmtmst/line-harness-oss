@@ -1436,6 +1436,17 @@ async function scheduled(
       }),
     );
     jobs.push(
+      import('@line-crm/db').then(async ({ processPendingAnalyticsUrlExposures }) => {
+        const result = await processPendingAnalyticsUrlExposures(env.DB, {
+          limit: 100,
+          now: new Date(event.scheduledTime).toISOString(),
+        });
+        if (result.claimed > 0) {
+          console.log(JSON.stringify({ event: 'analytics_url_exposure_queue', ...result }));
+        }
+      }),
+    );
+    jobs.push(
       import('./services/analytics-projection.js').then(async ({ refreshRecentAnalyticsProjections }) => {
         const result = await refreshRecentAnalyticsProjections(
           env.DB,
