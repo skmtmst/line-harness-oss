@@ -414,11 +414,29 @@ tags.post('/api/tags', requireRole('owner', 'admin'), async (c) => {
 });
 
 // DELETE /api/tags/:id - delete tag
-// friend_tags rows cascade via FK (ON DELETE CASCADE), but affiliate_offers.tag_id
-// references tags without a cascade — D1 enforces it, so surface that as 409.
+// 画面を通さず直接APIを呼ばれても、運用設定から参照中のタグは消さない。
+// friend_tags rows cascade via FK (ON DELETE CASCADE) and do not block deletion;
+// the delete-impact response still reports their count as a warning.
+// The FK error remains a second guard for references created between this check
+// and the DELETE, or references that are not yet covered by the impact query.
 tags.delete('/api/tags/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    const impact = await getTagDeleteImpact(c.env.DB, id);
+    if (!impact) {
+      return c.json({ success: false, error: 'tag not found' }, 404);
+    }
+    if (!impact.canDelete) {
+      return c.json({
+        success: false,
+        code: 'TAG_IN_USE',
+        error: 'tag is referenced by active settings',
+        data: {
+          blockingReferenceCount: impact.blockingReferenceCount,
+          references: impact.references,
+        },
+      }, 409);
+    }
     await deleteTag(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
