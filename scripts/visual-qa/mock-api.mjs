@@ -196,6 +196,39 @@ const RAW = {
   '/admin/manifest': { releases: [], versions: [] },
 }
 
+/** 参照が1つも無ければ消せる（`packages/db` の `canDelete` と同じ数え方）。 */
+function tagDeleteImpact(tag) {
+  const used = tag.usedIn ?? {}
+  const references = {
+    broadcasts: used.broadcasts ?? 0,
+    forms: used.forms ?? 0,
+    scenarios: used.scenarios ?? 0,
+    autoReplies: used.autoReplies ?? 0,
+    savedSearches: used.savedSearches ?? 0,
+    automations: 0,
+    commonActions: 0,
+    richMenus: 0,
+    templates: 0,
+    webinars: 0,
+    reminders: 0,
+    entryRoutes: 0,
+    trackedLinks: 0,
+    bookingMenus: 0,
+    affiliateOffers: 0,
+    events: 0,
+    analyticsFunnels: 0,
+    friendAddSettings: 0,
+  }
+  const blockingReferenceCount = Object.values(references).reduce((sum, n) => sum + n, 0)
+  return {
+    tag: { id: tag.id, name: tag.name },
+    friendCount: tag.friendCount ?? 0,
+    references,
+    blockingReferenceCount,
+    canDelete: blockingReferenceCount === 0,
+  }
+}
+
 function bodyFor(pathname) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
@@ -206,6 +239,17 @@ function bodyFor(pathname) {
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  /*
+   * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
+   * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という
+   * ありえない絵になり、どちらが本当か分からなくなる。
+   */
+  const deleteImpact = /^\/api\/tags\/([^/]+)\/delete-impact$/.exec(pathname)
+  if (deleteImpact) {
+    const tag = TAGS.find((item) => item.id === deleteImpact[1])
+    if (!tag) return { success: false, error: 'Not found' }
+    return { success: true, data: tagDeleteImpact(tag) }
+  }
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
   if (/^\/api\/accounts\/[^/]+\/health$/.test(pathname)) {

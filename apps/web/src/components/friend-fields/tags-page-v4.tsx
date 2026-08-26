@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowUp, MoreHorizontal, Palette, Pencil, Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
-import { api, ApiError } from '@/lib/api'
+import { api, ApiError, type TagDeleteImpact, type TagDeleteImpactReferences } from '@/lib/api'
 import ActionMenu from '@/components/shared/action-menu'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -302,22 +302,59 @@ function FolderList({ groups, items, countsKnown, active, onSelect, onChanged }:
 }
 
 /**
+ * 参照先の呼び分けと並び。設計 `dKlkz` は2行に分けている。
+ *
+ * - **参照先** … 人が選んで使っているもの。消すと「絞り込み条件から外れます」
+ * - **参照先（自動）** … ひとりでに動くもの。消すと「開始条件が空になります」
+ *
+ * 設計が名指ししている5つ（一斉配信・回答フォーム／シナリオ・自動応答・
+ * 保存検索）はそのままの組に置き、残り13はこの分け方に沿えた。
+ * `GET /api/tags/:id/delete-impact` の18項目と1対1で、**取りこぼしを出さない**。
+ */
+const MANUAL_REFS: Array<[keyof TagDeleteImpactReferences, string]> = [
+  ['broadcasts', '一斉配信'],
+  ['forms', '回答フォーム'],
+  ['templates', 'テンプレート'],
+  ['richMenus', 'リッチメニュー'],
+  ['webinars', 'ウェビナー'],
+  ['events', 'イベント予約'],
+  ['bookingMenus', '予約メニュー'],
+  ['entryRoutes', '流入経路'],
+  ['trackedLinks', '計測リンク'],
+  ['affiliateOffers', 'アフィリエイト案件'],
+  ['analyticsFunnels', 'ファネル'],
+]
+
+const AUTO_REFS: Array<[keyof TagDeleteImpactReferences, string]> = [
+  ['scenarios', 'シナリオ'],
+  ['autoReplies', '自動応答'],
+  ['savedSearches', '保存検索'],
+  ['automations', 'オートメーション'],
+  ['commonActions', '共通アクション'],
+  ['reminders', 'リマインダ'],
+  ['friendAddSettings', '友だち追加時の配信'],
+]
+
+/** 「一斉配信3・回答フォーム1」。**0件のものは出さない。** */
+function refSummary(
+  refs: TagDeleteImpactReferences,
+  labels: Array<[keyof TagDeleteImpactReferences, string]>,
+): string {
+  const parts = labels.filter(([key]) => refs[key] > 0).map(([key, label]) => `${label}${refs[key]}`)
+  return parts.length ? parts.join('・') : 'なし'
+}
+
+/**
  * 設計 `★ V6 4-1-F タグ削除の確認ダイアログ`（`dKlkz`）の影響5行。
  *
- * 「名前・値・結果」の3列。**値が取れないときは `—`。0とは書かない。**
+ * 「名前・値・結果」の3列。**取れていないときは `—`。0とは書かない。**
  * 何が起きるか（結果）は設定によらず決まっているので、値が取れなくても出す。
  */
-function deleteImpactRows(tag: Tag): Array<{ name: string; value: string; result: string }> {
-  const used = tag.usedIn
-  const manualRefs = [
-    used?.broadcasts ? `一斉配信${used.broadcasts}` : null,
-    used?.forms ? `回答フォーム${used.forms}` : null,
-  ].filter(Boolean).join('・')
-  const autoRefs = [
-    used?.scenarios ? `シナリオ${used.scenarios}` : null,
-    used?.autoReplies ? `自動応答${used.autoReplies}` : null,
-    used?.savedSearches ? `保存検索${used.savedSearches}` : null,
-  ].filter(Boolean).join('・')
+function deleteImpactRows(
+  tag: Tag,
+  impact: TagDeleteImpact | null,
+): Array<{ name: string; value: string; result: string }> {
+  const refs = impact?.references
   const linked = [
     tag.mileageReward ? `本人+${tag.mileageReward}` : null,
     tag.referralMileageReward ? `紹介者+${tag.referralMileageReward}` : null,
@@ -326,9 +363,14 @@ function deleteImpactRows(tag: Tag): Array<{ name: string; value: string; result
   ].filter(Boolean).join('／')
 
   return [
-    { name: '付与人数', value: `${(tag.friendCount ?? 0).toLocaleString('ja-JP')}人`, result: 'タグが外れます' },
-    { name: '参照先', value: manualRefs || 'なし', result: '絞り込み条件から外れます' },
-    { name: '参照先（自動）', value: autoRefs || 'なし', result: '開始条件が空になります' },
+    {
+      name: '付与人数',
+      // 人数はサーバーが数え直したものを使う。取れなければ一覧の値。
+      value: `${(impact?.friendCount ?? tag.friendCount ?? 0).toLocaleString('ja-JP')}人`,
+      result: 'タグが外れます',
+    },
+    { name: '参照先', value: refs ? refSummary(refs, MANUAL_REFS) : '—', result: '絞り込み条件から外れます' },
+    { name: '参照先（自動）', value: refs ? refSummary(refs, AUTO_REFS) : '—', result: '開始条件が空になります' },
     { name: '連動の停止', value: linked || 'なし', result: '以後は実行されません' },
     /*
       積んだマイルの合計を返す口がまだ無い（設計の絵は「1,450 mile」）。
@@ -342,13 +384,50 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  /**
+   * 削除して何が失われるか（`GET /api/tags/:id/delete-impact`）。
+   *
+   * **DELETE 側にはまだ強制停止が入っていない。** 止めるのはここ。
+   * 読み込み中と失敗のあいだも押せなくする。失敗を「参照0件」と読み違えて
+   * 使用中のタグを消させないため。
+   */
+  const [impact, setImpact] = useState<TagDeleteImpact | null>(null)
+  const [impactStatus, setImpactStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+
+  useEffect(() => {
+    let cancelled = false
+    setImpactStatus('loading')
+    ;(async () => {
+      try {
+        const res = await api.tags.deleteImpact(tag.id)
+        if (cancelled) return
+        if (!res.success) throw new Error(res.error)
+        setImpact(res.data)
+        setImpactStatus('ready')
+      } catch {
+        if (!cancelled) setImpactStatus('error')
+      }
+    })()
+    return () => { cancelled = true }
+  }, [tag.id])
+
   /*
     共通の作法に寄せる。Escapeで閉じ、Tabが外へ出ず、**背景がスクロールしない**。
     自前で組むと毎回どれかが抜ける。実際、背景が裏で動いていた。
   */
   const dialogRef = useOverlayFocus(true, onCancel, saving)
+
+  const blocked = impactStatus !== 'ready' || impact?.canDelete === false
+  const blockedReason = impactStatus === 'loading'
+    ? '影響を確認しています'
+    : impactStatus === 'error'
+      ? '影響を確認できませんでした。時間をおいて開き直してください'
+      : impact && !impact.canDelete
+        ? `使用中のため削除できません（${impact.blockingReferenceCount}件から参照されています）`
+        : ''
+
   const remove = async () => {
-    if (text !== tag.name || saving) return
+    if (blocked || text !== tag.name || saving) return
     setSaving(true)
     try {
       const result = await api.tags.delete(tag.id)
@@ -359,8 +438,9 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
       setSaving(false)
     }
   }
+
   return (
-    <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete">
+    <div ref={dialogRef} className="fixed inset-0 z-[90] flex items-center justify-center bg-ink/45 p-4" data-qa-dialog="tag-delete" data-impact={impactStatus}>
       <section className="w-full max-w-[680px] rounded-card border border-hairline bg-canvas p-7 shadow-2xl" role="alertdialog" aria-modal="true">
         <div className="flex items-start gap-3">
           {/* 設計 `iTwNX`/`lUbvQ`。赤いゴミ箱を22pxで見出しの左に置く。 */}
@@ -375,7 +455,7 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
 
         {/* 設計 `X3Lkr`。名前・値・結果の3列。 */}
         <dl className="mt-5 divide-y divide-hairline overflow-hidden rounded-control border border-hairline text-sm">
-          {deleteImpactRows(tag).map((row) => (
+          {deleteImpactRows(tag, impact).map((row) => (
             <div key={row.name} className="flex items-baseline gap-3 px-4 py-3">
               <dt className="w-[130px] shrink-0 text-ink-secondary">{row.name}</dt>
               <dd className="min-w-0 flex-1 font-bold text-ink">{row.value}</dd>
@@ -384,23 +464,26 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
           ))}
         </dl>
 
-        {/* 設計 `WrDxu`。 */}
+        {/* 設計 `WrDxu`。使用中で止まっているときは、その理由をここに出す。 */}
         <div className="mt-4 rounded-control border border-danger/25 bg-danger-bg p-3 text-sm text-danger">
-          <p className="font-bold">アフィリエイトのオファーで使用中のタグは削除できません</p>
-          <p className="mt-1 text-ink-secondary">その場合は、先にオファー側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p>
+          <p className="font-bold">{impactStatus === 'ready' && impact && !impact.canDelete
+            ? '使用中のため、このタグは削除できません'
+            : 'アフィリエイトのオファーで使用中のタグは削除できません'}</p>
+          <p className="mt-1 text-ink-secondary">その場合は、先に参照している側の設定からこのタグを外してください。削除しても、過去のマイル履歴と配信ログは残ります。</p>
         </div>
 
         {/* 設計 `seGRS`。 */}
         <label className="mt-5 block">
           <span className="mb-1.5 block text-xs font-semibold text-ink-secondary">確認のため、タグ名を入力してください</span>
-          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger" />
+          <input value={text} onChange={(event) => setText(event.target.value)} placeholder={tag.name} disabled={blocked} className="w-full rounded-control border border-hairline px-3 py-2.5 text-sm outline-none focus:border-danger disabled:bg-canvas-sunken" />
         </label>
         {error && <p className="mt-3 text-sm text-danger" role="alert">{error}</p>}
 
         {/* 設計 `rHKRG`。左が「やめる」、右が「このタグを削除する」。 */}
-        <div className="mt-6 flex justify-end gap-2">
-          <button type="button" onClick={onCancel} className="rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
-          <button type="button" disabled={saving || text !== tag.name} onClick={() => void remove()} className="rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '削除中…' : 'このタグを削除する'}</button>
+        <div className="mt-6 flex items-center justify-end gap-3">
+          {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
+          <button type="button" onClick={onCancel} className="shrink-0 rounded-control border border-hairline px-4 py-2.5 text-sm font-medium text-ink-secondary">やめる</button>
+          <button type="button" disabled={blocked || saving || text !== tag.name} onClick={() => void remove()} className="shrink-0 rounded-control bg-danger px-4 py-2.5 text-sm font-bold text-on-accent disabled:opacity-40">{saving ? '削除中…' : 'このタグを削除する'}</button>
         </div>
       </section>
     </div>

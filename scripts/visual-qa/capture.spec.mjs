@@ -214,30 +214,69 @@ for (const width of WIDTHS) {
  * **本物を開いて撮る。** 作り物の絵を別ルートに置くと、実際に押したときの
  * 画面とずれても誰も気づかない。一覧から赤いゴミ箱を押した先を見る。
  * 押すのはここまでで、削除そのものは実行しない（モックは更新を405で断る）。
+ *
+ * 2枚撮る。**使用中で止まる絵と、消せる絵は別物**で、片方だけ見ていると
+ * 「押せないほうが正しい」のか「押せるべきなのに押せない」のか分からない。
  */
+const DELETE_CASES = [
+  {
+    name: 'tags-delete',
+    label: '使用中で止まる',
+    // 設計の1行目。配信3・フォーム1から参照されているので消せない。
+    tag: 'EC顧客連携済み',
+    canDelete: false,
+  },
+  {
+    name: 'tags-delete-ok',
+    label: '消せる',
+    // どこからも参照されていない埋め草。
+    tag: 'VIPタグ 1',
+    canDelete: true,
+  },
+]
+
 for (const width of WIDTHS) {
-  test(`${width}px 友だち属性・削除の確認（tags-delete）`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 1000 })
-    await signIn(page)
-    await page.goto(`${BASE}${TAGS_PATH}`, { waitUntil: 'networkidle' })
-    await expectLanded(page, TAGS_PATH)
+  for (const item of DELETE_CASES) {
+    test(`${width}px 友だち属性・削除の確認／${item.label}（${item.name}）`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1000 })
+      await signIn(page)
+      await page.goto(`${BASE}${TAGS_PATH}`, { waitUntil: 'networkidle' })
+      await expectLanded(page, TAGS_PATH)
 
-    // 1行目は設計の「EC顧客連携済み」。行を選ばずに撮ると、
-    // 影響の数が毎回変わって画像が安定しない。
-    await page.locator('button[aria-label="EC顧客連携済み を削除"]').click()
-    const dialog = page.locator('[data-qa-dialog="tag-delete"]')
-    await expect(dialog).toBeVisible()
+      // 行を決め打ちする。選ばずに撮ると影響の数が毎回変わって画像が安定しない。
+      await page.locator(`button[aria-label="${item.tag} を削除"]`).click()
+      const dialog = page.locator('[data-qa-dialog="tag-delete"]')
+      await expect(dialog).toBeVisible()
+      // 影響を読み終えるまで待つ。読込中の絵を撮ると毎回ちがう。
+      await expect(dialog).toHaveAttribute('data-impact', 'ready')
 
-    // 出ているのが本物か。影響5行がそろっているかを名前で見る。
-    for (const row of ['付与人数', '参照先', '参照先（自動）', '連動の停止', '積んだマイル']) {
-      await expect(dialog.getByText(row, { exact: true })).toBeVisible()
-    }
+      // 出ているのが本物か。影響5行がそろっているかを名前で見る。
+      for (const row of ['付与人数', '参照先', '参照先（自動）', '連動の停止', '積んだマイル']) {
+        await expect(dialog.getByText(row, { exact: true })).toBeVisible()
+      }
 
-    await expect(page).toHaveScreenshot(`tags-delete-${width}.png`, {
-      fullPage: true,
-      maxDiffPixels: MAX_DIFF_PIXELS,
-      animations: 'disabled',
-      stylePath: STYLE_PATH,
+      // **押せる／押せないが狙いどおりか。** 絵だけ見ていると見落とす。
+      const remove = dialog.getByRole('button', { name: 'このタグを削除する' })
+      if (item.canDelete) {
+        // 名前を入れるまでは押せない。入れたら押せる。
+        await expect(remove).toBeDisabled()
+        await dialog.locator('input[type="text"], input:not([type])').first().fill(item.tag)
+        await expect(remove).toBeEnabled()
+        // 撮る絵は入力前に戻す（毎回同じにするため）。
+        await dialog.locator('input[type="text"], input:not([type])').first().fill('')
+      } else {
+        // 使用中は、名前を入れても押せない。確認欄自体を使えなくしてある。
+        await expect(remove).toBeDisabled()
+        await expect(dialog.locator('input[type="text"], input:not([type])').first()).toBeDisabled()
+        await expect(dialog.getByText('使用中のため削除できません', { exact: false })).toBeVisible()
+      }
+
+      await expect(page).toHaveScreenshot(`${item.name}-${width}.png`, {
+        fullPage: true,
+        maxDiffPixels: MAX_DIFF_PIXELS,
+        animations: 'disabled',
+        stylePath: STYLE_PATH,
+      })
     })
-  })
+  }
 }

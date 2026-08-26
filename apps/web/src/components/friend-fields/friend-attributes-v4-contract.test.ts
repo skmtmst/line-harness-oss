@@ -137,6 +137,45 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain("['タグ一覧', scope, today]")
   })
 
+  it('使用中のタグを、画面が削除させない', () => {
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    // 削除する前に影響を数える口を叩く（PR #381）。
+    expect(source).toContain('api.tags.deleteImpact(tag.id)')
+    /*
+      **DELETE 側にはまだ強制停止が入っていない。** 止めるのは画面の役目。
+      読込中・失敗・使用中の3つとも押せなくする。
+      失敗を「参照0件」と読み違えて消させないため、失敗も止める側に入れる。
+    */
+    expect(source).toContain("const blocked = impactStatus !== 'ready' || impact?.canDelete === false")
+    expect(source).toContain('if (blocked || text !== tag.name || saving) return')
+    expect(source).toContain('disabled={blocked || saving || text !== tag.name}')
+    // 確認欄も止める。名前を打てば消せる、と思わせない。
+    expect(source).toContain('disabled={blocked}')
+    // 止まっている理由を必ず出す。押せないだけだと理由が分からない。
+    expect(source).toContain('影響を確認しています')
+    expect(source).toContain('影響を確認できませんでした')
+    expect(source).toContain('使用中のため削除できません')
+  })
+
+  it('参照先は0件のものを出さず、取れないときは「0」と書かない', () => {
+    const source = read('components/friend-fields/tags-page-v4.tsx')
+    // 18種類すべてに呼び名がある。取りこぼすと、参照があるのに出ない。
+    const keys = [
+      'broadcasts', 'forms', 'scenarios', 'autoReplies', 'savedSearches',
+      'automations', 'commonActions', 'richMenus', 'templates', 'webinars',
+      'reminders', 'entryRoutes', 'trackedLinks', 'bookingMenus',
+      'affiliateOffers', 'events', 'analyticsFunnels', 'friendAddSettings',
+    ]
+    for (const key of keys) {
+      expect(source, `参照先「${key}」に呼び名が無い`).toContain(`'${key}',`)
+    }
+    // 0件は出さない。
+    expect(source).toContain('labels.filter(([key]) => refs[key] > 0)')
+    // 取れていないときは `—`。0件（「なし」）と書き分ける。
+    expect(source).toContain("refs ? refSummary(refs, MANUAL_REFS) : '—'")
+    expect(source).toContain("refs ? refSummary(refs, AUTO_REFS) : '—'")
+  })
+
   it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {
     expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 />')
     expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')
