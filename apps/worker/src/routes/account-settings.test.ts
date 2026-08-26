@@ -63,9 +63,13 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
       'line-account-1',
       '00000000-0000-4000-8000-000000000001',
       'tenant-a',
+      '00000000-0000-4000-8000-000000000001',
+      'tenant-a',
     );
     expect(prepare.mock.calls[0]?.[0]).toContain('JOIN friends f ON f.line_user_id = sm.line_user_id');
     expect(prepare.mock.calls[0]?.[0]).toContain('scoped.line_account_id = ?');
+    expect(prepare.mock.calls[0]?.[0]).toContain('fallback_account.id = f.line_account_id');
+    expect(prepare.mock.calls[0]?.[0]).toContain('COALESCE(fallback_account.tenant_id, ?) = ?');
     expect(prepare.mock.calls[0]?.[0]).toContain('COALESCE(sm.tenant_id, ?) = ?');
     expect(await response.json()).toEqual({
       success: true,
@@ -91,16 +95,36 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
   test('SQLでリクエスト元職員の統括だけに絞る', async () => {
     const all = vi.fn(async () => ({ results: [] }));
     const bind = vi.fn(() => ({ all }));
-    const prepare = vi.fn(() => ({ bind }));
+    const prepare = vi.fn((_sql: string) => ({ bind }));
 
     await app.request(
       '/api/account-settings/test-recipient-login-users?accountId=line-account-1',
       {}, { DB: { prepare } },
     );
 
-    expect(bind.mock.calls[0]?.slice(-2)).toEqual([
+    expect(bind.mock.calls[0]?.slice(-4)).toEqual([
+      '00000000-0000-4000-8000-000000000001', 'tenant-a',
       '00000000-0000-4000-8000-000000000001', 'tenant-a',
     ]);
+  });
+
+  test('フォールバック候補をリクエスト元職員と同じ統括のアカウントに限る', async () => {
+    const all = vi.fn(async () => ({ results: [] }));
+    const bind = vi.fn(() => ({ all }));
+    const prepare = vi.fn((_sql: string) => ({ bind }));
+
+    await app.request(
+      '/api/account-settings/test-recipient-login-users?accountId=line-account-1',
+      {}, { DB: { prepare } },
+    );
+
+    const sql = prepare.mock.calls[0]?.[0];
+    expect(sql).toMatch(/NOT EXISTS[\s\S]+AND EXISTS \([\s\S]+FROM line_accounts fallback_account/);
+    expect(bind).toHaveBeenCalledWith(
+      'line-account-1', 'line-account-1', 'line-account-1',
+      '00000000-0000-4000-8000-000000000001', 'tenant-a',
+      '00000000-0000-4000-8000-000000000001', 'tenant-a',
+    );
   });
 });
 
@@ -115,6 +139,61 @@ describe('PUT /api/account-settings/test-recipients', () => {
     }, { DB: { prepare } });
 
     expect(response.status).toBe(403);
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
+  test('別アカウントの友だちIDが混ざると保存前に400にする', async () => {
+    const all = vi.fn(async () => ({ results: [{ id: 'friend-1' }] }));
+    const bind = vi.fn(() => ({ all }));
+    const prepare = vi.fn(() => ({ bind }));
+
+    const response = await app.request('/api/account-settings/test-recipients', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'line-account-1', friendIds: ['friend-1', 'friend-other'] }),
+    }, { DB: { prepare } });
+
+    expect(response.status).toBe(400);
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(bind).toHaveBeenCalledWith('line-account-1', 'friend-1', 'friend-other');
+  });
+
+  test('空配列は友だち照合をせず保存できる', async () => {
+    const run = vi.fn(async () => ({ success: true }));
+    const bind = vi.fn(() => ({ run }));
+    const prepare = vi.fn(() => ({ bind }));
+
+    const response = await app.request('/api/account-settings/test-recipients', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'line-account-1', friendIds: [] }),
+    }, { DB: { prepare } });
+
+    expect(response.status).toBe(200);
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  test('上限を超える件数はDBを読まず400にする', async () => {
+    const prepare = vi.fn();
+    const response = await app.request('/api/account-settings/test-recipients', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accountId: 'line-account-1',
+        friendIds: Array.from({ length: 91 }, (_, index) => `friend-${index}`),
+      }),
+    }, { DB: { prepare } });
+
+    expect(response.status).toBe(400);
+    expect(prepare).not.toHaveBeenCalled();
+  });
+
+  test('friendIdsが配列でなければDBを読まず400にする', async () => {
+    const prepare = vi.fn();
+    const response = await app.request('/api/account-settings/test-recipients', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'line-account-1', friendIds: 'friend-1' }),
+    }, { DB: { prepare } });
+
+    expect(response.status).toBe(400);
     expect(prepare).not.toHaveBeenCalled();
   });
 });
