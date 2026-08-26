@@ -741,6 +741,20 @@ export interface CreateTagInput {
   groupId?: string | null;
 }
 
+export interface CreateTagsBulkInput {
+  name: string;
+  groupId?: string | null;
+}
+
+export interface CreateTagsBulkResult {
+  status: 'created' | 'skipped' | 'failed';
+  tagId?: string;
+}
+
+// D1 は1文につき100個までしか値を束縛できない。このINSERTは1行4個なので、
+// 25行でちょうど100個。500行でも20文に収まり、無料枠の1実行50クエリを超えない。
+const TAGS_PER_BULK_INSERT = 25;
+
 export async function createTag(
   db: D1Database,
   input: CreateTagInput,
@@ -762,6 +776,62 @@ export async function createTag(
     .prepare(`SELECT * FROM tags WHERE id = ?`)
     .bind(id)
     .first<Tag>())!;
+}
+
+/**
+ * CSVからのタグ登録を、D1の1実行あたりのクエリ上限内でまとめて書く。
+ *
+ * - idを先に作り、RETURNINGで実際に入った行だけを判別する。
+ * - 同名が先に作られた行はINSERT OR IGNOREで見送りにする。
+ * - 確認後にフォルダが消えた場合は、外部キー違反にせず未分類で登録する。
+ * - 1文が失敗しても、ほかの25行単位の文は続ける。
+ */
+export async function createTagsBulk(
+  db: D1Database,
+  inputs: CreateTagsBulkInput[],
+): Promise<CreateTagsBulkResult[]> {
+  const results: CreateTagsBulkResult[] = Array.from(
+    { length: inputs.length },
+    () => ({ status: 'failed' }),
+  );
+  const now = jstNow();
+
+  for (let offset = 0; offset < inputs.length; offset += TAGS_PER_BULK_INSERT) {
+    const chunk = inputs.slice(offset, offset + TAGS_PER_BULK_INSERT);
+    const prepared = chunk.map((input) => ({
+      id: crypto.randomUUID(),
+      name: input.name,
+      groupId: input.groupId ?? null,
+    }));
+    const values = prepared
+      .map(() => "(?, ?, '#3B82F6', (SELECT id FROM folders WHERE kind = 'tag' AND id = ?), ?)")
+      .join(', ');
+    const binds = prepared.flatMap((row) => [row.id, row.name, row.groupId, now]);
+
+    try {
+      const inserted = await db
+        .prepare(
+          `INSERT OR IGNORE INTO tags (id, name, color, folder_id, created_at)
+           VALUES ${values}
+           RETURNING id`,
+        )
+        .bind(...binds)
+        .run<{ id: string }>();
+      const insertedIds = new Set((inserted.results ?? []).map((row) => row.id));
+      prepared.forEach((row, index) => {
+        results[offset + index] = insertedIds.has(row.id)
+          ? { status: 'created', tagId: row.id }
+          : { status: 'skipped' };
+      });
+    } catch (error) {
+      console.error(`createTagsBulk rows ${offset + 1}-${offset + chunk.length} error:`, error);
+      prepared.forEach((_row, index) => {
+        results[offset + index] = { status: 'failed' };
+      });
+    }
+  }
+
+  return results;
 }
 
 /**
