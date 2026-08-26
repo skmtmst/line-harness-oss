@@ -201,6 +201,18 @@ function EmptyDataCard({ title, href, linkLabel }: { title: string; href: string
   )
 }
 
+function UnavailableDataCard({ title, onRetry }: { title: string; onRetry: () => void }) {
+  return (
+    <Card overflow="hidden">
+      <CardHeader size="roomy" title={title} />
+      <div className="px-5 py-7 text-center">
+        <p className="text-ink-faint text-sm">データを取得できませんでした。</p>
+        <button type="button" onClick={onRetry} className="text-action mt-2 text-xs font-medium hover:underline">もう一度読み込む</button>
+      </div>
+    </Card>
+  )
+}
+
 function LiveDataCard({
   title, href, linkLabel, value, unit = '件', detail,
 }: {
@@ -273,13 +285,14 @@ function ConnectionStatusCard({ account, risk, activeFriends }: { account: Retur
 }
 
 export default function DashboardPage() {
-  const { selectedAccountId, selectedAccount } = useAccount()
+  const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const [period, setPeriod] = useState<PeriodKey>('today')
   const [data, setData] = useState<DashboardOverview | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editorOpen, setEditorOpen] = useState(false)
   const [preferences, setPreferences] = useState<DashboardPreferences>(defaultDashboardPreferences)
+  const [preferenceVersion, setPreferenceVersion] = useState(0)
   const [inboxSummary, setInboxSummary] = useState<PendingInboxSummary | null>(null)
   const [shipmentSummary, setShipmentSummary] = useState<ShipmentSummary | null>(null)
   const [pendingPhotos, setPendingPhotos] = useState<number | null>(null)
@@ -298,28 +311,88 @@ export default function DashboardPage() {
   const needsHealth = visibleRight.some((item) => item.id === 'operational-alerts' || item.id === 'connection-status')
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setPreferences(defaultDashboardPreferences())
+      setPreferenceVersion(0)
+      return
+    }
+    let cancelled = false
     const key = dashboardStorageKey(selectedAccountId)
     try {
       const raw = window.localStorage.getItem(key)
-      setPreferences(normalizeDashboardPreferences(raw ? JSON.parse(raw) : null))
+      const cached = raw ? JSON.parse(raw) as { cards?: unknown; version?: unknown } : null
+      setPreferences(normalizeDashboardPreferences(cached?.cards ?? cached))
+      setPreferenceVersion(Number.isInteger(cached?.version) ? Number(cached?.version) : 0)
     } catch {
       setPreferences(defaultDashboardPreferences())
     }
+    void api.dashboard.preferences.get(selectedAccountId)
+      .then((response) => {
+        if (cancelled || !response.success) return
+        const next = normalizeDashboardPreferences(response.data.cards)
+        setPreferences(next)
+        setPreferenceVersion(response.data.version)
+        try { window.localStorage.setItem(key, JSON.stringify({ version: response.data.version, cards: next })) } catch { /* cache unavailable */ }
+      })
+      .catch(() => {
+        // The last server-confirmed cache remains visible; a later save still checks its version.
+      })
+    return () => { cancelled = true }
   }, [selectedAccountId])
 
-  const applyPreferences = (next: DashboardPreferences) => {
+  const applyPreferences = async (next: DashboardPreferences) => {
+    if (!selectedAccountId) {
+      setError('LINEアカウントを選択してください')
+      return
+    }
     const normalized = normalizeDashboardPreferences(next)
-    setPreferences(normalized)
-    window.localStorage.setItem(dashboardStorageKey(selectedAccountId), JSON.stringify(normalized))
-    setEditorOpen(false)
+    try {
+      const response = await api.dashboard.preferences.save(selectedAccountId, {
+        version: preferenceVersion,
+        cards: normalized,
+      })
+      if (!response.success) throw new Error(response.error)
+      setPreferences(normalized)
+      setPreferenceVersion(response.data.version)
+      setError('')
+      try { window.localStorage.setItem(dashboardStorageKey(selectedAccountId), JSON.stringify({ version: response.data.version, cards: normalized })) } catch { /* cache unavailable */ }
+      setEditorOpen(false)
+    } catch (caught) {
+      setError(caught instanceof Error && 'status' in caught && caught.status === 409
+        ? '別の画面で配置が更新されました。再読み込みしてください'
+        : 'ダッシュボードの配置を保存できませんでした')
+    }
+  }
+
+  const resetPreferences = async () => {
+    if (!selectedAccountId) return
+    try {
+      await api.dashboard.preferences.reset(selectedAccountId)
+      const response = await api.dashboard.preferences.get(selectedAccountId)
+      const next = response.success ? normalizeDashboardPreferences(response.data.cards) : defaultDashboardPreferences()
+      setPreferences(next)
+      setPreferenceVersion(0)
+      setError('')
+      try { window.localStorage.setItem(dashboardStorageKey(selectedAccountId), JSON.stringify({ version: 0, cards: next })) } catch { /* cache unavailable */ }
+      setEditorOpen(false)
+    } catch {
+      setError('ダッシュボードの配置を初期状態へ戻せませんでした')
+    }
   }
 
   const load = useCallback(async () => {
     const requestId = ++loadRequestId.current
+    if (accountLoading) return
+    if (!selectedAccountId) {
+      setData(null)
+      setLoading(false)
+      setError('LINEアカウントを選択してください')
+      return
+    }
     setLoading(true)
     setError('')
     try {
-      const response = await api.dashboard.overview({ period, accountId: selectedAccountId ?? undefined })
+      const response = await api.dashboard.overview({ period, accountId: selectedAccountId })
       if (requestId !== loadRequestId.current) return
       if (response.success) setData(response.data)
       else setError(response.error)
@@ -328,7 +401,7 @@ export default function DashboardPage() {
     } finally {
       if (requestId === loadRequestId.current) setLoading(false)
     }
-  }, [period, selectedAccountId])
+  }, [accountLoading, period, selectedAccountId])
 
   useEffect(() => { void load() }, [load])
 
@@ -373,22 +446,26 @@ export default function DashboardPage() {
   const today = jstDay(new Date())
   const todayBookings = activeBookings.filter((booking) => jstDay(booking.starts_at) === today)
   const upcomingBookings = bookings ? activeUpcomingBookings(bookings) : []
-  const pendingTotal = inboxSummary?.total ?? data?.inbox.unanswered ?? null
+  const sectionAvailable = (section: keyof NonNullable<DashboardOverview['sections']>) =>
+    data?.sections?.[section]?.status !== 'unavailable'
+  const pendingTotal = inboxSummary?.total ?? (sectionAvailable('inbox') ? data?.inbox.unanswered : null) ?? null
   const pendingDetail = inboxSummary
     ? `LINE ${inboxSummary.line}・メール ${inboxSummary.email}`
-    : data
+    : data && sectionAvailable('inbox')
       ? `対応中 ${data.inbox.inProgress}`
-      : '読み込み中'
+      : data ? '取得できません' : '読み込み中'
   const renderMainCard = (id: DashboardCardId): ReactNode => {
     if (id === 'pending-inbox') return <PendingInboxCard onSummaryChange={setInboxSummary} />
-    if (id === 'friend-trend') return <FriendTrendCard data={data} loading={loading} />
+    if (id === 'friend-trend') return data && !sectionAvailable('trend')
+      ? <UnavailableDataCard title="友だち数の推移" onRetry={() => void load()} />
+      : <FriendTrendCard data={data} loading={loading} />
     if (id === 'friend-add') return <FriendAddLinkCard />
     if (id === 'scenario-status') {
-      const scenarios = data?.operations?.scenarios
+      const scenarios = sectionAvailable('operations') ? data?.operations?.scenarios : undefined
       return <LiveDataCard title="シナリオ配信状況" href="/scenarios" linkLabel="シナリオを見る" value={scenarios?.active ?? null} detail={scenarios ? `一時停止 ${scenarios.paused}件` : data ? '取得できません' : '読み込み中'} />
     }
     if (id === 'uid-migration') {
-      const migrations = data?.operations?.migrations
+      const migrations = sectionAvailable('operations') ? data?.operations?.migrations : undefined
       return <LiveDataCard title="UID移行状況" href="/health" linkLabel="移行状況を見る" value={migrations?.active ?? null} detail={migrations ? `完了 ${migrations.completed}件` : data ? '取得できません' : '読み込み中'} />
     }
     return null
@@ -403,23 +480,29 @@ export default function DashboardPage() {
   }
 
   const renderRightCard = (id: DashboardCardId): ReactNode => {
-    if (id === 'send-quota') return <SendQuotaCard delivery={data?.delivery ?? null} />
-    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? data?.inbox.oldestUnansweredMinutes ?? null} />
-    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={data?.friends.active ?? null} />
+    if (id === 'send-quota') return <SendQuotaCard delivery={sectionAvailable('quota') ? data?.delivery ?? null : null} />
+    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} />
+    if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={sectionAvailable('friends') ? data?.friends.active ?? null : null} />
     if (id === 'upcoming') return <UpcomingCard bookings={bookings} loading={supplementLoading} />
-    if (id === 'monthly-delivery') return data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
-    if (id === 'recent-results') return data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
-    if (id === 'friend-status' && data) return <FriendStatusCard friends={data.friends} />
+    if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
+      ? <UnavailableDataCard title="今月の配信" onRetry={() => void load()} />
+      : data ? <MonthlyDeliveryCard delivery={data.delivery} /> : <EmptyDataCard title="今月の配信" href="/analytics" linkLabel="アクセス解析へ" />
+    if (id === 'recent-results') return data && !sectionAvailable('conversions')
+      ? <UnavailableDataCard title="最近の成果" onRetry={() => void load()} />
+      : data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
+    if (id === 'friend-status') return data && !sectionAvailable('friends')
+      ? <UnavailableDataCard title="友だちの状態" onRetry={() => void load()} />
+      : data ? <FriendStatusCard friends={data.friends} /> : <EmptyDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />
     if (id === 'booking-status') {
-      const bookingsStatus = data?.operations?.bookings
+      const bookingsStatus = sectionAvailable('operations') ? data?.operations?.bookings : undefined
       return <LiveDataCard title="予約状況" href="/booking/bookings" linkLabel="予約を見る" value={bookingsStatus?.upcoming ?? null} detail={bookingsStatus ? `承認待ち ${bookingsStatus.pending}件` : data ? '取得できません' : '読み込み中'} />
     }
     if (id === 'inflow-top') {
-      const inflowTop = data?.operations?.inflowTop
+      const inflowTop = sectionAvailable('operations') ? data?.operations?.inflowTop : undefined
       return <LiveDataCard title="流入経路TOP3" href="/inflow-links" linkLabel="流入経路を見る" value={inflowTop?.[0]?.count ?? (inflowTop ? 0 : null)} detail={inflowTop ? inflowTop.map((item) => `${item.name} ${item.count}`).join('、') || '期間内の追加なし' : data ? '取得できません' : '読み込み中'} />
     }
-    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={data?.operations?.funnelAlerts ?? null} detail="3人以上追加・成果0件の経路" />
-    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={data?.operations?.automationFailures ?? null} detail="期間内の失敗・一部失敗" />
+    if (id === 'funnel-alert') return <LiveDataCard title="ファネル要注意" href="/analytics" linkLabel="分析を見る" value={sectionAvailable('operations') ? data?.operations?.funnelAlerts ?? null : null} detail="3人以上追加・成果0件の経路" />
+    if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" />
     return null
   }
 
@@ -487,7 +570,7 @@ export default function DashboardPage() {
 
       {data && <p className="text-ink-faint mt-5 text-xs">{new Date(data.generatedAt).toLocaleString('ja-JP')} 時点 ・ 最新データへ更新</p>}
 
-      <DashboardEditor open={editorOpen} preferences={preferences} onCancel={() => setEditorOpen(false)} onApply={applyPreferences} />
+      <DashboardEditor open={editorOpen} preferences={preferences} onCancel={() => setEditorOpen(false)} onApply={applyPreferences} onReset={resetPreferences} />
     </div>
   )
 }

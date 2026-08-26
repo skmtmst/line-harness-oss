@@ -704,6 +704,25 @@ CREATE TABLE conversion_points (
 , measure_method TEXT NOT NULL DEFAULT 'manual'
   CHECK (measure_method IN ('url_reach', 'webhook', 'manual')), target_url TEXT, count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
 
+CREATE TABLE dashboard_default_preferences (
+  line_account_id TEXT PRIMARY KEY REFERENCES line_accounts(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  cards TEXT NOT NULL CHECK (json_valid(cards)),
+  updated_by TEXT REFERENCES staff_members(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE dashboard_preferences (
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+  cards TEXT NOT NULL CHECK (json_valid(cards)),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (staff_id, line_account_id)
+);
+
 CREATE TABLE ec_events (
   id                TEXT PRIMARY KEY,
   source            TEXT NOT NULL,
@@ -2678,6 +2697,9 @@ CREATE INDEX idx_conversion_events_point ON conversion_events (conversion_point_
 
 CREATE INDEX idx_cvs_pending
   ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
+
+CREATE INDEX idx_dashboard_preferences_account
+  ON dashboard_preferences(line_account_id, updated_at DESC);
 
 CREATE INDEX idx_ec_events_customer
   ON ec_events(customer_id, received_at DESC);

@@ -211,11 +211,12 @@ function groupLabel(group: DashboardGroup): string {
   return '右サイド'
 }
 
-export default function DashboardEditor({ open, preferences, onCancel, onApply }: {
+export default function DashboardEditor({ open, preferences, onCancel, onApply, onReset }: {
   open: boolean
   preferences: DashboardPreferences
   onCancel: () => void
   onApply: (next: DashboardPreferences) => void
+  onReset?: () => void
 }) {
   const [draft, setDraft] = useState(preferences)
   const [mode, setMode] = useState<'cards' | 'preview'>('cards')
@@ -268,7 +269,7 @@ export default function DashboardEditor({ open, preferences, onCancel, onApply }
             </div>
             <button type="button" onClick={onCancel} aria-label="閉じる" className="text-ink-faint hover:text-ink rounded-control p-1.5"><CloseIcon /></button>
           </div>
-          <button type="button" onClick={() => setDraft(defaultDashboardPreferences())} className="text-action mt-2 text-xs font-medium hover:underline">初期状態に戻す</button>
+          <button type="button" onClick={() => onReset ? onReset() : setDraft(defaultDashboardPreferences())} className="text-action mt-2 text-xs font-medium hover:underline">初期状態に戻す</button>
           <div className="mt-3 flex gap-5" role="tablist" aria-label="ダッシュボード編集モード">
             <button type="button" role="tab" aria-selected={mode === 'cards'} onClick={() => setMode('cards')} className={`border-b-2 px-0.5 pb-2.5 text-sm font-semibold ${mode === 'cards' ? 'border-accent text-accent' : 'border-transparent text-ink-faint hover:text-ink'}`}>カードと配置</button>
             <button type="button" role="tab" aria-selected={mode === 'preview'} onClick={() => setMode('preview')} className={`border-b-2 px-0.5 pb-2.5 text-sm font-semibold ${mode === 'preview' ? 'border-accent text-accent' : 'border-transparent text-ink-faint hover:text-ink'}`}>プレビュー</button>
