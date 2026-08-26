@@ -8,7 +8,7 @@ import {
   type DashboardOverview,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { canAccessLineAccount } from '../services/account-access.js';
+import { canAccessLineAccount, getVisibleLineAccountScope } from '../services/account-access.js';
 
 /**
  * ダッシュボードが1回で読む数。
@@ -100,7 +100,11 @@ dashboard.get('/api/dashboard/overview', async (c) => {
  */
 dashboard.get('/api/list-stats', async (c) => {
   try {
-    return c.json({ success: true as const, data: await getListStats(c.env.DB) });
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    return c.json({ success: true as const, data: await getListStats(c.env.DB, {
+      allowedAccountIds: accountScope.allowedAccountIds,
+      includeUnassigned: accountScope.canSeeUnassigned,
+    }) });
   } catch (err) {
     console.error('GET /api/list-stats error:', err);
     return c.json({ success: false as const, error: '集計を取得できませんでした' }, 500);

@@ -221,8 +221,13 @@ chats.delete('/api/operators/:id', requireRole('owner', 'admin'), async (c) => {
 chats.get('/api/chats/stats', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const { getInboxStats } = await import('@line-crm/db');
+    const { getVisibleLineAccountScope } = await import('../services/account-access.js');
     const staff = c.get('staff');
-    const stats = await getInboxStats(c.env.DB, staff?.id ?? null);
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
+    const stats = await getInboxStats(c.env.DB, staff?.id ?? null, {
+      allowedAccountIds: accountScope.allowedAccountIds,
+      includeUnassigned: accountScope.canSeeUnassigned,
+    });
     return c.json({ success: true as const, data: stats });
   } catch (err) {
     console.error('GET /api/chats/stats error:', err);

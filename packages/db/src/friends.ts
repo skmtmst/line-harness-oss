@@ -356,13 +356,6 @@ export async function getMergedMetadataByUserId(
   return merged;
 }
 
-export async function getFriendCount(db: D1Database): Promise<number> {
-  const row = await db
-    .prepare(`SELECT COUNT(*) as count FROM friends`)
-    .first<{ count: number }>();
-  return row?.count ?? 0;
-}
-
 /**
  * 直近N日に友だち追加された人を「はじめて」と「以前から」で分けて数える
  * （設計 V2 4-6）。
@@ -380,12 +373,19 @@ export async function getFriendCount(db: D1Database): Promise<number> {
  */
 export async function getFriendAddBreakdown(
   db: D1Database,
-  days = 30,
-  lineAccountId?: string | null,
+  days: number,
+  scope: { allowedAccountIds: readonly string[]; includeUnassigned: boolean } | { allTenants: true },
 ): Promise<{ days: number; firstTime: number; returning: number; unblocked: number }> {
-  const accountClause = lineAccountId ? 'AND line_account_id = ?' : '';
+  const allTenants = 'allTenants' in scope;
+  const placeholders = allTenants ? '' : scope.allowedAccountIds.map(() => '?').join(', ');
+  const accountPredicate = allTenants
+    ? '1 = 1'
+    : placeholders
+      ? `(line_account_id IN (${placeholders})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+      : scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0';
+  const accountClause = `AND ${accountPredicate}`;
   const binds: unknown[] = [days];
-  if (lineAccountId) binds.push(lineAccountId);
+  if (!allTenants) binds.push(...scope.allowedAccountIds);
   const row = await db
     .prepare(
       `SELECT
@@ -400,7 +400,7 @@ export async function getFriendAddBreakdown(
 
   // ブロック解除で戻ってきた人。いまフォロー中で、外れたことがある人。
   const unblockBinds: unknown[] = [days];
-  if (lineAccountId) unblockBinds.push(lineAccountId);
+  if (!allTenants) unblockBinds.push(...scope.allowedAccountIds);
   const unblockRow = await db
     .prepare(
       `SELECT COUNT(*) AS count
