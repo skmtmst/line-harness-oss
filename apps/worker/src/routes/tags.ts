@@ -4,6 +4,7 @@ import {
   getTagsWithUsage,
   getTagDeleteImpact,
   createTag,
+  createTagsBulk,
   deleteTag,
   updateTagMileageSettings,
   enqueueHistoricTagMileage,
@@ -109,6 +110,7 @@ function serializeTagGroup(row: DbTagGroup) {
 const GROUP_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 const TAG_IMPORT_MAX_ROWS = 500;
 const TAG_NAME_MAX_LENGTH = 60;
+const TAG_NAME_CONTROL_CHARACTER_PATTERN = /[\u0000-\u001F\u007F]/u;
 
 type PlannedTagImportRow = TagCsvImportRowResult & { groupId?: string | null };
 
@@ -186,12 +188,23 @@ function planTagImport(
     if (!name) {
       return { ...base, status: 'invalid', code: 'name_required', message: 'タグ名を入力してください' };
     }
-    if (name.length > TAG_NAME_MAX_LENGTH) {
+    const nameCharacters = Array.from(name);
+    if (nameCharacters.length > TAG_NAME_MAX_LENGTH) {
       return {
         ...base,
         status: 'invalid',
         code: 'name_too_long',
         message: `タグ名は${TAG_NAME_MAX_LENGTH}文字以内にしてください`,
+      };
+    }
+    const invalidCharacterIndex = nameCharacters.findIndex((character) =>
+      TAG_NAME_CONTROL_CHARACTER_PATTERN.test(character));
+    if (invalidCharacterIndex >= 0) {
+      return {
+        ...base,
+        status: 'invalid',
+        code: 'invalid_character',
+        message: `改行や制御文字はタグ名に使えません（${invalidCharacterIndex + 1}文字目）`,
       };
     }
 
@@ -217,11 +230,13 @@ function planTagImport(
     if (folderName) {
       const matches = groupsByName.get(normalizeTagNameForCleanup(folderName)) ?? [];
       if (matches.length === 0) {
+        acceptedNames.add(normalizedName);
         return {
           ...base,
-          status: 'invalid',
+          status: 'ready',
           code: 'folder_not_found',
-          message: '指定したフォルダが見つかりません',
+          message: 'フォルダが見つからないため、未分類として登録します',
+          groupId: null,
         };
       }
       if (matches.length > 1) {
@@ -429,51 +444,35 @@ tags.post('/api/tags/import', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: input.error }, input.status);
     }
     const planned = await loadTagImportPlan(c.env.DB, input.rows);
-    const rows: TagCsvImportRowResult[] = [];
-
-    for (const row of planned) {
-      if (row.status !== 'ready') {
-        rows.push(publicImportRow(row));
-        continue;
+    const readyRows = planned.filter((row) => row.status === 'ready');
+    const created = readyRows.length > 0
+      ? await createTagsBulk(
+          c.env.DB,
+          readyRows.map((row) => ({ name: row.name, groupId: row.groupId ?? null })),
+        )
+      : [];
+    let createIndex = 0;
+    const rows: TagCsvImportRowResult[] = planned.map((row) => {
+      if (row.status !== 'ready') return publicImportRow(row);
+      const result = created[createIndex++];
+      if (result?.status === 'created') {
+        return { ...publicImportRow(row), status: 'created', tagId: result.tagId };
       }
-      try {
-        const tag = await createTag(c.env.DB, {
-          name: row.name,
-          groupId: row.groupId ?? null,
-        });
-        rows.push({
+      if (result?.status === 'skipped') {
+        return {
           ...publicImportRow(row),
-          status: 'created',
-          tagId: tag.id,
-        });
-      } catch (err) {
-        if (err instanceof Error && err.message.includes('UNIQUE constraint')) {
-          rows.push({
-            ...publicImportRow(row),
-            status: 'skipped',
-            code: 'already_exists',
-            message: '同じ名前のタグが先に登録されたため見送りました',
-          });
-          continue;
-        }
-        if (err instanceof Error && err.message.includes('FOREIGN KEY constraint')) {
-          rows.push({
-            ...publicImportRow(row),
-            status: 'failed',
-            code: 'folder_changed',
-            message: '確認後にフォルダが変更されたため登録できませんでした',
-          });
-          continue;
-        }
-        console.error(`POST /api/tags/import row ${row.line} error:`, err);
-        rows.push({
-          ...publicImportRow(row),
-          status: 'failed',
-          code: 'create_failed',
-          message: 'タグを登録できませんでした',
-        });
+          status: 'skipped',
+          code: 'already_exists',
+          message: '同じ名前のタグが先に登録されたため見送りました',
+        };
       }
-    }
+      return {
+        ...publicImportRow(row),
+        status: 'failed',
+        code: 'create_failed',
+        message: 'タグを登録できませんでした',
+      };
+    });
 
     const summary = importSummary(rows);
     const data: TagCsvImportResult = { summary, rows, outcome: importOutcome(summary) };

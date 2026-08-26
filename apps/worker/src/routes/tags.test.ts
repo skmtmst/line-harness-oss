@@ -6,6 +6,7 @@ const dbMocks = {
   getTagsWithUsage: vi.fn(),
   getTagDeleteImpact: vi.fn(),
   createTag: vi.fn(),
+  createTagsBulk: vi.fn(),
   deleteTag: vi.fn(),
   updateTagMileageSettings: vi.fn(),
   enqueueHistoricTagMileage: vi.fn(),
@@ -217,9 +218,13 @@ describe('POST /api/tags/import', () => {
       name: input.name,
       folder_id: input.groupId,
     }));
+    dbMocks.createTagsBulk.mockImplementation(async (
+      _db,
+      inputs: Array<{ name: string; groupId: string | null }>,
+    ) => inputs.map((input) => ({ status: 'created', tagId: `tag-${input.name}` })));
   });
 
-  test('保存せず、既存・CSV内重複・フォルダ不明・空欄を行ごとに判定する', async () => {
+  test('保存せず、既存・CSV内重複・未分類への振替・入力不備を行ごとに判定する', async () => {
     dbMocks.getTags.mockResolvedValue([{ ...TAG_ROW, name: 'VIP' }]);
 
     const res = await post('/api/tags/import/preview', { rows: [
@@ -230,6 +235,7 @@ describe('POST /api/tags/import', () => {
       { line: 6, name: '別タグ', folderName: '不明' },
       { line: 7, name: '' },
       { line: 8, name: 'x'.repeat(61) },
+      { line: 9, name: '会員\nランク' },
     ] });
 
     expect(res.status).toBe(200);
@@ -237,15 +243,16 @@ describe('POST /api/tags/import', () => {
     await expect(res.json()).resolves.toMatchObject({
       success: true,
       data: {
-        summary: { total: 7, ready: 2, created: 0, skipped: 2, invalid: 3, failed: 0 },
+        summary: { total: 8, ready: 3, created: 0, skipped: 2, invalid: 3, failed: 0 },
         rows: [
           { line: 2, status: 'ready' },
           { line: 3, status: 'skipped', code: 'already_exists' },
           { line: 4, status: 'ready' },
           { line: 5, status: 'skipped', code: 'duplicate_in_file' },
-          { line: 6, status: 'invalid', code: 'folder_not_found' },
+          { line: 6, status: 'ready', code: 'folder_not_found' },
           { line: 7, status: 'invalid', code: 'name_required' },
           { line: 8, status: 'invalid', code: 'name_too_long' },
+          { line: 9, status: 'invalid', code: 'invalid_character' },
         ],
       },
     });
@@ -269,10 +276,12 @@ describe('POST /api/tags/import', () => {
   });
 
   test('一部失敗しても残りを登録し、失敗行を返す', async () => {
-    dbMocks.createTag.mockImplementation(async (_db, input: { name: string; groupId: string | null }) => {
-      if (input.name === '失敗') throw new Error('D1 unavailable');
-      return { ...TAG_ROW, id: `tag-${input.name}`, name: input.name, folder_id: input.groupId };
-    });
+    dbMocks.createTagsBulk.mockImplementation(async (
+      _db,
+      inputs: Array<{ name: string; groupId: string | null }>,
+    ) => inputs.map((input) => input.name === '失敗'
+      ? { status: 'failed' }
+      : { status: 'created', tagId: `tag-${input.name}` }));
 
     const res = await post('/api/tags/import', { rows: [
       { line: 2, name: '成功', folderName: '販売' },
@@ -282,15 +291,21 @@ describe('POST /api/tags/import', () => {
     ] });
 
     expect(res.status).toBe(200);
-    expect(dbMocks.createTag).toHaveBeenCalledTimes(3);
+    expect(dbMocks.createTagsBulk).toHaveBeenCalledTimes(1);
+    expect(dbMocks.createTagsBulk).toHaveBeenCalledWith(expect.anything(), [
+      { name: '成功', groupId: 'folder-sales' },
+      { name: '不明フォルダ', groupId: null },
+      { name: '失敗', groupId: null },
+      { name: '次も成功', groupId: null },
+    ]);
     await expect(res.json()).resolves.toMatchObject({
       success: true,
       data: {
         outcome: 'partial',
-        summary: { total: 4, ready: 0, created: 2, skipped: 0, invalid: 1, failed: 1 },
+        summary: { total: 4, ready: 0, created: 3, skipped: 0, invalid: 0, failed: 1 },
         rows: [
           { line: 2, status: 'created' },
-          { line: 3, status: 'invalid', code: 'folder_not_found' },
+          { line: 3, status: 'created', code: 'folder_not_found' },
           { line: 4, status: 'failed', code: 'create_failed' },
           { line: 5, status: 'created' },
         ],
@@ -299,7 +314,7 @@ describe('POST /api/tags/import', () => {
   });
 
   test('確認後に同名タグが作られても失敗ではなく見送りにする', async () => {
-    dbMocks.createTag.mockRejectedValue(new Error('UNIQUE constraint failed: tags.name'));
+    dbMocks.createTagsBulk.mockResolvedValue([{ status: 'skipped' }]);
     const res = await post('/api/tags/import', { rows: [{ name: '競合' }] });
 
     expect(res.status).toBe(200);
@@ -317,7 +332,7 @@ describe('POST /api/tags/import', () => {
     await expect(res.json()).resolves.toMatchObject({
       data: { outcome: 'failed', summary: { created: 0, invalid: 1 } },
     });
-    expect(dbMocks.createTag).not.toHaveBeenCalled();
+    expect(dbMocks.createTagsBulk).not.toHaveBeenCalled();
   });
 });
 
