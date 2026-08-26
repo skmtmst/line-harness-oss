@@ -912,7 +912,7 @@ CREATE TABLE funnels (
   -- 何日以内に次の段へ進んだものを数えるか。
   window_days  INTEGER NOT NULL DEFAULT 30,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE google_calendar_connections (
   id            TEXT PRIMARY KEY,
@@ -2566,6 +2566,9 @@ CREATE INDEX idx_friends_line_user_id ON friends (line_user_id);
 CREATE INDEX idx_friends_mark ON friends(support_mark_id);
 
 CREATE INDEX idx_friends_user_id ON friends (user_id);
+
+CREATE INDEX idx_funnels_line_account_created
+  ON funnels(line_account_id, created_at DESC);
 
 CREATE INDEX idx_google_calendar_connections_staff
   ON google_calendar_connections (line_account_id, staff_id, is_active);

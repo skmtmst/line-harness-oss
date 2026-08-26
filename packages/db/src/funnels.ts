@@ -20,6 +20,7 @@ export type FunnelStepKind = (typeof FUNNEL_STEP_KINDS)[number];
 
 export interface Funnel {
   id: string;
+  line_account_id: string | null;
   name: string;
   segment_json: string | null;
   window_days: number;
@@ -35,15 +36,21 @@ export interface FunnelStep {
   match_json: string;
 }
 
-export async function getFunnels(db: D1Database): Promise<Funnel[]> {
+export async function getFunnels(db: D1Database, lineAccountId: string): Promise<Funnel[]> {
   const result = await db
-    .prepare(`SELECT * FROM funnels ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM funnels WHERE line_account_id = ? ORDER BY created_at DESC`)
+    .bind(lineAccountId)
     .all<Funnel>();
   return result.results;
 }
 
-export async function getFunnelById(db: D1Database, id: string): Promise<Funnel | null> {
-  return db.prepare(`SELECT * FROM funnels WHERE id = ?`).bind(id).first<Funnel>();
+export async function getFunnelById(
+  db: D1Database,
+  lineAccountId: string,
+  id: string,
+): Promise<Funnel | null> {
+  return db.prepare(`SELECT * FROM funnels WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).first<Funnel>();
 }
 
 export async function getFunnelSteps(db: D1Database, funnelId: string): Promise<FunnelStep[]> {
@@ -58,6 +65,7 @@ export async function createFunnel(
   db: D1Database,
   input: {
     name: string;
+    lineAccountId: string;
     windowDays?: number;
     segment?: unknown;
     steps: Array<{ label: string; kind: FunnelStepKind; match: unknown }>;
@@ -66,11 +74,12 @@ export async function createFunnel(
   const id = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO funnels (id, name, segment_json, window_days, created_at)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO funnels (id, line_account_id, name, segment_json, window_days, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
+      input.lineAccountId,
       input.name,
       input.segment === undefined ? null : JSON.stringify(input.segment),
       input.windowDays ?? 30,
@@ -90,11 +99,16 @@ export async function createFunnel(
       .run();
     order++;
   }
-  return (await getFunnelById(db, id))!;
+  return (await getFunnelById(db, input.lineAccountId, id))!;
 }
 
-export async function deleteFunnel(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM funnels WHERE id = ?`).bind(id).run();
+export async function deleteFunnel(
+  db: D1Database,
+  lineAccountId: string,
+  id: string,
+): Promise<void> {
+  await db.prepare(`DELETE FROM funnels WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).run();
 }
 
 /**
@@ -106,7 +120,7 @@ export async function deleteFunnel(db: D1Database, id: string): Promise<void> {
 export async function countFunnelStep(
   db: D1Database,
   step: FunnelStep,
-  opts: { from: string; to: string; friendIds?: string[] },
+  opts: { from: string; to: string; lineAccountId: string; friendIds?: string[] },
 ): Promise<string[]> {
   const match = JSON.parse(step.match_json) as Record<string, unknown>;
   const scope = opts.friendIds;
@@ -114,15 +128,16 @@ export async function countFunnelStep(
   const scopeClause =
     scope && scope.length > 0 ? `AND friend_id IN (${scope.map(() => '?').join(',')})` : '';
   const scopeValues = scope ?? [];
+  const accountClause = `AND friend_id IN (SELECT id FROM friends WHERE line_account_id = ?)`;
 
   switch (step.kind) {
     case 'tag': {
       const result = await db
         .prepare(
           `SELECT DISTINCT friend_id FROM friend_tags
-            WHERE tag_id = ? AND assigned_at >= ? AND assigned_at <= ? ${scopeClause}`,
+            WHERE tag_id = ? AND assigned_at >= ? AND assigned_at <= ? ${accountClause} ${scopeClause}`,
         )
-        .bind(String(match.tagId), opts.from, opts.to, ...scopeValues)
+        .bind(String(match.tagId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
         .all<{ friend_id: string }>();
       return result.results.map((r) => r.friend_id);
     }
@@ -131,9 +146,9 @@ export async function countFunnelStep(
         .prepare(
           `SELECT DISTINCT friend_id FROM friend_field_values
             WHERE field_id = ? AND value IS NOT NULL AND value != ''
-              AND updated_at >= ? AND updated_at <= ? ${scopeClause}`,
+              AND updated_at >= ? AND updated_at <= ? ${accountClause} ${scopeClause}`,
         )
-        .bind(String(match.fieldId), opts.from, opts.to, ...scopeValues)
+        .bind(String(match.fieldId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
         .all<{ friend_id: string }>();
       return result.results.map((r) => r.friend_id);
     }
@@ -143,7 +158,7 @@ export async function countFunnelStep(
           `SELECT DISTINCT friend_id FROM site_events
             WHERE event_type = ? AND friend_id IS NOT NULL
               AND (? IS NULL OR path = ?)
-              AND occurred_at >= ? AND occurred_at <= ? ${scopeClause}`,
+              AND occurred_at >= ? AND occurred_at <= ? ${accountClause} ${scopeClause}`,
         )
         .bind(
           String(match.eventType ?? 'page_view'),
@@ -151,6 +166,7 @@ export async function countFunnelStep(
           match.path ?? null,
           opts.from,
           opts.to,
+          opts.lineAccountId,
           ...scopeValues,
         )
         .all<{ friend_id: string }>();
@@ -160,9 +176,9 @@ export async function countFunnelStep(
       const result = await db
         .prepare(
           `SELECT DISTINCT friend_id FROM conversion_events
-            WHERE conversion_point_id = ? AND created_at >= ? AND created_at <= ? ${scopeClause}`,
+            WHERE conversion_point_id = ? AND created_at >= ? AND created_at <= ? ${accountClause} ${scopeClause}`,
         )
-        .bind(String(match.conversionPointId), opts.from, opts.to, ...scopeValues)
+        .bind(String(match.conversionPointId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
         .all<{ friend_id: string }>();
       return result.results.map((r) => r.friend_id);
     }
@@ -171,9 +187,9 @@ export async function countFunnelStep(
         .prepare(
           `SELECT DISTINCT friend_id FROM link_clicks
             WHERE tracked_link_id = ? AND friend_id IS NOT NULL
-              AND clicked_at >= ? AND clicked_at <= ? ${scopeClause}`,
+              AND clicked_at >= ? AND clicked_at <= ? ${accountClause} ${scopeClause}`,
         )
-        .bind(String(match.trackedLinkId), opts.from, opts.to, ...scopeValues)
+        .bind(String(match.trackedLinkId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
         .all<{ friend_id: string }>();
       return result.results.map((r) => r.friend_id);
     }
@@ -182,9 +198,9 @@ export async function countFunnelStep(
         .prepare(
           `SELECT DISTINCT friend_id FROM form_submissions
             WHERE form_id = ? AND friend_id IS NOT NULL
-              AND created_at >= ? AND created_at <= ? ${scopeClause}`,
+              AND created_at >= ? AND created_at <= ? ${accountClause} ${scopeClause}`,
         )
-        .bind(String(match.formId), opts.from, opts.to, ...scopeValues)
+        .bind(String(match.formId), opts.from, opts.to, opts.lineAccountId, ...scopeValues)
         .all<{ friend_id: string }>();
       return result.results.map((r) => r.friend_id);
     }
