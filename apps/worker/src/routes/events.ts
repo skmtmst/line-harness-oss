@@ -603,13 +603,18 @@ events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'),
 
   const body = (await c.req.json().catch(() => ({}))) as { slots?: SlotInput[] };
   if (!Array.isArray(body.slots) || body.slots.length === 0) return bad(c, 'slots_required', 422);
+  if (body.slots.length > 400) {
+    return bad(c, '一度に追加できるのは400件までです。400件以下に分けて追加してください', 422);
+  }
 
-  const inserted: Array<Record<string, unknown>> = [];
+  const insertStatements: D1PreparedStatement[] = [];
+  const ids: string[] = [];
   for (const s of body.slots) {
     const v = validateSlotInput(s, true);
     if (!v.ok) return bad(c, v.code, 422);
     const id = crypto.randomUUID();
-    await c.env.DB
+    ids.push(id);
+    insertStatements.push(c.env.DB
       .prepare(
         `INSERT INTO event_slots
            (id, event_id, starts_at, ends_at, capacity, is_active, sort_order)
@@ -623,11 +628,24 @@ events.post('/api/events/admin/events/:id/slots', requireRole('owner', 'admin'),
         s.capacity ?? null,
         s.is_active ?? 1,
         s.sort_order ?? 0,
-      )
-      .run();
-    const row = await c.env.DB.prepare(`SELECT * FROM event_slots WHERE id = ?`).bind(id).first();
-    if (row) inserted.push(row as Record<string, unknown>);
+      ));
   }
+  await c.env.DB.batch(insertStatements);
+
+  const rowsById = new Map<string, Record<string, unknown>>();
+  for (let offset = 0; offset < ids.length; offset += 90) {
+    const chunk = ids.slice(offset, offset + 90);
+    const placeholders = chunk.map(() => '?').join(',');
+    const { results } = await c.env.DB
+      .prepare(`SELECT * FROM event_slots WHERE id IN (${placeholders})`)
+      .bind(...chunk)
+      .all<Record<string, unknown>>();
+    for (const row of results ?? []) rowsById.set(row.id as string, row);
+  }
+  const inserted = ids.flatMap((id) => {
+    const row = rowsById.get(id);
+    return row ? [row] : [];
+  });
   return c.json({ items: inserted }, 201);
 });
 

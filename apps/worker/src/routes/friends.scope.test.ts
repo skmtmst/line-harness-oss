@@ -22,7 +22,7 @@ vi.mock('@line-crm/line-sdk', () => ({
 
 const { friends } = await import('./friends.js');
 
-function createApp(prepared: Array<{ sql: string; binds: unknown[] }>) {
+function createApp(prepared: Array<{ sql: string; binds: unknown[] }>, friendRows: Array<Record<string, unknown>> = []) {
   const app = new Hono<any>();
   app.use('*', async (c, next) => {
     c.set('staff', { id: 'staff', role: 'owner', tenantId: 'tenant-a' });
@@ -34,7 +34,9 @@ function createApp(prepared: Array<{ sql: string; binds: unknown[] }>) {
           const statement = {
             bind(...binds: unknown[]) { entry.binds = binds; return statement; },
             first: vi.fn(async () => ({ count: 0, total: 0, active: 0, blocked_by_them: 0, hidden_by_us: 0, unanswered: 0, resolved: 0 })),
-            all: vi.fn(async () => ({ results: [] })),
+            all: vi.fn(async () => ({
+              results: sql.includes('FROM friends f') && sql.includes('LIMIT ? OFFSET ?') ? friendRows : [],
+            })),
             run: vi.fn(async () => ({})),
           };
           return statement;
@@ -126,5 +128,20 @@ describe('A-8 friends tenant scope', () => {
       success: true,
       data: { days: 30, firstTime: 0, returning: 0, unblocked: 0 },
     });
+  });
+
+  test('includeTags=false does not add one tag query per friend', async () => {
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const rows = Array.from({ length: 100 }, (_, index) => ({
+      id: `friend-${index}`,
+      display_name: `Friend ${index}`,
+      line_user_id: `U${index}`,
+    }));
+
+    const response = await createApp(prepared, rows).request('/api/friends?includeTags=false&limit=100');
+
+    expect(response.status).toBe(200);
+    expect(prepared.filter(({ sql }) => sql.includes('friend_tags'))).toHaveLength(0);
+    expect(prepared.length).toBeLessThan(10);
   });
 });

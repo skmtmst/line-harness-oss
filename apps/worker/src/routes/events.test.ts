@@ -629,6 +629,12 @@ function makeEventDb(state: {
               );
             return { results: items as unknown as T[] };
           }
+          if (sql.startsWith('SELECT * FROM event_slots WHERE id IN (')) {
+            const ids = new Set(bound as string[]);
+            return {
+              results: (state.slots ?? []).filter((slot) => ids.has(slot.id)) as unknown as T[],
+            };
+          }
           return { results: [] };
         },
         async run() {
@@ -833,6 +839,9 @@ function makeEventDb(state: {
         },
       };
       return stmt;
+    },
+    async batch(statements: D1PreparedStatement[]) {
+      return Promise.all(statements.map((statement) => statement.run()));
     },
   } as unknown as D1Database;
   return db;
@@ -1295,6 +1304,37 @@ describe('event_slots admin', () => {
     const body = (await res.json()) as { items: SlotRow[] };
     expect(body.items).toHaveLength(2);
     expect(state.slots).toHaveLength(2);
+  });
+
+  test('POST rejects more than 400 slots before inserting any', async () => {
+    const state = { events: [baseEvent({ id: 'e1', line_account_id: 'la1' })], slots: [] as SlotRow[] };
+    const slots = Array.from({ length: 401 }, (_, index) => ({
+      starts_at: `2099-06-${String((index % 28) + 1).padStart(2, '0')}T10:00:00Z`,
+      ends_at: `2099-06-${String((index % 28) + 1).padStart(2, '0')}T11:00:00Z`,
+      sort_order: index,
+    }));
+    const res = await setupApp(state).request('/api/events/admin/events/e1/slots?account_id=la1', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slots }),
+    });
+    expect(res.status).toBe(422);
+    expect(state.slots).toHaveLength(0);
+  });
+
+  test('POST atomically creates 400 slots and preserves request order', async () => {
+    const state = { events: [baseEvent({ id: 'e1', line_account_id: 'la1' })], slots: [] as SlotRow[] };
+    const slots = Array.from({ length: 400 }, (_, index) => ({
+      starts_at: new Date(Date.UTC(2099, 0, 1, 0, index)).toISOString(),
+      ends_at: new Date(Date.UTC(2099, 0, 1, 0, index + 1)).toISOString(),
+      sort_order: index,
+    }));
+    const res = await setupApp(state).request('/api/events/admin/events/e1/slots?account_id=la1', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ slots }),
+    });
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { items: SlotRow[] };
+    expect(state.slots).toHaveLength(400);
+    expect(body.items).toHaveLength(400);
+    expect(body.items.map((item) => item.starts_at)).toEqual(slots.map((slot) => slot.starts_at));
   });
 
   test('POST 422 when slots empty', async () => {
