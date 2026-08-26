@@ -262,6 +262,7 @@ export async function trackConversion(
 export async function getConversionEvents(
   db: D1Database,
   opts: {
+    scope: { allowedAccountIds: readonly string[]; includeUnassigned: boolean };
     conversionPointId?: string;
     friendId?: string;
     affiliateCode?: string;
@@ -269,29 +270,36 @@ export async function getConversionEvents(
     endDate?: string;
     limit?: number;
     offset?: number;
-  } = {},
+  },
 ): Promise<ConversionEvent[]> {
   const conditions: string[] = [];
   const values: unknown[] = [];
 
+  if (opts.scope.allowedAccountIds.length > 0) {
+    conditions.push(`(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`);
+    values.push(...opts.scope.allowedAccountIds);
+  } else {
+    conditions.push(opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0');
+  }
+
   if (opts.conversionPointId) {
-    conditions.push('conversion_point_id = ?');
+    conditions.push('ce.conversion_point_id = ?');
     values.push(opts.conversionPointId);
   }
   if (opts.friendId) {
-    conditions.push('friend_id = ?');
+    conditions.push('ce.friend_id = ?');
     values.push(opts.friendId);
   }
   if (opts.affiliateCode) {
-    conditions.push('affiliate_code = ?');
+    conditions.push('ce.affiliate_code = ?');
     values.push(opts.affiliateCode);
   }
   if (opts.startDate) {
-    conditions.push('created_at >= ?');
+    conditions.push('ce.created_at >= ?');
     values.push(opts.startDate);
   }
   if (opts.endDate) {
-    conditions.push('created_at <= ?');
+    conditions.push('ce.created_at <= ?');
     values.push(opts.endDate);
   }
 
@@ -303,7 +311,9 @@ export async function getConversionEvents(
 
   const result = await db
     .prepare(
-      `SELECT * FROM conversion_events ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      `SELECT ce.* FROM conversion_events ce
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+       ${where} ORDER BY ce.created_at DESC LIMIT ? OFFSET ?`,
     )
     .bind(...values)
     .all<ConversionEvent>();

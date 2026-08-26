@@ -66,12 +66,10 @@ broadcastMessageAssets.get('/api/broadcast-message-assets', async (c) => {
     return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
   }
   let rows = await listBroadcastMessageAssets(c.env.DB, lineAccountId, kind);
-  if (!lineAccountId) {
-    const { scope } = await adminAccountScope(c);
-    rows = rows.filter((row) => row.line_account_id === null
-      ? scope.canSeeUnassigned
-      : scope.allowedAccountIds.includes(row.line_account_id));
-  }
+  const { scope } = await adminAccountScope(c);
+  rows = rows.filter((row) => row.line_account_id === null
+    ? scope.canSeeUnassigned
+    : scope.allowedAccountIds.includes(row.line_account_id));
   return c.json({ success: true, data: rows.map(serialize) });
 });
 

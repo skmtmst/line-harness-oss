@@ -5,6 +5,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getConversionApprovalQueue } from '../src/affiliate-report.js';
+import { getConversionEvents } from '../src/conversions.js';
 import { setConversionApproval } from '../src/affiliate-offers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -13,6 +14,8 @@ const MIGRATIONS_DIR = join(PKG_ROOT, 'migrations');
 const BENIGN = /duplicate column name|already exists/i;
 
 // Canonical IDENTITY_KEY_SQL (kept in sync with apps/worker/src/lib/identity-key.ts).
+const ALL_SCOPE = { allowedAccountIds: [] as string[], includeUnassigned: true };
+
 const IDENTITY_KEY_SQL = `
   COALESCE(
     CASE
@@ -97,11 +100,11 @@ function insertAffiliate(s: Database.Database, id: string): void {
   ).run(id, `Aff ${id}`, `code-${id}`);
 }
 
-function insertPoint(s: Database.Database, id: string, value: number): void {
+function insertPoint(s: Database.Database, id: string, value: number, lineAccountId: string | null = null): void {
   s.prepare(
-    `INSERT INTO conversion_points (id, name, event_type, value, created_at)
-     VALUES (?, ?, 'purchase', ?, '2026-01-01T00:00:00.000+09:00')`,
-  ).run(id, `Point ${id}`, value);
+    `INSERT INTO conversion_points (id, name, event_type, value, line_account_id, created_at)
+     VALUES (?, ?, 'purchase', ?, ?, '2026-01-01T00:00:00.000+09:00')`,
+  ).run(id, `Point ${id}`, value, lineAccountId);
 }
 
 function insertOfferAndLink(
@@ -169,7 +172,7 @@ describe('getConversionApprovalQueue', () => {
       approvalStatus: null, createdAt: '2026-02-03T00:00:00.000+09:00',
     });
 
-    const pending = await getConversionApprovalQueue(db, { status: 'pending', identityKeySql: IDENTITY_KEY_SQL });
+    const pending = await getConversionApprovalQueue(db, { status: 'pending', scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
     expect(pending).toHaveLength(1);
     expect(pending[0]).toMatchObject({
       eventId: 'cv1',
@@ -182,7 +185,7 @@ describe('getConversionApprovalQueue', () => {
       duplicateFlag: false,
     });
 
-    const approved = await getConversionApprovalQueue(db, { status: 'approved', identityKeySql: IDENTITY_KEY_SQL });
+    const approved = await getConversionApprovalQueue(db, { status: 'approved', scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
     expect(approved.map((r) => r.eventId)).toEqual(['cv2']);
   });
 
@@ -208,7 +211,7 @@ describe('getConversionApprovalQueue', () => {
 
     const rows = await getConversionApprovalQueue(db, {
       status: 'approved',
-      identityKeySql: IDENTITY_KEY_SQL,
+      scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL,
     });
     const byEvent = new Map(rows.map((r) => [r.eventId, r]));
     expect(byEvent.get('cv1')).toMatchObject({ offerId: 'off1', offerRewardMiles: 200 });
@@ -227,7 +230,7 @@ describe('getConversionApprovalQueue', () => {
 
     const rows = await getConversionApprovalQueue(db, {
       status: 'pending',
-      identityKeySql: IDENTITY_KEY_SQL,
+      scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL,
     });
     expect(rows[0]).toMatchObject({ offerId: null, offerName: null, offerRewardMiles: null });
   });
@@ -246,7 +249,7 @@ describe('getConversionApprovalQueue', () => {
     insertConversion(sqlite, { id: 'cv2', pointId: 'p1', friendId: 'f2', affiliateId: 'aff1', refCode: 'rc1', approvalStatus: 'pending', createdAt: '2026-02-02T00:00:00.000+09:00' });
     insertConversion(sqlite, { id: 'cv3', pointId: 'p1', friendId: 'f3', affiliateId: 'aff1', refCode: 'rc1', approvalStatus: 'pending', createdAt: '2026-02-03T00:00:00.000+09:00' });
 
-    const rows = await getConversionApprovalQueue(db, { status: 'pending', identityKeySql: IDENTITY_KEY_SQL });
+    const rows = await getConversionApprovalQueue(db, { status: 'pending', scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
     const flagByEvent = new Map(rows.map((r) => [r.eventId, r.duplicateFlag]));
     expect(flagByEvent.get('cv1')).toBe(true);
     expect(flagByEvent.get('cv2')).toBe(true);
@@ -265,8 +268,44 @@ describe('getConversionApprovalQueue', () => {
     insertConversion(sqlite, { id: 'cv1', pointId: 'p1', friendId: 'f1', affiliateId: 'aff1', refCode: 'rc1', approvalStatus: 'pending', createdAt: '2026-02-01T00:00:00.000+09:00' });
     insertConversion(sqlite, { id: 'cv2', pointId: 'p1', friendId: 'f2', affiliateId: 'aff2', refCode: 'rc2', approvalStatus: 'pending', createdAt: '2026-02-02T00:00:00.000+09:00' });
 
-    const rows = await getConversionApprovalQueue(db, { status: 'pending', identityKeySql: IDENTITY_KEY_SQL });
+    const rows = await getConversionApprovalQueue(db, { status: 'pending', scope: ALL_SCOPE, identityKeySql: IDENTITY_KEY_SQL });
     expect(rows.every((r) => r.duplicateFlag === false)).toBe(true);
+  });
+
+  test('applies account scope before pagination for events and approvals', async () => {
+    insertFriend(sqlite, 'f1', { userId: 'uid-a' });
+    insertAffiliate(sqlite, 'aff1');
+    sqlite.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES (?, ?, ?, 'token', 'secret')`,
+    ).run('own', 'channel-own', 'Own');
+    sqlite.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES (?, ?, ?, 'token', 'secret')`,
+    ).run('other', 'channel-other', 'Other');
+    insertPoint(sqlite, 'own-point', 100, 'own');
+    insertPoint(sqlite, 'other-point', 100, 'other');
+    for (let index = 1; index <= 3; index += 1) {
+      insertConversion(sqlite, {
+        id: `other-${index}`, pointId: 'other-point', friendId: 'f1', affiliateId: 'aff1', refCode: null,
+        approvalStatus: 'pending', createdAt: `2026-02-0${index + 2}T00:00:00.000+09:00`,
+      });
+    }
+    for (let index = 1; index <= 2; index += 1) {
+      insertConversion(sqlite, {
+        id: `own-${index}`, pointId: 'own-point', friendId: 'f1', affiliateId: 'aff1', refCode: null,
+        approvalStatus: 'pending', createdAt: `2026-02-0${index}T00:00:00.000+09:00`,
+      });
+    }
+    const scope = { allowedAccountIds: ['own'], includeUnassigned: false };
+
+    const events = await getConversionEvents(db, { scope, limit: 2, offset: 0 });
+    expect(events.map((row) => row.id)).toEqual(['own-2', 'own-1']);
+
+    const approvals = await getConversionApprovalQueue(db, {
+      scope, status: 'pending', identityKeySql: IDENTITY_KEY_SQL, limit: 2, offset: 0,
+    });
+    expect(approvals.map((row) => row.eventId)).toEqual(['own-2', 'own-1']);
   });
 });
 
