@@ -8,7 +8,6 @@ import { api, ApiError, fetchApi } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
-import Header from '@/components/layout/header'
 import TemplatePicker from '@/components/chats/template-picker'
 import InboxKpis from '@/components/chats/inbox-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
@@ -2119,10 +2118,6 @@ function ChatsPageHost() {
 
   return (
     <div className="space-y-3">
-      <div data-design="Head">
-        <Header title="受信箱" action={<Button href="/support">マニュアル</Button>} />
-      </div>
-
       <div data-design="KPIs" data-inbox-v4="summary">
         <InboxKpis />
       </div>

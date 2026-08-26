@@ -47,6 +47,66 @@ final result: passed
 
 ---
 
+# V6 受信箱・共通トップバー重複解消 Design QA
+
+## 比較対象
+
+- source visual truth: Pencil `pencil-new.pen` の共通トップバー `cBSCb` と `docs/v6-shell-contract.md` §2
+- implementation route: `/chats`
+- before: PR #387時点の `chats-1440/1920-darwin.png`
+- after:
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/chats-1440-darwin.png`
+  - `scripts/visual-qa/capture.spec.mjs-snapshots/chats-1920-darwin.png`
+
+## 正規化
+
+- implementation: 1440 x 1000 / 1920 x 1000 CSS px、同じモックデータ・同じ未選択状態
+- before / afterを同じ比較入力で確認した。
+- この確認は、受信箱全体のV6視覚一致ではなく、共通トップバーと本文の重複解消だけを対象とする。
+
+## Full-view comparison evidence
+
+- 変更前は、共通トップバーの「受信箱」「マニュアル」と、本文の「受信箱」「マニュアル」が二重に表示されていた。
+- 変更後は共通トップバーだけに残り、KPIが本文の先頭へ上がった。
+- 1440 / 1920の2画像を3回連続で差分0として確認した。
+- 既存12ルート、タグ4状態、削除2状態、CSV4状態を含む全44画像も通過した。
+- 両幅でページ全体の横スクロールは0pxだった。
+
+## Focused region comparison evidence
+
+- 上端: 56pxの共通トップバーに画面名とマニュアルを1組だけ表示する。
+- 本文先頭: 旧 `Header` 行を削除し、KPIを最初の帯にした。
+- 既存のKPI、絞り込み、3カラム、返信操作には変更を加えていない。
+
+## Required fidelity surfaces
+
+- Fonts and typography: 共通トップバーの既存V6設定をそのまま使用した。
+- Spacing and layout rhythm: 重複行だけを取り除き、新しい余白や寸法は追加していない。
+- Colors and visual tokens: 変更なし。既存トークンのみ。
+- Image quality and asset fidelity: 対象箇所に画像資産はない。
+- Copy and content: 「受信箱」「マニュアル」を消したのではなく、シェル側の1組へ統合した。
+
+## Findings
+
+- P0 / P1 / P2: この変更範囲の残件なし。
+- 受信箱全体のV6 260画面との完全比較は、引き続き `unverified`。このPRでは完了を名乗らない。
+
+## Primary interactions tested
+
+- `/chats`への着地、ログイン画面への誤遷移なし
+- 1440 / 1920で横スクロールなし
+- Web全635テスト、型検査、本番用Webビルド
+
+## Console errors checked
+
+- Visual QAでエラー画面、店舗未選択、ログイン画面への転送なし。
+
+## Final result
+
+final result: passed
+
+---
+
 # Design QA — V5 B4 オーバーレイ・通知・メニュー
 
 ## 比較対象
