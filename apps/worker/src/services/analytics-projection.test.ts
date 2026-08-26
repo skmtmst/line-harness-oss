@@ -35,7 +35,7 @@ describe('分析の日別投影更新', () => {
     );
     expect(result).toEqual({ processed: 1, matched: 1, mismatched: 0, failed: 0 });
     expect(mocks.recentAnalyticsProjectionRange).toHaveBeenCalledWith(
-      new Date('2026-08-26T00:00:00.000Z'), 'Asia/Tokyo', 7,
+      new Date('2026-08-26T00:00:00.000Z'), 'Asia/Tokyo', 31,
     );
     expect(mocks.rebuildAnalyticsDailyMetrics).toHaveBeenCalledWith(
       {},
