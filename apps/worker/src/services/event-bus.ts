@@ -62,9 +62,18 @@ export async function fireEvent(
   lineAccessToken?: string,
   lineAccountId?: string | null,
 ): Promise<void> {
+  let outgoingWebhookLineAccountId = lineAccountId;
+  if (outgoingWebhookLineAccountId === undefined && payload.friendId) {
+    const friend = await db
+      .prepare('SELECT line_account_id FROM friends WHERE id = ?')
+      .bind(payload.friendId)
+      .first<{ line_account_id: string | null }>();
+    outgoingWebhookLineAccountId = friend?.line_account_id;
+  }
+
   // Phase 1: fire webhooks, apply scoring rules, and ad conversion postback concurrently.
   const phase1: Promise<unknown>[] = [
-    fireOutgoingWebhooks(db, eventType, payload),
+    fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId),
     processScoring(db, eventType, payload),
   ];
   if (payload.friendId && payload.conversionEventName) {
@@ -166,9 +175,10 @@ async function fireOutgoingWebhooks(
   db: D1Database,
   eventType: string,
   payload: EventPayload,
+  lineAccountId?: string | null,
 ): Promise<void> {
   try {
-    const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType);
+    const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType, lineAccountId);
     for (const wh of webhooks) {
       try {
         const body = JSON.stringify({

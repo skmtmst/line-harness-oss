@@ -1,3 +1,4 @@
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 // Webhook IN/OUT クエリヘルパー
 
@@ -130,9 +131,37 @@ export async function deleteOutgoingWebhook(db: D1Database, id: string): Promise
 }
 
 /** 指定イベントタイプに一致するアクティブな送信Webhookを取得 */
-export async function getActiveOutgoingWebhooksByEvent(db: D1Database, eventType: string): Promise<OutgoingWebhookRow[]> {
+export async function getActiveOutgoingWebhooksByEvent(
+  db: D1Database,
+  eventType: string,
+  lineAccountId?: string | null,
+): Promise<OutgoingWebhookRow[]> {
   const all = await db
-    .prepare(`SELECT * FROM outgoing_webhooks WHERE is_active = 1`)
+    .prepare(`
+      SELECT *
+      FROM outgoing_webhooks
+      WHERE is_active = 1
+        AND (
+          (? IS NULL AND line_account_id IS NULL)
+          OR line_account_id = ?
+          OR (
+            line_account_id IS NULL
+            AND EXISTS (
+              SELECT 1
+              FROM line_accounts la
+              WHERE la.id = ?
+                AND COALESCE(la.tenant_id, ?) = ?
+            )
+          )
+        )
+    `)
+    .bind(
+      lineAccountId ?? null,
+      lineAccountId ?? null,
+      lineAccountId ?? null,
+      DEFAULT_TENANT_ID,
+      DEFAULT_TENANT_ID,
+    )
     .all<OutgoingWebhookRow>();
   return all.results.filter((w) => {
     const types: string[] = JSON.parse(w.event_types);
