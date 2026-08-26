@@ -19,6 +19,9 @@ const mocks = {
   createFunnelVersion: vi.fn(),
   runChronologicalFunnel: vi.fn(),
   createFunnelResultAudience: vi.fn(),
+  createAnalyticsCrossRun: vi.fn(),
+  getAnalyticsCrossRun: vi.fn(),
+  createAnalyticsCrossAudience: vi.fn(),
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
   getLineAccounts: vi.fn(),
@@ -101,6 +104,15 @@ beforeEach(() => {
   mocks.createFunnelResultAudience.mockResolvedValue({
     id: 'audience-1', memberCount: 1, expiresAt: '2026-08-27T00:00:00.000Z',
   });
+  mocks.createAnalyticsCrossRun.mockResolvedValue({ id: 'cross-1', state: 'pending' });
+  mocks.getAnalyticsCrossRun.mockResolvedValue({
+    id: 'cross-1', state: 'available', errorCode: null,
+    result: { state: 'available', cells: [], totalValue: 0 },
+    createdAt: '2026-08-26T00:00:00.000Z',
+  });
+  mocks.createAnalyticsCrossAudience.mockResolvedValue({
+    id: 'audience-cross-1', memberCount: 2, expiresAt: '2026-08-27T00:00:00.000Z',
+  });
   mocks.getCurrentFunnelVersion.mockResolvedValue({
     id: 'fv-1', versionNumber: 1, createdAt: '2026-08-01T00:00:00.000Z',
   });
@@ -157,6 +169,50 @@ describe('クロス集計', () => {
     const res = await req(`/api/analytics/cross?${ACCOUNT}&fieldId=ff-1`);
     expect(res.status).toBe(200);
     expect(mocks.getTagFieldCross).toHaveBeenCalledWith(env.DB, 'account-a', 'ff-1');
+  });
+});
+
+describe('V6クロス分析API', () => {
+  const body = {
+    rowAxis: { kind: 'route' },
+    columnAxis: { kind: 'tag' },
+    measure: { kind: 'unique_friends' },
+    filters: [],
+    periodFrom: '2026-08-01T00:00:00.000Z',
+    periodTo: '2026-08-07T23:59:59.999Z',
+  };
+
+  it('重い集計をHTTP内で行わずpendingの結果IDを返す', async () => {
+    const res = await req(`/api/analytics/cross/query?${ACCOUNT}`, 'POST', body);
+    expect(res.status).toBe(202);
+    expect(mocks.createAnalyticsCrossRun).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        lineAccountId: 'account-a', timeZone: 'Asia/Tokyo', createdBy: 'u-1', query: body,
+      }),
+    );
+    expect(await res.json()).toMatchObject({ data: { id: 'cross-1', state: 'pending' } });
+  });
+
+  it('選択中アカウント内の結果だけを返す', async () => {
+    const res = await req(`/api/analytics/cross/results/cross-1?${ACCOUNT}`);
+    expect(res.status).toBe(200);
+    expect(mocks.getAnalyticsCrossRun).toHaveBeenCalledWith(env.DB, 'account-a', 'cross-1');
+  });
+
+  it('セルから友だちIDではなく24時間の対象者IDを返す', async () => {
+    const res = await req(`/api/analytics/results/cross-1/audiences?${ACCOUNT}`, 'POST', {
+      sourceKind: 'cross', rowKey: 'route-1', columnKey: 'tag-1',
+    });
+    expect(res.status).toBe(201);
+    expect(mocks.createAnalyticsCrossAudience).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({
+        lineAccountId: 'account-a', runId: 'cross-1',
+        rowKey: 'route-1', columnKey: 'tag-1', createdBy: 'u-1',
+      }),
+    );
+    expect(await res.json()).toMatchObject({ data: { id: 'audience-cross-1', memberCount: 2 } });
   });
 });
 

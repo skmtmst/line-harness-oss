@@ -17,6 +17,9 @@ import {
   createFunnelVersion,
   runChronologicalFunnel,
   createFunnelResultAudience,
+  createAnalyticsCrossRun,
+  getAnalyticsCrossRun,
+  createAnalyticsCrossAudience,
   getCurrentFunnelVersion,
   getLineAccountById,
   FUNNEL_STEP_KINDS,
@@ -104,7 +107,7 @@ function explicitTimestamp(value: unknown, code: string): string {
 function funnelErrorStatus(error: unknown): 404 | 422 | 500 {
   const message = error instanceof Error ? error.message : '';
   if (message.endsWith('_not_found')) return 404;
-  if (message.startsWith('analytics_funnel_')) return 422;
+  if (message.startsWith('analytics_funnel_') || message.startsWith('analytics_cross_')) return 422;
   return 500;
 }
 
@@ -180,6 +183,45 @@ analytics.get('/api/analytics/cross', async (c) => {
     return c.json({ success: true, data: cells });
   } catch (err) {
     console.error('GET /api/analytics/cross error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// V6: クロス分析はCronで非同期実行し、HTTPの処理時間とD1負荷を固定する。
+analytics.post('/api/analytics/cross/query', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const selectedAccount = await getLineAccountById(c.env.DB, account.accountId);
+    if (!selectedAccount) return c.json({ success: false, error: 'Not found' }, 404);
+    const body = await c.req.json<unknown>();
+    const result = await createAnalyticsCrossRun(c.env.DB, {
+      lineAccountId: account.accountId,
+      query: body,
+      timeZone: selectedAccount.timezone || 'Asia/Tokyo',
+      dataCutoffAt: new Date().toISOString(),
+      createdBy: c.get('staff').id,
+    });
+    return c.json({ success: true, data: result }, 202);
+  } catch (error) {
+    const status = funnelErrorStatus(error);
+    if (status === 500) console.error('POST /api/analytics/cross/query error:', error);
+    return c.json({
+      success: false,
+      error: status === 500 ? 'Internal server error' : (error as Error).message,
+    }, status);
+  }
+});
+
+analytics.get('/api/analytics/cross/results/:id', async (c) => {
+  try {
+    const account = await resolveAccount(c);
+    if (!account.ok) return account.response;
+    const result = await getAnalyticsCrossRun(c.env.DB, account.accountId, c.req.param('id'));
+    if (!result) return c.json({ success: false, error: 'Not found' }, 404);
+    return c.json({ success: true, data: result });
+  } catch (error) {
+    console.error('GET /api/analytics/cross/results/:id error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -302,8 +344,20 @@ analytics.post('/api/analytics/results/:id/audiences', requireRole('owner', 'adm
     const account = await resolveAccount(c);
     if (!account.ok) return account.response;
     const body = await c.req.json<{
-      groupKey?: unknown; stepOrder?: unknown; selection?: unknown;
+      sourceKind?: unknown; groupKey?: unknown; stepOrder?: unknown; selection?: unknown;
+      rowKey?: unknown; columnKey?: unknown;
     }>();
+    if (body.sourceKind === 'cross') {
+      const result = await createAnalyticsCrossAudience(c.env.DB, {
+        lineAccountId: account.accountId,
+        runId: c.req.param('id'),
+        rowKey: typeof body.rowKey === 'string' ? body.rowKey : '',
+        columnKey: typeof body.columnKey === 'string' ? body.columnKey : '',
+        createdBy: c.get('staff').id,
+        now: new Date(),
+      });
+      return c.json({ success: true, data: result }, 201);
+    }
     if (!['reached', 'stopped', 'in_progress'].includes(String(body.selection))) {
       return c.json({ success: false, error: '対象者の種類が不正です' }, 422);
     }

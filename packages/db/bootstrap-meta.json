@@ -194,7 +194,8 @@
     "185_automation_execution_plan.sql",
     "186_analytics_account_scope.sql",
     "187_analytics_read_model.sql",
-    "188_analytics_funnels.sql"
+    "188_analytics_funnels.sql",
+    "189_analytics_cross.sql"
   ],
-  "migrationCount": 195
+  "migrationCount": 196
 }

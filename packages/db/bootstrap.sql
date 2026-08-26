@@ -125,6 +125,33 @@ CREATE TABLE affiliates (
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , email TEXT, hold_days INTEGER, payout_cycle TEXT, notify_on_conversion INTEGER NOT NULL DEFAULT 0);
 
+CREATE TABLE analytics_cross_run_members (
+  run_id           TEXT NOT NULL REFERENCES analytics_cross_runs(id) ON DELETE CASCADE,
+  line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  row_key          TEXT NOT NULL,
+  col_key          TEXT NOT NULL,
+  friend_id        TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  PRIMARY KEY (run_id, row_key, col_key, friend_id)
+);
+
+CREATE TABLE analytics_cross_runs (
+  id                TEXT PRIMARY KEY,
+  line_account_id   TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  query_json        TEXT NOT NULL CHECK (json_valid(query_json)),
+  state             TEXT NOT NULL DEFAULT 'pending'
+                      CHECK (state IN ('pending','running','available','partial','unavailable','failed')),
+  result_json       TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(result_json)),
+  error_code        TEXT,
+  period_from       TEXT NOT NULL,
+  period_to         TEXT NOT NULL,
+  time_zone         TEXT NOT NULL,
+  data_cutoff_at    TEXT NOT NULL,
+  created_by        TEXT,
+  created_at        TEXT NOT NULL,
+  started_at        TEXT,
+  completed_at      TEXT
+);
+
 CREATE TABLE analytics_daily_metrics (
   line_account_id  TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   metric_date      TEXT NOT NULL,
@@ -242,8 +269,8 @@ CREATE TABLE analytics_result_audience_members (
 CREATE TABLE analytics_result_audiences (
   id                  TEXT PRIMARY KEY,
   line_account_id     TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
-  source_kind         TEXT NOT NULL CHECK (source_kind IN ('funnel')),
-  source_result_id    TEXT NOT NULL REFERENCES analytics_funnel_runs(id) ON DELETE CASCADE,
+  source_kind         TEXT NOT NULL CHECK (source_kind IN ('funnel','cross')),
+  source_result_id    TEXT NOT NULL,
   selection_key       TEXT NOT NULL,
   member_count        INTEGER NOT NULL DEFAULT 0,
   expires_at          TEXT NOT NULL,
@@ -2471,6 +2498,15 @@ CREATE INDEX idx_affiliate_links_offer ON affiliate_links (offer_id);
 
 CREATE UNIQUE INDEX idx_affiliates_friend ON affiliates (friend_id) WHERE friend_id IS NOT NULL;
 
+CREATE INDEX idx_analytics_cross_members_selection
+  ON analytics_cross_run_members(run_id, row_key, col_key, friend_id);
+
+CREATE INDEX idx_analytics_cross_runs_account_time
+  ON analytics_cross_runs(line_account_id, created_at DESC, id DESC);
+
+CREATE INDEX idx_analytics_cross_runs_pending
+  ON analytics_cross_runs(state, created_at, id);
+
 CREATE INDEX idx_analytics_daily_metrics_account_date
   ON analytics_daily_metrics(line_account_id, metric_date DESC, metric_key);
 
@@ -3059,6 +3095,11 @@ CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
   ON google_calendar_connections (staff_id)
   WHERE staff_id IS NOT NULL AND is_active = 1;
 
+CREATE TRIGGER trg_analytics_cross_runs_completed_immutable
+BEFORE UPDATE ON analytics_cross_runs
+WHEN OLD.state IN ('available','partial','unavailable','failed')
+BEGIN SELECT RAISE(ABORT, 'analytics_cross_run_immutable'); END;
+
 CREATE TRIGGER trg_analytics_funnel_runs_completed_immutable
 BEFORE UPDATE ON analytics_funnel_runs
 WHEN OLD.state != 'pending'
@@ -3071,6 +3112,24 @@ BEGIN SELECT RAISE(ABORT, 'analytics_funnel_version_immutable'); END;
 CREATE TRIGGER trg_analytics_funnel_versions_no_update
 BEFORE UPDATE ON analytics_funnel_versions
 BEGIN SELECT RAISE(ABORT, 'analytics_funnel_version_immutable'); END;
+
+CREATE TRIGGER trg_analytics_result_audiences_cross_reference
+BEFORE INSERT ON analytics_result_audiences
+WHEN NEW.source_kind = 'cross'
+ AND NOT EXISTS (
+   SELECT 1 FROM analytics_cross_runs r
+    WHERE r.id = NEW.source_result_id AND r.line_account_id = NEW.line_account_id
+ )
+BEGIN SELECT RAISE(ABORT, 'analytics_result_source_not_found'); END;
+
+CREATE TRIGGER trg_analytics_result_audiences_funnel_reference
+BEFORE INSERT ON analytics_result_audiences
+WHEN NEW.source_kind = 'funnel'
+ AND NOT EXISTS (
+   SELECT 1 FROM analytics_funnel_runs r
+    WHERE r.id = NEW.source_result_id AND r.line_account_id = NEW.line_account_id
+ )
+BEGIN SELECT RAISE(ABORT, 'analytics_result_source_not_found'); END;
 
 CREATE TRIGGER trg_automation_published_version_immutable
 BEFORE UPDATE ON automation_versions
