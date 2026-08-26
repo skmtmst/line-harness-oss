@@ -94,7 +94,7 @@
   "components/inbox/inbox-row.tsx": 14,
   "components/inbox/inbox-summary-bar.tsx": 11,
   "components/inflow-links/site-script.tsx": 1,
-  "components/layout/sidebar.tsx": 23,
+  "components/layout/sidebar.tsx": 10,
   "components/layout/update-banner.tsx": 7,
   "components/prompt-modal.tsx": 15,
   "components/rich-menus/apply-to-tag-modal.tsx": 30,

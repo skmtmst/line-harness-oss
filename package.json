@@ -23,17 +23,21 @@
     "deploy:lock": "tsx scripts/deploy/deploy-lock.ts",
     "deploy:preflight": "tsx scripts/deploy/preflight.ts",
     "deploy:staging": "bash scripts/deploy/staging-deploy.sh",
-    "build:bundle": "tsx scripts/release/build-bundle.ts"
+    "build:bundle": "tsx scripts/release/build-bundle.ts",
+    "qa:mock": "node scripts/visual-qa/mock-api.mjs",
+    "qa:web": "NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web dev",
+    "qa:shot": "playwright test scripts/visual-qa/capture.spec.mjs"
   },
   "packageManager": "pnpm@9.15.4",
   "engines": {
     "node": ">=20"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.0.0",
-    "typescript": "^5.9.3",
-    "wrangler": "4",
     "tsx": "^4.21.0",
-    "vitest": "^2.1.0"
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.0",
+    "wrangler": "4"
   }
 }

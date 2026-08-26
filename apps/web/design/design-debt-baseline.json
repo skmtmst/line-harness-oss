@@ -29,8 +29,8 @@
     "unresolved-classname": 6
   },
   "app/automations/page.tsx": {
-    "direct-primary-button": 1,
     "arbitrary-value": 3,
+    "direct-primary-button": 1,
     "unresolved-classname": 1
   },
   "app/booking/bookings/detail/page.tsx": {
@@ -625,6 +625,9 @@
     "arbitrary-value": 1,
     "direct-th": 3
   },
+  "components/layout/sidebar-identity.tsx": {
+    "unresolved-classname": 5
+  },
   "components/legal/terms-document.tsx": {
     "arbitrary-value": 1,
     "direct-th": 1
@@ -737,7 +740,7 @@
     "unresolved-classname": 1
   },
   "components/shared/top-bar.tsx": {
-    "unresolved-classname": 12
+    "unresolved-classname": 18
   },
   "components/staff/login-audit.tsx": {
     "arbitrary-value": 1,

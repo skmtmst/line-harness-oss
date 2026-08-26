@@ -7,14 +7,15 @@ const ROOT = dirname(fileURLToPath(import.meta.url))
 const WEB = join(ROOT, '..', '..', '..')
 const read = (...parts: string[]) => readFileSync(join(WEB, ...parts), 'utf8')
 
-describe('Pen.dev V5の共通画面枠', () => {
+describe('Pen.dev V6の共通画面枠', () => {
   const shell = read('src', 'components', 'app-shell.tsx')
   const shellCss = read('src', 'components', 'app-shell.module.css')
   const sidebar = read('src', 'components', 'layout', 'sidebar.tsx')
   const sidebarCss = read('src', 'components', 'layout', 'sidebar.module.css')
 
-  it('J33xqを正本にし、V4の画面枠名を残さない', () => {
-    expect(shell).toContain('data-design-shell="v5-1920"')
+  it('J33xqを正本にし、古い画面枠名を残さない', () => {
+    expect(shell).toContain('data-design-shell="v6-1920"')
+    expect(shell).not.toContain('data-design-shell="v5-1920"')
     expect(shell).toContain('data-design-node="J33xq"')
     expect(shell).not.toContain('data-design-shell="v4-1920"')
     expect(sidebar).toContain('data-design-node="J33xq"')
@@ -24,7 +25,27 @@ describe('Pen.dev V5の共通画面枠', () => {
     expect(sidebarCss).toContain('width: 256px')
     expect(sidebarCss).toContain('flex: 0 0 256px')
     expect(shellCss).toContain('max-width: var(--container-shell)')
-    expect(shellCss).toContain('padding: 32px 40px 40px')
+    // 上14px は ★V6 260枚すべてで例外がなかった値（docs/v6-shell-contract.md §4）。
+    expect(shellCss).toContain('padding: 14px 40px 32px')
+  })
+
+  it('画面の高さを固定しない', () => {
+    // ★V6 の画面の高さは12種類ある。1080px 固定にすると、縦の短いPCで
+    // 中身が無いのに縦スクロールが出る（同 §5）。
+    expect(shellCss).toContain('min-height: 100vh')
+    expect(shellCss).not.toMatch(/height:\s*1080px/)
+  })
+
+  it('トップバーを枠から出し、画面ごとに置かせない', () => {
+    expect(shell).toContain('AppTopBar')
+    expect(shell).toContain('PageChromeProvider')
+  })
+
+  it('全幅はページが明示したときだけ効く', () => {
+    // ルート名で自動判定しない（同 §11-3）。
+    expect(shell).toContain('fullWidth')
+    expect(shell).not.toContain("'/chats'")
+    expect(shellCss).toContain('.contentFull')
   })
 
   it('メニューの通常・選択・フォーカス状態を共通CSSで持つ', () => {
