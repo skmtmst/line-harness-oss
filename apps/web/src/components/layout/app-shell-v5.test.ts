@@ -74,10 +74,12 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
     expect(dashboard).not.toContain('運用状況です。')
   })
 
-  it('ダッシュボード見出しをV5共通ヘッダーへ載せる', () => {
-    expect(dashboard).toContain('<Header')
-    expect(dashboard).toContain('title="ダッシュボード"')
-    expect(dashboard).toContain('titleAction=')
+  it('ダッシュボードの画面名はV6共通トップバーだけに置く', () => {
+    expect(dashboard).not.toContain("import Header from '@/components/layout/header'")
+    expect(dashboard).not.toContain('<Header')
+    expect(dashboard).not.toContain('title="ダッシュボード"')
+    expect(dashboard).toContain('V6 `vUXKb/vwcM6`')
+    expect(dashboard).toContain('ダッシュボード編集')
     expect(pendingInbox).toContain('h-[61px]')
   })
 

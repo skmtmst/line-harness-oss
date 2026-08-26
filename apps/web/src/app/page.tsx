@@ -23,8 +23,8 @@ import DashboardEditor, {
   type DashboardCardId,
   type DashboardPreferences,
 } from '@/components/dashboard/dashboard-editor'
-import Header from '@/components/layout/header'
 import Card, { CardHeader } from '@/components/shared/card'
+import Button from '@/components/shared/button'
 
 const PERIODS = [
   { key: 'today', label: '今日' },
@@ -511,31 +511,25 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div data-design="Head">
-        <Header
-          title="ダッシュボード"
-          titleAction={
-            <button type="button" onClick={() => setEditorOpen(true)} className="border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken rounded-control inline-flex h-10 items-center gap-2 border px-3.25 text-label font-semibold">
-              <EditIcon />ダッシュボード編集
-            </button>
-          }
-          action={
-            <div className="flex flex-wrap items-center justify-end gap-2.5">
-              <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
-              <div className="flex gap-2">
-                {PERIODS.map((item) => (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setPeriod(item.key)}
-                    aria-pressed={period === item.key}
-                    className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
-                  >{item.label}</button>
-                ))}
-              </div>
-            </div>
-          }
-        />
+      {/* V6 `vUXKb/vwcM6`: 画面名は共通トップバーだけ。本文には操作だけを置く。 */}
+      <div data-design="Head" className="mb-4.5 flex min-h-10 flex-wrap items-center justify-between gap-3">
+        <Button onClick={() => setEditorOpen(true)}>
+          <EditIcon />ダッシュボード編集
+        </Button>
+        <div className="flex flex-wrap items-center justify-end gap-2.5">
+          <span className={`${healthClass} inline-flex items-center gap-1.5 text-xs font-medium`}><span className="h-2 w-2 rounded-full bg-current" />{healthLabel}</span>
+          <div className="flex gap-2">
+            {PERIODS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setPeriod(item.key)}
+                aria-pressed={period === item.key}
+                className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
+              >{item.label}</button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {error && <div className="bg-danger-bg text-danger rounded-card mb-5 p-4 text-sm">{error}</div>}
