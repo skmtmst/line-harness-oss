@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import {
   getTags,
-  getTagsWithCounts,
+  getTagsWithUsage,
   createTag,
   deleteTag,
   updateTagMileageSettings,
@@ -14,7 +14,7 @@ import {
   updateTag,
   reorderTags,
 } from '@line-crm/db';
-import type { Tag as DbTag, TagGroup as DbTagGroup } from '@line-crm/db';
+import type { Tag as DbTag, TagGroup as DbTagGroup, TagWithUsage } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 
@@ -29,7 +29,7 @@ const tags = new Hono<Env>();
  */
 const TAG_NEUTRAL_COLOR = '#8b938d';
 
-function serializeTag(row: DbTag & { friend_count?: number }) {
+function serializeTag(row: DbTag & Partial<TagWithUsage>) {
   return {
     id: row.id,
     name: row.name,
@@ -54,6 +54,30 @@ function serializeTag(row: DbTag & { friend_count?: number }) {
     displayOrder: Number(row.display_order ?? 0),
     createdAt: row.created_at,
     ...(row.friend_count !== undefined ? { friendCount: row.friend_count } : {}),
+    ...(row.assign_source ? { assignSource: row.assign_source } : {}),
+    ...((row.used_in_broadcasts ?? 0) > 0
+      || (row.used_in_forms ?? 0) > 0
+      || (row.used_in_scenarios ?? 0) > 0
+      || (row.used_in_auto_replies ?? 0) > 0
+      || (row.used_in_saved_searches ?? 0) > 0
+      ? {
+          usedIn: {
+            ...((row.used_in_broadcasts ?? 0) > 0
+              ? { broadcasts: Number(row.used_in_broadcasts) } : {}),
+            ...((row.used_in_forms ?? 0) > 0
+              ? { forms: Number(row.used_in_forms) } : {}),
+            ...((row.used_in_scenarios ?? 0) > 0
+              ? { scenarios: Number(row.used_in_scenarios) } : {}),
+            ...((row.used_in_auto_replies ?? 0) > 0
+              ? { autoReplies: Number(row.used_in_auto_replies) } : {}),
+            ...((row.used_in_saved_searches ?? 0) > 0
+              ? { savedSearches: Number(row.used_in_saved_searches) } : {}),
+          },
+        }
+      : {}),
+    ...((row.other_action_count ?? 0) > 0
+      ? { otherActionCount: Number(row.other_action_count) }
+      : {}),
   };
 }
 
@@ -197,13 +221,13 @@ tags.patch('/api/tags/:id/group', requireRole('owner', 'admin'), async (c) => {
 });
 
 // GET /api/tags - list all tags
-// ?withCounts=1 adds friendCount (JOIN over friend_tags) — admin UI only, so
+// ?withCounts=1 adds friendCount and usage aggregates — admin UI only, so
 // the many picker/filter consumers keep the cheap plain SELECT.
 tags.get('/api/tags', async (c) => {
   try {
     const withCounts = c.req.query('withCounts') === '1';
     const items = withCounts
-      ? await getTagsWithCounts(c.env.DB)
+      ? await getTagsWithUsage(c.env.DB)
       : await getTags(c.env.DB);
     return c.json({ success: true, data: items.map(serializeTag) });
   } catch (err) {
