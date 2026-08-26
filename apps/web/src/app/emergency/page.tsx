@@ -152,7 +152,7 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const dashboardRequest = apiData(api.dashboard.overview({ period: 'today' }))
+    const dashboardRequest = apiData(api.dashboard.organizationOverview({ period: 'today' }))
     const lineRequest = apiData(api.health.accounts()).then(async (accounts) => {
       const activeAccounts = accounts.filter((account) => account.isActive)
       const health = await Promise.all(

@@ -11,6 +11,16 @@ import { countOperations } from './operation-audit.js';
 /** 期間の指定。設計の「今日 / 過去7日 / 過去28日」に対応する。 */
 export type DashboardPeriod = 'today' | 'last7' | 'last28';
 
+export type DashboardSectionState = 'ok' | 'empty' | 'unavailable' | 'stale' | 'estimated';
+
+export interface DashboardSectionStatus {
+  status: DashboardSectionState;
+  /** The latest time represented by this section. */
+  asOf: string;
+  /** Human-readable fixed period key; the UI maps it to Japanese labels. */
+  period: DashboardPeriod | 'latest' | 'last7-fixed' | 'this-month';
+}
+
 export interface DashboardOverview {
   period: DashboardPeriod;
   /** 集計した時刻（JST）。カードごとの基準日がずれていないことの証拠になる。 */
@@ -88,6 +98,19 @@ export interface DashboardOverview {
     inflowTop: Array<{ name: string; count: number }>;
     funnelAlerts: number;
     automationFailures: number;
+  };
+  /**
+   * Availability metadata kept alongside the legacy numeric shape.
+   * Consumers must check this before rendering a numeric zero.
+   */
+  sections: {
+    friends: DashboardSectionStatus;
+    inbox: DashboardSectionStatus;
+    delivery: DashboardSectionStatus;
+    quota: DashboardSectionStatus;
+    trend: DashboardSectionStatus;
+    conversions: DashboardSectionStatus;
+    operations: DashboardSectionStatus;
   };
 }
 
@@ -583,9 +606,26 @@ export async function getDashboardOverview(
     safe('operations', operationsPromise, emptyOperations),
   ]);
 
+  const generatedAt = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00');
+  const status = (
+    names: string | string[],
+    empty: boolean,
+    sectionPeriod: DashboardSectionStatus['period'],
+  ): DashboardSectionStatus => ({
+    status: (Array.isArray(names) ? names : [names]).some((name) => partialFailures.includes(name))
+      ? 'unavailable'
+      : empty ? 'empty' : 'ok',
+    asOf: generatedAt,
+    period: sectionPeriod,
+  });
+  const trendStatus = status('trend', trend.length === 0, 'last7-fixed');
+  if (trendStatus.status === 'ok' && trend.some((point) => point.estimated)) {
+    trendStatus.status = 'estimated';
+  }
+
   return {
     period,
-    generatedAt: new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00'),
+    generatedAt,
     friends,
     inbox,
     delivery: {
@@ -602,6 +642,23 @@ export async function getDashboardOverview(
     conversions,
     partialFailures,
     operations,
+    sections: {
+      friends: status('friends', friends.total === 0, 'latest'),
+      inbox: status('inbox', inbox.unanswered + inbox.inProgress + inbox.resolved === 0, 'latest'),
+      delivery: status(['delivery', 'broadcasts'], (sent?.sent ?? 0) === 0 && broadcasts === 0, period),
+      quota: { status: 'unavailable', asOf: generatedAt, period: 'this-month' },
+      trend: trendStatus,
+      conversions: status('conversions', conversions.total === 0, period),
+      operations: status(
+        'operations',
+        operations.scenarios.active + operations.scenarios.paused
+          + operations.migrations.active + operations.migrations.completed
+          + operations.bookings.pending + operations.bookings.upcoming
+          + operations.funnelAlerts + operations.automationFailures === 0
+          && operations.inflowTop.length === 0,
+        period,
+      ),
+    },
   };
 }
 
