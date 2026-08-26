@@ -96,7 +96,6 @@ describe('共通部品への移管実証', () => {
   const tagEdit = read('src', 'app', 'tags', 'edit', 'page.tsx')
 
   it.each([
-    ['ダッシュボード', dashboard],
     ['友だち', friends],
     ['友だち属性', tags],
   ])('%sが共通Headerを使う', (_name, source) => {
@@ -104,9 +103,12 @@ describe('共通部品への移管実証', () => {
     expect(source).toContain('<Header')
   })
 
-  it('受信箱は共通トップバーと重なる本文Headerを置かない', () => {
-    expect(chats).not.toContain("import Header from '@/components/layout/header'")
-    expect(chats).not.toContain('<Header title="受信箱"')
+  it.each([
+    ['ダッシュボード', dashboard],
+    ['受信箱', chats],
+  ])('%sは共通トップバーと重なる本文Headerを置かない', (_name, source) => {
+    expect(source).not.toContain("import Header from '@/components/layout/header'")
+    expect(source).not.toContain('<Header')
   })
 
   it('友だちと友だち属性が共通タブを使う', () => {

@@ -90,7 +90,7 @@ describe('標準ボタンの第1段階移行', () => {
     // ページ送りも共通部品へ寄せた。主要2・副次7が減った。
     // 減ったら必ずここも締める。
     expect(debt['direct-primary-button']).toBe(137)
-    expect(debt['direct-secondary-button']).toBe(280)
+    expect(debt['direct-secondary-button']).toBe(279)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・

@@ -239,7 +239,7 @@
   },
   "app/page.tsx": {
     "arbitrary-value": 10,
-    "direct-secondary-button": 4,
+    "direct-secondary-button": 3,
     "direct-primary-button": 2,
     "unresolved-classname": 1
   },
