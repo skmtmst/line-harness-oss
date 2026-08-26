@@ -379,10 +379,10 @@
     "direct-primary-button": 1
   },
   "app/templates/page.tsx": {
-    "direct-primary-button": 4,
-    "direct-secondary-button": 2,
+    "unresolved-classname": 6,
+    "direct-primary-button": 2,
     "arbitrary-value": 13,
-    "unresolved-classname": 2
+    "direct-secondary-button": 1
   },
   "app/updates/page.tsx": {
     "direct-th": 4,

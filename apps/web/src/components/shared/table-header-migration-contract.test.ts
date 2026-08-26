@@ -19,12 +19,12 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('6ルートの標準見出し75セルを共通Thへ移行する', () => {
+  it('6ルートのV6標準見出し74セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
-    expect(migrated).toBe(75)
+    expect(migrated).toBe(74)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(
@@ -65,7 +65,7 @@ describe('表見出しの第1段階移行', () => {
     expect(part.routes.v5).toEqual({ '/tags': 'PbCvb' })
     expect(part.routes.v6).toEqual({
       '/reminders': 'kAnOQ',
-      '/templates': 'FH74x',
+      '/templates': 'W7LBc',
       '/affiliates': 'BaLte',
       '/conversions': 'Bw4fy',
       '/inflow-links': 'EQS0v',

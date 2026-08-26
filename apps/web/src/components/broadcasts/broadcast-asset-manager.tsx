@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
 
 const LABELS: Record<BroadcastAssetKind, { title: string; description: string; singular: string }> = {
   rich_message: { title: 'リッチメッセージ', description: '画像とタップ領域を組み合わせたテンプレートを作成し、一斉配信から引用できます。', singular: 'リッチメッセージ' },
@@ -66,7 +67,7 @@ export default function BroadcastAssetManager({ kind }: { kind: BroadcastAssetKi
 
   const meta = LABELS[kind]
   return <div className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-bold text-slate-900">{meta.title}テンプレート</h2><p className="mt-1 text-sm text-slate-500">{meta.description}</p></div><div className="flex flex-wrap gap-2"><a href="/broadcasts/new?templatePicker=1" className="rounded-xl border border-emerald-600 px-4 py-3 text-sm font-bold text-emerald-700">一斉配信で使う</a><button onClick={() => { reset(); setShowForm(true) }} className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white">＋ 新規作成</button></div></div>
+    <div className="flex flex-wrap items-center justify-between gap-3" data-design-node="FuBeQ"><div className="flex flex-wrap gap-2"><Button onClick={() => { reset(); setShowForm(true) }} variant="primary">{meta.singular}を作る</Button></div><Button href="/broadcasts/new?templatePicker=1">一斉配信で使う</Button></div>
     {showForm && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-5 flex items-center justify-between"><h3 className="font-bold">{editing ? '編集' : `新しい${meta.singular}`}</h3><button onClick={reset} className="text-sm text-slate-500">閉じる</button></div>
       <div className="space-y-4"><label className="block text-sm font-bold text-slate-700">名前<input value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5 w-full rounded-xl border px-3 py-2.5 font-normal" placeholder={`${meta.singular}の管理名`} /></label>

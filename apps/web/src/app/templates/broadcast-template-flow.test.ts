@@ -12,10 +12,12 @@ const formSource = readFileSync(
 
 describe('コンテンツテンプレートから一斉配信への引用導線', () => {
   it('manages the four reusable content types on the template page', () => {
-    expect(templatesSource).toContain("['rich_message', 'リッチメッセージ']")
-    expect(templatesSource).toContain("['card_message', 'カードタイプ']")
-    expect(templatesSource).toContain("['coupon', 'クーポン']")
-    expect(templatesSource).toContain("['research', 'リサーチ']")
+    for (const kind of ['rich_message', 'card_message', 'coupon', 'research']) {
+      expect(templatesSource).toContain(`'${kind}'`)
+    }
+    for (const label of ['リッチメッセージ', 'カルーセル', 'クーポン', 'リサーチ']) {
+      expect(templatesSource).toContain(`label: '${label}'`)
+    }
   })
 
   it('does not keep content-authoring tabs on the broadcast list', () => {

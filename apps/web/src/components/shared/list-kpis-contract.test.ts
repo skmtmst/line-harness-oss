@@ -10,7 +10,6 @@ describe('一覧KPIの取得失敗時', () => {
     const callers = [
       'app/scenarios/page.tsx',
       'app/reminders/page.tsx',
-      'app/templates/page.tsx',
       'components/friend-fields/tags-page-v4.tsx',
     ]
 

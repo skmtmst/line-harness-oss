@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { api, type BroadcastAssetKind } from '@/lib/api'
-import Header from '@/components/layout/header'
-import ListKpis from '@/components/shared/list-kpis'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import { Tabs } from '@/components/shared/tabs'
+import styles from './templates-v6.module.css'
 
 interface Template {
   id: string
@@ -39,6 +39,13 @@ interface TemplateDetail {
 
 type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'unused'
 
+const ASSET_KINDS: readonly BroadcastAssetKind[] = [
+  'card_message',
+  'rich_message',
+  'coupon',
+  'research',
+]
+
 const messageTypeLabels: Record<string, string> = {
   text: 'テキスト',
   image: '画像',
@@ -66,12 +73,14 @@ function formatDate(iso: string): string {
 export default function TemplatesPage() {
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
+  const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
   const [nameQuery, setNameQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
+  const [selectedCategory, setSelectedCategory] = useState('all')
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
@@ -109,6 +118,20 @@ export default function TemplatesPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all(
+      ASSET_KINDS.map(async (kind) => {
+        const result = await api.broadcastMessageAssets.list({ kind })
+        return [kind, result.success ? result.data.length : undefined] as const
+      }),
+    ).then((entries) => {
+      if (cancelled) return
+      setAssetCounts(Object.fromEntries(entries.filter((entry) => entry[1] !== undefined)))
+    })
+    return () => { cancelled = true }
+  }, [])
 
   // Drawer fetch
   useEffect(() => {
@@ -148,10 +171,17 @@ export default function TemplatesPage() {
     if (nameQuery.trim() && !t.name.toLowerCase().includes(nameQuery.trim().toLowerCase())) {
       return false
     }
+    if (selectedCategory !== 'all' && (t.category || '未分類') !== selectedCategory) return false
     if (typeFilter === 'all') return true
     if (typeFilter === 'unused') return t.usageCount === 0
     return t.messageType === typeFilter
   })
+
+  const categoryCounts = templates.reduce<Record<string, number>>((counts, template) => {
+    const category = template.category || '未分類'
+    counts[category] = (counts[category] ?? 0) + 1
+    return counts
+  }, {})
 
   const handleCreate = async () => {
     if (!form.name.trim()) { setFormError('テンプレート名を入力してください'); return }
@@ -218,103 +248,91 @@ export default function TemplatesPage() {
 
   return (
     <div>
-      <div data-design="Head">
-      <Header
-        title="テンプレート"
-        description="配信で使うメッセージを管理します。友だち情報や共通情報を差し込むと、一人ひとりに合わせた文面になります。"
-        action={activeSection === 'message' ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              disabled
-              title="マニュアルは準備中です"
-            >
-              マニュアル
-            </Button>
-            <Button
-              disabled
-              title="並び替えは準備中です"
-            >
-              並び替え
-            </Button>
-            {/* folders は 099 で入っているが templates.folder_id が無い。 */}
-            <Button
-              disabled
-              title="フォルダの追加は準備中です"
-            >
-              フォルダを追加
-            </Button>
-            <Button
-              onClick={() => setShowCreate(true)}
-              variant="primary"
-            >
-              + 新規テンプレート
+      <div data-design="TypeTabs" data-design-node="W7LBc kcmGB">
+        <Tabs
+          items={[
+            {
+              label: 'メッセージ',
+              count: loading ? undefined : templates.length,
+              current: activeSection === 'message',
+              onClick: () => { setActiveSection('message'); setShowCreate(false) },
+            },
+            {
+              label: 'カルーセル',
+              count: assetCounts.card_message,
+              current: activeSection === 'card_message',
+              onClick: () => { setActiveSection('card_message'); setShowCreate(false) },
+            },
+            {
+              label: 'リッチメッセージ',
+              count: assetCounts.rich_message,
+              current: activeSection === 'rich_message',
+              onClick: () => { setActiveSection('rich_message'); setShowCreate(false) },
+            },
+            {
+              label: 'クーポン',
+              count: assetCounts.coupon,
+              current: activeSection === 'coupon',
+              onClick: () => { setActiveSection('coupon'); setShowCreate(false) },
+            },
+            {
+              label: 'リサーチ',
+              count: assetCounts.research,
+              current: activeSection === 'research',
+              onClick: () => { setActiveSection('research'); setShowCreate(false) },
+            },
+          ]}
+        />
+      </div>
+
+      {activeSection === 'message' && (
+        <div
+          className={`${styles.createActions} flex items-center justify-between`}
+          data-design="CreateActions"
+          data-design-node="W7LBc FuBeQ"
+        >
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setShowCreate(true)} variant="primary">
+              テンプレートを作る
             </Button>
           </div>
-        ) : undefined}
-      />
-      </div>
-
-      <nav className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-canvas p-2" aria-label="テンプレート種別">
-        {([
-          ['message', 'メッセージ'],
-          ['rich_message', 'リッチメッセージ'],
-          ['card_message', 'カードタイプ'],
-          ['coupon', 'クーポン'],
-          ['research', 'リサーチ'],
-        ] as const).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => { setActiveSection(id); setShowCreate(false) }}
-            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold ${activeSection === id ? 'bg-accent text-on-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {/* 設計の KPI 4枚。数は /api/list-stats から4画面ぶんまとめて来る。 */}
-      <div data-design="KPIs">
-      {activeSection === 'message' && <ListKpis
-        variant="v6"
-        titles={['テンプレート', '今月の送信', '未使用', '使用中']}
-        build={(s) => [
-            { title: 'テンプレート', value: s.templates.total, unit: '件', detail: `使用中 ${s.templates.inUse}` },
-            {
-              title: '今月の送信',
-              value: s.templates.sentThisMonth,
-              unit: '通',
-              detail: 'テンプレート経由を含む全送信',
-            },
-            // 設計は「平均クリック率」。短縮URL経由の実測をテンプレート単位で
-            // 集計する口がまだ無い。使われていない数のほうが、いま手を打てる。
-            { title: '未使用', value: s.templates.unused90d, unit: '件', detail: 'どこからも参照されていない' },
-            { title: '使用中', value: s.templates.inUse, unit: '件', detail: 'シナリオ・自動応答から参照' },
-        ]}
-      />}
-      </div>
+        </div>
+      )}
 
       {/* 一覧本体（設計 `Body`）。 */}
-      <div data-design="Body">
+      <div className={styles.body} data-design="Body">
       {activeSection === 'message' ? <>
-      {/*
-        フォルダ（設計 `Body` の左）。folders は 099 で入っているが
-        templates.folder_id が無いので絞り込めない。枠だけ置く。
-      */}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="text-ink-faint text-xs">フォルダ</span>
-        {['すべて', '01_定期便', '02_健康フォロー', '未分類'].map((label, i) => (
+      <div className={styles.contentLayout}>
+      <aside className={`${styles.folderRail} bg-canvas border-hairline shrink-0 rounded-card border p-3`} aria-label="テンプレートのフォルダ">
+        <div className="text-ink-secondary mb-2 flex items-center justify-between text-xs font-bold">
+          <span>フォルダ</span>
+          <span>{Object.keys(categoryCounts).length}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setSelectedCategory('all')}
+          className={`flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === 'all' ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+        >
+          <span>すべて</span>
+          <span className="text-xs tabular-nums">{templates.length}</span>
+        </button>
+        {Object.entries(categoryCounts).map(([category, count]) => (
           <button
-            key={label}
-            disabled={i > 0}
-            title={i > 0 ? 'フォルダ分けは準備中です' : undefined}
-            className={`rounded-pill px-3 py-1 text-xs ${
-              i === 0 ? 'bg-accent text-on-accent' : 'border-hairline text-ink-faint border opacity-50'
-            }`}
+            key={category}
+            type="button"
+            onClick={() => setSelectedCategory(category)}
+            className={`mt-1 flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === category ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+            title={category}
           >
-            {label}
+            <span className="min-w-0 truncate">{category}</span>
+            <span className="ml-2 shrink-0 text-xs tabular-nums">{count}</span>
           </button>
         ))}
+      </aside>
+      <div className="min-w-0 flex-1">
+
+      <div className="bg-info-bg text-info mb-3 rounded-control px-3 py-2 text-xs">
+        一覧からテンプレートの中身・使われている場所・送信数を確認できます。
       </div>
 
       {/* 検索と並び順（設計 `Body` の上）。 */}
@@ -327,13 +345,6 @@ export default function TemplatesPage() {
           onChange={(e) => setNameQuery(e.target.value)}
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select disabled title="並び替えは準備中です" className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50">
-          <option>使用回数が多い順</option>
-        </select>
-        <Button disabled title="保存した条件は準備中です">
-          保存した条件
-        </Button>
       </div>
 
 
@@ -488,19 +499,12 @@ export default function TemplatesPage() {
             <table className="w-full min-w-[640px]">
               <thead>
                 <TableHeadRow>
-                  {/*
-                    列は設計 `V2 4-3 テンプレート` の並び。
-                    「カテゴリ」を「本文」に替えた。名前だけでは中身が
-                    分からず、開かないと選べない。冒頭が見えていれば
-                    一覧のまま選べる。
-                  */}
-                  <Th>種別</Th>
-                  <Th>名前</Th>
-                  <Th>本文</Th>
-                  <Th>使われている配信</Th>
-                  <Th>ヒット数</Th>
-                  <Th>登録日</Th>
-                  <Th />
+                  <Th>テンプレート</Th>
+                  <Th>中身</Th>
+                  <Th>使われている場所</Th>
+                  <Th>送信数</Th>
+                  <Th>更新</Th>
+                  <Th>操作</Th>
                 </TableHeadRow>
               </thead>
               <tbody className="divide-y divide-hairline">
@@ -511,34 +515,24 @@ export default function TemplatesPage() {
                     className={`hover:bg-canvas-sunken cursor-pointer transition-colors ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                        {messageTypeLabels[t.messageType] ?? t.messageType}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
                       <p className="text-sm font-medium text-ink">{t.name}</p>
                       <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
-                        {t.category}
+                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                        {messageTypeLabels[t.messageType] ?? t.messageType}
                       </span>
+                      <p className="text-ink-faint mt-1 max-w-40 truncate text-[11px]" title={t.category}>{t.category || '未分類'}</p>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
-                        {t.usageCount}
+                        {t.usageCount === 0 ? 'なし' : `${t.usageCount}件で使用`}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {/* 押される仕掛け（カルーセルの選択肢など）が無いものは 0 のまま。
-                          「-」にしないのは、0 と「数えられない」を見分けられなくなるため。 */}
-                      <span
-                        className={`text-sm tabular-nums ${t.tapCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}
-                      >
-                        {t.tapCount}
-                      </span>
+                      <span className="text-ink-faint text-sm" title="テンプレート別の送信数はまだ取得できません">—</span>
                     </td>
                     <td className="px-4 py-3 text-xs text-ink-faint">{formatDate(t.updatedAt)}</td>
                     <td className="px-4 py-3 text-right">
@@ -724,6 +718,8 @@ export default function TemplatesPage() {
           </div>
         </>
       )}
+      </div>
+      </div>
       </> : <BroadcastAssetManager kind={activeSection} />}
       </div>
     </div>
