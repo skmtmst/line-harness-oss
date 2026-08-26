@@ -328,13 +328,7 @@ async function friendTrend(
 ): Promise<DashboardOverview['trend']> {
   const days = TREND_DAYS;
   const start = jstDate(-(TREND_DAYS - 1));
-  const snapshots = accountScopeSql(scope, 'line_account_id');
-  const snapshotScope = 'allTenants' in scope
-    ? snapshots
-    : {
-        sql: `(${snapshots.sql}${scope.includeUnassigned ? " OR line_account_id = ''" : ''})`,
-        binds: snapshots.binds,
-      };
+  const snapshotScope = accountScopeSql(scope, 'line_account_id');
 
   const recorded = await db
     .prepare(

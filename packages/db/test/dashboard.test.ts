@@ -153,6 +153,28 @@ describe('友だち数の推移', () => {
     expect(trend.every((d) => d.estimated)).toBe(true);
   });
 
+  test('統括ごとの表示では全社合計の日次記録を使わず、その統括だけを逆算する', async () => {
+    for (const id of ['account-own', 'account-other']) {
+      sqlite.prepare(
+        `INSERT INTO line_accounts
+          (id, channel_id, name, channel_access_token, channel_secret)
+         VALUES (?, ?, ?, 'token', 'secret')`,
+      ).run(id, `channel-${id}`, id);
+    }
+    insertFriend('own', { lineAccountId: 'account-own' });
+    insertFriend('other', { lineAccountId: 'account-other' });
+    await recordFriendSnapshot(db, null);
+
+    const { trend } = await getDashboardOverview(db, 'today', {
+      allowedAccountIds: ['account-own'],
+      includeUnassigned: true,
+    });
+    const today = trend.find((d) => d.date === jstDate(0));
+
+    expect(today?.estimated).toBe(true);
+    expect(today?.active).toBe(1);
+  });
+
   test('記録のある日と無い日が混ざる', async () => {
     insertFriend('a');
     await recordFriendSnapshot(db, null);
