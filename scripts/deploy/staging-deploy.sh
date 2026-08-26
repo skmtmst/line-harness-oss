@@ -51,6 +51,9 @@ REMOTE="${LINE_HARNESS_DEPLOY_REMOTE:-origin}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    # pnpm 9 may forward the option separator itself for
+    # `pnpm deploy:staging -- --apply`. Treat it as syntax, not an option.
+    --) ;;
     --apply) APPLY=1 ;;
     --skip-admin) SKIP_ADMIN=1 ;;
     --parent-repo)
