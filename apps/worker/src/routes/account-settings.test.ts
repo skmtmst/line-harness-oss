@@ -1,6 +1,8 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
 const accessMocks = vi.hoisted(() => ({ canAccess: vi.fn(async () => true) }));
 vi.mock('../services/account-access.js', () => ({
@@ -17,6 +19,18 @@ app.use('*', async (c, next) => {
   await next();
 });
 app.route('/', accountSettings);
+
+function appForTenant(tenantId: string) {
+  const tenantApp = new Hono<Env>();
+  tenantApp.use('*', async (c, next) => {
+    c.set('staff', {
+      id: 'owner', name: 'Owner', role: 'owner', readOnly: false, tenantId,
+    });
+    await next();
+  });
+  tenantApp.route('/', accountSettings);
+  return tenantApp;
+}
 
 describe('GET /api/account-settings/test-recipient-login-users', () => {
   test('accountIdがない場合はDBを読まない', async () => {
@@ -63,6 +77,8 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
       'line-account-1',
       '00000000-0000-4000-8000-000000000001',
       'tenant-a',
+      'tenant-a',
+      '00000000-0000-4000-8000-000000000001',
       '00000000-0000-4000-8000-000000000001',
       'tenant-a',
     );
@@ -102,8 +118,9 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
       {}, { DB: { prepare } },
     );
 
-    expect(bind.mock.calls[0]?.slice(-4)).toEqual([
+    expect(bind.mock.calls[0]?.slice(-6)).toEqual([
       '00000000-0000-4000-8000-000000000001', 'tenant-a',
+      'tenant-a', '00000000-0000-4000-8000-000000000001',
       '00000000-0000-4000-8000-000000000001', 'tenant-a',
     ]);
   });
@@ -119,12 +136,43 @@ describe('GET /api/account-settings/test-recipient-login-users', () => {
     );
 
     const sql = prepare.mock.calls[0]?.[0];
-    expect(sql).toMatch(/NOT EXISTS[\s\S]+AND EXISTS \([\s\S]+FROM line_accounts fallback_account/);
+    expect(sql).toMatch(/NOT EXISTS[\s\S]+AND \([\s\S]+EXISTS \([\s\S]+FROM line_accounts fallback_account/);
     expect(bind).toHaveBeenCalledWith(
       'line-account-1', 'line-account-1', 'line-account-1',
       '00000000-0000-4000-8000-000000000001', 'tenant-a',
+      'tenant-a', '00000000-0000-4000-8000-000000000001',
       '00000000-0000-4000-8000-000000000001', 'tenant-a',
     );
+  });
+
+  test.each([
+    { tenantId: DEFAULT_TENANT_ID, expectedIds: ['friend-unassigned'], label: '既定統括' },
+    { tenantId: 'tenant-other', expectedIds: [], label: '既定統括でない統括' },
+  ])('$labelでは未割当の友だちを統括の可視範囲どおりに扱う', async ({ tenantId, expectedIds }) => {
+    const testDb = createTestD1();
+    try {
+      insertFriend(testDb.raw, 'friend-unassigned', {
+        line_user_id: 'U-unassigned',
+        line_account_id: null,
+      });
+      testDb.raw.prepare(`INSERT INTO staff_members
+        (id, name, role, api_key, line_user_id, tenant_id)
+        VALUES (?, ?, ?, ?, ?, ?)`).run(
+          `staff-${tenantId}`, '未割当スタッフ', 'staff', `key-${tenantId}`,
+          'U-unassigned', tenantId,
+        );
+
+      const response = await appForTenant(tenantId).request(
+        '/api/account-settings/test-recipient-login-users?accountId=line-account-1',
+        {}, { DB: testDb.db },
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json() as { data: Array<{ id: string }> };
+      expect(body.data.map(({ id }) => id)).toEqual(expectedIds);
+    } finally {
+      testDb.raw.close();
+    }
   });
 });
 

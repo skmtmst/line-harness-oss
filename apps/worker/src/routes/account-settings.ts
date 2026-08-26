@@ -67,10 +67,12 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
            SELECT 1 FROM friends scoped
             WHERE scoped.line_user_id = sm.line_user_id
               AND scoped.line_account_id = ?
-         ) AND EXISTS (
-           SELECT 1 FROM line_accounts fallback_account
-            WHERE fallback_account.id = f.line_account_id
-              AND COALESCE(fallback_account.tenant_id, ?) = ?
+         ) AND (
+           EXISTS (
+             SELECT 1 FROM line_accounts fallback_account
+              WHERE fallback_account.id = f.line_account_id
+                AND COALESCE(fallback_account.tenant_id, ?) = ?
+           ) OR (f.line_account_id IS NULL AND ? = ?)
          )
        )
      WHERE sm.is_active = 1
@@ -86,6 +88,8 @@ accountSettings.get('/api/account-settings/test-recipient-login-users', async (c
     accountId,
     DEFAULT_TENANT_ID,
     tenantId,
+    tenantId,
+    DEFAULT_TENANT_ID,
     DEFAULT_TENANT_ID,
     tenantId,
   ).all<{
