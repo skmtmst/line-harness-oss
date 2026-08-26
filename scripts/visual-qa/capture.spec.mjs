@@ -207,6 +207,173 @@ for (const width of WIDTHS) {
     })
   })
 }
+/*
+ * 4-1-H のCSV一括登録4状態。Pencil実Node:
+ * H374MR（選択）/ sfTEW（確認）/ op1rh（完了）/ QzRsJ（一部失敗）。
+ *
+ * 実ルートのボタンから開き、実際にファイルを選んでAPIへ進む。ダイアログだけを
+ * 作った検証ルートでは、ボタン・CSV解析・API接続が切れていても通るため。
+ */
+function importRows(count) {
+  return Array.from({ length: count }, (_, index) => ({
+    line: index + 2,
+    name: index === 0 ? '会員ランクA' : index === 1 ? '既存VIP' : `一括タグ${String(index + 1).padStart(3, '0')}`,
+    folderName: index === 2 ? '存在しないフォルダ' : index % 2 === 0 ? '会員' : '販売',
+  }))
+}
+
+function previewData(rows, ready, skipped, invalid, representative = false) {
+  const previewRows = rows.map((row, index) => {
+    if (index < ready) return {
+      ...row,
+      status: 'ready',
+      ...(index === 2 ? { code: 'folder_not_found', message: 'フォルダが見つからないため、未分類として登録します' } : {}),
+    }
+    if (index < ready + skipped) return { ...row, status: 'skipped', code: 'already_exists', message: '同じ名前のタグがすでにあります' }
+    const invalidOffset = index - ready - skipped
+    return invalidOffset === 0
+      ? { ...row, name: '会員↵ランク', status: 'invalid', code: 'invalid_character', message: '改行はタグ名に使えません（3文字目）' }
+      : { ...row, name: '長すぎるタグ名'.repeat(11), status: 'invalid', code: 'name_too_long', message: 'タグ名は60文字以内にしてください' }
+  })
+  if (representative && skipped > 0 && invalid > 0) {
+    const leadingIndexes = [0, ready, 2, ready + skipped, 1, ready + 1, ready + skipped + 1, 3]
+    const leading = new Set(leadingIndexes)
+    return {
+      summary: { total: rows.length, ready, created: 0, skipped, invalid, failed: 0 },
+      rows: [...leadingIndexes.map((index) => previewRows[index]), ...previewRows.filter((_, index) => !leading.has(index))],
+    }
+  }
+  return {
+    summary: { total: rows.length, ready, created: 0, skipped, invalid, failed: 0 },
+    rows: previewRows,
+  }
+}
+
+async function expectCsvDialogFitsViewport(page, designNode) {
+  const fit = await page.locator(`[data-design-node="${designNode}"]`).evaluate((panel) => {
+    const rect = panel.getBoundingClientRect()
+    return {
+      documentOverflow: document.documentElement.scrollWidth - window.innerWidth,
+      left: rect.left,
+      right: rect.right - window.innerWidth,
+    }
+  })
+  expect(fit.documentOverflow, `${designNode}: ページ全体の横スクロール`).toBeLessThanOrEqual(1)
+  expect(fit.left, `${designNode}: 左側の見切れ`).toBeGreaterThanOrEqual(0)
+  expect(fit.right, `${designNode}: 右側の見切れ`).toBeLessThanOrEqual(0)
+}
+
+async function openCsvImport(page, width, rows) {
+  await page.setViewportSize({ width, height: 1080 })
+  await signIn(page)
+  await page.goto(`${BASE}${TAGS_PATH}`, { waitUntil: 'networkidle' })
+  await expectLanded(page, TAGS_PATH)
+  await page.getByRole('button', { name: 'CSVで一括登録' }).click()
+  await expect(page.locator('[data-design-node="H374MR"]')).toBeVisible()
+  if (rows) {
+    const csv = ['タグ名,フォルダ', ...rows.map((row) => `"${row.name}","${row.folderName}"`)].join('\r\n')
+    await page.getByLabel('登録するCSV').setInputFiles({
+      name: 'tags.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(`\uFEFF${csv}`),
+    })
+    await expect(page.getByRole('button', { name: '取り込む内容を確認' })).toBeEnabled()
+  }
+}
+
+test.describe('4-1 タグCSV一括登録', () => {
+  test.describe.configure({ mode: 'serial' })
+
+for (const width of WIDTHS) {
+  test(`${width}px タグCSV一括登録・選択（tags-csv-select）`, async ({ page }) => {
+    await openCsvImport(page, width)
+    await expectCsvDialogFitsViewport(page, 'H374MR')
+    await expect(page).toHaveScreenshot(`tags-csv-select-${width}.png`, {
+      maxDiffPixels: MAX_DIFF_PIXELS,
+      animations: 'disabled',
+      stylePath: STYLE_PATH,
+    })
+  })
+
+  test(`${width}px タグCSV一括登録・確認（tags-csv-preview）`, async ({ page }) => {
+    const rows = importRows(500)
+    await page.route('**/api/tags/import/preview', (route) => route.fulfill({
+      status: 200,
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ success: true, data: previewData(rows, 412, 73, 15, true) }),
+    }))
+    await openCsvImport(page, width, rows)
+    await page.getByRole('button', { name: '取り込む内容を確認' }).click()
+    await expect(page.locator('[data-design-node="sfTEW"]')).toBeVisible()
+    await expectCsvDialogFitsViewport(page, 'sfTEW')
+    await expect(page).toHaveScreenshot(`tags-csv-preview-${width}.png`, {
+      maxDiffPixels: MAX_DIFF_PIXELS,
+      animations: 'disabled',
+      stylePath: STYLE_PATH,
+    })
+  })
+
+  test(`${width}px タグCSV一括登録・完了（tags-csv-success）`, async ({ page }) => {
+    const rows = importRows(485)
+    const preview = previewData(rows, 412, 73, 0)
+    await page.route('**/api/tags/import/preview', (route) => route.fulfill({
+      status: 200, contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ success: true, data: preview }),
+    }))
+    await page.route('**/api/tags/import', (route) => route.fulfill({
+      status: 200, contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ success: true, data: {
+        outcome: 'success',
+        summary: { total: 485, ready: 0, created: 412, skipped: 73, invalid: 0, failed: 0 },
+        rows: preview.rows.map((row, index) => index < 412
+          ? { ...row, status: 'created', tagId: `created-${index}` }
+          : row),
+      } }),
+    }))
+    await openCsvImport(page, width, rows)
+    await page.getByRole('button', { name: '取り込む内容を確認' }).click()
+    await page.getByRole('button', { name: '登録できる412件を登録' }).click()
+    await expect(page.locator('[data-design-node="op1rh"]')).toBeVisible()
+    await expectCsvDialogFitsViewport(page, 'op1rh')
+    await expect(page).toHaveScreenshot(`tags-csv-success-${width}.png`, {
+      maxDiffPixels: MAX_DIFF_PIXELS,
+      animations: 'disabled',
+      stylePath: STYLE_PATH,
+    })
+  })
+
+  test(`${width}px タグCSV一括登録・一部失敗（tags-csv-partial）`, async ({ page }) => {
+    const rows = importRows(485)
+    const preview = previewData(rows, 412, 73, 0)
+    await page.route('**/api/tags/import/preview', (route) => route.fulfill({
+      status: 200, contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ success: true, data: preview }),
+    }))
+    await page.route('**/api/tags/import', (route) => route.fulfill({
+      status: 200, contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ success: true, data: {
+        outcome: 'partial',
+        summary: { total: 485, ready: 0, created: 402, skipped: 73, invalid: 0, failed: 10 },
+        rows: preview.rows.map((row, index) => index < 402
+          ? { ...row, status: 'created', tagId: `created-${index}` }
+          : index < 412
+            ? { ...row, status: 'failed', code: 'create_failed', message: 'タグを登録できませんでした' }
+            : row),
+      } }),
+    }))
+    await openCsvImport(page, width, rows)
+    await page.getByRole('button', { name: '取り込む内容を確認' }).click()
+    await page.getByRole('button', { name: '登録できる412件を登録' }).click()
+    await expect(page.locator('[data-design-node="QzRsJ"]')).toBeVisible()
+    await expectCsvDialogFitsViewport(page, 'QzRsJ')
+    await expect(page).toHaveScreenshot(`tags-csv-partial-${width}.png`, {
+      maxDiffPixels: MAX_DIFF_PIXELS,
+      animations: 'disabled',
+      stylePath: STYLE_PATH,
+    })
+  })
+}
+})
 
 /*
  * 4-1 の削除の確認ダイアログ（設計 `★ V6 4-1-F` `dKlkz`）。
