@@ -3,11 +3,18 @@ import { Hono } from 'hono';
 import { richMenus } from './rich-menus.js';
 
 const uploadRichMenuImage = vi.fn();
+const getRichMenuList = vi.fn();
+const getVisibleLineAccountScope = vi.hoisted(() => vi.fn());
 
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: vi.fn().mockImplementation(() => ({
     uploadRichMenuImage,
+    getRichMenuList,
   })),
+}));
+
+vi.mock('../services/account-access.js', () => ({
+  getVisibleLineAccountScope,
 }));
 
 describe('POST /api/rich-menus/:id/image', () => {
@@ -31,6 +38,40 @@ describe('POST /api/rich-menus/:id/image', () => {
   beforeEach(() => {
     uploadRichMenuImage.mockReset();
     uploadRichMenuImage.mockResolvedValue(undefined);
+    getRichMenuList.mockReset();
+    getRichMenuList.mockResolvedValue({ richmenus: [] });
+    getVisibleLineAccountScope.mockReset();
+    getVisibleLineAccountScope.mockResolvedValue({
+      accounts: [], allowedAccountIds: [], canSeeUnassigned: true, ids: [],
+    });
+  });
+
+  test('rejects omitted accountId for non-default tenants before creating a LINE client', async () => {
+    getVisibleLineAccountScope.mockResolvedValue({
+      accounts: [], allowedAccountIds: ['account-a'], canSeeUnassigned: false, ids: ['account-a'],
+    });
+    const { LineClient } = await import('@line-crm/line-sdk');
+    vi.mocked(LineClient).mockClear();
+
+    const res = await setupApp().request('/api/rich-menus', {}, {
+      LINE_CHANNEL_ACCESS_TOKEN: 'token', DB: {} as D1Database,
+    });
+
+    expect(res.status).toBe(400);
+    expect(LineClient).not.toHaveBeenCalled();
+  });
+
+  test('keeps the default channel available to default-tenant staff', async () => {
+    const { LineClient } = await import('@line-crm/line-sdk');
+    vi.mocked(LineClient).mockClear();
+
+    const res = await setupApp().request('/api/rich-menus', {}, {
+      LINE_CHANNEL_ACCESS_TOKEN: 'default-token', DB: {} as D1Database,
+    });
+
+    expect(res.status).toBe(200);
+    expect(LineClient).toHaveBeenCalledWith('default-token');
+    expect(getRichMenuList).toHaveBeenCalledOnce();
   });
 
   test('accepts SDK imageData JSON field for base64 uploads', async () => {
