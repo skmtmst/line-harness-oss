@@ -192,7 +192,8 @@
     "183_automation_action_account_scope.sql",
     "184_line_account_timezone.sql",
     "185_automation_execution_plan.sql",
-    "186_analytics_account_scope.sql"
+    "186_analytics_account_scope.sql",
+    "187_analytics_read_model.sql"
   ],
-  "migrationCount": 193
+  "migrationCount": 194
 }
