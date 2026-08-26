@@ -109,8 +109,9 @@ describe('A-9 tenant scope', () => {
   ])('%s omits rows owned by another tenant', async (path, ownId) => {
     const response = await app().request(path);
     expect(response.status).toBe(200);
-    expect(JSON.stringify(await response.json())).toContain(ownId);
-    expect(JSON.stringify(await app().request(path).then((r) => r.json()))).not.toContain('other-');
+    const body = JSON.stringify(await response.json());
+    expect(body).toContain(ownId);
+    expect(body).not.toContain('other-');
   });
 
   test('rejects another tenant account before creating an asset', async () => {
