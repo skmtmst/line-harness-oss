@@ -711,6 +711,7 @@ export interface ConversionApprovalRow {
 export async function getConversionApprovalQueue(
   db: D1Database,
   opts: {
+    scope: { allowedAccountIds: readonly string[]; includeUnassigned: boolean };
     status: 'pending' | 'approved' | 'rejected';
     identityKeySql: string;
     limit?: number;
@@ -720,6 +721,9 @@ export async function getConversionApprovalQueue(
   const { status, identityKeySql } = opts;
   const limit = opts.limit ?? 200;
   const offset = opts.offset ?? 0;
+  const scopeCondition = opts.scope.allowedAccountIds.length > 0
+    ? `(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`
+    : opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0';
 
   // dup_keys: identity_keys shared by >=2 distinct attributed-conversion friends
   // WITHIN the same affiliate. Computed over the whole attributed-CV set (not
@@ -759,7 +763,7 @@ export async function getConversionApprovalQueue(
        FROM conversion_events ce
        JOIN friends ON friends.id = ce.friend_id
        LEFT JOIN affiliates a ON a.id = ce.affiliate_id
-       LEFT JOIN conversion_points cp ON cp.id = ce.conversion_point_id
+       JOIN conversion_points cp ON cp.id = ce.conversion_point_id
        LEFT JOIN affiliate_links al ON al.ref_code = ce.attributed_ref_code
        LEFT JOIN affiliate_offers off ON off.id = al.offer_id
        LEFT JOIN dup_keys dk
@@ -767,10 +771,11 @@ export async function getConversionApprovalQueue(
              AND dk.identity_key = (${identityKeySql})
       WHERE ce.affiliate_id IS NOT NULL
         AND ce.approval_status = ?
+        AND ${scopeCondition}
       ORDER BY julianday(ce.created_at) DESC, ce.id DESC
       LIMIT ? OFFSET ?`,
     )
-    .bind(status, limit, offset)
+    .bind(status, ...opts.scope.allowedAccountIds, limit, offset)
     .all<{
       event_id: string;
       created_at: string;

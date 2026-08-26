@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getTrackedLinks,
   getTrackedLinkById,
@@ -20,9 +20,28 @@ import { buildOgHtml } from '../lib/og-html.js';
 import { resolveOgForTrackedLink } from '../lib/og-resolver.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 
 const trackedLinks = new Hono<Env>();
+
+async function adminAccountScope(c: Context<Env>) {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const where = scope.allowedAccountIds.length
+    ? `(line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR line_account_id IS NULL' : ''})`
+    : scope.canSeeUnassigned
+      ? 'line_account_id IS NULL'
+      : '1 = 0';
+  return { scope, where };
+}
+
+const requireVisibleTrackedLink: MiddlewareHandler<Env> = async (c, next) => {
+  const link = await getTrackedLinkById(c.env.DB, c.req.param('id') ?? '');
+  if (!link || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [link.line_account_id])) {
+    return c.json({ success: false, error: 'Tracked link not found' }, 404);
+  }
+  await next();
+};
 
 function serializeTrackedLink(row: TrackedLink, baseUrl: string) {
   // Prefer the short code (baseUrl may be a branded short domain).
@@ -93,7 +112,19 @@ async function resolveLinkAccountId(
 // GET /api/tracked-links — list all
 trackedLinks.get('/api/tracked-links', async (c) => {
   try {
-    const items = await getTrackedLinks(c.env.DB);
+    const lineAccountId = c.req.query('lineAccountId');
+    if (lineAccountId && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+    let items = await getTrackedLinks(c.env.DB);
+    if (lineAccountId) {
+      items = items.filter((item) => item.line_account_id === lineAccountId);
+    } else {
+      const { scope } = await adminAccountScope(c);
+      items = items.filter((item) => item.line_account_id === null
+        ? scope.canSeeUnassigned
+        : scope.allowedAccountIds.includes(item.line_account_id));
+    }
     const base = await resolveApiLinkBase(c);
     return c.json({ success: true, data: items.map((item) => serializeTrackedLink(item, base)) });
   } catch (err) {
@@ -103,7 +134,7 @@ trackedLinks.get('/api/tracked-links', async (c) => {
 });
 
 // GET /api/tracked-links/:id — get single with click details
-trackedLinks.get('/api/tracked-links/:id', async (c) => {
+trackedLinks.get('/api/tracked-links/:id', requireVisibleTrackedLink, async (c) => {
   try {
     const id = c.req.param('id');
     const link = await getTrackedLinkById(c.env.DB, id);
@@ -149,6 +180,9 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c)
     if (!body.name || !body.originalUrl) {
       return c.json({ success: false, error: 'name and originalUrl are required' }, 400);
     }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
 
     const link = await createTrackedLink(c.env.DB, {
       name: body.name,
@@ -172,7 +206,7 @@ trackedLinks.post('/api/tracked-links', requireRole('owner', 'admin'), async (c)
 });
 
 // PATCH /api/tracked-links/:id — update mutable fields
-trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), async (c) => {
+trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json<{
@@ -188,6 +222,11 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), asyn
       ogImageUrl?: string | null;
     }>();
 
+    if ('lineAccountId' in body
+      && !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId ?? null])) {
+      return c.json({ success: false, error: 'このLINEアカウントを操作する権限がありません' }, 403);
+    }
+
     const link = await updateTrackedLink(c.env.DB, id, body);
     if (!link) {
       return c.json({ success: false, error: 'Tracked link not found' }, 404);
@@ -201,7 +240,7 @@ trackedLinks.patch('/api/tracked-links/:id', requireRole('owner', 'admin'), asyn
 });
 
 // DELETE /api/tracked-links/:id
-trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), async (c) => {
+trackedLinks.delete('/api/tracked-links/:id', requireRole('owner', 'admin'), requireVisibleTrackedLink, async (c) => {
   try {
     const id = c.req.param('id');
     const link = await getTrackedLinkById(c.env.DB, id);
