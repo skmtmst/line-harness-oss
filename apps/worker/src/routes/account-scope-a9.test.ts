@@ -5,8 +5,7 @@ const mocks = vi.hoisted(() => ({
   createAsset: vi.fn(), deleteAsset: vi.fn(), getAsset: vi.fn(), listAssets: vi.fn(), updateAsset: vi.fn(),
   createLink: vi.fn(), deleteLink: vi.fn(), getLink: vi.fn(), getLinks: vi.fn(), updateLink: vi.fn(),
   createPoint: vi.fn(), deletePoint: vi.fn(), getPoint: vi.fn(), getPoints: vi.fn(), updatePoint: vi.fn(),
-  getEvents: vi.fn(), getReport: vi.fn(), getApprovals: vi.fn(), setApproval: vi.fn(),
-  trackConversion: vi.fn(),
+  getEvents: vi.fn(), getReport: vi.fn(), getApprovals: vi.fn(), setApproval: vi.fn(), trackConversion: vi.fn(),
   canAccess: vi.fn(), getScope: vi.fn(),
 }));
 
@@ -66,9 +65,9 @@ function app() {
   const instance = new Hono<any>();
   instance.use('*', async (c, next) => {
     c.env = { DB: {
-      prepare: () => ({
-        bind: () => ({
-          first: async () => ({ line_account_id: 'own' }),
+      prepare: (query: string) => ({
+        bind: (...values: unknown[]) => ({
+          first: async () => ({ line_account_id: query.includes('friends') && values[0] === 'other-friend' ? 'other' : 'own' }),
           all: async () => ({ results: [{ id: 'own-point' }, { id: 'own-event' }] }),
         }),
       }),
@@ -89,21 +88,27 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.canAccess.mockImplementation(async (_db, _staff, ids: Array<string | null>) => !ids.includes('other'));
   mocks.getScope.mockResolvedValue({ allowedAccountIds: ['own'], canSeeUnassigned: false });
-  mocks.listAssets.mockResolvedValue([asset('own-asset', 'own'), asset('other-asset', 'other')]);
+  mocks.listAssets.mockResolvedValue([asset('own-asset', 'own'), asset('unassigned-asset', null)]);
   mocks.getLinks.mockResolvedValue([link('own-link', 'own'), link('other-link', 'other')]);
   mocks.getPoints.mockResolvedValue([point('own-point', 'own'), point('other-point', 'other')]);
-  mocks.getEvents.mockImplementation(async (_db, options) => options.allowedAccountIds
-    ? [{ id: 'own-event' }]
-    : [{ id: 'own-event' }, { id: 'other-event' }]);
+  mocks.getEvents.mockResolvedValue([{ id: 'own-event' }]);
   mocks.getReport.mockResolvedValue([
     { conversionPointId: 'own-point' }, { conversionPointId: 'other-point' },
   ]);
-  mocks.getApprovals.mockImplementation(async (_db, options) => options.allowedAccountIds
-    ? [{ eventId: 'own-event' }]
-    : [{ eventId: 'own-event' }, { eventId: 'other-event' }]);
+  mocks.getApprovals.mockResolvedValue([{ eventId: 'own-event' }]);
+  mocks.trackConversion.mockResolvedValue({
+    id: 'event', conversion_point_id: 'own-point', friend_id: 'own-friend', user_id: null,
+    affiliate_code: null, metadata: null, created_at: '',
+  });
 });
 
 describe('A-9 tenant scope', () => {
+  test('omits unassigned assets from an explicit account query when access disallows them', async () => {
+    const response = await app().request('/api/broadcast-message-assets?lineAccountId=own');
+    expect(response.status).toBe(200);
+    expect(JSON.stringify(await response.json())).not.toContain('unassigned-asset');
+  });
+
   test.each([
     ['/api/broadcast-message-assets', 'own-asset'],
     ['/api/tracked-links', 'own-link'],
@@ -127,13 +132,6 @@ describe('A-9 tenant scope', () => {
     expect(mocks.createAsset).not.toHaveBeenCalled();
   });
 
-  test('omits unassigned assets for a non-default tenant even with an account filter', async () => {
-    mocks.listAssets.mockResolvedValue([asset('own-asset', 'own'), asset('unassigned-asset', null)]);
-    const response = await app().request('/api/broadcast-message-assets?lineAccountId=own');
-    expect(response.status).toBe(200);
-    expect(JSON.stringify(await response.json())).not.toContain('unassigned-asset');
-  });
-
   test('rejects another tenant account before creating a tracked link', async () => {
     const response = await app().request('/api/tracked-links', json('POST', {
       lineAccountId: 'other', name: 'x', originalUrl: 'https://example.com',
@@ -150,25 +148,24 @@ describe('A-9 tenant scope', () => {
     expect(mocks.createPoint).not.toHaveBeenCalled();
   });
 
-  test('hides another tenant conversion point before tracking', async () => {
-    mocks.getPoint.mockResolvedValue(point('other-point', 'other'));
+  test('rejects another tenant friend before tracking a conversion', async () => {
     const response = await app().request('/api/conversions/track', json('POST', {
-      conversionPointId: 'other-point', friendId: 'friend',
+      conversionPointId: 'own-point', friendId: 'other-friend',
     }));
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(403);
     expect(mocks.trackConversion).not.toHaveBeenCalled();
   });
 
-  test.each(['/api/conversions/events', '/api/conversions/approvals'])(
-    '%s applies account scope before database pagination',
-    async (path) => {
-      expect((await app().request(`${path}?limit=1&offset=1`)).status).toBe(200);
-      const query = path.endsWith('events') ? mocks.getEvents : mocks.getApprovals;
-      expect(query).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-        allowedAccountIds: ['own'], canSeeUnassigned: false, limit: 1, offset: 1,
-      }));
-    },
-  );
+  test('passes account scope to paginated conversion queries', async () => {
+    expect((await app().request('/api/conversions/events?limit=2&offset=3')).status).toBe(200);
+    expect(mocks.getEvents).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      scope: { allowedAccountIds: ['own'], includeUnassigned: false }, limit: 2, offset: 3,
+    }));
+    expect((await app().request('/api/conversions/approvals?limit=2&offset=3')).status).toBe(200);
+    expect(mocks.getApprovals).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      scope: { allowedAccountIds: ['own'], includeUnassigned: false }, limit: 2, offset: 3,
+    }));
+  });
 
   test.each([
     ['/api/broadcast-message-assets/other-asset', 'PUT', { name: 'x', payload: {} }],

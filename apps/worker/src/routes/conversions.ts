@@ -55,13 +55,9 @@ const requireVisibleConversionEvent: MiddlewareHandler<Env> = async (c, next) =>
   await next();
 };
 
-async function visibleConversionIds(c: Context<Env>, table: 'conversion_points' | 'conversion_events') {
+async function visibleConversionPointIds(c: Context<Env>) {
   const { scope, where } = await adminAccountScope(c, 'cp.');
-  const id = table === 'conversion_points' ? 'cp.id' : 'ce.id';
-  const from = table === 'conversion_points'
-    ? 'conversion_points cp'
-    : 'conversion_events ce JOIN conversion_points cp ON cp.id = ce.conversion_point_id';
-  const rows = await c.env.DB.prepare(`SELECT ${id} AS id FROM ${from} WHERE ${where}`)
+  const rows = await c.env.DB.prepare(`SELECT cp.id AS id FROM conversion_points cp WHERE ${where}`)
     .bind(...scope.allowedAccountIds)
     .all<{ id: string }>();
   return new Set(rows.results.map((row) => row.id));
@@ -161,7 +157,7 @@ function readMeasureOptions(
 // GET /api/conversions/points - list all
 conversions.get('/api/conversions/points', async (c) => {
   try {
-    const visibleIds = await visibleConversionIds(c, 'conversion_points');
+    const visibleIds = await visibleConversionPointIds(c);
     const items = (await getConversionPoints(c.env.DB)).filter((item) => visibleIds.has(item.id));
     return c.json({
       success: true,
@@ -268,9 +264,18 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
       );
     }
 
-    const point = await getConversionPointById(c.env.DB, body.conversionPointId);
-    if (!point || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [point.line_account_id])) {
-      return c.json({ success: false, error: 'Conversion point not found' }, 404);
+    const [pointAccount, friendAccount] = await Promise.all([
+      c.env.DB.prepare('SELECT line_account_id FROM conversion_points WHERE id = ?')
+        .bind(body.conversionPointId).first<{ line_account_id: string | null }>(),
+      c.env.DB.prepare('SELECT line_account_id FROM friends WHERE id = ?')
+        .bind(body.friendId).first<{ line_account_id: string | null }>(),
+    ]);
+    if (!pointAccount || !friendAccount || !await canAccessAllLineAccounts(
+      c.env.DB,
+      c.get('staff'),
+      [pointAccount.line_account_id, friendAccount.line_account_id],
+    )) {
+      return c.json({ success: false, error: 'このコンバージョンを記録する権限がありません' }, 403);
     }
 
     const event = await trackConversion(c.env.DB, {
@@ -302,8 +307,9 @@ conversions.post('/api/conversions/track', requireRole('owner', 'admin'), async 
 // GET /api/conversions/events - list events with filters
 conversions.get('/api/conversions/events', async (c) => {
   try {
-    const { scope } = await adminAccountScope(c);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const events = await getConversionEvents(c.env.DB, {
+      scope: { allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned },
       conversionPointId: c.req.query('conversionPointId'),
       friendId: c.req.query('friendId'),
       affiliateCode: c.req.query('affiliateCode'),
@@ -311,8 +317,6 @@ conversions.get('/api/conversions/events', async (c) => {
       endDate: c.req.query('endDate'),
       limit: Number(c.req.query('limit') ?? '100'),
       offset: Number(c.req.query('offset') ?? '0'),
-      allowedAccountIds: scope.allowedAccountIds,
-      canSeeUnassigned: scope.canSeeUnassigned,
     });
 
     return c.json({
@@ -336,7 +340,7 @@ conversions.get('/api/conversions/events', async (c) => {
 // GET /api/conversions/report - aggregated report
 conversions.get('/api/conversions/report', requireRole('owner', 'admin'), async (c) => {
   try {
-    const visibleIds = await visibleConversionIds(c, 'conversion_points');
+    const visibleIds = await visibleConversionPointIds(c);
     const report = (await getConversionReport(c.env.DB, {
       startDate: c.req.query('startDate'),
       endDate: c.req.query('endDate'),
@@ -369,14 +373,13 @@ conversions.get('/api/conversions/approvals', async (c) => {
     const limit = Math.min(500, Math.max(1, Number.parseInt(c.req.query('limit') ?? '', 10) || 200));
     const offset = Math.max(0, Number.parseInt(c.req.query('offset') ?? '', 10) || 0);
 
-    const { scope } = await adminAccountScope(c);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
     const rows = await getConversionApprovalQueue(c.env.DB, {
+      scope: { allowedAccountIds: scope.allowedAccountIds, includeUnassigned: scope.canSeeUnassigned },
       status: status as 'pending' | 'approved' | 'rejected',
       identityKeySql: IDENTITY_KEY_SQL,
       limit,
       offset,
-      allowedAccountIds: scope.allowedAccountIds,
-      canSeeUnassigned: scope.canSeeUnassigned,
     });
 
     return c.json({ success: true, data: rows });

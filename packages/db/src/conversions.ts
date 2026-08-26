@@ -262,6 +262,7 @@ export async function trackConversion(
 export async function getConversionEvents(
   db: D1Database,
   opts: {
+    scope: { allowedAccountIds: readonly string[]; includeUnassigned: boolean };
     conversionPointId?: string;
     friendId?: string;
     affiliateCode?: string;
@@ -269,12 +270,17 @@ export async function getConversionEvents(
     endDate?: string;
     limit?: number;
     offset?: number;
-    allowedAccountIds?: string[];
-    canSeeUnassigned?: boolean;
-  } = {},
+  },
 ): Promise<ConversionEvent[]> {
   const conditions: string[] = [];
   const values: unknown[] = [];
+
+  if (opts.scope.allowedAccountIds.length > 0) {
+    conditions.push(`(cp.line_account_id IN (${opts.scope.allowedAccountIds.map(() => '?').join(',')})${opts.scope.includeUnassigned ? ' OR cp.line_account_id IS NULL' : ''})`);
+    values.push(...opts.scope.allowedAccountIds);
+  } else {
+    conditions.push(opts.scope.includeUnassigned ? 'cp.line_account_id IS NULL' : '1 = 0');
+  }
 
   if (opts.conversionPointId) {
     conditions.push('ce.conversion_point_id = ?');
@@ -295,15 +301,6 @@ export async function getConversionEvents(
   if (opts.endDate) {
     conditions.push('ce.created_at <= ?');
     values.push(opts.endDate);
-  }
-  if (opts.allowedAccountIds) {
-    const accountClauses: string[] = [];
-    if (opts.allowedAccountIds.length > 0) {
-      accountClauses.push(`cp.line_account_id IN (${opts.allowedAccountIds.map(() => '?').join(',')})`);
-      values.push(...opts.allowedAccountIds);
-    }
-    if (opts.canSeeUnassigned) accountClauses.push('cp.line_account_id IS NULL');
-    conditions.push(accountClauses.length > 0 ? `(${accountClauses.join(' OR ')})` : '1 = 0');
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
