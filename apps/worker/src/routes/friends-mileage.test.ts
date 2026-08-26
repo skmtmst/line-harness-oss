@@ -16,6 +16,10 @@ const dbMocks = {
   jstNow: vi.fn(() => '2026-08-09T00:00:00.000+09:00'),
 };
 vi.mock('@line-crm/db', () => dbMocks);
+vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: vi.fn().mockResolvedValue(true),
+  getVisibleLineAccountScope: vi.fn(),
+}));
 
 vi.mock('../services/event-bus.js', () => ({ fireEvent: vi.fn() }));
 vi.mock('../services/step-delivery.js', () => ({ buildMessage: vi.fn() }));
