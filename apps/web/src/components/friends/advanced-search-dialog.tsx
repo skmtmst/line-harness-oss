@@ -134,7 +134,7 @@ export default function AdvancedSearchDialog({
     }
     if (params.chatStatus) {
       out.push(
-        `対応マーク ${{ unread: '未対応', in_progress: '対応中', resolved: '対応済' }[params.chatStatus]}`,
+        `対応マーク ${{ unread: '未対応', in_progress: '対応中', on_hold: '保留', resolved: '対応済' }[params.chatStatus]}`,
       )
     }
     if (params.visibility === 'blocked') out.push('ブロックした人')

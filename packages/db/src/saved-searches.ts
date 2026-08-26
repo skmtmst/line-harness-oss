@@ -43,6 +43,24 @@ export interface SearchConditions {
   visibility?: 'visible_only' | 'hidden_only' | 'all';
 }
 
+export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;
+export const INBOX_SAVED_VIEW_CHANNELS = ['line', 'email'] as const;
+export const INBOX_SAVED_VIEW_SORTS = ['newest', 'waiting_desc'] as const;
+
+/** 受信箱専用。友だち検索の AND/OR 条件と混ぜず、版を持って移行できる形にする。 */
+export interface InboxSavedViewConditions {
+  version: 1;
+  query: string;
+  channels: Array<(typeof INBOX_SAVED_VIEW_CHANNELS)[number]>;
+  statuses: Array<(typeof INBOX_SAVED_VIEW_STATUSES)[number]>;
+  assignees: string[];
+  unread: 'all' | 'mine';
+  messageTypes: string[];
+  receivedFrom: string | null;
+  receivedTo: string | null;
+  sort: (typeof INBOX_SAVED_VIEW_SORTS)[number];
+}
+
 const CONDITION_KINDS = new Set([
   'tag',
   'field',
@@ -104,6 +122,58 @@ export function validateSearchConditions(
   return { ok: true, value: out };
 }
 
+function stringArray(value: unknown, allowed?: readonly string[]): string[] | null {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) return null;
+  const result = [...new Set(value as string[])];
+  if (allowed && result.some((item) => !allowed.includes(item))) return null;
+  return result;
+}
+
+export function validateInboxSavedViewConditions(
+  raw: unknown,
+): { ok: true; value: InboxSavedViewConditions } | { ok: false; error: string } {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    return { ok: false, error: '受信箱の条件の形が正しくありません' };
+  }
+  const input = raw as Record<string, unknown>;
+  if (input.version !== 1) return { ok: false, error: '対応していない条件の版です' };
+  const channels = stringArray(input.channels, INBOX_SAVED_VIEW_CHANNELS);
+  const statuses = stringArray(input.statuses, INBOX_SAVED_VIEW_STATUSES);
+  const assignees = stringArray(input.assignees);
+  const messageTypes = stringArray(input.messageTypes);
+  if (!channels?.length) return { ok: false, error: '表示する連絡手段を選んでください' };
+  if (!statuses?.length) return { ok: false, error: '表示する対応状態を選んでください' };
+  if (!assignees || !messageTypes) return { ok: false, error: '絞り込み条件が正しくありません' };
+  if (input.unread !== 'all' && input.unread !== 'mine') {
+    return { ok: false, error: '未読条件が正しくありません' };
+  }
+  if (!(INBOX_SAVED_VIEW_SORTS as readonly unknown[]).includes(input.sort)) {
+    return { ok: false, error: '並び順が正しくありません' };
+  }
+  const query = typeof input.query === 'string' ? input.query.trim().slice(0, 200) : '';
+  const receivedFrom = input.receivedFrom === null || typeof input.receivedFrom === 'string'
+    ? input.receivedFrom as string | null
+    : null;
+  const receivedTo = input.receivedTo === null || typeof input.receivedTo === 'string'
+    ? input.receivedTo as string | null
+    : null;
+  return {
+    ok: true,
+    value: {
+      version: 1,
+      query,
+      channels: channels as InboxSavedViewConditions['channels'],
+      statuses: statuses as InboxSavedViewConditions['statuses'],
+      assignees,
+      unread: input.unread,
+      messageTypes,
+      receivedFrom,
+      receivedTo,
+      sort: input.sort as InboxSavedViewConditions['sort'],
+    },
+  };
+}
+
 export async function getSavedSearches(
   db: D1Database,
   scope?: SavedSearchScope,
@@ -140,7 +210,7 @@ export async function createSavedSearch(
   input: {
     name: string;
     scope?: SavedSearchScope;
-    conditions: SearchConditions;
+    conditions: SearchConditions | InboxSavedViewConditions;
     createdBy?: string | null;
     isShared?: boolean;
     displayOrder?: number;
@@ -172,7 +242,7 @@ export async function updateSavedSearch(
   id: string,
   input: {
     name?: string;
-    conditions?: SearchConditions;
+    conditions?: SearchConditions | InboxSavedViewConditions;
     isShared?: boolean;
     displayOrder?: number;
   },

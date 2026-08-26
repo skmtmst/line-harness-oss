@@ -4,6 +4,7 @@ import {
   hashOutboundPayload,
   reserveOutboundSend,
 } from './outbound-idempotency.js';
+import { inboxEventStatement } from './inbox-events.js';
 
 const MAX_INBOUND_BYTES = 10 * 1024 * 1024;
 const MAX_BODY_CHARS = 200_000;
@@ -161,22 +162,24 @@ export async function storeSupportEmail(
           `UPDATE support_email_threads
            SET customer_name = COALESCE(?, customer_name), subject = ?, normalized_subject = ?,
                status = 'unread',
-               last_message_at = ?, last_incoming_at = ?, resolved_at = NULL, updated_at = ?
+               last_message_at = ?, last_incoming_at = ?, last_customer_message_at = ?,
+               resolved_at = NULL, revision = revision + 1, updated_at = ?
            WHERE id = ?`,
-        ).bind(customerName, subject, normalizedSubject, now, now, now, threadId),
+        ).bind(customerName, subject, normalizedSubject, now, now, now, now, threadId),
       ]
     : [
         env.DB.prepare(
           `INSERT INTO support_email_threads
            (id, customer_email, customer_name, subject, normalized_subject, status,
-            last_message_at, last_incoming_at, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, 'unread', ?, ?, ?, ?)`,
+            last_message_at, last_incoming_at, last_customer_message_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'unread', ?, ?, ?, ?, ?)`,
         ).bind(
           threadId,
           customerEmail,
           customerName,
           subject,
           normalizedSubject,
+          now,
           now,
           now,
           now,
@@ -204,6 +207,16 @@ export async function storeSupportEmail(
       now,
     ),
   );
+  statements.push(inboxEventStatement(env.DB, {
+    channel: 'email',
+    conversationId: threadId,
+    eventType: 'status',
+    before: existingThreadId ? { status: 'previous' } : null,
+    after: { status: 'unread', source: 'customer_message' },
+    actorStaffId: null,
+    correlationId: messageRowId,
+    createdAt: now,
+  }));
   await env.DB.batch(statements);
 
   console.log(JSON.stringify({ event: 'support_email_received', threadId, from: customerEmail }));
@@ -356,8 +369,19 @@ export async function sendSupportEmailReply(
     env.DB.prepare(
       `UPDATE support_email_threads
        SET status = 'in_progress', assigned_staff_id = ?, last_message_at = ?,
-           last_outgoing_at = ?, updated_at = ? WHERE id = ?`,
-    ).bind(staffId, now, now, now, threadId),
+           last_outgoing_at = ?, last_operator_message_at = ?,
+           revision = revision + 1, updated_at = ? WHERE id = ?`,
+    ).bind(staffId, now, now, now, now, threadId),
+    inboxEventStatement(env.DB, {
+      channel: 'email',
+      conversationId: threadId,
+      eventType: 'send',
+      before: null,
+      after: { messageId: sentMessageId, status: 'in_progress' },
+      actorStaffId: staffId,
+      correlationId: idempotencyKey,
+      createdAt: now,
+    }),
     completeOutboundSendStatement(env.DB, {
       key: idempotencyKey,
       responseId: sentMessageId,

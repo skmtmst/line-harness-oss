@@ -578,16 +578,24 @@ CREATE TABLE carousel_taps (
   tapped_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
-CREATE TABLE chats (
-  id            TEXT PRIMARY KEY,
-  friend_id     TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
-  operator_id   TEXT REFERENCES operators (id) ON DELETE SET NULL,
-  status        TEXT NOT NULL DEFAULT 'unread' CHECK (status IN ('unread', 'in_progress', 'resolved')),
-  notes         TEXT,
-  last_message_at TEXT,
-  created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
-  updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_account_id TEXT, first_replied_at TEXT, last_incoming_at TEXT);
+CREATE TABLE "chats" (
+  id                       TEXT PRIMARY KEY,
+  friend_id                TEXT NOT NULL REFERENCES friends (id) ON DELETE CASCADE,
+  operator_id              TEXT REFERENCES operators (id) ON DELETE SET NULL,
+  status                   TEXT NOT NULL DEFAULT 'unread'
+                           CHECK (status IN ('unread', 'in_progress', 'on_hold', 'resolved')),
+  notes                    TEXT,
+  last_message_at          TEXT,
+  created_at               TEXT NOT NULL,
+  updated_at               TEXT NOT NULL,
+  line_account_id          TEXT,
+  first_replied_at         TEXT,
+  last_incoming_at         TEXT,
+  revision                 INTEGER NOT NULL DEFAULT 0,
+  last_customer_message_at TEXT,
+  last_operator_message_at TEXT,
+  next_response_due_at     TEXT
+);
 
 CREATE TABLE codex_cloud_tasks (
   slack_event_id               TEXT PRIMARY KEY,
@@ -1128,6 +1136,41 @@ CREATE TABLE google_calendar_connections (
   last_error    TEXT,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+);
+
+CREATE TABLE inbox_conversation_events (
+  id              TEXT PRIMARY KEY,
+  channel         TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  conversation_id TEXT NOT NULL,
+  event_type      TEXT NOT NULL
+                  CHECK (event_type IN ('assignment', 'status', 'note', 'read', 'send', 'conflict', 'unsend')),
+  before_json     TEXT CHECK (before_json IS NULL OR json_valid(before_json)),
+  after_json      TEXT CHECK (after_json IS NULL OR json_valid(after_json)),
+  actor_staff_id  TEXT,
+  reason          TEXT,
+  correlation_id  TEXT NOT NULL,
+  created_at      TEXT NOT NULL
+);
+
+CREATE TABLE inbox_notes (
+  id                    TEXT PRIMARY KEY,
+  channel               TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  conversation_id       TEXT NOT NULL,
+  body                  TEXT NOT NULL,
+  created_by_staff_id   TEXT,
+  correction_of_note_id TEXT REFERENCES inbox_notes (id) ON DELETE SET NULL,
+  invalidation_reason   TEXT,
+  created_at            TEXT NOT NULL
+);
+
+CREATE TABLE inbox_reply_leases (
+  channel               TEXT NOT NULL CHECK (channel IN ('line', 'email')),
+  conversation_id       TEXT NOT NULL,
+  staff_id              TEXT NOT NULL,
+  acquired_at           TEXT NOT NULL,
+  expires_at            TEXT NOT NULL,
+  conversation_revision INTEGER NOT NULL,
+  PRIMARY KEY (channel, conversation_id)
 );
 
 CREATE TABLE inbox_staff_reads (
@@ -2229,9 +2272,9 @@ CREATE TABLE stripe_events (
   processed_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
-CREATE TABLE support_email_messages (
+CREATE TABLE "support_email_messages" (
   id                TEXT PRIMARY KEY,
-  thread_id         TEXT NOT NULL REFERENCES support_email_threads (id) ON DELETE CASCADE,
+  thread_id         TEXT NOT NULL REFERENCES "support_email_threads" (id) ON DELETE CASCADE,
   direction         TEXT NOT NULL CHECK (direction IN ('incoming', 'outgoing')),
   sender_email      TEXT NOT NULL,
   sender_name       TEXT,
@@ -2254,22 +2297,27 @@ CREATE TABLE support_email_sync_state (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE support_email_threads (
-  id                 TEXT PRIMARY KEY,
-  customer_email     TEXT NOT NULL,
-  customer_name      TEXT,
-  subject            TEXT NOT NULL,
-  normalized_subject TEXT NOT NULL,
-  status             TEXT NOT NULL DEFAULT 'unread'
-                     CHECK (status IN ('unread', 'in_progress', 'resolved')),
-  assigned_staff_id  TEXT,
-  last_message_at    TEXT NOT NULL,
-  last_incoming_at   TEXT NOT NULL,
-  last_outgoing_at   TEXT,
-  resolved_at        TEXT,
-  created_at         TEXT NOT NULL,
-  updated_at         TEXT NOT NULL
-, notes TEXT);
+CREATE TABLE "support_email_threads" (
+  id                       TEXT PRIMARY KEY,
+  customer_email           TEXT NOT NULL,
+  customer_name            TEXT,
+  subject                  TEXT NOT NULL,
+  normalized_subject       TEXT NOT NULL,
+  status                   TEXT NOT NULL DEFAULT 'unread'
+                           CHECK (status IN ('unread', 'in_progress', 'on_hold', 'resolved')),
+  assigned_staff_id        TEXT,
+  last_message_at          TEXT NOT NULL,
+  last_incoming_at         TEXT NOT NULL,
+  last_outgoing_at         TEXT,
+  resolved_at              TEXT,
+  created_at               TEXT NOT NULL,
+  updated_at               TEXT NOT NULL,
+  notes                    TEXT,
+  revision                 INTEGER NOT NULL DEFAULT 0,
+  last_customer_message_at TEXT,
+  last_operator_message_at TEXT,
+  next_response_due_at     TEXT
+);
 
 CREATE TABLE support_marks (
   id              TEXT PRIMARY KEY,
@@ -2661,7 +2709,7 @@ CREATE INDEX idx_carousel_taps_action ON carousel_taps(template_id, column_index
 
 CREATE INDEX idx_carousel_taps_friend ON carousel_taps(template_id, friend_id);
 
-CREATE INDEX idx_chats_friend_status_message ON chats(friend_id, status, last_message_at);
+CREATE INDEX idx_chats_friend_status_message ON chats (friend_id, status, last_message_at);
 
 CREATE UNIQUE INDEX idx_chats_friend_unique ON chats (friend_id);
 
@@ -2827,6 +2875,17 @@ CREATE INDEX idx_google_calendar_connections_staff
 CREATE INDEX idx_health_logs_account ON account_health_logs (line_account_id);
 
 CREATE INDEX idx_idempotency_expires ON booking_idempotency_keys (expires_at);
+
+CREATE UNIQUE INDEX idx_inbox_conversation_events_correlation
+  ON inbox_conversation_events (correlation_id, event_type);
+
+CREATE INDEX idx_inbox_conversation_events_lookup
+  ON inbox_conversation_events (channel, conversation_id, created_at DESC);
+
+CREATE INDEX idx_inbox_notes_lookup
+  ON inbox_notes (channel, conversation_id, created_at ASC);
+
+CREATE INDEX idx_inbox_reply_leases_expiry ON inbox_reply_leases (expires_at);
 
 CREATE INDEX idx_inbox_staff_reads_conversation
   ON inbox_staff_reads (channel, conversation_id, staff_id);

@@ -89,6 +89,27 @@ test('non-default tenant cannot read unassigned email threads', async () => {
   expect(body.data.items.every((item) => item.channel === 'line')).toBe(true);
 });
 
+test('a selected LINE account never receives unassigned legacy email threads', async () => {
+  getVisibleLineAccountScope.mockResolvedValue({
+    accounts: [{ id: 'account-1' }], ids: ['account-1'],
+    allowedAccountIds: ['account-1'], canSeeUnassigned: true,
+  });
+  const failOnEmailQuery = {
+    prepare: () => {
+      throw new Error('email query must not run for a selected LINE account');
+    },
+  } as unknown as D1Database;
+  const response = await app().request(
+    '/api/support/inbox?channel=email&status=all&lineAccountId=account-1',
+    {},
+    { DB: failOnEmailQuery } as Env['Bindings'],
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json() as { data: { items: unknown[]; summary: { email: number } } };
+  expect(body.data.items).toEqual([]);
+  expect(body.data.summary.email).toBe(0);
+});
+
 test('tenant with no accounts gets an empty LINE filter without errors', async () => {
   getVisibleLineAccountScope.mockResolvedValue({
     accounts: [], ids: [], allowedAccountIds: [], canSeeUnassigned: false,
