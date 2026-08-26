@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { getFriendStats, getInboxStats, getListStats } from '../src/dashboard.js';
+import { getDashboardOverview, getFriendStats, getInboxStats, getListStats } from '../src/dashboard.js';
 
 type Query = { sql: string; binds: unknown[] };
 
@@ -32,6 +32,24 @@ function expectScoped(queries: Query[], fragment: string): void {
 }
 
 describe('tenant-scoped dashboard aggregations', () => {
+  test('getDashboardOverview scopes every account-owned dashboard query and preserves bind order', async () => {
+    const queries: Query[] = [];
+    await getDashboardOverview(recordingDb(queries), 'last7', scope);
+
+    expect(queries.length).toBeGreaterThanOrEqual(17);
+    const accountQueries = queries.filter(({ sql }) => !sql.includes('friend_daily_snapshots'));
+    expect(accountQueries.every(({ sql }) => sql.includes('IN (?, ?)'))).toBe(true);
+    expect(accountQueries.every(({ binds }) => {
+      const a = binds.indexOf('account-a');
+      return a >= 0 && binds[a + 1] === 'account-b';
+    })).toBe(true);
+
+    const migrations = queries.find(({ sql }) => sql.includes('FROM account_migrations'));
+    expect(migrations?.binds).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
+    const broadcasts = queries.find(({ sql }) => sql.includes('FROM broadcasts b'));
+    expect(broadcasts?.binds.slice(-4)).toEqual(['account-a', 'account-b', 'account-a', 'account-b']);
+  });
+
   test('getFriendStats scopes friend totals, monthly additions, unanswered and resolved chats', async () => {
     const queries: Query[] = [];
     await getFriendStats(recordingDb(queries), scope);

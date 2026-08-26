@@ -92,7 +92,7 @@ describe('友だちの内訳', () => {
     insertFriend('d', { hidden: 1 });
     insertFriend('e', { following: 0, hidden: 1 });
 
-    const { friends } = await getDashboardOverview(db, 'today', null);
+    const { friends } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(friends.total).toBe(5);
     expect(friends.active).toBe(2);
     expect(friends.blockedByThem).toBe(1);
@@ -105,14 +105,14 @@ describe('友だちの内訳', () => {
     for (const [i, opts] of [{}, { following: 0 }, { hidden: 1 }, { following: 0, hidden: 1 }].entries()) {
       insertFriend(`f${i}`, opts);
     }
-    const { friends } = await getDashboardOverview(db, 'today', null);
+    const { friends } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(friends.active + friends.blockedByThem + friends.hiddenByUs + friends.blockedBoth).toBe(
       friends.total,
     );
   });
 
   test('友だちが0人でも落ちない', async () => {
-    const { friends } = await getDashboardOverview(db, 'today', null);
+    const { friends } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(friends).toEqual({
       active: 0,
       total: 0,
@@ -128,7 +128,7 @@ describe('友だち数の推移', () => {
     insertFriend('a');
     await recordFriendSnapshot(db, null);
 
-    const { trend } = await getDashboardOverview(db, 'today', null);
+    const { trend } = await getDashboardOverview(db, 'today', { allTenants: true });
     const today = trend.find((d) => d.date === jstDate(0));
     expect(today?.estimated).toBe(false);
     expect(today?.active).toBe(1);
@@ -138,7 +138,7 @@ describe('友だち数の推移', () => {
     // 推移は「直近どう動いたか」を見るもので、上の切り替えは KPI の集計期間。
     // 連動させていた頃は「今日」を選ぶと1行だけになり、増減が読めなかった。
     for (const period of ['today', 'last7', 'last28'] as const) {
-      const { trend } = await getDashboardOverview(db, period, null);
+      const { trend } = await getDashboardOverview(db, period, { allTenants: true });
       expect(trend).toHaveLength(7);
       expect(trend[trend.length - 1].date).toBe(jstDate(0));
       expect(trend[0].date).toBe(jstDate(-6));
@@ -148,7 +148,7 @@ describe('友だち数の推移', () => {
   test('記録が無い日は推定として印を付ける', async () => {
     // 印が無いと、逆算の値を正しい記録と見分けられない。
     insertFriend('a');
-    const { trend } = await getDashboardOverview(db, 'last7', null);
+    const { trend } = await getDashboardOverview(db, 'last7', { allTenants: true });
     expect(trend).toHaveLength(7);
     expect(trend.every((d) => d.estimated)).toBe(true);
   });
@@ -156,14 +156,14 @@ describe('友だち数の推移', () => {
   test('記録のある日と無い日が混ざる', async () => {
     insertFriend('a');
     await recordFriendSnapshot(db, null);
-    const { trend } = await getDashboardOverview(db, 'last7', null);
+    const { trend } = await getDashboardOverview(db, 'last7', { allTenants: true });
     const recorded = trend.filter((d) => !d.estimated);
     expect(recorded).toHaveLength(1);
     expect(recorded[0].date).toBe(jstDate(0));
   });
 
   test('古い順に並ぶ', async () => {
-    const { trend } = await getDashboardOverview(db, 'last7', null);
+    const { trend } = await getDashboardOverview(db, 'last7', { allTenants: true });
     const dates = trend.map((d) => d.date);
     expect([...dates].sort()).toEqual(dates);
   });
@@ -180,7 +180,7 @@ describe('友だち数の推移', () => {
     };
     expect(rows.n).toBe(1);
     // 上書きなので、あとの値が残る。
-    const { trend } = await getDashboardOverview(db, 'today', null);
+    const { trend } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(trend.find((d) => d.date === jstDate(0))?.active).toBe(2);
   });
 });
@@ -202,7 +202,7 @@ describe('受信箱の状態', () => {
         )
         .run(`chat-${id}`, id, status, jstDate(0), jstDate(0), '2020-01-01T00:00:00.000+09:00');
     }
-    const { inbox } = await getDashboardOverview(db, 'today', null);
+    const { inbox } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(inbox.unanswered).toBe(2);
     expect(inbox.inProgress).toBe(1);
     expect(inbox.resolved).toBe(1);
@@ -210,7 +210,7 @@ describe('受信箱の状態', () => {
   });
 
   test('未対応が無ければ経過時間は null', async () => {
-    const { inbox } = await getDashboardOverview(db, 'today', null);
+    const { inbox } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(inbox.oldestUnansweredMinutes).toBeNull();
   });
 });
@@ -218,7 +218,7 @@ describe('受信箱の状態', () => {
 describe('初回返信の平均', () => {
   test('記録が無ければ null', async () => {
     // 0 を出すと「即答している」と読めてしまう。
-    const { inbox } = await getDashboardOverview(db, 'today', null);
+    const { inbox } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(inbox.averageFirstReplyMinutes).toBeNull();
   });
 
@@ -238,7 +238,7 @@ describe('初回返信の平均', () => {
         )
         .run(`chat-${id}`, id, day, day, incoming, replied);
     }
-    const { inbox } = await getDashboardOverview(db, 'today', null);
+    const { inbox } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(inbox.averageFirstReplyMinutes).toBe(20);
   });
 
@@ -253,7 +253,7 @@ describe('初回返信の平均', () => {
          VALUES ('c1', 'a', 'resolved', ?, ?, ?, ?)`,
       )
       .run(day, day, `${day}T12:00:00.000+09:00`, `${day}T11:00:00.000+09:00`);
-    const { inbox } = await getDashboardOverview(db, 'today', null);
+    const { inbox } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(inbox.averageFirstReplyMinutes).toBeNull();
   });
 });
@@ -283,14 +283,14 @@ describe('全体', () => {
       ).run(row[0], row[0], row[1], day, row[2], row[3]);
     }
 
-    const overview = await getDashboardOverview(db, 'today', 'account-a');
+    const overview = await getDashboardOverview(db, 'today', { allowedAccountIds: ['account-a'], includeUnassigned: false });
     expect(overview.friends.total).toBe(1);
     expect(overview.delivery.broadcasts).toBe(2);
   });
 
   test('集計した時刻を返す', async () => {
     // カードごとに基準時刻がずれていないことの手がかりになる。
-    const overview = await getDashboardOverview(db, 'today', null);
+    const overview = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(overview.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(overview.period).toBe('today');
   });
@@ -298,7 +298,7 @@ describe('全体', () => {
   test('送信枠は DB 層では埋めない', async () => {
     // LINE の API から取るもの。DB だけを見る層が外を叩くと、
     // 外の障害でダッシュボード全体が落ちる。
-    const { delivery } = await getDashboardOverview(db, 'today', null);
+    const { delivery } = await getDashboardOverview(db, 'today', { allTenants: true });
     expect(delivery.quotaLimit).toBeNull();
     expect(delivery.quotaUsed).toBeNull();
   });

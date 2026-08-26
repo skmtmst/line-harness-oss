@@ -189,12 +189,6 @@ function accountScopeSql(scope: AccountStatsScope, column: string): { sql: strin
   return { sql: scope.includeUnassigned ? `${column} IS NULL` : '1 = 0', binds: [] };
 }
 
-function singleAccountOrAll(accountId: string | null): AccountStatsScope {
-  return accountId
-    ? { allowedAccountIds: [accountId], includeUnassigned: false }
-    : { allTenants: true };
-}
-
 async function inboxState(db: D1Database, scope: AccountStatsScope): Promise<DashboardOverview['inbox']> {
   const account = accountScopeSql(scope, 'f.line_account_id');
   const row = await db
@@ -330,30 +324,37 @@ const TREND_DAYS = 7;
  */
 async function friendTrend(
   db: D1Database,
-  accountId: string | null,
+  scope: AccountStatsScope,
 ): Promise<DashboardOverview['trend']> {
   const days = TREND_DAYS;
   const start = jstDate(-(TREND_DAYS - 1));
-  const key = accountId ?? '';
+  const snapshots = accountScopeSql(scope, 'line_account_id');
+  const snapshotScope = 'allTenants' in scope
+    ? snapshots
+    : {
+        sql: `(${snapshots.sql}${scope.includeUnassigned ? " OR line_account_id = ''" : ''})`,
+        binds: snapshots.binds,
+      };
 
   const recorded = await db
     .prepare(
-      `SELECT date, active, added, blocked
+      `SELECT date, SUM(active) AS active, SUM(added) AS added, SUM(blocked) AS blocked
          FROM friend_daily_snapshots
-        WHERE line_account_id = ? AND date >= ?
+        WHERE ${snapshotScope.sql} AND date >= ?
+        GROUP BY date
         ORDER BY date`,
     )
-    .bind(key, start)
+    .bind(...snapshotScope.binds, start)
     .all<{ date: string; active: number; added: number; blocked: number }>();
   const byDate = new Map(recorded.results.map((r) => [r.date, r]));
 
-  const where = accountId ? 'AND line_account_id = ?' : '';
-  const binds = accountId ? [start, accountId] : [start];
+  const friends = accountScopeSql(scope, 'line_account_id');
+  const binds = [start, ...friends.binds];
   const addedRows = await db
     .prepare(
       `SELECT substr(created_at, 1, 10) AS d, COUNT(*) AS n
          FROM friends
-        WHERE created_at >= ? ${where}
+        WHERE created_at >= ? AND ${friends.sql}
         GROUP BY d`,
     )
     .bind(...binds)
@@ -365,7 +366,7 @@ async function friendTrend(
             COUNT(*) AS n
        FROM friends f
        LEFT JOIN entry_routes er ON er.ref_code = f.ref_code
-      WHERE f.created_at >= ? ${where}
+      WHERE f.created_at >= ? AND ${accountScopeSql(scope, 'f.line_account_id').sql}
       GROUP BY d, name
       ORDER BY n DESC`,
   ).bind(...binds).all<{ d: string; name: string; n: number }>();
@@ -376,7 +377,7 @@ async function friendTrend(
     sourcesByDate.set(row.d, list);
   }
 
-  const now = await friendBreakdown(db, accountId);
+  const now = await friendBreakdown(db, null, accountScopeSql(scope, 'line_account_id'));
   const out: DashboardOverview['trend'] = [];
   let running = now.active;
   for (let i = 0; i < days; i += 1) {
@@ -402,15 +403,16 @@ async function friendTrend(
 async function conversionSummary(
   db: D1Database,
   period: DashboardPeriod,
-  accountId: string | null,
+  scope: AccountStatsScope,
 ): Promise<DashboardOverview['conversions']> {
   const start = periodStart(period);
+  const account = accountScopeSql(scope, 'f.line_account_id');
   const total = await count(
     db,
     `SELECT COUNT(*) AS n FROM conversion_events ce
       JOIN friends f ON f.id = ce.friend_id
-     WHERE ce.created_at >= ? ${accountId ? 'AND f.line_account_id = ?' : ''}`,
-    start, ...(accountId ? [accountId] : []),
+     WHERE ce.created_at >= ? AND ${account.sql}`,
+    start, ...account.binds,
   );
   const byPoint = await db
     .prepare(
@@ -418,12 +420,12 @@ async function conversionSummary(
          FROM conversion_events c
          JOIN conversion_points cp ON cp.id = c.conversion_point_id
          JOIN friends f ON f.id = c.friend_id
-        WHERE c.created_at >= ? ${accountId ? 'AND f.line_account_id = ?' : ''}
+        WHERE c.created_at >= ? AND ${account.sql}
         GROUP BY cp.id
         ORDER BY count DESC
         LIMIT 5`,
     )
-    .bind(start, ...(accountId ? [accountId] : []))
+    .bind(start, ...account.binds)
     .all<{ name: string; count: number }>();
   return { total, byPoint: byPoint.results };
 }
@@ -437,7 +439,7 @@ async function conversionSummary(
 export async function getDashboardOverview(
   db: D1Database,
   period: DashboardPeriod,
-  accountId: string | null,
+  scope: AccountStatsScope,
 ): Promise<DashboardOverview> {
   const start = periodStart(period);
   const partialFailures: string[] = [];
@@ -450,20 +452,17 @@ export async function getDashboardOverview(
       return fallback;
     }
   };
-  const messageAccountWhere = accountId ? 'AND ml.line_account_id = ?' : '';
-  const broadcastAccountWhere = accountId
-    ? `AND (
-         b.line_account_id = ?
-         OR (
-           b.target_type = 'multi-account-dedup'
-           AND b.account_ids IS NOT NULL
-           AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE value = ?)
-         )
-       )`
-    : '';
-
-  const accountClause = accountId ? 'AND f.line_account_id = ?' : '';
-  const accountBinds = accountId ? [accountId] : [];
+  const friendAccount = accountScopeSql(scope, 'f.line_account_id');
+  const messageAccount = accountScopeSql(scope, 'ml.line_account_id');
+  const bookingAccount = accountScopeSql(scope, 'line_account_id');
+  const migrationFrom = accountScopeSql(scope, 'from_account_id');
+  const migrationTo = accountScopeSql(scope, 'to_account_id');
+  const broadcastAccount = accountScopeSql(scope, 'b.line_account_id');
+  const broadcastJsonAccount = accountScopeSql(scope, 'value');
+  const broadcastScope = `(${broadcastAccount.sql} OR (
+    b.target_type = 'multi-account-dedup' AND b.account_ids IS NOT NULL
+    AND EXISTS (SELECT 1 FROM json_each(b.account_ids) WHERE ${broadcastJsonAccount.sql})
+  ))`;
   const emptyOperations: DashboardOverview['operations'] = {
     scenarios: { active: 0, paused: 0 }, migrations: { active: 0, completed: 0 },
     bookings: { pending: 0, upcoming: 0 }, inflowTop: [], funnelAlerts: 0,
@@ -474,38 +473,38 @@ export async function getDashboardOverview(
       `SELECT SUM(CASE WHEN fs.status='active' THEN 1 ELSE 0 END) active,
               SUM(CASE WHEN fs.status='paused' THEN 1 ELSE 0 END) paused
          FROM friend_scenarios fs JOIN friends f ON f.id=fs.friend_id
-        WHERE 1=1 ${accountClause}`,
-    ).bind(...accountBinds).first<{ active: number | null; paused: number | null }>(),
+        WHERE ${friendAccount.sql}`,
+    ).bind(...friendAccount.binds).first<{ active: number | null; paused: number | null }>(),
     db.prepare(
       `SELECT SUM(CASE WHEN status IN ('pending','in_progress') THEN 1 ELSE 0 END) active,
               SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) completed
          FROM account_migrations
-        WHERE 1=1 ${accountId ? 'AND (from_account_id = ? OR to_account_id = ?)' : ''}`,
-    ).bind(...(accountId ? [accountId, accountId] : [])).first<{ active: number | null; completed: number | null }>(),
+        WHERE (${migrationFrom.sql} OR ${migrationTo.sql})`,
+    ).bind(...migrationFrom.binds, ...migrationTo.binds).first<{ active: number | null; completed: number | null }>(),
     db.prepare(
       `SELECT SUM(CASE WHEN status='requested' THEN 1 ELSE 0 END) pending,
               SUM(CASE WHEN status IN ('requested','confirmed') AND starts_at >= ? THEN 1 ELSE 0 END) upcoming
-         FROM bookings WHERE 1=1 ${accountId ? 'AND line_account_id = ?' : ''}`,
-    ).bind(new Date().toISOString(), ...accountBinds).first<{ pending: number | null; upcoming: number | null }>(),
+         FROM bookings WHERE ${bookingAccount.sql}`,
+    ).bind(new Date().toISOString(), ...bookingAccount.binds).first<{ pending: number | null; upcoming: number | null }>(),
     db.prepare(
       `SELECT COALESCE(er.name, '経路不明') name, COUNT(*) count
          FROM friends f LEFT JOIN entry_routes er ON er.ref_code=f.ref_code
-        WHERE f.created_at >= ? ${accountClause}
+        WHERE f.created_at >= ? AND ${friendAccount.sql}
         GROUP BY name ORDER BY count DESC LIMIT 3`,
-    ).bind(start, ...accountBinds).all<{ name: string; count: number }>(),
+    ).bind(start, ...friendAccount.binds).all<{ name: string; count: number }>(),
     count(db,
       `WITH funnel AS (
          SELECT f.ref_code, COUNT(DISTINCT f.id) additions, COUNT(ce.id) conversions
            FROM friends f LEFT JOIN conversion_events ce ON ce.friend_id=f.id
-          WHERE f.created_at >= ? ${accountClause}
+          WHERE f.created_at >= ? AND ${friendAccount.sql}
           GROUP BY f.ref_code
        ) SELECT COUNT(*) n FROM funnel WHERE additions >= 3 AND conversions = 0`,
-      start, ...accountBinds),
+      start, ...friendAccount.binds),
     count(db,
       `SELECT COUNT(*) n FROM automation_logs al
         JOIN friends f ON f.id=al.friend_id
-       WHERE al.status IN ('partial','failed') AND al.created_at >= ? ${accountClause}`,
-      start, ...accountBinds),
+       WHERE al.status IN ('partial','failed') AND al.created_at >= ? AND ${friendAccount.sql}`,
+      start, ...friendAccount.binds),
   ]).then(([scenarios, migrations, bookings, inflow, funnelAlerts, automationFailures]) => ({
     scenarios: { active: scenarios?.active ?? 0, paused: scenarios?.paused ?? 0 },
     migrations: { active: migrations?.active ?? 0, completed: migrations?.completed ?? 0 },
@@ -516,14 +515,14 @@ export async function getDashboardOverview(
   }));
 
   const [friends, inbox, trend, conversions, sent, broadcasts, operations] = await Promise.all([
-    safe('friends', friendBreakdown(db, accountId), {
+    safe('friends', friendBreakdown(db, null, accountScopeSql(scope, 'line_account_id')), {
       active: 0,
       total: 0,
       blockedByThem: 0,
       hiddenByUs: 0,
       blockedBoth: 0,
     }),
-    safe('inbox', inboxState(db, singleAccountOrAll(accountId)), {
+    safe('inbox', inboxState(db, scope), {
       unanswered: 0,
       inProgress: 0,
       resolved: 0,
@@ -531,8 +530,8 @@ export async function getDashboardOverview(
       averageFirstReplyMinutes: null,
     }),
     // 推移だけは period を渡さない。上の切り替えに関わらず直近7日で見る。
-    safe('trend', friendTrend(db, accountId), []),
-    safe('conversions', conversionSummary(db, period, accountId), { total: 0, byPoint: [] }),
+    safe('trend', friendTrend(db, scope), []),
+    safe('conversions', conversionSummary(db, period, scope), { total: 0, byPoint: [] }),
     // プッシュ（こちらから）と リプライ（受信への応答）を分ける。
     // source は 028 で入っている。auto_reply と manual が応答。
     db
@@ -541,17 +540,17 @@ export async function getDashboardOverview(
            COUNT(*) AS sent,
            SUM(CASE WHEN source IN ('auto_reply','manual') THEN 1 ELSE 0 END) AS reply
          FROM messages_log ml
-          WHERE direction = 'outgoing' AND ml.created_at >= ? ${messageAccountWhere}`,
+          WHERE direction = 'outgoing' AND ml.created_at >= ? AND ${messageAccount.sql}`,
       )
-      .bind(start, ...(accountId ? [accountId] : []))
+      .bind(start, ...messageAccount.binds)
       .first<{ sent: number; reply: number }>()
       .then((value) => value)
       .catch((error) => { partialFailures.push('delivery'); console.error('[dashboard] delivery failed', error); return null; }),
     safe('broadcasts', count(
       db,
       `SELECT COUNT(*) AS n FROM broadcasts b
-        WHERE status = 'sent' AND b.created_at >= ? ${broadcastAccountWhere}`,
-      start, ...(accountId ? [accountId, accountId] : []),
+        WHERE status = 'sent' AND b.created_at >= ? AND ${broadcastScope}`,
+      start, ...broadcastAccount.binds, ...broadcastJsonAccount.binds,
     ), 0),
     safe('operations', operationsPromise, emptyOperations),
   ]);
