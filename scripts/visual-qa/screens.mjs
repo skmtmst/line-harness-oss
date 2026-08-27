@@ -58,6 +58,10 @@ const AUTO_REPLY = { feature: 8, dir: 'auto-replies-v6', route: '/auto-replies',
 /** 友だち追加時の配信。実装は**アカウントに1枚**の設定画面。 */
 const FRIEND_ADD = { feature: 9, dir: 'friend-add-v6', route: '/friend-add-settings', mode: 'page' }
 
+/** ウェビナー。編集は4つのタブ（いつ見られるようにするか／途中に出すもの／コメント演出／概要・分析）。 */
+const WEBINAR = { feature: 10, dir: 'webinars-v6', route: '/webinars', mode: 'page' }
+const WEBINAR_EDIT = '/webinars/edit?id=webinar-1'
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -459,6 +463,62 @@ export const SCREENS = [
   {
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
     status: 'unimplemented', why: '設定はアカウントに1枚で消せない。削除という考えがそもそも無い',
+  },
+
+  // ── 機能10 ウェビナー ───────────────────────────────────
+  /*
+    設計は5段のウィザード（基本設定→動画→CTA・フォーム→通知→確認）。
+    実装は作成が1枚、編集が4つのタブ。**「通知・リマインド」の段だけが
+    まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
+  */
+  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー' },
+  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new' },
+  {
+    ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT,
+    steps: [{ click: 'いつ見られるようにするか' }],
+  },
+  {
+    ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム', route: WEBINAR_EDIT,
+    steps: [{ click: '見ている途中に出すもの' }],
+  },
+  {
+    ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
+    status: 'unimplemented',
+    why: '前日・1時間前・開始時の案内も、未視聴者への見逃し案内も無い（`grep リマインド|見逃し|通知` が `/webinars` 配下で0件）',
+  },
+  {
+    ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT,
+    steps: [{ click: 'いつ見られるようにするか' }],
+  },
+  {
+    ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー', route: WEBINAR_EDIT,
+    status: 'unconfirmed',
+    why: '「プレビュー」の場所は在るが**押せない（無効のまま）**。「プレビューは準備中です」と書いてある（`edit/page.tsx:894`）',
+  },
+  {
+    ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
+    status: 'unimplemented', why: '公開前チェックと最終確認の段が無い。「保存」で即座に反映される',
+  },
+  {
+    ...WEBINAR, node: 'TimXl', name: '10-1-H 公開完了',
+    status: 'unimplemented', why: '10-1-G が無いので、その後の完了画面も無い',
+  },
+  {
+    ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT,
+    steps: [{ click: '概要・分析' }],
+  },
+  {
+    ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析', route: WEBINAR_EDIT,
+    steps: [{ click: '概要・分析' }],
+  },
+  {
+    ...WEBINAR, node: 'LKuAQ', name: '10-1-K 削除確認',
+    status: 'unimplemented',
+    why: 'ウェビナーを消す導線がどこにも無い。受け口（`webinarApi.remove`）は在るのに**画面が一度も呼んでいない**。編集画面の「削除」はCTAの札を1枚外すもので、ウェビナー本体ではない（`edit/page.tsx:764`）',
+  },
+  {
+    ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

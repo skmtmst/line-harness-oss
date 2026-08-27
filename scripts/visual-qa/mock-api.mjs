@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -419,6 +419,16 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: REMINDER_FOLDERS }
   }
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/webinars') return { success: true, data: WEBINARS }
+  const webinarAnalytics = /^\/api\/webinars\/([^/]+)\/analytics$/.exec(pathname)
+  if (webinarAnalytics) return { success: true, data: WEBINAR_ANALYTICS }
+  const webinarSub = /^\/api\/webinars\/([^/]+)\/(comments|ctas|participants|user-comments|reservations)$/.exec(pathname)
+  if (webinarSub) return { success: true, data: [] }
+  const webinarOne = /^\/api\/webinars\/([^/]+)$/.exec(pathname)
+  if (webinarOne) {
+    const found = WEBINARS.find((item) => item.id === webinarOne[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+  }
   if (pathname === '/api/friends/add-breakdown') return { success: true, data: FRIEND_ADD_BREAKDOWN }
   if (pathname === '/api/friend-add-routing/events') return { success: true, data: FRIEND_ADD_EVENTS }
   if (pathname === '/api/friend-add-routing') {

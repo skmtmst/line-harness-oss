@@ -881,3 +881,118 @@ export const FRIEND_ADD_EVENTS = {
   summary: { total: 86, firstTime: 74, returning: 12, captured: 74, unavailable: 12, pending: 0, failed: 2 },
   nextCursor: null,
 }
+
+/**
+ * 機能10 ウェビナー。設計 `ZC13r` の一覧。
+ *
+ * **画面が読む `Webinar`（`apps/web/src/lib/api.ts`）に合わせる。**
+ * `schedule` は `{type:'daily'|'weekly'|'once'}` の配列で、
+ * 画面はそこを `filter` して開催の言い方を組み立てる。**通で返すと落ちる。**
+ */
+export const WEBINARS = [
+  {
+    id: 'webinar-1', accountId: null, title: 'NEN活用スタートセミナー', slug: 'nen-start',
+    status: 'active', videoPrefix: 'nen-start-seminar', durationSeconds: 2538,
+    schedule: [{ type: 'daily', time: '10:00' }, { type: 'daily', time: '19:00' }],
+    cta: { label: '個別相談を予約する', url: 'https://example.com/booking', showAtSeconds: 1920 },
+    tagOnAttend: 'tag-0', tagOnCtaClick: 'tag-1',
+    createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    id: 'webinar-2', accountId: null, title: '予約機能の使い方', slug: 'booking-howto',
+    status: 'active', videoPrefix: 'booking-howto', durationSeconds: 1284,
+    schedule: [{ type: 'weekly', time: '20:00', days: [2, 4] }],
+    cta: { label: '空き枠を見る', url: 'https://example.com/slots', showAtSeconds: 900 },
+    tagOnAttend: 'tag-2', tagOnCtaClick: null,
+    createdAt: '2026-06-11T00:00:00.000Z', updatedAt: '2026-07-20T00:00:00.000Z',
+  },
+  {
+    id: 'webinar-3', accountId: null, title: '導入事例まとめ', slug: 'case-studies',
+    status: 'active', videoPrefix: 'case-studies', durationSeconds: 1860,
+    schedule: [{ type: 'once', at: '2026-08-25T02:00:00.000Z' }],
+    cta: null, tagOnAttend: null, tagOnCtaClick: null,
+    createdAt: '2026-05-30T00:00:00.000Z', updatedAt: '2026-08-05T00:00:00.000Z',
+  },
+  {
+    /* 下書き。**動画も日程もまだ無い。** ここが空でも一覧が崩れないことが要る。 */
+    id: 'webinar-4', accountId: null, title: '新プラン説明会', slug: 'new-plan',
+    status: 'draft', videoPrefix: null, durationSeconds: 0,
+    schedule: [], cta: null, tagOnAttend: null, tagOnCtaClick: null,
+    createdAt: '2026-08-18T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
+  },
+  {
+    id: 'webinar-5', accountId: null, title: '旧機能説明会', slug: 'legacy-features',
+    status: 'archived', videoPrefix: 'legacy-features', durationSeconds: 3120,
+    schedule: [], cta: null, tagOnAttend: null, tagOnCtaClick: null,
+    createdAt: '2026-02-14T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z',
+  },
+]
+
+/** 設計 `Q8sHa`・`yxyzQ` の数。申込184・再生142・完了96・CTA52。 */
+export const WEBINAR_ANALYTICS = {
+  summary: {
+    reservations: 184, viewers: 142, registeredAndJoined: 128,
+    watched5m: 131, watched15m: 112, completed: 96,
+    avgWatchedSeconds: 1722, ctaClicks: 52, formSubmissions: 28,
+  },
+  daily: [
+    { date: '2026-08-18', reservations: 22, viewers: 18, ctaClicks: 6, formSubmissions: 3 },
+    { date: '2026-08-19', reservations: 31, viewers: 25, ctaClicks: 9, formSubmissions: 5 },
+    { date: '2026-08-20', reservations: 28, viewers: 21, ctaClicks: 8, formSubmissions: 4 },
+    { date: '2026-08-21', reservations: 35, viewers: 28, ctaClicks: 11, formSubmissions: 6 },
+    { date: '2026-08-22', reservations: 26, viewers: 20, ctaClicks: 7, formSubmissions: 4 },
+  ],
+  /*
+    ここから下は **`WebinarAnalytics` に在って、`summary` と `daily` だけでは
+    足りない**もの。画面は `dropoff` `participants` `formFunnel` を
+    そのまま `map` するので、無いと編集画面ごと落ちる。
+  */
+  participants: [
+    {
+      friendId: 'friend-1', friendName: 'Kenta Kawano', pictureUrl: null, sessions: 2,
+      firstJoinedAt: '2026-08-20T01:00:00.000Z', latestJoinedAt: '2026-08-22T01:32:00.000Z',
+      maxWatchedSeconds: 2538, ctaClickedAt: '2026-08-22T01:58:00.000Z',
+      registered: true, formSubmittedAt: '2026-08-22T02:01:00.000Z',
+    },
+    {
+      friendId: 'friend-2', friendName: 'Masato S.', pictureUrl: null, sessions: 1,
+      firstJoinedAt: '2026-08-21T10:00:00.000Z', latestJoinedAt: '2026-08-21T10:00:00.000Z',
+      maxWatchedSeconds: 1980, ctaClickedAt: '2026-08-21T10:28:00.000Z',
+      registered: true, formSubmittedAt: null,
+    },
+    {
+      /* 未視聴。**申し込んだが再生していない人**が居ることが要る。 */
+      friendId: 'friend-3', friendName: '菅野 亮', pictureUrl: null, sessions: 0,
+      firstJoinedAt: '2026-08-19T00:00:00.000Z', latestJoinedAt: '2026-08-19T00:00:00.000Z',
+      maxWatchedSeconds: 0, ctaClickedAt: null, registered: true, formSubmittedAt: null,
+    },
+    {
+      /* 途中で離脱。18分20秒で止まっている（設計の「最大離脱」）。 */
+      friendId: 'friend-4', friendName: '山田 太郎', pictureUrl: null, sessions: 1,
+      firstJoinedAt: '2026-08-22T10:00:00.000Z', latestJoinedAt: '2026-08-22T10:00:00.000Z',
+      maxWatchedSeconds: 1100, ctaClickedAt: null, registered: false, formSubmittedAt: null,
+    },
+  ],
+  sessions: [
+    { sessionStartAt: 1755648000, viewers: 62, avgWatchedSeconds: 1810, ctaClicks: 24 },
+    { sessionStartAt: 1755680400, viewers: 48, avgWatchedSeconds: 1642, ctaClicks: 17 },
+    { sessionStartAt: 1755734400, viewers: 32, avgWatchedSeconds: 1585, ctaClicks: 11 },
+  ],
+  /* 設計 `yxyzQ`「最大離脱 18分20秒：機能説明パート」に合わせて谷を作る。 */
+  dropoff: [
+    { bucketStart: 0, viewers: 142 }, { bucketStart: 300, viewers: 138 },
+    { bucketStart: 600, viewers: 131 }, { bucketStart: 900, viewers: 124 },
+    { bucketStart: 1100, viewers: 118 }, { bucketStart: 1200, viewers: 74 },
+    { bucketStart: 1500, viewers: 108 }, { bucketStart: 1800, viewers: 102 },
+    { bucketStart: 2100, viewers: 98 }, { bucketStart: 2400, viewers: 96 },
+  ],
+  formFunnel: {
+    ctaImpressions: 118, ctaClicks: 52, formOpens: 48, formStarts: 41,
+    submitAttempts: 31, submitSuccesses: 28, submitErrors: 3,
+    fieldCompletions: [
+      { fieldName: 'お名前', users: 41 },
+      { fieldName: 'メールアドレス', users: 36 },
+      { fieldName: 'ご相談内容', users: 29 },
+    ],
+  },
+}
