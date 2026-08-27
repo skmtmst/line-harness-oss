@@ -144,6 +144,12 @@ describe('受信箱V4の画面契約', () => {
     expect(WORKER_CHATS).toContain("isAttention: friendMetadata.__attention === '1'")
   })
 
+  it('会話を切り替えた後に古い詳細応答を表示・操作へ使わない', () => {
+    expect(PAGE).toContain('const detailRequestIdRef = useRef(0)')
+    expect(PAGE).toContain('requestId !== detailRequestIdRef.current')
+    expect(PAGE).toContain('detailRequestIdRef.current += 1')
+  })
+
   it('シナリオ開始の札と時刻を分ける', () => {
     expect(PAGE).toContain('<Link2 aria-hidden="true"')
     expect(PAGE).toContain('<time className="text-[10px] text-ink-faint">{startedAt}</time>')

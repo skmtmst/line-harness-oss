@@ -498,6 +498,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   // 「サーバから最後に受け取った行」を ref で保持して次ページの起点にする
   // (offset 方式だと新着で行が押し下げられた分が欠落する)。
   const nextCursorRef = useRef<{ at: string; id: string } | null>(null)
+  // 会話を素早く切り替えたとき、前の会話の遅い応答で現在の詳細を
+  // 上書きしない。注目操作が別の友だちへ向く事故もここで防ぐ。
+  const detailRequestIdRef = useRef(0)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedNameQuery(nameQuery.trim()), 250)
@@ -698,10 +701,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }, [sendMode])
 
   const loadChatDetail = useCallback(async (chatId: string) => {
+    const requestId = ++detailRequestIdRef.current
     setDetailLoading(true)
     setError('')
     try {
       const res = await api.chats.get(chatId)
+      if (requestId !== detailRequestIdRef.current) return
       if (res.success) {
         setChatDetail(res.data as unknown as ChatDetail)
       } else {
@@ -710,11 +715,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
         setError(`チャット詳細の読み込みに失敗しました: ${errMsg}`)
       }
     } catch (err) {
+      if (requestId !== detailRequestIdRef.current) return
       // ネットワーク / parse / auth fail などの例外。empty catch だと原因不明だったので詳細を出す。
       const msg = err instanceof Error ? err.message : String(err)
       setError(`チャット詳細の読み込みに失敗しました: ${msg}`)
     } finally {
-      setDetailLoading(false)
+      if (requestId === detailRequestIdRef.current) setDetailLoading(false)
     }
   }, [])
 
@@ -753,7 +759,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     if (selectedChatId) {
       loadChatDetail(selectedChatId)
     } else {
+      detailRequestIdRef.current += 1
       setChatDetail(null)
+      setDetailLoading(false)
     }
   }, [selectedChatId, loadChatDetail])
 

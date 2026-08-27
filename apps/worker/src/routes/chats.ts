@@ -609,7 +609,10 @@ chats.get('/api/chats/:id', requireVisibleChat, async (c) => {
       }>();
     let friendMetadata: Record<string, unknown> = {};
     try {
-      friendMetadata = JSON.parse(friend?.metadata || '{}') as Record<string, unknown>;
+      const parsed = JSON.parse(friend?.metadata || '{}') as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        friendMetadata = parsed as Record<string, unknown>;
+      }
     } catch {
       // 壊れた任意項目があっても受信箱そのものは開ける。
     }
