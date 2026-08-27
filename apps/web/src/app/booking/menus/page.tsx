@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Select from '@/components/shared/select'
 import {
   api,
   bookingApi,
@@ -23,18 +25,6 @@ import BookingStaffPage from '@/app/booking/staff/page'
  * ここに寄せてあったので、受付時間（8-2-3）とメニュー×スタッフ（8-2-4）
  * への行き先をタブに並べた。別ページではあるが、探す場所は1か所になる。
  */
-
-const EMPTY: Partial<BookingMenu> = {
-  name: '',
-  category_label: '',
-  description: '',
-  duration_minutes: 60,
-  buffer_after_minutes: 0,
-  base_price: 5000,
-  sort_order: 0,
-  is_active: 1,
-  auto_tag_id: null,
-}
 
 const MERGED_TABS = [
   { key: 'menus', label: 'メニュー' },
@@ -70,6 +60,8 @@ function MenusPageInner() {
   const [staffReadFailed, setStaffReadFailed] = useState<string[]>([])
   const [bookings, setBookings] = useState<BookingRequest[]>([])
   const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<'bookings' | 'order' | 'name'>('bookings')
+  const [period, setPeriod] = useState<'current' | 'previous' | 'all'>('current')
 
   const liffId = selectedAccount?.liffId ?? null
   const workerBase = process.env.NEXT_PUBLIC_API_URL ?? ''
@@ -196,49 +188,67 @@ function MenusPageInner() {
     return { inThis, diff: inThis - inLast }
   }, [bookings, thisMonth])
 
-  /** メニュー名 → 今月の予約件数。 */
+  const periodBookings = useMemo(() => {
+    const month = period === 'current' ? thisMonth : period === 'previous' ? monthKey(-1) : null
+    return month ? bookings.filter((booking) => jstMonth(booking.starts_at) === month) : bookings
+  }, [bookings, period, thisMonth])
+
+  /** メニュー名 → 選択期間の予約件数。 */
   const bookingCounts = useMemo(() => {
     const counts = new Map<string, number>()
-    for (const b of bookings) {
-      if (jstMonth(b.starts_at) !== thisMonth) continue
+    for (const b of periodBookings) {
       counts.set(b.menu_name, (counts.get(b.menu_name) ?? 0) + 1)
     }
     return counts
-  }, [bookings, thisMonth])
+  }, [periodBookings])
 
   const shown = useMemo(() => {
     const q = query.trim()
-    return q ? items.filter((m) => m.name.includes(q)) : items
-  }, [items, query])
+    const filtered = q ? items.filter((m) => m.name.includes(q)) : items
+    return [...filtered].sort((a, b) => {
+      if (sort === 'bookings') {
+        const diff = (bookingCounts.get(b.name) ?? 0) - (bookingCounts.get(a.name) ?? 0)
+        if (diff !== 0) return diff
+      }
+      if (sort === 'name') return a.name.localeCompare(b.name, 'ja')
+      return a.sort_order - b.sort_order || a.id.localeCompare(b.id)
+    })
+  }, [bookingCounts, items, query, sort])
+
+  function exportCsv() {
+    const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`
+    const rows = shown.map((menu) => [
+      menu.name,
+      menu.category_label ?? '',
+      menu.duration_minutes,
+      menu.buffer_after_minutes,
+      menu.base_price,
+      (menuStaff.get(menu.id) ?? []).join('・'),
+      bookingCounts.get(menu.name) ?? 0,
+      menu.is_active ? '公開中' : '非公開',
+    ])
+    const csv = [
+      ['メニュー名', '分類', '所要時間（分）', '後片付け（分）', '料金（円）', '担当者', '予約件数', '状態'],
+      ...rows,
+    ].map((row) => row.map(escape).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `予約メニュー-${period === 'current' ? '今月' : period === 'previous' ? '前月' : '全期間'}.csv`
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
 
   return (
-    <div>
-      <div data-design="Head">
-        <Header
-          title="予約設定"
-          description="予約の受付内容をまとめて設定します。メニュー・担当スタッフ・受付時間を同じ画面のタブで切り替えます。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
-          <Link
-            href="/booking/staff/shifts"
-            className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-2 text-sm"
-          >
-            受付時間をまとめて設定
-          </Link>
-          <button
-            onClick={() => setEditing(EMPTY)}
-            disabled={!selectedAccountId}
-            className="bg-accent text-on-accent rounded-control hover:bg-accent-hover px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
-          >
-            メニューを追加
-          </button>
+    <div data-design-node="QSLEH">
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
+        <Button variant="primary" href="/booking/menus/new">
+          予約メニューを作る
+        </Button>
+        <div className="ml-auto">
+          <Button href="/booking/staff/shifts">受付枠と休業日を設定</Button>
         </div>
       </div>
 
@@ -278,36 +288,30 @@ function MenusPageInner() {
           aria-label="メニュー名で検索"
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>予約が多い順</option>
-        </select>
-        <span className="text-ink-faint text-xs whitespace-nowrap">期間</span>
-        <select
-          disabled
-          title="期間の切り替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>今月</option>
-        </select>
-        <button
-          disabled
-          title="書き出しは準備中です"
-          className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-        >
+        <Select
+          aria-label="並び順"
+          value={sort}
+          onChange={(value) => setSort(value as typeof sort)}
+          options={[
+            { value: 'bookings', label: '予約が多い順' },
+            { value: 'order', label: '公開順' },
+            { value: 'name', label: '名前順' },
+          ]}
+        />
+        <Select
+          aria-label="集計期間"
+          value={period}
+          onChange={(value) => setPeriod(value as typeof period)}
+          options={[
+            { value: 'current', label: '今月' },
+            { value: 'previous', label: '前月' },
+            { value: 'all', label: '全期間' },
+          ]}
+        />
+        <Button onClick={exportCsv} disabled={loading || Boolean(error) || shown.length === 0}>
           CSVで書き出す
-        </button>
+        </Button>
       </div>
-
-      {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
-      )}
 
       {staffReadFailed.length > 0 && (
         <div className="bg-warning-bg text-warning rounded-card mb-3 px-4 py-3 text-xs">
@@ -318,18 +322,19 @@ function MenusPageInner() {
       )}
 
       {!selectedAccountId ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
-          サイドバーでアカウントを選択してください
-        </div>
+        <div data-design-node="W6465r"><ListState kind="empty" title="LINEアカウントを選んでください" description="共通メニューで、予約設定を開くLINEアカウントを選んでください。" /></div>
       ) : loading ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
-          読み込み中…
-        </div>
+        <div data-design-node="W6465r"><ListState kind="loading" description="予約メニューと実績を読み込んでいます。" /></div>
+      ) : error ? (
+        <div data-design-node="W6465r"><ListState kind="error" description={error} /></div>
       ) : shown.length === 0 ? (
-        <div className="bg-canvas rounded-card border border-hairline p-12 text-center text-sm text-ink-faint">
-          {query
-            ? '検索に合うメニューはありません。'
-            : 'まだメニューがありません。上の「メニューを追加」から登録してください。'}
+        <div data-design-node="W6465r">
+          <ListState
+            kind="empty"
+            title={query ? '条件に合う予約メニューはありません' : 'まだ予約メニューがありません'}
+            description={query ? '検索語を変えてください。' : '最初の予約メニューを作ると、ここに並びます。'}
+            action={query ? undefined : <Button variant="primary" href="/booking/menus/new">予約メニューを作る</Button>}
+          />
         </div>
       ) : (
         <div
@@ -344,7 +349,9 @@ function MenusPageInner() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">所要時間</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">料金</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">担当できるスタッフ</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">今月の予約</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">
+                    {period === 'current' ? '今月' : period === 'previous' ? '前月' : '全期間'}の予約
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">予約URL</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">状態</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-ink-faint">操作</th>
@@ -731,8 +738,8 @@ function MenusPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   return (
     <div>
-      {/* 設計の4タブ。前の2つはこの画面の中で切り替わり、
-          受付時間は 8-2-3、予約フォームはまだ画面が無い。
+      {/* 既存の2タブはこの画面の中で切り替わり、
+          受付時間は別URLへ移動する。
           MergedTabs は「同じ画面の中で切り替わるもの」しか扱えないので
           ここは手で並べている。 */}
       <div data-design="Tabs" className="border-hairline mb-4 flex flex-wrap gap-1 border-b">
@@ -762,12 +769,6 @@ function MenusPageHost() {
         >
           受付時間
         </Link>
-        <span
-          title="予約フォームの見た目を変える画面は準備中です"
-          className="text-ink-faint rounded-t-md px-4 py-2 text-sm opacity-50"
-        >
-          予約フォーム
-        </span>
       </div>
       {tab === 'menus' && <MenusPageInner />}
       {tab === 'staff' && <BookingStaffPage />}

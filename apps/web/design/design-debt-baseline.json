@@ -49,10 +49,9 @@
     "unresolved-classname": 11
   },
   "app/booking/menus/page.tsx": {
-    "direct-secondary-button": 3,
-    "direct-primary-button": 2,
     "arbitrary-value": 2,
-    "direct-th": 8
+    "direct-th": 8,
+    "direct-primary-button": 1
   },
   "app/booking/menus/staff/page.tsx": {
     "direct-secondary-button": 2,
