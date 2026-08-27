@@ -116,11 +116,7 @@ export const SCREENS = [
     ...INBOX, node: 'TUveA', name: '2-11 テンプレート・予約フォルダ',
     status: 'unimplemented', why: '2-6 と同じ。フォルダの区分が無い',
   },
-  {
-    ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く',
-    status: 'unimplemented',
-    why: '「絞り込み」を開くボタンが無い。担当者・種別・並び順が上に並んだまま。設計は専用パネル（`bXyEA`）',
-  },
+  { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }] },
   { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }] },
   {
     ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',

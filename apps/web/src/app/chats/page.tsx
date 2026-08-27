@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
+import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -382,6 +383,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [unreadOnly, setUnreadOnly] = useState(false)
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
   const [nameQuery, setNameQuery] = useState('')
@@ -1101,20 +1104,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             {filter.label} <span className="ml-1 tabular-nums opacity-70">{quickCounts[filter.key]}</span>
           </button>
         ))}
-        <details className="relative ml-auto">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2 text-xs font-semibold text-[#344054] hover:bg-[#F7F8F6]">
-            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M7 12h10M10 19h4"/></svg>
-            絞り込み
-          </summary>
-          <div className="absolute top-[calc(100%+6px)] right-0 z-30 w-52 rounded-lg border border-[#E5E7EB] bg-canvas p-3 shadow-lg">
-            <p className="text-[11px] font-semibold text-[#667085]">対応状態</p>
-            <div className="mt-2 grid gap-1">
-              {statusFilters.map((filter) => (
-                <button key={filter.key} type="button" onClick={() => setStatusFilter(filter.key)} className={`rounded-md px-2 py-1.5 text-left text-xs ${statusFilter === filter.key ? 'bg-[#EAFBF0] font-semibold text-[#057A37]' : 'text-[#667085] hover:bg-[#F7F8F6]'}`}>{filter.label}</button>
-              ))}
-            </div>
-          </div>
-        </details>
+        <span className="ml-auto" />
+        {/*
+          設計 `xGLVe` は「絞り込み」と「保存した検索」を右に並べ、押すと
+          右から420pxのパネルが出る（`bXyEA`）。
+
+          以前は `<details>` の小さな箱（208px）で、中身は対応状態だけだった。
+          設計は 対応マーク・担当者・受信経路・期限・メッセージ種別・未読だけ の
+          6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
+        */}
+        <Button type="button" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+          絞り込み
+        </Button>
         <div className="relative">
           <Button
             type="button"
@@ -1186,6 +1187,26 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
           )}
         </div>
+        <InboxFilterPanel
+          open={filterOpen}
+          value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
+          operators={operators}
+          onChange={(next) => {
+            setStatusFilter(next.status as StatusFilter)
+            setAssigneeFilter(next.assignee)
+            setUnreadOnly(next.unreadOnly)
+            if (next.channel !== channel) {
+              router.push(next.channel === 'all' ? '/chats' : `/chats?channel=${next.channel}`)
+            }
+          }}
+          onReset={() => {
+            setStatusFilter('all')
+            setAssigneeFilter('all')
+            setUnreadOnly(false)
+            router.push('/chats')
+          }}
+          onClose={() => setFilterOpen(false)}
+        />
       </section>
 
       <div
