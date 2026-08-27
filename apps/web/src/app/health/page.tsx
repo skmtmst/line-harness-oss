@@ -23,6 +23,8 @@ interface AccountHealthLog {
   createdAt: string
 }
 
+type HealthRisk = AccountHealthLog['riskLevel'] | 'unknown'
+
 interface AccountMigration {
   id: string
   fromAccountId: string
@@ -38,6 +40,7 @@ const riskConfig = {
   normal: { label: '正常', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-100' },
   warning: { label: '警告', color: 'bg-yellow-500', textColor: 'text-yellow-700', bgColor: 'bg-yellow-100' },
   danger: { label: '危険', color: 'bg-red-500', textColor: 'text-red-700', bgColor: 'bg-red-100' },
+  unknown: { label: '未確認', color: 'bg-gray-400', textColor: 'text-gray-700', bgColor: 'bg-gray-100' },
 }
 
 const statusConfig: Record<AccountMigration['status'], { label: string; textColor: string; bgColor: string }> = {
@@ -50,7 +53,7 @@ const statusConfig: Record<AccountMigration['status'], { label: string; textColo
 export default function HealthPage() {
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [healthLogs, setHealthLogs] = useState<Record<string, AccountHealthLog[]>>({})
-  const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthLog['riskLevel']>>({})
+  const [latestRisk, setLatestRisk] = useState<Record<string, HealthRisk>>({})
   const [migrations, setMigrations] = useState<AccountMigration[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -68,24 +71,31 @@ export default function HealthPage() {
         const data = res.data as unknown as LineAccount[]
         setAccounts(data)
         // Load health for each account
-        const risks: Record<string, AccountHealthLog['riskLevel']> = {}
+        const risks: Record<string, HealthRisk> = {}
         for (const account of data) {
           try {
             const healthRes = await api.health.getHealth(account.id)
             if (healthRes.success) {
-              const payload = healthRes.data as unknown as { lineAccountId: string; riskLevel: string; logs: AccountHealthLog[] }
+              const payload = healthRes.data as unknown as {
+                lineAccountId: string
+                riskLevel: AccountHealthLog['riskLevel'] | null
+                isStale: boolean
+                logs: AccountHealthLog[]
+              }
               const logs = payload.logs ?? []
               setHealthLogs((prev) => ({ ...prev, [account.id]: logs }))
-              if (payload.riskLevel) {
-                risks[account.id] = payload.riskLevel as AccountHealthLog['riskLevel']
+              if (payload.isStale) {
+                risks[account.id] = 'unknown'
+              } else if (payload.riskLevel) {
+                risks[account.id] = payload.riskLevel
               } else if (logs.length > 0) {
                 risks[account.id] = logs[0].riskLevel
               } else {
-                risks[account.id] = 'normal'
+                risks[account.id] = 'unknown'
               }
             }
           } catch {
-            risks[account.id] = 'normal'
+            risks[account.id] = 'unknown'
           }
         }
         setLatestRisk(risks)
@@ -166,7 +176,7 @@ export default function HealthPage() {
           {/* Account Health Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             {accounts.map((account) => {
-              const risk = latestRisk[account.id] || 'normal'
+              const risk = latestRisk[account.id] || 'unknown'
               const config = riskConfig[risk]
               const isExpanded = expandedId === account.id
               const logs = healthLogs[account.id] || []
