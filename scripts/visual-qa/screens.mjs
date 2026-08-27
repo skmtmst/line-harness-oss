@@ -88,6 +88,9 @@ const MILEAGE = { feature: 17, dir: 'mileage-v6', route: '/scoring', mode: 'page
 /** 流入と計測。`/inflow-links?tab=` の3タブ（流入経路／サイトスクリプト／広告連携）。 */
 const INFLOW = { feature: 18, dir: 'inflow-v6', mode: 'page' }
 
+/** コンバージョン。成果地点とレポートは `/conversions?tab=` の2タブ。 */
+const CONVERSION = { feature: 19, dir: 'conversions-v6', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -794,6 +797,16 @@ export const SCREENS = [
   {
     ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴',
     status: 'unimplemented', why: '18-2 が無いので、送った・断られた・やり直した記録も無い',
+  },
+
+  // ── 機能19 コンバージョン ───────────────────────────────
+  { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points' },
+  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report' },
+  { ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new' },
+  {
+    ...CONVERSION, node: 'd8d3Mz', name: '19-1-C 成果地点の削除確認',
+    status: 'unimplemented',
+    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

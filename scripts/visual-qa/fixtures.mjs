@@ -1598,7 +1598,13 @@ export const CONVERSION_POINTS = [
     createdAt: '2026-02-01T00:00:00.000Z',
   },
   {
-    id: 'cp-3', name: '資料ダウンロード', eventType: 'download', value: null,
+    /*
+      **`eventType` は画面が名前を知っている言葉から選ぶ**
+      （`conversions/page.tsx:27` の `EVENT_TYPE_LABELS`）。
+      `'download'` のような知らない言葉を入れると、種別の列に
+      **英語のまま**出て、実装の不具合に見える。
+    */
+    id: 'cp-3', name: '資料ダウンロード', eventType: 'url_click', value: null,
     measureMethod: 'url_reach', targetUrl: 'https://example.co.jp/download/done',
     countRepeat: true, attributionDays: null, lineAccountId: null,
     createdAt: '2026-06-11T00:00:00.000Z',

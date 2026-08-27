@@ -462,6 +462,19 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
   if (pathname === '/api/conversions/approvals') return { success: true, data: CONVERSION_APPROVALS }
   if (pathname === '/api/conversion-points') return { success: true, data: CONVERSION_POINTS }
+  if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
+  if (pathname === '/api/conversions/report') {
+    return {
+      success: true,
+      data: CONVERSION_POINTS.map((point, i) => ({
+        conversionPointId: point.id,
+        conversionPointName: point.name,
+        eventType: point.eventType,
+        totalCount: [386, 42, 58][i] ?? 0,
+        totalValue: [1158000, 126000, 0][i] ?? 0,
+      })),
+    }
+  }
   const affLinks = /^\/api\/affiliates\/([^/]+)\/links$/.exec(pathname)
   if (affLinks) return { success: true, data: [] }
   const affJourneys = /^\/api\/affiliates\/([^/]+)\/journeys$/.exec(pathname)
