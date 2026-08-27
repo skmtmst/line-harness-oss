@@ -115,6 +115,9 @@ const WEBHOOK = { feature: 26, dir: 'webhooks-v6', route: '/webhooks', mode: 'pa
 /** 予約管理・予約設定。`/booking/bookings` `/booking/menus` `/booking/staff`。 */
 const BOOKING = { feature: 27, dir: 'booking-v6', route: '/booking/bookings', mode: 'page' }
 
+/** 予約設定。メニュー・担当スタッフはタブ、受付時間は別ルート。 */
+const BOOKING_SET = { feature: 28, dir: 'booking-settings-v6', route: '/booking/menus', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -1034,6 +1037,20 @@ export const SCREENS = [
   {
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
     status: 'unimplemented', why: '27-1-B が無いので、その入力の検査も無い',
+  },
+
+  // ── 機能28 予約設定 ─────────────────────────────────────
+  /*
+    設計のタブは4本（メニュー8／受付枠／休業日／予約のルール）。
+    実装はメニューと担当スタッフの2タブで、受付枠と休業日は
+    `/booking/staff/shifts` の別ルートにある。
+  */
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定' },
+  { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts' },
+  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new' },
+  {
+    ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
