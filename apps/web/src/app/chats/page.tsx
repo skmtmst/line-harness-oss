@@ -1556,15 +1556,30 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                  {chatDetail.friendPictureUrl && (
+                  {/*
+                    設計 `xGLVe` の見出しは、アバター・名前・「本名・種別・
+                    最終受信」の3点。**写真が無い人でも丸は出す。** 頭文字を
+                    入れておかないと、灰色の空丸が並んで誰の会話か目で追えない。
+                  */}
+                  {chatDetail.friendPictureUrl ? (
                     <img src={chatDetail.friendPictureUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
+                  ) : (
+                    <span className="bg-accent-soft text-accent flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold">
+                      {(chatDetail.friendName || '?').charAt(0)}
+                    </span>
                   )}
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink truncate">
                       {chatDetail.friendName}
                     </p>
                     <p className="text-ink-faint mt-0.5 text-xs">
-                      最終受信 {formatDatetime(chatDetail.lastMessageAt)} ・ LINE
+                      {/*
+                        設計はここに本名も置く（「河野 健太・LINE・最終受信…」）。
+                        **この部品は友だちの詳細を持っていない**ので、いまは
+                        出していない。右の顧客情報とは別の口が要る。
+                        取れていないものを空欄で出すと「本名が無い人」に見える。
+                      */}
+                      LINE ・ 最終受信 {formatDatetime(chatDetail.lastMessageAt)}
                     </p>
                   </div>
                 </div>
