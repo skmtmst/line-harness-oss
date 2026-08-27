@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import { webinarApi, type Webinar } from '@/lib/api'
@@ -44,9 +44,15 @@ function scheduleSummary(w: Webinar): string {
   return parts.join(' / ')
 }
 
+type SortKey = 'updated' | 'created' | 'name'
+type SavedFilter = '' | 'active' | 'draft'
+
 export default function WebinarsPage() {
   const [items, setItems] = useState<Webinar[]>([])
   const [query, setQuery] = useState('')
+  const [sortKey, setSortKey] = useState<SortKey>('updated')
+  const [pageSize, setPageSize] = useState(20)
+  const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -67,9 +73,24 @@ export default function WebinarsPage() {
     void refresh()
   }, [refresh])
 
-  // タイトルと slug の両方を見る。URLで探すこともあるため。
-  const q = query.trim()
-  const shown = q ? items.filter((w) => w.title.includes(q) || w.slug.includes(q)) : items
+  const filtered = useMemo(() => {
+    // タイトルと slug の両方を見る。URLで探すこともあるため。
+    const q = query.trim()
+    const searched = q
+      ? items.filter((w) => w.title.includes(q) || w.slug.includes(q))
+      : items
+    const narrowed = savedFilter
+      ? searched.filter((w) => w.status === savedFilter)
+      : searched
+    return [...narrowed].sort((a, b) => {
+      if (sortKey === 'name') return a.title.localeCompare(b.title, 'ja')
+      if (sortKey === 'created') return b.createdAt.localeCompare(a.createdAt)
+      return b.updatedAt.localeCompare(a.updatedAt)
+    })
+  }, [items, query, savedFilter, sortKey])
+
+  const visible = filtered.slice(0, pageSize)
+  const hiddenCount = Math.max(0, filtered.length - visible.length)
 
   return (
     <>
@@ -79,6 +100,12 @@ export default function WebinarsPage() {
           description="動画セミナーの申込から視聴、視聴後のフォロー配信までを管理します。"
           action={
             <div className="flex flex-wrap gap-2">
+              <Link
+                href="/webinars/new"
+                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
+              >
+                ウェビナーを作成
+              </Link>
               <button
                 disabled
                 title="マニュアルは準備中です"
@@ -86,27 +113,6 @@ export default function WebinarsPage() {
               >
                 マニュアル
               </button>
-              <button
-                disabled
-                title="並び替えは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                並び替え
-              </button>
-              {/* ウェビナーにフォルダを持たせる列が無い。 */}
-              <button
-                disabled
-                title="フォルダは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                フォルダを追加
-              </button>
-              <Link
-                href="/webinars/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium"
-              >
-                ウェビナーを作成
-              </Link>
             </div>
           }
         />
@@ -156,30 +162,43 @@ export default function WebinarsPage() {
           />
           <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
           <select
-            disabled
-            title="並び替えは準備中です"
-            className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+            value={sortKey}
+            onChange={(event) => setSortKey(event.target.value as SortKey)}
+            aria-label="並び順"
+            className="border-hairline rounded-control border px-2 py-2 text-sm"
           >
-            <option>申込が多い順</option>
+            <option value="updated">更新が新しい順</option>
+            <option value="created">作成が新しい順</option>
+            <option value="name">名前順</option>
           </select>
           <span className="text-ink-faint text-xs whitespace-nowrap">表示</span>
           <select
-            disabled
-            title="表示件数の切り替えは準備中です"
-            className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+            aria-label="表示件数"
+            className="border-hairline rounded-control border px-2 py-2 text-sm"
           >
-            <option>20件</option>
+            {[20, 50, 100].map((size) => (
+              <option key={size} value={size}>{size}件表示</option>
+            ))}
           </select>
         </div>
 
         <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
           <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-          {['よく使う', '公開中のみ', '下書きのみ'].map((label) => (
+          {([
+            { key: 'active', label: '公開中のみ' },
+            { key: 'draft', label: '下書きのみ' },
+          ] as const).map(({ key, label }) => (
             <button
-              key={label}
-              disabled
-              title="保存した条件は準備中です"
-              className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+              key={key}
+              onClick={() => setSavedFilter(savedFilter === key ? '' : key)}
+              aria-pressed={savedFilter === key}
+              className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
+                savedFilter === key
+                  ? 'border-accent bg-accent-soft text-ink'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+              }`}
             >
               {label}
             </button>
@@ -196,7 +215,7 @@ export default function WebinarsPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
             読み込み中...
           </div>
-        ) : shown.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <div className="text-gray-700 font-medium mb-2">ウェビナーがまだありません</div>
             <p className="text-sm text-gray-500 mb-4">
@@ -209,9 +228,14 @@ export default function WebinarsPage() {
               最初のウェビナーを作成
             </Link>
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+            <div className="text-ink font-medium">条件に合うウェビナーはありません</div>
+            <p className="text-ink-faint mt-2 text-sm">検索文字か保存した条件を変えてください。</p>
+          </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
-            {shown.map((w) => (
+            {visible.map((w) => (
               <Link
                 key={w.id}
                 href={`/webinars/edit?id=${w.id}`}
@@ -236,6 +260,11 @@ export default function WebinarsPage() {
               </Link>
             ))}
           </div>
+        )}
+        {hiddenCount > 0 && (
+          <p className="text-ink-faint mt-3 text-center text-xs">
+            ほかに {hiddenCount} 件あります。表示件数を増やすと確認できます。
+          </p>
         )}
       </div>
     </>

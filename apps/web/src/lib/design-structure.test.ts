@@ -54,6 +54,8 @@ const SCREENS = Object.entries(structure.screens) as Array<
       name: string;
       sections: string[];
       parts?: string[];
+      pendingParts?: string[];
+      pendingReason?: string;
       visualVerification?: {
         status: 'verified' | 'unverified' | 'blocked';
         referenceNodeIds: string[];
@@ -160,6 +162,16 @@ describe('画面の骨格が設計と一致する', () => {
       ].join('\n'),
     ).toEqual([]);
   });
+
+  it.each(SCREENS.filter(([, s]) => s.pendingParts?.length))(
+    '%s の未接続要件を理由つきで追跡する',
+    (_route, spec) => {
+      const pending = spec.pendingParts ?? [];
+      expect(spec.pendingReason?.trim().length).toBeGreaterThan(0);
+      expect(new Set(pending).size).toBe(pending.length);
+      expect(pending.filter((part) => spec.parts?.includes(part))).toEqual([]);
+    },
+  );
 });
 
 describe('V4の視覚一致を機能・文字列テストと混同しない', () => {
