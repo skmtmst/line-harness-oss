@@ -203,6 +203,8 @@ export type Env = {
     // Codex lifecycle events -> Slack relay. Tokens/secrets are Worker secrets;
     // channel ids and range mapping are non-secret deployment variables.
     CODEX_SLACK_RELAY_SECRET?: string;
+    CODEX_SLACK_RELAY_SECRET_KENTA?: string;
+    CODEX_SLACK_RELAY_SECRET_MASATO?: string;
     SLACK_BOT_TOKEN?: string;
     SLACK_COMMAND_CHANNEL_ID?: string;
     SLACK_ERROR_CHANNEL_ID?: string;

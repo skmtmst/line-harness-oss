@@ -73,7 +73,8 @@ describe('Codex Slack relay', () => {
       .mockResolvedValueOnce(slackResponse({
         channels: [{ id: 'C-301-400', name: 'line-harness-pr-301-400', is_archived: false }],
       }))
-      .mockResolvedValueOnce(slackResponse({ members: ['U-KENTA', 'U-MASATO'] }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: 'already_in_channel' })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: 'already_in_channel' })))
       .mockResolvedValueOnce(slackResponse({}));
 
     const channelId = await resolveCodexSlackChannelWithProvisioning({
@@ -87,9 +88,10 @@ describe('Codex Slack relay', () => {
 
     expect(channelId).toBe('C-301-400');
     expect(String(fetcher.mock.calls[0]?.[0])).toContain('conversations.list');
-    expect(String(fetcher.mock.calls[1]?.[0])).toContain('conversations.members');
+    expect(String(fetcher.mock.calls[1]?.[0])).toContain('conversations.invite');
     expect(String(fetcher.mock.calls[2]?.[0])).toContain('conversations.invite');
-    expect(JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body))).toEqual({
+    expect(String(fetcher.mock.calls[3]?.[0])).toContain('conversations.invite');
+    expect(JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body))).toEqual({
       channel: 'C-301-400',
       users: 'U-CODEX',
     });
@@ -101,7 +103,7 @@ describe('Codex Slack relay', () => {
       .mockResolvedValueOnce(slackResponse({
         channel: { id: 'C-301-400', name: 'line-harness-pr-301-400' },
       }))
-      .mockResolvedValueOnce(slackResponse({ members: [] }))
+      .mockResolvedValueOnce(slackResponse({}))
       .mockResolvedValueOnce(slackResponse({}));
 
     const channelId = await ensureUpcomingPrRangeChannel({
@@ -114,11 +116,15 @@ describe('Codex Slack relay', () => {
     expect(String(fetcher.mock.calls[1]?.[0])).toContain('conversations.create');
     const request = JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body));
     expect(request).toEqual({ name: 'line-harness-pr-301-400', is_private: false });
-    expect(String(fetcher.mock.calls[2]?.[0])).toContain('conversations.members');
+    expect(String(fetcher.mock.calls[2]?.[0])).toContain('conversations.invite');
     expect(String(fetcher.mock.calls[3]?.[0])).toContain('conversations.invite');
+    expect(JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body))).toEqual({
+      channel: 'C-301-400',
+      users: 'U-KENTA',
+    });
     expect(JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body))).toEqual({
       channel: 'C-301-400',
-      users: 'U-KENTA,U-MASATO',
+      users: 'U-MASATO',
     });
   });
 
@@ -128,7 +134,8 @@ describe('Codex Slack relay', () => {
       .mockResolvedValueOnce(slackResponse({
         channel: { id: 'C-401-500', name: 'line-harness-pr-401-500' },
       }))
-      .mockResolvedValueOnce(slackResponse({ members: [] }))
+      .mockResolvedValueOnce(slackResponse({}))
+      .mockResolvedValueOnce(slackResponse({}))
       .mockResolvedValueOnce(slackResponse({}));
 
     const channelId = await ensureUpcomingPrRangeChannel({
@@ -143,9 +150,39 @@ describe('Codex Slack relay', () => {
       name: 'line-harness-pr-401-500',
       is_private: false,
     });
+    expect(JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body))).toEqual({
+      channel: 'C-401-500',
+      users: 'U-KENTA',
+    });
     expect(JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body))).toEqual({
       channel: 'C-401-500',
-      users: 'U-KENTA,U-MASATO,U-CODEX',
+      users: 'U-MASATO',
+    });
+    expect(JSON.parse(String(fetcher.mock.calls[4]?.[1]?.body))).toEqual({
+      channel: 'C-401-500',
+      users: 'U-CODEX',
+    });
+  });
+
+  test('既に参加済みの利用者がいても残りの招待を続ける', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({
+        channels: [{ id: 'C-401-500', name: 'line-harness-pr-401-500', is_archived: false }],
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: 'already_in_channel' })))
+      .mockResolvedValueOnce(slackResponse({}));
+
+    const channelId = await resolveCodexSlackChannelWithProvisioning({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_KENTA_USER_ID: 'U-KENTA',
+      SLACK_MASATO_USER_ID: 'U-MASATO',
+    }, 'fix', 401, fetcher);
+
+    expect(channelId).toBe('C-401-500');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body))).toEqual({
+      channel: 'C-401-500',
+      users: 'U-MASATO',
     });
   });
 
