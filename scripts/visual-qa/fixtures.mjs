@@ -2048,3 +2048,81 @@ export const EC_SETTINGS = [
     updatedAt: '2026-06-01T00:00:00.000Z',
   },
 ]
+
+/**
+ * 機能25 オートメーション。設計 `gief7`（動いている14・止めている4）。
+ *
+ * **`eventType` は決まった12語のどれか**（`AutomationEventType`）。
+ * 設計の日本語（「タグが付いたとき」）は見出しで、項目名ではない。
+ */
+export const AUTOMATIONS = [
+  {
+    id: 'auto-1', name: 'はじめての人にあいさつする', description: '友だち追加でシナリオを始める',
+    eventType: 'friend_add', conditions: {},
+    actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-0' } }],
+    isActive: true, priority: 1, lineAccountId: null,
+    createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    id: 'auto-2', name: '「予約」と送られたら予約画面を出す', description: null,
+    eventType: 'message_received', conditions: { keyword: '予約' },
+    actions: [
+      { type: 'switch_rich_menu', params: { groupId: 'rmg-2' } },
+      { type: 'send_message', params: { templateId: 'template-1' } },
+    ],
+    isActive: true, priority: 2, lineAccountId: null,
+    createdAt: '2026-03-11T00:00:00.000Z', updatedAt: '2026-08-12T00:00:00.000Z',
+  },
+  {
+    id: 'auto-3', name: '体験申込タグで担当を付ける', description: 'タグ「体験申込」が付いたとき',
+    eventType: 'tag_change', conditions: { tagId: 'tag-0', direction: 'added' },
+    actions: [{ type: 'add_tag', params: { tagId: 'tag-1' } }],
+    isActive: true, priority: 3, lineAccountId: 'visual-qa-account',
+    createdAt: '2026-04-20T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    /* 止めているもの。**残った記録は消えない。** */
+    id: 'auto-4', name: '注文が確定したらお礼を送る', description: null,
+    eventType: 'ec.order.confirmed', conditions: {},
+    actions: [{ type: 'send_message', params: { templateId: 'template-2' } }],
+    isActive: false, priority: 4, lineAccountId: null,
+    createdAt: '2026-01-15T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z',
+  },
+]
+
+/** 動いた記録。**失敗（外部連携の返事なし）を混ぜる。** */
+export const AUTOMATION_LOGS = [
+  { id: 'al-1', automationId: 'auto-2', friendId: 'friend-1', eventData: '{"text":"予約したい"}', actionsResult: '{"ok":2}', status: 'success', createdAt: '2026-08-24T05:00:00.000Z' },
+  { id: 'al-2', automationId: 'auto-1', friendId: 'friend-2', eventData: '{}', actionsResult: '{"ok":1}', status: 'success', createdAt: '2026-08-24T02:00:00.000Z' },
+  { id: 'al-3', automationId: 'auto-3', friendId: 'friend-3', eventData: '{"tagId":"tag-0"}', actionsResult: '{"ok":0,"error":"外部連携の返事がありませんでした"}', status: 'failed', createdAt: '2026-08-23T09:00:00.000Z' },
+  { id: 'al-4', automationId: 'auto-2', friendId: 'friend-4', eventData: '{"text":"予約"}', actionsResult: '{"ok":1,"skipped":1}', status: 'partial', createdAt: '2026-08-23T01:00:00.000Z' },
+]
+
+/** 共通アクション。設計 `xOpDs`（14・公開中11・呼び出し元38・古い版のまま2）。 */
+export const COMMON_ACTIONS = [
+  {
+    id: 'ca-1', name: '体験申込を受けたとき', description: 'タグ・シナリオ・担当の3つ',
+    status: 'published', draftVersion: null, publishedVersion: 4,
+    actionCount: 5, bindingCount: 5, oldVersionBindingCount: 1,
+    updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'ca-2', name: '購入後のお礼', description: null,
+    status: 'published', draftVersion: 3, publishedVersion: 2,
+    actionCount: 3, bindingCount: 8, oldVersionBindingCount: 0,
+    updatedAt: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    id: 'ca-3', name: '休会の受け止め', description: '対応マークと担当の割り当て',
+    status: 'published', draftVersion: null, publishedVersion: 1,
+    actionCount: 2, bindingCount: 2, oldVersionBindingCount: 1,
+    updatedAt: '2026-07-02T00:00:00.000Z',
+  },
+  {
+    /* 下書き。**まだどこからも呼ばれていない。** */
+    id: 'ca-4', name: '紹介のお礼', description: null,
+    status: 'draft', draftVersion: 1, publishedVersion: null,
+    actionCount: 2, bindingCount: 0, oldVersionBindingCount: 0,
+    updatedAt: '2026-08-22T00:00:00.000Z',
+  },
+]

@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { EC_OVERVIEW, EC_EVENTS, EC_SETTINGS, NEN_PHOTOS, NEN_OVERVIEW, NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, ANALYTICS_MESSAGES, ANALYTICS_BROADCASTS, ANALYTICS_TRACKED_LINKS, ANALYTICS_CROSS, ENTRY_ROUTES, ENTRY_ROUTE_GENRES, REF_SUMMARY, MILEAGE_OVERVIEW, MILEAGE_RULES, AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, CONVERSION_POINTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { AUTOMATIONS, AUTOMATION_LOGS, COMMON_ACTIONS, EC_OVERVIEW, EC_EVENTS, EC_SETTINGS, NEN_PHOTOS, NEN_OVERVIEW, NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, ANALYTICS_MESSAGES, ANALYTICS_BROADCASTS, ANALYTICS_TRACKED_LINKS, ANALYTICS_CROSS, ENTRY_ROUTES, ENTRY_ROUTE_GENRES, REF_SUMMARY, MILEAGE_OVERVIEW, MILEAGE_RULES, AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, CONVERSION_POINTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -451,6 +451,80 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
     return { success: true, data: MEDIA_FOLDERS }
+  }
+  if (pathname === '/api/automations') return { success: true, data: AUTOMATIONS }
+  const automationOne = /^\/api\/automations\/([^/]+)$/.exec(pathname)
+  if (automationOne) {
+    const found = AUTOMATIONS.find((item) => item.id === automationOne[1])
+    return found
+      ? { success: true, data: { ...found, logs: AUTOMATION_LOGS.filter((log) => log.automationId === found.id) } }
+      : { success: false, error: 'Not found' }
+  }
+  if (pathname === '/api/automation-logs') return { success: true, data: AUTOMATION_LOGS }
+  if (pathname === '/api/common-actions') return { success: true, data: COMMON_ACTIONS }
+  if (pathname === '/api/common-actions/resources') {
+    /* **`{tags, scenarios, templates, webhooks, richMenus, commonActions}` の通。**
+       一覧の既定を返すと、作る画面が `tags.map` で落ちる。 */
+    return {
+      success: true,
+      data: {
+        tags: TAGS.slice(0, 8).map((t) => ({ id: t.id, name: t.name })),
+        scenarios: FRIEND_SCENARIOS.map((sc) => ({ id: sc.id, name: sc.name })),
+        templates: TEMPLATES.slice(0, 8).map((t) => ({ id: t.id, name: t.name })),
+        webhooks: [{ id: 'wh-1', name: 'Slack（対応チーム）' }],
+        richMenus: RICH_MENU_GROUPS.map((g) => ({ id: g.id, name: g.name })),
+        commonActions: COMMON_ACTIONS.filter((c) => c.publishedVersion)
+          .map((c) => ({ id: c.id, name: c.name, version: c.publishedVersion })),
+      },
+    }
+  }
+  const commonActionOne = /^\/api\/common-actions\/([^/]+)$/.exec(pathname)
+  if (commonActionOne) {
+    const found = COMMON_ACTIONS.find((item) => item.id === commonActionOne[1])
+    if (!found) return { success: false, error: 'Not found' }
+    /* **`versions` と `bindings` を通で付ける。** 版の画面が `versions.find` で落ちる。 */
+    const steps = [
+      { id: 's1', type: 'add_tag', params: { tagId: 'tag-0' }, onFailure: 'stop' },
+      { id: 's2', type: 'wait', params: { minutes: 30 }, onFailure: 'continue' },
+      { id: 's3', type: 'send_message', params: { templateId: 'template-1' }, onFailure: 'continue' },
+      { id: 's4', type: 'start_scenario', params: { scenarioId: 'scenario-0' }, onFailure: 'stop' },
+      { id: 's5', type: 'send_webhook', params: { webhookId: 'wh-1' }, onFailure: 'continue' },
+    ]
+    const published = found.publishedVersion ?? 1
+    return {
+      success: true,
+      data: {
+        id: found.id, name: found.name, description: found.description, status: found.status,
+        currentDraftVersionId: found.draftVersion ? `${found.id}-v${found.draftVersion}` : null,
+        currentPublishedVersionId: `${found.id}-v${published}`,
+        versions: Array.from({ length: published }, (_, i) => ({
+          id: `${found.id}-v${i + 1}`, versionNumber: i + 1,
+          status: i + 1 === published ? 'published' : 'published',
+          actions: steps.slice(0, found.actionCount),
+          createdBy: '川野 健太',
+          createdAt: '2026-06-01T00:00:00.000Z',
+          publishedAt: '2026-08-20T00:00:00.000Z',
+        })),
+        bindings: [
+          {
+            id: 'cb-1', consumerType: 'scenario', consumerId: 'scenario-0',
+            consumerPath: '体験前フォロー・1通目のあと',
+            versionId: `${found.id}-v${published}`, versionNumber: published,
+            latestVersionNumber: published, hasNewerVersion: false,
+            runningCount: 12, waitingCount: 0,
+          },
+          {
+            /* **古い版のまま呼んでいる先。** 設計の「要確認 1」に対応。 */
+            id: 'cb-2', consumerType: 'form', consumerId: 'form-1',
+            consumerPath: '体験のお申し込み・送信後',
+            versionId: `${found.id}-v${Math.max(1, published - 1)}`,
+            versionNumber: Math.max(1, published - 1),
+            latestVersionNumber: published, hasNewerVersion: true,
+            runningCount: 0, waitingCount: 3,
+          },
+        ],
+      },
+    }
   }
   if (pathname === '/api/ec-commerce/overview') return { success: true, data: EC_OVERVIEW }
   if (pathname === '/api/ec-commerce/events') {

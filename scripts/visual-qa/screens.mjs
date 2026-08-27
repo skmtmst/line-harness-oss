@@ -106,6 +106,9 @@ const EC = { feature: 23, dir: 'ec-v6', route: '/ec-commerce', mode: 'page' }
 /** LINE通知。実装は1枚もので、種別の札6本（すべて／注文／銀行振込／…）。 */
 const LINE_NOTIFY = { feature: 24, dir: 'line-notify-v6', route: '/line-notifications', mode: 'page' }
 
+/** オートメーションと共通アクション。設計は同じタブ帯にまとめている。 */
+const AUTOMATION = { feature: 25, dir: 'automations-v6', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -950,6 +953,32 @@ export const SCREENS = [
     ...LINE_NOTIFY, node: 'N2gAza', name: '24-2-A 運用者へのお知らせをつくる',
     status: 'unimplemented', why: '24-2 が無いので、作る画面も無い',
   },
+
+  // ── 機能25 オートメーション ─────────────────────────────
+  /*
+    設計のタブ帯は5本（動いているもの14／止めているもの4／動いた記録／
+    見本12／共通アクション14）で、オートメーションと共通アクションが
+    **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
+  */
+  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations' },
+  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new' },
+  {
+    ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
+    status: 'unimplemented',
+    why: '動いた記録を並べる画面が無い。**「条件に外れて動かなかった」も出ないので、「動いていないはず」の切り分けができない**',
+  },
+  {
+    ...AUTOMATION, node: 'WjYAC', name: '25-1-C 見本から作る',
+    status: 'unimplemented',
+    why: '見本（よく使う組み合わせ）が無い。`grep 見本|テンプレート` が `/automations` 配下で0件',
+  },
+  {
+    ...AUTOMATION, node: 'Vdbv5', name: '25-1-D 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new' },
+  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
