@@ -98,7 +98,15 @@ function serializeFriend(row: DbFriend) {
  * don't request them.
  */
 function serializeFriendListRow(
-  row: DbFriend & { first_tracked_link_name?: string | null; chat_status?: string | null },
+  row: DbFriend & {
+    first_tracked_link_name?: string | null;
+    chat_status?: string | null;
+    operator_id?: string | null;
+    operator_name?: string | null;
+    support_mark_id?: string | null;
+    support_mark_name?: string | null;
+    support_mark_color?: string | null;
+  },
   includeChatStatus: boolean,
 ) {
   const base = serializeFriend(row);
@@ -113,6 +121,11 @@ function serializeFriendListRow(
     // (matches /api/chats listing). Friend-list and chats-list now agree on
     // 未対応/対応中/対応済み state.
     chatStatus: (row.chat_status ?? 'resolved') as 'unread' | 'in_progress' | 'resolved',
+    operatorId: row.operator_id ?? null,
+    operatorName: row.operator_name ?? null,
+    supportMarkId: row.support_mark_id ?? null,
+    supportMarkName: row.support_mark_name ?? null,
+    supportMarkColor: row.support_mark_color ?? null,
   };
 }
 
@@ -156,6 +169,8 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     // hide rows on the current page and leave `total` misleading.
     const handledFilter: 'unhandled' | null =
       c.req.query('handled') === 'unhandled' ? 'unhandled' : null;
+    const operatorId = c.req.query('operatorId');
+    const scenarioId = c.req.query('scenarioId');
 
     const db = c.env.DB;
 
@@ -191,16 +206,32 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     //     in chats.ts:88 also seeds with 'resolved'), matching the chats
     //     listing's COALESCE(c.status, 'resolved') convention
     if (handledFilter === 'unhandled') {
-      // DESC mirrors the /api/chats listing — newest chat row wins so a
-      // resolved-then-reopened conversation correctly resurfaces as 未対応.
       conditions.push(
-        `COALESCE(
-           (SELECT status FROM chats c
-            WHERE c.friend_id = f.id
-            ORDER BY c.created_at DESC LIMIT 1),
-           'resolved'
-         ) = 'unread'`,
+        `EXISTS (
+          SELECT 1 FROM chats c
+          WHERE c.friend_id = f.id AND c.status = 'unread'
+        )`,
       );
+    }
+    if (operatorId) {
+      conditions.push(
+        `EXISTS (
+          SELECT 1 FROM chats c
+          WHERE c.friend_id = f.id AND c.operator_id = ?
+        )`,
+      );
+      binds.push(operatorId);
+    }
+    if (scenarioId) {
+      conditions.push(
+        `EXISTS (
+          SELECT 1 FROM friend_scenarios fs
+          WHERE fs.friend_id = f.id
+            AND fs.scenario_id = ?
+            AND fs.status IN ('active', 'delivering')
+        )`,
+      );
+      binds.push(scenarioId);
     }
     // Metadata filters: ?metadata.key=value (e.g. ?metadata.monthly_cost=〜100万円)
     // ?metadataNot.key=value is the「等しくない」side. 値を持たない人も含める
@@ -272,16 +303,14 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     }
 
     /**
-     * 対応マーク。`?chatStatus=unread|in_progress|resolved`
-     * 既にある `?handled=unhandled` と同じ見方（最新の chats 行）をする。
+     * 対応マーク。chats は友だちごとに1行なので、その現在値を見る。
      */
     const chatStatus = c.req.query('chatStatus');
-    if (chatStatus && ['unread', 'in_progress', 'resolved'].includes(chatStatus)) {
+    if (chatStatus && ['unread', 'in_progress', 'on_hold', 'resolved'].includes(chatStatus)) {
       conditions.push(
         `COALESCE(
            (SELECT status FROM chats c
-            WHERE c.friend_id = f.id
-            ORDER BY c.created_at DESC LIMIT 1),
+            WHERE c.friend_id = f.id),
            'resolved'
          ) = ?`,
       );
@@ -315,27 +344,29 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     //   alongside `Shun` / `shuji`, defeating the rerank.
     // - Word-start patterns include both ASCII space and full-width
     //   so Japanese names like `山田　太郎` match on the second name part.
-    // The tracked_links JOIN + chats.status subselect are only needed when the
+    // The tracked_links / chats / operators JOINs are only needed when the
     // caller requested chat status. Skipping them on autocomplete-style calls
     // (?includeChatStatus omitted, includeTags=false) keeps a single keystroke
     // cheap. List view enables it.
     //
-    // chat_status subselect: the existing /api/chats listing pulls the
-    // **newest** chat row per friend (chats.ts:288 — `ORDER BY created_at DESC`).
-    // Operators can re-open a resolved chat, which inserts a new row; reading
-    // the oldest row would show stale 対応済み in those cases. We mirror the
-    // chats list's DESC convention here so the badge agrees with /chats.
+    // chats は migration 048 以降「1 friend = 1 chat」の UNIQUE 制約を持つ。
+    // 同じ行から状態・担当ID・担当名を読むため、別々の相関サブクエリで
+    // IDと名前がずれることも、行ごとに同じ検索を繰り返すこともない。
     const baseSelect = includeChatStatus
       ? `f.*, tl.name AS first_tracked_link_name,
-         COALESCE(
-           (SELECT status FROM chats c
-            WHERE c.friend_id = f.id
-            ORDER BY c.created_at DESC LIMIT 1),
-           'resolved'
-         ) AS chat_status`
+         COALESCE(lc.status, 'resolved') AS chat_status,
+         lc.operator_id AS operator_id,
+         op.name AS operator_name,
+         sm.id AS support_mark_id,
+         sm.name AS support_mark_name,
+         sm.color AS support_mark_color`
       : `f.*`;
     const baseFrom = includeChatStatus
-      ? `FROM friends f LEFT JOIN tracked_links tl ON tl.id = f.first_tracked_link_id`
+      ? `FROM friends f
+         LEFT JOIN tracked_links tl ON tl.id = f.first_tracked_link_id
+         LEFT JOIN chats lc ON lc.friend_id = f.id
+         LEFT JOIN operators op ON op.id = lc.operator_id
+         LEFT JOIN support_marks sm ON sm.id = f.support_mark_id`
       : `FROM friends f`;
     // Secondary tier of the search-mode ORDER BY (after match_score) and the
     // primary tier in non-search mode. Switched by ?sort=oldest|recent.
@@ -442,7 +473,14 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       // We're inside `if (includeChatStatus)` so every row was emitted by
       // serializeFriendListRow with chatStatus populated. TS can't narrow
       // through the union, so assert the populated shape locally.
-      type WithChatStatus = (typeof itemsWithTags)[number] & { chatStatus: 'unread' | 'in_progress' | 'resolved' };
+      type WithChatStatus = (typeof itemsWithTags)[number] & {
+        chatStatus: 'unread' | 'in_progress' | 'resolved';
+        operatorId?: string | null;
+        operatorName?: string | null;
+        supportMarkId?: string | null;
+        supportMarkName?: string | null;
+        supportMarkColor?: string | null;
+      };
       itemsWithTags = (itemsWithTags as WithChatStatus[]).map((f) => {
         const inc = incomingByFriend.get(f.id);
         const outAt = outgoingByFriend.get(f.id);
@@ -459,6 +497,18 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
             : null,
           latestOutgoingAt: outAt ?? null,
           activeScenario: sc ? { name: sc.scenario_name, status: sc.status } : null,
+          operator:
+            f.operatorId && f.operatorName
+              ? { id: f.operatorId, name: f.operatorName }
+              : null,
+          supportMark:
+            f.supportMarkId && f.supportMarkName
+              ? {
+                  id: f.supportMarkId,
+                  name: f.supportMarkName,
+                  color: f.supportMarkColor ?? '#8B938D',
+                }
+              : null,
           handled,
         };
       });
@@ -733,8 +783,12 @@ friends.put('/api/friends/:id/metadata', requireRole('owner', 'admin', 'staff'),
     }
 
     const body = await c.req.json<Record<string, unknown>>();
-    const existing = JSON.parse(friend.metadata || '{}');
-    const merged = { ...existing, ...body };
+    const merged = JSON.parse(friend.metadata || '{}') as Record<string, unknown>;
+    for (const [key, value] of Object.entries(body)) {
+      if (value === null) delete merged[key];
+      else if (typeof value === 'string') merged[key] = value;
+      else return c.json({ success: false, error: 'metadata values must be string or null' }, 400);
+    }
     const now = jstNow();
 
     await db

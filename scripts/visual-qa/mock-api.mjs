@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { LIST_STATS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -158,6 +158,10 @@ const SHAPES = {
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   '/api/nen-members/overview': { pets: 0, healthLogs: 0, activeCare: 0, pendingPhotos: 0, members: 0, consultations: 0 },
+  '/api/friends/stats': FRIEND_STATS,
+  '/api/friends': { items: FRIENDS, total: 231, page: 1, limit: 20 },
+  '/api/operators': OPERATORS,
+  '/api/scenarios': FRIEND_SCENARIOS,
 
   /* 予約。`api.ts` を通らない口なので、読む側（`app/page.tsx`）に合わせる。 */
   '/api/booking/admin/requests': { requests: [] },
