@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 
 /**
  * データ移行（設計 V2 10-5）。
@@ -39,11 +40,18 @@ const NOT_TRANSFERABLE = [
 type Counts = Partial<Record<(typeof TRANSFERABLE)[number][0], number>>
 
 export default function AccountMigration() {
+  const { selectedAccountId } = useAccount()
   const [counts, setCounts] = useState<Counts>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    if (!selectedAccountId) {
+      setCounts({})
+      setLoading(false)
+      return () => { cancelled = true }
+    }
+    setLoading(true)
     void (async () => {
       // 1つ落ちても残りは出す。数えられなかったものは「—」になる。
       const [tags, fields, scenarios, templates, autoReplies, forms, reminders, vars, marks] =
@@ -56,7 +64,7 @@ export default function AccountMigration() {
           api.forms.list(),
           api.reminders.list(),
           api.commonVars.list(),
-          api.supportMarks.list(),
+          api.supportMarks.list(selectedAccountId),
         ])
       if (cancelled) return
       const len = (r: PromiseSettledResult<unknown>): number | undefined => {
@@ -80,7 +88,7 @@ export default function AccountMigration() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   return (
     <div className="space-y-4">

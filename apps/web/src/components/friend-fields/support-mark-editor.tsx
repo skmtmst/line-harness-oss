@@ -11,12 +11,14 @@ import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
 import StickyBar from '@/components/shared/sticky-bar'
 import { usePageTitle } from '@/components/shell/page-chrome'
+import { useAccount } from '@/contexts/account-context'
 
 const COLORS = ['#EF4B55', '#B86A00', '#06C755', '#2563D4', '#6B56CF', '#707981']
 type MarkRow = SupportMark & { friendCount: number }
 
 export default function SupportMarkEditor({ markId }: { markId?: string }) {
   const router = useRouter()
+  const { selectedAccountId } = useAccount()
   const editing = Boolean(markId)
   usePageTitle(editing ? '対応マークを編集' : '対応マークを追加')
 
@@ -41,7 +43,15 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
 
   useEffect(() => {
     let cancelled = false
-    void api.supportMarks.list()
+    if (!selectedAccountId) {
+      setItems([])
+      setError('LINE公式アカウントを選んでください')
+      setLoading(false)
+      return () => { cancelled = true }
+    }
+    setLoading(true)
+    setError('')
+    void api.supportMarks.list(selectedAccountId)
       .then((res) => {
         if (cancelled) return
         if (!res.success) throw new Error(res.error)
@@ -63,16 +73,17 @@ export default function SupportMarkEditor({ markId }: { markId?: string }) {
       .catch(() => setError('対応マークを読み込めませんでした'))
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [editing, markId])
+  }, [editing, markId, selectedAccountId])
 
   const save = async () => {
     if (!name.trim()) return setError('マーク名を入力してください')
+    if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
     setSaving(true)
     setError('')
     try {
       const result = editing && markId
-        ? await api.supportMarks.update(markId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
-        : await api.supportMarks.create({ name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
+        ? await api.supportMarks.update(markId, selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
+        : await api.supportMarks.create(selectedAccountId, { name: name.trim(), color, displayOrder, isDefault, autoOnInbound })
       if (!result.success) throw new Error(result.error)
       router.push('/tags?tab=marks')
     } catch (reason) {

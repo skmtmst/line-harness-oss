@@ -13,7 +13,7 @@ describe('V6 対応マーク', () => {
     for (const label of ['マークの種類', '未対応', '対応中', '過去7日の変更']) expect(LIST).toContain(label)
     for (const label of ['順番', 'マーク', '使用中', '初期値', '自動変更', '表示先', '操作']) expect(LIST).toContain(label)
     expect(LIST).toContain('利用状態：すべて')
-    expect(LIST).toContain('api.supportMarks.list()')
+    expect(LIST).toContain('api.supportMarks.list(accountId)')
   })
 
   it('追加編集画面は本文タイトルを置かず、トップバーへ画面名を渡す', () => {
@@ -22,6 +22,7 @@ describe('V6 対応マーク', () => {
     expect(EDITOR).not.toContain('<Header')
     expect(EDITOR).toContain('api.supportMarks.create')
     expect(EDITOR).toContain('api.supportMarks.update')
+    expect(EDITOR).toContain('api.supportMarks.list(selectedAccountId)')
   })
 
   it('タブ行から追加画面へ進める', () => {

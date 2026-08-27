@@ -247,6 +247,8 @@ export interface SupportMark {
   autoOnInbound: boolean;
   displayOrder: number;
   createdAt: string;
+  /** 旧環境から共有されているマーク。編集時に選択中アカウントへ複製される。 */
+  isInherited?: boolean;
   /** GET /api/support-marks の一覧で返る実参照数。省略は未取得、0は参照なし。 */
   usedIn?: {
     broadcasts: number;
@@ -1249,6 +1251,9 @@ export interface StaffMember {
   assignedLineAccountId: string | null;
   /** 基準アカウントより下の子・孫も表示・操作できるか。 */
   canAccessDescendantAccounts: boolean;
+  /** 担当範囲。accounts の場合は scopedLineAccountIds に対象店舗が入る。 */
+  accountScope?: 'all' | 'accounts';
+  scopedLineAccountIds?: string[];
 }
 
 export interface StaffProfile {

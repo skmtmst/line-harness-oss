@@ -52,8 +52,9 @@ describe('表見出しの第1段階移行', () => {
     expect(sources['app/affiliates/tabs.tsx'].match(/<th\b/g)).toHaveLength(20)
 
     const debt = totals(countDebt().counts) as Record<string, number>
-    // V6 4-3 対応マークの見出しを共通 `Th` へ寄せ、5か所減らした。
-    expect(debt['direct-th']).toBe(285)
+    // 4-1 の「表示」列追加を含む最新基準から、V6 4-3 対応マークの
+    // 見出し5か所を共通 `Th` へ寄せた実測値。
+    expect(debt['direct-th']).toBe(292)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

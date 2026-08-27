@@ -30,6 +30,7 @@ import {
   deleteFolder,
   isFolderKind,
   type SupportMark,
+  type SupportMarkScope,
   type SavedSearch,
   type SavedSearchAccess,
   type Folder,
@@ -56,7 +57,25 @@ function serializeMark(row: SupportMark) {
     autoOnInbound: Boolean(row.auto_on_inbound),
     displayOrder: row.display_order,
     createdAt: row.created_at,
+    isInherited: Boolean(row.is_inherited),
   };
+}
+
+async function supportMarkAccess(c: Context<Env>): Promise<SupportMarkScope | Response> {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const staff = c.get('staff');
+  if (!staff.tenantId) {
+    return c.json({ success: false, error: '所属を確認できません' }, 403);
+  }
+  const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
+  if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
+    // 権限の有無からアカウントの存在を推測させない。
+    return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
+  }
+  return { tenantId: staff.tenantId, lineAccountId };
 }
 
 function serializeSearch(row: SavedSearch) {
@@ -127,7 +146,9 @@ function maskIp(ip: string): string {
 
 friendAttributes.get('/api/support-marks', async (c) => {
   try {
-    const marks = await getSupportMarksWithUsage(c.env.DB);
+    const scope = await supportMarkAccess(c);
+    if (scope instanceof Response) return scope;
+    const marks = await getSupportMarksWithUsage(c.env.DB, scope);
     const withCounts = marks.map((mark) => ({
         ...serializeMark(mark),
         friendCount: Number(mark.friend_count),
@@ -148,13 +169,15 @@ friendAttributes.get('/api/support-marks', async (c) => {
 
 friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async (c) => {
   try {
+    const scope = await supportMarkAccess(c);
+    if (scope instanceof Response) return scope;
     const body = await c.req.json<Record<string, unknown>>();
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'マークの名前を入力してください' }, 400);
     if (body.color !== undefined && !COLOR_PATTERN.test(String(body.color))) {
       return c.json({ success: false, error: '色は #RRGGBB の形で指定してください' }, 400);
     }
-    const mark = await createSupportMark(c.env.DB, {
+    const mark = await createSupportMark(c.env.DB, scope, {
       name,
       color: body.color ? String(body.color) : undefined,
       isDefault: body.isDefault === true,
@@ -170,8 +193,10 @@ friendAttributes.post('/api/support-marks', requireRole('owner', 'admin'), async
 
 friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), async (c) => {
   try {
+    const scope = await supportMarkAccess(c);
+    if (scope instanceof Response) return scope;
     const id = c.req.param('id');
-    const existing = await getSupportMarkById(c.env.DB, id);
+    const existing = await getSupportMarkById(c.env.DB, id, scope);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const body = await c.req.json<Record<string, unknown>>();
@@ -190,7 +215,7 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
         409,
       );
     }
-    const mark = await updateSupportMark(c.env.DB, id, {
+    const mark = await updateSupportMark(c.env.DB, id, scope, {
       name: body.name === undefined ? undefined : String(body.name).trim(),
       color: body.color === undefined ? undefined : String(body.color),
       isDefault: body.isDefault === undefined ? undefined : body.isDefault === true,
@@ -206,9 +231,20 @@ friendAttributes.patch('/api/support-marks/:id', requireRole('owner', 'admin'), 
 
 friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'), async (c) => {
   try {
+    const scope = await supportMarkAccess(c);
+    if (scope instanceof Response) return scope;
     const id = c.req.param('id');
-    const existing = await getSupportMarkById(c.env.DB, id);
+    const existing = await getSupportMarkById(c.env.DB, id, scope);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    if (existing.is_inherited === 1) {
+      return c.json(
+        {
+          success: false,
+          error: '共通マークは削除できません。編集すると、このLINE公式アカウント専用になります。',
+        },
+        409,
+      );
+    }
     if (existing.is_default === 1) {
       return c.json(
         {
@@ -218,7 +254,7 @@ friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'),
         409,
       );
     }
-    const defaultMark = await getDefaultSupportMark(c.env.DB);
+    const defaultMark = await getDefaultSupportMark(c.env.DB, scope);
     if (!defaultMark || defaultMark.id === id) {
       return c.json(
         {
@@ -230,7 +266,7 @@ friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'),
     }
 
     // 使用中なら、削除前に置換先と人数を確認させる。
-    const count = await countFriendsWithMark(c.env.DB, id);
+    const count = await countFriendsWithMark(c.env.DB, id, scope);
     if (count > 0 && c.req.query('force') !== '1') {
       return c.json(
         {
@@ -245,9 +281,9 @@ friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'),
     }
     if (count > 0) {
       const staff = c.get('staff');
-      await replaceAndDeleteSupportMark(c.env.DB, id, defaultMark.id, staff.id);
+      await replaceAndDeleteSupportMark(c.env.DB, id, defaultMark.id, scope, staff.id);
     } else {
-      await deleteSupportMark(c.env.DB, id);
+      await deleteSupportMark(c.env.DB, id, scope);
     }
     return c.json({
       success: true,
@@ -264,16 +300,25 @@ friendAttributes.patch(
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
       const body = await c.req.json<{ markId?: unknown }>();
       const markId =
         body.markId === null || body.markId === '' || body.markId === undefined
           ? null
           : String(body.markId);
       if (markId) {
-        const mark = await getSupportMarkById(c.env.DB, markId);
+        const mark = await getSupportMarkById(c.env.DB, markId, scope);
         if (!mark) return c.json({ success: false, error: 'マークが見つかりません' }, 400);
       }
-      await setFriendSupportMark(c.env.DB, c.req.param('id'), markId);
+      const updated = await setFriendSupportMark(
+        c.env.DB,
+        c.req.param('id'),
+        markId,
+        scope,
+        c.get('staff').id,
+      );
+      if (!updated) return c.json({ success: false, error: '友だちが見つかりません' }, 404);
       return c.json({ success: true, data: null });
     } catch (err) {
       console.error('PATCH /api/friends/:id/support-mark error:', err);
@@ -287,6 +332,8 @@ friendAttributes.post(
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {
+      const scope = await supportMarkAccess(c);
+      if (scope instanceof Response) return scope;
       const body = await c.req.json<{ friendIds?: unknown; markId?: unknown }>();
       const friendIds = Array.isArray(body.friendIds) ? body.friendIds.map(String) : [];
       if (friendIds.length === 0) {
@@ -299,7 +346,10 @@ friendAttributes.post(
         body.markId === null || body.markId === '' || body.markId === undefined
           ? null
           : String(body.markId);
-      const updated = await setFriendSupportMarkBulk(c.env.DB, friendIds, markId);
+      if (markId && !(await getSupportMarkById(c.env.DB, markId, scope))) {
+        return c.json({ success: false, error: 'マークが見つかりません' }, 400);
+      }
+      const updated = await setFriendSupportMarkBulk(c.env.DB, friendIds, markId, scope);
       return c.json({ success: true, data: { updated } });
     } catch (err) {
       console.error('POST /api/friends/support-mark/bulk error:', err);

@@ -897,7 +897,7 @@ export default function TagsPageV4({
             <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} />
           </div>
         ) : null}
-      </> : tab === 'fields' ? <FriendFieldList /> : tab === 'marks' ? <SupportMarkList /> : <SavedSearchList accountId={accountId} />}
+      </> : tab === 'fields' ? <FriendFieldList /> : tab === 'marks' ? <SupportMarkList accountId={accountId} /> : <SavedSearchList accountId={accountId} />}
       {deleteTarget && <DeleteTagDialog tag={deleteTarget} onCancel={() => setDeleteTarget(null)} onDeleted={() => { setDeleteTarget(null); void load() }} />}
     </div>
   )

@@ -36,7 +36,7 @@ function usageLabel(mark: MarkRow): string {
  * 固定の対応状況（未対応・対応中・解決済）と、友だちに付ける対応マークは
  * 別の概念。ここは後者の設定だけを扱い、人数のKPIは既存の受信箱集計から読む。
  */
-export default function SupportMarkList() {
+export default function SupportMarkList({ accountId }: { accountId: string | null }) {
   const [items, setItems] = useState<MarkRow[]>([])
   const [status, setStatus] = useState<LoadStatus>('loading')
   const [error, setError] = useState('')
@@ -47,17 +47,23 @@ export default function SupportMarkList() {
   const defaultMark = items.find((item) => item.isDefault)
 
   const load = useCallback(async () => {
+    if (!accountId) {
+      setItems([])
+      setStatus('error')
+      setError('LINE公式アカウントを選んでください')
+      return
+    }
     setStatus('loading')
     setError('')
     try {
-      const res = await api.supportMarks.list()
+      const res = await api.supportMarks.list(accountId)
       if (!res.success) throw new Error(res.error)
       setItems(res.data)
       setStatus('ready')
     } catch (reason) {
       setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
     }
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     void load()
@@ -71,7 +77,14 @@ export default function SupportMarkList() {
   }), [items, query, usage])
 
   const move = async (targetId: string) => {
-    if (!dragId || dragId === targetId) return setDragId(null)
+    if (!accountId || !dragId || dragId === targetId) return setDragId(null)
+    const dragged = items.find((mark) => mark.id === dragId)
+    const target = items.find((mark) => mark.id === targetId)
+    if (dragged?.isInherited || target?.isInherited) {
+      setDragId(null)
+      setError('共有マークは、編集してこのアカウント専用にしてから並び替えてください')
+      return
+    }
     const order = visible.map((mark) => mark.id)
     const from = order.indexOf(dragId)
     const to = order.indexOf(targetId)
@@ -81,7 +94,11 @@ export default function SupportMarkList() {
     const next = order.map((id) => items.find((mark) => mark.id === id)).filter(Boolean) as MarkRow[]
     setItems(next)
     try {
-      await Promise.all(next.map((mark, index) => api.supportMarks.update(mark.id, { displayOrder: index })))
+      await Promise.all(
+        next.map((mark, index) =>
+          api.supportMarks.update(mark.id, accountId, { displayOrder: index }),
+        ),
+      )
       await load()
     } catch {
       setError('並び順を保存できませんでした')
@@ -90,9 +107,10 @@ export default function SupportMarkList() {
   }
 
   const confirmRemove = async (mark: MarkRow) => {
+    if (!accountId) return
     setError('')
     try {
-      const res = await api.supportMarks.delete(mark.id, { force: mark.friendCount > 0 })
+      const res = await api.supportMarks.delete(mark.id, accountId, { force: mark.friendCount > 0 })
       if (!res.success) throw new Error(res.error)
       await load()
     } catch (reason) {
@@ -165,7 +183,7 @@ export default function SupportMarkList() {
                 <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う対応マークはありません" description="検索語か利用状態を変えてください。" /></td></tr>
               ) : visible.map((mark) => (
                 <tr key={mark.id} className="hover:bg-canvas-sunken">
-                  <td draggable onDragStart={() => setDragId(mark.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(mark.id)} className="cursor-grab px-3 py-3 text-hairline" aria-label={`${mark.name}をドラッグして並び替え`}>
+                  <td draggable={!mark.isInherited} onDragStart={() => setDragId(mark.id)} onDragOver={(event) => event.preventDefault()} onDrop={() => void move(mark.id)} className={`${mark.isInherited ? 'cursor-not-allowed' : 'cursor-grab'} px-3 py-3 text-hairline`} aria-label={mark.isInherited ? `${mark.name}は編集後に並び替えできます` : `${mark.name}をドラッグして並び替え`} title={mark.isInherited ? '共有マークは編集後に並び替えできます' : undefined}>
                     <GripVertical size={16} aria-hidden="true" />
                   </td>
                   <td className="px-3 py-3">
@@ -178,8 +196,8 @@ export default function SupportMarkList() {
                   <td className="px-3 py-3 text-ink">{autoRuleLabel(mark)}</td>
                   <td className="truncate px-3 py-3 text-ink" title={usageLabel(mark)}>{usageLabel(mark)}</td>
                   <td className="px-3 py-3 text-center">
-                    {mark.isDefault ? (
-                      <span title="初期値のマークは削除できません" className="inline-flex text-ink-faint"><LockKeyhole size={18} aria-label="初期値のため削除できません" /></span>
+                    {mark.isDefault || mark.isInherited ? (
+                      <span title={mark.isDefault ? '初期値のマークは削除できません' : '共有マークは編集後に削除できます'} className="inline-flex text-ink-faint"><LockKeyhole size={18} aria-label={mark.isDefault ? '初期値のため削除できません' : '共有マークのため削除できません'} /></span>
                     ) : (
                       <button type="button" onClick={() => setPendingDelete(mark)} aria-label={`${mark.name}を削除`} className="text-danger hover:opacity-70"><Trash2 size={18} /></button>
                     )}

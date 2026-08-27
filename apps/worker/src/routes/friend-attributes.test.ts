@@ -78,6 +78,9 @@ const MARK = {
   auto_on_inbound: 1,
   display_order: 0,
   created_at: '2026-08-16',
+  tenant_id: 'tenant-1',
+  line_account_id: 'account-1',
+  is_inherited: 0,
 };
 
 const SEARCH = {
@@ -119,6 +122,7 @@ beforeEach(() => {
   marks.getDefaultSupportMark.mockResolvedValue(MARK);
   marks.replaceAndDeleteSupportMark.mockResolvedValue(0);
   marks.countFriendsWithMark.mockResolvedValue(0);
+  marks.setFriendSupportMark.mockResolvedValue(true);
   marks.setFriendSupportMarkBulk.mockResolvedValue(2);
   searches.getSavedSearches.mockResolvedValue([SEARCH]);
   searches.getSavedSearchById.mockResolvedValue(SEARCH);
@@ -139,34 +143,72 @@ beforeEach(() => {
 });
 
 describe('対応マーク', () => {
-  it('一覧に付いている人数が入る', async () => {
+  it('LINE公式アカウント未選択なら一覧を返さない', async () => {
     const res = await req('/api/support-marks', 'GET');
+    expect(res.status).toBe(400);
+    expect(marks.getSupportMarksWithUsage).not.toHaveBeenCalled();
+  });
+
+  it('見えないLINE公式アカウントは404にする', async () => {
+    const res = await req('/api/support-marks?lineAccountId=account-other', 'GET');
+    expect(res.status).toBe(404);
+    expect(marks.getSupportMarksWithUsage).not.toHaveBeenCalled();
+  });
+
+  it('所属テナントを確認できない利用者には返さない', async () => {
+    const app = new Hono<Env>();
+    app.use('*', async (c, next) => {
+      c.set('staff', {
+        id: 'u-no-tenant',
+        name: '所属不明',
+        role: 'staff',
+        readOnly: false,
+        tenantId: null,
+      });
+      return next();
+    });
+    app.route('/', friendAttributes);
+    const res = await app.fetch(
+      new Request('https://example.com/api/support-marks?lineAccountId=account-1'),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(accountAccess.getVisibleLineAccountScope).not.toHaveBeenCalled();
+    expect(marks.getSupportMarksWithUsage).not.toHaveBeenCalled();
+  });
+
+  it('一覧に付いている人数が入る', async () => {
+    const res = await req('/api/support-marks?lineAccountId=account-1', 'GET');
     const body = (await res.json()) as { data: Array<{ friendCount: number; usedIn: { broadcasts: number; savedSearches: number } }> };
     expect(body.data[0].friendCount).toBe(7);
     expect(body.data[0].usedIn).toMatchObject({ broadcasts: 2, savedSearches: 3 });
+    expect(marks.getSupportMarksWithUsage).toHaveBeenCalledWith(env.DB, {
+      tenantId: 'tenant-1',
+      lineAccountId: 'account-1',
+    });
   });
 
   it('色の形が違えば弾く', async () => {
-    const res = await req('/api/support-marks', 'POST', { name: 'x', color: 'red' });
+    const res = await req('/api/support-marks?lineAccountId=account-1', 'POST', { name: 'x', color: 'red' });
     expect(res.status).toBe(400);
     expect(marks.createSupportMark).not.toHaveBeenCalled();
   });
 
   it('既定を外す操作は止める', async () => {
     // 既定が1つも無いと、新しい友だちに何も付かない。
-    const res = await req('/api/support-marks/m-1', 'PATCH', { isDefault: false });
+    const res = await req('/api/support-marks/m-1?lineAccountId=account-1', 'PATCH', { isDefault: false });
     expect(res.status).toBe(409);
     expect(marks.updateSupportMark).not.toHaveBeenCalled();
   });
 
   it('別のマークを既定にするのは通る', async () => {
     marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
-    const res = await req('/api/support-marks/m-2', 'PATCH', { isDefault: true });
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'PATCH', { isDefault: true });
     expect(res.status).toBe(200);
   });
 
   it('既定のマークは削除できない', async () => {
-    const res = await req('/api/support-marks/m-1', 'DELETE');
+    const res = await req('/api/support-marks/m-1?lineAccountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
     expect(marks.deleteSupportMark).not.toHaveBeenCalled();
   });
@@ -174,7 +216,7 @@ describe('対応マーク', () => {
   it('付いている人がいれば人数を返して止める', async () => {
     marks.getSupportMarkById.mockResolvedValue({ ...MARK, is_default: 0 });
     marks.countFriendsWithMark.mockResolvedValue(5);
-    const res = await req('/api/support-marks/m-2', 'DELETE');
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'DELETE');
     expect(res.status).toBe(409);
     const body = (await res.json()) as {
       friendCount: number;
@@ -188,9 +230,15 @@ describe('対応マーク', () => {
     marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
     marks.countFriendsWithMark.mockResolvedValue(5);
     marks.replaceAndDeleteSupportMark.mockResolvedValue(5);
-    const res = await req('/api/support-marks/m-2?force=1', 'DELETE');
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1&force=1', 'DELETE');
     expect(res.status).toBe(200);
-    expect(marks.replaceAndDeleteSupportMark).toHaveBeenCalledWith(env.DB, 'm-2', 'm-1', 'u-1');
+    expect(marks.replaceAndDeleteSupportMark).toHaveBeenCalledWith(
+      env.DB,
+      'm-2',
+      'm-1',
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'u-1',
+    );
     expect(marks.deleteSupportMark).not.toHaveBeenCalled();
     expect(await res.json()).toMatchObject({
       data: { replacedFriendCount: 5, replacementMark: { id: 'm-1' } },
@@ -200,32 +248,42 @@ describe('対応マーク', () => {
   it('誰にも付いていないマークはそのまま消す', async () => {
     marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
     marks.countFriendsWithMark.mockResolvedValue(0);
-    const res = await req('/api/support-marks/m-2', 'DELETE');
+    const res = await req('/api/support-marks/m-2?lineAccountId=account-1', 'DELETE');
     expect(res.status).toBe(200);
-    expect(marks.deleteSupportMark).toHaveBeenCalledWith(env.DB, 'm-2');
+    expect(marks.deleteSupportMark).toHaveBeenCalledWith(
+      env.DB,
+      'm-2',
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+    );
     expect(marks.replaceAndDeleteSupportMark).not.toHaveBeenCalled();
   });
 
   it('無いマークは付けられない', async () => {
     marks.getSupportMarkById.mockResolvedValue(null);
-    const res = await req('/api/friends/f-1/support-mark', 'PATCH', { markId: 'ghost' });
+    const res = await req('/api/friends/f-1/support-mark?lineAccountId=account-1', 'PATCH', { markId: 'ghost' });
     expect(res.status).toBe(400);
     expect(marks.setFriendSupportMark).not.toHaveBeenCalled();
   });
 
   it('null は未設定に戻す（存在確認をしない）', async () => {
-    await req('/api/friends/f-1/support-mark', 'PATCH', { markId: null });
-    expect(marks.setFriendSupportMark).toHaveBeenCalledWith(env.DB, 'f-1', null);
+    await req('/api/friends/f-1/support-mark?lineAccountId=account-1', 'PATCH', { markId: null });
+    expect(marks.setFriendSupportMark).toHaveBeenCalledWith(
+      env.DB,
+      'f-1',
+      null,
+      { tenantId: 'tenant-1', lineAccountId: 'account-1' },
+      'u-1',
+    );
   });
 
   it('スタッフでもマークは変えられる', async () => {
     // 対応の状態は現場が付けるもの。管理者しか触れないと運用が回らない。
-    const res = await req('/api/friends/f-1/support-mark', 'PATCH', { markId: 'm-1' }, 'staff');
+    const res = await req('/api/friends/f-1/support-mark?lineAccountId=account-1', 'PATCH', { markId: 'm-1' }, 'staff');
     expect(res.status).toBe(200);
   });
 
   it('一括は1000人まで', async () => {
-    const res = await req('/api/friends/support-mark/bulk', 'POST', {
+    const res = await req('/api/friends/support-mark/bulk?lineAccountId=account-1', 'POST', {
       friendIds: Array.from({ length: 1001 }, (_, i) => `f-${i}`),
       markId: 'm-1',
     });

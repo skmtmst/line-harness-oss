@@ -184,6 +184,9 @@
     "direct-th": 11,
     "arbitrary-value": 1
   },
+  "app/hq/settings/hq-staff-section.tsx": {
+    "direct-th": 6
+  },
   "app/inflow-links/_components/create-genre-modal.tsx": {
     "arbitrary-value": 1
   },
@@ -336,7 +339,7 @@
     "arbitrary-value": 19,
     "direct-secondary-button": 6,
     "direct-primary-button": 4,
-    "direct-th": 10
+    "direct-th": 11
   },
   "app/tags/edit/page.tsx": {
     "direct-secondary-button": 1,
