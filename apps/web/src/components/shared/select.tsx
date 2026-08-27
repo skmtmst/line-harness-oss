@@ -146,10 +146,15 @@ export default function Select({
                   }}
                   onClick={() => choose(option)}
                 >
-                  <span className={`${styles.check} ${isSelected ? styles.checked : ''}`}>
-                    {isSelected ? <Check className={styles.checkIcon} aria-hidden="true" /> : null}
+                  {/*
+                    設計（V6 `Gfsb4` プルダウン開状態）は、**選んだ印を右端の
+                    チェックだけで出す。** 左に四角い枠を置くと「複数選べる」
+                    ように見え、1つだけ選ぶプルダウンと読み違える。
+                  */}
+                  <span className={styles.optionLabel}>{option.label}</span>
+                  <span className={`${styles.check} ${isSelected ? styles.checked : ''}`} aria-hidden="true">
+                    {isSelected ? <Check className={styles.checkIcon} /> : null}
                   </span>
-                  <span>{option.label}</span>
                 </button>
               </li>
             )

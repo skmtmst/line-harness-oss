@@ -126,6 +126,14 @@
   background: var(--color-accent-soft);
 }
 
+.optionLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* V6 `Gfsb4`: 選んだ印は右端のチェックだけ。枠も塗りも置かない。 */
 .check {
   box-sizing: border-box;
   display: inline-flex;
@@ -133,16 +141,12 @@
   height: 18px;
   flex: 0 0 18px;
   align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-hairline);
-  border-radius: var(--radius-icon);
-  background: var(--color-canvas);
+  justify-content: flex-end;
+  color: var(--color-accent);
 }
 
 .checked {
-  border-color: var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  color: var(--color-accent);
 }
 
 .checkIcon {
