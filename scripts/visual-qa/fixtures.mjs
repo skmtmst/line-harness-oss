@@ -1740,3 +1740,75 @@ export const REF_SUMMARY = {
   friendsWithRef: 289,
   friendsWithoutRef: 23,
 }
+
+/**
+ * 機能20 分析。設計 `J6Inc`（この30日に18回・のべ86,420人・押された割合6.8%）に
+ * だいたい合わせる。
+ *
+ * **どれも通の配列。** 一覧の既定を返すと日ごとの棒が描けない。
+ */
+export const ANALYTICS_MESSAGES = Array.from({ length: 30 }, (_, i) => {
+  const day = new Date(Date.UTC(2026, 6, 27 + i))
+  const iso = day.toISOString().slice(0, 10)
+  /* 8/13 は一斉配信「夏のご案内」を出した日。設計の説明に合わせて山を作る。 */
+  const spike = iso === '2026-08-13'
+  return {
+    date: iso,
+    outgoing: spike ? 4820 : 900 + ((i * 37) % 400),
+    incoming: 120 + ((i * 13) % 60),
+    reply: 80 + ((i * 7) % 40),
+    push: spike ? 4700 : 800 + ((i * 29) % 350),
+    fromBroadcast: spike ? 4600 : 300 + ((i * 17) % 200),
+    fromScenario: 200 + ((i * 11) % 120),
+  }
+})
+
+export const ANALYTICS_BROADCASTS = [
+  {
+    broadcastId: 'broadcast-1', name: '夏のご案内', sentAt: '2026-08-13T02:00:00.000Z',
+    delivered: 4801, uniqueImpression: 3120, uniqueClick: 326, suppressedByAudienceSize: false,
+  },
+  {
+    broadcastId: 'broadcast-2', name: '定期便のお知らせ', sentAt: '2026-08-20T11:00:00.000Z',
+    delivered: 3860, uniqueImpression: 2410, uniqueClick: 262, suppressedByAudienceSize: false,
+  },
+  {
+    /* **20人未満は開封が取れない。** `null` で撮れることが要る。 */
+    broadcastId: 'broadcast-3', name: '社内テスト配信', sentAt: '2026-08-18T00:00:00.000Z',
+    delivered: 12, uniqueImpression: null, uniqueClick: null, suppressedByAudienceSize: true,
+  },
+]
+
+export const ANALYTICS_TRACKED_LINKS = [
+  {
+    trackedLinkId: 'tl-1', name: '夏の特集ページ', originalUrl: 'https://example.co.jp/summer',
+    shortCode: 's3k9', tagName: '夏CP', scenarioName: null, isActive: true,
+    clicks: 1840, uniqueFriends: 812,
+  },
+  {
+    trackedLinkId: 'tl-2', name: '空き枠を見る', originalUrl: 'https://example.co.jp/slots',
+    shortCode: 'b7m2', tagName: null, scenarioName: '体験前フォロー', isActive: true,
+    clicks: 1420, uniqueFriends: 704,
+  },
+  {
+    trackedLinkId: 'tl-3', name: '資料ダウンロード', originalUrl: 'https://example.co.jp/download',
+    shortCode: 'd1x4', tagName: null, scenarioName: null, isActive: true,
+    clicks: 922, uniqueFriends: 348,
+  },
+  {
+    /* 設計 `Fh2Qj`「押されていないURL 6・配信4本の中」。**0で撮れることが要る。** */
+    trackedLinkId: 'tl-4', name: '旧キャンペーン', originalUrl: 'https://example.co.jp/spring',
+    shortCode: 'p0q8', tagName: null, scenarioName: null, isActive: false,
+    clicks: 0, uniqueFriends: 0,
+  },
+]
+
+/** クロス集計。`{row, col, count}` の通。 */
+export const ANALYTICS_CROSS = [
+  { row: '店頭QRコード', col: '体験申込', count: 128 },
+  { row: '店頭QRコード', col: '未申込', count: 214 },
+  { row: 'Instagramプロフィール', col: '体験申込', count: 86 },
+  { row: 'Instagramプロフィール', col: '未申込', count: 296 },
+  { row: '紹介キャンペーン', col: '体験申込', count: 42 },
+  { row: '紹介キャンペーン', col: '未申込', count: 114 },
+]

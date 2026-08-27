@@ -91,6 +91,9 @@ const INFLOW = { feature: 18, dir: 'inflow-v6', mode: 'page' }
 /** コンバージョン。成果地点とレポートは `/conversions?tab=` の2タブ。 */
 const CONVERSION = { feature: 19, dir: 'conversions-v6', mode: 'page' }
 
+/** 分析。`/analytics?tab=` の5タブ（送信数／ファネル／クロス集計／URLクリック／GA）。 */
+const ANALYTICS = { feature: 20, dir: 'analytics-v6', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -807,6 +810,43 @@ export const SCREENS = [
     ...CONVERSION, node: 'd8d3Mz', name: '19-1-C 成果地点の削除確認',
     status: 'unimplemented',
     why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**',
+  },
+
+  // ── 機能20 分析 ─────────────────────────────────────────
+  /*
+    設計のタブは8本（友だちの増減／配信の反応／経路と成果／使われ方／
+    クロス分析／ファネル／URLクリック／保存した分析18）。
+    実装は5本で、**4本が無く、代わりに「Google Analytics」がある**
+    （中身は Search Console の画面）。
+  */
+  {
+    ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）',
+    status: 'unimplemented',
+    why: '友だちの増減を日ごとに並べるタブが無い。増えた・減った・残っている割合をまとめて見る場所が無い',
+  },
+  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=messages' },
+  {
+    ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果',
+    status: 'unimplemented',
+    why: '経路ごとに広告費と成果を差し引きまで出すタブが無い。**赤字の経路が分からない**',
+  },
+  {
+    ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方',
+    status: 'unimplemented',
+    why: '作ったのに使っていないものを数えるタブが無い。片づける導線も無い',
+  },
+  {
+    ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
+    status: 'unimplemented',
+    why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が0件）',
+  },
+  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross' },
+  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel' },
+  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=clicks' },
+  {
+    ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析',
+    status: 'unimplemented',
+    why: '分析の条件を保存する仕組みが無い。**設計は結果までそのまま残す**（あとから軸を変えても過去の結果は書き換わらない）',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
