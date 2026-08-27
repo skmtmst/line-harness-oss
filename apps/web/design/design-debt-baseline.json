@@ -328,7 +328,7 @@
     "direct-th": 5
   },
   "app/settings/page.tsx": {
-    "arbitrary-value": 57,
+    "arbitrary-value": 42,
     "unresolved-classname": 1
   },
   "app/staff/new/page.tsx": {

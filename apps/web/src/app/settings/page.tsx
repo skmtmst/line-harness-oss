@@ -1,7 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import Toggle from '@/components/shared/toggle'
 import { api } from '@/lib/api'
 import {
   DEFAULT_FEATURES,
@@ -16,38 +19,6 @@ import {
   type FeatureItem,
   type MenuItemOrder,
 } from '@/lib/feature-settings'
-
-function Switch({
-  checked,
-  disabled = false,
-  label,
-  onChange,
-}: {
-  checked: boolean
-  disabled?: boolean
-  label: string
-  onChange?: (next: boolean) => void
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange?.(!checked)}
-      className={`relative h-6 w-10 shrink-0 rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#06c755] ${
-        checked && !disabled ? 'bg-[#06c755]' : 'bg-[#dedede]'
-      } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-    >
-      <span
-        className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-          checked ? 'translate-x-4' : 'translate-x-0'
-        }`}
-      />
-    </button>
-  )
-}
 
 function LockIcon() {
   return (
@@ -84,18 +55,19 @@ function GripIcon() {
   )
 }
 
-function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
+function groupSummary(group: FeatureGroup, features: Record<string, boolean>, mode: 'features' | 'order') {
   const total = groupFeatureCount(group)
-  if (total === 0) return 'この区分の項目は消せません（並び順だけ変えられます）'
+  if (total === 0) return mode === 'features' ? 'この区分の項目はオフにできません' : 'この区分の中で並びを変えられます'
   const enabled = groupEnabledCount(group, features)
   if (enabled === total) return `${total}機能すべて有効`
   if (enabled === 0) return `${total}機能すべて無効`
   return `${total}機能中 ${enabled}つが有効`
 }
 
-function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }: {
+function FeatureRow({ item, features, mode, canMoveUp, canMoveDown, onMove, onToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
+  mode: 'features' | 'order'
   canMoveUp: boolean
   canMoveDown: boolean
   onMove: (itemId: string, direction: -1 | 1) => void
@@ -105,7 +77,7 @@ function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }
   return (
     <li className="flex min-h-[62px] items-center justify-between gap-4 px-4 py-3 sm:px-5">
       <div className="flex min-w-0 items-start gap-2.5">
-        <span className="mt-0.5"><GripIcon /></span>
+        {mode === 'order' && <span className="mt-0.5"><GripIcon /></span>}
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-bold text-[#565656]">{item.label}</p>
@@ -119,7 +91,7 @@ function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
-        <button
+        {mode === 'order' && <><button
           type="button"
           aria-label={`${item.label}を上へ`}
           title="上へ移動"
@@ -139,25 +111,26 @@ function FeatureRow({ item, features, canMoveUp, canMoveDown, onMove, onToggle }
         >
           ↓
         </button>
-        <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-[#dedede]" />
+        <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-[#dedede]" /></>}
         <span className={`text-xs font-bold ${enabled && !item.required ? 'text-[#00b84f]' : 'text-[#777]'}`}>
           {item.required ? '必須' : enabled ? 'オン' : 'オフ'}
         </span>
         {item.required && <LockIcon />}
-        <Switch
+        {mode === 'features' && <Toggle
           checked={enabled}
-          disabled={item.required}
+          locked={item.required}
           label={item.required ? `${item.label}は必須機能です` : `${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
           onChange={(next) => onToggle(item, next)}
-        />
+        />}
       </div>
     </li>
   )
 }
 
-function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }: {
+function FeatureSection({ group, features, mode, onItemToggle, onGroupToggle, onMove }: {
   group: FeatureGroup
   features: Record<string, boolean>
+  mode: 'features' | 'order'
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
   onMove: (groupId: string, itemId: string, direction: -1 | 1) => void
@@ -169,9 +142,9 @@ function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }
       <div className="flex min-h-[42px] items-center justify-between gap-4 border-b border-[#e5e5e5] bg-[#fafafa] px-4 py-2.5 sm:px-5">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
           <h2 className="text-sm font-bold text-[#202020]">{group.label}</h2>
-          <p className="text-[10px] text-[#777]">{groupSummary(group, features)}</p>
+          <p className="text-[10px] text-[#777]">{groupSummary(group, features, mode)}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        {mode === 'features' && <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             aria-disabled={total === 0}
@@ -180,7 +153,7 @@ function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }
           >
             グループごと切替
           </button>
-        </div>
+        </div>}
       </div>
       <ul className="divide-y divide-[#e8e8e8]">
         {group.items.map((item, index) => (
@@ -188,6 +161,7 @@ function FeatureSection({ group, features, onItemToggle, onGroupToggle, onMove }
             key={item.id}
             item={item}
             features={features}
+            mode={mode}
             canMoveUp={index > 0}
             canMoveDown={index < group.items.length - 1}
             onMove={(itemId, direction) => onMove(group.id, itemId, direction)}
@@ -254,13 +228,16 @@ function SidebarPreview({ groups, features }: {
   )
 }
 
-export default function SettingsPage() {
+function SettingsPageHost() {
   const { selectedAccountId } = useAccount()
+  const params = useSearchParams()
+  const mode: 'features' | 'order' = params.get('view') === 'order' ? 'order' : 'features'
   const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
   const [features, setFeatures] = useState<Record<string, boolean>>(DEFAULT_FEATURES)
   const [savedItemOrder, setSavedItemOrder] = useState<MenuItemOrder>({})
   const [itemOrder, setItemOrder] = useState<MenuItemOrder>({})
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
+  const [version, setVersion] = useState(0)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -285,6 +262,7 @@ export default function SettingsPage() {
       const nextOrder = response.data.sidebarItemOrder ?? {}
       setSavedItemOrder(nextOrder)
       setItemOrder(nextOrder)
+      setVersion(response.data.version)
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
     } catch {
       setError('機能設定を読み込めませんでした。時間をおいてもう一度お試しください。')
@@ -372,11 +350,14 @@ export default function SettingsPage() {
       const response = await api.featureSettings.save(selectedAccountId, {
         features,
         sidebarItemOrder: currentOrder,
+        expectedVersion: version,
       })
       if (!response.success) {
         setError(response.error)
+        if (response.error.includes('先に変更')) void load()
         return
       }
+      setVersion(response.data.version)
       setSavedFeatures({ ...features })
       setSavedItemOrder(currentOrder)
       setItemOrder(currentOrder)
@@ -390,47 +371,31 @@ export default function SettingsPage() {
   }
 
   return (
-    <div>
-      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-[30px] font-bold tracking-tight text-[#202020]">機能設定</h1>
-          <p className="mt-1 text-xs leading-relaxed text-[#777]">
-            使わない機能をオフにすると、サイドメニューから消えます。データは残るので、あとからオンに戻せば元どおりです。並び順は↑↓で、同じ区分の中だけ入れ替えられます。
-          </p>
-        </div>
+    <div data-design-node={mode === 'features' ? 'c4R6F' : 'qNpAZ'}>
+      <div className="mb-5 flex flex-col gap-3 rounded-card bg-info-bg px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <p className="max-w-4xl text-xs leading-relaxed text-ink-secondary">
+          {mode === 'features'
+            ? 'オフにしても作ったデータは削除されません。公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」で変更します。'
+            : '同じ区分の中だけで順番を変えられます。右側で、保存後のサイドメニューを確認できます。'}
+        </p>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
-          <button
-            type="button"
+          {mode === 'features'
+            ? <Button href="/settings?view=order">並びを変える</Button>
+            : <Button href="/settings">機能の表示へ戻る</Button>}
+          <Button
             onClick={() => {
-              setFeatures({ ...DEFAULT_FEATURES })
-              setItemOrder({})
+              if (mode === 'features') setFeatures({ ...DEFAULT_FEATURES })
+              else setItemOrder({})
               setNotice('')
             }}
             disabled={loading || saving}
-            className="min-h-10 cursor-pointer rounded-lg border border-[#d9d9d9] bg-white px-4 text-sm font-bold text-[#444] hover:bg-[#fafafa] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            初期値に戻す
-          </button>
-          <button
-            type="button"
-            onClick={() => void save()}
-            disabled={loading || saving}
-            className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg bg-[#06c755] px-5 text-sm font-bold text-white hover:bg-[#05b34c] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-              <path d="m4 10 3.5 3.5L16 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            {saving ? '保存中…' : '保存'}
-          </button>
+            {mode === 'features' ? '機能を初期値に戻す' : '並び順を初期値に戻す'}
+          </Button>
+          <Button variant="primary" onClick={() => void save()} disabled={loading || saving || !dirty}>
+            {saving ? '保存中…' : mode === 'features' ? '機能設定を保存' : '並び順を保存'}
+          </Button>
         </div>
-      </div>
-
-      <div className="mb-5 flex items-start gap-3 rounded-[16px] bg-[#edf8ff] px-5 py-3.5 text-xs leading-relaxed text-[#3f4b53]">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="mt-px h-4 w-4 shrink-0 text-[#0066d6]">
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M12 10.5v6M12 7.5h.01" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        </svg>
-        <p>オフにしても、その機能で作ったデータ（タグ・配信履歴・予約など）は削除されません。APIも動いたままなので、管理画面から隠れるだけです。</p>
       </div>
 
       {!selectedAccountId ? (
@@ -447,19 +412,20 @@ export default function SettingsPage() {
           {loading ? (
             <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">読み込み中…</div>
           ) : (
-            <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <div className={mode === 'features' ? 'grid items-start gap-5 xl:grid-cols-3' : 'grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]'}>
               {/*
                 区分ごとの印は付けない。区分と項目はサイドメニューと同じ一覧
                 （src/lib/menu.ts）から作るので、並びと顔ぶれは
                 sidebar-design.test.ts が見ている。ここで二重に縛ると、
                 項目を1つ足すたびに2か所直すことになる。
               */}
-              <div data-design="機能の一覧" className="space-y-5">
+              <div data-design="機能の一覧" className={mode === 'features' ? 'grid gap-5 xl:col-span-3 xl:grid-cols-3' : 'space-y-5'}>
                 {groups.map((group) => (
                   <div key={group.id}>
                     <FeatureSection
                       group={group}
                       features={features}
+                      mode={mode}
                       onItemToggle={toggleItem}
                       onGroupToggle={toggleGroup}
                       onMove={moveItem}
@@ -467,11 +433,15 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
-              <SidebarPreview groups={groups} features={features} />
+              {mode === 'order' && <SidebarPreview groups={groups} features={features} />}
             </div>
           )}
         </>
       )}
     </div>
   )
+}
+
+export default function SettingsPage() {
+  return <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}><SettingsPageHost /></Suspense>
 }

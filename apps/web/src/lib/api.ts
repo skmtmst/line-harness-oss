@@ -1317,6 +1317,8 @@ export const api = {
         sidebarOrder: string[] | null
         /** 区分ごとの項目の並び。区分の目印 → 項目の目印の並び。 */
         sidebarItemOrder: Record<string, string[]> | null
+        /** 同じ画面を開いた別の管理者による上書きを防ぐ版番号。 */
+        version: number
         parentChildMode: boolean
         specializedFeatureKeys: string[]
       }>>(
@@ -1326,8 +1328,9 @@ export const api = {
       features?: Record<string, boolean>
       sidebarOrder?: string[]
       sidebarItemOrder?: Record<string, string[]>
+      expectedVersion: number
     }) =>
-      fetchApi<ApiResponse<null>>(
+      fetchApi<ApiResponse<{ version: number }>>(
         `/api/settings/features?account_id=${encodeURIComponent(accountId)}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),

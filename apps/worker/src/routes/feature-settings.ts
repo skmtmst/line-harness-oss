@@ -1,8 +1,13 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import { getAccountSetting, setAccountSetting } from '@line-crm/db';
+import {
+  getAccountSetting,
+  getVersionedAccountSetting,
+  saveVersionedAccountSetting,
+} from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 /**
  * 機能のオン／オフ。
@@ -76,6 +81,15 @@ const SIDEBAR_ORDER_KEY = 'sidebar.order';
 const SIDEBAR_ITEM_ORDER_KEY = 'sidebar.item_order';
 const PARENT_CHILD_MODE_KEY = 'organization.parent_child_enabled';
 const SPECIALIZED_CATALOG_KEY = 'feature.specialized.catalog';
+const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
+
+type FeatureSettingsData = {
+  features: Record<string, boolean>;
+  sidebarOrder: string[] | null;
+  sidebarItemOrder: Record<string, string[]> | null;
+};
+
+type FeatureSettingsState = FeatureSettingsData & { version: number };
 
 /** V2 10-3 の初期表示。記録が無い契約ではこの状態から始める。 */
 export const DEFAULT_DISABLED_FEATURES = new Set<ToggleableFeature>([
@@ -144,45 +158,76 @@ function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') || null;
 }
 
+function cleanStringArray(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const values = raw.filter((value): value is string => typeof value === 'string' && value.length > 0);
+  if (values.length !== raw.length || new Set(values).size !== values.length) return null;
+  return values;
+}
+
+function cleanItemOrder(raw: unknown): Record<string, string[]> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const cleaned: Record<string, string[]> = {};
+  for (const [sectionId, ids] of Object.entries(raw as Record<string, unknown>)) {
+    if (!sectionId) return null;
+    const values = cleanStringArray(ids);
+    if (!values) return null;
+    cleaned[sectionId] = values;
+  }
+  return cleaned;
+}
+
+async function loadLegacyFeatureSettings(db: D1Database, accountId: string): Promise<FeatureSettingsData> {
+  const rawFeatures = await Promise.all(
+    TOGGLEABLE_FEATURES.map((key) => getAccountSetting(db, accountId, `${SETTING_PREFIX}${key}`)),
+  );
+  const features: Record<string, boolean> = {};
+  TOGGLEABLE_FEATURES.forEach((key, index) => {
+    features[key] = featureIsEnabled(rawFeatures[index] ?? null, key);
+  });
+
+  const [orderRaw, itemOrderRaw] = await Promise.all([
+    getAccountSetting(db, accountId, SIDEBAR_ORDER_KEY),
+    getAccountSetting(db, accountId, SIDEBAR_ITEM_ORDER_KEY),
+  ]);
+  let sidebarOrder: string[] | null = null;
+  let sidebarItemOrder: Record<string, string[]> | null = null;
+  try { sidebarOrder = orderRaw ? cleanStringArray(JSON.parse(orderRaw)) : null; } catch { sidebarOrder = null; }
+  try { sidebarItemOrder = itemOrderRaw ? cleanItemOrder(JSON.parse(itemOrderRaw)) : null; } catch { sidebarItemOrder = null; }
+  return { features, sidebarOrder, sidebarItemOrder };
+}
+
+async function loadFeatureSettings(db: D1Database, accountId: string): Promise<FeatureSettingsState> {
+  const saved = await getVersionedAccountSetting<FeatureSettingsData>(
+    db,
+    accountId,
+    FEATURE_SETTINGS_BUNDLE_KEY,
+  );
+  if (!saved) return { ...(await loadLegacyFeatureSettings(db, accountId)), version: 0 };
+
+  const features: Record<string, boolean> = {};
+  for (const key of TOGGLEABLE_FEATURES) {
+    const value = saved.data.features?.[key];
+    features[key] = typeof value === 'boolean' ? value : featureIsEnabled(null, key);
+  }
+  return {
+    version: saved.version,
+    features,
+    sidebarOrder: cleanStringArray(saved.data.sidebarOrder) ?? null,
+    sidebarItemOrder: cleanItemOrder(saved.data.sidebarItemOrder) ?? null,
+  };
+}
+
+// サイドメニューも同じ結果を読むためGETは認証済みユーザーに開く。
+// 変更は下のPUTでowner/adminに限定する。
 featureSettings.get('/api/settings/features', async (c) => {
   try {
     const accountId = getAccountId(c);
     if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
-
-    const features: Record<string, boolean> = {};
-    for (const key of TOGGLEABLE_FEATURES) {
-      const raw = await getAccountSetting(c.env.DB, accountId, `${SETTING_PREFIX}${key}`);
-      features[key] = featureIsEnabled(raw, key);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
     }
-
-    const orderRaw = await getAccountSetting(c.env.DB, accountId, SIDEBAR_ORDER_KEY);
-    let sidebarOrder: string[] | null = null;
-    if (orderRaw) {
-      try {
-        const parsed = JSON.parse(orderRaw) as unknown;
-        if (Array.isArray(parsed)) sidebarOrder = parsed.map(String);
-      } catch {
-        sidebarOrder = null;
-      }
-    }
-
-    const itemOrderRaw = await getAccountSetting(c.env.DB, accountId, SIDEBAR_ITEM_ORDER_KEY);
-    let sidebarItemOrder: Record<string, string[]> | null = null;
-    if (itemOrderRaw) {
-      try {
-        const parsed = JSON.parse(itemOrderRaw) as unknown;
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          const cleaned: Record<string, string[]> = {};
-          for (const [sectionId, ids] of Object.entries(parsed as Record<string, unknown>)) {
-            if (Array.isArray(ids)) cleaned[sectionId] = ids.map(String);
-          }
-          sidebarItemOrder = cleaned;
-        }
-      } catch {
-        // 壊れていたら既定の並びで出す。読めない値で画面を落とさない。
-        sidebarItemOrder = null;
-      }
-    }
+    const state = await loadFeatureSettings(c.env.DB, accountId);
 
     const [parentChildRaw, specializedRaw] = await Promise.all([
       getAccountSetting(c.env.DB, accountId, PARENT_CHILD_MODE_KEY),
@@ -192,9 +237,10 @@ featureSettings.get('/api/settings/features', async (c) => {
     return c.json({
       success: true,
       data: {
-        features,
-        sidebarOrder,
-        sidebarItemOrder,
+        features: state.features,
+        sidebarOrder: state.sidebarOrder,
+        sidebarItemOrder: state.sidebarItemOrder,
+        version: state.version,
         parentChildMode: settingIsEnabled(parentChildRaw),
         specializedFeatureKeys: specializedCatalog(specializedRaw),
       },
@@ -209,12 +255,20 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
   try {
     const accountId = getAccountId(c);
     if (!accountId) return c.json({ success: false, error: 'account_id が必要です' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
 
     const body = await c.req.json<{
       features?: Record<string, unknown>;
       sidebarOrder?: unknown;
       sidebarItemOrder?: unknown;
+      expectedVersion?: unknown;
     }>();
+
+    if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
+      return c.json({ success: false, error: 'expectedVersion は0以上の整数で指定してください' }, 400);
+    }
 
     const unknownKeys = Object.keys(body.features ?? {}).filter((k) => !isToggleable(k));
     if (unknownKeys.length > 0) {
@@ -223,49 +277,42 @@ featureSettings.put('/api/settings/features', requireRole('owner', 'admin'), asy
         400,
       );
     }
-
-    for (const [key, value] of Object.entries(body.features ?? {})) {
-      await setAccountSetting(
-        c.env.DB,
-        accountId,
-        `${SETTING_PREFIX}${key}`,
-        JSON.stringify({ enabled: value !== false }),
-      );
+    const invalidFeature = Object.entries(body.features ?? {}).find(([, value]) => typeof value !== 'boolean');
+    if (invalidFeature) {
+      return c.json({ success: false, error: `${invalidFeature[0]} はtrueまたはfalseで指定してください` }, 400);
     }
 
+    let sidebarOrder: string[] | null | undefined;
     if (body.sidebarOrder !== undefined) {
-      if (!Array.isArray(body.sidebarOrder)) {
-        return c.json({ success: false, error: 'sidebarOrder は配列で指定してください' }, 400);
-      }
-      await setAccountSetting(
-        c.env.DB,
-        accountId,
-        SIDEBAR_ORDER_KEY,
-        JSON.stringify(body.sidebarOrder.map(String)),
-      );
+      sidebarOrder = cleanStringArray(body.sidebarOrder);
+      if (!sidebarOrder) return c.json({ success: false, error: 'sidebarOrder は重複のない文字列配列で指定してください' }, 400);
     }
 
+    let sidebarItemOrder: Record<string, string[]> | null | undefined;
     if (body.sidebarItemOrder !== undefined) {
-      const raw = body.sidebarItemOrder;
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-        return c.json({ success: false, error: 'sidebarItemOrder はオブジェクトで指定してください' }, 400);
-      }
-      const cleaned: Record<string, string[]> = {};
-      for (const [sectionId, ids] of Object.entries(raw as Record<string, unknown>)) {
-        if (!Array.isArray(ids)) {
-          return c.json({ success: false, error: `sidebarItemOrder.${sectionId} は配列で指定してください` }, 400);
-        }
-        cleaned[sectionId] = ids.map(String);
-      }
-      await setAccountSetting(
-        c.env.DB,
-        accountId,
-        SIDEBAR_ITEM_ORDER_KEY,
-        JSON.stringify(cleaned),
-      );
+      sidebarItemOrder = cleanItemOrder(body.sidebarItemOrder);
+      if (!sidebarItemOrder) return c.json({ success: false, error: 'sidebarItemOrder は重複のない文字列配列を持つオブジェクトで指定してください' }, 400);
     }
 
-    return c.json({ success: true, data: null });
+    const current = await loadFeatureSettings(c.env.DB, accountId);
+    const result = await saveVersionedAccountSetting(c.env.DB, {
+      accountId,
+      key: FEATURE_SETTINGS_BUNDLE_KEY,
+      expectedVersion: Number(body.expectedVersion),
+      data: {
+        features: { ...current.features, ...(body.features ?? {}) } as Record<string, boolean>,
+        sidebarOrder: sidebarOrder === undefined ? current.sidebarOrder : sidebarOrder,
+        sidebarItemOrder: sidebarItemOrder === undefined ? current.sidebarItemOrder : sidebarItemOrder,
+      },
+    });
+    if (result.status === 'conflict') {
+      return c.json({
+        success: false,
+        error: '別の管理者が先に変更しました。最新の設定を読み直してください。',
+      }, 409);
+    }
+
+    return c.json({ success: true, data: { version: result.setting.version } });
   } catch (err) {
     console.error('PUT /api/settings/features error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
