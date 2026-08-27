@@ -306,38 +306,85 @@ export const FRIEND_FIELDS = [
   updatedAt: '2026-01-13T00:00:00.000Z',
 }))
 
-/** 4-3 `rIhbN` の4件。色は設計の札の色。 */
+/**
+ * 4-3 `rIhbN` の4件。色は設計の札の色。
+ *
+ * `autoOnInbound` を必ず入れる。**入れないと4行とも空のチェック箱になり、
+ * 「受信時に自動で付く」印が付いているのか外れているのかが画像から
+ * 読めない。**設計の「自動変更」列は 未対応=受信時・期限超過 なので、
+ * 受信時に当たるのは未対応の1件だけ。
+ */
 export const SUPPORT_MARKS = [
-  ['未対応', '#E5484D', 23, true],
-  ['対応中', '#F5C56B', 19, false],
-  ['対応済', '#06C755', 186, false],
-  ['保留', '#8B938D', 3, false],
-].map(([name, color, friendCount, isDefault], index) => ({
+  ['未対応', '#E5484D', 23, true, true],
+  ['対応中', '#F5C56B', 19, false, false],
+  ['対応済', '#06C755', 186, false, false],
+  ['保留', '#8B938D', 3, false, false],
+].map(([name, color, friendCount, isDefault, autoOnInbound], index) => ({
   id: `mark-${index}`,
   name: String(name),
   color: String(color),
   displayOrder: index,
   isDefault: Boolean(isDefault),
+  autoOnInbound: Boolean(autoOnInbound),
   friendCount: Number(friendCount),
   createdAt: '2026-01-13T00:00:00.000Z',
   updatedAt: '2026-01-13T00:00:00.000Z',
 }))
 
-/** 4-4 `QKx8Q` の5行。絵は「1〜12 / 12件」なので、母数は12件。 */
+/**
+ * 4-4 `QKx8Q` の5行。絵は「1〜12 / 12件」なので、母数は12件。
+ *
+ * **`SavedSearch` の形に合わせる。** 最初は `visibility` `ownerName`
+ * `matchCount` という別名で書いてしまい、画面が読む `isShared` と
+ * `conditions` が無かった。結果、5行とも「自分だけ」「指定なし」で
+ * 描かれ、共有の札も条件の要約も**一度も試されないまま基準画像になった**。
+ *
+ * 条件は設計の「条件の要約」列そのまま。`describeOne` は
+ * `field / op / value` を並べて1行にする。
+ *
+ * 日時は 03:00Z に置く。UTC・JST・UTC+7 のどれで撮っても同じ日付になる。
+ * 端の時刻にすると、撮る機械によって日付が1日ずれる。
+ */
 export const SAVED_SEARCHES = [
-  ['VIPかつ未契約', 18, 'shared', 'Kenta', '2026-08-20T10:20:00.000Z'],
-  ['誕生日30日前', 12, 'private', 'Kenta', '2026-08-20T09:10:00.000Z'],
-  ['未対応・担当なし', 11, 'shared', 'Kenta', '2026-08-19T11:05:00.000Z'],
-  ['購入者または予約者', 42, 'shared', 'Masato', '2026-08-18T05:30:00.000Z'],
-  ['離脱注意', 0, 'private', 'Kenta', '2026-08-17T02:22:00.000Z'],
-].map(([name, matchCount, visibility, owner, updatedAt], index) => ({
+  ['VIPかつ未契約', true, 'Kenta', '2026-08-20T03:00:00.000Z', {
+    all: [
+      { field: 'タグ', op: '次を含む', value: 'VIP' },
+      { field: 'タグ', op: '次を含む', value: '未契約' },
+    ],
+    any: [],
+  }],
+  ['誕生日30日前', false, 'Kenta', '2026-08-20T03:00:00.000Z', {
+    all: [{ field: '誕生日', op: '今日から', value: '30日以内' }],
+    any: [],
+  }],
+  ['未対応・担当なし', true, 'Kenta', '2026-08-19T03:00:00.000Z', {
+    all: [
+      { field: '対応マーク', op: '次と一致', value: '未対応' },
+      { field: '担当者', op: 'なし', value: '' },
+    ],
+    any: [],
+  }],
+  ['購入者または予約者', true, 'Masato', '2026-08-18T03:00:00.000Z', {
+    all: [],
+    any: [
+      { field: 'タグ', op: '次を含む', value: '購入' },
+      { field: '予約', op: 'あり', value: '' },
+    ],
+  }],
+  ['離脱注意', false, 'Kenta', '2026-08-17T03:00:00.000Z', {
+    all: [
+      { field: '最終返信', op: '次より前', value: '60日' },
+      { field: '友だち状態', op: '次と一致', value: '有効' },
+    ],
+    any: [],
+  }],
+].map(([name, isShared, createdBy, createdAt, conditions], index) => ({
   id: `search-${index}`,
   name: String(name),
-  conditions: { all: [], any: [] },
-  conditionsJson: JSON.stringify({ all: [], any: [] }),
-  matchCount: Number(matchCount),
-  visibility: String(visibility),
-  ownerName: String(owner),
-  createdAt: '2026-08-17T02:22:00.000Z',
-  updatedAt: String(updatedAt),
+  scope: 'friends',
+  conditions,
+  createdBy: String(createdBy),
+  isShared: Boolean(isShared),
+  displayOrder: index,
+  createdAt: String(createdAt),
 }))
