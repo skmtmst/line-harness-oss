@@ -112,6 +112,9 @@ const AUTOMATION = { feature: 25, dir: 'automations-v6', mode: 'page' }
 /** 外部連携。実装は受信／送信の2タブ（外側に Webhook／未対応の通知）。 */
 const WEBHOOK = { feature: 26, dir: 'webhooks-v6', route: '/webhooks', mode: 'page' }
 
+/** 予約管理・予約設定。`/booking/bookings` `/booking/menus` `/booking/staff`。 */
+const BOOKING = { feature: 27, dir: 'booking-v6', route: '/booking/bookings', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -1001,6 +1004,36 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能27 予約管理 ─────────────────────────────────────
+  /*
+    設計は台帳（時間×担当の格子）と、電話の代理予約が4枚。
+    実装は一覧＋詳細で、**「予約を追加」は押せない**
+    （「管理画面から予約を代理で入れる仕組みは準備中です」`bookings/page.tsx:289`）。
+  */
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理' },
+  {
+    ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
+    mode: 'viewport', height: 1136, steps: [{ click: '高橋 直人', role: 'text' }],
+  },
+  {
+    ...BOOKING, node: 'cpdDi', name: '27-1-B 電話の予約を入れる',
+    status: 'unimplemented',
+    why: '「予約を追加」は在るが**押せない（無効のまま）**。「管理画面から予約を代理で入れる仕組みは準備中です」と書いてある（`bookings/page.tsx:289`）',
+  },
+  { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }] },
+  {
+    ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
+    status: 'unimplemented', why: '27-1-B が無いので、その確認も無い',
+  },
+  {
+    ...BOOKING, node: 'GfceK', name: '27-1-E 代理予約・登録完了',
+    status: 'unimplemented', why: '27-1-B が無いので、その完了も無い',
+  },
+  {
+    ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
+    status: 'unimplemented', why: '27-1-B が無いので、その入力の検査も無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

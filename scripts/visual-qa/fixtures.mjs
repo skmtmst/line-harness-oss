@@ -2182,3 +2182,75 @@ export const INCOMING_WEBHOOKS = [
     createdAt: '2026-08-20T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
   },
 ]
+
+/**
+ * 機能27・28 予約。設計 `TV2DI`（今日12件・LINEから9・電話3）。
+ *
+ * **予約まわりの型はスネークケース**（`BookingRequest` `BookingMenu` `BookingStaff`）。
+ * ほかの機能と混ぜて書くと、名前も時刻も空のまま撮れる。
+ */
+export const BOOKING_MENUS = [
+  {
+    id: 'bm-1', name: 'トリミング（小型犬）', category_label: 'トリミング',
+    description: 'シャンプー・カット・爪切り', duration_minutes: 105,
+    buffer_after_minutes: 15, base_price: 8400, sort_order: 1, is_active: 1,
+    auto_tag_id: 'tag-0', concurrent_capacity: 1, booking_window_days: 60,
+    cutoff_hours_before: 12, cancel_deadline_hours_before: 24,
+    intake_question: '気になるところはありますか',
+  },
+  {
+    id: 'bm-2', name: 'トリミング（中型犬）', category_label: 'トリミング',
+    description: null, duration_minutes: 135, buffer_after_minutes: 15,
+    base_price: 11800, sort_order: 2, is_active: 1, auto_tag_id: 'tag-0',
+    concurrent_capacity: 1, booking_window_days: 60, cutoff_hours_before: 12,
+    cancel_deadline_hours_before: 24, intake_question: null,
+  },
+  {
+    id: 'bm-3', name: '爪切りのみ', category_label: 'お手入れ',
+    description: null, duration_minutes: 20, buffer_after_minutes: 5,
+    base_price: 1200, sort_order: 3, is_active: 1, auto_tag_id: null,
+    concurrent_capacity: 2, booking_window_days: 30, cutoff_hours_before: 2,
+    cancel_deadline_hours_before: 2, intake_question: null,
+  },
+  {
+    /* 止めているメニュー。**枠は残るが新しくは受けない。** */
+    id: 'bm-4', name: '夏のスペシャルコース', category_label: '季節',
+    description: null, duration_minutes: 150, buffer_after_minutes: 15,
+    base_price: 14800, sort_order: 4, is_active: 0, auto_tag_id: null,
+    concurrent_capacity: 1, booking_window_days: null,
+    cutoff_hours_before: null, cancel_deadline_hours_before: null,
+    intake_question: null,
+  },
+]
+
+export const BOOKING_STAFF = [
+  { id: 'bs-1', name: '佐々木 亮太', display_name: '佐々木', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 1, is_designation_optional: 0, is_active: 1 },
+  { id: 'bs-2', name: '山本 京子', display_name: '山本', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 2, is_designation_optional: 0, is_active: 1 },
+  { id: 'bs-3', name: '中川 みどり', display_name: '中川', role: '受付', profile_image_url: null, bio: null, sort_order: 3, is_designation_optional: 1, is_active: 1 },
+]
+
+const booking = (i, hour, menu, staff, status, friendName, note) => ({
+  id: `br-${i}`, friend_id: `friend-${(i % 5) + 1}`,
+  starts_at: `2026-08-25T${String(hour - 9).padStart(2, '0')}:00:00.000Z`,
+  ends_at: `2026-08-25T${String(hour - 9 + 1).padStart(2, '0')}:45:00.000Z`,
+  status, customer_note: note, internal_note: null,
+  price_at_booking: menu === 'トリミング（小型犬）' ? 8400 : 1200,
+  menu_name: menu, staff_name: staff, friend_name: friendName,
+  requested_at: '2026-08-20T05:22:00.000Z', decided_at: '2026-08-20T05:30:00.000Z',
+  external_event_id: null,
+})
+
+export const BOOKING_REQUESTS = [
+  booking(1, 9, 'トリミング（小型犬）', '佐々木', 'confirmed', '高橋 直人', '耳のまわりは短めでお願いします'),
+  booking(2, 11, 'トリミング（小型犬）', '山本', 'confirmed', 'Kenta Kawano', null),
+  booking(3, 13, '爪切りのみ', '中川', 'confirmed', 'Masato S.', null),
+  /* まだ決めていないもの。**受けるか断るかを人が押す。** */
+  booking(4, 15, 'トリミング（小型犬）', '佐々木', 'requested', '菅野 亮', '前回 爪を嫌がりました'),
+  /* 取り消されたもの。**枠は空くが記録は残る。** */
+  booking(5, 16, '爪切りのみ', '山本', 'cancelled', '山田 太郎', null),
+  /*
+    **LINEに結びついていない予約（電話で受けたもの）。**
+    `friend_name` が null。設計は青い札で並べる。
+  */
+  { ...booking(6, 17, 'トリミング（小型犬）', '佐々木', 'confirmed', null, '電話で受付'), friend_id: '' },
+]
