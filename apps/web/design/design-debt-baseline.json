@@ -309,7 +309,7 @@
     "direct-primary-button": 1
   },
   "app/scenarios/page.tsx": {
-    "direct-secondary-button": 4,
+    "direct-secondary-button": 3,
     "direct-primary-button": 1,
     "arbitrary-value": 1
   },

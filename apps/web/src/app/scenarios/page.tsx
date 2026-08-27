@@ -168,19 +168,18 @@ export default function ScenariosPage() {
         description="配信のタイミングを指定して複数のメッセージを順に送ります。友だちの反応に応じて分岐もできます。作成しただけでは配信されません。"
         action={
           <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="border-hairline bg-canvas-sunken text-ink-secondary rounded-control border px-3 py-2 text-sm font-medium"
+              title="表の左端の ⠿ を掴むと並べ替えられます"
+            >
+              ⇅ 並び替えは ⠿ を掴む
+            </span>
             <button
               disabled
-              title="準備中です"
+              title="マニュアルは準備中です"
               className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
             >
               マニュアル
-            </button>
-            <button
-              disabled
-              title="準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              並び替え
             </button>
           </div>
         }

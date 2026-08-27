@@ -27,4 +27,12 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST).toContain('kind="scenario"')
     expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
   })
+
+  it('並び替えは既に使える行のつまみを案内し、マニュアルを最後に置く', () => {
+    expect(LIST).toContain('⇅ 並び替えは ⠿ を掴む')
+    expect(LIST).not.toContain('>\n              並び替え\n            </button>')
+    expect(LIST.indexOf('⇅ 並び替えは ⠿ を掴む')).toBeLessThan(
+      LIST.indexOf('マニュアル\n            </button>'),
+    )
+  })
 })
