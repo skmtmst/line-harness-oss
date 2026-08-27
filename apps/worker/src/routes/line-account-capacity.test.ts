@@ -11,6 +11,8 @@ const mocks = {
   updateLineAccountOrder: vi.fn(),
   deleteLineAccount: vi.fn(),
   countFriendsByLineAccount: vi.fn(),
+  getStaffById: vi.fn(),
+  getStaffAccountScopeIds: vi.fn(),
 };
 vi.mock('@line-crm/db', () => mocks);
 
@@ -61,6 +63,8 @@ function patch(body: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getLineAccounts.mockResolvedValue([{ ...ACCOUNT, parent_line_account_id: null }]);
+  mocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+  mocks.getStaffAccountScopeIds.mockResolvedValue([]);
   mocks.getLineAccountById.mockResolvedValue(ACCOUNT);
   mocks.updateLineAccountFields.mockResolvedValue(ACCOUNT);
   mocks.updateLineAccount.mockResolvedValue(ACCOUNT);

@@ -11,7 +11,7 @@ import { sendStaffInviteEmail, sendStaffLineLinkEmail } from '../services/staff-
 import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import type { Env } from '../index.js';
 import { getLineAccounts } from '@line-crm/db';
-import { filterVisibleLineAccounts } from '../services/account-access.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const staff = new Hono<Env>();
@@ -88,7 +88,7 @@ async function mayAssignAccountScopes(
   if (requestedScope === 'all') return currentMember?.account_scope !== 'accounts';
   const allowedIds = currentMember?.account_scope === 'accounts'
     ? await getStaffAccountScopeIds(db, current.id)
-    : filterVisibleLineAccounts(await getLineAccounts(db), current).map((account) => account.id);
+    : (await getVisibleLineAccountScope(db, current)).allowedAccountIds;
   return requestedIds.every((id) => allowedIds.includes(id));
 }
 
@@ -216,7 +216,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     if (!body.assignedLineAccountId) {
       return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
     }
-    const visibleAccounts = filterVisibleLineAccounts(await getLineAccounts(c.env.DB), c.get('staff'));
+    const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
     if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
     }
@@ -336,7 +336,7 @@ staff.patch('/api/staff/:id', async (c) => {
     if (!body.assignedLineAccountId) {
       return c.json({ success: false, error: '担当するLINEアカウントを選択してください' }, 400);
     }
-    const visibleAccounts = filterVisibleLineAccounts(await getLineAccounts(c.env.DB), current);
+    const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, current)).accounts;
     if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
     }
