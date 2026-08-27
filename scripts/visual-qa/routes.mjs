@@ -32,6 +32,13 @@ export const ROUTES = [
    * 友だち属性のタブ3本。**`?tab=` でしか区別できない。**
    * ここを撮っていない間、4-2/4-3/4-4 は1枚も見張られていなかった。
    * 行き先の判定はクエリまで見る（`capture.spec.mjs` の `expectLanded`）。
+   *
+   * **この3枚は設計に一致していない。合格した基準ではない。**
+   * 設計 `HBTk0` `rIhbN` `QKx8Q` との差（KPI・絞り込み・列の欠落）は
+   * `docs/design-qa/friend-attributes-v6/design-qa.md` に出してある。
+   * ここに置いてあるのは「前回から変わっていないか」を見るための絵で、
+   * 設計に合っているかは見ていない。実装を直したら撮り直し、あの文書の
+   * 判定も一緒に更新する。
    */
   { name: 'tags-fields', path: '/tags?tab=fields', type: 'L' },
   { name: 'tags-marks', path: '/tags?tab=marks', type: 'L' },
