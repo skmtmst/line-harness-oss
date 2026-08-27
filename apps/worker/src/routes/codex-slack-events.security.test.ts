@@ -133,6 +133,31 @@ describe('Codex Slack relay security boundary', () => {
     expect(response.status).toBe(503);
   });
 
+  test('ケンタ専用の秘密値でも署名済みイベントを受け付ける', async () => {
+    const current = env();
+    delete current.CODEX_SLACK_RELAY_SECRET;
+    current.CODEX_SLACK_RELAY_SECRET_KENTA = 'kenta-relay-secret';
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, messages: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, ts: '123.456' })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, ts: '123.789' })));
+    vi.stubGlobal('fetch', fetcher);
+    const body = JSON.stringify(payload);
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const response = await app().request('/api/integrations/codex-slack/events', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-nen-timestamp': timestamp,
+        'x-nen-signature': await signSupportRelay('kenta-relay-secret', timestamp, body),
+      },
+      body,
+    }, current);
+
+    expect(response.status).toBe(200);
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
   test('未定義の再照合モードを署名済みでも拒否する', async () => {
     const body = JSON.stringify({ ...payload, eventSource: 'github', syncMode: 'unknown' });
     const response = await app().request('/api/integrations/codex-slack/events', {

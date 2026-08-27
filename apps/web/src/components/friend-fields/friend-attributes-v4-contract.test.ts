@@ -25,6 +25,15 @@ describe('友だち属性 V4 contract', () => {
     expect(page).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
   })
 
+  it('タグ編集と対応マーク削除はV6の結果を正しく案内する', () => {
+    const editor = read('components/friend-fields/tag-editor-v4.tsx')
+    const markList = read('components/friend-fields/mark-list.tsx')
+    expect(editor).toContain("mode === 'edit' ? 'この変更で起きること' : 'この設定で起きること'")
+    expect(editor).toContain('取り消せない操作です')
+    expect(markList).toContain('削除後に「${defaultMark?.name')
+    expect(markList).not.toContain('対応マークが未設定へ戻ります')
+  })
+
   it('一覧は20・30・40・50件で切り替え、ページを無限に横並びにしない', () => {
     const source = read('components/friend-fields/tags-page-v4.tsx')
     expect(source).toMatch(/\[20,\s*30,\s*40,\s*50\]/)
@@ -221,7 +230,7 @@ describe('友だち属性 V4 contract', () => {
   })
 
   it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {
-    expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 />')
+    expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 accountId={selectedAccountId} />')
     expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')
     expect(read('app/tags/edit/page.tsx')).toContain('<EditTagPageV4 />')
   })

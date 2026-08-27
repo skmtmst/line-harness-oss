@@ -419,24 +419,22 @@ async function ensureSlackChannelMembers(
   fetcher: typeof fetch,
 ): Promise<void> {
   if (desiredMembers.length === 0) return;
-  const currentMembers = new Set<string>();
-  let cursor = '';
-  for (let page = 0; page < MAX_HISTORY_PAGES; page += 1) {
-    const result = await slackApi(token, 'conversations.members', {
-      channel,
-      limit: 200,
-      ...(cursor ? { cursor } : {}),
-    }, fetcher);
-    for (const member of result.members || []) currentMembers.add(member);
-    cursor = result.response_metadata?.next_cursor || '';
-    if (!cursor) break;
+  // Slack can reject conversations.members with invalid_arguments even when
+  // the same bot can create, invite to, and post in the channel. Inviting one
+  // member at a time is idempotent once the two benign responses below are
+  // accepted, and avoids one bad/duplicate user aborting every invitation.
+  for (const member of desiredMembers) {
+    try {
+      await slackApi(token, 'conversations.invite', {
+        channel,
+        users: member,
+      }, fetcher);
+    } catch (error) {
+      const message = String(error);
+      if (message.includes(':already_in_channel') || message.includes(':cant_invite_self')) continue;
+      throw error;
+    }
   }
-  const missingMembers = desiredMembers.filter((member) => !currentMembers.has(member));
-  if (missingMembers.length === 0) return;
-  await slackApi(token, 'conversations.invite', {
-    channel,
-    users: missingMembers.join(','),
-  }, fetcher);
 }
 
 async function ensurePublicSlackChannel(

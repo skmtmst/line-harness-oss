@@ -19,8 +19,15 @@ import {
   getSupportMarks,
   setFriendSupportMarkBulk,
   applyInboundSupportMark,
+  replaceAndDeleteSupportMark,
 } from '../src/support-marks.js';
-import { validateSearchConditions, createSavedSearch } from '../src/saved-searches.js';
+import {
+  validateSearchConditions,
+  createSavedSearch,
+  getSavedSearches,
+  updateSavedSearch,
+  deleteSavedSearch,
+} from '../src/saved-searches.js';
 import { sanitizePath, sanitizeReferrer, linkVisitorToFriend, recordSiteEvent } from '../src/site-tracking.js';
 import {
   createCommonVar,
@@ -70,6 +77,18 @@ function asD1(sqlite: Database.Database): D1Database {
         },
       };
     },
+    async batch(statements: Array<{ run: () => Promise<unknown> }>) {
+      sqlite.exec('BEGIN');
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        sqlite.exec('COMMIT');
+        return results;
+      } catch (error) {
+        sqlite.exec('ROLLBACK');
+        throw error;
+      }
+    },
   } as unknown as D1Database;
 }
 
@@ -87,6 +106,13 @@ function insertFriend(id: string): void {
 
 beforeEach(() => {
   sqlite = setupDb();
+  sqlite.exec(`
+    INSERT INTO line_accounts
+      (id, channel_id, name, channel_access_token, channel_secret)
+    VALUES
+      ('account-1', 'channel-1', '店舗1', 'token-1', 'secret-1'),
+      ('account-2', 'channel-2', '店舗2', 'token-2', 'secret-2');
+  `);
   db = asD1(sqlite);
 });
 
@@ -282,6 +308,53 @@ describe('対応マーク', () => {
     expect(n).toBe(2);
   });
 
+  test('使用中マークは初期値へ置換し、友だちごとの履歴を残してから削除する', async () => {
+    await getSupportMarks(db);
+    insertFriend('f-1');
+    insertFriend('f-2');
+    await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], 'mark_working');
+
+    const replaced = await replaceAndDeleteSupportMark(
+      db,
+      'mark_working',
+      'mark_untouched',
+      'staff-1',
+    );
+
+    expect(replaced).toBe(2);
+    expect(
+      sqlite.prepare(`SELECT DISTINCT support_mark_id FROM friends ORDER BY support_mark_id`).all(),
+    ).toEqual([{ support_mark_id: 'mark_untouched' }]);
+    expect(
+      sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks WHERE id = 'mark_working'`).get(),
+    ).toEqual({ c: 0 });
+    expect(
+      sqlite
+        .prepare(
+          `SELECT friend_id, target_id, actor_id, detail_json
+             FROM operation_audit
+            WHERE action = 'changed'
+            ORDER BY friend_id`,
+        )
+        .all(),
+    ).toEqual([
+      {
+        friend_id: 'f-1',
+        target_id: 'mark_untouched',
+        actor_id: 'staff-1',
+        detail_json:
+          '{"previousMarkId":"mark_working","replacementMarkId":"mark_untouched","reason":"deleted_mark_replacement"}',
+      },
+      {
+        friend_id: 'f-2',
+        target_id: 'mark_untouched',
+        actor_id: 'staff-1',
+        detail_json:
+          '{"previousMarkId":"mark_working","replacementMarkId":"mark_untouched","reason":"deleted_mark_replacement"}',
+      },
+    ]);
+  });
+
   test('空の配列ではクエリを投げない', async () => {
     expect(await setFriendSupportMarkBulk(db, [], 'mark_working')).toBe(0);
   });
@@ -330,10 +403,46 @@ describe('保存した検索の条件', () => {
   test('保存できる', async () => {
     const saved = await createSavedSearch(db, {
       name: '犬の飼い主',
+      lineAccountId: 'account-1',
       conditions: { all: [{ kind: 'tag', op: 'has', value: 't1' }] },
     });
     expect(saved.scope).toBe('friends');
     expect(JSON.parse(saved.conditions_json)).toHaveProperty('all');
+  });
+
+  test('個人検索とLINEアカウントの境界をDB条件で守る', async () => {
+    await createSavedSearch(db, {
+      name: '本人だけ',
+      lineAccountId: 'account-1',
+      createdBy: 'staff-1',
+      isShared: false,
+      conditions: { all: [{ kind: 'tag', op: 'has', value: 't1' }] },
+    });
+    const otherPrivate = await createSavedSearch(db, {
+      name: '他人だけ',
+      lineAccountId: 'account-1',
+      createdBy: 'staff-2',
+      isShared: false,
+      conditions: { all: [{ kind: 'tag', op: 'has', value: 't2' }] },
+    });
+    await createSavedSearch(db, {
+      name: '別アカウント共有',
+      lineAccountId: 'account-2',
+      createdBy: 'staff-2',
+      isShared: true,
+      conditions: { all: [{ kind: 'tag', op: 'has', value: 't3' }] },
+    });
+    sqlite.prepare(
+      `INSERT INTO saved_searches
+         (id, name, scope, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
+       VALUES ('legacy-own', '旧検索', 'friends', '{}', 'staff-1', NULL, 0, 0, '2026-08-16')`,
+    ).run();
+
+    const access = { lineAccountId: 'account-1', staffId: 'staff-1', canManageAll: false };
+    const visible = await getSavedSearches(db, 'friends', access);
+    expect(visible.map((item) => item.name).sort()).toEqual(['本人だけ', '旧検索'].sort());
+    expect(await updateSavedSearch(db, otherPrivate.id, access, { name: '変更' })).toBeNull();
+    expect(await deleteSavedSearch(db, otherPrivate.id, access)).toBe(false);
   });
 });
 

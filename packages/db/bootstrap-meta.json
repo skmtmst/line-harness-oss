@@ -199,7 +199,8 @@
     "190_analytics_url_exposures.sql",
     "191_dashboard_preferences.sql",
     "192_inbox_v6_foundation.sql",
-    "193_incoming_webhook_and_entry_route_owner.sql"
+    "193_incoming_webhook_and_entry_route_owner.sql",
+    "194_saved_search_account_scope.sql"
   ],
-  "migrationCount": 200
+  "migrationCount": 201
 }

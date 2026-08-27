@@ -301,6 +301,7 @@ export interface SavedSearch {
   /** { all: [...], any: [...], visibility } の形 */
   conditions: unknown;
   createdBy: string | null;
+  lineAccountId: string | null;
   isShared: boolean;
   displayOrder: number;
   createdAt: string;

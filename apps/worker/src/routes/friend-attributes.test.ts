@@ -8,7 +8,9 @@ const marks = {
   createSupportMark: vi.fn(),
   updateSupportMark: vi.fn(),
   deleteSupportMark: vi.fn(),
+  replaceAndDeleteSupportMark: vi.fn(),
   countFriendsWithMark: vi.fn(),
+  getDefaultSupportMark: vi.fn(),
   setFriendSupportMark: vi.fn(),
   setFriendSupportMarkBulk: vi.fn(),
 };
@@ -29,6 +31,9 @@ const searches = {
     return { ok: true as const, value: obj };
   },
 };
+const accountAccess = {
+  getVisibleLineAccountScope: vi.fn(),
+};
 const folders = {
   getFolders: vi.fn(),
   getFolderById: vi.fn(),
@@ -39,13 +44,14 @@ const folders = {
     typeof v === 'string' && ['tag', 'template', 'media'].includes(v),
 };
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
+vi.mock('../services/account-access.js', () => accountAccess);
 
 const { friendAttributes } = await import('./friend-attributes.js');
 
 function makeApp(role: 'owner' | 'admin' | 'staff' = 'owner') {
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false });
+    c.set('staff', { id: 'u-1', name: 'テスト', role, readOnly: false, tenantId: 'tenant-1' });
     return next();
   });
   app.route('/', friendAttributes);
@@ -80,6 +86,7 @@ const SEARCH = {
   scope: 'friends',
   conditions_json: '{"all":[{"kind":"tag","op":"has","value":"t1"}]}',
   created_by: 'u-1',
+  line_account_id: 'account-1',
   is_shared: 1,
   display_order: 0,
   created_at: '2026-08-16',
@@ -101,13 +108,22 @@ beforeEach(() => {
   marks.getSupportMarkById.mockResolvedValue(MARK);
   marks.createSupportMark.mockResolvedValue(MARK);
   marks.updateSupportMark.mockResolvedValue(MARK);
+  marks.getDefaultSupportMark.mockResolvedValue(MARK);
+  marks.replaceAndDeleteSupportMark.mockResolvedValue(0);
   marks.countFriendsWithMark.mockResolvedValue(0);
   marks.setFriendSupportMarkBulk.mockResolvedValue(2);
   searches.getSavedSearches.mockResolvedValue([SEARCH]);
   searches.getSavedSearchById.mockResolvedValue(SEARCH);
   searches.createSavedSearch.mockResolvedValue(SEARCH);
   searches.updateSavedSearch.mockResolvedValue(SEARCH);
+  searches.deleteSavedSearch.mockResolvedValue(true);
   searches.countSavedSearches.mockResolvedValue(0);
+  accountAccess.getVisibleLineAccountScope.mockResolvedValue({
+    accounts: [{ id: 'account-1' }],
+    ids: ['account-1'],
+    allowedAccountIds: ['account-1'],
+    canSeeUnassigned: false,
+  });
   folders.getFolders.mockResolvedValue([FOLDER]);
   folders.getFolderById.mockResolvedValue(FOLDER);
   folders.createFolder.mockResolvedValue(FOLDER);
@@ -152,15 +168,34 @@ describe('対応マーク', () => {
     marks.countFriendsWithMark.mockResolvedValue(5);
     const res = await req('/api/support-marks/m-2', 'DELETE');
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { friendCount: number };
+    const body = (await res.json()) as {
+      friendCount: number;
+      replacementMark: { id: string; name: string };
+    };
     expect(body.friendCount).toBe(5);
+    expect(body.replacementMark).toMatchObject({ id: 'm-1', name: '未対応' });
   });
 
-  it('force=1 なら消す', async () => {
-    marks.getSupportMarkById.mockResolvedValue({ ...MARK, is_default: 0 });
+  it('force=1 なら初期値へ置換してから消す', async () => {
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
     marks.countFriendsWithMark.mockResolvedValue(5);
+    marks.replaceAndDeleteSupportMark.mockResolvedValue(5);
     const res = await req('/api/support-marks/m-2?force=1', 'DELETE');
     expect(res.status).toBe(200);
+    expect(marks.replaceAndDeleteSupportMark).toHaveBeenCalledWith(env.DB, 'm-2', 'm-1', 'u-1');
+    expect(marks.deleteSupportMark).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({
+      data: { replacedFriendCount: 5, replacementMark: { id: 'm-1' } },
+    });
+  });
+
+  it('誰にも付いていないマークはそのまま消す', async () => {
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
+    marks.countFriendsWithMark.mockResolvedValue(0);
+    const res = await req('/api/support-marks/m-2', 'DELETE');
+    expect(res.status).toBe(200);
+    expect(marks.deleteSupportMark).toHaveBeenCalledWith(env.DB, 'm-2');
+    expect(marks.replaceAndDeleteSupportMark).not.toHaveBeenCalled();
   });
 
   it('無いマークは付けられない', async () => {
@@ -193,7 +228,7 @@ describe('対応マーク', () => {
 describe('保存した検索', () => {
   it('50件を超えたら422', async () => {
     searches.countSavedSearches.mockResolvedValue(50);
-    const res = await req('/api/saved-searches', 'POST', {
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'POST', {
       name: 'x',
       conditions: { all: [{ kind: 'tag', op: 'has' }] },
     });
@@ -204,32 +239,90 @@ describe('保存した検索', () => {
   it('上限は条件の検証より先に見る', async () => {
     // 条件を通してから弾くと、書いた条件が無駄になる。
     searches.countSavedSearches.mockResolvedValue(50);
-    const res = await req('/api/saved-searches', 'POST', { name: 'x', conditions: {} });
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'POST', { name: 'x', conditions: {} });
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain('50');
   });
 
   it('条件が空なら422', async () => {
-    const res = await req('/api/saved-searches', 'POST', { name: 'x', conditions: {} });
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'POST', { name: 'x', conditions: {} });
     expect(res.status).toBe(422);
   });
 
-  it('知らない scope は friends に寄せる', async () => {
-    await req('/api/saved-searches', 'POST', {
+  it('別機能の scope は汎用APIで扱わない', async () => {
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'POST', {
       name: 'x',
       scope: 'planets',
       conditions: { all: [{ kind: 'tag', op: 'has' }] },
     });
-    expect(searches.createSavedSearch).toHaveBeenCalledWith(
-      env.DB,
-      expect.objectContaining({ scope: 'friends' }),
-    );
+    expect(res.status).toBe(400);
+    expect(searches.createSavedSearch).not.toHaveBeenCalled();
   });
 
   it('条件はJSONを解いて返す', async () => {
-    const res = await req('/api/saved-searches', 'GET');
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'GET');
     const body = (await res.json()) as { data: Array<{ conditions: { all: unknown[] } }> };
     expect(body.data[0].conditions.all).toHaveLength(1);
+  });
+
+  it('スタッフ一覧は同じアカウントの共有・本人と本人の旧検索だけを返す', async () => {
+    searches.getSavedSearches.mockResolvedValue([
+      SEARCH,
+      { ...SEARCH, id: 'own', created_by: 'u-1', is_shared: 0 },
+      { ...SEARCH, id: 'private', created_by: 'u-2', is_shared: 0 },
+      { ...SEARCH, id: 'other-account', line_account_id: 'account-2' },
+      { ...SEARCH, id: 'other-scope', scope: 'chats' },
+      { ...SEARCH, id: 'legacy-own', line_account_id: null, created_by: 'u-1', is_shared: 0 },
+      { ...SEARCH, id: 'legacy-other', line_account_id: null, created_by: 'u-2', is_shared: 1 },
+    ]);
+    const res = await req('/api/saved-searches?lineAccountId=account-1', 'GET', undefined, 'staff');
+    const body = (await res.json()) as { data: Array<{ id: string }> };
+    expect(body.data.map((item) => item.id)).toEqual(['s-1', 'own', 'legacy-own']);
+  });
+
+  it('選択中のLINEアカウントが無ければ一覧を返さない', async () => {
+    const res = await req('/api/saved-searches', 'GET');
+    expect(res.status).toBe(400);
+    expect(searches.getSavedSearches).not.toHaveBeenCalled();
+  });
+
+  it('他人の個人検索をスタッフが更新・削除できない', async () => {
+    searches.getSavedSearchById.mockResolvedValue({ ...SEARCH, created_by: 'u-2', is_shared: 0 });
+    const patchRes = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'PATCH', { name: '盗用' }, 'staff');
+    const deleteRes = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'DELETE', undefined, 'staff');
+    expect(patchRes.status).toBe(404);
+    expect(deleteRes.status).toBe(404);
+    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.deleteSavedSearch).not.toHaveBeenCalled();
+  });
+
+  it('管理者は同じアカウントの個人検索を更新できる', async () => {
+    searches.getSavedSearchById.mockResolvedValue({ ...SEARCH, created_by: 'u-2', is_shared: 0 });
+    const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'PATCH', { name: '管理名' }, 'admin');
+    expect(res.status).toBe(200);
+    expect(searches.updateSavedSearch).toHaveBeenCalledWith(
+      env.DB,
+      's-1',
+      expect.objectContaining({ lineAccountId: 'account-1', canManageAll: true }),
+      expect.objectContaining({ name: '管理名' }),
+    );
+  });
+
+  it('担当外アカウントは存在を漏らさず404にする', async () => {
+    const res = await req('/api/saved-searches?lineAccountId=account-2', 'GET', undefined, 'staff');
+    expect(res.status).toBe(404);
+    expect(searches.getSavedSearches).not.toHaveBeenCalled();
+  });
+
+  it('別scopeや別アカウントのIDは管理者でも更新できない', async () => {
+    searches.getSavedSearchById.mockResolvedValue({ ...SEARCH, scope: 'chats' });
+    const wrongScope = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'PATCH', { name: 'x' }, 'admin');
+    searches.getSavedSearchById.mockResolvedValue({ ...SEARCH, line_account_id: 'account-2' });
+    const wrongAccount = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'DELETE', undefined, 'admin');
+    expect(wrongScope.status).toBe(404);
+    expect(wrongAccount.status).toBe(404);
+    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
+    expect(searches.deleteSavedSearch).not.toHaveBeenCalled();
   });
 });
 

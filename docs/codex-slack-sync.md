@@ -99,6 +99,7 @@ Slackのアプリ候補から選んだ実際の `@Codex` メンションが必�
 Workerの秘密値:
 
 - `CODEX_SLACK_RELAY_SECRET`: Codex側と共通の十分に長いランダム値
+- `CODEX_SLACK_RELAY_SECRET_KENTA` / `CODEX_SLACK_RELAY_SECRET_MASATO`: 任意の個人別秘密値。共通値を変えずに各Macの送信経路を追加・交換できる
 - `SLACK_BOT_TOKEN`: 内部SlackアプリのBot token。`chat:write`、対象チャンネルの履歴読み取り、公開チャンネルの参照・作成（`channels:read` / `channels:manage`）権限が必要
 - `SLACK_SIGNING_SECRET`: Slackのボタン操作が本物か確認する署名秘密値
 - `CODEX_SLACK_MONITOR_SIGNING_SECRET`: Codex監視専用SlackアプリのEvents API署名秘密値。設定時は `/api/integrations/slack/events` だけで優先し、既存アプリの `SLACK_SIGNING_SECRET` を変更しない
@@ -152,7 +153,7 @@ Slackアプリの Interactivity Request URL:
 
 - `CODEX_OPERATOR`: `kenta` または `masato`
 - `CODEX_SLACK_RELAY_URL`: Workerの `/api/integrations/codex-slack/events`
-- `CODEX_SLACK_RELAY_SECRET`: Workerと同じ秘密値
+- `CODEX_SLACK_RELAY_SECRET`: Workerの共通値、または自分用の個人別秘密値
 - `CODEX_SLACK_SYNC_REQUIRED=1`: 未設定や送信失敗をCodexの画面に警告する
 
 macOSでは、Codexアプリが環境変数をまだ引き継いでいない場合も、`launchctl` の設定値と
@@ -160,6 +161,8 @@ macOSでは、Codexアプリが環境変数をまだ引き継いでいない場�
 自動で確認する。完了報告に `PR #246` のような番号がある場合は、その番号の100件単位チャンネルへ送る。
 
 秘密値はリポジトリやSlackへ書かない。両名の環境設定が終わったらCodexを再起動し、プロジェクトフックを信頼済みにする。
+個人別秘密値を使う場合、ケンタのMacには `CODEX_SLACK_RELAY_SECRET_KENTA` と同じ値、
+マサトのMacには `CODEX_SLACK_RELAY_SECRET_MASATO` と同じ値だけを保存する。
 
 ## PCとスマホからの確認
 
