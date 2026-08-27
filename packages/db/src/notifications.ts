@@ -22,7 +22,20 @@ export interface NotificationRow {
   channel: string;
   status: string;
   metadata: string | null;
+  line_account_id: string | null;
+  category: 'error' | 'update' | 'info';
   created_at: string;
+}
+
+export interface NotificationCenterRow extends NotificationRow {
+  read_at: string | null;
+}
+
+export interface NotificationCenterCounts {
+  all: number;
+  error: number;
+  update: number;
+  unread: number;
 }
 
 // --- 通知ルール ---
@@ -86,17 +99,128 @@ export async function getNotifications(db: D1Database, opts: { status?: string; 
 
 export async function createNotification(
   db: D1Database,
-  input: { ruleId?: string; eventType: string; title: string; body: string; channel: string; metadata?: string },
+  input: {
+    ruleId?: string;
+    eventType: string;
+    title: string;
+    body: string;
+    channel: string;
+    metadata?: string;
+    lineAccountId?: string | null;
+    category?: 'error' | 'update' | 'info';
+  },
 ): Promise<NotificationRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
-  await db.prepare(`INSERT INTO notifications (id, rule_id, event_type, title, body, channel, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.ruleId ?? null, input.eventType, input.title, input.body, input.channel, input.metadata ?? null, now).run();
+  await db.prepare(`INSERT INTO notifications (id, rule_id, event_type, title, body, channel, metadata, line_account_id, category, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(
+      id,
+      input.ruleId ?? null,
+      input.eventType,
+      input.title,
+      input.body,
+      input.channel,
+      input.metadata ?? null,
+      input.lineAccountId ?? null,
+      input.category ?? 'info',
+      now,
+    ).run();
   return (await db.prepare(`SELECT * FROM notifications WHERE id = ?`).bind(id).first<NotificationRow>())!;
 }
 
 export async function updateNotificationStatus(db: D1Database, id: string, status: string): Promise<void> {
   await db.prepare(`UPDATE notifications SET status = ? WHERE id = ?`).bind(status, id).run();
+}
+
+export async function getNotificationCenter(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    staffId: string;
+    category?: 'error' | 'update';
+    limit?: number;
+  },
+): Promise<NotificationCenterRow[]> {
+  const conditions = ['n.line_account_id = ?', "n.channel = 'dashboard'"];
+  const values: unknown[] = [input.staffId, input.lineAccountId];
+  if (input.category) {
+    conditions.push('n.category = ?');
+    values.push(input.category);
+  }
+  values.push(input.limit ?? 20);
+  const result = await db.prepare(`
+    SELECT n.*, r.read_at
+    FROM notifications n
+    LEFT JOIN staff_notification_reads r
+      ON r.notification_id = n.id AND r.staff_id = ?
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY n.created_at DESC, n.id DESC
+    LIMIT ?
+  `).bind(...values).all<NotificationCenterRow>();
+  return result.results;
+}
+
+export async function getNotificationCenterCounts(
+  db: D1Database,
+  input: { lineAccountId: string; staffId: string },
+): Promise<NotificationCenterCounts> {
+  const row = await db.prepare(`
+    SELECT
+      COUNT(*) AS all_count,
+      SUM(CASE WHEN n.category = 'error' THEN 1 ELSE 0 END) AS error_count,
+      SUM(CASE WHEN n.category = 'update' THEN 1 ELSE 0 END) AS update_count,
+      SUM(CASE WHEN r.notification_id IS NULL THEN 1 ELSE 0 END) AS unread_count
+    FROM notifications n
+    LEFT JOIN staff_notification_reads r
+      ON r.notification_id = n.id AND r.staff_id = ?
+    WHERE n.line_account_id = ? AND n.channel = 'dashboard'
+  `).bind(input.staffId, input.lineAccountId).first<{
+    all_count: number;
+    error_count: number | null;
+    update_count: number | null;
+    unread_count: number | null;
+  }>();
+  return {
+    all: Number(row?.all_count ?? 0),
+    error: Number(row?.error_count ?? 0),
+    update: Number(row?.update_count ?? 0),
+    unread: Number(row?.unread_count ?? 0),
+  };
+}
+
+export async function markNotificationRead(
+  db: D1Database,
+  input: { notificationId: string; lineAccountId: string; staffId: string },
+): Promise<boolean> {
+  const now = jstNow();
+  const result = await db.prepare(`
+    INSERT OR REPLACE INTO staff_notification_reads (notification_id, staff_id, read_at)
+    SELECT id, ?, ? FROM notifications
+    WHERE id = ? AND line_account_id = ? AND channel = 'dashboard'
+  `).bind(input.staffId, now, input.notificationId, input.lineAccountId).run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
+export async function markAllNotificationsRead(
+  db: D1Database,
+  input: {
+    lineAccountId: string;
+    staffId: string;
+    category?: 'error' | 'update';
+  },
+): Promise<number> {
+  const conditions = ['line_account_id = ?', "channel = 'dashboard'"];
+  const values: unknown[] = [input.staffId, jstNow(), input.lineAccountId];
+  if (input.category) {
+    conditions.push('category = ?');
+    values.push(input.category);
+  }
+  const result = await db.prepare(`
+    INSERT OR REPLACE INTO staff_notification_reads (notification_id, staff_id, read_at)
+    SELECT id, ?, ? FROM notifications
+    WHERE ${conditions.join(' AND ')}
+  `).bind(...values).run();
+  return Number(result.meta.changes ?? 0);
 }
 
 /** イベントタイプに一致するアクティブな通知ルールを取得 */
