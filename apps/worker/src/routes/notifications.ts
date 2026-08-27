@@ -9,24 +9,20 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const notifications = new Hono<Env>();
 
 // ========== 通知ルールCRUD ==========
 
-notifications.get('/api/notifications/rules', async (c) => {
+notifications.get('/api/notifications/rules', requireRole('owner', 'admin'), async (c) => {
   try {
-    const lineAccountId = c.req.query('lineAccountId');
-    let items;
-    if (lineAccountId) {
-      const result = await c.env.DB
-        .prepare(`SELECT * FROM notification_rules WHERE line_account_id = ? ORDER BY created_at DESC`)
-        .bind(lineAccountId)
-        .all();
-      items = result.results as unknown as Awaited<ReturnType<typeof getNotificationRules>>;
-    } else {
-      items = await getNotificationRules(c.env.DB);
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
+    const items = await getNotificationRules(c.env.DB, lineAccountId);
     return c.json({
       success: true,
       data: items.map((r) => ({
@@ -46,9 +42,14 @@ notifications.get('/api/notifications/rules', async (c) => {
   }
 });
 
-notifications.get('/api/notifications/rules/:id', async (c) => {
+notifications.get('/api/notifications/rules/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    const item = await getNotificationRuleById(c.env.DB, c.req.param('id'));
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    const item = await getNotificationRuleById(c.env.DB, c.req.param('id'), lineAccountId);
     if (!item) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -70,9 +71,15 @@ notifications.get('/api/notifications/rules/:id', async (c) => {
 
 notifications.post('/api/notifications/rules', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }>();
-    if (!body.name || !body.eventType) return c.json({ success: false, error: 'name and eventType are required' }, 400);
-    const item = await createNotificationRule(c.env.DB, body);
+    const body = await c.req.json<{ lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }>();
+    const lineAccountId = body.lineAccountId?.trim();
+    if (!lineAccountId || !body.name || !body.eventType) {
+      return c.json({ success: false, error: 'LINEアカウント、名前、きっかけは必須です' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const item = await createNotificationRule(c.env.DB, { ...body, lineAccountId });
     return c.json({
       success: true,
       data: { id: item.id, name: item.name, eventType: item.event_type, channels: JSON.parse(item.channels), createdAt: item.created_at },
@@ -86,9 +93,29 @@ notifications.post('/api/notifications/rules', requireRole('owner', 'admin'), as
 notifications.put('/api/notifications/rules/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json();
-    await updateNotificationRule(c.env.DB, id, body);
-    const updated = await getNotificationRuleById(c.env.DB, id);
+    const body = await c.req.json<{
+      lineAccountId: string;
+      name?: string;
+      eventType?: string;
+      conditions?: Record<string, unknown>;
+      channels?: string[];
+      isActive?: boolean;
+    }>();
+    const lineAccountId = body.lineAccountId?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const current = await getNotificationRuleById(c.env.DB, id, lineAccountId);
+    if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+    await updateNotificationRule(c.env.DB, id, lineAccountId, {
+      name: body.name,
+      eventType: body.eventType,
+      conditions: body.conditions,
+      channels: body.channels,
+      isActive: body.isActive,
+    });
+    const updated = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -102,7 +129,14 @@ notifications.put('/api/notifications/rules/:id', requireRole('owner', 'admin'),
 
 notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    await deleteNotificationRule(c.env.DB, c.req.param('id'));
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const current = await getNotificationRuleById(c.env.DB, c.req.param('id'), lineAccountId);
+    if (!current) return c.json({ success: false, error: 'Not found' }, 404);
+    await deleteNotificationRule(c.env.DB, c.req.param('id'), lineAccountId);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/notifications/rules/:id error:', err);
@@ -112,28 +146,19 @@ notifications.delete('/api/notifications/rules/:id', requireRole('owner', 'admin
 
 // ========== 通知一覧 ==========
 
-notifications.get('/api/notifications', async (c) => {
+notifications.get('/api/notifications', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const status = c.req.query('status') ?? undefined;
-    const limit = Number(c.req.query('limit') ?? '100');
-    const lineAccountId = c.req.query('lineAccountId') ?? undefined;
-    let items;
-    if (lineAccountId) {
-      const conditions: string[] = ['line_account_id = ?'];
-      const bindings: unknown[] = [lineAccountId];
-      if (status) {
-        conditions.push('status = ?');
-        bindings.push(status);
-      }
-      bindings.push(limit);
-      const result = await c.env.DB
-        .prepare(`SELECT * FROM notifications WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC LIMIT ?`)
-        .bind(...bindings)
-        .all();
-      items = result.results as unknown as Awaited<ReturnType<typeof getNotifications>>;
-    } else {
-      items = await getNotifications(c.env.DB, { status, limit });
+    const requestedLimit = Number(c.req.query('limit') ?? '100');
+    const limit = Number.isInteger(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 100)
+      : 100;
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
     }
+    const items = await getNotifications(c.env.DB, { lineAccountId, status, limit });
     return c.json({
       success: true,
       data: items.map((n) => ({
