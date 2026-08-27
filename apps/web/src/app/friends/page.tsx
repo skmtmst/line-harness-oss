@@ -2,7 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import type { Tag } from '@line-crm/shared'
+import { ArrowDownWideNarrow, Bookmark, Circle, Search, SlidersHorizontal, Star } from 'lucide-react'
+import type { Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
@@ -13,11 +14,9 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
-import Pagination from '@/components/shared/pagination'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
-const CARD_SHADOW = 'shadow-[1px_1px_2px_rgba(29,29,31,0.13)]'
-const SECONDARY_CONTROL = 'h-10 whitespace-nowrap rounded-[9px] border border-[#DADDE2] bg-white px-4 text-sm font-medium text-[#1D1D1F] hover:bg-[#F6F6F8]'
+const SECONDARY_CONTROL = 'h-10 whitespace-nowrap rounded-v6-control border border-hairline bg-canvas px-4 text-sm font-medium text-v6-ink hover:bg-v6-surface-strong'
 
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
@@ -40,7 +39,10 @@ function FriendsPageInner({
   const { selectedAccountId } = useAccount()
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
+  const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
+  const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  const [savedOpen, setSavedOpen] = useState(false)
   const [advanced, setAdvanced] = useState<AdvancedSearchResult | null>(null)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -50,6 +52,9 @@ function FriendsPageInner({
   const [searchSubmitted, setSearchSubmitted] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('recent')
   const [responseFilter, setResponseFilter] = useState<ResponseFilter>('all')
+  const [operatorId, setOperatorId] = useState('')
+  const [scenarioId, setScenarioId] = useState('')
+  const [attentionOnly, setAttentionOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -65,14 +70,20 @@ function FriendsPageInner({
     })
   }, [])
 
-  const loadTags = useCallback(async () => {
+  const loadOptions = useCallback(async () => {
     try {
-      const response = await api.tags.list()
-      if (response.success) setAllTags(response.data)
+      const [tagResponse, operatorResponse, scenarioResponse] = await Promise.all([
+        api.tags.list(),
+        api.operators.list(),
+        api.scenarios.list(selectedAccountId ? { accountId: selectedAccountId } : undefined),
+      ])
+      if (tagResponse.success) setAllTags(tagResponse.data)
+      if (operatorResponse.success) setOperators(operatorResponse.data)
+      if (scenarioResponse.success) setScenarios(scenarioResponse.data)
     } catch {
-      // タグ取得に失敗しても、友だち一覧は使える。
+      // 選択肢の取得に失敗しても、友だち一覧と検索は使える。
     }
-  }, [])
+  }, [selectedAccountId])
 
   const loadFriends = useCallback(async () => {
     setLoading(true)
@@ -88,6 +99,9 @@ function FriendsPageInner({
         includeChatStatus: true,
         sort: sortMode,
         handled: responseFilter === 'unhandled' ? 'unhandled' : undefined,
+        operatorId: operatorId || undefined,
+        scenarioId: scenarioId || undefined,
+        metadata: attentionOnly ? { __attention: '1' } : undefined,
       })
       if (response.success) {
         setFriends(response.data.items)
@@ -101,9 +115,9 @@ function FriendsPageInner({
     } finally {
       setLoading(false)
     }
-  }, [advanced, page, pageSize, responseFilter, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
-  useEffect(() => void loadTags(), [loadTags])
+  useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => setPage(1), [selectedAccountId])
   useEffect(() => void loadFriends(), [loadFriends])
   useEffect(() => {
@@ -143,20 +157,31 @@ function FriendsPageInner({
 
   useEffect(() => onExportReady(exportCurrentPage), [exportCurrentPage, onExportReady])
 
+  const toggleAttention = useCallback(async (friend: FriendListItem) => {
+    const current = String(friend.metadata?.__attention ?? '') === '1'
+    try {
+      await api.friends.updateMetadata(friend.id, { __attention: current ? null : '1' })
+      await loadFriends()
+    } catch {
+      onNotice({ title: '注目の変更に失敗しました', message: '通信状態を確認して、もう一度お試しください。' })
+    }
+  }, [loadFriends, onNotice])
+
   return (
-    <div data-friends-design="v4" className="space-y-4">
+    <div data-friends-design="v6" className="space-y-3.5">
       <FriendKpis />
 
-      <section className={`rounded-[14px] border border-[#DADDE2] bg-white p-4 ${CARD_SHADOW}`} data-design="V4SearchPanel">
+      <section className={`rounded-v6-card border border-hairline bg-canvas px-4 py-3.5 shadow-v6-card`} data-design="V6SearchPanel" data-design-node="pRHvc">
         <form
           onSubmit={(event) => {
             event.preventDefault()
             resetPageWith(() => setSearchSubmitted(searchInput.trim()))
           }}
-          className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_auto_auto_auto_auto] xl:items-center"
+          className="flex min-w-0 items-center gap-2.5"
         >
-          <label className="relative block min-w-0">
+          <label className="relative block min-w-60 flex-1">
             <span className="sr-only">友だち名で検索</span>
+            <Search aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-v6-ink-faint" />
             <input
               type="search"
               value={searchInput}
@@ -165,66 +190,88 @@ function FriendsPageInner({
                 setSearchInput(value)
                 if (!value.trim() && searchSubmitted) resetPageWith(() => setSearchSubmitted(''))
               }}
-              placeholder="友だち名・LINE表示名で検索"
-              className="h-10 w-full rounded-[9px] border border-[#DADDE2] bg-white px-3 text-sm text-[#1D1D1F] outline-none transition focus:border-[#07C653] focus:ring-2 focus:ring-[#07C653]/15"
+              placeholder="名前・LINE名・タグ・メモで検索"
+              className="h-10.5 w-full rounded-v6-control border border-hairline bg-canvas pl-11 pr-3 text-sm text-v6-ink outline-none transition focus:border-v6-accent focus:ring-2 focus:ring-v6-accent/15"
             />
           </label>
-          <button type="button" onClick={() => setAdvancedOpen(true)} className={SECONDARY_CONTROL}>
-            詳細検索{advanced ? '（設定中）' : ''}
+          <button type="button" onClick={() => setAdvancedOpen(true)} className={`${SECONDARY_CONTROL} inline-flex items-center gap-2`}>
+            <SlidersHorizontal aria-hidden="true" className="h-4 w-4" />
+            詳細条件{advanced ? '（設定中）' : ''}
           </button>
           <button
             type="button"
-            onClick={() => onNotice({ title: '保存した検索', message: '保存済み検索の呼び出しは、検索条件の保存機能と一緒に実装予定です。' })}
-            className={SECONDARY_CONTROL}
+            onClick={() => setSavedOpen(true)}
+            className={`${SECONDARY_CONTROL} inline-flex items-center gap-2 text-v6-action`}
           >
+            <Bookmark aria-hidden="true" className="h-4 w-4" />
             保存した検索
           </button>
-          <select value={sortMode} onChange={(event) => resetPageWith(() => setSortMode(event.target.value as SortMode))} className="h-10 rounded-[9px] border border-[#DADDE2] bg-white px-3 text-sm text-[#1D1D1F]">
-            <option value="recent">追加が新しい順</option>
-            <option value="oldest">追加が古い順</option>
-          </select>
-          <button type="submit" className="h-10 rounded-[9px] bg-[#07C653] px-5 text-sm font-bold text-white hover:bg-[#079B45]">検索</button>
+          <label className="relative min-w-52.5">
+            <span className="sr-only">並び順</span>
+            <ArrowDownWideNarrow aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-v6-ink-secondary" />
+            <select value={sortMode} onChange={(event) => resetPageWith(() => setSortMode(event.target.value as SortMode))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas pl-9 text-sm font-semibold text-v6-ink">
+              <option value="recent">友だち追加の新しい順</option>
+              <option value="oldest">友だち追加の古い順</option>
+            </select>
+          </label>
+          <button type="submit" className="h-10.5 rounded-v6-control bg-v6-accent px-6 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">検索</button>
         </form>
 
         {advanced?.summary.length ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-[9px] bg-[#E9F9EF] px-3 py-2">
-            <span className="text-xs font-bold text-[#079B45]">絞り込み中</span>
-            {advanced.summary.map((summary) => <span key={summary} className="rounded-full bg-white px-2.5 py-1 text-xs text-[#565F59]">{summary}</span>)}
-            <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-[#0067D9] hover:underline">条件を外す</button>
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-v6-control bg-v6-accent-soft px-3 py-2">
+            <span className="text-xs font-bold text-v6-accent-hover">絞り込み中</span>
+            {advanced.summary.map((summary) => <span key={summary} className="rounded-full bg-canvas px-2.5 py-1 text-xs text-v6-ink-secondary">{summary}</span>)}
+            <button type="button" onClick={() => resetPageWith(() => setAdvanced(null))} className="ml-auto text-xs font-medium text-v6-action hover:underline">条件を外す</button>
           </div>
         ) : null}
 
-        <div className="mt-3 grid gap-3 border-t border-[#EAEBED] pt-3 md:grid-cols-[minmax(160px,240px)_minmax(150px,220px)_1fr_auto] md:items-center">
-          <label className="flex items-center gap-2 text-xs font-medium text-[#565F59]">
-            タグ
-            <select value={selectedTagId} onChange={(event) => resetPageWith(() => setSelectedTagId(event.target.value))} className="h-9 min-w-0 flex-1 rounded-[8px] border border-[#DADDE2] bg-white px-2 text-xs text-[#1D1D1F]">
-              <option value="">すべて</option>
+        <div className="mt-2.5 flex min-w-0 items-center gap-2.5">
+          <span className="shrink-0 text-sm font-semibold text-v6-ink-secondary">絞り込み</span>
+          <label className="w-37.5 shrink-0">
+            <span className="sr-only">タグ</span>
+            <select value={selectedTagId} onChange={(event) => resetPageWith(() => setSelectedTagId(event.target.value))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
+              <option value="">タグ：すべて</option>
               {allTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name}</option>)}
             </select>
           </label>
-          <label className="flex items-center gap-2 text-xs font-medium text-[#565F59]">
-            対応
-            <select value={responseFilter} onChange={(event) => resetPageWith(() => setResponseFilter(event.target.value as ResponseFilter))} className="h-9 min-w-0 flex-1 rounded-[8px] border border-[#DADDE2] bg-white px-2 text-xs text-[#1D1D1F]">
-              <option value="all">すべて</option>
-              <option value="unhandled">未対応のみ</option>
+          <label className="w-37.5 shrink-0">
+            <span className="sr-only">対応</span>
+            <select value={responseFilter} onChange={(event) => resetPageWith(() => setResponseFilter(event.target.value as ResponseFilter))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
+              <option value="all">対応：すべて</option>
+              <option value="unhandled">対応：未対応のみ</option>
             </select>
           </label>
-          <div className="flex flex-wrap gap-2 text-xs">
-            {['未対応かつ7日以内', '定期便 契約中', 'ブロック解除者'].map((label) => (
-              <button key={label} type="button" onClick={() => onNotice({ title: label, message: 'この保存条件は現在準備中です。条件を確認してから有効化します。' })} className="rounded-full border border-[#DADDE2] bg-white px-3 py-1.5 text-[#565F59] hover:bg-[#F6F6F8]">{label}</button>
-            ))}
-          </div>
-          <span className="whitespace-nowrap text-right text-xs text-[#8B938D]">{loading ? '読み込み中…' : `${total.toLocaleString('ja-JP')}件`}</span>
+          <label className="w-40 shrink-0">
+            <span className="sr-only">担当者</span>
+            <select value={operatorId} onChange={(event) => resetPageWith(() => setOperatorId(event.target.value))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
+              <option value="">担当者：すべて</option>
+              {operators.map((operator) => <option key={operator.id} value={operator.id}>担当者：{operator.name}</option>)}
+            </select>
+          </label>
+          <label className="w-40 shrink-0">
+            <span className="sr-only">シナリオ</span>
+            <select value={scenarioId} onChange={(event) => resetPageWith(() => setScenarioId(event.target.value))} className="v6-select h-10.5 w-full rounded-v6-control border border-hairline bg-canvas text-sm font-semibold text-v6-ink">
+              <option value="">シナリオ：すべて</option>
+              {scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>シナリオ：{scenario.name}</option>)}
+            </select>
+          </label>
+          <button type="button" aria-pressed={responseFilter === 'unhandled'} onClick={() => resetPageWith(() => setResponseFilter(responseFilter === 'unhandled' ? 'all' : 'unhandled'))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full px-4 text-xs font-bold text-v6-danger ${responseFilter === 'unhandled' ? 'bg-v6-danger-selected ring-2 ring-v6-danger/30' : 'bg-v6-danger-bg'}`}>
+            <Circle aria-hidden="true" className="h-2.5 w-2.5 fill-current" />未対応
+          </button>
+          <button type="button" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full bg-v6-warning-bg px-4 text-xs font-bold ${attentionOnly ? 'ring-2 ring-v6-warning-strong/30' : ''} text-v6-warning`}>
+            <Star aria-hidden="true" className="h-3.5 w-3.5" />注目のみ
+          </button>
+          <span className="shrink-0 whitespace-nowrap text-xs text-v6-ink-faint">{loading ? '—' : `${total.toLocaleString('ja-JP')}件`}</span>
         </div>
       </section>
 
       {selectedIds.size > 0 ? (
-        <section className={`rounded-[14px] border border-[#A8E9C1] bg-[#E9F9EF] p-3 ${CARD_SHADOW}`} data-design="V4BulkBar">
+        <section className={`rounded-v6-card border border-v6-accent-border bg-v6-accent-soft p-3 shadow-v6-card`} data-design="V4BulkBar">
           <div className="flex flex-wrap items-center gap-2">
-            <strong className="text-sm text-[#1D1D1F]">{selectedIds.size}人を選択中</strong>
-            <span className="text-xs text-[#565F59]">選択した友だちにまとめて操作します</span>
+            <strong className="text-sm text-v6-ink">{selectedIds.size}人を選択中</strong>
+            <span className="text-xs text-v6-ink-secondary">選択した友だちにまとめて操作します</span>
             {selectedIds.size > 1 ? (
-              <button type="button" onClick={() => onNotice({ title: '一括アクション', message: '複数人への一括更新APIは未接続です。誤操作を防ぐため、送信や変更は実行していません。' })} className="ml-auto rounded-[8px] bg-[#07C653] px-4 py-2 text-xs font-bold text-white hover:bg-[#079B45]">操作を選ぶ</button>
+              <button type="button" onClick={() => onNotice({ title: '一括アクション', message: '複数人への一括更新APIは未接続です。誤操作を防ぐため、送信や変更は実行していません。' })} className="ml-auto rounded-control bg-v6-accent px-4 py-2 text-xs font-bold text-on-accent hover:bg-v6-accent-hover">操作を選ぶ</button>
             ) : null}
           </div>
           {selectedIds.size === 1 ? (
@@ -235,11 +282,11 @@ function FriendsPageInner({
         </section>
       ) : null}
 
-      {error ? <div role="alert" className="rounded-[10px] border border-[#F3B8BB] bg-[#FFF1F2] p-4 text-sm text-[#B4232B]">{error}</div> : null}
+      {error ? <div role="alert" className="rounded-tile border border-v6-danger-border bg-v6-danger-bg p-4 text-sm text-v6-danger-text">{error}</div> : null}
 
       {loading ? (
-        <div className={`overflow-hidden rounded-[14px] border border-[#DADDE2] bg-white ${CARD_SHADOW}`}>
-          {Array.from({ length: Math.min(pageSize, 8) }, (_, index) => <div key={index} className="h-[66px] animate-pulse border-b border-[#EAEBED] bg-gradient-to-r from-white via-[#F6F6F8] to-white" />)}
+        <div className={`overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card`}>
+          {Array.from({ length: Math.min(pageSize, 8) }, (_, index) => <div key={index} className="h-16.5 animate-pulse border-b border-v6-divider bg-gradient-to-r from-canvas via-v6-surface-strong to-canvas" />)}
         </div>
       ) : (
         <FriendListTable
@@ -248,46 +295,99 @@ function FriendsPageInner({
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onToggleAll={(select) => setSelectedIds(select ? new Set(friends.map((friend) => friend.id)) : new Set())}
-          headerRight={!loading && total > 0 ? (
-            <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-[#565F59]">
-              <span className="whitespace-nowrap">{(page - 1) * pageSize + 1}〜{Math.min(page * pageSize, total)}件 / 全{total.toLocaleString('ja-JP')}件</span>
-              <label className="flex items-center gap-2 whitespace-nowrap">
-                表示件数
-                <select value={pageSize} onChange={(event) => resetPageWith(() => setPageSize(Number(event.target.value) as (typeof PAGE_SIZE_OPTIONS)[number]))} className="h-8 rounded-[8px] border border-[#DADDE2] bg-white px-2 text-xs text-[#1D1D1F]">
-                  {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}件</option>)}
-                </select>
-              </label>
-            </div>
-          ) : null}
+          page={page}
+          pageCount={totalPages}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => resetPageWith(() => setPageSize(size as (typeof PAGE_SIZE_OPTIONS)[number]))}
+          onToggleAttention={toggleAttention}
         />
       )}
 
-      {!loading && total > 0 ? (
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          <Pagination
-            page={page}
-            pageCount={totalPages}
-            onPageChange={setPage}
-            ariaLabel="友だち一覧のページ"
-          />
-        </div>
+      <AdvancedSearchDialog open={advancedOpen} tags={allTags} fieldNames={[]} onClose={() => setAdvancedOpen(false)} onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }} />
+      {savedOpen ? (
+        <SavedSearchDialog
+          onClose={() => setSavedOpen(false)}
+          onApply={(result) => {
+            setAdvanced(result)
+            setSavedOpen(false)
+            setPage(1)
+          }}
+          onOpenAdvanced={() => {
+            setSavedOpen(false)
+            setAdvancedOpen(true)
+          }}
+        />
       ) : null}
 
-      <AdvancedSearchDialog open={advancedOpen} tags={allTags} fieldNames={[]} onClose={() => setAdvancedOpen(false)} onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }} />
-
-      <div className="hidden" data-friends-v4-contract="10,20,30,40,50|compact-pagination|no-native-alert|1px-right-1px-down" />
+      <div className="hidden" data-friends-v6-contract="10,20,30,40,50|compact-pagination|前へ|次へ|no-native-alert|1px-right-1px-down" />
     </div>
   )
 }
 
 function NoticeDialog({ notice, onClose }: { notice: Exclude<Notice, null>; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/35 p-4" role="presentation" onMouseDown={onClose}>
-      <section role="dialog" aria-modal="true" aria-labelledby="friends-notice-title" className={`w-full max-w-md rounded-[16px] border border-[#DADDE2] bg-white p-5 ${CARD_SHADOW}`} onMouseDown={(event) => event.stopPropagation()}>
-        <h2 id="friends-notice-title" className="text-lg font-bold text-[#1D1D1F]">{notice.title}</h2>
-        <p className="mt-2 text-sm leading-6 text-[#565F59]">{notice.message}</p>
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-ink/35 p-4" role="presentation" onMouseDown={onClose}>
+      <section role="dialog" aria-modal="true" aria-labelledby="friends-notice-title" className={`w-full max-w-md rounded-v6-dialog border border-hairline bg-canvas p-5 shadow-v6-card`} onMouseDown={(event) => event.stopPropagation()}>
+        <h2 id="friends-notice-title" className="text-lg font-bold text-v6-ink">{notice.title}</h2>
+        <p className="mt-2 text-sm leading-6 text-v6-ink-secondary">{notice.message}</p>
         <div className="mt-5 flex justify-end">
-          <button type="button" onClick={onClose} className="rounded-[9px] bg-[#07C653] px-5 py-2 text-sm font-bold text-white hover:bg-[#079B45]">確認</button>
+          <button type="button" onClick={onClose} className="rounded-v6-control bg-v6-accent px-5 py-2 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">確認</button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function SavedSearchDialog({
+  onClose,
+  onApply,
+  onOpenAdvanced,
+}: {
+  onClose: () => void
+  onApply: (result: AdvancedSearchResult) => void
+  onOpenAdvanced: () => void
+}) {
+  const [saved, setSaved] = useState<AdvancedSearchResult | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('friends.savedSearch')
+      if (!raw) return
+      const parsed = JSON.parse(raw) as Partial<AdvancedSearchResult>
+      if (parsed.params && Array.isArray(parsed.summary) && parsed.summary.every((item) => typeof item === 'string')) {
+        setSaved({ params: parsed.params, summary: parsed.summary })
+      }
+    } catch {
+      setSaved(null)
+    }
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-100 flex items-center justify-center bg-ink/35 p-4" role="presentation" onMouseDown={onClose}>
+      <section role="dialog" aria-modal="true" aria-labelledby="saved-search-title" className={`w-full max-w-lg rounded-v6-dialog border border-hairline bg-canvas p-5 shadow-v6-card`} onMouseDown={(event) => event.stopPropagation()}>
+        <h2 id="saved-search-title" className="text-lg font-bold text-v6-ink">保存した検索</h2>
+        {saved ? (
+          <div className="mt-4 rounded-tile border border-hairline bg-v6-surface p-4">
+            <p className="text-sm font-bold text-v6-ink">最後に保存した条件</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {saved.summary.map((summary) => <span key={summary} className="rounded-full bg-canvas px-3 py-1.5 text-xs text-v6-ink-secondary">{summary}</span>)}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 rounded-tile border border-hairline bg-v6-surface p-4">
+            <p className="text-sm font-semibold text-v6-ink-secondary">保存した条件はまだありません。</p>
+            <p className="mt-1 text-xs leading-5 text-v6-ink-faint">「詳細条件」で絞り込みを組み、条件を保存すると次回からここで呼び出せます。</p>
+          </div>
+        )}
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-v6-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-v6-ink-secondary hover:bg-v6-surface-strong">閉じる</button>
+          {saved ? (
+            <button type="button" onClick={() => onApply(saved)} className="rounded-v6-control bg-v6-accent px-5 py-2 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">この条件で表示</button>
+          ) : (
+            <button type="button" onClick={onOpenAdvanced} className="rounded-v6-control bg-v6-accent px-5 py-2 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">詳細条件を設定</button>
+          )}
         </div>
       </section>
     </div>
@@ -315,8 +415,8 @@ function FriendsPageHost() {
           active={tab}
           actions={(
             <div className="flex flex-wrap items-center justify-end gap-2">
-              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-[38px] rounded-[9px] border border-[#DADDE2] bg-white px-4 text-sm font-semibold text-[#565F59] hover:bg-[#F6F6F8] disabled:text-[#B8BCC2]">CSVで書き出す</button> : null}
-              <Link href="/accounts?tab=migration" className="flex h-[38px] items-center rounded-[9px] border border-[#DADDE2] bg-white px-4 text-sm font-semibold text-[#0067D9] hover:bg-[#F3F8FF]">UID移行</Link>
+              {tab === 'list' ? <button type="button" onClick={() => exportCurrentPage?.()} disabled={!exportCurrentPage} className="h-9.5 rounded-v6-control border border-hairline bg-canvas px-4 text-sm font-semibold text-v6-ink-secondary hover:bg-v6-surface-strong disabled:text-v6-ink-disabled">CSVで書き出す</button> : null}
+              <Link href="/accounts?tab=migration" className="flex h-9.5 items-center rounded-v6-control border border-hairline bg-canvas px-4 text-sm font-semibold text-v6-action hover:bg-v6-action-soft">UID移行</Link>
             </div>
           )}
         />
@@ -331,7 +431,7 @@ function FriendsPageHost() {
 
 export default function FriendsPage() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-[#8B938D]">読み込み中…</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-v6-ink-faint">読み込み中…</div>}>
       <FriendsPageHost />
     </Suspense>
   )

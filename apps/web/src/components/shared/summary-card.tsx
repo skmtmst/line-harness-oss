@@ -10,6 +10,7 @@ export type SummaryCardProps = {
   unit: string
   detail: ReactNode
   badge?: string
+  badgeTone?: 'accent' | 'neutral' | 'danger'
   action?: { label: string; href: string }
   loading?: boolean
   /** 対象画面にV6がある場合はv6、配信予定を強調するカードはbroadcastを使う。 */
@@ -29,6 +30,7 @@ export default function SummaryCard({
   unit,
   detail,
   badge,
+  badgeTone = 'accent',
   action,
   loading = false,
   variant = 'v5',
@@ -55,7 +57,7 @@ export default function SummaryCard({
           {title || (loading ? <span className={styles.labelSkeleton} aria-hidden="true" /> : null)}
         </p>
         {badge ? (
-          <span className={styles.badge}>{badge}</span>
+          <span className={[styles.badge, styles[`badge_${badgeTone}`]].filter(Boolean).join(' ')}>{badge}</span>
         ) : action ? (
           <Link href={action.href} className={styles.link}>
             {action.label}

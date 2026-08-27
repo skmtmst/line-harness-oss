@@ -69,6 +69,37 @@
   --color-step-idle: #eef0f3;
   --color-surface-chrome: #ebedf1;
 
+  /* ★V6で実測した一覧・操作の色。既存V5画面へ波及させないため、
+   * 共通色を上書きせずV6の意味名で固定する。 */
+  --color-v6-accent: #07c653;
+  --color-v6-accent-hover: #079b45;
+  --color-v6-accent-soft: #e9f9ef;
+  --color-v6-accent-border: #a8e9c1;
+  --color-v6-action: #0067d9;
+  --color-v6-action-soft: #f3f8ff;
+  --color-v6-ink: #1d1d1f;
+  --color-v6-ink-secondary: #565f59;
+  --color-v6-ink-faint: #8b938d;
+  --color-v6-ink-disabled: #b8bcc2;
+  --color-v6-divider: #eaebed;
+  --color-v6-surface: #f9fafa;
+  --color-v6-surface-strong: #f6f6f8;
+  --color-v6-danger: #d34851;
+  --color-v6-danger-bg: #fff1f2;
+  --color-v6-danger-selected: #ffe4e7;
+  --color-v6-danger-text: #b4232b;
+  --color-v6-danger-border: #f3b8bb;
+  --color-v6-warning: #a66a00;
+  --color-v6-warning-strong: #d99017;
+  --color-v6-warning-bg: #fff7e8;
+  --color-v6-purple: #7651c9;
+  --color-v6-purple-bg: #f0ebff;
+  --color-v6-avatar-bg: #eef0f2;
+  --color-v6-avatar-indigo: #5545e6;
+  --color-v6-avatar-blue: #1260c9;
+  --color-v6-avatar-slate: #536170;
+  --color-v6-avatar-green: #079b45;
+
   /* 然-NEN- のLINEカード。Pen V2の必要な高級感を、生の色値ではなく共通語彙にする。 */
   --color-nen-ivory: #fbf8f1;
   --color-nen-green: #1b3a31;
@@ -94,6 +125,10 @@
   --radius-mini: 6px;
   --radius-tiny: 3px;
   --radius-pill: 9999px;
+  --radius-v6-option: 7px;
+  --radius-v6-control: 9px;
+  --radius-v6-card: 14px;
+  --radius-v6-dialog: 16px;
 
   /* --- 文字サイズ ---------------------------------------------------------
    * V5/V6の共通部品が使う意味名。既存のTailwind組み込みサイズは残し、
@@ -127,6 +162,8 @@
    * サイドバー256px＋本体1664pxで、右端まで使い切っている。
    */
   --container-shell: 104rem;
+
+  --shadow-v6-card: 1px 1px 2px #1d1d1f21;
 }
 
 /*

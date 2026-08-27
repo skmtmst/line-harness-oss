@@ -90,14 +90,17 @@ describe('標準ボタンの第1段階移行', () => {
     // ページ送りも共通部品へ寄せた。主要2・副次7が減った。
     // 減ったら必ずここも締める。
     expect(debt['direct-primary-button']).toBe(137)
-    expect(debt['direct-secondary-button']).toBe(279)
+    // ★V6 3-1（PhxG6）の38pxヘッダー操作2つと、保存検索ダイアログの
+    // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
+    expect(debt['direct-secondary-button']).toBe(282)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
       1040px の最小幅・絞り込みの 144/129/116px・間隔 14/10px）。
       **増やしたぶんはここに記録して止める。** 減ったら締め直す。
     */
-    expect(debt['arbitrary-value']).toBe(1412)
+    // 友だち一覧はV6トークンへ移し、任意値を127か所削除した。
+    expect(debt['arbitrary-value']).toBe(1285)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

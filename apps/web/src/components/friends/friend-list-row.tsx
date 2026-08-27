@@ -2,26 +2,39 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { Circle, Star } from 'lucide-react'
 import type { FriendListItem } from '@/lib/api'
+import type { FriendListColumn } from './friend-list-table'
 
 interface Props {
   friend: FriendListItem
   selected?: boolean
   onToggleSelect?: () => void
-  gridClass: string
+  onToggleAttention?: () => void
+  visibleColumns: Set<FriendListColumn>
+  gridTemplateColumns: string
 }
 
 function statusView(status: FriendListItem['chatStatus']) {
-  if (status === 'unread') return { label: '未対応', className: 'bg-[#FFF1F2] text-[#C3323B]' }
-  if (status === 'in_progress') return { label: '対応中', className: 'bg-[#FFF5DE] text-[#94600A]' }
-  return { label: '対応済み', className: 'bg-[#EEF0F2] text-[#565F59]' }
+  if (status === 'unread') return { label: '未対応', className: 'bg-v6-danger-bg text-v6-danger' }
+  if (status === 'in_progress' || status === 'on_hold') return { label: '対応中', className: 'bg-v6-warning-bg text-v6-warning' }
+  return { label: '対応済み', className: 'bg-v6-accent-soft text-v6-accent-hover' }
 }
 
-export default function FriendListRow({ friend, selected, onToggleSelect, gridClass }: Props) {
+export default function FriendListRow({
+  friend,
+  selected,
+  onToggleSelect,
+  onToggleAttention,
+  visibleColumns,
+  gridTemplateColumns,
+}: Props) {
   const router = useRouter()
   const status = statusView(friend.chatStatus)
   const latest = friend.latestIncomingMessage
   const lastContact = latest?.createdAt ?? friend.latestOutgoingAt ?? friend.createdAt
+  const attention = String(friend.metadata?.__attention ?? '') === '1'
+  const avatarColor = avatarTone(friend.displayName)
 
   const openChat = () => router.push(`/chats?friend=${friend.id}`)
 
@@ -37,7 +50,8 @@ export default function FriendListRow({ friend, selected, onToggleSelect, gridCl
           openChat()
         }
       }}
-      className={`grid min-w-0 cursor-pointer grid-cols-[30px_minmax(0,1fr)_auto] gap-2 border-b border-[#EAEBED] px-3 py-3 transition last:border-b-0 hover:bg-[#F9FAFA] focus:bg-[#F9FAFA] focus:outline-none lg:items-center ${gridClass}`}
+      className="grid h-19.5 min-w-0 cursor-pointer items-center gap-2 border-b border-v6-divider px-3 transition hover:bg-v6-surface focus:bg-v6-surface focus:outline-none"
+      style={{ gridTemplateColumns }}
     >
       <div onClick={(event) => event.stopPropagation()}>
         <input
@@ -45,65 +59,87 @@ export default function FriendListRow({ friend, selected, onToggleSelect, gridCl
           checked={selected ?? false}
           onChange={() => onToggleSelect?.()}
           aria-label={`${friend.displayName}を選ぶ`}
-          className="h-4 w-4 cursor-pointer accent-[#07C653]"
+          className="h-4 w-4 cursor-pointer accent-v6-accent"
         />
       </div>
 
-      <div className="flex min-w-0 items-center gap-2.5">
+      <button
+        type="button"
+        aria-pressed={attention}
+        aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
+        onClick={(event) => {
+          event.stopPropagation()
+          onToggleAttention?.()
+        }}
+        className={`rounded p-1 ${attention ? 'text-v6-warning-strong' : 'text-v6-ink-faint'} hover:bg-v6-warning-bg hover:text-v6-warning-strong`}
+      >
+        <Star aria-hidden="true" className={`h-4 w-4 ${attention ? 'fill-current' : ''}`} />
+      </button>
+
+      <div className="flex min-w-0 items-center gap-3">
         {friend.pictureUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- LINE CDNの利用者画像。
-          <img src={friend.pictureUrl} alt="" className="h-9 w-9 shrink-0 rounded-full bg-[#EEF0F2] object-cover" />
+          <img src={friend.pictureUrl} alt="" className="h-10 w-10 shrink-0 rounded-full bg-v6-avatar-bg object-cover" />
         ) : (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E9F9EF] text-sm font-bold text-[#079B45]">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-on-accent" style={{ backgroundColor: avatarColor }}>
             {friend.displayName?.charAt(0) ?? '?'}
           </div>
         )}
         <div className="min-w-0">
-          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block truncate text-sm font-semibold text-[#1D1D1F] hover:text-[#0067D9] hover:underline">
+          <Link href={`/friends/detail?id=${friend.id}`} onClick={(event) => event.stopPropagation()} title={friend.displayName} className="block truncate text-sm font-bold text-v6-ink hover:text-v6-action hover:underline">
             {friend.displayName}
           </Link>
-          <p className="mt-0.5 truncate text-[10px] text-[#8B938D]">登録 {formatDate(friend.createdAt)}</p>
-          {!friend.isFollowing ? <span className="mt-1 inline-flex rounded-full bg-[#FFF1F2] px-2 py-0.5 text-[10px] font-medium text-[#C3323B]">ブロック / 非表示</span> : null}
+          <p className="mt-1 truncate text-nano text-v6-ink-faint">登録 {formatDate(friend.createdAt)}</p>
         </div>
       </div>
 
-      <div className="flex justify-end lg:block">
-        <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[10px] font-semibold ${status.className}`}>{status.label}</span>
-        <p className="mt-1 hidden truncate text-[10px] text-[#8B938D] lg:block">担当 未設定</p>
-      </div>
+      {visibleColumns.has('support') ? (
+        <div className="min-w-0">
+          <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-nano font-bold ${status.className}`}>{status.label}</span>
+          <p className="mt-1 flex min-w-0 items-center gap-1 truncate text-nano font-semibold text-v6-ink-secondary">
+            <Circle aria-hidden="true" className="h-2 w-2 shrink-0 fill-current" style={{ color: friend.supportMark?.color ?? 'var(--color-v6-ink-disabled)' }} />
+            {friend.supportMark?.name ?? 'マークなし'}
+          </p>
+          <p className="mt-0.5 truncate text-nano text-v6-ink-secondary">担当：{friend.operator?.name ?? '未割り当て'}</p>
+        </div>
+      ) : null}
 
-      <div className="col-start-2 min-w-0 lg:col-auto">
-        {friend.activeScenario ? (
-          <>
-            <p className="truncate text-xs font-medium text-[#0067D9]" title={friend.activeScenario.name}>{friend.activeScenario.name}</p>
-            <p className="mt-0.5 text-[10px] text-[#8B938D]">{friend.activeScenario.status === 'active' ? '配信中' : '停止中'}</p>
-          </>
-        ) : <span className="text-xs text-[#8B938D]">なし</span>}
-      </div>
+      {visibleColumns.has('scenario') ? (
+        <div className="min-w-0">
+          {friend.activeScenario ? (
+            <p className="truncate text-xs font-medium text-v6-ink-secondary" title={friend.activeScenario.name}>{friend.activeScenario.name}</p>
+          ) : <span className="text-xs text-v6-ink-faint">なし</span>}
+        </div>
+      ) : null}
 
-      <div className="col-span-2 col-start-2 min-w-0 lg:col-auto lg:col-span-1">
-        {latest ? (
-          <>
-            <p className="line-clamp-2 text-xs leading-5 text-[#565F59]" title={latest.content}>
-              {latest.messageType === 'text' ? latest.content : `[${latest.messageType}]`}
-            </p>
-            <p className="mt-0.5 text-[10px] text-[#8B938D]">{formatDateTime(latest.createdAt)}</p>
-          </>
-        ) : <span className="text-xs text-[#8B938D]">受信なし</span>}
-      </div>
+      {visibleColumns.has('latest') ? (
+        <div className="min-w-0">
+          {latest ? (
+            <>
+              <p className="truncate text-xs text-v6-ink" title={latest.content}>
+                {latest.messageType === 'text' ? latest.content : `[${latest.messageType}]`}
+              </p>
+              <p className="mt-1 text-nano text-v6-ink-faint">{formatDateTime(latest.createdAt)}</p>
+            </>
+          ) : <><span className="text-xs text-v6-ink-secondary">受信なし</span><p className="mt-1 text-nano text-v6-ink-faint">—</p></>}
+        </div>
+      ) : null}
 
-      <div className="col-span-2 col-start-2 flex min-w-0 flex-wrap content-center gap-1 lg:col-auto lg:col-span-1">
-        {friend.tags.slice(0, 2).map((tag) => (
-          <span key={tag.id} title={tag.name} className="max-w-full truncate rounded-full bg-[#E9F9EF] px-2 py-1 text-[10px] font-medium text-[#079B45]">{tag.name}</span>
-        ))}
-        {friend.tags.length > 2 ? <span className="rounded-full bg-[#EEF0F2] px-2 py-1 text-[10px] text-[#565F59]">+{friend.tags.length - 2}</span> : null}
-        {!friend.tags.length && friend.firstTrackedLinkName ? <span title={friend.firstTrackedLinkName} className="max-w-full truncate text-[10px] text-[#565F59]">{friend.firstTrackedLinkName}</span> : null}
-        {!friend.tags.length && !friend.firstTrackedLinkName ? <span className="text-[10px] text-[#B8BCC2]">—</span> : null}
-      </div>
+      {visibleColumns.has('tags') ? (
+        <div className="flex min-w-0 flex-wrap content-center gap-1">
+          {friend.tags.slice(0, 2).map((tag, index) => (
+            <span key={tag.id} title={tag.name} className={`max-w-full truncate rounded-mini px-2 py-1 text-nano font-semibold ${index === 0 ? 'bg-v6-accent-soft text-v6-accent-hover' : 'bg-v6-purple-bg text-v6-purple'}`}>{tag.name}</span>
+          ))}
+          {friend.tags.length > 2 ? <span className="rounded-mini bg-v6-avatar-bg px-2 py-1 text-nano text-v6-ink-secondary">+{friend.tags.length - 2}</span> : null}
+          {!friend.tags.length ? <span className="text-nano text-v6-ink-disabled">—</span> : null}
+        </div>
+      ) : null}
 
-      <div className="col-start-2 text-xs tabular-nums text-[#565F59] lg:col-auto lg:text-center" title={formatDateTime(lastContact)}>
-        {formatDate(lastContact)}
-      </div>
+      {visibleColumns.has('last') ? (
+        <div className="text-center text-xs tabular-nums text-v6-ink-faint" title={formatDateTime(lastContact)}>
+          {formatDate(lastContact)}
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -115,4 +151,15 @@ function formatDateTime(iso: string): string {
 
 function formatDate(iso: string): string {
   return iso.slice(0, 10).replace(/-/g, '/')
+}
+
+function avatarTone(name: string): string {
+  const palette = [
+    'var(--color-v6-avatar-indigo)',
+    'var(--color-v6-avatar-blue)',
+    'var(--color-v6-avatar-slate)',
+    'var(--color-v6-avatar-green)',
+  ]
+  const index = [...name].reduce((sum, character) => sum + (character.codePointAt(0) ?? 0), 0) % palette.length
+  return palette[index]
 }

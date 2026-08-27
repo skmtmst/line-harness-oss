@@ -405,6 +405,10 @@ export type FriendListParams = {
   sort?: 'recent' | 'oldest'
   /** `unhandled` で「最新が未返信の incoming」だけに絞る (サーバ側 SQL filter). */
   handled?: 'unhandled'
+  /** 最新の対応担当者。 */
+  operatorId?: string
+  /** 現在配信中のシナリオ。 */
+  scenarioId?: string
 
   // ── 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）─────────────────
   // どれも足し算。指定が無ければ何も起きない。
@@ -546,6 +550,8 @@ export type FriendListItem = FriendWithTags & Partial<{
   latestOutgoingAt: string | null
   activeScenario: { name: string; status: string } | null
   handled: boolean
+  operator: { id: string; name: string } | null
+  supportMark: { id: string; name: string; color: string } | null
 }>
 
 
@@ -1019,6 +1025,8 @@ export const api = {
       if (params?.includeChatStatus) query.includeChatStatus = 'true'
       if (params?.sort) query.sort = params.sort
       if (params?.handled) query.handled = params.handled
+      if (params?.operatorId) query.operatorId = params.operatorId
+      if (params?.scenarioId) query.scenarioId = params.scenarioId
       if (params?.tagIds?.length) query.tagIds = params.tagIds.join(',')
       if (params?.excludeTagIds?.length) query.excludeTagIds = params.excludeTagIds.join(',')
       if (params?.statusMessage) query.statusMessage = params.statusMessage
@@ -1061,12 +1069,12 @@ export const api = {
     },
     /**
      * 友だち情報（metadata）を書き換える。
-     * 渡した項目だけ変わる。空文字を渡すと空で上書きする。
+     * 渡した項目だけ変わる。null を渡すとその項目を削除する。
      */
-    updateMetadata: (id: string, metadata: Record<string, string>) =>
+    updateMetadata: (id: string, metadata: Record<string, string | null>) =>
       fetchApi<ApiResponse<unknown>>(`/api/friends/${id}/metadata`, {
         method: 'PUT',
-        body: JSON.stringify({ metadata }),
+        body: JSON.stringify(metadata),
       }),
     addTag: (friendId: string, tagId: string) =>
       fetchApi<ApiResponse<null>>(`/api/friends/${friendId}/tags`, {
@@ -2685,6 +2693,10 @@ export const api = {
       fetchApi<ApiResponse<FriendStats>>(
         `/api/friends/stats${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`,
       ),
+  },
+  operators: {
+    list: () =>
+      fetchApi<ApiResponse<Array<{ id: string; name: string }>>>('/api/operators'),
   },
   dashboard: {
     overview: (params: { period?: 'today' | 'last7' | 'last28'; accountId: string }) => {
