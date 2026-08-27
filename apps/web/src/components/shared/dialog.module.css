@@ -11,6 +11,7 @@
 }
 
 .panel {
+  position: relative;
   display: flex;
   width: min(844px, 100%);
   flex-direction: column;
@@ -23,8 +24,38 @@
   color: var(--color-ink);
 }
 
+.closeButton {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+}
+
+.closeButton:hover:not(:disabled) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink);
+}
+
+.closeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
 .standardPanel {
   padding: 18px;
+}
+
+.compactPanel {
+  width: min(620px, 100%);
 }
 
 .panel:focus-visible,

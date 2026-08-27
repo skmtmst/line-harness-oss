@@ -352,11 +352,6 @@
     "direct-secondary-button": 2,
     "direct-primary-button": 1
   },
-  "app/tags/folders/new/page.tsx": {
-    "arbitrary-value": 4,
-    "direct-secondary-button": 4,
-    "direct-primary-button": 1
-  },
   "app/tags/new/page.tsx": {
     "arbitrary-value": 3,
     "unresolved-classname": 6
@@ -588,6 +583,9 @@
     "direct-secondary-button": 6,
     "unresolved-classname": 17,
     "arbitrary-value": 17
+  },
+  "components/friend-fields/tag-folder-dialog.tsx": {
+    "direct-secondary-button": 1
   },
   "components/friend-fields/tags-page-v4.tsx": {
     "unresolved-classname": 3,

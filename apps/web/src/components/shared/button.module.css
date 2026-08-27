@@ -47,3 +47,13 @@
 .secondary:hover:not(:disabled) {
   background: var(--color-canvas-sunken);
 }
+
+.dangerOutline {
+  border-color: var(--color-status-danger);
+  background: var(--color-canvas);
+  color: var(--color-status-danger);
+}
+
+.dangerOutline:hover:not(:disabled) {
+  background: var(--color-status-danger-soft);
+}

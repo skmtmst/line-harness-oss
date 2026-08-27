@@ -9,7 +9,7 @@ import type {
 import styles from './button.module.css'
 
 type CommonProps = {
-  variant?: 'primary' | 'secondary'
+  variant?: 'primary' | 'secondary' | 'dangerOutline'
   className?: string
   children: ReactNode
 }
