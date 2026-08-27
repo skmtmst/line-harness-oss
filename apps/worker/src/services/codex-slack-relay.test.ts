@@ -186,16 +186,46 @@ describe('Codex Slack relay', () => {
     });
   });
 
-  test('次のPRチャンネル準備が失敗したらSlack投稿前に停止する', async () => {
-    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(new Response(JSON.stringify({
-      ok: false,
-      error: 'missing_scope',
-    }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }));
+  test('1人の招待が失敗しても残りの招待とチャンネル利用を続ける', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(slackResponse({
+        channels: [{ id: 'C-401-500', name: 'line-harness-pr-401-500', is_archived: false }],
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: false, error: 'user_not_found' })))
+      .mockResolvedValueOnce(slackResponse({}));
 
-    await expect(relayCodexSlackEvent({
+    const channelId = await resolveCodexSlackChannelWithProvisioning({
+      SLACK_BOT_TOKEN: 'xoxb-test',
+      SLACK_KENTA_USER_ID: 'U-STALE',
+      SLACK_MASATO_USER_ID: 'U-MASATO',
+    }, 'fix', 401, fetcher);
+
+    expect(channelId).toBe('C-401-500');
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(String(fetcher.mock.calls[2]?.[1]?.body))).toEqual({
+      channel: 'C-401-500',
+      users: 'U-MASATO',
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('slack_pr_channel_member_invite_failed'));
+    warn.mockRestore();
+  });
+
+  test('次のPRチャンネル準備が失敗しても現在のPR報告を続ける', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        ok: false,
+        error: 'missing_scope',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(slackResponse({ messages: [] }))
+      .mockResolvedValueOnce(slackResponse({ ts: '290.001' }))
+      .mockResolvedValueOnce(slackResponse({ ts: '290.002' }));
+
+    const result = await relayCodexSlackEvent({
       SLACK_BOT_TOKEN: 'xoxb-test',
       SLACK_DEFAULT_PR_CHANNEL_ID: 'C-DEFAULT',
       SLACK_PR_CHANNELS_JSON: JSON.stringify({ '201-300': 'C-201-300' }),
@@ -204,10 +234,14 @@ describe('Codex Slack relay', () => {
       sessionId: 'github-pr-290',
       eventSource: 'github',
       syncMode: 'event',
-    }), fetcher)).rejects.toThrow('SLACK_API_FAILED:conversations.list:200:missing_scope');
+      refreshCommandCenter: false,
+    }), fetcher);
 
-    expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(fetcher.mock.calls.every((call) => !String(call[0]).includes('chat.postMessage'))).toBe(true);
+    expect(result).toEqual({ category: 'fix', channelId: 'C-201-300', threadTs: '290.001' });
+    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(fetcher.mock.calls.filter((call) => String(call[0]).includes('chat.postMessage'))).toHaveLength(2);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('slack_upcoming_pr_range_prepare_failed'));
+    warn.mockRestore();
   });
 
   test('Slackに出す前に秘密値を隠す', () => {
