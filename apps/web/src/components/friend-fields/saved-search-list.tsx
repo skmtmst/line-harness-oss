@@ -134,7 +134,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   {search.lineAccountId ? (
                     <Link
-                      href={`/friends?search=${search.id}`}
+                      href={`/friends?savedSearch=${search.id}`}
                       className="text-ink text-sm font-bold hover:underline"
                     >
                       {search.name}
@@ -158,6 +158,14 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   <span className="text-ink-faint ml-auto text-xs">
                     {new Date(search.createdAt).toLocaleDateString('ja-JP')}
                   </span>
+                  {search.lineAccountId ? (
+                    <Link
+                      href={`/tags/searches/edit?id=${encodeURIComponent(search.id)}`}
+                      className="text-action rounded-md px-2.5 py-1 text-xs font-semibold hover:bg-v6-action-soft"
+                    >
+                      条件を確認・編集
+                    </Link>
+                  ) : null}
                   <button
                     onClick={() => remove(search)}
                     disabled={!search.lineAccountId}

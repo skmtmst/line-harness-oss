@@ -410,6 +410,8 @@ export type FriendListParams = {
   operatorId?: string
   /** 現在配信中のシナリオ。 */
   scenarioId?: string
+  /** サーバーへ保存したAND/OR条件。選択中のLINEアカウントが必須。 */
+  savedSearchId?: string
 
   // ── 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）─────────────────
   // どれも足し算。指定が無ければ何も起きない。
@@ -1028,6 +1030,7 @@ export const api = {
       if (params?.handled) query.handled = params.handled
       if (params?.operatorId) query.operatorId = params.operatorId
       if (params?.scenarioId) query.scenarioId = params.scenarioId
+      if (params?.savedSearchId) query.savedSearchId = params.savedSearchId
       if (params?.tagIds?.length) query.tagIds = params.tagIds.join(',')
       if (params?.excludeTagIds?.length) query.excludeTagIds = params.excludeTagIds.join(',')
       if (params?.statusMessage) query.statusMessage = params.statusMessage

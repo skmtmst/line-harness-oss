@@ -596,7 +596,7 @@
     "direct-th": 10
   },
   "components/friends/advanced-search-dialog.tsx": {
-    "arbitrary-value": 60
+    "arbitrary-value": 57
   },
   "components/friends/friend-list-row.tsx": {
     "unresolved-classname": 1
