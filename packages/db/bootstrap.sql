@@ -1000,6 +1000,13 @@ CREATE TABLE friend_daily_snapshots (
   PRIMARY KEY (date, line_account_id)
 );
 
+CREATE TABLE friend_field_scopes (
+  field_id         TEXT PRIMARY KEY REFERENCES friend_fields(id) ON DELETE CASCADE,
+  tenant_id        TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id  TEXT REFERENCES line_accounts(id),
+  created_at       TEXT NOT NULL
+);
+
 CREATE TABLE friend_field_values (
   friend_id   TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
   field_id    TEXT NOT NULL REFERENCES friend_fields(id) ON DELETE CASCADE,
@@ -2859,6 +2866,9 @@ CREATE INDEX idx_friend_add_events_friend
 
 CREATE INDEX idx_friend_daily_snapshots_date
   ON friend_daily_snapshots (line_account_id, date);
+
+CREATE INDEX idx_friend_field_scopes_account
+  ON friend_field_scopes(tenant_id, line_account_id);
 
 CREATE INDEX idx_friend_fields_order ON friend_fields(display_order, id);
 
