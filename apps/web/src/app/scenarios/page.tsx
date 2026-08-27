@@ -151,6 +151,18 @@ export default function ScenariosPage() {
     }
   }
 
+  /** 一覧からフォルダを付け替える。作ったフォルダへ中身を入れる操作。 */
+  const handleMoveFolder = async (id: string, folderId: string) => {
+    setError('')
+    try {
+      const res = await api.scenarios.update(id, { folderId: folderId || null })
+      if (!res.success) throw new Error(res.error)
+      void loadScenarios()
+    } catch {
+      setError('フォルダの変更に失敗しました')
+    }
+  }
+
   const handleDelete = async (id: string) => {
     try {
       await api.scenarios.delete(id)
@@ -344,6 +356,8 @@ export default function ScenariosPage() {
                   : sc.folderId === folderFilter,
             )}
           onReorder={handleReorder}
+          folders={folders}
+          onMoveFolder={handleMoveFolder}
           onToggleActive={handleToggleActive}
           onDelete={handleDelete}
           loading={loading}

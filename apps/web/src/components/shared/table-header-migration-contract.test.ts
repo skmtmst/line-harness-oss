@@ -52,9 +52,9 @@ describe('表見出しの第1段階移行', () => {
     expect(sources['app/affiliates/tabs.tsx'].match(/<th\b/g)).toHaveLength(20)
 
     const debt = totals(countDebt().counts) as Record<string, number>
-    // 4-1 の表に「表示」列（★）を足したぶん1つ増えた。
-    // 共通の `Th` へ寄せるのは、横展開のときにまとめて行う。
-    expect(debt['direct-th']).toBe(297)
+    // 4-1 の表に「表示」列（★）を足したあと、シナリオ一覧の見出し9個を
+    // 共通の `Th` へ寄せて288。減ったぶんを戻せないよう締め直す。
+    expect(debt['direct-th']).toBe(288)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

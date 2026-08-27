@@ -8,6 +8,10 @@ const PAGE = fs.readFileSync(
   'utf8',
 )
 const LIST = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
+const LIST_TABLE = fs.readFileSync(
+  path.join(__dirname, '..', '..', '..', 'components', 'scenarios', 'scenario-list.tsx'),
+  'utf8',
+)
 
 describe('V6 シナリオ編集の契約', () => {
   it('上部の一括テスト送信を既存の全通テスト送信へ接続する', () => {
@@ -34,5 +38,13 @@ describe('V6 シナリオ編集の契約', () => {
     expect(LIST.indexOf('⇅ 並び替えは ⠿ を掴む')).toBeLessThan(
       LIST.indexOf('マニュアル\n            </button>'),
     )
+  })
+
+  it('作ったフォルダへ一覧からシナリオを移せる', () => {
+    expect(LIST).toContain("api.scenarios.update(id, { folderId: folderId || null })")
+    expect(LIST).toContain('onMoveFolder={handleMoveFolder}')
+    expect(LIST_TABLE).toContain('フォルダ')
+    expect(LIST_TABLE).toContain('className="v6-select')
+    expect(LIST_TABLE).toContain("onMoveFolder?.(s.id, event.target.value)")
   })
 })

@@ -672,8 +672,7 @@
     "direct-primary-button": 3
   },
   "components/scenarios/scenario-list.tsx": {
-    "arbitrary-value": 3,
-    "direct-th": 9
+    "arbitrary-value": 3
   },
   "components/scenarios/schedule-input.tsx": {
     "unresolved-classname": 5
