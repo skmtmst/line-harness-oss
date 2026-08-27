@@ -17,6 +17,11 @@ vi.mock('../services/availability.js', () => availabilityMocks);
 const notifierMocks = { sendBookingNotification: vi.fn() };
 vi.mock('../services/booking-notifier.js', () => notifierMocks);
 
+const accountAccessMocks = {
+  canAccessAllLineAccounts: vi.fn(async () => true),
+};
+vi.mock('../services/account-access.js', () => accountAccessMocks);
+
 const { default: booking } = await import('./booking.js');
 
 function makeApp(db: unknown) {
@@ -47,6 +52,14 @@ describe('GET /api/booking/admin/menus/:id/staff', () => {
     const { app, env } = makeApp(emptyDb);
     const res = await app.request('/api/booking/admin/menus/m1/staff', {}, env);
     expect(res.status).toBe(400);
+  });
+
+  test('403 when the selected LINE account is outside the operator scope', async () => {
+    accountAccessMocks.canAccessAllLineAccounts.mockResolvedValueOnce(false);
+    const { app, env } = makeApp(emptyDb);
+    const res = await app.request('/api/booking/admin/menus/m1/staff?account_id=other', {}, env);
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toEqual({ error: 'forbidden_account' });
   });
 
   test('200 with staff list', async () => {
