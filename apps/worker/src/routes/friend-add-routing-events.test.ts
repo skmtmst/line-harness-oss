@@ -6,6 +6,8 @@ const db = vi.hoisted(() => ({
   getLineAccounts: vi.fn(),
   listFriendAddEvents: vi.fn(),
   getTags: vi.fn(),
+  getStaffById: vi.fn(),
+  getStaffAccountScopeIds: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => db);
@@ -30,6 +32,8 @@ beforeEach(() => {
     { id: 'account-1', tenant_id: 'tenant-1' },
     { id: 'account-2', tenant_id: 'tenant-2' },
   ]);
+  db.getStaffById.mockResolvedValue({ account_scope: 'all' });
+  db.getStaffAccountScopeIds.mockResolvedValue([]);
   db.listFriendAddEvents.mockResolvedValue({
     items: [],
     summary: { total: 0, firstTime: 0, returning: 0, captured: 0, unavailable: 0, pending: 0, failed: 0 },

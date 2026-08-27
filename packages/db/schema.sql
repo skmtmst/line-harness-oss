@@ -894,6 +894,7 @@ CREATE TABLE IF NOT EXISTS notification_rules (
   event_type   TEXT NOT NULL,
   conditions   TEXT NOT NULL DEFAULT '{}',
   channels     TEXT NOT NULL DEFAULT '["webhook"]',
+  line_account_id TEXT REFERENCES line_accounts(id),
   is_active    INTEGER NOT NULL DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
@@ -908,11 +909,25 @@ CREATE TABLE IF NOT EXISTS notifications (
   channel         TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
   metadata        TEXT,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  category        TEXT NOT NULL DEFAULT 'info' CHECK (category IN ('error', 'update', 'info')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_notifications_status ON notifications (status);
 CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications (created_at);
+CREATE INDEX IF NOT EXISTS idx_notification_rules_account ON notification_rules(line_account_id, event_type, is_active);
+CREATE INDEX IF NOT EXISTS idx_notifications_center ON notifications(line_account_id, category, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS staff_notification_reads (
+  notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+  staff_id        TEXT NOT NULL,
+  read_at         TEXT NOT NULL,
+  PRIMARY KEY (notification_id, staff_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_notification_reads_staff
+  ON staff_notification_reads(staff_id, read_at DESC);
 
 -- ============================================================
 -- Round 3: Stripe決済連携

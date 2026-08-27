@@ -1630,6 +1630,7 @@ CREATE TABLE notification_rules (
   event_type   TEXT NOT NULL,
   conditions   TEXT NOT NULL DEFAULT '{}',
   channels     TEXT NOT NULL DEFAULT '["webhook"]',
+  line_account_id TEXT REFERENCES line_accounts(id),
   is_active    INTEGER NOT NULL DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
@@ -1644,6 +1645,8 @@ CREATE TABLE notifications (
   channel         TEXT NOT NULL,
   status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
   metadata        TEXT,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  category        TEXT NOT NULL DEFAULT 'info' CHECK (category IN ('error', 'update', 'info')),
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -2256,6 +2259,13 @@ CREATE TABLE staff_menus (
   PRIMARY KEY (staff_id, menu_id),
   FOREIGN KEY (staff_id) REFERENCES staff(id),
   FOREIGN KEY (menu_id) REFERENCES menus(id)
+);
+
+CREATE TABLE staff_notification_reads (
+  notification_id TEXT NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+  staff_id        TEXT NOT NULL,
+  read_at         TEXT NOT NULL,
+  PRIMARY KEY (notification_id, staff_id)
 );
 
 CREATE TABLE staff_shifts (
@@ -3020,6 +3030,10 @@ CREATE INDEX idx_nen_point_ledger_friend_created
 CREATE INDEX idx_nen_rich_menu_jobs_status
   ON nen_rich_menu_jobs(status, created_at);
 
+CREATE INDEX idx_notification_rules_account ON notification_rules(line_account_id, event_type, is_active);
+
+CREATE INDEX idx_notifications_center ON notifications(line_account_id, category, created_at DESC);
+
 CREATE INDEX idx_notifications_created ON notifications (created_at);
 
 CREATE INDEX idx_notifications_status ON notifications (status);
@@ -3155,6 +3169,9 @@ CREATE INDEX idx_staff_members_role ON staff_members(role);
 
 CREATE INDEX idx_staff_members_tenant
   ON staff_members(tenant_id);
+
+CREATE INDEX idx_staff_notification_reads_staff
+  ON staff_notification_reads(staff_id, read_at DESC);
 
 CREATE INDEX idx_stripe_events_friend ON stripe_events (friend_id);
 

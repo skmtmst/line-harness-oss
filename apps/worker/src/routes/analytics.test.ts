@@ -30,6 +30,8 @@ const mocks = {
   getCurrentFunnelVersion: vi.fn(),
   getLineAccountById: vi.fn(),
   getLineAccounts: vi.fn(),
+  getStaffById: vi.fn(),
+  getStaffAccountScopeIds: vi.fn(),
   FUNNEL_STEP_KINDS: [
     'tag',
     'field',
@@ -77,6 +79,8 @@ const FUNNEL = { id: 'fn-1', line_account_id: 'account-a', name: '購入まで',
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+  mocks.getStaffAccountScopeIds.mockResolvedValue([]);
   mocks.getDailyMessageCounts.mockResolvedValue([]);
   mocks.getTrackedLinkStats.mockResolvedValue([]);
   mocks.getLinkClickSummary.mockResolvedValue([]);
