@@ -132,20 +132,25 @@ function parseEvent(rawBody: string): CodexSlackEvent | null {
 }
 
 codexSlackEvents.post('/api/integrations/codex-slack/events', async (c) => {
-  const secret = c.env.CODEX_SLACK_RELAY_SECRET;
-  if (!secret || !c.env.SLACK_BOT_TOKEN) {
+  const secrets = [...new Set([
+    c.env.CODEX_SLACK_RELAY_SECRET,
+    c.env.CODEX_SLACK_RELAY_SECRET_KENTA,
+    c.env.CODEX_SLACK_RELAY_SECRET_MASATO,
+  ].filter((value): value is string => Boolean(value)))];
+  if (secrets.length === 0 || !c.env.SLACK_BOT_TOKEN) {
     return c.json({ success: false, error: 'Codex Slack relay not configured' }, 503);
   }
   const rawBody = await c.req.text();
   if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
     return c.json({ success: false, error: 'Payload too large' }, 413);
   }
-  const verified = await verifySupportRelay(
+  const verificationResults = await Promise.all(secrets.map((secret) => verifySupportRelay(
     secret,
     c.req.header('x-nen-timestamp'),
     c.req.header('x-nen-signature'),
     rawBody,
-  );
+  )));
+  const verified = verificationResults.some(Boolean);
   if (!verified) return c.json({ success: false, error: 'Invalid signature' }, 401);
 
   const event = parseEvent(rawBody);
