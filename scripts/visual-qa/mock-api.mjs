@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, CONVERSION_POINTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -451,6 +451,44 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   if (pathname === '/api/folders' && query.get('kind') === 'media') {
     return { success: true, data: MEDIA_FOLDERS }
+  }
+  if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
+  if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATES_REPORT }
+  if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
+  if (pathname === '/api/conversions/approvals') return { success: true, data: CONVERSION_APPROVALS }
+  if (pathname === '/api/conversion-points') return { success: true, data: CONVERSION_POINTS }
+  const affLinks = /^\/api\/affiliates\/([^/]+)\/links$/.exec(pathname)
+  if (affLinks) return { success: true, data: [] }
+  const affJourneys = /^\/api\/affiliates\/([^/]+)\/journeys$/.exec(pathname)
+  if (affJourneys) return { success: true, data: { items: [], total: 0 } }
+  const affReport = /^\/api\/affiliates\/([^/]+)\/report$/.exec(pathname)
+  if (affReport) {
+    const row = AFFILIATES_REPORT.find((item) => item.affiliateId === affReport[1]) ?? AFFILIATES_REPORT[0]
+    return {
+      success: true,
+      data: {
+        affiliateId: row.affiliateId, affiliateName: row.affiliateName, code: row.code,
+        commissionRate: row.commissionRate,
+        clicks: row.totalClicks, linkClicks: row.totalClicks, friendAdds: row.friendAdds,
+        conversions: row.totalConversions,
+        conversionsPending: 2, conversionsApproved: row.totalConversions - 2, conversionsRejected: 0,
+        conversionsByPoint: CONVERSION_POINTS.map((point, i) => ({
+          conversionPointId: point.id, name: point.name, count: [7, 3, 2][i] ?? 0, value: point.value ?? 0,
+        })),
+        revenue: row.totalRevenue, estimatedCommission: 86000, confirmedReward: 86000,
+        byOffer: AFFILIATE_OFFERS.slice(0, 3).map((offer, i) => ({
+          offerId: offer.id, offerName: offer.name, rewardAmount: offer.rewardAmount ?? 0,
+          conversionsApproved: [7, 2, 1][i], conversionsPending: [2, 0, 0][i],
+          confirmedReward: [21000, 16000, 300][i],
+        })),
+        duplicateFlags: [{ friendId: 'friend-4', identityKey: 'friend-4:offer-1' }],
+      },
+    }
+  }
+  const affOne = /^\/api\/affiliates\/([^/]+)$/.exec(pathname)
+  if (affOne) {
+    const found = AFFILIATES.find((item) => item.id === affOne[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/media') return { success: true, data: MEDIA_ITEMS }
   const mediaUsage = /^\/api\/media\/([^/]+)\/usages?$/.exec(pathname)

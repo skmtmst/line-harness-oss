@@ -1462,3 +1462,145 @@ export const MEDIA_USAGE = {
     { refKind: 'scenario', refId: 'scenario-0', scannedAt: '2026-08-24T00:00:00.000Z' },
   ],
 }
+
+/**
+ * 機能16 成果とアフィリエイト。設計 `PouPn`（アフィリエイター12・案件5・
+ * 成果承認8・支払い3）に数を合わせる。
+ *
+ * **`Affiliate`（`packages/shared`）と `AffiliateOffer`・
+ * `ConversionApprovalItem`（`apps/web/src/lib/api.ts`）の3つに分かれている。**
+ * どれも別の形なので、まとめて1つの固定データにはできない。
+ */
+export const AFFILIATES = [
+  {
+    id: 'aff-1', name: '田中 明', code: 'tanaka01', commissionRate: 10, isActive: true,
+    email: 'tanaka@example.com', holdDays: 30, payoutCycle: '毎月末締め・翌月末払い',
+    notifyOnConversion: true, createdAt: '2026-02-14T00:00:00.000Z',
+  },
+  {
+    id: 'aff-2', name: '合同会社ノース', code: 'north', commissionRate: 0, isActive: true,
+    email: 'info@north.example.com', holdDays: 30, payoutCycle: '毎月末締め・翌月末払い',
+    notifyOnConversion: false, createdAt: '2025-11-01T00:00:00.000Z',
+  },
+  {
+    id: 'aff-3', name: '木村 亮', code: 'kimura', commissionRate: 15, isActive: true,
+    email: null, holdDays: 30, payoutCycle: null,
+    notifyOnConversion: true, createdAt: '2026-04-08T00:00:00.000Z',
+  },
+  {
+    /* 止めている人。**成果は残るが新しくは数えない。** */
+    id: 'aff-4', name: '旧パートナーA', code: 'legacy-a', commissionRate: 5, isActive: false,
+    email: null, holdDays: null, payoutCycle: null,
+    notifyOnConversion: false, createdAt: '2025-06-20T00:00:00.000Z',
+  },
+]
+
+/** 設計 `GH8VL` の案件。**「動きが未設定」を1件混ぜる。** */
+export const AFFILIATE_OFFERS = [
+  {
+    id: 'offer-1', name: '無料体験の申込', description: '体験レッスンに申し込んだら成果',
+    rewardAmount: 3000, rewardMiles: 500, mileageProgramId: 'mp-1',
+    lineAccountId: null, tagId: 'tag-0', scenarioId: 'scenario-0',
+    isActive: true, createdAt: '2026-03-01T00:00:00.000Z',
+  },
+  {
+    id: 'offer-2', name: '定期便の申込', description: '定期便に申し込んだら成果',
+    rewardAmount: 8000, rewardMiles: 1000, mileageProgramId: 'mp-1',
+    lineAccountId: null, tagId: 'tag-1', scenarioId: null,
+    isActive: true, createdAt: '2026-03-01T00:00:00.000Z',
+  },
+  {
+    id: 'offer-3', name: '友だち追加だけ', description: '友だち追加で成果',
+    rewardAmount: 300, rewardMiles: 0, mileageProgramId: 'mp-1',
+    lineAccountId: null, tagId: 'tag-2', scenarioId: null,
+    isActive: true, createdAt: '2026-02-01T00:00:00.000Z',
+  },
+  {
+    /*
+      設計 `GH8VL`「動きが未設定の案件 1件・成果が出ても何も起きません」。
+      **タグもシナリオも null。** ここが空でも一覧が崩れないことが要る。
+    */
+    id: 'offer-4', name: '資料請求', description: '資料をダウンロードしたら成果',
+    rewardAmount: 1500, rewardMiles: 0, mileageProgramId: 'mp-1',
+    lineAccountId: null, tagId: null, scenarioId: null,
+    isActive: true, createdAt: '2026-06-11T00:00:00.000Z',
+  },
+  {
+    id: 'offer-5', name: '春の紹介キャンペーン', description: '3月末で終了',
+    rewardAmount: 5000, rewardMiles: 0, mileageProgramId: 'mp-1',
+    lineAccountId: null, tagId: 'tag-0', scenarioId: null,
+    isActive: false, createdAt: '2026-01-15T00:00:00.000Z',
+  },
+]
+
+/** 設計 `n5VVTb` の承認待ち8件。**重複ありを1件混ぜる。** */
+export const CONVERSION_APPROVALS = [
+  {
+    /* 同じ友だちが同じ案件で2回。**そのまま認めると二重で払う。** */
+    eventId: 'cev-1', createdAt: '2026-08-23T10:41:00.000Z',
+    friendId: 'friend-4', friendName: '山田 太郎',
+    affiliateId: 'aff-3', affiliateName: '木村 亮',
+    offerId: 'offer-1', offerName: '無料体験の申込', offerRewardMiles: 500,
+    conversionPointName: '体験申込フォームの送信', value: 3000,
+    approvalStatus: 'pending', duplicateFlag: true,
+  },
+  ...Array.from({ length: 7 }, (_, i) => ({
+    eventId: `cev-${i + 2}`,
+    createdAt: `2026-08-2${(i % 4) + 1}T0${i % 9}:15:00.000Z`,
+    friendId: `friend-${i + 1}`, friendName: ['Kenta Kawano', 'Masato S.', '菅野 亮', '佐藤 花子', '高橋 実', '伊藤 香', '渡辺 剛'][i],
+    affiliateId: ['aff-1', 'aff-2', 'aff-1', 'aff-3', 'aff-2', 'aff-1', 'aff-2'][i],
+    affiliateName: ['田中 明', '合同会社ノース', '田中 明', '木村 亮', '合同会社ノース', '田中 明', '合同会社ノース'][i],
+    offerId: ['offer-1', 'offer-2', 'offer-1', 'offer-3', 'offer-2', 'offer-4', 'offer-1'][i],
+    offerName: ['無料体験の申込', '定期便の申込', '無料体験の申込', '友だち追加だけ', '定期便の申込', '資料請求', '無料体験の申込'][i],
+    offerRewardMiles: [500, 1000, 500, 0, 1000, 0, 500][i],
+    conversionPointName: '体験申込フォームの送信',
+    value: [3000, 8000, 3000, 300, 8000, 1500, 3000][i],
+    approvalStatus: 'pending',
+    duplicateFlag: false,
+  })),
+]
+
+/** 設計 `PouPn` の流れ（クリック4,820 → 友だち追加612 → 成果42 → 認めた34）。 */
+export const AFFILIATES_REPORT = [
+  {
+    affiliateId: 'aff-1', affiliateName: '田中 明', code: 'tanaka01', commissionRate: 10,
+    totalClicks: 1240, totalConversions: 12, totalRevenue: 860000,
+    linkCount: 3, friendAdds: 86,
+  },
+  {
+    affiliateId: 'aff-2', affiliateName: '合同会社ノース', code: 'north', commissionRate: 0,
+    totalClicks: 2180, totalConversions: 18, totalRevenue: 1440000,
+    linkCount: 5, friendAdds: 312,
+  },
+  {
+    affiliateId: 'aff-3', affiliateName: '木村 亮', code: 'kimura', commissionRate: 15,
+    totalClicks: 1400, totalConversions: 12, totalRevenue: 620000,
+    linkCount: 2, friendAdds: 214,
+  },
+  {
+    /* 止めている人。**クリックも成果も0。** 0で崩れないことが要る。 */
+    affiliateId: 'aff-4', affiliateName: '旧パートナーA', code: 'legacy-a', commissionRate: 5,
+    totalClicks: 0, totalConversions: 0, totalRevenue: 0, linkCount: 1, friendAdds: 0,
+  },
+]
+
+/** 成果地点（`ConversionPoint`）。設計は「成果地点3つ」。 */
+export const CONVERSION_POINTS = [
+  {
+    id: 'cp-1', name: '体験申込フォームの送信', eventType: 'form_submit', value: 3000,
+    measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30,
+    lineAccountId: null, createdAt: '2026-02-01T00:00:00.000Z',
+  },
+  {
+    id: 'cp-2', name: '定期便の申込', eventType: 'purchase', value: 8000,
+    measureMethod: 'url_reach', targetUrl: 'https://example.co.jp/thanks/subscription',
+    countRepeat: false, attributionDays: 90, lineAccountId: null,
+    createdAt: '2026-02-01T00:00:00.000Z',
+  },
+  {
+    id: 'cp-3', name: '資料ダウンロード', eventType: 'download', value: null,
+    measureMethod: 'url_reach', targetUrl: 'https://example.co.jp/download/done',
+    countRepeat: true, attributionDays: null, lineAccountId: null,
+    createdAt: '2026-06-11T00:00:00.000Z',
+  },
+]

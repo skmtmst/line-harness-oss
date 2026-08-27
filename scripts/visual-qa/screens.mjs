@@ -79,6 +79,9 @@ const COMMON_VAR = { feature: 14, dir: 'common-vars-v6', route: '/contents/vars'
 /** 登録メディア。詳細は札の中で開く（別ルートではない）。 */
 const MEDIA = { feature: 15, dir: 'media-v6', route: '/contents', mode: 'page' }
 
+/** 成果とアフィリエイト。`/conversions?tab=` の5タブに寄せてある。 */
+const AFFILIATE = { feature: 16, dir: 'affiliates-v6', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -677,6 +680,38 @@ export const SCREENS = [
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能16 成果とアフィリエイト ─────────────────────────
+  /*
+    設計のタブは4本（アフィリエイター／案件／成果承認／支払い）。
+    実装は5本で、**「支払い」が無く**、代わりに「成果地点（CV）」と
+    「レポート」がある。支払いの2枚（`njLGA` `GqFTV`）は行き先が無い。
+  */
+  { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates' },
+  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers' },
+  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals' },
+  {
+    ...AFFILIATE, node: 'njLGA', name: '16-1-C 支払い',
+    status: 'unimplemented',
+    why: '「支払い」のタブが無い。締め日・支払日・振込先・未払い残高を扱う場所がどこにも無い（`grep 振込|締め` が0件）',
+  },
+  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new' },
+  {
+    ...AFFILIATE, node: 'jwrbf', name: '16-1-E アフィリエイターの成果内訳',
+    route: '/conversions?tab=affiliates', mode: 'viewport', height: 1136,
+    /* 表の行は `onClick` だけで、押せる役を持っていない。文字で探す。 */
+    steps: [{ click: '田中 明', role: 'text' }],
+  },
+  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new' },
+  {
+    ...AFFILIATE, node: 'QX70l', name: '16-1-G アフィリエイターを削除する確認',
+    status: 'unimplemented',
+    why: '一覧に消す導線が無い。受け口（`api.affiliates.delete`）は在るのに**画面が呼んでいない**',
+  },
+  {
+    ...AFFILIATE, node: 'GqFTV', name: '16-1-H 支払いを確定する',
+    status: 'unimplemented', why: '16-1-C（支払い）が無いので、締める操作も無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

@@ -136,7 +136,14 @@ async function runSteps(page, steps = [], node = '') {
       continue
     }
     const root = step.scope === 'main' ? page.locator('main') : page
-    const target = root.getByRole(step.role ?? 'button', { name: step.click })
+    /*
+      **押せるものが操作の役を持っているとは限らない。** 表の行に
+      `onClick` を付けただけのものは `button` でも `link` でもないので、
+      名前で引けない。`role: 'text'` のときは文字そのもので探す。
+    */
+    const target = step.role === 'text'
+      ? root.getByText(step.click, { exact: false })
+      : root.getByRole(step.role ?? 'button', { name: step.click })
     const one = step.nth === undefined ? target.first() : target.nth(step.nth)
     if (step.onlyIfOff && (await one.getAttribute('aria-checked')) === 'true') continue
     try {
