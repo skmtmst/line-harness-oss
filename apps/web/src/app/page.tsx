@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import type { EntryRoute } from '@line-crm/shared'
+import { useRouter } from 'next/navigation'
+import type { EntryRoute, NotificationCenterData, NotificationCenterItem } from '@line-crm/shared'
 import { api, bookingApi, type BookingRequest, type DashboardOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { formatDurationMinutes } from '@/lib/format-duration'
@@ -33,8 +34,15 @@ import {
   summarizeTwoFactor,
   type TwoFactorSummary,
 } from '@/components/dashboard/live-summary'
+import {
+  dashboardNotificationFilters,
+  dashboardNotificationItems,
+  markDashboardNotificationRead,
+  markDashboardNotificationsRead,
+  type DashboardNotificationFilter,
+} from '@/components/dashboard/notification-summary'
 
-/** 通知パネルの絞り込み。中身の口ができるまで数は0のまま。 */
+/** 共通トップバーの通知ベル。件数と一覧は選択中アカウントの通知センターから読む。 */
 function BellIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -43,12 +51,6 @@ function BellIcon() {
     </svg>
   )
 }
-
-const NOTIFICATION_FILTERS = [
-  { id: 'all', label: 'すべて', count: 0 },
-  { id: 'error', label: 'エラー', count: 0 },
-  { id: 'update', label: 'アップデート', count: 0 },
-]
 
 const PERIODS = [
   { key: 'today', label: '今日' },
@@ -322,6 +324,7 @@ function ConnectionStatusCard({ account, risk, activeFriends }: { account: Retur
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { selectedAccountId, selectedAccount, loading: accountLoading } = useAccount()
   const [period, setPeriod] = useState<PeriodKey>('today')
   const [data, setData] = useState<DashboardOverview | null>(null)
@@ -339,7 +342,13 @@ export default function DashboardPage() {
   const [healthIssueCount, setHealthIssueCount] = useState<number | null>(null)
   const [twoFactorSummary, setTwoFactorSummary] = useState<TwoFactorSummary | null>(null)
   const [supportMarkAutoOnInbound, setSupportMarkAutoOnInbound] = useState<boolean | null>(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notificationFilter, setNotificationFilter] = useState<DashboardNotificationFilter>('all')
+  const [notificationData, setNotificationData] = useState<NotificationCenterData | null>(null)
+  const [notificationLoading, setNotificationLoading] = useState(false)
+  const [notificationError, setNotificationError] = useState('')
   const loadRequestId = useRef(0)
+  const notificationRequestId = useRef(0)
   const visibleMain = preferences.main.filter((item) => item.visible)
   const visibleRight = preferences.right.filter((item) => item.visible)
   const visibleToday = preferences.today.filter((item) => item.visible)
@@ -445,6 +454,71 @@ export default function DashboardPage() {
   }, [accountLoading, period, selectedAccountId])
 
   useEffect(() => { void load() }, [load])
+
+  const loadNotificationCenter = useCallback(async () => {
+    const requestId = ++notificationRequestId.current
+    if (!selectedAccountId) {
+      setNotificationData(null)
+      setNotificationError('')
+      setNotificationLoading(false)
+      return
+    }
+    setNotificationLoading(true)
+    setNotificationError('')
+    try {
+      const response = await api.notifications.center.list(selectedAccountId, {
+        category: notificationFilter,
+        limit: 20,
+      })
+      if (requestId !== notificationRequestId.current) return
+      if (!response.success) throw new Error(response.error)
+      setNotificationData(response.data)
+    } catch {
+      if (requestId !== notificationRequestId.current) return
+      setNotificationData(null)
+      setNotificationError('通知を読み込めませんでした。もう一度お試しください。')
+    } finally {
+      if (requestId === notificationRequestId.current) setNotificationLoading(false)
+    }
+  }, [notificationFilter, selectedAccountId])
+
+  useEffect(() => { void loadNotificationCenter() }, [loadNotificationCenter])
+
+  useEffect(() => {
+    setNotificationsOpen(false)
+  }, [selectedAccountId])
+
+  const openNotification = async (item: NotificationCenterItem) => {
+    if (!selectedAccountId) return
+    if (!item.isRead) {
+      try {
+        const response = await api.notifications.center.markRead(item.id, selectedAccountId)
+        if (!response.success) throw new Error(response.error)
+        setNotificationData((current) => current ? markDashboardNotificationRead(current, item.id) : current)
+      } catch {
+        setNotificationError('通知を既読にできませんでした。')
+        return
+      }
+    }
+    if (item.eventType.startsWith('account_health_')) {
+      setNotificationsOpen(false)
+      router.push('/health')
+    }
+  }
+
+  const markAllNotificationsRead = async () => {
+    if (!selectedAccountId || !notificationData || notificationData.unreadCount === 0) return
+    try {
+      const response = await api.notifications.center.markAllRead(selectedAccountId, notificationFilter)
+      if (!response.success) throw new Error(response.error)
+      setNotificationData((current) => current
+        ? markDashboardNotificationsRead(current, notificationFilter, response.data.updated)
+        : current)
+      setNotificationError('')
+    } catch {
+      setNotificationError('通知をまとめて既読にできませんでした。')
+    }
+  }
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -562,9 +636,12 @@ export default function DashboardPage() {
     return null
   }
 
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
-  const [notificationFilter, setNotificationFilter] = useState('all')
-
+  const notificationItems = dashboardNotificationItems(
+    notificationData?.items ?? [],
+    (item) => { void openNotification(item) },
+  )
+  const notificationFilters = dashboardNotificationFilters(notificationData)
+  const unreadNotificationCount = notificationData?.unreadCount ?? 0
   const healthLabel = healthRisk === 'normal' ? '正常稼働' : healthRisk === 'warning' ? '要確認' : healthRisk === 'danger' ? '障害あり' : '状態確認中'
   const healthClass = healthRisk === 'danger' ? 'text-danger' : healthRisk === 'warning' ? 'text-warning' : healthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
 
@@ -588,32 +665,45 @@ export default function DashboardPage() {
               >{item.label}</button>
             ))}
           </div>
-          {/*
-            設計（`vUXKb` / `Alekb`）は期間の右にベルを置き、押すと通知パネルが
-            開く。部品（`components/shared/notification-panel.tsx`）は前からある
-            のに、ダッシュボードから呼ばれていなかった。
-
-            **中身を出す口はまだ無い。** バッジに数を作って出すと、本物らしく
-            見えるぶん無いより悪いので、件数は出さずパネルも「まだありません」
-            のままにする。口ができたらここへ繋ぐ。
-          */}
+          {/* 選択中のLINEアカウントの通知だけを表示し、未取得を0件に見せない。 */}
           <div className="relative">
             <IconButton
-              aria-label="通知"
+              aria-label={unreadNotificationCount > 0 ? `通知、未読${unreadNotificationCount}件` : '通知'}
               aria-expanded={notificationsOpen}
-              onClick={() => setNotificationsOpen((current) => !current)}
+              onClick={() => {
+                if (!notificationsOpen) void loadNotificationCenter()
+                setNotificationsOpen((current) => !current)
+              }}
             >
               <BellIcon />
             </IconButton>
+            {unreadNotificationCount > 0 ? (
+              <span
+                aria-hidden="true"
+                className="bg-danger text-on-accent pointer-events-none absolute -top-1.5 -right-1.5 min-w-5 rounded-full px-1 text-center text-xs leading-5 font-bold tabular-nums"
+              >{unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}</span>
+            ) : null}
             <NotificationPanel
               open={notificationsOpen}
-              items={[]}
-              filters={NOTIFICATION_FILTERS}
+              items={notificationItems}
+              filters={notificationFilters}
               activeFilter={notificationFilter}
-              unreadCount={0}
-              onFilterChange={setNotificationFilter}
-              onMarkAllRead={() => {}}
+              unreadCount={unreadNotificationCount}
+              loading={notificationLoading}
+              error={notificationError || undefined}
+              onFilterChange={(id) => {
+                if (id === 'all' || id === 'error' || id === 'update') setNotificationFilter(id)
+              }}
+              onMarkAllRead={() => { void markAllNotificationsRead() }}
               onClose={() => setNotificationsOpen(false)}
+              onViewAll={() => {
+                setNotificationsOpen(false)
+                router.push('/health')
+              }}
+              onOpenSettings={() => {
+                setNotificationsOpen(false)
+                router.push('/line-notifications')
+              }}
             />
           </div>
         </div>

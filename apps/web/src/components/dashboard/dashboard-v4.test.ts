@@ -8,9 +8,15 @@ import {
 } from './dashboard-editor'
 import { activeUpcomingBookings } from './side-cards'
 import { hasInboundSupportMark, summarizeTwoFactor } from './live-summary'
+import {
+  dashboardNotificationFilters,
+  dashboardNotificationItems,
+  markDashboardNotificationRead,
+  markDashboardNotificationsRead,
+} from './notification-summary'
 import { formatTrendSources } from './friend-trend-table'
 import type { BookingRequest } from '@/lib/api'
-import type { StaffMember } from '@line-crm/shared'
+import type { NotificationCenterData, StaffMember } from '@line-crm/shared'
 
 function booking(id: string, startsAt: string, status = 'confirmed'): BookingRequest {
   return {
@@ -58,6 +64,14 @@ describe('ダッシュボードV4の初期表示', () => {
       full: '広告 2',
       compact: '広告 2',
     })
+  })
+
+  it('通知は選択中アカウントの取得・1件既読・全件既読へ接続する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('api.notifications.center.list(selectedAccountId')
+    expect(source).toContain('api.notifications.center.markRead(item.id, selectedAccountId)')
+    expect(source).toContain('api.notifications.center.markAllRead(selectedAccountId, notificationFilter)')
+    expect(source).toContain('通知を読み込めませんでした。もう一度お試しください。')
   })
 
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
@@ -162,5 +176,71 @@ describe('既存データを使う運用状況', () => {
   it('受信時に自動変更する対応マークが1つでもあれば有効とする', () => {
     expect(hasInboundSupportMark([{ autoOnInbound: false }, { autoOnInbound: true }])).toBe(true)
     expect(hasInboundSupportMark([{ autoOnInbound: false }])).toBe(false)
+  })
+})
+
+describe('ダッシュボード通知', () => {
+  const data: NotificationCenterData = {
+    items: [
+      {
+        id: 'danger',
+        eventType: 'account_health_danger',
+        category: 'error',
+        title: '接続を確認してください',
+        body: '運用状態から確認してください。',
+        metadata: null,
+        isRead: false,
+        createdAt: '2026-08-27T01:30:00.000Z',
+      },
+      {
+        id: 'recovered',
+        eventType: 'account_health_recovered',
+        category: 'update',
+        title: '正常に戻りました',
+        body: '接続が正常に戻りました。',
+        metadata: null,
+        isRead: false,
+        createdAt: '2026-08-27T02:30:00.000Z',
+      },
+    ],
+    counts: { all: 2, error: 1, update: 1, unread: 2 },
+    unreadCount: 2,
+  }
+
+  it('APIの件数を通知タブへそのまま出す', () => {
+    expect(dashboardNotificationFilters(data)).toEqual([
+      { id: 'all', label: 'すべて', count: 2 },
+      { id: 'error', label: 'エラー', count: 1 },
+      { id: 'update', label: 'アップデート', count: 1 },
+    ])
+    expect(dashboardNotificationFilters(null).map((filter) => filter.count)).toEqual([null, null, null])
+  })
+
+  it('本文と日本時間を表示し、種類と未読状態を保つ', () => {
+    const selected: string[] = []
+    const items = dashboardNotificationItems(data.items, (item) => selected.push(item.id))
+    expect(items[0]).toMatchObject({
+      id: 'danger',
+      filterId: 'error',
+      unread: true,
+      meta: '運用状態から確認してください。｜8/27 10:30',
+    })
+    items[0].onSelect?.()
+    expect(selected).toEqual(['danger'])
+  })
+
+  it('1件既読は未読数だけを1減らし、二重操作では減らさない', () => {
+    const once = markDashboardNotificationRead(data, 'danger')
+    expect(once.unreadCount).toBe(1)
+    expect(once.counts).toEqual({ all: 2, error: 1, update: 1, unread: 1 })
+    expect(once.items.find((item) => item.id === 'danger')?.isRead).toBe(true)
+    expect(markDashboardNotificationRead(once, 'danger')).toBe(once)
+  })
+
+  it('種類別の全件既読は対象だけを既読にする', () => {
+    const next = markDashboardNotificationsRead(data, 'error', 1)
+    expect(next.items.find((item) => item.id === 'danger')?.isRead).toBe(true)
+    expect(next.items.find((item) => item.id === 'recovered')?.isRead).toBe(false)
+    expect(next.unreadCount).toBe(1)
   })
 })
