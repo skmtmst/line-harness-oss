@@ -20,6 +20,7 @@ import {
   jstNow,
   getFriendScore,
   recordAnalyticsEvent,
+  getEffectiveOperationStates,
 } from '@line-crm/db';
 import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
@@ -72,12 +73,16 @@ export async function fireEvent(
   }
 
   // Phase 1: fire webhooks, apply scoring rules, and ad conversion postback concurrently.
-  const phase1: Promise<unknown>[] = [
-    fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId),
-    processScoring(db, eventType, payload),
-  ];
+  const operationStates = await getEffectiveOperationStates(db, outgoingWebhookLineAccountId ?? null);
+  const webhookStopped = operationStates.webhook_outgoing === 'stopped';
+  const adPostbackStopped = operationStates.ad_postback === 'stopped';
+  const automationStopped = operationStates.automation_actions === 'stopped';
+  const phase1: Promise<unknown>[] = [processScoring(db, eventType, payload)];
+  if (!webhookStopped) {
+    phase1.push(fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId));
+  }
   if (payload.friendId && payload.conversionEventName) {
-    phase1.push(
+    if (!adPostbackStopped) phase1.push(
       sendAdConversions(db, payload.friendId, payload.conversionEventName, payload.conversionValue),
     );
   }
@@ -124,12 +129,14 @@ export async function fireEvent(
   }
 
   // Phase 2: evaluate automations.
-  await processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+  if (!automationStopped) {
+    await processAutomations(db, eventType, enrichedPayload, lineAccessToken, lineAccountId);
+  }
 
   // V6は発生元の不変IDとアカウントが分かるイベントだけを受け付ける。
   // 旧イベントの時刻などからIDを推測すると再配達で二重実行になるため、
   // 接続元が明示していないイベントは移行PRで接続するまで実行しない。
-  if (lineAccountId && enrichedPayload.sourceEventId) {
+  if (!automationStopped && lineAccountId && enrichedPayload.sourceEventId) {
     await dispatchAutomationEventWithLogging(db, {
       lineAccountId,
       eventType,

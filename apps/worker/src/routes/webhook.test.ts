@@ -36,6 +36,7 @@ vi.mock('@line-crm/db', () => ({
   markFriendAddEventRouting: vi.fn().mockResolvedValue(undefined),
   recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
   recordAutoReplyHit: vi.fn().mockResolvedValue(undefined),
+  isOperationCapabilityStopped: vi.fn().mockResolvedValue(false),
   toJstString: vi.fn().mockReturnValue('2026-08-24T12:00:00.000+09:00'),
 }));
 

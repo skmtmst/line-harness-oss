@@ -5,6 +5,8 @@
  * 固定し、外部処理は注入された executor に同じ stepExecutionId を渡す。
  */
 
+import { isOperationCapabilityStopped } from '@line-crm/db';
+
 const DEFAULT_LEASE_MINUTES = 5;
 const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
 const MAX_ATTEMPTS = RETRY_DELAYS_MINUTES.length + 1;
@@ -586,6 +588,12 @@ export async function processAutomationRun(
 ): Promise<RunStatus | 'busy' | 'not_found'> {
   const now = nowIso(options.now);
   const leaseMinutes = options.leaseMinutes ?? DEFAULT_LEASE_MINUTES;
+  const beforeClaim = await getRun(db, runId);
+  if (!beforeClaim) return 'not_found';
+  if (await isOperationCapabilityStopped(db, beforeClaim.line_account_id, 'automation_actions')) {
+    // 実行をclaimせず、停止解除後も同じ版・同じstepから再確認できる状態に置く。
+    return beforeClaim.status;
+  }
   if (!(await claimRun(db, runId, now, leaseMinutes))) {
     const existing = await getRun(db, runId);
     if (!existing) return 'not_found';

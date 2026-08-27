@@ -8,6 +8,7 @@ import {
   startAutomationRun,
   type ActionDefinition,
 } from './automation-engine';
+import { stopOperationCapabilities } from '@line-crm/db';
 
 const T0 = '2026-08-26T01:00:00.000Z';
 
@@ -96,6 +97,27 @@ describe('V6オートメーション実行エンジン', () => {
     expect(status).toBe('success');
     expect(seen).toEqual(['v1-step']);
     expect(created.automationVersionId).toBe(setup.versionId);
+  });
+
+  it('緊急停止中は実行をclaimせず、外部アクションを始めない', async () => {
+    const setup = addPublishedAutomation(testDb.raw, { actions: [action('blocked-step')] });
+    const created = await start(testDb.db, setup);
+    await stopOperationCapabilities(testDb.db, {
+      lineAccountId: setup.lineAccountId,
+      capabilities: ['automation_actions'],
+      expectedVersion: 0,
+      actorId: 'owner-1',
+      reason: '障害対応',
+    });
+    const executor = vi.fn();
+
+    expect(await processAutomationRun(testDb.db, created.runId!, {
+      now: T0,
+      executors: { record: executor },
+    })).toBe('queued');
+    expect(executor).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare('SELECT status FROM automation_runs WHERE id = ?').get(created.runId))
+      .toEqual({ status: 'queued' });
   });
 
   it('同じイベントの実行を二重に作らない', async () => {

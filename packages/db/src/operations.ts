@@ -126,19 +126,34 @@ export async function getOperationControlSet(
 }
 
 /** 全体停止とアカウント停止のどちらかが有効なら、送信を開始しない。 */
-export async function isOperationCapabilityStopped(
+export async function getEffectiveOperationStates(
   db: D1Database,
   lineAccountId: string | null,
-  capability: OperationCapability,
-): Promise<boolean> {
+): Promise<OperationStates> {
   const scopeKeys = lineAccountId ? [ALL_ACCOUNTS_SCOPE, lineAccountId] : [ALL_ACCOUNTS_SCOPE];
   const placeholders = scopeKeys.map(() => '?').join(',');
   const rows = await db.prepare(
     `SELECT states_json, active_incident_id
        FROM operation_control_sets WHERE scope_key IN (${placeholders})`,
   ).bind(...scopeKeys).all<{ states_json: string; active_incident_id: string | null }>();
-  return (rows.results ?? []).some((row) =>
-    isCapabilityStoppedFailClosed(row.states_json, row.active_incident_id, capability));
+  const effective = defaultOperationStates();
+  for (const row of rows.results ?? []) {
+    for (const capability of OPERATION_CAPABILITIES) {
+      if (isCapabilityStoppedFailClosed(row.states_json, row.active_incident_id, capability)) {
+        effective[capability] = 'stopped';
+      }
+    }
+  }
+  return effective;
+}
+
+/** 全体停止とアカウント停止のどちらかが有効なら、送信を開始しない。 */
+export async function isOperationCapabilityStopped(
+  db: D1Database,
+  lineAccountId: string | null,
+  capability: OperationCapability,
+): Promise<boolean> {
+  return (await getEffectiveOperationStates(db, lineAccountId))[capability] === 'stopped';
 }
 
 function nowIso(): string {

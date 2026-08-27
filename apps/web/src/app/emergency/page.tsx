@@ -304,7 +304,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
     broadcast_dispatch: { label: '予約中・送信中の一斉配信', note: '次のLINE送信をサーバーで止めます' },
     scenario_dispatch: { label: 'シナリオ配信', note: '次のステップ送信をサーバーで止めます' },
     reminder_dispatch: { label: 'リマインダ', note: '次のリマインド送信をサーバーで止めます' },
-    automation_actions: { label: '自動処理', note: 'この段階では停止状態だけ記録します（実行ゲートは未接続）' },
+    automation_actions: { label: '自動処理', note: '公開版の次のアクション実行をサーバーで止めます' },
   }
 
   const loadPreview = useCallback(async () => {

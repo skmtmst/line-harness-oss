@@ -1,5 +1,5 @@
 import type { LineClient } from '@line-crm/line-sdk';
-import { getTemplateById } from '@line-crm/db';
+import { getTemplateById, isOperationCapabilityStopped } from '@line-crm/db';
 import type { AutoReply, Friend } from '@line-crm/db';
 import { logOutgoingMessage } from './event-bus.js';
 import { shouldReply } from './auto-reply-conditions.js';
@@ -299,6 +299,12 @@ export async function matchAndReply(
     }
   }
   if (!rule) return { matched: false, replyTokenConsumed: false };
+
+  // ルールが当たっていても、停止中は返信も付随アクションも開始しない。
+  // matched=true を返し、別の自動経路へフォールバックして停止を回避させない。
+  if (await isOperationCapabilityStopped(db, lineAccountId, 'auto_reply_dispatch')) {
+    return { matched: true, replyTokenConsumed: false };
+  }
 
   // 当たった記録。一覧のヒット数と「1人につき1回だけ」の判定がこれを見る。
   // 返信より先に残すのは、返信に失敗しても当たった事実は変わらないため。

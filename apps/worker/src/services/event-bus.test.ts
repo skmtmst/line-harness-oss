@@ -53,6 +53,11 @@ vi.mock('@line-crm/db', async () => {
     getFriendScore: vi.fn().mockResolvedValue(0),
     getTemplateById: vi.fn().mockResolvedValue(null),
     recordAnalyticsEvent: vi.fn().mockResolvedValue({ id: 'analytics-event-1' }),
+    getEffectiveOperationStates: vi.fn().mockResolvedValue({
+      broadcast_dispatch: 'running', scenario_dispatch: 'running', reminder_dispatch: 'running',
+      automation_actions: 'running', auto_reply_dispatch: 'running',
+      webhook_outgoing: 'running', ad_postback: 'running',
+    }),
   };
 });
 
@@ -344,5 +349,44 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
       hasFriendId: false,
     });
     expect(record).not.toContain('webhook-1');
+  });
+});
+
+describe('fireEvent — 緊急停止ゲート', () => {
+  it('停止中はWebhook・広告送信・新旧オートメーションを開始しない', async () => {
+    vi.clearAllMocks();
+    const dbModule = await import('@line-crm/db');
+    const adModule = await import('./ad-conversion.js');
+    const deliveryModule = await import('./outgoing-webhook-delivery.js');
+    const automationModule = await import('./automation-triggers.js');
+    (dbModule.getEffectiveOperationStates as unknown as { mockResolvedValue: (value: Record<string, string>) => void })
+      .mockResolvedValue({
+        broadcast_dispatch: 'running', scenario_dispatch: 'running', reminder_dispatch: 'running',
+        automation_actions: 'stopped', auto_reply_dispatch: 'running',
+        webhook_outgoing: 'stopped', ad_postback: 'stopped',
+      });
+    (dbModule.getActiveAutomationsByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([{ id: 'legacy', line_account_id: 'account-a', conditions: '{}', actions: '[]' }]);
+    (dbModule.getActiveOutgoingWebhooksByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([{ id: 'hook-1', url: 'https://example.invalid', max_retries: 0 }]);
+    const db = fakeDb({ capturedInserts: [] });
+
+    await fireEvent(db, 'cv_fire', {
+      sourceEventId: 'event-1',
+      friendId: 'friend-1',
+      conversionEventName: 'purchase',
+    }, undefined, 'account-a');
+
+    expect(dbModule.getActiveOutgoingWebhooksByEvent).not.toHaveBeenCalled();
+    expect(deliveryModule.deliverWebhook).not.toHaveBeenCalled();
+    expect(adModule.sendAdConversions).not.toHaveBeenCalled();
+    expect(dbModule.createAutomationLog).not.toHaveBeenCalled();
+    expect(automationModule.dispatchAutomationEventWithLogging).not.toHaveBeenCalled();
+    (dbModule.getEffectiveOperationStates as unknown as { mockResolvedValue: (value: Record<string, string>) => void })
+      .mockResolvedValue({
+        broadcast_dispatch: 'running', scenario_dispatch: 'running', reminder_dispatch: 'running',
+        automation_actions: 'running', auto_reply_dispatch: 'running',
+        webhook_outgoing: 'running', ad_postback: 'running',
+      });
   });
 });
