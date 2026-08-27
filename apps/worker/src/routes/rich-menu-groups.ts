@@ -960,6 +960,24 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
       });
       if (!res.ok) throw new Error(`LINE createRichMenuAlias failed: ${res.status} ${await res.text()}`);
     },
+    async upsertRichMenuAlias(aliasId, richMenuId) {
+      const res = await fetch(`https://api.line.me/v2/bot/richmenu/alias/${aliasId}`, {
+        method: 'POST',
+        headers: { Authorization: auth, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ richMenuId }),
+      });
+      if (res.ok) return;
+      if (res.status === 404) {
+        const createRes = await fetch('https://api.line.me/v2/bot/richmenu/alias', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ richMenuAliasId: aliasId, richMenuId }),
+        });
+        if (createRes.ok) return;
+        throw new Error(`LINE createRichMenuAlias failed: ${createRes.status} ${await createRes.text()}`);
+      }
+      throw new Error(`LINE updateRichMenuAlias failed: ${res.status} ${await res.text()}`);
+    },
     async deleteRichMenu(richMenuId) {
       const res = await fetch(`https://api.line.me/v2/bot/richmenu/${richMenuId}`, {
         method: 'DELETE',

@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
@@ -280,53 +279,7 @@ export default function RichMenusListPage() {
   const hiddenCount = sorted.length - shownGroups.length
 
   return (
-    <main className="p-6 max-w-7xl mx-auto">
-      <div data-design="Head">
-        <Header
-          title="リッチメニュー"
-          description="トーク画面の下に表示されるメニューを作ります。友だちの状態ごとに出し分けでき、タップ数を計測できます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
-              <button
-                onClick={() => {
-                  // 並び替えは「自分で決めた順」で見ているときだけ意味がある。
-                  // 他の順で上下させても、次に開いたときその順で並ばない。
-                  setSortKey('manual')
-                  setReordering((v) => !v)
-                }}
-                aria-pressed={reordering}
-                className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
-                  reordering
-                    ? 'border-accent bg-accent-soft text-ink'
-                    : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
-                }`}
-              >
-                {reordering ? '並び替えを終える' : '並び替え'}
-              </button>
-              <button
-                onClick={() => setFolderDialogOpen(true)}
-                className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
-              >
-                フォルダを追加
-              </button>
-              <Link
-                href="/rich-menus/new"
-                className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
-              >
-                メニューを作成
-              </Link>
-            </div>
-          }
-        />
-      </div>
-
+    <main data-design-node="GO8RQ" className="p-6 max-w-7xl mx-auto">
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">メニュー</p>
@@ -380,6 +333,18 @@ export default function RichMenusListPage() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
+        <Link
+          href="/rich-menus/new"
+          className="bg-accent text-on-accent hover:bg-accent-hover rounded-control inline-flex items-center gap-1 px-4 py-2 text-sm font-medium transition-colors"
+        >
+          メニューを作る
+        </Link>
+        <button
+          onClick={() => setFolderDialogOpen(true)}
+          className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-4 py-2 text-sm font-medium transition-colors"
+        >
+          フォルダを追加
+        </button>
         <input
           type="search"
           value={query}
@@ -413,6 +378,22 @@ export default function RichMenusListPage() {
             </option>
           ))}
         </select>
+        <button
+          onClick={() => {
+            // 並び替えは「自分で決めた順」で見ているときだけ意味がある。
+            // 他の順で上下させても、次に開いたときその順で並ばない。
+            setSortKey('manual')
+            setReordering((v) => !v)
+          }}
+          aria-pressed={reordering}
+          className={`rounded-control border px-4 py-2 text-sm font-medium transition-colors ${
+            reordering
+              ? 'border-accent bg-accent-soft text-ink'
+              : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+          }`}
+        >
+          {reordering ? '並び替えを終える' : '出す順番を変える'}
+        </button>
       </div>
 
       <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
