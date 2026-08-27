@@ -113,10 +113,10 @@ beforeEach(() => {
   sqlite = setupDb();
   sqlite.exec(`
     INSERT INTO line_accounts
-      (id, channel_id, name, channel_access_token, channel_secret)
+      (id, channel_id, name, channel_access_token, channel_secret, tenant_id)
     VALUES
-      ('account-1', 'channel-1', '店舗1', 'token-1', 'secret-1'),
-      ('account-2', 'channel-2', '店舗2', 'token-2', 'secret-2');
+      ('account-1', 'channel-1', '店舗1', 'token-1', 'secret-1', '00000000-0000-4000-8000-000000000001'),
+      ('account-2', 'channel-2', '店舗2', 'token-2', 'secret-2', '00000000-0000-4000-8000-000000000001');
   `);
   db = asD1(sqlite);
 });
@@ -330,6 +330,11 @@ describe('対応マーク', () => {
   });
 
   test('移行前の共通マークを編集しても選択中アカウントだけに複製される', async () => {
+    sqlite.prepare(
+      `INSERT INTO support_marks
+         (id, name, color, is_default, auto_on_inbound, display_order, created_at)
+       VALUES ('mark_working', '対応中', '#3B82F6', 0, 0, 1, '2026-08-16')`,
+    ).run();
     insertFriend('f-account-1', 'account-1');
     insertFriend('f-account-2', 'account-2');
     await setFriendSupportMarkBulk(db, ['f-account-1'], 'mark_working', SCOPE);
@@ -367,10 +372,10 @@ describe('対応マーク', () => {
   });
 
   test('まとめて付けられる', async () => {
-    await getSupportMarks(db, SCOPE); // 初期マークを用意させる
+    const working = (await getSupportMarks(db, SCOPE)).find((mark) => mark.name === '対応中')!;
     insertFriend('f-1');
     insertFriend('f-2');
-    const n = await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], 'mark_working', SCOPE);
+    const n = await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], working.id, SCOPE);
     expect(n).toBe(2);
   });
 
@@ -379,12 +384,14 @@ describe('対応マーク', () => {
     insertFriend('f-1');
     insertFriend('f-2');
     const accountMark = await createSupportMark(db, SCOPE, { name: '対応中' });
+    const replacementMark = await getDefaultSupportMark(db, SCOPE);
+    expect(replacementMark).not.toBeNull();
     await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], accountMark.id, SCOPE);
 
     const replaced = await replaceAndDeleteSupportMark(
       db,
       accountMark.id,
-      'mark_untouched',
+      replacementMark!.id,
       SCOPE,
       'staff-1',
     );
@@ -392,7 +399,7 @@ describe('対応マーク', () => {
     expect(replaced).toBe(2);
     expect(
       sqlite.prepare(`SELECT DISTINCT support_mark_id FROM friends ORDER BY support_mark_id`).all(),
-    ).toEqual([{ support_mark_id: 'mark_untouched' }]);
+    ).toEqual([{ support_mark_id: replacementMark!.id }]);
     expect(
       sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks WHERE id = ?`).get(accountMark.id),
     ).toEqual({ c: 0 });
@@ -408,17 +415,17 @@ describe('対応マーク', () => {
     ).toEqual([
       {
         friend_id: 'f-1',
-        target_id: 'mark_untouched',
+        target_id: replacementMark!.id,
         actor_id: 'staff-1',
         detail_json:
-          `{"previousMarkId":"${accountMark.id}","replacementMarkId":"mark_untouched","reason":"deleted_mark_replacement"}`,
+          `{"previousMarkId":"${accountMark.id}","replacementMarkId":"${replacementMark!.id}","reason":"deleted_mark_replacement"}`,
       },
       {
         friend_id: 'f-2',
-        target_id: 'mark_untouched',
+        target_id: replacementMark!.id,
         actor_id: 'staff-1',
         detail_json:
-          `{"previousMarkId":"${accountMark.id}","replacementMarkId":"mark_untouched","reason":"deleted_mark_replacement"}`,
+          `{"previousMarkId":"${accountMark.id}","replacementMarkId":"${replacementMark!.id}","reason":"deleted_mark_replacement"}`,
       },
     ]);
   });
@@ -440,7 +447,7 @@ describe('対応マーク', () => {
     const row = sqlite.prepare(`SELECT support_mark_id FROM friends WHERE id = 'f-1'`).get() as {
       support_mark_id: string;
     };
-    expect(row.support_mark_id).toBe('mark_untouched');
+    expect(row.support_mark_id).toContain('mark_untouched_');
   });
 });
 

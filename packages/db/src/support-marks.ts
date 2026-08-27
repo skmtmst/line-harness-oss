@@ -43,13 +43,9 @@ const MARK_SELECT = `
 /**
  * 初期の3マークを用意する。
  *
- * マイグレーション 100 にも同じ INSERT があるが、それだけでは足りない。
- * bootstrap.sql は sqlite_master から DDL だけを取り出して作るので、
- * マイグレーションに書いた行は新規インストールに届かない。
- * 「既存環境は更新で入るが、新しく入れた環境だけマークが1つも無い」
- * という形の壊れ方になる。
- *
- * INSERT OR IGNORE と固定の id なので、何度呼んでも増えない。
+ * マイグレーション100の固定3件は既存環境にだけ残る。新規環境では
+ * 選択中アカウント専用の3件を作り、別アカウントとIDも設定も共有しない。
+ * INSERT OR IGNORE とアカウントを含む固定IDなので、何度呼んでも増えない。
  */
 export async function ensureDefaultSupportMarks(
   db: D1Database,

@@ -147,6 +147,28 @@ describe('対応マーク', () => {
     expect(marks.getSupportMarks).not.toHaveBeenCalled();
   });
 
+  it('所属テナントを確認できない利用者には返さない', async () => {
+    const app = new Hono<Env>();
+    app.use('*', async (c, next) => {
+      c.set('staff', {
+        id: 'u-no-tenant',
+        name: '所属不明',
+        role: 'staff',
+        readOnly: false,
+        tenantId: null,
+      });
+      return next();
+    });
+    app.route('/', friendAttributes);
+    const res = await app.fetch(
+      new Request('https://example.com/api/support-marks?lineAccountId=account-1'),
+      env,
+    );
+    expect(res.status).toBe(403);
+    expect(accountAccess.getVisibleLineAccountScope).not.toHaveBeenCalled();
+    expect(marks.getSupportMarks).not.toHaveBeenCalled();
+  });
+
   it('一覧に付いている人数が入る', async () => {
     marks.countFriendsWithMark.mockResolvedValue(7);
     const res = await req('/api/support-marks?lineAccountId=account-1', 'GET');

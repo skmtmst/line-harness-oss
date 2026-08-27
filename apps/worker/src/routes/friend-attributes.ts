@@ -66,12 +66,16 @@ async function supportMarkAccess(c: Context<Env>): Promise<SupportMarkScope | Re
   if (!lineAccountId) {
     return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
   }
-  const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const staff = c.get('staff');
+  if (!staff.tenantId) {
+    return c.json({ success: false, error: '所属を確認できません' }, 403);
+  }
+  const accountScope = await getVisibleLineAccountScope(c.env.DB, staff);
   if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
     // 権限の有無からアカウントの存在を推測させない。
     return c.json({ success: false, error: '対応マークが見つかりません' }, 404);
   }
-  return { tenantId: c.get('staff').tenantId, lineAccountId };
+  return { tenantId: staff.tenantId, lineAccountId };
 }
 
 function serializeSearch(row: SavedSearch) {
