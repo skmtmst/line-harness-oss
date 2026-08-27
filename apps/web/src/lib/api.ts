@@ -96,6 +96,45 @@ export type TagDeleteImpact = {
   canDelete: boolean
 }
 
+export type OperationCapability =
+  | 'broadcast_dispatch'
+  | 'scenario_dispatch'
+  | 'reminder_dispatch'
+  | 'automation_actions'
+  | 'auto_reply_dispatch'
+  | 'webhook_outgoing'
+  | 'ad_postback'
+
+export type OperationControl = {
+  scopeKey: string
+  lineAccountId: string | null
+  version: number
+  states: Record<OperationCapability, 'running' | 'stopped'>
+  activeIncidentId: string | null
+  reason: string | null
+  actorId: string | null
+  stoppedAt: string | null
+  updatedAt: string | null
+}
+
+export type OperationIncident = {
+  id: string
+  scopeKey: string
+  lineAccountId: string | null
+  status: 'preparing' | 'stopped' | 'resolved' | 'failed'
+  capabilities: OperationCapability[]
+  reason: string
+  detail: string | null
+  actorId: string
+  resolvedByActorId: string | null
+  controlVersion: number | null
+  errorMessage: string | null
+  stoppedAt: string | null
+  resolvedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -3194,6 +3233,47 @@ export const api = {
       }),
     getMigration: (migrationId: string) =>
       fetchApi<ApiResponse<AccountMigration>>(`/api/accounts/migrations/${migrationId}`),
+  },
+  operations: {
+    control: (accountId: string | null) => {
+      const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+      return fetchApi<ApiResponse<OperationControl>>(`/api/operations/control${query}`)
+    },
+    preview: (accountId: string | null) => {
+      const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
+      return fetchApi<ApiResponse<{
+        control: OperationControl
+        counts: Partial<Record<OperationCapability, number>>
+        calculatedAt: string
+      }>>(`/api/operations/control/preview${query}`)
+    },
+    stop: (data: {
+      lineAccountId: string | null
+      capabilities: OperationCapability[]
+      reason: string
+      detail?: string
+      expectedVersion: number
+      confirmation: '停止'
+    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+      '/api/operations/incidents',
+      {
+        method: 'POST',
+        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        body: JSON.stringify(data),
+      },
+    ),
+    restore: (incidentId: string, data: { expectedVersion: number; confirmation: '復旧' }) =>
+      fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+        `/api/operations/incidents/${incidentId}/restore`,
+        {
+          method: 'POST',
+          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          body: JSON.stringify(data),
+        },
+      ),
+    history: (limit = 100) => fetchApi<ApiResponse<OperationIncident[]>>(
+      `/api/operations/history?limit=${encodeURIComponent(String(limit))}`,
+    ),
   },
   staff: {
     list: () =>

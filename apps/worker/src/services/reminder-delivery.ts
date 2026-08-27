@@ -14,6 +14,7 @@ import {
   getFriendById,
   getTemplateById,
   jstNow,
+  isOperationCapabilityStopped,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
 import { addJitter, sleep } from './stealth.js';
@@ -127,6 +128,10 @@ export async function processReminderDeliveries(
           { ...extra, deliveredAt: sendAt },
         );
         const message = buildMessage(messageType, expanded);
+        // 送信開始の直前にサーバー正本を確認する。停止中は配信済みにしない。
+        if (await isOperationCapabilityStopped(db, friendAccountId ?? null, 'reminder_dispatch')) {
+          continue;
+        }
         await deliveryClient.pushMessage(friend.line_user_id, [message]);
 
         // Mark as delivered AFTER successful send.

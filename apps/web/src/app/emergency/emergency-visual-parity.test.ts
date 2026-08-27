@@ -5,52 +5,46 @@ import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'page.tsx'), 'utf8')
 
-describe('V3 10-4 運用状態の表示確認', () => {
-  it('確定済み画面と同じ小さな文字階層を3タブで共通利用する', () => {
-    expect(source).toContain('text-ink text-xl leading-tight font-bold')
-    expect(source).toContain('text-base font-bold text-gray-900">チェック結果')
-    expect(source).toContain('text-base font-bold text-gray-900">緊急停止')
-    expect(source).toContain('text-base font-bold text-blue-900">復旧')
-    expect(source).toContain('text-base font-bold text-gray-900">履歴')
-    expect(source).toContain('text-[11px] font-bold')
+describe('V6 32 運用状態の契約', () => {
+  it('4つの実Nodeと共通タブを使い、本文タイトルを重ねない', () => {
+    for (const node of ['UgonK', 'b3HfZ', 'UhC2O', 'U0BwS']) expect(source).toContain(node)
+    expect(source).toContain('<MergedTabs')
+    expect(source).not.toContain('<h1')
+    expect(source).not.toContain('OperationPageHeader')
   })
 
-  it('タブごとの説明をPenと同じ内容で表示する', () => {
-    expect(source).toContain('問題がないか自動で確認し、エラーがあれば内容と次の行動を表示します。')
-    expect(source).toContain('止める配信を選び、理由を入力して緊急停止します。')
-    expect(source).toContain('エラー、緊急停止、システム更新、設定変更を時間順に確認できます。')
-  })
-
-  it('仮表示を解除し、異常がないときは異常なしと表示する', () => {
-    expect(source).toContain("const resultTitle = isNormal ? '異常なし'")
-    expect(source).toContain('6項目を確認し、現在、確認できる異常はありません。')
-    expect(source).not.toContain('UI確認モード（仮表示）')
-    expect(source).not.toContain('全UI確認（仮表示）')
-  })
-
-  it('実データを使う6つのチェック項目を常に表示する', () => {
+  it('健全性の6項目を既存データから読み、取得失敗を正常にしない', () => {
     for (const label of ['LINE接続', '月間配信数', 'API・外部連携', 'Webhook', '配信処理', '友だち変化']) {
       expect(source).toContain(`label: '${label}'`)
     }
-    expect(source).not.toContain("label: '定期処理'")
-    expect(source).toContain('6項目を常に表示し、確認内容と最新結果を示します')
-    expect(source).toContain('api.health.getHealth')
-    expect(source).toContain('api.system.health')
-    expect(source).toContain('api.webhooks.incoming.list')
-    expect(source).toContain('api.broadcasts.list')
+    expect(source).toContain('Promise.allSettled')
+    expect(source).toContain("severity: 'unknown'")
+    expect(source).toContain('api.operations.control(null)')
   })
 
-  it('3つの概要カードと上部の主要操作を表示する', () => {
-    for (const label of ['全体の状態', '最後の確認', '緊急停止状態']) {
-      expect(source).toContain(`label="${label}"`)
-    }
-    expect(source).not.toContain('label="今月の配信残数"')
-    expect(source).toContain('チェックを今すぐ実行')
-    expect(source).toContain('配信をすべて緊急停止')
+  it('緊急停止と復旧をサーバーAPIへ1回だけ依頼する', () => {
+    expect(source).toContain('api.operations.stop({')
+    expect(source).toContain('api.operations.restore(')
+    expect(source).toContain("confirmation: '停止'")
+    expect(source).toContain("confirmation: '復旧'")
+    expect(source).not.toContain('api.broadcasts.update')
+    expect(source).not.toContain('api.scenarios.update')
+    expect(source).not.toContain('api.reminders.update')
+    expect(source).not.toContain('api.automations.update')
   })
 
-  it('5分ごとに実データを再確認する', () => {
-    expect(source).toContain('window.setInterval')
-    expect(source).toContain('5 * 60 * 1000')
+  it('ブラウザ内の停止正本と公開管理キーを使わない', () => {
+    expect(source).not.toContain('localStorage')
+    expect(source).not.toContain('NEXT_PUBLIC_ADMIN_API_KEY')
+    expect(source).not.toContain('nen_emergency_snapshot')
+    expect(source).not.toContain('nen_operation_history')
+    expect(source).toContain('api.operations.history()')
+  })
+
+  it('既定停止は一斉・シナリオ・リマインダだけで、自動処理は明示選択にする', () => {
+    expect(source).toContain('broadcast_dispatch: true')
+    expect(source).toContain('scenario_dispatch: true')
+    expect(source).toContain('reminder_dispatch: true')
+    expect(source).toContain('automation_actions: false')
   })
 })

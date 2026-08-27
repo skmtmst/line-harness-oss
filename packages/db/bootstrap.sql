@@ -1666,6 +1666,36 @@ CREATE TABLE operation_audit (
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
+CREATE TABLE operation_control_sets (
+  scope_key          TEXT PRIMARY KEY,
+  line_account_id    TEXT REFERENCES line_accounts(id),
+  version            INTEGER NOT NULL DEFAULT 1,
+  states_json        TEXT NOT NULL,
+  active_incident_id TEXT,
+  reason             TEXT,
+  actor_id            TEXT,
+  stopped_at         TEXT,
+  updated_at         TEXT NOT NULL
+);
+
+CREATE TABLE operation_incidents (
+  id                 TEXT PRIMARY KEY,
+  scope_key          TEXT NOT NULL,
+  line_account_id    TEXT REFERENCES line_accounts(id),
+  status             TEXT NOT NULL CHECK (status IN ('preparing', 'stopped', 'resolved', 'failed')),
+  capabilities_json  TEXT NOT NULL,
+  reason             TEXT NOT NULL,
+  detail             TEXT,
+  actor_id            TEXT NOT NULL,
+  resolved_by_actor_id TEXT,
+  control_version    INTEGER,
+  error_message      TEXT,
+  stopped_at         TEXT,
+  resolved_at        TEXT,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL
+);
+
 CREATE TABLE operators (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -3040,6 +3070,12 @@ CREATE INDEX idx_notifications_status ON notifications (status);
 
 CREATE INDEX idx_operation_audit_kind_date
   ON operation_audit (target_kind, created_at);
+
+CREATE INDEX idx_operation_incidents_scope_created
+  ON operation_incidents(scope_key, created_at DESC);
+
+CREATE INDEX idx_operation_incidents_status_created
+  ON operation_incidents(status, created_at DESC);
 
 CREATE INDEX idx_outbound_send_requests_created
   ON outbound_send_requests(created_at);

@@ -2067,18 +2067,20 @@
       ]
     },
     "/emergency": {
-      "node": "exo1P D3aAI EZTVX v9OAOT",
-      "name": "V3 10-4 運用状態",
+      "node": "UgonK b3HfZ UhC2O U0BwS",
+      "name": "★ V6 32 運用状態",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["UgonK", "b3HfZ", "UhC2O", "U0BwS"],
+        "requiredViewports": [1440, 1920],
+        "reason": "Claudeによる設計画像と同幅実装画像の比較前"
+      },
       "sections": [
-        "V3 Health",
-        "V3 Emergency control",
-        "V3 Update history"
+        "V6 Health",
+        "V6 Emergency control",
+        "V6 Update history"
       ],
       "parts": [
-        "運用状態",
-        "問題がないか自動で確認し、エラーがあれば内容と次の行動を表示します。",
-        "止める配信を選び、理由を入力して緊急停止します。",
-        "エラー、緊急停止、システム更新、設定変更を時間順に確認できます。",
         "健全性チェック",
         "緊急コントロール",
         "更新履歴",
@@ -2098,12 +2100,12 @@
         "対象アカウント",
         "停止理由",
         "復旧",
-        "復旧する",
-        "履歴",
+        "配信を復旧",
+        "緊急操作の履歴",
         "正常",
         "注意",
         "エラー",
-        "緊急停止を確認"
+        "配信を緊急停止"
       ]
     },
     "/settings": {

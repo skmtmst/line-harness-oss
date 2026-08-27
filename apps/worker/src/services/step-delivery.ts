@@ -19,6 +19,7 @@ import {
   addTagToFriend,
   type DeliveryMode,
   type Friend,
+  isOperationCapabilityStopped,
 } from '@line-crm/db';
 import type { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
@@ -502,6 +503,14 @@ async function processSingleDelivery(
     }
     const { LineClient: LC } = await import('@line-crm/line-sdk');
     deliveryClient = new LC(account.channel_access_token);
+  }
+  // LINEへ渡す直前に確認する。停止ボタンを押す直前にclaim済みでも送らない。
+  if (await isOperationCapabilityStopped(db, deliveryAccountId ?? null, 'scenario_dispatch')) {
+    await db.prepare(
+      `UPDATE friend_scenarios SET status = 'active', updated_at = ?
+        WHERE id = ? AND status = 'delivering'`,
+    ).bind(jstNow(), fs.id).run();
+    return false;
   }
   await deliveryClient.pushMessage(friend.line_user_id, messages);
 
