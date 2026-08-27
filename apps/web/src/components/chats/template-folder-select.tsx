@@ -7,23 +7,32 @@ import Button from '@/components/shared/button'
 export type TemplateFolderOption = {
   value: string
   label: string
-  count: number
+  count: number | null
   depth?: number
 }
+
+export type TemplateFolderStatus = 'loading' | 'ready' | 'error'
 
 /** V6受信箱のテンプレート用フォルダ選択（`NWbuF` / `TUveA`）。 */
 export default function TemplateFolderSelect({
   value,
   options,
   onChange,
+  status,
 }: {
   value: string
   options: TemplateFolderOption[]
   onChange: (value: string) => void
+  status: TemplateFolderStatus
 }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const selected = options.find((option) => option.value === value) ?? options[0]
+  const statusLabel = status === 'loading'
+    ? 'フォルダを読み込み中'
+    : status === 'error'
+      ? 'フォルダを読み込めません'
+      : null
 
   const choose = (next: string) => {
     onChange(next)
@@ -44,18 +53,20 @@ export default function TemplateFolderSelect({
           aria-label="テンプレートのフォルダ"
           aria-haspopup="listbox"
           aria-expanded={open}
+          aria-busy={status === 'loading'}
+          disabled={status !== 'ready'}
           onClick={() => setOpen((current) => !current)}
           className="w-full"
         >
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <Folder aria-hidden="true" size={15} className="shrink-0 text-ink-faint" />
-            <span className="min-w-0 flex-1 truncate text-left">{selected?.label ?? 'すべてのフォルダ'}</span>
+            <span className="min-w-0 flex-1 truncate text-left">{statusLabel ?? selected?.label ?? 'すべてのフォルダ'}</span>
             {open ? <ChevronUp aria-hidden="true" size={14} /> : <ChevronDown aria-hidden="true" size={14} />}
           </span>
         </Button>
       </div>
 
-      {open ? (
+      {open && status === 'ready' ? (
         <ul
           role="listbox"
           aria-label="テンプレートのフォルダ"
@@ -76,7 +87,7 @@ export default function TemplateFolderSelect({
                     <Folder aria-hidden="true" size={14} className="shrink-0 text-ink-faint" />
                   )}
                   <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                  <span className="shrink-0 tabular-nums text-ink-faint">{option.count}</span>
+                  <span className="shrink-0 tabular-nums text-ink-faint">{option.count ?? '—'}</span>
                   {selectedOption ? <Check aria-hidden="true" size={14} className="shrink-0" /> : null}
                 </button>
               </li>
