@@ -8,7 +8,9 @@ const marks = {
   createSupportMark: vi.fn(),
   updateSupportMark: vi.fn(),
   deleteSupportMark: vi.fn(),
+  replaceAndDeleteSupportMark: vi.fn(),
   countFriendsWithMark: vi.fn(),
+  getDefaultSupportMark: vi.fn(),
   setFriendSupportMark: vi.fn(),
   setFriendSupportMarkBulk: vi.fn(),
 };
@@ -106,6 +108,8 @@ beforeEach(() => {
   marks.getSupportMarkById.mockResolvedValue(MARK);
   marks.createSupportMark.mockResolvedValue(MARK);
   marks.updateSupportMark.mockResolvedValue(MARK);
+  marks.getDefaultSupportMark.mockResolvedValue(MARK);
+  marks.replaceAndDeleteSupportMark.mockResolvedValue(0);
   marks.countFriendsWithMark.mockResolvedValue(0);
   marks.setFriendSupportMarkBulk.mockResolvedValue(2);
   searches.getSavedSearches.mockResolvedValue([SEARCH]);
@@ -164,15 +168,34 @@ describe('対応マーク', () => {
     marks.countFriendsWithMark.mockResolvedValue(5);
     const res = await req('/api/support-marks/m-2', 'DELETE');
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { friendCount: number };
+    const body = (await res.json()) as {
+      friendCount: number;
+      replacementMark: { id: string; name: string };
+    };
     expect(body.friendCount).toBe(5);
+    expect(body.replacementMark).toMatchObject({ id: 'm-1', name: '未対応' });
   });
 
-  it('force=1 なら消す', async () => {
-    marks.getSupportMarkById.mockResolvedValue({ ...MARK, is_default: 0 });
+  it('force=1 なら初期値へ置換してから消す', async () => {
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
     marks.countFriendsWithMark.mockResolvedValue(5);
+    marks.replaceAndDeleteSupportMark.mockResolvedValue(5);
     const res = await req('/api/support-marks/m-2?force=1', 'DELETE');
     expect(res.status).toBe(200);
+    expect(marks.replaceAndDeleteSupportMark).toHaveBeenCalledWith(env.DB, 'm-2', 'm-1', 'u-1');
+    expect(marks.deleteSupportMark).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({
+      data: { replacedFriendCount: 5, replacementMark: { id: 'm-1' } },
+    });
+  });
+
+  it('誰にも付いていないマークはそのまま消す', async () => {
+    marks.getSupportMarkById.mockResolvedValue({ ...MARK, id: 'm-2', is_default: 0 });
+    marks.countFriendsWithMark.mockResolvedValue(0);
+    const res = await req('/api/support-marks/m-2', 'DELETE');
+    expect(res.status).toBe(200);
+    expect(marks.deleteSupportMark).toHaveBeenCalledWith(env.DB, 'm-2');
+    expect(marks.replaceAndDeleteSupportMark).not.toHaveBeenCalled();
   });
 
   it('無いマークは付けられない', async () => {

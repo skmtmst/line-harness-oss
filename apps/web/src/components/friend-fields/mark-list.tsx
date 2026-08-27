@@ -24,6 +24,7 @@ export default function SupportMarkList() {
   const [color, setColor] = useState(PRESET_COLORS[0])
   const [adding, setAdding] = useState(false)
   const [pendingDelete, setPendingDelete] = useState<MarkRow | null>(null)
+  const defaultMark = items.find((item) => item.isDefault)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -273,7 +274,7 @@ export default function SupportMarkList() {
         title={`対応マーク「${pendingDelete?.name ?? ''}」を削除しますか？`}
         description={
           (pendingDelete?.friendCount ?? 0) > 0
-            ? `${pendingDelete?.friendCount ?? 0} 人の対応マークが未設定へ戻ります。この操作は元に戻せません。`
+            ? `${pendingDelete?.friendCount ?? 0} 人の対応マークは、削除後に「${defaultMark?.name ?? '初期値'}」へ変更されます。この操作は元に戻せません。`
             : 'この対応マークを削除します。この操作は元に戻せません。'
         }
         confirmLabel="削除する"
