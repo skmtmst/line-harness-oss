@@ -248,7 +248,7 @@ export default function TemplatePicker({
               </span>
             </div>
             {visibleTemplatesStatus === 'loading' ? (
-              <p className="px-4 py-10 text-center text-sm text-[#98A2B3]">テンプレートを読み込んでいます。</p>
+              <p className="px-4 py-10 text-center text-sm text-ink-faint">テンプレートを読み込んでいます。</p>
             ) : visibleTemplatesStatus === 'error' ? (
               <p className="px-4 py-10 text-center text-sm text-danger">テンプレートを読み込めませんでした。もう一度開き直してください。</p>
             ) : shown.length === 0 ? (
