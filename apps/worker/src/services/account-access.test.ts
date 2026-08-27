@@ -90,6 +90,14 @@ describe('filterVisibleLineAccounts', () => {
       canSeeUnassigned: false,
     });
   });
+
+  it('保存用の店舗権限範囲はこの工程では閲覧範囲を変えない', async () => {
+    const limited = { ...staff(), accountScope: 'accounts', scopedLineAccountIds: ['parent'] };
+    await expect(getVisibleLineAccountScope({} as D1Database, limited)).resolves.toMatchObject({
+      allowedAccountIds: ['parent', 'child', 'grandchild'],
+      ids: ['parent', 'child', 'grandchild'],
+    });
+  });
 });
 
 describe('validateAccountHierarchy', () => {

@@ -15,6 +15,8 @@ const dbMocks = {
   updateStaffMember: vi.fn(),
   deleteStaffMember: vi.fn(),
   countLoginAudit: vi.fn(),
+  getStaffAccountScopeIds: vi.fn(),
+  replaceStaffAccountScopes: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -42,6 +44,7 @@ type Row = {
   tenant_id?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
+  account_scope?: 'all' | 'accounts';
 };
 
 function row(over: Partial<Row> & { id: string }): Row {
@@ -68,10 +71,106 @@ beforeEach(() => {
   dbMocks.updateStaffMember.mockImplementation(async (_db: unknown, id: string) => row({ id }));
   dbMocks.deleteStaffMember.mockResolvedValue(undefined);
   dbMocks.countLoginAudit.mockResolvedValue(0);
+  dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
+  dbMocks.replaceStaffAccountScopes.mockResolvedValue(undefined);
   dbMocks.getStaffByApiKey.mockResolvedValue(null);
   dbMocks.getLineAccounts.mockResolvedValue([]);
   inviteMocks.sendStaffInviteEmail.mockResolvedValue(undefined);
   inviteMocks.sendStaffLineLinkEmail.mockResolvedValue(undefined);
+});
+
+describe('スタッフの店舗権限範囲', () => {
+  const accounts = [
+    { id: 'line-1', tenant_id: 'tenant-a', parent_line_account_id: null, is_active: 1 },
+    { id: 'line-2', tenant_id: 'tenant-a', parent_line_account_id: null, is_active: 1 },
+    { id: 'line-other', tenant_id: 'tenant-b', parent_line_account_id: null, is_active: 1 },
+  ];
+
+  beforeEach(() => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a' }));
+    dbMocks.getLineAccounts.mockResolvedValue(accounts);
+    dbMocks.getStaffMembers.mockResolvedValue([]);
+    dbMocks.createStaffMember.mockResolvedValue(row({ id: 'new-staff', role: 'staff', is_active: 0, tenant_id: 'tenant-a', account_scope: 'all' }));
+  });
+
+  const invitation = (scope: 'all' | 'accounts', ids: string[]) => ({
+    name: '新しい担当者', email: 'scope@example.test', role: 'staff', assignedLineAccountId: 'line-1',
+    accountScope: scope, scopedLineAccountIds: ids,
+  });
+
+  it('全店舗では紐付けを空にして保存する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('all', ['line-1']));
+    expect(res.status).toBe(201);
+    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'new-staff', []);
+  });
+
+  it('指定店舗を2つ保存する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-1', 'line-2']));
+    expect(res.status).toBe(201);
+    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'new-staff', ['line-1', 'line-2']);
+  });
+
+  it('呼び出した人の範囲外の店舗を拒否する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-other']));
+    expect(res.status).toBe(403);
+    expect(dbMocks.createStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('指定店舗が空なら拒否する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('accounts', []));
+    expect(res.status).toBe(400);
+  });
+
+  it('限定された管理者は自分の範囲内だけ付与できる', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['line-1']);
+    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-2']));
+    expect(res.status).toBe(403);
+  });
+
+  it('限定された管理者は新規スタッフに全店舗の範囲を付与できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff', 'POST', invitation('all', []));
+    expect(res.status).toBe(403);
+    expect(dbMocks.createStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('限定された管理者は自分自身を全店舗の範囲に変更できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff/owner-a', 'PATCH', { accountScope: 'all' });
+    expect(res.status).toBe(403);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('PATCHで全店舗に戻すと紐付けを消す', async () => {
+    dbMocks.getStaffById.mockImplementation(async (_db: unknown, id: string) => row({
+      id,
+      role: id === 'owner-a' ? 'owner' : 'staff',
+      tenant_id: 'tenant-a',
+      account_scope: id === 'owner-a' ? 'all' : 'accounts',
+    }));
+    dbMocks.updateStaffMember.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'all' }));
+    const res = await send('/api/staff/target', 'PATCH', { accountScope: 'all', scopedLineAccountIds: ['line-1'] });
+    expect(res.status).toBe(200);
+    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'target', []);
+  });
+
+  it('PATCHで指定店舗の組み合わせを置き換える', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'all' }));
+    dbMocks.updateStaffMember.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['line-1', 'line-2']);
+    const res = await send('/api/staff/target', 'PATCH', { accountScope: 'accounts', scopedLineAccountIds: ['line-2', 'line-1'] });
+    expect(res.status).toBe(200);
+    expect(dbMocks.replaceStaffAccountScopes).toHaveBeenCalledWith(env.DB, 'target', ['line-2', 'line-1']);
+  });
+
+  it('一般スタッフは自分自身の範囲も変更できない', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'staff-a', role: 'staff', tenant_id: 'tenant-a' }));
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'staff-a', role: 'staff', tenant_id: 'tenant-a' }));
+    const res = await send('/api/staff/staff-a', 'PATCH', { accountScope: 'all' });
+    expect(res.status).toBe(403);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
 });
 
 describe('スタッフ招待の統括', () => {
@@ -140,7 +239,9 @@ describe('スタッフ経路の統括分離', () => {
 
     expect(res.status).toBe(200);
     expect(dbMocks.getStaffMembers).toHaveBeenCalledWith(env.DB, 'tenant-b');
-    expect((await res.json() as { data: Array<{ id: string }> }).data).toEqual([{ id: 'tenant-b-owner', name: 'tenant-b-owner', email: undefined, role: 'admin', lineLinked: false, twoFactorEnabled: false, isActive: true, permissionKeys: [], notificationPreferences: {}, inviteStatus: 'active', createdAt: undefined, updatedAt: undefined, assignedLineAccountId: null, canAccessDescendantAccounts: false }]);
+    expect((await res.json() as { data: Array<{ id: string }> }).data).toEqual([expect.objectContaining({
+      id: 'tenant-b-owner', accountScope: 'all', scopedLineAccountIds: [],
+    })]);
   });
 
   it.each([
