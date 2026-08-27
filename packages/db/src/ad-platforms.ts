@@ -39,7 +39,76 @@ export interface AdConversionLog {
   request_body: string | null;
   response_body: string | null;
   error_message: string | null;
+  idempotency_key: string | null;
+  attempt_count: number;
+  next_retry_at: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export async function reserveAdConversion(
+  db: D1Database,
+  opts: {
+    platformId: string;
+    friendId: string;
+    eventName: string;
+    clickId: string;
+    clickIdType: string;
+    idempotencyKey: string;
+  },
+): Promise<AdConversionLog | null> {
+  const id = crypto.randomUUID();
+  const now = jstNow();
+  const result = await db
+    .prepare(
+      `INSERT OR IGNORE INTO ad_conversion_logs
+       (id, ad_platform_id, friend_id, event_name, click_id, click_id_type,
+        status, idempotency_key, attempt_count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 0, ?, ?)`,
+    )
+    .bind(
+      id,
+      opts.platformId,
+      opts.friendId,
+      opts.eventName,
+      opts.clickId,
+      opts.clickIdType,
+      opts.idempotencyKey,
+      now,
+      now,
+    )
+    .run();
+
+  if ((result.meta.changes ?? 0) === 0) return null;
+  return db.prepare(`SELECT * FROM ad_conversion_logs WHERE id = ?`).bind(id).first<AdConversionLog>();
+}
+
+export async function finishAdConversionAttempt(
+  db: D1Database,
+  id: string,
+  opts: {
+    status: 'sent' | 'retry_wait' | 'failed';
+    responseBody?: string | null;
+    errorMessage?: string | null;
+    nextRetryAt?: string | null;
+  },
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE ad_conversion_logs
+          SET status = ?, attempt_count = attempt_count + 1,
+              response_body = ?, error_message = ?, next_retry_at = ?, updated_at = ?
+        WHERE id = ?`,
+    )
+    .bind(
+      opts.status,
+      opts.responseBody ?? null,
+      opts.errorMessage ?? null,
+      opts.nextRetryAt ?? null,
+      jstNow(),
+      id,
+    )
+    .run();
 }
 
 export async function getActiveAdPlatforms(db: D1Database): Promise<AdPlatform[]> {

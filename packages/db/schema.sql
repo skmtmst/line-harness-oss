@@ -1031,12 +1031,20 @@ CREATE TABLE IF NOT EXISTS ad_conversion_logs (
   request_body        TEXT,
   response_body       TEXT,
   error_message       TEXT,
-  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  idempotency_key     TEXT,
+  attempt_count       INTEGER NOT NULL DEFAULT 0,
+  next_retry_at       TEXT,
+  created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  updated_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_ad_conversion_logs_platform ON ad_conversion_logs (ad_platform_id);
 CREATE INDEX IF NOT EXISTS idx_ad_conversion_logs_friend ON ad_conversion_logs (friend_id);
 CREATE INDEX IF NOT EXISTS idx_ad_conversion_logs_status ON ad_conversion_logs (status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ad_conversion_logs_idempotency
+  ON ad_conversion_logs(idempotency_key) WHERE idempotency_key IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_ad_conversion_logs_retry
+  ON ad_conversion_logs(status, next_retry_at);
 
 -- Staff member accounts with role-based access control
 CREATE TABLE IF NOT EXISTS staff_members (
