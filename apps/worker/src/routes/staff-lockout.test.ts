@@ -98,6 +98,12 @@ describe('スタッフの店舗権限範囲', () => {
     accountScope: scope, scopedLineAccountIds: ids,
   });
 
+  it('担当範囲を省略すると400で拒否する', async () => {
+    const res = await send('/api/staff', 'POST', { name: '新しい担当者', email: 'scope@example.test', role: 'staff', assignedLineAccountId: 'line-1' });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: '担当範囲を選んでください' });
+  });
+
   it('全店舗では紐付けを空にして保存する', async () => {
     const res = await send('/api/staff', 'POST', invitation('all', ['line-1']));
     expect(res.status).toBe(201);
@@ -125,6 +131,18 @@ describe('スタッフの店舗権限範囲', () => {
     dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
     dbMocks.getStaffAccountScopeIds.mockResolvedValue(['line-1']);
     const res = await send('/api/staff', 'POST', invitation('accounts', ['line-2']));
+    expect(res.status).toBe(403);
+  });
+
+  it('限定された管理者は統括側の追加を実行できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff', 'POST', { ...invitation('accounts', ['line-1']), managementContext: 'hq' });
+    expect(res.status).toBe(403);
+  });
+
+  it('限定された管理者は統括側の担当範囲変更を実行できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff/target', 'PATCH', { accountScope: 'accounts', scopedLineAccountIds: ['line-1'], managementContext: 'hq' });
     expect(res.status).toBe(403);
   });
 
@@ -198,7 +216,7 @@ describe('スタッフ招待の統括', () => {
       name: '招待する担当者',
       email: 'invitee@example.test',
       role: 'staff',
-      assignedLineAccountId: 'line-1',
+      assignedLineAccountId: 'line-1', accountScope: 'all', scopedLineAccountIds: [],
     }, 'inviter-key');
 
     expect(res.status).toBe(201);
@@ -217,7 +235,7 @@ describe('スタッフ招待の統括', () => {
     dbMocks.createStaffMember.mockResolvedValue(row({ id: 'new-b', role: 'staff', is_active: 0, tenant_id: 'tenant-b' }));
 
     const res = await send('/api/staff', 'POST', {
-      name: '統括Bの担当者', email: 'shared@example.test', role: 'staff', assignedLineAccountId: 'line-b',
+      name: '統括Bの担当者', email: 'shared@example.test', role: 'staff', assignedLineAccountId: 'line-b', accountScope: 'all', scopedLineAccountIds: [],
     }, 'tenant-b-key');
 
     expect(res.status).toBe(201);
