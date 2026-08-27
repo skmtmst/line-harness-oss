@@ -49,6 +49,9 @@ const EDIT = '/scenarios/detail?id=scenario-0'
 const BROADCAST = { feature: 6, dir: 'broadcasts-v6', mode: 'page' }
 const NEW_BC = '/broadcasts/new'
 
+/** リマインダ。作成は `/reminders/new`、編集は `/reminders/edit?id=`。 */
+const REMINDER = { feature: 7, dir: 'reminders-v6', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -301,6 +304,56 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'TmHjF', name: '6-1-N 一覧の状態（空・読込・エラー）', route: '/broadcasts',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能7 リマインダ ────────────────────────────────────
+  /*
+    設計は5段の作成ウィザード（基本設定→対象者→通知ステップ→送信設定→確認）。
+    実装は `/reminders/new` の1枚もので、段の縦帯も右の「設定内容」も無い。
+    **段ごとの画面が無いので、設計の A〜G は1枚ずつには対応しない。**
+  */
+  { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ', route: '/reminders' },
+  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new' },
+  {
+    ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
+    route: '/reminders/edit?id=reminder-3',
+  },
+  {
+    ...REMINDER, node: 's7T2dz', name: '7-1-C 対象と終了条件', route: '/reminders/new',
+    status: 'unimplemented',
+    why: '「終了・停止条件」（予約取消で即時停止・対応完了で残りを停止 など）が実装に無い。`grep 停止条件|終了条件` が `/reminders` 配下で0件',
+  },
+  {
+    ...REMINDER, node: 'JCz6J', name: '7-1-D 配信予定プレビュー', route: '/reminders/new',
+    status: 'unimplemented',
+    why: '送信予定を日時ごとに並べて重複を検知する画面が無い。**送る前に何通いくかを見せる場所が無い**',
+  },
+  {
+    ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認', route: '/reminders/edit?id=reminder-3',
+    status: 'unimplemented',
+    why: 'テスト送信は一斉配信とシナリオには在るが、リマインダには無い（`grep テスト送信` が `/reminders` 配下で0件）',
+  },
+  {
+    ...REMINDER, node: 's6Vvp', name: '7-1-F 最終確認', route: '/reminders/new',
+    status: 'unimplemented', why: '有効化前チェックと最終確認の段が無い。保存すると即座に一覧へ戻る',
+  },
+  {
+    ...REMINDER, node: 'PSmHo', name: '7-1-G 有効化完了', route: '/reminders/new',
+    status: 'unimplemented', why: '7-1-F が無いので、その後の完了画面も無い',
+  },
+  {
+    ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果', route: '/reminders',
+    status: 'unimplemented',
+    why: 'ステップごとの送信数・開封率・エラーを出す画面が無い（`grep 実行結果|送信履歴|開封` が `/reminders` 配下で0件）',
+  },
+  {
+    ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認', route: '/reminders',
+    status: 'unimplemented',
+    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`reminders/page.tsx:202`）',
+  },
+  {
+    ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 

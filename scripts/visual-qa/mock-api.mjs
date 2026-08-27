@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -353,6 +353,25 @@ function tagDeleteImpact(tag) {
   }
 }
 
+/**
+ * リマインダの通知ステップ。**一覧の既定の形（`{items,…}`）では返さない。**
+ * 編集画面は `steps` を配列として回すので、通で返さないとそこで落ちる。
+ */
+function reminderStepsOf(reminder) {
+  const count = Number(reminder.stepCount ?? 0)
+  return Array.from({ length: count }, (_, i) => ({
+    id: `${reminder.id}-step-${i + 1}`,
+    reminderId: reminder.id,
+    offsetMinutes: Number(reminder.triggerOffsetMinutes ?? 0) + i * 60,
+    offsetDays: null,
+    sendAtTime: reminder.sendAtTime,
+    templateId: null,
+    messageType: 'text',
+    messageContent: i === 0 ? 'ご予約日時が近づいています。' : 'あわせてご確認ください。',
+    createdAt: '2026-06-02T00:00:00.000Z',
+  }))
+}
+
 function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
@@ -395,6 +414,32 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'reminder') {
+    return { success: true, data: REMINDER_FOLDERS }
+  }
+  if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/reminders') return { success: true, data: REMINDERS }
+  const reminderOne = /^\/api\/reminders\/([^/]+)$/.exec(pathname)
+  if (reminderOne) {
+    const found = REMINDERS.find((item) => item.id === reminderOne[1])
+    /*
+      **`steps` を通で足す。** 編集画面は `api.reminders.get()` の返事を
+      `Reminder & { steps: ReminderStep[] }` として読み、`steps.length` を
+      すぐ見る。付けずに返すと画面ごと落ちる。
+    */
+    return found
+      ? { success: true, data: { ...found, steps: reminderStepsOf(found) } }
+      : { success: false, error: 'Not found' }
+  }
+  /*
+    ステップは**通で返す**。一覧の既定（`{items,total,page,limit}`）を返すと
+    編集画面が `steps` を回そうとして落ちる。機能5で2度やった。
+  */
+  const reminderSteps = /^\/api\/reminders\/([^/]+)\/steps$/.exec(pathname)
+  if (reminderSteps) {
+    const reminder = REMINDERS.find((item) => item.id === reminderSteps[1])
+    return { success: true, data: reminder ? reminderStepsOf(reminder) : [] }
   }
   if (/^\/api\/scenarios\/[^/]+\/stats$/.test(pathname)) return { success: true, data: SCENARIO_STATS }
   const scenario = pathname.match(/^\/api\/scenarios\/([^/]+)$/)

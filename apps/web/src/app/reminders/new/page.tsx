@@ -47,6 +47,14 @@ export default function NewReminderPage() {
   const [deliveryMode, setDeliveryMode] = useState<'time' | 'countdown'>('countdown')
   const [offsetDays, setOffsetDays] = useState(-1)
   const [stepSendAtTime, setStepSendAtTime] = useState('10:00')
+  /*
+    156 で `reminders.folder_id` が入り、一覧はフォルダで分けられるように
+    なっている（`reminders/page.tsx` の移動プルダウン）。**作る画面だけが
+    取り残されていた。** 一覧で分けられるのに作るときに選べないと、
+    作ったそばから未分類に落ち、あとで1件ずつ移し直すことになる。
+  */
+  const [folderId, setFolderId] = useState('')
+  const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
 
   useEffect(() => {
     void api.tags.list().then((res) => {
@@ -54,6 +62,9 @@ export default function NewReminderPage() {
     })
     void api.templates.list().then((res) => {
       if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
+    })
+    void api.folders.list('reminder').then((res) => {
+      if (res.success) setFolders(res.data.map((f) => ({ id: f.id, name: f.name })))
     })
     // 起点にできるのは日付の欄だけ。文字の欄を選ばせても日付として読めない。
     void api.friendFields.list().then((res) => {
@@ -88,6 +99,7 @@ export default function NewReminderPage() {
         setName('')
         setDescription('')
         setMessageContent('')
+        setFolderId('')
       }}
       onSave={async () => {
         const res = await api.reminders.create({
@@ -96,6 +108,7 @@ export default function NewReminderPage() {
           triggerType,
           sendAtTime: triggerType === 'manual' ? null : sendAtTime || null,
           targetTagId: targetTagId || null,
+          folderId: folderId || null,
           deliveryMode,
           triggerFieldId: triggerType === 'friend_field' ? triggerFieldId || null : null,
           repeatYearly: triggerType === 'friend_field' ? repeatYearly : false,
@@ -160,10 +173,21 @@ export default function NewReminderPage() {
           />
         </Field>
 
-        {/* リマインダにフォルダを持たせる列が無い。 */}
-        <Field label="フォルダ" note="フォルダ分けは準備中です。">
-          <select disabled className={`${inputClass} opacity-50`}>
-            <option>未分類</option>
+        <Field
+          label="フォルダ"
+          htmlFor="rm-folder"
+          note={folders.length ? '一覧をフォルダで分けるための箱です。' : 'フォルダはまだありません。一覧から追加できます。'}
+        >
+          <select
+            id="rm-folder"
+            value={folderId}
+            onChange={(e) => setFolderId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">未分類</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
           </select>
         </Field>
 
