@@ -18,6 +18,7 @@
 
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import {
   isEmptyCondition,
   pruneCondition,
@@ -107,6 +108,7 @@ export interface ConditionBuilderProps {
 }
 
 export default function ConditionBuilder({ value, onChange, label, showCount = true }: ConditionBuilderProps) {
+  const { selectedAccountId } = useAccount()
   const [tags, setTags] = useState<Option[]>([])
   const [fields, setFields] = useState<Option[]>([])
   const [marks, setMarks] = useState<Option[]>([])
@@ -118,11 +120,15 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
 
   useEffect(() => {
     let cancelled = false
+    if (!selectedAccountId) {
+      setMarks([])
+      return () => { cancelled = true }
+    }
     void (async () => {
       const [tagRes, fieldRes, markRes, scenarioRes] = await Promise.all([
         api.tags.list(),
         api.friendFields.list(),
-        api.supportMarks.list(),
+        api.supportMarks.list(selectedAccountId),
         api.scenarios.list(),
       ])
       if (cancelled) return
@@ -134,7 +140,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   /*
    * 該当件数。条件を書きながら人数が見えないと、絞りすぎ・絞り足りないに

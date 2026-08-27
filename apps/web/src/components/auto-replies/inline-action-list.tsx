@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import type { ScenarioActionType } from '@/lib/api'
 import { ActionConfigEditor, ACTION_KINDS } from '@/components/scenarios/action-editor'
 import { newActionKey, type InlineAction } from './draft-fields'
+import { useAccount } from '@/contexts/account-context'
 
 /**
  * 応答したときに行うことの並び。
@@ -31,6 +32,7 @@ export interface ActionOptions {
  * 選べるものだけでも出すほうがよい。
  */
 export function useActionOptions(): ActionOptions {
+  const { selectedAccountId } = useAccount()
   const [options, setOptions] = useState<ActionOptions>({
     tags: [],
     fields: [],
@@ -41,11 +43,15 @@ export function useActionOptions(): ActionOptions {
 
   useEffect(() => {
     let cancelled = false
+    if (!selectedAccountId) {
+      setOptions({ tags: [], fields: [], marks: [], scenarios: [], vars: [] })
+      return () => { cancelled = true }
+    }
     void (async () => {
       const [tags, fields, marks, scenarios, vars] = await Promise.allSettled([
         api.tags.list(),
         api.friendFields.list(),
-        api.supportMarks.list(),
+        api.supportMarks.list(selectedAccountId),
         api.scenarios.list(),
         api.commonVars.list(),
       ])
@@ -76,7 +82,7 @@ export function useActionOptions(): ActionOptions {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   return options
 }

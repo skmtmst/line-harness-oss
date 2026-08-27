@@ -2328,6 +2328,13 @@ CREATE TABLE "support_email_threads" (
   next_response_due_at     TEXT
 );
 
+CREATE TABLE support_mark_scopes (
+  mark_id         TEXT PRIMARY KEY REFERENCES support_marks(id),
+  tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id TEXT REFERENCES line_accounts(id),
+  created_at      TEXT NOT NULL
+);
+
 CREATE TABLE support_marks (
   id              TEXT PRIMARY KEY,
   name            TEXT NOT NULL,
@@ -3164,6 +3171,9 @@ CREATE INDEX idx_support_email_threads_customer_subject
 
 CREATE INDEX idx_support_email_threads_status_last
   ON support_email_threads (status, last_message_at DESC);
+
+CREATE INDEX idx_support_mark_scopes_account
+  ON support_mark_scopes(tenant_id, line_account_id);
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
 

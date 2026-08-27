@@ -313,7 +313,12 @@ describe('V6分析の概要4画面', () => {
     const friendIds = Array.from({ length: 150 }, (_, index) => `bulk-friend-${index}`);
     for (const id of friendIds) insert.run(id, `U-${id}`);
 
-    await expect(setFriendSupportMarkBulk(db, friendIds, 'mark_working')).resolves.toBe(150);
+    await expect(
+      setFriendSupportMarkBulk(db, friendIds, 'mark_working', {
+        tenantId: '00000000-0000-4000-8000-000000000001',
+        lineAccountId: 'account-a',
+      }),
+    ).resolves.toBe(150);
     const updated = sqlite.prepare(
       `SELECT COUNT(*) AS count FROM friends WHERE support_mark_id = 'mark_working'`,
     ).get() as { count: number };
