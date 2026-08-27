@@ -28,6 +28,11 @@ import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
 import NotificationPanel from '@/components/shared/notification-panel'
+import {
+  hasInboundSupportMark,
+  summarizeTwoFactor,
+  type TwoFactorSummary,
+} from '@/components/dashboard/live-summary'
 
 /** 通知パネルの絞り込み。中身の口ができるまで数は0のまま。 */
 function BellIcon() {
@@ -284,8 +289,8 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFacto
     </div>
     {/*
       設計（`vUXKb`）は「最も古い未対応」と「二段階認証」の2行。
-      **二段階認証の人数は、まだ取れる口が無い。**「0 / 6人」と決め打ちで
-      書かず `—` にする。本物らしく見えるぶん、無い数より悪い。
+      二段階認証は既存のログインユーザー一覧から、有効な人だけを数える。
+      一覧を取得できなかったときだけ `—` にする。
     */}
     <div className="text-ink-secondary mt-3 space-y-2 text-xs">
       <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : `${oldestWaitMinutes.toLocaleString('ja-JP')}分前`}</p>
@@ -324,6 +329,8 @@ export default function DashboardPage() {
   const [supplementLoading, setSupplementLoading] = useState(true)
   const [healthRisk, setHealthRisk] = useState<HealthRisk>(null)
   const [healthIssueCount, setHealthIssueCount] = useState<number | null>(null)
+  const [twoFactorSummary, setTwoFactorSummary] = useState<TwoFactorSummary | null>(null)
+  const [supportMarkAutoOnInbound, setSupportMarkAutoOnInbound] = useState<boolean | null>(null)
   const loadRequestId = useRef(0)
   const visibleMain = preferences.main.filter((item) => item.visible)
   const visibleRight = preferences.right.filter((item) => item.visible)
@@ -333,6 +340,8 @@ export default function DashboardPage() {
   const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
     || visibleRight.some((item) => item.id === 'upcoming')
   const needsHealth = visibleRight.some((item) => item.id === 'operational-alerts' || item.id === 'connection-status')
+  const needsTwoFactor = visibleRight.some((item) => item.id === 'operational-alerts')
+  const needsSupportMarks = visibleRight.some((item) => item.id === 'support-mark-status')
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -435,6 +444,8 @@ export default function DashboardPage() {
       setPendingPhotos(null)
       setHealthRisk(null)
       setHealthIssueCount(null)
+      setTwoFactorSummary(null)
+      setSupportMarkAutoOnInbound(null)
       setSupplementLoading(false)
       return
     }
@@ -444,7 +455,9 @@ export default function DashboardPage() {
       needsPhotos ? api.nenMembers.overview() : Promise.resolve(null),
       needsBookings ? bookingApi.listRequests(selectedAccountId, 'all') : Promise.resolve(null),
       needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
-    ]).then(([photoResult, bookingResult, healthResult]) => {
+      needsTwoFactor ? api.staff.list() : Promise.resolve(null),
+      needsSupportMarks ? api.supportMarks.list(selectedAccountId) : Promise.resolve(null),
+    ]).then(([photoResult, bookingResult, healthResult, staffResult, supportMarkResult]) => {
       if (cancelled) return
       setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingPhotos : null)
       setBookings(bookingResult.status === 'fulfilled' && bookingResult.value ? bookingResult.value.requests : null)
@@ -458,10 +471,20 @@ export default function DashboardPage() {
           ? healthResult.value.data.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
           : null,
       )
+      setTwoFactorSummary(
+        staffResult.status === 'fulfilled' && staffResult.value?.success
+          ? summarizeTwoFactor(staffResult.value.data)
+          : null,
+      )
+      setSupportMarkAutoOnInbound(
+        supportMarkResult.status === 'fulfilled' && supportMarkResult.value?.success
+          ? hasInboundSupportMark(supportMarkResult.value.data)
+          : null,
+      )
       setSupplementLoading(false)
     })
     return () => { cancelled = true }
-  }, [needsBookings, needsHealth, needsPhotos, selectedAccountId])
+  }, [needsBookings, needsHealth, needsPhotos, needsSupportMarks, needsTwoFactor, selectedAccountId])
 
   const activeBookings = useMemo(
     () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],
@@ -505,7 +528,7 @@ export default function DashboardPage() {
 
   const renderRightCard = (id: DashboardCardId): ReactNode => {
     if (id === 'send-quota') return <SendQuotaCard delivery={sectionAvailable('quota') ? data?.delivery ?? null : null} />
-    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={null} />
+    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={twoFactorSummary} />
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={sectionAvailable('friends') ? data?.friends.active ?? null : null} />
     if (id === 'upcoming') return <UpcomingCard bookings={bookings} loading={supplementLoading} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
@@ -514,7 +537,7 @@ export default function DashboardPage() {
     if (id === 'recent-results') return data && !sectionAvailable('conversions')
       ? <UnavailableDataCard title="最近の成果" onRetry={() => void load()} />
       : data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
-    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? data?.inbox ?? null : null} autoOnInbound={null} />
+    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? data?.inbox ?? null : null} autoOnInbound={supportMarkAutoOnInbound} />
     if (id === 'friend-status') return data && !sectionAvailable('friends')
       ? <UnavailableDataCard title="友だちの状態" onRetry={() => void load()} />
       : data ? <FriendStatusCard friends={data.friends} /> : <EmptyDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />

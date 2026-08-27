@@ -7,8 +7,10 @@ import {
   reorderDashboardItems,
 } from './dashboard-editor'
 import { activeUpcomingBookings } from './side-cards'
+import { hasInboundSupportMark, summarizeTwoFactor } from './live-summary'
 import { formatTrendSources } from './friend-trend-table'
 import type { BookingRequest } from '@/lib/api'
+import type { StaffMember } from '@line-crm/shared'
 
 function booking(id: string, startsAt: string, status = 'confirmed'): BookingRequest {
   return {
@@ -124,5 +126,41 @@ describe('今後の予定', () => {
       booking('next', '2026-08-20T02:00:00.000Z'),
     ], now)
     expect(result.map((item) => item.id)).toEqual(['next', 'later'])
+  })
+})
+
+describe('既存データを使う運用状況', () => {
+  const member = (
+    id: string,
+    twoFactorEnabled: boolean,
+    isActive = true,
+  ): StaffMember => ({
+    id,
+    name: id,
+    email: null,
+    role: 'staff',
+    lineLinked: false,
+    twoFactorEnabled,
+    isActive,
+    permissionKeys: [],
+    notificationPreferences: {},
+    inviteStatus: 'active',
+    createdAt: '2026-08-27T00:00:00.000Z',
+    updatedAt: '2026-08-27T00:00:00.000Z',
+    assignedLineAccountId: null,
+    canAccessDescendantAccounts: false,
+  })
+
+  it('二段階認証は有効なログインユーザーだけを分母にする', () => {
+    expect(summarizeTwoFactor([
+      member('enabled', true),
+      member('disabled', false),
+      member('inactive', false, false),
+    ])).toEqual({ enabled: 1, total: 2 })
+  })
+
+  it('受信時に自動変更する対応マークが1つでもあれば有効とする', () => {
+    expect(hasInboundSupportMark([{ autoOnInbound: false }, { autoOnInbound: true }])).toBe(true)
+    expect(hasInboundSupportMark([{ autoOnInbound: false }])).toBe(false)
   })
 })
