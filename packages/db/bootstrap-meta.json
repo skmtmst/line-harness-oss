@@ -202,7 +202,8 @@
     "193_incoming_webhook_and_entry_route_owner.sql",
     "194_saved_search_account_scope.sql",
     "195_staff_account_scope.sql",
-    "196_support_mark_account_scope.sql"
+    "196_support_mark_account_scope.sql",
+    "197_notification_center_scope.sql"
   ],
-  "migrationCount": 203
+  "migrationCount": 204
 }
