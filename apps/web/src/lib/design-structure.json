@@ -1303,24 +1303,20 @@
       ]
     },
     "/analytics": {
-      "node": "C4qpF X5uwj rPp6w nRbh3",
-      "name": "V2 6-5 分析（送信数・クロス集計・URLクリック・ファネル）",
+      "node": "Zxezb J6Inc YBGtm QQ1SR URqOA f5HsX C2I7ry Fh2Qj dfwD4",
+      "name": "V6 20 分析（概要4タブ・詳細4タブ・定期レポート）",
       "sections": [
         "Bar",
-        "Head",
         "KPIs",
         "Table",
         "tf"
       ],
       "parts": [
         "分析",
-        "配信した数と、その反応をまとめて見ます。送信数はLINEの課金対象と直結するため、残枠と合わせて確認してください。",
-        "マニュアル",
-        "レポートを保存",
         "CSVで書き出す",
         "送信数",
         "ファネル",
-        "クロス集計",
+        "クロス分析",
         "URLクリック",
         "検索からの流入",
         "今月の送信",

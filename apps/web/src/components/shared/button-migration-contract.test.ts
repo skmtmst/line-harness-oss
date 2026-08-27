@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作26個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,7 +45,9 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    expect(openings).toHaveLength(29)
+    // 2026-08-28: 分析V6では、行き先の無いマニュアル・保存・CSVを
+    // 出さない。画面に出す操作は実行できるものだけに締めた。
+    expect(openings).toHaveLength(26)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
   })
 

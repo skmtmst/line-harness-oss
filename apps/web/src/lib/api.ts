@@ -181,6 +181,140 @@ export type CommonActionSummary = {
   updatedAt: string;
 };
 
+export type AnalyticsMetricState =
+  | 'available'
+  | 'pending'
+  | 'unavailable'
+  | 'insufficient'
+  | 'partial'
+  | 'failed'
+
+export type AnalyticsMetric<T> = {
+  value: T | null
+  state: AnalyticsMetricState
+  reason: string | null
+}
+
+export type AnalyticsEnvelope<T> = {
+  lineAccountId: string
+  timeZone: string
+  period: { from: string; to: string }
+  dataCutoffAt: string
+  data: T
+}
+
+export type AnalyticsFriendsOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  metrics: {
+    added: AnalyticsMetric<number>
+    removed: AnalyticsMetric<number>
+    net: AnalyticsMetric<number>
+    currentFriends: AnalyticsMetric<number>
+    firstTime: AnalyticsMetric<number>
+    returning: AnalyticsMetric<number>
+  }
+  days: Array<{ date: string; added: number; removed: number; net: number }>
+  campaigns: Array<{
+    id: string
+    name: string
+    kind: 'broadcast' | 'scenario'
+    occurredAt: string
+    date: string
+  }>
+  historyAvailableFrom: string | null
+}>
+
+export type AnalyticsReactionsOverview = AnalyticsEnvelope<{
+  metrics: {
+    sent: AnalyticsMetric<number>
+    delivered: AnalyticsMetric<number>
+    opened: AnalyticsMetric<number>
+    lineClicked: AnalyticsMetric<number>
+    trackedClicks: AnalyticsMetric<number>
+    unavailableCampaigns: AnalyticsMetric<number>
+  }
+  campaigns: Array<{
+    id: string
+    name: string
+    kind: 'broadcast' | 'scenario'
+    sentAt: string
+    targetPeople: AnalyticsMetric<number>
+    delivered: AnalyticsMetric<number>
+    opened: AnalyticsMetric<number>
+    lineClicked: AnalyticsMetric<number>
+    outcomes: AnalyticsMetric<number>
+    fetchedAt: string | null
+  }>
+  trackedClickHours: Array<{ hour: number; clicks: number }>
+  clickDefinition: string
+}>
+
+export type AnalyticsRoutesOverview = AnalyticsEnvelope<{
+  attributionModel: 'first_touch'
+  attributionLabel: string
+  routes: Array<{
+    id: string
+    refCode: string | null
+    name: string
+    clicks: AnalyticsMetric<number>
+    friendAdds: AnalyticsMetric<number>
+    currentFriends: AnalyticsMetric<number>
+    reactionPeople: AnalyticsMetric<number>
+    conversions: {
+      approved: AnalyticsMetric<number>
+      pending: AnalyticsMetric<number>
+      rejected: AnalyticsMetric<number>
+      revenue: AnalyticsMetric<number>
+    }
+    adCost: AnalyticsMetric<number>
+    costPerFriend: AnalyticsMetric<number>
+    costPerConversion: AnalyticsMetric<number>
+    profitAfterAdCost: AnalyticsMetric<number>
+  }>
+  searchConsoleHref: string
+}>
+
+export type AnalyticsUsageOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  checkedAt: string
+  automaticDeletion: false
+  categories: Array<{
+    key: string
+    label: string
+    href: string
+    created: AnalyticsMetric<number>
+    inUse: AnalyticsMetric<number>
+    unused: AnalyticsMetric<number>
+    brokenReferences: AnalyticsMetric<number>
+    lastUsedAt: AnalyticsMetric<string>
+  }>
+}>
+
+export type AnalyticsUrlClicksOverview = AnalyticsEnvelope<{
+  state: AnalyticsMetricState
+  stateReason: string | null
+  exposureAvailableFrom: string | null
+  hasMore: boolean
+  clickRateDefinition: string
+  links: Array<{
+    trackedLinkId: string
+    name: string
+    originalUrl: string
+    shortCode: string | null
+    isActive: boolean
+    actions: { tagName: string | null; scenarioName: string | null }
+    clicks: AnalyticsMetric<number>
+    knownClickPeople: AnalyticsMetric<number>
+    deliveredPeople: AnalyticsMetric<number>
+    clickRate: AnalyticsMetric<number>
+    firstClickedAt: AnalyticsMetric<string>
+    lastClickedAt: AnalyticsMetric<string>
+    usageLocations: string[]
+  }>
+}>
+
 export type CommonActionVersion = {
   id: string;
   versionNumber: number;
@@ -1337,6 +1471,35 @@ export const api = {
    * 外部APIを叩かないので、ここが外の障害で落ちることはない。
    */
   analytics: {
+    friendsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsFriendsOverview>>(
+        `/api/analytics/friends${rangeQuery({ ...params, accountId })}`,
+      ),
+    reactionsOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsReactionsOverview>>(
+        `/api/analytics/reactions${rangeQuery({ ...params, accountId })}`,
+      ),
+    routesOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsRoutesOverview>>(
+        `/api/analytics/routes${rangeQuery({ ...params, accountId })}`,
+      ),
+    usageOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+      fetchApi<ApiResponse<AnalyticsUsageOverview>>(
+        `/api/analytics/usage${rangeQuery({ ...params, accountId })}`,
+      ),
+    urlClicksOverview: (
+      accountId: string,
+      params?: { from?: string; to?: string; limit?: number },
+    ) => {
+      const query = new URLSearchParams()
+      query.set('account_id', accountId)
+      if (params?.from) query.set('from', params.from)
+      if (params?.to) query.set('to', params.to)
+      if (params?.limit) query.set('limit', String(params.limit))
+      return fetchApi<ApiResponse<AnalyticsUrlClicksOverview>>(
+        `/api/analytics/url-clicks?${query.toString()}`,
+      )
+    },
     messages: (accountId: string, params?: { from?: string; to?: string }) =>
       fetchApi<
         ApiResponse<
