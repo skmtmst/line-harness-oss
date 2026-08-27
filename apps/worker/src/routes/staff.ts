@@ -72,6 +72,11 @@ function normalizeAccountScopeInput(body: AccountScopeInput):
   return { accountScope: 'accounts', scopedLineAccountIds: ids };
 }
 
+async function hasAllAccountScope(db: D1Database, current: Env['Variables']['staff']): Promise<boolean> {
+  if (current.id === 'env-owner') return true;
+  return (await getStaffById(db, current.id))?.account_scope !== 'accounts';
+}
+
 async function mayAssignAccountScopes(
   db: D1Database,
   current: Env['Variables']['staff'],
@@ -198,10 +203,11 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
       assignedLineAccountId?: string | null;
       canAccessDescendantAccounts?: boolean;
-      accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[];
+      accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq';
     }>();
     const accountScope = normalizeAccountScopeInput(body);
     if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
+    if (accountScope.accountScope === undefined) return c.json({ success: false, error: '担当範囲を選んでください' }, 400);
     const name = body.name?.trim();
     const email = body.email?.trim().toLowerCase();
     if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
@@ -215,6 +221,9 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
     }
     const current = c.get('staff');
+    if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
+      return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を追加できます' }, 403);
+    }
     const canGrantDescendants =
       current.role === 'owner' ||
       !current.assignedLineAccountId ||
@@ -242,11 +251,11 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
       assigned_line_account_id: body.assignedLineAccountId,
       can_access_descendant_accounts: body.role === 'admin' && Boolean(body.canAccessDescendantAccounts),
-      account_scope: accountScope.accountScope ?? 'all',
+      account_scope: accountScope.accountScope,
       tenant_id: current.tenantId ?? DEFAULT_TENANT_ID,
     });
     try {
-      await replaceStaffAccountScopes(c.env.DB, member.id, accountScope.scopedLineAccountIds ?? []);
+      await replaceStaffAccountScopes(c.env.DB, member.id, accountScope.scopedLineAccountIds);
       await sendStaffInviteEmail(c.env, {
         name, email,
         verifyUrl: `${new URL(c.req.url).origin}/api/staff/invitations/${encodeURIComponent(token)}/verify`,
@@ -285,7 +294,7 @@ staff.patch('/api/staff/:id', async (c) => {
     lineLinked?: boolean;
     permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
     assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean;
-    accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[];
+    accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq';
   }>();
   const accountScope = normalizeAccountScopeInput(body);
   if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
@@ -293,6 +302,9 @@ staff.patch('/api/staff/:id', async (c) => {
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
   const current = c.get('staff');
+  if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
+    return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を変更できます' }, 403);
+  }
   const administrator = current.role === 'owner' || current.role === 'admin';
   if (!administrator && current.id !== id) {
     return c.json({ success: false, error: 'スタッフは自分の設定だけ変更できます' }, 403);

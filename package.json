@@ -4,6 +4,8 @@
   "private": true,
   "description": "Open-source LINE Official Account CRM/marketing automation",
   "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
     "dev:worker": "pnpm --filter worker dev",
     "dev:web": "pnpm --filter web dev",
     "build": "pnpm -r build",
