@@ -4,6 +4,7 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { resolveLineCredential } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
+import { resolveLineToken } from '../services/line-token.js';
 
 const profileRefresh = new Hono<Env>();
 
@@ -85,7 +86,7 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
   for (let i = 0; i < rows.length; i += CONCURRENCY) {
     const chunk = rows.slice(i, i + CONCURRENCY);
     await Promise.all(chunk.map(async (row) => {
-      const token = row.channel_access_token
+      const accountToken = row.channel_access_token
         ? await resolveLineCredential(
             row.channel_access_token_encrypted,
             row.channel_access_token,
@@ -94,7 +95,13 @@ profileRefresh.post('/api/admin/refresh-profiles', requireRole('owner'), async (
               field: 'channel_access_token',
             },
           )
-        : defaultToken;
+        : null;
+      const token = resolveLineToken({
+        accountToken,
+        defaultToken,
+        accountId: row.line_account_id,
+        context: 'profile-refresh.friend-profile',
+      });
       const client = new LineClient(token);
       try {
         const profile = await client.getProfile(row.line_user_id);

@@ -18,6 +18,7 @@ import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
 import { buildMessage } from '../services/step-delivery.js';
 import type { Env } from '../index.js';
+import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
@@ -838,14 +839,20 @@ friends.post('/api/friends/:id/messages', requireRole('owner', 'admin', 'staff')
 
     const { LineClient } = await import('@line-crm/line-sdk');
     // Resolve access token from friend's account (multi-account support)
-    let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+    let accountToken: string | null = null;
     const friendAccountId =
       ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
     if (friendAccountId) {
       const { getLineAccountById } = await import('@line-crm/db');
       const account = await getLineAccountById(db, friendAccountId);
-      if (account) accessToken = account.channel_access_token;
+      accountToken = account?.channel_access_token ?? null;
     }
+    const accessToken = resolveLineToken({
+      accountToken,
+      defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      accountId: friendAccountId,
+      context: 'friends.direct-send',
+    });
     const lineClient = new LineClient(accessToken);
 
     // Auto-wrap URLs with tracking links (text with URLs → Flex with button)

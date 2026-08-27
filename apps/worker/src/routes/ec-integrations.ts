@@ -3,6 +3,7 @@ import { getFriendByLineUserId, getLineAccountById, getLineAccounts, jstNow } fr
 import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import type { Env } from '../index.js';
+import { resolveLineToken } from '../services/line-token.js';
 import { fireEvent, logOutgoingMessage } from '../services/event-bus.js';
 import { enqueuePostShippingFollowUps } from '../services/nen-engagement.js';
 import { ecFlexMessage } from '../services/ec-notification-message.js';
@@ -361,7 +362,12 @@ ecIntegrations.post('/api/integrations/eccube/events', async (c) => {
     const account = friend.line_account_id
       ? await getLineAccountById(c.env.DB, friend.line_account_id)
       : (await getLineAccounts(c.env.DB)).find((candidate) => candidate.is_active === 1) ?? null;
-    const accessToken = account?.channel_access_token || c.env.LINE_CHANNEL_ACCESS_TOKEN;
+    const accessToken = resolveLineToken({
+      accountToken: account?.channel_access_token,
+      defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      accountId: account?.id ?? friend.line_account_id,
+      context: 'ec-integrations.event-send',
+    });
     if (!accessToken) throw new Error('LINE access token is not configured');
 
     await syncMemberSnapshot(c.env.DB, friend.id, event, now);
