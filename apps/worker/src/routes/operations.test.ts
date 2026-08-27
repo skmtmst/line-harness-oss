@@ -30,6 +30,19 @@ describe('運用状態API', () => {
     expect(await response.json()).toEqual({ success: true, data: null })
   })
 
+  it('健全性アラートを確認済みにできるのはowner/adminだけ', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO operation_health_alerts
+       (id, check_key, status, severity, detail, first_detected_at, last_detected_at, updated_at)
+       VALUES ('alert-1', 'delivery', 'open', 'warning', '滞留', '2026-08-28T00:00:00Z', '2026-08-28T00:00:00Z', '2026-08-28T00:00:00Z')`,
+    ).run()
+    const denied = await app('staff').request('/api/operations/alerts/alert-1/acknowledge', { method: 'POST' }, { DB: testDb.db })
+    expect(denied.status).toBe(403)
+    const allowed = await app('admin').request('/api/operations/alerts/alert-1/acknowledge', { method: 'POST' }, { DB: testDb.db })
+    expect(allowed.status).toBe(200)
+    expect(await allowed.json()).toMatchObject({ success: true, data: { status: 'acknowledged', acknowledgedBy: 'admin-1' } })
+  })
+
   it('確認ヘッダーと合言葉が無い停止を拒否する', async () => {
     const missingHeader = await app().request('/api/operations/incidents', {
       method: 'POST', headers: { 'content-type': 'application/json' },

@@ -1678,6 +1678,20 @@ CREATE TABLE operation_control_sets (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE operation_health_alerts (
+  id                 TEXT PRIMARY KEY,
+  check_key          TEXT NOT NULL CHECK (check_key IN ('quota', 'api', 'webhook', 'delivery', 'friends')),
+  status             TEXT NOT NULL CHECK (status IN ('open', 'acknowledged', 'resolved')),
+  severity           TEXT NOT NULL CHECK (severity IN ('warning', 'danger')),
+  detail             TEXT NOT NULL,
+  first_detected_at  TEXT NOT NULL,
+  last_detected_at   TEXT NOT NULL,
+  acknowledged_by   TEXT,
+  acknowledged_at   TEXT,
+  resolved_at       TEXT,
+  updated_at        TEXT NOT NULL
+);
+
 CREATE TABLE operation_health_results (
   run_id       TEXT NOT NULL REFERENCES operation_health_runs(id) ON DELETE CASCADE,
   check_key    TEXT NOT NULL CHECK (check_key IN ('quota', 'api', 'webhook', 'delivery', 'friends')),
@@ -3101,6 +3115,13 @@ CREATE INDEX idx_notifications_status ON notifications (status);
 
 CREATE INDEX idx_operation_audit_kind_date
   ON operation_audit (target_kind, created_at);
+
+CREATE UNIQUE INDEX idx_operation_health_alerts_active_check
+  ON operation_health_alerts(check_key)
+  WHERE status IN ('open', 'acknowledged');
+
+CREATE INDEX idx_operation_health_alerts_updated
+  ON operation_health_alerts(status, updated_at DESC);
 
 CREATE INDEX idx_operation_health_runs_completed
   ON operation_health_runs(status, completed_at DESC);

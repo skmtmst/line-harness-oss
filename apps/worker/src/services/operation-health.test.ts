@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { acknowledgeOperationHealthAlert, listOperationHealthAlerts } from '@line-crm/db';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { runOperationHealthChecks } from './operation-health.js';
 
@@ -16,9 +17,12 @@ beforeEach(() => {
        (date, line_account_id, active, total, added, blocked)
      VALUES ('2026-08-28', '', 100, 100, 2, 1)`,
   ).run();
-  vi.stubGlobal('fetch', vi.fn()
-    .mockResolvedValueOnce(new Response(JSON.stringify({ type: 'limited', value: 1000 }), { status: 200 }))
-    .mockResolvedValueOnce(new Response(JSON.stringify({ totalUsage: 500 }), { status: 200 })));
+  vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => Promise.resolve(
+    new Response(
+      JSON.stringify(String(input).includes('/consumption') ? { totalUsage: 500 } : { type: 'limited', value: 1000 }),
+      { status: 200 },
+    ),
+  )));
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -51,5 +55,31 @@ describe('運用状態の保存監視', () => {
     expect(snapshot?.results).toHaveLength(5);
     expect(snapshot?.results.find((item) => item.checkKey === 'quota')).toMatchObject({ severity: 'unknown' });
     expect(snapshot?.results.find((item) => item.checkKey === 'api')).toMatchObject({ severity: 'normal' });
+  });
+
+  it('同じ異常を1件へ束ね、確認済みのまま正常復帰で解決する', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks (id, name, url, is_active, secret, consecutive_failures)
+       VALUES ('hook-1', '通知', 'https://example.test', 1, NULL, 0)`,
+    ).run();
+    const env = { DB: testDb.db } as Parameters<typeof runOperationHealthChecks>[0];
+    await runOperationHealthChecks(env, new Date('2026-08-28T01:20:00.000Z'));
+    await runOperationHealthChecks(env, new Date('2026-08-28T01:25:00.000Z'));
+    let alerts = await listOperationHealthAlerts(testDb.db);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ checkKey: 'webhook', status: 'open', severity: 'danger' });
+
+    const acknowledged = await acknowledgeOperationHealthAlert(testDb.db, {
+      alertId: alerts[0]!.id,
+      actorId: 'admin-1',
+      now: '2026-08-28T01:26:00.000Z',
+    });
+    expect(acknowledged).toMatchObject({ status: 'acknowledged', acknowledgedBy: 'admin-1' });
+
+    testDb.raw.prepare("UPDATE outgoing_webhooks SET secret = 'signed' WHERE id = 'hook-1'").run();
+    await runOperationHealthChecks(env, new Date('2026-08-28T01:30:00.000Z'));
+    alerts = await listOperationHealthAlerts(testDb.db, { includeResolved: true });
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ status: 'resolved', acknowledgedBy: 'admin-1' });
   });
 });

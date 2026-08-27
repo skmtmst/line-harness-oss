@@ -5,6 +5,8 @@ import {
   getFriendById,
   getOperationControlSet,
   getLatestOperationHealthSnapshot,
+  acknowledgeOperationHealthAlert,
+  listOperationHealthAlerts,
   getOperationIncident,
   getPendingReminderDeliveries,
   listOperationIncidents,
@@ -164,6 +166,32 @@ operations.post(
   '/api/operations/health/check',
   requireRole('owner', 'admin'),
   async (c) => c.json({ success: true, data: await runOperationHealthChecks(c.env, new Date(), { force: true }) }),
+);
+
+operations.get('/api/operations/alerts', requireRole('owner', 'admin'), async (c) => {
+  const includeResolved = c.req.query('include_resolved') === '1';
+  return c.json({
+    success: true,
+    data: await listOperationHealthAlerts(c.env.DB, {
+      includeResolved,
+      limit: Number(c.req.query('limit') ?? 100),
+    }),
+  });
+});
+
+operations.post(
+  '/api/operations/alerts/:id/acknowledge',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const alert = await acknowledgeOperationHealthAlert(c.env.DB, {
+      alertId: c.req.param('id'),
+      actorId: c.get('staff')!.id,
+      now: new Date().toISOString(),
+    });
+    return alert
+      ? c.json({ success: true, data: alert })
+      : c.json({ success: false, error: 'アラートが見つかりません' }, 404);
+  },
 );
 
 operations.get('/api/operations/control/preview', async (c) => {

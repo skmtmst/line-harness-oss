@@ -75,3 +75,25 @@ CREATE TABLE IF NOT EXISTS operation_health_results (
 
 CREATE INDEX IF NOT EXISTS idx_operation_health_runs_completed
   ON operation_health_runs(status, completed_at DESC);
+
+-- 注意・エラーを同じ項目ごとに1件へ束ね、確認済みと正常復帰を追跡する。
+CREATE TABLE IF NOT EXISTS operation_health_alerts (
+  id                 TEXT PRIMARY KEY,
+  check_key          TEXT NOT NULL CHECK (check_key IN ('quota', 'api', 'webhook', 'delivery', 'friends')),
+  status             TEXT NOT NULL CHECK (status IN ('open', 'acknowledged', 'resolved')),
+  severity           TEXT NOT NULL CHECK (severity IN ('warning', 'danger')),
+  detail             TEXT NOT NULL,
+  first_detected_at  TEXT NOT NULL,
+  last_detected_at   TEXT NOT NULL,
+  acknowledged_by   TEXT,
+  acknowledged_at   TEXT,
+  resolved_at       TEXT,
+  updated_at        TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_operation_health_alerts_active_check
+  ON operation_health_alerts(check_key)
+  WHERE status IN ('open', 'acknowledged');
+
+CREATE INDEX IF NOT EXISTS idx_operation_health_alerts_updated
+  ON operation_health_alerts(status, updated_at DESC);

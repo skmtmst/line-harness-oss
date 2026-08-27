@@ -4,6 +4,7 @@ import {
   failOperationHealthRun,
   getLatestOperationHealthSnapshot,
   getLineAccounts,
+  reconcileOperationHealthAlerts,
   type OperationHealthResult,
   type OperationHealthSeverity,
   type OperationHealthSnapshot,
@@ -204,6 +205,7 @@ export async function runOperationHealthChecks(
     const results = settled.map((item, index) => item.status === 'fulfilled'
       ? item.value
       : errorResult(keys[index]!, checkedAt));
+    await reconcileOperationHealthAlerts(env.DB, results, checkedAt);
     await completeOperationHealthRun(env.DB, { runId, completedAt: new Date().toISOString(), results });
     return getLatestOperationHealthSnapshot(env.DB);
   } catch (error) {

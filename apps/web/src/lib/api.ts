@@ -159,6 +159,20 @@ export type OperationHealthSnapshot = {
   results: OperationHealthResult[]
 }
 
+export type OperationHealthAlert = {
+  id: string
+  checkKey: OperationHealthResult['checkKey']
+  status: 'open' | 'acknowledged' | 'resolved'
+  severity: 'warning' | 'danger'
+  detail: string
+  firstDetectedAt: string
+  lastDetectedAt: string
+  acknowledgedBy: string | null
+  acknowledgedAt: string | null
+  resolvedAt: string | null
+  updatedAt: string
+}
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -3267,6 +3281,12 @@ export const api = {
     health: () => fetchApi<ApiResponse<OperationHealthSnapshot | null>>('/api/operations/health'),
     runHealthCheck: () => fetchApi<ApiResponse<OperationHealthSnapshot | null>>(
       '/api/operations/health/check', { method: 'POST' },
+    ),
+    alerts: (includeResolved = false) => fetchApi<ApiResponse<OperationHealthAlert[]>>(
+      `/api/operations/alerts${includeResolved ? '?include_resolved=1' : ''}`,
+    ),
+    acknowledgeAlert: (alertId: string) => fetchApi<ApiResponse<OperationHealthAlert>>(
+      `/api/operations/alerts/${encodeURIComponent(alertId)}/acknowledge`, { method: 'POST' },
     ),
     control: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''

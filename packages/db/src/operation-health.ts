@@ -16,6 +16,34 @@ export interface OperationHealthSnapshot {
   results: OperationHealthResult[];
 }
 
+export interface OperationHealthAlert {
+  id: string;
+  checkKey: OperationHealthCheckKey;
+  status: 'open' | 'acknowledged' | 'resolved';
+  severity: 'warning' | 'danger';
+  detail: string;
+  firstDetectedAt: string;
+  lastDetectedAt: string;
+  acknowledgedBy: string | null;
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+  updatedAt: string;
+}
+
+interface HealthAlertRow {
+  id: string;
+  check_key: OperationHealthCheckKey;
+  status: OperationHealthAlert['status'];
+  severity: OperationHealthAlert['severity'];
+  detail: string;
+  first_detected_at: string;
+  last_detected_at: string;
+  acknowledged_by: string | null;
+  acknowledged_at: string | null;
+  resolved_at: string | null;
+  updated_at: string;
+}
+
 interface HealthResultRow {
   check_key: OperationHealthCheckKey;
   severity: OperationHealthSeverity;
@@ -33,6 +61,22 @@ function readMetrics(value: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+function mapAlert(row: HealthAlertRow): OperationHealthAlert {
+  return {
+    id: row.id,
+    checkKey: row.check_key,
+    status: row.status,
+    severity: row.severity,
+    detail: row.detail,
+    firstDetectedAt: row.first_detected_at,
+    lastDetectedAt: row.last_detected_at,
+    acknowledgedBy: row.acknowledged_by,
+    acknowledgedAt: row.acknowledged_at,
+    resolvedAt: row.resolved_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 export async function claimOperationHealthRun(
@@ -115,4 +159,65 @@ export async function getLatestOperationHealthSnapshot(
       checkedAt: row.checked_at,
     })),
   };
+}
+
+export async function reconcileOperationHealthAlerts(
+  db: D1Database,
+  results: OperationHealthResult[],
+  now: string,
+): Promise<void> {
+  for (const health of results) {
+    if (health.severity === 'warning' || health.severity === 'danger') {
+      const active = await db.prepare(
+        `SELECT id FROM operation_health_alerts
+          WHERE check_key = ? AND status IN ('open', 'acknowledged') LIMIT 1`,
+      ).bind(health.checkKey).first<{ id: string }>();
+      if (active) {
+        await db.prepare(
+          `UPDATE operation_health_alerts
+              SET severity = ?, detail = ?, last_detected_at = ?, updated_at = ?
+            WHERE id = ?`,
+        ).bind(health.severity, health.detail, now, now, active.id).run();
+      } else {
+        await db.prepare(
+          `INSERT INTO operation_health_alerts
+             (id, check_key, status, severity, detail, first_detected_at, last_detected_at, updated_at)
+           VALUES (?, ?, 'open', ?, ?, ?, ?, ?)`,
+        ).bind(crypto.randomUUID(), health.checkKey, health.severity, health.detail, now, now, now).run();
+      }
+    } else if (health.severity === 'normal') {
+      await db.prepare(
+        `UPDATE operation_health_alerts
+            SET status = 'resolved', resolved_at = ?, updated_at = ?
+          WHERE check_key = ? AND status IN ('open', 'acknowledged')`,
+      ).bind(now, now, health.checkKey).run();
+    }
+    // unknownは「正常に戻った」証拠ではないため、既存アラートを解決しない。
+  }
+}
+
+export async function listOperationHealthAlerts(
+  db: D1Database,
+  options: { includeResolved?: boolean; limit?: number } = {},
+): Promise<OperationHealthAlert[]> {
+  const limit = Math.max(1, Math.min(200, Math.floor(options.limit ?? 100)));
+  const where = options.includeResolved ? '' : `WHERE status IN ('open', 'acknowledged')`;
+  const rows = await db.prepare(
+    `SELECT * FROM operation_health_alerts ${where} ORDER BY updated_at DESC LIMIT ?`,
+  ).bind(limit).all<HealthAlertRow>();
+  return rows.results.map(mapAlert);
+}
+
+export async function acknowledgeOperationHealthAlert(
+  db: D1Database,
+  input: { alertId: string; actorId: string; now: string },
+): Promise<OperationHealthAlert | null> {
+  await db.prepare(
+    `UPDATE operation_health_alerts
+        SET status = 'acknowledged', acknowledged_by = ?, acknowledged_at = ?, updated_at = ?
+      WHERE id = ? AND status = 'open'`,
+  ).bind(input.actorId, input.now, input.now, input.alertId).run();
+  const row = await db.prepare(`SELECT * FROM operation_health_alerts WHERE id = ?`)
+    .bind(input.alertId).first<HealthAlertRow>();
+  return row ? mapAlert(row) : null;
 }
