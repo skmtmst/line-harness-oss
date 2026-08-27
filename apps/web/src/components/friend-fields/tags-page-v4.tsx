@@ -537,7 +537,13 @@ function DeleteTagDialog({ tag, onCancel, onDeleted }: { tag: Tag; onCancel: () 
   )
 }
 
-export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; groups: TagGroup[] } }) {
+export default function TagsPageV4({
+  fixture,
+  accountId = null,
+}: {
+  fixture?: { items: Tag[]; groups: TagGroup[] }
+  accountId?: string | null
+}) {
   const router = useRouter()
   const params = useSearchParams()
   const rawTab = params.get('tab')
@@ -889,7 +895,7 @@ export default function TagsPageV4({ fixture }: { fixture?: { items: Tag[]; grou
             <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} />
           </div>
         ) : null}
-      </> : tab === 'fields' ? <FriendFieldList /> : tab === 'marks' ? <SupportMarkList /> : <SavedSearchList />}
+      </> : tab === 'fields' ? <FriendFieldList /> : tab === 'marks' ? <SupportMarkList /> : <SavedSearchList accountId={accountId} />}
       {deleteTarget && <DeleteTagDialog tag={deleteTarget} onCancel={() => setDeleteTarget(null)} onDeleted={() => { setDeleteTarget(null); void load() }} />}
     </div>
   )

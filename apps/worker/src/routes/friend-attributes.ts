@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getSupportMarks,
   getSupportMarkById,
@@ -16,7 +16,6 @@ import {
   countSavedSearches,
   validateSearchConditions,
   SAVED_SEARCH_LIMIT,
-  SAVED_SEARCH_SCOPES,
   getLoginAudit,
   getStaffMembers,
   LOGIN_AUDIT_ACTIONS,
@@ -30,12 +29,13 @@ import {
   isFolderKind,
   type SupportMark,
   type SavedSearch,
+  type SavedSearchAccess,
   type Folder,
-  type SavedSearchScope,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 /**
  * 対応マーク・保存した検索・汎用フォルダ。
@@ -64,10 +64,28 @@ function serializeSearch(row: SavedSearch) {
     scope: row.scope,
     conditions: JSON.parse(row.conditions_json) as unknown,
     createdBy: row.created_by,
+    lineAccountId: row.line_account_id,
     isShared: Boolean(row.is_shared),
     displayOrder: row.display_order,
     createdAt: row.created_at,
   };
+}
+
+async function savedSearchAccess(c: Context<Env>): Promise<SavedSearchAccess | Response> {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
+    return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+  }
+  const staff = c.get('staff');
+  return {
+    lineAccountId,
+    staffId: staff.id,
+    canManageAll: staff.role === 'owner' || staff.role === 'admin',
+  } satisfies SavedSearchAccess;
 }
 
 function serializeFolder(row: Folder) {
@@ -267,14 +285,21 @@ friendAttributes.post(
 
 // ── 保存した検索 ────────────────────────────────────────────
 
-friendAttributes.get('/api/saved-searches', async (c) => {
+friendAttributes.get('/api/saved-searches', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const raw = c.req.query('scope');
-    const scope = (SAVED_SEARCH_SCOPES as readonly string[]).includes(raw ?? '')
-      ? (raw as SavedSearchScope)
-      : undefined;
-    const items = await getSavedSearches(c.env.DB, scope);
-    return c.json({ success: true, data: items.map(serializeSearch) });
+    if (raw && raw !== 'friends') {
+      return c.json({ success: false, error: 'この画面では友だち検索だけを扱えます' }, 400);
+    }
+    const access = await savedSearchAccess(c);
+    if (access instanceof Response) return access;
+    const items = await getSavedSearches(c.env.DB, 'friends', access);
+    const visible = items.filter((row) =>
+      row.scope === 'friends'
+      && (row.line_account_id === access.lineAccountId
+        ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
+        : row.line_account_id === null && row.created_by === access.staffId));
+    return c.json({ success: true, data: visible.map(serializeSearch) });
   } catch (err) {
     console.error('GET /api/saved-searches error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -289,7 +314,13 @@ friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staf
     if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
 
     // 上限を先に見る。条件の検証を通してから弾くと、書いた条件が無駄になる。
-    const count = await countSavedSearches(c.env.DB);
+    const access = await savedSearchAccess(c);
+    if (access instanceof Response) return access;
+    const count = await countSavedSearches(c.env.DB, {
+      scope: 'friends',
+      createdBy: staff.id,
+      lineAccountId: access.lineAccountId,
+    });
     if (count >= SAVED_SEARCH_LIMIT) {
       return c.json(
         {
@@ -303,16 +334,20 @@ friendAttributes.post('/api/saved-searches', requireRole('owner', 'admin', 'staf
     const conditions = validateSearchConditions(body.conditions);
     if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
 
-    const scope = (SAVED_SEARCH_SCOPES as readonly string[]).includes(String(body.scope))
-      ? (String(body.scope) as SavedSearchScope)
-      : 'friends';
+    if (body.scope !== undefined && body.scope !== 'friends') {
+      return c.json({ success: false, error: 'この画面では友だち検索だけを保存できます' }, 400);
+    }
+    if (body.isShared === true && staff.role === 'staff') {
+      return c.json({ success: false, error: '共有の検索を作る権限がありません' }, 403);
+    }
 
     const saved = await createSavedSearch(c.env.DB, {
       name,
-      scope,
+      scope: 'friends',
       conditions: conditions.value,
-      createdBy: staff?.id ?? null,
-      isShared: body.isShared !== false,
+      createdBy: staff.id,
+      lineAccountId: access.lineAccountId,
+      isShared: body.isShared === true,
       displayOrder: Number(body.displayOrder ?? 0),
     });
     return c.json({ success: true, data: serializeSearch(saved) }, 201);
@@ -328,11 +363,16 @@ friendAttributes.patch(
   async (c) => {
     try {
       const id = c.req.param('id');
-      const existing = await getSavedSearchById(c.env.DB, id);
-      if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+      const access = await savedSearchAccess(c);
+      if (access instanceof Response) return access;
+      const existing = await getSavedSearchById(c.env.DB, id, access.lineAccountId);
+      if (!existing || existing.scope !== 'friends' || existing.line_account_id !== access.lineAccountId
+          || (existing.created_by !== access.staffId && !access.canManageAll)) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
 
       const body = await c.req.json<Record<string, unknown>>();
-      const patch: Parameters<typeof updateSavedSearch>[2] = {};
+      const patch: Parameters<typeof updateSavedSearch>[3] = {};
       if (body.name !== undefined) {
         const name = String(body.name).trim();
         if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
@@ -343,10 +383,16 @@ friendAttributes.patch(
         if (!conditions.ok) return c.json({ success: false, error: conditions.error }, 422);
         patch.conditions = conditions.value;
       }
-      if (body.isShared !== undefined) patch.isShared = body.isShared === true;
+      if (body.isShared !== undefined) {
+        if (!access.canManageAll) {
+          return c.json({ success: false, error: '共有設定を変える権限がありません' }, 403);
+        }
+        patch.isShared = body.isShared === true;
+      }
       if (body.displayOrder !== undefined) patch.displayOrder = Number(body.displayOrder);
 
-      const saved = await updateSavedSearch(c.env.DB, id, patch);
+      const saved = await updateSavedSearch(c.env.DB, id, access, patch);
+      if (!saved) return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
       return c.json({ success: true, data: serializeSearch(saved!) });
     } catch (err) {
       console.error('PATCH /api/saved-searches/:id error:', err);
@@ -360,7 +406,16 @@ friendAttributes.delete(
   requireRole('owner', 'admin', 'staff'),
   async (c) => {
     try {
-      await deleteSavedSearch(c.env.DB, c.req.param('id'));
+      const access = await savedSearchAccess(c);
+      if (access instanceof Response) return access;
+      const id = c.req.param('id');
+      const existing = await getSavedSearchById(c.env.DB, id, access.lineAccountId);
+      if (!existing || existing.scope !== 'friends' || existing.line_account_id !== access.lineAccountId
+          || (existing.created_by !== access.staffId && !access.canManageAll)) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
+      const deleted = await deleteSavedSearch(c.env.DB, id, access);
+      if (!deleted) return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
       return c.json({ success: true, data: null });
     } catch (err) {
       console.error('DELETE /api/saved-searches/:id error:', err);

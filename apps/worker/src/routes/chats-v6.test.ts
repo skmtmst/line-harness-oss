@@ -5,7 +5,10 @@ import type { Env } from '../index.js';
 const mocks = vi.hoisted(() => ({
   getVisibleLineAccountScope: vi.fn(),
   getSavedSearches: vi.fn(),
+  getSavedSearchById: vi.fn(),
   createSavedSearch: vi.fn(),
+  updateSavedSearch: vi.fn(),
+  deleteSavedSearch: vi.fn(),
 }));
 
 vi.mock('../services/account-access.js', () => ({
@@ -18,7 +21,10 @@ vi.mock('@line-crm/db', async (importOriginal) => {
   return {
     ...actual,
     getSavedSearches: mocks.getSavedSearches,
+    getSavedSearchById: mocks.getSavedSearchById,
     createSavedSearch: mocks.createSavedSearch,
+    updateSavedSearch: mocks.updateSavedSearch,
+    deleteSavedSearch: mocks.deleteSavedSearch,
   };
 });
 
@@ -60,6 +66,7 @@ const saved = (id: string, name: string, createdBy: string, isShared: number) =>
     sort: 'newest',
   }),
   created_by: createdBy,
+  line_account_id: 'account-1',
   is_shared: isShared,
   display_order: 0,
   created_at: '2026-08-26T10:00:00Z',
@@ -74,6 +81,9 @@ beforeEach(() => {
     canSeeUnassigned: false,
   });
   mocks.getSavedSearches.mockResolvedValue([]);
+  mocks.getSavedSearchById.mockResolvedValue(null);
+  mocks.updateSavedSearch.mockResolvedValue(null);
+  mocks.deleteSavedSearch.mockResolvedValue(false);
 });
 
 describe('V6受信箱のアカウント境界', () => {
@@ -93,7 +103,7 @@ describe('V6受信箱の保存検索', () => {
       saved('shared', '共有', 'staff-2', 1),
       saved('private', '他人用', 'staff-2', 0),
     ]);
-    const response = await app().request('/api/inbox/saved-views', {}, {
+    const response = await app().request('/api/inbox/saved-views?lineAccountId=account-1', {}, {
       DB: {} as D1Database,
     } as Env['Bindings']);
     expect(response.status).toBe(200);
@@ -104,18 +114,38 @@ describe('V6受信箱の保存検索', () => {
   test('同じ所有者の同名と未知の状態を個別に拒否する', async () => {
     mocks.getSavedSearches.mockResolvedValue([saved('own', '未対応', 'staff-1', 0)]);
     const conditions = JSON.parse(saved('x', 'x', 'staff-1', 0).conditions_json);
-    const duplicate = await app().request('/api/inbox/saved-views', {
+    const duplicate = await app().request('/api/inbox/saved-views?lineAccountId=account-1', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: '未対応', conditions }),
     }, { DB: {} as D1Database } as Env['Bindings']);
     expect(duplicate.status).toBe(409);
 
-    const invalid = await app().request('/api/inbox/saved-views', {
+    const invalid = await app().request('/api/inbox/saved-views?lineAccountId=account-1', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: '不正', conditions: { ...conditions, statuses: ['waiting'] } }),
     }, { DB: {} as D1Database } as Env['Bindings']);
     expect(invalid.status).toBe(422);
+  });
+
+  test('他人の個人検索と別アカウントIDは更新・削除できない', async () => {
+    mocks.getSavedSearchById.mockResolvedValue(saved('private', '他人用', 'staff-2', 0));
+    const patchResponse = await app().request('/api/inbox/saved-views/private?lineAccountId=account-1', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '変更' }),
+    }, { DB: {} as D1Database } as Env['Bindings']);
+    mocks.getSavedSearchById.mockResolvedValue({
+      ...saved('wrong-account', '別店舗', 'staff-1', 0),
+      line_account_id: 'account-2',
+    });
+    const deleteResponse = await app().request('/api/inbox/saved-views/wrong-account?lineAccountId=account-1', {
+      method: 'DELETE',
+    }, { DB: {} as D1Database } as Env['Bindings']);
+    expect(patchResponse.status).toBe(404);
+    expect(deleteResponse.status).toBe(404);
+    expect(mocks.updateSavedSearch).not.toHaveBeenCalled();
+    expect(mocks.deleteSavedSearch).not.toHaveBeenCalled();
   });
 });

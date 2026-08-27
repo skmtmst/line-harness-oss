@@ -18,6 +18,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
 import MergedTabs from '@/components/layout/merged-tabs'
+import { useAccount } from '@/contexts/account-context'
 
 /** 「未分類」を表す絞り込みの値。空文字だと「すべて」と区別できない。 */
 const UNGROUPED = '__ungrouped__'
@@ -102,6 +103,7 @@ const FOLDER_COLORS = [
 ]
 
 function TagsPageInner() {
+  const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<Tag[]>([])
   const [groups, setGroups] = useState<TagGroup[]>([])
   const [loading, setLoading] = useState(true)
@@ -487,7 +489,7 @@ function TagsPageInner() {
             <strong>友だち一覧</strong>・<strong>配信の宛先</strong>・
             <strong>オートメーションの対象</strong>から呼び出せます。
           </p>
-          <SavedSearchList />
+          <SavedSearchList accountId={selectedAccountId} />
           <div className="text-ink-faint rounded-card border-hairline bg-canvas-sunken mt-4 border p-4 text-xs leading-relaxed">
             <p className="text-ink-secondary mb-1.5 font-medium">条件の組み方</p>
             <ul className="space-y-1">
@@ -875,9 +877,10 @@ function LegacyTagsPage() {
 void LegacyTagsPage
 
 export default function TagsPage() {
+  const { selectedAccountId } = useAccount()
   return (
     <Suspense fallback={<div className="p-6 text-sm text-ink-faint">読み込み中…</div>}>
-      <TagsPageV4 />
+      <TagsPageV4 accountId={selectedAccountId} />
     </Suspense>
   )
 }

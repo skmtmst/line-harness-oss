@@ -48,7 +48,7 @@ function splitConditions(conditions: unknown): { all: string[]; any: string[]; n
  * ここは管理だけ。条件を作るのは友だち一覧の絞り込みで、そこから
  * 「この条件を保存」で増える。条件を組む画面を2つ持つと、必ず食い違う。
  */
-export default function SavedSearchList() {
+export default function SavedSearchList({ accountId }: { accountId: string | null }) {
   const [items, setItems] = useState<SavedSearch[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -58,14 +58,15 @@ export default function SavedSearchList() {
     setLoading(true)
     setError('')
     try {
-      const res = await api.savedSearches.list()
+      if (!accountId) return
+      const res = await api.savedSearches.list(accountId)
       if (res.success) setItems(res.data)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     void load()
@@ -78,7 +79,8 @@ export default function SavedSearchList() {
   const confirmRemove = async (search: SavedSearch) => {
     setError('')
     try {
-      await api.savedSearches.delete(search.id)
+      if (!accountId) return
+      await api.savedSearches.delete(search.id, accountId)
       void load()
     } catch {
       setError('削除に失敗しました')
@@ -91,6 +93,12 @@ export default function SavedSearchList() {
         友だち一覧で組んだ絞り込みを保存したものです。ここでは名前の確認と削除ができます。
         新しく保存するときは、友だち一覧の絞り込みから「この条件を保存」を押してください。
       </p>
+
+      {!accountId && (
+        <div className="bg-info-bg text-info mb-4 rounded-lg p-4 text-sm">
+          上部でLINE公式アカウントを選んでください。
+        </div>
+      )}
 
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
@@ -124,15 +132,24 @@ export default function SavedSearchList() {
                 className="bg-canvas rounded-card border-hairline border p-4 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"
               >
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Link
-                    href={`/friends?search=${search.id}`}
-                    className="text-ink text-sm font-bold hover:underline"
-                  >
-                    {search.name}
-                  </Link>
+                  {search.lineAccountId ? (
+                    <Link
+                      href={`/friends?search=${search.id}`}
+                      className="text-ink text-sm font-bold hover:underline"
+                    >
+                      {search.name}
+                    </Link>
+                  ) : (
+                    <span className="text-ink text-sm font-bold">{search.name}</span>
+                  )}
                   <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px]">
                     {search.isShared ? '全員' : '自分だけ'}
                   </span>
+                  {!search.lineAccountId && (
+                    <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[11px]">
+                      対象アカウント未割当
+                    </span>
+                  )}
                   {note && (
                     <span className="bg-info-bg text-info rounded-pill px-2 py-0.5 text-[11px]">
                       {note}
@@ -143,7 +160,9 @@ export default function SavedSearchList() {
                   </span>
                   <button
                     onClick={() => remove(search)}
-                    className="hover:bg-danger-bg text-danger rounded-md px-2.5 py-1 text-xs font-medium"
+                    disabled={!search.lineAccountId}
+                    title={!search.lineAccountId ? '管理者が対象アカウントを割り当てるまで変更できません' : undefined}
+                    className="hover:bg-danger-bg text-danger rounded-md px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     削除
                   </button>

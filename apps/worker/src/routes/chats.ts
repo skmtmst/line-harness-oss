@@ -22,6 +22,7 @@ import {
   deleteSavedSearch,
   validateInboxSavedViewConditions,
   type SavedSearch,
+  type SavedSearchAccess,
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
@@ -43,6 +44,23 @@ import {
 } from '../services/inbox-events.js';
 
 const chats = new Hono<Env>();
+
+async function inboxSavedViewAccess(c: Context<Env>): Promise<SavedSearchAccess | Response> {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!scope.allowedAccountIds.includes(lineAccountId)) {
+    return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
+  }
+  const staff = c.get('staff');
+  return {
+    lineAccountId,
+    staffId: staff.id,
+    canManageAll: staff.role === 'owner' || staff.role === 'admin',
+  };
+}
 
 async function requireVisibleChat(c: Context<Env>, next: () => Promise<void>) {
   // Let the route return its stable 400 response without touching D1. No send or
@@ -116,6 +134,7 @@ function serializeInboxSavedView(row: SavedSearch) {
     scope: row.scope,
     conditions: JSON.parse(row.conditions_json) as unknown,
     createdBy: row.created_by,
+    lineAccountId: row.line_account_id,
     isShared: Boolean(row.is_shared),
     displayOrder: row.display_order,
     createdAt: row.created_at,
@@ -734,18 +753,24 @@ chats.get(
 );
 
 chats.get('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
-  const staff = c.get('staff');
-  const rows = await getSavedSearches(c.env.DB, 'chats');
+  const access = await inboxSavedViewAccess(c);
+  if (access instanceof Response) return access;
+  const rows = await getSavedSearches(c.env.DB, 'chats', access);
   return c.json({
     success: true,
     data: rows
-      .filter((row) => Boolean(row.is_shared) || row.created_by === staff.id)
+      .filter((row) => row.scope === 'chats'
+        && (row.line_account_id === access.lineAccountId
+          ? access.canManageAll || Boolean(row.is_shared) || row.created_by === access.staffId
+          : row.line_account_id === null && row.created_by === access.staffId))
       .map(serializeInboxSavedView),
   });
 });
 
 chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), async (c) => {
   const staff = c.get('staff');
+  const access = await inboxSavedViewAccess(c);
+  if (access instanceof Response) return access;
   const body: Record<string, unknown> = await c.req
     .json<Record<string, unknown>>()
     .catch((): Record<string, unknown> => ({}));
@@ -758,7 +783,7 @@ chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asy
   if (isShared && staff.role === 'staff') {
     return c.json({ success: false, error: '共有の検索を作る権限がありません' }, 403);
   }
-  const rows = await getSavedSearches(c.env.DB, 'chats');
+  const rows = await getSavedSearches(c.env.DB, 'chats', access);
   if (rows.filter((row) => row.created_by === staff.id).length >= 50) {
     return c.json({ success: false, error: '保存できる検索は50件までです' }, 422);
   }
@@ -770,6 +795,7 @@ chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asy
     scope: 'chats',
     conditions: conditions.value,
     createdBy: staff.id,
+    lineAccountId: access.lineAccountId,
     isShared,
   });
   return c.json({ success: true, data: serializeInboxSavedView(saved) }, 201);
@@ -777,8 +803,10 @@ chats.post('/api/inbox/saved-views', requireRole('owner', 'admin', 'staff'), asy
 
 chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   const staff = c.get('staff');
-  const existing = await getSavedSearchById(c.env.DB, c.req.param('id'));
-  if (!existing || existing.scope !== 'chats') {
+  const access = await inboxSavedViewAccess(c);
+  if (access instanceof Response) return access;
+  const existing = await getSavedSearchById(c.env.DB, c.req.param('id'), access.lineAccountId);
+  if (!existing || existing.scope !== 'chats' || existing.line_account_id !== access.lineAccountId) {
     return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
   }
   if (existing.created_by !== staff.id && staff.role === 'staff') {
@@ -787,12 +815,12 @@ chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff')
   const body: Record<string, unknown> = await c.req
     .json<Record<string, unknown>>()
     .catch((): Record<string, unknown> => ({}));
-  const patch: Parameters<typeof updateSavedSearch>[2] = {};
+  const patch: Parameters<typeof updateSavedSearch>[3] = {};
   if (body.name !== undefined) {
     const name = String(body.name).trim();
     if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
     if (name.length > 40) return c.json({ success: false, error: '名前は40文字以内で入力してください' }, 400);
-    const rows = await getSavedSearches(c.env.DB, 'chats');
+    const rows = await getSavedSearches(c.env.DB, 'chats', access);
     if (rows.some((row) => row.id !== existing.id && row.created_by === existing.created_by && row.name === name)) {
       return c.json({ success: false, error: '同じ名前の保存検索があります' }, 409);
     }
@@ -807,18 +835,22 @@ chats.patch('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff')
     if (staff.role === 'staff') return c.json({ success: false, error: '共有設定を変える権限がありません' }, 403);
     patch.isShared = body.isShared === true;
   }
-  const saved = await updateSavedSearch(c.env.DB, existing.id, patch);
+  const saved = await updateSavedSearch(c.env.DB, existing.id, access, patch);
+  if (!saved) return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
   return c.json({ success: true, data: serializeInboxSavedView(saved!) });
 });
 
 chats.delete('/api/inbox/saved-views/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
   const staff = c.get('staff');
-  const existing = await getSavedSearchById(c.env.DB, c.req.param('id'));
-  if (!existing || existing.scope !== 'chats'
+  const access = await inboxSavedViewAccess(c);
+  if (access instanceof Response) return access;
+  const existing = await getSavedSearchById(c.env.DB, c.req.param('id'), access.lineAccountId);
+  if (!existing || existing.scope !== 'chats' || existing.line_account_id !== access.lineAccountId
       || (existing.created_by !== staff.id && staff.role === 'staff')) {
     return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
   }
-  await deleteSavedSearch(c.env.DB, existing.id);
+  const deleted = await deleteSavedSearch(c.env.DB, existing.id, access);
+  if (!deleted) return c.json({ success: false, error: '保存検索が見つかりません' }, 404);
   return c.json({ success: true, data: null });
 });
 
