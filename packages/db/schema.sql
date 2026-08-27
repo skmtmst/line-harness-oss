@@ -597,10 +597,13 @@ CREATE TABLE IF NOT EXISTS incoming_webhooks (
   name        TEXT NOT NULL,
   source_type TEXT NOT NULL DEFAULT 'custom',
   secret      TEXT,
+  line_account_id TEXT REFERENCES line_accounts (id),
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
 CREATE TABLE IF NOT EXISTS outgoing_webhooks (
   id          TEXT PRIMARY KEY,

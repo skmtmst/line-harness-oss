@@ -8,6 +8,7 @@ export interface IncomingWebhookRow {
   source_type: string;
   secret: string | null;
   is_active: number;
+  line_account_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,24 +33,40 @@ export interface OutgoingWebhookRow {
 
 // --- 受信Webhook ---
 
-export async function getIncomingWebhooks(db: D1Database): Promise<IncomingWebhookRow[]> {
-  const result = await db.prepare(`SELECT * FROM incoming_webhooks ORDER BY created_at DESC`).all<IncomingWebhookRow>();
+export async function getIncomingWebhooks(db: D1Database, tenantId: string): Promise<IncomingWebhookRow[]> {
+  const result = await db
+    .prepare(`SELECT * FROM incoming_webhooks webhook
+      WHERE ${lineAccountOwnedWebhookTenantPredicate('webhook')}
+      ORDER BY created_at DESC`)
+    .bind(...lineAccountOwnedWebhookTenantBindings(tenantId))
+    .all<IncomingWebhookRow>();
   return result.results;
 }
 
-export async function getIncomingWebhookById(db: D1Database, id: string): Promise<IncomingWebhookRow | null> {
-  return db.prepare(`SELECT * FROM incoming_webhooks WHERE id = ?`).bind(id).first<IncomingWebhookRow>();
+export async function getIncomingWebhookById(
+  db: D1Database,
+  id: string,
+  tenantId?: string,
+): Promise<IncomingWebhookRow | null> {
+  if (tenantId === undefined) {
+    return db.prepare(`SELECT * FROM incoming_webhooks WHERE id = ?`).bind(id).first<IncomingWebhookRow>();
+  }
+  return db
+    .prepare(`SELECT * FROM incoming_webhooks webhook
+      WHERE webhook.id = ? AND ${lineAccountOwnedWebhookTenantPredicate('webhook')}`)
+    .bind(id, ...lineAccountOwnedWebhookTenantBindings(tenantId))
+    .first<IncomingWebhookRow>();
 }
 
 export async function createIncomingWebhook(
   db: D1Database,
-  input: { name: string; sourceType?: string; secret?: string },
+  input: { name: string; sourceType?: string; secret?: string; lineAccountId?: string },
 ): Promise<IncomingWebhookRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
-    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.sourceType ?? 'custom', input.secret ?? null, now, now)
+    .prepare(`INSERT INTO incoming_webhooks (id, name, source_type, secret, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.sourceType ?? 'custom', input.secret ?? null, input.lineAccountId ?? null, now, now)
     .run();
   return (await getIncomingWebhookById(db, id))!;
 }
@@ -78,7 +95,7 @@ export async function deleteIncomingWebhook(db: D1Database, id: string): Promise
 
 // --- 送信Webhook ---
 
-const outgoingWebhookTenantPredicate = (webhookAlias: string): string => `(
+const lineAccountOwnedWebhookTenantPredicate = (webhookAlias: string): string => `(
   (${webhookAlias}.line_account_id IS NULL AND ? = ?)
   OR EXISTS (
     SELECT 1 FROM line_accounts scope_account
@@ -87,7 +104,7 @@ const outgoingWebhookTenantPredicate = (webhookAlias: string): string => `(
   )
 )`;
 
-const outgoingWebhookTenantBindings = (tenantId: string): string[] => [
+const lineAccountOwnedWebhookTenantBindings = (tenantId: string): string[] => [
   tenantId,
   DEFAULT_TENANT_ID,
   DEFAULT_TENANT_ID,
@@ -97,9 +114,9 @@ const outgoingWebhookTenantBindings = (tenantId: string): string[] => [
 export async function getOutgoingWebhooks(db: D1Database, tenantId: string): Promise<OutgoingWebhookRow[]> {
   const result = await db
     .prepare(`SELECT * FROM outgoing_webhooks webhook
-      WHERE ${outgoingWebhookTenantPredicate('webhook')}
+      WHERE ${lineAccountOwnedWebhookTenantPredicate('webhook')}
       ORDER BY created_at DESC`)
-    .bind(...outgoingWebhookTenantBindings(tenantId))
+    .bind(...lineAccountOwnedWebhookTenantBindings(tenantId))
     .all<OutgoingWebhookRow>();
   return result.results;
 }
@@ -114,8 +131,8 @@ export async function getOutgoingWebhookById(
   }
   return db
     .prepare(`SELECT * FROM outgoing_webhooks webhook
-      WHERE webhook.id = ? AND ${outgoingWebhookTenantPredicate('webhook')}`)
-    .bind(id, ...outgoingWebhookTenantBindings(tenantId))
+      WHERE webhook.id = ? AND ${lineAccountOwnedWebhookTenantPredicate('webhook')}`)
+    .bind(id, ...lineAccountOwnedWebhookTenantBindings(tenantId))
     .first<OutgoingWebhookRow>();
 }
 
