@@ -7,6 +7,7 @@ const PAGE = fs.readFileSync(
   path.join(__dirname, 'scenario-detail-client.tsx'),
   'utf8',
 )
+const LIST = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
 
 describe('V6 シナリオ編集の契約', () => {
   it('上部の一括テスト送信を既存の全通テスト送信へ接続する', () => {
@@ -18,5 +19,12 @@ describe('V6 シナリオ編集の契約', () => {
 
   it('一括テスト送信の操作を画面内に重複させない', () => {
     expect(PAGE.match(/>\s*一括テスト送信\s*<\/button>/g)).toHaveLength(1)
+  })
+
+  it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {
+    expect(LIST).toContain("import FolderAddDialog from '@/components/shared/folder-add-dialog'")
+    expect(LIST).toContain('<Button onClick={() => setFolderDialogOpen(true)}>')
+    expect(LIST).toContain('kind="scenario"')
+    expect(LIST).not.toContain('title="準備中です"\n          className="border-hairline text-ink-faint rounded-control border px-4')
   })
 })
