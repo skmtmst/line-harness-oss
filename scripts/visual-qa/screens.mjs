@@ -85,6 +85,9 @@ const AFFILIATE = { feature: 16, dir: 'affiliates-v6', mode: 'page' }
 /** マイル・行動スコア。実装は `/scoring` の1枚もので、設計の5タブは無い。 */
 const MILEAGE = { feature: 17, dir: 'mileage-v6', route: '/scoring', mode: 'page' }
 
+/** 流入と計測。`/inflow-links?tab=` の3タブ（流入経路／サイトスクリプト／広告連携）。 */
+const INFLOW = { feature: 18, dir: 'inflow-v6', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -763,6 +766,34 @@ export const SCREENS = [
     ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/scoring/new',
     status: 'unimplemented',
     why: '`/scoring/new` は**マイルの付与ルール**を作る画面で、スコアのルールではない。17-2 が無いので行き先も無い',
+  },
+
+  // ── 機能18 流入と計測 ───────────────────────────────────
+  /*
+    設計のタブは4本（流入経路24／サイトスクリプト／広告連携3／広告とのつなぎ5）。
+    実装は3本で、**「広告とのつなぎ」（成果を広告へ返す）が無い。**
+  */
+  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links' },
+  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script' },
+  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads' },
+  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new' },
+  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig' },
+  {
+    ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
+    status: 'unimplemented', why: '一覧に消す確認の窓が無い。削除はブラウザの `confirm()` か、詳細の中の操作',
+  },
+  {
+    ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+  {
+    ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）',
+    status: 'unimplemented',
+    why: '成果を広告へ返す仕組みが無い。fbclid・gclid などの目印と成果地点の対応付けを扱う場所が無い（タブが3本しかない）',
+  },
+  {
+    ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴',
+    status: 'unimplemented', why: '18-2 が無いので、送った・断られた・やり直した記録も無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

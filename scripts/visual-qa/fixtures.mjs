@@ -1675,3 +1675,62 @@ export const MILEAGE_RULES = [
     createdAt: '2026-02-20T00:00:00.000Z', updatedAt: '2026-04-01T00:00:00.000Z',
   },
 ]
+
+/**
+ * 機能18 流入と計測。設計 `Q4bkTg` の一覧（流入元24本・今月312人）。
+ *
+ * **`EntryRoute`（`packages/shared`）と `RefSummaryData`
+ * （`inflow-links/page.tsx` の中の型）の2つが要る。**
+ * `ref-summary` は `{routes, totalFriends, friendsWithRef, friendsWithoutRef}` の
+ * 通で、一覧の既定を返すと `summary.routes.forEach` で落ちる。
+ */
+export const ENTRY_ROUTE_GENRES = [
+  { id: 'erg-1', name: '予約', createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z' },
+  { id: 'erg-2', name: 'お問い合わせ', createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z' },
+  { id: 'erg-3', name: 'SNS', createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z' },
+]
+
+export const ENTRY_ROUTES = [
+  {
+    id: 'er-1', refCode: 'summer-ig', genre: 'SNS', name: '夏のInstagram投稿',
+    tagId: 'tag-0', scenarioId: 'scenario-0', redirectUrl: null, poolId: null,
+    introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true,
+    createdAt: '2026-08-02T00:00:00.000Z', updatedAt: '2026-08-02T00:00:00.000Z',
+  },
+  {
+    id: 'er-2', refCode: 'store-qr', genre: '予約', name: '店頭QRコード',
+    tagId: 'tag-1', scenarioId: null, redirectUrl: null, poolId: null,
+    introTemplateId: null, runAccountFriendAddScenarios: true, isActive: true,
+    createdAt: '2026-05-11T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z',
+  },
+  {
+    id: 'er-3', refCode: 'ig-profile', genre: 'SNS', name: 'Instagramプロフィール',
+    tagId: 'tag-2', scenarioId: 'scenario-1', redirectUrl: null, poolId: null,
+    introTemplateId: null, runAccountFriendAddScenarios: false, isActive: true,
+    createdAt: '2026-04-18T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    /* 止めているリンク。**過去の記録は残るが、新しくは数えない。** */
+    id: 'er-4', refCode: 'spring-cp', genre: null, name: '春のキャンペーン',
+    tagId: null, scenarioId: null, redirectUrl: null, poolId: null,
+    introTemplateId: null, runAccountFriendAddScenarios: false, isActive: false,
+    createdAt: '2026-02-20T00:00:00.000Z', updatedAt: '2026-04-01T00:00:00.000Z',
+  },
+]
+
+export const REF_SUMMARY = {
+  routes: [
+    { refCode: 'summer-ig', name: '夏のInstagram投稿', friendCount: 86, clickCount: 1240, latestAt: '2026-08-24T05:00:00.000Z' },
+    { refCode: 'store-qr', name: '店頭QRコード', friendCount: 128, clickCount: 3480, latestAt: '2026-08-24T09:00:00.000Z' },
+    { refCode: 'ig-profile', name: 'Instagramプロフィール', friendCount: 75, clickCount: 3700, latestAt: '2026-08-23T01:00:00.000Z' },
+    { refCode: 'spring-cp', name: '春のキャンペーン', friendCount: 0, clickCount: 0, latestAt: null },
+    /*
+      **登録されていない ref。** URLに付いてきたが `entry_routes` に無いもの。
+      名前が null で出る。ここが欠けると「知らないところから来た人」を確かめられない。
+    */
+    { refCode: 'unknown-ref', name: null, friendCount: 23, clickCount: 210, latestAt: '2026-08-20T00:00:00.000Z' },
+  ],
+  totalFriends: 312,
+  friendsWithRef: 289,
+  friendsWithoutRef: 23,
+}
