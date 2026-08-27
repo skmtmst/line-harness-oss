@@ -16,7 +16,7 @@ const PRESET_COLORS = ['#F59E0B', '#3B82F6', '#10B981', '#EF4444', '#8B5CF6', '#
  * 別画面にせず、この場で足して直せるようにしている。項目が3〜5個で
  * 済むものに作成画面を作ると、行き来の方が手間になる。
  */
-export default function SupportMarkList() {
+export default function SupportMarkList({ accountId }: { accountId: string | null }) {
   const [items, setItems] = useState<MarkRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -27,17 +27,22 @@ export default function SupportMarkList() {
   const defaultMark = items.find((item) => item.isDefault)
 
   const load = useCallback(async () => {
+    if (!accountId) {
+      setItems([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError('')
     try {
-      const res = await api.supportMarks.list()
+      const res = await api.supportMarks.list(accountId)
       if (res.success) setItems(res.data)
     } catch {
       setError('読み込みに失敗しました')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     void load()
@@ -45,11 +50,11 @@ export default function SupportMarkList() {
 
   const add = async () => {
     const trimmed = name.trim()
-    if (!trimmed) return
+    if (!trimmed || !accountId) return
     setAdding(true)
     setError('')
     try {
-      await api.supportMarks.create({ name: trimmed, color, displayOrder: items.length })
+      await api.supportMarks.create(accountId, { name: trimmed, color, displayOrder: items.length })
       setName('')
       void load()
     } catch {
@@ -59,10 +64,11 @@ export default function SupportMarkList() {
     }
   }
 
-  const patch = async (mark: MarkRow, data: Parameters<typeof api.supportMarks.update>[1]) => {
+  const patch = async (mark: MarkRow, data: Parameters<typeof api.supportMarks.update>[2]) => {
+    if (!accountId) return
     setError('')
     try {
-      const res = await api.supportMarks.update(mark.id, data)
+      const res = await api.supportMarks.update(mark.id, accountId, data)
       if (!res.success) {
         setError(res.error)
         return
@@ -78,9 +84,10 @@ export default function SupportMarkList() {
   }
 
   const confirmRemove = async (mark: MarkRow) => {
+    if (!accountId) return
     setError('')
     try {
-      const res = await api.supportMarks.delete(mark.id, { force: mark.friendCount > 0 })
+      const res = await api.supportMarks.delete(mark.id, accountId, { force: mark.friendCount > 0 })
       if (!res.success) {
         setError(res.error)
         return

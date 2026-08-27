@@ -17,6 +17,7 @@ import ConditionBuilder, {
   pruneCondition,
   type SegmentCondition,
 } from '@/components/shared/condition-builder'
+import { useAccount } from '@/contexts/account-context'
 
 export const ACTION_KINDS: { type: ScenarioActionType; label: string; make: () => unknown }[] = [
   { type: 'tag', label: 'タグ操作', make: () => ({ op: 'add', tagIds: [] }) },
@@ -60,6 +61,7 @@ export default function ActionEditor({
   onClose,
   onChanged,
 }: ActionEditorProps) {
+  const { selectedAccountId } = useAccount()
   const [actions, setActions] = useState<ScenarioAction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -94,11 +96,15 @@ export default function ActionEditor({
   }, [load])
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setMarks([])
+      return
+    }
     void (async () => {
       const [tagRes, fieldRes, markRes, scenarioRes, varRes] = await Promise.all([
         api.tags.list(),
         api.friendFields.list(),
-        api.supportMarks.list(),
+        api.supportMarks.list(selectedAccountId),
         api.scenarios.list(),
         api.commonVars.list(),
       ])
@@ -111,7 +117,7 @@ export default function ActionEditor({
         )
       if (varRes.success) setVars(varRes.data.map((v) => ({ varKey: v.varKey, name: v.name })))
     })()
-  }, [scenarioId])
+  }, [scenarioId, selectedAccountId])
 
   const add = async (kind: (typeof ACTION_KINDS)[number]) => {
     setError('')
