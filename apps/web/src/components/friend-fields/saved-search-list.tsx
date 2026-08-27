@@ -146,7 +146,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                     {search.isShared ? '全員' : '自分だけ'}
                   </span>
                   {!search.lineAccountId && (
-                    <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-[11px]">
+                    <span className="bg-warning-bg text-warning rounded-pill px-2 py-0.5 text-xs">
                       対象アカウント未割当
                     </span>
                   )}
