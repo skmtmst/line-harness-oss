@@ -7,6 +7,7 @@ import {
   isOperationCapabilityStopped,
   listOperationTargetResults,
   listOperationIncidents,
+  recordOperationTargetOutcomeAcrossStop,
   restoreOperationIncident,
   stopOperationCapabilities,
 } from '../src/operations.js'
@@ -110,5 +111,39 @@ describe('サーバー正本の緊急停止', () => {
     ])
     expect((await listOperationIncidents(db, { accountIds: ['account-1'], includeGlobal: false }))[0]?.targetCounts)
       .toEqual({ held: 1, skippedDueToEmergency: 0, inFlight: 0, failed: 0 })
+  })
+
+  it('外部送信の開始後に停止された対象を、復旧後も開始済み・失敗として残す', async () => {
+    const stopped = await stopOperationCapabilities(db, {
+      lineAccountId: 'account-1', capabilities: ['webhook_outgoing'],
+      expectedVersion: 0, actorId: 'owner-1', reason: '障害対応',
+    })
+    if (stopped.status !== 'changed' || !stopped.incident.stoppedAt) throw new Error('stop failed')
+    const stoppedAt = Date.parse(stopped.incident.stoppedAt)
+    const startedAt = new Date(stoppedAt - 1_000).toISOString()
+    const completedAt = new Date(stoppedAt + 1_000).toISOString()
+
+    expect(await recordOperationTargetOutcomeAcrossStop(db, {
+      lineAccountId: 'account-1', capability: 'webhook_outgoing',
+      targetType: 'webhook_delivery', targetId: 'delivery-1', result: 'in_flight',
+      startedAt, completedAt,
+    })).toBe(1)
+    expect(await recordOperationTargetOutcomeAcrossStop(db, {
+      lineAccountId: 'account-1', capability: 'webhook_outgoing',
+      targetType: 'webhook_delivery', targetId: 'delivery-after-stop', result: 'in_flight',
+      startedAt: completedAt, completedAt: new Date(stoppedAt + 2_000).toISOString(),
+    })).toBe(0)
+
+    const restored = await restoreOperationIncident(db, {
+      incidentId: stopped.incident.id, expectedVersion: stopped.control.version, actorId: 'owner-2',
+    })
+    expect(restored.status).toBe('changed')
+    expect(await recordOperationTargetOutcomeAcrossStop(db, {
+      lineAccountId: 'account-1', capability: 'webhook_outgoing',
+      targetType: 'webhook_delivery', targetId: 'delivery-2', result: 'failed',
+      startedAt, completedAt: new Date(stoppedAt + 3_000).toISOString(), reason: 'HTTP 500',
+    })).toBe(1)
+    expect((await listOperationIncidents(db, { accountIds: ['account-1'], includeGlobal: false }))[0]?.targetCounts)
+      .toEqual({ held: 0, skippedDueToEmergency: 0, inFlight: 1, failed: 1 })
   })
 })

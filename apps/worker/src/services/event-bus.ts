@@ -21,6 +21,7 @@ import {
   getFriendScore,
   recordAnalyticsEvent,
   getEffectiveOperationStates,
+  recordOperationTargetOutcomeAcrossStop,
   recordStoppedOperationTarget,
 } from '@line-crm/db';
 import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
@@ -217,6 +218,8 @@ async function fireOutgoingWebhooks(
     }
     const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType, lineAccountId);
     for (const wh of webhooks) {
+      const startedAt = new Date().toISOString();
+      const targetId = `${payload.sourceEventId ?? startedAt}:${wh.id}`;
       try {
         const body = JSON.stringify({
           event: eventType,
@@ -227,12 +230,29 @@ async function fireOutgoingWebhooks(
         // 成功として扱っていた（例外にならないため）。deliverWebhook は
         // 応答の状態まで見て、必要なら送り直す。
         const result = await deliverWebhook(wh, body);
+        const completedAt = new Date().toISOString();
         if (!result.ok) {
           console.error(
             `送信Webhook ${wh.id} 失敗 (${result.attempts}回試行, 最後の応答=${result.lastStatus ?? '接続不可'})`,
           );
         }
         await recordDeliveryOutcome(db, wh.id, result.ok);
+        try {
+          await recordOperationTargetOutcomeAcrossStop(db, {
+            lineAccountId: lineAccountId ?? null,
+            capability: 'webhook_outgoing',
+            targetType: 'webhook_delivery',
+            targetId,
+            result: result.ok ? 'in_flight' : 'failed',
+            startedAt,
+            completedAt,
+            reason: result.ok
+              ? `送信開始後に停止（HTTP ${result.lastStatus ?? '応答不明'}）`
+              : `送信失敗（HTTP ${result.lastStatus ?? '接続不可'}）`,
+          });
+        } catch (trackingError) {
+          console.error('送信Webhookの停止影響を記録できませんでした:', trackingError);
+        }
       } catch (err) {
         console.error(`送信Webhook ${wh.id} への通知失敗:`, err);
       }

@@ -1,4 +1,10 @@
-import { addTagToFriend, getLineAccountById, jstNow, removeTagFromFriend } from '@line-crm/db';
+import {
+  addTagToFriend,
+  getLineAccountById,
+  jstNow,
+  recordOperationTargetOutcomeAcrossStop,
+  removeTagFromFriend,
+} from '@line-crm/db';
 import { LineClient, type Message } from '@line-crm/line-sdk';
 import {
   AutomationActionError,
@@ -420,13 +426,41 @@ async function webhookExecutor(
     'Idempotency-Key': context.idempotencyKey,
   };
   if (webhook.secret) headers['X-Webhook-Signature'] = await signBody(webhook.secret, body);
+  const startedAt = new Date().toISOString();
+  const targetId = `${context.idempotencyKey}:${webhook.id}`;
+  const recordStopOutcome = async (
+    result: 'in_flight' | 'failed',
+    reason: string,
+    completedAt: string,
+  ) => {
+    try {
+      await recordOperationTargetOutcomeAcrossStop(context.db, {
+        lineAccountId: context.lineAccountId,
+        capability: 'webhook_outgoing',
+        targetType: 'automation_webhook',
+        targetId,
+        result,
+        startedAt,
+        completedAt,
+        reason,
+      });
+    } catch (trackingError) {
+      console.error('自動処理Webhookの停止影響を記録できませんでした:', trackingError);
+    }
+  };
   let response: Response;
   try {
     response = await (dependencies.fetch ?? fetch)(webhook.url, {
       method: 'POST', headers, body, signal: AbortSignal.timeout(10_000),
     });
   } catch (error) {
+    const completedAt = new Date().toISOString();
     await recordDeliveryOutcome(context.db, webhook.id, false);
+    await recordStopOutcome(
+      'failed',
+      '送信Webhookへ接続できませんでした',
+      completedAt,
+    );
     throw new AutomationActionError(
       'webhook_connection_failed',
       error instanceof Error ? error.message : '送信Webhookへ接続できませんでした',
@@ -434,14 +468,18 @@ async function webhookExecutor(
     );
   }
   if (!response.ok) {
+    const completedAt = new Date().toISOString();
     await recordDeliveryOutcome(context.db, webhook.id, false);
+    await recordStopOutcome('failed', `送信WebhookがHTTP ${response.status}を返しました`, completedAt);
     throw new AutomationActionError(
       'webhook_rejected',
       `送信WebhookがHTTP ${response.status}を返しました`,
       response.status === 429 || response.status >= 500,
     );
   }
+  const completedAt = new Date().toISOString();
   await recordDeliveryOutcome(context.db, webhook.id, true);
+  await recordStopOutcome('in_flight', `送信開始後に停止（HTTP ${response.status}）`, completedAt);
   return { output: { status: response.status } };
 }
 

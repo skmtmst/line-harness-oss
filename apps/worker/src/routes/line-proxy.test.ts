@@ -14,6 +14,7 @@ vi.mock('@line-crm/db', () => ({
   updateChat: vi.fn(),
   getStaffById: vi.fn(async () => ({ account_scope: 'all' })),
   getStaffAccountScopeIds: vi.fn(async () => []),
+  recordOperationTargetOutcomeAcrossStop: vi.fn(async () => 0),
   jstNow: vi.fn(() => '2026-08-02T12:00:00.000'),
 }));
 
@@ -47,6 +48,7 @@ import {
   updateChat,
   getStaffById,
   getStaffAccountScopeIds,
+  recordOperationTargetOutcomeAcrossStop,
 } from '@line-crm/db';
 import { authenticateApiToken } from '../middleware/auth.js';
 import { lineProxy } from './line-proxy.js';
@@ -588,6 +590,14 @@ describe('broadcast', () => {
     const rows = loggedRows(executed);
     expect(rows).toHaveLength(3);
     expect(rows[0].deliveryType).toBeNull();
+    expect(recordOperationTargetOutcomeAcrossStop).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'acc-1',
+      capability: 'broadcast_dispatch',
+      targetType: 'line_api_request',
+      result: 'in_flight',
+      startedAt: expect.any(String),
+      completedAt: expect.any(String),
+    }));
   });
 
   test('single account install + env token: unscoped (all following friends)', async () => {

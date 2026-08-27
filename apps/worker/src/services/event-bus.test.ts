@@ -58,6 +58,7 @@ vi.mock('@line-crm/db', async () => {
       automation_actions: 'running', auto_reply_dispatch: 'running',
       webhook_outgoing: 'running', ad_postback: 'running',
     }),
+    recordOperationTargetOutcomeAcrossStop: vi.fn().mockResolvedValue(0),
   };
 });
 
@@ -349,6 +350,24 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
       hasFriendId: false,
     });
     expect(record).not.toContain('webhook-1');
+  });
+
+  it('送信Webhookの完了結果を、送信中に停止された場合の履歴へ渡す', async () => {
+    const dbModule = await import('@line-crm/db');
+    const db = fakeDb({ capturedInserts: [] });
+    (dbModule.getActiveOutgoingWebhooksByEvent as unknown as { mockResolvedValue: (v: unknown) => void })
+      .mockResolvedValue([{ id: 'hook-1', event_types: '["*"]', max_retries: 0 }]);
+
+    await fireEvent(db, 'message_received', { sourceEventId: 'event-1' }, undefined, 'account-a');
+
+    expect(dbModule.recordOperationTargetOutcomeAcrossStop).toHaveBeenCalledWith(db, expect.objectContaining({
+      lineAccountId: 'account-a',
+      capability: 'webhook_outgoing',
+      targetType: 'webhook_delivery',
+      targetId: 'event-1:hook-1',
+      result: 'in_flight',
+      startedAt: expect.any(String),
+    }));
   });
 });
 

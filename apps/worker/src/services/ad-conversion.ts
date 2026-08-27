@@ -10,6 +10,7 @@ import {
   getRefTrackingWithClickIds,
   isOperationCapabilityStopped,
   logAdConversion,
+  recordOperationTargetOutcomeAcrossStop,
   type AdPlatformConfig,
   type RefTracking,
 } from '@line-crm/db';
@@ -32,12 +33,18 @@ export async function sendAdConversions(
 
   for (const platform of platforms) {
     const config: AdPlatformConfig = JSON.parse(platform.config);
+    const startedAt = new Date().toISOString();
+    const targetId = `${friendId}:${eventName}:${platform.id}`;
+    let attempted = false;
+    let externalAccepted = false;
 
     try {
       switch (platform.name) {
         case 'meta':
           if (ref.fbclid) {
+            attempted = true;
             await sendMetaConversion(config, ref, eventName, eventValue);
+            externalAccepted = true;
             await logAdConversion(db, {
               platformId: platform.id, friendId, eventName,
               clickId: ref.fbclid, clickIdType: 'fbclid', status: 'sent',
@@ -46,7 +53,9 @@ export async function sendAdConversions(
           break;
         case 'x':
           if (ref.twclid) {
+            attempted = true;
             await sendXConversion(config, ref, eventName, eventValue);
+            externalAccepted = true;
             await logAdConversion(db, {
               platformId: platform.id, friendId, eventName,
               clickId: ref.twclid, clickIdType: 'twclid', status: 'sent',
@@ -55,7 +64,9 @@ export async function sendAdConversions(
           break;
         case 'google':
           if (ref.gclid) {
+            attempted = true;
             await sendGoogleConversion(config, ref, eventName, eventValue);
+            externalAccepted = true;
             await logAdConversion(db, {
               platformId: platform.id, friendId, eventName,
               clickId: ref.gclid, clickIdType: 'gclid', status: 'sent',
@@ -64,7 +75,9 @@ export async function sendAdConversions(
           break;
         case 'tiktok':
           if (ref.ttclid) {
+            attempted = true;
             await sendTikTokConversion(config, ref, eventName, eventValue);
+            externalAccepted = true;
             await logAdConversion(db, {
               platformId: platform.id, friendId, eventName,
               clickId: ref.ttclid, clickIdType: 'ttclid', status: 'sent',
@@ -72,16 +85,54 @@ export async function sendAdConversions(
           }
           break;
       }
+      const completedAt = new Date().toISOString();
+      if (attempted) {
+        try {
+          await recordOperationTargetOutcomeAcrossStop(db, {
+            lineAccountId: friend?.line_account_id ?? null,
+            capability: 'ad_postback',
+            targetType: 'ad_conversion',
+            targetId,
+            result: 'in_flight',
+            startedAt,
+            completedAt,
+            reason: `${platform.name}への送信開始後に停止`,
+          });
+        } catch (trackingError) {
+          console.error('広告成果送信の停止影響を記録できませんでした:', trackingError);
+        }
+      }
     } catch (error) {
-      await logAdConversion(db, {
-        platformId: platform.id,
-        friendId,
-        eventName,
-        clickId: ref.fbclid || ref.twclid || ref.gclid || ref.ttclid || '',
-        clickIdType: platform.name,
-        status: 'failed',
-        errorMessage: String(error),
-      });
+      const completedAt = new Date().toISOString();
+      try {
+        await recordOperationTargetOutcomeAcrossStop(db, {
+          lineAccountId: friend?.line_account_id ?? null,
+          capability: 'ad_postback',
+          targetType: 'ad_conversion',
+          targetId,
+          result: externalAccepted ? 'in_flight' : 'failed',
+          startedAt,
+          completedAt,
+          reason: externalAccepted
+            ? `${platform.name}への送信は受理済み・結果記録に失敗`
+            : `${platform.name}への送信に失敗`,
+        });
+      } catch (trackingError) {
+        console.error('広告成果送信の失敗影響を記録できませんでした:', trackingError);
+      }
+      if (!externalAccepted) {
+        await logAdConversion(db, {
+          platformId: platform.id,
+          friendId,
+          eventName,
+          clickId: ref.fbclid || ref.twclid || ref.gclid || ref.ttclid || '',
+          clickIdType: platform.name,
+          status: 'failed',
+          errorMessage: String(error),
+        });
+      } else {
+        console.error('広告成果送信は受理されましたが結果を記録できませんでした:', error);
+      }
     }
   }
 }

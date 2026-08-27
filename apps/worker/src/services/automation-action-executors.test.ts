@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite';
 import { createAutomationActionExecutors } from './automation-action-executors';
 import { processAutomationRun, startAutomationRun, type ActionDefinition } from './automation-engine';
+import { stopOperationCapabilities } from '@line-crm/db';
 
 const NOW = '2026-08-26T05:00:00.000Z';
 
@@ -281,6 +282,38 @@ describe('V6オートメーションの既存処理接続', () => {
       `SELECT id FROM automation_run_steps WHERE automation_run_id = ? AND step_key = 'webhook'`,
     ).get(result.runId) as { id: string };
     expect(headers['Idempotency-Key']).toBe(step.id);
+  });
+
+  it('Webhook送信中に緊急停止が入った事実をincidentへ残す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO outgoing_webhooks
+         (id, name, url, event_types, is_active, line_account_id)
+       VALUES ('webhook-cross-stop', 'CRM', 'https://hooks.example.com/events', '[]', 1, 'account-1')`,
+    ).run();
+    let resolveFetch!: (value: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => { resolveFetch = resolve; }));
+    const execution = execute(testDb, {
+      accountId: 'account-1', friendId: 'friend-1',
+      action: {
+        id: 'webhook-cross-stop', type: 'send_webhook',
+        params: { webhookId: 'webhook-cross-stop' }, onFailure: 'stop',
+      },
+      executors: createAutomationActionExecutors({ fetch: fetchMock as typeof fetch }),
+    });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    const stopped = await stopOperationCapabilities(testDb.db, {
+      lineAccountId: 'account-1', capabilities: ['webhook_outgoing'],
+      expectedVersion: 0, actorId: 'owner-1', reason: '障害対応',
+    });
+    expect(stopped.status).toBe('changed');
+    resolveFetch(new Response('', { status: 200 }));
+    expect((await execution).status).toBe('success');
+
+    expect(testDb.raw.prepare(
+      `SELECT capability, target_type, result FROM operation_target_results`,
+    ).all()).toEqual([{
+      capability: 'webhook_outgoing', target_type: 'automation_webhook', result: 'in_flight',
+    }]);
   });
 
   it('別アカウントのWebhookと安全でないURLを送らない', async () => {

@@ -212,6 +212,61 @@ export async function recordStoppedOperationTarget(
   return recorded;
 }
 
+/**
+ * 外部送信を始めたあとで緊急停止が入った場合、その結果を停止履歴へ残す。
+ *
+ * 呼び出し開始時刻より後、完了時刻以前に停止された incident だけを対象にする。
+ * 復旧が送信完了より先でも、resolved の履歴へ追記して事実を失わない。
+ */
+export async function recordOperationTargetOutcomeAcrossStop(
+  db: D1Database,
+  input: {
+    lineAccountId: string | null;
+    capability: OperationCapability;
+    targetType: string;
+    targetId: string;
+    result: 'in_flight' | 'failed';
+    startedAt: string;
+    completedAt?: string;
+    reason?: string;
+  },
+): Promise<number> {
+  const completedAt = input.completedAt ?? nowIso();
+  const scopeKeys = input.lineAccountId ? [ALL_ACCOUNTS_SCOPE, input.lineAccountId] : [ALL_ACCOUNTS_SCOPE];
+  const placeholders = scopeKeys.map(() => '?').join(',');
+  const rows = await db.prepare(
+    `SELECT id, line_account_id, capabilities_json
+       FROM operation_incidents
+      WHERE scope_key IN (${placeholders})
+        AND status IN ('stopped', 'resolved')
+        AND stopped_at IS NOT NULL
+        AND stopped_at > ?
+        AND stopped_at <= ?
+      ORDER BY stopped_at DESC`,
+  ).bind(...scopeKeys, input.startedAt, completedAt).all<{
+    id: string;
+    line_account_id: string | null;
+    capabilities_json: string;
+  }>();
+
+  let recorded = 0;
+  for (const row of rows.results ?? []) {
+    let capabilities: unknown = null;
+    try { capabilities = JSON.parse(row.capabilities_json); } catch { capabilities = null; }
+    if (!Array.isArray(capabilities) || !capabilities.includes(input.capability)) continue;
+    const inserted = await db.prepare(
+      `INSERT OR IGNORE INTO operation_target_results
+         (id, incident_id, line_account_id, capability, target_type, target_id, result, reason, occurred_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), row.id, input.lineAccountId, input.capability,
+      input.targetType, input.targetId, input.result, input.reason ?? null, completedAt,
+    ).run();
+    recorded += Number(inserted.meta.changes ?? 0);
+  }
+  return recorded;
+}
+
 export interface OperationTargetResult {
   id: string;
   incidentId: string;

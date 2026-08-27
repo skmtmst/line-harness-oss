@@ -10,6 +10,7 @@ import {
   createChat,
   updateChat,
   jstNow,
+  recordOperationTargetOutcomeAcrossStop,
 } from '@line-crm/db';
 import type { Friend, LineAccount } from '@line-crm/db';
 import { authenticateApiToken } from '../middleware/auth.js';
@@ -535,6 +536,35 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
     const retryKey = c.req.header('X-Line-Retry-Key');
     if (retryKey) headers['X-Line-Retry-Key'] = retryKey;
 
+    // push/reply は呼び出し元のシナリオ・リマインダ等のゲートで管理する。
+    // このdrop-in経路だけで種類を確定できる一斉系は、停止と上流応答が
+    // 交差した事実をincidentへ残す。
+    const tracksBroadcastDispatch = isMessageSend
+      && ['/v2/bot/message/broadcast', '/v2/bot/message/multicast', '/v2/bot/message/narrowcast'].includes(path);
+    const startedAt = new Date().toISOString();
+    const targetId = retryKey ?? `line-request:${crypto.randomUUID()}`;
+    const recordStopOutcome = async (
+      result: 'in_flight' | 'failed',
+      completedAt: string,
+      reason: string,
+    ) => {
+      if (!tracksBroadcastDispatch) return;
+      try {
+        await recordOperationTargetOutcomeAcrossStop(c.env.DB, {
+          lineAccountId: caller.lineAccountId,
+          capability: 'broadcast_dispatch',
+          targetType: 'line_api_request',
+          targetId,
+          result,
+          startedAt,
+          completedAt,
+          reason,
+        });
+      } catch (trackingError) {
+        console.error('[line-proxy] emergency outcome tracking failed:', trackingError);
+      }
+    };
+
     let upstream: Response;
     try {
       upstream = await fetch(`${upstreamBase}${encodedPath}${url.search}`, {
@@ -544,9 +574,20 @@ function proxyHandler(prefix: string, upstreamBase: string, logSends: boolean) {
         signal: AbortSignal.timeout(15_000),
       });
     } catch (err) {
+      const completedAt = new Date().toISOString();
+      await recordStopOutcome('failed', completedAt, `${path}: 上流へ接続できませんでした`);
       console.error('[line-proxy] upstream fetch failed:', err);
       return c.json({ message: 'Upstream request failed' }, 502);
     }
+
+    const completedAt = new Date().toISOString();
+    const alreadyAccepted = upstream.status === 409
+      && Boolean(upstream.headers.get('x-line-accepted-request-id'));
+    await recordStopOutcome(
+      upstream.ok || alreadyAccepted ? 'in_flight' : 'failed',
+      completedAt,
+      `${path}: HTTP ${upstream.status}`,
+    );
 
     if (isMessageSend && upstream.ok && rawBody) {
       // Log in the background where possible: a multicast to hundreds of
