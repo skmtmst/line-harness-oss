@@ -113,11 +113,10 @@
     "direct-th": 6
   },
   "app/conversions/new/page.tsx": {
-    "unresolved-classname": 6
+    "unresolved-classname": 5
   },
   "app/conversions/page.tsx": {
-    "arbitrary-value": 8,
-    "direct-secondary-button": 2
+    "arbitrary-value": 8
   },
   "app/duplicates/page.tsx": {
     "arbitrary-value": 43,

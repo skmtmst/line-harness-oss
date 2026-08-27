@@ -98,7 +98,8 @@ export default function NewConversionPointPage() {
   const yen = value ? Number(value) : null
 
   return (
-    <CreatePage
+    <div data-conversions-design="v6" data-design-node="GtylA">
+      <CreatePage
       title="成果地点（CV）を作る"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
       parent={['成果とアフィリエイト', '/conversions']}
@@ -240,10 +241,8 @@ export default function NewConversionPointPage() {
         {/* 設計は「毎回同じ金額」以外の決め方（率など）も見据えた作りだが、
             持っているのは1件あたりの固定額だけ。選べる形にすると、
             選べないものが選べるように見える。 */}
-        <Field label="金額の決め方" htmlFor="cv-value-mode" note="率での指定は準備中です。">
-          <select id="cv-value-mode" disabled className={`${inputClass} opacity-50`}>
-            <option>毎回同じ金額</option>
-          </select>
+        <Field label="金額の決め方" note="成果が起きた時点の金額を記録します。">
+          <p className="border-hairline rounded-control border px-3 py-2 text-sm">毎回同じ金額</p>
         </Field>
 
         {/* 一覧の列名は「成果単価」だが、作る画面では「1件あたりの金額」。
@@ -318,6 +317,7 @@ export default function NewConversionPointPage() {
           </select>
         </Field>
       </FormSection>
-    </CreatePage>
+      </CreatePage>
+    </div>
   )
 }

@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作26個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,7 +45,9 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    expect(openings).toHaveLength(29)
+    // 2026-08-28: 成果地点のV6化で、行き先のない手動・並び順と
+    // 旧「提携成果」タブへの操作を外した。減った基準を戻さない。
+    expect(openings).toHaveLength(26)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
   })
 
@@ -67,7 +69,6 @@ describe('標準ボタンの第1段階移行', () => {
       '/tags/fields/new',
       '/reminders/new',
       '/affiliate-offers/new',
-      '/conversions?tab=affiliates',
       '/conversions/new',
       '/inflow-links/new',
     ]) {
@@ -94,8 +95,10 @@ describe('標準ボタンの第1段階移行', () => {
     // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
     //
     // 2026-08-27: ダッシュボードの受信カードが自前の「前へ／次へ」をやめて
-    // 共通ページ送りへ寄せた。副次2つ減って280。**減ったので締め直す。**
-    expect(debt['direct-secondary-button']).toBe(280)
+    // 共通ページ送りへ寄せた。副次2つ減って280。
+    // 2026-08-28: 成果地点から行き先のない副次操作2つを外して278。
+    // **減ったので締め直す。**
+    expect(debt['direct-secondary-button']).toBe(278)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・

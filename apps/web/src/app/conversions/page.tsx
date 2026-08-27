@@ -45,7 +45,6 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 function within28Days(iso: string): boolean {
   return Date.now() - new Date(iso).getTime() <= 28 * 24 * 3600_000
 }
-import Header from '@/components/layout/header'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
@@ -112,9 +111,9 @@ function ConversionsPageInner() {
 
   useEffect(() => { load() }, [])
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('このCVポイントを削除しますか？')) return
-    await api.conversions.deletePoint(id)
+  const handleStop = async (id: string) => {
+    if (!confirm('この成果地点の計測を停止しますか？ 過去の成果と金額は残ります。')) return
+    await api.conversions.stopPoint(id)
     load()
   }
 
@@ -141,35 +140,7 @@ function ConversionsPageInner() {
   }, [points, query])
 
   return (
-    <div>
-      <div data-design="Head">
-        <Header
-          title="成果とアフィリエイト"
-          description="何を成果として数えるか、誰の紹介か、いくら払うかを1か所でまとめて扱います。成果地点の定義と、出た成果の承認が同じ画面で完結します。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled
-                title="マニュアルは準備中です"
-              >
-                マニュアル
-              </Button>
-              <Button
-                href="/conversions?tab=affiliates"
-              >
-                アフィリエイターを追加
-              </Button>
-              <Button
-                href="/conversions/new"
-                variant="primary"
-              >
-                成果地点を追加
-              </Button>
-            </div>
-          }
-        />
-      </div>
-
+    <div data-conversions-design="v6" data-design-node="ZrpKn">
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="確定した成果"
@@ -217,28 +188,6 @@ function ConversionsPageInner() {
           aria-label="CV名で検索"
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
-        <span className="text-ink-faint text-xs whitespace-nowrap">並び順</span>
-        <select
-          disabled
-          title="並び替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>CV数が多い順</option>
-        </select>
-        <span className="text-ink-faint text-xs whitespace-nowrap">期間</span>
-        <select
-          disabled
-          title="期間の切り替えは準備中です"
-          className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-        >
-          <option>今月</option>
-        </select>
-        <Button
-          disabled
-          title="書き出しは準備中です"
-        >
-          CSVで書き出す
-        </Button>
       </div>
 
       {/* 設計の表は7列。報酬と状態は持っている列が無いので「—」を出す。
@@ -305,17 +254,26 @@ function ConversionsPageInner() {
                   </td>
                   {/* 報酬は案件ごとの料率で決まる。成果地点と案件を結ぶ列が無いので出せない。 */}
                   <td className="text-ink-faint px-4 py-3 text-sm">—</td>
-                  {/* 計測を止める仕組みが無い。作った成果地点は常に計測中。 */}
                   <td className="px-4 py-3 text-sm">
-                    <span className="bg-success-bg text-success rounded-pill px-2 py-0.5 text-[11px]">計測中</span>
+                    <span className={`rounded-pill px-2 py-0.5 text-[11px] ${
+                      point.status === 'stopped'
+                        ? 'bg-canvas-sunken text-ink-faint'
+                        : 'bg-success-bg text-success'
+                    }`}>
+                      {point.status === 'stopped' ? '停止' : '計測中'}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(point.id)}
-                      className="text-danger text-sm hover:underline"
-                    >
-                      削除
-                    </button>
+                    {point.status === 'stopped' ? (
+                      <span className="text-ink-faint text-xs">過去実績を保持</span>
+                    ) : (
+                      <button
+                        onClick={() => handleStop(point.id)}
+                        className="text-danger text-sm hover:underline"
+                      >
+                        計測を停止
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -328,15 +286,7 @@ function ConversionsPageInner() {
         <p className="text-ink-faint text-xs">
           成果が出たあとの承認は「成果承認」タブで行います。旧デザインではCV計測とアフィリエイトが別ページに分かれていて、定義と承認の間で画面を往復する必要がありました。
         </p>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-ink-faint tabular-nums">全 {shown.length} 件</span>
-          <button disabled title="ページの切り替えは準備中です" className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50">
-            前へ
-          </button>
-          <button disabled title="ページの切り替えは準備中です" className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50">
-            次へ
-          </button>
-        </div>
+        <span className="text-ink-faint text-xs tabular-nums">全 {shown.length} 件</span>
       </div>
     </div>
   )
@@ -390,7 +340,7 @@ function ReportTab() {
   }
 
   return (
-    <div className="bg-canvas rounded-card border-hairline overflow-x-auto border">
+    <div data-design-node="GUxsj" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
       <table className="w-full min-w-[560px]">
         <thead>
           <TableHeadRow>
@@ -430,14 +380,19 @@ function ReportTab() {
 function ConversionsPageHost() {
   const tab = useMergedTab(MERGED_TABS, 'tab', DEFAULT_TAB)
   return (
-    <div>
-      <MergedTabs
-        basePath="/conversions"
-        paramName="tab"
-        tabs={MERGED_TABS}
-        active={tab}
-        defaultKey={DEFAULT_TAB}
-      />
+    <div data-design-node={tab === 'report' ? 'GUxsj' : tab === 'points' ? 'ZrpKn' : undefined}>
+      <div data-design="MergedTabs">
+        <MergedTabs
+          basePath="/conversions"
+          paramName="tab"
+          tabs={MERGED_TABS}
+          active={tab}
+          defaultKey={DEFAULT_TAB}
+          actions={tab === 'points'
+            ? <Button href="/conversions/new" variant="primary">成果地点を作る</Button>
+            : undefined}
+        />
+      </div>
       {tab === 'points' && <ConversionsPageInner />}
       {tab === 'affiliates' && <AffiliatorsTab />}
       {tab === 'offers' && <OffersTab />}
