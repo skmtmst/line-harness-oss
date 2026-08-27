@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   getFormById: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   createFormSubmission: vi.fn(),
+  createForm: vi.fn(),
+  getFormSubmissions: vi.fn(),
+  getFormSubmissionsPage: vi.fn(),
   verifyCallerLineIdentity: vi.fn(),
   getLineAccountById: vi.fn(),
   dispatchLineProxyLocally: vi.fn(),
@@ -15,10 +18,11 @@ vi.mock('@line-crm/db', () => ({
   getForms: vi.fn(),
   getFormsWithStats: vi.fn(),
   getFormById: mocks.getFormById,
-  createForm: vi.fn(),
+  createForm: mocks.createForm,
   updateForm: vi.fn(),
   deleteForm: vi.fn(),
-  getFormSubmissions: vi.fn(),
+  getFormSubmissions: mocks.getFormSubmissions,
+  getFormSubmissionsPage: mocks.getFormSubmissionsPage,
   createFormSubmission: mocks.createFormSubmission,
   getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,
   getFriendById: vi.fn(),
@@ -105,7 +109,76 @@ beforeEach(() => {
     data: input.data,
     created_at: '2026-08-04T12:00:00+09:00',
   }));
+  mocks.createForm.mockResolvedValue({
+    ...baseForm,
+    id: 'draft-form-1',
+    name: '名称未設定のフォーム',
+    fields: '[]',
+    layout: null,
+    is_active: 0,
+    submit_count: 0,
+  });
   mocks.dispatchLineProxyLocally.mockResolvedValue(new Response(null, { status: 200 }));
+});
+
+describe('draft creation', () => {
+  test('creates an inactive draft before opening the editor', async () => {
+    const { bindings } = env();
+    const res = await app(true).request('/api/forms/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    }, bindings);
+    expect(res.status).toBe(201);
+    expect(mocks.createForm).toHaveBeenCalledWith(bindings.DB, {
+      name: '名称未設定のフォーム',
+      fields: '[]',
+      layout: null,
+      isActive: false,
+    });
+    const body = await res.json() as { data: { id: string; isActive: boolean } };
+    expect(body.data).toMatchObject({ id: 'draft-form-1', isActive: false });
+  });
+
+  test('does not let an unauthenticated caller create a draft', async () => {
+    const { bindings } = env();
+    const res = await app().request('/api/forms/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    }, bindings);
+    expect(res.status).toBe(403);
+    expect(mocks.createForm).not.toHaveBeenCalled();
+  });
+});
+
+describe('submission pagination compatibility', () => {
+  test('returns the existing array shape when pagination is not requested', async () => {
+    mocks.getFormSubmissions.mockResolvedValue([]);
+    const { bindings } = env();
+    const res = await app(true).request('/api/forms/form-1/submissions', {}, bindings);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, data: [] });
+    expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1');
+    expect(mocks.getFormSubmissionsPage).not.toHaveBeenCalled();
+  });
+
+  test('returns page metadata when the V6 list requests page and limit', async () => {
+    mocks.getFormSubmissionsPage.mockResolvedValue({ items: [], total: 42, page: 2, limit: 20 });
+    const { bindings } = env();
+    const res = await app(true).request('/api/forms/form-1/submissions?page=2&limit=20', {}, bindings);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { items: [], total: 42, page: 2, limit: 20 },
+    });
+    expect(mocks.getFormSubmissionsPage).toHaveBeenCalledWith(
+      bindings.DB,
+      'form-1',
+      { page: 2, limit: 20 },
+    );
+    expect(mocks.getFormSubmissions).not.toHaveBeenCalled();
+  });
 });
 
 afterEach(() => {

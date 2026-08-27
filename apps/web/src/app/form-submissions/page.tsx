@@ -1,11 +1,16 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
+import { api } from '@/lib/api'
 import { countryFlag } from '@/lib/country-flag'
-import Header from '@/components/layout/header'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
+import Select from '@/components/shared/select'
 
 interface UsedByAccount {
   id: string
@@ -40,7 +45,6 @@ interface Submission {
   createdAt: string
 }
 
-const PAGE_SIZE = 20
 type FormFilter = 'all' | 'answered' | 'unanswered'
 
 function formatRelative(iso: string | null): string {
@@ -105,13 +109,18 @@ function formatValue(v: unknown): string {
 }
 
 export default function FormSubmissionsPage() {
+  const router = useRouter()
   const [forms, setForms] = useState<Form[]>([])
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [subLoading, setSubLoading] = useState(false)
+  const [subError, setSubError] = useState('')
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [submissionTotal, setSubmissionTotal] = useState(0)
   const [detailSubmission, setDetailSubmission] = useState<Submission | null>(null)
   const [query, setQuery] = useState('')
   const [formFilter, setFormFilter] = useState<FormFilter>('all')
@@ -119,59 +128,87 @@ export default function FormSubmissionsPage() {
   const [editingName, setEditingName] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [renameError, setRenameError] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const submissionRequest = useRef(0)
 
   const loadForms = useCallback(async () => {
     setLoading(true)
+    setLoadError('')
     try {
       const res = await fetchApi<{ success: boolean; data: Form[] }>('/api/forms')
-      if (res.success) setForms(res.data)
-    } catch { /* silent */ }
+      if (!res.success) throw new Error('load_failed')
+      setForms(res.data)
+    } catch {
+      setLoadError('回答フォームを読み込めませんでした。')
+    }
     setLoading(false)
   }, [])
 
   useEffect(() => { loadForms() }, [loadForms])
 
-  const loadSubmissions = useCallback(async (formId: string) => {
+  const loadSubmissions = useCallback(async (formId: string, requestedPage = 1, requestedLimit = 20) => {
+    const request = ++submissionRequest.current
     setSubLoading(true)
+    setSubError('')
     setPage(1)
     setDetailSubmission(null)
     try {
       const formRes = await fetchApi<{ success: boolean; data: FormDetail | { fields: string | FormDetail['fields'] } }>(`/api/forms/${formId}`)
-      const subRes = await fetchApi<{ success: boolean; data: Submission[] }>(`/api/forms/${formId}/submissions`)
+      const subRes = await fetchApi<{
+        success: boolean
+        data: { items: Submission[]; total: number; page: number; limit: number }
+      }>(`/api/forms/${formId}/submissions?page=${requestedPage}&limit=${requestedLimit}`)
+      if (!subRes.success) throw new Error('submissions_failed')
+      if (request !== submissionRequest.current) return
 
-      // Race-guard: only apply if user hasn't switched away
-      setSelectedFormId((current) => {
-        if (current !== formId) return current
-        if (formRes.success) {
-          const rawFields = (formRes.data as { fields: unknown }).fields
-          const fields = typeof rawFields === 'string'
-            ? (JSON.parse(rawFields) as Array<{ name: string; label: string }>)
-            : (rawFields as Array<{ name: string; label: string }>)
-          const labels: Record<string, string> = {}
-          for (const f of fields ?? []) labels[f.name] = f.label
-          setFieldLabels(labels)
-        }
-        if (subRes.success) {
-          setSubmissions(
-            subRes.data.map((s) => ({
-              ...s,
-              data: typeof s.data === 'string' ? JSON.parse(s.data) : s.data,
-              friendName: s.friendName ?? null,
-            })),
-          )
-        }
-        return current
-      })
-    } catch { /* silent */ }
-    setSelectedFormId((current) => {
-      if (current === formId) setSubLoading(false)
-      return current
-    })
+      if (formRes.success) {
+        const rawFields = (formRes.data as { fields: unknown }).fields
+        const fields = typeof rawFields === 'string'
+          ? (JSON.parse(rawFields) as Array<{ name: string; label: string }>)
+          : (rawFields as Array<{ name: string; label: string }>)
+        const labels: Record<string, string> = {}
+        for (const f of fields ?? []) labels[f.name] = f.label
+        setFieldLabels(labels)
+      }
+      setPage(subRes.data.page)
+      setPageSize(subRes.data.limit)
+      setSubmissionTotal(subRes.data.total)
+      setSubmissions(
+        subRes.data.items.map((s) => ({
+          ...s,
+          data: typeof s.data === 'string' ? JSON.parse(s.data) : s.data,
+          friendName: s.friendName ?? null,
+        })),
+      )
+    } catch {
+      if (request !== submissionRequest.current) return
+      setSubError('回答を読み込めませんでした。')
+      setSubmissions([])
+      setSubmissionTotal(0)
+    } finally {
+      if (request === submissionRequest.current) setSubLoading(false)
+    }
   }, [])
 
   const handleSelectForm = (formId: string) => {
     setSelectedFormId(formId)
-    loadSubmissions(formId)
+    loadSubmissions(formId, 1, pageSize)
+  }
+
+  const createDraft = async () => {
+    if (creating) return
+    setCreating(true)
+    setCreateError('')
+    try {
+      const res = await api.forms.createDraft()
+      if (!res.success) throw new Error(res.error)
+      router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
+    } catch {
+      setCreateError('フォームの下書きを作れませんでした。もう一度お試しください。')
+    } finally {
+      setCreating(false)
+    }
   }
 
   const openRename = (form: Form) => {
@@ -233,8 +270,7 @@ export default function FormSubmissionsPage() {
     [forms, selectedFormId],
   )
 
-  const totalPages = Math.max(1, Math.ceil(submissions.length / PAGE_SIZE))
-  const paged = submissions.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(submissionTotal / pageSize))
 
   const fieldKeys = useMemo(
     () =>
@@ -245,28 +281,7 @@ export default function FormSubmissionsPage() {
   )
 
   return (
-    <div>
-      <div data-design="Head">
-        <Header
-          title="回答フォーム"
-          description="友だちに答えてもらうフォームを作ります。回答は指定した友だち情報欄にそのまま記録され、友だち詳細やテンプレートの差し込みで使えます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              {['マニュアル', '並び替え', 'フォルダを追加'].map((label) => (
-                <button
-                  key={label}
-                  disabled
-                  title="準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          }
-        />
-      </div>
-
+    <div data-design-node="EMBIK">
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">フォーム</p>
@@ -277,12 +292,12 @@ export default function FormSubmissionsPage() {
           <p className="text-ink-faint mt-0.5 text-xs">作成済み</p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
-          <p className="text-ink-faint text-xs">回答</p>
+          <p className="text-ink-faint text-xs">公開中</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {submissions.length}
+            {forms.filter((form) => form.isActive).length}
             <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
           </p>
-          <p className="text-ink-faint mt-0.5 text-xs">読み込んだぶん</p>
+          <p className="text-ink-faint mt-0.5 text-xs">回答を受け付けています</p>
         </div>
         {/* 月ごとの集計と、回答率（配ったうち何人が答えたか）を出す経路が無い。 */}
         <div className="bg-canvas rounded-card border-hairline border p-4">
@@ -299,10 +314,13 @@ export default function FormSubmissionsPage() {
 
       {/* Form cards */}
       <section className="mb-6">
-        {!loading && forms.length > 0 && (
+        {!loading && !loadError && forms.length > 0 && (
           <div className="mb-4 space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="primary" onClick={createDraft} disabled={creating}>
+                  {creating ? '下書きを作成中' : 'フォームを作る'}
+                </Button>
                 {([
                   ['all', `すべて ${forms.length}`],
                   ['answered', `回答あり ${answeredCount}`],
@@ -336,19 +354,36 @@ export default function FormSubmissionsPage() {
             {query && (
               <p className="text-xs text-gray-400">{filteredForms.length}件見つかりました</p>
             )}
+            {createError && <p className="text-danger text-sm">{createError}</p>}
           </div>
         )}
         {loading ? (
-          <div className="text-sm text-gray-400">読み込み中...</div>
+          <ListState kind="loading" title="回答フォームを読み込んでいます" />
+        ) : loadError ? (
+          <ListState
+            kind="error"
+            title="回答フォームを読み込めませんでした"
+            description="通信状態を確認して、もう一度読み込んでください。"
+            action={<Button onClick={() => void loadForms()}>回答フォームを再読み込み</Button>}
+          />
         ) : forms.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">
-            フォームがまだありません
-          </div>
+          <ListState
+            kind="empty"
+            title="まだ回答フォームがありません"
+            description="最初のフォームを下書きで作り、質問と公開条件を設定します。"
+            action={(
+              <Button variant="primary" onClick={createDraft} disabled={creating}>
+                {creating ? '下書きを作成中' : 'フォームを作る'}
+              </Button>
+            )}
+          />
         ) : (
           filteredForms.length === 0 ? (
-            <div className="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
-              条件に合うフォームがありません
-            </div>
+            <ListState
+              kind="empty"
+              title="条件に合うフォームはありません"
+              description="検索語や絞り込み条件を変えてください。"
+            />
           ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {filteredForms.map((form) => {
@@ -443,13 +478,15 @@ export default function FormSubmissionsPage() {
             <div className="flex items-baseline gap-2">
               <h2 className="text-base font-semibold text-gray-900">{displayFormName(selectedForm.name)}</h2>
               <span className="text-xs text-gray-400">
-                {subLoading ? '読み込み中...' : `${submissions.length}件`}
+                {subLoading ? '読み込み中...' : `${submissionTotal}件`}
               </span>
             </div>
             <button
               onClick={() => {
+                submissionRequest.current++
                 setSelectedFormId(null)
                 setSubmissions([])
+                setSubmissionTotal(0)
                 setDetailSubmission(null)
               }}
               className="text-xs text-gray-400 hover:text-gray-600"
@@ -460,6 +497,13 @@ export default function FormSubmissionsPage() {
 
           {subLoading ? (
             <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">読み込み中...</div>
+          ) : subError ? (
+            <ListState
+              kind="error"
+              title="回答を読み込めませんでした"
+              description="通信状態を確認して、もう一度読み込んでください。"
+              action={<Button onClick={() => void loadSubmissions(selectedForm.id, page, pageSize)}>回答を再読み込み</Button>}
+            />
           ) : submissions.length === 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">回答がありません</div>
           ) : (
@@ -481,7 +525,7 @@ export default function FormSubmissionsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {paged.map((sub) => (
+                    {submissions.map((sub) => (
                       <tr
                         key={sub.id}
                         onClick={() => setDetailSubmission(sub)}
@@ -519,27 +563,26 @@ export default function FormSubmissionsPage() {
                 </table>
               </div>
 
-              {totalPages > 1 && (
+              {submissionTotal > 0 && (
                 <div className="flex items-center justify-between mt-4">
                   <p className="text-xs text-gray-400">
-                    {(page - 1) * PAGE_SIZE + 1}〜{Math.min(page * PAGE_SIZE, submissions.length)} 件 / 全{submissions.length}件
+                    {(page - 1) * pageSize + 1}〜{Math.min(page * pageSize, submissionTotal)}件 / 全{submissionTotal}件
                   </p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
-                    >
-                      前へ
-                    </button>
-                    <span className="px-3 py-1.5 text-sm text-gray-500">{page} / {totalPages}</span>
-                    <button
-                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 disabled:opacity-30 hover:bg-gray-50"
-                    >
-                      次へ
-                    </button>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      aria-label="回答の表示件数"
+                      size="page-size"
+                      value={String(pageSize)}
+                      options={[10, 20, 50].map((value) => ({ value: String(value), label: `${value}件表示` }))}
+                      onChange={(value) => void loadSubmissions(selectedForm.id, 1, Number(value))}
+                    />
+                    <Pagination
+                      page={page}
+                      pageCount={totalPages}
+                      disabled={subLoading}
+                      ariaLabel="回答一覧のページ送り"
+                      onPageChange={(nextPage) => void loadSubmissions(selectedForm.id, nextPage, pageSize)}
+                    />
                   </div>
                 </div>
               )}

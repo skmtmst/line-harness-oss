@@ -158,7 +158,6 @@
     "arbitrary-value": 2
   },
   "app/form-submissions/page.tsx": {
-    "direct-secondary-button": 1,
     "arbitrary-value": 12,
     "direct-th": 4,
     "direct-primary-button": 1

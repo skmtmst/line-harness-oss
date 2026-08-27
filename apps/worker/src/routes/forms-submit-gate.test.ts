@@ -39,6 +39,7 @@ vi.mock('@line-crm/db', () => ({
   updateForm: vi.fn(),
   deleteForm: vi.fn(),
   getFormSubmissions: vi.fn(),
+  getFormSubmissionsPage: vi.fn(),
   getLatestFormSubmission: vi.fn(),
   createFormSubmission: mocks.createFormSubmission,
   getFriendByLineUserIdForAccount: mocks.getFriendByLineUserIdForAccount,

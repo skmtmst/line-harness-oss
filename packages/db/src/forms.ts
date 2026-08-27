@@ -133,6 +133,8 @@ export interface CreateFormInput {
   ogTitle?: string | null;
   ogDescription?: string | null;
   ogImageUrl?: string | null;
+  /** 新規作成画面から作る空レコードは公開しない。未指定は既存互換で公開中。 */
+  isActive?: boolean;
 }
 
 export async function createForm(db: D1Database, input: CreateFormInput): Promise<Form> {
@@ -148,7 +150,7 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
           save_to_metadata, is_active, submit_count,
           og_title, og_description, og_image_url,
           created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -164,6 +166,7 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
       input.onSubmitWebhookHeaders ?? null,
       input.onSubmitWebhookFailMessage ?? null,
       input.saveToMetadata !== false ? 1 : 0,
+      input.isActive === false ? 0 : 1,
       input.ogTitle ?? null,
       input.ogDescription ?? null,
       input.ogImageUrl ?? null,
@@ -290,6 +293,39 @@ export async function getFormSubmissions(
     .bind(formId)
     .all<FormSubmission & { friend_name: string | null }>();
   return result.results;
+}
+
+export interface FormSubmissionPage {
+  items: Array<FormSubmission & { friend_name: string | null }>;
+  total: number;
+  page: number;
+  limit: number;
+}
+
+/** 管理画面向け回答一覧。全件をブラウザへ渡さず、D1側でページ分けする。 */
+export async function getFormSubmissionsPage(
+  db: D1Database,
+  formId: string,
+  options: { page?: number; limit?: number } = {},
+): Promise<FormSubmissionPage> {
+  const page = Math.max(1, Math.floor(options.page ?? 1));
+  const limit = Math.max(1, Math.min(Math.floor(options.limit ?? 20), 50));
+  const offset = (page - 1) * limit;
+  const count = await db
+    .prepare(`SELECT COUNT(*) AS total FROM form_submissions WHERE form_id = ?`)
+    .bind(formId)
+    .first<{ total: number }>();
+  const result = await db
+    .prepare(
+      `SELECT fs.*, f.display_name as friend_name FROM form_submissions fs
+       LEFT JOIN friends f ON f.id = fs.friend_id
+       WHERE fs.form_id = ?
+       ORDER BY fs.created_at DESC, fs.id DESC
+       LIMIT ? OFFSET ?`,
+    )
+    .bind(formId, limit, offset)
+    .all<FormSubmission & { friend_name: string | null }>();
+  return { items: result.results, total: count?.total ?? 0, page, limit };
 }
 
 /** 友だち詳細欄で使う、フォーム名・質問定義つきの最新回答履歴。 */

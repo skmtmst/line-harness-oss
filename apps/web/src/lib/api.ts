@@ -1454,6 +1454,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    createDraft: (name?: string) =>
+      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>('/api/forms/drafts', {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
     update: (
       id: string,
       data: {

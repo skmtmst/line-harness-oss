@@ -7,6 +7,7 @@ import {
   updateForm,
   deleteForm,
   getFormSubmissions,
+  getFormSubmissionsPage,
   getLatestFormSubmission,
   createFormSubmission,
   getFriendByLineUserIdForAccount,
@@ -285,6 +286,23 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
   }
 });
 
+// POST /api/forms/drafts — 公開されていない空の下書きを作り、編集画面へ進む。
+forms.post('/api/forms/drafts', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ name?: string }>().catch(() => ({} as { name?: string }));
+    const form = await createForm(c.env.DB, {
+      name: body.name?.trim() || '名称未設定のフォーム',
+      fields: '[]',
+      layout: null,
+      isActive: false,
+    });
+    return c.json({ success: true, data: serializeForm(form) }, 201);
+  } catch (err) {
+    console.error('POST /api/forms/drafts error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // PUT /api/forms/:id — update form
 forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   try {
@@ -373,8 +391,24 @@ forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), 
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    const submissions = await getFormSubmissions(c.env.DB, id);
-    return c.json({ success: true, data: submissions.map(serializeSubmission) });
+    const hasPagination = c.req.query('page') !== undefined || c.req.query('limit') !== undefined;
+    if (!hasPagination) {
+      // SDKなど既存利用先との互換性を保つ。V6管理画面だけが明示的にページ分けを要求する。
+      const submissions = await getFormSubmissions(c.env.DB, id);
+      return c.json({ success: true, data: submissions.map(serializeSubmission) });
+    }
+    const page = Number(c.req.query('page') ?? '1');
+    const limit = Number(c.req.query('limit') ?? '20');
+    const submissions = await getFormSubmissionsPage(c.env.DB, id, { page, limit });
+    return c.json({
+      success: true,
+      data: {
+        items: submissions.items.map(serializeSubmission),
+        total: submissions.total,
+        page: submissions.page,
+        limit: submissions.limit,
+      },
+    });
   } catch (err) {
     console.error('GET /api/forms/:id/submissions error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
