@@ -1338,3 +1338,51 @@ export const FORM_LAYOUT_VISIT = {
     afterActions: [{ kind: 'tag', op: 'add', tagIds: ['tag-0'] }],
   },
 }
+
+/**
+ * 機能14 共通情報。設計 `WuKzU` の一覧。
+ *
+ * **`CommonVar` の型どおり。** `type` は `'text'|'url'|'image'|'number'` の
+ * 4つで、設計の「差し込みキー」は `varKey` に入る。
+ */
+export const COMMON_VAR_FOLDERS = [
+  { id: 'cvf-shop', kind: 'common_var', name: '01_お店の情報', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'cvf-text', kind: 'common_var', name: '02_案内文の型', parentId: null, displayOrder: 2, color: '#059669' },
+  { id: 'cvf-campaign', kind: 'common_var', name: '03_キャンペーン', parentId: null, displayOrder: 3, color: '#d97706' },
+]
+
+export const COMMON_VARS = [
+  {
+    id: 'cv-1', folderId: 'cvf-shop', name: '会社名', varKey: '会社名',
+    type: 'text', value: '株式会社NEN',
+    createdAt: '2025-11-20T07:40:00.000Z', updatedAt: '2026-08-01T01:12:00.000Z',
+  },
+  {
+    id: 'cv-2', folderId: 'cvf-shop', name: '営業時間', varKey: '営業時間',
+    type: 'text', value: '平日 10:00〜19:00／土日祝 休み',
+    createdAt: '2025-11-20T07:40:00.000Z', updatedAt: '2026-08-12T00:00:00.000Z',
+  },
+  {
+    id: 'cv-3', folderId: 'cvf-shop', name: '電話番号', varKey: '電話番号',
+    type: 'text', value: '03-1234-5678',
+    createdAt: '2025-11-20T07:40:00.000Z', updatedAt: '2026-07-20T00:00:00.000Z',
+  },
+  {
+    /* 設計の帯「中身が空のまま使われているものが1件」。**空で撮れることが要る。** */
+    id: 'cv-4', folderId: 'cvf-campaign', name: '今月のキャンペーン', varKey: 'キャンペーン',
+    type: 'text', value: '',
+    createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'cv-5', folderId: 'cvf-text', name: '案内文の結び', varKey: '結び',
+    type: 'text', value: 'ご不明な点はお気軽にどうぞ。',
+    createdAt: '2026-02-10T00:00:00.000Z', updatedAt: '2026-06-05T00:00:00.000Z',
+  },
+]
+
+/** 日付での切り替え予約。設計の「9/30 を過ぎたら自動で空になります」。 */
+export const COMMON_VAR_SCHEDULES = {
+  'cv-4': [
+    { id: 'cvs-1', varId: 'cv-4', effectiveFrom: '2026-09-30T15:00:00.000Z', value: '', appliedAt: null },
+  ],
+}

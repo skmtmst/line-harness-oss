@@ -73,6 +73,9 @@ const RM_EDIT = '/rich-menus/edit?id=rmg-1'
 const FORM = { feature: 13, dir: 'forms-v6', route: '/form-submissions', mode: 'page' }
 const FORM_EDIT = '/form-submissions/edit?id=form-1'
 
+/** 共通情報。差し込みの中身を1か所で持つ。 */
+const COMMON_VAR = { feature: 14, dir: 'common-vars-v6', route: '/contents/vars', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -634,6 +637,20 @@ export const SCREENS = [
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能14 共通情報 ─────────────────────────────────────
+  { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報' },
+  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1' },
+  {
+    ...COMMON_VAR, node: 'uNBlA', name: '14-1-B 変える前に影響を見る',
+    status: 'unimplemented',
+    why: '差し込み先を1件ずつ並べて、変える前と後の文を見せる画面が無い（`grep 影響|使われて` が `/contents/vars` 配下で0件）。**文字数の上限を超える先も出ない**',
+  },
+  {
+    ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
+    status: 'unimplemented',
+    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`contents/vars/page.tsx:150`）',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

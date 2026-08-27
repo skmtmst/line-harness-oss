@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -446,6 +446,17 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: REMINDER_FOLDERS }
   }
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
+    return { success: true, data: COMMON_VAR_FOLDERS }
+  }
+  if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
+  const cvSchedules = /^\/api\/common-vars\/([^/]+)\/schedules$/.exec(pathname)
+  if (cvSchedules) return { success: true, data: COMMON_VAR_SCHEDULES[cvSchedules[1]] ?? [] }
+  const cvOne = /^\/api\/common-vars\/([^/]+)$/.exec(pathname)
+  if (cvOne) {
+    const found = COMMON_VARS.find((item) => item.id === cvOne[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+  }
   if (pathname === '/api/forms') return { success: true, data: FORMS }
   const formSubs = /^\/api\/forms\/([^/]+)\/submissions$/.exec(pathname)
   if (formSubs) {
