@@ -135,6 +135,14 @@ export type OperationIncident = {
   updatedAt: string
 }
 
+export type OperationRestorePreview = {
+  incidentId: string
+  controlVersion: number
+  blockers: Partial<Record<OperationCapability, number>>
+  canRestore: boolean
+  calculatedAt: string
+}
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -3270,6 +3278,11 @@ export const api = {
           headers: { 'X-Confirm-Irreversible': 'operation-restore' },
           body: JSON.stringify(data),
         },
+      ),
+    restorePreview: (incidentId: string) =>
+      fetchApi<ApiResponse<OperationRestorePreview>>(
+        `/api/operations/incidents/${incidentId}/restore-preview`,
+        { method: 'POST' },
       ),
     history: (limit = 100) => fetchApi<ApiResponse<OperationIncident[]>>(
       `/api/operations/history?limit=${encodeURIComponent(String(limit))}`,

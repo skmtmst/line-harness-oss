@@ -10,6 +10,7 @@ import {
   type OperationCapability,
   type OperationControl,
   type OperationIncident,
+  type OperationRestorePreview,
 } from '@/lib/api'
 import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
 import ReleaseLogPanel from '@/components/emergency/release-log-panel'
@@ -296,6 +297,7 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
   const [message, setMessage] = useState<{ tone: 'success' | 'warning' | 'danger'; text: string } | null>(null)
   const [control, setControl] = useState<OperationControl | null>(null)
   const [counts, setCounts] = useState<Partial<Record<OperationCapability, number>>>({})
+  const [restorePreview, setRestorePreview] = useState<OperationRestorePreview | null>(null)
 
   const selectedTargets = (Object.keys(targets) as StopTarget[]).filter((key) => targets[key])
   const accountName = targetAccountId === 'all' ? 'すべてのアカウント' : accounts.find((account) => account.id === targetAccountId)?.name ?? '選択したアカウント'
@@ -381,6 +383,29 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
     } catch { setMessage({ tone: 'danger', text: '復旧に失敗しました。更新履歴を確認してください。' }); setConfirmMode(null) } finally { setRunning(false) }
   }
 
+  const openRestoreConfirm = async () => {
+    if (!control?.activeIncidentId) return
+    setRunning(true); setMessage(null); setRestorePreview(null)
+    try {
+      const response = await api.operations.restorePreview(control.activeIncidentId)
+      if (!response.success) {
+        setMessage({ tone: 'danger', text: response.error })
+        return
+      }
+      setRestorePreview(response.data)
+      if (!response.data.canRestore) {
+        const total = Object.values(response.data.blockers).reduce((sum, value) => sum + Number(value ?? 0), 0)
+        setMessage({ tone: 'warning', text: `期限切れまたは実行待ちが${total}件あります。過去分を自動送信しないよう、整理してから復旧してください。` })
+        return
+      }
+      setConfirmWord(''); setConfirmMode('restore')
+    } catch {
+      setMessage({ tone: 'danger', text: '復旧前の安全確認を実行できませんでした。' })
+    } finally {
+      setRunning(false)
+    }
+  }
+
   const stopped = Boolean(control?.activeIncidentId)
 
   return (
@@ -394,8 +419,8 @@ function EmergencyControlPanel({ accounts }: { accounts: LineAccount[] }) {
         <div className="mt-5"><label className="text-xs font-bold text-gray-700" htmlFor="emergency-detail">補足（任意）</label><textarea id="emergency-detail" value={reasonDetail} onChange={(event) => setReasonDetail(event.target.value)} rows={2} placeholder="発生していることを短く入力" className="border-hairline rounded-control mt-2 w-full border px-3 py-2 text-sm" /></div>
         <div className="mt-5 flex justify-end"><button onClick={openStopConfirm} disabled={running || loading || stopped || !control} className="rounded-control min-h-10 bg-red-600 px-4 text-xs font-bold text-white hover:bg-red-700 disabled:opacity-50">配信を緊急停止</button></div>
       </section>
-      {stopped && <section className="rounded-card border border-blue-200 bg-blue-50 p-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-base font-bold text-blue-900">復旧</h2><p className="mt-1 text-xs text-blue-800">停止中に期限を過ぎた配信を自動で追送しません。定義自体も勝手に有効化しません。</p></div><button onClick={() => { setConfirmWord(''); setConfirmMode('restore') }} disabled={running} className="rounded-control border border-blue-300 bg-white px-4 py-2 text-xs font-bold text-blue-800 hover:bg-blue-100">配信を復旧</button></div></section>}
-      {confirmMode && <div data-design-node="U0BwS" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-lg bg-white p-6 shadow-2xl"><h2 id="emergency-confirm-title" className="text-lg font-bold text-gray-900">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><div className={`mt-4 rounded-control p-4 text-sm ${confirmMode === 'stop' ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><p className="mt-1">{selectedTargets.map((key) => `${targetLabels[key].label}（${counts[key] == null ? '未取得' : `${counts[key]}件`}）`).join('・')}</p><p className="mt-1">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{accountName}</p><p className="mt-1">サーバーの送信ゲートを再開します。期限切れ分は追送しません。</p></>}</div><label className="mt-4 block text-sm font-bold text-gray-800" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-sm" /><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control border-hairline min-h-11 border px-4 text-sm font-bold text-gray-700">確認画面を閉じる</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-white disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-red-600' : 'bg-blue-700'}`}>{running ? '実行中...' : confirmMode === 'stop' ? 'この内容で配信を緊急停止' : 'この内容で配信を復旧'}</button></div></div></div>}
+      {stopped && <section className="rounded-card border border-blue-200 bg-blue-50 p-4"><div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-base font-bold text-blue-900">復旧</h2><p className="mt-1 text-xs text-blue-800">期限切れ・実行待ちをサーバーで確認し、過去分が残っている間は復旧を止めます。</p></div><button onClick={() => void openRestoreConfirm()} disabled={running} className="rounded-control border border-blue-300 bg-white px-4 py-2 text-xs font-bold text-blue-800 hover:bg-blue-100">復旧内容を確認</button></div></section>}
+      {confirmMode && <div data-design-node="U0BwS" className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="emergency-confirm-title"><div className="rounded-card w-full max-w-lg bg-white p-6 shadow-2xl"><h2 id="emergency-confirm-title" className="text-lg font-bold text-gray-900">{confirmMode === 'stop' ? '緊急停止の最終確認' : '復旧の最終確認'}</h2><div className={`mt-4 rounded-control p-4 text-sm ${confirmMode === 'stop' ? 'bg-red-50 text-red-800' : 'bg-blue-50 text-blue-900'}`}>{confirmMode === 'stop' ? <><p className="font-bold">{accountName}</p><p className="mt-1">{selectedTargets.map((key) => `${targetLabels[key].label}（${counts[key] == null ? '未取得' : `${counts[key]}件`}）`).join('・')}</p><p className="mt-1">理由：{fullReason}</p><p className="mt-2 font-bold">停止前にすでにLINEへ渡したものは取り消せません。</p></> : <><p className="font-bold">{accountName}</p><p className="mt-1">期限切れ・実行待ち0件を確認しました。サーバーの送信ゲートを再開します。</p><p className="mt-1 text-xs">確認時刻：{formatOperationDate(restorePreview?.calculatedAt ?? null)}</p></>}</div><label className="mt-4 block text-sm font-bold text-gray-800" htmlFor="emergency-confirm-word">確認のため「{confirmMode === 'stop' ? '停止' : '復旧'}」と入力</label><input id="emergency-confirm-word" value={confirmWord} onChange={(event) => setConfirmWord(event.target.value)} autoFocus className="border-hairline rounded-control mt-2 min-h-11 w-full border px-3 text-sm" /><div className="mt-5 flex justify-end gap-2"><button onClick={() => { setConfirmMode(null); setConfirmWord('') }} disabled={running} className="rounded-control border-hairline min-h-11 border px-4 text-sm font-bold text-gray-700">確認画面を閉じる</button><button onClick={() => void (confirmMode === 'stop' ? runStop() : runRestore())} disabled={running || confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')} className={`rounded-control min-h-11 px-4 text-sm font-bold text-white disabled:opacity-40 ${confirmMode === 'stop' ? 'bg-red-600' : 'bg-blue-700'}`}>{running ? '実行中...' : confirmMode === 'stop' ? 'この内容で配信を緊急停止' : 'この内容で配信を復旧'}</button></div></div></div>}
     </div>
   )
 }

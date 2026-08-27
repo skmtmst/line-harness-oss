@@ -2,13 +2,16 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
   OPERATION_CAPABILITIES,
+  getFriendById,
   getOperationControlSet,
   getOperationIncident,
+  getPendingReminderDeliveries,
   listOperationIncidents,
   restoreOperationIncident,
   stopOperationCapabilities,
   type OperationCapability,
 } from '@line-crm/db';
+import { resolveReminderSendAt } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -44,6 +47,79 @@ async function countActive(
     ? await statement.bind(accountId).first<{ count: number }>()
     : await statement.first<{ count: number }>();
   return Number(row?.count ?? 0);
+}
+
+type RestoreBlockers = Partial<Record<OperationCapability, number>>;
+
+async function countRestoreBlockers(
+  db: D1Database,
+  incident: Awaited<ReturnType<typeof getOperationIncident>> & {},
+): Promise<RestoreBlockers> {
+  // preview直後に期限へ達するraceも避けるため、5分以内を安全側で止める。
+  const cutoff = new Date(Date.now() + 5 * 60_000).toISOString();
+  const accountClause = incident.lineAccountId ? ' AND line_account_id = ?' : '';
+  const count = async (sql: string) => {
+    const statement = db.prepare(sql);
+    const row = incident.lineAccountId
+      ? await statement.bind(cutoff, incident.lineAccountId).first<{ count: number }>()
+      : await statement.bind(cutoff).first<{ count: number }>();
+    return Number(row?.count ?? 0);
+  };
+  const blockers: RestoreBlockers = {};
+  if (incident.capabilities.includes('broadcast_dispatch')) {
+    blockers.broadcast_dispatch = await count(
+      `SELECT COUNT(*) AS count FROM broadcasts
+        WHERE (status IN ('sending', 'queued') OR (status = 'scheduled' AND scheduled_at <= ?))${accountClause}`,
+    );
+  }
+  if (incident.capabilities.includes('scenario_dispatch')) {
+    const scope = incident.lineAccountId ? ' AND s.line_account_id = ?' : '';
+    const statement = db.prepare(
+      `SELECT COUNT(*) AS count FROM friend_scenarios fs
+         JOIN scenarios s ON s.id = fs.scenario_id
+        WHERE fs.status IN ('active', 'delivering') AND fs.next_delivery_at <= ?${scope}`,
+    );
+    const row = incident.lineAccountId
+      ? await statement.bind(cutoff, incident.lineAccountId).first<{ count: number }>()
+      : await statement.bind(cutoff).first<{ count: number }>();
+    blockers.scenario_dispatch = Number(row?.count ?? 0);
+  }
+  if (incident.capabilities.includes('automation_actions')) {
+    const scope = incident.lineAccountId ? ' AND line_account_id = ?' : '';
+    const statement = db.prepare(
+      `SELECT COUNT(*) AS count FROM automation_runs
+        WHERE (status = 'queued' OR (status = 'waiting' AND resume_at <= ?)
+          OR (status = 'running' AND lease_expires_at <= ?))${scope}`,
+    );
+    const row = incident.lineAccountId
+      ? await statement.bind(cutoff, cutoff, incident.lineAccountId).first<{ count: number }>()
+      : await statement.bind(cutoff, cutoff).first<{ count: number }>();
+    blockers.automation_actions = Number(row?.count ?? 0);
+  }
+  if (incident.capabilities.includes('reminder_dispatch')) {
+    let due = 0;
+    const pending = await getPendingReminderDeliveries(db);
+    const cutoffMs = Date.parse(cutoff);
+    for (const reminder of pending) {
+      const friend = await getFriendById(db, reminder.friend_id);
+      const friendAccountId = (friend as unknown as Record<string, unknown> | null)?.line_account_id;
+      if (incident.lineAccountId && friendAccountId !== incident.lineAccountId) continue;
+      for (const step of reminder.steps) {
+        const sendAt = resolveReminderSendAt(
+          new Date(reminder.target_date),
+          { offsetDays: step.offset_days, sendAtTime: step.send_at_time, offsetMinutes: step.offset_minutes },
+          reminder.delivery_mode === 'time' ? 'time' : 'countdown',
+        );
+        if (sendAt.getTime() <= cutoffMs) due += 1;
+      }
+    }
+    blockers.reminder_dispatch = due;
+  }
+  return blockers;
+}
+
+function hasRestoreBlockers(blockers: RestoreBlockers): boolean {
+  return Object.values(blockers).some((count) => Number(count) > 0);
 }
 
 operations.get('/api/operations/control', async (c) => {
@@ -131,6 +207,31 @@ operations.post(
 );
 
 operations.post(
+  '/api/operations/incidents/:id/restore-preview',
+  requireRole('owner', 'admin'),
+  async (c) => {
+    const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
+    if (!incident || incident.status !== 'stopped') {
+      return c.json({ success: false, error: '復旧できる停止記録ではありません' }, 409);
+    }
+    if (!await canUseScope(c, incident.lineAccountId)) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    const blockers = await countRestoreBlockers(c.env.DB, incident);
+    return c.json({
+      success: true,
+      data: {
+        incidentId: incident.id,
+        controlVersion: (await getOperationControlSet(c.env.DB, incident.lineAccountId)).version,
+        blockers,
+        canRestore: !hasRestoreBlockers(blockers),
+        calculatedAt: new Date().toISOString(),
+      },
+    });
+  },
+);
+
+operations.post(
   '/api/operations/incidents/:id/restore',
   requireRole('owner', 'admin'),
   requireIrreversibleConfirmation('operation-restore'),
@@ -142,6 +243,14 @@ operations.post(
     if (body.confirmation !== '復旧') return c.json({ success: false, error: '確認のため「復旧」と入力してください' }, 400);
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
       return c.json({ success: false, error: 'expectedVersion は1以上の整数で指定してください' }, 400);
+    }
+    const blockers = await countRestoreBlockers(c.env.DB, incident);
+    if (hasRestoreBlockers(blockers)) {
+      return c.json({
+        success: false,
+        error: '期限切れまたは実行待ちの処理があります。内容を整理してから復旧してください。',
+        data: { blockers },
+      }, 409);
     }
     const result = await restoreOperationIncident(c.env.DB, {
       incidentId: incident.id,

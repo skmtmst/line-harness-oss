@@ -85,4 +85,40 @@ describe('運用状態API', () => {
       data: expect.arrayContaining([expect.objectContaining({ reason: '誤配信', status: 'stopped' })]),
     })
   })
+
+  it('期限切れの予約がある間は復旧を拒否し、整理後だけ復旧する', async () => {
+    const stopped = await app().request('/api/operations/incidents', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop' },
+      body: JSON.stringify({ lineAccountId: 'account-1', capabilities: ['broadcast_dispatch'], reason: '障害', expectedVersion: 0, confirmation: '停止' }),
+    }, { DB: testDb.db })
+    const stoppedBody = await stopped.json() as { data: { control: { version: number }; incident: { id: string } } }
+    testDb.raw.prepare(
+      `INSERT INTO broadcasts
+         (id, title, message_type, message_content, target_type, status, scheduled_at, line_account_id)
+       VALUES ('broadcast-overdue', '期限切れ', 'text', '本文', 'all', 'scheduled', '2020-01-01T00:00:00.000Z', 'account-1')`,
+    ).run()
+
+    const preview = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore-preview`,
+      { method: 'POST' },
+      { DB: testDb.db },
+    )
+    expect(await preview.json()).toMatchObject({
+      success: true,
+      data: { canRestore: false, blockers: { broadcast_dispatch: 1 } },
+    })
+
+    const restoreRequest = () => app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-restore' },
+        body: JSON.stringify({ expectedVersion: stoppedBody.data.control.version, confirmation: '復旧' }),
+      },
+      { DB: testDb.db },
+    )
+    expect((await restoreRequest()).status).toBe(409)
+    testDb.raw.prepare("UPDATE broadcasts SET status = 'draft' WHERE id = 'broadcast-overdue'").run()
+    expect((await restoreRequest()).status).toBe(200)
+  })
 })
