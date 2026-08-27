@@ -2309,3 +2309,71 @@ export const EVENTS = [
     pending_count: 0, visible_tag_id: null, visible_tag_name: null,
   },
 ]
+
+/**
+ * 機能30 ログインユーザー。設計 `e3jz3`（いまいる人8・招待中2）。
+ *
+ * **`StaffMember` の型どおり。** `role` は `'owner'|'admin'|'staff'|'viewer'` の
+ * 4つで、設計の「運用」「受付」「見るだけ」はその上に乗せた言い換え。
+ */
+export const STAFF_MEMBERS = [
+  {
+    id: 'st-1', name: '佐々木 亮太', email: 'sasaki@example.com', role: 'owner',
+    lineLinked: true, twoFactorEnabled: true, isActive: true,
+    permissionKeys: [], notificationPreferences: {},
+    assignedLineAccountId: null, accountScope: 'all', scopedLineAccountIds: [],
+    inviteStatus: 'active', canAccessDescendantAccounts: true,
+    createdAt: '2025-04-01T00:00:00.000Z', updatedAt: '2026-08-25T00:10:00.000Z',
+  },
+  {
+    id: 'st-2', name: '川野 健太', email: 'kawano@example.com', role: 'admin',
+    lineLinked: true, twoFactorEnabled: true, isActive: true,
+    permissionKeys: [], notificationPreferences: {},
+    assignedLineAccountId: null, accountScope: 'all', scopedLineAccountIds: [],
+    inviteStatus: 'active', canAccessDescendantAccounts: true,
+    createdAt: '2025-04-01T00:00:00.000Z', updatedAt: '2026-08-24T09:40:00.000Z',
+  },
+  {
+    /* 2段階の確認を入れていない人。**設計は「6／8人」と数える。** */
+    id: 'st-3', name: '高田 誠', email: 'takada@example.com', role: 'staff',
+    lineLinked: true, twoFactorEnabled: false, isActive: true,
+    permissionKeys: ['inbox', 'friends'], notificationPreferences: {},
+    assignedLineAccountId: 'visual-qa-account', accountScope: 'accounts',
+    scopedLineAccountIds: ['visual-qa-account'],
+    inviteStatus: 'active', canAccessDescendantAccounts: false,
+    createdAt: '2026-01-10T00:00:00.000Z', updatedAt: '2026-08-22T02:00:00.000Z',
+  },
+  {
+    /* 90日 入っていない人。**辞めた方かもしれない。** */
+    id: 'st-4', name: '山本 京子', email: 'yamamoto@example.com', role: 'viewer',
+    lineLinked: false, twoFactorEnabled: false, isActive: true,
+    permissionKeys: ['analytics'], notificationPreferences: {},
+    assignedLineAccountId: null, accountScope: 'all', scopedLineAccountIds: [],
+    inviteStatus: 'active', canAccessDescendantAccounts: false,
+    createdAt: '2025-09-15T00:00:00.000Z', updatedAt: '2026-05-01T00:00:00.000Z',
+  },
+  {
+    /* まだ一度も入っていない（招待中）。**`lastLoginAt` が null。** */
+    id: 'st-5', name: '中川 由美', email: 'nakagawa@example.com', role: 'staff',
+    lineLinked: false, twoFactorEnabled: false, isActive: true,
+    permissionKeys: [], notificationPreferences: {},
+    assignedLineAccountId: null, accountScope: 'all', scopedLineAccountIds: [],
+    /* **招待して返事がない人。** `inviteStatus` が `pending_email` のまま。 */
+    inviteStatus: 'pending_email', canAccessDescendantAccounts: false,
+    createdAt: '2026-08-18T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
+  },
+]
+
+/**
+ * 対応マーク（機能4-3）。設計 `k6lHgo` の5つ。
+ *
+ * **`autoOnInbound` を必ず入れる。** 「新しい返事が来たら自動で戻す」印で、
+ * 落とすとダッシュボードの対応マークの帯が `—` のまま撮れる。
+ */
+export const SUPPORT_MARKS = [
+  { id: 'mark-1', name: '未対応', color: '#dc2626', isDefault: true, autoOnInbound: true, displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z' },
+  { id: 'mark-2', name: '対応中', color: '#d97706', isDefault: false, autoOnInbound: false, displayOrder: 2, createdAt: '2026-01-05T00:00:00.000Z' },
+  { id: 'mark-3', name: '保留', color: '#2563eb', isDefault: false, autoOnInbound: false, displayOrder: 3, createdAt: '2026-01-05T00:00:00.000Z' },
+  { id: 'mark-4', name: '対応済', color: '#059669', isDefault: false, autoOnInbound: false, displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z' },
+  { id: 'mark-5', name: '気にかける', color: '#7c3aed', isDefault: false, autoOnInbound: false, displayOrder: 5, createdAt: '2026-04-10T00:00:00.000Z' },
+]

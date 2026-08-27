@@ -121,6 +121,9 @@ const BOOKING_SET = { feature: 28, dir: 'booking-settings-v6', route: '/booking/
 /** イベント予約。一覧・作成・申込者の3ルート。 */
 const EVENT = { feature: 29, dir: 'events-v6', route: '/events', mode: 'page' }
 
+/** ログインユーザー。実装は1枚もので、編集は窓で開く。 */
+const STAFF = { feature: 30, dir: 'staff-v6', route: '/staff', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -1064,6 +1067,23 @@ export const SCREENS = [
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
+
+  // ── 機能30 ログインユーザー ─────────────────────────────
+  /*
+    設計のタブは4本（いまいる人8／招待中2／入った記録／権限のかたまり5）。
+    実装は1枚もの。
+  */
+  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー' },
+  {
+    ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
+    mode: 'viewport', height: 1080, steps: [{ click: '高田 誠', role: 'text' }],
+  },
+  {
+    ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録',
+    status: 'unimplemented',
+    why: '入った記録を並べる画面が無い。窓の中に「このユーザーにはログイン履歴が N 件あります」と**数だけ**出る（`staff/page.tsx:31`）。いつ・だれが・何をしたかは読めない',
+  },
+  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。

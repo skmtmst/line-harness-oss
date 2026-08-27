@@ -199,7 +199,16 @@ async function captureImpl(feature) {
         const landed = url.pathname + url.search
         if (landed !== s.route) throw new Error(`${s.route} から ${landed} へ飛ばされた`)
         const body = await page.locator('body').innerText()
-        if (body.includes('LINEでログイン')) throw new Error('ログイン画面になっている')
+        /*
+          **文字だけで見分けない。** 「LINEでログイン」は説明文にも出る
+          （`/staff/new` の「3. 連携完了後はLINEでログイン」）。**押せる形**で
+          在るかどうかで見る。ログイン画面はそれをボタンとして出す。
+        */
+        const loginButton = await page
+          .getByRole('button', { name: 'LINEでログイン' })
+          .count()
+          .catch(() => 0)
+        if (loginButton > 0) throw new Error('ログイン画面になっている')
         /*
           **落ちた画面をそのまま撮らない。** 受信箱で会話を開いたとき、
           右の顧客情報が `mileage.summary.programName` で落ち、画面が
