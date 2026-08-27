@@ -294,7 +294,7 @@
   },
   "app/scenarios/detail/scenario-detail-client.tsx": {
     "arbitrary-value": 6,
-    "direct-secondary-button": 10,
+    "direct-secondary-button": 9,
     "direct-primary-button": 3,
     "direct-th": 7
   },
