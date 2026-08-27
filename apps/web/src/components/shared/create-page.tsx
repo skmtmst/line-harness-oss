@@ -34,6 +34,8 @@ export interface CreatePageProps {
   aside?: ReactNode
   /** 保存ボタンの文言。設計は画面ごとに「メニューを追加」などと書き分けている */
   saveLabel?: string
+  /** 共通トップバーが画面名を持つV6では本文の見出しを重ねない。 */
+  showHeader?: boolean
   children: ReactNode
 }
 
@@ -46,6 +48,7 @@ export default function CreatePage({
   validate,
   aside,
   saveLabel,
+  showHeader = true,
   children,
 }: CreatePageProps) {
   const router = useRouter()
@@ -93,9 +96,9 @@ export default function CreatePage({
         <span>{title}</span>
       </nav>
 
-      <div data-design="Head">
+      {showHeader && <div data-design="Head">
         <Header title={title} description={description} />
-      </div>
+      </div>}
 
       <div data-design="Body" className={aside ? 'flex flex-col gap-4 xl:flex-row' : undefined}>
         <div

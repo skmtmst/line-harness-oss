@@ -54,11 +54,12 @@ export default function NewStaffPage() {
     })
   }, [])
 
-  return <CreatePage
+  return <div data-design-node="I3ZSrU"><CreatePage
     title="ユーザーを追加する"
     description="管理画面にログインできる人を追加し、できることの範囲を決めます。"
     parent={['ログインユーザー', '/staff?tab=members']}
     saveLabel="招待メールを送る"
+    showHeader={false}
     validate={() => !name.trim() ? '名前を入力してください' : !email.trim() ? 'メールアドレスを入力してください' : !assignedLineAccountId ? '最初に表示するLINEアカウントを選択してください' : role === 'staff' && permissionKeys.length === 0 ? 'スタッフに表示する機能を1つ以上選択してください' : null}
     onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys, notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: true, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
@@ -101,5 +102,5 @@ export default function NewStaffPage() {
     <FormSection step={role === 'staff' ? 5 : 4} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
       <div className="divide-hairline overflow-hidden rounded-card border border-hairline divide-y">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 px-4 py-3"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>メール</span><NotificationSwitch checked={notifications[key].email} onChange={() => toggleChannel(key, 'email')} label={`${label}をメールで通知`} /></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>LINE</span><NotificationSwitch checked={notifications[key].line} onChange={() => toggleChannel(key, 'line')} label={`${label}をLINEで通知`} /></div></div>)}</div>
     </FormSection>
-  </CreatePage>
+  </CreatePage></div>
 }
