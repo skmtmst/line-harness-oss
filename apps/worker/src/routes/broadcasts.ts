@@ -14,6 +14,7 @@ import { processSegmentSend } from '../services/segment-send.js';
 import type { SegmentCondition } from '../services/segment-query.js';
 import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { resolveLineToken } from '../services/line-token.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import {
   assertNoUnresolvedBroadcastVariables,
@@ -1025,13 +1026,19 @@ broadcasts.post('/api/broadcasts/:id/send', requireRole('owner', 'admin'), requi
     // 500人以下またはtarget_type='all'は即時送信
     // accessToken 解決は lock 前に行う (setup 失敗時に status='sending' で stuck しないため、
     // 即時送信パスには recoverStalledBroadcasts がない)
-    let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+    let accountToken: string | null = null;
     const broadcastAccountId = (existing as unknown as Record<string, unknown>).line_account_id;
     if (broadcastAccountId) {
       const { getLineAccountById } = await import('@line-crm/db');
       const account = await getLineAccountById(c.env.DB, broadcastAccountId as string);
-      if (account) accessToken = account.channel_access_token;
+      accountToken = account?.channel_access_token ?? null;
     }
+    const accessToken = resolveLineToken({
+      accountToken,
+      defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      accountId: (broadcastAccountId as string | null) ?? null,
+      context: 'broadcasts.immediate-send',
+    });
     const lineClient = new LineClient(accessToken);
 
     // atomic lock — 'draft' と 'scheduled' を分けて単一 UPDATE で claim する。
@@ -1219,12 +1226,18 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requireRole('owner', 'admin
     if (lineRequestId) {
       // broadcast API ('all') 経由の insight: 単一 lineRequestId で取れる
       const accountId = rawBroadcast?.line_account_id || null;
-      let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+      let accountToken: string | null = null;
       if (accountId) {
         const { getLineAccountById } = await import('@line-crm/db');
         const account = await getLineAccountById(c.env.DB, accountId);
-        if (account) accessToken = account.channel_access_token;
+        accountToken = account?.channel_access_token ?? null;
       }
+      const accessToken = resolveLineToken({
+        accountToken,
+        defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+        accountId,
+        context: 'broadcasts.message-insight',
+      });
       const lineClient = new LineClient(accessToken);
       const response = await lineClient.getMessageEventInsight(lineRequestId) as Record<string, unknown>;
       const overview = response.overview as Record<string, unknown> | undefined;
@@ -1295,12 +1308,18 @@ broadcasts.post('/api/broadcasts/:id/fetch-insight', requireRole('owner', 'admin
     } else if (aggregationUnit) {
       // tag broadcast (単一アカ): 既存パス
       const accountId = rawBroadcast?.line_account_id || null;
-      let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+      let accountToken: string | null = null;
       if (accountId) {
         const { getLineAccountById } = await import('@line-crm/db');
         const account = await getLineAccountById(c.env.DB, accountId);
-        if (account) accessToken = account.channel_access_token;
+        accountToken = account?.channel_access_token ?? null;
       }
+      const accessToken = resolveLineToken({
+        accountToken,
+        defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+        accountId,
+        context: 'broadcasts.unit-insight',
+      });
       const lineClient = new LineClient(accessToken);
       const response = await lineClient.getUnitInsight(aggregationUnit, sentDate, sentDate) as Record<string, unknown>;
       const messages = response.messages as Array<Record<string, unknown>> | undefined;

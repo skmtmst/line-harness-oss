@@ -38,6 +38,7 @@ import {
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { safeRedirectTarget } from '../lib/safe-redirect.js';
 import type { Env } from '../index.js';
+import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { verifyCrossAccountToken } from '../lib/cross-account-token.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -1034,14 +1035,20 @@ liffRoutes.get('/auth/callback', async (c) => {
         let formLiffUrl = `${new URL(c.req.url).origin}?${formQuery.toString()}`;
         const { LineClient } = await import('@line-crm/line-sdk');
         const { getLineAccountById: getAcctById } = await import('@line-crm/db');
-        let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+        let accountToken: string | null = null;
         if (friend.line_account_id) {
           const account = await getAcctById(db, friend.line_account_id);
-          if (account?.channel_access_token) accessToken = account.channel_access_token;
+          accountToken = account?.channel_access_token ?? null;
           if (account?.liff_id) {
             formLiffUrl = `https://liff.line.me/${account.liff_id}?${formQuery.toString()}`;
           }
         }
+        const accessToken = resolveLineToken({
+          accountToken,
+          defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+          accountId: friend.line_account_id,
+          context: 'liff.oauth-form-send',
+        });
         if (formLiffUrl.startsWith(`${new URL(c.req.url).origin}`)) {
           const envLiffUrl = c.env.LIFF_URL || '';
           const envLiffIdMatch = envLiffUrl.match(/liff\.line\.me\/([0-9]+-[A-Za-z0-9]+)/);
@@ -1967,14 +1974,20 @@ liffRoutes.post('/api/liff/send-form-link', async (c) => {
     if (xh) formQuery.set('xh', xh);
     let formLiffUrl = `${new URL(c.req.url).origin}?${formQuery.toString()}`;
     const { LineClient } = await import('@line-crm/line-sdk');
-    let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+    let accountToken: string | null = null;
     if ((friend as any).line_account_id) {
       const account = await getLineAccountById(db, (friend as any).line_account_id);
-      if (account?.channel_access_token) accessToken = account.channel_access_token;
+      accountToken = account?.channel_access_token ?? null;
       if (account?.liff_id) {
         formLiffUrl = `https://liff.line.me/${account.liff_id}?${formQuery.toString()}`;
       }
     }
+    const accessToken = resolveLineToken({
+      accountToken,
+      defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      accountId: (friend as any).line_account_id ?? null,
+      context: 'liff.form-send',
+    });
     if (formLiffUrl.startsWith(`${new URL(c.req.url).origin}`)) {
       // Fallback: use env LIFF_URL if no account-specific liff_id
       const liffUrl = c.env.LIFF_URL || '';

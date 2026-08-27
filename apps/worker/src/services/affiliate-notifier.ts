@@ -1,4 +1,5 @@
 import { LineClient } from '@line-crm/line-sdk';
+import { resolveLineToken } from './line-token.js';
 import {
   getAffiliateById,
   getFriendById,
@@ -57,11 +58,19 @@ export async function notifyAffiliate(
 
     // Resolve the push token from the friend's LINE account, falling back to
     // the env default when the account row / token is absent.
-    let accessToken = env.LINE_CHANNEL_ACCESS_TOKEN;
+    let accountToken: string | null = null;
+    let accountId: string | null = friend.line_account_id ?? null;
     if (friend.line_account_id) {
       const account = await getLineAccountById(db, friend.line_account_id);
-      if (account?.channel_access_token) accessToken = account.channel_access_token;
+      accountToken = account?.channel_access_token ?? null;
+      accountId = account?.id ?? friend.line_account_id;
     }
+    const accessToken = resolveLineToken({
+      accountToken,
+      defaultToken: env.LINE_CHANNEL_ACCESS_TOKEN,
+      accountId,
+      context: 'affiliate-notifier.push',
+    });
     if (!accessToken) return;
 
     const client = new LineClient(accessToken);

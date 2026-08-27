@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../index.js';
+import { resolveLineToken } from '../services/line-token.js';
 import { getFriendByLineUserIdForAccount, getScenarioById } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { verifySupportRelay } from '../services/support-relay.js';
@@ -81,12 +82,20 @@ app.post('/api/meet-callback', async (c) => {
   if (!receipt.meta.changes) return c.json({ success: true, duplicate: true });
 
   // Resolve LINE access token (multi-account support)
-  let accessToken = c.env.LINE_CHANNEL_ACCESS_TOKEN;
+  let accountToken: string | null = null;
+  let accountId = ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
   if ((friend as unknown as Record<string, unknown>).line_account_id) {
     const { getLineAccountById } = await import('@line-crm/db');
     const account = await getLineAccountById(c.env.DB, (friend as unknown as Record<string, unknown>).line_account_id as string);
-    if (account) accessToken = account.channel_access_token;
+    accountToken = account?.channel_access_token ?? null;
+    accountId = account?.id ?? accountId;
   }
+  const accessToken = resolveLineToken({
+    accountToken,
+    defaultToken: c.env.LINE_CHANNEL_ACCESS_TOKEN,
+    accountId,
+    context: 'meet-callback.confirmation',
+  });
   const lineClient = new LineClient(accessToken);
 
   // Build Flex message with requirements doc

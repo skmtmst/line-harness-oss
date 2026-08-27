@@ -25,6 +25,7 @@ import {
   jstNow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import {
   completeOutboundSendStatement,
@@ -167,6 +168,7 @@ async function resolveFriendAndAccessToken(
   db: D1Database,
   friendId: string,
   defaultAccessToken: string,
+  context: string,
 ) {
   const friend = await getFriendById(db, friendId);
   if (!friend) {
@@ -174,12 +176,18 @@ async function resolveFriendAndAccessToken(
   }
 
   if (!friend.line_account_id) {
-    return { friend, accessToken: defaultAccessToken };
+    return { friend, accessToken: resolveLineToken({
+      accountToken: null, defaultToken: defaultAccessToken,
+      accountId: friend.line_account_id, context,
+    }) };
   }
 
   const account = await getLineAccountById(db, friend.line_account_id);
   if (!account) {
-    return { friend, accessToken: defaultAccessToken };
+    return { friend, accessToken: resolveLineToken({
+      accountToken: null, defaultToken: defaultAccessToken,
+      accountId: friend.line_account_id, context,
+    }) };
   }
 
   return { friend, accessToken: account.channel_access_token };
@@ -977,6 +985,7 @@ chats.post('/api/chats/:id/loading', requireRole('owner', 'admin', 'staff'), req
       c.env.DB,
       chat.friend_id,
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      'chats.loading-animation',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
 
@@ -1021,6 +1030,7 @@ chats.post('/api/chats/:id/send', requireRole('owner', 'admin', 'staff'), requir
       c.env.DB,
       chat.friend_id,
       c.env.LINE_CHANNEL_ACCESS_TOKEN,
+      'chats.manual-send',
     );
     if (!friend) return c.json({ success: false, error: 'Friend not found' }, 404);
 

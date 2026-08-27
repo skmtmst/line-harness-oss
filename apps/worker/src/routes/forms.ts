@@ -26,6 +26,7 @@ import type {
   Friend as DbFriend,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
+import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
@@ -94,11 +95,12 @@ async function resolveFriendAccessToken(
   db: D1Database,
   friend: DbFriend,
   defaultAccessToken: string,
+  context: string,
 ): Promise<string> {
   const accountId = friend.line_account_id ?? null;
-  if (!accountId) return defaultAccessToken;
+  if (!accountId) return resolveLineToken({ accountToken: null, defaultToken: defaultAccessToken, accountId: null, context });
   const account = await getLineAccountById(db, accountId);
-  return account?.channel_access_token ?? defaultAccessToken;
+  return resolveLineToken({ accountToken: account?.channel_access_token, defaultToken: defaultAccessToken, accountId, context });
 }
 
 function serializeForm(
@@ -677,6 +679,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
                 c.env.DB,
                 friend,
                 c.env.LINE_CHANNEL_ACCESS_TOKEN,
+                'forms.webhook-failure-send',
               );
               await pushViaHarnessProxy(
                 new URL(c.req.url).origin,
@@ -805,6 +808,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
                 db,
                 target,
                 c.env.LINE_CHANNEL_ACCESS_TOKEN,
+                'forms.layout-text-send',
               );
               await pushViaHarnessProxy(
                 new URL(c.req.url).origin,
@@ -884,6 +888,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
               db,
               friend,
               c.env.LINE_CHANNEL_ACCESS_TOKEN,
+              'forms.meet-link-send',
             );
             const joinUrl = String(webhookData!.join_url);
             const meetFlex = {
@@ -936,6 +941,7 @@ forms.post('/api/forms/:id/submit', async (c) => {
             db,
             friend,
             c.env.LINE_CHANNEL_ACCESS_TOKEN,
+            'forms.reply-send',
           );
           const { buildMessage, expandVariables } = await import('../services/step-delivery.js');
           const apiOrigin = new URL(c.req.url).origin;
