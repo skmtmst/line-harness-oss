@@ -76,6 +76,17 @@ describe('dashboard organization account policy', () => {
     });
   });
 
+  test('account-scoped staff cannot select an unassigned account', async () => {
+    dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['account-1']);
+
+    const response = await app().request('/api/dashboard/overview?accountId=account-2', {}, env());
+
+    expect(response.status).toBe(404);
+    expect(dbMocks.getLineAccountById).not.toHaveBeenCalled();
+    expect(dbMocks.getDashboardOverview).not.toHaveBeenCalled();
+  });
+
   test('an explicit account is required instead of silently aggregating visible accounts', async () => {
     const response = await app().request('/api/dashboard/overview', {}, env());
     expect(response.status).toBe(400);
