@@ -23,6 +23,7 @@ export interface StaffMember {
   totp_last_used_step: number | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
+  account_scope?: 'all' | 'accounts';
   tenant_id: string | null;
   created_at: string;
   updated_at: string;
@@ -42,6 +43,7 @@ export interface CreateStaffInput {
   invite_expires_at?: string | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
+  account_scope?: 'all' | 'accounts';
   tenant_id?: string | null;
 }
 
@@ -65,6 +67,7 @@ export interface UpdateStaffInput {
   totp_last_used_step?: number | null;
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: boolean;
+  account_scope?: 'all' | 'accounts';
 }
 
 function generateApiKey(): string {
@@ -143,8 +146,8 @@ export async function createStaffMember(
        (id, name, email, role, access_level, api_key, line_user_id, is_active,
         permission_keys, notification_preferences, invite_status, invite_token_hash,
         invite_expires_at, assigned_line_account_id, can_access_descendant_accounts,
-        tenant_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        account_scope, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id, input.name, input.email ?? null, input.role, input.access_level ?? 'full', apiKey,
@@ -153,6 +156,7 @@ export async function createStaffMember(
       input.invite_status ?? 'active', input.invite_token_hash ?? null,
       input.invite_expires_at ?? null, input.assigned_line_account_id ?? null,
       input.can_access_descendant_accounts ? 1 : 0,
+      input.account_scope ?? 'all',
       input.tenant_id ?? DEFAULT_TENANT_ID, now, now,
     )
     .run();
@@ -191,6 +195,7 @@ export async function updateStaffMember(
   if (input.totp_last_used_step !== undefined) { sets.push('totp_last_used_step = ?'); values.push(input.totp_last_used_step); }
   if (input.assigned_line_account_id !== undefined) { sets.push('assigned_line_account_id = ?'); values.push(input.assigned_line_account_id); }
   if (input.can_access_descendant_accounts !== undefined) { sets.push('can_access_descendant_accounts = ?'); values.push(input.can_access_descendant_accounts ? 1 : 0); }
+  if (input.account_scope !== undefined) { sets.push('account_scope = ?'); values.push(input.account_scope); }
 
   values.push(id);
   await db
@@ -199,6 +204,28 @@ export async function updateStaffMember(
     .run();
 
   return db.prepare('SELECT * FROM staff_members WHERE id = ?').bind(id).first<StaffMember>();
+}
+
+export async function getStaffAccountScopeIds(db: D1Database, staffId: string): Promise<string[]> {
+  const result = await db
+    .prepare('SELECT line_account_id FROM staff_account_scopes WHERE staff_id = ? ORDER BY line_account_id')
+    .bind(staffId)
+    .all<{ line_account_id: string }>();
+  return result.results.map((row) => row.line_account_id);
+}
+
+export async function replaceStaffAccountScopes(
+  db: D1Database,
+  staffId: string,
+  lineAccountIds: string[],
+): Promise<void> {
+  const now = jstNow();
+  await db.batch([
+    db.prepare('DELETE FROM staff_account_scopes WHERE staff_id = ?').bind(staffId),
+    ...lineAccountIds.map((lineAccountId) => db
+      .prepare('INSERT INTO staff_account_scopes (staff_id, line_account_id, created_at) VALUES (?, ?, ?)')
+      .bind(staffId, lineAccountId, now)),
+  ]);
 }
 
 export async function getStaffByInviteTokenHash(db: D1Database, tokenHash: string): Promise<StaffMember | null> {

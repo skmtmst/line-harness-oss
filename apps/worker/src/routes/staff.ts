@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import {
   getStaffMembers, getStaffById, getStaffByInviteTokenHash,
   createStaffMember, updateStaffMember, deleteStaffMember, countLoginAudit,
+  getStaffAccountScopeIds, replaceStaffAccountScopes,
 } from '@line-crm/db';
 import type { StaffMember } from '@line-crm/db';
 import { requireRole } from '../middleware/role-guard.js';
@@ -25,7 +26,8 @@ function displayRole(row: StaffMember): 'admin' | 'staff' | 'viewer' {
   return row.role === 'staff' ? 'staff' : 'admin';
 }
 
-function serializeStaff(row: StaffMember) {
+async function serializeStaff(db: D1Database, row: StaffMember) {
+  const accountScope = row.account_scope ?? 'all';
   return {
     id: row.id,
     name: row.name,
@@ -41,7 +43,46 @@ function serializeStaff(row: StaffMember) {
     updatedAt: row.updated_at,
     assignedLineAccountId: row.assigned_line_account_id ?? null,
     canAccessDescendantAccounts: Boolean(row.can_access_descendant_accounts),
+    accountScope,
+    scopedLineAccountIds: accountScope === 'accounts' ? await getStaffAccountScopeIds(db, row.id) : [],
   };
+}
+
+type AccountScopeInput = {
+  accountScope?: 'all' | 'accounts';
+  scopedLineAccountIds?: string[];
+};
+
+function normalizeAccountScopeInput(body: AccountScopeInput):
+  | { accountScope: undefined; scopedLineAccountIds: undefined }
+  | { accountScope: 'all' | 'accounts'; scopedLineAccountIds: string[] }
+  | { error: string } {
+  if (body.accountScope === undefined) {
+    return { accountScope: undefined, scopedLineAccountIds: undefined };
+  }
+  if (body.accountScope !== 'all' && body.accountScope !== 'accounts') {
+    return { error: '店舗の権限範囲が正しくありません' };
+  }
+  if (body.accountScope === 'all') return { accountScope: 'all', scopedLineAccountIds: [] };
+  if (!Array.isArray(body.scopedLineAccountIds)) return { error: '指定店舗を選択してください' };
+  const ids = [...new Set(body.scopedLineAccountIds.filter((id): id is string => typeof id === 'string' && id.length > 0))];
+  if (ids.length === 0 || ids.length !== body.scopedLineAccountIds.length) {
+    return { error: '指定店舗を1つ以上選択してください' };
+  }
+  return { accountScope: 'accounts', scopedLineAccountIds: ids };
+}
+
+async function mayAssignAccountScopes(
+  db: D1Database,
+  current: Env['Variables']['staff'],
+  requestedIds: string[],
+): Promise<boolean> {
+  if (requestedIds.length === 0) return true;
+  const currentMember = current.id === 'env-owner' ? null : await getStaffById(db, current.id);
+  const allowedIds = currentMember?.account_scope === 'accounts'
+    ? await getStaffAccountScopeIds(db, current.id)
+    : filterVisibleLineAccounts(await getLineAccounts(db), current).map((account) => account.id);
+  return requestedIds.every((id) => allowedIds.includes(id));
 }
 
 /**
@@ -107,11 +148,11 @@ staff.get('/api/staff/me', async (c) => {
   try {
     const current = c.get('staff');
     if (current.id === 'env-owner') {
-      return c.json({ success: true, data: { id: current.id, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true } });
+      return c.json({ success: true, data: { id: current.id, name: '管理者', role: 'admin', email: null, permissionKeys: [], assignedLineAccountId: null, canAccessDescendantAccounts: true, accountScope: 'all', scopedLineAccountIds: [] } });
     }
     const member = await getStaffById(c.env.DB, current.id);
     if (!member) return c.json({ success: false, error: 'Staff member not found' }, 404);
-    return c.json({ success: true, data: serializeStaff(member) });
+    return c.json({ success: true, data: await serializeStaff(c.env.DB, member) });
   } catch (error) {
     console.error('GET /api/staff/me error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -120,7 +161,8 @@ staff.get('/api/staff/me', async (c) => {
 
 staff.get('/api/staff', async (c) => {
   try {
-    return c.json({ success: true, data: (await getStaffMembers(c.env.DB, currentTenantId(c))).map(serializeStaff) });
+    const members = await getStaffMembers(c.env.DB, currentTenantId(c));
+    return c.json({ success: true, data: await Promise.all(members.map((member) => serializeStaff(c.env.DB, member))) });
   } catch (error) {
     console.error('GET /api/staff error:', error);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -143,7 +185,7 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
 staff.get('/api/staff/:id', async (c) => {
   const member = await getStaffById(c.env.DB, c.req.param('id'));
   return member && isInCurrentTenant(c, member)
-    ? c.json({ success: true, data: serializeStaff(member) })
+    ? c.json({ success: true, data: await serializeStaff(c.env.DB, member) })
     : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
@@ -154,7 +196,10 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
       assignedLineAccountId?: string | null;
       canAccessDescendantAccounts?: boolean;
+      accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[];
     }>();
+    const accountScope = normalizeAccountScopeInput(body);
+    if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
     const name = body.name?.trim();
     const email = body.email?.trim().toLowerCase();
     if (!name) return c.json({ success: false, error: '名前を入力してください' }, 400);
@@ -175,6 +220,9 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     if (body.canAccessDescendantAccounts && !canGrantDescendants) {
       return c.json({ success: false, error: '自分が持っていない他アカウント権限は付与できません' }, 403);
     }
+    if (accountScope.accountScope === 'accounts' && !await mayAssignAccountScopes(c.env.DB, current, accountScope.scopedLineAccountIds)) {
+      return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
+    }
     if ((await getStaffMembers(c.env.DB, currentTenantId(c))).some((item) => item.email?.toLowerCase() === email)) {
       return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
     }
@@ -192,9 +240,11 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       invite_expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
       assigned_line_account_id: body.assignedLineAccountId,
       can_access_descendant_accounts: body.role === 'admin' && Boolean(body.canAccessDescendantAccounts),
+      account_scope: accountScope.accountScope ?? 'all',
       tenant_id: current.tenantId ?? DEFAULT_TENANT_ID,
     });
     try {
+      await replaceStaffAccountScopes(c.env.DB, member.id, accountScope.scopedLineAccountIds ?? []);
       await sendStaffInviteEmail(c.env, {
         name, email,
         verifyUrl: `${new URL(c.req.url).origin}/api/staff/invitations/${encodeURIComponent(token)}/verify`,
@@ -203,7 +253,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       await deleteStaffMember(c.env.DB, member.id);
       throw error;
     }
-    return c.json({ success: true, data: serializeStaff(member) }, 201);
+    return c.json({ success: true, data: await serializeStaff(c.env.DB, member) }, 201);
   } catch (error) {
     console.error('POST /api/staff error:', error);
     return c.json({ success: false, error: '招待メールを送信できませんでした' }, 500);
@@ -233,7 +283,10 @@ staff.patch('/api/staff/:id', async (c) => {
     lineLinked?: boolean;
     permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>;
     assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean;
+    accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[];
   }>();
+  const accountScope = normalizeAccountScopeInput(body);
+  if ('error' in accountScope) return c.json({ success: false, error: accountScope.error }, 400);
 
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return c.json({ success: false, error: 'Staff member not found' }, 404);
@@ -244,7 +297,7 @@ staff.patch('/api/staff/:id', async (c) => {
   }
   if (!administrator && (
     body.name !== undefined || body.role !== undefined || body.isActive !== undefined || body.permissionKeys !== undefined ||
-    body.assignedLineAccountId !== undefined || body.canAccessDescendantAccounts !== undefined
+    body.assignedLineAccountId !== undefined || body.canAccessDescendantAccounts !== undefined || body.accountScope !== undefined
   )) {
     return c.json({ success: false, error: '権限と利用状態は管理者だけが変更できます' }, 403);
   }
@@ -282,6 +335,9 @@ staff.patch('/api/staff/:id', async (c) => {
   ) {
     return c.json({ success: false, error: '自分が持っていない他アカウント権限は付与できません' }, 403);
   }
+  if (administrator && accountScope.accountScope === 'accounts' && !await mayAssignAccountScopes(c.env.DB, current, accountScope.scopedLineAccountIds)) {
+    return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
+  }
 
   const updated = await updateStaffMember(c.env.DB, id, {
     name: body.name, email: body.email,
@@ -299,8 +355,12 @@ staff.patch('/api/staff/:id', async (c) => {
       body.role === 'admin' || (body.role === undefined && target.role !== 'staff')
         ? body.canAccessDescendantAccounts
         : false,
+    account_scope: accountScope.accountScope,
   });
-  return updated ? c.json({ success: true, data: serializeStaff(updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+  if (updated && accountScope.accountScope !== undefined) {
+    await replaceStaffAccountScopes(c.env.DB, id, accountScope.scopedLineAccountIds);
+  }
+  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
 function canEditMember(c: { get: (key: 'staff') => Env['Variables']['staff'] }, id: string): boolean {
@@ -351,7 +411,7 @@ staff.post('/api/staff/:id/two-factor/confirm', async (c) => {
     totp_enabled_at: new Date().toISOString(),
     totp_last_used_step: null,
   });
-  return c.json({ success: true, data: serializeStaff(updated!) });
+  return c.json({ success: true, data: await serializeStaff(c.env.DB, updated!) });
 });
 
 staff.delete('/api/staff/:id/two-factor', async (c) => {
@@ -365,7 +425,7 @@ staff.delete('/api/staff/:id/two-factor', async (c) => {
     totp_enabled_at: null,
     totp_last_used_step: null,
   });
-  return updated ? c.json({ success: true, data: serializeStaff(updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
+  return updated ? c.json({ success: true, data: await serializeStaff(c.env.DB, updated) }) : c.json({ success: false, error: 'Staff member not found' }, 404);
 });
 
 staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
