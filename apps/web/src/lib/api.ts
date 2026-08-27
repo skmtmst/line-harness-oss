@@ -3101,39 +3101,50 @@ export const api = {
   },
   webhooks: {
     incoming: {
-      list: () =>
-        fetchApi<ApiResponse<IncomingWebhook[]>>('/api/webhooks/incoming'),
-      create: (data: { name: string; sourceType?: string; secret: string }) =>
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<IncomingWebhook[]>>(
+          `/api/webhooks/incoming?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (data: { lineAccountId: string; name: string; sourceType?: string; secret: string }) =>
         fetchApi<ApiResponse<IncomingWebhookCreated>>('/api/webhooks/incoming', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string }) =>
-        fetchApi<ApiResponse<IncomingWebhook>>(`/api/webhooks/incoming/${id}`, {
+      update: (id: string, lineAccountId: string, data: Partial<Pick<IncomingWebhook, 'name' | 'sourceType' | 'isActive'>> & { secret?: string }) =>
+        fetchApi<ApiResponse<IncomingWebhook>>(`/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           body: JSON.stringify(data),
         }),
-      delete: (id: string) =>
-        fetchApi<ApiResponse<null>>(`/api/webhooks/incoming/${id}`, { method: 'DELETE' }),
+      delete: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<null>>(
+          `/api/webhooks/incoming/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'DELETE' },
+        ),
     },
     outgoing: {
-      list: () =>
-        fetchApi<ApiResponse<OutgoingWebhook[]>>('/api/webhooks/outgoing'),
-      create: (data: { name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }) =>
+      list: (lineAccountId: string) =>
+        fetchApi<ApiResponse<OutgoingWebhook[]>>(
+          `/api/webhooks/outgoing?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+        ),
+      create: (data: { lineAccountId: string; name: string; url: string; eventTypes: string[]; secret: string; maxRetries?: number }) =>
         fetchApi<ApiResponse<OutgoingWebhookCreated>>('/api/webhooks/outgoing', {
           method: 'POST',
           body: JSON.stringify(data),
         }),
       update: (
         id: string,
+        lineAccountId: string,
         data: Partial<Pick<OutgoingWebhook, 'name' | 'url' | 'eventTypes' | 'isActive' | 'maxRetries'>> & { secret?: string },
       ) =>
-        fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}`, {
+        fetchApi<ApiResponse<OutgoingWebhook>>(`/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`, {
           method: 'PUT',
           body: JSON.stringify(data),
         }),
-      delete: (id: string) =>
-        fetchApi<ApiResponse<null>>(`/api/webhooks/outgoing/${id}`, { method: 'DELETE' }),
+      delete: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<null>>(
+          `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'DELETE' },
+        ),
     },
   },
   notifications: {

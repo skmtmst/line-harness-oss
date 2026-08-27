@@ -7,6 +7,7 @@ import type { IncomingWebhook, OutgoingWebhook } from '@line-crm/shared'
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationsPage from '@/app/notifications/page'
+import { useAccount } from '@/contexts/account-context'
 
 type Tab = 'incoming' | 'outgoing'
 
@@ -37,6 +38,7 @@ const MERGED_TABS = [
 ]
 
 function WebhooksPageInner() {
+  const { selectedAccountId } = useAccount()
   const [tab, setTab] = useState<Tab>('incoming')
   const [incoming, setIncoming] = useState<IncomingWebhook[]>([])
   const [outgoing, setOutgoing] = useState<OutgoingWebhook[]>([])
@@ -61,12 +63,18 @@ function WebhooksPageInner() {
   const [rotateSecretValue, setRotateSecretValue] = useState('')
 
   const load = useCallback(async () => {
+    if (!selectedAccountId) {
+      setIncoming([])
+      setOutgoing([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError('')
     try {
       const [inRes, outRes] = await Promise.all([
-        api.webhooks.incoming.list(),
-        api.webhooks.outgoing.list(),
+        api.webhooks.incoming.list(selectedAccountId),
+        api.webhooks.outgoing.list(selectedAccountId),
       ])
       if (inRes.success) setIncoming(inRes.data)
       else setError(inRes.error)
@@ -77,13 +85,14 @@ function WebhooksPageInner() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => { load() }, [load])
 
   const handleToggleIncoming = async (id: string, currentActive: boolean) => {
+    if (!selectedAccountId) return setError('LINEアカウントを選択してください')
     try {
-      await api.webhooks.incoming.update(id, { isActive: !currentActive })
+      await api.webhooks.incoming.update(id, selectedAccountId, { isActive: !currentActive })
       load()
     } catch {
       setError('更新に失敗しました')
@@ -91,8 +100,9 @@ function WebhooksPageInner() {
   }
 
   const handleToggleOutgoing = async (id: string, currentActive: boolean) => {
+    if (!selectedAccountId) return setError('LINEアカウントを選択してください')
     try {
-      await api.webhooks.outgoing.update(id, { isActive: !currentActive })
+      await api.webhooks.outgoing.update(id, selectedAccountId, { isActive: !currentActive })
       load()
     } catch {
       setError('更新に失敗しました')
@@ -100,9 +110,10 @@ function WebhooksPageInner() {
   }
 
   const handleDeleteIncoming = async (id: string) => {
+    if (!selectedAccountId) return setError('LINEアカウントを選択してください')
     if (!confirm('この受信Webhookを削除しますか？')) return
     try {
-      await api.webhooks.incoming.delete(id)
+      await api.webhooks.incoming.delete(id, selectedAccountId)
       load()
     } catch {
       setError('削除に失敗しました')
@@ -110,9 +121,10 @@ function WebhooksPageInner() {
   }
 
   const handleDeleteOutgoing = async (id: string) => {
+    if (!selectedAccountId) return setError('LINEアカウントを選択してください')
     if (!confirm('この送信Webhookを削除しますか？')) return
     try {
-      await api.webhooks.outgoing.delete(id)
+      await api.webhooks.outgoing.delete(id, selectedAccountId)
       load()
     } catch {
       setError('削除に失敗しました')
@@ -122,6 +134,7 @@ function WebhooksPageInner() {
   const handleCreateIncoming = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (!selectedAccountId) return setError('LINEアカウントを選択してください')
     if (!inForm.name) return
     if (inForm.secret.length < MIN_SECRET_LENGTH) {
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
@@ -129,6 +142,7 @@ function WebhooksPageInner() {
     }
     try {
       const res = await api.webhooks.incoming.create({
+        lineAccountId: selectedAccountId,
         name: inForm.name,
         sourceType: inForm.sourceType || undefined,
         secret: inForm.secret,
@@ -150,6 +164,7 @@ function WebhooksPageInner() {
   const handleCreateOutgoing = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (!selectedAccountId) return setError('LINEアカウントを選択してください')
     if (!outForm.name || !outForm.url) return
     if (!isHttpsUrl(outForm.url)) {
       setError('URLは https:// から始まる必要があります')
@@ -165,6 +180,7 @@ function WebhooksPageInner() {
         .map((s) => s.trim())
         .filter(Boolean)
       const res = await api.webhooks.outgoing.create({
+        lineAccountId: selectedAccountId,
         name: outForm.name,
         url: outForm.url,
         eventTypes,
@@ -197,6 +213,7 @@ function WebhooksPageInner() {
   const handleRotateSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (!selectedAccountId) return setError('LINEアカウントを選択してください')
     if (!rotateTarget) return
     if (rotateSecretValue.length < MIN_SECRET_LENGTH) {
       setError(`シークレットは最低${MIN_SECRET_LENGTH}文字必要です`)
@@ -206,8 +223,8 @@ function WebhooksPageInner() {
       const payload = { secret: rotateSecretValue, isActive: rotateTarget.activate || undefined }
       const res =
         rotateTarget.kind === 'incoming'
-          ? await api.webhooks.incoming.update(rotateTarget.id, payload)
-          : await api.webhooks.outgoing.update(rotateTarget.id, payload)
+          ? await api.webhooks.incoming.update(rotateTarget.id, selectedAccountId, payload)
+          : await api.webhooks.outgoing.update(rotateTarget.id, selectedAccountId, payload)
       if (!res.success) {
         setError(res.error)
         return

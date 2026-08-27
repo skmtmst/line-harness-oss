@@ -43,6 +43,7 @@ import { webhooks } from './webhooks.js';
 
 const VALID_SECRET = 'a'.repeat(32);
 const SHORT_SECRET = 'a'.repeat(31);
+const ACCOUNT_ID = 'account-a';
 
 function setupApp(tenantId?: string) {
   const app = new Hono<Env>();
@@ -61,9 +62,10 @@ const baseEnv = { DB: {} as D1Database } as Record<string, unknown>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(canAccessAllLineAccounts).mockResolvedValue(true);
   vi.mocked(getIncomingWebhookById).mockResolvedValue({
     id: 'iwh-1', name: 'test', source_type: 'custom', secret: VALID_SECRET,
-    is_active: 1, line_account_id: null, created_at: '2026-05-08', updated_at: '2026-05-08',
+    is_active: 1, line_account_id: ACCOUNT_ID, created_at: '2026-05-08', updated_at: '2026-05-08',
   });
   vi.mocked(getOutgoingWebhookById).mockResolvedValue({
     id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
@@ -127,6 +129,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
           url: 'http://example.com/hook',
           eventTypes: ['*'],
           secret: VALID_SECRET,
+          lineAccountId: ACCOUNT_ID,
         }),
       },
       baseEnv,
@@ -181,6 +184,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
           url: 'https://example.com/hook',
           eventTypes: ['*'],
           secret: VALID_SECRET,
+          lineAccountId: ACCOUNT_ID,
         }),
       },
       baseEnv,
@@ -194,7 +198,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
     expect(body.success).toBe(true);
     expect(body.data.secret).toBe(VALID_SECRET);
     expect(body.data.id).toBe('wh-1');
-    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: undefined }));
+    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }));
   });
 
   test('既定でない統括はLINEアカウントを省略できない', async () => {
@@ -203,7 +207,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
       body: JSON.stringify({ name: 'test', url: 'https://example.com/hook', secret: VALID_SECRET }),
     }, baseEnv);
     expect(res.status).toBe(400);
-    expect((await res.json()) as object).toMatchObject({ error: 'どのLINEアカウント向けか選んでください' });
+    expect((await res.json()) as object).toMatchObject({ error: 'LINEアカウントを選択してください' });
     expect(createOutgoingWebhook).not.toHaveBeenCalled();
   });
 
@@ -225,7 +229,7 @@ describe('POST /api/webhooks/outgoing — validation', () => {
 describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   test('見えない行は404で更新しない', async () => {
     vi.mocked(getOutgoingWebhookById).mockResolvedValue(null);
-    const res = await setupApp('tenant-b').request('/api/webhooks/outgoing/other', {
+    const res = await setupApp('tenant-b').request(`/api/webhooks/outgoing/other?lineAccountId=${ACCOUNT_ID}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: 'https://changed.example.com', secret: 'z'.repeat(32) }),
     }, baseEnv);
@@ -235,7 +239,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   test('rejects updating to http:// URL with 400', async () => {
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-1',
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -250,7 +254,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   test('rejects updating secret to fewer than 32 chars with 400', async () => {
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-1',
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -265,7 +269,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
   test('rejects truthy non-boolean isActive with 400 (migration bypass)', async () => {
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-legacy',
+      `/api/webhooks/outgoing/wh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -278,7 +282,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     expect(getOutgoingWebhookById).toHaveBeenCalledWith(
       baseEnv.DB,
       'wh-legacy',
-      '00000000-0000-4000-8000-000000000001',
+      ACCOUNT_ID,
     );
   });
 
@@ -299,7 +303,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
 
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-legacy',
+      `/api/webhooks/outgoing/wh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -328,7 +332,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
 
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-legacy-http',
+      `/api/webhooks/outgoing/wh-legacy-http?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -357,7 +361,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
 
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/outgoing/wh-1',
+      `/api/webhooks/outgoing/wh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -373,7 +377,7 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
 describe('DELETE /api/webhooks/outgoing/:id — tenant scope', () => {
   test.each(['other-tenant', 'missing'])('%s は404で削除しない', async () => {
     vi.mocked(getOutgoingWebhookById).mockResolvedValue(null);
-    const res = await setupApp('tenant-b').request('/api/webhooks/outgoing/hidden', { method: 'DELETE' }, baseEnv);
+    const res = await setupApp('tenant-b').request(`/api/webhooks/outgoing/hidden?lineAccountId=${ACCOUNT_ID}`, { method: 'DELETE' }, baseEnv);
     expect(res.status).toBe(404);
     expect(deleteOutgoingWebhook).not.toHaveBeenCalled();
   });
@@ -402,7 +406,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
     ]);
 
     const app = setupApp();
-    const res = await app.request('/api/webhooks/outgoing', { method: 'GET' }, baseEnv);
+    const res = await app.request(`/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     expect(res.status).toBe(200);
     const text = await res.text();
     expect(text).not.toContain(VALID_SECRET);
@@ -430,7 +434,7 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
     ]);
 
     const app = setupApp();
-    const res = await app.request('/api/webhooks/outgoing', { method: 'GET' }, baseEnv);
+    const res = await app.request(`/api/webhooks/outgoing?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     const body = (await res.json()) as { data: Array<Record<string, unknown>> };
     expect(body.data[0]).not.toHaveProperty('secret');
     expect(body.data[0].hasSecret).toBe(false);
@@ -496,7 +500,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
       source_type: 'custom',
       secret: VALID_SECRET,
       is_active: 1,
-      line_account_id: null,
+      line_account_id: ACCOUNT_ID,
       created_at: '2026-05-08T00:00:00.000+09:00',
       updated_at: '2026-05-08T00:00:00.000+09:00',
     });
@@ -507,13 +511,13 @@ describe('POST /api/webhooks/incoming — validation', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'test', secret: VALID_SECRET }),
+        body: JSON.stringify({ name: 'test', secret: VALID_SECRET, lineAccountId: ACCOUNT_ID }),
       },
       baseEnv,
     );
     expect(res.status).toBe(201);
     expect(createIncomingWebhook).toHaveBeenCalledOnce();
-    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: undefined }));
+    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: ACCOUNT_ID }));
     const body = (await res.json()) as { data: { id: string; secret: string } };
     expect(body.data.secret).toBe(VALID_SECRET);
   });
@@ -526,7 +530,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
 describe('PUT /api/webhooks/incoming/:id — validation', () => {
   test('returns 404 before changing a webhook outside the tenant', async () => {
     vi.mocked(getIncomingWebhookById).mockResolvedValue(null);
-    const res = await setupApp('tenant-b').request('/api/webhooks/incoming/iwh-other', {
+    const res = await setupApp('tenant-b').request(`/api/webhooks/incoming/iwh-other?lineAccountId=${ACCOUNT_ID}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ secret: VALID_SECRET }),
     }, baseEnv);
@@ -537,7 +541,7 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
   test('rejects updating secret to fewer than 32 chars with 400', async () => {
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/incoming/iwh-1',
+      `/api/webhooks/incoming/iwh-1?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -563,7 +567,7 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
 
     const app = setupApp();
     const res = await app.request(
-      '/api/webhooks/incoming/iwh-legacy',
+      `/api/webhooks/incoming/iwh-legacy?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -579,7 +583,7 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
 describe('DELETE /api/webhooks/incoming/:id — tenant scope', () => {
   test('returns 404 before deleting a webhook outside the tenant', async () => {
     vi.mocked(getIncomingWebhookById).mockResolvedValue(null);
-    const res = await setupApp('tenant-b').request('/api/webhooks/incoming/iwh-other', { method: 'DELETE' }, baseEnv);
+    const res = await setupApp('tenant-b').request(`/api/webhooks/incoming/iwh-other?lineAccountId=${ACCOUNT_ID}`, { method: 'DELETE' }, baseEnv);
     expect(res.status).toBe(404);
     expect(deleteIncomingWebhook).not.toHaveBeenCalled();
   });
@@ -598,14 +602,14 @@ describe('GET /api/webhooks/incoming — secret exposure', () => {
         source_type: 'custom',
         secret: VALID_SECRET,
         is_active: 1,
-        line_account_id: null,
+        line_account_id: ACCOUNT_ID,
         created_at: '2026-05-08T00:00:00.000+09:00',
         updated_at: '2026-05-08T00:00:00.000+09:00',
       },
     ]);
 
     const app = setupApp();
-    const res = await app.request('/api/webhooks/incoming', { method: 'GET' }, baseEnv);
+    const res = await app.request(`/api/webhooks/incoming?lineAccountId=${ACCOUNT_ID}`, { method: 'GET' }, baseEnv);
     const text = await res.text();
     expect(text).not.toContain(VALID_SECRET);
     const body = JSON.parse(text) as { data: Array<Record<string, unknown>> };

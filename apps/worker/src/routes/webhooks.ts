@@ -14,7 +14,6 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
-import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const webhooks = new Hono<Env>();
 
@@ -84,10 +83,14 @@ async function computeHmacSha256Hex(secret: string, body: string): Promise<strin
 
 // ========== 受信Webhook ==========
 
-webhooks.get('/api/webhooks/incoming', async (c) => {
+webhooks.get('/api/webhooks/incoming', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const items = await getIncomingWebhooks(c.env.DB, tenantId);
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    const items = await getIncomingWebhooks(c.env.DB, lineAccountId);
     return c.json({
       success: true,
       data: items.map((w) => ({
@@ -108,7 +111,7 @@ webhooks.get('/api/webhooks/incoming', async (c) => {
 
 webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
   try {
-    const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId?: string }>();
+    const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId: string }>();
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
     }
@@ -116,19 +119,16 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
     if (secretError) {
       return c.json({ success: false, error: secretError }, 400);
     }
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    if (body.lineAccountId !== undefined) {
-      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
-        return c.json({ success: false, error: 'Forbidden' }, 403);
-      }
-    } else if (tenantId !== DEFAULT_TENANT_ID) {
-      return c.json({ success: false, error: 'どのLINEアカウント向けか選んでください' }, 400);
+    const lineAccountId = body.lineAccountId?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const item = await createIncomingWebhook(c.env.DB, {
       name: body.name,
       sourceType: body.sourceType,
       secret: body.secret as string,
-      lineAccountId: body.lineAccountId,
+      lineAccountId,
     });
     return c.json(
       {
@@ -155,8 +155,12 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
 webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const existing = await getIncomingWebhookById(c.env.DB, id, tenantId);
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean }>();
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
@@ -183,8 +187,8 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateIncomingWebhook(c.env.DB, id, body);
-    const updated = await getIncomingWebhookById(c.env.DB, id, tenantId);
+    await updateIncomingWebhook(c.env.DB, id, lineAccountId, body);
+    const updated = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -205,10 +209,14 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
 webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const existing = await getIncomingWebhookById(c.env.DB, id, tenantId);
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const existing = await getIncomingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteIncomingWebhook(c.env.DB, id);
+    await deleteIncomingWebhook(c.env.DB, id, lineAccountId);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/webhooks/incoming/:id error:', err);
@@ -218,10 +226,14 @@ webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), async (c) =>
 
 // ========== 送信Webhook ==========
 
-webhooks.get('/api/webhooks/outgoing', async (c) => {
+webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const items = await getOutgoingWebhooks(c.env.DB, tenantId);
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+    }
+    const items = await getOutgoingWebhooks(c.env.DB, lineAccountId);
     return c.json({
       success: true,
       data: items.map((w) => ({
@@ -252,7 +264,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       eventTypes?: string[];
       secret?: string;
       maxRetries?: unknown;
-      lineAccountId?: string;
+      lineAccountId: string;
     }>();
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
@@ -273,13 +285,10 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       }
       maxRetries = parsed.value;
     }
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    if (body.lineAccountId !== undefined) {
-      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
-        return c.json({ success: false, error: 'Forbidden' }, 403);
-      }
-    } else if (tenantId !== DEFAULT_TENANT_ID) {
-      return c.json({ success: false, error: 'どのLINEアカウント向けか選んでください' }, 400);
+    const lineAccountId = body.lineAccountId?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
     const item = await createOutgoingWebhook(c.env.DB, {
       name: body.name,
@@ -287,7 +296,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       eventTypes: body.eventTypes ?? [],
       secret: body.secret as string,
       maxRetries,
-      lineAccountId: body.lineAccountId,
+      lineAccountId,
     });
     return c.json(
       {
@@ -315,8 +324,12 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
 webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const existing = await getOutgoingWebhookById(c.env.DB, id, tenantId);
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const existing = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{
       name?: string;
@@ -375,8 +388,8 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
         );
       }
     }
-    await updateOutgoingWebhook(c.env.DB, id, { ...body, maxRetries });
-    const updated = await getOutgoingWebhookById(c.env.DB, id, tenantId);
+    await updateOutgoingWebhook(c.env.DB, id, lineAccountId, { ...body, maxRetries });
+    const updated = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -401,10 +414,14 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
 webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
-    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
-    const existing = await getOutgoingWebhookById(c.env.DB, id, tenantId);
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+      return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
+    }
+    const existing = await getOutgoingWebhookById(c.env.DB, id, lineAccountId);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
-    await deleteOutgoingWebhook(c.env.DB, id);
+    await deleteOutgoingWebhook(c.env.DB, id, lineAccountId);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/webhooks/outgoing/:id error:', err);
