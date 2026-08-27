@@ -108,6 +108,29 @@ const DASHBOARD_TREND = [
   date, added, blocked, active, estimated: false, sources,
 }))
 
+/**
+ * 表示するカードと並び。設計 `vUXKb` の右カラムに合わせる。
+ * 既定では出ない「友だちの状態」も、設計の絵では出ているので出す。
+ */
+const DASHBOARD_PREFERENCES = {
+  source: 'account-default',
+  version: 1,
+  updatedAt: `${FIXED_TO}T00:00:00.000Z`,
+  cards: {
+    today: ['today-inbox', 'today-photo-review', 'today-bookings', 'today-shipments']
+      .map((id) => ({ id, visible: true })),
+    main: [
+      ...['shipment', 'pending-inbox', 'friend-trend', 'friend-add'].map((id) => ({ id, visible: true })),
+      ...['scenario-status', 'uid-migration'].map((id) => ({ id, visible: false })),
+    ],
+    right: [
+      ...['send-quota', 'operational-alerts', 'connection-status', 'support-mark-status',
+        'friend-status', 'upcoming', 'monthly-delivery', 'recent-results'].map((id) => ({ id, visible: true })),
+      ...['booking-status', 'inflow-top', 'funnel-alert', 'automation-failures'].map((id) => ({ id, visible: false })),
+    ],
+  },
+}
+
 const DASHBOARD_OVERVIEW = {
   period: 'today',
   generatedAt: `${FIXED_TO}T00:00:00.000Z`,
@@ -321,7 +344,20 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
   if (pathname === '/api/line-accounts') {
-    return { success: true, data: [ACCOUNT] }
+    /*
+      `webhook` を付ける。無いと接続状態カードが「確認中」のままで、
+      設計の「正常」と並べたときに実装の差に見えてしまう。
+    */
+    return { success: true, data: [{ ...ACCOUNT, webhook: { status: 'matched', checkedAt: `${FIXED_TO}T00:00:00.000Z` } }] }
+  }
+  if (pathname === '/api/dashboard/preferences') {
+    /*
+      設計 `vUXKb` の並び。**「友だちの状態」は既定では出ない**カードだが、
+      設計の絵では出ている（運用者が出す設定にした状態）。ここでその設定を
+      返して、設計と同じ並びで撮れるようにする。
+      `null` を返すと組み込みの既定になり、絵が変わる。
+    */
+    return { success: true, data: DASHBOARD_PREFERENCES }
   }
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
@@ -367,8 +403,15 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/tag-groups') return { success: true, data: TAG_GROUPS }
   if (pathname === '/api/list-stats') return { success: true, data: LIST_STATS }
   if (/^\/api\/accounts\/[^/]+\/health$/.test(pathname)) {
-    // `{status,checks}` ではない。ダッシュボードは `logs` を数える。
-    return { success: true, data: { riskLevel: 'ok', logs: [] } }
+    /*
+      `{status,checks}` ではない。ダッシュボードは `logs` を数える。
+
+      **`'ok'` ではなく `'normal'`。** 画面の `HealthRisk` は
+      `'normal' | 'warning' | 'danger'` で、`'ok'` はどれにも当たらない。
+      当たらないと「状態確認中」のままになり、設計の「正常稼働」と
+      並べたときに**実装の差に見えてしまう**（実際はこちらの返事が違うだけ）。
+    */
+    return { success: true, data: { riskLevel: 'normal', logs: [] } }
   }
   if (pathname in SHAPES) {
     return { success: true, data: SHAPES[pathname] }

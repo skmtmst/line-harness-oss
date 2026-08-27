@@ -15,7 +15,8 @@ function SideCard({
   children,
 }: {
   title: string
-  action: { label: string; href: string }
+  /** 設計に右上のリンクが無いカードもある（現在の対応マーク）。 */
+  action?: { label: string; href: string }
   children: ReactNode
 }) {
   return (
@@ -23,7 +24,7 @@ function SideCard({
       <CardHeader
         size="roomy"
         title={title}
-        action={<Link href={action.href} className="hover:underline">{action.label}</Link>}
+        action={action ? <Link href={action.href} className="hover:underline">{action.label}</Link> : undefined}
         actionTone="info"
       />
       <div className="p-5">{children}</div>
@@ -102,16 +103,14 @@ export function InboxStatusCard({ inbox }: { inbox: DashboardOverview['inbox'] }
   )
 }
 
+/**
+ * 今月の配信。**送信枠はここに出さない。**
+ *
+ * 以前はここにも「送信枠 3 / 200・残り98.5%」の帯を置いていた。右上の
+ * 「今月の送信枠」と**同じ数を2回**描くことになり、片方を見て片方を
+ * 見落とす。設計（`vUXKb`）でも枠は上の1枚だけ。
+ */
 export function MonthlyDeliveryCard({ delivery }: { delivery: DashboardOverview['delivery'] }) {
-  const remaining =
-    delivery.quotaLimit !== null && delivery.quotaUsed !== null
-      ? delivery.quotaLimit - delivery.quotaUsed
-      : null
-  const remainingPercent =
-    remaining !== null && delivery.quotaLimit && delivery.quotaLimit > 0
-      ? Math.max(0, (remaining / delivery.quotaLimit) * 100)
-      : null
-
   return (
     <SideCard title="今月の配信" action={{ label: 'アクセス解析へ →', href: '/analytics' }}>
       <div className="grid grid-cols-2 gap-4">
@@ -122,34 +121,46 @@ export function MonthlyDeliveryCard({ delivery }: { delivery: DashboardOverview[
         */}
         <Figure label="プッシュ数" value={delivery.push} unit="通" />
         <Figure label="リプライ数" value={delivery.reply} unit="通" />
-        <div className="col-span-2 border-hairline border-t pt-3">
-          <p className="text-ink-faint text-xs">送信枠</p>
-          <p className="text-ink mt-0.5 text-lg font-bold tabular-nums">
-            {delivery.quotaUsed === null ? '—' : delivery.quotaUsed.toLocaleString('ja-JP')}
-            {delivery.quotaLimit !== null && (
-              <span className="text-ink-secondary ml-1 text-xs font-normal">
-                / {delivery.quotaLimit.toLocaleString('ja-JP')}
-              </span>
-            )}
-          </p>
-          {remainingPercent !== null && (
-            <>
-              <div className="bg-canvas-sunken mt-2 h-1.5 overflow-hidden rounded-full">
-                <div className="bg-accent h-full rounded-full" style={{ width: `${Math.min(100, remainingPercent)}%` }} />
-              </div>
-              <div className="mt-2 flex items-center justify-between gap-3 text-[11px]">
-                <span className="text-success font-medium">残り {remainingPercent.toFixed(1)}%</span>
-                <Link href="/accounts" className="text-action hover:underline">配信設定へ →</Link>
-              </div>
-            </>
-          )}
-          {remaining === null && (
-            <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">
-              LINE から送信枠を取得できませんでした。アクセストークンの設定を確認してください。
-            </p>
-          )}
-        </div>
       </div>
+    </SideCard>
+  )
+}
+
+/**
+ * 現在の対応マーク（設計 `vUXKb` の右カラム）。
+ *
+ * 未対応と対応済みは `/api/dashboard/overview` の `inbox` から出る。
+ * **「メッセージ受信時の自動変更」は、まだ取れる口が無い。**
+ * 「有効」と決め打ちで書かず、`—`（未取得）のままにする。
+ * 本物らしく見えるぶん、無い数より悪い。
+ */
+export function SupportMarkStatusCard({
+  inbox,
+  autoOnInbound,
+}: {
+  inbox: DashboardOverview['inbox'] | null
+  /** 受信時の自動変更が入っているか。取れないときは null。 */
+  autoOnInbound: boolean | null
+}) {
+  return (
+    <SideCard title="現在の対応マーク">
+      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+        {[
+          { label: '未対応', value: inbox?.unanswered ?? null },
+          { label: '対応済み', value: inbox?.resolved ?? null },
+        ].map((row) => (
+          <p key={row.label} className="text-success text-sm font-bold">
+            {row.label}
+            <span className="ml-1.5 tabular-nums">
+              {row.value === null ? '—' : `${row.value.toLocaleString('ja-JP')}人`}
+            </span>
+          </p>
+        ))}
+      </div>
+      <p className="text-ink-secondary mt-3 text-xs">
+        メッセージ受信時の自動変更：
+        {autoOnInbound === null ? '—' : autoOnInbound ? '有効' : '無効'}
+      </p>
     </SideCard>
   )
 }
@@ -226,7 +237,7 @@ export function UpcomingCard({
       ) : bookings === null ? (
         <p className="text-ink-faint text-xs leading-relaxed">予定を読み込めませんでした。</p>
       ) : upcoming.length === 0 ? (
-        <p className="text-ink-faint text-xs leading-relaxed">予定されている予約はありません。</p>
+        <p className="text-ink-faint text-xs leading-relaxed">予定されている配信・予約はありません。</p>
       ) : (
         <div className="space-y-3">
           {upcoming.slice(0, 3).map((booking) => (
@@ -252,14 +263,32 @@ export function FriendStatusCard({ friends }: { friends: DashboardOverview['frie
   const rate = base > 0 ? (blocked / base) * 100 : 0
   return (
     <SideCard title="友だちの状態" action={{ label: '友だちを見る →', href: '/friends' }}>
-      <div className="grid grid-cols-2 gap-x-4 gap-y-4">
-        <Figure label="有効友だち" value={friends.active} unit="人" />
-        <Figure label="ブロック・非表示" value={blocked} unit="人" />
-        <div className="col-span-2">
-          <p className="text-ink-faint text-xs">ブロック率</p>
-          <p className="text-ink mt-0.5 text-lg font-bold tabular-nums">{rate.toFixed(1)}<span className="text-ink-secondary ml-1 text-xs font-normal">%</span></p>
+      {/*
+        設計（`vUXKb`）は「友だち総数 / 有効 / ブロック・非表示（率）」の3行と、
+        その下に内訳。**総数と内訳が無いと、223人が誰から止められたのかが
+        読めない**（相手からブロックされたのか、こちらで非表示にしたのか）。
+      */}
+      <dl className="space-y-2.5 text-sm">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ink-secondary text-xs">友だち総数</dt>
+          <dd className="text-success font-bold tabular-nums">{friends.total.toLocaleString('ja-JP')}人</dd>
         </div>
-      </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ink-secondary text-xs">有効</dt>
+          <dd className="text-success font-bold tabular-nums">{friends.active.toLocaleString('ja-JP')}人</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ink-secondary text-xs">ブロック・非表示</dt>
+          <dd className="text-success font-bold tabular-nums">
+            {blocked.toLocaleString('ja-JP')}人（{rate.toFixed(1)}%）
+          </dd>
+        </div>
+      </dl>
+      <p className="text-ink-faint mt-3 text-[11px] leading-relaxed">
+        内訳 相手から{friends.blockedByThem.toLocaleString('ja-JP')}人
+        ・自分から{friends.hiddenByUs.toLocaleString('ja-JP')}人
+        ・相互に{friends.blockedBoth.toLocaleString('ja-JP')}人
+      </p>
     </SideCard>
   )
 }

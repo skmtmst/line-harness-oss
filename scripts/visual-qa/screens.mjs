@@ -48,13 +48,13 @@ export const SCREENS = [
   },
   {
     node: 'NjK9q', feature: 1, name: '1-1-3 対応受信の表示件数を開く',
-    dir: 'dashboard-v6', route: '/', status: 'unimplemented',
-    why: '`pending-inbox-card.tsx` の `PAGE_SIZE = 5` が固定で、表示件数を選ぶ場所が無い',
+    dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
+    steps: [{ click: '表示件数' }],
   },
   {
     node: 'Alekb', feature: 1, name: '1-1-4 通知パネルを開く',
-    dir: 'dashboard-v6', route: '/', status: 'unimplemented',
-    why: '通知パネルの部品は在るが、ダッシュボードから呼ばれていない（検証用ルートとテストだけ）',
+    dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
+    steps: [{ click: '通知' }],
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
