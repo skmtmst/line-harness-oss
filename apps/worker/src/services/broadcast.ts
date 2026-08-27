@@ -95,7 +95,9 @@ export async function processBroadcastSend(
     throw new Error(`Broadcast ${broadcastId} not found`);
   }
   const initialAccountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
-  if (await isOperationCapabilityStopped(db, initialAccountId, 'broadcast_dispatch')) {
+  if (await isOperationCapabilityStopped(db, initialAccountId, 'broadcast_dispatch', {
+    targetType: 'broadcast', targetId: broadcast.id, result: 'held',
+  })) {
     throw new Error('OPERATION_STOPPED:broadcast_dispatch');
   }
 
@@ -253,7 +255,9 @@ export async function processBroadcastSend(
 
   try {
     if (broadcast.target_type === 'all') {
-      if (await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) {
+      if (await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch', {
+        targetType: 'broadcast', targetId: broadcast.id, result: 'held',
+      })) {
         throw new Error('OPERATION_STOPPED:broadcast_dispatch');
       }
       // Use LINE broadcast API (sends to all followers)
@@ -298,7 +302,9 @@ export async function processBroadcastSend(
       // 開封数を取らない配信では null。集計ユニットは月1,000の上限がある。
       const unit = aggregationUnitFor(broadcast);
       for (let i = 0; i < followingFriends.length; i += MULTICAST_BATCH_SIZE) {
-        if (await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) {
+        if (await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch', {
+          targetType: 'broadcast', targetId: broadcast.id, result: 'held',
+        })) {
           throw new Error('OPERATION_STOPPED:broadcast_dispatch');
         }
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
@@ -382,7 +388,9 @@ export async function processScheduledBroadcasts(
   for (const broadcast of scheduled) {
     try {
       const accountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
-      if (await isOperationCapabilityStopped(db, accountId, 'broadcast_dispatch')) continue;
+      if (await isOperationCapabilityStopped(db, accountId, 'broadcast_dispatch', {
+        targetType: 'broadcast', targetId: broadcast.id, result: 'held',
+      })) continue;
       // Optimistic lock: claim this broadcast (scheduled → sending)
       const lockResult = await db
         .prepare(`UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled'`)
@@ -451,7 +459,9 @@ export async function processQueuedBroadcasts(
   for (const broadcast of queued) {
     // アカウント別のlineClientを解決
     const accountId = (broadcast as unknown as Record<string, unknown>).line_account_id as string | null;
-    if (await isOperationCapabilityStopped(db, accountId, 'broadcast_dispatch')) continue;
+    if (await isOperationCapabilityStopped(db, accountId, 'broadcast_dispatch', {
+      targetType: 'broadcast', targetId: broadcast.id, result: 'held',
+    })) continue;
     let client = lineClient;
     if (accountId) {
       const { getLineAccountById } = await import('@line-crm/db');
@@ -494,7 +504,9 @@ async function processQueuedBroadcastBatches(
     return;
   }
   const gateAccountId = raw.line_account_id as string | null;
-  if (await isOperationCapabilityStopped(db, gateAccountId, 'broadcast_dispatch')) {
+  if (await isOperationCapabilityStopped(db, gateAccountId, 'broadcast_dispatch', {
+    targetType: 'broadcast', targetId: broadcast.id, result: 'held',
+  })) {
     await updateBroadcastBatchProgress(db, broadcast.id, batchOffset, 0);
     return;
   }

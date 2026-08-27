@@ -156,8 +156,85 @@ export async function isOperationCapabilityStopped(
   db: D1Database,
   lineAccountId: string | null,
   capability: OperationCapability,
+  target?: {
+    targetType: string;
+    targetId: string;
+    result: 'held' | 'skipped_due_to_emergency';
+    reason?: string;
+  },
 ): Promise<boolean> {
-  return (await getEffectiveOperationStates(db, lineAccountId))[capability] === 'stopped';
+  const stopped = (await getEffectiveOperationStates(db, lineAccountId))[capability] === 'stopped';
+  if (stopped && target) {
+    await recordStoppedOperationTarget(db, { lineAccountId, capability, ...target });
+  }
+  return stopped;
+}
+
+/** 停止を発生させた全体・アカウント別incidentへ、同じ対象を1回だけ記録する。 */
+export async function recordStoppedOperationTarget(
+  db: D1Database,
+  input: {
+    lineAccountId: string | null;
+    capability: OperationCapability;
+    targetType: string;
+    targetId: string;
+    result: 'held' | 'skipped_due_to_emergency';
+    reason?: string;
+  },
+): Promise<number> {
+  const scopeKeys = input.lineAccountId ? [ALL_ACCOUNTS_SCOPE, input.lineAccountId] : [ALL_ACCOUNTS_SCOPE];
+  const placeholders = scopeKeys.map(() => '?').join(',');
+  const rows = await db.prepare(
+    `SELECT states_json, active_incident_id
+       FROM operation_control_sets
+      WHERE scope_key IN (${placeholders}) AND active_incident_id IS NOT NULL`,
+  ).bind(...scopeKeys).all<{ states_json: string; active_incident_id: string }>();
+  let recorded = 0;
+  const occurredAt = nowIso();
+  for (const row of rows.results ?? []) {
+    if (!isCapabilityStoppedFailClosed(row.states_json, row.active_incident_id, input.capability)) continue;
+    const inserted = await db.prepare(
+      `INSERT OR IGNORE INTO operation_target_results
+         (id, incident_id, line_account_id, capability, target_type, target_id, result, reason, occurred_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(), row.active_incident_id, input.lineAccountId, input.capability,
+      input.targetType, input.targetId, input.result, input.reason ?? null, occurredAt,
+    ).run();
+    recorded += Number(inserted.meta.changes ?? 0);
+  }
+  return recorded;
+}
+
+export interface OperationTargetResult {
+  id: string;
+  incidentId: string;
+  lineAccountId: string | null;
+  capability: OperationCapability;
+  targetType: string;
+  targetId: string;
+  result: 'held' | 'skipped_due_to_emergency' | 'in_flight' | 'failed';
+  reason: string | null;
+  occurredAt: string;
+}
+
+export async function listOperationTargetResults(
+  db: D1Database,
+  incidentId: string,
+  limit = 200,
+): Promise<OperationTargetResult[]> {
+  const rows = await db.prepare(
+    `SELECT id, incident_id, line_account_id, capability, target_type, target_id, result, reason, occurred_at
+       FROM operation_target_results WHERE incident_id = ? ORDER BY occurred_at DESC LIMIT ?`,
+  ).bind(incidentId, Math.max(1, Math.min(500, Math.floor(limit)))).all<{
+    id: string; incident_id: string; line_account_id: string | null; capability: OperationCapability;
+    target_type: string; target_id: string; result: OperationTargetResult['result']; reason: string | null; occurred_at: string;
+  }>();
+  return rows.results.map((row) => ({
+    id: row.id, incidentId: row.incident_id, lineAccountId: row.line_account_id,
+    capability: row.capability, targetType: row.target_type, targetId: row.target_id,
+    result: row.result, reason: row.reason, occurredAt: row.occurred_at,
+  }));
 }
 
 function nowIso(): string {

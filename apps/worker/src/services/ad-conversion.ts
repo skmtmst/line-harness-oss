@@ -22,7 +22,9 @@ export async function sendAdConversions(
 ): Promise<void> {
   const friend = await db.prepare('SELECT line_account_id FROM friends WHERE id = ?')
     .bind(friendId).first<{ line_account_id: string | null }>();
-  if (await isOperationCapabilityStopped(db, friend?.line_account_id ?? null, 'ad_postback')) return;
+  if (await isOperationCapabilityStopped(db, friend?.line_account_id ?? null, 'ad_postback', {
+    targetType: 'ad_conversion', targetId: `${friendId}:${eventName}`, result: 'skipped_due_to_emergency',
+  })) return;
   const ref = await getRefTrackingWithClickIds(db, friendId);
   if (!ref) return;
 

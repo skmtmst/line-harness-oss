@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { Hono } from 'hono'
 import type { Env } from '../index.js'
 import { createTestD1 } from '../test-utils/d1-sqlite.js'
+import { isOperationCapabilityStopped } from '@line-crm/db'
 import { operations } from './operations.js'
 
 function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
@@ -123,6 +124,37 @@ describe('運用状態API', () => {
     expect(await history.json()).toMatchObject({
       success: true,
       data: expect.arrayContaining([expect.objectContaining({ reason: '誤配信', status: 'stopped' })]),
+    })
+  })
+
+  it('停止中に保留した対象を、停止記録の詳細から取得できる', async () => {
+    const stopped = await app().request('/api/operations/incidents', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop', 'idempotency-key': key(7) },
+      body: JSON.stringify({ lineAccountId: 'account-1', capabilities: ['broadcast_dispatch'], reason: '誤配信', expectedVersion: 0, confirmation: '停止' }),
+    }, { DB: testDb.db })
+    const stoppedBody = await stopped.json() as { data: { incident: { id: string } } }
+    expect(await isOperationCapabilityStopped(testDb.db, 'account-1', 'broadcast_dispatch', {
+      targetType: 'broadcast', targetId: 'broadcast-1', result: 'held',
+    })).toBe(true)
+
+    const detail = await app('staff').request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}`,
+      {},
+      { DB: testDb.db },
+    )
+    expect(detail.status).toBe(200)
+    expect(await detail.json()).toMatchObject({
+      success: true,
+      data: {
+        incident: { id: stoppedBody.data.incident.id },
+        targetResults: [{
+          incidentId: stoppedBody.data.incident.id,
+          capability: 'broadcast_dispatch',
+          targetType: 'broadcast',
+          targetId: 'broadcast-1',
+          result: 'held',
+        }],
+      },
     })
   })
 

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import {
   getOperationControlSet,
   isOperationCapabilityStopped,
+  listOperationTargetResults,
   listOperationIncidents,
   restoreOperationIncident,
   stopOperationCapabilities,
@@ -87,5 +88,25 @@ describe('サーバー正本の緊急停止', () => {
     const visible = await getOperationControlSet(db, 'account-1')
     expect(visible.activeIncidentId).not.toBeNull()
     expect(Object.values(visible.states).every((state) => state === 'stopped')).toBe(true)
+  })
+
+  it('停止中に保留した対象をincidentへ1回だけ記録する', async () => {
+    const stopped = await stopOperationCapabilities(db, {
+      lineAccountId: 'account-1', capabilities: ['broadcast_dispatch'],
+      expectedVersion: 0, actorId: 'owner-1', reason: '障害対応',
+    })
+    if (stopped.status !== 'changed') throw new Error('stop failed')
+    const target = { targetType: 'broadcast', targetId: 'broadcast-1', result: 'held' as const }
+    expect(await isOperationCapabilityStopped(db, 'account-1', 'broadcast_dispatch', target)).toBe(true)
+    expect(await isOperationCapabilityStopped(db, 'account-1', 'broadcast_dispatch', target)).toBe(true)
+    expect(await listOperationTargetResults(db, stopped.incident.id)).toEqual([
+      expect.objectContaining({
+        incidentId: stopped.incident.id,
+        capability: 'broadcast_dispatch',
+        targetType: 'broadcast',
+        targetId: 'broadcast-1',
+        result: 'held',
+      }),
+    ])
   })
 })

@@ -21,6 +21,7 @@ import {
   getFriendScore,
   recordAnalyticsEvent,
   getEffectiveOperationStates,
+  recordStoppedOperationTarget,
 } from '@line-crm/db';
 import { deliverWebhook, recordDeliveryOutcome } from './outgoing-webhook-delivery.js';
 import { LineClient } from '@line-crm/line-sdk';
@@ -77,6 +78,28 @@ export async function fireEvent(
   const webhookStopped = operationStates.webhook_outgoing === 'stopped';
   const adPostbackStopped = operationStates.ad_postback === 'stopped';
   const automationStopped = operationStates.automation_actions === 'stopped';
+  const stableTargetId = payload.sourceEventId ?? null;
+  if (stableTargetId) {
+    const stoppedRecords: Promise<unknown>[] = [];
+    if (webhookStopped) stoppedRecords.push(recordStoppedOperationTarget(db, {
+      lineAccountId: outgoingWebhookLineAccountId ?? null,
+      capability: 'webhook_outgoing', targetType: 'event', targetId: stableTargetId,
+      result: 'skipped_due_to_emergency', reason: eventType,
+    }));
+    if (adPostbackStopped && payload.friendId && payload.conversionEventName) {
+      stoppedRecords.push(recordStoppedOperationTarget(db, {
+        lineAccountId: outgoingWebhookLineAccountId ?? null,
+        capability: 'ad_postback', targetType: 'event', targetId: stableTargetId,
+        result: 'skipped_due_to_emergency', reason: eventType,
+      }));
+    }
+    if (automationStopped) stoppedRecords.push(recordStoppedOperationTarget(db, {
+      lineAccountId: outgoingWebhookLineAccountId ?? null,
+      capability: 'automation_actions', targetType: 'event', targetId: stableTargetId,
+      result: 'skipped_due_to_emergency', reason: eventType,
+    }));
+    await Promise.allSettled(stoppedRecords);
+  }
   const phase1: Promise<unknown>[] = [processScoring(db, eventType, payload)];
   if (!webhookStopped) {
     phase1.push(fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId));

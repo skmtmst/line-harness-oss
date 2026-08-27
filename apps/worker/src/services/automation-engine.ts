@@ -590,7 +590,9 @@ export async function processAutomationRun(
   const leaseMinutes = options.leaseMinutes ?? DEFAULT_LEASE_MINUTES;
   const beforeClaim = await getRun(db, runId);
   if (!beforeClaim) return 'not_found';
-  if (await isOperationCapabilityStopped(db, beforeClaim.line_account_id, 'automation_actions')) {
+  if (await isOperationCapabilityStopped(db, beforeClaim.line_account_id, 'automation_actions', {
+    targetType: 'automation_run', targetId: beforeClaim.id, result: 'held',
+  })) {
     // 実行をclaimせず、停止解除後も同じ版・同じstepから再確認できる状態に置く。
     return beforeClaim.status;
   }

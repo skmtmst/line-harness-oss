@@ -129,7 +129,9 @@ export async function processReminderDeliveries(
         );
         const message = buildMessage(messageType, expanded);
         // 送信開始の直前にサーバー正本を確認する。停止中は配信済みにしない。
-        if (await isOperationCapabilityStopped(db, friendAccountId ?? null, 'reminder_dispatch')) {
+        if (await isOperationCapabilityStopped(db, friendAccountId ?? null, 'reminder_dispatch', {
+          targetType: 'reminder_delivery', targetId: `${fr.id}:${step.id}`, result: 'held',
+        })) {
           continue;
         }
         await deliveryClient.pushMessage(friend.line_user_id, [message]);

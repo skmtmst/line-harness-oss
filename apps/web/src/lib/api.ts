@@ -135,6 +135,18 @@ export type OperationIncident = {
   updatedAt: string
 }
 
+export type OperationTargetResult = {
+  id: string
+  incidentId: string
+  lineAccountId: string | null
+  capability: OperationCapability
+  targetType: string
+  targetId: string
+  result: 'held' | 'skipped_due_to_emergency' | 'in_flight' | 'failed'
+  reason: string | null
+  occurredAt: string
+}
+
 export type OperationRestorePreview = {
   incidentId: string
   controlVersion: number
@@ -3338,6 +3350,10 @@ export const api = {
     history: (limit = 100) => fetchApi<ApiResponse<OperationIncident[]>>(
       `/api/operations/history?limit=${encodeURIComponent(String(limit))}`,
     ),
+    incident: (incidentId: string) => fetchApi<ApiResponse<{
+      incident: OperationIncident
+      targetResults: OperationTargetResult[]
+    }>>(`/api/operations/incidents/${encodeURIComponent(incidentId)}`),
   },
   staff: {
     list: () =>

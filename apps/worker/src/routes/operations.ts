@@ -10,6 +10,7 @@ import {
   getOperationIncident,
   getPendingReminderDeliveries,
   listOperationIncidents,
+  listOperationTargetResults,
   operationScopeKey,
   restoreOperationIncident,
   stopOperationCapabilities,
@@ -227,6 +228,19 @@ operations.get('/api/operations/history', async (c) => {
     limit: Number(c.req.query('limit') ?? 100),
   });
   return c.json({ success: true, data: incidents });
+});
+
+operations.get('/api/operations/incidents/:id', async (c) => {
+  const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
+  if (!incident) return c.json({ success: false, error: '停止記録が見つかりません' }, 404);
+  if (!await canUseScope(c, incident.lineAccountId)) return c.json({ success: false, error: 'Forbidden' }, 403);
+  return c.json({
+    success: true,
+    data: {
+      incident,
+      targetResults: await listOperationTargetResults(c.env.DB, incident.id, Number(c.req.query('limit') ?? 200)),
+    },
+  });
 });
 
 operations.post(

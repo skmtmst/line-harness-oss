@@ -97,3 +97,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_operation_health_alerts_active_check
 
 CREATE INDEX IF NOT EXISTS idx_operation_health_alerts_updated
   ON operation_health_alerts(status, updated_at DESC);
+
+-- 停止中に実際に止めた対象をincidentへ紐づける。通常時には書き込まない。
+CREATE TABLE IF NOT EXISTS operation_target_results (
+  id              TEXT PRIMARY KEY,
+  incident_id     TEXT NOT NULL REFERENCES operation_incidents(id) ON DELETE CASCADE,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  capability      TEXT NOT NULL,
+  target_type     TEXT NOT NULL,
+  target_id       TEXT NOT NULL,
+  result          TEXT NOT NULL CHECK (result IN ('held', 'skipped_due_to_emergency', 'in_flight', 'failed')),
+  reason          TEXT,
+  occurred_at     TEXT NOT NULL,
+  UNIQUE (incident_id, capability, target_type, target_id, result)
+);
+
+CREATE INDEX IF NOT EXISTS idx_operation_target_results_incident
+  ON operation_target_results(incident_id, occurred_at DESC);

@@ -302,7 +302,9 @@ export async function matchAndReply(
 
   // ルールが当たっていても、停止中は返信も付随アクションも開始しない。
   // matched=true を返し、別の自動経路へフォールバックして停止を回避させない。
-  if (await isOperationCapabilityStopped(db, lineAccountId, 'auto_reply_dispatch')) {
+  if (await isOperationCapabilityStopped(db, lineAccountId, 'auto_reply_dispatch', {
+    targetType: 'auto_reply', targetId: `${rule.id}:${friend.id}`, result: 'skipped_due_to_emergency',
+  })) {
     return { matched: true, replyTokenConsumed: false };
   }
 

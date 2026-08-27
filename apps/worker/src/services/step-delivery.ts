@@ -505,7 +505,9 @@ async function processSingleDelivery(
     deliveryClient = new LC(account.channel_access_token);
   }
   // LINEへ渡す直前に確認する。停止ボタンを押す直前にclaim済みでも送らない。
-  if (await isOperationCapabilityStopped(db, deliveryAccountId ?? null, 'scenario_dispatch')) {
+  if (await isOperationCapabilityStopped(db, deliveryAccountId ?? null, 'scenario_dispatch', {
+    targetType: 'friend_scenario', targetId: fs.id, result: 'held',
+  })) {
     await db.prepare(
       `UPDATE friend_scenarios SET status = 'active', updated_at = ?
         WHERE id = ? AND status = 'delivering'`,

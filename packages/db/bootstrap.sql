@@ -1741,6 +1741,19 @@ CREATE TABLE operation_incidents (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE operation_target_results (
+  id              TEXT PRIMARY KEY,
+  incident_id     TEXT NOT NULL REFERENCES operation_incidents(id) ON DELETE CASCADE,
+  line_account_id TEXT REFERENCES line_accounts(id),
+  capability      TEXT NOT NULL,
+  target_type     TEXT NOT NULL,
+  target_id       TEXT NOT NULL,
+  result          TEXT NOT NULL CHECK (result IN ('held', 'skipped_due_to_emergency', 'in_flight', 'failed')),
+  reason          TEXT,
+  occurred_at     TEXT NOT NULL,
+  UNIQUE (incident_id, capability, target_type, target_id, result)
+);
+
 CREATE TABLE operators (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -3134,6 +3147,9 @@ CREATE INDEX idx_operation_incidents_scope_created
 
 CREATE INDEX idx_operation_incidents_status_created
   ON operation_incidents(status, created_at DESC);
+
+CREATE INDEX idx_operation_target_results_incident
+  ON operation_target_results(incident_id, occurred_at DESC);
 
 CREATE INDEX idx_outbound_send_requests_created
   ON outbound_send_requests(created_at);
