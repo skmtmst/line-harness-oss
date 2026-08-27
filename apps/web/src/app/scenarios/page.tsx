@@ -19,6 +19,16 @@ type ScenarioWithCount = Scenario & { stepCount?: number }
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
 
+/** 作成日時が、運用画面の基準である日本時間の今月か。 */
+function isCreatedThisMonth(createdAt: string, now = new Date()): boolean {
+  const month = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+  })
+  return month.format(new Date(createdAt)) === month.format(now)
+}
+
 export default function ScenariosPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const router = useRouter()
@@ -27,6 +37,7 @@ export default function ScenariosPage() {
   const [nameQuery, setNameQuery] = useState('')
   /** よく使う絞り込み。いま数えられるのは「停止中のみ」だけ。 */
   const [stoppedOnly, setStoppedOnly] = useState(false)
+  const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
@@ -307,14 +318,37 @@ export default function ScenariosPage() {
         >
           停止中のみ
         </button>
-        {['離脱が大きい', '今月作成'].map((label) => (
+        {[
+          {
+            label: '離脱が大きい',
+            disabled: true,
+            active: false,
+            title: '離脱率の比較基準が決まっていないため、まだ数えられません',
+            onClick: undefined,
+          },
+          {
+            label: '今月作成',
+            disabled: false,
+            active: createdThisMonthOnly,
+            title: undefined,
+            onClick: () => setCreatedThisMonthOnly((current) => !current),
+          },
+        ].map((filter) => (
           <button
-            key={label}
-            disabled
-            title="この絞り込みはまだ数えられません"
-            className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
+            key={filter.label}
+            disabled={filter.disabled}
+            title={filter.title}
+            onClick={filter.onClick}
+            aria-pressed={filter.disabled ? undefined : filter.active}
+            className={`rounded-pill border px-3 py-1 text-xs transition-colors ${
+              filter.disabled
+                ? 'border-hairline text-ink-faint opacity-50'
+                : filter.active
+                  ? 'border-accent-soft bg-accent-soft text-accent'
+                  : 'border-hairline text-ink-secondary hover:bg-canvas-sunken'
+            }`}
           >
-            {label}
+            {filter.label}
           </button>
         ))}
       </div>
@@ -348,6 +382,7 @@ export default function ScenariosPage() {
                 : sc.name.toLowerCase().includes(nameQuery.trim().toLowerCase()),
             )
             .filter((sc) => (stoppedOnly ? !sc.isActive : true))
+            .filter((sc) => (createdThisMonthOnly ? isCreatedThisMonth(sc.createdAt) : true))
             .filter((sc) =>
               folderFilter === ''
                 ? true
