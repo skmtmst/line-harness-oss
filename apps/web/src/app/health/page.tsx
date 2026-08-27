@@ -40,7 +40,7 @@ const riskConfig = {
   normal: { label: '正常', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-100' },
   warning: { label: '警告', color: 'bg-yellow-500', textColor: 'text-yellow-700', bgColor: 'bg-yellow-100' },
   danger: { label: '危険', color: 'bg-red-500', textColor: 'text-red-700', bgColor: 'bg-red-100' },
-  unknown: { label: '未確認', color: 'bg-gray-400', textColor: 'text-gray-700', bgColor: 'bg-gray-100' },
+  unknown: { label: '未確認', color: 'bg-ink-secondary', textColor: 'text-ink-secondary', bgColor: 'bg-canvas-sunken' },
 }
 
 const statusConfig: Record<AccountMigration['status'], { label: string; textColor: string; bgColor: string }> = {
