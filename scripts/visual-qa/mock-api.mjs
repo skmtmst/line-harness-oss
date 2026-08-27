@@ -160,6 +160,27 @@ const SUPPORT_INBOX_ITEMS = [
 ]
 
 /**
+ * 受信箱（`/chats`）に混ぜるメール。ダッシュボードの行とは別の形が要る。
+ * `status` が無いと `statusConfig[item.status]` で落ちる。
+ */
+const SUPPORT_EMAIL_ITEMS = [
+  {
+    id: 'email:mail-1',
+    threadId: 'mail-1',
+    customerName: 'テスト 太郎',
+    customerIdentifier: 'taro@example.com',
+    subject: 'ご注文について',
+    preview: 'テスト太郎 様 この度…',
+    status: 'unread',
+    revision: 1,
+    assignedStaffId: null,
+    assignedStaffName: null,
+    lastIncomingAt: '2026-08-15T12:00:00.000Z',
+    isUnread: true,
+  },
+]
+
+/**
  * 一覧を配列で返す口。**`api.ts` から読む。手で並べない。**
  *
  * 手で並べていたときは6件しか無く、足りない口が `{items:[],total:0}` に
@@ -295,7 +316,7 @@ function tagDeleteImpact(tag) {
   }
 }
 
-function bodyFor(pathname) {
+function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/auth/session') {
     return { success: true, data: STAFF, csrfToken: 'visual-qa-csrf' }
   }
@@ -306,13 +327,23 @@ function bodyFor(pathname) {
   // 「空の状態」だけを見て一致したと言えてしまう。
   if (pathname === '/api/support/inbox') {
     /*
-      設計 `vUXKb` の表。2行を出し、**総数は5件**にしてページ送りを出す。
-      1ページに収まる数で返すと、ページ送りが描かれず、そこを見張れない。
+      **同じ口を2つの画面が読む。返す形が違う。**
 
-      形は `{ items, summary }`。`{ items, total }` で返していたときは
-      `summary` が `undefined` になり、**行が1つも描かれないのに
-      ページ送りだけ出る**という、実際には起きない絵になった。
+      - ダッシュボード（`pending-inbox-card.tsx`）… `channel` を付けずに呼び、
+        `{ items, summary }` を読む
+      - 受信箱（`/chats`）… `channel=email` で呼び、`{ items }` の1件ずつに
+        `status` `threadId` `subject` `revision` `isUnread` まで要る
+
+      ダッシュボードの形だけで返していたとき、受信箱は
+      `statusConfig[item.status].className` で落ちて**画面ごと真っ白**に
+      なった。片方の画面のために形を変えると、もう片方が黙って壊れる。
+
+      行は設計 `vUXKb` の表そのまま。**総数は5件**にしてページ送りを出す。
+      1ページに収まる数で返すと、ページ送りが描かれず、そこを見張れない。
     */
+    if (query.get('channel') === 'email') {
+      return { success: true, data: { items: SUPPORT_EMAIL_ITEMS } }
+    }
     return {
       success: true,
       data: {
@@ -388,7 +419,7 @@ const server = createServer((req, res) => {
     res.writeHead(200).end(JSON.stringify(RAW[url.pathname]))
     return
   }
-  res.writeHead(200).end(JSON.stringify(bodyFor(url.pathname)))
+  res.writeHead(200).end(JSON.stringify(bodyFor(url.pathname, url.searchParams)))
 })
 
 /*
