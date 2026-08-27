@@ -5,7 +5,9 @@ import {
   createSupportMark,
   updateSupportMark,
   deleteSupportMark,
+  replaceAndDeleteSupportMark,
   countFriendsWithMark,
+  getDefaultSupportMark,
   setFriendSupportMark,
   setFriendSupportMarkBulk,
   getSavedSearches,
@@ -213,21 +215,41 @@ friendAttributes.delete('/api/support-marks/:id', requireRole('owner', 'admin'),
         409,
       );
     }
-    // 付いている友だちは消えない（ON DELETE SET NULL）。何人が未設定に戻るかを伝える。
+    const defaultMark = await getDefaultSupportMark(c.env.DB);
+    if (!defaultMark || defaultMark.id === id) {
+      return c.json(
+        {
+          success: false,
+          error: '置換先の初期値マークがありません。先に別のマークを初期値にしてください。',
+        },
+        409,
+      );
+    }
+
+    // 使用中なら、削除前に置換先と人数を確認させる。
     const count = await countFriendsWithMark(c.env.DB, id);
     if (count > 0 && c.req.query('force') !== '1') {
       return c.json(
         {
           success: false,
-          error: `このマークは ${count} 人に付いています。削除するとその人たちは未設定に戻ります。`,
+          error: `このマークは ${count} 人に付いています。削除すると「${defaultMark.name}」へ変更されます。`,
           code: 'IN_USE',
           friendCount: count,
+          replacementMark: serializeMark(defaultMark),
         },
         409,
       );
     }
-    await deleteSupportMark(c.env.DB, id);
-    return c.json({ success: true, data: null });
+    if (count > 0) {
+      const staff = c.get('staff');
+      await replaceAndDeleteSupportMark(c.env.DB, id, defaultMark.id, staff.id);
+    } else {
+      await deleteSupportMark(c.env.DB, id);
+    }
+    return c.json({
+      success: true,
+      data: { replacedFriendCount: count, replacementMark: serializeMark(defaultMark) },
+    });
   } catch (err) {
     console.error('DELETE /api/support-marks/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
