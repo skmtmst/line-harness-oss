@@ -125,6 +125,8 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
       const risks = health.map((item) => item.riskLevel)
       const lineSeverity: OperationSeverity = activeAccounts.length === 0
         ? 'unknown'
+        : health.some((item) => item.isStale)
+          ? 'unknown'
         : risks.some((risk) => risk === 'danger')
           ? 'danger'
           : risks.some((risk) => risk === 'warning')
@@ -139,6 +141,8 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
         severity: lineSeverity,
         detail: activeAccounts.length === 0
           ? '有効なLINEアカウントが登録されていません'
+          : health.some((item) => item.isStale)
+            ? `10分以内の確認結果がないLINEアカウントが${health.filter((item) => item.isStale).length}件あります`
           : `LINE APIの認証エラーと接続状態を確認しました（${activeAccounts.length}アカウント）`,
       })
     } else {

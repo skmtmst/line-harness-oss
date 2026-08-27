@@ -19,6 +19,8 @@ describe('V6 32 運用状態の契約', () => {
     }
     expect(source).toContain('Promise.allSettled')
     expect(source).toContain("severity: 'unknown'")
+    expect(source).toContain('item.isStale')
+    expect(source).toContain('10分以内の確認結果がないLINEアカウント')
     expect(source).toContain('api.operations.control(null)')
   })
 

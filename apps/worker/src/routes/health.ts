@@ -13,6 +13,17 @@ import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const health = new Hono<Env>();
 
+const ACCOUNT_HEALTH_STALE_AFTER_MS = 10 * 60_000;
+
+export function isAccountHealthStale(
+  lastCheckedAt: string | null,
+  nowMs = Date.now(),
+): boolean {
+  if (!lastCheckedAt) return true;
+  const checkedAtMs = Date.parse(lastCheckedAt);
+  return !Number.isFinite(checkedAtMs) || nowMs - checkedAtMs > ACCOUNT_HEALTH_STALE_AFTER_MS;
+}
+
 // ========== Liveness ==========
 // Public (no auth, see middleware/auth.ts skip list): probed by
 // `create-line-harness update` and by the self-update verify phase
@@ -37,11 +48,14 @@ health.get('/api/accounts/:id/health', async (c) => {
       getLatestRiskLevel(c.env.DB, lineAccountId),
       getAccountHealthLogs(c.env.DB, lineAccountId),
     ]);
+    const lastCheckedAt = logs[0]?.created_at ?? null;
     return c.json({
       success: true,
       data: {
         lineAccountId,
         riskLevel,
+        lastCheckedAt,
+        isStale: isAccountHealthStale(lastCheckedAt),
         logs: logs.map((l) => ({
           id: l.id,
           errorCode: l.error_code,

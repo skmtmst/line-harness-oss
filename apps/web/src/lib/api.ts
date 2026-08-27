@@ -3229,7 +3229,12 @@ export const api = {
     accounts: () =>
       fetchApi<ApiResponse<LineAccount[]>>('/api/line-accounts'),
     getHealth: (accountId: string) =>
-      fetchApi<ApiResponse<{ riskLevel: string; logs: AccountHealthLog[] }>>(
+      fetchApi<ApiResponse<{
+        riskLevel: string | null
+        lastCheckedAt: string | null
+        isStale: boolean
+        logs: AccountHealthLog[]
+      }>>(
         `/api/accounts/${accountId}/health`,
       ),
     migrations: () =>

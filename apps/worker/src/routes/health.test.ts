@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
-import { health } from './health.js';
+import { health, isAccountHealthStale } from './health.js';
 import type { Env } from '../index.js';
 
 vi.mock('@line-crm/db', () => ({
@@ -56,5 +56,20 @@ describe('account health stays auth-guarded', () => {
   test('GET /api/accounts/:id/health without credentials → 401', async () => {
     const res = await app().request('/api/accounts/a1/health', {}, env());
     expect(res.status).toBe(401);
+  });
+});
+
+describe('account health staleness', () => {
+  test('treats missing, invalid, and older-than-two-cycles results as stale', () => {
+    const now = Date.parse('2026-08-28T00:20:00.000Z');
+    expect(isAccountHealthStale(null, now)).toBe(true);
+    expect(isAccountHealthStale('invalid', now)).toBe(true);
+    expect(isAccountHealthStale('2026-08-28T00:09:59.999Z', now)).toBe(true);
+  });
+
+  test('keeps a result from the latest two five-minute cycles current', () => {
+    const now = Date.parse('2026-08-28T00:20:00.000Z');
+    expect(isAccountHealthStale('2026-08-28T00:10:00.000Z', now)).toBe(false);
+    expect(isAccountHealthStale('2026-08-28T00:19:30.000Z', now)).toBe(false);
   });
 });
