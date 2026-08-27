@@ -84,6 +84,7 @@ function serializeMedia(row: Media, workerUrl: string) {
     url: row.public_url ?? `${workerUrl}/images/${row.r2_key}`,
     uploadedBy: row.uploaded_by,
     createdAt: row.created_at,
+    usageCount: row.usage_count === undefined ? undefined : Number(row.usage_count),
   };
 }
 
@@ -234,11 +235,11 @@ contents.delete('/api/media/:id', requireRole('owner', 'admin'), async (c) => {
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
     const usage = await countMediaUsages(c.env.DB, id);
-    if (usage > 0 && c.req.query('force') !== '1') {
+    if (usage > 0) {
       return c.json(
         {
           success: false,
-          error: `このファイルは ${usage} か所で使われています。削除すると、その箇所の表示が崩れます。`,
+          error: `このファイルは ${usage} か所で使われています。使用先から外すか、別のメディアへ差し替えてください。`,
           code: 'IN_USE',
           usageCount: usage,
         },

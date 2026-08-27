@@ -1585,9 +1585,9 @@ export const api = {
         body: JSON.stringify(data),
       }),
     usages: (id: string) => fetchApi<ApiResponse<MediaUsage[]>>(`/api/media/${id}/usages`),
-    /** 使用中は 409 で件数が返る。force で消せる。 */
-    delete: (id: string, opts?: { force?: boolean }) =>
-      fetchApi<ApiResponse<null>>(`/api/media/${id}${opts?.force ? '?force=1' : ''}`, {
+    /** 使用中は 409 で止まり、使用先から外すまで消せない。 */
+    delete: (id: string) =>
+      fetchApi<ApiResponse<null>>(`/api/media/${id}`, {
         method: 'DELETE',
       }),
   },

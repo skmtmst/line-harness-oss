@@ -37,6 +37,8 @@ export interface Media {
   public_url: string | null;
   uploaded_by: string | null;
   created_at: string;
+  /** 一覧取得時だけ付く。使用先をカードごとに再取得しないための集計値。 */
+  usage_count?: number;
 }
 
 export interface MediaUsage {
@@ -63,7 +65,14 @@ export async function getMedia(
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   values.push(opts.limit ?? 200);
   const result = await db
-    .prepare(`SELECT * FROM media ${where} ORDER BY created_at DESC LIMIT ?`)
+    .prepare(
+      `SELECT m.*,
+              (SELECT COUNT(*) FROM media_usages u WHERE u.media_id = m.id) AS usage_count
+         FROM media m
+         ${where}
+        ORDER BY m.created_at DESC
+        LIMIT ?`,
+    )
     .bind(...values)
     .all<Media>();
   return result.results;

@@ -94,7 +94,7 @@
     "direct-secondary-button": 2
   },
   "app/contents/page.tsx": {
-    "direct-secondary-button": 5,
+    "direct-secondary-button": 4,
     "arbitrary-value": 10,
     "direct-primary-button": 1
   },

@@ -263,6 +263,8 @@ export interface MediaItem {
   url: string;
   uploadedBy: string | null;
   createdAt: string;
+  /** 0は未使用。省略は旧APIなどでまだ取得できていない状態。 */
+  usageCount?: number;
 }
 
 /** メディアの使用箇所 */

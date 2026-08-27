@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaItem, MediaUsage } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import Header from '@/components/layout/header'
 import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import Notice from '@/components/shared/notice'
 
 /**
  * 登録メディア一覧。
@@ -67,6 +69,7 @@ function formatSize(bytes: number): string {
 export default function MediaLibraryPage() {
   const [items, setItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
@@ -88,12 +91,13 @@ export default function MediaLibraryPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setLoadFailed(false)
     setError('')
     try {
       const res = await api.media.list()
       if (res.success) setItems(res.data)
     } catch {
-      setError('読み込みに失敗しました')
+      setLoadFailed(true)
     } finally {
       setLoading(false)
     }
@@ -169,7 +173,7 @@ export default function MediaLibraryPage() {
     }
   }
 
-  /** 選んだ札をまとめて消す。使用中は件数を出して、もう一度聞く。 */
+  /** 選んだ札をまとめて消す。使用中はAPIでも必ず止める。 */
   const removeSelected = async () => {
     if (selected.size === 0) return
     if (!confirm(`${selected.size}件のメディアを削除しますか？`)) return
@@ -180,12 +184,7 @@ export default function MediaLibraryPage() {
       } catch (e) {
         if (e instanceof ApiError && e.status === 409) {
           const name = items.find((m) => m.id === id)?.filename ?? id
-          if (!confirm(`${name}\n${e.message}\n\nそれでも削除しますか？`)) continue
-          try {
-            await api.media.delete(id, { force: true })
-          } catch {
-            setError('削除に失敗しました')
-          }
+          setError(`${name}: ${e.message}`)
           continue
         }
         setError('削除に失敗しました')
@@ -213,30 +212,16 @@ export default function MediaLibraryPage() {
     if (page > pageCount) setPage(pageCount)
   }, [page, pageCount])
 
-  const allSelected = filtered.length > 0 && filtered.every((item) => selected.has(item.id))
+  const removable = filtered.filter(
+    (item) => item.usageCount === undefined || item.usageCount === 0,
+  )
+  const allSelected = removable.length > 0 && removable.every((item) => selected.has(item.id))
 
   return (
-    <div>
-      <div data-design="Head">
-        <Header
-          title="登録メディア一覧"
-          description="配信やリッチメニューで使う画像・動画・PDFをここにまとめます。どこで使われているかも一緒に管理します。"
-          action={
-            <button
-              disabled
-              title="マニュアルは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              マニュアル
-            </button>
-          }
-        />
-      </div>
+    <div data-design-node="g89Tc" data-media-design="v6">
 
       {error && (
-        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
-          {error}
-        </div>
+        <Notice tone="error" message={error} onClose={() => setError('')} className="mb-4" />
       )}
 
       {/* ドロップ枠と、受け付ける形式の表。Lステップと同じく左右に並べる。 */}
@@ -329,13 +314,20 @@ export default function MediaLibraryPage() {
       </div>
 
       {loading ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
-        </div>
+        <ListState kind="loading" title="メディアを読み込んでいます" />
+      ) : loadFailed ? (
+        <ListState
+          kind="error"
+          title="メディアを表示できませんでした"
+          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={<Button variant="secondary" onClick={() => void load()}>登録メディアを再読み込み</Button>}
+        />
       ) : current.length === 0 ? (
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          {items.length === 0 ? 'ファイルがまだありません。' : 'この条件に合うメディアはありません。'}
-        </div>
+        <ListState
+          kind="empty"
+          title={items.length === 0 ? '登録メディアはまだありません' : '条件に合うメディアはありません'}
+          description={items.length === 0 ? '上の枠へファイルを入れると、配信や公開画面で使えます。' : '種類または検索条件を変えてください。'}
+        />
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {current.map((item) => (
@@ -395,6 +387,7 @@ export default function MediaLibraryPage() {
                       <input
                         type="checkbox"
                         checked={selected.has(item.id)}
+                        disabled={(item.usageCount ?? 0) > 0}
                         onChange={() =>
                           setSelected((prev) => {
                             const next = new Set(prev)
@@ -404,6 +397,7 @@ export default function MediaLibraryPage() {
                           })
                         }
                         aria-label={`${item.filename}を選ぶ`}
+                        title={(item.usageCount ?? 0) > 0 ? '使用先から外すまで削除できません' : undefined}
                         className="accent-green-500 mt-0.5"
                       />
                       <span className="bg-ink-secondary text-on-accent rounded px-1 py-0.5 text-[10px] leading-none">
@@ -415,6 +409,9 @@ export default function MediaLibraryPage() {
                     </label>
                     <p className="text-ink-faint text-[11px] tabular-nums">
                       登録：{formatStamp(item.createdAt)}・{formatSize(item.sizeBytes)}
+                    </p>
+                    <p className="text-ink-faint text-xs tabular-nums">
+                      使用先：{item.usageCount === undefined ? '—' : `${item.usageCount}件`}
                     </p>
                   </>
                 )}
@@ -484,7 +481,7 @@ export default function MediaLibraryPage() {
                 setSelected((prev) => {
                   if (allSelected) return new Set<string>()
                   const next = new Set(prev)
-                  for (const item of filtered) next.add(item.id)
+                  for (const item of removable) next.add(item.id)
                   return next
                 })
               }

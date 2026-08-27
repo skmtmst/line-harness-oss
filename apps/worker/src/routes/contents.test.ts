@@ -73,6 +73,7 @@ const MEDIA = {
   public_url: null,
   uploaded_by: 'u-1',
   created_at: '2026-08-16',
+  usage_count: 3,
 };
 
 const VAR = {
@@ -113,6 +114,13 @@ beforeEach(() => {
 });
 
 describe('メディアのアップロード', () => {
+  it('一覧に使用先件数を含める', async () => {
+    const res = await req('/api/media', 'GET');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: Array<{ usageCount: number }> };
+    expect(body.data[0]?.usageCount).toBe(3);
+  });
+
   it('形式と拡張子が揃っていれば通る', async () => {
     const res = await req('/api/media', 'POST', {
       filename: 'a.png',
@@ -183,11 +191,11 @@ describe('メディアの削除', () => {
     expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
-  it('force=1 なら消す', async () => {
+  it('force=1 を付けても使用中は消さない', async () => {
     mocks.countMediaUsages.mockResolvedValue(5);
     const res = await req('/api/media/md-1?force=1', 'DELETE');
-    expect(res.status).toBe(200);
-    expect(mocks.deleteMedia).toHaveBeenCalled();
+    expect(res.status).toBe(409);
+    expect(mocks.deleteMedia).not.toHaveBeenCalled();
   });
 
   it('DBの行を先に消す', async () => {
