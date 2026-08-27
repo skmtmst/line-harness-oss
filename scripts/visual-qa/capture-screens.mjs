@@ -44,9 +44,12 @@ function check() {
     if (seen.has(s.node)) problems.push(`${s.node}: 二重に書いてある`)
     seen.add(s.node)
     if (!s.dir) problems.push(`${s.node}: dir が無い`)
-    if (s.status === 'unimplemented') {
-      if (!s.why) problems.push(`${s.node}: 未実装なのに理由が無い`)
+    if (s.status === 'unimplemented' || s.status === 'unconfirmed') {
+      if (!s.why) problems.push(`${s.node}: ${s.status} なのに理由が無い`)
       continue
+    }
+    if (s.status && !['unimplemented', 'unconfirmed'].includes(s.status)) {
+      problems.push(`${s.node}: 知らない status（${s.status}）`)
     }
     if (!s.route || s.route === '—') problems.push(`${s.node}: route が無い`)
     if (!['page', 'viewport'].includes(s.mode)) problems.push(`${s.node}: mode が page/viewport ではない`)
@@ -139,6 +142,15 @@ async function captureImpl(feature) {
   for (const s of list) {
     if (s.status === 'unimplemented') {
       console.log(`${s.node}\t未実装のため撮らない\t${s.why}`)
+      continue
+    }
+    if (s.status === 'unconfirmed') {
+      /*
+        **「押せない」と「無い」は別。** 押せる場所は見つかったが無効の
+        ままだった、というだけで「実装が無い」と書くと、あとで直す人が
+        探す場所を間違える。分けて出す。
+      */
+      console.log(`${s.node}\t未確認のため撮らない\t${s.why}`)
       continue
     }
     const out = join(ROOT, 'docs', 'design-qa', s.dir)
