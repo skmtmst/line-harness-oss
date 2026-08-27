@@ -88,7 +88,7 @@
     "unresolved-classname": 1
   },
   "app/chats/page.tsx": {
-    "arbitrary-value": 121,
+    "arbitrary-value": 116,
     "direct-primary-button": 2,
     "unresolved-classname": 2,
     "direct-secondary-button": 2
@@ -487,6 +487,11 @@
     "arbitrary-value": 53,
     "unresolved-classname": 11,
     "direct-secondary-button": 1
+  },
+  "components/chats/inbox-dropdown.tsx": {
+    "unresolved-classname": 8,
+    "direct-secondary-button": 2,
+    "arbitrary-value": 1
   },
   "components/chats/inbox-kpis.tsx": {
     "arbitrary-value": 27

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
+import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -1217,18 +1218,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             </div>
             <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
               <span className="shrink-0">担当者</span>
-              <select
-                value={assigneeFilter}
-                onChange={(event) => setAssigneeFilter(event.target.value)}
-                aria-label="担当者で絞り込む"
-                className="min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-canvas px-2 py-1.5 text-[11px] font-medium text-[#344054] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
-              >
-                <option value="all">すべて</option>
-                <option value="unassigned">未割り当て</option>
-                {operators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>{operator.name}</option>
-                ))}
-              </select>
+              <span className="min-w-0 flex-1">
+                <OperatorDropdown
+                  value={assigneeFilter}
+                  operators={operators}
+                  onChange={setAssigneeFilter}
+                  label="担当者"
+                  ariaLabel="担当者で絞り込む"
+                />
+              </span>
             </label>
             <div className="mt-2 flex items-center gap-1">
               {CHANNELS.map((item) => (
@@ -1592,34 +1590,24 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                 */}
                 {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。 */}
                 <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <span className="text-ink-faint">対応</span>
-                    <select
-                      value={chatDetail.status}
-                      onChange={(e) => void handleStatusUpdate(e.target.value as Chat['status'])}
-                      className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
-                    >
-                      <option value="unread">未対応</option>
-                      <option value="in_progress">対応中</option>
-                      <option value="on_hold">保留</option>
-                      <option value="resolved">対応済</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <span className="text-ink-faint">担当</span>
-                    <select
-                      value={chatDetail.operatorId ?? ''}
-                      onChange={(e) => void handleOperatorUpdate(e.target.value || null)}
-                      className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
-                    >
-                      <option value="">未割り当て</option>
-                      {operators.map((op) => (
-                        <option key={op.id} value={op.id}>
-                          {op.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {/*
+                    素の `<select>` から専用のプルダウンへ替えた。
+                    **開いた中身がブラウザ任せだと画像に写らない。** 設計の
+                    2-8 / 2-9 / 2-10 は「開いた状態」なので、素のセレクトの
+                    ままでは永久に見比べられない。色の丸と札も設計どおりに出す。
+                  */}
+                  <StatusDropdown
+                    value={chatDetail.status as ChatStatus}
+                    onChange={(next) => void handleStatusUpdate(next as Chat['status'])}
+                    ariaLabel="対応マークを変える"
+                  />
+                  <OperatorDropdown
+                    value={chatDetail.operatorId ?? 'unassigned'}
+                    operators={operators}
+                    onChange={(next) => void handleOperatorUpdate(next === 'unassigned' ? null : next)}
+                    label="担当"
+                    ariaLabel="担当者を変える"
+                  />
                   {!showFriendInfo && (
                     <button
                       type="button"

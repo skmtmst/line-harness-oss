@@ -95,24 +95,22 @@ export const SCREENS = [
     steps: [...OPEN_CHAT, { click: '内部メモ' }],
   },
   /*
-    2-8 / 2-9 / 2-10 は「プルダウンを開いた状態」。
-    **実装は素のセレクトなので、開いた中身が画像に写らない。**
-    設計は専用のパネル（`lJ1CF` 担当者プルダウン開状態、
-    `k6lHgo` 対応マークプルダウン開状態）で、共通の `Select` でもない。
+    2-8 / 2-9 / 2-10 は「プルダウンを開いた状態」。素のセレクトのままだと
+    開いた中身がブラウザ任せで**画像に写らない**ので、専用の部品へ替えた
+    （`components/chats/inbox-dropdown.tsx`）。
+    2-8 は一覧の絞り込み、2-9 は会話の見出し、2-10 は対応マーク。
   */
   {
     ...INBOX, node: 'YZaDK', name: '2-8 担当者プルダウンを開く',
-    status: 'unimplemented',
-    why: '素のセレクトで、開いた中身が画像に写らない。設計は専用パネル（`lJ1CF`）',
+    steps: [{ click: '担当者で絞り込む' }],
   },
   {
     ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
-    status: 'unimplemented', why: '2-8 と同じ。素のセレクト',
+    steps: [...OPEN_CHAT, { click: '担当者を変える' }],
   },
   {
     ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
-    status: 'unimplemented',
-    why: '素のセレクトで、開いた中身が画像に写らない。設計は専用パネル（`k6lHgo`）',
+    steps: [...OPEN_CHAT, { click: '対応マークを変える' }],
   },
   {
     ...INBOX, node: 'TUveA', name: '2-11 テンプレート・予約フォルダ',

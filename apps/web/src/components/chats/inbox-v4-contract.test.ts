@@ -119,7 +119,7 @@ describe('受信箱V4の画面契約', () => {
 
   it('自分担当チップを外し、担当者プルダウンでLINEとメールを絞る', () => {
     expect(PAGE).not.toContain("{ key: 'mine' as const, label: '自分担当' }")
-    expect(PAGE).toContain('aria-label="担当者で絞り込む"')
+    expect(PAGE).toContain('ariaLabel="担当者で絞り込む"')
     expect(PAGE).toContain("assigneeFilter === 'unassigned'")
     expect(PAGE).toContain('item.assignedStaffId === assigneeFilter')
     expect(PAGE).toContain('chat.operatorId !== assigneeFilter')
