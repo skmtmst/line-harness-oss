@@ -36,6 +36,9 @@ const DASHBOARD_CLOCK = '2026-08-19T12:00:00.000Z'
  */
 const INBOX_CLOCK = '2026-08-19T11:00:00.000Z'
 
+/** 友だちは一覧。3-2 重複検出・3-3 統合ユーザーは同じ画面のタブ。 */
+const FRIENDS = { feature: 3, dir: 'friends-v6', route: '/friends', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -150,6 +153,45 @@ export const SCREENS = [
     ],
   },
 
+  // ── 機能3 友だち ────────────────────────────────────────
+  { ...FRIENDS, node: 'PhxG6', name: '3-1 友だち' },
+  {
+    ...FRIENDS, node: 'LT8RS', name: '3-1-A 友だち（表示件数を開く）',
+    status: 'unimplemented',
+    why: '表示件数が素のセレクトで、開いた中身が画像に写らない。**タグ一覧は共通の `Select` を使っていて、同じ操作の作りが画面ごとに違う**',
+  },
+  {
+    ...FRIENDS, node: 'Igi72', name: '3-1-B 友だち（詳細検索・14軸）',
+    steps: [{ click: '詳細条件' }],
+  },
+  {
+    ...FRIENDS, node: 'IAf7j', name: '3-1-C 友だち（一括アクション）',
+    steps: [{ click: '表示中の友だちをすべて選ぶ', role: 'checkbox' }],
+  },
+  { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0' },
+  {
+    ...FRIENDS, node: 'bzDn6', name: '3-1-E 友だち一覧の状態（空・読込・エラー）',
+    status: 'unimplemented',
+    why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い（`capture.spec.mjs` の `TAG_STATES` と同じ作りが要る）',
+  },
+  { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates' },
+  {
+    ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
+    route: '/friends?tab=duplicates', status: 'unimplemented',
+    why: '重複検出タブに「再計算」しか無く、**候補を1件ずつ開く導線が無い**。設計は統合前の確認まで見せる',
+  },
+  { ...FRIENDS, node: 'r7eSi', name: '3-3 統合ユーザー', route: '/friends?tab=merged' },
+  {
+    ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
+    route: '/friends?tab=merged', status: 'unimplemented',
+    why: '統合ユーザーの行を開く導線が無い（再計算とページ送りだけ）',
+  },
+  {
+    ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
+    status: 'unimplemented',
+    why: '`/accounts` を開くと `/hq` へ飛ばされる。画面確認アカウントの権限では入れない。権限の切り分けが要る',
+  },
+
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
   // ここには、設計と並べるために撮るものだけを置く。
@@ -213,6 +255,9 @@ export const DESIGN_SIZE = {
   L35UOV: [1920, 1840], IYjvu: [1920, 1840], TUveA: [1920, 1840], w72a2: [1920, 1840],
   ASsb3: [1920, 1840], ANgda: [1920, 1840], tBlkL: [1920, 1840], AuSDY: [1920, 1840],
   LHjwD: [1920, 1840],
+  PhxG6: [1920, 1080], LT8RS: [1920, 1080], Igi72: [1920, 1080], IAf7j: [1920, 1107],
+  I6UAdr: [1920, 1384], bzDn6: [1920, 1080], YzxU1: [1920, 1431], InCDe: [1920, 1080],
+  r7eSi: [1920, 1080], w8W4Eh: [1920, 1080], vtBCu: [1920, 1080],
   vUXKb: [1920, 1668], ZN0ov: [1920, 1754], JN6mQ: [1920, 1668],
   NjK9q: [1920, 1668], Alekb: [1920, 1668],
   l25rlp: [1920, 1080], tP0RW: [1920, 1320], LfrQs: [1920, 1320],

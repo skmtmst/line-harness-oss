@@ -468,3 +468,63 @@ export const INBOX_SAVED_VIEWS = [
   displayOrder: index,
   createdAt: '2026-08-17T03:00:00.000Z',
 }))
+
+/**
+ * 重複検出の数（設計 `YzxU1`）。
+ *
+ * `{items,total}` で返していたあいだ、重複検出のタブは
+ * `perAccount.length` を読んで落ち、**画面ごと「表示できませんでした」**に
+ * なっていた。数の形が違うだけで、タブが1つ丸ごと開けない。
+ */
+export const DUPLICATE_STATS = {
+  totalFollowing: 231,
+  uniquePeople: 214,
+  friendDups: 17,
+  duplicateGroups: 8,
+  wastedPerBroadcastYen: 51,
+  msgUnitYen: 3,
+  perAccount: [
+    { accountId: 'visual-qa-account', accountName: '画面確認アカウント', friends: 231, dups: 17, dupRate: 0.074 },
+  ],
+  pairwiseOverlap: [],
+  computedAt: '2026-08-19T03:00:00.000Z',
+}
+
+/**
+ * 統合ユーザー（設計 `r7eSi`）。
+ *
+ * `{items,total}` で返していたあいだ、タブは `rows` を回そうとして
+ * **`rows is not iterable`** で落ちていた。画面ごと開けない。
+ *
+ * 3件のうち1件は2アカウントに重複している人（`isDuplicate`）。
+ * **重複を1件も入れないと、重複の見え方を確かめられない。**
+ */
+export const USERS_GROUPED = {
+  total: 3,
+  page: 1,
+  pageSize: 20,
+  computedAt: '2026-08-19T03:00:00.000Z',
+  rows: [
+    ['Kyohei Yamamoto', 'url_token', true, ['kyohei@example.com'], ['090-0000-0001']],
+    ['Kenta Kawano (Obama)', 'uid', false, ['kenta@example.com'], []],
+    ['菅野 亮', 'solo', false, [], ['090-0000-0003']],
+  ].map(([displayName, kind, isDuplicate, emails, phones], index) => ({
+    identityKey: `identity-${index}`,
+    identityKeyKind: String(kind),
+    displayName: String(displayName),
+    pictureUrl: null,
+    accounts: (isDuplicate ? [0, 1] : [0]).map((n) => ({
+      accountId: n === 0 ? 'visual-qa-account' : 'visual-qa-account-2',
+      accountName: n === 0 ? '画面確認アカウント' : '画面確認アカウント（2）',
+      lineUserId: `U${index}${n}0000000000000000000000000000`,
+      isFollowing: true,
+      joinedAt: '2026-08-13T00:00:00.000Z',
+      friendId: `friend-${index}`,
+    })),
+    xUsername: null,
+    emails,
+    phones,
+    lastActivityAt: '2026-08-19T03:00:00.000Z',
+    isDuplicate: Boolean(isDuplicate),
+  })),
+}
