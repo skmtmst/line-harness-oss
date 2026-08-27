@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import {
-  getSupportMarks,
+  getSupportMarksWithUsage,
   getSupportMarkById,
   createSupportMark,
   updateSupportMark,
@@ -127,15 +127,18 @@ function maskIp(ip: string): string {
 
 friendAttributes.get('/api/support-marks', async (c) => {
   try {
-    const marks = await getSupportMarks(c.env.DB);
-    // 何人に付いているかも返す。運用でどれが使われているか分かる。
-    const withCounts = [];
-    for (const mark of marks) {
-      withCounts.push({
+    const marks = await getSupportMarksWithUsage(c.env.DB);
+    const withCounts = marks.map((mark) => ({
         ...serializeMark(mark),
-        friendCount: await countFriendsWithMark(c.env.DB, mark.id),
-      });
-    }
+        friendCount: Number(mark.friend_count),
+        usedIn: {
+          broadcasts: Number(mark.broadcasts),
+          scenarios: Number(mark.scenarios),
+          autoReplies: Number(mark.auto_replies),
+          savedSearches: Number(mark.saved_searches),
+          automations: Number(mark.automations),
+        },
+      }));
     return c.json({ success: true, data: withCounts });
   } catch (err) {
     console.error('GET /api/support-marks error:', err);

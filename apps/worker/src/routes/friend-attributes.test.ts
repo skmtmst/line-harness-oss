@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import type { Env } from '../index.js';
 
 const marks = {
-  getSupportMarks: vi.fn(),
+  getSupportMarksWithUsage: vi.fn(),
   getSupportMarkById: vi.fn(),
   createSupportMark: vi.fn(),
   updateSupportMark: vi.fn(),
@@ -104,7 +104,15 @@ const FOLDER = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  marks.getSupportMarks.mockResolvedValue([MARK]);
+  marks.getSupportMarksWithUsage.mockResolvedValue([{
+    ...MARK,
+    friend_count: 7,
+    broadcasts: 2,
+    scenarios: 1,
+    auto_replies: 0,
+    saved_searches: 3,
+    automations: 1,
+  }]);
   marks.getSupportMarkById.mockResolvedValue(MARK);
   marks.createSupportMark.mockResolvedValue(MARK);
   marks.updateSupportMark.mockResolvedValue(MARK);
@@ -132,10 +140,10 @@ beforeEach(() => {
 
 describe('対応マーク', () => {
   it('一覧に付いている人数が入る', async () => {
-    marks.countFriendsWithMark.mockResolvedValue(7);
     const res = await req('/api/support-marks', 'GET');
-    const body = (await res.json()) as { data: Array<{ friendCount: number }> };
+    const body = (await res.json()) as { data: Array<{ friendCount: number; usedIn: { broadcasts: number; savedSearches: number } }> };
     expect(body.data[0].friendCount).toBe(7);
+    expect(body.data[0].usedIn).toMatchObject({ broadcasts: 2, savedSearches: 3 });
   });
 
   it('色の形が違えば弾く', async () => {

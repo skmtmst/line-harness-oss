@@ -17,6 +17,7 @@ import {
   createSupportMark,
   getDefaultSupportMark,
   getSupportMarks,
+  getSupportMarksWithUsage,
   setFriendSupportMarkBulk,
   applyInboundSupportMark,
   replaceAndDeleteSupportMark,
@@ -306,6 +307,21 @@ describe('対応マーク', () => {
     insertFriend('f-2');
     const n = await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], 'mark_working');
     expect(n).toBe(2);
+  });
+
+  test('一覧の使用先を固定文言ではなく実参照から数える', async () => {
+    await getSupportMarks(db);
+    insertFriend('f-1');
+    await setFriendSupportMarkBulk(db, ['f-1'], 'mark_working');
+    sqlite.prepare(
+      `INSERT INTO saved_searches
+         (id, name, scope, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
+       VALUES ('search-mark', '対応中の人', 'friends', ?, 'staff-1', 'account-1', 1, 0, '2026-08-27')`,
+    ).run(JSON.stringify({ all: [{ type: 'support_mark', value: { markIds: ['mark_working'] } }] }));
+
+    const mark = (await getSupportMarksWithUsage(db)).find((row) => row.id === 'mark_working');
+    expect(mark).toMatchObject({ friend_count: 1, saved_searches: 1 });
+    expect(mark?.broadcasts).toBe(0);
   });
 
   test('使用中マークは初期値へ置換し、友だちごとの履歴を残してから削除する', async () => {

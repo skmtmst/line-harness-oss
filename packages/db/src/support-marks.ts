@@ -19,6 +19,15 @@ export interface SupportMark {
   created_at: string;
 }
 
+export interface SupportMarkWithUsage extends SupportMark {
+  friend_count: number;
+  broadcasts: number;
+  scenarios: number;
+  auto_replies: number;
+  saved_searches: number;
+  automations: number;
+}
+
 /**
  * 初期の3マークを用意する。
  *
@@ -49,6 +58,74 @@ export async function getSupportMarks(db: D1Database): Promise<SupportMark[]> {
   const result = await db
     .prepare(`SELECT * FROM support_marks ORDER BY display_order ASC, created_at ASC`)
     .all<SupportMark>();
+  return result.results;
+}
+
+/**
+ * 一覧用の対応マークと参照数を1回で読む。
+ *
+ * 画面で「配信・自動応答」と固定表示すると、実際には使っていないマークまで
+ * 使用中に見える。逆に1件ずつ数えるとN+1になるため、JSON条件も含めて
+ * 相関サブクエリでまとめて返す。実行履歴は現在の使用先ではないため数えない。
+ */
+export async function getSupportMarksWithUsage(db: D1Database): Promise<SupportMarkWithUsage[]> {
+  await ensureDefaultSupportMarks(db);
+  const result = await db.prepare(
+    `SELECT sm.*,
+       (SELECT COUNT(*) FROM friends f WHERE f.support_mark_id = sm.id) AS friend_count,
+       (SELECT COUNT(*) FROM broadcasts b WHERE EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(b.segment_conditions)
+                                       THEN b.segment_conditions ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        )) AS broadcasts,
+       (SELECT COUNT(DISTINCT a.scenario_id) FROM scenario_actions a WHERE
+          (a.action_type = 'support_mark' AND EXISTS (
+            SELECT 1 FROM json_tree(CASE WHEN json_valid(a.config_json)
+                                         THEN a.config_json ELSE 'null' END) j
+             WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+          )) OR EXISTS (
+            SELECT 1 FROM json_tree(CASE WHEN json_valid(a.condition_json)
+                                         THEN a.condition_json ELSE 'null' END) j
+             WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+          )
+        ) AS scenarios,
+       (SELECT COUNT(*) FROM auto_replies a WHERE EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions_json)
+                                       THEN a.actions_json ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        ) OR EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(a.friend_conditions_json)
+                                       THEN a.friend_conditions_json ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        )) AS auto_replies,
+       (SELECT COUNT(*) FROM saved_searches s WHERE EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(s.conditions_json)
+                                       THEN s.conditions_json ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        )) AS saved_searches,
+       ((SELECT COUNT(*) FROM automations a WHERE EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(a.conditions)
+                                       THEN a.conditions ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        ) OR EXISTS (
+          SELECT 1 FROM json_tree(CASE WHEN json_valid(a.actions)
+                                       THEN a.actions ELSE 'null' END) j
+           WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+        )) +
+        (SELECT COUNT(DISTINCT v.automation_id) FROM automation_versions v WHERE v.status = 'published' AND (
+          EXISTS (
+            SELECT 1 FROM json_tree(CASE WHEN json_valid(v.condition_config)
+                                         THEN v.condition_config ELSE 'null' END) j
+             WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+          ) OR EXISTS (
+            SELECT 1 FROM json_tree(CASE WHEN json_valid(v.action_config)
+                                         THEN v.action_config ELSE 'null' END) j
+             WHERE j.type = 'text' AND CAST(j.value AS TEXT) = sm.id
+          )
+        ))) AS automations
+     FROM support_marks sm
+    ORDER BY sm.display_order ASC, sm.created_at ASC`,
+  ).all<SupportMarkWithUsage>();
   return result.results;
 }
 

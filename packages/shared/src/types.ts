@@ -247,6 +247,14 @@ export interface SupportMark {
   autoOnInbound: boolean;
   displayOrder: number;
   createdAt: string;
+  /** GET /api/support-marks の一覧で返る実参照数。省略は未取得、0は参照なし。 */
+  usedIn?: {
+    broadcasts: number;
+    scenarios: number;
+    autoReplies: number;
+    savedSearches: number;
+    automations: number;
+  };
 }
 
 /** メディアライブラリの1件 */
