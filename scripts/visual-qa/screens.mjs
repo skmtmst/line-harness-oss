@@ -69,6 +69,10 @@ const TEMPLATE = { feature: 11, dir: 'templates-v6', route: '/templates', mode: 
 const RICH_MENU = { feature: 12, dir: 'rich-menus-v6', route: '/rich-menus', mode: 'page' }
 const RM_EDIT = '/rich-menus/edit?id=rmg-1'
 
+/** 回答フォーム。一覧と回答が同じ画面。編集は `/form-submissions/edit?id=`。 */
+const FORM = { feature: 13, dir: 'forms-v6', route: '/form-submissions', mode: 'page' }
+const FORM_EDIT = '/form-submissions/edit?id=form-1'
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -601,6 +605,34 @@ export const SCREENS = [
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能13 回答フォーム ─────────────────────────────────
+  /*
+    設計は一覧・編集（3つのタブ）・集まった回答の3つ。実装は一覧と回答が
+    同じ画面で、編集は別ルート。**「デザイン設定」は押せない状態で置いてある**
+    （見た目をアプリにそろえる方針にしたため、と画面に書いてある）。
+  */
+  { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム' },
+  { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT },
+  {
+    ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定', route: FORM_EDIT,
+    status: 'unconfirmed',
+    why: '「デザイン設定」は在るが**押せない（無効のまま）**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」と書いてある（`edit/page.tsx:377`）',
+  },
+  {
+    ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定', route: FORM_EDIT,
+    mode: 'viewport', height: 1080, steps: [{ click: 'オプション設定' }],
+  },
+  { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答', steps: [{ click: '来店アンケート' }] },
+  {
+    ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
+    status: 'unimplemented',
+    why: '一覧に削除の導線が無い（`grep 削除|confirm` が `form-submissions/page.tsx` で0件）',
+  },
+  {
+    ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 

@@ -114,6 +114,12 @@ export default function FormSubmissionsPage() {
   const [page, setPage] = useState(1)
   const [detailSubmission, setDetailSubmission] = useState<Submission | null>(null)
   const [query, setQuery] = useState('')
+
+  /** 全フォームの回答数の合計。札に出しているのと同じ `submitCount` を足す。 */
+  const totalSubmitCount = useMemo(
+    () => forms.reduce((sum, form) => sum + (form.submitCount ?? 0), 0),
+    [forms],
+  )
   const [formFilter, setFormFilter] = useState<FormFilter>('all')
   const [editingForm, setEditingForm] = useState<Form | null>(null)
   const [editingName, setEditingName] = useState('')
@@ -276,13 +282,20 @@ export default function FormSubmissionsPage() {
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">作成済み</p>
         </div>
+        {/*
+          **全フォームの合計を出す。** ここは以前 `submissions.length`
+          で、いま開いているフォームのぶんだけを数えていた。フォームを
+          選ぶまで 0 なので、下の札が「1,284件の回答」と出ているのに
+          帯は「回答 0件」になる。**同じ画面で数が食い違って見える。**
+          `submitCount` は一覧の返事に最初から入っている。
+        */}
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">回答</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {submissions.length}
+            {totalSubmitCount.toLocaleString('ja-JP')}
             <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
           </p>
-          <p className="text-ink-faint mt-0.5 text-xs">読み込んだぶん</p>
+          <p className="text-ink-faint mt-0.5 text-xs">すべてのフォームの合計</p>
         </div>
         {/* 月ごとの集計と、回答率（配ったうち何人が答えたか）を出す経路が無い。 */}
         <div className="bg-canvas rounded-card border-hairline border p-4">

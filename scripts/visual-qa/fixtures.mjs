@@ -1179,3 +1179,162 @@ export const RICH_MENU_GROUP_DETAILS = {
     ],
   },
 }
+
+/**
+ * 機能13 回答フォーム。設計 `EMBIK` の一覧。
+ *
+ * **一覧が読む形（`form-submissions/page.tsx` の `Form`）に合わせる。**
+ * `fields` は `{name,label,type}` の配列で、通で返さないと
+ * 回答の列見出しが組み立てられない。
+ */
+export const FORMS = [
+  {
+    id: 'form-1', name: '来店アンケート', description: '来店後に感想と次回の希望を聞く',
+    fields: [
+      { name: 'name', label: 'お名前', type: 'text' },
+      { name: 'satisfaction', label: 'ご満足度', type: 'radio' },
+      { name: 'good_points', label: 'よかったところ', type: 'checkbox' },
+      { name: 'comment', label: 'ご意見・ご要望', type: 'textarea' },
+      { name: 'next_visit', label: '次回のご来店予定', type: 'date' },
+    ],
+    isActive: true, submitCount: 1284,
+    createdAt: '2026-05-02T00:00:00.000Z', lastSubmittedAt: '2026-08-24T05:22:00.000Z',
+    usedByAccounts: [],
+  },
+  {
+    id: 'form-2', name: '資料請求', description: '名前と連絡先',
+    fields: [
+      { name: 'name', label: 'お名前', type: 'text' },
+      { name: 'email', label: 'メールアドレス', type: 'email' },
+      { name: 'tel', label: '電話番号', type: 'tel' },
+      { name: 'company', label: '会社名', type: 'text' },
+      { name: 'interest', label: 'ご関心のある内容', type: 'checkbox' },
+    ],
+    isActive: true, submitCount: 468,
+    createdAt: '2026-04-14T00:00:00.000Z', lastSubmittedAt: '2026-08-23T02:10:00.000Z',
+    usedByAccounts: [],
+  },
+  {
+    id: 'form-3', name: '休止の理由', description: '定期便を止めたい人に聞く',
+    fields: [
+      { name: 'reason', label: '休止の理由', type: 'radio' },
+      { name: 'detail', label: 'くわしく', type: 'textarea' },
+    ],
+    isActive: true, submitCount: 96,
+    createdAt: '2026-06-20T00:00:00.000Z', lastSubmittedAt: '2026-08-19T08:00:00.000Z',
+    usedByAccounts: [],
+  },
+  {
+    /* 下書き。**まだ1件も答えが無い。** 「未回答」で撮れることが要る。 */
+    id: 'form-4', name: '新メニューの好み', description: null,
+    fields: [{ name: 'choice', label: 'どれが気になりますか', type: 'radio' }],
+    isActive: false, submitCount: 0,
+    createdAt: '2026-08-18T00:00:00.000Z', lastSubmittedAt: null,
+    usedByAccounts: [],
+  },
+]
+
+/** 設計 `v9tYhl` の「集まった回答」。 */
+export const FORM_SUBMISSIONS = [
+  {
+    id: 'sub-1', formId: 'form-1', friendId: 'friend-4', friendName: '山田 太郎',
+    data: {
+      name: '山田 太郎', satisfaction: 'とても良かった',
+      good_points: ['接客', '味'],
+      comment: '接客がとても良かったです。またうかがいます。',
+      next_visit: '2026-09-10',
+    },
+    createdAt: '2026-08-24T05:22:00.000Z',
+  },
+  {
+    id: 'sub-2', formId: 'form-1', friendId: 'friend-5', friendName: '佐藤 花子',
+    data: {
+      name: '佐藤 花子', satisfaction: '良かった',
+      good_points: ['味'], comment: '味は良かったが少し待ちました',
+      next_visit: '2026-09-02',
+    },
+    createdAt: '2026-08-24T02:05:00.000Z',
+  },
+  {
+    /* 自由記入なし。**空欄で撮れることが要る。** */
+    id: 'sub-3', formId: 'form-1', friendId: 'friend-6', friendName: '鈴木 一郎',
+    data: { name: '鈴木 一郎', satisfaction: 'ふつう', good_points: [], comment: '', next_visit: '' },
+    createdAt: '2026-08-23T10:40:00.000Z',
+  },
+  {
+    /* 友だちに結びついていない回答。**匿名で撮れることが要る。** */
+    id: 'sub-4', formId: 'form-1', friendId: null, friendName: null,
+    data: { name: '（未記入）', satisfaction: 'あまり', good_points: [], comment: '待ち時間が長かった', next_visit: '' },
+    createdAt: '2026-08-22T08:15:00.000Z',
+  },
+]
+
+/**
+ * 設計 `vCqUj` の「来店アンケート」9ブロック。
+ *
+ * **`FormLayout`（`packages/shared/src/form-layout.ts`）の形どおりに書く。**
+ * `version` `header` `sections` `options` の4つが要る。
+ * 飾りのブロック（`image` `heading` `text`）と入力欄（`input`）は別の形で、
+ * 入力欄は `kind: 'input'` と `type` `name` `label` を持つ。
+ * ここを崩すと編集画面が `sections` を回そうとして落ちる。
+ */
+export const FORM_LAYOUT_VISIT = {
+  version: 2,
+  header: [],
+  sections: [
+    {
+      id: 's_visit', name: 'セクション1',
+      blocks: [
+        { id: 'b_img', kind: 'image', mediaUrl: 'https://example.co.jp/header.png', size: 'full' },
+        { id: 'b_head', kind: 'heading', text: 'ご来店ありがとうございました', level: 1 },
+        { id: 'b_text', kind: 'text', text: '30秒で終わります。よろしければお答えください。' },
+        {
+          id: 'b_name', kind: 'input', type: 'text', name: 'name', label: 'お名前',
+          required: true, placeholder: '山田 太郎',
+        },
+        {
+          id: 'b_sat', kind: 'input', type: 'radio', name: 'satisfaction', label: 'ご満足度',
+          required: true, inline: true, choiceMode: 'friendField',
+          choiceFriendFieldId: 'field-plan',
+          choices: [
+            { id: 'c1', label: 'とても良かった', value: 'とても良かった' },
+            { id: 'c2', label: '良かった', value: '良かった' },
+            { id: 'c3', label: 'ふつう', value: 'ふつう' },
+            { id: 'c4', label: 'あまり', value: 'あまり' },
+          ],
+        },
+        {
+          id: 'b_good', kind: 'input', type: 'checkbox', name: 'good_points', label: 'よかったところ',
+          inline: true, choiceMode: 'tag',
+          choices: [
+            { id: 'g1', label: '接客', value: '接客' },
+            { id: 'g2', label: '味', value: '味' },
+            { id: 'g3', label: 'お店の雰囲気', value: 'お店の雰囲気' },
+          ],
+        },
+        {
+          id: 'b_comment', kind: 'input', type: 'textarea', name: 'comment',
+          label: 'ご意見・ご要望', placeholder: '自由にお書きください',
+        },
+        {
+          /* 設計は、ここに入った日付でリマインダ「来店前日のご案内」が動く。 */
+          id: 'b_next', kind: 'input', type: 'date', name: 'next_visit',
+          label: '次回のご来店予定', dateStyle: 'calendar',
+          reminder: { reminderId: 'reminder-1', time: '18:00' },
+        },
+        { id: 'b_note', kind: 'text', text: 'このフォームは 然-NEN- TEST が作成しています' },
+      ],
+    },
+  ],
+  options: {
+    thanksUrl: null, thanksText: 'ご回答ありがとうございました。',
+    restorePrevious: false, pageTitle: '来店アンケート',
+    submitLabel: '送信する', prevLabel: '前へ', nextLabel: '次へ',
+    sectionHeader: 'pageNumber',
+    confirmDialog: { enabled: false },
+    deadline: { enabled: false },
+    oncePerFriend: { enabled: true, message: 'すでにご回答いただいています。' },
+    totalLimit: { enabled: false },
+    afterActions: [{ kind: 'tag', op: 'add', tagIds: ['tag-0'] }],
+  },
+}

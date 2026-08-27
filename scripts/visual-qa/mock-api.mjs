@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -357,6 +357,33 @@ function tagDeleteImpact(tag) {
  * リマインダの通知ステップ。**一覧の既定の形（`{items,…}`）では返さない。**
  * 編集画面は `steps` を配列として回すので、通で返さないとそこで落ちる。
  */
+/** 中身の無いフォームの下敷き。`FormLayout` の4つの持ち物をすべて埋める。 */
+function emptyFormLayout(form) {
+  return {
+    version: 2,
+    header: [],
+    sections: [{
+      id: `s_${form.id}`,
+      name: 'セクション1',
+      blocks: form.fields.map((field, i) => ({
+        id: `b_${form.id}_${i}`,
+        kind: 'input',
+        type: field.type ?? 'text',
+        name: field.name,
+        label: field.label,
+      })),
+    }],
+    options: {
+      thanksText: 'ご回答ありがとうございました。',
+      submitLabel: '送信', prevLabel: '前へ', nextLabel: '次へ',
+      sectionHeader: 'pageNumber',
+      confirmDialog: { enabled: false }, deadline: { enabled: false },
+      oncePerFriend: { enabled: false }, totalLimit: { enabled: false },
+      afterActions: [],
+    },
+  }
+}
+
 function reminderStepsOf(reminder) {
   const count = Number(reminder.stepCount ?? 0)
   return Array.from({ length: count }, (_, i) => ({
@@ -419,6 +446,27 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: REMINDER_FOLDERS }
   }
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/forms') return { success: true, data: FORMS }
+  const formSubs = /^\/api\/forms\/([^/]+)\/submissions$/.exec(pathname)
+  if (formSubs) {
+    return { success: true, data: FORM_SUBMISSIONS.filter((item) => item.formId === formSubs[1]) }
+  }
+  const formOne = /^\/api\/forms\/([^/]+)$/.exec(pathname)
+  if (formOne) {
+    const found = FORMS.find((item) => item.id === formOne[1])
+    return found
+      ? {
+          success: true,
+          data: {
+            ...found,
+            /* **`FormLayout` の形で返す。** `{sections:[]}` だけでは
+               `version` も `header` も `options` も無く、編集画面が落ちる。 */
+            layout: found.id === 'form-1' ? FORM_LAYOUT_VISIT : emptyFormLayout(found),
+            onSubmitTagId: null, onSubmitMessageType: null, onSubmitMessageContent: null,
+          },
+        }
+      : { success: false, error: 'Not found' }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'rich_menu') {
     return { success: true, data: RICH_MENU_FOLDERS }
   }
