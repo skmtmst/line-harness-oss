@@ -82,6 +82,9 @@ const MEDIA = { feature: 15, dir: 'media-v6', route: '/contents', mode: 'page' }
 /** 成果とアフィリエイト。`/conversions?tab=` の5タブに寄せてある。 */
 const AFFILIATE = { feature: 16, dir: 'affiliates-v6', mode: 'page' }
 
+/** マイル・行動スコア。実装は `/scoring` の1枚もので、設計の5タブは無い。 */
+const MILEAGE = { feature: 17, dir: 'mileage-v6', route: '/scoring', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -712,6 +715,54 @@ export const SCREENS = [
   {
     ...AFFILIATE, node: 'GqFTV', name: '16-1-H 支払いを確定する',
     status: 'unimplemented', why: '16-1-C（支払い）が無いので、締める操作も無い',
+  },
+
+  // ── 機能17 マイル・行動スコア ───────────────────────────
+  /*
+    設計は5つのタブ（友だちの残高／たまる決めごと／使い道／履歴／行動スコア）。
+    実装は `/scoring` の**1枚もの**で、帯・付与ルール・ランキングの3つだけ。
+    **「使い道」「履歴」「行動スコア」はまるごと無い。**
+  */
+  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル' },
+  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと' },
+  {
+    ...MILEAGE, node: 'qlVLJ', name: '17-1-B マイルの使い道',
+    status: 'unimplemented',
+    why: '交換できる使い道の考えがまるごと無い（`grep 使い道|交換|redemption` が `/scoring` 配下で0件）。**ためてもらう仕組みだけあって、使う先が無い**',
+  },
+  {
+    ...MILEAGE, node: 'MvZm5', name: '17-1-C マイルの履歴',
+    status: 'unimplemented',
+    why: '増減の記録を並べる画面が無い。手で動かした分の理由も残らない（`grep 履歴` が0件）',
+  },
+  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/scoring/new' },
+  {
+    ...MILEAGE, node: 'HIU5O', name: '17-1-E 友だちのマイル明細',
+    status: 'unimplemented',
+    why: 'マイルの画面から友だち1人の明細へ行けない。友だち詳細（`/friends/detail`）にマイルの帯は在るが、**何でたまったかの内訳は無い**',
+  },
+  {
+    ...MILEAGE, node: 'vz0Ji', name: '17-1-F マイルを手で増やす・減らす',
+    status: 'unimplemented',
+    why: '手で増減する操作が無い（`grep 手で|調整|adjust` が `/scoring` 配下で0件）。**間違って付いたマイルを直せない**',
+  },
+  {
+    ...MILEAGE, node: 'p9CcEB', name: '17-1-G マイルの使い道をつくる',
+    status: 'unimplemented', why: '17-1-B（使い道）が無いので、作る画面も無い',
+  },
+  {
+    ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+  {
+    ...MILEAGE, node: 'z3PB2', name: '17-2 行動スコア',
+    status: 'unimplemented',
+    why: '行動スコアがまるごと無い（`grep 行動スコア|score` が `/scoring` 配下で0件）。**サイドバーの「マイル」はマイルだけ**',
+  },
+  {
+    ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/scoring/new',
+    status: 'unimplemented',
+    why: '`/scoring/new` は**マイルの付与ルール**を作る画面で、スコアのルールではない。17-2 が無いので行き先も無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

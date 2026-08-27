@@ -1604,3 +1604,74 @@ export const CONVERSION_POINTS = [
     createdAt: '2026-06-11T00:00:00.000Z',
   },
 ]
+
+/**
+ * 機能17 マイル。設計 `s98Vfw` の帯（友だち1,284人・486,200マイル）。
+ *
+ * **`MileageAdminOverview` は `{summary, members, pagination}` の通。**
+ * 一覧の既定（`{items,total,page,limit}`）を返すと `summary.total…` を
+ * 読もうとして画面ごと落ちる。
+ */
+const mileageMember = (i, name, available, lifetime, rank) => ({
+  identityKey: `mk-${i}`, primaryFriendId: `friend-${i}`, displayName: name,
+  pictureUrl: null, accountCount: 1, accountNames: ['LINE 本店'],
+  available, pending: 0, lifetimeEarned: lifetime,
+  actionCount: 40 - i, messageCount: 18 - i, linkClickCount: 12 - i,
+  formCount: 3, bookingCount: 2, webinarCount: 1, instagramCount: 0,
+  followingDays: 300 - i * 20, unfollowCount: 0, rank,
+})
+
+export const MILEAGE_OVERVIEW = {
+  summary: {
+    totalMembers: 1284, totalAvailable: 486200,
+    activeMembers30d: 498, totalActions: 4180, queuedEvents: 0,
+  },
+  members: [
+    mileageMember(1, '高橋 直人', 8420, 12400, 'ゴールド'),
+    mileageMember(2, 'Kenta Kawano', 5200, 7800, 'ゴールド'),
+    mileageMember(3, 'Masato S.', 3140, 4600, 'シルバー'),
+    mileageMember(4, '菅野 亮', 2050, 2900, 'シルバー'),
+    /* 0マイルの人。**持っていない786人がいることが要る。** */
+    mileageMember(5, '山田 太郎', 0, 0, 'ブロンズ'),
+  ],
+  pagination: { total: 1284, limit: 20, offset: 0 },
+}
+
+/** 設計 `N46cQ` のたまる決めごと。**止めているものを2つ混ぜる。** */
+export const MILEAGE_RULES = [
+  {
+    id: 'mr-1', name: '友だち登録してくれた', eventType: 'friend_add', source: null,
+    amount: 100, initialStatus: 'available',
+    conditions: { uniquePerSubject: true },
+    isActive: true, validFrom: null, validUntil: null,
+    createdAt: '2025-11-03T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z',
+  },
+  {
+    id: 'mr-2', name: 'LINEでメッセージを送ってくれた', eventType: 'message', source: null,
+    amount: 10, initialStatus: 'available',
+    conditions: { dailyCapActions: 1 },
+    isActive: true, validFrom: null, validUntil: null,
+    createdAt: '2025-11-03T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z',
+  },
+  {
+    id: 'mr-3', name: '予約してくれたら 300 マイル', eventType: 'booking', source: 'booking',
+    amount: 300, initialStatus: 'pending',
+    conditions: { uniquePerSubject: true },
+    isActive: true, validFrom: null, validUntil: null,
+    createdAt: '2026-01-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    id: 'mr-4', name: '紹介の成果が認められた', eventType: 'affiliate_conversion', source: 'affiliate',
+    amount: 500, initialStatus: 'pending',
+    conditions: { beneficiary: 'referrer', uniquePerReferredFriend: true },
+    isActive: true, validFrom: null, validUntil: null,
+    createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    /* 止めている決めごと。**残高は減らないが、もう付かない。** */
+    id: 'mr-5', name: '春のキャンペーン参加', eventType: 'campaign', source: null,
+    amount: 1000, initialStatus: 'available', conditions: {},
+    isActive: false, validFrom: '2026-03-01T00:00:00.000Z', validUntil: '2026-03-31T00:00:00.000Z',
+    createdAt: '2026-02-20T00:00:00.000Z', updatedAt: '2026-04-01T00:00:00.000Z',
+  },
+]
