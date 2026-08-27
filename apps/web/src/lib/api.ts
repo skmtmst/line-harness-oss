@@ -2407,6 +2407,10 @@ export const api = {
         usedBy: {
           autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>;
           automations: Array<{ id: string; name: string; eventType: string }>;
+          scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>;
+          reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
+          richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>;
+          trackedLinks: Array<{ id: string; name: string }>;
         };
         createdAt: string;
         updatedAt: string;
@@ -2446,7 +2450,11 @@ export const api = {
     usages: (id: string) =>
       fetchApi<ApiResponse<{
         autoReplies: Array<{ id: string; keyword: string; lineAccountId: string | null }>;
+        automations: Array<{ id: string; name: string; eventType: string }>;
         scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>;
+        reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
+        richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>;
+        trackedLinks: Array<{ id: string; name: string }>;
       }>>(`/api/templates/${id}/usages`),
   },
   autoReplies: {

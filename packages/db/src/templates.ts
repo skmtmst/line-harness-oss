@@ -124,12 +124,34 @@ export interface TemplateUsage {
     name: string;
     eventType: string;
   }>;
+  scenarioSteps: Array<{
+    scenarioId: string;
+    scenarioName: string;
+    stepId: string;
+    stepOrder: number;
+  }>;
+  reminderSteps: Array<{
+    reminderId: string;
+    reminderName: string;
+    stepId: string;
+  }>;
+  richMenuAreas: Array<{
+    groupId: string;
+    groupName: string;
+    pageName: string;
+    areaId: string;
+    label: string | null;
+  }>;
+  trackedLinks: Array<{
+    id: string;
+    name: string;
+  }>;
 }
 
 /**
  * Template の参照箇所を返す。
- * - auto_replies: template_id が一致する row
- * - automations: actions JSON 内に "template_id":"<id>" を含む row (LIKE 検索)
+ * 現行の templates.id を参照する運用中の設定をすべて返す。
+ * messages_log.template_id_at_send は送信済み履歴なので、削除を止める参照には含めない。
  *   automations は数十件規模なので LIKE で十分高速。
  */
 export async function getTemplateUsage(db: D1Database, templateId: string): Promise<TemplateUsage> {
@@ -159,6 +181,52 @@ export async function getTemplateUsage(db: D1Database, templateId: string): Prom
     }
   }
 
+  const scenarioRes = await db
+    .prepare(
+      `SELECT ss.id AS step_id, ss.step_order, ss.scenario_id, s.name AS scenario_name
+       FROM scenario_steps ss
+       JOIN scenarios s ON s.id = ss.scenario_id
+       WHERE ss.template_id = ?
+       ORDER BY s.name, ss.step_order`,
+    )
+    .bind(templateId)
+    .all<{ step_id: string; step_order: number; scenario_id: string; scenario_name: string }>();
+
+  const reminderRes = await db
+    .prepare(
+      `SELECT rs.id AS step_id, r.id AS reminder_id, r.name AS reminder_name
+       FROM reminder_steps rs
+       JOIN reminders r ON r.id = rs.reminder_id
+       WHERE rs.template_id = ?
+       ORDER BY r.name, rs.offset_minutes`,
+    )
+    .bind(templateId)
+    .all<{ step_id: string; reminder_id: string; reminder_name: string }>();
+
+  const richMenuRes = await db
+    .prepare(
+      `SELECT a.id AS area_id, a.label, p.name AS page_name,
+              g.id AS group_id, g.name AS group_name
+       FROM rich_menu_areas a
+       JOIN rich_menu_pages p ON p.id = a.page_id
+       JOIN rich_menu_groups g ON g.id = p.group_id
+       WHERE a.template_id = ?
+       ORDER BY g.name, p.order_index, a.id`,
+    )
+    .bind(templateId)
+    .all<{
+      area_id: string;
+      label: string | null;
+      page_name: string;
+      group_id: string;
+      group_name: string;
+    }>();
+
+  const trackedLinkRes = await db
+    .prepare(`SELECT id, name FROM tracked_links WHERE template_id = ? ORDER BY name`)
+    .bind(templateId)
+    .all<{ id: string; name: string }>();
+
   return {
     autoReplies: (arRes.results ?? []).map((r) => ({
       id: r.id,
@@ -171,6 +239,25 @@ export async function getTemplateUsage(db: D1Database, templateId: string): Prom
       name: r.name,
       eventType: r.event_type,
     })),
+    scenarioSteps: (scenarioRes.results ?? []).map((r) => ({
+      scenarioId: r.scenario_id,
+      scenarioName: r.scenario_name,
+      stepId: r.step_id,
+      stepOrder: r.step_order,
+    })),
+    reminderSteps: (reminderRes.results ?? []).map((r) => ({
+      reminderId: r.reminder_id,
+      reminderName: r.reminder_name,
+      stepId: r.step_id,
+    })),
+    richMenuAreas: (richMenuRes.results ?? []).map((r) => ({
+      groupId: r.group_id,
+      groupName: r.group_name,
+      pageName: r.page_name,
+      areaId: r.area_id,
+      label: r.label,
+    })),
+    trackedLinks: (trackedLinkRes.results ?? []).map((r) => ({ id: r.id, name: r.name })),
   };
 }
 
@@ -195,12 +282,24 @@ export async function getTemplatesWithUsageCount(
   const tplStmt = category ? db.prepare(tplSql).bind(category) : db.prepare(tplSql);
   const templates = await tplStmt.all<TemplateRow>();
 
-  // 2. auto_replies の template_id 別カウント (NOT NULL のみ)
-  const arRes = await db
-    .prepare(`SELECT template_id, COUNT(*) AS cnt FROM auto_replies WHERE template_id IS NOT NULL GROUP BY template_id`)
-    .all<{ template_id: string; cnt: number }>();
-  const autoReplyCount = new Map<string, number>();
-  for (const r of arRes.results ?? []) autoReplyCount.set(r.template_id, r.cnt);
+  // 2. 列で参照している設定は1回の問い合わせでまとめて数える。
+  const relationalRes = await db.prepare(
+    `SELECT template_id, SUM(cnt) AS cnt
+     FROM (
+       SELECT template_id, COUNT(*) AS cnt FROM auto_replies WHERE template_id IS NOT NULL GROUP BY template_id
+       UNION ALL
+       SELECT template_id, COUNT(*) AS cnt FROM scenario_steps WHERE template_id IS NOT NULL GROUP BY template_id
+       UNION ALL
+       SELECT template_id, COUNT(*) AS cnt FROM reminder_steps WHERE template_id IS NOT NULL GROUP BY template_id
+       UNION ALL
+       SELECT template_id, COUNT(*) AS cnt FROM rich_menu_areas WHERE template_id IS NOT NULL GROUP BY template_id
+       UNION ALL
+       SELECT template_id, COUNT(*) AS cnt FROM tracked_links WHERE template_id IS NOT NULL GROUP BY template_id
+     ) references_by_kind
+     GROUP BY template_id`,
+  ).all<{ template_id: string; cnt: number }>();
+  const relationalCount = new Map<string, number>();
+  for (const r of relationalRes.results ?? []) relationalCount.set(r.template_id, r.cnt);
 
   // 3. automations の actions JSON を取って template_id を抽出
   const autRes = await db
@@ -219,15 +318,8 @@ export async function getTemplatesWithUsageCount(
     }
   }
 
-  // 4. scenario_steps の template_id 別カウント
-  const ssRes = await db
-    .prepare(`SELECT template_id, COUNT(*) AS cnt FROM scenario_steps WHERE template_id IS NOT NULL GROUP BY template_id`)
-    .all<{ template_id: string; cnt: number }>();
-  const scenarioStepCount = new Map<string, number>();
-  for (const r of ssRes.results ?? []) scenarioStepCount.set(r.template_id, r.cnt);
-
   return (templates.results ?? []).map((t) => ({
     ...t,
-    usage_count: (autoReplyCount.get(t.id) ?? 0) + (automationCount.get(t.id) ?? 0) + (scenarioStepCount.get(t.id) ?? 0),
+    usage_count: (relationalCount.get(t.id) ?? 0) + (automationCount.get(t.id) ?? 0),
   }));
 }

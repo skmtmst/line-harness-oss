@@ -108,7 +108,11 @@ templates.get('/api/templates/:id', async (c) => {
   }
 });
 
-// GET /api/templates/:id/usages — auto_replies + scenario_steps での使用箇所
+function templateUsageCount(usage: Awaited<ReturnType<typeof getTemplateUsage>>): number {
+  return Object.values(usage).reduce((total, items) => total + items.length, 0);
+}
+
+// GET /api/templates/:id/usages — 現行 templates.id を参照する設定をまとめて返す
 templates.get('/api/templates/:id/usages', async (c) => {
   try {
     const templateId = c.req.param('id');
@@ -121,46 +125,7 @@ templates.get('/api/templates/:id/usages', async (c) => {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
 
-    const autoRepliesResult = await c.env.DB
-      .prepare(
-        `SELECT id, keyword, line_account_id FROM auto_replies WHERE template_id = ?`,
-      )
-      .bind(templateId)
-      .all<{ id: string; keyword: string; line_account_id: string | null }>();
-
-    const scenarioStepsResult = await c.env.DB
-      .prepare(
-        `SELECT ss.id AS step_id, ss.step_order, ss.scenario_id,
-                s.name AS scenario_name
-         FROM scenario_steps ss
-         JOIN scenarios s ON ss.scenario_id = s.id
-         WHERE ss.template_id = ?
-         ORDER BY s.name, ss.step_order`,
-      )
-      .bind(templateId)
-      .all<{
-        step_id: string;
-        step_order: number;
-        scenario_id: string;
-        scenario_name: string;
-      }>();
-
-    return c.json({
-      success: true,
-      data: {
-        autoReplies: autoRepliesResult.results.map((r) => ({
-          id: r.id,
-          keyword: r.keyword,
-          lineAccountId: r.line_account_id ?? null,
-        })),
-        scenarioSteps: scenarioStepsResult.results.map((r) => ({
-          scenarioId: r.scenario_id,
-          scenarioName: r.scenario_name,
-          stepId: r.step_id,
-          stepOrder: r.step_order,
-        })),
-      },
-    });
+    return c.json({ success: true, data: await getTemplateUsage(c.env.DB, templateId) });
   } catch (err) {
     console.error('GET /api/templates/:id/usages error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -261,15 +226,16 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
 templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    // automations.actions JSON には FK が無いので、削除すると orphan な template_id が
-    // 残って実行時に空メッセージ送信→partial fail を引き起こす。auto_replies は
-    // ON DELETE SET NULL + inline fallback (responseContent snapshot) で大丈夫だが、
-    // automations は安全な fallback パスがないので、参照があれば削除を拒否する。
+    // ON DELETE SET NULL や本文の控えがあっても、参照中の設定を運用者に知らせず
+    // 切ることはしない。すべての利用先を先に差し替えてもらう。
     const usage = await getTemplateUsage(c.env.DB, id);
-    if (usage.automations.length > 0) {
+    const usageCount = templateUsageCount(usage);
+    if (usageCount > 0) {
       return c.json({
         success: false,
-        error: `automation rule (${usage.automations.length} 件) でこのテンプレートを参照しています。先にそちらの参照を解除してください。`,
+        code: 'IN_USE',
+        usageCount,
+        error: `${usageCount}件の設定で使用中です。先に使用先を差し替えてください。`,
         usedBy: usage,
       }, 409);
     }
