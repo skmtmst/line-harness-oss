@@ -128,6 +128,20 @@ describe('スタッフの店舗権限範囲', () => {
     expect(res.status).toBe(403);
   });
 
+  it('限定された管理者は新規スタッフに全店舗の範囲を付与できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff', 'POST', invitation('all', []));
+    expect(res.status).toBe(403);
+    expect(dbMocks.createStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('限定された管理者は自分自身を全店舗の範囲に変更できない', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'owner-a', role: 'owner', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    const res = await send('/api/staff/owner-a', 'PATCH', { accountScope: 'all' });
+    expect(res.status).toBe(403);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
   it('PATCHで全店舗に戻すと紐付けを消す', async () => {
     dbMocks.getStaffById.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'accounts' }));
     dbMocks.updateStaffMember.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'all' }));

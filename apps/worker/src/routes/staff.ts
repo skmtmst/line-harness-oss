@@ -75,10 +75,12 @@ function normalizeAccountScopeInput(body: AccountScopeInput):
 async function mayAssignAccountScopes(
   db: D1Database,
   current: Env['Variables']['staff'],
+  requestedScope: 'all' | 'accounts',
   requestedIds: string[],
 ): Promise<boolean> {
-  if (requestedIds.length === 0) return true;
+  if (current.id === 'env-owner') return true;
   const currentMember = current.id === 'env-owner' ? null : await getStaffById(db, current.id);
+  if (requestedScope === 'all') return currentMember?.account_scope !== 'accounts';
   const allowedIds = currentMember?.account_scope === 'accounts'
     ? await getStaffAccountScopeIds(db, current.id)
     : filterVisibleLineAccounts(await getLineAccounts(db), current).map((account) => account.id);
@@ -220,7 +222,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
     if (body.canAccessDescendantAccounts && !canGrantDescendants) {
       return c.json({ success: false, error: '自分が持っていない他アカウント権限は付与できません' }, 403);
     }
-    if (accountScope.accountScope === 'accounts' && !await mayAssignAccountScopes(c.env.DB, current, accountScope.scopedLineAccountIds)) {
+    if (accountScope.accountScope !== undefined && !await mayAssignAccountScopes(c.env.DB, current, accountScope.accountScope, accountScope.scopedLineAccountIds)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
     }
     if ((await getStaffMembers(c.env.DB, currentTenantId(c))).some((item) => item.email?.toLowerCase() === email)) {
@@ -335,7 +337,7 @@ staff.patch('/api/staff/:id', async (c) => {
   ) {
     return c.json({ success: false, error: '自分が持っていない他アカウント権限は付与できません' }, 403);
   }
-  if (administrator && accountScope.accountScope === 'accounts' && !await mayAssignAccountScopes(c.env.DB, current, accountScope.scopedLineAccountIds)) {
+  if (administrator && accountScope.accountScope !== undefined && !await mayAssignAccountScopes(c.env.DB, current, accountScope.accountScope, accountScope.scopedLineAccountIds)) {
     return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
   }
 
