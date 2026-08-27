@@ -180,7 +180,7 @@ export default function FriendAddSettingsPage() {
               <button
                 type="button"
                 onClick={save}
-                disabled={saving || routingError() !== ''}
+                disabled={saving}
                 title={routingError() || undefined}
                 className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
               >
