@@ -49,8 +49,14 @@ function sizeFromHtml(src) {
   return w && h ? [Number(w[1]), Number(h[1])] : null
 }
 
-/** 画面が落ちたときに出る文言。出ていたら撮らない。 */
-const FAILURE_TEXTS = ['画面を表示できませんでした', '店舗が選ばれていません', 'Application error']
+/**
+ * 画面が落ちたときに出る文言。出ていたら撮らない。
+ *
+ * **「画面を表示できませんでした」はここに置かない。** 反映履歴の本文にも
+ * 出るので（運用状態の更新履歴タブがそれを並べる）、文字だけでは
+ * 見分けられない。落ちた画面は下の `retry` で見る。
+ */
+const FAILURE_TEXTS = ['店舗が選ばれていません', 'Application error']
 
 const argv = process.argv.slice(2)
 const flag = (name) => argv.includes(`--${name}`)
@@ -209,6 +215,14 @@ async function captureImpl(feature) {
           .count()
           .catch(() => 0)
         if (loginButton > 0) throw new Error('ログイン画面になっている')
+        /* 落ちた画面（`global-error.tsx`）。押せる「もう一度試す」で見る。 */
+        const retry = await page
+          .getByRole('button', { name: 'もう一度試す' })
+          .count()
+          .catch(() => 0)
+        if (retry > 0 && body.includes('画面を表示できませんでした')) {
+          throw new Error('画面が落ちている（もう一度試す が出ている）')
+        }
         /*
           **落ちた画面をそのまま撮らない。** 受信箱で会話を開いたとき、
           右の顧客情報が `mileage.summary.programName` で落ち、画面が

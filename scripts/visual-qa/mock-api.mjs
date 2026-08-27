@@ -463,6 +463,8 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     予約の口は **`{success, data}` ではない**。`{requests}` `{menus}` のように
     それぞれ別の名前で包んで返す（`apps/web/src/lib/api.ts` の `bookingAdminApi`）。
   */
+  /* 健全性は `{status:'ok'}` の通。一覧の既定を返すと状態が読めない。 */
+  if (pathname === '/api/health') return { success: true, data: { status: 'ok' } }
   if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
   if (pathname === '/api/staff') return { success: true, data: STAFF_MEMBERS }
   if (pathname === '/api/staff/me') return { success: true, data: STAFF_MEMBERS[0] }

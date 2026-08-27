@@ -60,7 +60,14 @@ await page.waitForTimeout(5_000)
 const url = new URL(page.url())
 console.log(`${path} → ${url.pathname}${url.search}`)
 const body = await page.locator('body').innerText()
-const broken = ['画面を表示できませんでした', 'もう一度試す'].some((t) => body.includes(t))
+/*
+  **文字だけで見分けない。** 「もう一度試す」も「画面を表示できませんでした」も、
+  反映履歴の本文に出る（運用状態の更新履歴タブがそれを並べる）。
+  落ちた画面（`global-error.tsx`）は、**その2つが両方**あって、
+  「もう一度試す」が**押せる形**で出る。
+*/
+const retry = await page.getByRole('button', { name: 'もう一度試す' }).count().catch(() => 0)
+const broken = retry > 0 && body.includes('画面を表示できませんでした')
 console.log(broken ? '**落ちている**' : '描けている')
 if (errors.length) console.log('エラー: ' + [...new Set(errors)].join(' | '))
 console.log('\n口の返事:')

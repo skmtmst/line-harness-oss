@@ -127,6 +127,9 @@ const STAFF = { feature: 30, dir: 'staff-v6', route: '/staff', mode: 'page' }
 /** 機能設定。サイドメニューに出す機能を切り替える1枚。 */
 const FEATURE_SET = { feature: 31, dir: 'settings-v6', route: '/settings', mode: 'page' }
 
+/** 運用状態。`/emergency?tab=` の3タブ（健全性チェック／緊急コントロール／更新履歴）。 */
+const OPERATIONS = { feature: 32, dir: 'operations-v6', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -1090,6 +1093,22 @@ export const SCREENS = [
 
   // ── 機能31 機能設定 ─────────────────────────────────────
   { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定' },
+
+  // ── 機能32 運用状態 ─────────────────────────────────────
+  /* タブ3本は設計とそろっている（健全性チェック／緊急コントロール／更新履歴）。 */
+  { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health' },
+  { ...OPERATIONS, node: 'b3HfZ', name: '32-1-A 緊急コントロール', route: '/emergency?tab=control' },
+  { ...OPERATIONS, node: 'UhC2O', name: '32-1-B 更新履歴', route: '/emergency?tab=history' },
+  {
+    ...OPERATIONS, node: 'U0BwS', name: '32-1-C 緊急停止の最終確認',
+    route: '/emergency?tab=control', mode: 'viewport', height: 1136,
+    /*
+      **停止するものを1つ選んでから押す。** 何も選ばずに押すと
+      「停止する配信を1つ以上選んでください」で窓が開かない
+      （`emergency/page.tsx:361`）。
+    */
+    steps: [{ click: '予約中の一斉配信', role: 'text' }, { click: '緊急停止する' }],
+  },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
