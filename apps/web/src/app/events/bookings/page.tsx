@@ -3,9 +3,16 @@
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Header from '@/components/layout/header'
 import { useAccount } from '@/contexts/account-context'
-import { eventsApi, type EventBookingItem, type EventDetail } from '@/lib/api'
+import {
+  eventsApi,
+  type EventBookingItem,
+  type EventDetail,
+  type EventWaitlistItem,
+} from '@/lib/api'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'requested', label: '承認待ち' },
@@ -15,6 +22,7 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'expired', label: '期限切れ' },
   { key: 'attended', label: '参加済' },
   { key: 'no_show', label: '無断' },
+  { key: 'waitlist', label: 'キャンセル待ち' },
   { key: 'all', label: '全件' },
 ]
 
@@ -44,6 +52,7 @@ function BookingsInner() {
   const { selectedAccountId, accounts } = useAccount()
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [items, setItems] = useState<EventBookingItem[]>([])
+  const [waitlist, setWaitlist] = useState<EventWaitlistItem[]>([])
   const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
   const [tab, setTab] = useState<string>('requested')
   const [loading, setLoading] = useState(true)
@@ -55,20 +64,21 @@ function BookingsInner() {
     setLoading(true)
     setError(null)
     try {
-      const filters = tab === 'all' ? {} : { status: tab }
-      const [evRes, listRes] = await Promise.all([
+      const [evRes, listRes, waitlistRes] = await Promise.all([
         event == null ? eventsApi.getEvent(selectedAccountId, eventId) : Promise.resolve(event),
-        eventsApi.listBookings(selectedAccountId, eventId, filters),
+        eventsApi.listBookings(selectedAccountId, eventId),
+        eventsApi.listWaitlist(selectedAccountId, eventId),
       ])
       setEvent(evRes)
       setItems(listRes.items)
+      setWaitlist(waitlistRes.waitlist)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAccountId, eventId, tab])
+  }, [selectedAccountId, eventId])
 
   useEffect(() => {
     void refresh()
@@ -146,9 +156,47 @@ function BookingsInner() {
   const cancelled = items.filter((b) => b.status === 'cancelled').length
   // 定員は一覧APIが持っている（枠の合計）。詳細APIには入っていない。
   const capacity = totalCapacity ?? 0
+  const shownItems = tab === 'all' ? items : items.filter((item) => item.status === tab)
+
+  function csvCell(value: unknown): string {
+    const raw = String(value ?? '')
+    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw
+    return `"${safe.replaceAll('"', '""')}"`
+  }
+
+  function downloadCsv() {
+    const rows = tab === 'waitlist'
+      ? [
+          ['順番', '友だち', '予約枠', '状態', '受付日時'],
+          ...waitlist.map((item, index) => [
+            index + 1,
+            item.friend_name ?? item.friend_id.slice(0, 8),
+            formatJp(item.slot_starts_at),
+            item.status === 'invited' ? '案内済み' : '待機中',
+            formatJp(item.created_at),
+          ]),
+        ]
+      : [
+          ['友だち', '経由アカウント', '予約枠', '状態', '受付日時'],
+          ...shownItems.map((item) => [
+            item.friend_display_name ?? item.friend_id.slice(0, 8),
+            accounts.find((account) => account.id === item.line_account_id)?.name ?? '',
+            formatJp(item.slot_starts_at),
+            STATUS_TABS.find((status) => status.key === item.status)?.label ?? item.status,
+            formatJp(item.requested_at),
+          ]),
+        ]
+    const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}`
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `event-${eventId}-${tab}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
-    <div>
+    <div data-design-node="i5SN2j">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/events" className="hover:underline">
           イベント予約
@@ -161,36 +209,8 @@ function BookingsInner() {
         <span>予約者</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title="イベントの予約者"
-          description="申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。"
-        />
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <button
-            disabled
-            title="操作マニュアルは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            マニュアル
-          </button>
-          <button
-            disabled
-            title="書き出しは準備中です"
-            className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm opacity-50"
-          >
-            CSVで書き出す
-          </button>
-          {/* 予約者だけに送る仕組みが無い。一斉配信はいまのところ
-              タグや友だち全体が単位で、イベントの申込者を宛先にできない。 */}
-          <button
-            disabled
-            title="予約者だけを宛先にする配信は準備中です"
-            className="bg-accent text-on-accent rounded-control px-4 py-2 text-sm font-medium opacity-50"
-          >
-            予約者に一斉送信
-          </button>
-        </div>
+      <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
+        <Button onClick={downloadCsv}>CSVで書き出す</Button>
       </div>
 
       <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
@@ -209,23 +229,14 @@ function BookingsInner() {
           detail={capacity > 0 ? `定員 ${capacity} ・ 残り${Math.max(0, capacity - confirmed)}` : '定員なし'}
         />
         <EventKpi title="承認待ち" value={String(pending)} unit="件" detail="対応が必要" />
-        {/* event_bookings に「キャンセル待ち」という状態が無い。
-            イベント側に waitlist_enabled はあるが、待っている人を数える
-            場所がまだない。数を作らずに、受けるかどうかだけ出す。 */}
         <EventKpi
           title="キャンセル待ち"
-          value="—"
+          value={String(waitlist.length)}
           unit="人"
           detail={event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
         />
         <EventKpi title="キャンセル" value={String(cancelled)} unit="件" detail="この一覧のうち" />
       </div>
-
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="flex border-b border-gray-200 overflow-x-auto">
@@ -245,26 +256,55 @@ function BookingsInner() {
           </div>
 
           {loading ? (
-            <div className="p-12 text-center text-gray-500">読み込み中...</div>
-          ) : items.length === 0 ? (
-            <div className="p-12 text-center text-gray-500 text-sm">
-              該当する予約はありません
-            </div>
+            <ListState kind="loading" />
+          ) : error ? (
+            <ListState kind="error" description={error} action={<Button onClick={() => void refresh()}>再読み込み</Button>} />
+          ) : tab === 'waitlist' ? (
+            waitlist.length === 0 ? (
+              <ListState kind="empty" title="キャンセル待ちはありません" description="空き待ちの友だちはまだいません。" />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-gray-600">
+                    <TableHeadRow>
+                      <Th>順番</Th>
+                      <Th>友だち</Th>
+                      <Th>予約枠</Th>
+                      <Th>状態</Th>
+                      <Th>受付日時</Th>
+                    </TableHeadRow>
+                  </thead>
+                  <tbody>
+                    {waitlist.map((item, index) => (
+                      <tr key={item.id} className="border-t border-gray-100">
+                        <td className="px-4 py-3 tabular-nums">{index + 1}</td>
+                        <td className="px-4 py-3">{item.friend_name ?? item.friend_id.slice(0, 8)}</td>
+                        <td className="px-4 py-3">{formatJp(item.slot_starts_at)}</td>
+                        <td className="px-4 py-3">{item.status === 'invited' ? '案内済み' : '待機中'}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{formatJp(item.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : shownItems.length === 0 ? (
+            <ListState kind="empty" title="該当する予約はありません" description="状態を変えると、ほかの予約を確認できます。" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600">
-                  <tr>
-                    <th className="text-left px-4 py-2 font-medium">友だち</th>
-                    <th className="text-left px-4 py-2 font-medium">経由アカ</th>
-                    <th className="text-left px-4 py-2 font-medium">予約枠</th>
-                    <th className="text-left px-4 py-2 font-medium">状態</th>
-                    <th className="text-left px-4 py-2 font-medium">受付日時</th>
-                    <th className="text-right px-4 py-2 font-medium">操作</th>
-                  </tr>
+                  <TableHeadRow>
+                    <Th>友だち</Th>
+                    <Th>経由アカ</Th>
+                    <Th>予約枠</Th>
+                    <Th>状態</Th>
+                    <Th>受付日時</Th>
+                    <Th align="right">操作</Th>
+                  </TableHeadRow>
                 </thead>
                 <tbody>
-                  {items.map((b) => {
+                  {shownItems.map((b) => {
                     const acct = accounts.find((a) => a.id === b.line_account_id)
                     const accountLabel = acct
                       ? `${acct.country ? acct.country + ' ' : ''}${acct.name}`

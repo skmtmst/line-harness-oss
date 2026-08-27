@@ -10,7 +10,7 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする24ファイルだけを利用先に数える', () => {
+  it('共通Buttonを直接importする27ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -21,6 +21,9 @@ describe('共通部品の影響範囲', () => {
       'app/common-actions/page.tsx',
       'app/common-actions/versions/page.tsx',
       'app/conversions/page.tsx',
+      'app/events/bookings/page.tsx',
+      'app/events/edit/page.tsx',
+      'app/events/page.tsx',
       'app/hq/open/page.tsx',
       'app/hq/page.tsx',
       'app/hq/settings/hq-staff-section.tsx',
@@ -44,12 +47,13 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, paginationCss)).toEqual([pagination])
   })
 
-  it('共通Paginationを直接importする7ファイルだけを利用先に数える', () => {
+  it('共通Paginationを直接importする9ファイルだけを利用先に数える', () => {
     // ダッシュボードの受信カードが自前の「前へ／次へ」をやめて共通へ寄せた。
     // 設計（`vUXKb` / `NjK9q`）は表の下にページ送りがあり、番号で飛べる。
     expect(directImporters(files, pagination).map((file) => relative(SRC, file))).toEqual([
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
+      'app/events/page.tsx',
       'app/reminders/page.tsx',
       'app/tags/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',

@@ -3,9 +3,10 @@
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import Header from '@/components/layout/header'
 import EventForm from '@/components/events/event-form'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import {
   eventsApi,
   type EventBookingItem,
@@ -84,7 +85,7 @@ function BookingStatus({ accountId, eventId }: { accountId: string; eventId: str
           </span>
         )}
         <Link
-          href={`/events/bookings?eventId=${eventId}`}
+          href={`/events/bookings?id=${eventId}`}
           className="text-accent ml-auto text-xs hover:underline"
         >
           予約者を見る
@@ -112,13 +113,12 @@ function EditEventInner() {
   if (!id) {
     return (
       <div>
-        <Header title="イベントの編集" />
-        <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          イベントが指定されていません。
-          <Link href="/events" className="text-accent ml-1 hover:underline">
-            イベント予約へ戻る
-          </Link>
-        </p>
+        <ListState
+          kind="empty"
+          title="イベントが指定されていません"
+          description="一覧から編集するイベントを選んでください。"
+          action={<Button href="/events">イベント予約へ戻る</Button>}
+        />
       </div>
     )
   }
@@ -133,19 +133,8 @@ function EditEventInner() {
         <span>編集</span>
       </nav>
 
-      <div data-design="Head">
-        <Header
-          title="イベントの編集"
-          description="開催内容と申込のルールを決めます。承認制にすると、申込のたびに確認できます。"
-          action={
-            <Link
-              href={`/events/bookings?eventId=${id}`}
-              className="border-hairline text-ink-secondary hover:bg-canvas-sunken rounded-control border px-3 py-2 text-sm font-medium"
-            >
-              申込の一覧を見る
-            </Link>
-          }
-        />
+      <div data-design="Head" className="mb-4 flex items-center justify-end">
+        <Button href={`/events/bookings?id=${id}`}>申込の一覧を見る</Button>
       </div>
 
       {!selectedAccountId ? (

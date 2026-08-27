@@ -923,8 +923,8 @@
       ],
       "cssPrefix": "table",
       "pencilUsage": 107,
-      "lastCheckedAt": "2026-08-24",
-      "note": "6機能で最も多く使われている部品。第1段階で75セルを共通Thへ移行し、設計に無い uppercase / tracking-wider と画面別の色・余白を除いた。見出し行の寸法は友だち一覧 FG391 の f9yhp から採取。V6でも同じtPTMpを使う。",
+      "lastCheckedAt": "2026-08-28",
+      "note": "イベント予約を含むV6一覧で共通Thを使い、設計に無い uppercase / tracking-wider と画面別の色・余白を除いた。見出し行の寸法は友だち一覧 FG391 の f9yhp から採取。V6でも同じtPTMpを使う。",
       "routes": {
         "v5": {
           "/tags": "PbCvb"
@@ -934,13 +934,15 @@
           "/templates": "W7LBc",
           "/affiliates": "BaLte",
           "/conversions": "Bw4fy",
-          "/inflow-links": "EQS0v"
+          "/inflow-links": "EQS0v",
+          "/events": "ugP5y",
+          "/events/bookings": "i5SN2j"
         }
       },
       "migration": {
         "directThBefore": 378,
-        "migratedInThisPr": 75,
-        "directThRemaining": 303
+        "migratedInThisPr": 88,
+        "directThRemaining": 290
       },
       "visualVerification": {
         "status": "unverified",

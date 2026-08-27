@@ -64,6 +64,20 @@ function bad(c: Context<Env>, code: string, status = 422): Response {
   return c.json({ error: code }, status as 400 | 401 | 403 | 404 | 409 | 410 | 422 | 429);
 }
 
+// 管理画面は URL の account_id を利用者が書き換えられる。各処理がイベントの
+// 所有関係だけを見ても、権限外アカウントの一覧や予約者を読めてしまうため、
+// admin 配下は入口で選択中アカウントへのアクセス権を必ず確認する。
+events.use('/api/events/admin/*', async (c, next) => {
+  const accountId = c.req.query('account_id');
+  if (
+    accountId &&
+    !(await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId]))
+  ) {
+    return bad(c, ACCOUNT_ACCESS_ERROR, 403);
+  }
+  await next();
+});
+
 function getAccountId(c: Context<Env>): string | null {
   return c.req.query('account_id') ?? null;
 }

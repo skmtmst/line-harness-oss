@@ -2,9 +2,9 @@
 
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Header from '@/components/layout/header'
 import EventWizard from '@/components/events/event-wizard'
 import { useAccount } from '@/contexts/account-context'
+import ListState from '@/components/shared/list-state'
 
 function NewEventPageInner() {
   const { selectedAccountId } = useAccount()
@@ -17,28 +17,22 @@ function NewEventPageInner() {
 
   if (!selectedAccountId) {
     return (
-      <>
-        <Header title="イベントを作る" />
-        <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
-          サイドバーでアカウントを選択してください
-        </div>
-      </>
+      <div data-design-node="MKrPY">
+        <ListState kind="empty" title="LINEアカウントを選択してください" description="サイドバーで運用するLINEアカウントを選んでください。" />
+      </div>
     )
   }
 
   return (
-    <>
-      <div data-design="Head">
-        <Header title="イベントを作る" description="3つの段階に分けて登録します" />
-      </div>
+    <div data-design-node="MKrPY">
       <EventWizard accountId={selectedAccountId} eventId={eventId} step={step} />
-    </>
+    </div>
   )
 }
 
 export default function NewEventPage() {
   return (
-    <Suspense fallback={<Header title="イベントを作る" />}>
+    <Suspense fallback={<ListState kind="loading" />}>
       <NewEventPageInner />
     </Suspense>
   )

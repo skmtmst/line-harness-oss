@@ -52,9 +52,8 @@ describe('表見出しの第1段階移行', () => {
     expect(sources['app/affiliates/tabs.tsx'].match(/<th\b/g)).toHaveLength(20)
 
     const debt = totals(countDebt().counts) as Record<string, number>
-    // 4-1 の表に「表示」列（★）を足したぶん1つ増えた。
-    // 共通の `Th` へ寄せるのは、横展開のときにまとめて行う。
-    expect(debt['direct-th']).toBe(297)
+    // 2026-08-28: イベント一覧・申込者・キャンセル待ちの17見出しを共通Thへ移した。
+    expect(debt['direct-th']).toBe(290)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {
@@ -69,11 +68,13 @@ describe('表見出しの第1段階移行', () => {
       '/affiliates': 'BaLte',
       '/conversions': 'Bw4fy',
       '/inflow-links': 'EQS0v',
+      '/events': 'ugP5y',
+      '/events/bookings': 'i5SN2j',
     })
     expect(part.migration).toEqual({
       directThBefore: 378,
-      migratedInThisPr: 75,
-      directThRemaining: 303,
+      migratedInThisPr: 88,
+      directThRemaining: 290,
     })
     expect(part.visualVerification.status).toBe('unverified')
   })

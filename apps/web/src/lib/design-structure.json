@@ -758,10 +758,15 @@
       ]
     },
     "/events": {
-      "node": "Ih3xS",
-      "name": "V2 8-3 イベント予約",
+      "node": "ugP5y k5m5Bc",
+      "name": "V6 29-1 イベント予約（一覧状態を含む）",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["ugP5y", "k5m5Bc"],
+        "requiredViewports": [1440, 1920],
+        "reason": "Claudeによる同じ状態・同じ横幅の設計画像と実装画像の比較待ち"
+      },
       "sections": [
-        "Head",
         "KPIs",
         "Bar",
         "Saved",
@@ -769,11 +774,7 @@
         "tf"
       ],
       "parts": [
-        "開催するイベントの申込を管理します。定員と承認制の設定ができます。",
-        "マニュアル",
-        "並び替え",
-        "フォルダを追加",
-        "イベントを作成",
+        "イベントを作る",
         "受付中",
         "申込",
         "累計",
@@ -785,8 +786,7 @@
         "並び順",
         "開催日が近い順",
         "表示",
-        "20件",
-        "保存した条件",
+        "件表示",
         "よく使う",
         "受付中のみ",
         "承認待ちあり",
@@ -797,15 +797,21 @@
         "申込条件",
         "全員",
         "状態",
-        "準備中",
-        "全 ",
+        "下書き",
+        "全",
         "前へ",
         "次へ"
       ]
     },
     "/events/bookings": {
-      "node": "gHmNK",
-      "name": "V2 8-3-5 イベントの予約者",
+      "node": "i5SN2j",
+      "name": "V6 29-1-B 申込者の一覧",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["i5SN2j"],
+        "requiredViewports": [1440, 1920],
+        "reason": "Claudeによる同じ状態・同じ横幅の設計画像と実装画像の比較待ち"
+      },
       "sections": [
         "Crumb",
         "Head",
@@ -813,11 +819,7 @@
         "KPIs"
       ],
       "parts": [
-        "イベントの予約者",
-        "申込の確認・承認・キャンセルを行います。承認制のイベントは、承認するまで確定しません。",
-        "マニュアル",
         "CSVで書き出す",
-        "予約者に一斉送信",
         "イベント",
         "ほかのイベントを選ぶ",
         "申込",
@@ -830,11 +832,16 @@
       ]
     },
     "/events/new": {
-      "node": "C2Qr4h u9Dp8 G1lc3",
-      "name": "V2 8-3-2〜8-3-4 イベントを作る（3段階）",
+      "node": "MKrPY",
+      "name": "V6 29-1-A イベントをつくる",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["MKrPY"],
+        "requiredViewports": [1440, 1920],
+        "reason": "Claudeによる同じ状態・同じ横幅の設計画像と実装画像の比較待ち"
+      },
       "sections": [
         "Crumb",
-        "Head",
         "Steps",
         "Body",
         "Left",
@@ -2706,7 +2713,6 @@
       ],
       "parts": [
         "イベントの編集",
-        "開催内容と申込のルールを決めます。承認制にすると、申込のたびに確認できます。",
         "申込の状況",
         "予約 / 定員",
         "承認待ち",
