@@ -2383,6 +2383,7 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        folderId: string | null;
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;

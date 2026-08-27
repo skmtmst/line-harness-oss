@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import TemplateFolderSelect, { type TemplateFolderOption } from './template-folder-select'
 
 /**
  * テンプレートを選ぶ（設計 V2 2-1-1）。
@@ -59,10 +60,49 @@ export default function TemplatePicker({
     return map
   }, [textTemplates])
 
+  /** 親子1段の置き場を、設計どおり同じパネルで選べる順番へ並べる。 */
+  const folderOptions = useMemo<TemplateFolderOption[]>(() => {
+    const children = new Map<string | null, Folder[]>()
+    for (const folder of folders) {
+      const parentId = folders.some((candidate) => candidate.id === folder.parentId)
+        ? folder.parentId
+        : null
+      children.set(parentId, [...(children.get(parentId) ?? []), folder])
+    }
+    const options: TemplateFolderOption[] = [
+      { value: '', label: 'すべてのフォルダ', count: textTemplates.length },
+    ]
+    for (const parent of children.get(null) ?? []) {
+      const childFolders = children.get(parent.id) ?? []
+      const count = (folderCounts.get(parent.id) ?? 0)
+        + childFolders.reduce((sum, child) => sum + (folderCounts.get(child.id) ?? 0), 0)
+      options.push({ value: parent.id, label: parent.name, count })
+      for (const child of childFolders) {
+        options.push({
+          value: child.id,
+          label: child.name,
+          count: folderCounts.get(child.id) ?? 0,
+          depth: 1,
+        })
+      }
+    }
+    options.push({ value: '__none__', label: '未分類', count: folderCounts.get('') ?? 0 })
+    return options
+  }, [folderCounts, folders, textTemplates.length])
+
+  /** 親フォルダを選んだときは、その直下のフォルダも一緒に表示する。 */
+  const selectedFolderIds = useMemo(() => {
+    if (!folderId || folderId === '__none__') return null
+    return new Set([
+      folderId,
+      ...folders.filter((folder) => folder.parentId === folderId).map((folder) => folder.id),
+    ])
+  }, [folderId, folders])
+
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filtered = textTemplates.filter((t) => {
-      if (folderId === '__none__' ? t.folderId !== null : folderId && t.folderId !== folderId) {
+      if (folderId === '__none__' ? Boolean(t.folderId) : selectedFolderIds && !selectedFolderIds.has(t.folderId ?? '')) {
         return false
       }
       if (!q) return true
@@ -72,7 +112,7 @@ export default function TemplatePicker({
     if (category === 'reservation') return filtered.filter((template) => /予約|来店|前日|日程/.test(`${template.name} ${template.messageContent}`))
     if (category === 'ec') return filtered.filter((template) => /EC|注文|発送|配送|商品/.test(`${template.name} ${template.messageContent}`))
     return filtered
-  }, [category, textTemplates, search, folderId])
+  }, [category, textTemplates, search, folderId, selectedFolderIds])
 
   if (!open) return null
 
@@ -118,18 +158,11 @@ export default function TemplatePicker({
               className="w-full rounded-lg border border-[#E5E7EB] py-2.5 pr-3 pl-9 text-sm outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
             />
           </div>
-          <select
+          <TemplateFolderSelect
             value={folderId}
-            onChange={(e) => setFolderId(e.target.value)}
-            aria-label="フォルダ"
-            className="rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none focus:border-[#06C755]"
-          >
-            <option value="">すべてのフォルダ（{textTemplates.length}）</option>
-            {folders.map((folder) => (
-              <option key={folder.id} value={folder.id}>{folder.name}（{folderCounts.get(folder.id) ?? 0}）</option>
-            ))}
-            <option value="__none__">未分類（{folderCounts.get('') ?? 0}）</option>
-          </select>
+            onChange={setFolderId}
+            options={folderOptions}
+          />
         </div>
 
         <div className="min-h-0 flex-1 grid-cols-[350px_1fr] md:grid">
