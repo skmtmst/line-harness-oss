@@ -109,6 +109,9 @@ const LINE_NOTIFY = { feature: 24, dir: 'line-notify-v6', route: '/line-notifica
 /** オートメーションと共通アクション。設計は同じタブ帯にまとめている。 */
 const AUTOMATION = { feature: 25, dir: 'automations-v6', mode: 'page' }
 
+/** 外部連携。実装は受信／送信の2タブ（外側に Webhook／未対応の通知）。 */
+const WEBHOOK = { feature: 26, dir: 'webhooks-v6', route: '/webhooks', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -979,6 +982,26 @@ export const SCREENS = [
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions' },
   { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new' },
   { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1' },
+
+  // ── 機能26 外部連携 ─────────────────────────────────────
+  /*
+    設計のタブは4本（こちらから送る6／こちらで受け取る3／やり取りの記録／見本14）。
+    実装は2本（受信 (Incoming)／送信 (Outgoing)）で、記録も見本も無い。
+  */
+  {
+    ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
+    steps: [{ click: '送信 (Outgoing)' }],
+  },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る' },
+  {
+    ...WEBHOOK, node: 'KNG00', name: '26-1-B やり取りの記録',
+    status: 'unimplemented',
+    why: '送った・受け取ったやり取りの記録が無い。**失敗したものをやり直す場所も無い**（`grep 記録|やり直す|deliveries` が `/webhooks` 配下で0件）',
+  },
+  {
+    ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。

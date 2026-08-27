@@ -2126,3 +2126,59 @@ export const COMMON_ACTIONS = [
     updatedAt: '2026-08-22T00:00:00.000Z',
   },
 ]
+
+/**
+ * 機能26 外部連携。設計 `k3WxrO`（こちらから送る6・こちらで受け取る3）。
+ *
+ * **合言葉（secret）は返事に入らない。** `hasSecret` の真偽値だけ。
+ * 固定データに生の合言葉を書くと、実装より多くの物を見せてしまう。
+ */
+export const OUTGOING_WEBHOOKS = [
+  {
+    id: 'ow-1', name: 'Slack ／ #注文チャンネル',
+    url: 'https://hooks.slack.com/services/T0XXXXX/B0XXXXX/xxxxxxxx',
+    eventTypes: ['ec.order.confirmed'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 0, lastFailedAt: null,
+    createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    /* 連続で失敗している先。**設計の「返事がなかった 6回・すべて Slack」。** */
+    id: 'ow-2', name: 'Slack ／ #対応チーム',
+    url: 'https://hooks.slack.com/services/T0YYYYY/B0YYYYY/yyyyyyyy',
+    eventTypes: ['friend_add', 'message_received'], hasSecret: true, isActive: true,
+    maxRetries: 3, consecutiveFailures: 6, lastFailedAt: '2026-08-24T09:00:00.000Z',
+    createdAt: '2026-04-12T00:00:00.000Z', updatedAt: '2026-08-24T09:00:00.000Z',
+  },
+  {
+    id: 'ow-3', name: '在庫システム', url: 'https://stock.example.co.jp/hook',
+    eventTypes: ['ec.order.confirmed', 'ec.order.shipped'], hasSecret: true, isActive: true,
+    maxRetries: 5, consecutiveFailures: 0, lastFailedAt: null,
+    createdAt: '2026-02-20T00:00:00.000Z', updatedAt: '2026-07-01T00:00:00.000Z',
+  },
+  {
+    /* 止めているもの。**合言葉を入れていない。** */
+    id: 'ow-4', name: '旧CRM（停止中）', url: 'https://old-crm.example.co.jp/hook',
+    eventTypes: ['friend_add'], hasSecret: false, isActive: false,
+    maxRetries: 0, consecutiveFailures: 0, lastFailedAt: null,
+    createdAt: '2025-10-01T00:00:00.000Z', updatedAt: '2026-05-01T00:00:00.000Z',
+  },
+]
+
+export const INCOMING_WEBHOOKS = [
+  {
+    id: 'iw-1', name: '予約サービスから', sourceType: 'booking',
+    hasSecret: true, isActive: true,
+    createdAt: '2026-05-02T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    id: 'iw-2', name: 'アンケートツールから', sourceType: 'survey',
+    hasSecret: true, isActive: true,
+    createdAt: '2026-06-14T00:00:00.000Z', updatedAt: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    /* 合言葉を入れていない受け取り口。**誰でも投げ込める。** */
+    id: 'iw-3', name: 'テスト用', sourceType: 'other',
+    hasSecret: false, isActive: false,
+    createdAt: '2026-08-20T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+]
