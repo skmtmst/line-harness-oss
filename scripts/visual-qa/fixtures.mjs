@@ -384,6 +384,9 @@ export const SAVED_SEARCHES = [
   scope: 'friends',
   conditions,
   createdBy: String(createdBy),
+  // PR #403 で口がアカウント単位になった。`signIn` が置く印と同じ値にする。
+  // 別の値だと1件も出ず、「まだありません」の絵を基準にしてしまう。
+  lineAccountId: 'visual-qa-account',
   isShared: Boolean(isShared),
   displayOrder: index,
   createdAt: String(createdAt),
