@@ -201,7 +201,8 @@
     "192_inbox_v6_foundation.sql",
     "193_incoming_webhook_and_entry_route_owner.sql",
     "194_saved_search_account_scope.sql",
-    "195_staff_account_scope.sql"
+    "195_staff_account_scope.sql",
+    "196_support_mark_account_scope.sql"
   ],
-  "migrationCount": 202
+  "migrationCount": 203
 }

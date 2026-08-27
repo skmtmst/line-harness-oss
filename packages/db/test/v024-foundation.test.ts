@@ -15,6 +15,7 @@ import {
 } from '../src/friend-fields.js';
 import {
   createSupportMark,
+  updateSupportMark,
   getDefaultSupportMark,
   getSupportMarks,
   setFriendSupportMarkBulk,
@@ -94,14 +95,18 @@ function asD1(sqlite: Database.Database): D1Database {
 
 let sqlite: Database.Database;
 let db: D1Database;
+const SCOPE = {
+  tenantId: '00000000-0000-4000-8000-000000000001',
+  lineAccountId: 'account-1',
+};
 
-function insertFriend(id: string): void {
+function insertFriend(id: string, accountId = 'account-1'): void {
   sqlite
     .prepare(
-      `INSERT INTO friends (id, line_user_id, display_name, created_at, updated_at)
-       VALUES (?, ?, 'テスト', '2026-08-16', '2026-08-16')`,
+      `INSERT INTO friends (id, line_user_id, line_account_id, display_name, created_at, updated_at)
+       VALUES (?, ?, ?, 'テスト', '2026-08-16', '2026-08-16')`,
     )
-    .run(id, `U${id.padEnd(32, '0').slice(0, 32)}`);
+    .run(id, `U${id.padEnd(32, '0').slice(0, 32)}`, accountId);
 }
 
 beforeEach(() => {
@@ -287,37 +292,100 @@ describe('対応マーク', () => {
     // bootstrap.sql は DDL だけなので、マイグレーションに書いた行は
     // 新規インストールに届かない。ヘルパ側で補っている。
     expect(sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks`).get()).toEqual({ c: 0 });
-    const marks = await getSupportMarks(db);
+    const marks = await getSupportMarks(db, SCOPE);
     expect(marks.map((m) => m.name)).toEqual(['未対応', '対応中', '解決済']);
   });
 
   test('既定は1つだけ', async () => {
-    expect((await getDefaultSupportMark(db))?.name).toBe('未対応');
-    await createSupportMark(db, { name: '保留', isDefault: true });
+    expect((await getDefaultSupportMark(db, SCOPE))?.name).toBe('未対応');
+    await createSupportMark(db, SCOPE, { name: '保留', isDefault: true });
     // 新しく既定にしたら、前の既定は降りる。
-    expect((await getDefaultSupportMark(db))?.name).toBe('保留');
-    const defaults = (await getSupportMarks(db)).filter((m) => m.is_default === 1);
+    expect((await getDefaultSupportMark(db, SCOPE))?.name).toBe('保留');
+    const defaults = (await getSupportMarks(db, SCOPE)).filter((m) => m.is_default === 1);
     expect(defaults).toHaveLength(1);
   });
 
+  test('別のLINE公式アカウントで作ったマークは一覧にも付与にも混ざらない', async () => {
+    const account2Scope = { ...SCOPE, lineAccountId: 'account-2' };
+    const account1Mark = await createSupportMark(db, SCOPE, { name: '店舗1だけ' });
+    const account2Mark = await createSupportMark(db, account2Scope, { name: '店舗2だけ' });
+
+    expect((await getSupportMarks(db, SCOPE)).map((mark) => mark.name)).toContain('店舗1だけ');
+    expect((await getSupportMarks(db, SCOPE)).map((mark) => mark.name)).not.toContain('店舗2だけ');
+
+    insertFriend('f-account-1', 'account-1');
+    insertFriend('f-account-2', 'account-2');
+    expect(
+      await setFriendSupportMarkBulk(
+        db,
+        ['f-account-1', 'f-account-2'],
+        account1Mark.id,
+        SCOPE,
+      ),
+    ).toBe(1);
+    expect(
+      await setFriendSupportMarkBulk(db, ['f-account-2'], account1Mark.id, account2Scope),
+    ).toBe(0);
+    expect(account2Mark.line_account_id).toBe('account-2');
+  });
+
+  test('移行前の共通マークを編集しても選択中アカウントだけに複製される', async () => {
+    insertFriend('f-account-1', 'account-1');
+    insertFriend('f-account-2', 'account-2');
+    await setFriendSupportMarkBulk(db, ['f-account-1'], 'mark_working', SCOPE);
+    await setFriendSupportMarkBulk(
+      db,
+      ['f-account-2'],
+      'mark_working',
+      { ...SCOPE, lineAccountId: 'account-2' },
+    );
+
+    const cloned = await updateSupportMark(db, 'mark_working', SCOPE, { name: '店舗1で対応中' });
+    expect(cloned?.id).not.toBe('mark_working');
+    expect(cloned?.line_account_id).toBe('account-1');
+    expect(
+      sqlite.prepare(`SELECT support_mark_id FROM friends WHERE id = 'f-account-1'`).get(),
+    ).toEqual({ support_mark_id: cloned?.id });
+    expect(
+      sqlite.prepare(`SELECT support_mark_id FROM friends WHERE id = 'f-account-2'`).get(),
+    ).toEqual({ support_mark_id: 'mark_working' });
+  });
+
+  test('別アカウントのマークは削除時の置換先にできない', async () => {
+    const account2Scope = { ...SCOPE, lineAccountId: 'account-2' };
+    const account1Mark = await createSupportMark(db, SCOPE, { name: '店舗1' });
+    const account2Mark = await createSupportMark(db, account2Scope, { name: '店舗2' });
+    insertFriend('f-account-1', 'account-1');
+    await setFriendSupportMarkBulk(db, ['f-account-1'], account1Mark.id, SCOPE);
+
+    expect(
+      await replaceAndDeleteSupportMark(db, account1Mark.id, account2Mark.id, SCOPE, 'staff-1'),
+    ).toBe(0);
+    expect(
+      sqlite.prepare(`SELECT support_mark_id FROM friends WHERE id = 'f-account-1'`).get(),
+    ).toEqual({ support_mark_id: account1Mark.id });
+  });
+
   test('まとめて付けられる', async () => {
-    await getSupportMarks(db); // 初期マークを用意させる
+    await getSupportMarks(db, SCOPE); // 初期マークを用意させる
     insertFriend('f-1');
     insertFriend('f-2');
-    const n = await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], 'mark_working');
+    const n = await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], 'mark_working', SCOPE);
     expect(n).toBe(2);
   });
 
   test('使用中マークは初期値へ置換し、友だちごとの履歴を残してから削除する', async () => {
-    await getSupportMarks(db);
+    await getSupportMarks(db, SCOPE);
     insertFriend('f-1');
     insertFriend('f-2');
-    await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], 'mark_working');
+    const accountMark = await createSupportMark(db, SCOPE, { name: '対応中' });
+    await setFriendSupportMarkBulk(db, ['f-1', 'f-2'], accountMark.id, SCOPE);
 
     const replaced = await replaceAndDeleteSupportMark(
       db,
-      'mark_working',
+      accountMark.id,
       'mark_untouched',
+      SCOPE,
       'staff-1',
     );
 
@@ -326,7 +394,7 @@ describe('対応マーク', () => {
       sqlite.prepare(`SELECT DISTINCT support_mark_id FROM friends ORDER BY support_mark_id`).all(),
     ).toEqual([{ support_mark_id: 'mark_untouched' }]);
     expect(
-      sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks WHERE id = 'mark_working'`).get(),
+      sqlite.prepare(`SELECT COUNT(*) AS c FROM support_marks WHERE id = ?`).get(accountMark.id),
     ).toEqual({ c: 0 });
     expect(
       sqlite
@@ -343,24 +411,24 @@ describe('対応マーク', () => {
         target_id: 'mark_untouched',
         actor_id: 'staff-1',
         detail_json:
-          '{"previousMarkId":"mark_working","replacementMarkId":"mark_untouched","reason":"deleted_mark_replacement"}',
+          `{"previousMarkId":"${accountMark.id}","replacementMarkId":"mark_untouched","reason":"deleted_mark_replacement"}`,
       },
       {
         friend_id: 'f-2',
         target_id: 'mark_untouched',
         actor_id: 'staff-1',
         detail_json:
-          '{"previousMarkId":"mark_working","replacementMarkId":"mark_untouched","reason":"deleted_mark_replacement"}',
+          `{"previousMarkId":"${accountMark.id}","replacementMarkId":"mark_untouched","reason":"deleted_mark_replacement"}`,
       },
     ]);
   });
 
   test('空の配列ではクエリを投げない', async () => {
-    expect(await setFriendSupportMarkBulk(db, [], 'mark_working')).toBe(0);
+    expect(await setFriendSupportMarkBulk(db, [], 'mark_working', SCOPE)).toBe(0);
   });
 
   test('受信で自動的に付くマークが無ければ何もしない', async () => {
-    await getSupportMarks(db);
+    await getSupportMarks(db, SCOPE);
     insertFriend('f-1');
     sqlite.prepare(`UPDATE support_marks SET auto_on_inbound = 0`).run();
     expect(await applyInboundSupportMark(db, 'f-1')).toBe(false);

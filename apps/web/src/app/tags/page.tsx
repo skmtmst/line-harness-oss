@@ -471,7 +471,7 @@ function TagsPageInner() {
             問い合わせの状態を表すマークを作ります。ここで決めた選択肢が、
             <strong>受信箱</strong>・<strong>友だち一覧</strong>・<strong>友だち詳細</strong>で使われます。
           </p>
-          <SupportMarkList />
+          <SupportMarkList accountId={selectedAccountId} />
           <div className="text-ink-faint rounded-card border-hairline bg-canvas-sunken mt-4 border p-4 text-xs leading-relaxed">
             <p className="text-ink-secondary mb-1.5 font-medium">気をつけること</p>
             <ul className="space-y-1">
