@@ -1249,9 +1249,9 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    /** 付いている人がいると 409。force で未設定に戻して消す。 */
+    /** 付いている人がいると 409。force で初期値マークへ置換して消す。 */
     delete: (id: string, opts?: { force?: boolean }) =>
-      fetchApi<ApiResponse<null>>(
+      fetchApi<ApiResponse<{ replacedFriendCount: number; replacementMark: SupportMark }>>(
         `/api/support-marks/${id}${opts?.force ? '?force=1' : ''}`,
         { method: 'DELETE' },
       ),

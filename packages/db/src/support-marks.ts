@@ -150,6 +150,46 @@ export async function deleteSupportMark(db: D1Database, id: string): Promise<voi
   await db.prepare(`DELETE FROM support_marks WHERE id = ?`).bind(id).run();
 }
 
+/**
+ * 使用中の対応マークを初期値へ置き換えてから削除する。
+ *
+ * 先に削除すると外部キーの ON DELETE SET NULL で絞り込みから漏れるため、
+ * 変更履歴・置換・削除を D1 の1バッチ（1トランザクション）にまとめる。
+ */
+export async function replaceAndDeleteSupportMark(
+  db: D1Database,
+  markId: string,
+  replacementMarkId: string,
+  actorId?: string | null,
+): Promise<number> {
+  if (markId === replacementMarkId) {
+    throw new Error('Replacement support mark must be different');
+  }
+
+  const detail = JSON.stringify({
+    previousMarkId: markId,
+    replacementMarkId,
+    reason: 'deleted_mark_replacement',
+  });
+  const results = await db.batch([
+    db
+      .prepare(
+        `INSERT INTO operation_audit
+           (id, target_kind, target_id, action, actor_id, friend_id, detail_json)
+         SELECT lower(hex(randomblob(16))), 'support_mark', ?, 'changed', ?, id, ?
+           FROM friends
+          WHERE support_mark_id = ?`,
+      )
+      .bind(replacementMarkId, actorId ?? null, detail, markId),
+    db
+      .prepare(`UPDATE friends SET support_mark_id = ? WHERE support_mark_id = ?`)
+      .bind(replacementMarkId, markId),
+    db.prepare(`DELETE FROM support_marks WHERE id = ?`).bind(markId),
+  ]);
+
+  return Number(results[1]?.meta?.changes ?? 0);
+}
+
 /** そのマークが付いている友だちの数。削除前の確認に使う。 */
 export async function countFriendsWithMark(db: D1Database, markId: string): Promise<number> {
   const row = await db
