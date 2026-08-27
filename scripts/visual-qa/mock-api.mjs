@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -419,6 +419,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: REMINDER_FOLDERS }
   }
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/folders' && query.get('kind') === 'rich_menu') {
+    return { success: true, data: RICH_MENU_FOLDERS }
+  }
+  if (pathname === '/api/rich-menu-groups/external') return { success: true, data: RICH_MENU_EXTERNAL }
+  if (pathname === '/api/rich-menu-groups/tap-stats') return { success: true, data: RICH_MENU_TAP_STATS }
+  if (pathname === '/api/rich-menu-groups') return { success: true, data: RICH_MENU_GROUPS }
+  const richMenuOne = /^\/api\/rich-menu-groups\/([^/]+)$/.exec(pathname)
+  if (richMenuOne) {
+    const detail = RICH_MENU_GROUP_DETAILS[richMenuOne[1]]
+    if (detail) return { success: true, data: detail }
+    const group = RICH_MENU_GROUPS.find((item) => item.id === richMenuOne[1])
+    /* **`pages` は必ず付ける。** 無いと編集画面が `pages[0]` で落ちる。 */
+    return group
+      ? { success: true, data: { ...group, createdAt: group.updatedAt, pages: [] } }
+      : { success: false, error: 'Not found' }
+  }
   if (pathname === '/api/broadcast-message-assets') {
     const kind = query.get('kind')
     return {

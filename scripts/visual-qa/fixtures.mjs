@@ -1031,3 +1031,151 @@ export const BROADCAST_MESSAGE_ASSETS = [
     createdAt: '2026-07-11T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
   })),
 ]
+
+/**
+ * 機能12 リッチメニュー。設計 `GO8RQ` の一覧。
+ *
+ * **画面が読む形（`RichMenuGroupListItem`）に合わせる。**
+ * `status` は `'draft' | 'published'` の2つだけで、設計の「予約」は
+ * この型に無い（下の design-qa に書いた食い違い）。
+ */
+export const RICH_MENU_FOLDERS = [
+  { id: 'rmf-member', kind: 'rich_menu', name: '01_会員向け', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'rmf-campaign', kind: 'rich_menu', name: '02_キャンペーン', parentId: null, displayOrder: 2, color: '#d97706' },
+  { id: 'rmf-store', kind: 'rich_menu', name: '03_店舗別', parentId: null, displayOrder: 3, color: '#059669' },
+]
+
+export const RICH_MENU_GROUPS = [
+  {
+    id: 'rmg-1', accountId: 'visual-qa-account', name: '通常メニュー（会員向け）',
+    chatBarText: 'メニュー', size: 'large', defaultPageId: 'rmp-1',
+    isDefaultForAll: true, status: 'published', publishingAt: null,
+    targetingCondition: null, targetingPriority: 3, targetingEnabled: false,
+    folderId: 'rmf-member', displayOrder: 1, thumbnailR2Key: null,
+    updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'rmg-2', accountId: 'visual-qa-account', name: '夏キャンペーン',
+    chatBarText: 'キャンペーン', size: 'large', defaultPageId: 'rmp-2',
+    isDefaultForAll: false, status: 'published', publishingAt: '2026-08-25T01:00:00.000Z',
+    targetingCondition: JSON.stringify({ match: 'all', rules: [{ field: 'tag', op: 'contains', value: 'ゴールド' }] }),
+    targetingPriority: 1, targetingEnabled: true,
+    folderId: 'rmf-campaign', displayOrder: 2, thumbnailR2Key: null,
+    updatedAt: '2026-08-22T00:00:00.000Z',
+  },
+  {
+    id: 'rmg-3', accountId: 'visual-qa-account', name: '会員ランク上位',
+    chatBarText: 'メニュー', size: 'large', defaultPageId: 'rmp-3',
+    isDefaultForAll: false, status: 'published', publishingAt: null,
+    targetingCondition: JSON.stringify({ match: 'all', rules: [{ field: 'purchase_count', op: 'gte', value: 3 }] }),
+    targetingPriority: 2, targetingEnabled: true,
+    folderId: 'rmf-member', displayOrder: 3, thumbnailR2Key: null,
+    updatedAt: '2026-08-18T00:00:00.000Z',
+  },
+  {
+    /* 下書き。**画像も条件も無い。** ここが空でも一覧が崩れないことが要る。 */
+    id: 'rmg-4', accountId: 'visual-qa-account', name: '店舗A限定メニュー',
+    chatBarText: 'メニュー', size: 'compact', defaultPageId: null,
+    isDefaultForAll: false, status: 'draft', publishingAt: null,
+    targetingCondition: null, targetingPriority: 4, targetingEnabled: false,
+    folderId: 'rmf-store', displayOrder: 4, thumbnailR2Key: null,
+    updatedAt: '2026-08-15T00:00:00.000Z',
+  },
+]
+
+/** 設計 `GO8RQ` の「今月のタップ 12,480回」。 */
+export const RICH_MENU_TAP_STATS = {
+  from: '2026-08-01', to: '2026-08-31',
+  byArea: [
+    { areaId: 'rma-1', groupId: 'rmg-1', pageId: 'rmp-1', label: '商品を見る', taps: 4820, viaTrackedLink: 3110 },
+    { areaId: 'rma-2', groupId: 'rmg-1', pageId: 'rmp-1', label: '予約する', taps: 3960, viaTrackedLink: 2402 },
+    { areaId: 'rma-3', groupId: 'rmg-2', pageId: 'rmp-2', label: 'キャンペーン', taps: 2180, viaTrackedLink: 1508 },
+    /* 消したボタン。**名前が null になる。** 消しても数は残る。 */
+    { areaId: 'rma-4', groupId: 'rmg-3', pageId: 'rmp-3', label: null, taps: 1520, viaTrackedLink: 0 },
+  ],
+  byGroup: [
+    { groupId: 'rmg-1', taps: 12480 },
+    { groupId: 'rmg-2', taps: 2180 },
+    { groupId: 'rmg-3', taps: 1520 },
+    { groupId: 'rmg-4', taps: 0 },
+  ],
+  total: 16180,
+}
+
+/**
+ * 管理画面の外にあるメニュー（設計 `TL7tp`）。
+ * LINE公式マネージャーで作ったもので、こちらに取り込んでいないもの。
+ */
+export const RICH_MENU_EXTERNAL = {
+  currentDefault: 'richmenu-line-1',
+  lineMenus: [
+    {
+      richMenuId: 'richmenu-line-1', name: 'LINE公式マネージャーで作成', chatBarText: 'メニュー',
+      size: { width: 2500, height: 1686 }, areasCount: 6,
+      isCurrentDefault: true, adminManaged: false, adminInfo: null,
+    },
+    {
+      richMenuId: 'richmenu-line-2', name: '旧ツールの会員メニュー', chatBarText: 'メニュー',
+      size: { width: 2500, height: 1686 }, areasCount: 4,
+      isCurrentDefault: false, adminManaged: false, adminInfo: null,
+    },
+    {
+      /* 取り込み済み。**こちらに持ち主がいる。** */
+      richMenuId: 'richmenu-line-3', name: 'テスト用（名前なし）', chatBarText: 'メニュー',
+      size: { width: 2500, height: 843 }, areasCount: 1,
+      isCurrentDefault: false, adminManaged: true,
+      adminInfo: { groupId: 'rmg-1', groupName: '通常メニュー（会員向け）', pageName: 'トップ', groupStatus: 'published' },
+    },
+  ],
+}
+
+/**
+ * リッチメニュー1枚ぶんの中身（`/api/rich-menu-groups/:id`）。
+ *
+ * **`pages` と `areas` を通で付ける。** 一覧の既定（`{items,…}`）を返すと
+ * 編集画面が `pages[0]` を見て落ちる。設計 `DIUbO` の切替3枚
+ * （トップ→商品を見る→予約する）に合わせた。
+ */
+const rmArea = (id, x, y, w, h, label, actionType, actionData, intent) => ({
+  id, boundsX: x, boundsY: y, boundsWidth: w, boundsHeight: h,
+  actionType, actionData, intent, label,
+  tagIds: [], scoreChange: null, templateId: null, formId: null, trackedLinkId: null,
+})
+
+/** 大サイズ 2500x1686 を6面に割る。 */
+const sixAreas = (prefix) => [
+  rmArea(`${prefix}-a`, 0, 0, 833, 843, '商品を見る', 'uri', { uri: 'https://example.co.jp/menu' }, 'url'),
+  rmArea(`${prefix}-b`, 833, 0, 833, 843, '予約する', 'message', { text: '予約したい' }, 'text'),
+  rmArea(`${prefix}-c`, 1666, 0, 834, 843, 'お問い合わせ', 'message', { text: '問い合わせ' }, 'text'),
+  rmArea(`${prefix}-d`, 0, 843, 833, 843, 'マイページ', 'uri', { uri: 'https://example.co.jp/mypage' }, 'url'),
+  rmArea(`${prefix}-e`, 833, 843, 833, 843, 'クーポン', 'uri', { uri: 'https://example.co.jp/coupon' }, 'url'),
+  /* 設計 `UMiJ9` の公開前チェック「面 F のアクションが未設定です」。 */
+  rmArea(`${prefix}-f`, 1666, 843, 834, 843, null, 'message', {}, null),
+]
+
+export const RICH_MENU_GROUP_DETAILS = {
+  'rmg-1': {
+    ...(() => {
+      const g = RICH_MENU_GROUPS[0]
+      return { ...g, createdAt: '2026-06-01T00:00:00.000Z' }
+    })(),
+    pages: [
+      {
+        id: 'rmp-1', orderIndex: 0, name: 'トップ', aliasId: 'top',
+        lineRichmenuId: 'richmenu-top', imageR2Key: 'rm/top.png', imageContentType: 'image/png',
+        areas: sixAreas('rma-top'),
+      },
+      {
+        id: 'rmp-2', orderIndex: 1, name: '商品を見る', aliasId: 'products',
+        lineRichmenuId: 'richmenu-products', imageR2Key: 'rm/products.png', imageContentType: 'image/png',
+        areas: sixAreas('rma-products'),
+      },
+      {
+        /* 設計 `DIUbO`「『予約する』からトップへ戻るタブがありません」。 */
+        id: 'rmp-3', orderIndex: 2, name: '予約する', aliasId: 'booking',
+        lineRichmenuId: null, imageR2Key: null, imageContentType: null,
+        areas: sixAreas('rma-booking'),
+      },
+    ],
+  },
+}

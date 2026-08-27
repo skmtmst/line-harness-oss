@@ -65,6 +65,10 @@ const WEBINAR_EDIT = '/webinars/edit?id=webinar-1'
 /** テンプレート。上のタブで種類を切り替える（メッセージ／カルーセル／…）。 */
 const TEMPLATE = { feature: 11, dir: 'templates-v6', route: '/templates', mode: 'page' }
 
+/** リッチメニュー。作成・編集は1枚もので、設計の3段には分かれていない。 */
+const RICH_MENU = { feature: 12, dir: 'rich-menus-v6', route: '/rich-menus', mode: 'page' }
+const RM_EDIT = '/rich-menus/edit?id=rmg-1'
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -567,6 +571,36 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能12 リッチメニュー ───────────────────────────────
+  /*
+    設計は3段（形とボタン→誰に出すか→公開のしかた）。実装は1枚もの。
+    段は無いが**中身は同じ画面に全部ある**ので、同じ絵を3つの設計と
+    突き合わせる形にする。
+  */
+  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー' },
+  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new' },
+  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT },
+  {
+    ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり', route: RM_EDIT,
+    status: 'unimplemented',
+    why: '「どのメニューからどこへ移れるか」を図で見せる画面が無い。**戻るタブが無いことに気づく場所が無い**（`grep つながり|切替メニュー` が0件。参照の検査は削除しようとしたときの文言だけ）',
+  },
+  {
+    ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし', route: RM_EDIT,
+    status: 'unimplemented', why: '12-1-C が無いので、その空の状態も無い',
+  },
+  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT },
+  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む' },
+  {
+    ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
+    status: 'unimplemented',
+    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`rich-menus/page.tsx:193`）',
+  },
+  {
+    ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 
