@@ -394,3 +394,54 @@ export const FRIEND_DETAILS = {
     formSubmissions: [],
   },
 }
+
+/**
+ * テンプレートの置き場。設計 `NWbuF`（2-6 全フォルダ展開）の件数そのまま。
+ * 未分類3・お問い合わせ8・予約5・EC4 で計20件。
+ */
+export const TEMPLATE_FOLDERS = [
+  ['tf-inquiry', 'お問い合わせ', 8],
+  ['tf-booking', '予約', 5],
+  ['tf-ec', 'EC', 4],
+].map(([id, name, count], index) => ({
+  id: String(id),
+  kind: 'template',
+  name: String(name),
+  parentId: null,
+  displayOrder: index,
+  color: null,
+  createdAt: '2026-01-13T00:00:00.000Z',
+  updatedAt: '2026-01-13T00:00:00.000Z',
+  templateCount: Number(count),
+}))
+
+/**
+ * テンプレート20件。**件数はフォルダの数に合わせる。**
+ * 合わないと、フォルダの脇に出る数と一覧の行数が食い違う。
+ */
+export const TEMPLATES = (() => {
+  const rows = []
+  const plan = [
+    [null, '未分類', 3],
+    ['tf-inquiry', 'お問い合わせ', 8],
+    ['tf-booking', '予約', 5],
+    ['tf-ec', 'EC', 4],
+  ]
+  let n = 0
+  for (const [folderId, label, count] of plan) {
+    for (let i = 0; i < count; i += 1) {
+      rows.push({
+        id: `template-${n}`,
+        name: `${label}のひな形 ${i + 1}`,
+        category: 'text',
+        messageType: 'text',
+        messageContent: `${label}のご連絡です。内容をご確認ください。`,
+        folderId,
+        createdAt: '2026-01-13T00:00:00.000Z',
+        updatedAt: '2026-01-13T00:00:00.000Z',
+      })
+      n += 1
+    }
+  }
+  return rows
+})()

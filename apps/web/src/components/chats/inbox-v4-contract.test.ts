@@ -37,7 +37,7 @@ describe('受信箱V4で既存機能を失わない', () => {
 
   it('テンプレートは選択だけでは送信せず入力欄へ挿入する', () => {
     expect(TEMPLATE_PICKER).toContain('入力欄へ挿入')
-    expect(TEMPLATE_PICKER).toContain('すべてのフォルダ')
+    expect(TEMPLATE_PICKER).toContain('FolderDropdown')
     expect(TEMPLATE_PICKER).toContain('送信内容のプレビュー')
     expect(PAGE).toContain('setMessageContent')
     expect(TEMPLATE_PICKER).toContain('createPortal')

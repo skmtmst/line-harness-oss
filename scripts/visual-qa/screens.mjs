@@ -87,8 +87,7 @@ export const SCREENS = [
   { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読' },
   {
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
-    status: 'unimplemented',
-    why: 'テンプレート選択にフォルダの開閉が無い。2-2 の一覧が出るだけ',
+    steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }],
   },
   {
     ...INBOX, node: 'B7CER8', name: '2-7 内部メモ入力',
@@ -114,7 +113,9 @@ export const SCREENS = [
   },
   {
     ...INBOX, node: 'TUveA', name: '2-11 テンプレート・予約フォルダ',
-    status: 'unimplemented', why: '2-6 と同じ。フォルダの区分が無い',
+    // 「予約」だけだと**分類のチップ**に当たる。フォルダの行は
+    // `role="option"` で「フォルダ 予約」という名前なので、そちらを指す。
+    steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }, { click: 'フォルダ 予約', role: 'option' }],
   },
   { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }] },
   { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }] },

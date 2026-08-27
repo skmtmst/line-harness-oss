@@ -221,3 +221,105 @@ export function StatusDropdown({
     </div>
   )
 }
+
+// ─────────────────────────────────────────────────────────────
+// テンプレートの置き場
+// ─────────────────────────────────────────────────────────────
+
+export type FolderOption = { id: string; name: string; count: number }
+
+/**
+ * テンプレートの置き場を選ぶ（設計 Pencil `esGzX` すべてのフォルダ・ドロップダウン）。
+ *
+ * 素の `<select>` にしていたころは、**開いた中身が画像に写らなかった**。
+ * 設計の 2-6（全フォルダ展開）と 2-11（予約フォルダ）は「開いた状態」なので、
+ * 素のセレクトのままでは見比べられない。
+ *
+ * 中身は 検索欄 ＋「すべてのフォルダ」＋ 置き場ごとの件数。
+ * **件数を出す。** ひな形が20枚あるとき、どこに何枚あるかが分からないと
+ * 「予約」を開くべきかどうかが決められない。
+ */
+export function FolderDropdown({
+  value,
+  folders,
+  totalCount,
+  onChange,
+  ariaLabel = 'フォルダ',
+}: {
+  /** 空文字はすべてのフォルダ */
+  value: string
+  folders: FolderOption[]
+  totalCount: number
+  onChange: (next: string) => void
+  ariaLabel?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const ref = useCloseOnOutside(open, () => setOpen(false))
+
+  const shown = query.trim()
+    ? folders.filter((folder) => folder.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    : folders
+  const current = folders.find((folder) => folder.id === value)
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={() => setOpen((now) => !now)}
+        className={`border-hairline rounded-control bg-canvas text-ink flex w-full items-center gap-2 border px-3 py-2.5 text-sm font-medium ${open ? 'border-accent' : ''}`}
+      >
+        <span className="truncate">
+          {current ? `${current.name}（${current.count}）` : `すべてのフォルダ（${totalCount}）`}
+        </span>
+        <span className="text-ink-faint ml-auto"><Chevron open={open} /></span>
+      </button>
+      {open ? (
+        <div className={`${panelClass} right-0 w-70`} role="listbox" aria-label={ariaLabel}>
+          <div className="border-hairline border-b p-2">
+            <input
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="フォルダを検索"
+              aria-label="フォルダを検索"
+              className="border-hairline rounded-control text-ink placeholder:text-ink-faint w-full border px-2 py-1.5 text-xs outline-none"
+            />
+          </div>
+          <button
+            type="button"
+            role="option"
+            aria-selected={value === ''}
+            onClick={() => { onChange(''); setOpen(false); setQuery('') }}
+            className={`${rowClass} justify-between ${value === '' ? 'bg-accent-soft text-accent font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
+          >
+            <span className="truncate">すべてのフォルダ</span>
+            <span className="tabular-nums">{totalCount}</span>
+          </button>
+          {shown.map((folder) => {
+            const selected = folder.id === value
+            return (
+              <button
+                key={folder.id}
+                type="button"
+                role="option"
+                // 分類のチップにも同じ名前（「予約」など）が出る。
+                // どちらを指しているか読み上げでも試験でも分かるようにする。
+                aria-label={`フォルダ ${folder.name}`}
+                aria-selected={selected}
+                onClick={() => { onChange(folder.id); setOpen(false); setQuery('') }}
+                className={`${rowClass} justify-between ${selected ? 'bg-accent-soft text-accent font-medium' : 'text-ink hover:bg-canvas-sunken'}`}
+              >
+                <span className="truncate">{folder.name}</span>
+                <span className="text-ink-faint tabular-nums">{folder.count}</span>
+              </button>
+            )
+          })}
+          {shown.length === 0 ? <p className="text-ink-faint px-3 py-3 text-xs">見つかりません</p> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}

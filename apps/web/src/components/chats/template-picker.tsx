@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { FolderDropdown } from '@/components/chats/inbox-dropdown'
 
 /**
  * テンプレートを選ぶ（設計 V2 2-1-1）。
@@ -118,18 +119,22 @@ export default function TemplatePicker({
               className="w-full rounded-lg border border-[#E5E7EB] py-2.5 pr-3 pl-9 text-sm outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
             />
           </div>
-          <select
+          {/*
+            素の `<select>` から専用のプルダウンへ替えた。**開いた中身が
+            画像に写らない**ため、設計の 2-6（全フォルダ展開）・2-11（予約
+            フォルダ）を見比べられなかった。件数も設計どおり出す。
+          */}
+          <FolderDropdown
             value={folderId}
-            onChange={(e) => setFolderId(e.target.value)}
-            aria-label="フォルダ"
-            className="rounded-lg border border-[#E5E7EB] bg-canvas px-3 py-2.5 text-sm font-medium text-[#1F2937] outline-none focus:border-[#06C755]"
-          >
-            <option value="">すべてのフォルダ（{textTemplates.length}）</option>
-            {folders.map((folder) => (
-              <option key={folder.id} value={folder.id}>{folder.name}（{folderCounts.get(folder.id) ?? 0}）</option>
-            ))}
-            <option value="__none__">未分類（{folderCounts.get('') ?? 0}）</option>
-          </select>
+            folders={folders.map((folder) => ({
+              id: folder.id,
+              name: folder.name,
+              count: folderCounts.get(folder.id) ?? 0,
+            }))}
+            totalCount={textTemplates.length}
+            onChange={setFolderId}
+            ariaLabel="フォルダ"
+          />
         </div>
 
         <div className="min-h-0 flex-1 grid-cols-[350px_1fr] md:grid">
