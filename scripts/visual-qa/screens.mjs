@@ -76,6 +76,9 @@ const FORM_EDIT = '/form-submissions/edit?id=form-1'
 /** 共通情報。差し込みの中身を1か所で持つ。 */
 const COMMON_VAR = { feature: 14, dir: 'common-vars-v6', route: '/contents/vars', mode: 'page' }
 
+/** 登録メディア。詳細は札の中で開く（別ルートではない）。 */
+const MEDIA = { feature: 15, dir: 'media-v6', route: '/contents', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -651,6 +654,29 @@ export const SCREENS = [
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
     status: 'unimplemented',
     why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`contents/vars/page.tsx:150`）',
+  },
+
+  // ── 機能15 登録メディア ─────────────────────────────────
+  { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア' },
+  {
+    ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
+    mode: 'viewport', height: 1080, steps: [{ click: '夏の定番セット.jpgの使用箇所' }],
+  },
+  {
+    /*
+      設計の `eXAJP` は一覧と同じ文言。実装も**一覧の上にドロップ枠が
+      常に出ている**ので、同じ絵で突き合わせる。
+    */
+    ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
+  },
+  {
+    ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
+    status: 'unimplemented',
+    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`contents/page.tsx:175`）',
+  },
+  {
+    ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

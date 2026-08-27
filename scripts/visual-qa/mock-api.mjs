@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -448,6 +448,17 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
   if (pathname === '/api/folders' && query.get('kind') === 'common_var') {
     return { success: true, data: COMMON_VAR_FOLDERS }
+  }
+  if (pathname === '/api/folders' && query.get('kind') === 'media') {
+    return { success: true, data: MEDIA_FOLDERS }
+  }
+  if (pathname === '/api/media') return { success: true, data: MEDIA_ITEMS }
+  const mediaUsage = /^\/api\/media\/([^/]+)\/usages?$/.exec(pathname)
+  if (mediaUsage) return { success: true, data: MEDIA_USAGE[mediaUsage[1]] ?? [] }
+  const mediaOne = /^\/api\/media\/([^/]+)$/.exec(pathname)
+  if (mediaOne) {
+    const found = MEDIA_ITEMS.find((item) => item.id === mediaOne[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
   }
   if (pathname === '/api/common-vars') return { success: true, data: COMMON_VARS }
   const cvSchedules = /^\/api\/common-vars\/([^/]+)\/schedules$/.exec(pathname)

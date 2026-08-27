@@ -1386,3 +1386,79 @@ export const COMMON_VAR_SCHEDULES = {
     { id: 'cvs-1', varId: 'cv-4', effectiveFrom: '2026-09-30T15:00:00.000Z', value: '', appliedAt: null },
   ],
 }
+
+/**
+ * 機能15 登録メディア。設計 `g89Tc` の一覧。
+ *
+ * **`MediaItem` の型どおり。** `kind` は `'image'|'video'|'audio'|'file'` の4つ。
+ * 設計の「JPG」「MP4」は `mimeType` から出す表示で、項目名ではない。
+ */
+export const MEDIA_FOLDERS = [
+  { id: 'mf-product', kind: 'media', name: '01_商品写真', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'mf-banner', kind: 'media', name: '02_バナー', parentId: null, displayOrder: 2, color: '#059669' },
+  { id: 'mf-video', kind: 'media', name: '03_動画', parentId: null, displayOrder: 3, color: '#d97706' },
+]
+
+export const MEDIA_ITEMS = [
+  {
+    id: 'media-1', folderId: 'mf-product', kind: 'image', filename: '夏の定番セット.jpg',
+    mimeType: 'image/jpeg', sizeBytes: 348160, width: 1024, height: 678, durationMs: null,
+    url: 'https://example.co.jp/media/summer-set.jpg', uploadedBy: '川野 健太',
+    createdAt: '2026-08-18T00:00:00.000Z',
+  },
+  {
+    id: 'media-2', folderId: 'mf-banner', kind: 'image', filename: '会員証バナー.png',
+    mimeType: 'image/png', sizeBytes: 839680, width: 2500, height: 1686, durationMs: null,
+    url: 'https://example.co.jp/media/member-banner.png', uploadedBy: '川野 健太',
+    createdAt: '2026-08-14T00:00:00.000Z',
+  },
+  {
+    /* 動画。**184MB。** 上限に近いものが混ざっていることが要る。 */
+    id: 'media-3', folderId: 'mf-video', kind: 'video', filename: '店内のようす.mp4',
+    mimeType: 'video/mp4', sizeBytes: 192937984, width: 1920, height: 1080, durationMs: 80000,
+    url: 'https://example.co.jp/media/shop.mp4', uploadedBy: '菅野 亮',
+    createdAt: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    id: 'media-4', folderId: 'mf-banner', kind: 'image', filename: '誕生月クーポン.png',
+    mimeType: 'image/png', sizeBytes: 215040, width: 1029, height: 1029, durationMs: null,
+    url: 'https://example.co.jp/media/birthday-coupon.png', uploadedBy: '川野 健太',
+    createdAt: '2026-08-05T00:00:00.000Z',
+  },
+  {
+    /* どこでも使っていないファイル。**消してよいものが分かることが要る。** */
+    id: 'media-5', folderId: null, kind: 'file', filename: 'メニュー表.pdf',
+    mimeType: 'application/pdf', sizeBytes: 1258291, width: null, height: null, durationMs: null,
+    url: 'https://example.co.jp/media/menu.pdf', uploadedBy: '菅野 亮',
+    createdAt: '2026-07-28T00:00:00.000Z',
+  },
+  {
+    id: 'media-6', folderId: 'mf-product', kind: 'image', filename: '定期便パンフ.jpg',
+    mimeType: 'image/jpeg', sizeBytes: 491520, width: 1024, height: 678, durationMs: null,
+    url: 'https://example.co.jp/media/subscription.jpg', uploadedBy: '川野 健太',
+    createdAt: '2026-07-20T00:00:00.000Z',
+  },
+]
+
+/** 設計 `voJtX`「使われている場所 3か所」。**空でない使用箇所が要る。** */
+export const MEDIA_USAGE = {
+  'media-1': [
+    { refKind: 'card_message', refId: 'asset-card-1', scannedAt: '2026-08-24T00:00:00.000Z' },
+    { refKind: 'broadcast', refId: 'broadcast-2', scannedAt: '2026-08-24T00:00:00.000Z' },
+    { refKind: 'rich_menu', refId: 'rmg-2', scannedAt: '2026-08-24T00:00:00.000Z' },
+  ],
+  'media-2': [
+    { refKind: 'rich_menu', refId: 'rmg-1', scannedAt: '2026-08-24T00:00:00.000Z' },
+    { refKind: 'template', refId: 'template-1', scannedAt: '2026-08-24T00:00:00.000Z' },
+  ],
+  'media-3': [{ refKind: 'webinar', refId: 'webinar-1', scannedAt: '2026-08-24T00:00:00.000Z' }],
+  'media-4': [{ refKind: 'coupon', refId: 'asset-coupon-1', scannedAt: '2026-08-24T00:00:00.000Z' }],
+  'media-5': [],
+  'media-6': [
+    { refKind: 'template', refId: 'template-2', scannedAt: '2026-08-24T00:00:00.000Z' },
+    { refKind: 'template', refId: 'template-3', scannedAt: '2026-08-24T00:00:00.000Z' },
+    { refKind: 'card_message', refId: 'asset-card-2', scannedAt: '2026-08-24T00:00:00.000Z' },
+    { refKind: 'broadcast', refId: 'broadcast-1', scannedAt: '2026-08-24T00:00:00.000Z' },
+    { refKind: 'scenario', refId: 'scenario-0', scannedAt: '2026-08-24T00:00:00.000Z' },
+  ],
+}
