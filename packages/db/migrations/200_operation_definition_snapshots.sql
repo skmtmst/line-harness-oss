@@ -3,4 +3,3 @@
 ALTER TABLE operation_incidents ADD COLUMN definition_snapshot_json TEXT;
 ALTER TABLE operation_incidents ADD COLUMN definition_snapshot_error TEXT;
 ALTER TABLE operation_incidents ADD COLUMN restore_drift_json TEXT;
-
