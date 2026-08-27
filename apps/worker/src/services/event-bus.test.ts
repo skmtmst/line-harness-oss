@@ -330,10 +330,19 @@ describe('fireEvent — 送信Webhookのアカウント解決', () => {
         max_retries: 0,
       }]);
 
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     await fireEvent(db, 'incoming_webhook.custom', { eventData: { webhookId: 'webhook-1' } });
 
     expect(dbModule.getActiveOutgoingWebhooksByEvent)
       .toHaveBeenCalledWith(db, 'incoming_webhook.custom', undefined);
     expect(deliveryModule.recordDeliveryOutcome).toHaveBeenCalledWith(db, 'legacy-webhook', true);
+    expect(log).toHaveBeenCalledOnce();
+    const record = log.mock.calls[0]?.[0] as string;
+    expect(JSON.parse(record)).toEqual({
+      event: 'outgoing_webhook_line_account_unknown',
+      eventType: 'incoming_webhook.custom',
+      hasFriendId: false,
+    });
+    expect(record).not.toContain('webhook-1');
   });
 });

@@ -13,6 +13,8 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const webhooks = new Hono<Env>();
 
@@ -203,7 +205,8 @@ webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), async (c) =>
 
 webhooks.get('/api/webhooks/outgoing', async (c) => {
   try {
-    const items = await getOutgoingWebhooks(c.env.DB);
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const items = await getOutgoingWebhooks(c.env.DB, tenantId);
     return c.json({
       success: true,
       data: items.map((w) => ({
@@ -234,6 +237,7 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       eventTypes?: string[];
       secret?: string;
       maxRetries?: unknown;
+      lineAccountId?: string;
     }>();
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
@@ -254,12 +258,21 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
       }
       maxRetries = parsed.value;
     }
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    if (body.lineAccountId !== undefined) {
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+        return c.json({ success: false, error: 'Forbidden' }, 403);
+      }
+    } else if (tenantId !== DEFAULT_TENANT_ID) {
+      return c.json({ success: false, error: 'どのLINEアカウント向けか選んでください' }, 400);
+    }
     const item = await createOutgoingWebhook(c.env.DB, {
       name: body.name,
       url: body.url,
       eventTypes: body.eventTypes ?? [],
       secret: body.secret as string,
       maxRetries,
+      lineAccountId: body.lineAccountId,
     });
     return c.json(
       {
@@ -287,6 +300,9 @@ webhooks.post('/api/webhooks/outgoing', requireRole('owner'), async (c) => {
 webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getOutgoingWebhookById(c.env.DB, id, tenantId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{
       name?: string;
       url?: string;
@@ -325,8 +341,6 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
     // partial update. Without this, migration 034 can be bypassed by
     // sending {isActive:true} on a legacy http:// or secret-less row.
     if (body.isActive === true) {
-      const existing = await getOutgoingWebhookById(c.env.DB, id);
-      if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
       const effectiveSecret = body.secret ?? existing.secret;
       const effectiveUrl = body.url ?? existing.url;
       if (!effectiveSecret || effectiveSecret.length < MIN_SECRET_LENGTH) {
@@ -347,7 +361,7 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
       }
     }
     await updateOutgoingWebhook(c.env.DB, id, { ...body, maxRetries });
-    const updated = await getOutgoingWebhookById(c.env.DB, id);
+    const updated = await getOutgoingWebhookById(c.env.DB, id, tenantId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -371,7 +385,11 @@ webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
 
 webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) => {
   try {
-    await deleteOutgoingWebhook(c.env.DB, c.req.param('id'));
+    const id = c.req.param('id');
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getOutgoingWebhookById(c.env.DB, id, tenantId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    await deleteOutgoingWebhook(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/webhooks/outgoing/:id error:', err);

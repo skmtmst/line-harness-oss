@@ -25,6 +25,7 @@ export interface OutgoingWebhookRow {
   consecutive_failures: number;
   /** 最後に失敗した時刻。成功すると NULL に戻る */
   last_failed_at: string | null;
+  line_account_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,24 +78,56 @@ export async function deleteIncomingWebhook(db: D1Database, id: string): Promise
 
 // --- 送信Webhook ---
 
-export async function getOutgoingWebhooks(db: D1Database): Promise<OutgoingWebhookRow[]> {
-  const result = await db.prepare(`SELECT * FROM outgoing_webhooks ORDER BY created_at DESC`).all<OutgoingWebhookRow>();
+const outgoingWebhookTenantPredicate = (webhookAlias: string): string => `(
+  (${webhookAlias}.line_account_id IS NULL AND ? = ?)
+  OR EXISTS (
+    SELECT 1 FROM line_accounts scope_account
+    WHERE scope_account.id = ${webhookAlias}.line_account_id
+      AND COALESCE(scope_account.tenant_id, ?) = ?
+  )
+)`;
+
+const outgoingWebhookTenantBindings = (tenantId: string): string[] => [
+  tenantId,
+  DEFAULT_TENANT_ID,
+  DEFAULT_TENANT_ID,
+  tenantId,
+];
+
+export async function getOutgoingWebhooks(db: D1Database, tenantId: string): Promise<OutgoingWebhookRow[]> {
+  const result = await db
+    .prepare(`SELECT * FROM outgoing_webhooks webhook
+      WHERE ${outgoingWebhookTenantPredicate('webhook')}
+      ORDER BY created_at DESC`)
+    .bind(...outgoingWebhookTenantBindings(tenantId))
+    .all<OutgoingWebhookRow>();
   return result.results;
 }
 
-export async function getOutgoingWebhookById(db: D1Database, id: string): Promise<OutgoingWebhookRow | null> {
-  return db.prepare(`SELECT * FROM outgoing_webhooks WHERE id = ?`).bind(id).first<OutgoingWebhookRow>();
+export async function getOutgoingWebhookById(
+  db: D1Database,
+  id: string,
+  tenantId?: string,
+): Promise<OutgoingWebhookRow | null> {
+  if (tenantId === undefined) {
+    return db.prepare(`SELECT * FROM outgoing_webhooks WHERE id = ?`).bind(id).first<OutgoingWebhookRow>();
+  }
+  return db
+    .prepare(`SELECT * FROM outgoing_webhooks webhook
+      WHERE webhook.id = ? AND ${outgoingWebhookTenantPredicate('webhook')}`)
+    .bind(id, ...outgoingWebhookTenantBindings(tenantId))
+    .first<OutgoingWebhookRow>();
 }
 
 export async function createOutgoingWebhook(
   db: D1Database,
-  input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number },
+  input: { name: string; url: string; eventTypes: string[]; secret?: string; maxRetries?: number; lineAccountId?: string },
 ): Promise<OutgoingWebhookRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
   await db
-    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, max_retries, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), input.secret ?? null, input.maxRetries ?? 0, now, now)
+    .prepare(`INSERT INTO outgoing_webhooks (id, name, url, event_types, secret, max_retries, line_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, input.name, input.url, JSON.stringify(input.eventTypes), input.secret ?? null, input.maxRetries ?? 0, input.lineAccountId ?? null, now, now)
     .run();
   return (await getOutgoingWebhookById(db, id))!;
 }
