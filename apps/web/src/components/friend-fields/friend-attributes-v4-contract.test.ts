@@ -61,6 +61,24 @@ describe('友だち属性 V4 contract', () => {
     }
   })
 
+  it('友だち情報欄はV6の一覧・作成・移行dry-runを縦に通す', () => {
+    const list = read('components/friend-fields/field-list.tsx')
+    const create = read('app/tags/fields/new/page.tsx')
+    const migrate = read('app/tags/fields/migrate/page.tsx')
+    expect(list).toContain('data-design-node="HBTk0"')
+    expect(create).toContain('data-design-node="A1ZYeP"')
+    expect(migrate).toContain('data-design-node="KoT6c"')
+    expect(list).toContain('/tags/fields/migrate?id=')
+    expect(migrate).toContain('api.friendFields.migrationPreview(')
+    expect(migrate).toContain('友だちの値や既存の項目は変更しません')
+    expect(migrate).not.toContain('migrationExecute')
+    // 回答フォームはまだアカウント所属を持たない。全体件数を0件と偽らない。
+    expect(list).toContain("formLinks === null ? '未取得'")
+    // 画面名は共通トップバーだけに置く。本文の大見出しへ戻さない。
+    expect(create).not.toContain("import Header from '@/components/layout/header'")
+    expect(migrate).not.toContain("import Header from '@/components/layout/header'")
+  })
+
   it('友だち属性ではブラウザ標準confirmを使わない', () => {
     const sources = [
       read('components/friend-fields/tags-page-v4.tsx'),

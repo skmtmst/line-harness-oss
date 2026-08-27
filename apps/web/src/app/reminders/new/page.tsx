@@ -11,6 +11,7 @@ import CreatePage, {
   inputClass,
 } from '@/components/shared/create-page'
 import { TextArea } from '@/components/shared/form-controls'
+import { useAccount } from '@/contexts/account-context'
 
 const TRIGGERS: Array<{ key: ReminderTriggerType; label: string }> = [
   { key: 'manual', label: '手動で対象を登録' },
@@ -28,6 +29,7 @@ const OFFSETS = [
 ]
 
 export default function NewReminderPage() {
+  const { selectedAccountId } = useAccount()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [triggerType, setTriggerType] = useState<ReminderTriggerType>('booking')
@@ -56,7 +58,8 @@ export default function NewReminderPage() {
       if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
     })
     // 起点にできるのは日付の欄だけ。文字の欄を選ばせても日付として読めない。
-    void api.friendFields.list().then((res) => {
+    if (!selectedAccountId) return
+    void api.friendFields.list(selectedAccountId).then((res) => {
       if (res.success) {
         setDateFields(
           res.data
@@ -65,7 +68,7 @@ export default function NewReminderPage() {
         )
       }
     })
-  }, [])
+  }, [selectedAccountId])
 
   return (
     <CreatePage

@@ -72,6 +72,7 @@ function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
 }
 
 function FormEditInner() {
+  const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const { selectedAccount } = useAccount()
@@ -138,7 +139,7 @@ function FormEditInner() {
       try {
         const [tagRes, ffRes, scenarioRes, reminderRes, templateRes] = await Promise.all([
           api.tags.list(),
-          api.friendFields.list(),
+          selectedAccountId ? api.friendFields.list(selectedAccountId) : Promise.resolve({ success: true as const, data: [] }),
           api.scenarios.list(),
           api.reminders.list(),
           api.templates.list(),

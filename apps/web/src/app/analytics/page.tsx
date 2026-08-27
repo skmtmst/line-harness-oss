@@ -633,13 +633,13 @@ function CrossTab({ accountId }: { accountId: string }) {
   const [picked, setPicked] = useState<{ row: string; col: string; count: number } | null>(null)
 
   useEffect(() => {
-    void api.friendFields.list().then((res) => {
+    void api.friendFields.list(accountId).then((res) => {
       if (res.success) {
         setFields(res.data)
         if (res.data.length > 0) setFieldId(res.data[0].id)
       }
     })
-  }, [])
+  }, [accountId])
 
   useEffect(() => {
     if (!fieldId) return

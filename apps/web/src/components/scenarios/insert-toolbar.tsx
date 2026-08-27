@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 
 /** 日付の書き方。worker の interpolation-date.ts と同じ並び。 */
 const DATE_FORMATS: { token: string; label: string; example: string }[] = [
@@ -43,6 +44,7 @@ export interface InsertToolbarProps {
 }
 
 export default function InsertToolbar({ targetRef, value, onChange }: InsertToolbarProps) {
+  const { selectedAccountId } = useAccount()
   const [open, setOpen] = useState<string | null>(null)
   const [fields, setFields] = useState<Option[]>([])
   const [vars, setVars] = useState<Option[]>([])
@@ -51,7 +53,11 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
 
   useEffect(() => {
     void (async () => {
-      const [fieldRes, varRes] = await Promise.all([api.friendFields.list(), api.commonVars.list()])
+      if (!selectedAccountId) {
+        setFields([])
+        return
+      }
+      const [fieldRes, varRes] = await Promise.all([api.friendFields.list(selectedAccountId), api.commonVars.list()])
       if (fieldRes.success) {
         setFields(fieldRes.data.map((f) => ({ token: `{{field.${f.fieldKey}}}`, label: f.name })))
       }
@@ -59,7 +65,7 @@ export default function InsertToolbar({ targetRef, value, onChange }: InsertTool
         setVars(varRes.data.map((v) => ({ token: `{{var.${v.varKey}}}`, label: v.name })))
       }
     })()
-  }, [])
+  }, [selectedAccountId])
 
   // 外を押したら閉じる。開いたままだと下の入力欄が押せない。
   useEffect(() => {

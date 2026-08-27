@@ -57,7 +57,7 @@ export default function AccountMigration() {
       const [tags, fields, scenarios, templates, autoReplies, forms, reminders, vars, marks] =
         await Promise.allSettled([
           api.tags.list(),
-          api.friendFields.list(),
+          api.friendFields.list(selectedAccountId),
           api.scenarios.list(),
           api.templates.list(),
           api.autoReplies.list(),

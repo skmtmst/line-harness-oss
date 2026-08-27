@@ -13,6 +13,7 @@ import type {
   TagCsvImportPreview,
   TagCsvImportResult,
   FriendField,
+  FriendFieldListSummary,
   FriendFieldType,
   SupportMark,
   Folder,
@@ -1167,8 +1168,9 @@ export const api = {
    * 既存の値の意味が変わったり、テンプレートの差し込みが空になったりする。
    */
   friendFields: {
-    list: (params?: { folderId?: string; withUsage?: boolean }) => {
+    list: (accountId: string, params?: { folderId?: string; withUsage?: boolean }) => {
       const q = new URLSearchParams()
+      q.set('lineAccountId', accountId)
       if (params?.folderId) q.set('folderId', params.folderId)
       if (params?.withUsage) q.set('withUsage', '1')
       const query = q.toString()
@@ -1176,23 +1178,49 @@ export const api = {
         `/api/friend-fields${query ? `?${query}` : ''}`,
       )
     },
-    create: (data: {
+    stats: (accountId: string) =>
+      fetchApi<ApiResponse<FriendFieldListSummary>>(
+        `/api/friend-fields-stats?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    /** 値は変更せず、種類を変えた場合に確認が要る友だちだけを返す。 */
+    migrationPreview: (id: string, accountId: string, targetType: FriendFieldType) =>
+      fetchApi<ApiResponse<{
+        source: FriendField
+        summary: { total: number; convertible: number; review: number; invalid: number }
+        rows: Array<{
+          friendId: string
+          sourceValue: string
+          convertedValue: string | null
+          status: 'review' | 'invalid'
+          reason: string | null
+        }>
+      }>>(
+        `/api/friend-fields/${id}/migration-preview?lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'POST', body: JSON.stringify({ targetType }) },
+      ),
+    create: (accountId: string, data: {
       name: string
       fieldKey: string
       type: FriendFieldType
       folderId?: string | null
       options?: string[] | null
       defaultValue?: string | null
+      ecFieldPath?: string | null
+      ecIsMaster?: boolean
       isPersonal?: boolean
       isStarred?: boolean
       displayOrder?: number
     }) =>
-      fetchApi<ApiResponse<FriendField>>('/api/friend-fields', {
+      fetchApi<ApiResponse<FriendField>>(
+        `/api/friend-fields?lineAccountId=${encodeURIComponent(accountId)}`,
+        {
         method: 'POST',
         body: JSON.stringify(data),
-      }),
+        },
+      ),
     update: (
       id: string,
+      accountId: string,
       data: Partial<
         Pick<
           FriendField,
@@ -1200,14 +1228,14 @@ export const api = {
         >
       > & { options?: string[] | null },
     ) =>
-      fetchApi<ApiResponse<FriendField>>(`/api/friend-fields/${id}`, {
+      fetchApi<ApiResponse<FriendField>>(`/api/friend-fields/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    /** 値が入っていると 409 で人数が返る。force で消せる。 */
-    delete: (id: string, opts?: { force?: boolean }) =>
+    /** 値が入っている項目は409。物理削除せず移行する。 */
+    delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(
-        `/api/friend-fields/${id}${opts?.force ? '?force=1' : ''}`,
+        `/api/friend-fields/${id}?lineAccountId=${encodeURIComponent(accountId)}`,
         { method: 'DELETE' },
       ),
     /** 1人ぶんの全項目と値。個人情報は役割で絞られる。 */
