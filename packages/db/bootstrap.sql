@@ -1600,7 +1600,8 @@ CREATE TABLE nen_photo_submissions (
   created_at TEXT NOT NULL,
   reviewed_at TEXT,
   updated_at TEXT NOT NULL
-);
+, line_account_id TEXT REFERENCES line_accounts(id), publication_consent_version TEXT, publication_consent_at TEXT, publication_withdrawn_at TEXT, public_pet_name INTEGER NOT NULL DEFAULT 0
+  CHECK (public_pet_name IN (0, 1)));
 
 CREATE TABLE nen_point_ledger (
   id TEXT PRIMARY KEY,
@@ -3021,6 +3022,13 @@ CREATE INDEX idx_nen_pet_profiles_birthday
 
 CREATE INDEX idx_nen_pet_profiles_customer
   ON nen_pet_profiles(customer_id);
+
+CREATE INDEX idx_nen_photos_account_status
+  ON nen_photo_submissions(line_account_id, status, created_at DESC);
+
+CREATE INDEX idx_nen_photos_publication
+  ON nen_photo_submissions(line_account_id, publication_consent_at, reviewed_at DESC)
+  WHERE status = 'adopted' AND publication_withdrawn_at IS NULL;
 
 CREATE INDEX idx_nen_photos_status ON nen_photo_submissions(status, created_at DESC);
 
