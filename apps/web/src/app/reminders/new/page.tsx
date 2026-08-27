@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { ReminderTriggerType, Tag } from '@line-crm/shared'
+import type { Folder, ReminderTriggerType, Tag } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import CreatePage, {
   AsideCard,
@@ -30,6 +30,7 @@ const OFFSETS = [
 export default function NewReminderPage() {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [folderId, setFolderId] = useState('')
   const [triggerType, setTriggerType] = useState<ReminderTriggerType>('booking')
   const [sendAtTime, setSendAtTime] = useState('19:00')
   const [offsetMinutes, setOffsetMinutes] = useState(1440)
@@ -37,6 +38,7 @@ export default function NewReminderPage() {
   const [messageContent, setMessageContent] = useState('')
   const [activateNow, setActivateNow] = useState(true)
   const [tags, setTags] = useState<Tag[]>([])
+  const [folders, setFolders] = useState<Folder[]>([])
   // 154: 友だち情報欄の日付を起点にするときの設定
   const [triggerFieldId, setTriggerFieldId] = useState('')
   const [repeatYearly, setRepeatYearly] = useState(true)
@@ -54,6 +56,9 @@ export default function NewReminderPage() {
     })
     void api.templates.list().then((res) => {
       if (res.success) setTemplates(res.data.map((t) => ({ id: t.id, name: t.name })))
+    })
+    void api.folders.list('reminder').then((res) => {
+      if (res.success) setFolders(res.data)
     })
     // 起点にできるのは日付の欄だけ。文字の欄を選ばせても日付として読めない。
     void api.friendFields.list().then((res) => {
@@ -87,12 +92,14 @@ export default function NewReminderPage() {
       onReset={() => {
         setName('')
         setDescription('')
+        setFolderId('')
         setMessageContent('')
       }}
       onSave={async () => {
         const res = await api.reminders.create({
           name: name.trim(),
           description: description.trim() || null,
+          folderId: folderId || null,
           triggerType,
           sendAtTime: triggerType === 'manual' ? null : sendAtTime || null,
           targetTagId: targetTagId || null,
@@ -160,10 +167,18 @@ export default function NewReminderPage() {
           />
         </Field>
 
-        {/* リマインダにフォルダを持たせる列が無い。 */}
-        <Field label="フォルダ" note="フォルダ分けは準備中です。">
-          <select disabled className={`${inputClass} opacity-50`}>
-            <option>未分類</option>
+        <Field label="フォルダ" note="一覧で作ったリマインダ用フォルダから選べます。">
+          <select
+            value={folderId}
+            onChange={(event) => setFolderId(event.target.value)}
+            className={inputClass}
+          >
+            <option value="">未分類</option>
+            {folders.map((folder) => (
+              <option key={folder.id} value={folder.id}>
+                {folder.name}
+              </option>
+            ))}
           </select>
         </Field>
 
