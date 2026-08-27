@@ -76,6 +76,8 @@ describe('ダッシュボードV4の初期表示', () => {
       'send-quota',
       'operational-alerts',
       'connection-status',
+      // 設計 `vUXKb` は接続状態のすぐ下に「現在の対応マーク」を置く。
+      'support-mark-status',
       'upcoming',
       'monthly-delivery',
       'recent-results',

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useCallback, useEffect, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
+import Pagination from '@/components/shared/pagination'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 
 /**
@@ -41,7 +43,15 @@ export function inboxItemHref(item: Pick<InboxItem, 'channel' | 'id'>): string {
     : `/chats?friend=${encodeURIComponent(rawId)}&unanswered=1`
 }
 
-const PAGE_SIZE = 5
+/**
+ * 1ページに出す数。**固定にしない。**
+ *
+ * 5件に固定していたころ、総数5件でも2行しか出せず、**残りへ行く手段が
+ * 無かった**（ページ送りも表示件数も無い）。設計（`vUXKb` / `NjK9q`）は
+ * 表の右上に「表示件数」があり、下にページ送りがある。
+ */
+const PAGE_SIZE_OPTIONS = [5, 10, 15, 20]
+const DEFAULT_PAGE_SIZE = 5
 
 function elapsed(iso: string): string {
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000))
@@ -59,14 +69,18 @@ export default function PendingInboxCard({
   const [summary, setSummary] = useState<PendingInboxSummary | null>(null)
   const [items, setItems] = useState<InboxItem[]>([])
   const [page, setPage] = useState(1)
-  const pageCount = Math.max(1, Math.ceil((summary?.total ?? 0) / PAGE_SIZE))
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const total = summary?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const firstRow = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const lastRow = Math.min(total, (page - 1) * pageSize + items.length)
 
   const load = useCallback(async () => {
     try {
       const inboxResponse = await fetchApi<{
         success: boolean
         data: { items: InboxItem[]; summary: PendingInboxSummary }
-      }>(`/api/support/inbox?status=open&limit=${PAGE_SIZE}&offset=${(page - 1) * PAGE_SIZE}`)
+      }>(`/api/support/inbox?status=open&limit=${pageSize}&offset=${(page - 1) * pageSize}`)
       if (inboxResponse.success) {
         setSummary(inboxResponse.data.summary)
         onSummaryChange?.(inboxResponse.data.summary)
@@ -75,7 +89,7 @@ export default function PendingInboxCard({
     } catch {
       // ダッシュボード本体は残し、次のポーリングで復旧する。
     }
-  }, [onSummaryChange, page])
+  }, [onSummaryChange, page, pageSize])
 
   useEffect(() => {
     if (page > pageCount) setPage(pageCount)
@@ -100,7 +114,20 @@ export default function PendingInboxCard({
         size="roomy"
         title="対応が必要な受信"
         meta={summary && summary.total > 0 ? `${summary.total}件` : undefined}
-        action={<Link href="/chats" className="hover:underline">受信箱をすべて見る</Link>}
+        action={
+          <span className="flex items-center gap-3">
+            <span className="text-ink-secondary flex items-center gap-1.5 text-xs font-normal">
+              表示件数
+              <Select
+                aria-label="表示件数"
+                value={String(pageSize)}
+                onChange={(next) => { setPageSize(Number(next)); setPage(1) }}
+                options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: `${n}件表示` }))}
+              />
+            </span>
+            <Link href="/chats" className="hover:underline">受信箱をすべて見る</Link>
+          </span>
+        }
         actionTone="info"
       />
 
@@ -155,32 +182,20 @@ export default function PendingInboxCard({
               </tbody>
             </table>
           </div>
-          {pageCount > 1 ? (
+          {total > 0 ? (
             <nav
-              className="border-hairline flex h-[50px] shrink-0 items-center justify-end gap-2 border-t px-5"
+              className="border-hairline flex h-[50px] shrink-0 items-center justify-between gap-3 border-t px-5"
               aria-label="受信一覧のページ送り"
             >
-              <button
-                type="button"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={page === 1}
-                className="border-hairline text-ink hover:bg-canvas-sunken rounded-control min-h-8 border px-3 text-xs disabled:cursor-not-allowed disabled:opacity-35"
-                aria-label="前のページ"
-              >
-                前へ
-              </button>
-              <span className="text-ink-secondary min-w-16 text-center text-xs tabular-nums">
-                {page} / {pageCount}ページ
+              <span className="text-ink-secondary text-xs tabular-nums">
+                {firstRow}〜{lastRow} / {total}件
               </span>
-              <button
-                type="button"
-                onClick={() => setPage((current) => Math.min(pageCount, current + 1))}
-                disabled={page === pageCount}
-                className="border-hairline text-ink hover:bg-canvas-sunken rounded-control min-h-8 border px-3 text-xs disabled:cursor-not-allowed disabled:opacity-35"
-                aria-label="次のページ"
-              >
-                次へ
-              </button>
+              <Pagination
+                page={page}
+                pageCount={pageCount}
+                onPageChange={setPage}
+                ariaLabel="受信一覧のページ送り"
+              />
             </nav>
           ) : null}
         </div>

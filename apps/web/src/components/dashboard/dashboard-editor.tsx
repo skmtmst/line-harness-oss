@@ -40,6 +40,7 @@ export type DashboardCardId =
   | 'inflow-top'
   | 'funnel-alert'
   | 'automation-failures'
+  | 'support-mark-status'
   | 'friend-status'
 
 export type DashboardGroup = 'today' | 'main' | 'right'
@@ -75,6 +76,7 @@ export const DASHBOARD_CARD_DEFINITIONS: CardDefinition[] = [
   { id: 'send-quota', label: '今月の送信枠', description: '右サイド｜使用数と残り', group: 'right', defaultVisible: true },
   { id: 'operational-alerts', label: '運用アラート', description: '右サイド｜障害・処理異常', group: 'right', defaultVisible: true },
   { id: 'connection-status', label: '接続状態', description: '右サイド｜Webhook・自動処理', group: 'right', defaultVisible: true },
+  { id: 'support-mark-status', label: '現在の対応マーク', description: '右サイド｜未対応・対応済み', group: 'right', defaultVisible: true },
   { id: 'friend-status', label: '友だちの状態', description: '右サイド｜有効数・ブロック率', group: 'right', defaultVisible: false },
   { id: 'upcoming', label: '今後の予定', description: '予約・配信の予定', group: 'right', defaultVisible: true },
   { id: 'monthly-delivery', label: '今月の配信', description: 'プッシュ・リプライ・残枠', group: 'right', defaultVisible: true },
