@@ -94,6 +94,9 @@ const CONVERSION = { feature: 19, dir: 'conversions-v6', mode: 'page' }
 /** 分析。`/analytics?tab=` の5タブ（送信数／ファネル／クロス集計／URLクリック／GA）。 */
 const ANALYTICS = { feature: 20, dir: 'analytics-v6', mode: 'page' }
 
+/** NEN配信。タブは画面の中の状態で持つので、押して切り替える。 */
+const NEN = { feature: 21, dir: 'nen-v6', route: '/nen-campaigns', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -847,6 +850,26 @@ export const SCREENS = [
     ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析',
     status: 'unimplemented',
     why: '分析の条件を保存する仕組みが無い。**設計は結果までそのまま残す**（あとから軸を変えても過去の結果は書き換わらない）',
+  },
+
+  // ── 機能21 NEN配信 ──────────────────────────────────────
+  /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
+  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信' },
+  { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }] },
+  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }] },
+  { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', steps: [{ click: '配信履歴' }] },
+  {
+    ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
+    route: '/nen-campaigns/edit?key=review_request',
+  },
+  {
+    ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
+    status: 'unimplemented',
+    why: 'コラムを新しく書く画面が無い。実装は**外から取り込んだコラムの「配信文」だけ**を直せる（`page.tsx:414`「配信文を編集」）。題名・本文・写真・分類はこちらで作れない',
+  },
+  {
+    ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

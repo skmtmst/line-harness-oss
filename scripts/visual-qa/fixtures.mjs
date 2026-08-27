@@ -1812,3 +1812,119 @@ export const ANALYTICS_CROSS = [
   { row: '紹介キャンペーン', col: '体験申込', count: 42 },
   { row: '紹介キャンペーン', col: '未申込', count: 114 },
 ]
+
+/**
+ * 機能21 NEN配信。設計 `VLMGH`（配信フロー8・NENコラム24・この30日2,486通）。
+ *
+ * **`/api/nen-campaigns/overview` は `{activeCampaigns, jobs:{…}, columns, pets, coupons}` の通。**
+ * 一覧の既定を返すと `overview.jobs.pending` で落ちる。
+ */
+export const NEN_OVERVIEW = {
+  activeCampaigns: 6,
+  jobs: { total: 2640, pending: 148, sent: 2486, failed: 6 },
+  columns: 24,
+  pets: 864,
+  coupons: 72,
+}
+
+export const NEN_CAMPAIGN_SETTINGS = [
+  {
+    campaignKey: 'order_confirmed', label: '注文が確定', category: 'transactional',
+    triggerEvent: 'ec.order.confirmed', delayDays: 0, deliveryTime: '00:00',
+    isEnabled: true, title: '注文ありがとうございます',
+    bodyText: 'ご注文ありがとうございます。発送まで少しお待ちください。',
+    buttonLabel: '注文をみる', buttonUrl: 'https://example.co.jp/orders',
+    imageUrl: null, updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    campaignKey: 'shipped', label: '発送しました', category: 'transactional',
+    triggerEvent: 'ec.order.shipped', delayDays: 0, deliveryTime: '18:00',
+    isEnabled: true, title: 'お荷物の追跡番号',
+    bodyText: '本日発送しました。追跡番号は {{追跡番号}} です。',
+    buttonLabel: '追跡する', buttonUrl: 'https://example.co.jp/track',
+    imageUrl: null, updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    campaignKey: 'delivered', label: '届きました', category: 'follow_up',
+    triggerEvent: 'ec.order.delivered', delayDays: 1, deliveryTime: '10:00',
+    isEnabled: true, title: '使い方のご案内',
+    bodyText: 'お届けした商品の使い方をご案内します。',
+    buttonLabel: null, buttonUrl: null, imageUrl: null,
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    campaignKey: 'review_request', label: '口コミのお願い', category: 'follow_up',
+    triggerEvent: 'ec.order.delivered', delayDays: 7, deliveryTime: '20:00',
+    isEnabled: true, title: 'いかがでしたか',
+    bodyText: '{{ペットの名前}}ちゃん、{{商品名}}はいかがでしたか。',
+    buttonLabel: '感想を送る', buttonUrl: 'https://example.co.jp/review',
+    imageUrl: null, updatedAt: '2026-08-10T00:00:00.000Z',
+  },
+  {
+    campaignKey: 'pet_birthday', label: 'ペットの誕生日', category: 'birthday',
+    triggerEvent: 'pet.birthday', delayDays: -3, deliveryTime: '10:00',
+    isEnabled: true, title: 'お誕生日おめでとうございます',
+    bodyText: '{{ペットの名前}}ちゃん、お誕生日おめでとうございます。',
+    buttonLabel: 'クーポンを使う', buttonUrl: 'https://example.co.jp/coupon',
+    imageUrl: null, updatedAt: '2026-07-01T00:00:00.000Z',
+  },
+  {
+    /* 止めている段。**設計は「グレーの丸」で出す。** */
+    campaignKey: 'winback', label: '久しぶりの方へ', category: 'follow_up',
+    triggerEvent: 'ec.order.none_90d', delayDays: 90, deliveryTime: '11:00',
+    isEnabled: false, title: 'お久しぶりです',
+    bodyText: 'また会えるのを楽しみにしています。',
+    buttonLabel: null, buttonUrl: null, imageUrl: null,
+    updatedAt: '2026-05-01T00:00:00.000Z',
+  },
+]
+
+export const NEN_COLUMNS = [
+  {
+    id: 'nc-1', externalId: null, slug: 'summer-hydration', title: '夏の水分補給、どれくらい？',
+    category: '季節のこと', excerpt: '暑い日がつづきますね。', introText: '今週のコラムです。',
+    articleUrl: 'https://example.co.jp/column/summer-hydration', imageUrl: null,
+    publishedAt: null, deliveryStatus: 'scheduled', deliveryAt: '2026-08-28T01:00:00.000Z',
+    lineAccountId: null, updatedAt: '2026-08-24T00:00:00.000Z',
+  },
+  {
+    id: 'nc-2', externalId: null, slug: 'toothbrush', title: '歯みがきのコツ',
+    category: 'お手入れ', excerpt: '毎日でなくても大丈夫です。', introText: '今週のコラムです。',
+    articleUrl: 'https://example.co.jp/column/toothbrush', imageUrl: null,
+    publishedAt: '2026-08-14T01:00:00.000Z', deliveryStatus: 'sent',
+    deliveryAt: '2026-08-14T01:00:00.000Z', lineAccountId: null,
+    updatedAt: '2026-08-14T00:00:00.000Z',
+  },
+  {
+    id: 'nc-3', externalId: null, slug: 'walk-in-heat', title: '暑い日のお散歩',
+    category: '季節のこと', excerpt: 'アスファルトの温度に気をつけて。', introText: '今週のコラムです。',
+    articleUrl: 'https://example.co.jp/column/walk-in-heat', imageUrl: null,
+    publishedAt: '2026-08-07T01:00:00.000Z', deliveryStatus: 'sent',
+    deliveryAt: '2026-08-07T01:00:00.000Z', lineAccountId: null,
+    updatedAt: '2026-08-07T00:00:00.000Z',
+  },
+  {
+    /* 下書き。**まだどこへも出していない。** */
+    id: 'nc-4', externalId: null, slug: 'autumn-food', title: '秋のごはん',
+    category: '食べもの', excerpt: '', introText: '',
+    articleUrl: 'https://example.co.jp/column/autumn-food', imageUrl: null,
+    publishedAt: null, deliveryStatus: 'draft', deliveryAt: null,
+    lineAccountId: null, updatedAt: '2026-08-22T00:00:00.000Z',
+  },
+]
+
+export const NEN_PETS = [
+  { id: 'pet-1', friendId: 'friend-1', customerId: 'cus-1', name: 'モモ', animalType: 'dog', gender: 'female', birthday: '2021-09-02', ownerName: 'Kenta Kawano', lineUserId: 'U0001' },
+  { id: 'pet-2', friendId: 'friend-2', customerId: 'cus-2', name: 'ソラ', animalType: 'cat', gender: 'male', birthday: '2019-08-28', ownerName: 'Masato S.', lineUserId: 'U0002' },
+  { id: 'pet-3', friendId: 'friend-3', customerId: null, name: 'ココ', animalType: 'dog', gender: 'female', birthday: null, ownerName: '菅野 亮', lineUserId: 'U0003' },
+  { id: 'pet-4', friendId: 'friend-4', customerId: 'cus-4', name: 'ハナ', animalType: 'other', gender: 'unknown', birthday: '2023-01-14', ownerName: '山田 太郎', lineUserId: 'U0004' },
+]
+
+/** 配信の記録。設計 `WeXbL`（送りました2,486／これから148／届きませんでした6）。 */
+export const NEN_JOBS = [
+  { id: 'nj-1', campaignKey: 'review_request', label: '口コミのお願い', friendName: 'Kenta Kawano', scheduledAt: '2026-08-25T11:00:00.000Z', status: 'pending', attempts: 0, lastError: null, sentAt: null },
+  { id: 'nj-2', campaignKey: 'shipped', label: '発送しました', friendName: 'Masato S.', scheduledAt: '2026-08-24T09:00:00.000Z', status: 'sent', attempts: 1, lastError: null, sentAt: '2026-08-24T09:00:02.000Z' },
+  { id: 'nj-3', campaignKey: 'pet_birthday', label: 'ペットの誕生日', friendName: '菅野 亮', scheduledAt: '2026-08-24T01:00:00.000Z', status: 'sent', attempts: 1, lastError: null, sentAt: '2026-08-24T01:00:01.000Z' },
+  /* 届かなかったもの。**ブロックされた人。** 理由が残ることが要る。 */
+  { id: 'nj-4', campaignKey: 'delivered', label: '届きました', friendName: '山田 太郎', scheduledAt: '2026-08-23T01:00:00.000Z', status: 'failed', attempts: 3, lastError: 'ブロックされています', sentAt: null },
+]
