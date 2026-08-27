@@ -728,3 +728,72 @@ export const FRIEND_FIELDS = [
     displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
   },
 ]
+
+/**
+ * 機能8 自動応答。設計 `cmDfJ` の5行。
+ *
+ * **画面が読む形に合わせる。** `packages/shared` の `AutoReply` は
+ * `keyword / matchType / responseType / responseContent / isActive` しか
+ * 持たないが、画面（`auto-replies/page.tsx`）はそれより広い形を読む
+ * （`priority` `folderId` `actions` `responseWeekdays` `hits` など）。
+ * 狭いほうに合わせて書くと、優先順位も曜日も当たり回数も空のまま撮れて、
+ * **設計の一覧と比べるものが何も無くなる。**
+ */
+export const AUTO_REPLY_FOLDERS = [
+  { id: 'arf-inquiry', kind: 'auto_reply', name: 'お問い合わせ', parentId: null, displayOrder: 1, color: '#2563eb' },
+  { id: 'arf-booking', kind: 'auto_reply', name: '予約', parentId: null, displayOrder: 2, color: '#059669' },
+  { id: 'arf-keyword', kind: 'auto_reply', name: 'キーワード', parentId: null, displayOrder: 3, color: '#d97706' },
+  { id: 'arf-afterhours', kind: 'auto_reply', name: '営業時間外', parentId: null, displayOrder: 4, color: '#7c3aed' },
+]
+
+const AR_BASE = {
+  templateId: null, lineAccountId: null, activeFrom: null, activeUntil: null,
+  cooldownMinutes: null, skipWhenOperatorActive: false, messageKinds: null,
+  responseWeekdays: null, responseHolidayRule: null, oncePerFriend: false,
+  friendConditions: null, respondToAll: false, keywordMatchMode: 'any',
+}
+
+export const AUTO_REPLIES = [
+  {
+    ...AR_BASE, id: 'ar-1', name: '営業時間外の自動返信', keyword: '', matchType: 'contains',
+    responseType: 'text', responseContent: '本日の受付は終了しました。翌営業日にご連絡します。',
+    isActive: true, priority: 1, folderId: 'arf-afterhours',
+    activeFrom: '21:00', activeUntil: '09:00',
+    responseWeekdays: [0, 1, 2, 3, 4, 5, 6], respondToAll: true,
+    actions: [{ actionType: 'support_mark' }],
+    keywords: [], hits: { period: 214, total: 1893 },
+    createdAt: '2026-03-04T00:00:00.000Z',
+  },
+  {
+    ...AR_BASE, id: 'ar-2', name: '予約変更のお問い合わせ', keyword: '予約変更', matchType: 'contains',
+    responseType: 'text', responseContent: '予約変更を承ります。ご希望の日時をこのトークでお知らせください。',
+    isActive: true, priority: 2, folderId: 'arf-booking', templateId: 'template-1',
+    keywords: [{ word: '予約変更' }, { word: '日程変更' }, { word: 'キャンセル' }],
+    actions: [{ actionType: 'support_mark' }],
+    hits: { period: 186, total: 942 }, createdAt: '2026-04-18T00:00:00.000Z',
+  },
+  {
+    ...AR_BASE, id: 'ar-3', name: '商品についての質問', keyword: '商品', matchType: 'contains',
+    responseType: 'text', responseContent: '商品についてのご質問ありがとうございます。',
+    isActive: true, priority: 3, folderId: 'arf-inquiry',
+    keywords: [{ word: '商品' }, { word: '価格' }, { word: '在庫' }, { word: 'サイズ' }, { word: '送料' }],
+    actions: [{ actionType: 'tag' }],
+    hits: { period: 152, total: 733 }, createdAt: '2026-05-06T00:00:00.000Z',
+  },
+  {
+    /* 下書き。**当たった回数は0。** 「一度も当たっていない」と
+       「まだ動かしていない」は違うので、0で撮れることが要る。 */
+    ...AR_BASE, id: 'ar-4', name: 'キャンセル受付', keyword: 'キャンセル', matchType: 'contains',
+    responseType: 'text', responseContent: 'キャンセルを承りました。',
+    isActive: false, priority: 4, folderId: 'arf-booking',
+    keywords: [{ word: 'キャンセル' }, { word: '取り消し' }],
+    actions: [], hits: { period: 0, total: 0 }, createdAt: '2026-08-12T00:00:00.000Z',
+  },
+  {
+    ...AR_BASE, id: 'ar-5', name: '旧キーワードルール', keyword: '営業時間', matchType: 'exact',
+    responseType: 'text', responseContent: '平日 09:00〜18:00 です。',
+    isActive: false, priority: 5, folderId: 'arf-keyword',
+    keywords: [{ word: '営業時間' }],
+    actions: [], hits: { period: 0, total: 411 }, createdAt: '2026-01-20T00:00:00.000Z',
+  },
+]

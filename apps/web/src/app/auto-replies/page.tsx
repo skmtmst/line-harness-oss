@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import FolderPanel from '@/components/shared/folder-panel'
+import { toDraft } from '@/components/auto-replies/edit-dialog'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -588,31 +589,7 @@ export default function AutoRepliesPage() {
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <button
-                        onClick={() => setEditing({
-                          id: r.id,
-                          keyword: r.keyword,
-                          matchType: r.matchType,
-                          responseType: r.responseType,
-                          responseContent: r.responseContent,
-                          templateId: r.templateId,
-                          lineAccountId: r.lineAccountId,
-                          isActive: r.isActive,
-                          priority: r.priority,
-                          messageKinds: r.messageKinds,
-                          respondToAll: r.respondToAll,
-                          name: r.name,
-                          keywordMatchMode: r.keywordMatchMode === 'all' ? 'all' : 'any',
-                          activeFrom: r.activeFrom,
-                          activeUntil: r.activeUntil,
-                          cooldownMinutes: r.cooldownMinutes,
-                          skipWhenOperatorActive: r.skipWhenOperatorActive,
-                          actions: r.actions,
-                          responseWeekdays: r.responseWeekdays,
-                          responseHolidayRule: r.responseHolidayRule,
-                          oncePerFriend: r.oncePerFriend,
-                          keywords: r.keywords,
-                          friendConditions: r.friendConditions,
-                        })}
+                        onClick={() => setEditing(toDraft(r))}
                         className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-info-bg rounded-md"
                       >
                         編集
