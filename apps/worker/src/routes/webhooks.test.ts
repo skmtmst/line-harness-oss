@@ -598,6 +598,7 @@ describe('GET /api/webhooks/incoming — secret exposure', () => {
         source_type: 'custom',
         secret: VALID_SECRET,
         is_active: 1,
+        line_account_id: null,
         created_at: '2026-05-08T00:00:00.000+09:00',
         updated_at: '2026-05-08T00:00:00.000+09:00',
       },
