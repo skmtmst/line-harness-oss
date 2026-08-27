@@ -143,7 +143,12 @@ describe('スタッフの店舗権限範囲', () => {
   });
 
   it('PATCHで全店舗に戻すと紐付けを消す', async () => {
-    dbMocks.getStaffById.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    dbMocks.getStaffById.mockImplementation(async (_db: unknown, id: string) => row({
+      id,
+      role: id === 'owner-a' ? 'owner' : 'staff',
+      tenant_id: 'tenant-a',
+      account_scope: id === 'owner-a' ? 'all' : 'accounts',
+    }));
     dbMocks.updateStaffMember.mockResolvedValue(row({ id: 'target', role: 'staff', tenant_id: 'tenant-a', account_scope: 'all' }));
     const res = await send('/api/staff/target', 'PATCH', { accountScope: 'all', scopedLineAccountIds: ['line-1'] });
     expect(res.status).toBe(200);
