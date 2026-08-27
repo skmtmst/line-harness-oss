@@ -1678,6 +1678,25 @@ CREATE TABLE operation_control_sets (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE operation_health_results (
+  run_id       TEXT NOT NULL REFERENCES operation_health_runs(id) ON DELETE CASCADE,
+  check_key    TEXT NOT NULL CHECK (check_key IN ('quota', 'api', 'webhook', 'delivery', 'friends')),
+  severity     TEXT NOT NULL CHECK (severity IN ('normal', 'warning', 'danger', 'unknown')),
+  detail       TEXT NOT NULL,
+  metrics_json TEXT NOT NULL DEFAULT '{}',
+  checked_at   TEXT NOT NULL,
+  PRIMARY KEY (run_id, check_key)
+);
+
+CREATE TABLE operation_health_runs (
+  id           TEXT PRIMARY KEY,
+  bucket_key   TEXT NOT NULL UNIQUE,
+  status       TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+  started_at   TEXT NOT NULL,
+  completed_at TEXT,
+  error_message TEXT
+);
+
 CREATE TABLE operation_idempotency_keys (
   key             TEXT PRIMARY KEY,
   action          TEXT NOT NULL CHECK (action IN ('stop', 'restore')),
@@ -3082,6 +3101,9 @@ CREATE INDEX idx_notifications_status ON notifications (status);
 
 CREATE INDEX idx_operation_audit_kind_date
   ON operation_audit (target_kind, created_at);
+
+CREATE INDEX idx_operation_health_runs_completed
+  ON operation_health_runs(status, completed_at DESC);
 
 CREATE INDEX idx_operation_idempotency_expires
   ON operation_idempotency_keys(expires_at);

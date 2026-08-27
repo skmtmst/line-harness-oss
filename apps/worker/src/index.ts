@@ -20,6 +20,7 @@ import { processReminderDeliveries } from './services/reminder-delivery.js';
 import { processFriendFieldReminders } from './services/friend-field-reminders.js';
 import { toJstParts } from '@line-crm/shared';
 import { checkAccountHealth } from './services/ban-monitor.js';
+import { runOperationHealthChecks } from './services/operation-health.js';
 import { purgeExpiredOperationIdempotency } from './services/operation-idempotency.js';
 import { refreshLineAccessTokens } from './services/token-refresh.js';
 import { processInsightFetch } from './services/insight-fetcher.js';
@@ -1397,6 +1398,8 @@ async function scheduled(
   );
   jobs.push(processQueuedBroadcasts(env.DB, defaultLineClient, env.WORKER_URL));
   jobs.push(checkAccountHealth(env.DB));
+  // V6運用状態の5項目を5分バケットで保存する。同じCron枠が重なってもDBの一意制約で1回だけ動く。
+  jobs.push(runOperationHealthChecks(env, new Date(event.scheduledTime)));
 
   /*
    * 友だち情報欄の日付から、リマインダのゴール日を立てる（154）。

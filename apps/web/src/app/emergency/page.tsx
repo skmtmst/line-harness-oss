@@ -6,13 +6,12 @@ import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import {
   api,
-  type DashboardOverview,
   type OperationCapability,
   type OperationControl,
   type OperationIncident,
   type OperationRestorePreview,
 } from '@/lib/api'
-import { formatOperationDate, monthlyQuotaStatus, type OperationSeverity } from '@/lib/operation-status'
+import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import ReleaseLogPanel from '@/components/emergency/release-log-panel'
 
 const TABS = [
@@ -79,7 +78,7 @@ function SummaryCard({ label, value, note }: { label: string; value: string; not
   )
 }
 
-function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity) => void }) {
+function HealthPanel({ onSeverity, refreshKey }: { onSeverity: (severity: OperationSeverity) => void; refreshKey: number }) {
   const [checks, setChecks] = useState<HealthCheckItem[]>(() =>
     CHECK_DEFINITIONS.map((item) => ({ ...item, detail: '確認しています…', severity: 'unknown' })),
   )
@@ -89,7 +88,6 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
 
   const load = useCallback(async () => {
     setLoading(true)
-    const dashboardRequest = apiData(api.dashboard.organizationOverview({ period: 'today' }))
     const lineRequest = apiData(api.health.accounts()).then(async (accounts) => {
       const activeAccounts = accounts.filter((account) => account.isActive)
       const health = await Promise.all(
@@ -97,24 +95,13 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
       )
       return { activeAccounts, health }
     })
-    const apiRequest = Promise.all([
-      apiData(api.system.health()),
-      apiData(api.ecCommerce.overview()),
-    ])
-    const webhookRequest = Promise.all([
-      apiData(api.webhooks.incoming.list()),
-      apiData(api.webhooks.outgoing.list()),
-    ])
-    const deliveryRequest = apiData(api.broadcasts.list())
+    const persistedRequest = apiData(api.operations.health())
     const controlRequest = apiData(api.operations.control(null))
 
-    const [dashboardResult, lineResult, apiResult, webhookResult, deliveryResult, controlResult] =
+    const [lineResult, persistedResult, controlResult] =
       await Promise.allSettled([
-        dashboardRequest,
         lineRequest,
-        apiRequest,
-        webhookRequest,
-        deliveryRequest,
+        persistedRequest,
         controlRequest,
       ])
 
@@ -149,70 +136,25 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
       nextChecks.push({ id: 'line', label: 'LINE接続', icon: 'L', severity: 'unknown', detail: 'LINE接続状態を取得できませんでした' })
     }
 
-    if (dashboardResult.status === 'fulfilled') {
-      const dashboard = dashboardResult.value as DashboardOverview
-      const quota = monthlyQuotaStatus(dashboard.delivery.quotaLimit, dashboard.delivery.quotaUsed)
-      const quotaDetail = quota.remaining == null || dashboard.delivery.quotaLimit == null
-        ? '配信上限なしとして、今月の配信数を確認しました'
-        : `残り${quota.remaining.toLocaleString('ja-JP')}通 / 上限${dashboard.delivery.quotaLimit.toLocaleString('ja-JP')}通（残り${Math.floor(quota.remainingPercent ?? 0)}%）`
-      nextChecks.push({ id: 'quota', label: '月間配信数', icon: '↗', severity: quota.severity, detail: quotaDetail })
-      const today = dashboard.trend.at(-1)
-      nextChecks.push({
-        id: 'friends',
-        label: '友だち変化',
-        icon: '人',
-        severity: 'normal',
-        detail: today
-          ? `直近日の追加${today.added.toLocaleString('ja-JP')}人・ブロック${today.blocked.toLocaleString('ja-JP')}人を確認しました`
-          : '友だち数と日次変化を確認しました（変化なし）',
-      })
-      setCheckedAt(dashboard.generatedAt ?? new Date().toISOString())
+    if (persistedResult.status === 'fulfilled' && persistedResult.value && !persistedResult.value.isStale) {
+      const snapshot = persistedResult.value
+      for (const definition of CHECK_DEFINITIONS.filter((item) => item.id !== 'line')) {
+        const saved = snapshot.results.find((item) => item.checkKey === definition.id)
+        nextChecks.push(saved
+          ? { ...definition, severity: saved.severity, detail: saved.detail }
+          : { ...definition, severity: 'unknown', detail: '保存された確認結果がありません' })
+      }
+      setCheckedAt(snapshot.checkedAt)
     } else {
-      nextChecks.push({ id: 'quota', label: '月間配信数', icon: '↗', severity: 'unknown', detail: '月間配信数を取得できませんでした' })
-      nextChecks.push({ id: 'friends', label: '友だち変化', icon: '人', severity: 'unknown', detail: '友だちの日次変化を取得できませんでした' })
-      setCheckedAt(new Date().toISOString())
-    }
-
-    if (apiResult.status === 'fulfilled') {
-      const [, commerce] = apiResult.value
-      nextChecks.push({
-        id: 'api',
-        label: 'API・外部連携',
-        icon: '↔',
-        severity: 'normal',
-        detail: `管理APIとEC連携データを確認しました（24時間以内の受信${commerce.last24h.toLocaleString('ja-JP')}件）`,
-      })
-    } else {
-      nextChecks.push({ id: 'api', label: 'API・外部連携', icon: '↔', severity: 'unknown', detail: '管理APIまたはEC連携データを取得できませんでした' })
-    }
-
-    if (webhookResult.status === 'fulfilled') {
-      const [incoming, outgoing] = webhookResult.value
-      const invalidSecrets = [...incoming, ...outgoing].filter((item) => item.isActive && !item.hasSecret).length
-      const failedOutgoing = outgoing.filter((item) => item.isActive && (item.consecutiveFailures ?? 0) > 0)
-      const webhookSeverity: OperationSeverity = invalidSecrets > 0 ? 'danger' : failedOutgoing.length > 0 ? 'warning' : 'normal'
-      const webhookDetail = invalidSecrets > 0
-        ? `有効なWebhookの署名設定不足が${invalidSecrets}件あります`
-        : failedOutgoing.length > 0
-          ? `送信に連続失敗しているWebhookが${failedOutgoing.length}件あります`
-          : `受信${incoming.length}件・送信${outgoing.length}件の設定と送信失敗を確認しました`
-      nextChecks.push({ id: 'webhook', label: 'Webhook', icon: 'W', severity: webhookSeverity, detail: webhookDetail })
-    } else {
-      nextChecks.push({ id: 'webhook', label: 'Webhook', icon: 'W', severity: 'unknown', detail: 'Webhook設定と送信失敗を取得できませんでした' })
-    }
-
-    if (deliveryResult.status === 'fulfilled') {
-      const scheduled = deliveryResult.value.filter((item) => item.status === 'scheduled').length
-      const sending = deliveryResult.value.filter((item) => item.status === 'sending').length
-      nextChecks.push({
-        id: 'delivery',
-        label: '配信処理',
-        icon: '▷',
-        severity: 'normal',
-        detail: `配信処理を確認しました（予約${scheduled}件・送信中${sending}件）`,
-      })
-    } else {
-      nextChecks.push({ id: 'delivery', label: '配信処理', icon: '▷', severity: 'unknown', detail: '配信処理の状態を取得できませんでした' })
+      const stale = persistedResult.status === 'fulfilled' && persistedResult.value?.isStale
+      for (const definition of CHECK_DEFINITIONS.filter((item) => item.id !== 'line')) {
+        nextChecks.push({
+          ...definition,
+          severity: 'unknown',
+          detail: stale ? '10分以内の確認結果がありません' : '保存された確認結果を取得できませんでした',
+        })
+      }
+      setCheckedAt(persistedResult.status === 'fulfilled' ? persistedResult.value?.checkedAt ?? null : null)
     }
 
     setControl(controlResult.status === 'fulfilled' ? controlResult.value : null)
@@ -225,7 +167,7 @@ function HealthPanel({ onSeverity }: { onSeverity: (severity: OperationSeverity)
     void load()
     const timer = window.setInterval(() => { void load() }, 5 * 60 * 1000)
     return () => window.clearInterval(timer)
-  }, [load])
+  }, [load, refreshKey])
 
   const displayedSeverity = loading ? 'unknown' : mostSevere(checks)
   const isNormal = displayedSeverity === 'normal'
@@ -473,11 +415,22 @@ function EmergencyPageInner() {
   const tab = useMergedTab(TABS)
   const [severity, setSeverity] = useState<OperationSeverity>('unknown')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
+  const [healthRefreshKey, setHealthRefreshKey] = useState(0)
+  const [healthRunning, setHealthRunning] = useState(false)
   useEffect(() => { api.health.accounts().then((response) => { if (response.success) setAccounts(response.data) }).catch(() => undefined) }, [])
+  const runHealthCheck = async () => {
+    setHealthRunning(true)
+    try {
+      await api.operations.runHealthCheck()
+      setHealthRefreshKey((current) => current + 1)
+    } finally {
+      setHealthRunning(false)
+    }
+  }
   const headerAction = tab === 'health'
-    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => window.location.reload()} className="rounded-control min-h-9 bg-accent px-3 text-xs font-bold text-white">健全性を再読込</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">配信を緊急停止</Link></div>
+    ? <div className="flex flex-wrap gap-2"><button type="button" onClick={() => void runHealthCheck()} disabled={healthRunning} className="rounded-control min-h-9 bg-accent px-3 text-xs font-bold text-white disabled:opacity-50">{healthRunning ? '確認中…' : '健全性を再確認'}</button><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white">配信を緊急停止</Link></div>
     : severity === 'danger' || severity === 'warning' ? <StatusPill severity={severity} /> : undefined
-  return <div data-design-node={tab === 'health' ? 'UgonK' : tab === 'control' ? 'b3HfZ' : 'UhC2O'}><MergedTabs basePath="/emergency" tabs={TABS} active={tab} actions={headerAction} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
+  return <div data-design-node={tab === 'health' ? 'UgonK' : tab === 'control' ? 'b3HfZ' : 'UhC2O'}><MergedTabs basePath="/emergency" tabs={TABS} active={tab} actions={headerAction} />{tab === 'health' && <HealthPanel onSeverity={setSeverity} refreshKey={healthRefreshKey} />}{tab === 'control' && <EmergencyControlPanel accounts={accounts} />}{tab === 'history' && <HistoryPanel />}</div>
 }
 
 export default function EmergencyPage() {

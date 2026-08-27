@@ -24,6 +24,12 @@ beforeEach(() => {
 })
 
 describe('運用状態API', () => {
+  it('保存された健全性結果が無いときは0件と偽らずnullを返す', async () => {
+    const response = await app('admin').request('/api/operations/health', {}, { DB: testDb.db })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ success: true, data: null })
+  })
+
   it('確認ヘッダーと合言葉が無い停止を拒否する', async () => {
     const missingHeader = await app().request('/api/operations/incidents', {
       method: 'POST', headers: { 'content-type': 'application/json' },

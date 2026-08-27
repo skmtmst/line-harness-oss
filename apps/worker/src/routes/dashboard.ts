@@ -15,6 +15,7 @@ import type { Env } from '../index.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
+import { fetchLineQuota } from '../services/line-quota.js';
 
 /**
  * ダッシュボードが1回で読む数。
@@ -96,35 +97,6 @@ async function requireVisibleAccount(c: {
  * 取れなくても画面は出したいので、失敗は null にして握りつぶす。
  * ここで落とすと、LINE 側の一時的な不調で管理画面全体が開かなくなる。
  */
-async function fetchQuota(
-  token: string | undefined,
-): Promise<{ limit: number | null; used: number | null; failed: boolean }> {
-  if (!token) return { limit: null, used: null, failed: false };
-  try {
-    const [quota, consumption] = await Promise.all([
-      fetch('https://api.line.me/v2/bot/message/quota', {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(10_000),
-      }),
-      fetch('https://api.line.me/v2/bot/message/quota/consumption', {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(10_000),
-      }),
-    ]);
-    if (!quota.ok || !consumption.ok) return { limit: null, used: null, failed: true };
-    // type が 'none' のときは上限なし。数字が入らないので null のままにする。
-    const q = (await quota.json()) as { type?: string; value?: number };
-    const c = (await consumption.json()) as { totalUsage?: number };
-    return {
-      limit: q.type === 'limited' && typeof q.value === 'number' ? q.value : null,
-      used: typeof c.totalUsage === 'number' ? c.totalUsage : null,
-      failed: false,
-    };
-  } catch {
-    return { limit: null, used: null, failed: true };
-  }
-}
-
 dashboard.get('/api/dashboard/overview', async (c) => {
   try {
     const period = readPeriod(c.req.query('period'));
@@ -139,7 +111,7 @@ dashboard.get('/api/dashboard/overview', async (c) => {
     const statsScope = { allowedAccountIds: [accountId], includeUnassigned: false };
     const overview: DashboardOverview = await getDashboardOverview(c.env.DB, period, statsScope);
     const quotaToken = selectedAccount.channel_access_token;
-    const quota = await fetchQuota(quotaToken);
+    const quota = await fetchLineQuota(quotaToken);
     if (quota.failed) {
       overview.partialFailures.push('quota');
     }
@@ -167,7 +139,7 @@ dashboard.get('/api/dashboard/organization-overview', requireRole('owner'), asyn
       allowedAccountIds: visibleScope.allowedAccountIds,
       includeUnassigned: false,
     });
-    const quotas = await Promise.all(visibleScope.accounts.map((account) => fetchQuota(account.channel_access_token)));
+    const quotas = await Promise.all(visibleScope.accounts.map((account) => fetchLineQuota(account.channel_access_token)));
     const quotaFailed = quotas.some((quota) => quota.failed);
     if (quotaFailed) {
       overview.partialFailures.push('quota');

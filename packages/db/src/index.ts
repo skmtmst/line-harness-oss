@@ -75,3 +75,4 @@ export * from './dashboard';
 export * from './dashboard-preferences';
 export * from './operation-audit';
 export * from './operations';
+export * from './operation-health';

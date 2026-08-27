@@ -143,6 +143,22 @@ export type OperationRestorePreview = {
   calculatedAt: string
 }
 
+export type OperationHealthResult = {
+  checkKey: 'quota' | 'api' | 'webhook' | 'delivery' | 'friends'
+  severity: 'normal' | 'warning' | 'danger' | 'unknown'
+  detail: string
+  metrics: Record<string, unknown>
+  checkedAt: string
+}
+
+export type OperationHealthSnapshot = {
+  runId: string
+  status: 'completed' | 'failed'
+  checkedAt: string
+  isStale: boolean
+  results: OperationHealthResult[]
+}
+
 /** Affiliate offer (案件) as returned by the worker. */
 export type AffiliateOffer = {
   id: string
@@ -3248,6 +3264,10 @@ export const api = {
       fetchApi<ApiResponse<AccountMigration>>(`/api/accounts/migrations/${migrationId}`),
   },
   operations: {
+    health: () => fetchApi<ApiResponse<OperationHealthSnapshot | null>>('/api/operations/health'),
+    runHealthCheck: () => fetchApi<ApiResponse<OperationHealthSnapshot | null>>(
+      '/api/operations/health/check', { method: 'POST' },
+    ),
     control: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
       return fetchApi<ApiResponse<OperationControl>>(`/api/operations/control${query}`)

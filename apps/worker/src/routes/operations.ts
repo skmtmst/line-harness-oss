@@ -4,6 +4,7 @@ import {
   OPERATION_CAPABILITIES,
   getFriendById,
   getOperationControlSet,
+  getLatestOperationHealthSnapshot,
   getOperationIncident,
   getPendingReminderDeliveries,
   listOperationIncidents,
@@ -22,6 +23,7 @@ import {
   isValidOperationIdempotencyKey,
   reserveOperationIdempotency,
 } from '../services/operation-idempotency.js';
+import { runOperationHealthChecks } from '../services/operation-health.js';
 
 const operations = new Hono<Env>();
 
@@ -145,6 +147,24 @@ operations.get('/api/operations/control', async (c) => {
   }
   return c.json({ success: true, data: await getOperationControlSet(c.env.DB, accountId) });
 });
+
+operations.get('/api/operations/health', requireRole('owner', 'admin'), async (c) => {
+  const snapshot = await getLatestOperationHealthSnapshot(c.env.DB);
+  if (!snapshot) {
+    return c.json({ success: true, data: null });
+  }
+  const ageMs = Date.now() - Date.parse(snapshot.checkedAt);
+  return c.json({
+    success: true,
+    data: { ...snapshot, isStale: !Number.isFinite(ageMs) || ageMs > 10 * 60_000 },
+  });
+});
+
+operations.post(
+  '/api/operations/health/check',
+  requireRole('owner', 'admin'),
+  async (c) => c.json({ success: true, data: await runOperationHealthChecks(c.env, new Date(), { force: true }) }),
+);
 
 operations.get('/api/operations/control/preview', async (c) => {
   const accountId = requestedAccountId(c.req.query('account_id'));

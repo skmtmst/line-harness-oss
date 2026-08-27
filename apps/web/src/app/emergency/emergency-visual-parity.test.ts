@@ -13,7 +13,7 @@ describe('V6 32 運用状態の契約', () => {
     expect(source).not.toContain('OperationPageHeader')
   })
 
-  it('健全性の6項目を既存データから読み、取得失敗を正常にしない', () => {
+  it('健全性の6項目を保存済み結果から読み、取得失敗を正常にしない', () => {
     for (const label of ['LINE接続', '月間配信数', 'API・外部連携', 'Webhook', '配信処理', '友だち変化']) {
       expect(source).toContain(`label: '${label}'`)
     }
@@ -21,6 +21,12 @@ describe('V6 32 運用状態の契約', () => {
     expect(source).toContain("severity: 'unknown'")
     expect(source).toContain('item.isStale')
     expect(source).toContain('10分以内の確認結果がないLINEアカウント')
+    expect(source).toContain('api.operations.health()')
+    expect(source).toContain('api.operations.runHealthCheck()')
+    expect(source).not.toContain('api.dashboard.organizationOverview')
+    expect(source).not.toContain('api.ecCommerce.overview')
+    expect(source).not.toContain('api.webhooks.incoming.list')
+    expect(source).not.toContain('api.broadcasts.list')
     expect(source).toContain('api.operations.control(null)')
   })
 

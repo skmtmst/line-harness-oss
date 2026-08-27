@@ -51,3 +51,27 @@ CREATE TABLE IF NOT EXISTS operation_idempotency_keys (
 
 CREATE INDEX IF NOT EXISTS idx_operation_idempotency_expires
   ON operation_idempotency_keys(expires_at);
+
+-- LINE接続以外の5項目を、ブラウザの都度集計ではなく5分単位で保存する。
+-- bucket_key の一意制約で、Cronが重なっても同じ5分枠を二重実行しない。
+CREATE TABLE IF NOT EXISTS operation_health_runs (
+  id           TEXT PRIMARY KEY,
+  bucket_key   TEXT NOT NULL UNIQUE,
+  status       TEXT NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+  started_at   TEXT NOT NULL,
+  completed_at TEXT,
+  error_message TEXT
+);
+
+CREATE TABLE IF NOT EXISTS operation_health_results (
+  run_id       TEXT NOT NULL REFERENCES operation_health_runs(id) ON DELETE CASCADE,
+  check_key    TEXT NOT NULL CHECK (check_key IN ('quota', 'api', 'webhook', 'delivery', 'friends')),
+  severity     TEXT NOT NULL CHECK (severity IN ('normal', 'warning', 'danger', 'unknown')),
+  detail       TEXT NOT NULL,
+  metrics_json TEXT NOT NULL DEFAULT '{}',
+  checked_at   TEXT NOT NULL,
+  PRIMARY KEY (run_id, check_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_operation_health_runs_completed
+  ON operation_health_runs(status, completed_at DESC);
