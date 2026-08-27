@@ -736,12 +736,13 @@ CREATE TABLE ec_events (
   source            TEXT NOT NULL,
   external_event_id TEXT NOT NULL,
   event_type        TEXT NOT NULL,
+  line_account_id   TEXT REFERENCES line_accounts(id),
   customer_id       TEXT,
-  line_user_id      TEXT NOT NULL,
+  line_user_id      TEXT,
   friend_id         TEXT,
   payload           TEXT NOT NULL,
   status            TEXT NOT NULL DEFAULT 'received'
-                    CHECK (status IN ('received', 'processing', 'processed', 'skipped', 'failed')),
+                    CHECK (status IN ('received', 'identity_pending', 'processing', 'processed', 'skipped', 'failed')),
   error_message     TEXT,
   received_at       TEXT NOT NULL,
   processed_at      TEXT,
@@ -2775,14 +2776,16 @@ CREATE INDEX idx_cvs_pending
 CREATE INDEX idx_dashboard_preferences_account
   ON dashboard_preferences(line_account_id, updated_at DESC);
 
-CREATE INDEX idx_ec_events_customer
-  ON ec_events(customer_id, received_at DESC);
+CREATE INDEX idx_ec_events_account_received ON ec_events(line_account_id, received_at DESC);
 
-CREATE INDEX idx_ec_events_friend
-  ON ec_events(friend_id, received_at DESC);
+CREATE INDEX idx_ec_events_customer ON ec_events(customer_id, received_at DESC);
 
-CREATE INDEX idx_ec_events_status_received
-  ON ec_events(status, received_at);
+CREATE INDEX idx_ec_events_friend ON ec_events(friend_id, received_at DESC);
+
+CREATE INDEX idx_ec_events_identity_pending
+  ON ec_events(line_account_id, received_at DESC) WHERE status = 'identity_pending';
+
+CREATE INDEX idx_ec_events_status_received ON ec_events(status, received_at);
 
 CREATE INDEX idx_engagement_events_actor_friend
   ON engagement_events(program_id, actor_friend_id, occurred_at DESC);
