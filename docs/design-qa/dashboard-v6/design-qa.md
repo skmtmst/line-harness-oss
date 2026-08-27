@@ -9,6 +9,19 @@
 | 設計 | Pencil の実ノードを `html-css` で書き出し、Chromium で実寸描画（幅1920） |
 | 実装 | 実ルート `/` を操作して 1440・1920 で撮影 |
 
+**撮り方は `scripts/visual-qa/screens.mjs` にデータで書いてあります。**
+機能ごとに使い捨てのスクリプトを書くと、262枚ぶんで必ず撮り方がずれ、
+**ずれた絵どうしを比べて「差がある」と言ってしまいます。**
+
+```
+node scripts/visual-qa/capture-screens.mjs --check
+node scripts/visual-qa/capture-screens.mjs --feature 1 --impl
+node scripts/visual-qa/capture-screens.mjs --feature 1 --design --from <書き出したhtmlの置き場>
+```
+
+この5枚は、使い捨てスクリプトで撮ったものと**画素がまったく同じ**に
+なることを確かめてから、仕組み側の絵に置き換えてあります。
+
 **時計を止めて撮っています。** 「6日前」は `Date.now()` から出るので
 （`pending-inbox-card.tsx` の `elapsed()`）、止めないと**日をまたぐたびに
 絵が変わり**、基準画像として使えません。`2026-08-19T12:00:00Z` に固定し、
