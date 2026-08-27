@@ -84,5 +84,8 @@ describe('サーバー正本の緊急停止', () => {
     expect(stopped.status).toBe('changed')
     sqlite.prepare("UPDATE operation_control_sets SET states_json = '{broken' WHERE scope_key = 'account-1'").run()
     expect(await isOperationCapabilityStopped(db, 'account-1', 'broadcast_dispatch')).toBe(true)
+    const visible = await getOperationControlSet(db, 'account-1')
+    expect(visible.activeIncidentId).not.toBeNull()
+    expect(Object.values(visible.states).every((state) => state === 'stopped')).toBe(true)
   })
 })

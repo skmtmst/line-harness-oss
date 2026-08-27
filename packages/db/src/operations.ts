@@ -52,7 +52,7 @@ export function defaultOperationStates(): OperationStates {
   return Object.fromEntries(OPERATION_CAPABILITIES.map((key) => [key, 'running'])) as OperationStates;
 }
 
-function parseStates(raw: string | null): OperationStates {
+function parseStates(raw: string | null, activeIncidentId: string | null): OperationStates {
   const states = defaultOperationStates();
   if (!raw) return states;
   try {
@@ -61,7 +61,11 @@ function parseStates(raw: string | null): OperationStates {
       if (parsed[capability] === 'stopped') states[capability] = 'stopped';
     }
   } catch {
-    // 壊れた値を「停止」と推測しない。API側の履歴と監視で異常を知らせる。
+    // 停止中の正本が壊れた場合、画面だけ「動作中」と表示すると運用者が
+    // 誤って復旧判断する。送信ゲートと同じく全対象を安全側へ倒す。
+    if (activeIncidentId) {
+      for (const capability of OPERATION_CAPABILITIES) states[capability] = 'stopped';
+    }
   }
   return states;
 }
@@ -104,7 +108,7 @@ function mapControl(row: ControlRow | null, lineAccountId: string | null): Opera
     scopeKey: row.scope_key,
     lineAccountId: row.line_account_id,
     version: row.version,
-    states: parseStates(row.states_json),
+    states: parseStates(row.states_json, row.active_incident_id),
     activeIncidentId: row.active_incident_id,
     reason: row.reason,
     actorId: row.actor_id,
