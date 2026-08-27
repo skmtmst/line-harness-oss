@@ -36,6 +36,13 @@ describe('運用状態API', () => {
       body: JSON.stringify({ lineAccountId: null, capabilities: ['broadcast_dispatch'], reason: '障害', expectedVersion: 0, confirmation: 'とめる' }),
     }, { DB: testDb.db })
     expect(wrongWord.status).toBe(400)
+
+    const missingIdempotency = await app().request('/api/operations/incidents', {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop' },
+      body: JSON.stringify({ lineAccountId: null, capabilities: ['broadcast_dispatch'], reason: '障害', expectedVersion: 0, confirmation: '停止' }),
+    }, { DB: testDb.db })
+    expect(missingIdempotency.status).toBe(400)
+    expect(await missingIdempotency.json()).toMatchObject({ error: expect.stringContaining('Idempotency-Key') })
   })
 
   it('全体停止はownerだけ、アカウント停止はadminも実行できる', async () => {
