@@ -348,6 +348,7 @@ export default function NenCampaignsPage() {
           <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:flex sm:items-center sm:justify-between">
             <div><h2 className="font-bold text-gray-900">テスト送信先</h2><p className="mt-1 text-xs text-gray-500">保存後、実際のLINE表示を確認できます。</p></div>
             <select value={testFriendId} onChange={(e) => setTestFriendId(e.target.value)} className="mt-3 w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm sm:mt-0 sm:w-72">
+              <option value="">未設定</option>
               {friends.map((friend) => <option key={friend.id} value={friend.id}>{friend.displayName || '名前未取得'}</option>)}
             </select>
           </div>
