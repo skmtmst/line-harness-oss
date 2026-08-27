@@ -266,8 +266,16 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
       <h2 className="text-ink text-base font-bold">今月の送信枠</h2>
       <span className="text-ink-faint text-xs">毎月1日リセット</span>
     </div>
-    <p className="text-ink mt-3 text-2xl font-bold tabular-nums">
-      {remaining === null || limit === null ? '—' : `${remaining.toLocaleString('ja-JP')} / ${limit.toLocaleString('ja-JP')}通`}
+    {/*
+      設計（`vUXKb`）は数の前に「LINE公式」と置く。送信枠はLINE公式アカウント
+      の枠で、メールには効かない。どちらの枠かが書いていないと、メールが
+      止まったときにここを見てしまう。
+    */}
+    <p className="text-ink mt-3 flex items-baseline gap-2">
+      <span className="text-ink-secondary text-xs font-medium">LINE公式</span>
+      <span className="text-2xl font-bold tabular-nums">
+        {remaining === null || limit === null ? '—' : `${remaining.toLocaleString('ja-JP')} / ${limit.toLocaleString('ja-JP')}通`}
+      </span>
     </p>
     <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className="bg-accent h-full rounded-pill" style={{ width: `${remainingRate ?? 0}%` }} /></div>
     <div className="mt-2 flex items-center justify-between gap-3 text-xs">
