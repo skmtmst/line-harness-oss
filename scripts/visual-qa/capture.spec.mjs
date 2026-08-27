@@ -76,7 +76,13 @@ async function signIn(page) {
 
 /** その画面に居るか。ログインへ飛ばされていたら、見ているのは別の画面。 */
 async function expectLanded(page, path) {
-  const landed = new URL(page.url()).pathname
+  /*
+    **クエリまで見る。** タブは `?tab=` でしか区別できないので、
+    パスだけ見ていると「情報欄を開いたつもりでタグを撮っていた」を
+    見逃す。`/tags?tab=fields` から `/tags` へ落ちたら失敗にする。
+  */
+  const url = new URL(page.url())
+  const landed = url.pathname + url.search
   expect(landed, `${path} から ${landed} へ飛ばされた`).toBe(path)
   const body = await page.locator('body').innerText()
   expect(body, `${path} がログイン画面になっている`).not.toContain(LOGIN_TEXT)

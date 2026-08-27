@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { FRIENDS, FRIEND_FIELDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, SAVED_SEARCHES, SUPPORT_MARKS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -243,6 +243,13 @@ function bodyFor(pathname) {
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
   if (pathname === '/api/tags') return { success: true, data: TAGS }
+  /*
+   * 友だち属性のタブ3本（設計 `HBTk0` / `rIhbN` / `QKx8Q`）。
+   * 空の表で撮ると「一致した」と言えてしまうので、絵の行数で返す。
+   */
+  if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/support-marks') return { success: true, data: SUPPORT_MARKS }
+  if (pathname === '/api/saved-searches') return { success: true, data: SAVED_SEARCHES }
   /*
    * 削除する前の影響（PR #381）。**一覧の `usedIn` から組み立てる。**
    * 別々に持つと、一覧が「配信3」なのに削除画面は「なし」という

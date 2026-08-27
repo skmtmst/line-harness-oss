@@ -262,3 +262,82 @@ export const FRIENDS = [
     tags: [FRIEND_TAGS.login, FRIEND_TAGS.ec], createdAt: '2026-08-13T00:00:00.000Z',
   }),
 ]
+
+/* ============================================================
+ * 友だち属性のタブ3本（タグ以外）。
+ *
+ * **Pencil ★V6 の絵に書いてある値をそのまま写している。**
+ *   4-2 友だち情報欄 `HBTk0`
+ *   4-3 対応マーク   `rIhbN`
+ *   4-4 保存した検索 `QKx8Q`
+ *
+ * 空の表のまま撮ると、桁あふれも折り返しも出ないので
+ * 「一致した」と言えてしまう。設計の行数・文字数で撮る。
+ * ============================================================ */
+
+/**
+ * 4-2 `HBTk0` の4行。
+ *
+ * **`FriendField` 型の必須項目をすべて埋める。** 最初に `fieldKey` を
+ * 落としたら、差し込み名が `{{field.undefined}}` と出た。型に無い形で
+ * 撮ると、実装の不具合と見分けが付かなくなる。
+ */
+export const FRIEND_FIELDS = [
+  ['愛犬のお名前', 'pet_name', 'text', 187, 'form'],
+  ['お住まい', 'area', 'select', 164, 'form'],
+  ['生年月日', 'birthday', 'date', 141, 'form'],
+  ['便の状態', 'stool_condition', 'select', 72, 'form'],
+].map(([name, fieldKey, type, usageCount, source], index) => ({
+  id: `field-${index}`,
+  folderId: null,
+  name: String(name),
+  fieldKey: String(fieldKey),
+  type: String(type),
+  options: type === 'select' ? ['よい', 'ふつう', 'わるい'] : null,
+  defaultValue: null,
+  source: String(source),
+  ecFieldPath: null,
+  ecIsMaster: false,
+  isPersonal: false,
+  isStarred: false,
+  displayOrder: index,
+  usageCount: Number(usageCount),
+  createdAt: '2026-01-13T00:00:00.000Z',
+  updatedAt: '2026-01-13T00:00:00.000Z',
+}))
+
+/** 4-3 `rIhbN` の4件。色は設計の札の色。 */
+export const SUPPORT_MARKS = [
+  ['未対応', '#E5484D', 23, true],
+  ['対応中', '#F5C56B', 19, false],
+  ['対応済', '#06C755', 186, false],
+  ['保留', '#8B938D', 3, false],
+].map(([name, color, friendCount, isDefault], index) => ({
+  id: `mark-${index}`,
+  name: String(name),
+  color: String(color),
+  displayOrder: index,
+  isDefault: Boolean(isDefault),
+  friendCount: Number(friendCount),
+  createdAt: '2026-01-13T00:00:00.000Z',
+  updatedAt: '2026-01-13T00:00:00.000Z',
+}))
+
+/** 4-4 `QKx8Q` の5行。絵は「1〜12 / 12件」なので、母数は12件。 */
+export const SAVED_SEARCHES = [
+  ['VIPかつ未契約', 18, 'shared', 'Kenta', '2026-08-20T10:20:00.000Z'],
+  ['誕生日30日前', 12, 'private', 'Kenta', '2026-08-20T09:10:00.000Z'],
+  ['未対応・担当なし', 11, 'shared', 'Kenta', '2026-08-19T11:05:00.000Z'],
+  ['購入者または予約者', 42, 'shared', 'Masato', '2026-08-18T05:30:00.000Z'],
+  ['離脱注意', 0, 'private', 'Kenta', '2026-08-17T02:22:00.000Z'],
+].map(([name, matchCount, visibility, owner, updatedAt], index) => ({
+  id: `search-${index}`,
+  name: String(name),
+  conditions: { all: [], any: [] },
+  conditionsJson: JSON.stringify({ all: [], any: [] }),
+  matchCount: Number(matchCount),
+  visibility: String(visibility),
+  ownerName: String(owner),
+  createdAt: '2026-08-17T02:22:00.000Z',
+  updatedAt: String(updatedAt),
+}))

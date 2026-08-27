@@ -28,6 +28,14 @@ export const ROUTES = [
   { name: 'broadcasts', path: '/broadcasts', type: 'L' },
   { name: 'rich-menus', path: '/rich-menus', type: 'L' },
   { name: 'automations', path: '/automations', type: 'L' },
+  /*
+   * 友だち属性のタブ3本。**`?tab=` でしか区別できない。**
+   * ここを撮っていない間、4-2/4-3/4-4 は1枚も見張られていなかった。
+   * 行き先の判定はクエリまで見る（`capture.spec.mjs` の `expectLanded`）。
+   */
+  { name: 'tags-fields', path: '/tags?tab=fields', type: 'L' },
+  { name: 'tags-marks', path: '/tags?tab=marks', type: 'L' },
+  { name: 'tags-searches', path: '/tags?tab=searches', type: 'L' },
 ]
 
 /**
