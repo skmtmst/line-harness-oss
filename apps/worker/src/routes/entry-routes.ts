@@ -14,6 +14,7 @@ import {
 import type { EntryRoute, EntryRouteGenre } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
 const entryRoutes = new Hono<Env>();
 
@@ -42,6 +43,10 @@ function serializeGenre(row: EntryRouteGenre) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function canAccessEntryRoute(row: EntryRoute, tenantId: string): boolean {
+  return row.tenant_id === tenantId || (row.tenant_id === null && tenantId === DEFAULT_TENANT_ID);
 }
 
 entryRoutes.get('/api/entry-route-genres', async (c) => {
@@ -95,7 +100,8 @@ entryRoutes.patch('/api/entry-route-genres/:id', requireRole('owner', 'admin'), 
 // GET /api/entry-routes — list all
 entryRoutes.get('/api/entry-routes', async (c) => {
   try {
-    const rows = await getEntryRoutes(c.env.DB);
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const rows = await getEntryRoutes(c.env.DB, tenantId);
     return c.json({ success: true, data: rows.map(serialize) });
   } catch (err) {
     console.error('GET /api/entry-routes error:', err);
@@ -108,7 +114,8 @@ entryRoutes.get('/api/entry-routes/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const row = await getEntryRouteById(c.env.DB, id);
-    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    if (!row || !canAccessEntryRoute(row, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({ success: true, data: serialize(row) });
   } catch (err) {
     console.error('GET /api/entry-routes/:id error:', err);
@@ -143,7 +150,8 @@ entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) =
     if ((genre?.length ?? 0) > 80 || name.length > 120) {
       return c.json({ success: false, error: 'ジャンルは80文字、名前は120文字以内で入力してください' }, 400);
     }
-    const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre });
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const row = await createEntryRoute(c.env.DB, { ...body, refCode, name, genre, tenantId });
     return c.json({ success: true, data: serialize(row) }, 201);
   } catch (err) {
     console.error('POST /api/entry-routes error:', err);
@@ -158,6 +166,9 @@ entryRoutes.post('/api/entry-routes', requireRole('owner', 'admin'), async (c) =
 entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getEntryRouteById(c.env.DB, id);
+    if (!existing || !canAccessEntryRoute(existing, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<
       Partial<{
         refCode: string;
@@ -200,6 +211,9 @@ entryRoutes.patch('/api/entry-routes/:id', requireRole('owner', 'admin'), async 
 entryRoutes.delete('/api/entry-routes/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getEntryRouteById(c.env.DB, id);
+    if (!existing || !canAccessEntryRoute(existing, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
     await deleteEntryRoute(c.env.DB, id);
     return c.json({ success: true });
   } catch (err) {
@@ -213,7 +227,8 @@ entryRoutes.get('/api/entry-routes/:id/funnel', async (c) => {
   try {
     const id = c.req.param('id');
     const route = await getEntryRouteById(c.env.DB, id);
-    if (!route) return c.json({ success: false, error: 'Not found' }, 404);
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    if (!route || !canAccessEntryRoute(route, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
     const funnel = await getEntryRouteFunnel(c.env.DB, id);
     return c.json({ success: true, data: funnel });
   } catch (err) {
@@ -229,7 +244,8 @@ entryRoutes.get('/api/entry-routes/:id/sources', async (c) => {
   try {
     const id = c.req.param('id');
     const route = await getEntryRouteById(c.env.DB, id);
-    if (!route) return c.json({ success: false, error: 'Not found' }, 404);
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    if (!route || !canAccessEntryRoute(route, tenantId)) return c.json({ success: false, error: 'Not found' }, 404);
     const sources = await getEntryRouteSources(c.env.DB, id);
     return c.json({ success: true, data: sources });
   } catch (err) {

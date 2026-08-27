@@ -195,7 +195,7 @@ async function resolveFriendAndAccessToken(
 
 // ========== オペレーターCRUD ==========
 
-chats.get('/api/operators', async (c) => {
+chats.get('/api/operators', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const items = await getOperators(c.env.DB);
     return c.json({

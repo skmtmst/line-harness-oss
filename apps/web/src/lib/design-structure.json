@@ -155,36 +155,45 @@
         "status": "unverified",
         "referenceNodeIds": ["PhxG6"],
         "requiredViewports": [1440, 1920],
-        "reason": "トップバー・タブ・操作行以外の一覧本体と全状態は、V6と同条件で比較した証拠が未登録"
+        "reason": "Pencilと実装を同寸法で目視比較済み。ただしシェルの例示データと現在地表示に意図した差があるため、完全一致とは扱わない",
+        "referenceScreenshots": [
+          "docs/design-reference/friends-v6/PhxG6-1920.png"
+        ],
+        "implementationScreenshots": [
+          "docs/design-qa/friends-v6/implementation-1440.png",
+          "docs/design-qa/friends-v6/implementation-1920.png"
+        ],
+        "checkedAt": "2026-08-27T11:51:26+09:00",
+        "evidence": "docs/design-qa/friends-v6/design-qa.md"
       },
       "sections": [
         "V6Tabs",
-        "V4FriendKpis",
-        "V4SearchPanel",
+        "V6FriendKpis",
+        "V6SearchPanel",
         "V4BulkBar",
-        "V4FriendTable"
+        "V6FriendTable"
       ],
       "parts": [
         "有効友だち",
-        "ブロック / 非表示",
+        "ブロック・非表示",
         "未対応",
         "今月の追加",
         "CSVで書き出す",
         "UID移行",
         "一括アクション",
-        "友だち名・LINE表示名で検索",
-        "詳細検索",
+        "名前・LINE名・タグ・メモで検索",
+        "詳細条件",
         "保存した検索",
-        "追加が新しい順",
-        "未対応かつ7日以内",
-        "ブロック解除者",
+        "友だち追加の新しい順",
+        "注目のみ",
         "選択した友だちにまとめて操作します",
-        "対応 / 担当",
+        "対応・担当",
         "シナリオ",
         "最新メッセージ",
         "タグ・属性",
         "最終接触",
-        "表示件数",
+        "表示項目を編集",
+        "件表示",
         "前へ",
         "次へ"
       ]

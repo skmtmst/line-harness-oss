@@ -47,11 +47,11 @@ describe('共通部品の影響範囲', () => {
     expect(directImporters(files, pagination).map((file) => relative(SRC, file))).toEqual([
       'app/contents/page.tsx',
       'app/contents/vars/page.tsx',
-      'app/friends/page.tsx',
       'app/reminders/page.tsx',
       'app/tags/page.tsx',
       'components/friend-attributes-v2/tag-list-v2.tsx',
       'components/friend-fields/tags-page-v4.tsx',
+      'components/friends/friend-list-table.tsx',
     ])
   })
 

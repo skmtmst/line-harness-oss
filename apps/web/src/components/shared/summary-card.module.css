@@ -68,6 +68,16 @@
   font-weight: 600;
 }
 
+.badge_neutral {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+}
+
+.badge_danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
 .link {
   flex-shrink: 0;
   color: var(--color-action);

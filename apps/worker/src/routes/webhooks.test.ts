@@ -29,6 +29,7 @@ import {
   getIncomingWebhookById,
   createIncomingWebhook,
   updateIncomingWebhook,
+  deleteIncomingWebhook,
   getOutgoingWebhooks,
   getOutgoingWebhookById,
   createOutgoingWebhook,
@@ -36,6 +37,7 @@ import {
   deleteOutgoingWebhook,
 } from '@line-crm/db';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { fireEvent } from '../services/event-bus.js';
 import type { Env } from '../index.js';
 import { webhooks } from './webhooks.js';
 
@@ -59,6 +61,10 @@ const baseEnv = { DB: {} as D1Database } as Record<string, unknown>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getIncomingWebhookById).mockResolvedValue({
+    id: 'iwh-1', name: 'test', source_type: 'custom', secret: VALID_SECRET,
+    is_active: 1, line_account_id: null, created_at: '2026-05-08', updated_at: '2026-05-08',
+  });
   vi.mocked(getOutgoingWebhookById).mockResolvedValue({
     id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
     secret: VALID_SECRET, is_active: 1, max_retries: 0, consecutive_failures: 0,
@@ -436,6 +442,23 @@ describe('GET /api/webhooks/outgoing — secret exposure', () => {
 // =====================================================
 
 describe('POST /api/webhooks/incoming — validation', () => {
+  test('requires an account outside the default tenant and checks an explicit account', async () => {
+    const app = setupApp('tenant-b');
+    const omitted = await app.request('/api/webhooks/incoming', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'test', secret: VALID_SECRET }),
+    }, baseEnv);
+    expect(omitted.status).toBe(400);
+
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValueOnce(false);
+    const forbidden = await app.request('/api/webhooks/incoming', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'test', secret: VALID_SECRET, lineAccountId: 'account-a' }),
+    }, baseEnv);
+    expect(forbidden.status).toBe(403);
+    expect(canAccessAllLineAccounts).toHaveBeenCalledWith(baseEnv.DB, expect.anything(), ['account-a']);
+  });
+
   test('rejects missing secret with 400', async () => {
     const app = setupApp();
     const res = await app.request(
@@ -473,6 +496,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
       source_type: 'custom',
       secret: VALID_SECRET,
       is_active: 1,
+      line_account_id: null,
       created_at: '2026-05-08T00:00:00.000+09:00',
       updated_at: '2026-05-08T00:00:00.000+09:00',
     });
@@ -489,6 +513,7 @@ describe('POST /api/webhooks/incoming — validation', () => {
     );
     expect(res.status).toBe(201);
     expect(createIncomingWebhook).toHaveBeenCalledOnce();
+    expect(createIncomingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: undefined }));
     const body = (await res.json()) as { data: { id: string; secret: string } };
     expect(body.data.secret).toBe(VALID_SECRET);
   });
@@ -499,6 +524,16 @@ describe('POST /api/webhooks/incoming — validation', () => {
 // =====================================================
 
 describe('PUT /api/webhooks/incoming/:id — validation', () => {
+  test('returns 404 before changing a webhook outside the tenant', async () => {
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(null);
+    const res = await setupApp('tenant-b').request('/api/webhooks/incoming/iwh-other', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret: VALID_SECRET }),
+    }, baseEnv);
+    expect(res.status).toBe(404);
+    expect(updateIncomingWebhook).not.toHaveBeenCalled();
+  });
+
   test('rejects updating secret to fewer than 32 chars with 400', async () => {
     const app = setupApp();
     const res = await app.request(
@@ -521,6 +556,7 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
       source_type: 'custom',
       secret: null,
       is_active: 0,
+      line_account_id: null,
       created_at: '2026-05-08T00:00:00.000+09:00',
       updated_at: '2026-05-08T00:00:00.000+09:00',
     });
@@ -540,6 +576,15 @@ describe('PUT /api/webhooks/incoming/:id — validation', () => {
   });
 });
 
+describe('DELETE /api/webhooks/incoming/:id — tenant scope', () => {
+  test('returns 404 before deleting a webhook outside the tenant', async () => {
+    vi.mocked(getIncomingWebhookById).mockResolvedValue(null);
+    const res = await setupApp('tenant-b').request('/api/webhooks/incoming/iwh-other', { method: 'DELETE' }, baseEnv);
+    expect(res.status).toBe(404);
+    expect(deleteIncomingWebhook).not.toHaveBeenCalled();
+  });
+});
+
 // =====================================================
 // GET /api/webhooks/incoming — secret must NOT be exposed
 // =====================================================
@@ -553,6 +598,7 @@ describe('GET /api/webhooks/incoming — secret exposure', () => {
         source_type: 'custom',
         secret: VALID_SECRET,
         is_active: 1,
+        line_account_id: null,
         created_at: '2026-05-08T00:00:00.000+09:00',
         updated_at: '2026-05-08T00:00:00.000+09:00',
       },
@@ -580,6 +626,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       source_type: 'custom',
       secret: VALID_SECRET,
       is_active: 1,
+      line_account_id: null,
       created_at: '2026-05-08T00:00:00.000+09:00',
       updated_at: '2026-05-08T00:00:00.000+09:00',
     });
@@ -604,6 +651,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       source_type: 'custom',
       secret: VALID_SECRET,
       is_active: 1,
+      line_account_id: null,
       created_at: '2026-05-08T00:00:00.000+09:00',
       updated_at: '2026-05-08T00:00:00.000+09:00',
     });
@@ -631,6 +679,7 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       source_type: 'custom',
       secret: VALID_SECRET,
       is_active: 1,
+      line_account_id: 'account-a',
       created_at: '2026-05-08T00:00:00.000+09:00',
       updated_at: '2026-05-08T00:00:00.000+09:00',
     });
@@ -663,5 +712,12 @@ describe('POST /api/webhooks/incoming/:id/receive — signature', () => {
       baseEnv,
     );
     expect(res.status).toBe(200);
+    expect(fireEvent).toHaveBeenCalledWith(
+      baseEnv.DB,
+      'incoming_webhook.custom',
+      expect.anything(),
+      undefined,
+      'account-a',
+    );
   });
 });

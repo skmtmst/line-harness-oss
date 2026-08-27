@@ -86,7 +86,8 @@ async function computeHmacSha256Hex(secret: string, body: string): Promise<strin
 
 webhooks.get('/api/webhooks/incoming', async (c) => {
   try {
-    const items = await getIncomingWebhooks(c.env.DB);
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const items = await getIncomingWebhooks(c.env.DB, tenantId);
     return c.json({
       success: true,
       data: items.map((w) => ({
@@ -107,7 +108,7 @@ webhooks.get('/api/webhooks/incoming', async (c) => {
 
 webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
   try {
-    const body = await c.req.json<{ name: string; sourceType?: string; secret?: string }>();
+    const body = await c.req.json<{ name: string; sourceType?: string; secret?: string; lineAccountId?: string }>();
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
     }
@@ -115,10 +116,19 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
     if (secretError) {
       return c.json({ success: false, error: secretError }, 400);
     }
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    if (body.lineAccountId !== undefined) {
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.lineAccountId])) {
+        return c.json({ success: false, error: 'Forbidden' }, 403);
+      }
+    } else if (tenantId !== DEFAULT_TENANT_ID) {
+      return c.json({ success: false, error: 'どのLINEアカウント向けか選んでください' }, 400);
+    }
     const item = await createIncomingWebhook(c.env.DB, {
       name: body.name,
       sourceType: body.sourceType,
       secret: body.secret as string,
+      lineAccountId: body.lineAccountId,
     });
     return c.json(
       {
@@ -145,6 +155,9 @@ webhooks.post('/api/webhooks/incoming', requireRole('owner'), async (c) => {
 webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id');
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getIncomingWebhookById(c.env.DB, id, tenantId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
     const body = await c.req.json<{ name?: string; sourceType?: string; secret?: string; isActive?: boolean }>();
     if (body.isActive !== undefined && typeof body.isActive !== 'boolean') {
       return c.json({ success: false, error: 'isActive must be a boolean' }, 400);
@@ -159,8 +172,6 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
     // would still be invalid. Otherwise migration 034 can be bypassed by
     // toggling isActive without touching the legacy null/short secret.
     if (body.isActive === true) {
-      const existing = await getIncomingWebhookById(c.env.DB, id);
-      if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
       const effectiveSecret = body.secret ?? existing.secret;
       if (!effectiveSecret || effectiveSecret.length < MIN_SECRET_LENGTH) {
         return c.json(
@@ -173,7 +184,7 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
       }
     }
     await updateIncomingWebhook(c.env.DB, id, body);
-    const updated = await getIncomingWebhookById(c.env.DB, id);
+    const updated = await getIncomingWebhookById(c.env.DB, id, tenantId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
@@ -193,7 +204,11 @@ webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
 
 webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), async (c) => {
   try {
-    await deleteIncomingWebhook(c.env.DB, c.req.param('id'));
+    const id = c.req.param('id');
+    const tenantId = c.get('staff').tenantId ?? DEFAULT_TENANT_ID;
+    const existing = await getIncomingWebhookById(c.env.DB, id, tenantId);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    await deleteIncomingWebhook(c.env.DB, id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/webhooks/incoming/:id error:', err);
@@ -433,7 +448,7 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
     const eventType = `incoming_webhook.${wh.source_type}`;
     await fireEvent(c.env.DB, eventType, {
       eventData: { webhookId: wh.id, source: wh.source_type, payload },
-    });
+    }, undefined, wh.line_account_id ?? null);
 
     return c.json({ success: true, data: { received: true, source: wh.source_type } });
   } catch (err) {

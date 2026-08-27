@@ -158,3 +158,107 @@ export const LIST_STATS = {
   scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 },
   reminders: { total: 0, active: 0, waiting: 0, sentThisMonth: 0 },
 }
+
+/** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
+export const FRIEND_STATS = {
+  active: 214,
+  total: 231,
+  blockedByThem: 12,
+  hiddenByUs: 5,
+  unanswered: 23,
+  resolved: 186,
+  addedThisMonth: 38,
+  addedLastMonth: 26,
+}
+
+export const OPERATORS = [
+  { id: 'operator-masato', name: 'Masato' },
+  { id: 'operator-kenta', name: 'Kenta' },
+]
+
+export const FRIEND_SCENARIOS = [
+  {
+    id: 'scenario-paused',
+    name: '停止中',
+    description: null,
+    triggerType: 'manual',
+    triggerTagId: null,
+    lineAccountId: 'visual-qa-account',
+    isActive: false,
+    deliveryMode: 'relative',
+    allowConcurrent: true,
+    displayOrder: 0,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    folderId: null,
+    audienceCondition: null,
+    onCompleteMode: 'pause',
+    onCompleteScenarioId: null,
+  },
+]
+
+const FRIEND_TAGS = {
+  subscription: { id: 'friend-tag-subscription', name: '定期便提案対象', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
+  uncontracted: { id: 'friend-tag-uncontracted', name: '未契約', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
+  staff: { id: 'friend-tag-staff', name: 'スタッフ', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
+  nen: { id: 'friend-tag-nen', name: 'NEN会員', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
+  delivery: { id: 'friend-tag-delivery', name: '商品到着確認対象', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
+  login: { id: 'friend-tag-login', name: 'LINEログイン連携済み', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
+  ec: { id: 'friend-tag-ec', name: 'EC顧客連携済み', color: '#8B938D', createdAt: '2026-01-01T00:00:00.000Z' },
+}
+
+function friend(overrides) {
+  return {
+    id: '',
+    lineUserId: '',
+    displayName: '',
+    pictureUrl: null,
+    statusMessage: null,
+    isFollowing: true,
+    metadata: {},
+    refCode: null,
+    lineAccountId: 'visual-qa-account',
+    userId: null,
+    createdAt: '2026-08-13T00:00:00.000Z',
+    updatedAt: '2026-08-13T00:00:00.000Z',
+    latestIncomingMessage: null,
+    latestOutgoingAt: null,
+    activeScenario: { name: '停止中', status: 'paused' },
+    handled: true,
+    operator: null,
+    supportMark: null,
+    tags: [],
+    ...overrides,
+  }
+}
+
+export const FRIENDS = [
+  friend({
+    id: 'friend-kyohei', lineUserId: 'U-visual-1', displayName: 'Kyohei Yamamoto',
+    metadata: { __attention: '1' }, createdAt: '2026-08-14T00:00:00.000Z',
+    chatStatus: 'unread', handled: false,
+    latestIncomingMessage: { content: '🚚♨', messageType: 'text', createdAt: '2026-08-14T07:58:00.000Z' },
+    supportMark: { id: 'mark-unread', name: '未対応', color: '#D34851' },
+    tags: [FRIEND_TAGS.subscription, FRIEND_TAGS.uncontracted],
+  }),
+  friend({
+    id: 'friend-masato', lineUserId: 'U-visual-2', displayName: 'Masato.S',
+    chatStatus: 'resolved', operator: OPERATORS[0],
+    supportMark: { id: 'mark-progress', name: '対応中', color: '#A66A00' },
+    tags: [FRIEND_TAGS.staff],
+  }),
+  friend({
+    id: 'friend-kanno', lineUserId: 'U-visual-3', displayName: '菅野 亮',
+    metadata: { __attention: '1' }, chatStatus: 'resolved', operator: OPERATORS[1],
+    latestIncomingMessage: { content: '', messageType: 'sticker', createdAt: '2026-08-13T20:52:00.000Z' },
+    supportMark: { id: 'mark-progress', name: '担当中', color: '#A66A00' },
+    tags: [FRIEND_TAGS.nen, FRIEND_TAGS.delivery], createdAt: '2026-08-13T00:00:00.000Z',
+  }),
+  friend({
+    id: 'friend-kenta', lineUserId: 'U-visual-4', displayName: 'Kenta Kawano(Obama)',
+    chatStatus: 'in_progress', operator: OPERATORS[1],
+    latestIncomingMessage: { content: '登録しました！', messageType: 'text', createdAt: '2026-08-13T16:16:00.000Z' },
+    supportMark: { id: 'mark-progress', name: '対応中', color: '#A66A00' },
+    tags: [FRIEND_TAGS.login, FRIEND_TAGS.ec], createdAt: '2026-08-13T00:00:00.000Z',
+  }),
+]

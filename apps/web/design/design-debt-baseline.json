@@ -176,8 +176,8 @@
     "direct-primary-button": 2
   },
   "app/friends/page.tsx": {
-    "unresolved-classname": 6,
-    "arbitrary-value": 74
+    "unresolved-classname": 2,
+    "direct-secondary-button": 3
   },
   "app/health/page.tsx": {
     "unresolved-classname": 5,
@@ -596,11 +596,6 @@
     "arbitrary-value": 60
   },
   "components/friends/friend-list-row.tsx": {
-    "unresolved-classname": 2,
-    "arbitrary-value": 37
-  },
-  "components/friends/friend-list-table.tsx": {
-    "arbitrary-value": 16,
     "unresolved-classname": 1
   },
   "components/friends/friend-table.tsx": {

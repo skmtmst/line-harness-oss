@@ -9,6 +9,7 @@ const mocks = {
   updateEntryRoute: vi.fn(),
   deleteEntryRoute: vi.fn(),
   getEntryRouteFunnel: vi.fn(),
+  getEntryRouteSources: vi.fn(),
   getEntryRouteGenres: vi.fn(),
   createEntryRouteGenre: vi.fn(),
   updateEntryRouteGenre: vi.fn(),
@@ -20,7 +21,7 @@ const app = new Hono<Env>();
 // 更新系はオーナー／管理者限定になった。ここで見たいのは本体の挙動なので、
 // 認証は通った状態にしてから渡す。権限の検証は role-guard.test.ts が持つ。
 app.use('*', async (c, next) => {
-  c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false });
+  c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false, tenantId: 'tenant-a' });
   return next();
 });
 app.route('/', entryRoutes);
@@ -65,7 +66,7 @@ describe('POST /api/entry-routes', () => {
     const body = await response.json() as { data: { genre: string; name: string } };
     expect(body.data).toMatchObject({ genre: 'A店', name: 'Instagram' });
     expect(mocks.createEntryRoute).toHaveBeenCalledWith(env.DB, expect.objectContaining({
-      genre: 'A店', name: 'Instagram', refCode: 'ashop-instagram',
+      genre: 'A店', name: 'Instagram', refCode: 'ashop-instagram', tenantId: 'tenant-a',
     }));
   });
 
@@ -86,6 +87,41 @@ describe('POST /api/entry-routes', () => {
     const response = await post({ genre: 'A店', name: 'Instagram', refCode: 'duplicate' });
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ error: 'この ref_code は既に使われています' });
+  });
+});
+
+describe('entry route tenant scope', () => {
+  const otherRoute = {
+    id: 'route-b', ref_code: 'b-ref', genre: null, name: 'B', tag_id: null,
+    scenario_id: null, redirect_url: 'https://before.example', pool_id: null,
+    intro_template_id: null, run_account_friend_add_scenarios: 1, is_active: 1,
+    tenant_id: 'tenant-b', created_at: '2026-08-14', updated_at: '2026-08-14',
+  };
+
+  it('passes the current tenant to the list query', async () => {
+    mocks.getEntryRoutes.mockResolvedValue([]);
+    const response = await app.fetch(new Request('https://example.com/api/entry-routes'), env);
+    expect(response.status).toBe(200);
+    expect(mocks.getEntryRoutes).toHaveBeenCalledWith(env.DB, 'tenant-a');
+  });
+
+  it('returns 404 without patching another tenant route', async () => {
+    mocks.getEntryRouteById.mockResolvedValue(otherRoute);
+    const response = await app.fetch(new Request('https://example.com/api/entry-routes/route-b', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ redirectUrl: 'https://after.example' }),
+    }), env);
+    expect(response.status).toBe(404);
+    expect(mocks.updateEntryRoute).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 without deleting another tenant route', async () => {
+    mocks.getEntryRouteById.mockResolvedValue(otherRoute);
+    const response = await app.fetch(new Request('https://example.com/api/entry-routes/route-b', {
+      method: 'DELETE',
+    }), env);
+    expect(response.status).toBe(404);
+    expect(mocks.deleteEntryRoute).not.toHaveBeenCalled();
   });
 });
 

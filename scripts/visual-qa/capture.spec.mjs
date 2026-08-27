@@ -96,6 +96,12 @@ for (const width of WIDTHS) {
       // 1・2. そのページに居て、描けているか
       await expectLanded(page, route.path)
 
+      // URLとエラー文言だけでは、本文が空白でも通ってしまう。
+      // 友だち一覧は画面の主見出しまで出たことを確かめる。
+      if (route.name === 'friends') {
+        await expect(page.getByText('友だち一覧', { exact: true }).first()).toBeVisible()
+      }
+
       // 3. 横スクロールが出ていないか。V6共通ルール §1-8。
       //    1px の誤差は端数なので許す。2px 以上はレイアウトの破れ。
       const overflow = await page.evaluate(() =>

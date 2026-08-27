@@ -16,14 +16,29 @@ vi.mock('@line-crm/db', async (importOriginal) => {
 import { chats } from './chats.js';
 
 describe('GET /api/operators response', () => {
-  test('returns only fields needed by the inbox assignee picker', async () => {
+  const appFor = (role: 'owner' | 'admin' | 'staff' | null) => {
     const app = new Hono<Env>();
+    if (role) {
+      app.use('*', async (c, next) => {
+        c.set('staff', { id: 'staff-1', name: '担当者', role, readOnly: false });
+        await next();
+      });
+    }
     app.route('/', chats);
-    const response = await app.request('/api/operators', {}, { DB: {} as D1Database } as Env['Bindings']);
+    return app;
+  };
+
+  test('returns only fields needed by the inbox assignee picker', async () => {
+    const response = await appFor('staff').request('/api/operators', {}, { DB: {} as D1Database } as Env['Bindings']);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
       success: true,
       data: [{ id: 'staff-1', name: '担当者' }],
     });
+  });
+
+  test('rejects an unauthenticated operator-list request', async () => {
+    const response = await appFor(null).request('/api/operators', {}, { DB: {} as D1Database } as Env['Bindings']);
+    expect(response.status).toBe(403);
   });
 });
