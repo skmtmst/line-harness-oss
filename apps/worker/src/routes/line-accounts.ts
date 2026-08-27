@@ -22,8 +22,8 @@ import {
 } from '../services/follower-import.js';
 import type { FollowerImportClient } from '../services/follower-import.js';
 import {
-  canAccessLineAccount,
-  filterVisibleLineAccounts,
+  canAccessAllLineAccounts,
+  getVisibleLineAccountScope,
   validateAccountHierarchy,
 } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
@@ -120,8 +120,7 @@ function serializeLineAccountFull(row: DbLineAccount) {
 lineAccounts.get('/api/line-accounts', async (c) => {
   try {
     const db = c.env.DB;
-    const allItems = await getLineAccounts(db);
-    const items = filterVisibleLineAccounts(allItems, c.get('staff'));
+    const items = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
     if (c.req.query('live') === '0') {
       return c.json({
         success: true,
@@ -181,8 +180,7 @@ lineAccounts.get('/api/line-accounts', async (c) => {
 lineAccounts.get('/api/line-accounts/summary', async (c) => {
   try {
     const db = c.env.DB;
-    const allItems = await getLineAccounts(db);
-    const visibleActiveIds = filterVisibleLineAccounts(allItems, c.get('staff'))
+    const visibleActiveIds = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts
       .filter((item) => Boolean(item.is_active))
       .map((item) => item.id);
     if (visibleActiveIds.length === 0) {
@@ -300,8 +298,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
     if (!account) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
-    const allAccounts = await getLineAccounts(c.env.DB);
-    if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     return c.json({ success: true, data: serializeLineAccount(account) });
@@ -321,8 +318,7 @@ lineAccounts.get(
       if (!account) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
       }
-      const allAccounts = await getLineAccounts(c.env.DB);
-      if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
       }
       const health = await getLineAccountCredentialHealth(
@@ -355,8 +351,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
 
-    const visibleAccounts = await getLineAccounts(c.env.DB);
-    if (!canAccessLineAccount(visibleAccounts, c.get('staff'), account.id)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
 
@@ -386,8 +381,7 @@ lineAccounts.get('/api/line-accounts/:id/follower-insight', async (c) => {
 lineAccounts.get('/api/line-accounts/:id/follower-import', async (c) => {
   const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
   if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
-  const allAccounts = await getLineAccounts(c.env.DB);
-  if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
     return c.json({ success: false, error: 'LINE account not found' }, 404);
   }
   const state = await getFollowerImportState(c.env.DB, account.id);
@@ -401,8 +395,7 @@ lineAccounts.post(
     try {
       const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
       if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
-      const allAccounts = await getLineAccounts(c.env.DB);
-      if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
       }
       const client = new LineClient(account.channel_access_token);
@@ -426,8 +419,7 @@ lineAccounts.post(
   async (c) => {
     const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
-    const allAccounts = await getLineAccounts(c.env.DB);
-    if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     try {
@@ -448,8 +440,7 @@ lineAccounts.post(
   async (c) => {
     const account = await getLineAccountById(c.env.DB, c.req.param('id')!);
     if (!account) return c.json({ success: false, error: 'LINE account not found' }, 404);
-    const allAccounts = await getLineAccounts(c.env.DB);
-    if (!canAccessLineAccount(allAccounts, c.get('staff'), account.id)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [account.id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     const client = new LineClient(account.channel_access_token);
@@ -601,8 +592,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), async (c)
     const copyItems = normalizeCopyItems(body.copyItems);
     if (copyItems === null) return c.json({ success: false, error: 'コピー項目が正しくありません' }, 400);
     const copyFromAccountId = normalizeOptionalString(body.copyFromAccountId) ?? null;
-    const allAccounts = await getLineAccounts(c.env.DB);
-    const visibleAccounts = filterVisibleLineAccounts(allAccounts, c.get('staff'));
+    const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
     const currentStaff = c.get('staff');
     if (
       currentStaff.role === 'admin' &&
@@ -723,7 +713,7 @@ lineAccounts.patch(
       }
 
       const allAccounts = await getLineAccounts(c.env.DB);
-      const visible = filterVisibleLineAccounts(allAccounts, c.get('staff'));
+      const visible = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
       const visibleIds = new Set(visible.map((account) => account.id));
       if (
         relationships.some(
@@ -777,8 +767,7 @@ lineAccounts.patch(
         }
       }
 
-      const allAccounts = await getLineAccounts(c.env.DB);
-      const visibleIds = new Set(filterVisibleLineAccounts(allAccounts, c.get('staff')).map((item) => item.id));
+      const visibleIds = new Set((await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts.map((item) => item.id));
       if (body.ordered.some((item) => !visibleIds.has(item.id))) {
         return c.json({ success: false, error: '権限のないLINEアカウントは並べ替えできません' }, 403);
       }
@@ -808,8 +797,7 @@ lineAccounts.patch(
   async (c) => {
     try {
       const id = c.req.param('id')!;
-      const allAccounts = await getLineAccounts(c.env.DB);
-      if (!canAccessLineAccount(allAccounts, c.get('staff'), id)) {
+      if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
         return c.json({ success: false, error: 'LINE account not found' }, 404);
       }
       const body = await c.req.json<{
@@ -951,8 +939,7 @@ lineAccounts.patch(
 lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id')!;
-    const allAccounts = await getLineAccounts(c.env.DB);
-    if (!canAccessLineAccount(allAccounts, c.get('staff'), id)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     const body = await c.req.json<{
@@ -1063,8 +1050,7 @@ lineAccounts.put('/api/line-accounts/:id', requireRole('owner'), async (c) => {
 lineAccounts.delete('/api/line-accounts/:id', requireRole('owner'), async (c) => {
   try {
     const id = c.req.param('id')!;
-    const allAccounts = await getLineAccounts(c.env.DB);
-    if (!canAccessLineAccount(allAccounts, c.get('staff'), id)) {
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [id])) {
       return c.json({ success: false, error: 'LINE account not found' }, 404);
     }
     await deleteLineAccount(c.env.DB, id);

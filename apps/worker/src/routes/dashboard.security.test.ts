@@ -11,6 +11,8 @@ const dbMocks = vi.hoisted(() => ({
   saveDashboardPreference: vi.fn(),
   deleteDashboardPreference: vi.fn(),
   saveDashboardDefaultPreference: vi.fn(),
+  getStaffById: vi.fn(),
+  getStaffAccountScopeIds: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
@@ -56,6 +58,8 @@ describe('dashboard organization account policy', () => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({})));
     dbMocks.getLineAccounts.mockResolvedValue([account('account-1'), account('account-2')]);
+    dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+    dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
     dbMocks.getLineAccountById.mockImplementation(async (_db: unknown, id: string) => account(id));
   });
 
