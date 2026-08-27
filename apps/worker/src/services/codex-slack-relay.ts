@@ -432,7 +432,16 @@ async function ensureSlackChannelMembers(
     } catch (error) {
       const message = String(error);
       if (message.includes(':already_in_channel') || message.includes(':cant_invite_self')) continue;
-      throw error;
+      // A stale or temporarily unavailable member must not prevent the
+      // channel from being used or block invitations for the remaining
+      // operators. Keep the failure visible in Worker logs and retry it on
+      // the next PR event.
+      console.warn(JSON.stringify({
+        event: 'slack_pr_channel_member_invite_failed',
+        channel,
+        member,
+        error: message,
+      }));
     }
   }
 }
@@ -504,6 +513,26 @@ export async function ensureUpcomingPrRangeChannel(
     configuredPrChannelMembers(config),
     fetcher,
   );
+}
+
+async function ensureUpcomingPrRangeChannelWithoutBlocking(
+  config: CodexSlackRelayConfig,
+  prNumber: number,
+  fetcher: typeof fetch,
+): Promise<void> {
+  try {
+    await ensureUpcomingPrRangeChannel(config, prNumber, fetcher);
+  } catch (error) {
+    // Preparing the next 100-PR channel is preventive maintenance. A missing
+    // Slack scope or a temporary API failure must never suppress the current
+    // PR report. Every event from #x90 through #x00 retries the preparation.
+    console.warn(JSON.stringify({
+      event: 'slack_upcoming_pr_range_prepare_failed',
+      prNumber,
+      nextRangeStart: nextPrRangeStartToPrepare(prNumber),
+      error: String(error),
+    }));
+  }
 }
 
 async function readThreadParent(
@@ -1217,10 +1246,12 @@ export async function relayCodexSlackEvent(
     fetcher,
   );
   if (!channelId) throw new Error(`SLACK_CHANNEL_NOT_CONFIGURED:${category}`);
-  // Provisioning needs broader Slack scopes than posting. Run it before any
-  // message mutation so a missing scope cannot leave a partial reply that a
-  // GitHub retry would post again.
-  if (event.prNumber) await ensureUpcomingPrRangeChannel(config, event.prNumber, fetcher);
+  // Next-range preparation is independent from the current PR report. It is
+  // retried for every PR in the last 11 numbers of the current range, but a
+  // provisioning failure is logged and never aborts the main Slack update.
+  if (event.prNumber) {
+    await ensureUpcomingPrRangeChannelWithoutBlocking(config, event.prNumber, fetcher);
+  }
   let key = workKey(event);
   let threadTs: string | null = null;
   let createdParent = false;
