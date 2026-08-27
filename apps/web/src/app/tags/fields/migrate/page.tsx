@@ -34,7 +34,7 @@ function FieldSummary({ title, field, kind }: { title: string; field: FriendFiel
           <h2 className="text-base font-bold text-ink">{field.name}</h2>
           <p className="mt-1 font-mono text-xs text-ink-faint">{`{{field.${field.fieldKey}}}`}</p>
         </div>
-        <span className={kind === 'source' ? 'rounded-full bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-full bg-accent-bg px-3 py-1 text-xs font-semibold text-accent'}>
+        <span className={kind === 'source' ? 'rounded-full bg-surface-soft px-3 py-1 text-xs font-semibold text-ink-secondary' : 'rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent'}>
           {FIELD_TYPE_LABELS[field.type]}
         </span>
       </div>
@@ -109,7 +109,7 @@ function MigrateFriendField() {
       </div>
       {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
-      <div className="grid gap-4 xl:grid-cols-3 xl:items-stretch">
+      <div data-design="Fields" className="grid gap-4 xl:grid-cols-3 xl:items-stretch">
         <FieldSummary title="いま使っている項目" field={source} kind="source" />
         <div className="flex items-center justify-center text-2xl text-ink-faint" aria-hidden="true">→</div>
         <section className="rounded-card border border-accent/30 bg-canvas p-5 shadow-sm">
@@ -125,7 +125,7 @@ function MigrateFriendField() {
         </section>
       </div>
 
-      <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Preview" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-base font-bold text-ink">値を変換できるか事前確認</h2><p className="mt-1 text-sm text-ink-secondary">登録済みの値を読み取り、移行できる数だけを確認します。</p></div>
           <Button type="button" onClick={() => void runPreview()} disabled={checking}>{checking ? '確認しています…' : 'dry-runを実行'}</Button>
@@ -143,12 +143,12 @@ function MigrateFriendField() {
                 <thead><TableHeadRow><Th>友だちID</Th><Th>いまの値</Th><Th>確認する理由</Th></TableHeadRow></thead>
                 <tbody>{preview.rows.map((row) => <Tr key={row.friendId}><Td className="truncate font-mono text-xs" title={row.friendId}>{row.friendId}</Td><Td className="truncate" title={row.sourceValue}>{row.sourceValue || '（空欄）'}</Td><Td>{row.reason ?? '確認してください'}</Td></Tr>)}</tbody>
               </DataTable>
-            ) : <p className="mt-4 rounded-control bg-accent-bg p-3 text-sm text-accent">確認が必要な値はありません。</p>}
+            ) : <p className="mt-4 rounded-control bg-accent-soft p-3 text-sm text-accent">確認が必要な値はありません。</p>}
           </div>
         ) : <p className="mt-4 text-sm text-ink-faint">まだ事前確認していません。未取得を0人として表示しません。</p>}
       </section>
 
-      <section className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
+      <section data-design="Usage" className="mt-4 rounded-card border border-hairline bg-canvas p-5 shadow-sm">
         <h2 className="text-base font-bold text-ink">切り替わる使用先</h2>
         <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
           <p className="rounded-control bg-surface-soft p-3">回答フォーム <strong className="float-right">—</strong></p>

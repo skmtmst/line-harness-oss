@@ -89,7 +89,7 @@ function NewFriendFieldForm() {
       {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <section className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+        <section data-design="Basic" className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
           <h2 className="mb-4 text-base font-bold text-ink">基本情報</h2>
           <div className="space-y-4">
             <label className="block text-sm font-semibold text-ink">項目名（必須）<input value={name} onChange={(event) => { setName(event.target.value); if (!keyTouched) setFieldKey(suggestKey(event.target.value)) }} placeholder="例：愛犬のお名前" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal outline-none focus:border-accent" /></label>
@@ -103,7 +103,7 @@ function NewFriendFieldForm() {
         </section>
 
         <div className="space-y-4">
-          <section className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
+          <section data-design="Value" className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
             <h2 className="mb-4 text-base font-bold text-ink">値の扱い</h2>
             <label className="block text-sm font-semibold text-ink">既定値<input value={defaultValue} onChange={(event) => setDefaultValue(event.target.value)} placeholder="未設定" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-normal" /><span className="mt-1 block text-xs font-normal text-ink-faint">友だち情報が空欄のとき、この値が代わりに送信されます。</span></label>
             <div className="mt-4 divide-y divide-hairline">
@@ -113,7 +113,7 @@ function NewFriendFieldForm() {
             </div>
             {ecIsMaster ? <label className="mt-3 block text-sm font-semibold text-ink">EC側の項目名<input value={ecFieldPath} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" className="mt-1.5 h-10 w-full rounded-control border border-hairline bg-canvas px-3 font-mono font-normal" /></label> : null}
           </section>
-          <section className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"><h2 className="text-base font-bold text-ink">作成後に変更できないもの</h2><p className="mt-2 text-sm leading-6 text-ink-secondary">種類と差し込み名は、値やテンプレートを壊さないため固定します。変更したい場合は、新しい項目への移行プレビューを使います。</p><p className="mt-2 text-xs text-ink-faint">表示先：{destination} ／ {isStarred ? '友だち一覧' : '友だち詳細'} ／ テンプレート差し込み</p></section>
+          <section data-design="Immutable" className="rounded-card border border-hairline bg-canvas p-5 [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]"><h2 className="text-base font-bold text-ink">作成後に変更できないもの</h2><p className="mt-2 text-sm leading-6 text-ink-secondary">種類と差し込み名は、値やテンプレートを壊さないため固定します。変更したい場合は、新しい項目への移行プレビューを使います。</p><p className="mt-2 text-xs text-ink-faint">表示先：{destination} ／ {isStarred ? '友だち一覧' : '友だち詳細'} ／ テンプレート差し込み</p></section>
         </div>
       </div>
 

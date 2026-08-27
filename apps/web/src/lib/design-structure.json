@@ -2167,38 +2167,61 @@
       ]
     },
     "/tags/fields/new": {
-      "node": "nKQRg",
-      "name": "V2 3-2-1 項目を追加する（一部）",
+      "node": "A1ZYeP",
+      "name": "V6 4-2-A 友だち情報欄を追加",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["A1ZYeP"],
+        "requiredViewports": [1440, 1920],
+        "reason": "V6へ実装済み。Claudeの同条件画像比較待ち"
+      },
       "sections": [
-        "Head"
+        "Basic",
+        "Value",
+        "Immutable"
       ],
       "parts": [
         "友だち情報欄",
-        "項目を追加する",
-        "キャンセル",
         "項目を追加",
-        "どの項目か",
+        "基本情報",
         "項目名",
         "必須",
+        "差し込み名",
+        "種類",
         "フォルダ",
-        "入力の形式",
-        "短いテキスト",
-        "長い文章",
-        "選択",
-        "決まった選択肢から選ぶ",
-        "数値",
-        "体重など",
-        "日付",
-        "誕生日など",
-        "選択肢",
-        "なし",
-        "追加",
-        "複数選択",
-        "できる",
-        "どこで使うか",
-        "プレビュー",
-        "テンプレートの差し込み",
-        "気をつけること"
+        "値の扱い",
+        "既定値",
+        "友だち一覧に表示",
+        "個人情報として保護",
+        "EC側を正とする",
+        "作成後に変更できないもの",
+        "キャンセル",
+        "項目を作成"
+      ]
+    },
+    "/tags/fields/migrate": {
+      "node": "KoT6c",
+      "name": "V6 4-2-B 友だち情報欄を移行",
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": ["KoT6c"],
+        "requiredViewports": [1440, 1920],
+        "reason": "安全なdry-runまで実装済み。Claudeの同条件画像比較待ち"
+      },
+      "sections": [
+        "Fields",
+        "Preview",
+        "Usage"
+      ],
+      "parts": [
+        "友だち情報欄",
+        "項目を移行",
+        "いま使っている項目",
+        "新しく作る項目",
+        "値を変換できるか事前確認",
+        "dry-runを実行",
+        "切り替わる使用先",
+        "移行をやめる"
       ]
     },
     "/automations": {
