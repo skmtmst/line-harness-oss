@@ -100,6 +100,9 @@ const NEN = { feature: 21, dir: 'nen-v6', route: '/nen-campaigns', mode: 'page' 
 /** 写真審査。札の格子と、状態の札4本（審査待ち／採用済み／見送り／すべて）。 */
 const PHOTO = { feature: 22, dir: 'photos-v6', route: '/nen-members', mode: 'page' }
 
+/** EC連携。実装は1枚もので、設計の4タブは無い。 */
+const EC = { feature: 23, dir: 'ec-v6', route: '/ec-commerce', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -891,6 +894,28 @@ export const SCREENS = [
     ...PHOTO, node: 'J3Wxl8', name: '22-1-C 出しているもの',
     status: 'unimplemented',
     why: '通した写真をどこで使っているか（リッチメニュー・コラム・サイト）を並べるタブが無い。状態の札は4本（審査待ち／採用済み／見送り／すべて）で「出しているもの」が無い',
+  },
+
+  // ── 機能23 EC連携 ───────────────────────────────────────
+  /*
+    設計のタブは4本（取り込みの記録／会員のつき合わせ／定期便／つなぎ先）。
+    実装は1枚もので、**取り込みの記録だけ**がある。
+  */
+  { ...EC, node: 'eI3gs', name: '23-1 EC連携' },
+  {
+    ...EC, node: 'ELayY', name: '23-1-A 会員のつき合わせ',
+    status: 'unimplemented',
+    why: '結びつかなかった注文を並べて、候補と突き合わせる画面が無い。**`friendId` が空の注文が、どこにも出てこない**',
+  },
+  {
+    ...EC, node: 'bfB50', name: '23-1-B 定期便',
+    status: 'unimplemented',
+    why: '定期便のタブが無い。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）',
+  },
+  {
+    ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
+    status: 'unimplemented',
+    why: 'つなぎ先も、人を見分ける決めごとも画面から変えられない。「接続先や突合キーを画面から変える口が無い」と書いてある（`page.tsx:174`）',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

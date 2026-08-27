@@ -1966,3 +1966,85 @@ export const NEN_PHOTOS = [
     reject_reason: 'うしろに人の顔が写っています',
   },
 ]
+
+/**
+ * 機能23 EC連携。設計 `eI3gs`（取り込み2,486・つき合わせ24・定期便186）。
+ *
+ * **`overview` は `{total, processed, failed, skipped, last24h, lastReceivedAt, byType}` の通。**
+ * `events` は `EcCommerceEvent` の**配列**で、一覧の既定を返すと
+ * `events.map` で落ちる。
+ */
+export const EC_OVERVIEW = {
+  total: 2486, processed: 2412, failed: 2, skipped: 24,
+  last24h: 148, lastReceivedAt: '2026-08-25T02:40:00.000Z',
+  byType: [
+    { eventType: 'order_created', label: '注文が確定', count: 96 },
+    { eventType: 'payment_confirmed', label: '入金を確認', count: 32 },
+    { eventType: 'shipped', label: '発送した', count: 20 },
+  ],
+}
+
+export const EC_EVENTS = [
+  {
+    id: 'ece-1', externalEventId: 'shopify-1', eventType: 'order_created', eventLabel: '注文が確定',
+    customerId: 'cus-1', friendId: 'friend-1', friendName: 'Kenta Kawano', orderNumber: '#12486',
+    status: 'processed', errorMessage: null,
+    receivedAt: '2026-08-25T02:42:00.000Z', processedAt: '2026-08-25T02:42:01.000Z',
+  },
+  {
+    id: 'ece-2', externalEventId: 'shopify-2', eventType: 'shipped', eventLabel: '発送した',
+    customerId: 'cus-2', friendId: 'friend-2', friendName: 'Masato S.', orderNumber: '#12480',
+    status: 'processed', errorMessage: null,
+    receivedAt: '2026-08-25T01:10:00.000Z', processedAt: '2026-08-25T01:10:02.000Z',
+  },
+  {
+    /*
+      **友だちが見つからなかった注文。** 設計の「会員のつき合わせ」に並ぶもの。
+      `friendId` が null で、状態は `skipped`。ここが欠けると
+      「つながっていない注文」を確かめられない。
+    */
+    id: 'ece-3', externalEventId: 'shopify-3', eventType: 'order_created', eventLabel: '注文が確定',
+    customerId: 'cus-3', friendId: null, friendName: null, orderNumber: '#12479',
+    status: 'skipped', errorMessage: null,
+    receivedAt: '2026-08-24T23:50:00.000Z', processedAt: '2026-08-24T23:50:01.000Z',
+  },
+  {
+    /* 3回やり直しても入らなかったもの。**理由が残ることが要る。** */
+    id: 'ece-4', externalEventId: 'shopify-4', eventType: 'payment_confirmed', eventLabel: '入金を確認',
+    customerId: 'cus-4', friendId: 'friend-4', friendName: '山田 太郎', orderNumber: '#12470',
+    status: 'failed', errorMessage: '注文の金額が読めませんでした',
+    receivedAt: '2026-08-24T20:00:00.000Z', processedAt: null,
+  },
+]
+
+export const EC_SETTINGS = [
+  {
+    eventType: 'order_created', label: '注文が確定した', isEnabled: true,
+    title: 'ご注文ありがとうございます', introText: 'ご注文を承りました。', outroText: '発送までお待ちください。',
+    category: 'order', buttonLabel: '注文をみる', buttonUrl: 'https://example.co.jp/orders',
+    imageUrl: '', displayOrder: 1, fixedFields: ['注文番号', '金額'],
+    fixedPreview: '注文番号 #12486 ／ ¥4,200', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    eventType: 'payment_confirmed', label: '入金を確認した', isEnabled: true,
+    title: 'お支払いを確認しました', introText: 'お支払いありがとうございます。', outroText: '',
+    category: 'payment', buttonLabel: '', buttonUrl: '', imageUrl: '',
+    displayOrder: 2, fixedFields: ['金額'], fixedPreview: '¥4,200',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    eventType: 'shipped', label: '発送した', isEnabled: true,
+    title: 'お荷物を送りました', introText: '本日発送しました。', outroText: '',
+    category: 'shipping', buttonLabel: '追跡する', buttonUrl: 'https://example.co.jp/track',
+    imageUrl: '', displayOrder: 3, fixedFields: ['追跡番号'],
+    fixedPreview: '追跡番号 1234-5678-9012', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    /* 止めているもの。**チェックを外すと購入後の配信も止まる。** */
+    eventType: 'refunded', label: '返品・返金した', isEnabled: false,
+    title: '', introText: '', outroText: '',
+    category: 'support', buttonLabel: '', buttonUrl: '', imageUrl: '',
+    displayOrder: 5, fixedFields: [], fixedPreview: '',
+    updatedAt: '2026-06-01T00:00:00.000Z',
+  },
+]
