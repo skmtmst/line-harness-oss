@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   canAccess: vi.fn(),
   getScope: vi.fn(),
   getFriendById: vi.fn(),
+  getSavedSearchById: vi.fn(),
   pushMessage: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ vi.mock('../services/account-access.js', () => ({
 vi.mock('@line-crm/db', async (importOriginal) => ({
   ...await importOriginal<typeof import('@line-crm/db')>(),
   getFriendById: mocks.getFriendById,
+  getSavedSearchById: mocks.getSavedSearchById,
 }));
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class { pushMessage = mocks.pushMessage; },
@@ -22,10 +24,14 @@ vi.mock('@line-crm/line-sdk', () => ({
 
 const { friends } = await import('./friends.js');
 
-function createApp(prepared: Array<{ sql: string; binds: unknown[] }>, friendRows: Array<Record<string, unknown>> = []) {
+function createApp(
+  prepared: Array<{ sql: string; binds: unknown[] }>,
+  friendRows: Array<Record<string, unknown>> = [],
+  role: 'owner' | 'admin' | 'staff' = 'owner',
+) {
   const app = new Hono<any>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff', role: 'owner', tenantId: 'tenant-a' });
+    c.set('staff', { id: 'staff', role, tenantId: 'tenant-a' });
     c.env = {
       DB: {
         prepare(sql: string) {
@@ -59,6 +65,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getScope.mockResolvedValue({ allowedAccountIds: ['own'], canSeeUnassigned: false, ids: ['own'], accounts: [] });
   mocks.getFriendById.mockResolvedValue({ id: 'friend', line_account_id: 'other', metadata: '{}', line_user_id: 'U-test' });
+  mocks.getSavedSearchById.mockResolvedValue(null);
   mocks.canAccess.mockResolvedValue(false);
 });
 
@@ -143,5 +150,50 @@ describe('A-8 friends tenant scope', () => {
     expect(response.status).toBe(200);
     expect(prepared.filter(({ sql }) => sql.includes('friend_tags'))).toHaveLength(0);
     expect(prepared.length).toBeLessThan(10);
+  });
+
+  test('shared saved search applies its AND and OR conditions inside the selected account', async () => {
+    mocks.getSavedSearchById.mockResolvedValue({
+      id: 'search-1',
+      scope: 'friends',
+      created_by: 'another-staff',
+      line_account_id: 'own',
+      is_shared: 1,
+      conditions_json: JSON.stringify({
+        all: [{ kind: 'tag', op: 'includes', value: 'vip' }],
+        any: [{ kind: 'name', op: 'contains', value: '田中' }],
+      }),
+    });
+    const prepared: Array<{ sql: string; binds: unknown[] }> = [];
+    const response = await createApp(prepared).request(
+      '/api/friends?includeTags=false&lineAccountId=own&savedSearchId=search-1',
+    );
+    expect(response.status).toBe(200);
+    expect(prepared.some(({ sql, binds }) =>
+      sql.includes('friend_tags sft') && sql.includes('f.display_name LIKE ?')
+      && binds.includes('vip') && binds.includes('%田中%'))).toBe(true);
+  });
+
+  test('private saved search owned by another staff is hidden', async () => {
+    mocks.getSavedSearchById.mockResolvedValue({
+      id: 'search-1',
+      scope: 'friends',
+      created_by: 'another-staff',
+      line_account_id: 'own',
+      is_shared: 0,
+      conditions_json: JSON.stringify({ all: [{ kind: 'tag', op: 'includes', value: 'vip' }] }),
+    });
+    const response = await createApp([], [], 'staff').request(
+      '/api/friends?includeTags=false&lineAccountId=own&savedSearchId=search-1',
+    );
+    expect(response.status).toBe(404);
+  });
+
+  test('saved search from an invisible account returns 404 before reading it', async () => {
+    const response = await createApp([]).request(
+      '/api/friends?includeTags=false&lineAccountId=other&savedSearchId=search-1',
+    );
+    expect(response.status).toBe(404);
+    expect(mocks.getSavedSearchById).not.toHaveBeenCalled();
   });
 });

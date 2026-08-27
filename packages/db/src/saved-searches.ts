@@ -1,4 +1,10 @@
 import { jstNow } from './utils.js';
+import type {
+  SavedSearchCondition as SearchCondition,
+  SavedSearchConditions as SearchConditions,
+} from '@line-crm/shared';
+
+export type { SavedSearchCondition as SearchCondition, SavedSearchConditions as SearchConditions } from '@line-crm/shared';
 
 /**
  * 保存した検索。
@@ -33,24 +39,6 @@ export interface SavedSearchAccess {
   canManageAll: boolean;
 }
 
-/** 条件1つ。kind ごとに op と value の意味が変わる。 */
-export interface SearchCondition {
-  kind: 'tag' | 'field' | 'form' | 'purchase' | 'mark' | 'scenario' | 'created_at';
-  key?: string;
-  formId?: string;
-  op: string;
-  value?: unknown;
-}
-
-export interface SearchConditions {
-  /** すべて満たす条件 */
-  all?: SearchCondition[];
-  /** どれか1つ満たせばよい条件 */
-  any?: SearchCondition[];
-  /** 'visible_only' | 'hidden_only' | 'all'。省略時は visible_only */
-  visibility?: 'visible_only' | 'hidden_only' | 'all';
-}
-
 export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;
 export const INBOX_SAVED_VIEW_CHANNELS = ['line', 'email'] as const;
 export const INBOX_SAVED_VIEW_SORTS = ['newest', 'waiting_desc'] as const;
@@ -71,11 +59,15 @@ export interface InboxSavedViewConditions {
 
 const CONDITION_KINDS = new Set([
   'tag',
+  'name',
   'field',
   'form',
   'purchase',
   'mark',
   'scenario',
+  'chat_status',
+  'following',
+  'status_message',
   'created_at',
 ]);
 
@@ -125,6 +117,37 @@ export function validateSearchConditions(
       return { ok: false, error: '表示状態の指定が正しくありません' };
     }
     out.visibility = obj.visibility as SearchConditions['visibility'];
+  }
+
+  if (obj.description !== undefined) {
+    if (typeof obj.description !== 'string') {
+      return { ok: false, error: '説明は文字で指定してください' };
+    }
+    out.description = obj.description.trim().slice(0, 300);
+  }
+
+  if (obj.list !== undefined) {
+    if (typeof obj.list !== 'object' || obj.list === null || Array.isArray(obj.list)) {
+      return { ok: false, error: '一覧の表示設定が正しくありません' };
+    }
+    const list = obj.list as Record<string, unknown>;
+    const limit = list.limit === undefined ? undefined : Number(list.limit);
+    if (limit !== undefined && ![10, 20, 30, 40, 50].includes(limit)) {
+      return { ok: false, error: '表示件数が正しくありません' };
+    }
+    const sort = list.sort === undefined ? undefined : String(list.sort);
+    if (sort !== undefined && sort !== 'recent' && sort !== 'oldest') {
+      return { ok: false, error: '並び順が正しくありません' };
+    }
+    const columns = list.columns === undefined ? undefined : stringArray(list.columns);
+    if (list.columns !== undefined && !columns) {
+      return { ok: false, error: '表示列が正しくありません' };
+    }
+    out.list = {
+      ...(columns ? { columns } : {}),
+      ...(sort ? { sort: sort as 'recent' | 'oldest' } : {}),
+      ...(limit ? { limit: limit as 10 | 20 | 30 | 40 | 50 } : {}),
+    };
   }
 
   return { ok: true, value: out };

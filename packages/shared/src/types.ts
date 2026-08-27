@@ -293,13 +293,54 @@ export interface CommonVarSchedule {
   appliedAt: string | null;
 }
 
+export type SavedSearchConditionKind =
+  | "name"
+  | "tag"
+  | "field"
+  | "form"
+  | "purchase"
+  | "mark"
+  | "scenario"
+  | "chat_status"
+  | "following"
+  | "status_message"
+  | "created_at";
+
+/** 保存した検索の条件1本。kind ごとに op / key / value の意味が変わる。 */
+export interface SavedSearchCondition {
+  kind: SavedSearchConditionKind;
+  key?: string;
+  formId?: string;
+  op: string;
+  value?: unknown;
+}
+
+/**
+ * 保存した検索の中身。
+ *
+ * AND と OR は1段だけにする。入れ子を許すと編集画面と実行側で同じ条件を
+ * 再現できなくなる。説明と一覧表示も同じJSONに置き、DB列を増やさず既存
+ * データとの互換性を保つ。
+ */
+export interface SavedSearchConditions {
+  all?: SavedSearchCondition[];
+  any?: SavedSearchCondition[];
+  visibility?: "visible_only" | "hidden_only" | "all";
+  description?: string;
+  list?: {
+    columns?: string[];
+    sort?: "recent" | "oldest";
+    limit?: 10 | 20 | 30 | 40 | 50;
+  };
+}
+
 /** 保存した検索 */
 export interface SavedSearch {
   id: string;
   name: string;
   scope: "friends" | "chats" | "bookings";
   /** { all: [...], any: [...], visibility } の形 */
-  conditions: unknown;
+  conditions: SavedSearchConditions;
   createdBy: string | null;
   lineAccountId: string | null;
   isShared: boolean;
