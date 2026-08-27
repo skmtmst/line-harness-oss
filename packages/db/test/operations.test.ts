@@ -108,5 +108,7 @@ describe('サーバー正本の緊急停止', () => {
         result: 'held',
       }),
     ])
+    expect((await listOperationIncidents(db, { accountIds: ['account-1'], includeGlobal: false }))[0]?.targetCounts)
+      .toEqual({ held: 1, skippedDueToEmergency: 0, inFlight: 0, failed: 0 })
   })
 })

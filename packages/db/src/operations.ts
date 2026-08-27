@@ -40,6 +40,12 @@ export interface OperationIncident {
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  targetCounts: {
+    held: number;
+    skippedDueToEmergency: number;
+    inFlight: number;
+    failed: number;
+  };
 }
 
 const ALL_ACCOUNTS_SCOPE = '*';
@@ -372,6 +378,8 @@ type IncidentRow = {
   resolved_by_actor_id: string | null;
   error_message: string | null; stopped_at: string | null; resolved_at: string | null;
   created_at: string; updated_at: string;
+  held_count?: number | null; skipped_count?: number | null;
+  in_flight_count?: number | null; failed_count?: number | null;
 };
 
 function mapIncident(row: IncidentRow): OperationIncident {
@@ -388,11 +396,25 @@ function mapIncident(row: IncidentRow): OperationIncident {
     controlVersion: row.control_version,
     errorMessage: row.error_message, stoppedAt: row.stopped_at,
     resolvedAt: row.resolved_at, createdAt: row.created_at, updatedAt: row.updated_at,
+    targetCounts: {
+      held: Number(row.held_count ?? 0),
+      skippedDueToEmergency: Number(row.skipped_count ?? 0),
+      inFlight: Number(row.in_flight_count ?? 0),
+      failed: Number(row.failed_count ?? 0),
+    },
   };
 }
 
 export async function getOperationIncident(db: D1Database, id: string): Promise<OperationIncident | null> {
-  const row = await db.prepare('SELECT * FROM operation_incidents WHERE id = ?')
+  const row = await db.prepare(`SELECT oi.*,
+      SUM(CASE WHEN otr.result = 'held' THEN 1 ELSE 0 END) AS held_count,
+      SUM(CASE WHEN otr.result = 'skipped_due_to_emergency' THEN 1 ELSE 0 END) AS skipped_count,
+      SUM(CASE WHEN otr.result = 'in_flight' THEN 1 ELSE 0 END) AS in_flight_count,
+      SUM(CASE WHEN otr.result = 'failed' THEN 1 ELSE 0 END) AS failed_count
+    FROM operation_incidents oi
+    LEFT JOIN operation_target_results otr ON otr.incident_id = oi.id
+    WHERE oi.id = ?
+    GROUP BY oi.id`)
     .bind(id).first<IncidentRow>();
   return row ? mapIncident(row) : null;
 }
@@ -403,17 +425,24 @@ export async function listOperationIncidents(
 ): Promise<OperationIncident[]> {
   const clauses: string[] = [];
   const binds: unknown[] = [];
-  if (options.includeGlobal) clauses.push("scope_key = '*'");
+  if (options.includeGlobal) clauses.push("oi.scope_key = '*'");
   if (options.accountIds.length > 0) {
-    clauses.push(`line_account_id IN (${options.accountIds.map(() => '?').join(',')})`);
+    clauses.push(`oi.line_account_id IN (${options.accountIds.map(() => '?').join(',')})`);
     binds.push(...options.accountIds);
   }
   if (clauses.length === 0) return [];
   const limit = Math.max(1, Math.min(options.limit ?? 100, 500));
   const rows = await db.prepare(
-    `SELECT * FROM operation_incidents
+    `SELECT oi.*,
+      SUM(CASE WHEN otr.result = 'held' THEN 1 ELSE 0 END) AS held_count,
+      SUM(CASE WHEN otr.result = 'skipped_due_to_emergency' THEN 1 ELSE 0 END) AS skipped_count,
+      SUM(CASE WHEN otr.result = 'in_flight' THEN 1 ELSE 0 END) AS in_flight_count,
+      SUM(CASE WHEN otr.result = 'failed' THEN 1 ELSE 0 END) AS failed_count
+      FROM operation_incidents oi
+      LEFT JOIN operation_target_results otr ON otr.incident_id = oi.id
       WHERE ${clauses.map((clause) => `(${clause})`).join(' OR ')}
-      ORDER BY created_at DESC LIMIT ?`,
+      GROUP BY oi.id
+      ORDER BY oi.created_at DESC LIMIT ?`,
   ).bind(...binds, limit).all<IncidentRow>();
   return (rows.results ?? []).map(mapIncident);
 }

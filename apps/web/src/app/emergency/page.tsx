@@ -8,11 +8,13 @@ import {
   api,
   type OperationCapability,
   type OperationControl,
+  type OperationHealthAlert,
   type OperationIncident,
   type OperationRestorePreview,
 } from '@/lib/api'
 import { formatOperationDate, type OperationSeverity } from '@/lib/operation-status'
 import ReleaseLogPanel from '@/components/emergency/release-log-panel'
+import Button from '@/components/shared/button'
 
 const TABS = [
   { key: 'health', label: '健全性チェック' },
@@ -85,6 +87,10 @@ function HealthPanel({ onSeverity, refreshKey }: { onSeverity: (severity: Operat
   const [loading, setLoading] = useState(true)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
   const [control, setControl] = useState<OperationControl | null>(null)
+  const [alerts, setAlerts] = useState<OperationHealthAlert[]>([])
+  const [alertState, setAlertState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [acknowledgingAlertId, setAcknowledgingAlertId] = useState<string | null>(null)
+  const [alertMessage, setAlertMessage] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -97,12 +103,14 @@ function HealthPanel({ onSeverity, refreshKey }: { onSeverity: (severity: Operat
     })
     const persistedRequest = apiData(api.operations.health())
     const controlRequest = apiData(api.operations.control(null))
+    const alertsRequest = apiData(api.operations.alerts())
 
-    const [lineResult, persistedResult, controlResult] =
+    const [lineResult, persistedResult, controlResult, alertsResult] =
       await Promise.allSettled([
         lineRequest,
         persistedRequest,
         controlRequest,
+        alertsRequest,
       ])
 
     const nextChecks: HealthCheckItem[] = []
@@ -158,6 +166,13 @@ function HealthPanel({ onSeverity, refreshKey }: { onSeverity: (severity: Operat
     }
 
     setControl(controlResult.status === 'fulfilled' ? controlResult.value : null)
+    if (alertsResult.status === 'fulfilled') {
+      setAlerts(alertsResult.value)
+      setAlertState('ready')
+    } else {
+      setAlerts([])
+      setAlertState('error')
+    }
 
     setChecks(CHECK_DEFINITIONS.map((definition) => nextChecks.find((item) => item.id === definition.id) ?? { ...definition, detail: '確認できませんでした', severity: 'unknown' }))
     setLoading(false)
@@ -168,6 +183,23 @@ function HealthPanel({ onSeverity, refreshKey }: { onSeverity: (severity: Operat
     const timer = window.setInterval(() => { void load() }, 5 * 60 * 1000)
     return () => window.clearInterval(timer)
   }, [load, refreshKey])
+
+  const acknowledgeAlert = async (alertId: string) => {
+    setAcknowledgingAlertId(alertId)
+    setAlertMessage(null)
+    try {
+      const response = await api.operations.acknowledgeAlert(alertId)
+      if (!response.success) {
+        setAlertMessage(response.error)
+        return
+      }
+      setAlerts((current) => current.map((alert) => alert.id === alertId ? response.data : alert))
+    } catch {
+      setAlertMessage('アラートを確認済みにできませんでした。')
+    } finally {
+      setAcknowledgingAlertId(null)
+    }
+  }
 
   const displayedSeverity = loading ? 'unknown' : mostSevere(checks)
   const isNormal = displayedSeverity === 'normal'
@@ -208,6 +240,7 @@ function HealthPanel({ onSeverity, refreshKey }: { onSeverity: (severity: Operat
           {checks.map((check) => {
             const style = severityStyle[check.severity]
             const iconClass = check.severity === 'normal' ? 'bg-emerald-100 text-emerald-700' : check.severity === 'warning' ? 'bg-amber-100 text-amber-800' : check.severity === 'danger' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'
+            const alert = check.id === 'line' ? undefined : alerts.find((item) => item.checkKey === check.id)
             return (
               <div key={check.id} className={`flex items-center gap-3 px-4 py-4 ${check.severity === 'normal' ? 'bg-emerald-50/50' : style.panel}`}>
                 <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${iconClass}`}>{check.icon}</span>
@@ -215,11 +248,20 @@ function HealthPanel({ onSeverity, refreshKey }: { onSeverity: (severity: Operat
                   <p className="text-sm font-bold text-gray-900">{check.label}</p>
                   <p className="mt-1 text-xs text-gray-600">{check.detail}</p>
                 </div>
-                <StatusPill severity={check.severity} />
+                <div className="flex shrink-0 items-center gap-2">
+                  {alert?.status === 'acknowledged'
+                    ? <span className="bg-info-bg text-info rounded-pill px-2.5 py-1 text-xs font-bold">確認済み</span>
+                    : alert?.status === 'open'
+                      ? <Button onClick={() => void acknowledgeAlert(alert.id)} disabled={acknowledgingAlertId === alert.id}>{acknowledgingAlertId === alert.id ? '反映中…' : '確認済みにする'}</Button>
+                      : null}
+                  <StatusPill severity={check.severity} />
+                </div>
               </div>
             )
           })}
         </div>
+        {alertState === 'error' ? <p className="border-hairline bg-warning-bg text-warning border-t px-4 py-3 text-xs font-medium">アラートの確認状態を取得できませんでした。</p> : null}
+        {alertMessage ? <p className="border-hairline bg-danger-bg text-danger border-t px-4 py-3 text-xs font-medium">{alertMessage}</p> : null}
         {!isNormal && <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3"><p className="text-xs text-gray-600">配信予定を確認し、必要な場合だけ配信を停止してください。</p><Link href="/emergency?tab=control" className="rounded-control inline-flex min-h-9 items-center bg-red-600 px-3 text-xs font-bold text-white hover:bg-red-700">緊急停止を確認</Link></div>}
       </section>
     </div>
@@ -386,6 +428,16 @@ function HistoryPanel() {
   const last = operations[0]
   const stoppedCount = operations.filter((item) => item.status === 'stopped').length
   const statusLabel = (status: OperationIncident['status']) => status === 'stopped' ? '停止中' : status === 'resolved' ? '復旧済み' : status === 'failed' ? '失敗' : '処理中'
+  const targetResultSummary = (incident: OperationIncident) => {
+    const counts = incident.targetCounts
+    if (!counts) return '停止対象の実績を取得できません'
+    return [
+      counts.held > 0 ? `保留 ${counts.held}件` : null,
+      counts.skippedDueToEmergency > 0 ? `見送り ${counts.skippedDueToEmergency}件` : null,
+      counts.inFlight > 0 ? `送信開始済み ${counts.inFlight}件` : null,
+      counts.failed > 0 ? `失敗 ${counts.failed}件` : null,
+    ].filter((item): item is string => item !== null).join('・')
+  }
   return (
     <div className="space-y-4" data-design="V6 Update history" data-design-node="UhC2O">
       <div className="rounded-card border border-blue-200 bg-blue-50 px-4 py-3 text-xs font-medium text-blue-900">
@@ -405,7 +457,7 @@ function HistoryPanel() {
           </select>
         </div>
         {state === 'error' && <p className="bg-red-50 px-4 py-3 text-xs font-medium text-red-800">緊急操作の履歴を取得できませんでした。</p>}
-        {state === 'loading' ? <p className="p-8 text-center text-xs text-gray-500">履歴を読み込んでいます…</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-gray-500">該当する履歴はまだありません。</p> : <div className="divide-y divide-gray-100">{entries.map((entry) => <div key={entry.id} className="grid gap-2 px-4 py-4 md:grid-cols-[150px_120px_1fr_auto] md:items-center"><time className="text-xs text-gray-500">{formatOperationDate(entry.stoppedAt ?? entry.createdAt)}</time><span className="text-xs font-bold text-gray-600">{entry.lineAccountId ? 'アカウント別' : '全アカウント'}</span><div><p className="text-sm font-bold text-gray-900">{entry.reason}</p><p className="mt-1 text-xs text-gray-500">{entry.capabilities.join('・')}{entry.detail ? ` / ${entry.detail}` : ''}{entry.errorMessage ? ` / ${entry.errorMessage}` : ''}</p></div><span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${entry.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>{statusLabel(entry.status)}</span></div>)}</div>}
+        {state === 'loading' ? <p className="p-8 text-center text-xs text-gray-500">履歴を読み込んでいます…</p> : entries.length === 0 ? <p className="p-8 text-center text-xs text-gray-500">該当する履歴はまだありません。</p> : <div className="divide-y divide-gray-100">{entries.map((entry) => { const resultSummary = targetResultSummary(entry); return <div key={entry.id} className="grid gap-2 px-4 py-4 md:grid-cols-[150px_120px_1fr_auto] md:items-center"><time className="text-xs text-gray-500">{formatOperationDate(entry.stoppedAt ?? entry.createdAt)}</time><span className="text-xs font-bold text-gray-600">{entry.lineAccountId ? 'アカウント別' : '全アカウント'}</span><div><p className="text-sm font-bold text-gray-900">{entry.reason}</p><p className="mt-1 text-xs text-gray-500">{entry.capabilities.join('・')}{entry.detail ? ` / ${entry.detail}` : ''}{entry.errorMessage ? ` / ${entry.errorMessage}` : ''}</p>{resultSummary ? <p className="text-ink-secondary mt-1 text-xs font-bold">{resultSummary}</p> : null}</div><span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${entry.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' : entry.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>{statusLabel(entry.status)}</span></div> })}</div>}
       </div>
     </div>
   )

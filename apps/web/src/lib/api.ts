@@ -133,6 +133,12 @@ export type OperationIncident = {
   resolvedAt: string | null
   createdAt: string
   updatedAt: string
+  targetCounts?: {
+    held: number
+    skippedDueToEmergency: number
+    inFlight: number
+    failed: number
+  }
 }
 
 export type OperationTargetResult = {

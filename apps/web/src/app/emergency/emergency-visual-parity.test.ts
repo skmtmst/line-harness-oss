@@ -30,6 +30,16 @@ describe('V6 32 運用状態の契約', () => {
     expect(source).toContain('api.operations.control(null)')
   })
 
+  it('保存済みアラートを表示して確認済みにし、停止結果の実数を履歴へ出す', () => {
+    expect(source).toContain('api.operations.alerts()')
+    expect(source).toContain('api.operations.acknowledgeAlert(alertId)')
+    expect(source).toContain('確認済みにする')
+    expect(source).toContain('const counts = incident.targetCounts')
+    expect(source).toContain('counts.skippedDueToEmergency')
+    expect(source).toContain('停止対象の実績を取得できません')
+    expect(source).toContain('送信開始済み')
+  })
+
   it('緊急停止と復旧をサーバーAPIへ1回だけ依頼する', () => {
     expect(source).toContain('api.operations.stop({')
     expect(source).toContain('api.operations.restore(')
