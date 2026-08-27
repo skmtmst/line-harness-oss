@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getTagsWithUsage } from '../src/tags.js';
+import {
+  MAX_TAG_USAGE_COMPOUND_SELECT_TERMS,
+  TAG_USAGE_BLOCKING_REFERENCE_SELECTS,
+  buildTagUsageBlockingReferenceQueries,
+  collectTagUsageBlockingTagIds,
+  getTagsWithUsage,
+} from '../src/tags.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -171,6 +177,26 @@ describe('タグの使用先集計', () => {
       friend_count: 0,
       cleanup_reasons: [],
     });
+  });
+
+  it('運用参照の複合SELECTを安全な項数以下へ分割する', () => {
+    const queries = buildTagUsageBlockingReferenceQueries();
+    expect(queries.length).toBeGreaterThan(1);
+    for (const query of queries) {
+      expect(query.split(/\nUNION\n/u).length)
+        .toBeLessThanOrEqual(MAX_TAG_USAGE_COMPOUND_SELECT_TERMS);
+    }
+  });
+
+  it('参照元を1種類増やしても分割し、参照タグを集合へ合流する', async () => {
+    const addedReference = "SELECT 'tag-unused' AS tag_id";
+    const selects = [...TAG_USAGE_BLOCKING_REFERENCE_SELECTS, addedReference];
+    const queries = buildTagUsageBlockingReferenceQueries(selects);
+
+    expect(queries.every((query) => query.split(/\nUNION\n/u).length
+      <= MAX_TAG_USAGE_COMPOUND_SELECT_TERMS)).toBe(true);
+    await expect(collectTagUsageBlockingTagIds(db, selects))
+      .resolves.toContain('tag-unused');
   });
 
   it('全角・空白・大文字小文字だけ違う名前を重複候補にする', async () => {
