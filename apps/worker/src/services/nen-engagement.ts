@@ -36,6 +36,7 @@ type DeliveryJob = {
   line_account_id: string | null;
   source_key: string;
   payload: string;
+  campaign_snapshot: string | null;
 };
 
 export type NenDeliveryOptions = {
@@ -70,6 +71,39 @@ function renderCampaignCopy(value: string, payload: Record<string, unknown>): st
     .replaceAll('{{pet_name}}', String(pet?.name || '大切なご家族'))
     .replaceAll('{{coupon_code}}', String(coupon?.code || ''))
     .replaceAll('{{coupon_expiry}}', String(coupon?.expires_at || '').slice(0, 10));
+}
+
+function campaignSnapshot(campaign: CampaignRow): string {
+  return JSON.stringify(campaign);
+}
+
+export function readNenCampaignSnapshot(value: string | null, campaignKey: string): CampaignRow | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<CampaignRow>;
+    if (
+      parsed.campaign_key !== campaignKey
+      || typeof parsed.title !== 'string'
+      || typeof parsed.body_text !== 'string'
+      || typeof parsed.label !== 'string'
+      || typeof parsed.category !== 'string'
+    ) return null;
+    return {
+      campaign_key: parsed.campaign_key,
+      label: parsed.label,
+      category: parsed.category,
+      delay_days: Number(parsed.delay_days ?? 0),
+      delivery_time: typeof parsed.delivery_time === 'string' ? parsed.delivery_time : '10:00',
+      is_enabled: Number(parsed.is_enabled ?? 1),
+      title: parsed.title,
+      body_text: parsed.body_text,
+      button_label: typeof parsed.button_label === 'string' ? parsed.button_label : null,
+      button_url: typeof parsed.button_url === 'string' ? parsed.button_url : null,
+      image_url: typeof parsed.image_url === 'string' ? parsed.image_url : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function buildDefaultColumnIntro(title: string, excerpt: string): string {
@@ -187,21 +221,23 @@ export async function enqueuePostShippingFollowUps(
 ): Promise<number> {
   if (event.event_type !== 'ec.order.shipped') return 0;
   const campaigns = await db.prepare(
-    `SELECT campaign_key, delay_days, delivery_time FROM nen_campaign_settings
+    `SELECT campaign_key, label, category, delay_days, delivery_time, is_enabled,
+            title, body_text, button_label, button_url, image_url
+       FROM nen_campaign_settings
       WHERE campaign_key IN ('arrival_check', 'review_request', 'cross_sell') AND is_enabled = 1`,
-  ).all<{ campaign_key: string; delay_days: number; delivery_time: string }>();
+  ).all<CampaignRow>();
   const now = jstNow();
   let created = 0;
   for (const campaign of campaigns.results) {
     if (!FOLLOW_UP_KEYS.includes(campaign.campaign_key as typeof FOLLOW_UP_KEYS[number])) continue;
     const result = await db.prepare(
       `INSERT OR IGNORE INTO nen_delivery_jobs
-        (id, campaign_key, friend_id, line_account_id, source_key, payload, scheduled_at,
-         status, attempts, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
+        (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+         scheduled_at, status, attempts, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
     ).bind(
       crypto.randomUUID(), campaign.campaign_key, friendId, lineAccountId,
-      event.event_id, JSON.stringify({ event }),
+      event.event_id, JSON.stringify({ event }), campaignSnapshot(campaign),
       scheduledAfter(event.shipping?.shipped_at || event.occurred_at, campaign.delay_days, campaign.delivery_time),
       now, now,
     ).run();
@@ -220,6 +256,8 @@ export async function queueColumnDelivery(
     `SELECT id, title, excerpt, article_url, image_url, intro_text FROM nen_columns WHERE id = ?`,
   ).bind(columnId).first<Record<string, unknown>>();
   if (!column) throw new Error('Column not found');
+  const campaign = await getNenCampaign(db, 'column');
+  if (!campaign || campaign.is_enabled !== 1) throw new Error('Column campaign is disabled');
   const friends = await db.prepare(
     `SELECT id FROM friends WHERE line_account_id = ? AND is_following = 1`,
   ).bind(lineAccountId).all<{ id: string }>();
@@ -228,12 +266,12 @@ export async function queueColumnDelivery(
   for (const friend of friends.results) {
     const result = await db.prepare(
       `INSERT OR IGNORE INTO nen_delivery_jobs
-        (id, campaign_key, friend_id, line_account_id, source_key, payload, scheduled_at,
-         status, attempts, created_at, updated_at)
-       VALUES (?, 'column', ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
+        (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+         scheduled_at, status, attempts, created_at, updated_at)
+       VALUES (?, 'column', ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
     ).bind(
       crypto.randomUUID(), friend.id, lineAccountId, `column:${columnId}`,
-      JSON.stringify({ article: column }), scheduledAt, now, now,
+      JSON.stringify({ article: column }), campaignSnapshot(campaign), scheduledAt, now, now,
     ).run();
     queued += result.meta.changes ?? 0;
   }
@@ -310,13 +348,13 @@ export async function enqueueBirthdayCoupons(
     if (!issue.meta.changes) continue;
     await db.prepare(
       `INSERT OR IGNORE INTO nen_delivery_jobs
-        (id, campaign_key, friend_id, line_account_id, source_key, payload, scheduled_at,
-         status, attempts, created_at, updated_at)
-       VALUES (?, 'birthday_coupon', ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
+        (id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot,
+         scheduled_at, status, attempts, created_at, updated_at)
+       VALUES (?, 'birthday_coupon', ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?)`,
     ).bind(
       crypto.randomUUID(), pet.friend_id, pet.line_account_id, `birthday:${pet.id}:${year}`,
       JSON.stringify({ pet: { id: pet.id, name: pet.name }, coupon: { code, expires_at: sqliteDate(expires), benefit_label: setting.benefit_label } }),
-      sqliteDate(now), issuedAt, issuedAt,
+      campaignSnapshot(campaign), sqliteDate(now), issuedAt, issuedAt,
     ).run();
     queued++;
   }
@@ -368,7 +406,7 @@ export async function processNenDeliveries(
   options: NenDeliveryOptions,
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   const jobs = await db.prepare(
-    `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload
+    `SELECT id, campaign_key, friend_id, line_account_id, source_key, payload, campaign_snapshot
        FROM nen_delivery_jobs
       WHERE status IN ('pending', 'failed') AND datetime(scheduled_at) <= datetime('now')
         AND attempts < ?
@@ -384,19 +422,35 @@ export async function processNenDeliveries(
     ).bind(jstNow(), job.id).run();
     if (!claim.meta.changes) continue;
     try {
-      const [friend, campaign] = await Promise.all([
+      const [friend, currentCampaign, account] = await Promise.all([
         getFriendById(db, job.friend_id),
         getNenCampaign(db, job.campaign_key),
+        job.line_account_id ? getLineAccountById(db, job.line_account_id) : Promise.resolve(null),
       ]);
-      if (!friend || !friend.is_following || !campaign || campaign.is_enabled !== 1) {
+      const campaign = readNenCampaignSnapshot(job.campaign_snapshot, job.campaign_key);
+      const accountMismatch = Boolean(
+        friend && job.line_account_id && friend.line_account_id !== job.line_account_id,
+      );
+      if (
+        !friend || !friend.is_following || !job.line_account_id || !account?.channel_access_token || accountMismatch
+        || !currentCampaign || currentCampaign.is_enabled !== 1 || !campaign
+      ) {
+        const reason = !friend || !friend.is_following
+          ? 'friend_unavailable'
+          : !job.line_account_id || !account?.channel_access_token
+            ? 'line_account_unavailable'
+            : accountMismatch
+              ? 'line_account_mismatch'
+              : !campaign
+                ? 'campaign_snapshot_missing'
+                : 'campaign_disabled';
         await db.prepare(
           `UPDATE nen_delivery_jobs SET status = 'skipped', last_error = ?, updated_at = ? WHERE id = ?`,
-        ).bind(!friend || !friend.is_following ? 'friend_unavailable' : 'campaign_disabled', jstNow(), job.id).run();
+        ).bind(reason, jstNow(), job.id).run();
         skipped++;
         continue;
       }
-      const account = job.line_account_id ? await getLineAccountById(db, job.line_account_id) : null;
-      const accessToken = account?.channel_access_token || options.defaultAccessToken;
+      const accessToken = account.channel_access_token;
       const payload = JSON.parse(job.payload) as Record<string, unknown>;
       const messages = buildNenDeliveryMessages(campaign, payload);
       await pushViaHarnessProxy(
@@ -409,7 +463,7 @@ export async function processNenDeliveries(
           content: message.type === 'text' ? message.text : JSON.stringify(message),
           deliveryType: 'push',
           source: `nen_${job.campaign_key}`,
-          lineAccountId: account?.id ?? job.line_account_id,
+          lineAccountId: account.id,
         });
       }
       await db.prepare(

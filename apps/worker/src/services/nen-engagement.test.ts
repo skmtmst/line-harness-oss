@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildDefaultColumnIntro, buildNenDeliveryMessages, buildNenFlexMessage } from './nen-engagement.js';
+import {
+  buildDefaultColumnIntro,
+  buildNenDeliveryMessages,
+  buildNenFlexMessage,
+  readNenCampaignSnapshot,
+} from './nen-engagement.js';
 
 const campaign = {
   campaign_key: 'shipping_confirmed',
@@ -16,6 +21,22 @@ const campaign = {
 };
 
 describe('buildNenFlexMessage', () => {
+  it('uses the copy fixed when the job was queued', () => {
+    const snapshot = JSON.stringify({ ...campaign, title: '予約時の見出し' });
+    const fixed = readNenCampaignSnapshot(snapshot, campaign.campaign_key);
+    expect(fixed?.title).toBe('予約時の見出し');
+
+    const changedCurrentSetting = { ...campaign, title: '後から編集した見出し' };
+    expect(buildNenDeliveryMessages(fixed!, {})).not.toEqual(
+      buildNenDeliveryMessages(changedCurrentSetting, {}),
+    );
+  });
+
+  it('rejects a snapshot belonging to another campaign', () => {
+    expect(readNenCampaignSnapshot(JSON.stringify(campaign), 'review_request')).toBeNull();
+    expect(readNenCampaignSnapshot(null, campaign.campaign_key)).toBeNull();
+  });
+
   it('keeps mandatory order facts while using editable campaign copy', () => {
     const message = buildNenFlexMessage(campaign, {
       event: {
