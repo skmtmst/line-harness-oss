@@ -8,6 +8,7 @@ const read = (path: string) => readFileSync(join(HERE, path), 'utf8')
 
 describe('テンプレート一覧のV6画面構造', () => {
   const page = read('page.tsx')
+  const detail = read('detail/page.tsx')
   const assetManager = read('../../components/broadcasts/broadcast-asset-manager.tsx')
   const styles = read('templates-v6.module.css')
 
@@ -44,5 +45,25 @@ describe('テンプレート一覧のV6画面構造', () => {
     expect(styles).toContain('flex: 0 0 252px')
     expect(page).toContain('aria-label="テンプレートのフォルダ"')
     expect(page).toContain('className="min-w-0 flex-1"')
+  })
+
+  it('参照中は強制削除せず、使用先を確認させる', () => {
+    expect(page).toContain('使用先を見る')
+    expect(page).toContain('使用先を差し替えてから削除してください。')
+    expect(page).not.toContain('削除すると参照がクリアされます')
+    for (const usage of ['scenarioSteps', 'reminderSteps', 'richMenuAreas', 'trackedLinks']) {
+      expect(page).toContain(usage)
+    }
+    expect(detail).toContain('disabled={usageCount > 0}')
+    expect(detail).toContain('使用中のため削除できません')
+    expect(detail).not.toContain('削除すると、その箇所の本文が空になります')
+  })
+
+  it('詳細もタイトルを本文へ重ねず、データ由来の名前をトップバーへ渡す', () => {
+    expect(detail).toContain('usePageTitle(template?.name ?? null)')
+    expect(detail).not.toContain("import Header from '@/components/layout/header'")
+    expect(detail).not.toContain('本文と、このテンプレートがどこで使われているかを確認できます。')
+    expect(detail).not.toContain('複製は準備中です')
+    expect(detail).toContain('テンプレートを編集')
   })
 })

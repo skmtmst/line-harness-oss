@@ -32,6 +32,10 @@ interface TemplateDetail {
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
+    scenarioSteps: Array<{ scenarioId: string; scenarioName: string; stepId: string; stepOrder: number }>
+    reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>
+    richMenuAreas: Array<{ groupId: string; groupName: string; pageName: string; areaId: string; label: string | null }>
+    trackedLinks: Array<{ id: string; name: string }>
   }
   createdAt: string
   updatedAt: string
@@ -88,12 +92,6 @@ export default function TemplatesPage() {
   // Drawer
   const [drawerId, setDrawerId] = useState<string | null>(null)
   const [drawerData, setDrawerData] = useState<TemplateDetail | null>(null)
-  const [scenarioStepUsages, setScenarioStepUsages] = useState<Array<{
-    scenarioId: string
-    scenarioName: string
-    stepId: string
-    stepOrder: number
-  }>>([])
   const [drawerLoading, setDrawerLoading] = useState(false)
   const [drawerError, setDrawerError] = useState<string | null>(null)
   const [editContent, setEditContent] = useState<string | null>(null)
@@ -135,24 +133,17 @@ export default function TemplatesPage() {
 
   // Drawer fetch
   useEffect(() => {
-    if (!drawerId) { setDrawerData(null); setDrawerError(null); setScenarioStepUsages([]); return }
+    if (!drawerId) { setDrawerData(null); setDrawerError(null); return }
     let cancelled = false
     setDrawerLoading(true)
     setDrawerError(null)
     setDrawerData(null)
-    setScenarioStepUsages([])
-    Promise.all([
-      api.templates.get(drawerId),
-      api.templates.usages(drawerId).catch(() => null),
-    ]).then(([detailRes, usagesRes]) => {
+    api.templates.get(drawerId).then((detailRes) => {
       if (cancelled) return
       if (detailRes.success && detailRes.data) {
         setDrawerData(detailRes.data)
       } else {
         setDrawerError((detailRes as { error?: string }).error ?? '読み込みに失敗しました')
-      }
-      if (usagesRes && usagesRes.success) {
-        setScenarioStepUsages(usagesRes.data.scenarioSteps)
       }
     }).catch((err) => {
       if (cancelled) return
@@ -233,18 +224,37 @@ export default function TemplatesPage() {
 
   const handleDelete = async (id: string, usageCount: number) => {
     if (usageCount > 0) {
-      if (!confirm(`このテンプレートは ${usageCount} 箇所で使用されています。削除すると参照がクリアされます。続行しますか？`)) return
-    } else {
-      if (!confirm('このテンプレートを削除しますか？')) return
+      setDrawerId(id)
+      setError(`${usageCount}件で使用中です。使用先を差し替えてから削除してください。`)
+      return
     }
+    if (!confirm('このテンプレートを削除しますか？')) return
     try {
-      await api.templates.delete(id)
+      const result = await api.templates.delete(id)
+      if (!result.success) {
+        setError(result.error)
+        setDrawerId(id)
+        return
+      }
       if (drawerId === id) setDrawerId(null)
       load()
     } catch {
       setError('削除に失敗しました')
     }
   }
+
+  const scenarioStepUsages = drawerData?.usedBy.scenarioSteps ?? []
+  const reminderStepUsages = drawerData?.usedBy.reminderSteps ?? []
+  const richMenuAreaUsages = drawerData?.usedBy.richMenuAreas ?? []
+  const trackedLinkUsages = drawerData?.usedBy.trackedLinks ?? []
+  const drawerUsageCount = drawerData
+    ? drawerData.usedBy.autoReplies.length
+      + drawerData.usedBy.automations.length
+      + scenarioStepUsages.length
+      + reminderStepUsages.length
+      + richMenuAreaUsages.length
+      + trackedLinkUsages.length
+    : 0
 
   return (
     <div>
@@ -544,12 +554,20 @@ export default function TemplatesPage() {
                       >
                         一斉配信で使う
                       </a>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.usageCount) }}
-                        className="px-2.5 py-1 text-xs font-medium text-red-500 hover:bg-danger-bg rounded-md"
-                      >
-                        削除
-                      </button>
+                      {t.usageCount > 0 ? (
+                        <Button
+                          onClick={(e) => { e.stopPropagation(); setDrawerId(t.id) }}
+                        >
+                          使用先を見る
+                        </Button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.usageCount) }}
+                          className="hover:bg-danger-bg rounded-md px-2.5 py-1 text-xs font-medium text-red-500"
+                        >
+                          テンプレートを削除
+                        </button>
+                      )}
                       </div>
                     </td>
                   </tr>
@@ -676,38 +694,59 @@ export default function TemplatesPage() {
                 {/* Used by */}
                 <div>
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">
-                    使用箇所 ({drawerData.usedBy.autoReplies.length + drawerData.usedBy.automations.length + scenarioStepUsages.length})
+                    使用箇所 ({drawerUsageCount})
                   </h4>
-                  {(drawerData.usedBy.autoReplies.length === 0 && drawerData.usedBy.automations.length === 0 && scenarioStepUsages.length === 0) ? (
+                  {drawerUsageCount === 0 ? (
                     <p className="text-[11px] text-ink-faint italic">どこからも使用されていません</p>
                   ) : (
                     <>
                       <ul className="space-y-1.5 text-xs">
                         {drawerData.usedBy.autoReplies.map((ar) => (
                           <li key={`ar-${ar.id}`}>
-                            <a href="/auto-replies" className="text-blue-600 hover:underline">
+                            <a href="/auto-replies" className="text-accent hover:underline">
                               自動返信: {ar.keyword} <span className="text-ink-faint">({ar.matchType})</span>
                             </a>
                           </li>
                         ))}
                         {drawerData.usedBy.automations.map((au) => (
                           <li key={`au-${au.id}`}>
-                            <a href="/automations" className="text-blue-600 hover:underline">
+                            <a href="/automations" className="text-accent hover:underline">
                               オートメーション: {au.name} <span className="text-ink-faint">({au.eventType})</span>
                             </a>
                           </li>
                         ))}
                         {scenarioStepUsages.map((ss) => (
                           <li key={`ss-${ss.stepId}`}>
-                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-blue-600 hover:underline">
+                            <a href={`/scenarios/detail?id=${ss.scenarioId}`} className="text-accent hover:underline">
                               シナリオ: {ss.scenarioName} <span className="text-ink-faint">#{ss.stepOrder}</span>
                             </a>
                           </li>
                         ))}
+                        {reminderStepUsages.map((rs) => (
+                          <li key={`rs-${rs.stepId}`}>
+                            <a href={`/reminders/edit?id=${rs.reminderId}`} className="text-accent hover:underline">
+                              リマインダ: {rs.reminderName}
+                            </a>
+                          </li>
+                        ))}
+                        {richMenuAreaUsages.map((area) => (
+                          <li key={`rm-${area.areaId}`}>
+                            <a href={`/rich-menus/edit?id=${area.groupId}`} className="text-accent hover:underline">
+                              リッチメニュー: {area.groupName} / {area.pageName}{area.label ? ` / ${area.label}` : ''}
+                            </a>
+                          </li>
+                        ))}
+                        {trackedLinkUsages.map((link) => (
+                          <li key={`tl-${link.id}`}>
+                            <a href={`/inflow-links/detail?id=${link.id}`} className="text-accent hover:underline">
+                              流入リンク: {link.name}
+                            </a>
+                          </li>
+                        ))}
                       </ul>
-                      {scenarioStepUsages.length > 0 && (
+                      {drawerUsageCount > 0 && (
                         <p className="mt-2 text-[10px] text-amber-700">
-                          ⚠ このテンプレートを修正すると、上記すべてに一斉反映されます
+                          このテンプレートは使用中です。削除する前に使用先を差し替えてください。
                         </p>
                       )}
                     </>

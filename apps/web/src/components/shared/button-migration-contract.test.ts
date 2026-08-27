@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作30個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,7 +45,8 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    expect(openings).toHaveLength(29)
+    // 2026-08-27: 参照中テンプレートの「使用先を見る」も共通部品へ移した。
+    expect(openings).toHaveLength(30)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
   })
 
@@ -89,13 +90,15 @@ describe('標準ボタンの第1段階移行', () => {
     // 2026-08-26: 4-1（友だち属性）のヘッダー操作を共通Buttonへ替え、
     // ページ送りも共通部品へ寄せた。主要2・副次7が減った。
     // 減ったら必ずここも締める。
-    expect(debt['direct-primary-button']).toBe(137)
+    // 2026-08-27: テンプレート詳細の編集操作を共通Buttonへ移して136。
+    expect(debt['direct-primary-button']).toBe(136)
     // ★V6 3-1（PhxG6）の38pxヘッダー操作2つと、保存検索ダイアログの
     // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
     //
     // 2026-08-27: ダッシュボードの受信カードが自前の「前へ／次へ」をやめて
     // 共通ページ送りへ寄せた。副次2つ減って280。**減ったので締め直す。**
-    expect(debt['direct-secondary-button']).toBe(280)
+    // 2026-08-27: 未実装の複製ボタンを出さないようにして279。
+    expect(debt['direct-secondary-button']).toBe(279)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
