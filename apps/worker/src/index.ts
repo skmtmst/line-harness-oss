@@ -20,6 +20,7 @@ import { processReminderDeliveries } from './services/reminder-delivery.js';
 import { processFriendFieldReminders } from './services/friend-field-reminders.js';
 import { toJstParts } from '@line-crm/shared';
 import { checkAccountHealth } from './services/ban-monitor.js';
+import { purgeExpiredOperationIdempotency } from './services/operation-idempotency.js';
 import { refreshLineAccessTokens } from './services/token-refresh.js';
 import { processInsightFetch } from './services/insight-fetcher.js';
 import { processDueReminders } from './services/booking-reminders.js';
@@ -1475,6 +1476,13 @@ async function scheduled(
 
   // Booking expirer — runs only on the 6h cron tick.
   if (event.cron === '0 */6 * * *') {
+    try {
+      const purged = await purgeExpiredOperationIdempotency(env.DB, new Date(event.scheduledTime));
+      if (purged > 0) console.log(`[operation-idempotency] purged=${purged}`);
+    } catch (e) {
+      console.error('operation idempotency purge error:', e);
+    }
+
     try {
       const result = await enqueueFollowingMileageMilestones(env.DB, {
         limitPerMilestone: 1000,

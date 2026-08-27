@@ -35,3 +35,19 @@ CREATE INDEX IF NOT EXISTS idx_operation_incidents_scope_created
 
 CREATE INDEX IF NOT EXISTS idx_operation_incidents_status_created
   ON operation_incidents(status, created_at DESC);
+
+-- 停止・復旧ボタンの二重送信や通信再試行で、同じ不可逆操作を二度実行しない。
+CREATE TABLE IF NOT EXISTS operation_idempotency_keys (
+  key             TEXT PRIMARY KEY,
+  action          TEXT NOT NULL CHECK (action IN ('stop', 'restore')),
+  actor_id        TEXT NOT NULL,
+  scope_key       TEXT NOT NULL,
+  request_hash    TEXT NOT NULL,
+  response_status INTEGER NOT NULL DEFAULT 0,
+  response_body   TEXT NOT NULL DEFAULT '',
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_operation_idempotency_expires
+  ON operation_idempotency_keys(expires_at);

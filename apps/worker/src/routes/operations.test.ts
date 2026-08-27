@@ -16,6 +16,8 @@ function app(role: 'owner' | 'admin' | 'staff' = 'owner') {
 
 let testDb: ReturnType<typeof createTestD1>
 
+const key = (suffix: number) => `00000000-0000-4000-8000-${String(suffix).padStart(12, '0')}`
+
 beforeEach(() => {
   testDb = createTestD1()
   testDb.raw.prepare("INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret) VALUES ('account-1', 'channel', 'LINE', 'token', 'secret')").run()
@@ -44,7 +46,7 @@ describe('運用状態API', () => {
     expect(denied.status).toBe(403)
 
     const allowed = await app('admin').request('/api/operations/incidents', {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop', 'idempotency-key': key(1) },
       body: JSON.stringify({ lineAccountId: 'account-1', capabilities: ['broadcast_dispatch'], reason: '障害', expectedVersion: 0, confirmation: '停止' }),
     }, { DB: testDb.db })
     expect(allowed.status).toBe(201)
@@ -71,11 +73,23 @@ describe('運用状態API', () => {
   it('停止後は別端末相当のGETと履歴で同じ状態を取得し、古い版を409にする', async () => {
     const request = {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop' },
+      headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop', 'idempotency-key': key(2) },
       body: JSON.stringify({ lineAccountId: 'account-1', capabilities: ['broadcast_dispatch'], reason: '誤配信', expectedVersion: 0, confirmation: '停止' }),
     }
     expect((await app().request('/api/operations/incidents', request, { DB: testDb.db })).status).toBe(201)
-    expect((await app().request('/api/operations/incidents', request, { DB: testDb.db })).status).toBe(409)
+    const replayed = await app().request('/api/operations/incidents', request, { DB: testDb.db })
+    expect(replayed.status).toBe(201)
+    expect(replayed.headers.get('Idempotency-Replayed')).toBe('true')
+    const reusedForAnotherRequest = {
+      ...request,
+      body: JSON.stringify({ lineAccountId: 'account-1', capabilities: ['scenario_dispatch'], reason: '別の停止', expectedVersion: 0, confirmation: '停止' }),
+    }
+    expect((await app().request('/api/operations/incidents', reusedForAnotherRequest, { DB: testDb.db })).status).toBe(409)
+    const staleRequest = {
+      ...request,
+      headers: { ...request.headers, 'idempotency-key': key(3) },
+    }
+    expect((await app().request('/api/operations/incidents', staleRequest, { DB: testDb.db })).status).toBe(409)
 
     const control = await app('staff').request('/api/operations/control?account_id=account-1', {}, { DB: testDb.db })
     expect(await control.json()).toMatchObject({ success: true, data: { states: { broadcast_dispatch: 'stopped' } } })
@@ -88,7 +102,7 @@ describe('運用状態API', () => {
 
   it('期限切れの予約がある間は復旧を拒否し、整理後だけ復旧する', async () => {
     const stopped = await app().request('/api/operations/incidents', {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop' },
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-stop', 'idempotency-key': key(4) },
       body: JSON.stringify({ lineAccountId: 'account-1', capabilities: ['broadcast_dispatch'], reason: '障害', expectedVersion: 0, confirmation: '停止' }),
     }, { DB: testDb.db })
     const stoppedBody = await stopped.json() as { data: { control: { version: number }; incident: { id: string } } }
@@ -108,17 +122,20 @@ describe('運用状態API', () => {
       data: { canRestore: false, blockers: { broadcast_dispatch: 1 } },
     })
 
-    const restoreRequest = () => app().request(
+    const restoreRequest = (idempotencyKey: string) => app().request(
       `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
       {
         method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-restore' },
+        headers: { 'content-type': 'application/json', 'x-confirm-irreversible': 'operation-restore', 'idempotency-key': idempotencyKey },
         body: JSON.stringify({ expectedVersion: stoppedBody.data.control.version, confirmation: '復旧' }),
       },
       { DB: testDb.db },
     )
-    expect((await restoreRequest()).status).toBe(409)
+    expect((await restoreRequest(key(5))).status).toBe(409)
     testDb.raw.prepare("UPDATE broadcasts SET status = 'draft' WHERE id = 'broadcast-overdue'").run()
-    expect((await restoreRequest()).status).toBe(200)
+    expect((await restoreRequest(key(6))).status).toBe(200)
+    const replayedRestore = await restoreRequest(key(6))
+    expect(replayedRestore.status).toBe(200)
+    expect(replayedRestore.headers.get('Idempotency-Replayed')).toBe('true')
   })
 })

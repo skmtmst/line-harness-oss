@@ -3271,7 +3271,10 @@ export const api = {
       '/api/operations/incidents',
       {
         method: 'POST',
-        headers: { 'X-Confirm-Irreversible': 'operation-stop' },
+        headers: {
+          'X-Confirm-Irreversible': 'operation-stop',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
         body: JSON.stringify(data),
       },
     ),
@@ -3280,7 +3283,10 @@ export const api = {
         `/api/operations/incidents/${incidentId}/restore`,
         {
           method: 'POST',
-          headers: { 'X-Confirm-Irreversible': 'operation-restore' },
+          headers: {
+            'X-Confirm-Irreversible': 'operation-restore',
+            'Idempotency-Key': crypto.randomUUID(),
+          },
           body: JSON.stringify(data),
         },
       ),

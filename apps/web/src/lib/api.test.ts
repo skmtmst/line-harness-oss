@@ -4,10 +4,13 @@ let fetchApi: typeof import('./api').fetchApi
 let ApiError: typeof import('./api').ApiError
 let extractApiErrorMessage: typeof import('./api').extractApiErrorMessage
 let eventsApi: typeof import('./api').eventsApi
+let operationsApi: typeof import('./api').api.operations
 
 beforeAll(async () => {
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
-  ;({ fetchApi, ApiError, extractApiErrorMessage, eventsApi } = await import('./api'))
+  const module = await import('./api')
+  ;({ fetchApi, ApiError, extractApiErrorMessage, eventsApi } = module)
+  operationsApi = module.api.operations
 })
 
 describe('eventsApi.createSlots', () => {
@@ -143,5 +146,31 @@ describe('fetchApi error response', () => {
     const init = spy.mock.calls[0][1] as RequestInit
     expect(init.credentials).toBe('include')
     expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json')
+  })
+})
+
+describe('operations API irreversible requests', () => {
+  it('停止と復旧に別々のUUID Idempotency-Keyを付ける', async () => {
+    const spy = vi.fn(async () => new Response(JSON.stringify({ success: true, data: {} }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', spy)
+
+    await operationsApi.stop({
+      lineAccountId: null,
+      capabilities: ['broadcast_dispatch'],
+      reason: '障害',
+      expectedVersion: 0,
+      confirmation: '停止',
+    })
+    await operationsApi.restore('incident-1', { expectedVersion: 1, confirmation: '復旧' })
+
+    const stopHeaders = spy.mock.calls[0][1]?.headers as Record<string, string>
+    const restoreHeaders = spy.mock.calls[1][1]?.headers as Record<string, string>
+    const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+    expect(stopHeaders['Idempotency-Key']).toMatch(uuid)
+    expect(restoreHeaders['Idempotency-Key']).toMatch(uuid)
+    expect(restoreHeaders['Idempotency-Key']).not.toBe(stopHeaders['Idempotency-Key'])
   })
 })

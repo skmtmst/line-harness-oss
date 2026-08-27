@@ -7,6 +7,7 @@ import {
   getOperationIncident,
   getPendingReminderDeliveries,
   listOperationIncidents,
+  operationScopeKey,
   restoreOperationIncident,
   stopOperationCapabilities,
   type OperationCapability,
@@ -15,6 +16,12 @@ import { resolveReminderSendAt } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import {
+  finalizeOperationIdempotency,
+  hashOperationRequest,
+  isValidOperationIdempotencyKey,
+  reserveOperationIdempotency,
+} from '../services/operation-idempotency.js';
 
 const operations = new Hono<Env>();
 
@@ -122,6 +129,13 @@ function hasRestoreBlockers(blockers: RestoreBlockers): boolean {
   return Object.values(blockers).some((count) => Number(count) > 0);
 }
 
+function replayJson(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=UTF-8', 'Idempotency-Replayed': 'true' },
+  });
+}
+
 operations.get('/api/operations/control', async (c) => {
   const accountId = requestedAccountId(c.req.query('account_id'));
   // 全体停止は全員が見えないと、別端末で通常運用と誤認する。
@@ -191,18 +205,51 @@ operations.post(
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 0) {
       return c.json({ success: false, error: 'expectedVersion は0以上の整数で指定してください' }, 400);
     }
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidOperationIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
+    const detail = typeof body.detail === 'string' && body.detail.trim()
+      ? body.detail.trim().slice(0, 1000)
+      : null;
+    const actorId = c.get('staff')!.id;
+    const reservation = await reserveOperationIdempotency(c.env.DB, {
+      key: idempotencyKey,
+      action: 'stop',
+      actorId,
+      scopeKey: operationScopeKey(accountId),
+      requestHash: await hashOperationRequest({
+        lineAccountId: accountId,
+        capabilities: [...capabilities].sort(),
+        reason: body.reason.trim(),
+        detail,
+        expectedVersion: Number(body.expectedVersion),
+      }),
+      now: new Date(),
+    });
+    if (reservation.kind === 'cached') return replayJson(reservation.body, reservation.status);
+    if (reservation.kind === 'in_progress') {
+      return c.json({ success: false, error: '同じ停止操作を処理中です。結果を読み直してください。' }, 409);
+    }
+    if (reservation.kind === 'conflict') {
+      return c.json({ success: false, error: '同じIdempotency-Keyを別の操作へ再利用できません。' }, 409);
+    }
     const result = await stopOperationCapabilities(c.env.DB, {
       lineAccountId: accountId,
       capabilities,
       expectedVersion: Number(body.expectedVersion),
-      actorId: c.get('staff')!.id,
+      actorId,
       reason: body.reason.trim(),
-      detail: typeof body.detail === 'string' && body.detail.trim() ? body.detail.trim().slice(0, 1000) : null,
+      detail,
     });
     if (result.status === 'conflict') {
-      return c.json({ success: false, error: '別の管理者が先に変更しました。最新の状態を読み直してください。', data: result.control }, 409);
+      const response = { success: false, error: '別の管理者が先に変更しました。最新の状態を読み直してください。', data: result.control };
+      await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 409, body: response });
+      return c.json(response, 409);
     }
-    return c.json({ success: true, data: result }, 201);
+    const response = { success: true, data: result };
+    await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 201, body: response });
+    return c.json(response, 201);
   },
 );
 
@@ -244,24 +291,57 @@ operations.post(
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
       return c.json({ success: false, error: 'expectedVersion は1以上の整数で指定してください' }, 400);
     }
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidOperationIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
+    const actorId = c.get('staff')!.id;
+    const reservation = await reserveOperationIdempotency(c.env.DB, {
+      key: idempotencyKey,
+      action: 'restore',
+      actorId,
+      scopeKey: incident.scopeKey,
+      requestHash: await hashOperationRequest({
+        incidentId: incident.id,
+        expectedVersion: Number(body.expectedVersion),
+      }),
+      now: new Date(),
+    });
+    if (reservation.kind === 'cached') return replayJson(reservation.body, reservation.status);
+    if (reservation.kind === 'in_progress') {
+      return c.json({ success: false, error: '同じ復旧操作を処理中です。結果を読み直してください。' }, 409);
+    }
+    if (reservation.kind === 'conflict') {
+      return c.json({ success: false, error: '同じIdempotency-Keyを別の操作へ再利用できません。' }, 409);
+    }
     const blockers = await countRestoreBlockers(c.env.DB, incident);
     if (hasRestoreBlockers(blockers)) {
-      return c.json({
+      const response = {
         success: false,
         error: '期限切れまたは実行待ちの処理があります。内容を整理してから復旧してください。',
         data: { blockers },
-      }, 409);
+      };
+      await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 409, body: response });
+      return c.json(response, 409);
     }
     const result = await restoreOperationIncident(c.env.DB, {
       incidentId: incident.id,
       expectedVersion: Number(body.expectedVersion),
-      actorId: c.get('staff')!.id,
+      actorId,
     });
-    if (result.status === 'not_found') return c.json({ success: false, error: '復旧できる停止記録ではありません' }, 409);
-    if (result.status === 'conflict') {
-      return c.json({ success: false, error: '別の管理者が先に変更しました。最新の状態を読み直してください。', data: result.control }, 409);
+    if (result.status === 'not_found') {
+      const response = { success: false, error: '復旧できる停止記録ではありません' };
+      await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 409, body: response });
+      return c.json(response, 409);
     }
-    return c.json({ success: true, data: result });
+    if (result.status === 'conflict') {
+      const response = { success: false, error: '別の管理者が先に変更しました。最新の状態を読み直してください。', data: result.control };
+      await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 409, body: response });
+      return c.json(response, 409);
+    }
+    const response = { success: true, data: result };
+    await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 200, body: response });
+    return c.json(response);
   },
 );
 

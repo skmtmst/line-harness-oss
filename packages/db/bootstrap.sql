@@ -1678,6 +1678,18 @@ CREATE TABLE operation_control_sets (
   updated_at         TEXT NOT NULL
 );
 
+CREATE TABLE operation_idempotency_keys (
+  key             TEXT PRIMARY KEY,
+  action          TEXT NOT NULL CHECK (action IN ('stop', 'restore')),
+  actor_id        TEXT NOT NULL,
+  scope_key       TEXT NOT NULL,
+  request_hash    TEXT NOT NULL,
+  response_status INTEGER NOT NULL DEFAULT 0,
+  response_body   TEXT NOT NULL DEFAULT '',
+  expires_at      TEXT NOT NULL,
+  created_at      TEXT NOT NULL
+);
+
 CREATE TABLE operation_incidents (
   id                 TEXT PRIMARY KEY,
   scope_key          TEXT NOT NULL,
@@ -3070,6 +3082,9 @@ CREATE INDEX idx_notifications_status ON notifications (status);
 
 CREATE INDEX idx_operation_audit_kind_date
   ON operation_audit (target_kind, created_at);
+
+CREATE INDEX idx_operation_idempotency_expires
+  ON operation_idempotency_keys(expires_at);
 
 CREATE INDEX idx_operation_incidents_scope_created
   ON operation_incidents(scope_key, created_at DESC);
