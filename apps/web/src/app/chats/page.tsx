@@ -18,6 +18,8 @@ import { createPortal } from 'react-dom'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import EmailThread from '@/components/support/email-thread'
 import Button from '@/components/shared/button'
+import InboxSelect, { type InboxSelectOption } from '@/components/chats/inbox-select'
+import { Link2, Star } from 'lucide-react'
 
 interface Chat {
   id: string
@@ -53,7 +55,9 @@ interface ChatMessage {
 
 interface ChatDetail extends Chat {
   friendName: string
+  friendRealName: string | null
   friendPictureUrl: string | null
+  isAttention: boolean
   messages?: ChatMessage[]
 }
 
@@ -89,6 +93,13 @@ const statusFilters: { key: StatusFilter; label: string }[] = [
   { key: 'in_progress', label: '対応中' },
   { key: 'on_hold', label: '保留' },
   { key: 'resolved', label: '対応済' },
+]
+
+const chatStatusOptions: InboxSelectOption[] = [
+  { value: 'unread', label: '未対応', tone: 'danger' },
+  { value: 'in_progress', label: '対応中', tone: 'warning' },
+  { value: 'on_hold', label: '保留', tone: 'info' },
+  { value: 'resolved', label: '対応済', tone: 'success' },
 ]
 
 type InboxSavedViewConditions = {
@@ -149,6 +160,16 @@ function formatDatetime(iso: string | null): string {
   if (!iso) return '-'
   return new Date(iso).toLocaleString('ja-JP', {
     year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatInboxDatetime(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('ja-JP', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
@@ -1012,6 +1033,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     }
   }
 
+  /** 友だち一覧と同じ「注目」を受信箱の★から切り替える。 */
+  const handleAttentionUpdate = async () => {
+    if (!chatDetail) return
+    const next = !chatDetail.isAttention
+    setChatDetail((current) => current ? { ...current, isAttention: next } : current)
+    try {
+      await api.friends.updateMetadata(chatDetail.friendId, { __attention: next ? '1' : null })
+    } catch {
+      setChatDetail((current) => current ? { ...current, isAttention: !next } : current)
+      setError('注目の変更に失敗しました。')
+    }
+  }
+
   const handleSaveMemo = async () => {
     if (!selectedChatId || memoSaving) return
     setMemoSaving(true)
@@ -1065,6 +1099,18 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     ?? (chatDetail?.id === selectedChatId ? chatDetail.friendId : null)
     ?? chats.find((chat) => chat.id === selectedChatId)?.friendId
     ?? null
+  const operatorOptions: InboxSelectOption[] = [
+    { value: '', label: '未割り当て' },
+    ...operators.map((operator) => ({
+      value: operator.id,
+      label: operator.name,
+      initial: operator.name.charAt(0),
+    })),
+  ]
+  const assigneeOptions: InboxSelectOption[] = [
+    { value: 'all', label: 'すべて' },
+    ...operatorOptions,
+  ]
 
   return (
     <div className="space-y-3">
@@ -1215,21 +1261,15 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
               className="w-full rounded-lg border border-[#E5E7EB] bg-canvas py-2 pr-3 pl-9 text-xs text-[#1F2937] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
               />
             </div>
-            <label className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[#667085]">
-              <span className="shrink-0">担当者</span>
-              <select
-                value={assigneeFilter}
-                onChange={(event) => setAssigneeFilter(event.target.value)}
-                aria-label="担当者で絞り込む"
-                className="min-w-0 flex-1 rounded-lg border border-[#E5E7EB] bg-canvas px-2 py-1.5 text-[11px] font-medium text-[#344054] outline-none focus:border-[#06C755] focus:ring-2 focus:ring-[#06C755]/15"
-              >
-                <option value="all">すべて</option>
-                <option value="unassigned">未割り当て</option>
-                {operators.map((operator) => (
-                  <option key={operator.id} value={operator.id}>{operator.name}</option>
-                ))}
-              </select>
-            </label>
+            <InboxSelect
+              aria-label="担当者で絞り込む"
+              className="mt-2 w-full"
+              value={assigneeFilter === 'unassigned' ? '' : assigneeFilter}
+              onChange={(next) => setAssigneeFilter(next === '' ? 'unassigned' : next)}
+              options={assigneeOptions}
+              prefix="担当者"
+              searchable
+            />
             <div className="mt-2 flex items-center gap-1">
               {CHANNELS.map((item) => (
                 <button
@@ -1556,15 +1596,19 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                   </button>
-                  {chatDetail.friendPictureUrl && (
-                    <img src={chatDetail.friendPictureUrl} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
+                  {chatDetail.friendPictureUrl ? (
+                    <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
+                  ) : (
+                    <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-v6-avatar-indigo text-xs font-bold text-on-action" aria-hidden="true">
+                      {chatDetail.friendName.charAt(0)}
+                    </span>
                   )}
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink truncate">
                       {chatDetail.friendName}
                     </p>
-                    <p className="text-ink-faint mt-0.5 text-xs">
-                      最終受信 {formatDatetime(chatDetail.lastMessageAt)} ・ LINE
+                    <p className="mt-0.5 truncate text-xs text-ink-faint">
+                      {chatDetail.friendRealName ? `${chatDetail.friendRealName}・` : ''}LINE・最終受信 {formatInboxDatetime(chatDetail.lastMessageAt)}
                     </p>
                   </div>
                 </div>
@@ -1576,35 +1620,31 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   同じ場所に置く。
                 */}
                 {/* 右へ寄せる。名前は左、操作は右。目で追う向きがそろう。 */}
-                <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <span className="text-ink-faint">対応</span>
-                    <select
-                      value={chatDetail.status}
-                      onChange={(e) => void handleStatusUpdate(e.target.value as Chat['status'])}
-                      className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
-                    >
-                      <option value="unread">未対応</option>
-                      <option value="in_progress">対応中</option>
-                      <option value="on_hold">保留</option>
-                      <option value="resolved">対応済</option>
-                    </select>
-                  </label>
-                  <label className="flex items-center gap-1.5 text-xs">
-                    <span className="text-ink-faint">担当</span>
-                    <select
-                      value={chatDetail.operatorId ?? ''}
-                      onChange={(e) => void handleOperatorUpdate(e.target.value || null)}
-                      className="border-hairline rounded-control focus:ring-accent border px-2 py-1 text-xs focus:ring-2 focus:outline-none"
-                    >
-                      <option value="">未割り当て</option>
-                      {operators.map((op) => (
-                        <option key={op.id} value={op.id}>
-                          {op.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    aria-label={chatDetail.isAttention ? '注目から外す' : '注目にする'}
+                    aria-pressed={chatDetail.isAttention}
+                    onClick={() => void handleAttentionUpdate()}
+                    className={`flex h-9 w-9 items-center justify-center rounded-control border ${chatDetail.isAttention ? 'border-warning bg-warning-bg text-warning' : 'border-hairline bg-canvas text-ink-faint hover:bg-canvas-sunken'}`}
+                  >
+                    <Star aria-hidden="true" size={17} fill={chatDetail.isAttention ? 'currentColor' : 'none'} />
+                  </button>
+                  <InboxSelect
+                    aria-label="担当者を変更"
+                    className="w-36"
+                    value={chatDetail.operatorId ?? ''}
+                    onChange={(next) => void handleOperatorUpdate(next || null)}
+                    options={operatorOptions}
+                    prefix="担当"
+                  />
+                  <InboxSelect
+                    aria-label="対応マークを変更"
+                    className="w-32"
+                    value={chatDetail.status}
+                    onChange={(next) => void handleStatusUpdate(next as Chat['status'])}
+                    options={chatStatusOptions}
+                  />
                   {!showFriendInfo && (
                     <button
                       type="button"
@@ -1673,10 +1713,12 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               </span>
                             </div>
                           )}
-                          <div className="my-2 flex justify-center">
-                            <span className="bg-canvas/90 text-action rounded-full px-3 py-1 text-[11px] font-medium shadow-sm">
-                              シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始 ・ {startedAt}
+                          <div className="my-2 flex items-center justify-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-pill bg-canvas/90 px-3 py-1 text-[11px] font-semibold text-action shadow-sm">
+                              <Link2 aria-hidden="true" size={13} />
+                              シナリオ「{msg.scenarioName ?? '名称未設定'}」を開始
                             </span>
+                            <time className="text-[10px] text-ink-faint">{startedAt}</time>
                           </div>
                         </div>
                       )
@@ -1699,7 +1741,9 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                             chatDetail.friendPictureUrl ? (
                               <img src={chatDetail.friendPictureUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full" />
                             ) : (
-                              <div className="bg-hairline h-8 w-8 flex-shrink-0 rounded-full" />
+                              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-v6-avatar-indigo text-xs font-bold text-on-action" aria-hidden="true">
+                                {chatDetail.friendName.charAt(0)}
+                              </div>
                             )
                           )}
 
@@ -1709,7 +1753,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                               className={`max-w-[320px] px-3 py-2 text-sm break-words whitespace-pre-wrap ${
                                 isOutgoing
                                   ? 'rounded-tl-2xl rounded-tr-md rounded-bl-2xl rounded-br-2xl text-on-accent'
-                                  : 'rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-canvas text-ink'
+                                  : 'min-w-64 rounded-tl-md rounded-tr-2xl rounded-bl-2xl rounded-br-2xl bg-canvas text-ink'
                               }`}
                               style={isOutgoing ? { backgroundColor: 'var(--color-accent)' } : undefined}
                             >

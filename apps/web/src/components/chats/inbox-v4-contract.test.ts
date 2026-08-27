@@ -8,6 +8,7 @@ const PAGE = readFileSync(join(HERE, '..', '..', 'app', 'chats', 'page.tsx'), 'u
 const TEMPLATE_PICKER = readFileSync(join(HERE, 'template-picker.tsx'), 'utf8')
 const FRIEND_INFO = readFileSync(join(HERE, 'friend-info-sidebar.tsx'), 'utf8')
 const INBOX_KPIS = readFileSync(join(HERE, 'inbox-kpis.tsx'), 'utf8')
+const INBOX_SELECT = readFileSync(join(HERE, 'inbox-select.tsx'), 'utf8')
 const EMAIL_THREAD = readFileSync(join(HERE, '..', 'support', 'email-thread.tsx'), 'utf8')
 const WORKER_CHATS = readFileSync(
   join(HERE, '..', '..', '..', '..', 'worker', 'src', 'routes', 'chats.ts'),
@@ -123,6 +124,29 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain("assigneeFilter === 'unassigned'")
     expect(PAGE).toContain('item.assignedStaffId === assigneeFilter')
     expect(PAGE).toContain('chat.operatorId !== assigneeFilter')
+  })
+
+  it('担当と対応をV6専用プルダウンで操作し、開状態も確認できる', () => {
+    expect(PAGE).toContain("import InboxSelect")
+    expect(PAGE).toContain('aria-label="担当者を変更"')
+    expect(PAGE).toContain('aria-label="対応マークを変更"')
+    expect(INBOX_SELECT).toContain('role="listbox"')
+    expect(INBOX_SELECT).toContain('担当者名を検索')
+    expect(INBOX_SELECT).not.toContain('<select')
+  })
+
+  it('トーク見出しに本名・注目・代替アバターを出す', () => {
+    expect(PAGE).toContain('chatDetail.friendRealName')
+    expect(PAGE).toContain('chatDetail.isAttention')
+    expect(PAGE).toContain('handleAttentionUpdate')
+    expect(PAGE).toContain("__attention: next ? '1' : null")
+    expect(WORKER_CHATS).toContain('friendRealName: friend?.real_name || null')
+    expect(WORKER_CHATS).toContain("isAttention: friendMetadata.__attention === '1'")
+  })
+
+  it('シナリオ開始の札と時刻を分ける', () => {
+    expect(PAGE).toContain('<Link2 aria-hidden="true"')
+    expect(PAGE).toContain('<time className="text-[10px] text-ink-faint">{startedAt}</time>')
   })
 
   it('狭い画面でも対応状況の見出しを1行で表示する', () => {
