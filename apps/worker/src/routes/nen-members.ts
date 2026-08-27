@@ -158,9 +158,12 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
   const [pets, snapshot, photos, photoStats, consultations] = await Promise.all([
     c.env.DB.prepare(`SELECT * FROM nen_pet_profiles WHERE friend_id = ? ORDER BY created_at`).bind(friend.id).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT * FROM nen_ec_member_snapshots WHERE friend_id = ?`).bind(friend.id).first<Record<string, unknown>>(),
-    c.env.DB.prepare(`SELECT ps.id, ps.pet_id, ps.image_url, ps.caption, ps.status, ps.awarded_points, ps.created_at, p.name pet_name
+    c.env.DB.prepare(`SELECT ps.id, ps.pet_id, ps.image_url, ps.caption, ps.status, ps.awarded_points,
+      ps.publication_consent_at, ps.publication_withdrawn_at, ps.public_pet_name,
+      ps.created_at, p.name pet_name
       FROM nen_photo_submissions ps JOIN nen_pet_profiles p ON p.id = ps.pet_id
-      WHERE ps.status = 'adopted' ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 30`).all<Record<string, unknown>>(),
+      WHERE ps.friend_id = ? AND ps.status = 'adopted'
+      ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 30`).bind(friend.id).all<Record<string, unknown>>(),
     c.env.DB.prepare(`SELECT COUNT(*) submitted_count,
       SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) pending_count,
       SUM(CASE WHEN status='adopted' THEN 1 ELSE 0 END) adopted_count,
@@ -177,7 +180,13 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
       purchaseCount: snapshot.purchase_count, purchaseAmount: snapshot.purchase_amount,
       points: snapshot.point_balance, rank: snapshot.member_rank, syncedAt: snapshot.synced_at,
     } : { orders: [], subscription: null, purchaseCount: 0, purchaseAmount: 0, points: 0, rank: 'レギュラー', syncedAt: null },
-    photos: photos.results.map((r) => ({ id: r.id, petId: r.pet_id, petName: r.pet_name, imageUrl: r.image_url, caption: r.caption, status: r.status, awardedPoints: r.awarded_points, createdAt: r.created_at })),
+    photos: photos.results.map((r) => ({
+      id: r.id, petId: r.pet_id, petName: r.pet_name, imageUrl: r.image_url,
+      caption: r.caption, status: r.status, awardedPoints: r.awarded_points,
+      publicationConsent: Boolean(r.publication_consent_at) && !r.publication_withdrawn_at,
+      publicPetName: r.public_pet_name === 1,
+      createdAt: r.created_at,
+    })),
     photoStats: {
       submittedCount: Number(photoStats?.submitted_count || 0),
       pendingCount: Number(photoStats?.pending_count || 0),
@@ -189,9 +198,19 @@ nenMembers.get('/api/liff/nen/member', async (c) => {
 });
 
 nenMembers.get('/api/public/nen/adopted-photos', async (c) => {
-  const rows = await c.env.DB.prepare(`SELECT ps.id, ps.image_url, ps.caption, ps.reviewed_at, p.name pet_name
-    FROM nen_photo_submissions ps JOIN nen_pet_profiles p ON p.id = ps.pet_id
-    WHERE ps.status = 'adopted' ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 24`).all<Record<string, unknown>>();
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (!lineAccountId) return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+  const rows = await c.env.DB.prepare(`SELECT ps.id, ps.image_url, ps.caption, ps.reviewed_at,
+      CASE WHEN ps.public_pet_name = 1 THEN p.name ELSE NULL END pet_name
+    FROM nen_photo_submissions ps
+    JOIN nen_pet_profiles p ON p.id = ps.pet_id
+    JOIN friends f ON f.id = ps.friend_id
+    WHERE ps.status = 'adopted'
+      AND ps.line_account_id = ? AND f.line_account_id = ?
+      AND ps.publication_consent_at IS NOT NULL
+      AND ps.publication_withdrawn_at IS NULL
+    ORDER BY ps.reviewed_at DESC, ps.created_at DESC LIMIT 24`)
+    .bind(lineAccountId, lineAccountId).all<Record<string, unknown>>();
   const origin = c.req.header('Origin') || '';
   const allowed = new Set(['https://stg.nen-petfood.com', 'https://nen-petfood.com', 'https://www.nen-petfood.com']);
   if (allowed.has(origin)) c.header('Access-Control-Allow-Origin', origin);
@@ -356,10 +375,58 @@ nenMembers.post('/api/liff/nen/photos', async (c) => {
   await c.env.IMAGES.put(key, bytes, { httpMetadata: { contentType: body.mimeType }, customMetadata: { friendId: friend.id, petId: body.petId || '' } });
   const imageUrl = `${c.env.WORKER_PUBLIC_URL || new URL(c.req.url).origin}/images/${key}`;
   const now = jstNow();
-  await c.env.DB.prepare(`INSERT INTO nen_photo_submissions (id, friend_id, pet_id, r2_key, image_url, content_type, caption, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`)
-    .bind(id, friend.id, body.petId, key, imageUrl, body.mimeType, String(body.caption || '').trim().slice(0, 300), now, now).run();
+  await c.env.DB.prepare(`INSERT INTO nen_photo_submissions
+    (id, friend_id, pet_id, r2_key, image_url, content_type, caption, status,
+     created_at, updated_at, line_account_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)`)
+    .bind(
+      id, friend.id, body.petId, key, imageUrl, body.mimeType,
+      String(body.caption || '').trim().slice(0, 300), now, now, friend.line_account_id,
+    ).run();
   await syncNenPhotoTags(c.env.DB, friend.id);
   return c.json({ success: true, data: { id, imageUrl, status: 'pending' } }, 201);
+});
+
+nenMembers.put('/api/liff/nen/photos/:id/publication-consent', async (c) => {
+  const friend = await currentFriend(c);
+  if (!friend) return c.json({ success: false, error: 'Unauthorized' }, 401);
+  const body = await c.req.json<{
+    consent?: boolean;
+    consentVersion?: string;
+    showPetName?: boolean;
+  }>().catch(() => null);
+  const consentVersion = typeof body?.consentVersion === 'string'
+    ? body.consentVersion.trim().slice(0, 80)
+    : '';
+  if (typeof body?.consent !== 'boolean' || (body.consent && !consentVersion)) {
+    return c.json({ success: false, error: '公開同意の内容を確認してください' }, 400);
+  }
+  const photo = await c.env.DB.prepare(
+    `SELECT id FROM nen_photo_submissions WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+  ).bind(c.req.param('id'), friend.id, friend.line_account_id).first<{ id: string }>();
+  if (!photo) return c.json({ success: false, error: 'Not found' }, 404);
+  const now = jstNow();
+  if (body.consent) {
+    await c.env.DB.prepare(
+      `UPDATE nen_photo_submissions
+          SET publication_consent_version = ?, publication_consent_at = ?,
+              publication_withdrawn_at = NULL, public_pet_name = ?, updated_at = ?
+        WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+    ).bind(
+      consentVersion, now, body.showPetName === true ? 1 : 0, now,
+      photo.id, friend.id, friend.line_account_id,
+    ).run();
+  } else {
+    await c.env.DB.prepare(
+      `UPDATE nen_photo_submissions
+          SET publication_withdrawn_at = ?, public_pet_name = 0, updated_at = ?
+        WHERE id = ? AND friend_id = ? AND line_account_id = ?`,
+    ).bind(now, now, photo.id, friend.id, friend.line_account_id).run();
+  }
+  return c.json({
+    success: true,
+    data: { publicationConsent: body.consent, publicPetName: body.consent && body.showPetName === true },
+  });
 });
 
 type KnowledgeMeta = { id: string; title: string; animal_type: string; tags_json: string; source_name: string; authority_rank: number };
