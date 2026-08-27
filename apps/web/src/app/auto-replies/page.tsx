@@ -612,6 +612,7 @@ export default function AutoRepliesPage() {
                           oncePerFriend: r.oncePerFriend,
                           keywords: r.keywords,
                           friendConditions: r.friendConditions,
+                          folderId: r.folderId,
                         })}
                         className="px-2.5 py-1 text-xs font-medium text-blue-600 hover:bg-info-bg rounded-md"
                       >
