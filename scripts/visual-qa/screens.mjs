@@ -124,6 +124,9 @@ const EVENT = { feature: 29, dir: 'events-v6', route: '/events', mode: 'page' }
 /** ログインユーザー。実装は1枚もので、編集は窓で開く。 */
 const STAFF = { feature: 30, dir: 'staff-v6', route: '/staff', mode: 'page' }
 
+/** 機能設定。サイドメニューに出す機能を切り替える1枚。 */
+const FEATURE_SET = { feature: 31, dir: 'settings-v6', route: '/settings', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -1084,6 +1087,9 @@ export const SCREENS = [
     why: '入った記録を並べる画面が無い。窓の中に「このユーザーにはログイン履歴が N 件あります」と**数だけ**出る（`staff/page.tsx:31`）。いつ・だれが・何をしたかは読めない',
   },
   { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new' },
+
+  // ── 機能31 機能設定 ─────────────────────────────────────
+  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。

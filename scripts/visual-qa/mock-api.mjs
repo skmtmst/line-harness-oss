@@ -273,7 +273,14 @@ const SHAPES = {
     sidebarOrder: null,
     sidebarItemOrder: null,
     parentChildMode: false,
-    specializedFeatureKeys: [],
+    /*
+      **専用機能の鍵を渡す。** 空だと `visibleFeatureGroups` が
+      「専用機能」「飲食店向け（テスト）」の区分をまるごと隠すので、
+      機能設定の画面が設計より短く撮れ、**実装に無いように見える。**
+    */
+    specializedFeatureKeys: [
+      'nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications', 'restaurant_test',
+    ],
   },
   '/api/inbox/unanswered/count': { total: 0, byAccount: [], oldestWaitMinutes: null },
   // 設計 `vUXKb` の「写真審査 1件 確認待ち」。0で返すとカードが空のまま撮れる。
