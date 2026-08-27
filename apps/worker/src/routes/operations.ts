@@ -163,7 +163,7 @@ operations.get('/api/operations/health', requireRole('owner', 'admin'), async (c
 });
 
 operations.post(
-  '/api/operations/health/check',
+  '/api/operations/health/runs',
   requireRole('owner', 'admin'),
   async (c) => c.json({ success: true, data: await runOperationHealthChecks(c.env, new Date(), { force: true }) }),
 );
@@ -180,7 +180,7 @@ operations.get('/api/operations/alerts', requireRole('owner', 'admin'), async (c
 });
 
 operations.post(
-  '/api/operations/alerts/:id/acknowledge',
+  '/api/operations/alerts/:id/ack',
   requireRole('owner', 'admin'),
   async (c) => {
     const alert = await acknowledgeOperationHealthAlert(c.env.DB, {

@@ -3280,13 +3280,13 @@ export const api = {
   operations: {
     health: () => fetchApi<ApiResponse<OperationHealthSnapshot | null>>('/api/operations/health'),
     runHealthCheck: () => fetchApi<ApiResponse<OperationHealthSnapshot | null>>(
-      '/api/operations/health/check', { method: 'POST' },
+      '/api/operations/health/runs', { method: 'POST' },
     ),
     alerts: (includeResolved = false) => fetchApi<ApiResponse<OperationHealthAlert[]>>(
       `/api/operations/alerts${includeResolved ? '?include_resolved=1' : ''}`,
     ),
     acknowledgeAlert: (alertId: string) => fetchApi<ApiResponse<OperationHealthAlert>>(
-      `/api/operations/alerts/${encodeURIComponent(alertId)}/acknowledge`, { method: 'POST' },
+      `/api/operations/alerts/${encodeURIComponent(alertId)}/ack`, { method: 'POST' },
     ),
     control: (accountId: string | null) => {
       const query = accountId ? `?account_id=${encodeURIComponent(accountId)}` : ''
