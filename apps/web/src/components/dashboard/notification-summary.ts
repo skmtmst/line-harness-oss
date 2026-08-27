@@ -39,6 +39,14 @@ export function dashboardNotificationItems(
   }))
 }
 
+export function dashboardNotificationDestination(
+  item: NotificationCenterItem,
+): string | null {
+  if (item.eventType.startsWith('account_health_')) return '/emergency'
+  if (item.eventType === 'release' || item.eventType.startsWith('deployment_')) return '/updates'
+  return null
+}
+
 export function markDashboardNotificationRead(
   data: NotificationCenterData,
   notificationId: string,
@@ -53,23 +61,5 @@ export function markDashboardNotificationRead(
       unread: Math.max(0, data.counts.unread - 1),
     },
     unreadCount: Math.max(0, data.unreadCount - 1),
-  }
-}
-
-export function markDashboardNotificationsRead(
-  data: NotificationCenterData,
-  category: DashboardNotificationFilter,
-  updated: number,
-): NotificationCenterData {
-  return {
-    ...data,
-    items: data.items.map((item) => category === 'all' || item.category === category
-      ? { ...item, isRead: true }
-      : item),
-    counts: {
-      ...data.counts,
-      unread: Math.max(0, data.counts.unread - updated),
-    },
-    unreadCount: Math.max(0, data.unreadCount - updated),
   }
 }

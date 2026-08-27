@@ -35,10 +35,10 @@ import {
   type TwoFactorSummary,
 } from '@/components/dashboard/live-summary'
 import {
+  dashboardNotificationDestination,
   dashboardNotificationFilters,
   dashboardNotificationItems,
   markDashboardNotificationRead,
-  markDashboardNotificationsRead,
   type DashboardNotificationFilter,
 } from '@/components/dashboard/notification-summary'
 
@@ -455,7 +455,14 @@ export default function DashboardPage() {
 
   useEffect(() => { void load() }, [load])
 
-  const loadNotificationCenter = useCallback(async () => {
+  useEffect(() => {
+    notificationRequestId.current += 1
+    setNotificationsOpen(false)
+    setNotificationData(null)
+    setNotificationError('')
+  }, [selectedAccountId])
+
+  const loadNotificationCenter = useCallback(async (limit = 20) => {
     const requestId = ++notificationRequestId.current
     if (!selectedAccountId) {
       setNotificationData(null)
@@ -468,7 +475,7 @@ export default function DashboardPage() {
     try {
       const response = await api.notifications.center.list(selectedAccountId, {
         category: notificationFilter,
-        limit: 20,
+        limit,
       })
       if (requestId !== notificationRequestId.current) return
       if (!response.success) throw new Error(response.error)
@@ -484,10 +491,6 @@ export default function DashboardPage() {
 
   useEffect(() => { void loadNotificationCenter() }, [loadNotificationCenter])
 
-  useEffect(() => {
-    setNotificationsOpen(false)
-  }, [selectedAccountId])
-
   const openNotification = async (item: NotificationCenterItem) => {
     if (!selectedAccountId) return
     if (!item.isRead) {
@@ -500,9 +503,10 @@ export default function DashboardPage() {
         return
       }
     }
-    if (item.eventType.startsWith('account_health_')) {
+    const destination = dashboardNotificationDestination(item)
+    if (destination) {
       setNotificationsOpen(false)
-      router.push('/health')
+      router.push(destination)
     }
   }
 
@@ -511,10 +515,9 @@ export default function DashboardPage() {
     try {
       const response = await api.notifications.center.markAllRead(selectedAccountId, notificationFilter)
       if (!response.success) throw new Error(response.error)
-      setNotificationData((current) => current
-        ? markDashboardNotificationsRead(current, notificationFilter, response.data.updated)
-        : current)
-      setNotificationError('')
+      // updated は新規既読数ではなく対象総数。既読済みを
+      // 重ねて引かないよう、未読数はサーバーから取り直す。
+      await loadNotificationCenter()
     } catch {
       setNotificationError('通知をまとめて既読にできませんでした。')
     }
@@ -697,8 +700,7 @@ export default function DashboardPage() {
               onMarkAllRead={() => { void markAllNotificationsRead() }}
               onClose={() => setNotificationsOpen(false)}
               onViewAll={() => {
-                setNotificationsOpen(false)
-                router.push('/health')
+                void loadNotificationCenter(100)
               }}
               onOpenSettings={() => {
                 setNotificationsOpen(false)

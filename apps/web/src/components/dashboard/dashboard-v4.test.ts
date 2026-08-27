@@ -9,10 +9,10 @@ import {
 import { activeUpcomingBookings } from './side-cards'
 import { hasInboundSupportMark, summarizeTwoFactor } from './live-summary'
 import {
+  dashboardNotificationDestination,
   dashboardNotificationFilters,
   dashboardNotificationItems,
   markDashboardNotificationRead,
-  markDashboardNotificationsRead,
 } from './notification-summary'
 import { formatTrendSources } from './friend-trend-table'
 import type { BookingRequest } from '@/lib/api'
@@ -237,10 +237,22 @@ describe('ダッシュボード通知', () => {
     expect(markDashboardNotificationRead(once, 'danger')).toBe(once)
   })
 
-  it('種類別の全件既読は対象だけを既読にする', () => {
-    const next = markDashboardNotificationsRead(data, 'error', 1)
-    expect(next.items.find((item) => item.id === 'danger')?.isRead).toBe(true)
-    expect(next.items.find((item) => item.id === 'recovered')?.isRead).toBe(false)
-    expect(next.unreadCount).toBe(1)
+  it('まとめて既読にした後はAPIの総対象数を引かず、未読数を再取得する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('api.notifications.center.markAllRead(selectedAccountId, notificationFilter)')
+    expect(source).toContain('await loadNotificationCenter()')
+    expect(source).not.toContain('markDashboardNotificationsRead')
+  })
+
+  it('通知種類ごとに安全な管理画面へ送る', () => {
+    expect(dashboardNotificationDestination(data.items[0])).toBe('/emergency')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
+      eventType: 'release',
+    })).toBe('/updates')
+    expect(dashboardNotificationDestination({
+      ...data.items[1],
+      eventType: 'unknown',
+    })).toBeNull()
   })
 })
