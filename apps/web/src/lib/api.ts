@@ -1228,43 +1228,58 @@ export const api = {
   },
   /** 対応マーク。友だちの対応状況を運用側の言葉で持つ。 */
   supportMarks: {
-    list: () =>
-      fetchApi<ApiResponse<Array<SupportMark & { friendCount: number }>>>('/api/support-marks'),
-    create: (data: {
+    list: (accountId: string) =>
+      fetchApi<ApiResponse<Array<SupportMark & { friendCount: number }>>>(
+        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    create: (accountId: string, data: {
       name: string
       color?: string
       isDefault?: boolean
       autoOnInbound?: boolean
       displayOrder?: number
     }) =>
-      fetchApi<ApiResponse<SupportMark>>('/api/support-marks', {
+      fetchApi<ApiResponse<SupportMark>>(
+        `/api/support-marks?lineAccountId=${encodeURIComponent(accountId)}`,
+        {
         method: 'POST',
         body: JSON.stringify(data),
-      }),
+        },
+      ),
     update: (
       id: string,
+      accountId: string,
       data: Partial<Pick<SupportMark, 'name' | 'color' | 'isDefault' | 'autoOnInbound' | 'displayOrder'>>,
     ) =>
-      fetchApi<ApiResponse<SupportMark>>(`/api/support-marks/${id}`, {
+      fetchApi<ApiResponse<SupportMark>>(
+        `/api/support-marks/${id}?lineAccountId=${encodeURIComponent(accountId)}`,
+        {
         method: 'PATCH',
         body: JSON.stringify(data),
-      }),
+        },
+      ),
     /** 付いている人がいると 409。force で初期値マークへ置換して消す。 */
-    delete: (id: string, opts?: { force?: boolean }) =>
+    delete: (id: string, accountId: string, opts?: { force?: boolean }) =>
       fetchApi<ApiResponse<{ replacedFriendCount: number; replacementMark: SupportMark }>>(
-        `/api/support-marks/${id}${opts?.force ? '?force=1' : ''}`,
+        `/api/support-marks/${id}?lineAccountId=${encodeURIComponent(accountId)}${opts?.force ? '&force=1' : ''}`,
         { method: 'DELETE' },
       ),
-    setForFriend: (friendId: string, markId: string | null) =>
-      fetchApi<ApiResponse<null>>(`/api/friends/${friendId}/support-mark`, {
+    setForFriend: (friendId: string, accountId: string, markId: string | null) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/friends/${friendId}/support-mark?lineAccountId=${encodeURIComponent(accountId)}`,
+        {
         method: 'PATCH',
         body: JSON.stringify({ markId }),
-      }),
-    bulk: (friendIds: string[], markId: string | null) =>
-      fetchApi<ApiResponse<{ updated: number }>>('/api/friends/support-mark/bulk', {
+        },
+      ),
+    bulk: (friendIds: string[], accountId: string, markId: string | null) =>
+      fetchApi<ApiResponse<{ updated: number }>>(
+        `/api/friends/support-mark/bulk?lineAccountId=${encodeURIComponent(accountId)}`,
+        {
         method: 'POST',
         body: JSON.stringify({ friendIds, markId }),
-      }),
+        },
+      ),
   },
   /** 保存した検索。上限50件。 */
   savedSearches: {
@@ -3167,12 +3182,12 @@ export const api = {
     get: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`),
     me: () => fetchApi<ApiResponse<StaffMember>>('/api/staff/me'),
-    create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId: string; canAccessDescendantAccounts?: boolean }) =>
+    create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId: string; canAccessDescendantAccounts?: boolean; accountScope: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq' }) =>
       fetchApi<ApiResponse<StaffMember>>('/api/staff', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean }) =>
+    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq' }) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),

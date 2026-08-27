@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import { api } from '@/lib/api'
+import HqStaffSection from './hq-staff-section'
 
 export default function HqSettingsPage() {
   const [name, setName] = useState('')
@@ -76,6 +77,7 @@ export default function HqSettingsPage() {
           <Button type="submit" variant="primary" disabled={loading || saving}>{saving ? '保存中…' : '保存'}</Button>
         </div>
       </form>
+      <HqStaffSection />
     </div>
   )
 }

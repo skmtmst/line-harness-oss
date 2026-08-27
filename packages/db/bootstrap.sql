@@ -2207,6 +2207,13 @@ CREATE TABLE staff (
   FOREIGN KEY (line_account_id) REFERENCES line_accounts(id)
 );
 
+CREATE TABLE staff_account_scopes (
+  staff_id        TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  created_at      TEXT NOT NULL,
+  PRIMARY KEY (staff_id, line_account_id)
+);
+
 CREATE TABLE staff_availability_rules (
   id          TEXT PRIMARY KEY,
   staff_id    TEXT NOT NULL,
@@ -2237,7 +2244,8 @@ CREATE TABLE staff_members (
   line_linked_at TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id));
+, line_user_id TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT, totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0, tenant_id TEXT REFERENCES tenants(id), account_scope TEXT NOT NULL DEFAULT 'all'
+  CHECK (account_scope IN ('all', 'accounts')));
 
 CREATE TABLE staff_menus (
   staff_id                  TEXT NOT NULL,
@@ -2318,6 +2326,13 @@ CREATE TABLE "support_email_threads" (
   last_customer_message_at TEXT,
   last_operator_message_at TEXT,
   next_response_due_at     TEXT
+);
+
+CREATE TABLE support_mark_scopes (
+  mark_id         TEXT PRIMARY KEY REFERENCES support_marks(id),
+  tenant_id       TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id TEXT REFERENCES line_accounts(id),
+  created_at      TEXT NOT NULL
 );
 
 CREATE TABLE support_marks (
@@ -3117,6 +3132,9 @@ CREATE INDEX idx_site_events_path ON site_events(path, occurred_at);
 
 CREATE INDEX idx_site_visitors_friend ON site_visitors(friend_id);
 
+CREATE INDEX idx_staff_account_scopes_account
+  ON staff_account_scopes(line_account_id);
+
 CREATE INDEX idx_staff_account_sort ON staff (line_account_id, sort_order);
 
 CREATE INDEX idx_staff_availability_rules_staff
@@ -3153,6 +3171,9 @@ CREATE INDEX idx_support_email_threads_customer_subject
 
 CREATE INDEX idx_support_email_threads_status_last
   ON support_email_threads (status, last_message_at DESC);
+
+CREATE INDEX idx_support_mark_scopes_account
+  ON support_mark_scopes(tenant_id, line_account_id);
 
 CREATE INDEX idx_tag_groups_sort ON tag_groups(sort_order, id);
 

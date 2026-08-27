@@ -37,6 +37,7 @@ describe('ログインユーザーの無効化と監査記録', () => {
         email_verified_at TEXT, line_linked_at TEXT, totp_secret_enc TEXT, totp_pending_secret_enc TEXT,
         totp_enabled_at TEXT, totp_last_used_step INTEGER, assigned_line_account_id TEXT,
         can_access_descendant_accounts INTEGER NOT NULL DEFAULT 0,
+        account_scope TEXT NOT NULL DEFAULT 'all',
         tenant_id TEXT,
         created_at TEXT NOT NULL, updated_at TEXT NOT NULL
       );
