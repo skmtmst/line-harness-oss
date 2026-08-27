@@ -502,6 +502,11 @@
   "components/chats/inbox-kpis.tsx": {
     "arbitrary-value": 27
   },
+  "components/chats/saved-view-dialog.tsx": {
+    "arbitrary-value": 4,
+    "direct-primary-button": 2,
+    "direct-secondary-button": 1
+  },
   "components/chats/template-picker.tsx": {
     "arbitrary-value": 61
   },

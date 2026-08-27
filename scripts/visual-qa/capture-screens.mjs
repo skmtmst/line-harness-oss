@@ -100,6 +100,12 @@ async function newPage(browser, width, height, clock) {
 async function runSteps(page, steps = [], node = '') {
   for (const step of steps) {
     if (step.wait) { await page.waitForTimeout(step.wait); continue }
+    if (step.fill !== undefined) {
+      // 入力してから撮る状態（保存した検索の名前など）。
+      await page.getByLabel(step.fill).fill(step.text ?? '')
+      await page.waitForTimeout(step.after ?? 300)
+      continue
+    }
     const root = step.scope === 'main' ? page.locator('main') : page
     const target = root.getByRole(step.role ?? 'button', { name: step.click })
     const one = step.nth === undefined ? target.first() : target.nth(step.nth)

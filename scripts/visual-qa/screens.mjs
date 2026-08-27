@@ -17,7 +17,7 @@
  *   mode      'page'     … ページ全体を撮る（`fullPage`）
  *             'viewport' … 見えている範囲だけ撮る
  *   height    'viewport' のときの高さ。**設計の高さに合わせる**
- *   steps     撮る前の操作。`{ click: 'ボタン名' }` `{ wait: 800 }`
+ *   steps     撮る前の操作。`{ click: 'ボタン名' }` `{ fill: '欄名', text: '…' }` `{ wait: 800 }`
  *   clock     時計を止める時刻。相対時刻（「6日前」）を出す画面では必須
  *   status    'unimplemented' … 実装が無い。**撮らない。合格にもしない**
  *   why       `status` の理由。空にしない
@@ -119,21 +119,35 @@ export const SCREENS = [
   },
   { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }] },
   { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }] },
+  /*
+    2-14 → 2-15 → 2-16 → 2-17 は一続きの流れ。
+    「この条件を保存」で `Ln4zS` のモーダルを開き、名前を入れて保存する。
+    エラーは空のとき・同じ名前のときで文を変える。
+  */
   {
     ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',
-    status: 'unimplemented', why: '2-13 の中に「この条件を保存」が無い。名前を付けて保存する導線が未確認',
+    steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
-    status: 'unimplemented', why: '2-14 が無いため、その先も無い',
+    steps: [
+      { click: '保存した検索' }, { click: 'この条件を保存' },
+      { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
+    ],
   },
   {
     ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
-    status: 'unimplemented', why: '2-14 が無いため、その先も無い',
+    steps: [
+      { click: '保存した検索' }, { click: 'この条件を保存' },
+      { click: 'この条件を保存', nth: 1 },
+    ],
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
-    status: 'unimplemented', why: '2-14 が無いため、その先も無い',
+    steps: [
+      { click: '保存した検索' }, { click: 'この条件を保存' },
+      { fill: '検索名', text: 'VIPかつ未契約' }, { click: 'この条件を保存', nth: 1 },
+    ],
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

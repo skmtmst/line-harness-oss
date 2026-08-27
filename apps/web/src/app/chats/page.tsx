@@ -7,6 +7,7 @@ import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
+import SavedViewDialog from '@/components/chats/saved-view-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -384,6 +385,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   const [quickFilter, setQuickFilter] = useState<'all' | 'reply' | 'overdue'>('all')
   const [assigneeFilter, setAssigneeFilter] = useState('all')
   const [filterOpen, setFilterOpen] = useState(false)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [unreadOnly, setUnreadOnly] = useState(false)
   // 一覧が長くなると状態の絞り込みだけでは足りない（設計 `ListPane` の「名前で検索」）。
   // 送信側で絞ると、打つたびに一覧を取り直して重い。手元で絞る。
@@ -631,9 +633,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     sort: 'newest',
   })
 
-  const createSavedView = async () => {
+  const createSavedView = async (nameOverride?: string) => {
     if (savingView) return
-    const name = savedViewName.trim()
+    // モーダルから呼ぶときは、そこで打った名前をそのまま使う。
+    // 状態の更新を待つと、1回目の保存が空の名前で走る。
+    const name = (nameOverride ?? savedViewName).trim()
     if (!name) {
       setSavedViewError('名前を入力してください')
       return
@@ -1160,33 +1164,36 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                   </div>
                 ))}
               </div>
+              {/*
+                前はここに名前の入力欄と保存ボタンが直接並んでいた。
+                **何を保存しようとしているのかが書いていない**ので、絞り込みを
+                変えたつもりで前の条件を保存してしまう。設計（`Ln4zS`）は
+                名前と「保存する条件」を並べて見せてから保存させる。
+              */}
               <div className="border-hairline mt-3 border-t pt-3">
-                <label htmlFor="saved-inbox-view-name" className="text-ink-faint text-xs font-semibold">
-                  現在の条件を保存
-                </label>
-                <div className="mt-1.5 flex gap-2">
-                  <input
-                    id="saved-inbox-view-name"
-                    value={savedViewName}
-                    onChange={(event) => setSavedViewName(event.target.value)}
-                    maxLength={40}
-                    placeholder="例：自分の未対応"
-                    className="border-hairline focus:ring-accent min-w-0 flex-1 rounded-lg border px-3 py-2 text-xs outline-none focus:border-accent focus:ring-2"
-                  />
-                  <Button
-                    variant="primary"
-                    type="button"
-                    onClick={() => void createSavedView()}
-                    disabled={savingView}
-                  >
-                    {savingView ? '保存中' : '保存'}
-                  </Button>
-                </div>
+                <Button variant="primary" type="button" onClick={() => setSaveDialogOpen(true)}>
+                  この条件を保存
+                </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
             </div>
           )}
         </div>
+        <SavedViewDialog
+          open={saveDialogOpen}
+          conditions={[
+            { label: '対応マーク', value: statusFilters.find((f) => f.key === statusFilter)?.label ?? 'すべて' },
+            { label: '担当者', value: assigneeFilter === 'all' ? 'すべて' : assigneeFilter === 'unassigned' ? '未割り当て' : (operators.find((o) => o.id === assigneeFilter)?.name ?? 'すべて') },
+            { label: '受信経路', value: channel === 'all' ? 'LINE・MAIL' : channel === 'line' ? 'LINE' : 'MAIL' },
+          ]}
+          existingNames={savedViews.map((view) => view.name)}
+          saving={savingView}
+          onSave={async (name) => {
+            setSavedViewName(name)
+            await createSavedView(name)
+          }}
+          onClose={() => setSaveDialogOpen(false)}
+        />
         <InboxFilterPanel
           open={filterOpen}
           value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}

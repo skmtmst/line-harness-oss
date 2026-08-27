@@ -445,3 +445,26 @@ export const TEMPLATES = (() => {
   }
   return rows
 })()
+
+/**
+ * 受信箱の保存した検索。設計 `ASsb3`（2-13 保存した検索を開く）の並び。
+ *
+ * **空で返すと、同じ名前かどうかを確かめられない。** 2-17（重複エラー）は
+ * すでにある名前を打ったときの絵なので、既存が0件だと「保存しました」に
+ * なってしまう。実際そうなった。
+ */
+export const INBOX_SAVED_VIEWS = [
+  ['VIPかつ未契約', true],
+  ['未対応・担当なし', true],
+  ['自分の未対応', false],
+].map(([name, isShared], index) => ({
+  id: `inbox-view-${index}`,
+  name: String(name),
+  scope: 'chats',
+  conditions: { all: [], any: [] },
+  createdBy: 'Kenta',
+  lineAccountId: 'visual-qa-account',
+  isShared: Boolean(isShared),
+  displayOrder: index,
+  createdAt: '2026-08-17T03:00:00.000Z',
+}))
