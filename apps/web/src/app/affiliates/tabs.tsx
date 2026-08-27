@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import type { Tag, Scenario, LineAccount } from '@line-crm/shared'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 
 const WORKER_BASE = process.env.NEXT_PUBLIC_API_URL
 if (!WORKER_BASE) {
@@ -278,14 +278,14 @@ export function AffiliatorsTab() {
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div>
+    <div data-design-node="PouPn" data-affiliate-design="v6">
       <div className="mb-4 flex justify-end">
-        <button
+        <Button
+          variant="primary"
           onClick={() => setCreateOpen(true)}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
         >
-          + 新規作成
-        </button>
+          アフィリエイターを追加
+        </Button>
       </div>
 
       {createOpen && (
@@ -295,20 +295,22 @@ export function AffiliatorsTab() {
         />
       )}
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          読み込み中...
-        </div>
+      {error ? (
+        <ListState
+          kind="error"
+          title="紹介者を表示できませんでした"
+          description="再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={<Button onClick={() => void loadList()}>紹介者を再読み込み</Button>}
+        />
+      ) : loading ? (
+        <ListState kind="loading" title="紹介者を読み込んでいます" />
       ) : rows.length === 0 ? (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-          アフィリエイターがまだ登録されていません
-        </div>
+        <ListState
+          kind="empty"
+          title="紹介者はまだ登録されていません"
+          description="紹介してくれる方を登録すると、専用リンクと成果を管理できます。"
+          action={<Button variant="primary" onClick={() => setCreateOpen(true)}>アフィリエイターを追加</Button>}
+        />
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
           <table className="w-full min-w-[900px]">
