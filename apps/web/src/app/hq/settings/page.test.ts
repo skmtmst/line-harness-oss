@@ -11,4 +11,8 @@ describe('統括設定', () => {
     expect(source).toContain('maxLength={100}')
     expect(source).toContain("trimmed.length > 100")
   })
+
+  it('権限者の一覧・追加・担当範囲変更を同じ設定画面に置く', () => {
+    expect(source).toContain('<HqStaffSection />')
+  })
 })
