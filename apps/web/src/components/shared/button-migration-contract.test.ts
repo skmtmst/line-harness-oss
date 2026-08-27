@@ -92,7 +92,7 @@ describe('標準ボタンの第1段階移行', () => {
     expect(debt['direct-primary-button']).toBe(137)
     // ★V6 3-1（PhxG6）の38pxヘッダー操作2つと、保存検索ダイアログの
     // 閉じる操作1つは、既存V5ボタンの36pxと形が違うため画面側に残す。
-    expect(debt['direct-secondary-button']).toBe(282)
+    expect(debt['direct-secondary-button']).toBe(281)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・

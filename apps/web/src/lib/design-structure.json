@@ -292,34 +292,16 @@
       ]
     },
     "/tags": {
-      "node": "xn98K wdLjf KYG39 X79IHW t7Mhgl lNGcs NU4N2 FORVU",
-      "name": "V4 4-1 友だち属性（4タブ）",
+      "node": "hqrOv HBTk0 rIhbN QKx8Q",
+      "name": "V6 4 友だち属性（4タブ）",
       "visualVerification": {
-        "status": "verified",
-        "referenceNodeIds": ["xn98K", "wdLjf", "KYG39", "X79IHW", "t7Mhgl", "lNGcs", "NU4N2", "FORVU"],
+        "status": "unverified",
+        "referenceNodeIds": ["hqrOv", "HBTk0", "rIhbN", "QKx8Q"],
         "requiredViewports": [1440, 1920],
-        "referenceScreenshots": [
-          "docs/design-reference/friend-attributes-v4/01-list.png/xn98K.png",
-          "docs/design-reference/friend-attributes-v4/02-create-initial.png/wdLjf.png",
-          "docs/design-reference/friend-attributes-v4/03-create-linked.png/KYG39.png",
-          "docs/design-reference/friend-attributes-v4/04-action-drawer.png/X79IHW.png",
-          "docs/design-reference/friend-attributes-v4/05-edit-existing.png/t7Mhgl.png",
-          "docs/design-reference/friend-attributes-v4/06-retroactive-dialog.png/lNGcs.png",
-          "docs/design-reference/friend-attributes-v4/07-delete-dialog.png/NU4N2.png",
-          "docs/design-reference/friend-attributes-v4/08-folder-dialog.png/FORVU.png"
-        ],
-        "implementationScreenshots": [
-          "docs/design-qa/friend-attributes-v4/01-list.png",
-          "docs/design-qa/friend-attributes-v4/02-create-initial.png",
-          "docs/design-qa/friend-attributes-v4/03-create-linked.png",
-          "docs/design-qa/friend-attributes-v4/04-action-drawer.png",
-          "docs/design-qa/friend-attributes-v4/05-edit-existing.png",
-          "docs/design-qa/friend-attributes-v4/06-retroactive-dialog.png",
-          "docs/design-qa/friend-attributes-v4/07-delete-dialog.png",
-          "docs/design-qa/friend-attributes-v4/08-folder-dialog.png"
-        ],
-        "checkedAt": "2026-08-21T18:18:00+09:00",
-        "evidence": "docs/design-qa/friend-attributes-v4/design-qa.md"
+        "referenceScreenshots": [],
+        "implementationScreenshots": [],
+        "checkedAt": "2026-08-27T12:50:00+09:00",
+        "reason": "V6実装と1440px・1920pxの比較証拠はClaude側のVisual QAで作成中"
       },
       "sections": [
         "Body",
@@ -366,9 +348,9 @@
         "担当者あり",
         "過去7日",
         "マーク名",
-        "新規の初期値",
-        "いまの人数",
-        "自動で変わるとき",
+        "初期値",
+        "使用中",
+        "自動変更",
         "初期値",
         "編集",
         "有効",

@@ -677,6 +677,8 @@ export default function TagsPageV4({
             まで同じ操作の中で進む。
           */
           <Button type="button" onClick={() => setCsvOpen(true)}>CSVで一括登録</Button>
+        ) : tab === 'marks' ? (
+          <Button href="/tags/marks/new" variant="primary">＋ マークを追加</Button>
         ) : undefined}
       />
 

@@ -570,9 +570,7 @@
     "direct-th": 6
   },
   "components/friend-fields/mark-list.tsx": {
-    "arbitrary-value": 9,
-    "direct-th": 5,
-    "direct-secondary-button": 1
+    "arbitrary-value": 9
   },
   "components/friend-fields/saved-search-list.tsx": {
     "arbitrary-value": 7
