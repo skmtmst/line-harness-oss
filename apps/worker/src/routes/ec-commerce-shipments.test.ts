@@ -32,7 +32,7 @@ async function callShipments(rows: Row[], query = '') {
   // 権限そのものの検証は middleware/role-guard.test.ts が持つ。
   const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'staff-1', name: 'Staff', role: 'staff', readOnly: false });
+    c.set('staff', { id: 'env-owner', name: 'Staff', role: 'owner', readOnly: false });
     return next();
   });
   app.route('/', ecCommerce);

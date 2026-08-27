@@ -12,6 +12,7 @@ import QrDialog from '@/components/dashboard/qr-dialog'
 import FriendTrendTable from '@/components/dashboard/friend-trend-table'
 import {
   FriendStatusCard,
+  SupportMarkStatusCard,
   MonthlyDeliveryCard,
   RecentResultsCard,
   UpcomingCard,
@@ -25,6 +26,29 @@ import DashboardEditor, {
 } from '@/components/dashboard/dashboard-editor'
 import Card, { CardHeader } from '@/components/shared/card'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import NotificationPanel from '@/components/shared/notification-panel'
+import {
+  hasInboundSupportMark,
+  summarizeTwoFactor,
+  type TwoFactorSummary,
+} from '@/components/dashboard/live-summary'
+
+/** 通知パネルの絞り込み。中身の口ができるまで数は0のまま。 */
+function BellIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  )
+}
+
+const NOTIFICATION_FILTERS = [
+  { id: 'all', label: 'すべて', count: 0 },
+  { id: 'error', label: 'エラー', count: 0 },
+  { id: 'update', label: 'アップデート', count: 0 },
+]
 
 const PERIODS = [
   { key: 'today', label: '今日' },
@@ -240,10 +264,18 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
   return <Card padding="roomy" className="min-h-[128px]">
     <div className="flex items-start justify-between gap-3">
       <h2 className="text-ink text-base font-bold">今月の送信枠</h2>
-      <span className="text-ink-faint text-xs">月初リセット</span>
+      <span className="text-ink-faint text-xs">毎月1日リセット</span>
     </div>
-    <p className="text-ink mt-3 text-2xl font-bold tabular-nums">
-      {remaining === null || limit === null ? '—' : `${remaining.toLocaleString('ja-JP')} / ${limit.toLocaleString('ja-JP')}通`}
+    {/*
+      設計（`vUXKb`）は数の前に「LINE公式」と置く。送信枠はLINE公式アカウント
+      の枠で、メールには効かない。どちらの枠かが書いていないと、メールが
+      止まったときにここを見てしまう。
+    */}
+    <p className="text-ink mt-3 flex items-baseline gap-2">
+      <span className="text-ink-secondary text-xs font-medium">LINE公式</span>
+      <span className="text-2xl font-bold tabular-nums">
+        {remaining === null || limit === null ? '—' : `${remaining.toLocaleString('ja-JP')} / ${limit.toLocaleString('ja-JP')}通`}
+      </span>
     </p>
     <div className="bg-hairline mt-3 h-1.5 overflow-hidden rounded-pill"><div className="bg-accent h-full rounded-pill" style={{ width: `${remainingRate ?? 0}%` }} /></div>
     <div className="mt-2 flex items-center justify-between gap-3 text-xs">
@@ -253,7 +285,7 @@ function SendQuotaCard({ delivery }: { delivery: DashboardOverview['delivery'] |
   </Card>
 }
 
-function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null }) {
+function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes, twoFactor }: { risk: HealthRisk; healthIssues: number | null; oldestWaitMinutes: number | null; twoFactor: { enabled: number; total: number } | null }) {
   const currentHealthIssue = risk === 'warning' || risk === 'danger'
   // 未対応の長さは受信カードで管理する。ここへ重ねて警告扱いすると、
   // 接続も自動処理も正常なのに赤い「1件」が出てしまう。
@@ -263,9 +295,14 @@ function OperationalAlertsCard({ risk, healthIssues, oldestWaitMinutes }: { risk
       <h2 className="text-ink text-base font-bold">運用アラート</h2>
       <span className={count === null ? 'text-ink-faint text-sm font-bold' : count > 0 ? 'text-danger text-sm font-bold' : 'text-success text-sm font-bold'}>{count === null ? '—' : `${count}件`}</span>
     </div>
+    {/*
+      設計（`vUXKb`）は「最も古い未対応」と「二段階認証」の2行。
+      二段階認証は既存のログインユーザー一覧から、有効な人だけを数える。
+      一覧を取得できなかったときだけ `—` にする。
+    */}
     <div className="text-ink-secondary mt-3 space-y-2 text-xs">
-      <p>・接続・自動処理：{risk === null ? '確認中' : currentHealthIssue ? '確認が必要です' : '正常です'}</p>
-      <p>・未対応の最長待ち：{oldestWaitMinutes === null ? '確認中' : `${formatDurationMinutes(oldestWaitMinutes)}（受信箱で確認）`}</p>
+      <p>・最も古い未対応：{oldestWaitMinutes === null ? '—' : `${oldestWaitMinutes.toLocaleString('ja-JP')}分前`}</p>
+      <p>・二段階認証：{twoFactor === null ? '—' : `${twoFactor.enabled} / ${twoFactor.total}人`}</p>
     </div>
     <Link href="/emergency" className="text-action mt-3 inline-block text-xs font-medium hover:underline">運用状態を見る →</Link>
   </Card>
@@ -300,6 +337,8 @@ export default function DashboardPage() {
   const [supplementLoading, setSupplementLoading] = useState(true)
   const [healthRisk, setHealthRisk] = useState<HealthRisk>(null)
   const [healthIssueCount, setHealthIssueCount] = useState<number | null>(null)
+  const [twoFactorSummary, setTwoFactorSummary] = useState<TwoFactorSummary | null>(null)
+  const [supportMarkAutoOnInbound, setSupportMarkAutoOnInbound] = useState<boolean | null>(null)
   const loadRequestId = useRef(0)
   const visibleMain = preferences.main.filter((item) => item.visible)
   const visibleRight = preferences.right.filter((item) => item.visible)
@@ -309,6 +348,8 @@ export default function DashboardPage() {
   const needsBookings = visibleToday.some((item) => item.id === 'today-bookings')
     || visibleRight.some((item) => item.id === 'upcoming')
   const needsHealth = visibleRight.some((item) => item.id === 'operational-alerts' || item.id === 'connection-status')
+  const needsTwoFactor = visibleRight.some((item) => item.id === 'operational-alerts')
+  const needsSupportMarks = visibleRight.some((item) => item.id === 'support-mark-status')
 
   useEffect(() => {
     if (!selectedAccountId) {
@@ -411,6 +452,8 @@ export default function DashboardPage() {
       setPendingPhotos(null)
       setHealthRisk(null)
       setHealthIssueCount(null)
+      setTwoFactorSummary(null)
+      setSupportMarkAutoOnInbound(null)
       setSupplementLoading(false)
       return
     }
@@ -420,7 +463,9 @@ export default function DashboardPage() {
       needsPhotos ? api.nenMembers.overview() : Promise.resolve(null),
       needsBookings ? bookingApi.listRequests(selectedAccountId, 'all') : Promise.resolve(null),
       needsHealth ? api.health.getHealth(selectedAccountId) : Promise.resolve(null),
-    ]).then(([photoResult, bookingResult, healthResult]) => {
+      needsTwoFactor ? api.staff.list() : Promise.resolve(null),
+      needsSupportMarks ? api.supportMarks.list(selectedAccountId) : Promise.resolve(null),
+    ]).then(([photoResult, bookingResult, healthResult, staffResult, supportMarkResult]) => {
       if (cancelled) return
       setPendingPhotos(photoResult.status === 'fulfilled' && photoResult.value?.success ? photoResult.value.data.pendingPhotos : null)
       setBookings(bookingResult.status === 'fulfilled' && bookingResult.value ? bookingResult.value.requests : null)
@@ -434,10 +479,20 @@ export default function DashboardPage() {
           ? healthResult.value.data.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
           : null,
       )
+      setTwoFactorSummary(
+        staffResult.status === 'fulfilled' && staffResult.value?.success
+          ? summarizeTwoFactor(staffResult.value.data)
+          : null,
+      )
+      setSupportMarkAutoOnInbound(
+        supportMarkResult.status === 'fulfilled' && supportMarkResult.value?.success
+          ? hasInboundSupportMark(supportMarkResult.value.data)
+          : null,
+      )
       setSupplementLoading(false)
     })
     return () => { cancelled = true }
-  }, [needsBookings, needsHealth, needsPhotos, selectedAccountId])
+  }, [needsBookings, needsHealth, needsPhotos, needsSupportMarks, needsTwoFactor, selectedAccountId])
 
   const activeBookings = useMemo(
     () => bookings?.filter((booking) => !inactiveBookingStatuses.has(booking.status)) ?? [],
@@ -481,7 +536,7 @@ export default function DashboardPage() {
 
   const renderRightCard = (id: DashboardCardId): ReactNode => {
     if (id === 'send-quota') return <SendQuotaCard delivery={sectionAvailable('quota') ? data?.delivery ?? null : null} />
-    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} />
+    if (id === 'operational-alerts') return <OperationalAlertsCard risk={healthRisk} healthIssues={healthIssueCount} oldestWaitMinutes={inboxSummary?.oldestWaitMinutes ?? (sectionAvailable('inbox') ? data?.inbox.oldestUnansweredMinutes : null) ?? null} twoFactor={twoFactorSummary} />
     if (id === 'connection-status') return <ConnectionStatusCard account={selectedAccount} risk={healthRisk} activeFriends={sectionAvailable('friends') ? data?.friends.active ?? null : null} />
     if (id === 'upcoming') return <UpcomingCard bookings={bookings} loading={supplementLoading} />
     if (id === 'monthly-delivery') return data && !sectionAvailable('delivery')
@@ -490,6 +545,7 @@ export default function DashboardPage() {
     if (id === 'recent-results') return data && !sectionAvailable('conversions')
       ? <UnavailableDataCard title="最近の成果" onRetry={() => void load()} />
       : data ? <RecentResultsCard conversions={data.conversions} /> : <EmptyDataCard title="最近の成果" href="/conversions" linkLabel="成果を見る" />
+    if (id === 'support-mark-status') return <SupportMarkStatusCard inbox={sectionAvailable('inbox') ? data?.inbox ?? null : null} autoOnInbound={supportMarkAutoOnInbound} />
     if (id === 'friend-status') return data && !sectionAvailable('friends')
       ? <UnavailableDataCard title="友だちの状態" onRetry={() => void load()} />
       : data ? <FriendStatusCard friends={data.friends} /> : <EmptyDataCard title="友だちの状態" href="/friends" linkLabel="友だちを見る" />
@@ -505,6 +561,9 @@ export default function DashboardPage() {
     if (id === 'automation-failures') return <LiveDataCard title="オートメーション失敗" href="/automations" linkLabel="実行状況を見る" value={sectionAvailable('operations') ? data?.operations?.automationFailures ?? null : null} detail="期間内の失敗・一部失敗" />
     return null
   }
+
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notificationFilter, setNotificationFilter] = useState('all')
 
   const healthLabel = healthRisk === 'normal' ? '正常稼働' : healthRisk === 'warning' ? '要確認' : healthRisk === 'danger' ? '障害あり' : '状態確認中'
   const healthClass = healthRisk === 'danger' ? 'text-danger' : healthRisk === 'warning' ? 'text-warning' : healthRisk === 'normal' ? 'text-success' : 'text-ink-faint'
@@ -528,6 +587,34 @@ export default function DashboardPage() {
                 className={`rounded-pill border px-4 py-2 text-xs font-medium transition-colors ${period === item.key ? 'border-accent bg-accent text-on-accent' : 'border-hairline bg-canvas text-ink-secondary hover:bg-canvas-sunken'}`}
               >{item.label}</button>
             ))}
+          </div>
+          {/*
+            設計（`vUXKb` / `Alekb`）は期間の右にベルを置き、押すと通知パネルが
+            開く。部品（`components/shared/notification-panel.tsx`）は前からある
+            のに、ダッシュボードから呼ばれていなかった。
+
+            **中身を出す口はまだ無い。** バッジに数を作って出すと、本物らしく
+            見えるぶん無いより悪いので、件数は出さずパネルも「まだありません」
+            のままにする。口ができたらここへ繋ぐ。
+          */}
+          <div className="relative">
+            <IconButton
+              aria-label="通知"
+              aria-expanded={notificationsOpen}
+              onClick={() => setNotificationsOpen((current) => !current)}
+            >
+              <BellIcon />
+            </IconButton>
+            <NotificationPanel
+              open={notificationsOpen}
+              items={[]}
+              filters={NOTIFICATION_FILTERS}
+              activeFilter={notificationFilter}
+              unreadCount={0}
+              onFilterChange={setNotificationFilter}
+              onMarkAllRead={() => {}}
+              onClose={() => setNotificationsOpen(false)}
+            />
           </div>
         </div>
       </div>

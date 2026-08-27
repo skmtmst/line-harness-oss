@@ -1141,6 +1141,30 @@ export interface Notification {
   createdAt: string;
 }
 
+export type NotificationCenterCategory = "error" | "update" | "info";
+
+export interface NotificationCenterItem {
+  id: string;
+  eventType: string;
+  category: NotificationCenterCategory;
+  title: string;
+  body: string;
+  metadata: Record<string, unknown> | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface NotificationCenterData {
+  items: NotificationCenterItem[];
+  counts: {
+    all: number;
+    error: number;
+    update: number;
+    unread: number;
+  };
+  unreadCount: number;
+}
+
 // -----------------------------------------------------------------------------
 // Stripe イベント (StripeEvent)
 // -----------------------------------------------------------------------------

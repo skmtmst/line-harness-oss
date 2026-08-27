@@ -5,7 +5,6 @@ import {
   getDashboardPreference,
   getListStats,
   getLineAccountById,
-  getLineAccounts,
   deleteDashboardPreference,
   saveDashboardDefaultPreference,
   saveDashboardPreference,
@@ -13,7 +12,7 @@ import {
   type DashboardOverview,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
-import { canAccessLineAccount, getVisibleLineAccountScope } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { auditLog } from '../lib/audit-log.js';
 
@@ -85,8 +84,7 @@ async function requireVisibleAccount(c: {
   if (!accountId) {
     return { response: Response.json({ success: false, error: 'LINEアカウントを選択してください' }, { status: 400 }) };
   }
-  const accounts = await getLineAccounts(c.env.DB);
-  if (!canAccessLineAccount(accounts, c.get('staff'), accountId)) {
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
     return { response: Response.json({ success: false, error: 'LINE account not found' }, { status: 404 }) };
   }
   return { accountId };

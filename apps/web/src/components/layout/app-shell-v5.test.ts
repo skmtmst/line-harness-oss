@@ -61,11 +61,19 @@ describe('Pen.dev V6を共通レイアウトの正本にする', () => {
   })
 
   it('対応が必要な受信はV4の4列だけを出し、件数に合わせて高さを縮める', () => {
-    for (const label of ['お名前', '内容', '待ち時間', '状態', 'h-fit', 'PAGE_SIZE = 5', '前のページ', '次のページ']) {
+    for (const label of ['お名前', '内容', '待ち時間', '状態', 'h-fit']) {
       expect(pendingInbox).toContain(label)
     }
     expect(pendingInbox).not.toContain('h-[440px]')
-    expect(pendingInbox).toContain('offset=${(page - 1) * PAGE_SIZE}')
+    /*
+      1ページの数は**固定にしない**。5件に固定していたころ、総数5件でも
+      2行しか出せず、残りへ行く手段が無かった。設計（`NjK9q`）は表示件数を
+      選べて、下に番号のページ送りが出る。ページ送りは共通部品へ寄せた。
+    */
+    expect(pendingInbox).toContain('PAGE_SIZE_OPTIONS')
+    expect(pendingInbox).toContain('表示件数')
+    expect(pendingInbox).toContain("from '@/components/shared/pagination'")
+    expect(pendingInbox).toContain('offset=${(page - 1) * pageSize}')
     expect(pendingInbox).not.toContain('一括で確認済みにする')
     expect(pendingInbox).not.toContain('すべて選択')
   })

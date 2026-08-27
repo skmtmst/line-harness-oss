@@ -513,7 +513,7 @@
   },
   "components/dashboard/side-cards.tsx": {
     "unresolved-classname": 1,
-    "arbitrary-value": 4
+    "arbitrary-value": 3
   },
   "components/emergency/release-log-panel.tsx": {
     "arbitrary-value": 3,
@@ -752,8 +752,7 @@
   },
   "components/support/pending-inbox-card.tsx": {
     "arbitrary-value": 8,
-    "direct-th": 4,
-    "direct-secondary-button": 2
+    "direct-th": 4
   },
   "components/support/support-alert-panel.tsx": {
     "arbitrary-value": 3

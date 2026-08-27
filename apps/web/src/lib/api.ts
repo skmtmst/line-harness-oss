@@ -44,6 +44,7 @@ import type {
   OutgoingWebhookCreated,
   NotificationRule,
   Notification,
+  NotificationCenterData,
   AccountHealthLog,
   AccountMigration,
   StaffMember,
@@ -3138,6 +3139,24 @@ export const api = {
     },
   },
   notifications: {
+    center: {
+      list: (lineAccountId: string, params?: { category?: 'all' | 'error' | 'update'; limit?: number }) => {
+        const query = new URLSearchParams({ lineAccountId });
+        if (params?.category) query.set('category', params.category);
+        if (params?.limit !== undefined) query.set('limit', String(params.limit));
+        return fetchApi<ApiResponse<NotificationCenterData>>(`/api/notifications/center?${query}`);
+      },
+      markRead: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<null>>(`/api/notifications/center/${id}/read`, {
+          method: 'POST',
+          body: JSON.stringify({ lineAccountId }),
+        }),
+      markAllRead: (lineAccountId: string, category?: 'all' | 'error' | 'update') =>
+        fetchApi<ApiResponse<{ updated: number }>>('/api/notifications/center/read-all', {
+          method: 'POST',
+          body: JSON.stringify({ lineAccountId, category }),
+        }),
+    },
     rules: {
       list: () =>
         fetchApi<ApiResponse<NotificationRule[]>>('/api/notifications/rules'),
