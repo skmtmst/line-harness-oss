@@ -103,6 +103,9 @@ const PHOTO = { feature: 22, dir: 'photos-v6', route: '/nen-members', mode: 'pag
 /** EC連携。実装は1枚もので、設計の4タブは無い。 */
 const EC = { feature: 23, dir: 'ec-v6', route: '/ec-commerce', mode: 'page' }
 
+/** LINE通知。実装は1枚もので、種別の札6本（すべて／注文／銀行振込／…）。 */
+const LINE_NOTIFY = { feature: 24, dir: 'line-notify-v6', route: '/line-notifications', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -916,6 +919,36 @@ export const SCREENS = [
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
     status: 'unimplemented',
     why: 'つなぎ先も、人を見分ける決めごとも画面から変えられない。「接続先や突合キーを画面から変える口が無い」と書いてある（`page.tsx:174`）',
+  },
+
+  // ── 機能24 LINE通知 ─────────────────────────────────────
+  /*
+    設計のタブは4本（顧客へのお知らせ9／運用者へのお知らせ11／
+    送れなかったもの4／記録）。実装は**1枚もの**で、顧客へのお知らせだけ。
+  */
+  { ...LINE_NOTIFY, node: 'festr', name: '24-1 LINE通知' },
+  {
+    ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
+    mode: 'viewport', height: 1136, steps: [{ click: '発送した', role: 'text' }],
+  },
+  {
+    ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
+    status: 'unimplemented',
+    why: '届かなかったお知らせを並べるタブが無い。**発送や返金が届いていない人を、その日のうちに別の手だてで届ける場所が無い**',
+  },
+  {
+    ...LINE_NOTIFY, node: 'Se65i', name: '24-1-C お知らせの記録',
+    status: 'unimplemented',
+    why: 'いつ・だれに・どのお知らせを送ったかの記録が無い。開かれた・押されたの数も出ない',
+  },
+  {
+    ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
+    status: 'unimplemented',
+    why: 'お店の人へ知らせる仕組みが無い（`grep 運用者` が `/line-notifications` 配下で0件）',
+  },
+  {
+    ...LINE_NOTIFY, node: 'N2gAza', name: '24-2-A 運用者へのお知らせをつくる',
+    status: 'unimplemented', why: '24-2 が無いので、作る画面も無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
