@@ -20,6 +20,10 @@ vi.mock('../services/event-bus.js', () => ({
   fireEvent: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: vi.fn().mockResolvedValue(true),
+}));
+
 import {
   getIncomingWebhooks,
   getIncomingWebhookById,
@@ -29,20 +33,22 @@ import {
   getOutgoingWebhookById,
   createOutgoingWebhook,
   updateOutgoingWebhook,
+  deleteOutgoingWebhook,
 } from '@line-crm/db';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 import type { Env } from '../index.js';
 import { webhooks } from './webhooks.js';
 
 const VALID_SECRET = 'a'.repeat(32);
 const SHORT_SECRET = 'a'.repeat(31);
 
-function setupApp() {
+function setupApp(tenantId?: string) {
   const app = new Hono<Env>();
   // Webhook の作成・更新・削除はオーナー限定になった。ここで見たいのは
   // 入力の検証なので、認証は通った状態にしてから本体へ渡す。
   // 権限そのものの検証は middleware/role-guard.test.ts にある。
   app.use('*', async (c, next) => {
-    c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false });
+    c.set('staff', { id: 'owner-1', name: 'Owner', role: 'owner', readOnly: false, tenantId });
     return next();
   });
   app.route('/', webhooks);
@@ -53,6 +59,11 @@ const baseEnv = { DB: {} as D1Database } as Record<string, unknown>;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getOutgoingWebhookById).mockResolvedValue({
+    id: 'wh-1', name: 'test', url: 'https://example.com/hook', event_types: '["*"]',
+    secret: VALID_SECRET, is_active: 1, max_retries: 0, consecutive_failures: 0,
+    last_failed_at: null, created_at: '2026-05-08', updated_at: '2026-05-08',
+  });
 });
 
 // =====================================================
@@ -177,6 +188,27 @@ describe('POST /api/webhooks/outgoing — validation', () => {
     expect(body.success).toBe(true);
     expect(body.data.secret).toBe(VALID_SECRET);
     expect(body.data.id).toBe('wh-1');
+    expect(createOutgoingWebhook).toHaveBeenCalledWith(baseEnv.DB, expect.objectContaining({ lineAccountId: undefined }));
+  });
+
+  test('既定でない統括はLINEアカウントを省略できない', async () => {
+    const res = await setupApp('tenant-b').request('/api/webhooks/outgoing', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'test', url: 'https://example.com/hook', secret: VALID_SECRET }),
+    }, baseEnv);
+    expect(res.status).toBe(400);
+    expect((await res.json()) as object).toMatchObject({ error: 'どのLINEアカウント向けか選んでください' });
+    expect(createOutgoingWebhook).not.toHaveBeenCalled();
+  });
+
+  test('他統括のLINEアカウントは403にする', async () => {
+    vi.mocked(canAccessAllLineAccounts).mockResolvedValue(false);
+    const res = await setupApp('tenant-b').request('/api/webhooks/outgoing', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'test', url: 'https://example.com/hook', secret: VALID_SECRET, lineAccountId: 'account-a' }),
+    }, baseEnv);
+    expect(res.status).toBe(403);
+    expect(createOutgoingWebhook).not.toHaveBeenCalled();
   });
 });
 
@@ -185,6 +217,15 @@ describe('POST /api/webhooks/outgoing — validation', () => {
 // =====================================================
 
 describe('PUT /api/webhooks/outgoing/:id — validation', () => {
+  test('見えない行は404で更新しない', async () => {
+    vi.mocked(getOutgoingWebhookById).mockResolvedValue(null);
+    const res = await setupApp('tenant-b').request('/api/webhooks/outgoing/other', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://changed.example.com', secret: 'z'.repeat(32) }),
+    }, baseEnv);
+    expect(res.status).toBe(404);
+    expect(updateOutgoingWebhook).not.toHaveBeenCalled();
+  });
   test('rejects updating to http:// URL with 400', async () => {
     const app = setupApp();
     const res = await app.request(
@@ -228,7 +269,11 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     );
     expect(res.status).toBe(400);
     expect(updateOutgoingWebhook).not.toHaveBeenCalled();
-    expect(getOutgoingWebhookById).not.toHaveBeenCalled();
+    expect(getOutgoingWebhookById).toHaveBeenCalledWith(
+      baseEnv.DB,
+      'wh-legacy',
+      '00000000-0000-4000-8000-000000000001',
+    );
   });
 
   test('rejects re-activating webhook whose stored secret is too short (migration bypass)', async () => {
@@ -316,6 +361,15 @@ describe('PUT /api/webhooks/outgoing/:id — validation', () => {
     );
     expect(res.status).toBe(200);
     expect(updateOutgoingWebhook).toHaveBeenCalledOnce();
+  });
+});
+
+describe('DELETE /api/webhooks/outgoing/:id — tenant scope', () => {
+  test.each(['other-tenant', 'missing'])('%s は404で削除しない', async () => {
+    vi.mocked(getOutgoingWebhookById).mockResolvedValue(null);
+    const res = await setupApp('tenant-b').request('/api/webhooks/outgoing/hidden', { method: 'DELETE' }, baseEnv);
+    expect(res.status).toBe(404);
+    expect(deleteOutgoingWebhook).not.toHaveBeenCalled();
   });
 });
 

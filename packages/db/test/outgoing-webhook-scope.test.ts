@@ -2,7 +2,11 @@ import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
-import { getActiveOutgoingWebhooksByEvent } from '../src/webhooks.js';
+import {
+  getActiveOutgoingWebhooksByEvent,
+  getOutgoingWebhookById,
+  getOutgoingWebhooks,
+} from '../src/webhooks.js';
 import { asD1 } from './d1-test-helper.js';
 
 describe('送信Webhookのアカウント・統括分離', () => {
@@ -59,5 +63,20 @@ describe('送信Webhookのアカウント・統括分離', () => {
   it('アカウント不明のイベントは既存のNULL Webhookだけを返す', async () => {
     const rows = await getActiveOutgoingWebhooksByEvent(db, 'message_received');
     expect(rows.map((row) => row.id)).toEqual(['webhook-legacy']);
+  });
+
+  it('既定統括の管理一覧には自統括アカウントとNULLの既存行だけを返す', async () => {
+    const rows = await getOutgoingWebhooks(db, DEFAULT_TENANT_ID);
+    expect(rows.map((row) => row.id).sort()).toEqual(['webhook-a', 'webhook-legacy']);
+  });
+
+  it('既定でない統括の管理一覧には自統括アカウントだけを返す', async () => {
+    const rows = await getOutgoingWebhooks(db, 'tenant-b');
+    expect(rows.map((row) => row.id).sort()).toEqual(['webhook-b', 'webhook-star-b']);
+  });
+
+  it('別統括のIDと存在しないIDは管理用の単一取得で見つからない', async () => {
+    await expect(getOutgoingWebhookById(db, 'webhook-b', DEFAULT_TENANT_ID)).resolves.toBeNull();
+    await expect(getOutgoingWebhookById(db, 'missing', DEFAULT_TENANT_ID)).resolves.toBeNull();
   });
 });

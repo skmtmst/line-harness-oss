@@ -178,6 +178,13 @@ async function fireOutgoingWebhooks(
   lineAccountId?: string | null,
 ): Promise<void> {
   try {
+    if (lineAccountId == null) {
+      console.log(JSON.stringify({
+        event: 'outgoing_webhook_line_account_unknown',
+        eventType,
+        hasFriendId: Boolean(payload.friendId),
+      }));
+    }
     const webhooks = await getActiveOutgoingWebhooksByEvent(db, eventType, lineAccountId);
     for (const wh of webhooks) {
       try {
