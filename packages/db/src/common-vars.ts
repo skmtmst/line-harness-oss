@@ -20,7 +20,39 @@ export interface CommonVar {
   value: string;
   created_at: string;
   updated_at: string;
+  /** 一覧用。未反映の次回予約を一覧APIでまとめて返し、行ごとのAPI呼出を避ける。 */
+  next_effective_from?: string | null;
+  next_value?: string | null;
+  pending_schedule_count?: number;
 }
+
+export type CommonVarUsageKind =
+  | 'template'
+  | 'broadcast'
+  | 'scenario'
+  | 'reminder'
+  | 'auto_reply'
+  | 'form'
+  | 'automation';
+
+export interface CommonVarUsageImpact {
+  total: number;
+  byKind: Record<CommonVarUsageKind, number>;
+}
+
+const COMMON_VAR_USAGE_SOURCES: Array<{
+  kind: CommonVarUsageKind;
+  table: string;
+  columns: string[];
+}> = [
+  { kind: 'template', table: 'templates', columns: ['message_content'] },
+  { kind: 'broadcast', table: 'broadcasts', columns: ['message_content'] },
+  { kind: 'scenario', table: 'scenario_steps', columns: ['message_content', 'message_bubbles_json'] },
+  { kind: 'reminder', table: 'reminder_steps', columns: ['message_content'] },
+  { kind: 'auto_reply', table: 'auto_replies', columns: ['response_content', 'actions_json'] },
+  { kind: 'form', table: 'forms', columns: ['fields', 'layout', 'on_submit_message_content'] },
+  { kind: 'automation', table: 'automations', columns: ['conditions', 'actions'] },
+];
 
 export interface CommonVarSchedule {
   id: string;
@@ -34,17 +66,54 @@ export async function getCommonVars(
   db: D1Database,
   opts: { folderId?: string } = {},
 ): Promise<CommonVar[]> {
+  const overview = `,
+    (SELECT s.effective_from FROM common_var_schedules s
+      WHERE s.var_id = common_vars.id AND s.applied_at IS NULL
+      ORDER BY s.effective_from ASC, s.id ASC LIMIT 1) AS next_effective_from,
+    (SELECT s.value FROM common_var_schedules s
+      WHERE s.var_id = common_vars.id AND s.applied_at IS NULL
+      ORDER BY s.effective_from ASC, s.id ASC LIMIT 1) AS next_value,
+    (SELECT COUNT(*) FROM common_var_schedules s
+      WHERE s.var_id = common_vars.id AND s.applied_at IS NULL) AS pending_schedule_count`;
   if (opts.folderId) {
     const result = await db
-      .prepare(`SELECT * FROM common_vars WHERE folder_id = ? ORDER BY name ASC`)
+      .prepare(`SELECT common_vars.* ${overview} FROM common_vars WHERE folder_id = ? ORDER BY name ASC`)
       .bind(opts.folderId)
       .all<CommonVar>();
     return result.results;
   }
   const result = await db
-    .prepare(`SELECT * FROM common_vars ORDER BY name ASC`)
+    .prepare(`SELECT common_vars.* ${overview} FROM common_vars ORDER BY name ASC`)
     .all<CommonVar>();
   return result.results;
+}
+
+/**
+ * 従来キーの差し込みを厳密なトークン単位で数える。
+ * LIKEはアンダースコアをワイルドカード扱いするため使わない。
+ * 1種類でも走査できなければ例外にし、削除を安全側に止める。
+ */
+export async function getCommonVarUsageImpact(
+  db: D1Database,
+  varKey: string,
+): Promise<CommonVarUsageImpact> {
+  const token = `{{var.${varKey}}}`;
+  const byKind = Object.fromEntries(
+    COMMON_VAR_USAGE_SOURCES.map((source) => [source.kind, 0]),
+  ) as Record<CommonVarUsageKind, number>;
+
+  for (const source of COMMON_VAR_USAGE_SOURCES) {
+    const predicate = source.columns
+      .map((column) => `instr(coalesce(${column}, ''), ?) > 0`)
+      .join(' OR ');
+    const row = await db
+      .prepare(`SELECT COUNT(*) AS total FROM ${source.table} WHERE ${predicate}`)
+      .bind(...source.columns.map(() => token))
+      .first<{ total: number }>();
+    byKind[source.kind] = Number(row?.total ?? 0);
+  }
+
+  return { total: Object.values(byKind).reduce((sum, count) => sum + count, 0), byKind };
 }
 
 export async function getCommonVarById(db: D1Database, id: string): Promise<CommonVar | null> {

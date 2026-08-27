@@ -12,6 +12,7 @@ import {
   createCommonVar,
   updateCommonVar,
   deleteCommonVar,
+  getCommonVarUsageImpact,
   getCommonVarSchedules,
   createCommonVarSchedule,
   deleteCommonVarSchedule,
@@ -280,6 +281,10 @@ function serializeVar(row: CommonVar) {
     value: row.value,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    nextSchedule: row.next_effective_from
+      ? { effectiveFrom: row.next_effective_from, value: row.next_value ?? '' }
+      : null,
+    pendingScheduleCount: Number(row.pending_schedule_count ?? 0),
   };
 }
 
@@ -367,13 +372,45 @@ contents.patch('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) 
   }
 });
 
+contents.get('/api/common-vars/:id/delete-impact', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const existing = await getCommonVarById(c.env.DB, c.req.param('id'));
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key);
+    return c.json({ success: true, data: { ...impact, canDelete: impact.total === 0 } });
+  } catch (err) {
+    console.error('GET /api/common-vars/:id/delete-impact error:', err);
+    return c.json(
+      { success: false, error: '使用先を確認できないため削除できません' },
+      503,
+    );
+  }
+});
+
 contents.delete('/api/common-vars/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    await deleteCommonVar(c.env.DB, c.req.param('id'));
+    const existing = await getCommonVarById(c.env.DB, c.req.param('id'));
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    const impact = await getCommonVarUsageImpact(c.env.DB, existing.var_key);
+    if (impact.total > 0) {
+      return c.json(
+        {
+          success: false,
+          error: `${impact.total}件で使用中のため削除できません`,
+          code: 'COMMON_VAR_IN_USE',
+          data: { ...impact, canDelete: false },
+        },
+        409,
+      );
+    }
+    await deleteCommonVar(c.env.DB, existing.id);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/common-vars/:id error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    return c.json(
+      { success: false, error: '使用先を確認できないため削除できません' },
+      503,
+    );
   }
 });
 

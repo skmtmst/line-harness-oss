@@ -1614,6 +1614,12 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    deleteImpact: (id: string) =>
+      fetchApi<ApiResponse<{
+        total: number
+        canDelete: boolean
+        byKind: Record<string, number>
+      }>>(`/api/common-vars/${id}/delete-impact`),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/common-vars/${id}`, { method: 'DELETE' }),
     schedules: (id: string) =>

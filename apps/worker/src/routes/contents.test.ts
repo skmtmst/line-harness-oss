@@ -15,6 +15,7 @@ const mocks = {
   createCommonVar: vi.fn(),
   updateCommonVar: vi.fn(),
   deleteCommonVar: vi.fn(),
+  getCommonVarUsageImpact: vi.fn(),
   getCommonVarSchedules: vi.fn(),
   createCommonVarSchedule: vi.fn(),
   deleteCommonVarSchedule: vi.fn(),
@@ -103,6 +104,18 @@ beforeEach(() => {
   mocks.getCommonVarById.mockResolvedValue(VAR);
   mocks.createCommonVar.mockResolvedValue(VAR);
   mocks.updateCommonVar.mockResolvedValue(VAR);
+  mocks.getCommonVarUsageImpact.mockResolvedValue({
+    total: 0,
+    byKind: {
+      template: 0,
+      broadcast: 0,
+      scenario: 0,
+      reminder: 0,
+      auto_reply: 0,
+      form: 0,
+      automation: 0,
+    },
+  });
   mocks.createCommonVarSchedule.mockResolvedValue({
     id: 'sc-1',
     var_id: 'cv-1',
@@ -226,6 +239,33 @@ describe('共通情報', () => {
   it('値だけの変更は通る', async () => {
     const res = await req('/api/common-vars/cv-1', 'PATCH', { value: '11-20' });
     expect(res.status).toBe(200);
+  });
+
+  it('使用中の共通情報はAPIを直接呼んでも削除できない', async () => {
+    mocks.getCommonVarUsageImpact.mockResolvedValue({
+      total: 3,
+      byKind: { template: 2, broadcast: 1 },
+    });
+    const res = await req('/api/common-vars/cv-1', 'DELETE');
+    expect(res.status).toBe(409);
+    expect(mocks.deleteCommonVar).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({
+      code: 'COMMON_VAR_IN_USE',
+      data: { total: 3, canDelete: false },
+    });
+  });
+
+  it('使用先を確認できないときは0件扱いせず削除を止める', async () => {
+    mocks.getCommonVarUsageImpact.mockRejectedValue(new Error('D1 unavailable'));
+    const res = await req('/api/common-vars/cv-1', 'DELETE');
+    expect(res.status).toBe(503);
+    expect(mocks.deleteCommonVar).not.toHaveBeenCalled();
+  });
+
+  it('未使用なら影響確認後に削除できる', async () => {
+    const res = await req('/api/common-vars/cv-1', 'DELETE');
+    expect(res.status).toBe(200);
+    expect(mocks.deleteCommonVar).toHaveBeenCalledWith(env.DB, 'cv-1');
   });
 });
 
