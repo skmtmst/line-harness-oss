@@ -20,9 +20,17 @@ export interface SavedSearch {
   scope: string;
   conditions_json: string;
   created_by: string | null;
+  line_account_id: string | null;
   is_shared: number;
   display_order: number;
   created_at: string;
+}
+
+export interface SavedSearchAccess {
+  lineAccountId: string;
+  staffId: string;
+  /** owner/admin may read every search in the selected LINE account. */
+  canManageAll: boolean;
 }
 
 /** 条件1つ。kind ごとに op と value の意味が変わる。 */
@@ -176,19 +184,26 @@ export function validateInboxSavedViewConditions(
 
 export async function getSavedSearches(
   db: D1Database,
-  scope?: SavedSearchScope,
+  scope: SavedSearchScope,
+  access: SavedSearchAccess,
 ): Promise<SavedSearch[]> {
-  if (scope) {
-    const result = await db
-      .prepare(
-        `SELECT * FROM saved_searches WHERE scope = ? ORDER BY display_order ASC, created_at ASC`,
-      )
-      .bind(scope)
-      .all<SavedSearch>();
-    return result.results;
-  }
   const result = await db
-    .prepare(`SELECT * FROM saved_searches ORDER BY scope ASC, display_order ASC, created_at ASC`)
+    .prepare(
+      `SELECT * FROM saved_searches
+       WHERE scope = ?
+         AND (
+           (line_account_id = ? AND (is_shared = 1 OR created_by = ? OR ? = 1))
+           OR (line_account_id IS NULL AND created_by = ?)
+         )
+       ORDER BY display_order ASC, created_at ASC`,
+    )
+    .bind(
+      scope,
+      access.lineAccountId,
+      access.staffId,
+      access.canManageAll ? 1 : 0,
+      access.staffId,
+    )
     .all<SavedSearch>();
   return result.results;
 }
@@ -196,12 +211,25 @@ export async function getSavedSearches(
 export async function getSavedSearchById(
   db: D1Database,
   id: string,
+  lineAccountId: string,
 ): Promise<SavedSearch | null> {
-  return db.prepare(`SELECT * FROM saved_searches WHERE id = ?`).bind(id).first<SavedSearch>();
+  return db
+    .prepare(`SELECT * FROM saved_searches WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
+    .first<SavedSearch>();
 }
 
-export async function countSavedSearches(db: D1Database): Promise<number> {
-  const row = await db.prepare(`SELECT COUNT(*) AS c FROM saved_searches`).first<{ c: number }>();
+export async function countSavedSearches(
+  db: D1Database,
+  input: { scope: SavedSearchScope; createdBy: string; lineAccountId: string },
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS c FROM saved_searches
+       WHERE scope = ? AND created_by = ? AND line_account_id = ?`,
+    )
+    .bind(input.scope, input.createdBy, input.lineAccountId)
+    .first<{ c: number }>();
   return Number(row?.c ?? 0);
 }
 
@@ -212,6 +240,7 @@ export async function createSavedSearch(
     scope?: SavedSearchScope;
     conditions: SearchConditions | InboxSavedViewConditions;
     createdBy?: string | null;
+    lineAccountId: string;
     isShared?: boolean;
     displayOrder?: number;
   },
@@ -220,8 +249,8 @@ export async function createSavedSearch(
   await db
     .prepare(
       `INSERT INTO saved_searches
-         (id, name, scope, conditions_json, created_by, is_shared, display_order, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, name, scope, conditions_json, created_by, line_account_id, is_shared, display_order, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -229,17 +258,19 @@ export async function createSavedSearch(
       input.scope ?? 'friends',
       JSON.stringify(input.conditions),
       input.createdBy ?? null,
+      input.lineAccountId,
       input.isShared === false ? 0 : 1,
       input.displayOrder ?? 0,
       jstNow(),
     )
     .run();
-  return (await getSavedSearchById(db, id))!;
+  return (await getSavedSearchById(db, id, input.lineAccountId))!;
 }
 
 export async function updateSavedSearch(
   db: D1Database,
   id: string,
+  access: SavedSearchAccess,
   input: {
     name?: string;
     conditions?: SearchConditions | InboxSavedViewConditions;
@@ -266,15 +297,30 @@ export async function updateSavedSearch(
     values.push(input.displayOrder);
   }
   if (sets.length > 0) {
-    values.push(id);
+    values.push(id, access.lineAccountId, access.staffId, access.canManageAll ? 1 : 0);
     await db
-      .prepare(`UPDATE saved_searches SET ${sets.join(', ')} WHERE id = ?`)
+      .prepare(
+        `UPDATE saved_searches SET ${sets.join(', ')}
+         WHERE id = ? AND line_account_id = ? AND (created_by = ? OR ? = 1)`,
+      )
       .bind(...values)
       .run();
   }
-  return getSavedSearchById(db, id);
+  const updated = await getSavedSearchById(db, id, access.lineAccountId);
+  return updated && (updated.created_by === access.staffId || access.canManageAll) ? updated : null;
 }
 
-export async function deleteSavedSearch(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM saved_searches WHERE id = ?`).bind(id).run();
+export async function deleteSavedSearch(
+  db: D1Database,
+  id: string,
+  access: SavedSearchAccess,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `DELETE FROM saved_searches
+       WHERE id = ? AND line_account_id = ? AND (created_by = ? OR ? = 1)`,
+    )
+    .bind(id, access.lineAccountId, access.staffId, access.canManageAll ? 1 : 0)
+    .run();
+  return Number(result.meta.changes ?? 0) > 0;
 }

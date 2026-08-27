@@ -1268,27 +1268,27 @@ export const api = {
   },
   /** 保存した検索。上限50件。 */
   savedSearches: {
-    list: (params?: { scope?: 'friends' | 'chats' | 'bookings' }) =>
+    list: (accountId: string) =>
       fetchApi<ApiResponse<SavedSearch[]>>(
-        `/api/saved-searches${params?.scope ? `?scope=${params.scope}` : ''}`,
+        `/api/saved-searches?lineAccountId=${encodeURIComponent(accountId)}`,
       ),
     create: (data: {
       name: string
-      scope?: 'friends' | 'chats' | 'bookings'
+      accountId: string
       conditions: unknown
       isShared?: boolean
     }) =>
-      fetchApi<ApiResponse<SavedSearch>>('/api/saved-searches', {
+      fetchApi<ApiResponse<SavedSearch>>(`/api/saved-searches?lineAccountId=${encodeURIComponent(data.accountId)}`, {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({ name: data.name, conditions: data.conditions, isShared: data.isShared }),
       }),
-    update: (id: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
-      fetchApi<ApiResponse<SavedSearch>>(`/api/saved-searches/${id}`, {
+    update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
+      fetchApi<ApiResponse<SavedSearch>>(`/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/saved-searches/${id}`, { method: 'DELETE' }),
+    delete: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<null>>(`/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
   },
   /**
    * 機能のオン／オフ。account_settings の key/value に入る。
@@ -2919,19 +2919,19 @@ export const api = {
         createdAt: string
       }>>>(`/api/chats/${id}/events`),
     savedViews: {
-      list: () => fetchApi<ApiResponse<SavedSearch[]>>('/api/inbox/saved-views'),
-      create: (data: { name: string; conditions: unknown; isShared?: boolean }) =>
-        fetchApi<ApiResponse<SavedSearch>>('/api/inbox/saved-views', {
+      list: (accountId: string) => fetchApi<ApiResponse<SavedSearch[]>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`),
+      create: (accountId: string, data: { name: string; conditions: unknown; isShared?: boolean }) =>
+        fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'POST',
           body: JSON.stringify(data),
         }),
-      update: (id: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
-        fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views/${id}`, {
+      update: (id: string, accountId: string, data: { name?: string; conditions?: unknown; isShared?: boolean }) =>
+        fetchApi<ApiResponse<SavedSearch>>(`/api/inbox/saved-views/${id}?lineAccountId=${encodeURIComponent(accountId)}`, {
           method: 'PATCH',
           body: JSON.stringify(data),
         }),
-      delete: (id: string) =>
-        fetchApi<ApiResponse<null>>(`/api/inbox/saved-views/${id}`, { method: 'DELETE' }),
+      delete: (id: string, accountId: string) =>
+        fetchApi<ApiResponse<null>>(`/api/inbox/saved-views/${id}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
     },
   },
   reminders: {

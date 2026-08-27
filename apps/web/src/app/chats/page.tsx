@@ -596,13 +596,17 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
   }, [])
 
   const loadSavedViews = useCallback(async () => {
+    if (!selectedAccountId) {
+      setSavedViews([])
+      return
+    }
     try {
-      const response = await api.chats.savedViews.list()
+      const response = await api.chats.savedViews.list(selectedAccountId)
       if (response.success) setSavedViews(response.data as unknown as InboxSavedView[])
     } catch {
       setSavedViewError('保存した検索を読み込めませんでした')
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     void loadSavedViews()
@@ -633,7 +637,11 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setSavingView(true)
     setSavedViewError('')
     try {
-      const response = await api.chats.savedViews.create({
+      if (!selectedAccountId) {
+        setSavedViewError('LINE公式アカウントを選んでください')
+        return
+      }
+      const response = await api.chats.savedViews.create(selectedAccountId, {
         name,
         conditions: currentSavedViewConditions(),
       })
@@ -1138,7 +1146,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
                     <button
                       type="button"
                       onClick={async () => {
-                        await api.chats.savedViews.delete(view.id)
+                        if (!selectedAccountId) return
+                        await api.chats.savedViews.delete(view.id, selectedAccountId)
                         await loadSavedViews()
                       }}
                       className="text-danger hover:bg-danger-bg shrink-0 rounded px-1.5 py-1 text-xs"

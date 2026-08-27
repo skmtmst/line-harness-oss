@@ -2082,7 +2082,7 @@ CREATE TABLE saved_searches (
   is_shared       INTEGER NOT NULL DEFAULT 1,
   display_order   INTEGER NOT NULL DEFAULT 0,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE scenario_action_fires (
   action_id TEXT NOT NULL REFERENCES scenario_actions (id) ON DELETE CASCADE,
@@ -3090,6 +3090,9 @@ CREATE INDEX idx_rt_stores_org ON rt_stores(organization_id, status);
 CREATE INDEX idx_rt_sync_events_recent ON rt_sync_events(store_id, received_at DESC);
 
 CREATE INDEX idx_rt_tables_store ON rt_tables(store_id, is_active);
+
+CREATE INDEX idx_saved_searches_account_scope
+  ON saved_searches(line_account_id, scope, created_by, display_order);
 
 CREATE INDEX idx_saved_searches_scope ON saved_searches(scope, display_order);
 

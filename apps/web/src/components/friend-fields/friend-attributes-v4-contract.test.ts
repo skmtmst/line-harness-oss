@@ -221,7 +221,7 @@ describe('友だち属性 V4 contract', () => {
   })
 
   it('タグの作成・編集・一覧ルートはV4を既定表示にする', () => {
-    expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 />')
+    expect(read('app/tags/page.tsx')).toContain('<TagsPageV4 accountId={selectedAccountId} />')
     expect(read('app/tags/new/page.tsx')).toContain('<NewTagPageV4 />')
     expect(read('app/tags/edit/page.tsx')).toContain('<EditTagPageV4 />')
   })
