@@ -92,9 +92,7 @@ export interface TagWithUsage extends TagWithCount {
   cleanup_reasons: TagCleanupReason[];
 }
 
-type TagWithUsageRow = Omit<TagWithUsage, 'cleanup_reasons'> & {
-  has_operational_references?: number;
-};
+type TagWithUsageRow = Omit<TagWithUsage, 'cleanup_reasons'>;
 
 /** D1 の未知の上限へ余裕を持たせた、1クエリ当たりの複合SELECT項数。 */
 export const MAX_TAG_USAGE_COMPOUND_SELECT_TERMS = 10;
@@ -155,7 +153,12 @@ export function buildTagUsageBlockingReferenceQueries(
 ): string[] {
   const queries: string[] = [];
   for (let offset = 0; offset < selects.length; offset += MAX_TAG_USAGE_COMPOUND_SELECT_TERMS) {
-    queries.push(selects.slice(offset, offset + MAX_TAG_USAGE_COMPOUND_SELECT_TERMS).join('\nUNION\n'));
+    const referenceSelects = selects
+      .slice(offset, offset + MAX_TAG_USAGE_COMPOUND_SELECT_TERMS)
+      .join('\nUNION\n');
+    queries.push(`SELECT DISTINCT r.tag_id
+      FROM (${referenceSelects}) r
+      JOIN tags known ON known.id = r.tag_id`);
   }
   return queries;
 }
@@ -383,8 +386,7 @@ export async function getTagsWithUsage(
               COALESCE(sc.count, 0) AS used_in_scenarios,
               COALESCE(ac.count, 0) AS used_in_auto_replies,
               COALESCE(ssc.count, 0) AS used_in_saved_searches,
-              COALESCE(act.count, 0) AS other_action_count,
-              0 AS has_operational_references
+              COALESCE(act.count, 0) AS other_action_count
          FROM tags t
          LEFT JOIN friend_tags ft ON ft.tag_id = t.id
          LEFT JOIN folders fo ON fo.id = t.folder_id
@@ -407,7 +409,7 @@ export async function getTagsWithUsage(
     duplicateCounts.set(normalizedName, (duplicateCounts.get(normalizedName) ?? 0) + 1);
   }
 
-  return result.results.map(({ has_operational_references, ...row }) => {
+  return result.results.map((row) => {
     const cleanupReasons: TagCleanupReason[] = [];
     if (Number(row.friend_count) === 0 && !blockingTagIds.has(row.id)) {
       cleanupReasons.push('unused');
