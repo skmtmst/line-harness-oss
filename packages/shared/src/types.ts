@@ -832,6 +832,9 @@ export interface ConversionPoint {
   attributionDays?: number | null;
   /** 集計対象を1アカウントに絞る場合。null なら全アカウント */
   lineAccountId?: string | null;
+  /** 計測中か停止済みか。旧APIとの段階反映中は省略されることがある */
+  status?: "active" | "stopped";
+  stoppedAt?: string | null;
   /** 作成日時 (ISO 8601) */
   createdAt: string;
 }

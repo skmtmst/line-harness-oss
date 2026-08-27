@@ -700,6 +700,10 @@ CREATE TABLE conversion_events (
   attributed_ref_code  TEXT,
   approval_status      TEXT CHECK (approval_status IN ('pending','approved','rejected')),
   approved_at          TEXT,
+  point_name_snapshot  TEXT,
+  event_type_snapshot  TEXT,
+  value_snapshot       REAL,
+  idempotency_key      TEXT,
   created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 );
 
@@ -708,7 +712,10 @@ CREATE TABLE conversion_points (
   name       TEXT NOT NULL,
   event_type TEXT NOT NULL,
   value      REAL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  status     TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'stopped')),
+  stopped_at TEXT,
+  updated_at TEXT
 , measure_method TEXT NOT NULL DEFAULT 'manual'
   CHECK (measure_method IN ('url_reach', 'webhook', 'manual')), target_url TEXT, count_repeat INTEGER NOT NULL DEFAULT 1, attribution_days INTEGER, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL);
 
@@ -2767,7 +2774,11 @@ CREATE INDEX idx_conversion_events_created_friend ON conversion_events(created_a
 
 CREATE INDEX idx_conversion_events_friend ON conversion_events (friend_id);
 
+CREATE UNIQUE INDEX idx_conversion_events_idempotency ON conversion_events(idempotency_key) WHERE idempotency_key IS NOT NULL;
+
 CREATE INDEX idx_conversion_events_point ON conversion_events (conversion_point_id);
+
+CREATE INDEX idx_conversion_points_status ON conversion_points(status, created_at DESC);
 
 CREATE INDEX idx_cvs_pending
   ON common_var_schedules(var_id, effective_from) WHERE applied_at IS NULL;
@@ -3261,6 +3272,10 @@ CREATE INDEX idx_webinar_viewers_webinar
 CREATE UNIQUE INDEX uq_google_calendar_connections_active_staff
   ON google_calendar_connections (staff_id)
   WHERE staff_id IS NOT NULL AND is_active = 1;
+
+CREATE TRIGGER conversion_points_prevent_delete
+BEFORE DELETE ON conversion_points
+BEGIN SELECT RAISE(ABORT, 'conversion_points must be stopped, not deleted'); END;
 
 CREATE TRIGGER trg_analytics_cross_runs_completed_immutable
 BEFORE UPDATE ON analytics_cross_runs
