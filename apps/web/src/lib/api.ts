@@ -944,7 +944,7 @@ export type AdPlatform = {
   /** meta / x / google / tiktok */
   name: string
   displayName: string | null
-  /** 鍵は先頭と末尾だけ残して伏せてある。 */
+  /** 秘密値は文字数や一部を漏らさず「設定済み」に置換される。 */
   config: Record<string, unknown>
   isActive: boolean
   createdAt: string
@@ -959,6 +959,8 @@ export type AdConversionLog = {
   clickId: string | null
   clickIdType: string | null
   status: string
+  attemptCount?: number
+  nextRetryAt?: string | null
   errorMessage: string | null
   createdAt: string
 }

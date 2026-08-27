@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 /**
  * 広告連携（設計 V2 6-8）。
@@ -27,6 +28,7 @@ const STATUS_LABEL: Record<string, string> = {
   sent: '送信済み',
   success: '送信済み',
   pending: '送信待ち',
+  retry_wait: '再試行待ち',
   failed: '失敗',
   skipped: '送信しない',
 }
@@ -79,7 +81,7 @@ export default function AdIntegration() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-design-node="v0HaI">
       <p className="text-ink-secondary text-sm leading-relaxed">
         広告から来た友だちを計測し、LINEで起きた成果を広告側に返します。広告費に対して実際にいくら売れたかを見るには、広告側の費用を取り込む必要があり、そちらはまだできていません。
       </p>
@@ -92,14 +94,6 @@ export default function AdIntegration() {
             <p className="text-ink-faint mt-1 text-xs leading-relaxed">
               広告を使っていない場合は、このままで問題ありません。つなぐと、LINEで起きた成果を広告側に返せるようになります。
             </p>
-            {/* 接続を作る画面が無い。いまは API を直に叩くしかない。 */}
-            <button
-              disabled
-              title="接続を作る画面は準備中です"
-              className="border-hairline text-ink-faint rounded-control mt-3 border px-3 py-2 text-sm font-medium opacity-50"
-            >
-              連携を設定
-            </button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -116,13 +110,6 @@ export default function AdIntegration() {
                     {' ・ '}成果が起きたその場で送ります
                   </p>
                 </div>
-                <button
-                  disabled
-                  title="接続設定の画面は準備中です"
-                  className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-                >
-                  接続設定
-                </button>
               </div>
             ))}
           </div>
@@ -176,14 +163,16 @@ export default function AdIntegration() {
           <p className="text-ink-faint p-8 text-center text-sm">まだ送った記録がありません。</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="bg-canvas-sunken text-ink-faint text-xs">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium">日時</th>
-                  <th className="px-4 py-2 text-left font-medium">成果</th>
-                  <th className="px-4 py-2 text-left font-medium">クリックの種類</th>
-                  <th className="px-4 py-2 text-left font-medium">状態</th>
-                </tr>
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <TableHeadRow>
+                  <Th>日時</Th>
+                  <Th>成果</Th>
+                  <Th>クリックの種類</Th>
+                  <Th>状態</Th>
+                  <Th>試行</Th>
+                  <Th>次の再試行</Th>
+                </TableHeadRow>
               </thead>
               <tbody className="divide-hairline divide-y">
                 {logs.map((l) => (
@@ -205,6 +194,14 @@ export default function AdIntegration() {
                         {STATUS_LABEL[l.status] ?? l.status}
                       </span>
                     </td>
+                    <td className="text-ink-secondary px-4 py-2 tabular-nums">
+                      {l.attemptCount === undefined ? '—' : `${l.attemptCount}回`}
+                    </td>
+                    <td className="text-ink-faint px-4 py-2 tabular-nums">
+                      {l.nextRetryAt
+                        ? l.nextRetryAt.slice(5, 16).replace('T', ' ').replaceAll('-', '/')
+                        : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -221,7 +218,7 @@ export default function AdIntegration() {
           <li>
             ・お客様の名前やメールアドレスは送っていません。クリックIDと成果の名前だけを送ります
           </li>
-          <li>・送った記録を残しているので、同じ成果を二重に送ることはありません</li>
+          <li>・重複を防ぐ記録と再試行時刻は保持します。実送信への接続は別途確認します</li>
           <li>・広告を使っていない場合、この機能はオフのままで問題ありません</li>
         </ul>
       </section>

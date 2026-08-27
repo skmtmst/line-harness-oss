@@ -194,12 +194,10 @@
     "arbitrary-value": 1
   },
   "app/inflow-links/ad-integration.tsx": {
-    "direct-secondary-button": 2,
-    "arbitrary-value": 1,
-    "direct-th": 4
+    "arbitrary-value": 1
   },
   "app/inflow-links/detail/page.tsx": {
-    "direct-secondary-button": 2
+    "direct-secondary-button": 1
   },
   "app/inflow-links/new/page.tsx": {
     "unresolved-classname": 9,
@@ -208,7 +206,7 @@
   "app/inflow-links/page.tsx": {
     "unresolved-classname": 1,
     "arbitrary-value": 19,
-    "direct-secondary-button": 5
+    "direct-secondary-button": 2
   },
   "app/line-notifications/page.tsx": {
     "direct-primary-button": 2,

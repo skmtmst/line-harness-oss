@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
-import Header from '@/components/layout/header'
 import type {
   EntryRoute,
   EntryRouteFunnel,
@@ -132,7 +131,7 @@ function InflowLinkDetailPageContent() {
   const totalSources = sources.reduce((sum, s) => sum + s.count, 0)
 
   return (
-    <div>
+    <div data-inflow-design="v6" data-design-node="JupxW">
       <nav data-design="Crumb" className="text-ink-faint mb-2 text-xs">
         <Link href="/inflow-links" className="hover:underline">
           流入経路
@@ -140,31 +139,6 @@ function InflowLinkDetailPageContent() {
         <span className="mx-1.5">/</span>
         <span>リンクの詳細</span>
       </nav>
-
-      <div data-design="Head">
-        <Header
-          title="リンクの詳細"
-          description="選んだリンクの流入とクリックの内訳を表示します。どこから友だちになって、どこまで進んだかを追えます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={copyUrl}
-                disabled={!url}
-                className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-4 py-2 text-sm font-medium disabled:opacity-40"
-              >
-                {copied ? 'コピーしました' : 'URLをコピー'}
-              </button>
-              <button
-                disabled
-                title="QRコードの保存は準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
-              >
-                QRコードを保存
-              </button>
-            </div>
-          }
-        />
-      </div>
 
       {error && <p className="text-danger mb-3 text-sm">{error}</p>}
 
@@ -227,15 +201,23 @@ function InflowLinkDetailPageContent() {
                       {url} ・ 作成 {route.createdAt.slice(0, 10).replace(/-/g, '/')}
                     </p>
                   </div>
-                  <span
-                    className={`rounded-pill px-2 py-0.5 text-xs ${
-                      route.isActive
-                        ? 'bg-success-bg text-success'
-                        : 'bg-canvas-sunken text-ink-faint'
-                    }`}
-                  >
-                    {route.isActive ? '計測中' : '停止中'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={copyUrl}
+                      className="border-hairline text-ink-secondary rounded-control hover:bg-canvas-sunken border px-3 py-1.5 text-xs font-medium"
+                    >
+                      {copied ? 'コピーしました' : 'URLをコピー'}
+                    </button>
+                    <span
+                      className={`rounded-pill px-2 py-0.5 text-xs ${
+                        route.isActive
+                          ? 'bg-success-bg text-success'
+                          : 'bg-canvas-sunken text-ink-faint'
+                      }`}
+                    >
+                      {route.isActive ? '計測中' : '停止中'}
+                    </span>
+                  </div>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">

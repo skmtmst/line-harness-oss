@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作26個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,7 +45,7 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    expect(openings).toHaveLength(29)
+    expect(openings).toHaveLength(26)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
   })
 
@@ -95,7 +95,9 @@ describe('標準ボタンの第1段階移行', () => {
     //
     // 2026-08-27: ダッシュボードの受信カードが自前の「前へ／次へ」をやめて
     // 共通ページ送りへ寄せた。副次2つ減って280。**減ったので締め直す。**
-    expect(debt['direct-secondary-button']).toBe(280)
+    // 2026-08-28: 流入経路から押せない並び順・表示件数・保存条件と、
+    // 詳細の押せないQR保存を除き、副次操作が6つ減った。
+    expect(debt['direct-secondary-button']).toBe(274)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・

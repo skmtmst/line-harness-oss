@@ -12,11 +12,11 @@ import { sendAdConversions } from '../services/ad-conversion.js';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 
-function maskConfig(config: Record<string, unknown>): Record<string, unknown> {
+export function maskConfig(config: Record<string, unknown>): Record<string, unknown> {
   const masked: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config)) {
-    if (typeof value === 'string' && value.length > 8) {
-      masked[key] = value.slice(0, 4) + '****' + value.slice(-4);
+    if (/(?:token|secret|api_key|developer_key|password)/i.test(key)) {
+      masked[key] = value ? '設定済み' : '';
     } else {
       masked[key] = value;
     }
@@ -27,7 +27,7 @@ function maskConfig(config: Record<string, unknown>): Record<string, unknown> {
 const adPlatforms = new Hono<Env>();
 
 // GET /api/ad-platforms - list all
-adPlatforms.get('/api/ad-platforms', async (c) => {
+adPlatforms.get('/api/ad-platforms', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const items = await getAdPlatforms(c.env.DB);
     return c.json({
@@ -78,7 +78,7 @@ adPlatforms.post('/api/ad-platforms', requireRole('owner'), async (c) => {
         id: platform.id,
         name: platform.name,
         displayName: platform.display_name,
-        config: JSON.parse(platform.config),
+        config: maskConfig(JSON.parse(platform.config)),
         isActive: !!platform.is_active,
         createdAt: platform.created_at,
         updatedAt: platform.updated_at,
@@ -112,7 +112,7 @@ adPlatforms.put('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
         id: platform.id,
         name: platform.name,
         displayName: platform.display_name,
-        config: JSON.parse(platform.config),
+        config: maskConfig(JSON.parse(platform.config)),
         isActive: !!platform.is_active,
         createdAt: platform.created_at,
         updatedAt: platform.updated_at,
@@ -171,7 +171,7 @@ adPlatforms.delete('/api/ad-platforms/:id', requireRole('owner'), async (c) => {
 });
 
 // GET /api/ad-platforms/:id/logs - conversion send logs
-adPlatforms.get('/api/ad-platforms/:id/logs', async (c) => {
+adPlatforms.get('/api/ad-platforms/:id/logs', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const id = c.req.param('id');
     const limit = Number(c.req.query('limit') ?? '50');
@@ -187,6 +187,8 @@ adPlatforms.get('/api/ad-platforms/:id/logs', async (c) => {
         clickId: l.click_id,
         clickIdType: l.click_id_type,
         status: l.status,
+        attemptCount: l.attempt_count,
+        nextRetryAt: l.next_retry_at,
         errorMessage: l.error_message,
         createdAt: l.created_at,
       })),

@@ -4,7 +4,6 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import { api, fetchApi } from '@/lib/api'
-import Header from '@/components/layout/header'
 import KpiCard from '@/components/dashboard/kpi-card'
 import { useAccount } from '@/contexts/account-context'
 import type { EntryRoute, EntryRouteGenre, TrafficPool, Scenario, Tag } from '@line-crm/shared'
@@ -426,40 +425,6 @@ function InflowLinksPageInner() {
 
   return (
     <div>
-      <div data-design="Head">
-        <Header
-          title="流入と計測"
-          description="どこから友だちが来たかを計測します。発行したURLごとにクリック・友だち追加・その後の成果まで追えます。"
-          action={
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled
-                title="マニュアルは準備中です"
-              >
-                マニュアル
-              </Button>
-              <Button
-                disabled
-                title="並び替えは準備中です"
-              >
-                並び替え
-              </Button>
-              <Button
-                onClick={() => setEditingGenre('new')}
-              >
-                フォルダを追加
-              </Button>
-              <Button
-                href="/inflow-links/new"
-                variant="primary"
-              >
-                URLを発行
-              </Button>
-            </div>
-          }
-        />
-      </div>
-
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           title="流入元"
@@ -574,22 +539,6 @@ function InflowLinksPageInner() {
                 />
                 <span aria-hidden="true" className="absolute right-3 top-2 text-ink-faint">⌕</span>
               </label>
-              <span className="text-ink-faint self-center text-xs whitespace-nowrap">並び順</span>
-              <select
-                disabled
-                title="並び替えは準備中です"
-                className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-              >
-                <option>友だち追加が多い順</option>
-              </select>
-              <span className="text-ink-faint self-center text-xs whitespace-nowrap">表示</span>
-              <select
-                disabled
-                title="表示件数の切り替えは準備中です"
-                className="border-hairline rounded-control border px-2 py-2 text-sm opacity-50"
-              >
-                <option>20件</option>
-              </select>
               <button
                 onClick={() => setEditing('new')}
                 disabled={!selectedGenre || selectedGenre === UNCATEGORIZED}
@@ -599,20 +548,6 @@ function InflowLinksPageInner() {
                 ＋ このフォルダにURLを発行
               </button>
             </div>
-          </div>
-
-          <div data-design="Saved" className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="text-ink-faint text-xs whitespace-nowrap">保存した条件</span>
-            {['よく使う', '今月分', '追加率が高い', '計測停止中'].map((label) => (
-              <button
-                key={label}
-                disabled
-                title="保存した条件は準備中です"
-                className="border-hairline text-ink-faint rounded-pill border px-3 py-1 text-xs opacity-50"
-              >
-                {label}
-              </button>
-            ))}
           </div>
 
       {loading ? (
@@ -841,22 +776,8 @@ function InflowLinksPageInner() {
         </div>
       )}
 
-          <div data-design="tf" className="mt-3 flex items-center justify-end gap-2 text-xs">
+          <div data-design="tf" className="mt-3 flex items-center justify-end text-xs">
             <span className="text-ink-faint tabular-nums">全 {sortedRows.length} 件</span>
-            <button
-              disabled
-              title="ページの切り替えは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
-            >
-              前へ
-            </button>
-            <button
-              disabled
-              title="ページの切り替えは準備中です"
-              className="border-hairline text-ink-faint rounded-control border px-2 py-1 opacity-50"
-            >
-              次へ
-            </button>
           </div>
         </section>
       </div>
@@ -1029,9 +950,23 @@ function ReferralQrModal({
 
 function InflowLinksPageHost() {
   const tab = useMergedTab(MERGED_TABS)
+  const nodeByTab: Record<string, string> = {
+    links: 'Q4bkTg',
+    script: 'IhSBB',
+    ads: 'v0HaI',
+  }
   return (
-    <div>
-      <MergedTabs basePath="/inflow-links" tabs={MERGED_TABS} active={tab} />
+    <div data-inflow-design="v6" data-design-node={nodeByTab[tab]}>
+      <div data-design="MergedTabs">
+        <MergedTabs
+          basePath="/inflow-links"
+          tabs={MERGED_TABS}
+          active={tab}
+          actions={tab === 'links'
+            ? <Button href="/inflow-links/new" variant="primary">流入リンクを作る</Button>
+            : undefined}
+        />
+      </div>
       {tab === 'links' && <InflowLinksPageInner />}
       {tab === 'script' && <SiteScript />}
       {tab === 'ads' && <AdIntegration />}
