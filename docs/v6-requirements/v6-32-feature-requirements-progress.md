@@ -1,55 +1,67 @@
 # V6 全32機能 要件定義進捗台帳
 
-更新日: 2026-08-26
+更新日: 2026-08-27
 
 ## 1. 現在地
 
-- 詳細要件定義済み: **32 / 32機能（100%）**
-- 残り: **0機能**
-- V6デザイン: **同日のV5修正を含む260画面を★V6として複製し、要件定義の正本にした**
-- リポジトリ: 要件文書はリポジトリ外の作業用領域にあり、まだgitへ格納していない
+- 要件定義: **32 / 32機能 完了**
+- V6設計: **32 / 32機能・260画面を正本化済み**
+- V6実装: **全機能完了 0 / 32、一部実装 7 / 32、共通シェルのみ 25 / 32**
+- 画像確認: **全状態確認済み 0 / 32、一部比較済み 2 / 32、実装画像のみ 10 / 32、未確認 20 / 32**
+- リポジトリ: **32本の要件文書と次工程文書をgitへ格納済み**
 - 要件の根拠: V6、現行コード・DB・API、Lステップ・Liny調査
 
 各詳細要件には、採点、主タスク、画面、データ、API、権限、移行、Lステップとの差、除外、完了条件、実装順を含む。
 
-## 2. 全32機能
+## 2. 全32機能の4段階進捗
 
-| # | 機能 | 状態 | 詳細要件 |
-|---:|---|---|---|
-| 1 | ダッシュボード | 完了 | `v6-01-dashboard-requirements-draft.md` |
-| 2 | 受信箱 | 完了 | `v6-02-inbox-requirements-draft.md` |
-| 3 | 友だち | 完了 | `v6-03-friends-requirements-draft.md` |
-| 4 | 友だち属性 | 完了 | `v6-04-friend-attributes-requirements-draft.md` |
-| 5 | シナリオ配信 | 完了 | `v6-05-scenario-delivery-requirements-draft.md` |
-| 6 | 一斉配信 | 完了 | `v6-06-broadcast-requirements-draft.md` |
-| 7 | リマインダ | 完了 | `v6-07-reminder-requirements-draft.md` |
-| 8 | 自動応答 | 完了 | `v6-08-auto-reply-requirements-draft.md` |
-| 9 | 友だち追加時配信 | 完了 | `v6-09-friend-add-delivery-requirements-draft.md` |
-| 10 | ウェビナー | 完了 | `v6-10-webinar-requirements-draft.md` |
-| 11 | テンプレート | 完了 | `v6-11-template-requirements-draft.md` |
-| 12 | リッチメニュー | 完了 | `v6-12-rich-menu-requirements-draft.md` |
-| 13 | 回答フォーム | 完了 | `v6-13-response-form-requirements-draft.md` |
-| 14 | 共通情報 | 完了 | `v6-14-common-information-requirements-draft.md` |
-| 15 | 登録メディア | 完了 | `v6-15-media-library-requirements-draft.md` |
-| 16 | 成果・アフィリエイト | 完了 | `v6-16-affiliate-requirements-draft.md` |
-| 17 | マイル | 完了 | `v6-17-mileage-score-requirements-draft.md` |
-| 18 | 流入と計測 | 完了 | `v6-18-inflow-measurement-requirements-draft.md` |
-| 19 | コンバージョン | 完了 | `v6-19-conversion-requirements-draft.md` |
-| 20 | 分析 | 完了 | `v6-20-analytics-requirements-draft.md` |
-| 21 | NEN配信 | 完了 | `v6-21-nen-delivery-requirements-draft.md` |
-| 22 | 写真審査 | 完了 | `v6-22-photo-review-requirements-draft.md` |
-| 23 | EC連携 | 完了 | `v6-23-ec-integration-requirements-draft.md` |
-| 24 | LINE通知 | 完了 | `v6-24-line-notification-requirements-draft.md` |
-| 25 | オートメーション | 完了 | `v6-25-automation-requirements-draft.md` |
-| 26 | 外部連携 | 完了 | `v6-26-external-integrations-requirements-draft.md` |
-| 27 | 予約管理 | 完了 | `v6-27-booking-management-requirements-draft.md` |
-| 28 | 予約設定 | 完了 | `v6-28-booking-settings-requirements-draft.md` |
-| 29 | イベント予約 | 完了 | `v6-29-event-booking-requirements-draft.md` |
-| 30 | ログインユーザー | 完了 | `v6-30-login-users-requirements-draft.md` |
-| 31 | 機能設定 | 完了 | `v6-31-feature-settings-requirements-draft.md` |
-| 32 | 運用状態 | 完了 | `v6-32-operations-status-requirements-draft.md` |
+### 2-1. 見かた
 
-## 3. 完了した実施順
+- **要件定義 完了**: データ、API、権限、移行、除外、完了条件まで記載済み
+- **V6設計 完了**: ★V6の実Node IDを正本として割り当て済み
+- **実装 一部**: V6向けの機能・API・画面の一部を統合済み。機能全体の完了条件は未達
+- **実装 共通枠のみ**: トップバーなどの共通シェルは反映済みだが、機能固有のV6移行は未着手
+- **画像 一部比較済み**: 機能内の一部画面だけPencilと同幅で比較済み
+- **画像 実装画像のみ**: 1440px・1920pxの実装画像はあるが、Pencilとの全状態比較は未完了
+
+| # | 機能 | 要件定義 | V6設計 | 実装 | 画像確認 | 主な実装根拠 | 詳細要件 |
+|---:|---|---|---|---|---|---|---|
+| 1 | ダッシュボード | ✅ 完了 | ✅ 完了 | 🟡 一部 | 🟠 実装画像のみ | #371、#391 | `v6-01-dashboard-requirements-draft.md` |
+| 2 | 受信箱 | ✅ 完了 | ✅ 完了 | 🟡 一部 | 🟠 実装画像のみ | #374、#389 | `v6-02-inbox-requirements-draft.md` |
+| 3 | 友だち | ✅ 完了 | ✅ 完了 | 🟡 一部 | 🟡 通常一覧を比較済み | #392、#399 | `v6-03-friends-requirements-draft.md` |
+| 4 | 友だち属性 | ✅ 完了 | ✅ 完了 | 🟡 一部 | 🟡 4-1主要状態を比較済み | #375、#376、#378、#381、#383、#387 | `v6-04-friend-attributes-requirements-draft.md` |
+| 5 | シナリオ配信 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | 🟠 実装画像のみ | — | `v6-05-scenario-delivery-requirements-draft.md` |
+| 6 | 一斉配信 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | 🟠 実装画像のみ | — | `v6-06-broadcast-requirements-draft.md` |
+| 7 | リマインダ | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-07-reminder-requirements-draft.md` |
+| 8 | 自動応答 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-08-auto-reply-requirements-draft.md` |
+| 9 | 友だち追加時配信 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-09-friend-add-delivery-requirements-draft.md` |
+| 10 | ウェビナー | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-10-webinar-requirements-draft.md` |
+| 11 | テンプレート | ✅ 完了 | ✅ 完了 | 🟡 一部 | 🟠 実装画像のみ | #390 | `v6-11-template-requirements-draft.md` |
+| 12 | リッチメニュー | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | 🟠 実装画像のみ | — | `v6-12-rich-menu-requirements-draft.md` |
+| 13 | 回答フォーム | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-13-response-form-requirements-draft.md` |
+| 14 | 共通情報 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-14-common-information-requirements-draft.md` |
+| 15 | 登録メディア | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-15-media-library-requirements-draft.md` |
+| 16 | 成果・アフィリエイト | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-16-affiliate-requirements-draft.md` |
+| 17 | マイル | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-17-mileage-score-requirements-draft.md` |
+| 18 | 流入と計測 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-18-inflow-measurement-requirements-draft.md` |
+| 19 | コンバージョン | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-19-conversion-requirements-draft.md` |
+| 20 | 分析 | ✅ 完了 | ✅ 完了 | 🟡 一部 | 🟠 実装画像のみ | #365〜#370 | `v6-20-analytics-requirements-draft.md` |
+| 21 | NEN配信 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-21-nen-delivery-requirements-draft.md` |
+| 22 | 写真審査 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-22-photo-review-requirements-draft.md` |
+| 23 | EC連携 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-23-ec-integration-requirements-draft.md` |
+| 24 | LINE通知 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-24-line-notification-requirements-draft.md` |
+| 25 | オートメーション | ✅ 完了 | ✅ 完了 | 🟡 一部 | 🟠 実装画像のみ | #356、#358、#360、#361、#363 | `v6-25-automation-requirements-draft.md` |
+| 26 | 外部連携 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-26-external-integrations-requirements-draft.md` |
+| 27 | 予約管理 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-27-booking-management-requirements-draft.md` |
+| 28 | 予約設定 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-28-booking-settings-requirements-draft.md` |
+| 29 | イベント予約 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-29-event-booking-requirements-draft.md` |
+| 30 | ログインユーザー | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | 🟠 実装画像のみ | — | `v6-30-login-users-requirements-draft.md` |
+| 31 | 機能設定 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | 🟠 実装画像のみ | — | `v6-31-feature-settings-requirements-draft.md` |
+| 32 | 運用状態 | ✅ 完了 | ✅ 完了 | ⚪ 共通枠のみ | ⚪ 未確認 | — | `v6-32-operations-status-requirements-draft.md` |
+
+> 「一部実装」は、既存機能が使えるかどうかではなく、各要件書のV6完了条件を全て満たしたかで判定する。既存機能が動いていても、V6の全画面・全状態・画像比較が未完なら完了にしない。
+
+## 3. 要件定義を完了した順
 
 ### A. LINE中核を閉じる（完了）
 
@@ -129,4 +141,4 @@
 
 PencilのV6実Nodeは32機能・260画面で再集計し、詳細要件内のV5由来Node参照をV6実Node IDへ更新した。
 
-実装は未開始。既存のdirty作業treeを整理し、最新`codex/development`から専用branchを作ることが開始条件である。
+実装は開始済み。現時点では7機能が一部実装、残り25機能は共通シェル反映までである。次は各機能を要件書の完了条件に沿って縦に通し、実装・画像確認の列を1機能ずつ完了へ進める。
