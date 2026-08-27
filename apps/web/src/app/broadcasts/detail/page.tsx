@@ -1,10 +1,11 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { api, type ApiBroadcast } from '@/lib/api'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
 
 const STATUS_LABELS: Record<string, string> = {
@@ -26,6 +27,7 @@ function BroadcastDetailInner() {
     suppressedByAudienceSize: boolean
   } | null>(null)
   const [loading, setLoading] = useState(true)
+  const contentRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     let active = true
@@ -102,14 +104,12 @@ function BroadcastDetailInner() {
           }
           action={
             <div className="flex flex-wrap gap-2">
-              {/* 送った内容は下に出ている。別画面で開く先が無い。 */}
-              <button
-                disabled
-                title="配信内容の別画面は準備中です。内容は下に出ています"
-                className="border-hairline text-ink-faint rounded-control border px-4 py-2 text-sm font-medium opacity-50"
+              <Button
+                onClick={() => contentRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                disabled={!broadcast}
               >
                 配信内容を見る
-              </button>
+              </Button>
               {/* 既存の配信を種にして作り直す口が無い。作成は空から始まる。 */}
               <button
                 disabled
@@ -251,7 +251,11 @@ function BroadcastDetailInner() {
             </p>
           </section>
 
-          <section className="bg-canvas rounded-card border-hairline border p-5">
+          <section
+            ref={contentRef}
+            id="broadcast-content"
+            className="bg-canvas rounded-card border-hairline scroll-mt-20 border p-5"
+          >
             <p className="text-ink text-sm font-semibold">送った内容</p>
             <p className="text-ink-faint mt-0.5 mb-2 text-xs">実際に届いた形</p>
             <div className="bg-canvas-sunken rounded-card p-3">
