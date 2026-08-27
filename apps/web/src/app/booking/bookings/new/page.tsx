@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
-import { Select } from '@/components/shared/select'
+import Select from '@/components/shared/select'
 import {
   api,
   bookingApi,
