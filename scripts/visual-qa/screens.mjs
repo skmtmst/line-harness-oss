@@ -97,6 +97,9 @@ const ANALYTICS = { feature: 20, dir: 'analytics-v6', mode: 'page' }
 /** NEN配信。タブは画面の中の状態で持つので、押して切り替える。 */
 const NEN = { feature: 21, dir: 'nen-v6', route: '/nen-campaigns', mode: 'page' }
 
+/** 写真審査。札の格子と、状態の札4本（審査待ち／採用済み／見送り／すべて）。 */
+const PHOTO = { feature: 22, dir: 'photos-v6', route: '/nen-members', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -870,6 +873,24 @@ export const SCREENS = [
   {
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能22 写真審査 ─────────────────────────────────────
+  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査' },
+  {
+    ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
+    status: 'unimplemented',
+    why: '1枚を大きく見る画面が無い。拡大・回転・切り取りも、自動で見つけたこと（人の顔・他社のロゴ・重複）も無い',
+  },
+  {
+    ...PHOTO, node: 'N2J629', name: '22-1-B 写真を戻す理由をえらぶ',
+    status: 'unimplemented',
+    why: '戻すときに理由を選ぶ窓が無い。「見送る」を押すとその場で確定する（`nen-members/page.tsx:136`）。**理由が残らず、お客様にも伝わらない**',
+  },
+  {
+    ...PHOTO, node: 'J3Wxl8', name: '22-1-C 出しているもの',
+    status: 'unimplemented',
+    why: '通した写真をどこで使っているか（リッチメニュー・コラム・サイト）を並べるタブが無い。状態の札は4本（審査待ち／採用済み／見送り／すべて）で「出しているもの」が無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

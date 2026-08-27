@@ -1928,3 +1928,41 @@ export const NEN_JOBS = [
   /* 届かなかったもの。**ブロックされた人。** 理由が残ることが要る。 */
   { id: 'nj-4', campaignKey: 'delivered', label: '届きました', friendName: '山田 太郎', scheduledAt: '2026-08-23T01:00:00.000Z', status: 'failed', attempts: 3, lastError: 'ブロックされています', sentAt: null },
 ]
+
+/**
+ * 機能22 写真審査。設計 `Qu6Vk`（見ていない18・通した486・戻した24・出している62）。
+ *
+ * **`/api/nen-members/photos` は `Record<string, unknown>` の配列**で、
+ * 画面は `photo.pet_name` `photo.owner_name` `photo.status` `photo.created_at`
+ * という**スネークケース**で読む（`nen-members/page.tsx:133`）。
+ * キャメルケースで書くと名前が空のまま撮れる。
+ */
+export const NEN_PHOTOS = [
+  {
+    id: 'ph-1', pet_name: 'もも', owner_name: '高橋 直人', status: 'pending',
+    image_url: 'https://example.co.jp/photos/momo.jpg',
+    caption: 'はじめて海に行きました', created_at: '2026-08-22T09:22:00.000Z',
+  },
+  {
+    id: 'ph-2', pet_name: 'そら', owner_name: '前田 さくら', status: 'pending',
+    image_url: 'https://example.co.jp/photos/sora.jpg',
+    caption: 'おひるね中です', created_at: '2026-08-22T02:10:00.000Z',
+  },
+  {
+    id: 'ph-3', pet_name: 'こむぎ', owner_name: '木村 亮', status: 'pending',
+    image_url: 'https://example.co.jp/photos/komugi.jpg',
+    caption: '', created_at: '2026-08-23T05:40:00.000Z',
+  },
+  {
+    id: 'ph-4', pet_name: 'レオ', owner_name: '大西 健一', status: 'adopted',
+    image_url: 'https://example.co.jp/photos/leo.jpg',
+    caption: '海が好きです', created_at: '2026-08-18T09:22:00.000Z',
+  },
+  {
+    /* 戻したもの。**理由が残ることが要る。** */
+    id: 'ph-5', pet_name: 'マロン', owner_name: '佐藤 花子', status: 'rejected',
+    image_url: 'https://example.co.jp/photos/maron.jpg',
+    caption: '', created_at: '2026-08-15T01:00:00.000Z',
+    reject_reason: 'うしろに人の顔が写っています',
+  },
+]
