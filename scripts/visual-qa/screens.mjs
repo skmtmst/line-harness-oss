@@ -18,6 +18,8 @@
  *             'viewport' … 見えている範囲だけ撮る
  *   height    'viewport' のときの高さ。**設計の高さに合わせる**
  *   steps     撮る前の操作。`{ click: 'ボタン名' }` `{ fill: '欄名', text: '…' }` `{ wait: 800 }`
+ *             **名前は一部だけでよい**（言葉の一部で探す）。長く書くと、
+ *             読み上げ名の空白の入り方が違うだけで当たらなくなる。
  *   clock     時計を止める時刻。相対時刻（「6日前」）を出す画面では必須
  *   status    'unimplemented' … 実装が無い。**撮らない。合格にもしない**
  *   why       `status` の理由。空にしない
@@ -38,6 +40,10 @@ const INBOX_CLOCK = '2026-08-19T11:00:00.000Z'
 
 /** 友だちは一覧。3-2 重複検出・3-3 統合ユーザーは同じ画面のタブ。 */
 const FRIENDS = { feature: 3, dir: 'friends-v6', route: '/friends', mode: 'page' }
+
+/** シナリオ配信。編集は `?id=` 付きで開く。 */
+const SCENARIO = { feature: 5, dir: 'scenarios-v6', mode: 'page' }
+const EDIT = '/scenarios/detail?id=scenario-0'
 
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
@@ -192,6 +198,54 @@ export const SCREENS = [
     why: '`/accounts` を開くと `/hq` へ飛ばされる。画面確認アカウントの権限では入れない。権限の切り分けが要る',
   },
 
+  // ── 機能5 シナリオ配信 ──────────────────────────────────
+  { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios' },
+  { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0' },
+  { ...SCENARIO, node: 'kk8dz', name: '5-1-B シナリオ作成・1通目設定', route: '/scenarios/first-step?id=scenario-0' },
+  { ...SCENARIO, node: 'bV5Vs', name: '5-1-C シナリオ編集', route: EDIT },
+  {
+    ...SCENARIO, node: 'xfYLn', name: '5-1-D シナリオ・ステップ編集', route: EDIT,
+    mode: 'viewport', height: 1080, steps: [{ click: '編集' }],
+  },
+  {
+    ...SCENARIO, node: 'r6Gzsu', name: '5-1-E シナリオ・配信条件を開く', route: EDIT,
+    mode: 'viewport', height: 1080, steps: [{ click: '条件なし' }],
+  },
+  {
+    ...SCENARIO, node: 'hz9ti', name: '5-1-F シナリオ・送信後アクションを開く', route: EDIT,
+    mode: 'viewport', height: 1080, steps: [{ click: 'アクション' }],
+  },
+  {
+    ...SCENARIO, node: 'dqFft', name: '5-1-G シナリオ・ステップ削除確認', route: EDIT,
+    mode: 'viewport', height: 1080, steps: [{ click: 'この通を削除する' }],
+  },
+  {
+    ...SCENARIO, node: 'EvVO5', name: '5-1-H シナリオ・開始条件を開く', route: EDIT,
+    mode: 'viewport', height: 1080, steps: [{ click: '変更' }],
+  },
+  {
+    ...SCENARIO, node: 'RUxNf', name: '5-1-I シナリオ・配信開始確認', route: EDIT,
+    status: 'unimplemented',
+    why: '編集画面に「配信を開始」が無い。状態は一覧の再開／停止で変えるだけで、**開始前の確認が挟まらない**',
+  },
+  {
+    ...SCENARIO, node: 'NrBkW', name: '5-1-J シナリオ・配信開始完了', route: EDIT,
+    status: 'unimplemented', why: '5-1-I（開始の確認）が無いため、その先も無い',
+  },
+  {
+    ...SCENARIO, node: 'g2UNV', name: '5-1-K シナリオ・テスト送信', route: EDIT,
+    mode: 'viewport', height: 1080, steps: [{ click: '一括テスト送信', nth: 1 }],
+  },
+  {
+    ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果', route: EDIT,
+    status: 'unimplemented', why: '配信結果を開く導線が未確認',
+  },
+  {
+    ...SCENARIO, node: 'q5G45', name: '5-1-M 一覧の状態（空・読込・エラー）', route: '/scenarios',
+    status: 'unimplemented',
+    why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
   // ここには、設計と並べるために撮るものだけを置く。
@@ -255,6 +309,10 @@ export const DESIGN_SIZE = {
   L35UOV: [1920, 1840], IYjvu: [1920, 1840], TUveA: [1920, 1840], w72a2: [1920, 1840],
   ASsb3: [1920, 1840], ANgda: [1920, 1840], tBlkL: [1920, 1840], AuSDY: [1920, 1840],
   LHjwD: [1920, 1840],
+  TC1b1: [1920, 1080], cCB7r: [1920, 1080], kk8dz: [1920, 1153], bV5Vs: [1920, 1080],
+  xfYLn: [1920, 1080], r6Gzsu: [1920, 1080], hz9ti: [1920, 1080], dqFft: [1920, 1080],
+  EvVO5: [1920, 1080], RUxNf: [1920, 1080], NrBkW: [1920, 1080], g2UNV: [1920, 1080],
+  M2b2B: [1920, 1080], q5G45: [1920, 1080],
   PhxG6: [1920, 1080], LT8RS: [1920, 1080], Igi72: [1920, 1080], IAf7j: [1920, 1107],
   I6UAdr: [1920, 1384], bzDn6: [1920, 1080], YzxU1: [1920, 1431], InCDe: [1920, 1080],
   r7eSi: [1920, 1080], w8W4Eh: [1920, 1080], vtBCu: [1920, 1080],
