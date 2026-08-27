@@ -357,3 +357,114 @@ export async function claimStaffTotpStep(db: D1Database, staffId: string, step: 
   ).bind(step, jstNow(), staffId, step).run();
   return result.meta.changes === 1;
 }
+
+export type AdminStepUpPurpose = 'operation-stop' | 'operation-restore';
+
+/**
+ * 現在の管理画面sessionだけで使える、短期の再確認証明を保存する。
+ * token本体はブラウザへ1回返すだけで、DBにはhashしか残さない。
+ */
+export async function createAdminStepUpGrant(
+  db: D1Database,
+  input: {
+    tokenHash: string;
+    staffId: string;
+    sessionTokenHash: string;
+    purpose: AdminStepUpPurpose;
+    expiresAt: string;
+    createdAt: string;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO admin_step_up_grants
+       (token_hash, staff_id, session_token_hash, purpose, expires_at, consumed_at, created_at)
+     VALUES (?, ?, ?, ?, ?, NULL, ?)`,
+  ).bind(
+    input.tokenHash,
+    input.staffId,
+    input.sessionTokenHash,
+    input.purpose,
+    input.expiresAt,
+    input.createdAt,
+  ).run();
+}
+
+/** 同じsession・本人・用途に結び付いた証明を、期限内に1回だけ消費する。 */
+export async function consumeAdminStepUpGrant(
+  db: D1Database,
+  input: {
+    tokenHash: string;
+    staffId: string;
+    sessionTokenHash: string;
+    purpose: AdminStepUpPurpose;
+    now: string;
+  },
+): Promise<boolean> {
+  const result = await db.prepare(
+    `UPDATE admin_step_up_grants
+        SET consumed_at = ?
+      WHERE token_hash = ?
+        AND staff_id = ?
+        AND session_token_hash = ?
+        AND purpose = ?
+        AND consumed_at IS NULL
+        AND expires_at > ?`,
+  ).bind(
+    input.now,
+    input.tokenHash,
+    input.staffId,
+    input.sessionTokenHash,
+    input.purpose,
+    input.now,
+  ).run();
+  return result.meta.changes === 1;
+}
+
+export async function deleteExpiredAdminStepUpGrants(
+  db: D1Database,
+  now: string,
+): Promise<void> {
+  await db.prepare(
+    'DELETE FROM admin_step_up_grants WHERE expires_at <= ? OR consumed_at IS NOT NULL',
+  ).bind(now).run();
+}
+
+export async function countRecentAdminStepUpFailures(
+  db: D1Database,
+  sessionTokenHash: string,
+  since: string,
+): Promise<number> {
+  const row = await db.prepare(
+    `SELECT COUNT(*) AS count FROM admin_step_up_failures
+      WHERE session_token_hash = ? AND occurred_at >= ?`,
+  ).bind(sessionTokenHash, since).first<{ count: number }>();
+  return Number(row?.count ?? 0);
+}
+
+export async function deleteOldAdminStepUpFailures(
+  db: D1Database,
+  before: string,
+): Promise<void> {
+  await db.prepare(
+    'DELETE FROM admin_step_up_failures WHERE occurred_at < ?',
+  ).bind(before).run();
+}
+
+export async function recordAdminStepUpFailure(
+  db: D1Database,
+  input: { id: string; staffId: string; sessionTokenHash: string; occurredAt: string },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO admin_step_up_failures (id, staff_id, session_token_hash, occurred_at)
+     VALUES (?, ?, ?, ?)`,
+  ).bind(input.id, input.staffId, input.sessionTokenHash, input.occurredAt).run();
+}
+
+export async function clearAdminStepUpFailures(
+  db: D1Database,
+  sessionTokenHash: string,
+): Promise<void> {
+  await db.prepare(
+    'DELETE FROM admin_step_up_failures WHERE session_token_hash = ?',
+  ).bind(sessionTokenHash).run();
+}

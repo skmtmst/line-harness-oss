@@ -80,6 +80,24 @@ export async function finalizeOperationIdempotency(
   ).bind(input.status, JSON.stringify(input.body), input.key).run();
 }
 
+/**
+ * 再認証が通らなかったfresh reservationだけを解放する。
+ * これにより、利用者は新しいTOTPコードで同じ操作を安全にやり直せる。
+ */
+export async function releaseOperationIdempotency(
+  db: D1Database,
+  input: {
+    key: string;
+    actorId: string;
+    requestHash: string;
+  },
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM operation_idempotency_keys
+      WHERE key = ? AND actor_id = ? AND request_hash = ? AND response_status = 0`,
+  ).bind(input.key, input.actorId, input.requestHash).run();
+}
+
 export async function purgeExpiredOperationIdempotency(db: D1Database, now: Date): Promise<number> {
   const result = await db.prepare(
     'DELETE FROM operation_idempotency_keys WHERE expires_at <= ?',

@@ -8,3 +8,4 @@ export * from "./anniversary";
 export * from "./shipping-schedule";
 export * from "./form-layout";
 export * from "./tenant";
+export * from "./permissions";

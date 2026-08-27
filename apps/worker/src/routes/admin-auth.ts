@@ -7,6 +7,7 @@ import {
   CSRF_COOKIE,
   adminSessionCookie,
   adminSessionTokenFromCookie,
+  adminSessionTokenHashFromRequest,
   authenticateApiToken,
   csrfCookie,
   csrfTokenFromCookie,
@@ -20,6 +21,11 @@ import {
   createAdminSession,
   createTwoFactorChallenge,
   claimStaffTotpStep,
+  clearAdminStepUpFailures,
+  countRecentAdminStepUpFailures,
+  createAdminStepUpGrant,
+  deleteExpiredAdminStepUpGrants,
+  deleteOldAdminStepUpFailures,
   deleteAdminSession,
   deleteExpiredTwoFactorChallenges,
   deleteTwoFactorChallenge,
@@ -29,6 +35,7 @@ import {
   getStaffByLineUserIdIncludingInactive,
   getTwoFactorChallenge,
   incrementTwoFactorChallengeAttempts,
+  recordAdminStepUpFailure,
   updateStaffMember,
 } from '@line-crm/db';
 import { decryptTotpSecret, verifyTotp } from '../lib/totp.js';
@@ -42,6 +49,8 @@ const OAUTH_INVITE_COOKIE = 'lh_line_invite';
 const OAUTH_MAX_AGE = 600;
 const TWO_FACTOR_CHALLENGE_MAX_AGE = 5 * 60 * 1000;
 const TWO_FACTOR_MAX_ATTEMPTS = 5;
+const STEP_UP_MAX_AGE = 5 * 60 * 1000;
+const STEP_UP_FAILURE_WINDOW = 5 * 60 * 1000;
 
 function randomToken(bytes = 32): string {
   const value = new Uint8Array(bytes);
@@ -295,6 +304,84 @@ adminAuth.post('/api/auth/two-factor/verify', async (c) => {
     // cross-site fallback hands the opaque session token to the SPA.
     data: { sessionToken: config.crossSite ? session.sessionToken : undefined },
     csrfToken: session.csrfToken,
+  });
+});
+
+adminAuth.post('/api/auth/step-up', async (c) => {
+  const body = await c.req.json<{
+    code?: string;
+    purpose?: 'operation-stop' | 'operation-restore';
+  }>().catch(() => ({} as { code?: string; purpose?: 'operation-stop' | 'operation-restore' }));
+  const code = body.code?.trim() ?? '';
+  if (!/^\d{6}$/.test(code)) {
+    return c.json({ success: false, error: '6桁の認証コードを入力してください' }, 400);
+  }
+  if (body.purpose !== 'operation-stop' && body.purpose !== 'operation-restore') {
+    return c.json({ success: false, error: '再確認する操作を指定してください' }, 400);
+  }
+
+  const authenticated = c.get('staff');
+  const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
+  if (!authenticated || !sessionTokenHash || authenticated.id === 'env-owner') {
+    return c.json({
+      success: false,
+      error: '高危険操作は、二段階認証を設定した通常のログインセッションから実行してください',
+    }, 403);
+  }
+
+  const staff = await getStaffById(c.env.DB, authenticated.id);
+  const masterKey = c.env.TOTP_ENCRYPTION_KEY;
+  if (!staff?.is_active || !staff.totp_secret_enc || !staff.totp_enabled_at || !masterKey) {
+    return c.json({
+      success: false,
+      error: '二段階認証が未設定です。ログインユーザー画面で設定してから実行してください',
+    }, 403);
+  }
+
+  const now = new Date();
+  const failureWindowStart = new Date(now.getTime() - STEP_UP_FAILURE_WINDOW).toISOString();
+  await deleteOldAdminStepUpFailures(c.env.DB, failureWindowStart);
+  if (await countRecentAdminStepUpFailures(c.env.DB, sessionTokenHash, failureWindowStart) >= TWO_FACTOR_MAX_ATTEMPTS) {
+    return c.json({
+      success: false,
+      error: '入力回数を超えました。5分待ってからもう一度確認してください',
+    }, 429);
+  }
+
+  const verified = await verifyTotp(
+    await decryptTotpSecret(staff.totp_secret_enc, masterKey),
+    code,
+    Date.now(),
+    staff.totp_last_used_step,
+  );
+  if (!verified.valid || verified.step === null) {
+    await recordAdminStepUpFailure(c.env.DB, {
+      id: crypto.randomUUID(),
+      staffId: staff.id,
+      sessionTokenHash,
+      occurredAt: now.toISOString(),
+    });
+    return c.json({ success: false, error: '認証コードが正しくありません' }, 400);
+  }
+  if (!await claimStaffTotpStep(c.env.DB, staff.id, verified.step)) {
+    return c.json({ success: false, error: 'この認証コードは使用済みです。次のコードを入力してください' }, 409);
+  }
+
+  await clearAdminStepUpFailures(c.env.DB, sessionTokenHash);
+  const expiresAt = new Date(now.getTime() + STEP_UP_MAX_AGE).toISOString();
+  const stepUpToken = randomToken();
+  await deleteExpiredAdminStepUpGrants(c.env.DB, now.toISOString());
+  await createAdminStepUpGrant(c.env.DB, {
+    tokenHash: await sha256Hex(stepUpToken),
+    staffId: staff.id,
+    sessionTokenHash,
+    purpose: body.purpose,
+    expiresAt,
+    createdAt: now.toISOString(),
+  });
+  return c.json({
+    success: true,
+    data: { stepUpToken, purpose: body.purpose, expiresAt },
   });
 });
 

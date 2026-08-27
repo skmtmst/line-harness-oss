@@ -1099,6 +1099,19 @@ function rangeQuery(params?: { from?: string; to?: string; accountId?: string })
 }
 
 export const api = {
+  auth: {
+    stepUp: (data: {
+      code: string
+      purpose: 'operation-stop' | 'operation-restore'
+    }) => fetchApi<ApiResponse<{
+      stepUpToken: string
+      purpose: 'operation-stop' | 'operation-restore'
+      expiresAt: string
+    }>>('/api/auth/step-up', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  },
   system: {
     health: () =>
       fetchApi<ApiResponse<{ status: 'ok' }>>('/api/health'),
@@ -3315,6 +3328,7 @@ export const api = {
       return fetchApi<ApiResponse<{
         control: OperationControl
         counts: Partial<Record<OperationCapability, number>>
+        permissions: { canControl: boolean }
         calculatedAt: string
       }>>(`/api/operations/control/preview${query}`)
     },
@@ -3325,24 +3339,30 @@ export const api = {
       detail?: string
       expectedVersion: number
       confirmation: '停止'
-    }) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
+    }, stepUpToken: string) => fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
       '/api/operations/incidents',
       {
         method: 'POST',
         headers: {
           'X-Confirm-Irreversible': 'operation-stop',
+          'X-Step-Up-Token': stepUpToken,
           'Idempotency-Key': crypto.randomUUID(),
         },
         body: JSON.stringify(data),
       },
     ),
-    restore: (incidentId: string, data: { expectedVersion: number; confirmation: '復旧' }) =>
+    restore: (
+      incidentId: string,
+      data: { expectedVersion: number; confirmation: '復旧' },
+      stepUpToken: string,
+    ) =>
       fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(
         `/api/operations/incidents/${incidentId}/restore`,
         {
           method: 'POST',
           headers: {
             'X-Confirm-Irreversible': 'operation-restore',
+            'X-Step-Up-Token': stepUpToken,
             'Idempotency-Key': crypto.randomUUID(),
           },
           body: JSON.stringify(data),

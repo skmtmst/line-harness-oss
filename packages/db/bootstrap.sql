@@ -65,6 +65,23 @@ CREATE TABLE admin_sessions (
   FOREIGN KEY (staff_id) REFERENCES staff_members(id) ON DELETE CASCADE
 );
 
+CREATE TABLE admin_step_up_failures (
+  id                 TEXT PRIMARY KEY,
+  staff_id           TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  session_token_hash TEXT NOT NULL REFERENCES admin_sessions(token_hash) ON DELETE CASCADE,
+  occurred_at        TEXT NOT NULL
+);
+
+CREATE TABLE admin_step_up_grants (
+  token_hash         TEXT PRIMARY KEY,
+  staff_id           TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  session_token_hash TEXT NOT NULL REFERENCES admin_sessions(token_hash) ON DELETE CASCADE,
+  purpose            TEXT NOT NULL CHECK (purpose IN ('operation-stop', 'operation-restore')),
+  expires_at         TEXT NOT NULL,
+  consumed_at        TEXT,
+  created_at         TEXT NOT NULL
+);
+
 CREATE TABLE admin_two_factor_challenges (
   token_hash TEXT PRIMARY KEY,
   staff_id TEXT NOT NULL,
@@ -2692,6 +2709,15 @@ CREATE INDEX idx_admin_sessions_restaurant_store
   WHERE selected_restaurant_store_id IS NOT NULL;
 
 CREATE INDEX idx_admin_sessions_staff_id ON admin_sessions(staff_id);
+
+CREATE INDEX idx_admin_step_up_failures_session_time
+  ON admin_step_up_failures(session_token_hash, occurred_at DESC);
+
+CREATE INDEX idx_admin_step_up_grants_expires
+  ON admin_step_up_grants(expires_at);
+
+CREATE INDEX idx_admin_step_up_grants_session
+  ON admin_step_up_grants(session_token_hash, expires_at);
 
 CREATE INDEX idx_admin_two_factor_challenges_expires
   ON admin_two_factor_challenges(expires_at);

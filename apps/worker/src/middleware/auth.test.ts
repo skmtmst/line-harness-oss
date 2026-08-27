@@ -39,6 +39,12 @@ vi.mock('@line-crm/db', () => ({
   incrementTwoFactorChallengeAttempts: vi.fn(async () => undefined),
   deleteTwoFactorChallenge: vi.fn(async () => undefined),
   claimStaffTotpStep: vi.fn(async () => true),
+  createAdminStepUpGrant: vi.fn(async () => undefined),
+  deleteExpiredAdminStepUpGrants: vi.fn(async () => undefined),
+  deleteOldAdminStepUpFailures: vi.fn(async () => undefined),
+  countRecentAdminStepUpFailures: vi.fn(async () => 0),
+  recordAdminStepUpFailure: vi.fn(async () => undefined),
+  clearAdminStepUpFailures: vi.fn(async () => undefined),
   updateStaffMember: vi.fn(async () => null),
   deleteAdminSession: vi.fn(async () => undefined),
   // ログイン・ログアウト・失敗を記録する。本体では例外を握るので、
@@ -249,6 +255,79 @@ describe('Authenticator verification', () => {
     expect(body.csrfToken).toBeTruthy();
     expect(cookieFor(response, 'lh_admin_session')).toBeTruthy();
     expect(db.claimStaffTotpStep).toHaveBeenCalledWith(expect.anything(), 'staff-1', expect.any(Number));
+  });
+});
+
+describe('高危険操作の本人再確認', () => {
+  test('現在のsessionと用途に結び付いた5分間のstep-up tokenを発行する', async () => {
+    const db = await import('@line-crm/db');
+    const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+    const masterKey = 'test-master-key-which-is-longer-than-32-characters';
+    vi.mocked(db.getStaffById).mockResolvedValueOnce({
+      id: 'staff-1', name: 'Staff One', email: 'staff@example.com', role: 'admin', access_level: 'full', api_key: 'hidden', line_user_id: 'U1', is_active: 1,
+      permission_keys: '[]', notification_preferences: '{}', invite_status: 'active', invite_token_hash: null, invite_expires_at: null, email_verified_at: null, line_linked_at: null,
+      totp_secret_enc: await encryptTotpSecret(secret, masterKey), totp_pending_secret_enc: null, totp_enabled_at: new Date().toISOString(), totp_last_used_step: null,
+      tenant_id: '00000000-0000-4000-8000-000000000001',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+    const step = Math.floor(Date.now() / 30_000);
+    const response = await app().request('/api/auth/step-up', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'lh_admin_session=staff-key; lh_csrf=csrf-token',
+        'X-CSRF-Token': 'csrf-token',
+      },
+      body: JSON.stringify({ code: await totpAtStep(secret, step), purpose: 'operation-stop' }),
+    }, { ...crossSiteEnv(), TOTP_ENCRYPTION_KEY: masterKey });
+    expect(response.status).toBe(200);
+    const body = await response.json() as {
+      success: boolean;
+      data: { stepUpToken: string; purpose: string; expiresAt: string };
+    };
+    expect(body).toMatchObject({ success: true, data: { purpose: 'operation-stop' } });
+    expect(body.data.stepUpToken.length).toBeGreaterThan(30);
+    expect(Date.parse(body.data.expiresAt)).toBeGreaterThan(Date.now());
+    expect(db.createAdminStepUpGrant).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      staffId: 'staff-1',
+      purpose: 'operation-stop',
+      sessionTokenHash: 'c1e9199b97100cfa89cf5335e39753c0ee4caddde90d79bf5ca16ab99d4a7d9a',
+    }));
+  });
+
+  test('APIキーだけの緊急sessionではstep-up tokenを発行しない', async () => {
+    const response = await app().request('/api/auth/step-up', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer env-key' },
+      body: JSON.stringify({ code: '123456', purpose: 'operation-stop' }),
+    }, crossSiteEnv());
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('通常のログインセッション') });
+  });
+
+  test('同じsessionで5回失敗したあとはTOTP検証前に一時停止する', async () => {
+    const db = await import('@line-crm/db');
+    const masterKey = 'test-master-key-which-is-longer-than-32-characters';
+    vi.mocked(db.getStaffById).mockResolvedValueOnce({
+      id: 'staff-1', name: 'Staff One', email: 'staff@example.com', role: 'admin', access_level: 'full', api_key: 'hidden', line_user_id: 'U1', is_active: 1,
+      permission_keys: '[]', notification_preferences: '{}', invite_status: 'active', invite_token_hash: null, invite_expires_at: null, email_verified_at: null, line_linked_at: null,
+      totp_secret_enc: await encryptTotpSecret('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', masterKey), totp_pending_secret_enc: null, totp_enabled_at: new Date().toISOString(), totp_last_used_step: null,
+      tenant_id: '00000000-0000-4000-8000-000000000001',
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    });
+    vi.mocked(db.countRecentAdminStepUpFailures).mockResolvedValueOnce(5);
+    const response = await app().request('/api/auth/step-up', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Cookie: 'lh_admin_session=staff-key; lh_csrf=csrf-token',
+        'X-CSRF-Token': 'csrf-token',
+      },
+      body: JSON.stringify({ code: '123456', purpose: 'operation-stop' }),
+    }, { ...crossSiteEnv(), TOTP_ENCRYPTION_KEY: masterKey });
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining('5分待って') });
+    expect(db.recordAdminStepUpFailure).not.toHaveBeenCalled();
   });
 });
 

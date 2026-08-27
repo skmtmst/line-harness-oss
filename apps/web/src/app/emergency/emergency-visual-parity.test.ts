@@ -51,6 +51,16 @@ describe('V6 32 運用状態の契約', () => {
     expect(source).not.toContain('api.automations.update')
   })
 
+  it('専用権限をサーバーから読み、認証アプリの6桁コードで操作直前に再確認する', () => {
+    expect(source).toContain('response.data.permissions.canControl')
+    expect(source).toContain('api.auth.stepUp({ code: totpCode')
+    expect(source).toContain("purpose: 'operation-stop'")
+    expect(source).toContain("purpose: 'operation-restore'")
+    expect(source).toContain('verified.data.stepUpToken')
+    expect(source).toContain('認証アプリの6桁コード')
+    expect(source).toContain('/^\\d{6}$/')
+  })
+
   it('ブラウザ内の停止正本と公開管理キーを使わない', () => {
     expect(source).not.toContain('localStorage')
     expect(source).not.toContain('NEXT_PUBLIC_ADMIN_API_KEY')

@@ -10,6 +10,7 @@ import { sha256Hex } from '../middleware/auth.js';
 import { sendStaffInviteEmail, sendStaffLineLinkEmail } from '../services/staff-invite.js';
 import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import type { Env } from '../index.js';
+import { EMERGENCY_CONTROL_PERMISSION } from '@line-crm/shared';
 import { getLineAccounts } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -26,13 +27,26 @@ function displayRole(row: StaffMember): 'admin' | 'staff' | 'viewer' {
   return row.role === 'staff' ? 'staff' : 'admin';
 }
 
+function permissionKeysForRole(
+  role: 'admin' | 'staff' | 'viewer',
+  input: unknown,
+): string[] {
+  if (!Array.isArray(input)) return [];
+  const keys = [...new Set(input.filter((value): value is string => typeof value === 'string'))];
+  if (role === 'viewer') return [];
+  if (role === 'admin') return keys.includes(EMERGENCY_CONTROL_PERMISSION)
+    ? [EMERGENCY_CONTROL_PERMISSION]
+    : [];
+  return keys.filter((key) => key.startsWith('/') && key !== '/emergency');
+}
+
 async function serializeStaff(db: D1Database, row: StaffMember) {
   const accountScope = row.account_scope ?? 'all';
   return {
     id: row.id,
     name: row.name,
     email: row.email,
-    role: displayRole(row),
+    role: row.role === 'owner' ? 'owner' : displayRole(row),
     lineLinked: Boolean(row.line_user_id),
     twoFactorEnabled: Boolean(row.totp_enabled_at && row.totp_secret_enc),
     isActive: Boolean(row.is_active),
@@ -221,6 +235,13 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
     }
     const current = c.get('staff');
+    if (
+      current.role !== 'owner'
+      && Array.isArray(body.permissionKeys)
+      && body.permissionKeys.includes(EMERGENCY_CONTROL_PERMISSION)
+    ) {
+      return c.json({ success: false, error: '緊急停止・復旧の権限はownerだけが付与できます' }, 403);
+    }
     if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
       return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を追加できます' }, 403);
     }
@@ -244,7 +265,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), async (c) => {
       role: body.role === 'admin' ? 'admin' : 'staff',
       access_level: body.role === 'viewer' ? 'read_only' : 'full',
       is_active: 0,
-      permission_keys: body.role === 'staff' ? (body.permissionKeys ?? []) : [],
+      permission_keys: permissionKeysForRole(body.role, body.permissionKeys),
       notification_preferences: body.notificationPreferences ?? {},
       invite_status: 'pending_email',
       invite_token_hash: await sha256Hex(token),
@@ -315,6 +336,18 @@ staff.patch('/api/staff/:id', async (c) => {
   )) {
     return c.json({ success: false, error: '権限と利用状態は管理者だけが変更できます' }, 403);
   }
+  if (current.role !== 'owner') {
+    const targetPermissionKeys = safeJson<string[]>(target.permission_keys, []);
+    const hadEmergencyPermission = displayRole(target) === 'admin'
+      && targetPermissionKeys.includes(EMERGENCY_CONTROL_PERMISSION);
+    const nextRole = body.role ?? displayRole(target);
+    const requestedPermissionKeys = body.permissionKeys ?? targetPermissionKeys;
+    const requestsEmergencyPermission = nextRole === 'admin'
+      && requestedPermissionKeys.includes(EMERGENCY_CONTROL_PERMISSION);
+    if (hadEmergencyPermission !== requestsEmergencyPermission) {
+      return c.json({ success: false, error: '緊急停止・復旧の権限はownerだけが変更できます' }, 403);
+    }
+  }
   if (body.email !== undefined && body.email !== null) {
     const email = body.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -362,7 +395,12 @@ staff.patch('/api/staff/:id', async (c) => {
     // ここで受けるのは false（解除）のときだけにする。
     line_user_id: body.lineLinked === false ? null : undefined,
     line_linked_at: body.lineLinked === false ? null : undefined,
-    permission_keys: body.permissionKeys,
+    permission_keys: body.permissionKeys === undefined && body.role === undefined
+      ? undefined
+      : permissionKeysForRole(
+        body.role ?? displayRole(target),
+        body.permissionKeys ?? safeJson<string[]>(target.permission_keys, []),
+      ),
     notification_preferences: body.notificationPreferences,
     assigned_line_account_id: body.assignedLineAccountId,
     can_access_descendant_accounts:

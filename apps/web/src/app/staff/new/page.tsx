@@ -8,6 +8,7 @@ import { TextInput } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import NotificationSwitch from '@/components/ui/notification-switch'
 import { useAccount } from '@/contexts/account-context'
+import { EMERGENCY_CONTROL_PERMISSION } from '@line-crm/shared'
 
 type Role = 'admin' | 'staff' | 'viewer'
 type Channel = { email: boolean; line: boolean }
@@ -42,6 +43,7 @@ export default function NewStaffPage() {
   const [permissionKeys, setPermissionKeys] = useState<string[]>([])
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [assignedLineAccountId, setAssignedLineAccountId] = useState('')
+  const [canGrantEmergency, setCanGrantEmergency] = useState(false)
   const [notifications, setNotifications] = useState<Record<string, Channel>>({
     operations: { email: true, line: true }, emergency: { email: true, line: true },
     security: { email: true, line: false }, updates: { email: false, line: true },
@@ -49,6 +51,9 @@ export default function NewStaffPage() {
   const togglePermission = (key: string) => setPermissionKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key])
   const toggleChannel = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
   useEffect(() => {
+    void api.staff.me().then((response) => {
+      if (response.success) setCanGrantEmergency(response.data.role === 'owner')
+    })
     void api.lineAccounts.list().then((response) => {
       if (response.success) setAccounts(response.data)
     })
@@ -98,7 +103,14 @@ export default function NewStaffPage() {
       <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <label key={key} className={`flex cursor-pointer items-center gap-2 rounded-control border p-2.5 text-sm ${permissionKeys.includes(key) ? 'border-accent bg-accent-soft text-accent' : 'border-hairline text-ink-secondary'}`}><input type="checkbox" checked={permissionKeys.includes(key)} onChange={() => togglePermission(key)} className="accent-green-500" />{label}</label>)}</div></div>)}</div>
     </FormSection>}
 
-    <FormSection step={role === 'staff' ? 5 : 4} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
+    {role === 'admin' && canGrantEmergency && <FormSection step={4} label="重要操作" note="通常の管理権限とは別に、事故対応で必要な操作だけを許可します。">
+      <label className={`flex cursor-pointer items-start gap-3 rounded-card border p-4 ${permissionKeys.includes(EMERGENCY_CONTROL_PERMISSION) ? 'border-danger bg-danger-bg' : 'border-hairline'}`}>
+        <input type="checkbox" checked={permissionKeys.includes(EMERGENCY_CONTROL_PERMISSION)} onChange={() => togglePermission(EMERGENCY_CONTROL_PERMISSION)} className="mt-1 accent-accent" />
+        <span><span className="block text-sm font-semibold text-ink">緊急停止・復旧を許可</span><span className="mt-1 block text-xs leading-5 text-ink-secondary">実行時は、この権限に加えて認証アプリの6桁コードを毎回確認します。</span></span>
+      </label>
+    </FormSection>}
+
+    <FormSection step={role === 'staff' || (role === 'admin' && canGrantEmergency) ? 5 : 4} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
       <div className="divide-hairline overflow-hidden rounded-card border border-hairline divide-y">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 px-4 py-3"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>メール</span><NotificationSwitch checked={notifications[key].email} onChange={() => toggleChannel(key, 'email')} label={`${label}をメールで通知`} /></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>LINE</span><NotificationSwitch checked={notifications[key].line} onChange={() => toggleChannel(key, 'line')} label={`${label}をLINEで通知`} /></div></div>)}</div>
     </FormSection>
   </CreatePage>

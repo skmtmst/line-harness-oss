@@ -45,6 +45,7 @@ type Row = {
   assigned_line_account_id?: string | null;
   can_access_descendant_accounts?: number;
   account_scope?: 'all' | 'accounts';
+  permission_keys?: string | null;
 };
 
 function row(over: Partial<Row> & { id: string }): Row {
@@ -98,6 +99,17 @@ describe('スタッフの店舗権限範囲', () => {
     accountScope: scope, scopedLineAccountIds: ids,
   });
 
+  it('DB上のownerをadminへ落とさず画面へ返す', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({
+      id: 'owner-a',
+      role: 'owner',
+      tenant_id: 'tenant-a',
+    }));
+    const res = await send('/api/staff/me', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ data: { id: 'owner-a', role: 'owner' } });
+  });
+
   it('担当範囲を省略すると400で拒否する', async () => {
     const res = await send('/api/staff', 'POST', { name: '新しい担当者', email: 'scope@example.test', role: 'staff', assignedLineAccountId: 'line-1' });
     expect(res.status).toBe(400);
@@ -125,6 +137,70 @@ describe('スタッフの店舗権限範囲', () => {
   it('指定店舗が空なら拒否する', async () => {
     const res = await send('/api/staff', 'POST', invitation('accounts', []));
     expect(res.status).toBe(400);
+  });
+
+  it('管理者には緊急停止・復旧の専用権限だけを保存する', async () => {
+    dbMocks.createStaffMember.mockResolvedValue(row({ id: 'new-admin', role: 'admin', is_active: 0, tenant_id: 'tenant-a' }));
+    const res = await send('/api/staff', 'POST', {
+      ...invitation('accounts', ['line-1']),
+      role: 'admin',
+      permissionKeys: ['/friends', 'action:emergency-control'],
+    });
+    expect(res.status).toBe(201);
+    expect(dbMocks.createStaffMember).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ permission_keys: ['action:emergency-control'] }),
+    );
+  });
+
+  it('adminは新しいadminへ緊急停止・復旧の専用権限を付与できない', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({
+      id: 'admin-a',
+      role: 'admin',
+      tenant_id: 'tenant-a',
+    }));
+    const res = await send('/api/staff', 'POST', {
+      ...invitation('accounts', ['line-1']),
+      role: 'admin',
+      permissionKeys: ['action:emergency-control'],
+    }, 'admin-key');
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      error: '緊急停止・復旧の権限はownerだけが付与できます',
+    });
+    expect(dbMocks.createStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('adminは役割変更を使って緊急停止・復旧の専用権限を外せない', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({
+      id: 'admin-a', role: 'admin', tenant_id: 'tenant-a',
+    }));
+    dbMocks.getStaffById.mockResolvedValue(row({
+      id: 'admin-with-emergency', role: 'admin', tenant_id: 'tenant-a',
+      permission_keys: JSON.stringify(['action:emergency-control']),
+    }));
+    dbMocks.getStaffMembers.mockResolvedValue([
+      row({ id: 'admin-a', role: 'admin', tenant_id: 'tenant-a' }),
+      row({ id: 'admin-with-emergency', role: 'admin', tenant_id: 'tenant-a' }),
+    ]);
+    const res = await send('/api/staff/admin-with-emergency', 'PATCH', { role: 'staff' }, 'admin-key');
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      error: '緊急停止・復旧の権限はownerだけが変更できます',
+    });
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('一般スタッフへ緊急停止・復旧の専用権限を混ぜて保存しない', async () => {
+    const res = await send('/api/staff', 'POST', {
+      ...invitation('accounts', ['line-1']),
+      permissionKeys: ['/friends', 'action:emergency-control'],
+    });
+    expect(res.status).toBe(201);
+    expect(dbMocks.createStaffMember).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ permission_keys: ['/friends'] }),
+    );
   });
 
   it('限定された管理者は自分の範囲内だけ付与できる', async () => {

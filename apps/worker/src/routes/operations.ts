@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
-import type { Context } from 'hono';
+import type { Context, Next } from 'hono';
 import {
   OPERATION_CAPABILITIES,
   getFriendById,
   getOperationControlSet,
   getLatestOperationHealthSnapshot,
   acknowledgeOperationHealthAlert,
+  consumeAdminStepUpGrant,
   listOperationHealthAlerts,
   getOperationIncident,
   getPendingReminderDeliveries,
@@ -16,19 +17,32 @@ import {
   stopOperationCapabilities,
   type OperationCapability,
 } from '@line-crm/db';
-import { resolveReminderSendAt } from '@line-crm/shared';
+import { canControlEmergency, resolveReminderSendAt } from '@line-crm/shared';
 import type { Env } from '../index.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
+import { adminSessionTokenHashFromRequest, sha256Hex } from '../middleware/auth.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import {
   finalizeOperationIdempotency,
   hashOperationRequest,
   isValidOperationIdempotencyKey,
+  releaseOperationIdempotency,
   reserveOperationIdempotency,
 } from '../services/operation-idempotency.js';
 import { runOperationHealthChecks } from '../services/operation-health.js';
 
 const operations = new Hono<Env>();
+
+const requireEmergencyControlPermission = async (c: Context<Env>, next: Next) => {
+  const current = c.get('staff');
+  if (!canControlEmergency(current?.role, current?.permissionKeys)) {
+    return c.json({
+      success: false,
+      error: '緊急停止・復旧の専用権限がありません。ownerに権限付与を依頼してください',
+    }, 403);
+  }
+  await next();
+};
 
 function requestedAccountId(value: string | undefined): string | null {
   return !value || value === 'all' ? null : value;
@@ -141,6 +155,37 @@ function replayJson(body: unknown, status: number): Response {
   });
 }
 
+async function consumeOperationStepUp(
+  c: Context<Env>,
+  purpose: 'operation-stop' | 'operation-restore',
+  reservation: { key: string; actorId: string; requestHash: string },
+): Promise<Response | null> {
+  const token = c.req.header('X-Step-Up-Token')?.trim();
+  const sessionTokenHash = await adminSessionTokenHashFromRequest(c);
+  if (!token || !sessionTokenHash) {
+    await releaseOperationIdempotency(c.env.DB, reservation);
+    return c.json({
+      success: false,
+      error: '認証アプリの6桁コードで本人確認してから実行してください',
+    }, 428);
+  }
+  const consumed = await consumeAdminStepUpGrant(c.env.DB, {
+    tokenHash: await sha256Hex(token),
+    staffId: reservation.actorId,
+    sessionTokenHash,
+    purpose,
+    now: new Date().toISOString(),
+  });
+  if (!consumed) {
+    await releaseOperationIdempotency(c.env.DB, reservation);
+    return c.json({
+      success: false,
+      error: '本人確認の有効時間が切れたか、すでに使用済みです。もう一度確認してください',
+    }, 428);
+  }
+  return null;
+}
+
 operations.get('/api/operations/control', async (c) => {
   const accountId = requestedAccountId(c.req.query('account_id'));
   // 全体停止は全員が見えないと、別端末で通常運用と誤認する。
@@ -215,6 +260,9 @@ operations.get('/api/operations/control/preview', async (c) => {
         reminder_dispatch: reminders,
         automation_actions: automations,
       },
+      permissions: {
+        canControl: canControlEmergency(c.get('staff')?.role, c.get('staff')?.permissionKeys),
+      },
       calculatedAt: new Date().toISOString(),
     },
   });
@@ -246,6 +294,7 @@ operations.get('/api/operations/incidents/:id', async (c) => {
 operations.post(
   '/api/operations/incidents',
   requireRole('owner', 'admin'),
+  requireEmergencyControlPermission,
   requireIrreversibleConfirmation('operation-stop'),
   async (c) => {
     const body = await c.req.json<{
@@ -275,18 +324,19 @@ operations.post(
       ? body.detail.trim().slice(0, 1000)
       : null;
     const actorId = c.get('staff')!.id;
+    const requestHash = await hashOperationRequest({
+      lineAccountId: accountId,
+      capabilities: [...capabilities].sort(),
+      reason: body.reason.trim(),
+      detail,
+      expectedVersion: Number(body.expectedVersion),
+    });
     const reservation = await reserveOperationIdempotency(c.env.DB, {
       key: idempotencyKey,
       action: 'stop',
       actorId,
       scopeKey: operationScopeKey(accountId),
-      requestHash: await hashOperationRequest({
-        lineAccountId: accountId,
-        capabilities: [...capabilities].sort(),
-        reason: body.reason.trim(),
-        detail,
-        expectedVersion: Number(body.expectedVersion),
-      }),
+      requestHash,
       now: new Date(),
     });
     if (reservation.kind === 'cached') return replayJson(reservation.body, reservation.status);
@@ -296,6 +346,10 @@ operations.post(
     if (reservation.kind === 'conflict') {
       return c.json({ success: false, error: '同じIdempotency-Keyを別の操作へ再利用できません。' }, 409);
     }
+    const stepUpError = await consumeOperationStepUp(c, 'operation-stop', {
+      key: idempotencyKey, actorId, requestHash,
+    });
+    if (stepUpError) return stepUpError;
     const result = await stopOperationCapabilities(c.env.DB, {
       lineAccountId: accountId,
       capabilities,
@@ -343,6 +397,7 @@ operations.post(
 operations.post(
   '/api/operations/incidents/:id/restore',
   requireRole('owner', 'admin'),
+  requireEmergencyControlPermission,
   requireIrreversibleConfirmation('operation-restore'),
   async (c) => {
     const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
@@ -358,15 +413,16 @@ operations.post(
       return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
     }
     const actorId = c.get('staff')!.id;
+    const requestHash = await hashOperationRequest({
+      incidentId: incident.id,
+      expectedVersion: Number(body.expectedVersion),
+    });
     const reservation = await reserveOperationIdempotency(c.env.DB, {
       key: idempotencyKey,
       action: 'restore',
       actorId,
       scopeKey: incident.scopeKey,
-      requestHash: await hashOperationRequest({
-        incidentId: incident.id,
-        expectedVersion: Number(body.expectedVersion),
-      }),
+      requestHash,
       now: new Date(),
     });
     if (reservation.kind === 'cached') return replayJson(reservation.body, reservation.status);
@@ -376,6 +432,10 @@ operations.post(
     if (reservation.kind === 'conflict') {
       return c.json({ success: false, error: '同じIdempotency-Keyを別の操作へ再利用できません。' }, 409);
     }
+    const stepUpError = await consumeOperationStepUp(c, 'operation-restore', {
+      key: idempotencyKey, actorId, requestHash,
+    });
+    if (stepUpError) return stepUpError;
     const blockers = await countRestoreBlockers(c.env.DB, incident);
     if (hasRestoreBlockers(blockers)) {
       const response = {

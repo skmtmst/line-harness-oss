@@ -163,14 +163,16 @@ describe('operations API irreversible requests', () => {
       reason: '障害',
       expectedVersion: 0,
       confirmation: '停止',
-    })
-    await operationsApi.restore('incident-1', { expectedVersion: 1, confirmation: '復旧' })
+    }, 'stop-step-up')
+    await operationsApi.restore('incident-1', { expectedVersion: 1, confirmation: '復旧' }, 'restore-step-up')
 
     const stopHeaders = spy.mock.calls[0][1]?.headers as Record<string, string>
     const restoreHeaders = spy.mock.calls[1][1]?.headers as Record<string, string>
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
     expect(stopHeaders['Idempotency-Key']).toMatch(uuid)
+    expect(stopHeaders['X-Step-Up-Token']).toBe('stop-step-up')
     expect(restoreHeaders['Idempotency-Key']).toMatch(uuid)
+    expect(restoreHeaders['X-Step-Up-Token']).toBe('restore-step-up')
     expect(restoreHeaders['Idempotency-Key']).not.toBe(stopHeaders['Idempotency-Key'])
   })
 })
