@@ -2698,7 +2698,9 @@ export const api = {
     get: () => fetchApi<ApiResponse<InboxStats>>('/api/chats/stats'),
   },
   listStats: {
-    get: () => fetchApi<ApiResponse<ListStats>>('/api/list-stats'),
+    get: (accountId?: string) => fetchApi<ApiResponse<ListStats>>(
+      `/api/list-stats${accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''}`,
+    ),
   },
   broadcastStats: {
     get: () => fetchApi<ApiResponse<BroadcastStats>>('/api/broadcasts/stats'),

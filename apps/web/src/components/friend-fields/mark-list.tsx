@@ -123,6 +123,7 @@ export default function SupportMarkList({ accountId }: { accountId: string | nul
       <ListKpis
         key="support-marks"
         variant="v6"
+        accountId={accountId}
         titles={['マークの種類', '未対応', '対応中', '過去7日の変更']}
         build={(stats) => [
           { title: 'マークの種類', value: stats.marks.total, unit: '件', detail: `使用中 ${stats.marks.inUse}件` },

@@ -79,5 +79,7 @@ describe('tenant-scoped dashboard aggregations', () => {
     expectScoped(queries, 'FROM reminders WHERE');
     expectScoped(queries, "source = 'scenario'");
     expectScoped(queries, "source = 'reminder'");
+    expectScoped(queries, 'LEFT JOIN support_mark_scopes sms');
+    expectScoped(queries, 'FROM operation_audit oa');
   });
 });
