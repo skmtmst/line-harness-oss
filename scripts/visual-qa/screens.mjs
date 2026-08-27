@@ -30,6 +30,18 @@
 /** ダッシュボードの「6日前」を止める時刻。設計の推移が8/19までなので、その日に置く。 */
 const DASHBOARD_CLOCK = '2026-08-19T12:00:00.000Z'
 
+/**
+ * 受信箱の時計。「1時間12分待ち」を出すため、設計の最終受信に合わせて止める。
+ * 止めないと待ち時間が伸び続け、日をまたぐたびに絵が変わる。
+ */
+const INBOX_CLOCK = '2026-08-19T11:00:00.000Z'
+
+/** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
+const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
+
+/** 会話を1本選んでから撮る。設計はどれも「Kenta Kawano (Obama)」を開いた状態。 */
+const OPEN_CHAT = [{ click: 'Kenta Kawano (Obama)', after: 1200 }]
+
 export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
@@ -55,6 +67,78 @@ export const SCREENS = [
     node: 'Alekb', feature: 1, name: '1-1-4 通知パネルを開く',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '通知' }],
+  },
+
+  // ── 機能2 受信箱 ────────────────────────────────────────
+  { ...INBOX, node: 'xGLVe', name: '2-1 受信箱', steps: OPEN_CHAT },
+  {
+    ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
+    steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }],
+  },
+  {
+    ...INBOX, node: 'H3lAOB', name: '2-3 顧客情報パネル非表示',
+    steps: [...OPEN_CHAT, { click: '顧客情報を閉じる' }],
+  },
+  {
+    ...INBOX, node: 'Xi4x9', name: '2-4 右パネル表示設定',
+    steps: [...OPEN_CHAT, { click: '表示項目' }],
+  },
+  // 未読の会話が並んだ状態。開かずにそのまま撮る。
+  { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読' },
+  {
+    ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
+    status: 'unimplemented',
+    why: 'テンプレート選択にフォルダの開閉が無い。2-2 の一覧が出るだけ',
+  },
+  {
+    ...INBOX, node: 'B7CER8', name: '2-7 内部メモ入力',
+    steps: [...OPEN_CHAT, { click: '内部メモ' }],
+  },
+  /*
+    2-8 / 2-9 / 2-10 は「プルダウンを開いた状態」。
+    **実装は素のセレクトなので、開いた中身が画像に写らない。**
+    設計は専用のパネル（`lJ1CF` 担当者プルダウン開状態、
+    `k6lHgo` 対応マークプルダウン開状態）で、共通の `Select` でもない。
+  */
+  {
+    ...INBOX, node: 'YZaDK', name: '2-8 担当者プルダウンを開く',
+    status: 'unimplemented',
+    why: '素のセレクトで、開いた中身が画像に写らない。設計は専用パネル（`lJ1CF`）',
+  },
+  {
+    ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
+    status: 'unimplemented', why: '2-8 と同じ。素のセレクト',
+  },
+  {
+    ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
+    status: 'unimplemented',
+    why: '素のセレクトで、開いた中身が画像に写らない。設計は専用パネル（`k6lHgo`）',
+  },
+  {
+    ...INBOX, node: 'TUveA', name: '2-11 テンプレート・予約フォルダ',
+    status: 'unimplemented', why: '2-6 と同じ。フォルダの区分が無い',
+  },
+  {
+    ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く',
+    status: 'unimplemented',
+    why: '「絞り込み」を開くボタンが無い。担当者・種別・並び順が上に並んだまま。設計は専用パネル（`bXyEA`）',
+  },
+  { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }] },
+  {
+    ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',
+    status: 'unimplemented', why: '2-13 の中に「この条件を保存」が無い。名前を付けて保存する導線が未確認',
+  },
+  {
+    ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
+    status: 'unimplemented', why: '2-14 が無いため、その先も無い',
+  },
+  {
+    ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
+    status: 'unimplemented', why: '2-14 が無いため、その先も無い',
+  },
+  {
+    ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
+    status: 'unimplemented', why: '2-14 が無いため、その先も無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
@@ -115,6 +199,11 @@ export const SCREENS = [
 
 /** 設計の高さ。`Get(node)` で引いた実寸。`capture-screens.mjs --design` が使う。 */
 export const DESIGN_SIZE = {
+  xGLVe: [1920, 1840], NfgOs: [1920, 1840], H3lAOB: [1920, 1840], Xi4x9: [1920, 1840],
+  f0zn6: [1920, 1840], NWbuF: [1920, 1840], B7CER8: [1920, 1840], YZaDK: [1920, 1840],
+  L35UOV: [1920, 1840], IYjvu: [1920, 1840], TUveA: [1920, 1840], w72a2: [1920, 1840],
+  ASsb3: [1920, 1840], ANgda: [1920, 1840], tBlkL: [1920, 1840], AuSDY: [1920, 1840],
+  LHjwD: [1920, 1840],
   vUXKb: [1920, 1668], ZN0ov: [1920, 1754], JN6mQ: [1920, 1668],
   NjK9q: [1920, 1668], Alekb: [1920, 1668],
   l25rlp: [1920, 1080], tP0RW: [1920, 1320], LfrQs: [1920, 1320],

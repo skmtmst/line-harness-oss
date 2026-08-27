@@ -262,3 +262,135 @@ export const FRIENDS = [
     tags: [FRIEND_TAGS.login, FRIEND_TAGS.ec], createdAt: '2026-08-13T00:00:00.000Z',
   }),
 ]
+
+/**
+ * 受信箱のLINEの会話。設計 `★ V6 2-1 受信箱` `xGLVe` の一覧のうち、LINEの3件。
+ *
+ * **メールはここに入れない。** 画面は `/api/chats`（LINE）と
+ * `/api/support/inbox?channel=email`（メール）を別々に読んで混ぜる。
+ * メールをここへ入れると、MAILの札が付かずLINE扱いで描かれる。
+ *
+ * 空で返していたあいだ、受信箱は「チャットを選択してください」しか描けず、
+ * **一覧も吹き出しも顧客情報も出ないまま**だった。空の絵を設計と並べても
+ * 「差が無い」とは言えない。
+ *
+ * 画面が読むのは `Chat` に画面用の項目を足した形（`friendName`
+ * `lastMessageContent` `isUnread` など）。**型に無いからと省くと、
+ * 名前も本文も出ない行になる。**
+ */
+export const CHATS = [
+  // 名前, 状態, 担当, 本文, 最終受信, 未読
+  ['Kyohei Yamamoto', 'unread', 'operator-kenta', '本日8月19日のお知らせです。内容をご確認ください。', '2026-08-19T09:48:00.000Z', true],
+  ['Kenta Kawano (Obama)', 'in_progress', 'operator-kenta', 'テスト', '2026-08-18T10:20:00.000Z', false],
+  ['菅野 亮', 'resolved', 'operator-masato', '最新のやり取りを確認できます。', '2026-08-13T05:16:00.000Z', false],
+].map(([friendName, status, operatorId, lastMessageContent, lastMessageAt, isUnread], index) => ({
+  id: `chat-${index}`,
+  friendId: `friend-${index}`,
+  friendName: String(friendName),
+  friendPictureUrl: null,
+  operatorId,
+  status: String(status),
+  notes: null,
+  revision: 1,
+  isUnread: Boolean(isUnread),
+  lastMessageAt: String(lastMessageAt),
+  lastMessageContent: String(lastMessageContent),
+  lastMessageDirection: 'inbound',
+  lastMessageType: 'text',
+  sendMode: 'line',
+  createdAt: '2026-08-13T00:00:00.000Z',
+  updatedAt: String(lastMessageAt),
+}))
+
+/**
+ * 受信箱の上に出る数。設計 `xGLVe` の帯そのまま。
+ * 「要返信 1件・最長 1時間12分待ち」。
+ */
+export const INBOX_STATS = {
+  waiting: 1,
+  oldestWaitingMinutes: 72,
+  averageFirstReplyMinutes: null,
+  waitingOverAnHour: 1,
+  mine: 0,
+  todayInbound: 0,
+  todayByChannel: { line: 0, email: 0 },
+}
+
+/**
+ * 選んだ会話の吹き出し。設計 `xGLVe` のトーク欄そのまま。
+ *
+ * 空で返すとトーク欄が真っ白になり、**日付の区切り・シナリオの記録・
+ * 送った人の名前**という設計の3要素をどれも確かめられない。
+ *
+ * 向きは `incoming` / `outgoing`。**`inbound` / `outbound` ではない。**
+ * 違う言葉で書くと、画面はどれも受信側の吹き出しとして描く。
+ *
+ * 吹き出しは `/api/chats/:id` の `messages` から出る。
+ * `/api/friends/:id/messages` は別の口で、こちらには出ない。
+ */
+export const FRIEND_MESSAGES = {
+  'friend-1': [
+    {
+      id: 'msg-1', friendId: 'friend-1', direction: 'incoming', messageType: 'text',
+      content: '登録しました！', createdAt: '2026-08-13T05:16:00.000Z',
+      broadcastId: null, scenarioStepId: null,
+      source: 'line', scenarioName: null, sentByStaffName: null,
+    },
+    {
+      id: 'msg-2', friendId: 'friend-1', direction: 'outgoing', messageType: 'text',
+      content: 'シナリオ「友だち挨拶」を開始', createdAt: '2026-08-13T05:18:00.000Z',
+      broadcastId: null, scenarioStepId: 'step-1',
+      source: 'scenario', scenarioName: '友だち挨拶', sentByStaffName: null,
+    },
+    {
+      id: 'msg-3', friendId: 'friend-1', direction: 'outgoing', messageType: 'text',
+      content: 'テスト', createdAt: '2026-08-13T10:20:00.000Z',
+      broadcastId: null, scenarioStepId: null,
+      source: 'manual', scenarioName: null, sentByStaffName: '河野',
+    },
+  ],
+}
+
+/**
+ * 友だちのマイル。設計 `xGLVe` の右パネル「利用可能 2,450 mile」。
+ *
+ * **`summary` を返さないと画面ごと落ちる**（`summary.programName` を読む）。
+ * 空の一覧で返していたあいだ、会話を開くたびに「もう一度試す」だけの
+ * 画面になっていた。
+ */
+export const FRIEND_MILEAGE = {
+  summary: {
+    programId: 'mile-default',
+    programName: 'NENマイル',
+    available: 2450,
+    pending: 0,
+    lifetimeEarned: 2450,
+    spent: 0,
+  },
+  history: [],
+}
+
+/**
+ * 会話を開いたときの右パネル。設計 `xGLVe` の「顧客情報」そのまま。
+ *
+ * **`tags` と `formSubmissions` は必ず配列で返す。** 一覧の口が返す
+ * `{items,total,page,limit}` のままだと `friend.tags.length` で落ち、
+ * 会話を開くたびに「もう一度試す」だけの画面になっていた。
+ */
+export const FRIEND_DETAILS = {
+  'friend-1': {
+    id: 'friend-1',
+    displayName: 'Kenta Kawano (Obama)',
+    systemDisplayName: 'Kenta Kawano (Obama)',
+    realName: '河野 健太',
+    pictureUrl: null,
+    isFollowing: true,
+    createdAt: '2026-08-13T00:00:00.000Z',
+    metadata: {},
+    tags: [
+      { id: 'friend-tag-kubun', name: '顧客区分：既存顧客', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
+      { id: 'friend-tag-store', name: '来店店舗：渋谷店', color: '#8B938D', createdAt: '2026-08-13T00:00:00.000Z' },
+    ],
+    formSubmissions: [],
+  },
+}

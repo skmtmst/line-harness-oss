@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { CHATS, INBOX_STATS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -190,15 +190,29 @@ const SUPPORT_EMAIL_ITEMS = [
   {
     id: 'email:mail-1',
     threadId: 'mail-1',
-    customerName: 'テスト 太郎',
-    customerIdentifier: 'taro@example.com',
-    subject: 'ご注文について',
-    preview: 'テスト太郎 様 この度…',
+    customerName: '坂本 真人',
+    customerIdentifier: 'sakamoto@example.com',
+    subject: '発送について',
+    preview: 'ご注文ありがとうございます。発送状況をご案内します。',
     status: 'unread',
     revision: 1,
     assignedStaffId: null,
     assignedStaffName: null,
-    lastIncomingAt: '2026-08-15T12:00:00.000Z',
+    lastIncomingAt: '2026-08-16T02:10:00.000Z',
+    isUnread: true,
+  },
+  {
+    id: 'email:mail-2',
+    threadId: 'mail-2',
+    customerName: 'テスト 太郎',
+    customerIdentifier: 'taro@example.com',
+    subject: 'ご注文について',
+    preview: 'ご注文ありがとうございます。内容を確認して対応します。',
+    status: 'unread',
+    revision: 1,
+    assignedStaffId: null,
+    assignedStaffName: null,
+    lastIncomingAt: '2026-08-16T01:30:00.000Z',
     isUnread: true,
   },
 ]
@@ -361,6 +375,24 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   // 設計と画像で比べるための中身。空の表しか描けないと、
   // 「空の状態」だけを見て一致したと言えてしまう。
+  // 受信箱（設計 `xGLVe`）。空で返すと一覧も吹き出しも出ない。
+  const chat = pathname.match(/^\/api\/chats\/([^/]+)$/)
+  if (chat) {
+    // 一覧と同じ行を返す。`{items,total}` のままだと、開いた会話の名前が
+    // `undefined` になり `friendName.charAt(0)` で落ちる。
+    const row = CHATS.find((c) => c.id === chat[1])
+    if (row) return { success: true, data: { ...row, messages: FRIEND_MESSAGES[row.friendId] ?? [] } }
+  }
+  const detail = pathname.match(/^\/api\/friends\/([^/]+)$/)
+  if (detail && FRIEND_DETAILS[detail[1]]) return { success: true, data: FRIEND_DETAILS[detail[1]] }
+  if (/^\/api\/friends\/[^/]+\/mileage$/.test(pathname)) return { success: true, data: FRIEND_MILEAGE }
+  const messages = pathname.match(/^\/api\/friends\/([^/]+)\/messages$/)
+  if (messages) {
+    // 設計 `xGLVe` のトーク欄。載っていない友だちは空で返す（実際に空の人もいる）。
+    return { success: true, data: FRIEND_MESSAGES[messages[1]] ?? [] }
+  }
+  if (pathname === '/api/chats') return { success: true, data: CHATS }
+  if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
   if (pathname === '/api/support/inbox') {
     /*
       **同じ口を2つの画面が読む。返す形が違う。**
