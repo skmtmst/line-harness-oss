@@ -2254,3 +2254,58 @@ export const BOOKING_REQUESTS = [
   */
   { ...booking(6, 17, 'トリミング（小型犬）', '佐々木', 'confirmed', null, '電話で受付'), friend_id: '' },
 ]
+
+/**
+ * 機能29 イベント予約。設計 `ugP5y`（これからの回6・申し込み86人・定員120人）。
+ *
+ * **`{items: EventListItem[]}` の通。** `{items,total,page,limit}` の
+ * 既定に見えるが `total` `page` `limit` は返らない。項目はスネークケース。
+ */
+export const EVENTS = [
+  {
+    id: 'ev-1', name: '秋のしつけ教室（第1回）', venue_name: '店内', venue_url: null,
+    image_url: null, description: 'はじめての方むけに、おうちでできるしつけのコツを90分で。',
+    description_centered: 0, max_bookings_per_friend: 1, requires_approval: 0,
+    cancel_deadline_hours_before: 18, reminder_day_before_enabled: 1,
+    reminder_hours_before: 24, is_published: 1, sort_order: 1,
+    created_at: '2026-08-01T00:00:00.000Z', updated_at: '2026-08-20T00:00:00.000Z',
+    next_slot_starts_at: '2026-08-28T05:00:00.000Z',
+    total_capacity: 12, total_active: 12, pending_count: 3,
+    visible_tag_id: null, visible_tag_name: null,
+  },
+  {
+    id: 'ev-2', name: 'トリミング体験会', venue_name: '店内', venue_url: null,
+    image_url: null, description: null, description_centered: 0,
+    max_bookings_per_friend: 1, requires_approval: 0,
+    cancel_deadline_hours_before: 24, reminder_day_before_enabled: 1,
+    reminder_hours_before: 24, is_published: 1, sort_order: 2,
+    created_at: '2026-07-20T00:00:00.000Z', updated_at: '2026-08-18T00:00:00.000Z',
+    next_slot_starts_at: '2026-08-31T02:00:00.000Z',
+    total_capacity: 20, total_active: 4, pending_count: 0,
+    visible_tag_id: null, visible_tag_name: null,
+  },
+  {
+    /* タグを持っている人にだけ見えるイベント。**申込条件が付いている。** */
+    id: 'ev-3', name: '会員かぎりの相談会', venue_name: 'オンライン',
+    venue_url: 'https://meet.example.com/nen', image_url: null,
+    description: null, description_centered: 0, max_bookings_per_friend: 1,
+    requires_approval: 1, cancel_deadline_hours_before: 12,
+    reminder_day_before_enabled: 1, reminder_hours_before: 3,
+    is_published: 1, sort_order: 3,
+    created_at: '2026-08-10T00:00:00.000Z', updated_at: '2026-08-22T00:00:00.000Z',
+    next_slot_starts_at: '2026-09-05T08:00:00.000Z',
+    total_capacity: 8, total_active: 6, pending_count: 2,
+    visible_tag_id: 'tag-2', visible_tag_name: 'NEN会員',
+  },
+  {
+    /* まだ出していない回。**受付前。** */
+    id: 'ev-4', name: '冬のケアセミナー', venue_name: '店内', venue_url: null,
+    image_url: null, description: null, description_centered: 0,
+    max_bookings_per_friend: 2, requires_approval: 0,
+    cancel_deadline_hours_before: null, reminder_day_before_enabled: 0,
+    reminder_hours_before: null, is_published: 0, sort_order: 4,
+    created_at: '2026-08-22T00:00:00.000Z', updated_at: '2026-08-22T00:00:00.000Z',
+    next_slot_starts_at: null, total_capacity: null, total_active: 0,
+    pending_count: 0, visible_tag_id: null, visible_tag_name: null,
+  },
+]

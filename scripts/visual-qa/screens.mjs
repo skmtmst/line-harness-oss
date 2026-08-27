@@ -118,6 +118,9 @@ const BOOKING = { feature: 27, dir: 'booking-v6', route: '/booking/bookings', mo
 /** 予約設定。メニュー・担当スタッフはタブ、受付時間は別ルート。 */
 const BOOKING_SET = { feature: 28, dir: 'booking-settings-v6', route: '/booking/menus', mode: 'page' }
 
+/** イベント予約。一覧・作成・申込者の3ルート。 */
+const EVENT = { feature: 29, dir: 'events-v6', route: '/events', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -1050,6 +1053,15 @@ export const SCREENS = [
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能29 イベント予約 ─────────────────────────────────
+  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new' },
+  { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1' },
+  {
+    ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 
