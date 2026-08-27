@@ -60,6 +60,16 @@ describe('ダッシュボードV4の初期表示', () => {
     })
   })
 
+  it('通知パネルは既存の通知台帳と既読APIに接続する', () => {
+    const source = readFileSync(path.join(process.cwd(), 'src/app/page.tsx'), 'utf8')
+    expect(source).toContain('api.notifications.center.list')
+    expect(source).toContain('api.notifications.center.markRead')
+    expect(source).toContain('api.notifications.center.markAllRead')
+    expect(source).not.toContain('items={[]}')
+    expect(source).not.toContain('unreadCount={0}')
+    expect(source).not.toContain('中身を出す口はまだ無い')
+  })
+
   it('既存カードは表示し、追加候補と友だちの状態はOFFにする', () => {
     const preferences = defaultDashboardPreferences()
     expect(preferences.today.filter((item) => item.visible).map((item) => item.id)).toEqual([
