@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -419,6 +419,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: REMINDER_FOLDERS }
   }
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/broadcast-message-assets') {
+    const kind = query.get('kind')
+    return {
+      success: true,
+      data: kind ? BROADCAST_MESSAGE_ASSETS.filter((item) => item.kind === kind) : BROADCAST_MESSAGE_ASSETS,
+    }
+  }
   if (pathname === '/api/webinars') return { success: true, data: WEBINARS }
   const webinarAnalytics = /^\/api\/webinars\/([^/]+)\/analytics$/.exec(pathname)
   if (webinarAnalytics) return { success: true, data: WEBINAR_ANALYTICS }

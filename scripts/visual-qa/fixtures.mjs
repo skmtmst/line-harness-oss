@@ -996,3 +996,38 @@ export const WEBINAR_ANALYTICS = {
     ],
   },
 }
+
+/**
+ * 機能11 テンプレートの、メッセージ以外の4種。設計 `W7LBc` のタブの数
+ * （カルーセル24・リッチメッセージ10・クーポン6・リサーチ4）に合わせる。
+ *
+ * **`kind` は4つの決まった言葉だけ**（`BroadcastAssetKind`）。
+ * 設計の見出し（「カルーセル」）をそのまま入れるとタブの数が0のままになり、
+ * **どのタブも空で撮れる。**
+ */
+export const BROADCAST_MESSAGE_ASSETS = [
+  ...Array.from({ length: 24 }, (_, i) => ({
+    id: `asset-card-${i + 1}`, lineAccountId: null, kind: 'card_message',
+    name: i === 0 ? '夏の定番5点' : `カルーセル ${i + 1}`,
+    payload: { panels: [{ title: '夏の定番セット（送料込み）', body: 'この夏いちばん出ているセットです。' }] },
+    createdAt: '2026-06-01T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  })),
+  ...Array.from({ length: 10 }, (_, i) => ({
+    id: `asset-rich-${i + 1}`, lineAccountId: null, kind: 'rich_message',
+    name: i === 0 ? '夏のキャンペーン告知' : `リッチメッセージ ${i + 1}`,
+    payload: { layout: '4', areas: [] },
+    createdAt: '2026-06-05T00:00:00.000Z', updatedAt: '2026-08-19T00:00:00.000Z',
+  })),
+  ...Array.from({ length: 6 }, (_, i) => ({
+    id: `asset-coupon-${i + 1}`, lineAccountId: null, kind: 'coupon',
+    name: i === 0 ? '夏の20%オフ' : `クーポン ${i + 1}`,
+    payload: { from: '2026-08-25T00:00', to: '2026-09-30T23:59', useLimit: 'once' },
+    createdAt: '2026-07-02T00:00:00.000Z', updatedAt: '2026-08-21T00:00:00.000Z',
+  })),
+  ...Array.from({ length: 4 }, (_, i) => ({
+    id: `asset-research-${i + 1}`, lineAccountId: null, kind: 'research',
+    name: i === 0 ? '定期便のご満足度' : `リサーチ ${i + 1}`,
+    payload: { questions: [] },
+    createdAt: '2026-07-11T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
+  })),
+]

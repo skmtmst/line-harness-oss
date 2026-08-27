@@ -62,6 +62,9 @@ const FRIEND_ADD = { feature: 9, dir: 'friend-add-v6', route: '/friend-add-setti
 const WEBINAR = { feature: 10, dir: 'webinars-v6', route: '/webinars', mode: 'page' }
 const WEBINAR_EDIT = '/webinars/edit?id=webinar-1'
 
+/** テンプレート。上のタブで種類を切り替える（メッセージ／カルーセル／…）。 */
+const TEMPLATE = { feature: 11, dir: 'templates-v6', route: '/templates', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -518,6 +521,52 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
+    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能11 テンプレート ─────────────────────────────────
+  /*
+    設計のタブは6本（メッセージ／カルーセル／リッチメッセージ／質問／
+    クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
+  */
+  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート' },
+  {
+    ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
+    steps: [{ click: 'テンプレートを作る' }],
+  },
+  {
+    ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
+    steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
+  },
+  {
+    ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
+    status: 'unimplemented',
+    why: '種類のタブが5本しかなく、**「質問」だけが無い**（`page.tsx:255-283`）。設計は「質問 8」のタブを持つ',
+  },
+  {
+    ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
+    steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
+  },
+  {
+    ...TEMPLATE, node: 'hsBtl', name: '11-1-E クーポンを作る',
+    steps: [{ click: 'クーポン' }, { click: 'クーポンを作る' }],
+  },
+  {
+    ...TEMPLATE, node: 'J3GxEZ', name: '11-1-F リサーチを作る',
+    steps: [{ click: 'リサーチ' }, { click: 'リサーチを作る' }],
+  },
+  {
+    ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
+    status: 'unimplemented',
+    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`templates/page.tsx:236`）',
+  },
+  {
+    ...TEMPLATE, node: 'CzndJ', name: '11-1-H フォルダ操作',
+    status: 'unimplemented',
+    why: '「フォルダを追加」が無い。左の縦帯はテンプレートの `category` という文字から**自動で生えているだけ**で、`/api/folders` を一度も呼んでいない。作る・名前を変える・消すのどれもできない',
+  },
+  {
+    ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
   },
 
