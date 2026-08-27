@@ -1,5 +1,6 @@
 import { jstNow } from './utils.js';
 import { ensureEntryRouteGenre } from './entry-route-genres.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 export interface EntryRoute {
   id: string;
   ref_code: string;
@@ -12,6 +13,7 @@ export interface EntryRoute {
   intro_template_id: string | null;
   run_account_friend_add_scenarios: number;
   is_active: number;
+  tenant_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -45,6 +47,7 @@ export interface CreateEntryRouteInput {
   introTemplateId?: string | null;
   runAccountFriendAddScenarios?: boolean;
   isActive?: boolean;
+  tenantId?: string;
 }
 
 export interface EntryRouteFunnel {
@@ -54,9 +57,12 @@ export interface EntryRouteFunnel {
   cv_count: number;
 }
 
-export async function getEntryRoutes(db: D1Database): Promise<EntryRoute[]> {
+export async function getEntryRoutes(db: D1Database, tenantId: string): Promise<EntryRoute[]> {
   const result = await db
-    .prepare(`SELECT * FROM entry_routes ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM entry_routes
+      WHERE tenant_id = ? OR (tenant_id IS NULL AND ? = ?)
+      ORDER BY created_at DESC`)
+    .bind(tenantId, tenantId, DEFAULT_TENANT_ID)
     .all<EntryRoute>();
   return result.results;
 }
@@ -88,8 +94,8 @@ export async function createEntryRoute(
       `INSERT INTO entry_routes
          (id, ref_code, genre, name, tag_id, scenario_id, redirect_url,
           pool_id, intro_template_id, run_account_friend_add_scenarios,
-          is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          is_active, tenant_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -103,6 +109,7 @@ export async function createEntryRoute(
       input.introTemplateId ?? null,
       runAccount,
       isActive,
+      input.tenantId ?? DEFAULT_TENANT_ID,
       now,
       now,
     )

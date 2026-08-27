@@ -794,7 +794,7 @@ CREATE TABLE entry_routes (
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT);
+, pool_id TEXT REFERENCES traffic_pools (id) ON DELETE SET NULL, intro_template_id TEXT REFERENCES message_templates (id) ON DELETE SET NULL, run_account_friend_add_scenarios INTEGER NOT NULL DEFAULT 1, genre TEXT, tenant_id TEXT REFERENCES tenants(id));
 
 CREATE TABLE event_booking_idempotency_keys (
   key              TEXT PRIMARY KEY,
@@ -1187,6 +1187,7 @@ CREATE TABLE incoming_webhooks (
   name        TEXT NOT NULL,
   source_type TEXT NOT NULL DEFAULT 'custom',
   secret      TEXT,
+  line_account_id TEXT REFERENCES line_accounts (id),
   is_active   INTEGER NOT NULL DEFAULT 1,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
@@ -2777,6 +2778,9 @@ CREATE INDEX idx_entry_routes_pool ON entry_routes (pool_id);
 
 CREATE INDEX idx_entry_routes_ref ON entry_routes (ref_code);
 
+CREATE INDEX idx_entry_routes_tenant
+  ON entry_routes(tenant_id);
+
 CREATE INDEX idx_event_booking_idempotency_expires ON event_booking_idempotency_keys (expires_at);
 
 CREATE INDEX idx_event_booking_reminders_status_scheduled ON event_booking_reminders (status, scheduled_at);
@@ -2889,6 +2893,8 @@ CREATE INDEX idx_inbox_reply_leases_expiry ON inbox_reply_leases (expires_at);
 
 CREATE INDEX idx_inbox_staff_reads_conversation
   ON inbox_staff_reads (channel, conversation_id, staff_id);
+
+CREATE INDEX idx_incoming_webhooks_line_account ON incoming_webhooks (line_account_id);
 
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);

@@ -10,6 +10,7 @@ import {
   getEntryRouteGenres,
   updateEntryRouteGenre,
 } from '../src/index.js';
+import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -52,19 +53,19 @@ describe('entry route genres', () => {
   });
 
   it('automatically registers genres used by compatible API clients', async () => {
-    await createEntryRoute(db, { refCode: 'ashop-instagram', genre: 'A店', name: 'Instagram' });
+    await createEntryRoute(db, { refCode: 'ashop-instagram', genre: 'A店', name: 'Instagram', tenantId: DEFAULT_TENANT_ID });
     expect(await getEntryRouteGenres(db)).toEqual([expect.objectContaining({ name: 'A店' })]);
   });
 
   it('renames the genre and moves its existing links together', async () => {
     const genre = await createEntryRouteGenre(db, 'A店');
-    await createEntryRoute(db, { refCode: 'ashop-instagram', genre: 'A店', name: 'Instagram' });
-    await createEntryRoute(db, { refCode: 'ashop-x', genre: 'A店', name: 'X' });
+    await createEntryRoute(db, { refCode: 'ashop-instagram', genre: 'A店', name: 'Instagram', tenantId: DEFAULT_TENANT_ID });
+    await createEntryRoute(db, { refCode: 'ashop-x', genre: 'A店', name: 'X', tenantId: DEFAULT_TENANT_ID });
 
     expect(await updateEntryRouteGenre(db, genre.id, 'A店 SNS')).toEqual(
       expect.objectContaining({ name: 'A店 SNS' }),
     );
-    expect(await getEntryRoutes(db)).toEqual([
+    expect(await getEntryRoutes(db, DEFAULT_TENANT_ID)).toEqual([
       expect.objectContaining({ genre: 'A店 SNS' }),
       expect.objectContaining({ genre: 'A店 SNS' }),
     ]);
