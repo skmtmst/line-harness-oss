@@ -205,7 +205,8 @@
     "196_support_mark_account_scope.sql",
     "197_notification_center_scope.sql",
     "198_operation_control.sql",
-    "199_admin_step_up_grants.sql"
+    "199_admin_step_up_grants.sql",
+    "200_operation_definition_snapshots.sql"
   ],
-  "migrationCount": 206
+  "migrationCount": 207
 }

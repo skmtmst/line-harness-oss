@@ -1756,7 +1756,7 @@ CREATE TABLE operation_incidents (
   resolved_at        TEXT,
   created_at         TEXT NOT NULL,
   updated_at         TEXT NOT NULL
-);
+, definition_snapshot_json TEXT, definition_snapshot_error TEXT, restore_drift_json TEXT);
 
 CREATE TABLE operation_target_results (
   id              TEXT PRIMARY KEY,

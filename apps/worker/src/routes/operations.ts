@@ -14,6 +14,8 @@ import {
   listOperationTargetResults,
   operationScopeKey,
   restoreOperationIncident,
+  saveOperationDefinitionSnapshot,
+  saveOperationRestoreDrift,
   stopOperationCapabilities,
   type OperationCapability,
 } from '@line-crm/db';
@@ -30,6 +32,12 @@ import {
   reserveOperationIdempotency,
 } from '../services/operation-idempotency.js';
 import { runOperationHealthChecks } from '../services/operation-health.js';
+import {
+  captureOperationDefinitionSnapshot,
+  compareOperationDefinitionSnapshots,
+  isOperationDefinitionSnapshot,
+  operationRestorePreviewHash,
+} from '../services/operation-definition-snapshot.js';
 
 const operations = new Hono<Env>();
 
@@ -146,6 +154,37 @@ async function countRestoreBlockers(
 
 function hasRestoreBlockers(blockers: RestoreBlockers): boolean {
   return Object.values(blockers).some((count) => Number(count) > 0);
+}
+
+async function buildDefinitionRestorePreview(
+  db: D1Database,
+  incident: Awaited<ReturnType<typeof getOperationIncident>> & {},
+  controlVersion: number,
+) {
+  if (!isOperationDefinitionSnapshot(incident.definitionSnapshot)) {
+    return {
+      available: false as const,
+      error: incident.definitionSnapshotError ?? '停止時の設定を確認できません。復旧せず管理者へ連絡してください。',
+      drift: [],
+      previewHash: null,
+    };
+  }
+  const current = await captureOperationDefinitionSnapshot(db, {
+    lineAccountId: incident.lineAccountId,
+    capabilities: incident.capabilities,
+  });
+  const drift = compareOperationDefinitionSnapshots(incident.definitionSnapshot, current);
+  return {
+    available: true as const,
+    error: null,
+    drift,
+    previewHash: await operationRestorePreviewHash({
+      incidentId: incident.id,
+      controlVersion,
+      current,
+      drift,
+    }),
+  };
 }
 
 function replayJson(body: unknown, status: number): Response {
@@ -363,6 +402,31 @@ operations.post(
       await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 409, body: response });
       return c.json(response, 409);
     }
+    // 送信ゲートを止めたあとで取得する。snapshot取得が失敗しても緊急停止を失敗へ戻さない。
+    try {
+      const snapshot = await captureOperationDefinitionSnapshot(c.env.DB, {
+        lineAccountId: accountId,
+        capabilities,
+      });
+      await saveOperationDefinitionSnapshot(c.env.DB, {
+        incidentId: result.incident.id,
+        snapshot,
+      });
+      result.incident.definitionSnapshot = snapshot;
+      result.incident.definitionSnapshotError = null;
+    } catch {
+      try {
+        await saveOperationDefinitionSnapshot(c.env.DB, {
+          incidentId: result.incident.id,
+          snapshot: null,
+          error: '停止時の設定スナップショットを保存できませんでした',
+        });
+      } catch {
+        // 停止は正本へ反映済み。監査情報の保存失敗で送信ゲートを再開してはいけない。
+      }
+      result.incident.definitionSnapshot = null;
+      result.incident.definitionSnapshotError = '停止時の設定スナップショットを保存できませんでした';
+    }
     const response = { success: true, data: result };
     await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 201, body: response });
     return c.json(response, 201);
@@ -381,13 +445,26 @@ operations.post(
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const blockers = await countRestoreBlockers(c.env.DB, incident);
+    const controlVersion = (await getOperationControlSet(c.env.DB, incident.lineAccountId)).version;
+    let definitions;
+    try {
+      definitions = await buildDefinitionRestorePreview(c.env.DB, incident, controlVersion);
+    } catch {
+      definitions = {
+        available: false as const,
+        error: '現在の設定を比較できません。復旧せず管理者へ連絡してください。',
+        drift: [],
+        previewHash: null,
+      };
+    }
     return c.json({
       success: true,
       data: {
         incidentId: incident.id,
-        controlVersion: (await getOperationControlSet(c.env.DB, incident.lineAccountId)).version,
+        controlVersion,
         blockers,
-        canRestore: !hasRestoreBlockers(blockers),
+        definitions,
+        canRestore: !hasRestoreBlockers(blockers) && definitions.available,
         calculatedAt: new Date().toISOString(),
       },
     });
@@ -403,10 +480,13 @@ operations.post(
     const incident = await getOperationIncident(c.env.DB, c.req.param('id'));
     if (!incident) return c.json({ success: false, error: '停止記録が見つかりません' }, 404);
     if (!await canUseScope(c, incident.lineAccountId)) return c.json({ success: false, error: 'Forbidden' }, 403);
-    const body = await c.req.json<{ expectedVersion?: unknown; confirmation?: unknown }>();
+    const body = await c.req.json<{ expectedVersion?: unknown; confirmation?: unknown; previewHash?: unknown }>();
     if (body.confirmation !== '復旧') return c.json({ success: false, error: '確認のため「復旧」と入力してください' }, 400);
     if (!Number.isInteger(body.expectedVersion) || Number(body.expectedVersion) < 1) {
       return c.json({ success: false, error: 'expectedVersion は1以上の整数で指定してください' }, 400);
+    }
+    if (typeof body.previewHash !== 'string' || !/^[a-f0-9]{64}$/.test(body.previewHash)) {
+      return c.json({ success: false, error: '復旧内容をもう一度確認してください' }, 400);
     }
     const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
     if (!isValidOperationIdempotencyKey(idempotencyKey)) {
@@ -416,6 +496,7 @@ operations.post(
     const requestHash = await hashOperationRequest({
       incidentId: incident.id,
       expectedVersion: Number(body.expectedVersion),
+      previewHash: body.previewHash,
     });
     const reservation = await reserveOperationIdempotency(c.env.DB, {
       key: idempotencyKey,
@@ -446,6 +527,32 @@ operations.post(
       await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 409, body: response });
       return c.json(response, 409);
     }
+    let definitions;
+    try {
+      definitions = await buildDefinitionRestorePreview(c.env.DB, incident, Number(body.expectedVersion));
+    } catch {
+      definitions = null;
+    }
+    if (!definitions?.available || definitions.previewHash !== body.previewHash) {
+      const response = {
+        success: false,
+        error: definitions?.available
+          ? '確認後に設定が変わりました。復旧内容を読み直してください。'
+          : '停止時と現在の設定を比較できないため復旧できません。',
+        data: definitions ? { definitions } : undefined,
+      };
+      await finalizeOperationIdempotency(c.env.DB, { key: idempotencyKey, status: 409, body: response });
+      return c.json(response, 409);
+    }
+    await saveOperationRestoreDrift(c.env.DB, {
+      incidentId: incident.id,
+      drift: {
+        previewHash: definitions.previewHash,
+        definitions: definitions.drift,
+        confirmedAt: new Date().toISOString(),
+        actorId,
+      },
+    });
     const result = await restoreOperationIncident(c.env.DB, {
       incidentId: incident.id,
       expectedVersion: Number(body.expectedVersion),

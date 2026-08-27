@@ -264,27 +264,80 @@ describe('運用状態API', () => {
       { method: 'POST' },
       { DB: testDb.db },
     )
-    expect(await preview.json()).toMatchObject({
+    const blockedPreview = await preview.json() as {
+      data: { definitions: { previewHash: string }; canRestore: boolean; blockers: { broadcast_dispatch: number } }
+    }
+    expect(blockedPreview).toMatchObject({
       success: true,
-      data: { canRestore: false, blockers: { broadcast_dispatch: 1 } },
+      data: {
+        canRestore: false,
+        blockers: { broadcast_dispatch: 1 },
+        definitions: { available: true, drift: [expect.objectContaining({ id: 'broadcast-overdue', change: 'added' })] },
+      },
     })
 
-    const restoreRequest = (idempotencyKey: string, headers: Record<string, string>) => app().request(
+    const restoreRequest = (headers: Record<string, string>, previewHash: string) => app().request(
       `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
       {
         method: 'POST',
         headers,
-        body: JSON.stringify({ expectedVersion: stoppedBody.data.control.version, confirmation: '復旧' }),
+        body: JSON.stringify({ expectedVersion: stoppedBody.data.control.version, confirmation: '復旧', previewHash }),
       },
       { DB: testDb.db },
     )
     const blockedHeaders = await operationHeaders('owner', 'operation-restore', key(5), 'blocked-restore')
-    expect((await restoreRequest(key(5), blockedHeaders)).status).toBe(409)
+    expect((await restoreRequest(blockedHeaders, blockedPreview.data.definitions.previewHash)).status).toBe(409)
     testDb.raw.prepare("UPDATE broadcasts SET status = 'draft' WHERE id = 'broadcast-overdue'").run()
+    const safePreviewResponse = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore-preview`,
+      { method: 'POST' },
+      { DB: testDb.db },
+    )
+    const safePreview = await safePreviewResponse.json() as { data: { definitions: { previewHash: string } } }
     const restoreHeaders = await operationHeaders('owner', 'operation-restore', key(6), 'successful-restore')
-    expect((await restoreRequest(key(6), restoreHeaders)).status).toBe(200)
-    const replayedRestore = await restoreRequest(key(6), restoreHeaders)
+    expect((await restoreRequest(restoreHeaders, safePreview.data.definitions.previewHash)).status).toBe(200)
+    const replayedRestore = await restoreRequest(restoreHeaders, safePreview.data.definitions.previewHash)
     expect(replayedRestore.status).toBe(200)
     expect(replayedRestore.headers.get('Idempotency-Replayed')).toBe('true')
+  })
+
+  it('復旧確認後に設定が変わった場合は復旧を止め、最新の差分を返す', async () => {
+    testDb.raw.prepare(
+      `INSERT INTO scenarios (id, name, trigger_type, is_active, line_account_id)
+       VALUES ('scenario-restore', '復旧対象', 'manual', 1, 'account-1')`,
+    ).run()
+    const stopped = await app().request('/api/operations/incidents', {
+      method: 'POST', headers: await operationHeaders('owner', 'operation-stop', key(9), 'drift-stop'),
+      body: JSON.stringify({ lineAccountId: 'account-1', capabilities: ['scenario_dispatch'], reason: '障害', expectedVersion: 0, confirmation: '停止' }),
+    }, { DB: testDb.db })
+    const stoppedBody = await stopped.json() as { data: { control: { version: number }; incident: { id: string } } }
+    const preview = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore-preview`,
+      { method: 'POST' },
+      { DB: testDb.db },
+    )
+    const previewBody = await preview.json() as { data: { definitions: { previewHash: string; drift: unknown[] } } }
+    expect(previewBody.data.definitions.drift).toEqual([])
+    testDb.raw.prepare("UPDATE scenarios SET name = '確認後に編集' WHERE id = 'scenario-restore'").run()
+
+    const response = await app().request(
+      `/api/operations/incidents/${stoppedBody.data.incident.id}/restore`,
+      {
+        method: 'POST',
+        headers: await operationHeaders('owner', 'operation-restore', key(10), 'drift-restore'),
+        body: JSON.stringify({
+          expectedVersion: stoppedBody.data.control.version,
+          confirmation: '復旧',
+          previewHash: previewBody.data.definitions.previewHash,
+        }),
+      },
+      { DB: testDb.db },
+    )
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining('設定が変わりました'),
+      data: { definitions: { drift: [expect.objectContaining({ id: 'scenario-restore', change: 'edited' })] } },
+    })
+    expect(await isOperationCapabilityStopped(testDb.db, 'account-1', 'scenario_dispatch')).toBe(true)
   })
 })

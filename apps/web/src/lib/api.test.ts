@@ -164,7 +164,11 @@ describe('operations API irreversible requests', () => {
       expectedVersion: 0,
       confirmation: '停止',
     }, 'stop-step-up')
-    await operationsApi.restore('incident-1', { expectedVersion: 1, confirmation: '復旧' }, 'restore-step-up')
+    await operationsApi.restore('incident-1', {
+      expectedVersion: 1,
+      confirmation: '復旧',
+      previewHash: 'a'.repeat(64),
+    }, 'restore-step-up')
 
     const stopHeaders = spy.mock.calls[0][1]?.headers as Record<string, string>
     const restoreHeaders = spy.mock.calls[1][1]?.headers as Record<string, string>

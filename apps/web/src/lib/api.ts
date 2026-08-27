@@ -157,6 +157,19 @@ export type OperationRestorePreview = {
   incidentId: string
   controlVersion: number
   blockers: Partial<Record<OperationCapability, number>>
+  definitions: {
+    available: boolean
+    error: string | null
+    drift: Array<{
+      key: string
+      capability: OperationCapability
+      kind: string
+      id: string
+      name: string
+      change: 'deleted' | 'disabled' | 'edited' | 'enabled' | 'added'
+    }>
+    previewHash: string | null
+  }
   canRestore: boolean
   calculatedAt: string
 }
@@ -3353,7 +3366,7 @@ export const api = {
     ),
     restore: (
       incidentId: string,
-      data: { expectedVersion: number; confirmation: '復旧' },
+      data: { expectedVersion: number; confirmation: '復旧'; previewHash: string },
       stepUpToken: string,
     ) =>
       fetchApi<ApiResponse<{ status: 'changed'; control: OperationControl; incident: OperationIncident }>>(

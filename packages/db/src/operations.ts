@@ -40,12 +40,45 @@ export interface OperationIncident {
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  definitionSnapshot: unknown | null;
+  definitionSnapshotError: string | null;
+  restoreDrift: unknown | null;
   targetCounts: {
     held: number;
     skippedDueToEmergency: number;
     inFlight: number;
     failed: number;
   };
+}
+
+function parseStoredJson(raw: string | null | undefined): unknown | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw) as unknown; } catch { return null; }
+}
+
+export async function saveOperationDefinitionSnapshot(
+  db: D1Database,
+  input: { incidentId: string; snapshot: unknown | null; error?: string | null },
+): Promise<void> {
+  await db.prepare(
+    `UPDATE operation_incidents
+        SET definition_snapshot_json = ?, definition_snapshot_error = ?, updated_at = ?
+      WHERE id = ? AND status = 'stopped'`,
+  ).bind(
+    input.snapshot === null ? null : JSON.stringify(input.snapshot),
+    input.error?.slice(0, 500) ?? null,
+    nowIso(),
+    input.incidentId,
+  ).run();
+}
+
+export async function saveOperationRestoreDrift(
+  db: D1Database,
+  input: { incidentId: string; drift: unknown },
+): Promise<void> {
+  await db.prepare(
+    `UPDATE operation_incidents SET restore_drift_json = ?, updated_at = ? WHERE id = ?`,
+  ).bind(JSON.stringify(input.drift), nowIso(), input.incidentId).run();
 }
 
 const ALL_ACCOUNTS_SCOPE = '*';
@@ -433,6 +466,8 @@ type IncidentRow = {
   resolved_by_actor_id: string | null;
   error_message: string | null; stopped_at: string | null; resolved_at: string | null;
   created_at: string; updated_at: string;
+  definition_snapshot_json: string | null; definition_snapshot_error: string | null;
+  restore_drift_json: string | null;
   held_count?: number | null; skipped_count?: number | null;
   in_flight_count?: number | null; failed_count?: number | null;
 };
@@ -451,6 +486,9 @@ function mapIncident(row: IncidentRow): OperationIncident {
     controlVersion: row.control_version,
     errorMessage: row.error_message, stoppedAt: row.stopped_at,
     resolvedAt: row.resolved_at, createdAt: row.created_at, updatedAt: row.updated_at,
+    definitionSnapshot: parseStoredJson(row.definition_snapshot_json),
+    definitionSnapshotError: row.definition_snapshot_error,
+    restoreDrift: parseStoredJson(row.restore_drift_json),
     targetCounts: {
       held: Number(row.held_count ?? 0),
       skippedDueToEmergency: Number(row.skipped_count ?? 0),
