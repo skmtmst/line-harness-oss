@@ -55,6 +55,9 @@ const REMINDER = { feature: 7, dir: 'reminders-v6', mode: 'page' }
 /** 自動応答。作る・直すは一覧の上に出る窓（`/auto-replies/edit?id=` でも開ける）。 */
 const AUTO_REPLY = { feature: 8, dir: 'auto-replies-v6', route: '/auto-replies', mode: 'page' }
 
+/** 友だち追加時の配信。実装は**アカウントに1枚**の設定画面。 */
+const FRIEND_ADD = { feature: 9, dir: 'friend-add-v6', route: '/friend-add-settings', mode: 'page' }
+
 /** 受信箱は全画面3カラム。設計はどれも 1920x1840。 */
 const INBOX = { feature: 2, dir: 'inbox-v6', route: '/chats', clock: INBOX_CLOCK, mode: 'viewport', height: 1840 }
 
@@ -409,6 +412,53 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
     status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+  },
+
+  // ── 機能9 友だち追加時の配信 ────────────────────────────
+  /*
+    **設計と実装で、持ち物の数が違う。**
+    設計は「流入リンクごとに初回案内を並べる一覧」＋5段のウィザード。
+    実装は**アカウントに1枚**の設定（`FriendAddRouting`）で、
+    ①はじめて追加した人 と ②以前からの友だち の2つに分けるだけ。
+    流入リンクで出し分ける仕組みがそもそも無い。
+  */
+  { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信' },
+  {
+    ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定',
+    status: 'unimplemented',
+    why: '設定名・フォルダ・優先順位が無い。**設定はアカウントに1枚**なので、名前も順番も要らない作りになっている',
+  },
+  {
+    ...FRIEND_ADD, node: 'W1wzCa', name: '9-1-B 流入条件',
+    status: 'unimplemented',
+    why: '流入リンクを選ぶ仕組みが無い。画面にも「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と書いてある（`page.tsx:712`）',
+  },
+  {
+    ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内',
+    status: 'unimplemented',
+    why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
+  },
+  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加' },
+  {
+    ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
+    mode: 'viewport', height: 1080, steps: [{ click: 'テスト実行' }],
+  },
+  {
+    ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
+    status: 'unimplemented', why: '有効化前チェックと最終確認の段が無い。「保存」で即座に反映される',
+  },
+  {
+    ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
+    status: 'unimplemented', why: '9-1-F が無いので、その後の完了画面も無い',
+  },
+  {
+    ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
+    status: 'unimplemented',
+    why: '誰がどの経路から入って何が実行されたかを並べる場所が無い。受け口（`/api/friend-add-routing/events`）は在るのに**画面が読んでいない**（`grep 履歴|events` が0件）',
+  },
+  {
+    ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
+    status: 'unimplemented', why: '設定はアカウントに1枚で消せない。削除という考えがそもそも無い',
   },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────

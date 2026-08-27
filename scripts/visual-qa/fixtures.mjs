@@ -797,3 +797,87 @@ export const AUTO_REPLIES = [
     actions: [], hits: { period: 0, total: 411 }, createdAt: '2026-01-20T00:00:00.000Z',
   },
 ]
+
+/**
+ * 機能9 友だち追加時の配信。設計 `uLQQc`。
+ *
+ * 実装は**1アカウントに1枚の設定**（`FriendAddRouting`）で、
+ * ①はじめて追加した人 と ②以前からの友だち・ブロック解除した人 の
+ * 2つに分かれます。設計の「流入リンクごとに複数の初回案内を並べる」形とは
+ * 別物なので、行を並べる固定データは作れません。
+ * **無いものを在るように見せるより、実装の形で撮って差を書きます。**
+ */
+export const FRIEND_ADD_ROUTING = {
+  firstTime: {
+    scenarioId: 'scenario-0',
+    timing: 'immediate',
+    actions: [
+      /*
+        **`tagId` ではなく `tagIds`（配列）。** 画面は `c.tagIds` を読む
+        （`friend-add-settings/page.tsx:633`）。単数で書くと札が「タグ「?」を
+        付ける」になり、**実装の不具合に見える。** 実際はこちらの書き方が違うだけ。
+      */
+      { kind: 'row', actionType: 'tag', config: { tagIds: ['tag-0'], op: 'add' } },
+      { kind: 'row', actionType: 'scenario', config: { scenarioId: 'scenario-1', op: 'start' } },
+    ],
+  },
+  returning: {
+    scenarioId: 'scenario-1',
+    mode: 'other',
+    startPosition: 'beginning',
+    actions: [{ kind: 'row', actionType: 'support_mark', config: { markId: 'mark-1' } }],
+  },
+  criteria: { firstTime: 'unfollow_count_zero' },
+}
+
+/** 設計 `uLQQc` の帯: 直近7日の追加86人・経路が取れた74人・分からなかった12人。 */
+export const FRIEND_ADD_BREAKDOWN = { days: 7, firstTime: 74, returning: 9, unblocked: 3 }
+
+/**
+ * 友だち追加の履歴。**`{items,total,page,limit}` ではない。**
+ * 画面は `summary` を読んで帯を描き、`nextCursor` で続きを取る。
+ */
+export const FRIEND_ADD_EVENTS = {
+  items: [
+    {
+      id: 'fae-1', friendId: 'friend-1', displayName: 'Kenta Kawano', pictureUrl: null,
+      kind: 'first_time', isUnblockedHint: false, attributionStatus: 'captured',
+      refCode: 'store-qr', entryRouteId: 'route-qr', entryRouteName: '店頭QRコード',
+      routingStatus: 'completed',
+      occurredAt: '2026-08-22T00:14:00.000Z', processedAt: '2026-08-22T00:14:03.000Z',
+    },
+    {
+      id: 'fae-2', friendId: 'friend-2', displayName: 'Masato S.', pictureUrl: null,
+      kind: 'first_time', isUnblockedHint: false, attributionStatus: 'captured',
+      refCode: 'ig-profile', entryRouteId: 'route-ad', entryRouteName: 'Instagramプロフィール',
+      routingStatus: 'completed',
+      occurredAt: '2026-08-22T01:05:00.000Z', processedAt: '2026-08-22T01:05:02.000Z',
+    },
+    {
+      /* 経路が取れなかった人。**素のQR・検索から来ると `refCode` が付かない。** */
+      id: 'fae-3', friendId: 'friend-3', displayName: '菅野 亮', pictureUrl: null,
+      kind: 'first_time', isUnblockedHint: false, attributionStatus: 'unavailable',
+      refCode: null, entryRouteId: null, entryRouteName: null,
+      routingStatus: 'completed',
+      occurredAt: '2026-08-22T02:21:00.000Z', processedAt: '2026-08-22T02:21:01.000Z',
+    },
+    {
+      /* 以前からの友だち。ここを分けないと「はじめまして」が届く。 */
+      id: 'fae-4', friendId: 'friend-4', displayName: '山田 太郎', pictureUrl: null,
+      kind: 'returning', isUnblockedHint: true, attributionStatus: 'captured',
+      refCode: 'referral', entryRouteId: 'route-referral', entryRouteName: '紹介キャンペーン',
+      routingStatus: 'suppressed',
+      occurredAt: '2026-08-21T09:42:00.000Z', processedAt: '2026-08-21T09:42:01.000Z',
+    },
+    {
+      /* 失敗。**「まだ」と「もうだめ」は別。** */
+      id: 'fae-5', friendId: 'friend-5', displayName: '佐藤 花子', pictureUrl: null,
+      kind: 'first_time', isUnblockedHint: false, attributionStatus: 'captured',
+      refCode: 'store-qr', entryRouteId: 'route-qr', entryRouteName: '店頭QRコード',
+      routingStatus: 'failed',
+      occurredAt: '2026-08-21T11:20:00.000Z', processedAt: null,
+    },
+  ],
+  summary: { total: 86, firstTime: 74, returning: 12, captured: 74, unavailable: 12, pending: 0, failed: 2 },
+  nextCursor: null,
+}

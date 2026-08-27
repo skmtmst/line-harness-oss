@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -419,6 +419,22 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: REMINDER_FOLDERS }
   }
   if (pathname === '/api/friend-fields') return { success: true, data: FRIEND_FIELDS }
+  if (pathname === '/api/friends/add-breakdown') return { success: true, data: FRIEND_ADD_BREAKDOWN }
+  if (pathname === '/api/friend-add-routing/events') return { success: true, data: FRIEND_ADD_EVENTS }
+  if (pathname === '/api/friend-add-routing') {
+    /* **`{routing, scenarios, tags}` の通。** 一覧の既定を返すと画面が読めない。 */
+    return {
+      success: true,
+      data: {
+        /* **`configured` を返す。** 無いと画面は「まだ決めていない」の
+           注意帯を出し続け、設定してあるのに未設定の絵で撮れる。 */
+        configured: true,
+        routing: FRIEND_ADD_ROUTING,
+        scenarios: FRIEND_SCENARIOS.map((item) => ({ id: item.id, name: item.name })),
+        tags: TAGS.slice(0, 8).map((item) => ({ id: item.id, name: item.name })),
+      },
+    }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'auto_reply') {
     return { success: true, data: AUTO_REPLY_FOLDERS }
   }
