@@ -15,4 +15,15 @@ describe('V6 一斉配信詳細の契約', () => {
   it('配信が読めるまでは内容への操作を押せない', () => {
     expect(PAGE).toContain('disabled={!broadcast}')
   })
+
+  it('取得失敗を配信なしと混ぜず、同じ画面で再読込できる', () => {
+    expect(PAGE).toContain("setLoadState(error instanceof ApiError && error.status === 404 ? 'not-found' : 'error')")
+    expect(PAGE).toContain('配信を読み込めませんでした')
+    expect(PAGE).toContain('配信を再読み込み')
+  })
+
+  it('期間集計ではなく配信自身の保存済みインサイトを読む', () => {
+    expect(PAGE).toContain('api.broadcasts.getInsight(id)')
+    expect(PAGE).not.toContain('api.analytics.broadcasts(selectedAccountId)')
+  })
 })

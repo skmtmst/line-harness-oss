@@ -3,10 +3,11 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { api, type ApiBroadcast } from '@/lib/api'
+import { ApiError, api, type ApiBroadcast } from '@/lib/api'
 import Header from '@/components/layout/header'
 import Button from '@/components/shared/button'
 import { useAccount } from '@/contexts/account-context'
+import { broadcastBelongsToSelectedAccount } from './broadcast-detail-account'
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '下書き',
@@ -26,41 +27,61 @@ function BroadcastDetailInner() {
     uniqueClick: number | null
     suppressedByAudienceSize: boolean
   } | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'not-found' | 'error'>('loading')
+  const [reloadToken, setReloadToken] = useState(0)
   const contentRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
     let active = true
     setBroadcast(null)
     setInsight(null)
-    setLoading(true)
+    setLoadState('loading')
     if (!id || accountLoading) {
       return
     }
     if (!selectedAccountId) {
-      setLoading(false)
+      setLoadState('not-found')
       return
     }
     void (async () => {
       try {
-        const [detail, stats] = await Promise.all([
-          api.broadcasts.get(id),
-          api.analytics.broadcasts(selectedAccountId),
-        ])
+        const detail = await api.broadcasts.get(id)
         if (!active) return
-        if (detail.success) setBroadcast(detail.data)
-        if (stats.success) {
-          const found = stats.data.find((b) => b.broadcastId === id)
-          if (found) setInsight(found)
+        if (!detail.success || !broadcastBelongsToSelectedAccount(detail.data, selectedAccountId)) {
+          setLoadState('not-found')
+          return
         }
-      } finally {
-        if (active) setLoading(false)
+
+        setBroadcast(detail.data)
+        setLoadState('ready')
+
+        // 詳細画面は送信日が30日より前でも開く。期間集計ではなく、
+        // この配信自身の保存済みインサイトを読む。
+        try {
+          const stats = await api.broadcasts.getInsight(id)
+          if (active && stats.success && stats.data) {
+            setInsight({
+              delivered: stats.data.delivered,
+              uniqueImpression: stats.data.uniqueImpression,
+              uniqueClick: stats.data.uniqueClick,
+              suppressedByAudienceSize:
+                stats.data.uniqueImpression == null
+                && (stats.data.delivered ?? 0) > 0
+                && (stats.data.delivered ?? 0) < 20,
+            })
+          }
+        } catch {
+          // 配信本体は読めている。集計だけ失敗したときは「—」で残す。
+        }
+      } catch (error) {
+        if (!active) return
+        setLoadState(error instanceof ApiError && error.status === 404 ? 'not-found' : 'error')
       }
     })()
     return () => {
       active = false
     }
-  }, [accountLoading, id, selectedAccountId])
+  }, [accountLoading, id, reloadToken, selectedAccountId])
 
   if (!id) {
     return (
@@ -123,13 +144,21 @@ function BroadcastDetailInner() {
         />
       </div>
 
-      {loading ? (
+      {loadState === 'loading' ? (
         <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           読み込み中...
         </div>
-      ) : !broadcast ? (
+      ) : loadState === 'error' ? (
+        <div className="bg-canvas rounded-card border-hairline border p-8 text-center">
+          <p className="text-ink text-sm font-semibold">配信を読み込めませんでした</p>
+          <p className="text-ink-faint mt-1 text-xs">通信状態を確認して、もう一度お試しください。</p>
+          <Button className="mt-4" onClick={() => setReloadToken((value) => value + 1)}>
+            配信を再読み込み
+          </Button>
+        </div>
+      ) : loadState === 'not-found' || !broadcast ? (
         <p className="text-ink-faint bg-canvas rounded-card border-hairline border p-8 text-center text-sm">
-          この配信は見つかりませんでした。
+          このLINEアカウントで確認できる配信は見つかりませんでした。
         </p>
       ) : (
         <div className="max-w-3xl space-y-4">
