@@ -1,4 +1,7 @@
 <!-- scripts/visual-qa/ledger.mjs --html が作ります。手で直さないでください。 -->
+<!-- 文字の指定を落とすと、ローカルで開いたときに日本語が全部化けます。 -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>V6 画面比較の進捗</title>
 <style>
   :root {
@@ -47,6 +50,12 @@
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
   footer { color: var(--ink-2); font-size: .8rem; }
   tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+  td.at { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  td.at code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  td.at .pr { color: var(--ok); font-weight: 600; margin-right: .35em; }
+  td.at .none { color: var(--mute); }
+  td.at .hold { color: var(--warn); }
+  td.at .hold small { display: block; font-size: 10px; color: var(--ink-2); }
 </style>
 <main>
   <header>
@@ -75,7 +84,7 @@
       <thead><tr>
         <th scope="col">機能</th><th scope="col">内訳</th><th scope="col" class="n">総数</th>
         <th scope="col" class="n">比較済み</th><th scope="col" class="n">未実装</th>
-        <th scope="col" class="n">未確認</th><th scope="col" class="n">別仕掛け</th><th scope="col" class="n">未撮影</th>
+        <th scope="col" class="n">未確認</th><th scope="col" class="n">別仕掛け</th><th scope="col" class="n">未撮影</th><th scope="col">撮った先</th>
       </tr></thead>
       <tbody>
       <tr>
@@ -84,6 +93,7 @@
         <td class="n">5</td><td class="n ok">5</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">2</span>受信箱</th>
@@ -91,6 +101,7 @@
         <td class="n">17</td><td class="n ok">17</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">3</span>友だち</th>
@@ -98,6 +109,7 @@
         <td class="n">11</td><td class="n ok">7</td>
         <td class="n">4</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">4</span>友だち属性</th>
@@ -105,6 +117,7 @@
         <td class="n">21</td><td class="n ok">14</td>
         <td class="n">3</td><td class="n">—</td>
         <td class="n">4</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">5</span>シナリオ配信</th>
@@ -112,6 +125,7 @@
         <td class="n">14</td><td class="n ok">11</td>
         <td class="n">3</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">6</span>一斉配信</th>
@@ -119,6 +133,7 @@
         <td class="n">15</td><td class="n ok">10</td>
         <td class="n">—</td><td class="n">5</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">7</span>リマインダ</th>
@@ -126,6 +141,7 @@
         <td class="n">11</td><td class="n ok">4</td>
         <td class="n">7</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">8</span>自動応答</th>
@@ -133,6 +149,7 @@
         <td class="n">11</td><td class="n ok">5</td>
         <td class="n">6</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">9</span>友だち追加時の配信</th>
@@ -140,6 +157,7 @@
         <td class="n">10</td><td class="n ok">3</td>
         <td class="n">7</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">10</span>ウェビナー</th>
@@ -147,6 +165,7 @@
         <td class="n">13</td><td class="n ok">8</td>
         <td class="n">4</td><td class="n">1</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">11</span>テンプレート</th>
@@ -154,6 +173,7 @@
         <td class="n">10</td><td class="n ok">7</td>
         <td class="n">3</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">12</span>リッチメニュー</th>
@@ -161,6 +181,7 @@
         <td class="n">9</td><td class="n ok">6</td>
         <td class="n">3</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">13</span>回答フォーム</th>
@@ -168,6 +189,7 @@
         <td class="n">7</td><td class="n ok">5</td>
         <td class="n">1</td><td class="n">1</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">14</span>共通情報</th>
@@ -175,6 +197,7 @@
         <td class="n">4</td><td class="n ok">2</td>
         <td class="n">2</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">15</span>登録メディア</th>
@@ -182,6 +205,7 @@
         <td class="n">5</td><td class="n ok">4</td>
         <td class="n">1</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">16</span>成果とアフィリエイト</th>
@@ -189,6 +213,7 @@
         <td class="n">9</td><td class="n ok">6</td>
         <td class="n">3</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">17</span>マイル・行動スコア</th>
@@ -196,6 +221,7 @@
         <td class="n">11</td><td class="n ok">4</td>
         <td class="n">7</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="pr">#441</span><code>5fd7c048</code></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">18</span>流入と計測</th>
@@ -203,6 +229,7 @@
         <td class="n">9</td><td class="n ok">8</td>
         <td class="n">1</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="pr">#443</span><code>f372ff30</code></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">19</span>コンバージョン</th>
@@ -210,6 +237,7 @@
         <td class="n">4</td><td class="n ok">3</td>
         <td class="n">1</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="hold">#465<small>Codexの修正待ち。#465 の比較結果を維持</small></span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">20</span>分析</th>
@@ -217,6 +245,7 @@
         <td class="n">9</td><td class="n ok">8</td>
         <td class="n">1</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">21</span>NEN配信</th>
@@ -224,6 +253,7 @@
         <td class="n">7</td><td class="n ok">6</td>
         <td class="n">1</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="pr">#446</span><code>d7e2bc9c</code></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">22</span>写真審査</th>
@@ -231,6 +261,7 @@
         <td class="n">4</td><td class="n ok">1</td>
         <td class="n">3</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">23</span>EC連携</th>
@@ -238,6 +269,7 @@
         <td class="n">4</td><td class="n ok">1</td>
         <td class="n">3</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">24</span>LINE通知</th>
@@ -245,6 +277,7 @@
         <td class="n">6</td><td class="n ok">2</td>
         <td class="n">4</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">25</span>オートメーション</th>
@@ -252,6 +285,7 @@
         <td class="n">8</td><td class="n ok">6</td>
         <td class="n">2</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">26</span>外部連携</th>
@@ -259,6 +293,7 @@
         <td class="n">4</td><td class="n ok">3</td>
         <td class="n">1</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">27</span>予約管理</th>
@@ -266,6 +301,7 @@
         <td class="n">7</td><td class="n ok">4</td>
         <td class="n">3</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">28</span>予約設定</th>
@@ -273,6 +309,7 @@
         <td class="n">4</td><td class="n ok">4</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">29</span>イベント予約</th>
@@ -280,6 +317,7 @@
         <td class="n">4</td><td class="n ok">4</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">30</span>ログインユーザー</th>
@@ -287,6 +325,7 @@
         <td class="n">4</td><td class="n ok">4</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">31</span>機能設定</th>
@@ -294,6 +333,7 @@
         <td class="n">1</td><td class="n ok">1</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">32</span>運用状態</th>
@@ -301,6 +341,7 @@
         <td class="n">4</td><td class="n ok">4</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
+        <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       </tbody>
     </table>

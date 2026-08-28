@@ -12,7 +12,7 @@
  * **3つとも同じ数から出す。** 表とJSONとページを別々に書くと、必ずどれかが
  * 古くなる。古い数を根拠に「あと何枚」を話すことになる。
  */
-import { SCREENS, screensOf } from './screens.mjs'
+import { SCREENS, screensOf, CAPTURED_AT } from './screens.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -35,6 +35,22 @@ export const FEATURE_NAMES = {
  * 1枚の状態。**「撮れた」と「合っている」は別。**
  * 撮れたかどうかは画像の有無で分かるが、合っているかは比較文書だけが言える。
  */
+/** 進捗ページ用。空欄は「まだPRのheadで撮り直していない」。 */
+function capturedAtHtml(feature) {
+  const at = CAPTURED_AT[feature]
+  if (!at) return '<span class="none" title="まだ実装PRのheadで撮り直していません">—</span>'
+  if (!at.head) return `<span class="hold">#${at.pr}<small>${esc(at.note ?? '保留')}</small></span>`
+  return `<span class="pr">#${at.pr}</span><code>${at.head}</code>`
+}
+
+/** その機能をどのPRのheadで撮ったか。書いていなければ空欄。 */
+function capturedAt(feature) {
+  const at = CAPTURED_AT[feature]
+  if (!at) return ''
+  if (!at.head) return `#${at.pr}（${at.note ?? '保留'}）`
+  return `#${at.pr} \`${at.head}\` ${at.on}`
+}
+
 function stateOf(screen) {
   if (screen.status === 'unimplemented') return 'unimplemented'
   if (screen.status === 'unconfirmed') return 'unconfirmed'
@@ -82,9 +98,13 @@ if (process.argv.includes('--html')) {
         <td class="n">${r.total}</td><td class="n ok">${r.compared}</td>
         <td class="n">${r.unimplemented || '—'}</td><td class="n">${r.unconfirmed || '—'}</td>
         <td class="n">${r.elsewhere || '—'}</td><td class="n">${r.missing || '—'}</td>
+        <td class="at">${capturedAtHtml(r.feature)}</td>
       </tr>`
   }).join('\n')
   console.log(`<!-- scripts/visual-qa/ledger.mjs --html が作ります。手で直さないでください。 -->
+<!-- 文字の指定を落とすと、ローカルで開いたときに日本語が全部化けます。 -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>V6 画面比較の進捗</title>
 <style>
   :root {
@@ -133,6 +153,12 @@ if (process.argv.includes('--html')) {
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
   footer { color: var(--ink-2); font-size: .8rem; }
   tbody tr:last-child th, tbody tr:last-child td { border-bottom: 0; }
+  td.at { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  td.at code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  td.at .pr { color: var(--ok); font-weight: 600; margin-right: .35em; }
+  td.at .none { color: var(--mute); }
+  td.at .hold { color: var(--warn); }
+  td.at .hold small { display: block; font-size: 10px; color: var(--ink-2); }
 </style>
 <main>
   <header>
@@ -161,7 +187,7 @@ if (process.argv.includes('--html')) {
       <thead><tr>
         <th scope="col">機能</th><th scope="col">内訳</th><th scope="col" class="n">総数</th>
         <th scope="col" class="n">比較済み</th><th scope="col" class="n">未実装</th>
-        <th scope="col" class="n">未確認</th><th scope="col" class="n">別仕掛け</th><th scope="col" class="n">未撮影</th>
+        <th scope="col" class="n">未確認</th><th scope="col" class="n">別仕掛け</th><th scope="col" class="n">未撮影</th><th scope="col">撮った先</th>
       </tr></thead>
       <tbody>
 ${bars}
@@ -179,16 +205,17 @@ ${bars}
     generatedFrom: 'scripts/visual-qa/screens.mjs',
     total: SCREENS.length,
     ...all,
-    features: rows,
+    features: rows.map((r) => ({ ...r, capturedAt: CAPTURED_AT[r.feature] ?? null })),
   }, null, 2))
 } else {
   console.log('# V6 進捗台帳（262画面）\n')
   console.log('`scripts/visual-qa/screens.mjs` から機械で組み立てています。**手で書き写していません。**\n')
   console.log(`総数 **${SCREENS.length}** ／ 比較済み **${all.compared}** ／ 未実装 **${all.unimplemented}** ／ 未確認 **${all.unconfirmed}** ／ 別の仕掛けで撮影 **${all.elsewhere}** ／ 未撮影 **${all.missing}**\n`)
-  console.log('| 機能 | 名前 | 総数 | 比較済み | 未実装 | 未確認 | 別の仕掛け | 未撮影 |')
-  console.log('|---|---|---|---|---|---|---|---|')
+  console.log('| 機能 | 名前 | 総数 | 比較済み | 未実装 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |')
+  console.log('|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
-    console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.unimplemented} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} |`)
+    console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.unimplemented} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} | ${capturedAt(r.feature)} |`)
   }
-  console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.unimplemented}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** |`)
+  console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.unimplemented}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** | |`)
+  console.log('\n**「撮った先」が空**の機能は、まだ実装PRのheadで撮り直していません（自分の枝で撮ったものです）。**空欄を確認済みと読まないでください。**')
 }

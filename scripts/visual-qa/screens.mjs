@@ -1242,3 +1242,20 @@ export const WIDTHS = [1440, 1920]
 export function screensOf(feature) {
   return SCREENS.filter((s) => s.feature === Number(feature))
 }
+
+/**
+ * どのPRの、どのheadで撮ったか。
+ *
+ * **「基準画像が以前と同じ」は合格の理由になりません。** 実装が進んだのに
+ * 古いheadの絵を並べていると、直ったことも壊れたことも見えません。
+ * どの機能をいつ・どの commit で見たかを、ここに1か所だけ持ちます。
+ *
+ * 書いていない機能は、まだPRのheadで撮り直していません（自分の枝で撮った
+ * ものです）。**空欄を「確認済み」と読まないでください。**
+ */
+export const CAPTURED_AT = {
+  17: { pr: 441, head: '5fd7c048', on: '2026-08-28' },
+  18: { pr: 443, head: 'f372ff30', on: '2026-08-28' },
+  19: { pr: 465, head: null, on: '2026-08-28', note: 'Codexの修正待ち。#465 の比較結果を維持' },
+  21: { pr: 446, head: 'd7e2bc9c', on: '2026-08-28' },
+}

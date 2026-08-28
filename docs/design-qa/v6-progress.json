@@ -15,7 +15,8 @@
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 2,
@@ -25,7 +26,8 @@
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 3,
@@ -35,7 +37,8 @@
       "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 4,
@@ -45,7 +48,8 @@
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 4,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 5,
@@ -55,7 +59,8 @@
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 6,
@@ -65,7 +70,8 @@
       "unimplemented": 0,
       "unconfirmed": 5,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 7,
@@ -75,7 +81,8 @@
       "unimplemented": 7,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 8,
@@ -85,7 +92,8 @@
       "unimplemented": 6,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 9,
@@ -95,7 +103,8 @@
       "unimplemented": 7,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 10,
@@ -105,7 +114,8 @@
       "unimplemented": 4,
       "unconfirmed": 1,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 11,
@@ -115,7 +125,8 @@
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 12,
@@ -125,7 +136,8 @@
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 13,
@@ -135,7 +147,8 @@
       "unimplemented": 1,
       "unconfirmed": 1,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 14,
@@ -145,7 +158,8 @@
       "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 15,
@@ -155,7 +169,8 @@
       "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 16,
@@ -165,7 +180,8 @@
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 17,
@@ -175,7 +191,12 @@
       "unimplemented": 7,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": {
+        "pr": 441,
+        "head": "5fd7c048",
+        "on": "2026-08-28"
+      }
     },
     {
       "feature": 18,
@@ -185,7 +206,12 @@
       "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": {
+        "pr": 443,
+        "head": "f372ff30",
+        "on": "2026-08-28"
+      }
     },
     {
       "feature": 19,
@@ -195,7 +221,13 @@
       "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": {
+        "pr": 465,
+        "head": null,
+        "on": "2026-08-28",
+        "note": "Codexの修正待ち。#465 の比較結果を維持"
+      }
     },
     {
       "feature": 20,
@@ -205,7 +237,8 @@
       "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 21,
@@ -215,7 +248,12 @@
       "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": {
+        "pr": 446,
+        "head": "d7e2bc9c",
+        "on": "2026-08-28"
+      }
     },
     {
       "feature": 22,
@@ -225,7 +263,8 @@
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 23,
@@ -235,7 +274,8 @@
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 24,
@@ -245,7 +285,8 @@
       "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 25,
@@ -255,7 +296,8 @@
       "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 26,
@@ -265,7 +307,8 @@
       "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 27,
@@ -275,7 +318,8 @@
       "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 28,
@@ -285,7 +329,8 @@
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 29,
@@ -295,7 +340,8 @@
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 30,
@@ -305,7 +351,8 @@
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 31,
@@ -315,7 +362,8 @@
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     },
     {
       "feature": 32,
@@ -325,7 +373,8 @@
       "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0
+      "missing": 0,
+      "capturedAt": null
     }
   ]
 }
