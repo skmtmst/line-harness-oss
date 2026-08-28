@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { getLineAccountById, jstNow } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -9,7 +9,7 @@ import {
   queueColumnDelivery,
 } from '../services/nen-engagement.js';
 import { syncNenPetTags } from '../services/nen-tag-sync.js';
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const nenCampaigns = new Hono<Env>();
 const CAMPAIGN_KEYS = new Set([
@@ -17,6 +17,16 @@ const CAMPAIGN_KEYS = new Set([
 ]);
 const MAX_BODY_BYTES = 256 * 1024;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
+
+async function adminAccountScope(c: Context<Env>) {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const where = scope.allowedAccountIds.length
+    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    : scope.canSeeUnassigned
+      ? 'AND f.line_account_id IS NULL'
+      : 'AND 1 = 0';
+  return { scope, where };
+}
 
 function isUrl(value: string): boolean {
   if (!value) return true;
@@ -208,16 +218,17 @@ nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireRole('owner', 
   return c.json({ success: true });
 });
 
-nenCampaigns.get('/api/nen-campaigns/pets', async (c) => {
+nenCampaigns.get('/api/nen-campaigns/pets', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const { scope, where } = await adminAccountScope(c);
   const query = (c.req.query('search') || '').trim();
   const like = `%${query.replace(/[\\%_]/g, '\\$&')}%`;
   const rows = await c.env.DB.prepare(
     `SELECT p.id, p.friend_id, p.customer_id, p.name, p.animal_type, p.gender, p.birthday,
             f.display_name, f.line_user_id
        FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id
-      WHERE (? = '' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\')
+      WHERE (? = '' OR p.name LIKE ? ESCAPE '\\' OR f.display_name LIKE ? ESCAPE '\\') ${where}
       ORDER BY p.updated_at DESC LIMIT 200`,
-  ).bind(query, like, like).all<Record<string, unknown>>();
+  ).bind(query, like, like, ...scope.allowedAccountIds).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results.map((row) => ({
     id: row.id, friendId: row.friend_id, customerId: row.customer_id, name: row.name,
     animalType: row.animal_type, gender: row.gender, birthday: row.birthday,
@@ -233,6 +244,11 @@ nenCampaigns.post('/api/nen-campaigns/pets', requireRole('owner', 'admin'), asyn
   const animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
   const gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
   const birthday = typeof body.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.birthday) ? body.birthday : null;
+  const friend = await c.env.DB.prepare(`SELECT id, line_account_id FROM friends WHERE id = ?`)
+    .bind(body.friendId).first<{ id: string; line_account_id: string | null }>();
+  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friend.line_account_id])) {
+    return c.json({ success: false, error: 'Friend not found' }, 404);
+  }
   const now = jstNow();
   const id = crypto.randomUUID();
   await c.env.DB.prepare(
@@ -249,9 +265,11 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
   const animalType = ['dog', 'cat', 'other'].includes(String(body.animalType)) ? String(body.animalType) : 'dog';
   const gender = ['male', 'female', 'unknown'].includes(String(body.gender)) ? String(body.gender) : 'unknown';
   const birthday = typeof body.birthday === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.birthday) ? body.birthday : null;
-  const pet = await c.env.DB.prepare(`SELECT friend_id FROM nen_pet_profiles WHERE id = ?`)
-    .bind(c.req.param('id')).first<{ friend_id: string }>();
-  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
+  const pet = await c.env.DB.prepare(`SELECT p.friend_id, f.line_account_id FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`)
+    .bind(c.req.param('id')).first<{ friend_id: string; line_account_id: string | null }>();
+  if (!pet || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [pet.line_account_id])) {
+    return c.json({ success: false, error: 'Pet not found' }, 404);
+  }
   await c.env.DB.prepare(
     `UPDATE nen_pet_profiles SET name = ?, animal_type = ?, gender = ?, birthday = ?, updated_at = ? WHERE id = ?`,
   ).bind(body.name.trim(), animalType, gender, birthday, jstNow(), c.req.param('id')).run();
@@ -260,9 +278,11 @@ nenCampaigns.put('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), a
 });
 
 nenCampaigns.delete('/api/nen-campaigns/pets/:id', requireRole('owner', 'admin'), async (c) => {
-  const pet = await c.env.DB.prepare(`SELECT friend_id FROM nen_pet_profiles WHERE id = ?`)
-    .bind(c.req.param('id')).first<{ friend_id: string }>();
-  if (!pet) return c.json({ success: false, error: 'Pet not found' }, 404);
+  const pet = await c.env.DB.prepare(`SELECT p.friend_id, f.line_account_id FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE p.id = ?`)
+    .bind(c.req.param('id')).first<{ friend_id: string; line_account_id: string | null }>();
+  if (!pet || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [pet.line_account_id])) {
+    return c.json({ success: false, error: 'Pet not found' }, 404);
+  }
   await c.env.DB.prepare(`DELETE FROM nen_pet_profiles WHERE id = ?`).bind(c.req.param('id')).run();
   await syncNenPetTags(c.env.DB, pet.friend_id);
   return c.json({ success: true });
