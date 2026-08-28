@@ -410,11 +410,22 @@ export const SCREENS = [
     ],
   },
   {
-    ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認', route: NEW_BC,
-    gap: 'parts',
-    gapNote: '`ConfirmDialog` を挟む。**1,284人へ送る操作に確認が無い**',
-    status: 'unimplemented',
-    why: '**確かめました（2026-08-28）。最終確認の窓がありません。**「配信を予約する」は `save()` を直に呼びます（`broadcast-form.tsx:1002-1006`）。`/broadcasts` 配下に `ConfirmDialog` は1つもありません。**押した瞬間に予約が確定します。**',
+    /*
+      **Claude が作りました**（`codex/kenta-v6-broadcast-final-confirm`、
+      #495 の head `7d890d3b` を土台）。押した瞬間に予約が確定しない
+      ようにした窓。**本文と予約日時を入れないと出ない**ので、
+      `steps` で埋めてから撮る。
+    */
+    ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認',
+    route: NEW_BC, mode: 'viewport', height: 1080,
+    steps: [
+      { fill: 'main input[placeholder^="例：8月"]', selector: true, text: '8月キャンペーンのお知らせ', after: 400 },
+      { fill: 'main textarea', selector: true, text: '8月限定キャンペーンのお知らせです。詳しくはこちらをご確認ください。', after: 1600 },
+      { click: '日時を指定して予約', scope: 'main' },
+      { fill: 'main input[type="date"]', selector: true, text: '2026-08-27', after: 900 },
+      { click: '配信を予約する', scope: 'main' },
+      { wait: 900 },
+    ],
   },
   {
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 予約完了', route: NEW_BC,
@@ -1486,6 +1497,7 @@ export const CAPTURED_AT = {
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
     { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
   ],
+  6: [{ pr: 497, head: '84e5bab9', on: '2026-08-28', screens: ['FpgxH'], note: 'Claudeが作ったDraft。#495 の上に積んである' }],
   17: [
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },

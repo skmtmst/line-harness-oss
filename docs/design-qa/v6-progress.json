@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 188,
-  "unimplemented": 70,
+  "compared": 189,
+  "unimplemented": 69,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
@@ -89,12 +89,22 @@
       "feature": 6,
       "name": "一斉配信",
       "total": 15,
-      "compared": 11,
-      "unimplemented": 4,
+      "compared": 12,
+      "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 497,
+          "head": "84e5bab9",
+          "on": "2026-08-28",
+          "screens": [
+            "FpgxH"
+          ],
+          "note": "Claudeが作ったDraft。#495 の上に積んである"
+        }
+      ]
     },
     {
       "feature": 7,
@@ -528,13 +538,6 @@
       "name": "6-1-B 対象条件",
       "gap": "build",
       "gapNote": "保存した検索の仕組みは #421 で入った。配信側から呼ぶだけ"
-    },
-    {
-      "feature": 6,
-      "node": "FpgxH",
-      "name": "6-1-H 最終確認",
-      "gap": "parts",
-      "gapNote": "`ConfirmDialog` を挟む。**1,284人へ送る操作に確認が無い**"
     },
     {
       "feature": 6,
