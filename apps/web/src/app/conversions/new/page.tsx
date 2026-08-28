@@ -58,7 +58,7 @@ interface ReportRow {
 }
 
 export default function NewConversionPointPage() {
-  const { accounts } = useAccount()
+  const { selectedAccountId, selectedAccount } = useAccount()
   const [name, setName] = useState('')
   const [eventType, setEventType] = useState('purchase')
   const [value, setValue] = useState('')
@@ -66,14 +66,19 @@ export default function NewConversionPointPage() {
   const [targetUrl, setTargetUrl] = useState('')
   const [countRepeat, setCountRepeat] = useState(true)
   const [attributionDays, setAttributionDays] = useState('')
-  const [lineAccountId, setLineAccountId] = useState('')
   const [points, setPoints] = useState<ConversionPoint[]>([])
   const [report, setReport] = useState<ReportRow[]>([])
 
   // 右の「同種の成果地点」に要る。作る前に、似たものが既にあるか分かるように。
   useEffect(() => {
     let cancelled = false
-    void Promise.allSettled([api.conversions.points(), api.conversions.report()]).then(
+    setPoints([])
+    setReport([])
+    if (!selectedAccountId) return () => { cancelled = true }
+    void Promise.allSettled([
+      api.conversions.points({ lineAccountId: selectedAccountId }),
+      api.conversions.report({ lineAccountId: selectedAccountId }),
+    ]).then(
       ([p, r]) => {
         if (cancelled) return
         if (p.status === 'fulfilled' && p.value.success) setPoints(p.value.data)
@@ -83,7 +88,7 @@ export default function NewConversionPointPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   const sameKind = useMemo(() => {
     const ids = new Set(points.filter((p) => p.eventType === eventType).map((p) => p.id))
@@ -102,13 +107,14 @@ export default function NewConversionPointPage() {
       <CreatePage
       title="成果地点（CV）を作る"
       description="「申込」「購入」など、成果として数えたい行動を登録します。"
-      parent={['成果とアフィリエイト', '/conversions']}
+      parent={['コンバージョン', '/conversions']}
       saveLabel="成果地点を作成"
       validate={() => {
         if (!name.trim()) return '成果地点（CV）名を入力してください'
         if (measureMethod === 'url_reach' && !targetUrl.trim()) {
           return '指定ページへの到達で数えるときは、対象のURLが要ります'
         }
+        if (!selectedAccountId) return '上のバーでLINEアカウントを選んでください'
         return null
       }}
       onReset={() => {
@@ -125,7 +131,7 @@ export default function NewConversionPointPage() {
           targetUrl: measureMethod === 'url_reach' ? targetUrl.trim() : null,
           countRepeat,
           attributionDays: attributionDays ? Number(attributionDays) : null,
-          lineAccountId: lineAccountId || null,
+          lineAccountId: selectedAccountId,
         })
         if (!res.success) throw new Error(res.error)
         return res.data.id
@@ -299,22 +305,11 @@ export default function NewConversionPointPage() {
       <FormSection step={5} label="集計対象アカウント">
         <Field
           label="対象"
-          htmlFor="cv-account"
-          note="1つに絞ると、そのアカウントで起きた成果だけを数えます。"
+          note="上のバーで選んだLINEアカウントに保存します。別アカウントの成果と混ざりません。"
         >
-          <select
-            id="cv-account"
-            value={lineAccountId}
-            onChange={(e) => setLineAccountId(e.target.value)}
-            className={inputClass}
-          >
-            <option value="">すべてのアカウント</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
+          <p className="border-hairline rounded-control border px-3 py-2 text-sm">
+            {selectedAccount?.displayName || selectedAccount?.name || 'LINEアカウントが選ばれていません'}
+          </p>
         </Field>
       </FormSection>
       </CreatePage>

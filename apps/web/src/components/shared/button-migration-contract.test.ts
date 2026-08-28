@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作26個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作29個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -47,7 +47,8 @@ describe('標準ボタンの第1段階移行', () => {
 
     // 2026-08-28: 成果地点のV6化で、行き先のない手動・並び順と
     // 旧「提携成果」タブへの操作を外した。減った基準を戻さない。
-    expect(openings).toHaveLength(26)
+    // 同日: 成果地点の再読込・絞り込み・安全な停止も共通Buttonへ寄せた。
+    expect(openings).toHaveLength(29)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
   })
 
@@ -108,7 +109,8 @@ describe('標準ボタンの第1段階移行', () => {
     // 友だち一覧はV6トークンへ移し、任意値を127か所削除した。
     // 2026-08-27: 「今月の配信」から重複していた送信枠の帯を外し、
     // 「友だちの状態」を設計の3行＋内訳に組み直した。実測値が1つ減って1284。
-    expect(debt['arbitrary-value']).toBe(1284)
+    // 2026-08-28: 成果地点の列幅・11px直書きをV6トークンへ寄せて1277。
+    expect(debt['arbitrary-value']).toBe(1277)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

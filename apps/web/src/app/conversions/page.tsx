@@ -1,9 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { api, type ConversionApprovalItem } from '@/lib/api'
+import Link from 'next/link'
+import { api, type ConversionPointImpact, type ConversionPointWithUsage } from '@/lib/api'
 import type { ConversionPoint } from '@line-crm/shared'
 import KpiCard from '@/components/dashboard/kpi-card'
+import ListState from '@/components/shared/list-state'
+import Dialog from '@/components/shared/dialog'
+import { useAccount } from '@/contexts/account-context'
 
 /**
  * 数え方を運用者の言葉にする。既定（manual）も省略せずに出す。
@@ -41,10 +45,6 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   custom: 'その他',
 }
 
-/** 過去28日ぶんに絞る。設計のKPIはどれも「過去28日」で数えている。 */
-function within28Days(iso: string): boolean {
-  return Date.now() - new Date(iso).getTime() <= 28 * 24 * 3600_000
-}
 import { Suspense } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import { AffiliatorsTab, OffersTab, ApprovalQueue } from '@/app/affiliates/tabs'
@@ -78,43 +78,86 @@ const MERGED_TABS = [
 const DEFAULT_TAB = 'points'
 
 function ConversionsPageInner() {
-  const [points, setPoints] = useState<ConversionPoint[]>([])
+  const { selectedAccountId } = useAccount()
+  const [points, setPoints] = useState<ConversionPointWithUsage[]>([])
   const [report, setReport] = useState<ConversionReportItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [pending, setPending] = useState<ConversionApprovalItem[]>([])
-  const [approved, setApproved] = useState<ConversionApprovalItem[]>([])
-  const [openOffers, setOpenOffers] = useState(0)
+  const [loadError, setLoadError] = useState('')
   const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<'all' | 'active' | 'stopped' | 'unused'>('all')
+  const [reload, setReload] = useState(0)
+  const [stopTarget, setStopTarget] = useState<ConversionPointWithUsage | null>(null)
+  const [stopImpact, setStopImpact] = useState<ConversionPointImpact | null>(null)
+  const [impactLoading, setImpactLoading] = useState(false)
+  const [stopBusy, setStopBusy] = useState(false)
+  const [stopError, setStopError] = useState('')
 
-  const load = async () => {
+  useEffect(() => {
+    let cancelled = false
+    setPoints([])
+    setReport([])
+    setLoadError('')
+    if (!selectedAccountId) {
+      setLoading(false)
+      return () => { cancelled = true }
+    }
     setLoading(true)
+    const startDate = new Date(Date.now() - 30 * 24 * 3600_000).toISOString()
+    void Promise.all([
+      api.conversions.points({ lineAccountId: selectedAccountId }),
+      api.conversions.report({ lineAccountId: selectedAccountId, startDate }),
+    ]).then(([pointsRes, reportRes]) => {
+      if (cancelled) return
+      if (!pointsRes.success || !reportRes.success) throw new Error('成果地点を取得できませんでした')
+      setPoints(pointsRes.data)
+      setReport(reportRes.data)
+    }).catch((error: unknown) => {
+      if (!cancelled) setLoadError(error instanceof Error ? error.message : '成果地点を取得できませんでした')
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [selectedAccountId, reload])
+
+  const openStopDialog = async (point: ConversionPointWithUsage) => {
+    setStopTarget(point)
+    setStopImpact(null)
+    setStopError('')
+    setImpactLoading(true)
     try {
-      // 上のKPIは成果地点だけでは出ない。承認の待ち・確定と、公開中の案件を
-      // 一緒に引く。1つ落ちても他は出せるよう allSettled。
-      const [pointsRes, reportRes, pendingRes, approvedRes, offersRes] = await Promise.allSettled([
-        api.conversions.points(),
-        api.conversions.report(),
-        api.conversionApprovals.list({ status: 'pending', limit: 200 }),
-        api.conversionApprovals.list({ status: 'approved', limit: 200 }),
-        api.affiliateOffers.list({ activeOnly: true }),
-      ])
-      if (pointsRes.status === 'fulfilled' && pointsRes.value.success) setPoints(pointsRes.value.data)
-      if (reportRes.status === 'fulfilled' && reportRes.value.success) setReport(reportRes.value.data)
-      if (pendingRes.status === 'fulfilled' && pendingRes.value.success) setPending(pendingRes.value.data)
-      if (approvedRes.status === 'fulfilled' && approvedRes.value.success) setApproved(approvedRes.value.data)
-      if (offersRes.status === 'fulfilled' && offersRes.value.success) {
-        setOpenOffers(offersRes.value.data.length)
-      }
-    } catch {}
-    setLoading(false)
+      const response = await api.conversions.pointImpact(point.id)
+      if (!response.success) throw new Error(response.error || '影響を確認できませんでした')
+      setStopImpact(response.data)
+    } catch (error) {
+      setStopError(error instanceof Error ? error.message : '影響を確認できませんでした')
+    } finally {
+      setImpactLoading(false)
+    }
   }
 
-  useEffect(() => { load() }, [])
+  const closeStopDialog = () => {
+    if (stopBusy) return
+    setStopTarget(null)
+    setStopImpact(null)
+    setStopError('')
+  }
 
-  const handleStop = async (id: string) => {
-    if (!confirm('この成果地点の計測を停止しますか？ 過去の成果と金額は残ります。')) return
-    await api.conversions.stopPoint(id)
-    load()
+  const confirmStop = async () => {
+    if (!stopTarget || !stopImpact) return
+    setStopBusy(true)
+    setStopError('')
+    try {
+      const response = await api.conversions.stopPoint(stopTarget.id)
+      if (!response.success) throw new Error(response.error || '計測を停止できませんでした')
+      setStopTarget(null)
+      setStopImpact(null)
+      setStopError('')
+      setReload((value) => value + 1)
+    } catch (error) {
+      setStopError(error instanceof Error ? error.message : '計測を停止できませんでした')
+    } finally {
+      setStopBusy(false)
+    }
   }
 
   // 成果地点ごとのCV数。レポートは成果地点IDで返る。
@@ -124,54 +167,62 @@ function ConversionsPageInner() {
     return m
   }, [report])
 
-  const kpi = useMemo(() => {
-    const approvedRecent = approved.filter((a) => within28Days(a.createdAt))
-    return {
-      confirmed: approvedRecent.length,
-      confirmedYen: approvedRecent.reduce((s, a) => s + (a.value ?? 0), 0),
-      pendingCount: pending.length,
-      pendingYen: pending.reduce((s, a) => s + (a.value ?? 0), 0),
-    }
-  }, [approved, pending])
+  const kpi = useMemo(() => ({
+    active: points.filter((point) => point.status !== 'stopped').length,
+    resultCount: report.reduce((sum, row) => sum + row.totalCount, 0),
+    totalValue: report.reduce((sum, row) => sum + row.totalValue, 0),
+    zeroCount: points.filter((point) => point.status !== 'stopped' && (countByPoint.get(point.id) ?? 0) === 0).length,
+  }), [countByPoint, points, report])
+
+  const filterCounts = useMemo(() => ({
+    all: points.length,
+    active: points.filter((point) => point.status !== 'stopped').length,
+    stopped: points.filter((point) => point.status === 'stopped').length,
+    unused: points.filter((point) => point.usedIn.length === 0).length,
+  }), [points])
 
   const shown = useMemo(() => {
     const q = query.trim()
-    return q ? points.filter((p) => p.name.includes(q)) : points
-  }, [points, query])
+    return points.filter((point) => {
+      if (q && !point.name.includes(q)) return false
+      if (filter === 'active' && point.status === 'stopped') return false
+      if (filter === 'stopped' && point.status !== 'stopped') return false
+      if (filter === 'unused' && point.usedIn.length > 0) return false
+      return true
+    })
+  }, [filter, points, query])
 
   return (
     <div data-conversions-design="v6" data-design-node="ZrpKn">
       <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          title="確定した成果"
-          value={kpi.confirmed}
-          unit="件"
-          detail="過去28日"
+          title="決めてある成果地点"
+          value={points.length}
+          unit="個"
+          detail={`動いているもの ${kpi.active}個`}
           loading={loading}
         />
         <KpiCard
-          title="承認待ち"
-          value={kpi.pendingCount}
+          title="この30日の成果"
+          value={kpi.resultCount}
           unit="件"
-          detail={`合計 ¥${kpi.pendingYen.toLocaleString()}`}
-          action={{ label: '成果承認', href: '/conversions?tab=approvals' }}
+          detail="成果地点をまたいだ合計"
           loading={loading}
         />
-        {/* 設計は「確定報酬」。報酬そのものを持つ列が無いので、確定した成果の
-            金額を出している。案件の料率で計算した額とは一致しない。 */}
         <KpiCard
-          title="確定報酬"
-          value={kpi.confirmedYen}
+          title="金額がついた成果"
+          value={kpi.totalValue}
           unit="円"
-          detail="過去28日・成果の金額"
+          detail="発生時点の金額を合計"
           loading={loading}
         />
         <KpiCard
-          title="公開中の案件"
-          value={openOffers}
-          unit="件"
-          detail="紹介できる案件"
-          action={{ label: '案件', href: '/conversions?tab=offers' }}
+          title="1件も起きていない"
+          value={kpi.zeroCount}
+          unit="個"
+          detail="決めたのに成果が起きていません"
+          badge={kpi.zeroCount > 0 ? '確認が必要' : undefined}
+          badgeTone={kpi.zeroCount > 0 ? 'danger' : 'neutral'}
           loading={loading}
         />
       </div>
@@ -180,37 +231,62 @@ function ConversionsPageInner() {
         data-design="Bar"
         className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3"
       >
+        {([
+          ['all', 'すべて'],
+          ['active', '動いている'],
+          ['stopped', '止めている'],
+          ['unused', 'どこからも使われていない'],
+        ] as const).map(([key, label]) => (
+          <Button
+            key={key}
+            type="button"
+            aria-pressed={filter === key}
+            onClick={() => setFilter(key)}
+            variant={filter === key ? 'primary' : 'secondary'}
+          >
+            {label} {filterCounts[key]}
+          </Button>
+        ))}
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="CV名で検索"
-          aria-label="CV名で検索"
-          className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+          placeholder="成果地点名で検索"
+          aria-label="成果地点名で検索"
+          className="border-hairline rounded-control focus:ring-accent ml-auto w-56 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
         />
       </div>
 
-      {/* 設計の表は7列。報酬と状態は持っている列が無いので「—」を出す。
-          列ごと消すと、その考え方が無い画面に見えてしまう。 */}
-      {loading ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm text-ink-faint">
-          読み込み中...
-        </div>
+      {!selectedAccountId ? (
+        <ListState
+          kind="empty"
+          title="LINEアカウントを選んでください"
+          description="上のバーで対象を選ぶと、そのアカウントの成果地点だけを表示します。"
+        />
+      ) : loading ? (
+        <ListState kind="loading" title="成果地点を読み込んでいます" />
+      ) : loadError ? (
+        <ListState
+          kind="error"
+          title="成果地点を表示できませんでした"
+          description={loadError}
+          action={<Button onClick={() => setReload((value) => value + 1)} variant="secondary">もう一度読み込む</Button>}
+        />
       ) : shown.length === 0 ? (
-        <div className="bg-canvas rounded-card border-hairline border p-8 text-center text-sm text-ink-faint">
-          {query ? '検索に合う成果地点はありません。' : 'まだ成果地点がありません。右上の「成果地点を追加」から登録してください。'}
-        </div>
+        <ListState
+          kind="empty"
+          title={query || filter !== 'all' ? '条件に合う成果地点はありません' : 'まだ成果地点がありません'}
+          description={query || filter !== 'all' ? '検索や絞り込みを変えてください。' : '成果として数えたい行動を登録してください。'}
+        />
       ) : (
-        <div data-design="Table" className="bg-canvas rounded-card border-hairline overflow-x-auto border">
-          <table className="w-full min-w-[880px]">
+        <div data-design="Table" className="bg-canvas rounded-card border-hairline border">
+          <table className="w-full table-fixed">
             <thead>
               <TableHeadRow>
-                <Th>成果地点（CV）名</Th>
-                <Th>種別</Th>
-                <Th>計測方法</Th>
-                <Th align="right">成果単価</Th>
-                <Th align="right">CV数</Th>
-                <Th>報酬</Th>
+                <Th>成果地点名</Th>
+                <Th>何を数えるか</Th>
+                <Th align="right">この30日の成果</Th>
+                <Th>使われている場所</Th>
                 <Th>状態</Th>
                 <Th align="right">操作</Th>
               </TableHeadRow>
@@ -219,60 +295,75 @@ function ConversionsPageInner() {
               {shown.map((point) => (
                 <tr key={point.id} className="hover:bg-canvas-sunken">
                   <td className="text-ink px-4 py-3 text-sm font-medium">
-                    {point.name}
+                    <span className="block truncate" title={point.name}>{point.name}</span>
                     {point.targetUrl && (
-                      <p className="text-ink-faint mt-0.5 max-w-[22rem] truncate text-[11px]" title={point.targetUrl}>
+                      <p className="text-ink-faint mt-0.5 truncate text-caption" title={point.targetUrl}>
                         {point.targetUrl}
                       </p>
                     )}
                   </td>
                   <td className="text-ink-secondary px-4 py-3 text-sm">
-                    {EVENT_TYPE_LABELS[point.eventType] ?? point.eventType}
-                  </td>
-                  <td className="text-ink-secondary px-4 py-3 text-sm">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
+                    <p className="text-ink text-xs font-medium">{EVENT_TYPE_LABELS[point.eventType] ?? point.eventType}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-caption whitespace-nowrap">
                         {measureLabel(point.measureMethod)}
                       </span>
                       {point.countRepeat === false && (
-                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap">
+                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-caption whitespace-nowrap">
                           一人一回
                         </span>
                       )}
                       {point.attributionDays != null && (
-                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-[11px] whitespace-nowrap tabular-nums">
+                        <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-caption whitespace-nowrap tabular-nums">
                           {point.attributionDays}日
                         </span>
                       )}
                     </div>
                   </td>
-                  <td className="text-ink-secondary px-4 py-3 text-right text-sm tabular-nums">
-                    {point.value !== null ? `¥${point.value.toLocaleString()}` : '—'}
-                  </td>
                   <td className="text-ink px-4 py-3 text-right text-sm tabular-nums">
-                    {countByPoint.get(point.id) ?? 0}
+                    <p className="font-semibold">{countByPoint.get(point.id) ?? 0}件</p>
+                    <p className="text-ink-faint mt-0.5 text-caption">
+                      {point.value !== null ? `1件 ¥${point.value.toLocaleString()}` : '金額なし'}
+                    </p>
                   </td>
-                  {/* 報酬は案件ごとの料率で決まる。成果地点と案件を結ぶ列が無いので出せない。 */}
-                  <td className="text-ink-faint px-4 py-3 text-sm">—</td>
                   <td className="px-4 py-3 text-sm">
-                    <span className={`rounded-pill px-2 py-0.5 text-[11px] ${
+                    {point.usedIn.length === 0 ? (
+                      <span className="text-warning text-xs">どこからも使われていません</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {point.usedIn.slice(0, 2).map((usage) => (
+                          <Link
+                            key={`${usage.kind}:${usage.consumerId}`}
+                            href={usage.href}
+                            className="bg-canvas-sunken text-ink-secondary rounded-pill max-w-full truncate px-2 py-0.5 text-caption"
+                            title={`分析：${usage.consumerName}`}
+                          >
+                            分析：{usage.consumerName}
+                          </Link>
+                        ))}
+                        {point.usedIn.length > 2 ? <span className="text-ink-faint text-caption">ほか{point.usedIn.length - 2}件</span> : null}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`rounded-pill px-2 py-0.5 text-caption ${
                       point.status === 'stopped'
                         ? 'bg-canvas-sunken text-ink-faint'
                         : 'bg-success-bg text-success'
                     }`}>
-                      {point.status === 'stopped' ? '停止' : '計測中'}
+                      {point.status === 'stopped' ? '止めている' : '動いている'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
                     {point.status === 'stopped' ? (
                       <span className="text-ink-faint text-xs">過去実績を保持</span>
                     ) : (
-                      <button
-                        onClick={() => handleStop(point.id)}
-                        className="text-danger text-sm hover:underline"
+                      <Button
+                        onClick={() => void openStopDialog(point)}
+                        variant="secondary"
                       >
-                        計測を停止
-                      </button>
+                        数えるのをやめる
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -284,9 +375,49 @@ function ConversionsPageInner() {
 
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <p className="text-ink-faint text-xs">
-          成果が出たあとの承認は「成果承認」タブで行います。旧デザインではCV計測とアフィリエイトが別ページに分かれていて、定義と承認の間で画面を往復する必要がありました。
+          成果地点は「何を1件として数えるか」の決めごとです。止めても過去の成果と金額は残ります。
         </p>
         <span className="text-ink-faint text-xs tabular-nums">全 {shown.length} 件</span>
+      </div>
+
+      <div data-design-node="d8d3Mz">
+        <Dialog
+          open={stopTarget !== null}
+          title={stopTarget ? `「${stopTarget.name}」の計測を停止しますか？` : '成果地点の計測を停止しますか？'}
+          description="新しい成果は数えなくなります。過去の成果・金額・分析結果は削除しません。"
+          tone="destructive"
+          busy={stopBusy}
+          error={stopError || undefined}
+          confirmLabel="数えるのをやめる"
+          cancelLabel="一覧へ戻る"
+          onCancel={closeStopDialog}
+          onConfirm={stopImpact ? () => void confirmStop() : undefined}
+        >
+          {impactLoading ? (
+            <ListState kind="loading" title="影響を確認しています" />
+          ) : stopImpact ? (
+            <div className="space-y-3 text-sm">
+              <div className="bg-canvas-sunken rounded-control p-3">
+                <p className="text-ink font-medium">そのまま残るもの</p>
+                <p className="text-ink-secondary mt-1">
+                  過去の成果 {stopImpact.eventCount.toLocaleString()}件・金額 ¥{stopImpact.totalValue.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-ink font-medium">使われている場所</p>
+                {stopImpact.usedIn.length === 0 ? (
+                  <p className="text-ink-faint mt-1">どこからも使われていません。</p>
+                ) : (
+                  <ul className="text-ink-secondary mt-1 space-y-1">
+                    {stopImpact.usedIn.map((usage) => (
+                      <li key={`${usage.kind}:${usage.consumerId}`}>・分析「{usage.consumerName}」は、停止した成果地点として残ります</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </Dialog>
       </div>
     </div>
   )
@@ -300,18 +431,29 @@ function ConversionsPageInner() {
  * 見る画面なので、金額を主にしている。
  */
 function ReportTab() {
+  const { selectedAccountId } = useAccount()
   const [rows, setRows] = useState<ConversionReportItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     let cancelled = false
+    setRows([])
+    setError('')
+    if (!selectedAccountId) {
+      setLoading(false)
+      return () => { cancelled = true }
+    }
+    setLoading(true)
     void api.conversions
-      .report()
+      .report({ lineAccountId: selectedAccountId })
       .then((r) => {
-        if (!cancelled && r.success) setRows(r.data)
+        if (cancelled) return
+        if (!r.success) throw new Error(r.error || 'レポートを取得できませんでした')
+        setRows(r.data)
       })
-      .catch(() => {
-        // レポートが引けなくても、他のタブは使える。
+      .catch((caught: unknown) => {
+        if (!cancelled) setError(caught instanceof Error ? caught.message : 'レポートを取得できませんでした')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -319,24 +461,24 @@ function ReportTab() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   const total = rows.reduce((s, r) => s + r.totalValue, 0)
 
+  if (!selectedAccountId) {
+    return <ListState kind="empty" title="LINEアカウントを選んでください" description="上のバーで対象を選ぶと、そのアカウントの成果だけを表示します。" />
+  }
+
   if (loading) {
-    return (
-      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-        読み込み中...
-      </div>
-    )
+    return <ListState kind="loading" title="成果レポートを読み込んでいます" />
+  }
+
+  if (error) {
+    return <ListState kind="error" title="成果レポートを表示できませんでした" description={error} />
   }
 
   if (rows.length === 0) {
-    return (
-      <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-        まだ成果の記録がありません。成果地点を作って計測が始まると、ここに出ます。
-      </div>
-    )
+    return <ListState kind="empty" title="まだ成果の記録がありません" description="成果地点を作って計測が始まると、ここに出ます。" />
   }
 
   return (

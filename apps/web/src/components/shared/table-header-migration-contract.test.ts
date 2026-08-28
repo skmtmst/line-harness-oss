@@ -19,12 +19,14 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('6ルートのV6標準見出し74セルを共通Thで維持する', () => {
+  it('6ルートのV6標準見出し72セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
-    expect(migrated).toBe(74)
+    // 成果地点は「種別＋計測方法」「単価＋件数」を各1列へまとめ、
+    // 代わりに利用先を1列で出す。重複した2見出しを戻さない。
+    expect(migrated).toBe(72)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(
