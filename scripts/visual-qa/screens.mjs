@@ -1511,10 +1511,10 @@ export const SCREENS = [
   },
   {
     ...AUTOMATION, node: 'WjYAC', name: '25-1-C 見本から作る',
-    gap: 'build',
-    gapNote: '見本は固定データでよい。ただし実IDを埋めず、選択した見本から公開ではなく下書きを作り、タグ・シナリオ・テンプレートを利用者が選び直す。V6オートメーション実装チェーンの作成API上に載せる',
+    gap: 'api',
+    gapNote: '見本の一覧自体は固定データで作れるが、選択後は公開ではなく下書きを作る必要がある。現行 `POST /api/automations` は `isActive`／下書き状態を受け取らず、`automations.is_active DEFAULT 1` で即時稼働するため、その口へ見本を接続してはいけない。下書き作成API、または版付きV6作成APIへ接続してから実装する。見本は実データIDを持たず、タグ・シナリオ・テンプレートを利用者が選び直す',
     status: 'unimplemented',
-    why: '見本（よく使う組み合わせ）が無い。`grep 見本|テンプレート` が `/automations` 配下で0件',
+    why: '見本（よく使う組み合わせ）が無い。画面だけ追加して現行createを呼ぶと、要件の「公開ではなく下書きを作る」に反して即時稼働する。`api.automations.create` の入力に `isActive`／statusは無く、DBの既定値は有効。下書き契約ができるまでは見本を選べる画面を出さない',
   },
   {
     ...AUTOMATION, node: 'Vdbv5', name: '25-1-D 一覧の状態（空・読込・エラー）',
