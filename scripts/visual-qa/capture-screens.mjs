@@ -6,6 +6,7 @@
  *
  * 使い方
  *   node scripts/visual-qa/capture-screens.mjs --feature 1 --impl
+ *   node scripts/visual-qa/capture-screens.mjs --feature 4 --impl --only QKx8Q,XBkiQ
  *   node scripts/visual-qa/capture-screens.mjs --feature 1 --design --from <書き出したhtmlの置き場>
  *   node scripts/visual-qa/capture-screens.mjs --check
  *
@@ -286,8 +287,31 @@ async function readListState(page) {
     .catch(() => null)
 }
 
+/**
+ * 撮る対象を絞る。`--only QKx8Q,XBkiQ`
+ *
+ * **1つの機能が複数のPRに分かれていることがある。** 機能4は #420（友だち
+ * 情報欄）と #421（保存した検索）が別々に進んでいて、#421 は #420 を
+ * 含まない。**片方の head で機能4を丸ごと撮り直すと、もう片方で直った絵が
+ * 直る前に戻る。一度それをやった。**
+ *
+ * 直したPRのheadで確かめるときは、**そのPRが触った画面だけ**を撮る。
+ */
+function onlyFilter(list) {
+  const raw = value('only')
+  if (!raw) return list
+  const want = new Set(raw.split(',').map((x) => x.trim()).filter(Boolean))
+  const picked = list.filter((s) => want.has(s.node))
+  const missing = [...want].filter((n) => !picked.some((s) => s.node === n))
+  if (missing.length) {
+    console.error(`--only に書いた Node が この機能にありません: ${missing.join(', ')}`)
+    process.exit(1)
+  }
+  return picked
+}
+
 async function captureImpl(feature) {
-  const list = screensOf(feature)
+  const list = onlyFilter(screensOf(feature))
   if (!list.length) { console.error(`機能${feature} の画面が screens.mjs にありません`); process.exit(1) }
   const browser = await chromium.launch()
   let shot = 0
@@ -419,7 +443,7 @@ async function captureDesign(feature, from) {
     console.error(`設計HTMLの置き場が無い: ${dir}\n  --from で渡すか V6_DESIGN_REF を設定してください`)
     process.exit(1)
   }
-  const list = screensOf(feature)
+  const list = onlyFilter(screensOf(feature))
   const browser = await chromium.launch()
   let shot = 0
   for (const s of list) {

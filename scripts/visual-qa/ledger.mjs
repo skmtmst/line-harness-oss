@@ -39,18 +39,20 @@ export const FEATURE_NAMES = {
  */
 /** 進捗ページ用。空欄は「まだPRのheadで撮り直していない」。 */
 function capturedAtHtml(feature) {
-  const at = CAPTURED_AT[feature]
-  if (!at) return '<span class="none" title="まだ実装PRのheadで撮り直していません">—</span>'
-  if (!at.head) return `<span class="hold">#${at.pr}<small>${esc(at.note ?? '保留')}</small></span>`
-  return `<span class="pr">#${at.pr}</span><code>${at.head}</code>`
+  const list = CAPTURED_AT[feature]
+  if (!list) return '<span class="none" title="まだ実装PRのheadで撮り直していません">—</span>'
+  return list.map((at) => (at.head
+    ? `<span class="pr">#${at.pr}</span><code>${at.head}</code>${at.screens ? `<small>${esc(at.screens.join('・'))}</small>` : ''}`
+    : `<span class="hold">#${at.pr}<small>${esc(at.note ?? '保留')}</small></span>`)).join('<br>')
 }
 
 /** その機能をどのPRのheadで撮ったか。書いていなければ空欄。 */
 function capturedAt(feature) {
-  const at = CAPTURED_AT[feature]
-  if (!at) return ''
-  if (!at.head) return `#${at.pr}（${at.note ?? '保留'}）`
-  return `#${at.pr} \`${at.head}\` ${at.on}`
+  const list = CAPTURED_AT[feature]
+  if (!list) return ''
+  return list.map((at) => (at.head
+    ? `#${at.pr} \`${at.head}\` ${at.on}${at.screens ? `（${at.screens.join('・')}）` : ''}`
+    : `#${at.pr}（${at.note ?? '保留'}）`)).join('<br>')
 }
 
 function stateOf(screen) {

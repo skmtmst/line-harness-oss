@@ -1216,9 +1216,9 @@ export const SCREENS = [
     steps: [{ click: '削除', nth: 1, scope: 'main' }],
   },
   {
+    /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
     node: 'XBkiQ', feature: 4, name: '4-4-A 保存した検索の条件確認・編集',
-    dir: 'friend-attributes-v6', route: '/tags?tab=searches', status: 'unimplemented',
-    why: '条件の確認・編集の画面が無い。一覧は名前の確認と削除だけ',
+    dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
   },
 ]
 
@@ -1265,12 +1265,23 @@ export function screensOf(feature) {
  *
  * 書いていない機能は、まだPRのheadで撮り直していません（自分の枝で撮った
  * ものです）。**空欄を「確認済み」と読まないでください。**
+ *
+ * **1つの機能が複数のPRに分かれることがあります。** 機能4は #420（友だち
+ * 情報欄）と #421（保存した検索）が別々に進んでいて、**#421 は #420 を
+ * 含みません。** #421 の head で機能4を丸ごと撮り直すと、#420 で直った
+ * 絵が直る前に戻ります。**一度それをやりました。**
+ *
+ * そうならないよう、機能ごとに配列で持ち、`screens` にどの画面が
+ * どのheadのものかを書きます。**撮り直すときは `--only` で対象を絞る。**
  */
 export const CAPTURED_AT = {
-  4: { pr: 420, head: '87c150ad', on: '2026-08-28' },
-  17: { pr: 441, head: '5fd7c048', on: '2026-08-28' },
-  18: { pr: 443, head: 'f372ff30', on: '2026-08-28' },
-  19: { pr: 465, head: null, on: '2026-08-28', note: 'Codexの修正待ち。#465 の比較結果を維持' },
-  21: { pr: 446, head: 'd7e2bc9c', on: '2026-08-28' },
-  22: { pr: 447, head: '12c80878', on: '2026-08-28' },
+  4: [
+    { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
+    { pr: 421, head: '71aff344', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
+  ],
+  17: [{ pr: 441, head: '5fd7c048', on: '2026-08-28' }],
+  18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
+  19: [{ pr: 465, head: null, on: '2026-08-28', note: 'Codexの修正待ち。#465 の比較結果を維持' }],
+  21: [{ pr: 446, head: 'd7e2bc9c', on: '2026-08-28' }],
+  22: [{ pr: 447, head: '12c80878', on: '2026-08-28' }],
 }

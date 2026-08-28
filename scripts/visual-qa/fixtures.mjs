@@ -2418,37 +2418,93 @@ export const SUPPORT_MARKS = [
  * 5行とも「自分だけ」で撮ったことがある（PR #434）。`lineAccountId` は
  * #403 で足された項目で、これが無いと「すべてのアカウント」に見える。
  */
+/**
+ * 保存した検索。**型は `SavedSearch`。**
+ *
+ * 条件は `{ kind, key, op, value }`（`SavedSearchCondition`）。
+ * `{ field, op, value }` で書いていた頃は、画面の当てはめが
+ * `o.field` の逃げ道を通っていて、**書き方が間違っていることに
+ * 気づけなかった。**
+ *
+ * `kind` は `SavedSearchConditionKind` の11個から選ぶ。対応マークは
+ * **`mark`**（`support_mark` ではない）。union に無い値を書くと、
+ * 編集画面の種類のプルダウンが先頭（タグ）に落ちる。**実装のせいに
+ * 見えるが、こちらの書き間違い。**
+ *
+ * `usedIn` と `canDelete` と `matchCount` は、**未取得と0件を分けるために
+ * わざと混ぜてある。**
+ *
+ *   ss-1  使用先2件（一斉配信・オートメーション）→ 消せない
+ *   ss-2  `lineAccountId` が無い → アカウントを割り当てるまで触れない
+ *   ss-3  使用先0件（サーバーが確かめた）→ 消せる
+ *   ss-4  `usedIn` を返せない（未取得）→ 消させない。`matchCount` も null で理由つき
+ *   ss-5  使用先1件（シナリオ・固定参照）→ 消せない
+ */
 export const SAVED_SEARCHES = [
   {
     id: 'ss-1', name: '未対応・期限超過', scope: 'chats',
-    conditions: { all: [{ field: 'support_mark', op: 'is', value: 'mark-1' }], any: [] },
+    conditions: {
+      all: [{ kind: 'mark', op: 'eq', value: 'mark-1' }],
+      any: [], visibility: 'visible_only',
+      list: { sort: 'recent', limit: 20 },
+    },
     createdBy: 'st-1', lineAccountId: 'visual-qa-account', isShared: true,
-    createdAt: '2026-05-02T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+    displayOrder: 1, createdAt: '2026-05-02T00:00:00.000Z',
+    matchCount: 38, matchCountError: null,
+    usedIn: [
+      { kind: 'broadcast', id: 'broadcast-2', name: '8月の再入荷のお知らせ', mode: 'live', lastUsedAt: '2026-08-20T10:00:00.000Z' },
+      { kind: 'automation', id: 'auto-1', name: '未対応が3日続いたら知らせる', mode: 'live', lastUsedAt: '2026-08-24T01:00:00.000Z' },
+    ],
+    canDelete: false,
   },
   {
+    /* 管理者がアカウントを割り当てるまで触れない。 */
     id: 'ss-2', name: '体験申込ずみ・未購入', scope: 'friends',
-    conditions: { all: [{ field: 'tag', op: 'contains', value: 'tag-0' }], any: [] },
+    conditions: {
+      all: [{ kind: 'tag', op: 'includes', value: 'tag-0' }],
+      any: [], visibility: 'visible_only',
+      list: { sort: 'recent', limit: 20 },
+    },
     createdBy: 'st-2', lineAccountId: null, isShared: true,
-    createdAt: '2026-06-11T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+    displayOrder: 2, createdAt: '2026-06-11T00:00:00.000Z',
+    matchCount: null, matchCountError: 'アカウントが割り当てられていません',
+    usedIn: [], canDelete: false,
   },
   {
     /* 自分だけのもの。**共有と分けて撮れることが要る。** */
     id: 'ss-3', name: '（自分用）今週の宿題', scope: 'friends',
-    conditions: { all: [], any: [{ field: 'tag', op: 'contains', value: 'tag-1' }] },
+    conditions: {
+      all: [], any: [{ kind: 'tag', op: 'includes', value: 'tag-1' }],
+      visibility: 'visible_only', list: { sort: 'recent', limit: 20 },
+    },
     createdBy: 'st-1', lineAccountId: 'visual-qa-account', isShared: false,
-    createdAt: '2026-08-18T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
+    displayOrder: 3, createdAt: '2026-08-18T00:00:00.000Z',
+    matchCount: 12, matchCountError: null,
+    usedIn: [], canDelete: true,
   },
   {
+    /* **使用先を確かめられなかった。** 0件と同じ絵にしてはいけない。 */
     id: 'ss-4', name: '90日 反応なし', scope: 'friends',
-    conditions: { all: [{ field: 'last_activity', op: 'before', value: '90d' }], any: [] },
-    createdBy: 'st-2', lineAccountId: null, isShared: true,
-    createdAt: '2026-03-20T00:00:00.000Z', updatedAt: '2026-07-02T00:00:00.000Z',
+    conditions: {
+      all: [{ kind: 'created_at', op: 'between', value: { from: '2026-01-01', to: '2026-05-27' } }],
+      any: [], visibility: 'visible_only', list: { sort: 'oldest', limit: 50 },
+    },
+    createdBy: 'st-2', lineAccountId: 'visual-qa-account', isShared: true,
+    displayOrder: 4, createdAt: '2026-03-20T00:00:00.000Z',
+    matchCount: null, matchCountError: '条件が重く、いまは数えられません',
+    canDelete: false,
   },
   {
     id: 'ss-5', name: '来週の予約あり', scope: 'bookings',
-    conditions: { all: [{ field: 'booking_date', op: 'within', value: '7d' }], any: [] },
+    conditions: {
+      all: [{ kind: 'field', key: 'next_delivery', op: 'eq', value: '2026-09-01' }],
+      any: [], visibility: 'visible_only', list: { sort: 'recent', limit: 20 },
+    },
     createdBy: 'st-1', lineAccountId: 'visual-qa-account', isShared: true,
-    createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z',
+    displayOrder: 5, createdAt: '2026-07-15T00:00:00.000Z',
+    matchCount: 7, matchCountError: null,
+    usedIn: [{ kind: 'scenario', id: 'sc-3', name: '予約前日・当日案内', mode: 'fixed', lastUsedAt: null }],
+    canDelete: false,
   },
 ]
 

@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 178,
-  "unimplemented": 75,
+  "compared": 179,
+  "unimplemented": 74,
   "unconfirmed": 5,
   "elsewhere": 4,
   "missing": 0,
@@ -44,16 +44,34 @@
       "feature": 4,
       "name": "友だち属性",
       "total": 21,
-      "compared": 14,
-      "unimplemented": 3,
+      "compared": 15,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 4,
       "missing": 0,
-      "capturedAt": {
-        "pr": 420,
-        "head": "87c150ad",
-        "on": "2026-08-28"
-      }
+      "capturedAt": [
+        {
+          "pr": 420,
+          "head": "87c150ad",
+          "on": "2026-08-28",
+          "screens": [
+            "HBTk0",
+            "yKEdO",
+            "A1ZYeP",
+            "l25rlp",
+            "rIhbN"
+          ]
+        },
+        {
+          "pr": 421,
+          "head": "71aff344",
+          "on": "2026-08-28",
+          "screens": [
+            "QKx8Q",
+            "XBkiQ"
+          ]
+        }
+      ]
     },
     {
       "feature": 5,
@@ -196,11 +214,13 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": {
-        "pr": 441,
-        "head": "5fd7c048",
-        "on": "2026-08-28"
-      }
+      "capturedAt": [
+        {
+          "pr": 441,
+          "head": "5fd7c048",
+          "on": "2026-08-28"
+        }
+      ]
     },
     {
       "feature": 18,
@@ -211,11 +231,13 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": {
-        "pr": 443,
-        "head": "f372ff30",
-        "on": "2026-08-28"
-      }
+      "capturedAt": [
+        {
+          "pr": 443,
+          "head": "f372ff30",
+          "on": "2026-08-28"
+        }
+      ]
     },
     {
       "feature": 19,
@@ -226,12 +248,14 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": {
-        "pr": 465,
-        "head": null,
-        "on": "2026-08-28",
-        "note": "Codexの修正待ち。#465 の比較結果を維持"
-      }
+      "capturedAt": [
+        {
+          "pr": 465,
+          "head": null,
+          "on": "2026-08-28",
+          "note": "Codexの修正待ち。#465 の比較結果を維持"
+        }
+      ]
     },
     {
       "feature": 20,
@@ -253,11 +277,13 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": {
-        "pr": 446,
-        "head": "d7e2bc9c",
-        "on": "2026-08-28"
-      }
+      "capturedAt": [
+        {
+          "pr": 446,
+          "head": "d7e2bc9c",
+          "on": "2026-08-28"
+        }
+      ]
     },
     {
       "feature": 22,
@@ -268,11 +294,13 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": {
-        "pr": 447,
-        "head": "12c80878",
-        "on": "2026-08-28"
-      }
+      "capturedAt": [
+        {
+          "pr": 447,
+          "head": "12c80878",
+          "on": "2026-08-28"
+        }
+      ]
     },
     {
       "feature": 23,
