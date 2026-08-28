@@ -11,9 +11,24 @@ describe('V6 機能20 分析', () => {
       'クロス分析', 'ファネル', 'URLクリック', '保存した分析',
     ]) expect(PAGE).toContain(`label: '${tab}'`)
 
-    for (const node of ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'Fh2Qj', 'dfwD4']) {
+    for (const node of ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'Fh2Qj', 'dfwD4']) {
       expect(PAGE).toContain(`data-design-node="${node}"`)
     }
+  })
+
+  it('クロス分析とファネルは旧集計へ戻らず、版付きの不変結果を使う', () => {
+    for (const path of [
+      '/api/analytics/cross/query',
+      '/api/analytics/cross/results/',
+      '/api/analytics/funnels?account_id=',
+      '/api/analytics/funnels/${funnelId}/runs/latest',
+      '/api/analytics/funnels/${funnelId}/run',
+      '/api/analytics/results/${resultId}/audiences',
+    ]) expect(API).toContain(path)
+    expect(PAGE).toContain('api.analytics.v6Funnels.list')
+    expect(PAGE).toContain('api.analytics.runCross')
+    expect(PAGE).not.toContain('api.funnels.create')
+    expect(PAGE).not.toContain('api.funnels.result')
   })
 
   it('既存の5つの読取APIを再利用し、本文タイトルを重ねない', () => {
@@ -26,9 +41,20 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('Search Consoleを見る')
   })
 
-  it('未取得の数値を0にせず、保存機能の未接続を明示する', () => {
+  it('未取得の数値を0にせず、定義と結果を分けて保存する', () => {
     expect(PAGE).toContain("if (value.value === null) return '—'")
-    expect(PAGE).toContain('保存した分析はまだ接続されていません')
-    expect(PAGE).not.toContain('定義版と結果スナップショットが無くても')
+    expect(API).toContain('/api/analytics/saved?account_id=')
+    expect(API).toContain('/api/analytics/saved/${id}/snapshots?account_id=')
+    expect(PAGE).toContain('条件の定義と集計結果を分けて保存しています')
+    expect(PAGE).toContain('保存時点の結果は書き換わりません')
+    expect(PAGE).toContain('定期レポートは現在「なし」です')
+    expect(PAGE).not.toContain('保存した分析はまだ接続されていません')
+  })
+
+  it('保存と個人一覧への移動は閲覧権限と分ける', () => {
+    expect(PAGE).toContain("response.data.role === 'owner' || response.data.role === 'admin'")
+    expect(PAGE).toContain('結果の保存と個人一覧への移動は、統括・管理者だけが行えます。')
+    expect(PAGE).toContain('canManage && <Button onClick={() => void prepareCrossAudience()}')
+    expect(PAGE).toContain('canManage && <Button onClick={() => void prepareFunnelAudience()}')
   })
 })

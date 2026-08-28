@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作26個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作30個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,10 +45,10 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    // 2026-08-28: 分析V6では、行き先の無いマニュアル・保存・CSVを
-    // 出さない。画面に出す操作は実行できるものだけに締めた。
-    expect(openings).toHaveLength(26)
-    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(10)
+    // 2026-08-28: 分析V6の保存結果を、名前を付けて保存できるようにした。
+    // 未実装のCSV・定期レポート操作は数へ入れない。
+    expect(openings).toHaveLength(30)
+    expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(12)
   })
 
   it('共通部品が持つ見た目を画面側で重ねない', () => {
@@ -97,7 +97,9 @@ describe('標準ボタンの第1段階移行', () => {
     //
     // 2026-08-27: ダッシュボードの受信カードが自前の「前へ／次へ」をやめて
     // 共通ページ送りへ寄せた。副次2つ減って280。**減ったので締め直す。**
-    expect(debt['direct-secondary-button']).toBe(280)
+    // 分析の死んだ旧UIを削除して11個減った。共通Buttonで実装した保存操作は
+    // この直書き数へは入らない。
+    expect(debt['direct-secondary-button']).toBe(269)
     /*
       4-1 を設計の実測値へ合わせるたびに増える。設計 `hqrOv` に
       書いてある数で、トークンには無い（26px の札・7px の余白・
@@ -107,7 +109,7 @@ describe('標準ボタンの第1段階移行', () => {
     // 友だち一覧はV6トークンへ移し、任意値を127か所削除した。
     // 2026-08-27: 「今月の配信」から重複していた送信枠の帯を外し、
     // 「友だちの状態」を設計の3行＋内訳に組み直した。実測値が1つ減って1284。
-    expect(debt['arbitrary-value']).toBe(1284)
+    expect(debt['arbitrary-value']).toBe(1283)
   })
 
   it('V5基準・V6画面優先と画像比較の未検証を契約へ残す', () => {

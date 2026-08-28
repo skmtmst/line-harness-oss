@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ArrowDownWideNarrow, Bookmark, Circle, Search, SlidersHorizontal, Star } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListItem } from '@/lib/api'
@@ -37,6 +38,8 @@ function FriendsPageInner({
   onExportReady: (exporter: () => void) => void
 }) {
   const { selectedAccountId } = useAccount()
+  const searchParams = useSearchParams()
+  const audienceId = searchParams.get('audienceId')?.trim() || ''
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -95,6 +98,7 @@ function FriendsPageInner({
         limit: pageSize,
         tagId: selectedTagId || undefined,
         accountId: selectedAccountId || undefined,
+        audienceId: audienceId || undefined,
         search: searchSubmitted || undefined,
         includeChatStatus: true,
         sort: sortMode,
@@ -115,7 +119,7 @@ function FriendsPageInner({
     } finally {
       setLoading(false)
     }
-  }, [advanced, attentionOnly, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => setPage(1), [selectedAccountId])
