@@ -399,13 +399,32 @@ export const SCREENS = [
   },
 
   // ── 機能5 シナリオ配信 ──────────────────────────────────
-  { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios' },
-  { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0' },
-  { ...SCENARIO, node: 'kk8dz', name: '5-1-B シナリオ作成・1通目設定', route: '/scenarios/first-step?id=scenario-0' },
-  { ...SCENARIO, node: 'bV5Vs', name: '5-1-C シナリオ編集', route: EDIT },
+  { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
+    verdict: 'needs_fix', verdictNote: 'P1 完了率が画面の2つの数と合わない。購読中1,028人・読了済728人と出しながら完了率41%と出す（scenarios/page.tsx:234 が completed/(subscribers+completed) で割っている）。設計は71%（728/1,028）。P2 一覧に登録日の列が無い。配信方式に「経過時間（旧）」と内部の旧表記が出る。設計の緑の案内帯（作成しただけでは配信されません…）が本文の副題になっている',
+    verdictSource: 'scenarios-v6/TC1b1-1920.png + apps/web/src/app/scenarios/page.tsx:234', verdictHead: '6db5ad7f',
+  },
+  { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
+    verdict: 'needs_fix', verdictNote: 'P2 設計の3段の進み表示（STEP1 シナリオ情報／STEP2 配信方式／STEP3 1通目を設定）が無い。フォルダをこの画面で選べない（設計はシナリオ情報のカードで選ぶ）。2つのカードの本文・例・チップは設計どおり',
+    verdictSource: 'scenarios-v6/cCB7r-1920.png', verdictHead: '6db5ad7f',
+  },
+  { ...SCENARIO, node: 'kk8dz', name: '5-1-B シナリオ作成・1通目設定', route: '/scenarios/first-step?id=scenario-0',
+    verdict: 'needs_fix', verdictNote: 'P2 STEP表示が無い。右側にLINEプレビューの吹き出しと設定サマリー（配信対象・配信日時・送信数・配信後）が無い。本文の字数（52 / 5,000）が出ない。種類のタブが設計の6つ（テキスト・画像・テンプレート・質問・カルーセル・その他）と違う9つ。時刻欄が「10:00 AM」と英語書式になるのは撮影側のブラウザ言語の癖で、実装の不具合ではない',
+    verdictSource: 'scenarios-v6/kk8dz-1920.png', verdictHead: '6db5ad7f',
+  },
+  { ...SCENARIO, node: 'bV5Vs', name: '5-1-C シナリオ編集', route: EDIT,
+    verdict: 'needs_fix', verdictNote: 'P1 到達率が取れないと NaN% と出る（scenario-detail-client.tsx:1510 の Math.round(stat.reachRate*100)。未取得なら—にすべき）。撮った絵のNaN%自体は当時の固定データが reachedRate という別名だったのが原因で、固定データは直した。実装側の守りは残っている。P2 一覧に配信対象の列が無く、配信後がどの行も—。設計の注意帯（作成しただけでは配信されません…）が無い',
+    verdictSource: 'scenarios-v6/bV5Vs-1920.png + apps/web/src/app/scenarios/detail/scenario-detail-client.tsx:1510', verdictHead: '6db5ad7f',
+  },
   {
+    /*
+      **`{ click: '編集' }` は設定カードの「編集」に当たっていた。**
+      撮れた絵はシナリオ名・説明・フォルダ・トリガーの設定欄で、
+      設計の「1通目を編集」ではない。**別の画面を並べて判定しない。**
+      通の行の「編集」は設定カードの次に出るので `nth: 1` にする。
+      撮り直すまで判定は入れない。
+    */
     ...SCENARIO, node: 'xfYLn', name: '5-1-D シナリオ・ステップ編集', route: EDIT,
-    mode: 'viewport', height: 1080, steps: [{ click: '編集' }],
+    mode: 'viewport', height: 1080, steps: [{ click: '編集', nth: 1 }],
   },
   {
     ...SCENARIO, node: 'r6Gzsu', name: '5-1-E シナリオ・配信条件を開く', route: EDIT,
