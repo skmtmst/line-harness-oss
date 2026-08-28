@@ -1,6 +1,6 @@
 # V6 画像比較の引き継ぎ書
 
-最終更新：2026-08-28 22:00 JST
+最終更新：2026-08-28 23:50 JST
 
 **手で数字を書き写さないでください。** 数はすべて
 `scripts/visual-qa/screens.mjs` から機械で出します。
@@ -24,27 +24,55 @@
 
 - [#491](https://github.com/skmtmst/line-harness-oss/pull/491) 自動応答の段番号と `toDraft`（#450 からの切り出し）
 - [#497](https://github.com/skmtmst/line-harness-oss/pull/497) 一斉配信の最終確認（**Draft。マージしない**）
+- [#499](https://github.com/skmtmst/line-harness-oss/pull/499) スコアのルールの文言と幅（**Draft。マージしない**）
+
+**設計（Pencil）も2回直しました。** どちらも「取れない数が描いてある」
+のを外したものです（10節）。
 
 ---
 
 ## 2. いまの数
 
 ```
-総数 262 ／ 比較済み 189 ／ 未実装 69 ／ 未確認 0 ／ 別の仕掛け 4 ／ 未撮影 0
+総数 262 ／ 比較済み 195 ／ 未実装 63 ／ 未確認 0 ／ 別の仕掛け 4 ／ 未撮影 0
 ```
 
-未実装69枚の内訳：**既存部品18／通常実装22／新規API24／除外候補5**
+**「比較済み」は「合っていた」ではありません。** 2026-08-28 に
+判定（`verdict`）を台帳へ入れたので、いまは内訳が機械で出ます。
+
+```
+一致 6 ／ 構造一致・データ未接続 16 ／ 要修正 96 ／ 未実装 63 ／ 未判定 77
+完了まで残り 252
+```
+
+**未判定77は、元の文書で「撮影済み・突き合わせ中」だったものです。**
+画像の有無から推測して一致にはしていません。`--check` はこの77件を
+1つずつ挙げて落ちます。**落ちるのは意図どおりです。**
+
+未実装63枚の内訳：**通常実装22／既存部品16／新規API20／除外候補5**
 
 ```bash
 node scripts/visual-qa/ledger.mjs          # 進捗表（Markdown）
 node scripts/visual-qa/ledger.mjs --json   # 集計値
 node scripts/visual-qa/ledger.mjs --html   # 進捗ページ
 node scripts/visual-qa/ledger.mjs --gaps   # 未実装の片づけ方
-node scripts/visual-qa/capture-screens.mjs --check   # 行の数え上げ
+node scripts/visual-qa/capture-screens.mjs --check   # 行と判定の検査
 ```
 
-**3つの出口は同じところから出ます。** 別々に書くと必ずどれかが古くなり、
-古い数を根拠に「あと何枚」を話すことになります。
+**3つの出口は同じところから出ます。** 別々に書くと必ずどれかが古くなります。
+
+### 本番までの距離
+
+**V6は1画面も本番に出ていません。**
+
+| | |
+|---|---|
+| `main` へ取り込まれたPR | **0件** |
+| `codex/development` が `main` より進んでいる数 | **1515コミット** |
+| 本番へ運ぶPR [#258](https://github.com/skmtmst/line-harness-oss/pull/258) | **開いたまま** |
+| 比較済みのうち、未取り込みDraftのheadでしか撮っていない画面 | **28枚** |
+
+全画面がそろった機能は **8つ**（1・2・19・28・29・30・31・32）です。
 
 ---
 
@@ -109,7 +137,13 @@ VISUAL_QA_BASE=http://localhost:3103 node scripts/visual-qa/capture-screens.mjs 
   shots: 'tags-csv-select',       // elsewhere のときの基準画像名
   gap: 'parts'|'build'|'api'|'drop'|'pending',
   gapNote: '**何が要るか**を書く。「無い」では足りない',
-  why: 'status の理由。空にしない' }
+  why: 'status の理由。空にしない',
+
+  /* 判定。**`status` とは別。5節を読んでから書く** */
+  verdict: 'match'|'structure_match_data_pending'|'needs_fix',
+  verdictNote: 'P1×5' / '未接続の中身',
+  verdictSource: '<機能>-v6/design-qa-….md',
+  verdictHead: '75b010fc' }
 ```
 
 `CAPTURED_AT` は機能ごとの配列です。**どの画面をどのheadで撮ったか**を持ち、
@@ -120,13 +154,38 @@ VISUAL_QA_BASE=http://localhost:3103 node scripts/visual-qa/capture-screens.mjs 
 
 ## 5. 判定の言葉
 
-| 言葉 | いつ使うか |
-|---|---|
-| **一致** | 設計どおり。実装が足したものは差として書く |
-| **構造一致・データ未接続** | 形は同じ。数字や中身が繋がっていない |
-| **要修正** | 直すところがある。P0/P1/P2 を付ける |
-| **未実装** | 画面が無い。**撮らない。合格にもしない** |
-| **未確認** | こちらが確かめていない。**いまは0枚** |
+**台帳が持ちます。手で数えません。**
+
+```js
+verdict: 'match' | 'structure_match_data_pending' | 'needs_fix',
+verdictNote:   'P1×5' / '未接続の中身',   // 何を直すか・何が繋がっていないか
+verdictSource: '<機能>-v6/design-qa-….md', // どこで判定したか
+verdictHead:   '75b010fc',                  // 判定したときのPR head
+```
+
+| 言葉 | `verdict` | いつ使うか |
+|---|---|---|
+| 一致 | `match` | 設計どおり。実装が足したものは差として書く |
+| 構造一致・データ未接続 | `structure_match_data_pending` | 形は同じ。**何が繋がっていないかを書く** |
+| 要修正 | `needs_fix` | **P0/P1/P2 か参照先を残す** |
+| 未実装 | （`status`側） | 画面が無い。**撮らない。合格にもしない** |
+| 未判定 | 空 | まだ判定していない。**自動で一致にしない** |
+
+**実装の状態（`status`）と判定（`verdict`）は別です。**
+「撮れた」と「合っていた」は違います。
+
+### `--check` が見るもの（7つ）
+
+1. 比較済みなのに `verdict` が無い → 落ちる
+2. `status: 'unimplemented'` を `match` にできない
+3. 空欄を自動で一致にしない（1と同じ入口）
+4. `structure_match_data_pending` に `verdictNote` が無い → 落ちる
+5. `needs_fix` に P0/P1/P2 も参照先も無い → 落ちる
+6. 合計が 262 でない → 落ちる
+7. `verdictHead` と `CAPTURED_AT` の最新 head がずれていたら**見直しに挙げる**
+
+**5つとも、わざと壊して落ちるところまで確かめてあります。**
+数え上げは**落ちるときにも出します**（出さないと「あと何枚か」が消える）。
 
 全画面に効く決めごと：
 
@@ -226,63 +285,139 @@ NEN配信のキーを自作の名前で書いていて、画面の `campaignKey`
 
 ---
 
-## 7. PRの状態
+## 7. 実行の記録：契約が決まりました
+
+**7機能ぶんの「動いた記録」の画面は、1つの契約に乗ります。**
+`packages/shared/src/types.ts`（#500 で入り、#501・#502 が写した）。
+
+```ts
+ExecutionOwnerKind  broadcast reminder scenario auto_reply manual user
+                    automation notification integration     （9つ）
+ExecutionRunStatus  succeeded failed partial skipped pending cancelled （6つ）
+ExecutionRunListItem
+  occurredAt subject accountLabel triggerLabel reference
+  status detail durationMs canRetry               （共通9項目）
+```
+
+**物理テーブルは1本にしません。** 各機能の書込台帳はそのまま残し、
+**読む口の形だけ揃えます。** 機能固有の状態は `domainStatus` に置き、
+共通状態へ潰しません。
+
+| Node | 機能 | PR | 判定 | 読む先 |
+|---|---|---|---|---|
+| `GC4St` | 7 リマインダ | #500 `409f00bb` | **要修正 P1×5** | 新しい台帳 |
+| `t7UtYQ` | 8 自動応答 | #501 `93edbe17` | **一致** | 新しい台帳 |
+| `DkPY0` | 25 オートメーション | #502 `75b010fc` | **一致** | **既存の `automation_runs`** |
+| `M2b2B` | 5 シナリオ | #503 `6db5ad7f` | **一致** | **既存の `ScenarioStats`** |
+| `Se65i` `X8JCA5` | 24 LINE通知 | 未着 | — | `ec_events` ＋ `messages_log` の見込み |
+| `KNG00` | 26 外部連携 | 未着 | — | **読む先が無い** |
+
+**#502・#503 でやり方が決まりました。まず「既存を読めないか」を見ます。**
+
+### `t7UtYQ`・`DkPY0` が手本です
+
+- **失敗と「何もしていない」を必ず分ける**（`skipped` を成功にも失敗にも寄せない）
+- **空でも、並べる元が無いものは `—`**（`DkPY0` は空のとき
+  「動いた 0回」と「いちばん動いた —回」を同じ画面に出す）
+- **失敗の理由は口の側で日本語にする**（`safeFailureReason`。
+  画面が `failure_code` を知らなくて済む）
+
+**#500 で返した5件のうち4件は、#501 では最初から起きていません。**
+`GC4St` を直すときの手本にできます。
+
+---
+
+## 8. PRの状態
 
 | PR | head | 状態 | 中身 |
 |---|---|---|---|
-| [#490](https://github.com/skmtmst/line-harness-oss/pull/490) | `ff33ee09` | MERGEABLE/CLEAN | 機能4の比較証拠。**維持** |
-| [#491](https://github.com/skmtmst/line-harness-oss/pull/491) | `5078911d` | MERGEABLE/CLEAN | 自動応答の2点。**#430 の後に取り込む。単独マージしない** |
-| [#492](https://github.com/skmtmst/line-harness-oss/pull/492) | `ea12afc7` | MERGEABLE/CLEAN | 台帳と比較文書の本体 |
-| [#497](https://github.com/skmtmst/line-harness-oss/pull/497) | `84e5bab9` | **Draft** | 一斉配信の最終確認。**#495 → #497 の順。マージしない** |
+| [#490](https://github.com/skmtmst/line-harness-oss/pull/490) | `ff33ee09` | MERGEABLE | 機能4の比較証拠。**維持** |
+| [#491](https://github.com/skmtmst/line-harness-oss/pull/491) | `5078911d` | MERGEABLE | 自動応答の2点。**#430 の後。単独マージしない** |
+| [#492](https://github.com/skmtmst/line-harness-oss/pull/492) | `96e16458` | MERGEABLE | **台帳と比較文書の本体** |
+| [#497](https://github.com/skmtmst/line-harness-oss/pull/497) | `84e5bab9` | **Draft** | 一斉配信の最終確認。**#495 → #497。マージしない** |
+| [#499](https://github.com/skmtmst/line-harness-oss/pull/499) | `642b8222` | **Draft** | スコアのルールの文言と幅。**#496 → #499。マージしない** |
 
-`#492` は `codex/kenta-v6-feature4-remaining`（#490）の上に積んでいます。
-**下から順に取り込んでください。**
+`#492` は `#490` の上に積んでいます。**下から順に取り込んでください。**
 
-### Codexへ返した指摘（PRコメント）
+### Codexへ返した指摘
 
 #420 / #421 / #433 / #441 / #444 / #445 / #446 / #447 / #448 / #450 /
-#493 / #494 / #495
+#493 / #494 / #495 / #496 / #500
 
-**#445 と #447 は解決済みとして閉じました。**
+**#445・#447 は解決済みとして閉じました。**
+
+### 止まっている12枚
+
+確認画面12枚は、**12枚すべてが同じファイルを触る未統合PRにふさがれて**
+います（[v6-parts-12-confirm-blocked.md](v6-parts-12-confirm-blocked.md)）。
+**どのPRも確認の窓は作っていません。順番がぶつかっているだけです。**
+取り込みを待って上から実装する、で合意しています。
 
 ---
 
-## 8. 文書
+## 9. 文書
 
 | 文書 | 中身 |
 |---|---|
-| [v6-progress-ledger.md](v6-progress-ledger.md) | 進捗表（生成物） |
+| [v6-progress-ledger.md](v6-progress-ledger.md) | 進捗表と**判定の内訳**（生成物） |
 | [v6-progress.json](v6-progress.json) / [v6-progress.html](v6-progress.html) | 同上 |
-| [v6-unimplemented-gaps.md](v6-unimplemented-gaps.md) | **未実装69枚の片づけ方**（生成物） |
-| [v6-parts-19-instructions.md](v6-parts-19-instructions.md) | **既存部品で作れる画面の実装指示書** |
+| [v6-unimplemented-gaps.md](v6-unimplemented-gaps.md) | **未実装63枚の片づけ方**（生成物） |
+| [v6-api-requirements-rollup.md](v6-api-requirements-rollup.md) | **未実装の口の要りようを7つに束ねたもの** |
+| [v6-execution-records-remaining-4.md](v6-execution-records-remaining-4.md) | 残る `Se65i` `X8JCA5` `KNG00` の下ごしらえ |
+| [v6-parts-12-confirm-blocked.md](v6-parts-12-confirm-blocked.md) | 確認画面12枚がふさがれている記録 |
+| [v6-parts-19-instructions.md](v6-parts-19-instructions.md) | 既存部品で作れる画面の実装指示書 |
+| [v6-recheck-496-and-classification.md](v6-recheck-496-and-classification.md) | 分類を直した記録（`GMvBd` `LT8RS` ほか） |
 | [v6-unconfirmed-cleared.md](v6-unconfirmed-cleared.md) | 未確認5枚を0にした記録 |
-| [v6-visual-qa-pr-status.md](v6-visual-qa-pr-status.md) | PRの重なりと、撮り直しの履歴 |
-| `<機能>-v6/design-qa*.md` | 機能ごとの比較結果 |
+| `<機能>-v6/design-qa*.md` | 機能ごと・PRごとの比較結果 |
 
 ---
 
-## 9. 次にやること
+## 10. 次にやること
 
-1. **`z3PB2` の設計突き合わせ。** 撮影は済んでいますが、設計HTML
-   （`f17/z3PB2.html`）とまだ並べていません
-2. **#497 の残差4件。** うち「除外の人数」はAPI側の話なのでCodexへ
-3. **既存部品で作れる18枚。** 指示書のとおりに進める。優先は
-   削除確認7枚 → 実行・停止の最終確認6枚 → そのほか5枚
-4. **`s6MBc`。** CodexがDB・API基盤を実装中。**こちらは実装せず、
-   V6設計との差分整理だけ**続ける
-5. **未実装69枚の再確認。** 実装PRが進むたび、最新headで撮り直す
+1. **未判定77件を減らす。** いちばん効きます。`--check` が1件ずつ
+   挙げるので、上から `design-qa.md` を読んで `verdict` を入れる。
+   **画像の有無から推測しない**
+2. **`GC4St` のP1×5。** `t7UtYQ` が手本。とくに
+   「失敗したのに『0件』と書く」と「1440pxで列が切れる」
+3. **`Se65i`・`X8JCA5`。** 読む先は `ec_events` ＋
+   `messages_log(source='ec_transactional')`。**`ec_events` に
+   `line_account_id` は無く、`friend_id` は `null` になりうる。
+   所属アカウントを推測で出さない**
+4. **`KNG00`。** 4枚のうちここだけ読む先が無い。**`DkPY0` と形が
+   ほぼ同じなので、先にそちらを見て写せるか確かめる**
+5. **確認画面12枚。** ふさいでいるPRが取り込まれた順に
 6. **設計側の食い違い**（記録だけにしてある分）を Pencil で直す
+
+### 設計側で直したもの・残っているもの
+
+**直した（2件）**
+
+| Node | 何を |
+|---|---|
+| `s6MBc` | 「メッセージを開いた ＋2」の行を消し、理由を1行足した |
+| `GC4St` | 開封率の列（見出し1・セル3）を消し、注記を1行足した |
+
+**残っている（取れない数が設計に描いてある）**
+
+| Node | 設計の数 |
+|---|---|
+| `M2b2B` | ステップ別の反応「開封 82.4%・74.8%・69.2%」 |
+| `Se65i` | 「開かれた 3,682通 96.2%」＋行ごとの「読まれた」列 |
+| `M2b2B` | 「エラー 3人」／`KNG00` 「返事までの時間 平均0.4秒」 |
+
+**Pencilを直すときは、必ず控えを取ってから**（10節）。
 
 ### 待っているもの
 
 | 何 | 誰 |
 |---|---|
-| `s6MBc` のDB・API基盤 | Codex |
-| #495 のマージ（#497 の前提） | Codex |
+| `Se65i`・`X8JCA5`・`KNG00` の実装PR | Codex |
+| #495 のマージ（#497 の前提）／#496 のマージ（#499 の前提） | Codex |
+| 確認画面12枚をふさいでいる11本の取り込み | Codex |
 
 ---
 
-## 10. 覚えておくこと
+## 11. 覚えておくこと
 
 - **`pnpm` は PATH にありません。** `./node_modules/.bin/…` か
   `../../node_modules/.bin/vitest` を直接叩く
@@ -292,7 +427,12 @@ NEN配信のキーを自作の名前で書いていて、画面の `campaignKey`
   意味がありません
 - **force push しない**
 - **worktree は外付け側へ。** `/private/tmp` は使わない
-- **Pencil の `png` 書き出しは壊れています**（砂嵐）。`html-css` で
-  書き出してChromiumで描く。まとめ書き出しは55秒で切れるので30個ずつ
+- **Pencil の `png` 書き出しは古い絵を返します**（バイト数まで同じ）。
+  `html-css` で書き出して撮影ハーネスに通す。
+  **`html-tailwind` では駄目**（`sizeFromHtml` が幅を読めない）
+- **Pencil の `filePath` は効きません。** どの道を渡しても、
+  いま開いている1つの文書を触ります。**複製の読み比べには使えない**
+- **`.pen` ファイルは259バイトの入れ物です。** 中身は
+  `~/.pencil/backup/` に指紋の名前で置かれます。**控えはそちらを写す**
 - このマシンの時計は **UTC+7**。日時を書くときは `TZ=Asia/Tokyo` を明示
 - 外付けの git は遅い。rebase / merge は背景で走らせて待つ
