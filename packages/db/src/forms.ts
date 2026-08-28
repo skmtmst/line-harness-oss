@@ -60,9 +60,36 @@ export interface FormUsedByAccount {
 export interface FormWithStats extends Form {
   last_submitted_at: string | null;
   used_by_accounts: FormUsedByAccount[];
+  account_scope_review_required: boolean;
 }
 
-export async function getFormsWithStats(db: D1Database): Promise<FormWithStats[]> {
+export interface FormAccountScope {
+  lineAccountIds?: string[];
+  includeUnassigned?: boolean;
+}
+
+export async function getFormsWithStats(
+  db: D1Database,
+  scope: FormAccountScope = {},
+): Promise<FormWithStats[]> {
+  const accountIds = [...new Set(scope.lineAccountIds ?? [])].filter(Boolean);
+  let scopeClause = '';
+  if (scope.lineAccountIds !== undefined && accountIds.length === 0) {
+    scopeClause = scope.includeUnassigned
+      ? `WHERE NOT EXISTS (SELECT 1 FROM form_accounts visible WHERE visible.form_id = f.id)`
+      : 'WHERE 0';
+  } else if (scope.lineAccountIds !== undefined) {
+    scopeClause = `WHERE (
+           EXISTS (
+             SELECT 1 FROM form_accounts visible
+             WHERE visible.form_id = f.id
+               AND visible.line_account_id IN (${accountIds.map(() => '?').join(', ')})
+           )
+           ${scope.includeUnassigned
+             ? `OR NOT EXISTS (SELECT 1 FROM form_accounts pending WHERE pending.form_id = f.id)`
+             : ''}
+         )`;
+  }
   // Single query: forms + last submission + per-account submission counts.
   // json_group_array returns '[]' (not NULL) when subquery yields no rows.
   const result = await db
@@ -70,6 +97,9 @@ export async function getFormsWithStats(db: D1Database): Promise<FormWithStats[]
       `SELECT
          f.*,
          (SELECT MAX(created_at) FROM form_submissions WHERE form_id = f.id) AS last_submitted_at,
+         NOT EXISTS (
+           SELECT 1 FROM form_accounts assigned WHERE assigned.form_id = f.id
+         ) AS account_scope_review_required,
          (SELECT json_group_array(
                    json_object(
                      'id', la.id,
@@ -79,21 +109,29 @@ export async function getFormsWithStats(db: D1Database): Promise<FormWithStats[]
                      'count', sub.cnt
                    )
                  )
-            FROM (
+            FROM form_accounts assigned
+            JOIN line_accounts la ON la.id = assigned.line_account_id
+            LEFT JOIN (
               SELECT fr.line_account_id, COUNT(*) AS cnt
               FROM form_submissions fs
               JOIN friends fr ON fr.id = fs.friend_id
               WHERE fs.form_id = f.id AND fr.line_account_id IS NOT NULL
               GROUP BY fr.line_account_id
-            ) sub
-            JOIN line_accounts la ON la.id = sub.line_account_id) AS used_by_accounts_json
+            ) sub ON sub.line_account_id = assigned.line_account_id
+            WHERE assigned.form_id = f.id) AS used_by_accounts_json
        FROM forms f
+       ${scopeClause}
        ORDER BY
          CASE WHEN last_submitted_at IS NULL THEN 1 ELSE 0 END,
          last_submitted_at DESC,
          f.created_at DESC`,
     )
-    .all<Form & { last_submitted_at: string | null; used_by_accounts_json: string | null }>();
+    .bind(...accountIds)
+    .all<Form & {
+      last_submitted_at: string | null;
+      account_scope_review_required: number;
+      used_by_accounts_json: string | null;
+    }>();
 
   return result.results.map((row) => {
     const { used_by_accounts_json, ...rest } = row;
@@ -106,8 +144,44 @@ export async function getFormsWithStats(db: D1Database): Promise<FormWithStats[]
         parsed = [];
       }
     }
-    return { ...rest, used_by_accounts: parsed };
+    return {
+      ...rest,
+      account_scope_review_required: Boolean(rest.account_scope_review_required),
+      used_by_accounts: parsed.map((account) => ({ ...account, count: account.count ?? 0 })),
+    };
   });
+}
+
+export async function getFormAccountIds(db: D1Database, formId: string): Promise<string[]> {
+  const result = await db
+    .prepare(`SELECT line_account_id FROM form_accounts WHERE form_id = ? ORDER BY line_account_id`)
+    .bind(formId)
+    .all<{ line_account_id: string }>();
+  return result.results.map((row) => row.line_account_id);
+}
+
+export async function formBelongsToLineAccount(
+  db: D1Database,
+  formId: string,
+  lineAccountId: string,
+): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT 1 AS found FROM form_accounts WHERE form_id = ? AND line_account_id = ?`)
+    .bind(formId, lineAccountId)
+    .first<{ found: number }>();
+  return Boolean(row?.found);
+}
+
+export async function attachFormAccounts(
+  db: D1Database,
+  formId: string,
+  lineAccountIds: string[],
+): Promise<void> {
+  const uniqueIds = [...new Set(lineAccountIds)].filter(Boolean);
+  if (uniqueIds.length === 0) return;
+  await db.batch(uniqueIds.map((accountId) => db
+    .prepare(`INSERT OR IGNORE INTO form_accounts (form_id, line_account_id) VALUES (?, ?)`)
+    .bind(formId, accountId)));
 }
 
 export async function getFormById(db: D1Database, id: string): Promise<Form | null> {
@@ -135,15 +209,18 @@ export interface CreateFormInput {
   ogImageUrl?: string | null;
   /** 新規作成画面から作る空レコードは公開しない。未指定は既存互換で公開中。 */
   isActive?: boolean;
+  /** 明示したLINE公式アカウントだけで利用する。 */
+  lineAccountIds?: string[];
 }
 
 export async function createForm(db: D1Database, input: CreateFormInput): Promise<Form> {
   const id = crypto.randomUUID();
   const now = jstNow();
 
-  await db
-    .prepare(
-      `INSERT INTO forms
+  try {
+    await db
+      .prepare(
+        `INSERT INTO forms
          (id, name, description, fields, layout, on_submit_tag_id, on_submit_scenario_id,
           on_submit_message_type, on_submit_message_content,
           on_submit_webhook_url, on_submit_webhook_headers, on_submit_webhook_fail_message,
@@ -151,29 +228,36 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
           og_title, og_description, og_image_url,
           created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
-    )
-    .bind(
-      id,
-      input.name,
-      input.description ?? null,
-      input.fields,
-      input.layout ?? null,
-      input.onSubmitTagId ?? null,
-      input.onSubmitScenarioId ?? null,
-      input.onSubmitMessageType ?? null,
-      input.onSubmitMessageContent ?? null,
-      input.onSubmitWebhookUrl ?? null,
-      input.onSubmitWebhookHeaders ?? null,
-      input.onSubmitWebhookFailMessage ?? null,
-      input.saveToMetadata !== false ? 1 : 0,
-      input.isActive === false ? 0 : 1,
-      input.ogTitle ?? null,
-      input.ogDescription ?? null,
-      input.ogImageUrl ?? null,
-      now,
-      now,
-    )
-    .run();
+      )
+      .bind(
+        id,
+        input.name,
+        input.description ?? null,
+        input.fields,
+        input.layout ?? null,
+        input.onSubmitTagId ?? null,
+        input.onSubmitScenarioId ?? null,
+        input.onSubmitMessageType ?? null,
+        input.onSubmitMessageContent ?? null,
+        input.onSubmitWebhookUrl ?? null,
+        input.onSubmitWebhookHeaders ?? null,
+        input.onSubmitWebhookFailMessage ?? null,
+        input.saveToMetadata !== false ? 1 : 0,
+        input.isActive === false ? 0 : 1,
+        input.ogTitle ?? null,
+        input.ogDescription ?? null,
+        input.ogImageUrl ?? null,
+        now,
+        now,
+      )
+      .run();
+
+    await attachFormAccounts(db, id, input.lineAccountIds ?? []);
+  } catch (error) {
+    // 所属だけ保存に失敗したフォームを残さない。管理画面から見えない孤立行になるため。
+    await db.prepare(`DELETE FROM forms WHERE id = ?`).bind(id).run().catch(() => undefined);
+    throw error;
+  }
 
   return (await getFormById(db, id))!;
 }
