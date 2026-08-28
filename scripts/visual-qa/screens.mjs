@@ -368,6 +368,13 @@ export const SCREENS = [
     mode: 'viewport', height: 1080, steps: [{ click: '一括テスト送信', nth: 1 }],
   },
   {
+    /*
+      **撮る支度だけ。ルートも口も、まだ決まっていません。**
+      固定データは `SCENARIO_RESULTS`。共通契約
+      （`ExecutionRunListItem`）に合わせてある。
+      **開封率とエラー人数は `null`。** 取れないものを数で埋めない。
+      実装PRの番号と head が届いたら route/states を実物から書く。
+    */
     ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果', route: EDIT,
     gap: 'api',
     gapNote: 'シナリオの配信結果を数える口が要る',
@@ -1183,6 +1190,11 @@ export const SCREENS = [
     mode: 'viewport', height: 1136, steps: [{ click: '発送した', role: 'text' }],
   },
   {
+    /*
+      **撮る支度だけ。** 固定データは `UNDELIVERED_RECORDS`。
+      **届かなかった理由・メール送信の記録は置き場がありません。**
+      連絡先は作り物（`example.com`）だけを置く。
+    */
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
     gap: 'api',
     gapNote: '届かなかったお知らせを残す記録が要る',
@@ -1190,6 +1202,12 @@ export const SCREENS = [
     why: '届かなかったお知らせを並べるタブが無い。**発送や返金が届いていない人を、その日のうちに別の手だてで届ける場所が無い**',
   },
   {
+    /*
+      **撮る支度だけ。ルートも口も、まだ決まっていません。**
+      固定データは `NOTIFICATION_RECORDS`（共通契約に合わせてある）。
+      **だれに送ったか・開封・クリックは、いまの `notifications` に
+      置き場がありません。** そこは `null` にしてある。
+    */
     ...LINE_NOTIFY, node: 'Se65i', name: '24-1-C お知らせの記録',
     gap: 'api',
     gapNote: 'いつ・だれに・どのお知らせを送ったかの記録が要る',
@@ -1252,6 +1270,11 @@ export const SCREENS = [
   },
   { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る' },
   {
+    /*
+      **撮る支度だけ。** 固定データは `INTEGRATION_RECORDS`。
+      **つなぎ先は名前だけ。** `outgoing_webhooks` は `url` と `secret` を
+      持つので、道も鍵も送った中身も、画面にも画像にも出さない。
+    */
     ...WEBHOOK, node: 'KNG00', name: '26-1-B やり取りの記録',
     gap: 'api',
     gapNote: '外部連携のやり取りを残す記録と、やり直しの口が要る',

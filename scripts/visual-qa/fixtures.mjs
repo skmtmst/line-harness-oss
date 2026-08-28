@@ -3450,3 +3450,209 @@ export const AUTO_REPLY_RUNS = {
   ],
   pagination: { total: 7, limit: 20, offset: 0 },
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   実行の記録・残り4枚の下ごしらえ（`M2b2B` `Se65i` `X8JCA5` `KNG00`）
+
+   **口はまだありません。** 4枚とも、いまの実装に読む口が
+   1本もありません（`apps/web/src/lib/api.ts` を探して0件）。
+   **推測した道をここへ書きません。** 実装PRの番号と head が届いてから、
+   実物に照らして `mock-api.mjs` へ足します。
+
+   形は `packages/shared/src/types.ts` の `ExecutionRunListItem`
+   （共通9項目）に合わせてあります。**これは #500/#501 で入った正本です。**
+
+   **取れないものは `null` にしてあります。** 数を作ると、
+   「取れている」絵が基準画像になります。どこが `—` で写るかを
+   見るための固定データです。
+   ═══════════════════════════════════════════════════════════════ */
+
+const execRow = (over) => ({
+  ownerKind: over.ownerKind,
+  ownerId: over.ownerId,
+  lineAccountId: 'visual-qa-account',
+  occurredAt: over.occurredAt,
+  subject: over.subject ?? null,
+  accountLabel: over.accountLabel ?? '然-NEN- TEST',
+  triggerLabel: over.triggerLabel,
+  reference: over.reference ?? null,
+  status: over.status,
+  detail: over.detail,
+  durationMs: over.durationMs ?? null,
+  canRetry: over.canRetry ?? false,
+  domainStatus: over.domainStatus,
+})
+
+/* ── M2b2B シナリオ配信結果 ─────────────────────────────────
+   既存：`friend_scenarios`（参加中・完了・一時停止）／`scenario_steps`
+         （段の名前）／`messages_log.scenario_step_id`（段ごとの送信数）／
+         `link_clicks`（押された数）
+   **無い：開封。** LINEは友だち単位の既読を返さない。
+   **無い：エラー人数。** シナリオ配信の失敗を1件ずつ残す記録が無い。
+*/
+export const SCENARIO_RESULTS = {
+  scenario: { id: 'scenario-0', name: '新規登録7日間フォロー', isActive: true },
+  summary: {
+    started: 386,
+    completed: 264,
+    completedRate: 0.684,
+    active: 428,
+    /* **未取得。** 失敗を1件ずつ残す記録が無い。0人と書かない。 */
+    errors: null,
+    /* **未取得。** 一時停止と離脱を分ける印が `friend_scenarios` に無い。 */
+    droppedOut: null,
+  },
+  steps: [
+    { id: 'ss-1', stepOrder: 1, name: '登録直後', sent: 386,
+      /* **取れない。** 設計の「開封 82.4%」はここ。 */
+      openRate: null, clicks: 178, clickRate: 0.461, errors: null },
+    { id: 'ss-2', stepOrder: 2, name: '1日後', sent: 371,
+      openRate: null, clicks: 117, clickRate: 0.316, errors: null },
+    { id: 'ss-3', stepOrder: 3, name: '3日後', sent: 352,
+      openRate: null, clicks: 79, clickRate: 0.224, errors: null },
+    /* **一度も送っていない段。** 実値0と未取得を並べて見分ける。 */
+    { id: 'ss-4', stepOrder: 4, name: '7日後', sent: 0,
+      openRate: null, clicks: 0, clickRate: null, errors: null },
+  ],
+  items: [
+    execRow({ ownerKind: 'scenario', ownerId: 'scenario-0', occurredAt: '2026-08-24T01:00:00.000Z',
+      subject: 'Kenta Kawano', triggerLabel: '1通目：登録直後', reference: null,
+      status: 'succeeded', domainStatus: 'delivered', detail: '送りました', durationMs: 520 }),
+    execRow({ ownerKind: 'scenario', ownerId: 'scenario-0', occurredAt: '2026-08-24T00:40:00.000Z',
+      subject: 'Masato S.', triggerLabel: '2通目：1日後', reference: null,
+      status: 'pending', domainStatus: 'scheduled', detail: 'これから送ります' }),
+    /* **条件で送らなかった。** 失敗ではない。 */
+    execRow({ ownerKind: 'scenario', ownerId: 'scenario-0', occurredAt: '2026-08-24T00:20:00.000Z',
+      subject: '前田 さくら', triggerLabel: '3通目：3日後', reference: null,
+      status: 'skipped', domainStatus: 'condition_not_met',
+      detail: '配信条件に合わなかったため送っていません' }),
+    /* **止めた人。** 離脱と一時停止を分けられるか。 */
+    execRow({ ownerKind: 'scenario', ownerId: 'scenario-0', occurredAt: '2026-08-23T09:00:00.000Z',
+      subject: '石田 未来', triggerLabel: '2通目：1日後', reference: null,
+      status: 'cancelled', domainStatus: 'paused', detail: '購読を止めました' }),
+  ],
+  pagination: { total: 4, limit: 20, offset: 0 },
+}
+
+/* ── Se65i 運用者通知の記録 ─────────────────────────────────
+   既存：`notifications`（title・body・channel・category・
+         status は pending/sent/failed・line_account_id・created_at）
+   **無い：だれに送ったか。** `notifications` に `friend_id` が無い。
+   **無い：開封・クリック。** 設計の「開かれた 96.2%」「押された 22.9%」
+         「読まれた」列は、いまの記録から出せない。
+   **無い：注文番号との結びつき。** `metadata` に入るかは実装しだい。
+*/
+export const NOTIFICATION_RECORDS = {
+  summary: {
+    sent30d: 3826,
+    perDay: 127,
+    /* **取れない。** LINEは友だち単位の既読を返さない。 */
+    opened: null, openRate: null,
+    clicked: null, clickRate: null,
+    undelivered: 4, undeliveredRate: 0.001,
+  },
+  tabs: { customer: 9, operator: 11, undelivered: 4 },
+  items: [
+    execRow({ ownerKind: 'notification', ownerId: 'notif-1', occurredAt: '2026-08-25T02:42:00.000Z',
+      subject: '石田 未来', accountLabel: 'LINE 二号店',
+      triggerLabel: '注文ありがとうございます', reference: '#12492',
+      status: 'succeeded', domainStatus: 'sent', detail: '届きました' }),
+    execRow({ ownerKind: 'notification', ownerId: 'notif-2', occurredAt: '2026-08-24T06:20:00.000Z',
+      subject: '大西 健一', triggerLabel: '返金しました', reference: '#12402',
+      status: 'succeeded', domainStatus: 'sent', detail: '届きました' }),
+    /* **まだ送っていない。** 失敗ではない。 */
+    execRow({ ownerKind: 'notification', ownerId: 'notif-3', occurredAt: '2026-08-24T09:10:00.000Z',
+      subject: '高橋 直人', triggerLabel: 'お荷物を送りました', reference: '#12480',
+      status: 'pending', domainStatus: 'pending', detail: 'これから送ります' }),
+    /* **届かなかった。** 理由の置き場が `notifications` に無い。 */
+    execRow({ ownerKind: 'notification', ownerId: 'notif-4', occurredAt: '2026-08-24T09:00:00.000Z',
+      subject: '林 里佳', triggerLabel: 'お荷物を送りました', reference: '#12466',
+      status: 'failed', domainStatus: 'failed', detail: '届きませんでした' }),
+  ],
+  pagination: { total: 4, limit: 20, offset: 0 },
+}
+
+/* ── X8JCA5 送れなかった通知 ────────────────────────────────
+   `Se65i` と同じ `notifications` を、届かなかったものに絞った面。
+   **無い：届かなかった理由**（ブロック・友だちでない・結びついていない）
+   **無い：メールアドレスと、メールで送った記録**
+   **無い：「いまどうなっているか」の状態**
+
+   **メールアドレスは作り物です。** `example.com` しか置きません。
+*/
+export const UNDELIVERED_RECORDS = {
+  summary: {
+    undelivered: 4, undeliveredRate: 0.0016,
+    blocked: 3, mailed: 2, untouched: 2,
+  },
+  items: [
+    { ...execRow({ ownerKind: 'notification', ownerId: 'notif-4', occurredAt: '2026-08-24T09:00:00.000Z',
+        subject: '林 里佳', triggerLabel: 'お荷物を送りました', reference: '#12466',
+        status: 'failed', domainStatus: 'blocked', detail: 'ブロックされています' }),
+      contactEmail: 'rika@example.com', followUp: 'mailed', followUpLabel: 'メールで届きました' },
+    { ...execRow({ ownerKind: 'notification', ownerId: 'notif-5', occurredAt: '2026-08-23T03:20:00.000Z',
+        subject: '佐野 亮', triggerLabel: 'ご入金を確認しました', reference: '#12440',
+        status: 'failed', domainStatus: 'blocked', detail: 'ブロックされています' }),
+      /* **連絡先が無い行。** `—` と空文字を分ける。 */
+      contactEmail: null, followUp: 'untouched', followUpLabel: 'まだ何もできていません' },
+    { ...execRow({ ownerKind: 'notification', ownerId: 'notif-6', occurredAt: '2026-08-22T00:40:00.000Z',
+        subject: '井上 大輔', triggerLabel: '注文ありがとうございます', reference: '#12418',
+        status: 'failed', domainStatus: 'not_friend', detail: '友だちではありません' }),
+      contactEmail: 'daisuke@example.com', followUp: 'mailed', followUpLabel: 'メールで届きました' },
+    { ...execRow({ ownerKind: 'notification', ownerId: 'notif-7', occurredAt: '2026-08-19T06:02:00.000Z',
+        subject: null, triggerLabel: '返金しました', reference: '#12388',
+        status: 'failed', domainStatus: 'unlinked', detail: '結びついていません' }),
+      contactEmail: null, followUp: 'untouched', followUpLabel: 'まだ何もできていません' },
+  ],
+  pagination: { total: 4, limit: 20, offset: 0 },
+}
+
+/* ── KNG00 外部連携のやり取りの記録 ──────────────────────────
+   既存：`outgoing_webhooks`／`incoming_webhooks`（**つなぎ先の定義だけ**）
+   **無い：やり取り1件ずつの記録。** 送った・受け取った・返事・
+         かかった時間・やり直し、どれも置き場が無い。
+   `rt_sync_events` は飲食店向けの受信専用（`direction='inbound'` 固定、
+   `store_id` 必須）で、**汎用の記録ではありません。**
+
+   **つなぎ先は名前だけにします。** `outgoing_webhooks` は `url` と
+   `secret` を持ちます。**画面にも画像にも出しません。**
+   送った中身も、鍵になりうるものは入れません。
+*/
+export const INTEGRATION_RECORDS = {
+  summary: {
+    total30d: 1972, outbound: 1486, inbound: 486,
+    succeeded: 1966, succeededRate: 0.997,
+    failed: 6,
+    /* かかった時間は `duration_ms` があれば出せる。いまは置き場が無い。 */
+    averageMs: null, slowestMs: null,
+  },
+  items: [
+    execRow({ ownerKind: 'integration', ownerId: 'hook-1', occurredAt: '2026-08-25T02:42:00.000Z',
+      subject: 'こちらから送った', accountLabel: 'Slack ／ #注文チャンネル',
+      triggerLabel: '注文が確定したとき', reference: null,
+      status: 'succeeded', domainStatus: 'ok_200', detail: '200 OK', durationMs: 400 }),
+    execRow({ ownerKind: 'integration', ownerId: 'hook-2', occurredAt: '2026-08-24T07:30:00.000Z',
+      subject: 'こちらで受け取った', accountLabel: 'アンケートツールから ／ 受け取り口 2',
+      triggerLabel: '回答が届いたとき', reference: null,
+      status: 'succeeded', domainStatus: 'matched', detail: '結びつきました', durationMs: 200 }),
+    /* **人が見つからない。** 失敗だがやり直しても直らない種類。 */
+    execRow({ ownerKind: 'integration', ownerId: 'hook-2', occurredAt: '2026-08-24T00:00:00.000Z',
+      subject: 'こちらで受け取った', accountLabel: 'アンケートツールから ／ 受け取り口 2',
+      triggerLabel: '回答が届いたとき', reference: null,
+      status: 'failed', domainStatus: 'unmatched', detail: '人が見つかりません',
+      durationMs: 200, canRetry: false }),
+    /* **やり直せる失敗。** 相手が落ちていただけ。 */
+    execRow({ ownerKind: 'integration', ownerId: 'hook-1', occurredAt: '2026-08-24T00:10:00.000Z',
+      subject: 'こちらから送った', accountLabel: 'Slack ／ #注文チャンネル',
+      triggerLabel: '成果が認められたとき', reference: null,
+      status: 'failed', domainStatus: 'http_503', detail: 'つなぎ先が応答しませんでした',
+      durationMs: 10000, canRetry: true }),
+    /* **一部だけできた。** 送れたが、返事の中身を読めなかった。 */
+    execRow({ ownerKind: 'integration', ownerId: 'hook-1', occurredAt: '2026-08-23T05:00:00.000Z',
+      subject: 'こちらから送った', accountLabel: 'Slack ／ #注文チャンネル',
+      triggerLabel: '注文が確定したとき', reference: null,
+      status: 'partial', domainStatus: 'ok_but_unparsed', detail: '送れましたが、返事を読めませんでした',
+      durationMs: 900 }),
+  ],
+  pagination: { total: 5, limit: 20, offset: 0 },
+}
