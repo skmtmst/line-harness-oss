@@ -2377,3 +2377,44 @@ export const SUPPORT_MARKS = [
   { id: 'mark-4', name: '対応済', color: '#059669', isDefault: false, autoOnInbound: false, displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z' },
   { id: 'mark-5', name: '気にかける', color: '#7c3aed', isDefault: false, autoOnInbound: false, displayOrder: 5, createdAt: '2026-04-10T00:00:00.000Z' },
 ]
+
+/**
+ * 保存した検索（機能4-4）。設計 `QKx8Q`。
+ *
+ * **`SavedSearch` の型どおり。** `isShared` を `visibility` と書いて
+ * 5行とも「自分だけ」で撮ったことがある（PR #434）。`lineAccountId` は
+ * #403 で足された項目で、これが無いと「すべてのアカウント」に見える。
+ */
+export const SAVED_SEARCHES = [
+  {
+    id: 'ss-1', name: '未対応・期限超過', scope: 'chats',
+    conditions: { all: [{ field: 'support_mark', op: 'is', value: 'mark-1' }], any: [] },
+    createdBy: 'st-1', lineAccountId: 'visual-qa-account', isShared: true,
+    createdAt: '2026-05-02T00:00:00.000Z', updatedAt: '2026-08-20T00:00:00.000Z',
+  },
+  {
+    id: 'ss-2', name: '体験申込ずみ・未購入', scope: 'friends',
+    conditions: { all: [{ field: 'tag', op: 'contains', value: 'tag-0' }], any: [] },
+    createdBy: 'st-2', lineAccountId: null, isShared: true,
+    createdAt: '2026-06-11T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+  {
+    /* 自分だけのもの。**共有と分けて撮れることが要る。** */
+    id: 'ss-3', name: '（自分用）今週の宿題', scope: 'friends',
+    conditions: { all: [], any: [{ field: 'tag', op: 'contains', value: 'tag-1' }] },
+    createdBy: 'st-1', lineAccountId: 'visual-qa-account', isShared: false,
+    createdAt: '2026-08-18T00:00:00.000Z', updatedAt: '2026-08-18T00:00:00.000Z',
+  },
+  {
+    id: 'ss-4', name: '90日 反応なし', scope: 'friends',
+    conditions: { all: [{ field: 'last_activity', op: 'before', value: '90d' }], any: [] },
+    createdBy: 'st-2', lineAccountId: null, isShared: true,
+    createdAt: '2026-03-20T00:00:00.000Z', updatedAt: '2026-07-02T00:00:00.000Z',
+  },
+  {
+    id: 'ss-5', name: '来週の予約あり', scope: 'bookings',
+    conditions: { all: [{ field: 'booking_date', op: 'within', value: '7d' }], any: [] },
+    createdBy: 'st-1', lineAccountId: 'visual-qa-account', isShared: true,
+    createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z',
+  },
+]

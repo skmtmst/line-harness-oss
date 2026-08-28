@@ -21,7 +21,13 @@
  *             **名前は一部だけでよい**（言葉の一部で探す）。長く書くと、
  *             読み上げ名の空白の入り方が違うだけで当たらなくなる。
  *   clock     時計を止める時刻。相対時刻（「6日前」）を出す画面では必須
+ *   states    一覧の状態を撮る。`{ apis: [口の当てはめ], kinds: ['loading','empty','error'] }`
+ *             口の返事を差し替えて `<node>-<状態>-<幅>.png` を出す。
+ *             **差し替えるのは一覧の口だけにしない。** 上の帯だけ前の数が残ると、
+ *             「読めなかったのに件数は出ている」という起きない絵になる
  *   status    'unimplemented' … 実装が無い。**撮らない。合格にもしない**
+ *             'elsewhere'     … 別の仕掛け（`capture.spec.mjs`）で撮っている。
+ *                               **台帳から消さない。**消すと見ていないように見える
  *   why       `status` の理由。空にしない
  *
  * **`mode: 'page'` で重なりを撮らない。** `fullPage` は `position: fixed` を
@@ -262,8 +268,7 @@ export const SCREENS = [
   { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0' },
   {
     ...FRIENDS, node: 'bzDn6', name: '3-1-E 友だち一覧の状態（空・読込・エラー）',
-    status: 'unimplemented',
-    why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い（`capture.spec.mjs` の `TAG_STATES` と同じ作りが要る）',
+    states: { apis: ['**/api/friends*', '**/api/friend-stats*'], kinds: ['loading', 'empty', 'error'] },
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates' },
   {
@@ -327,8 +332,7 @@ export const SCREENS = [
   },
   {
     ...SCENARIO, node: 'q5G45', name: '5-1-M 一覧の状態（空・読込・エラー）', route: '/scenarios',
-    status: 'unimplemented',
-    why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/scenarios*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能6 一斉配信 ──────────────────────────────────────
@@ -382,7 +386,7 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'TmHjF', name: '6-1-N 一覧の状態（空・読込・エラー）', route: '/broadcasts',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/broadcasts*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能7 リマインダ ────────────────────────────────────
@@ -432,7 +436,7 @@ export const SCREENS = [
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/reminders*', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能8 自動応答 ──────────────────────────────────────
@@ -483,7 +487,7 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/auto-replies*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能9 友だち追加時の配信 ────────────────────────────
@@ -586,7 +590,7 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/webinars*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能11 テンプレート ─────────────────────────────────
@@ -632,7 +636,7 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/templates*', '**/api/broadcast-message-assets*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能12 リッチメニュー ───────────────────────────────
@@ -662,7 +666,7 @@ export const SCREENS = [
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/rich-menu-groups*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能13 回答フォーム ─────────────────────────────────
@@ -690,7 +694,7 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/forms*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能14 共通情報 ─────────────────────────────────────
@@ -727,7 +731,7 @@ export const SCREENS = [
   },
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/media*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能16 成果とアフィリエイト ─────────────────────────
@@ -797,7 +801,7 @@ export const SCREENS = [
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/mileage/rules*', '**/api/mileage/overview*'], kinds: ['loading', 'empty', 'error'] },
   },
   {
     ...MILEAGE, node: 'z3PB2', name: '17-2 行動スコア',
@@ -826,7 +830,8 @@ export const SCREENS = [
   },
   {
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    route: '/inflow-links?tab=links',
+    states: { apis: ['**/api/entry-routes*', '**/api/analytics/ref-summary*'], kinds: ['loading', 'empty', 'error'] },
   },
   {
     ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）',
@@ -902,7 +907,7 @@ export const SCREENS = [
   },
   {
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/nen-campaigns/columns*', '**/api/nen-campaigns/overview*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能22 写真審査 ─────────────────────────────────────
@@ -995,7 +1000,8 @@ export const SCREENS = [
   },
   {
     ...AUTOMATION, node: 'Vdbv5', name: '25-1-D 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    route: '/automations',
+    states: { apis: ['**/api/automations*'], kinds: ['loading', 'empty', 'error'] },
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions' },
   { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new' },
@@ -1018,7 +1024,7 @@ export const SCREENS = [
   },
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能27 予約管理 ─────────────────────────────────────
@@ -1062,7 +1068,7 @@ export const SCREENS = [
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
@@ -1071,7 +1077,7 @@ export const SCREENS = [
   { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1' },
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
-    status: 'unimplemented', why: '口の返事を差し替えて撮る形。いまの仕組みに差し替えの手順が無い',
+    states: { apis: ['**/api/events/admin/events*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能30 ログインユーザー ─────────────────────────────
@@ -1109,6 +1115,48 @@ export const SCREENS = [
     */
     steps: [{ click: '予約中の一斉配信', role: 'text' }, { click: '緊急停止する' }],
   },
+
+  // ── 機能4 友だち属性（PR #402 で比較した残り10枚を台帳へ統合） ──
+  /*
+    タグ・情報欄・対応マーク・保存した検索は `/tags` の4タブ。
+    CSV取り込みの4枚は、ファイルを選ばせる必要があるので
+    `capture.spec.mjs` が撮っている（`tags-csv-*`）。
+  */
+  { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page' },
+  {
+    node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
+    dir: 'friend-attributes-v6', route: '/tags', mode: 'viewport', height: 1080,
+    steps: [{ click: '削除', scope: 'main' }],
+  },
+  {
+    node: 'H374MR', feature: 4, name: '4-1-H タグCSV一括登録',
+    dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
+    status: 'elsewhere',
+    why: 'ファイルを選ばせる操作が要る。`capture.spec.mjs` の `tags-csv-select` が撮っている',
+  },
+  {
+    node: 'sfTEW', feature: 4, name: '4-1-H-A CSV取り込み・確認（dry-run）',
+    dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
+    status: 'elsewhere', why: '同上。`tags-csv-preview` が撮っている',
+  },
+  {
+    node: 'op1rh', feature: 4, name: '4-1-H-B CSV取り込み・完了',
+    dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
+    status: 'elsewhere', why: '同上。`tags-csv-success` が撮っている',
+  },
+  {
+    node: 'QzRsJ', feature: 4, name: '4-1-H-C CSV取り込み・一部失敗',
+    dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
+    status: 'elsewhere', why: '同上。`tags-csv-partial` が撮っている',
+  },
+  { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page' },
+  {
+    node: 'yKEdO', feature: 4, name: '4-2-C 一覧の状態（空・読込・エラー）',
+    dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
+    states: { apis: ['**/api/friend-fields*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
+  },
+  { node: 'rIhbN', feature: 4, name: '4-3 対応マーク', dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page' },
+  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。

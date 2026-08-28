@@ -73,11 +73,11 @@ function check() {
     if (seen.has(s.node)) problems.push(`${s.node}: 二重に書いてある`)
     seen.add(s.node)
     if (!s.dir) problems.push(`${s.node}: dir が無い`)
-    if (s.status === 'unimplemented' || s.status === 'unconfirmed') {
+    if (['unimplemented', 'unconfirmed', 'elsewhere'].includes(s.status)) {
       if (!s.why) problems.push(`${s.node}: ${s.status} なのに理由が無い`)
       continue
     }
-    if (s.status && !['unimplemented', 'unconfirmed'].includes(s.status)) {
+    if (s.status && !['unimplemented', 'unconfirmed', 'elsewhere'].includes(s.status)) {
       problems.push(`${s.node}: 知らない status（${s.status}）`)
     }
     if (!s.route || s.route === '—') problems.push(`${s.node}: route が無い`)
@@ -167,6 +167,116 @@ async function runSteps(page, steps = [], node = '') {
   }
 }
 
+/**
+ * 一覧の3状態を作る差し替え。
+ *
+ * 設計はどの一覧にも「読み込んでいます／まだ〜がありません／表示できませんでした」の
+ * 3枚を並べています。**この3つを言い分けられるかどうか**が見どころで、
+ * 「1件も無い」と「読めなかった」に同じ文が出ると、運用する人からは
+ * 「登録したものが消えた」ように見えます。
+ */
+const LIST_STATES = {
+  empty: { status: 200, body: { success: true, data: [] } },
+  error: { status: 500, body: { success: false, error: 'internal error' } },
+  forbidden: { status: 403, body: { success: false, error: 'forbidden' } },
+}
+
+/**
+ * 「1件も無い」ときの返事は、口によって形が違う。
+ *
+ * **一覧の口だけが配列。** 上の帯を出す口は通で、`[]` を返すと
+ * `s.reminders.total` のような読み方で**画面ごと落ちます**（実際に落とした）。
+ * 落ちた絵を「空の状態」として撮ると、実装が空を描けないように見えます。
+ *
+ * 当てはまる順に見て、最初に当たったものを使います。
+ */
+const EMPTY_BODIES = [
+  [/\/api\/list-stats/, {
+    tags: { total: 0, unused: 0, taggedFriends: 0, assignedThisMonth: 0 },
+    marks: { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 },
+    searches: { total: 0, limit: 5 },
+    templates: { total: 0, inUse: 0, sentThisMonth: 0, unused90d: 0, clickRate: null },
+    scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 },
+    reminders: { total: 0, active: 0, waiting: 0, sentThisMonth: 0, failed: 0 },
+  }],
+  [/\/api\/mileage\/overview/, {
+    summary: { totalMembers: 0, totalAvailable: 0, activeMembers30d: 0, totalActions: 0, queuedEvents: 0 },
+    members: [],
+    pagination: { total: 0, limit: 20, offset: 0 },
+  }],
+  [/\/api\/nen-campaigns\/overview/, {
+    activeCampaigns: 0, jobs: { total: 0, pending: 0, sent: 0, failed: 0 },
+    columns: 0, pets: 0, coupons: 0,
+  }],
+  [/\/api\/analytics\/ref-summary/, {
+    routes: [], totalFriends: 0, friendsWithRef: 0, friendsWithoutRef: 0,
+  }],
+  [/\/api\/friend-stats/, {
+    active: 0, total: 0, blockedByThem: 0, hiddenByUs: 0,
+    unanswered: 0, resolved: 0, addedThisMonth: 0, addedLastMonth: 0,
+  }],
+  /* 友だちの一覧はページ送りつき。配列で返すと画面ごと落ちる。 */
+  [/\/api\/friends(\?|$)/, { items: [], total: 0, page: 1, limit: 20 }],
+  [/\/api\/rich-menu-groups\/(external|tap-stats)/, null],
+]
+
+/**
+ * `{success,data}` で包まない口。**予約とイベントはそれぞれ別の名前で返す。**
+ * 包んで返すと画面が読めず、空の状態のつもりで落ちた絵を撮ってしまう。
+ */
+const BARE_EMPTY = [
+  [/\/api\/booking\/admin\/menus/, { menus: [] }],
+  [/\/api\/booking\/admin\/staff/, { staff: [] }],
+  [/\/api\/booking\/admin\/requests/, { requests: [] }],
+  [/\/api\/events\/admin\/events/, { items: [] }],
+]
+
+/** その口の「空」の返事を組み立てる。`null` なら差し替えない（そのまま通す）。 */
+function emptyBodyFor(url) {
+  for (const [pattern, body] of BARE_EMPTY) {
+    if (pattern.test(url)) return body
+  }
+  for (const [pattern, data] of EMPTY_BODIES) {
+    if (pattern.test(url)) return data === null ? null : { success: true, data }
+  }
+  return { success: true, data: [] }
+}
+
+/** 口を差し替える。`loading` は返事を遅らせて、待っている絵にする。 */
+async function applyState(page, apis, kind) {
+  for (const glob of apis) {
+    if (kind === 'loading') {
+      /* **止めるのではなく遅らせる。** 止めると画面が失敗として扱う。 */
+      await page.route(glob, async () => { await new Promise(() => {}) })
+      continue
+    }
+    const state = LIST_STATES[kind]
+    await page.route(glob, (route) => {
+      /* 空のときだけ、口ごとの形に合わせる。エラーはどの口でも同じ。 */
+      const body = kind === 'empty' ? emptyBodyFor(route.request().url()) : state.body
+      if (body === null) return route.continue()
+      return route.fulfill({
+        status: state.status,
+        contentType: 'application/json; charset=utf-8',
+        body: JSON.stringify(body),
+      })
+    })
+  }
+}
+
+/**
+ * 出ている状態を名前で読む。**絵だけ見ると、別の状態でも気づけない。**
+ * 共通部品（`components/shared/list-state.tsx`）が `data-list-state` を
+ * 付ける。付いていない画面は、状態を名前で言えていない。
+ */
+async function readListState(page) {
+  return page
+    .locator('[data-list-state]')
+    .first()
+    .getAttribute('data-list-state', { timeout: 2_000 })
+    .catch(() => null)
+}
+
 async function captureImpl(feature) {
   const list = screensOf(feature)
   if (!list.length) { console.error(`機能${feature} の画面が screens.mjs にありません`); process.exit(1) }
@@ -183,6 +293,16 @@ async function captureImpl(feature) {
       console.log(`${s.node}\t未実装のため撮らない\t${s.why}`)
       continue
     }
+    if (s.status === 'elsewhere') {
+      /*
+        **別の仕掛けで撮っているもの。** CSV取り込みのように、ファイルを
+        選ばせたり口の返事を細かく作り込む必要があるものは
+        `capture.spec.mjs` が撮っている。**ここで二重に撮らない。**
+        台帳から消すと「見ていない」ように見えるので、行は残す。
+      */
+      console.log(`${s.node}\t別の仕掛けで撮っている\t${s.why}`)
+      continue
+    }
     if (s.status === 'unconfirmed') {
       /*
         **「押せない」と「無い」は別。** 押せる場所は見つかったが無効の
@@ -194,10 +314,23 @@ async function captureImpl(feature) {
     }
     const out = join(ROOT, 'docs', 'design-qa', s.dir)
     mkdirSync(out, { recursive: true })
+    /*
+      **状態のある画面は、状態のぶんだけ撮る。** 設計は3つを1枚に並べるが、
+      実装は1度に1つしか出せないので、1つずつ撮って並べて比べる。
+    */
+    const shots = s.states
+      ? s.states.kinds.map((kind) => ({ kind, suffix: `-${kind}` }))
+      : [{ kind: null, suffix: '' }]
     for (const width of WIDTHS) {
+     for (const shotSpec of shots) {
       const page = await newPage(browser, width, s.mode === 'viewport' ? s.height : 1080, s.clock)
       try {
-        await page.goto(`${BASE}${s.route}`, { waitUntil: 'networkidle', timeout: 120_000 })
+        if (shotSpec.kind) await applyState(page, s.states.apis, shotSpec.kind)
+        await page.goto(`${BASE}${s.route}`, {
+          /* 読み込み中は返事が来ないので `networkidle` を待てない。 */
+          waitUntil: shotSpec.kind === 'loading' ? 'domcontentloaded' : 'networkidle',
+          timeout: 120_000,
+        })
         await page.waitForTimeout(1200)
 
         // 行き先を必ず見る。**クエリまで見る**（タブは `?tab=` でしか区別できない）。
@@ -240,19 +373,26 @@ async function captureImpl(feature) {
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
         )
         await page.screenshot({
-          path: join(out, `${s.node}-${width}.png`),
+          path: join(out, `${s.node}${shotSpec.suffix}-${width}.png`),
           fullPage: s.mode === 'page',
         })
-        console.log(`${s.node}\t${width}px\t撮影OK\tはみ出し=${overflow}`)
+        /*
+          **どの状態が出ているかを名前で言えるか**も一緒に記録する。
+          共通部品を使っていない画面は `—` になる。それ自体が結果。
+        */
+        const marked = shotSpec.kind ? (await readListState(page)) ?? '—' : ''
+        const tail = shotSpec.kind ? `\t${shotSpec.kind}→${marked}` : ''
+        console.log(`${s.node}${shotSpec.suffix}\t${width}px\t撮影OK\tはみ出し=${overflow}${tail}`)
         if (overflow >= 2) console.log(`  ⚠ ${s.node} ${width}px に横スクロールが出ている`)
         shot += 1
       } catch (error) {
         const reason = error instanceof Error ? error.message : String(error)
-        console.log(`${s.node}\t${width}px\t撮れず\t${reason.split('\n')[0]}`)
-        failures.push(`${s.node} ${width}px: ${reason.split('\n')[0]}`)
+        console.log(`${s.node}${shotSpec.suffix}\t${width}px\t撮れず\t${reason.split('\n')[0]}`)
+        failures.push(`${s.node}${shotSpec.suffix} ${width}px: ${reason.split('\n')[0]}`)
       } finally {
         await page.close()
       }
+     }
     }
   }
   await browser.close()
