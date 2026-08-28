@@ -12,12 +12,15 @@ const mocks = vi.hoisted(() => ({
   verifyCallerLineIdentity: vi.fn(),
   getLineAccountById: vi.fn(),
   dispatchLineProxyLocally: vi.fn(),
+  formBelongsToLineAccount: vi.fn(),
+  canAccessAllLineAccounts: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
   getForms: vi.fn(),
   getFormsWithStats: vi.fn(),
   getFormById: mocks.getFormById,
+  formBelongsToLineAccount: mocks.formBelongsToLineAccount,
   createForm: mocks.createForm,
   updateForm: vi.fn(),
   deleteForm: vi.fn(),
@@ -43,6 +46,10 @@ vi.mock('../services/friend-tag-attach.js', () => ({
 
 vi.mock('../services/local-line-proxy.js', () => ({
   dispatchLineProxyLocally: mocks.dispatchLineProxyLocally,
+}));
+
+vi.mock('../services/account-access.js', () => ({
+  canAccessAllLineAccounts: mocks.canAccessAllLineAccounts,
 }));
 
 import { forms } from './forms.js';
@@ -102,6 +109,8 @@ beforeEach(() => {
   mocks.getFormById.mockResolvedValue({ ...baseForm });
   mocks.verifyCallerLineIdentity.mockResolvedValue(null);
   mocks.getFriendByLineUserIdForAccount.mockResolvedValue(null);
+  mocks.formBelongsToLineAccount.mockResolvedValue(true);
+  mocks.canAccessAllLineAccounts.mockResolvedValue(true);
   mocks.createFormSubmission.mockImplementation(async (_db, input) => ({
     id: 'submission-1',
     form_id: input.formId,
@@ -127,7 +136,7 @@ describe('draft creation', () => {
     const res = await app(true).request('/api/forms/drafts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: '{}',
+      body: JSON.stringify({ accountId: 'account-a' }),
     }, bindings);
     expect(res.status).toBe(201);
     expect(mocks.createForm).toHaveBeenCalledWith(bindings.DB, {
@@ -135,6 +144,7 @@ describe('draft creation', () => {
       fields: '[]',
       layout: null,
       isActive: false,
+      lineAccountIds: ['account-a'],
     });
     const body = await res.json() as { data: { id: string; isActive: boolean } };
     expect(body.data).toMatchObject({ id: 'draft-form-1', isActive: false });
@@ -152,11 +162,57 @@ describe('draft creation', () => {
   });
 });
 
+describe('LINE公式アカウントの範囲', () => {
+  test('所属していないフォームの管理設定を返さない', async () => {
+    mocks.formBelongsToLineAccount.mockResolvedValue(false);
+    const { bindings } = env();
+    const res = await app(true).request(
+      '/api/forms/form-1?account_id=account-other',
+      {},
+      bindings,
+    );
+    expect(res.status).toBe(404);
+    expect(JSON.stringify(await res.json())).not.toContain('Bearer secret');
+  });
+
+  test('権限のないアカウントには下書きを作らない', async () => {
+    mocks.canAccessAllLineAccounts.mockResolvedValue(false);
+    const { bindings } = env();
+    const res = await app(true).request('/api/forms/drafts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accountId: 'account-other' }),
+    }, bindings);
+    expect(res.status).toBe(404);
+    expect(mocks.createForm).not.toHaveBeenCalled();
+  });
+
+  test('別アカウントの友だちからの回答を保存しない', async () => {
+    mocks.verifyCallerLineIdentity.mockResolvedValue({
+      lineUserId: 'U-other',
+      lineAccountId: 'account-other',
+    });
+    mocks.formBelongsToLineAccount.mockResolvedValue(false);
+    const { bindings } = env();
+    const res = await app().request('/api/forms/form-1/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer id-token' },
+      body: JSON.stringify({ data: { x_username: 'other' } }),
+    }, bindings);
+    expect(res.status).toBe(404);
+    expect(mocks.createFormSubmission).not.toHaveBeenCalled();
+  });
+});
+
 describe('submission pagination compatibility', () => {
   test('returns the existing array shape when pagination is not requested', async () => {
     mocks.getFormSubmissions.mockResolvedValue([]);
     const { bindings } = env();
-    const res = await app(true).request('/api/forms/form-1/submissions', {}, bindings);
+    const res = await app(true).request(
+      '/api/forms/form-1/submissions?account_id=account-a',
+      {},
+      bindings,
+    );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ success: true, data: [] });
     expect(mocks.getFormSubmissions).toHaveBeenCalledWith(bindings.DB, 'form-1');
@@ -166,7 +222,11 @@ describe('submission pagination compatibility', () => {
   test('returns page metadata when the V6 list requests page and limit', async () => {
     mocks.getFormSubmissionsPage.mockResolvedValue({ items: [], total: 42, page: 2, limit: 20 });
     const { bindings } = env();
-    const res = await app(true).request('/api/forms/form-1/submissions?page=2&limit=20', {}, bindings);
+    const res = await app(true).request(
+      '/api/forms/form-1/submissions?page=2&limit=20&account_id=account-a',
+      {},
+      bindings,
+    );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({
       success: true,
@@ -208,7 +268,7 @@ describe('public form representation', () => {
 
   test('keeps the full representation for an authenticated admin', async () => {
     const { bindings } = env();
-    const res = await app(true).request('/api/forms/form-1', {}, bindings);
+    const res = await app(true).request('/api/forms/form-1?account_id=account-a', {}, bindings);
     expect(res.status).toBe(200);
 
     const body = await res.json() as { data: Record<string, unknown> };

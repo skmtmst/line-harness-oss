@@ -25,7 +25,7 @@ describe('V6回答フォーム一覧', () => {
 
   it('フォームを公開せず下書きで作って編集画面へ進む', () => {
     expect(API).toContain('createDraft:')
-    expect(PAGE).toContain('api.forms.createDraft()')
+    expect(PAGE).toContain('api.forms.createDraft(selectedAccountId)')
     expect(PAGE).toContain('フォームを作る')
     expect(PAGE).toContain('&tab=basic')
     expect(PAGE).not.toContain('準備中')
@@ -36,5 +36,12 @@ describe('V6回答フォーム一覧', () => {
     expect(PAGE).toContain('<Pagination')
     expect(PAGE).toContain('<Select')
     expect(PAGE).not.toContain('submissions.slice(')
+  })
+
+  it('選択中のLINE公式アカウントだけを読み書きする', () => {
+    expect(PAGE).toContain('useAccount()')
+    expect(PAGE).toContain('account_id=${encodeURIComponent(selectedAccountId)}')
+    expect(PAGE).toContain('LINE公式アカウントを選んでください')
+    expect(API).toContain('createDraft: (accountId: string')
   })
 })

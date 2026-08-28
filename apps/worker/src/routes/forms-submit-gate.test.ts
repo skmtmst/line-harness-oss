@@ -29,12 +29,14 @@ const mocks = vi.hoisted(() => ({
   setFriendFieldValue: vi.fn(),
   getFriendFieldById: vi.fn(),
   awardActivityMileage: vi.fn(),
+  formBelongsToLineAccount: vi.fn(),
 }));
 
 vi.mock('@line-crm/db', () => ({
   getForms: vi.fn(),
   getFormsWithStats: vi.fn(),
   getFormById: mocks.getFormById,
+  formBelongsToLineAccount: mocks.formBelongsToLineAccount,
   createForm: vi.fn(),
   updateForm: vi.fn(),
   deleteForm: vi.fn(),
@@ -170,6 +172,7 @@ beforeEach(() => {
     lineUserId: 'U-line-user',
     lineAccountId: 'account-a',
   });
+  mocks.formBelongsToLineAccount.mockResolvedValue(true);
   mocks.getFriendByLineUserIdForAccount.mockResolvedValue({
     id: 'friend-1',
     line_user_id: 'U-line-user',

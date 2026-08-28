@@ -3,6 +3,7 @@ import {
   getForms,
   getFormsWithStats,
   getFormById,
+  formBelongsToLineAccount,
   createForm,
   updateForm,
   deleteForm,
@@ -29,6 +30,7 @@ import type {
 import type { Env } from '../index.js';
 import { resolveLineToken } from '../services/line-token.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { awardActivityMileage } from '../services/activity-mileage.js';
 import { dispatchAutomationEventWithLogging } from '../services/automation-triggers.js';
 import {
@@ -106,7 +108,11 @@ async function resolveFriendAccessToken(
 
 function serializeForm(
   row: DbForm,
-  extra?: { lastSubmittedAt?: string | null; usedByAccounts?: FormUsedByAccount[] },
+  extra?: {
+    lastSubmittedAt?: string | null;
+    usedByAccounts?: FormUsedByAccount[];
+    accountScopeReviewRequired?: boolean;
+  },
 ) {
   return {
     id: row.id,
@@ -131,7 +137,18 @@ function serializeForm(
     updatedAt: row.updated_at,
     lastSubmittedAt: extra?.lastSubmittedAt ?? null,
     usedByAccounts: extra?.usedByAccounts ?? [],
+    accountScopeReviewRequired: extra?.accountScopeReviewRequired ?? false,
   };
+}
+
+async function canUseFormFromAccount(
+  c: Context<Env>,
+  formId: string,
+  accountId: string | undefined,
+): Promise<boolean> {
+  if (!accountId) return false;
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) return false;
+  return formBelongsToLineAccount(c.env.DB, formId, accountId);
 }
 
 function publicWebhookConfig(row: DbForm): {
@@ -200,15 +217,23 @@ function normalizeLayoutInput(raw: unknown): { layout: string; fields: string } 
 }
 
 // GET /api/forms — list all forms (with submission stats + delivering accounts)
-forms.get('/api/forms', async (c) => {
+forms.get('/api/forms', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
-    const items = await getFormsWithStats(c.env.DB);
+    const accountId = c.req.query('account_id');
+    if (!accountId) {
+      return c.json({ success: false, error: 'account_id is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    const items = await getFormsWithStats(c.env.DB, { lineAccountIds: [accountId] });
     return c.json({
       success: true,
       data: items.map((row) =>
         serializeForm(row, {
           lastSubmittedAt: row.last_submitted_at,
           usedByAccounts: row.used_by_accounts,
+          accountScopeReviewRequired: row.account_scope_review_required,
         }),
       ),
     });
@@ -226,7 +251,11 @@ forms.get('/api/forms/:id', async (c) => {
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
     }
-    const data = c.get('staff') ? serializeForm(form) : serializePublicForm(form);
+    const staff = c.get('staff');
+    if (staff && !await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
+    const data = staff ? serializeForm(form) : serializePublicForm(form);
     return c.json({ success: true, data });
   } catch (err) {
     console.error('GET /api/forms/:id error:', err);
@@ -253,10 +282,17 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
       ogTitle?: string | null;
       ogDescription?: string | null;
       ogImageUrl?: string | null;
+      accountId?: string;
     }>();
 
     if (!body.name) {
       return c.json({ success: false, error: 'name is required' }, 400);
+    }
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
     }
 
     const normalized = body.layout !== undefined ? normalizeLayoutInput(body.layout) : null;
@@ -277,6 +313,7 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
       ogTitle: body.ogTitle ?? null,
       ogDescription: body.ogDescription ?? null,
       ogImageUrl: body.ogImageUrl ?? null,
+      lineAccountIds: [body.accountId],
     });
 
     return c.json({ success: true, data: serializeForm(form) }, 201);
@@ -289,12 +326,20 @@ forms.post('/api/forms', requireRole('owner', 'admin'), async (c) => {
 // POST /api/forms/drafts — 公開されていない空の下書きを作り、編集画面へ進む。
 forms.post('/api/forms/drafts', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name?: string }>().catch(() => ({} as { name?: string }));
+    const body = await c.req.json<{ name?: string; accountId?: string }>()
+      .catch(() => ({} as { name?: string; accountId?: string }));
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const form = await createForm(c.env.DB, {
       name: body.name?.trim() || '名称未設定のフォーム',
       fields: '[]',
       layout: null,
       isActive: false,
+      lineAccountIds: [body.accountId],
     });
     return c.json({ success: true, data: serializeForm(form) }, 201);
   } catch (err) {
@@ -307,6 +352,9 @@ forms.post('/api/forms/drafts', requireRole('owner', 'admin'), async (c) => {
 forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const body = await c.req.json<{
       name?: string;
       description?: string | null;
@@ -371,6 +419,9 @@ forms.put('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
 forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const form = await getFormById(c.env.DB, id);
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
@@ -387,6 +438,9 @@ forms.delete('/api/forms/:id', requireRole('owner', 'admin'), async (c) => {
 forms.get('/api/forms/:id/submissions', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
     const id = c.req.param('id');
+    if (!await canUseFormFromAccount(c, id, c.req.query('account_id'))) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const form = await getFormById(c.env.DB, id);
     if (!form) {
       return c.json({ success: false, error: 'Form not found' }, 404);
@@ -423,6 +477,11 @@ forms.post('/api/forms/:id/opened', async (c) => {
     // open to the LINE identity proven by its ID token. Body-supplied customer
     // IDs are intentionally ignored.
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
+    if (identity && (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId))) {
+      // 関係のない公式アカウントから開いた記録を、このフォームへ混ぜない。
+      return c.json({ success: true });
+    }
     const friend = identity
       ? await getFriendByLineUserIdForAccount(
           c.env.DB,
@@ -456,6 +515,10 @@ forms.post('/api/forms/:id/partial', async (c) => {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, c.req.param('id'), identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
     }
 
     const friend = await getFriendByLineUserIdForAccount(
@@ -516,6 +579,10 @@ forms.post('/api/forms/:id/files', async (c) => {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
     }
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,
@@ -593,6 +660,10 @@ forms.get('/api/forms/:id/my-latest', async (c) => {
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
+    }
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,
       identity.lineUserId,
@@ -642,6 +713,10 @@ forms.post('/api/forms/:id/submit', async (c) => {
     const identity = await verifyCallerLineIdentity(c.req.header('Authorization'), c.env);
     if (!identity) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    if (!identity.lineAccountId
+      || !await formBelongsToLineAccount(c.env.DB, formId, identity.lineAccountId)) {
+      return c.json({ success: false, error: 'Form not found' }, 404);
     }
     const friend = await getFriendByLineUserIdForAccount(
       c.env.DB,

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { fetchApi } from '@/lib/api'
 import { api } from '@/lib/api'
+import { useAccount } from '@/contexts/account-context'
 import { countryFlag } from '@/lib/country-flag'
 import { displayFormName, sortFormsByLatestAnswer } from './form-list'
 import Button from '@/components/shared/button'
@@ -110,6 +111,7 @@ function formatValue(v: unknown): string {
 
 export default function FormSubmissionsPage() {
   const router = useRouter()
+  const { selectedAccountId, loading: accountLoading } = useAccount()
   const [forms, setForms] = useState<Form[]>([])
   const [selectedFormId, setSelectedFormId] = useState<string | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -131,34 +133,58 @@ export default function FormSubmissionsPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
   const submissionRequest = useRef(0)
+  const formRequest = useRef(0)
 
   const loadForms = useCallback(async () => {
+    const request = ++formRequest.current
+    if (!selectedAccountId) {
+      setForms([])
+      setSelectedFormId(null)
+      setSubmissions([])
+      setSubmissionTotal(0)
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setLoadError('')
     try {
-      const res = await fetchApi<{ success: boolean; data: Form[] }>('/api/forms')
+      const res = await fetchApi<{ success: boolean; data: Form[] }>(
+        `/api/forms?account_id=${encodeURIComponent(selectedAccountId)}`,
+      )
       if (!res.success) throw new Error('load_failed')
+      if (request !== formRequest.current) return
       setForms(res.data)
     } catch {
+      if (request !== formRequest.current) return
       setLoadError('回答フォームを読み込めませんでした。')
+      setForms([])
+    } finally {
+      if (request === formRequest.current) setLoading(false)
     }
-    setLoading(false)
-  }, [])
+  }, [selectedAccountId])
 
-  useEffect(() => { loadForms() }, [loadForms])
+  useEffect(() => {
+    submissionRequest.current += 1
+    setSelectedFormId(null)
+    setSubmissions([])
+    setSubmissionTotal(0)
+    void loadForms()
+  }, [loadForms])
 
   const loadSubmissions = useCallback(async (formId: string, requestedPage = 1, requestedLimit = 20) => {
+    if (!selectedAccountId) return
     const request = ++submissionRequest.current
     setSubLoading(true)
     setSubError('')
     setPage(1)
     setDetailSubmission(null)
     try {
-      const formRes = await fetchApi<{ success: boolean; data: FormDetail | { fields: string | FormDetail['fields'] } }>(`/api/forms/${formId}`)
+      const accountQuery = `account_id=${encodeURIComponent(selectedAccountId)}`
+      const formRes = await fetchApi<{ success: boolean; data: FormDetail | { fields: string | FormDetail['fields'] } }>(`/api/forms/${formId}?${accountQuery}`)
       const subRes = await fetchApi<{
         success: boolean
         data: { items: Submission[]; total: number; page: number; limit: number }
-      }>(`/api/forms/${formId}/submissions?page=${requestedPage}&limit=${requestedLimit}`)
+      }>(`/api/forms/${formId}/submissions?page=${requestedPage}&limit=${requestedLimit}&${accountQuery}`)
       if (!subRes.success) throw new Error('submissions_failed')
       if (request !== submissionRequest.current) return
 
@@ -189,7 +215,7 @@ export default function FormSubmissionsPage() {
     } finally {
       if (request === submissionRequest.current) setSubLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   const handleSelectForm = (formId: string) => {
     setSelectedFormId(formId)
@@ -197,11 +223,11 @@ export default function FormSubmissionsPage() {
   }
 
   const createDraft = async () => {
-    if (creating) return
+    if (creating || !selectedAccountId) return
     setCreating(true)
     setCreateError('')
     try {
-      const res = await api.forms.createDraft()
+      const res = await api.forms.createDraft(selectedAccountId)
       if (!res.success) throw new Error(res.error)
       router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
     } catch {
@@ -218,12 +244,12 @@ export default function FormSubmissionsPage() {
   }
 
   const saveName = async () => {
-    if (!editingForm || !editingName.trim() || savingName) return
+    if (!editingForm || !editingName.trim() || savingName || !selectedAccountId) return
     const name = displayFormName(editingName)
     setSavingName(true)
     setRenameError('')
     try {
-      const res = await fetchApi<{ success: boolean; data: Form }>(`/api/forms/${editingForm.id}`, {
+      const res = await fetchApi<{ success: boolean; data: Form }>(`/api/forms/${editingForm.id}?account_id=${encodeURIComponent(selectedAccountId)}`, {
         method: 'PUT',
         body: JSON.stringify({ name }),
       })
@@ -357,7 +383,15 @@ export default function FormSubmissionsPage() {
             {createError && <p className="text-danger text-sm">{createError}</p>}
           </div>
         )}
-        {loading ? (
+        {accountLoading ? (
+          <ListState kind="loading" title="LINE公式アカウントを確認しています" />
+        ) : !selectedAccountId ? (
+          <ListState
+            kind="empty"
+            title="LINE公式アカウントを選んでください"
+            description="上のアカウント切替から、回答フォームを使う公式アカウントを選びます。"
+          />
+        ) : loading ? (
           <ListState kind="loading" title="回答フォームを読み込んでいます" />
         ) : loadError ? (
           <ListState
