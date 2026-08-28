@@ -653,11 +653,11 @@ export const SCREENS = [
     実装は `/reminders/new` の1枚もので、段の縦帯も右の「設定内容」も無い。
     **段ごとの画面が無いので、設計の A〜G は1枚ずつには対応しない。**
   */
-  { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ', route: '/reminders', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'reminders-v6/design-qa.md' },
-  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'reminders-v6/design-qa.md' },
+  { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ', route: '/reminders', verdict: 'needs_fix', verdictNote: 'P1 失敗の帯が無い（設計の4つめは「失敗 2通（要確認）」、実装は「今月の配信」）。P1 状態で絞る札4つ（有効のみ・下書き・停止中・失敗あり）が無い。P1 列に「予定」と「最終送信」が無い（実装は 名前・配信方式・きっかけ・送る内容・フォルダ・稼働・登録日）。P2 送信予定の単位が設計の「通」でなく「人」。基準日の期間・並び順・表示件数が無い。行ごとのごみ箱が無く下に「選択したリマインダを削除」。P2 状態が2つしか出せない。Reminder.isActive が真偽値ひとつなので、作ったが動かしていない（下書き）と動かしていて止めた（停止中）を分けられない。**列を増やすかどうかは実装側の決めごと**', verdictSource: 'reminders-v6/design-qa.md' },
+  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new', verdict: 'needs_fix', verdictNote: 'P1 作成の段の構造が無い。設計は段ごとに 対象の絞り込み・停止条件・配信予定の下見・テスト送信・最終確認へ進むが、実装にあるのは1段目の入力だけ', verdictSource: 'reminders-v6/design-qa.md' },
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'reminders-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 通知ステップ編集の面が設計とそろわない', verdictSource: 'reminders-v6/design-qa.md',
     route: '/reminders/edit?id=reminder-3',
   },
   {
@@ -727,20 +727,20 @@ export const SCREENS = [
     設計は5段のウィザード（基本設定→どんなときに動くか→何を返すか→優先順位→確認）。
     実装は一覧の上に出る**1枚の窓**で、段も右の「設定内容」も無い。
   */
-  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'auto-replies-v6/design-qa.md' },
+  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: 'P1 「条件が重なっている」を知らせる帯が無い（設計の4つめは「要確認（条件重複）」、実装は「未ヒット」）。上から順に最初に当てはまった1つだけが動く仕組みなので、重なりに気づく場所が要る', verdictSource: 'auto-replies-v6/design-qa.md' },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'auto-replies-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 ルール編集の段が無い。設計の A・B・C（ルール編集／反応条件／応答とアクション）が、実装では一覧の上に出る1枚の窓に全部入っている。右の「設定内容」も無い', verdictSource: 'auto-replies-v6/design-qa.md',
     route: '/auto-replies/edit?id=ar-2',
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'auto-replies-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 8-1-B 反応条件が独立しておらず、8-1-A と同じ1枚の中にある', verdictSource: 'auto-replies-v6/design-qa.md',
     route: '/auto-replies/edit?id=ar-2',
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'auto-replies-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 8-1-C 応答とアクションが独立しておらず、8-1-A と同じ1枚の中にある', verdictSource: 'auto-replies-v6/design-qa.md',
     route: '/auto-replies/edit?id=ar-2',
   },
   {
@@ -869,16 +869,16 @@ export const SCREENS = [
     実装は作成が1枚、編集が4つのタブ。**「通知・リマインド」の段だけが
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
-  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md' },
-  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md' },
+  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー', verdict: 'needs_fix', verdictNote: 'P1 一覧に申込人数・視聴人数が出ない。帯の3つ（申込・平均視聴率・平均視聴時間）がどれも—で、札に「一覧では数えられません」「視聴ログの集計は未対応」と書いてある。どのウェビナーが効いているかを一覧で比べられず、1本ずつ開いて覚えて比べることになる。WebinarAnalytics は1本ぶんを返せるので、足りていないのはまとめて数える口。P2 表でなく札の格子。左のフォルダの縦帯が無く「フォルダを追加」は押せない。CTA反応の帯が無い。「並び替え」が在るが押せない', verdictSource: 'webinars-v6/design-qa.md' },
+  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: 'P1 作成の段（設計は複数段に分ける）が無く、1枚の画面になっている', verdictSource: 'webinars-v6/design-qa.md' },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 10-1-B 動画・公開設定が独立しておらず、視聴後アクション（Xjk8q）と同じタブに混ざっている', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: 'いつ見られるようにするか' }],
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 CTA・フォームの面が設計とそろわない。案内を送る仕組み（前日20:00・1時間前・開始時・未視聴者へ翌日10:00の見逃し案内）は画面にも口にも無く、grep で0件', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: '見ている途中に出すもの' }],
   },
   {
@@ -890,7 +890,7 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 10-1-E 視聴後アクションが独立しておらず、10-1-B と同じタブに混ざっている', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: 'いつ見られるようにするか' }],
   },
   {
@@ -914,12 +914,12 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 参加者管理の面が設計とそろわない。1本ぶんの申込・視聴・CTAは WebinarAnalytics が返せるが、一覧では数えられない', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: '概要・分析' }],
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 10-1-J 分析が独立しておらず、10-1-I 参加者管理と同じタブに混ざっている', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: '概要・分析' }],
   },
   {
@@ -941,15 +941,15 @@ export const SCREENS = [
     設計のタブは6本（メッセージ／カルーセル／リッチメッセージ／質問／
     クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
   */
-  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md' },
+  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: 'P1 種類のタブが5本で、設計の6本から「質問」が抜けている。質問は文のあとにボタンを2つ出し、押された選択肢ごとにタグ付与・シナリオ開始・フォームを分ける道具で、代わりにカルーセルのボタンや自動応答で受けると押した人を取りこぼす。P1 左の縦帯はテンプレートの category という文字から自動で生えているだけで /api/folders を一度も呼んでいない。作る・名前を変える・消すのどれもできない', verdictSource: 'templates-v6/design-qa.md' },
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 メッセージを作る面が設計とそろわない。差し込みと吹き出しの上限、保存してテンプレート化の扱いが違う', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'テンプレートを作る' }],
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 カルーセルを作る面が設計とそろわない', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
   },
   {
@@ -961,17 +961,17 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 リッチメッセージを作る面が設計とそろわない', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
   },
   {
     ...TEMPLATE, node: 'hsBtl', name: '11-1-E クーポンを作る',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 クーポンそのものを作れない。入力欄は名前・特典内容の自由記入・クーポンを開くURLの3つだけ（broadcast-asset-manager.tsx:76）で、どこか別で作ったクーポンのURLを貼るだけ。設計の 画像1029×1029／使える期間／使い方のご案内／使える回数（1人1回・何回でも）／だれに見えるか／抽選（当たる確率・当選人数の上限）／クーポンコード／使われたときに実行すること が全部無い。**抽選の上限が無いまま配ると全員に当たる**', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'クーポン' }, { click: 'クーポンを作る' }],
   },
   {
     ...TEMPLATE, node: 'J3GxEZ', name: '11-1-F リサーチを作る',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 リサーチで質問を1問も作れない（説明とURLだけ）。設計は10問まで、種類（1つだけ選ぶ・いくつでも・自由に書く）と、答えの残し先（友だち情報欄・タグ）まで決める', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'リサーチ' }, { click: 'リサーチを作る' }],
   },
   {
@@ -1023,9 +1023,9 @@ export const SCREENS = [
     段は無いが**中身は同じ画面に全部ある**ので、同じ絵を3つの設計と
     突き合わせる形にする。
   */
-  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
-  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
-  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: 'P1 どれが出るかを決める「順番」が画面に出ない。リッチメニューは同じ友だちが複数に当てはまると**いちばん上の1つだけ**が出るのに、並び順の既定は「タップ数が多い順」（page.tsx:93）で、画面の並びと実際に出る順番が関係ない。targetingPriority はデータとして持っているのに一覧が一度も出していない（grep が0件）。出し分けを2件以上使い始めた時点で効いてくる。P2 表でなく札の格子。絞り込みの札が3つで「条件で出し分け」「管理画面の外」で絞れない。状態に「予約」が無い（status は draft と published の2つだけで、publishingAt は持っているのに予約中を出せない）。「保存した検索」が無い', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: 'P1 形とボタンを決める段が無く、1枚の画面に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-B 誰に出すかが独立しておらず、同じ1枚の中に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' },
   {
     ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり', route: RM_EDIT,
     gap: 'build',
@@ -1039,8 +1039,8 @@ export const SCREENS = [
     gapNote: '上の空の状態',
     status: 'unimplemented', why: '12-1-C が無いので、その空の状態も無い',
   },
-  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
-  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-D 公開のしかたが独立しておらず、同じ1枚の中に混ざっている。日時を決めて出す「予約中」の状態を出せない', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: 'P2 設計は別画面だが実装は一覧の中に埋め込み。**設計より近い場所にあるので悪い差ではない**。ただし絞り込みの札に「管理画面の外」が無く、絞れない', verdictSource: 'rich-menus-v6/design-qa.md' },
   {
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
     gap: 'parts',
@@ -1061,8 +1061,8 @@ export const SCREENS = [
     同じ画面で、編集は別ルート。**「デザイン設定」は押せない状態で置いてある**
     （見た目をアプリにそろえる方針にしたため、と画面に書いてある）。
   */
-  { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'forms-v6/design-qa.md' },
-  { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT, verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'forms-v6/design-qa.md' },
+  { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム', verdict: 'needs_fix', verdictNote: 'P1 一覧の列に「回答の保存先」（友だち情報欄3・タグ2）が無い。このフォームに答えると友だちの何が書き換わるかを一覧で読めない。**どこへ書いているかは、消す前・変える前にいちばん要る情報**。実装の札は名前・回答数・最終回答だけで、保存先を知るには1つずつ編集画面を開いてブロックを見ることになる。P2 表でなく札の格子', verdictSource: 'forms-v6/design-qa.md' },
+  { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 フォームを作る面が設計とそろわない', verdictSource: 'forms-v6/design-qa.md' },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定', route: FORM_EDIT,
     gap: 'drop',
@@ -1072,10 +1072,10 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定', route: FORM_EDIT,
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'forms-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 オプション設定の面が設計とそろわない', verdictSource: 'forms-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: 'オプション設定' }],
   },
-  { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答', steps: [{ click: '来店アンケート' }], verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'forms-v6/design-qa.md' },
+  { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答', steps: [{ click: '来店アンケート' }], verdict: 'needs_fix', verdictNote: 'P1 情報欄への書き込みが失敗した件数が出ない（設計は「3件は欄が消えていて書けていません」）。**答えは受け取れているのに友だち情報へ入っていない状態が、画面のどこにも出ない。** あとでリマインダが動かない形で表に出る。P1 「1件ずつ見る／まとめて見る」の切り替え、絞り込み、CSVで書き出す、帯4つ（回答／開いた人のうち答えた割合／情報欄への書き込み／次回予定が入った人）が無い', verdictSource: 'forms-v6/design-qa.md' },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
     gap: 'parts',
@@ -1143,9 +1143,9 @@ export const SCREENS = [
     実装は5本で、**「支払い」が無く**、代わりに「成果地点（CV）」と
     「レポート」がある。支払いの2枚（`njLGA` `GqFTV`）は行き先が無い。
   */
-  { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
-  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
-  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates', verdict: 'needs_fix', verdictNote: 'P1 帯4つ（今月の成果42件／承認待ち8件 合計¥96,000／確定した報酬¥312,000 8/31締め9/30払い／ほか）が無い。P1 「支払い」のタブが無い（grep 振込|締め が0件）。まだ払っていない額・次の締め・次の支払日・振込先が未登録の人を、画面から知る方法が無い。**成果を認めるところまではできて、そこから先が無い**', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: 'P1 案件の面が設計とそろわない。報酬の決め方が「案件ごとの決まった額」を主にできない', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: 'P1 成果承認の面が設計とそろわない。承認したあと支払いへつなぐ先が無い', verdictSource: 'affiliates-v6/design-qa.md' },
   {
     ...AFFILIATE, node: 'njLGA', name: '16-1-C 支払い',
     gap: 'api',
@@ -1153,15 +1153,15 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '「支払い」のタブが無い。締め日・支払日・振込先・未払い残高を扱う場所がどこにも無い（`grep 振込|締め` が0件）',
   },
-  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: 'P1 報酬が「売上 × 率」でしか出ない（tabs.tsx:193）。設計の払い方は「案件ごとの決まった額」が基本で、AffiliateOffer.rewardAmount は持っているのに一覧の報酬だけが見ていない。**決まった額で払う人は一覧でずっと ¥0 に見える**（固定データの合同会社ノースは18件の成果で¥0）', verdictSource: 'affiliates-v6/design-qa.md' },
   {
     ...AFFILIATE, node: 'jwrbf', name: '16-1-E アフィリエイターの成果内訳',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 成果内訳の面が設計とそろわない。報酬が率でしか出ないので内訳も合わない', verdictSource: 'affiliates-v6/design-qa.md',
     route: '/conversions?tab=affiliates', mode: 'viewport', height: 1136,
     /* 表の行は `onClick` だけで、押せる役を持っていない。文字で探す。 */
     steps: [{ click: '田中 明', role: 'text' }],
   },
-  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', verdict: 'needs_fix', verdictNote: 'P1 案件をつくる面で、報酬の決め方（案件ごとの決まった額）を主にできない', verdictSource: 'affiliates-v6/design-qa.md' },
   {
     ...AFFILIATE, node: 'QX70l', name: '16-1-G アフィリエイターを削除する確認',
     gap: 'parts',
@@ -1272,9 +1272,9 @@ export const SCREENS = [
     設計のタブは4本（流入経路24／サイトスクリプト／広告連携3／広告とのつなぎ5）。
     実装は3本で、**「広告とのつなぎ」（成果を広告へ返す）が無い。**
   */
-  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: 'P1 タブに件数が付かない（設計は流入経路24／広告連携3）。帯4つの作りが違う（設計は流入元24本／今月312人・経路が分かる289人／クリック8,420回／平均の追加率6.4%）。左のフォルダの縦帯が無い（ジャンルはあるが別の作り）。「まとめて操作」「CSVで書き出す」が無い', verdictSource: 'inflow-v6/design-qa.md' },
   { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「Yahoo!広告 つないでいません」から実際につなげない。押すと「接続を作る画面は準備中です」で止まる。設計はそこから接続を作らせる', verdictSource: 'inflow-v6/design-qa.md' },
   { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
   { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
   {
@@ -1285,7 +1285,7 @@ export const SCREENS = [
   },
   {
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 一覧の状態に共通部品（ListState）を使っておらず、読込・空・失敗の言い分けが設計とそろわない。ほかの機能は同じ部品へ寄せている', verdictSource: 'inflow-v6/design-qa.md',
     route: '/inflow-links?tab=links',
     states: { apis: ['**/api/entry-routes*', '**/api/entry-routes/**', '**/api/analytics/ref-summary*'], kinds: ['loading', 'empty', 'error'] },
   },
@@ -1295,8 +1295,8 @@ export const SCREENS = [
     だけで、**中身は「広告連携」タブに入っている。** 返した記録も、
     クリックの種類（fbclid）も、失敗の理由も出る。
   */
-  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「成果地点と、広告に返す名前の対応」が無い。対応が付いていない成果地点は広告へ返せないのに、**返せていないことに気づく場所がどこにも無い**。P1 「失敗したものをまとめてやり直す」が無い（試行・次の再試行は—のまま）。P2 帯が「広告側へ返した成果 1件」だけ（設計は 送った866／待っている12／断られた7／やり直して成功23）', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 18-2-A 送信履歴が独立した画面として無く、18-2 の1枚の中に混ざっている', verdictSource: 'inflow-v6/design-qa.md' },
 
   // ── 機能19 コンバージョン ───────────────────────────────
   { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'needs_fix', verdictNote: 'P2', verdictSource: 'conversions-v6/design-qa.md' },
@@ -1341,13 +1341,13 @@ export const SCREENS = [
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
-  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'nen-v6/design-qa.md' },
-  { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }], verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'nen-v6/design-qa.md' },
-  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }], verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'nen-v6/design-qa.md' },
+  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', verdict: 'needs_fix', verdictNote: 'P1 画面の名前がメニューと違う（メニューと上の帯は「NEN配信」、見出しは「フォロー配信」）。押した名前と着いた先の名前が違うと、着いた場所が合っているか確かめられない。P1 押せない操作が理由なしに3つ置いてある（マニュアル・並び替え・フォルダを追加。3つとも disabled）。さらに上の帯に押せる「マニュアル」があり、同じ名前が2つあって片方だけ押せる', verdictSource: 'nen-v6/design-qa.md' },
+  { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }], verdict: 'needs_fix', verdictNote: 'P1 コラムの状態が英語のまま出る（scheduled / sent / draft。page.tsx:422）。設計は「出したもの／下書き／予約ずみ」。#446 が配信ジョブで直したのと同じ形で、jobStatusLabel と同じ当てはめをコラムにも置けば済む', verdictSource: 'nen-v6/design-qa.md' },
+  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }], verdict: 'needs_fix', verdictNote: 'P1 帯4つ（登録864匹・友だち1,284人のうち62%／今月誕生日72匹／誕生日配信の開封94.6%／クーポン利用38.2%）が無い。一覧の「次の配信」列（9/1に誕生日クーポン／送れません）と「これまでの配信」列（6回）が無い。LINEプレビューが無い。クーポンの決めごととペットの一覧は在る', verdictSource: 'nen-v6/design-qa.md' },
   { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', steps: [{ click: '配信履歴' }], verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'nen-v6/design-qa.md' },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
-    verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'nen-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 きっかけが ec.order.delivered のまま生で出る（edit/campaign-editor.tsx:298-301）。設計は「注文が届いたとき」。pet.birthday も同じ。P1 誕生日配信では「何日後に送るか」の欄が効かないのに出ている。一覧は「誕生日の3日前 10:00」と出るのに編集画面は「0日後」に見える。campaignKey === birthday_coupon のときは日数の欄を隠し、一覧が使っている formatCampaignTiming をそのまま置けばよい', verdictSource: 'nen-v6/design-qa.md',
     route: '/nen-campaigns/edit?key=review_request',
   },
   {
@@ -1477,8 +1477,8 @@ export const SCREENS = [
     見本12／共通アクション14）で、オートメーションと共通アクションが
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
-  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'needs_fix', verdictNote: 'P1 帯4つ（動いているもの14本／この30日に動いた8,420回／失敗した6回／減らせた手作業およそ70時間）が無い。とくに「減らせた手作業」は、この機能を使い続ける理由を数で出すもの。P1 見本から作る導線が無い（grep 見本 が /automations 配下で0件）。空の作成画面から始めるのと、動く形を1つ手元に置いてから直すのとでは使い始めるまでの距離が違う', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'needs_fix', verdictNote: 'P1 つくる面が設計とそろわない。見本から始める道が無い', verdictSource: 'automations-v6/design-qa.md' },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
@@ -1511,9 +1511,9 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「オートメーションがありません。「新規ルール」から作成してください。」を出し、作成を誘う。押せば同じルールをもう1つ作る。ルールの数も0件と出る（未取得なので—にすべき）。P2 誘い文の「新規ルール」と実際のボタン名「ルールを作成」が違う。**#516 で直す差分が出ている（未取り込み）**',
     verdictSource: 'automations-v6/Vdbv5-error-1920.png', verdictHead: '75b010fc',
   },
-  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
-  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: 'P2 実装は設計にかなり近い。版（v4）と呼び出し元、古い版のまま呼んでいる先まである。差は、設計がオートメーションと共通アクションを同じタブ帯（5本）にしているのに実装は別ページ（/automations と /common-actions）であること、帯（共通アクション14／呼び出し元38・5機能から／今月2,847回・失敗6／古い版のまま要確認2）が無いこと', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: 'P2 共通アクションをつくる面は設計に近い。差は「複製して作る」の扱いと、上のタブ帯の位置', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'needs_fix', verdictNote: 'P2 版と使われている場所は設計に近く、古い版のまま呼んでいる先まで出せている。差は帯と、タブ帯の位置', verdictSource: 'automations-v6/design-qa.md' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
