@@ -18,11 +18,19 @@ export async function sendAdConversions(
   friendId: string,
   eventName: string,
   eventValue?: number,
+  lineAccountId?: string | null,
 ): Promise<void> {
+  if (!lineAccountId) return;
+  const friend = await db
+    .prepare(`SELECT id FROM friends WHERE id = ? AND line_account_id = ?`)
+    .bind(friendId, lineAccountId)
+    .first<{ id: string }>();
+  if (!friend) return;
+
   const ref = await getRefTrackingWithClickIds(db, friendId);
   if (!ref) return;
 
-  const platforms = await getActiveAdPlatforms(db);
+  const platforms = await getActiveAdPlatforms(db, lineAccountId);
 
   for (const platform of platforms) {
     const config: AdPlatformConfig = JSON.parse(platform.config);
@@ -33,7 +41,7 @@ export async function sendAdConversions(
           if (ref.fbclid) {
             await sendMetaConversion(config, ref, eventName, eventValue);
             await logAdConversion(db, {
-              platformId: platform.id, friendId, eventName,
+              platformId: platform.id, lineAccountId, friendId, eventName,
               clickId: ref.fbclid, clickIdType: 'fbclid', status: 'sent',
             });
           }
@@ -42,7 +50,7 @@ export async function sendAdConversions(
           if (ref.twclid) {
             await sendXConversion(config, ref, eventName, eventValue);
             await logAdConversion(db, {
-              platformId: platform.id, friendId, eventName,
+              platformId: platform.id, lineAccountId, friendId, eventName,
               clickId: ref.twclid, clickIdType: 'twclid', status: 'sent',
             });
           }
@@ -51,7 +59,7 @@ export async function sendAdConversions(
           if (ref.gclid) {
             await sendGoogleConversion(config, ref, eventName, eventValue);
             await logAdConversion(db, {
-              platformId: platform.id, friendId, eventName,
+              platformId: platform.id, lineAccountId, friendId, eventName,
               clickId: ref.gclid, clickIdType: 'gclid', status: 'sent',
             });
           }
@@ -60,7 +68,7 @@ export async function sendAdConversions(
           if (ref.ttclid) {
             await sendTikTokConversion(config, ref, eventName, eventValue);
             await logAdConversion(db, {
-              platformId: platform.id, friendId, eventName,
+              platformId: platform.id, lineAccountId, friendId, eventName,
               clickId: ref.ttclid, clickIdType: 'ttclid', status: 'sent',
             });
           }
@@ -69,6 +77,7 @@ export async function sendAdConversions(
     } catch (error) {
       await logAdConversion(db, {
         platformId: platform.id,
+        lineAccountId,
         friendId,
         eventName,
         clickId: ref.fbclid || ref.twclid || ref.gclid || ref.ttclid || '',

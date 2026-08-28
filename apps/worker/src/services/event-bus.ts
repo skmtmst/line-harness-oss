@@ -76,9 +76,15 @@ export async function fireEvent(
     fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId),
     processScoring(db, eventType, payload),
   ];
-  if (payload.friendId && payload.conversionEventName) {
+  if (payload.friendId && payload.conversionEventName && outgoingWebhookLineAccountId) {
     phase1.push(
-      sendAdConversions(db, payload.friendId, payload.conversionEventName, payload.conversionValue),
+      sendAdConversions(
+        db,
+        payload.friendId,
+        payload.conversionEventName,
+        payload.conversionValue,
+        outgoingWebhookLineAccountId,
+      ),
     );
   }
   await Promise.allSettled(phase1);

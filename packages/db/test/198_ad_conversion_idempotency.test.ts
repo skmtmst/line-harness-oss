@@ -15,6 +15,7 @@ function setup(): Database.Database {
   sqlite.exec(`
     CREATE TABLE ad_conversion_logs (
       id TEXT PRIMARY KEY,
+      line_account_id TEXT,
       ad_platform_id TEXT NOT NULL,
       friend_id TEXT NOT NULL,
       conversion_point_id TEXT,
@@ -44,6 +45,7 @@ describe('広告成果の重複防止と再試行', () => {
 
     const input = {
       platformId: 'platform-a', friendId: 'friend-a', eventName: 'Purchase',
+      lineAccountId: 'account-a',
       clickId: 'click-a', clickIdType: 'gclid', idempotencyKey: 'event-a:google',
     };
     const first = await reserveAdConversion(db, input);
@@ -58,6 +60,7 @@ describe('広告成果の重複防止と再試行', () => {
     const db = asD1(sqlite);
     const row = await reserveAdConversion(db, {
       platformId: 'platform-a', friendId: 'friend-a', eventName: 'Purchase',
+      lineAccountId: 'account-a',
       clickId: 'click-a', clickIdType: 'gclid', idempotencyKey: 'event-b:google',
     });
     expect(row).not.toBeNull();

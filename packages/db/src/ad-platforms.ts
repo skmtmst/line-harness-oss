@@ -2,6 +2,7 @@ import { jstNow } from './utils.js';
 
 export interface AdPlatform {
   id: string;
+  line_account_id: string | null;
   name: string;
   display_name: string | null;
   config: string;
@@ -29,6 +30,7 @@ export interface AdPlatformConfig {
 
 export interface AdConversionLog {
   id: string;
+  line_account_id: string | null;
   ad_platform_id: string;
   friend_id: string;
   conversion_point_id: string | null;
@@ -50,6 +52,7 @@ export async function reserveAdConversion(
   db: D1Database,
   opts: {
     platformId: string;
+    lineAccountId: string;
     friendId: string;
     eventName: string;
     clickId: string;
@@ -62,12 +65,13 @@ export async function reserveAdConversion(
   const result = await db
     .prepare(
       `INSERT OR IGNORE INTO ad_conversion_logs
-       (id, ad_platform_id, friend_id, event_name, click_id, click_id_type,
+       (id, line_account_id, ad_platform_id, friend_id, event_name, click_id, click_id_type,
         status, idempotency_key, attempt_count, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, 0, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, 0, ?, ?)`,
     )
     .bind(
       id,
+      opts.lineAccountId,
       opts.platformId,
       opts.friendId,
       opts.eventName,
@@ -111,9 +115,13 @@ export async function finishAdConversionAttempt(
     .run();
 }
 
-export async function getActiveAdPlatforms(db: D1Database): Promise<AdPlatform[]> {
+export async function getActiveAdPlatforms(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<AdPlatform[]> {
   const result = await db
-    .prepare(`SELECT * FROM ad_platforms WHERE is_active = 1`)
+    .prepare(`SELECT * FROM ad_platforms WHERE line_account_id = ? AND is_active = 1`)
+    .bind(lineAccountId)
     .all<AdPlatform>();
   return result.results;
 }
@@ -121,16 +129,21 @@ export async function getActiveAdPlatforms(db: D1Database): Promise<AdPlatform[]
 export async function getAdPlatformByName(
   db: D1Database,
   name: string,
+  lineAccountId: string,
 ): Promise<AdPlatform | null> {
   return db
-    .prepare(`SELECT * FROM ad_platforms WHERE name = ? AND is_active = 1`)
-    .bind(name)
+    .prepare(`SELECT * FROM ad_platforms WHERE name = ? AND line_account_id = ? AND is_active = 1`)
+    .bind(name, lineAccountId)
     .first<AdPlatform>();
 }
 
-export async function getAdPlatforms(db: D1Database): Promise<AdPlatform[]> {
+export async function getAdPlatforms(
+  db: D1Database,
+  lineAccountId: string,
+): Promise<AdPlatform[]> {
   const result = await db
-    .prepare(`SELECT * FROM ad_platforms ORDER BY created_at DESC`)
+    .prepare(`SELECT * FROM ad_platforms WHERE line_account_id = ? ORDER BY created_at DESC`)
+    .bind(lineAccountId)
     .all<AdPlatform>();
   return result.results;
 }
@@ -138,26 +151,41 @@ export async function getAdPlatforms(db: D1Database): Promise<AdPlatform[]> {
 export async function getAdPlatformById(
   db: D1Database,
   id: string,
+  lineAccountId: string,
 ): Promise<AdPlatform | null> {
   return db
-    .prepare(`SELECT * FROM ad_platforms WHERE id = ?`)
-    .bind(id)
+    .prepare(`SELECT * FROM ad_platforms WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
     .first<AdPlatform>();
 }
 
 export async function createAdPlatform(
   db: D1Database,
-  input: { name: string; displayName?: string | null; config: Record<string, unknown> },
+  input: {
+    lineAccountId: string;
+    name: string;
+    displayName?: string | null;
+    config: Record<string, unknown>;
+  },
 ): Promise<AdPlatform> {
   const id = crypto.randomUUID();
   const now = jstNow();
 
   await db
     .prepare(
-      `INSERT INTO ad_platforms (id, name, display_name, config, is_active, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 1, ?, ?)`,
+      `INSERT INTO ad_platforms
+       (id, line_account_id, name, display_name, config, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1, ?, ?)`,
     )
-    .bind(id, input.name, input.displayName ?? null, JSON.stringify(input.config), now, now)
+    .bind(
+      id,
+      input.lineAccountId,
+      input.name,
+      input.displayName ?? null,
+      JSON.stringify(input.config),
+      now,
+      now,
+    )
     .run();
 
   return (await db
@@ -169,6 +197,7 @@ export async function createAdPlatform(
 export async function updateAdPlatform(
   db: D1Database,
   id: string,
+  lineAccountId: string,
   input: { name?: string; displayName?: string | null; config?: Record<string, unknown>; isActive?: boolean },
 ): Promise<AdPlatform | null> {
   const now = jstNow();
@@ -180,24 +209,35 @@ export async function updateAdPlatform(
   if (input.config !== undefined) { fields.push('config = ?'); values.push(JSON.stringify(input.config)); }
   if (input.isActive !== undefined) { fields.push('is_active = ?'); values.push(input.isActive ? 1 : 0); }
 
-  values.push(id);
+  values.push(id, lineAccountId);
 
   await db
-    .prepare(`UPDATE ad_platforms SET ${fields.join(', ')} WHERE id = ?`)
+    .prepare(`UPDATE ad_platforms SET ${fields.join(', ')} WHERE id = ? AND line_account_id = ?`)
     .bind(...values)
     .run();
 
-  return db.prepare(`SELECT * FROM ad_platforms WHERE id = ?`).bind(id).first<AdPlatform>();
+  return db
+    .prepare(`SELECT * FROM ad_platforms WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
+    .first<AdPlatform>();
 }
 
-export async function deleteAdPlatform(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM ad_platforms WHERE id = ?`).bind(id).run();
+export async function deleteAdPlatform(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<void> {
+  await db
+    .prepare(`DELETE FROM ad_platforms WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId)
+    .run();
 }
 
 export async function logAdConversion(
   db: D1Database,
   opts: {
     platformId: string;
+    lineAccountId: string;
     friendId: string;
     eventName: string;
     clickId: string;
@@ -214,11 +254,13 @@ export async function logAdConversion(
   await db
     .prepare(
       `INSERT INTO ad_conversion_logs
-       (id, ad_platform_id, friend_id, event_name, click_id, click_id_type, status, request_body, response_body, error_message, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, line_account_id, ad_platform_id, friend_id, event_name, click_id, click_id_type,
+        status, request_body, response_body, error_message, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
+      opts.lineAccountId,
       opts.platformId,
       opts.friendId,
       opts.eventName,
@@ -229,6 +271,7 @@ export async function logAdConversion(
       opts.responseBody ?? null,
       opts.errorMessage ?? null,
       now,
+      now,
     )
     .run();
 }
@@ -236,13 +279,16 @@ export async function logAdConversion(
 export async function getAdConversionLogs(
   db: D1Database,
   platformId: string,
+  lineAccountId: string,
   limit = 50,
 ): Promise<AdConversionLog[]> {
   const result = await db
     .prepare(
-      `SELECT * FROM ad_conversion_logs WHERE ad_platform_id = ? ORDER BY created_at DESC LIMIT ?`,
+      `SELECT * FROM ad_conversion_logs
+        WHERE ad_platform_id = ? AND line_account_id = ?
+        ORDER BY created_at DESC LIMIT ?`,
     )
-    .bind(platformId, limit)
+    .bind(platformId, lineAccountId, limit)
     .all<AdConversionLog>();
   return result.results;
 }

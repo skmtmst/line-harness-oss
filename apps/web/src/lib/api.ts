@@ -941,6 +941,7 @@ export type NenFriendOverview = {
 
 export type AdPlatform = {
   id: string
+  lineAccountId: string
   /** meta / x / google / tiktok */
   name: string
   displayName: string | null
@@ -953,6 +954,7 @@ export type AdPlatform = {
 
 export type AdConversionLog = {
   id: string
+  lineAccountId: string
   adPlatformId: string
   friendId: string
   eventName: string
@@ -3717,10 +3719,14 @@ export const api = {
   },
   /** 広告連携（設計 V2 6-8）。鍵は伏せた形で返ってくる。 */
   adPlatforms: {
-    list: () =>
-      fetchApi<ApiResponse<AdPlatform[]>>('/api/ad-platforms'),
-    logs: (id: string, limit = 20) =>
-      fetchApi<ApiResponse<AdConversionLog[]>>(`/api/ad-platforms/${id}/logs?limit=${limit}`),
+    list: (lineAccountId: string) =>
+      fetchApi<ApiResponse<AdPlatform[]>>(
+        `/api/ad-platforms?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      ),
+    logs: (id: string, lineAccountId: string, limit = 20) =>
+      fetchApi<ApiResponse<AdConversionLog[]>>(
+        `/api/ad-platforms/${id}/logs?lineAccountId=${encodeURIComponent(lineAccountId)}&limit=${limit}`,
+      ),
   },
   uploads: {
     /**

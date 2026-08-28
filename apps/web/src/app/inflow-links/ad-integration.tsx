@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import type { AdConversionLog, AdPlatform } from '@/lib/api'
 import { TableHeadRow, Th } from '@/components/shared/table'
+import { useAccount } from '@/contexts/account-context'
+import ListState from '@/components/shared/list-state'
 
 /**
  * 広告連携（設計 V2 6-8）。
@@ -44,14 +46,25 @@ function accountLabel(platform: AdPlatform): string | null {
 }
 
 export default function AdIntegration() {
+  const { selectedAccountId } = useAccount()
   const [platforms, setPlatforms] = useState<AdPlatform[]>([])
   const [logs, setLogs] = useState<AdConversionLog[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    setPlatforms([])
+    setLogs([])
+    if (!selectedAccountId) {
+      setLoading(false)
+      return () => {
+        cancelled = true
+      }
+    }
+    setLoading(true)
     void (async () => {
-      const res = await api.adPlatforms.list()
+      const accountAtRequest = selectedAccountId
+      const res = await api.adPlatforms.list(accountAtRequest)
       if (cancelled || !res.success) {
         if (!cancelled) setLoading(false)
         return
@@ -59,7 +72,7 @@ export default function AdIntegration() {
       setPlatforms(res.data)
       const active = res.data.find((p) => p.isActive) ?? res.data[0]
       if (active) {
-        const logRes = await api.adPlatforms.logs(active.id, 20)
+        const logRes = await api.adPlatforms.logs(active.id, accountAtRequest, 20)
         if (!cancelled && logRes.success) setLogs(logRes.data)
       }
       if (!cancelled) setLoading(false)
@@ -67,7 +80,7 @@ export default function AdIntegration() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [selectedAccountId])
 
   const connected = platforms.filter((p) => p.isActive)
   const sentCount = logs.filter((l) => l.status === 'sent' || l.status === 'success').length
@@ -77,6 +90,16 @@ export default function AdIntegration() {
       <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-12 text-center text-sm">
         読み込み中...
       </div>
+    )
+  }
+
+  if (!selectedAccountId) {
+    return (
+      <ListState
+        kind="empty"
+        title="LINEアカウントを選んでください"
+        description="広告との接続と送信履歴は、上部で選んだLINEアカウントごとに表示します。"
+      />
     )
   }
 

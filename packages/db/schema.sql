@@ -1008,6 +1008,7 @@ CREATE INDEX IF NOT EXISTS idx_automation_logs_automation ON automation_logs (au
 -- ============================================================
 CREATE TABLE IF NOT EXISTS ad_platforms (
   id           TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
   name         TEXT NOT NULL,
   display_name TEXT,
   config       TEXT NOT NULL DEFAULT '{}',
@@ -1021,6 +1022,7 @@ CREATE TABLE IF NOT EXISTS ad_platforms (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS ad_conversion_logs (
   id                  TEXT PRIMARY KEY,
+  line_account_id     TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
   ad_platform_id      TEXT NOT NULL,
   friend_id           TEXT NOT NULL,
   conversion_point_id TEXT,
@@ -1045,6 +1047,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ad_conversion_logs_idempotency
   ON ad_conversion_logs(idempotency_key) WHERE idempotency_key IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_ad_conversion_logs_retry
   ON ad_conversion_logs(status, next_retry_at);
+CREATE INDEX IF NOT EXISTS idx_ad_platforms_account_active
+  ON ad_platforms(line_account_id, is_active, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ad_conversion_logs_account_created
+  ON ad_conversion_logs(line_account_id, created_at DESC, id);
 
 -- Staff member accounts with role-based access control
 CREATE TABLE IF NOT EXISTS staff_members (

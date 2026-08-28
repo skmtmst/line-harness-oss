@@ -10,6 +10,9 @@ export function registerManageAdPlatforms(server: McpServer): void {
       action: z
         .enum(["list", "create", "update", "delete", "test"])
         .describe("Action to perform"),
+      lineAccountId: z
+        .string()
+        .describe("Selected LINE account ID. Every action is scoped to this account."),
       platformId: z
         .string()
         .optional()
@@ -41,13 +44,13 @@ export function registerManageAdPlatforms(server: McpServer): void {
         .optional()
         .describe("Friend ID for test conversion (for 'test')"),
     },
-    async ({ action, platformId, name, displayName, config, isActive, eventName, friendId }) => {
+    async ({ action, lineAccountId, platformId, name, displayName, config, isActive, eventName, friendId }) => {
       try {
         const client = getClient();
 
         switch (action) {
           case "list": {
-            const platforms = await client.adPlatforms.list();
+            const platforms = await client.adPlatforms.list(lineAccountId);
             return {
               content: [
                 {
@@ -72,6 +75,7 @@ export function registerManageAdPlatforms(server: McpServer): void {
               throw new Error("config is required for create action");
 
             const platform = await client.adPlatforms.create({
+              lineAccountId,
               name,
               displayName,
               config,
@@ -91,7 +95,7 @@ export function registerManageAdPlatforms(server: McpServer): void {
             if (!platformId)
               throw new Error("platformId is required for update action");
 
-            const platform = await client.adPlatforms.update(platformId, {
+            const platform = await client.adPlatforms.update(platformId, lineAccountId, {
               name,
               displayName,
               config,
@@ -112,7 +116,7 @@ export function registerManageAdPlatforms(server: McpServer): void {
             if (!platformId)
               throw new Error("platformId is required for delete action");
 
-            await client.adPlatforms.delete(platformId);
+            await client.adPlatforms.delete(platformId, lineAccountId);
             return {
               content: [
                 {
@@ -132,6 +136,7 @@ export function registerManageAdPlatforms(server: McpServer): void {
               throw new Error("eventName is required for test action");
 
             const result = await client.adPlatforms.test(
+              lineAccountId,
               name,
               eventName,
               friendId,

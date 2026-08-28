@@ -7,6 +7,9 @@ export function registerGetConversionLogs(server: McpServer): void {
     "get_conversion_logs",
     "View ad conversion send logs for a specific platform. Shows the history of conversion events sent to Meta CAPI, X, Google Ads, or TikTok, including status (sent/failed) and error details.",
     {
+      lineAccountId: z
+        .string()
+        .describe("Selected LINE account ID"),
       platformId: z
         .string()
         .describe(
@@ -18,10 +21,10 @@ export function registerGetConversionLogs(server: McpServer): void {
         .default(50)
         .describe("Maximum number of logs to return (default: 50)"),
     },
-    async ({ platformId, limit }) => {
+    async ({ lineAccountId, platformId, limit }) => {
       try {
         const client = getClient();
-        const logs = await client.adPlatforms.getLogs(platformId, limit);
+        const logs = await client.adPlatforms.getLogs(platformId, lineAccountId, limit);
 
         const summary = {
           total: logs.length,

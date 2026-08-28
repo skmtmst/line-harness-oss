@@ -204,7 +204,8 @@
     "195_staff_account_scope.sql",
     "196_support_mark_account_scope.sql",
     "197_notification_center_scope.sql",
-    "198_ad_conversion_idempotency.sql"
+    "198_ad_conversion_idempotency.sql",
+    "201_ad_platform_account_scope.sql"
   ],
-  "migrationCount": 205
+  "migrationCount": 206
 }

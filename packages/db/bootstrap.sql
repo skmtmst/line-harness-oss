@@ -33,6 +33,7 @@ CREATE TABLE account_settings (
 
 CREATE TABLE ad_conversion_logs (
   id                  TEXT PRIMARY KEY,
+  line_account_id     TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
   ad_platform_id      TEXT NOT NULL,
   friend_id           TEXT NOT NULL,
   conversion_point_id TEXT,
@@ -52,6 +53,7 @@ CREATE TABLE ad_conversion_logs (
 
 CREATE TABLE ad_platforms (
   id           TEXT PRIMARY KEY,
+  line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE,
   name         TEXT NOT NULL,
   display_name TEXT,
   config       TEXT NOT NULL DEFAULT '{}',
@@ -2595,6 +2597,9 @@ CREATE TABLE webinars (
   updated_at TEXT NOT NULL
 );
 
+CREATE INDEX idx_ad_conversion_logs_account_created
+  ON ad_conversion_logs(line_account_id, created_at DESC, id);
+
 CREATE INDEX idx_ad_conversion_logs_friend ON ad_conversion_logs (friend_id);
 
 CREATE UNIQUE INDEX idx_ad_conversion_logs_idempotency
@@ -2606,6 +2611,9 @@ CREATE INDEX idx_ad_conversion_logs_retry
   ON ad_conversion_logs(status, next_retry_at);
 
 CREATE INDEX idx_ad_conversion_logs_status ON ad_conversion_logs (status);
+
+CREATE INDEX idx_ad_platforms_account_active
+  ON ad_platforms(line_account_id, is_active, created_at DESC);
 
 CREATE INDEX idx_admin_sessions_expires_at ON admin_sessions(expires_at);
 

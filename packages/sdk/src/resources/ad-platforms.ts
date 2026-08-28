@@ -3,6 +3,7 @@ import type { ApiResponse } from '../types.js'
 
 export interface AdPlatform {
   id: string
+  lineAccountId: string
   name: string
   displayName: string | null
   config: Record<string, unknown>
@@ -13,6 +14,7 @@ export interface AdPlatform {
 
 export interface AdConversionLog {
   id: string
+  lineAccountId: string
   adPlatformId: string
   friendId: string
   eventName: string
@@ -24,6 +26,7 @@ export interface AdConversionLog {
 }
 
 export interface CreateAdPlatformInput {
+  lineAccountId: string
   name: 'meta' | 'x' | 'google' | 'tiktok'
   displayName?: string
   config: Record<string, unknown>
@@ -39,8 +42,10 @@ export interface UpdateAdPlatformInput {
 export class AdPlatformsResource {
   constructor(private readonly http: HttpClient) {}
 
-  async list(): Promise<AdPlatform[]> {
-    const res = await this.http.get<ApiResponse<AdPlatform[]>>('/api/ad-platforms')
+  async list(lineAccountId: string): Promise<AdPlatform[]> {
+    const res = await this.http.get<ApiResponse<AdPlatform[]>>(
+      `/api/ad-platforms?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+    )
     return res.data
   }
 
@@ -49,28 +54,37 @@ export class AdPlatformsResource {
     return res.data
   }
 
-  async update(id: string, input: UpdateAdPlatformInput): Promise<AdPlatform> {
-    const res = await this.http.put<ApiResponse<AdPlatform>>(`/api/ad-platforms/${id}`, input)
+  async update(id: string, lineAccountId: string, input: UpdateAdPlatformInput): Promise<AdPlatform> {
+    const res = await this.http.put<ApiResponse<AdPlatform>>(
+      `/api/ad-platforms/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      input,
+    )
     return res.data
   }
 
-  async delete(id: string): Promise<void> {
-    await this.http.delete(`/api/ad-platforms/${id}`)
+  async delete(id: string, lineAccountId: string): Promise<void> {
+    await this.http.delete(`/api/ad-platforms/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`)
   }
 
-  async getLogs(id: string, limit?: number): Promise<AdConversionLog[]> {
-    const path = limit
-      ? `/api/ad-platforms/${id}/logs?limit=${limit}`
-      : `/api/ad-platforms/${id}/logs`
+  async getLogs(id: string, lineAccountId: string, limit?: number): Promise<AdConversionLog[]> {
+    const query = new URLSearchParams({ lineAccountId })
+    if (limit !== undefined) query.set('limit', String(limit))
+    const path = `/api/ad-platforms/${id}/logs?${query.toString()}`
     const res = await this.http.get<ApiResponse<AdConversionLog[]>>(path)
     return res.data
   }
 
-  async test(platform: string, eventName: string, friendId?: string): Promise<{ message: string }> {
+  async test(
+    lineAccountId: string,
+    platform: string,
+    eventName: string,
+    friendId?: string,
+  ): Promise<{ message: string }> {
     const res = await this.http.post<ApiResponse<{ message: string }>>('/api/ad-platforms/test', {
       platform,
       eventName,
       friendId,
+      lineAccountId,
     })
     return res.data
   }

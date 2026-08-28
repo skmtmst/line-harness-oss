@@ -26,4 +26,12 @@ describe('V6 流入と計測', () => {
     expect(ads).toContain("retry_wait: '再試行待ち'");
     expect(ads).toContain("l.attemptCount === undefined ? '—'");
   });
+
+  it('広告接続と履歴を選択中のLINEアカウントへ限定する', () => {
+    expect(ads).toContain('const { selectedAccountId } = useAccount()');
+    expect(ads).toContain('api.adPlatforms.list(accountAtRequest)');
+    expect(ads).toContain('api.adPlatforms.logs(active.id, accountAtRequest, 20)');
+    expect(ads).toContain('}, [selectedAccountId])');
+    expect(ads).toContain('LINEアカウントを選んでください');
+  });
 });
