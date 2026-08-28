@@ -104,6 +104,11 @@ describe('受信箱V4の画面契約', () => {
     expect(PAGE).toContain("msg.sentByStaffName ?? '担当者'")
   })
 
+  it('担当変更では、絞り込み用の「すべて」を担当者として送らない', () => {
+    expect(PAGE).toContain('allowAll={false}')
+    expect(PAGE).toContain("if (next === 'all') return")
+  })
+
   it('内部メモは送信欄と分けたダイアログで編集できる', () => {
     expect(PAGE).toContain('handleSaveMemo')
     expect(PAGE).toContain('createPortal(')
