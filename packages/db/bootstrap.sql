@@ -687,7 +687,7 @@ CREATE TABLE common_vars (
   value       TEXT NOT NULL DEFAULT '',
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours'))
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE conversion_events (
   id                   TEXT PRIMARY KEY,
@@ -2760,6 +2760,9 @@ CREATE INDEX idx_common_action_versions_action_status
 
 CREATE INDEX idx_common_actions_account_status
   ON common_actions(line_account_id, status, updated_at DESC);
+
+CREATE INDEX idx_common_vars_account_name
+  ON common_vars(line_account_id, name, id);
 
 CREATE INDEX idx_conversion_events_affiliate ON conversion_events (affiliate_code);
 

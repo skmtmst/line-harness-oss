@@ -1429,7 +1429,7 @@ broadcasts.post('/api/broadcasts/:id/test-send', requireRole('owner', 'admin'), 
      */
     const { resolveInterpolationExtra } = await import('../services/interpolation-context.js');
     const { getCommonVarMap } = await import('@line-crm/db');
-    const commonVars = /\{\{\s*var\./.test(tracked.content) ? await getCommonVarMap(c.env.DB) : undefined;
+    const commonVars = /\{\{\s*var\./.test(tracked.content) ? await getCommonVarMap(c.env.DB, accountId) : undefined;
     // 配信日の起点は「いま」。テスト送信は今すぐ届くので、今日の日付でよい。
     const testSendAt = new Date();
 

@@ -1593,11 +1593,12 @@ export const api = {
   },
   /** 共通情報。営業時間などを1か所で直す。 */
   commonVars: {
-    list: (params?: { folderId?: string }) =>
+    list: (accountId: string, params?: { folderId?: string }) =>
       fetchApi<ApiResponse<CommonVar[]>>(
-        `/api/common-vars${params?.folderId ? `?folderId=${encodeURIComponent(params.folderId)}` : ''}`,
+        `/api/common-vars?accountId=${encodeURIComponent(accountId)}${params?.folderId ? `&folderId=${encodeURIComponent(params.folderId)}` : ''}`,
       ),
     create: (data: {
+      accountId: string
       name: string
       varKey: string
       type?: string
@@ -1609,28 +1610,28 @@ export const api = {
         body: JSON.stringify(data),
       }),
     /** varKey は変えられない（テンプレートの差し込みが空になるため）。 */
-    update: (id: string, data: { name?: string; value?: string; folderId?: string | null }) =>
-      fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}`, {
+    update: (id: string, accountId: string, data: { name?: string; value?: string; folderId?: string | null }) =>
+      fetchApi<ApiResponse<CommonVar>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    deleteImpact: (id: string) =>
+    deleteImpact: (id: string, accountId: string) =>
       fetchApi<ApiResponse<{
         total: number
         canDelete: boolean
         byKind: Record<string, number>
-      }>>(`/api/common-vars/${id}/delete-impact`),
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}`, { method: 'DELETE' }),
-    schedules: (id: string) =>
-      fetchApi<ApiResponse<CommonVarSchedule[]>>(`/api/common-vars/${id}/schedules`),
-    addSchedule: (id: string, data: { effectiveFrom: string; value: string }) =>
-      fetchApi<ApiResponse<CommonVarSchedule>>(`/api/common-vars/${id}/schedules`, {
+      }>>(`/api/common-vars/${id}/delete-impact?accountId=${encodeURIComponent(accountId)}`),
+    delete: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}?accountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
+    schedules: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<CommonVarSchedule[]>>(`/api/common-vars/${id}/schedules?accountId=${encodeURIComponent(accountId)}`),
+    addSchedule: (id: string, accountId: string, data: { effectiveFrom: string; value: string }) =>
+      fetchApi<ApiResponse<CommonVarSchedule>>(`/api/common-vars/${id}/schedules?accountId=${encodeURIComponent(accountId)}`, {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    deleteSchedule: (id: string, scheduleId: string) =>
-      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}/schedules/${scheduleId}`, {
+    deleteSchedule: (id: string, scheduleId: string, accountId: string) =>
+      fetchApi<ApiResponse<null>>(`/api/common-vars/${id}/schedules/${scheduleId}?accountId=${encodeURIComponent(accountId)}`, {
         method: 'DELETE',
       }),
   },

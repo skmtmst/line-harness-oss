@@ -275,6 +275,7 @@ export interface MediaUsage {
 /** 共通情報。テンプレートに {{var.shop_hours}} として差し込む */
 export interface CommonVar {
   id: string;
+  lineAccountId: string | null;
   folderId: string | null;
   name: string;
   varKey: string;

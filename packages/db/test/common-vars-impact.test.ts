@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getCommonVarUsageImpact } from '../src/common-vars';
+import Database from 'better-sqlite3';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { getCommonVarMap, getCommonVarUsageImpact } from '../src/common-vars';
+import { asD1 } from './d1-test-helper';
 
 describe('common variable usage impact', () => {
   it('counts the exact legacy token across every supported usage kind', async () => {
@@ -36,5 +40,26 @@ describe('common variable usage impact', () => {
     } as unknown as D1Database;
 
     await expect(getCommonVarUsageImpact(db, 'shop_hours')).rejects.toThrow('table unavailable');
+  });
+});
+
+describe('common variable account scope', () => {
+  it('returns only values assigned to the requested LINE account', async () => {
+    const raw = new Database(':memory:');
+    raw.exec(readFileSync(join(process.cwd(), 'bootstrap.sql'), 'utf8'));
+    raw.exec(`
+      INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+      VALUES ('a1','c1','A1','t','s'), ('a2','c2','A2','t','s');
+      INSERT INTO common_vars (id, line_account_id, name, var_key, value)
+      VALUES
+        ('v1','a1','営業時間','hours','10-18'),
+        ('v2','a2','電話番号','phone','000'),
+        ('legacy',NULL,'所属不明','legacy_key','hidden');
+    `);
+
+    await expect(getCommonVarMap(asD1(raw), 'a1')).resolves.toEqual({ hours: '10-18' });
+    await expect(getCommonVarMap(asD1(raw), 'a2')).resolves.toEqual({ phone: '000' });
+    await expect(getCommonVarMap(asD1(raw), null)).resolves.toEqual({});
+    raw.close();
   });
 });

@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import type { CommonVar, Folder } from '@line-crm/shared'
@@ -10,6 +10,7 @@ import { VAR_TYPE_LABELS, formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { useAccount } from '@/contexts/account-context'
 
 /**
  * 共通情報の一覧。
@@ -27,6 +28,9 @@ const UNGROUPED = '__ungrouped__'
 const PER_PAGE = 20
 
 function VarsPageInner() {
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  latestAccountRef.current = selectedAccountId
   const router = useRouter()
   const params = useSearchParams()
 
@@ -51,25 +55,33 @@ function VarsPageInner() {
   const [savingFolder, setSavingFolder] = useState(false)
 
   const load = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setItems([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setError('')
     try {
       const [vars, folderList] = await Promise.all([
-        api.commonVars.list(),
+        api.commonVars.list(accountAtRequest),
         api.folders.list('common_var'),
       ])
+      if (accountAtRequest !== latestAccountRef.current) return
       if (vars.success) setItems(vars.data)
       if (folderList.success) setFolders(folderList.data)
     } catch {
-      setError('読み込みに失敗しました')
+      if (accountAtRequest === latestAccountRef.current) setError('読み込みに失敗しました')
     } finally {
-      setLoading(false)
+      if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
+    if (accountLoading) return
     void load()
-  }, [load])
+  }, [accountLoading, load])
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -117,12 +129,12 @@ function VarsPageInner() {
   }
 
   const removeSelected = async () => {
-    if (selected.size === 0) return
+    if (selected.size === 0 || !selectedAccountId) return
     setError('')
     try {
       const impacts = await Promise.all(
         [...selected].map(async (id) => {
-          const response = await api.commonVars.deleteImpact(id)
+          const response = await api.commonVars.deleteImpact(id, selectedAccountId)
           if (!response.success) throw new Error(response.error)
           return { id, impact: response.data }
         }),
@@ -144,7 +156,7 @@ function VarsPageInner() {
     )
       return
     try {
-      for (const id of selected) await api.commonVars.delete(id)
+      for (const id of selected) await api.commonVars.delete(id, selectedAccountId)
       setSelected(new Set())
       void load()
     } catch {
@@ -164,6 +176,9 @@ function VarsPageInner() {
 
   return (
     <div data-design-node="WuKzU">
+      {!selectedAccountId && !accountLoading && (
+        <ListState kind="empty" title="LINEアカウントを選択してください" description="共通情報はLINEアカウントごとに管理します。" />
+      )}
       {error && (
         <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-lg border p-4 text-sm">
           {error}
