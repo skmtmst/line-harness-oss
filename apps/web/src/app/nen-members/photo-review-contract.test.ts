@@ -19,6 +19,16 @@ describe('V6 photo review contract', () => {
     expect(api).toContain('/api/nen-members/photos?accountId=');
   });
 
+  it('separates loading, empty and failed states without making zero counts', () => {
+    expect(page).toContain("import ListState from '@/components/shared/list-state'");
+    expect(page).toContain('kind="loading"');
+    expect(page).toContain('kind="empty"');
+    expect(page).toContain('kind="error"');
+    expect(page).toContain('写真を再読み込み');
+    expect(page).toContain("countsReady ? counts.pending : '—'");
+    expect(page).toContain("countsReady ? counts[value] : '—'");
+  });
+
   it('requires a reason and previews the submitter message', () => {
     expect(page).toContain('写真を戻す理由を選ぶ');
     expect(page).toContain('投稿者に届く内容');
