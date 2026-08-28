@@ -2871,8 +2871,23 @@ export const api = {
     overview: () => fetchApi<ApiResponse<{ pets: number; healthLogs: number; activeCare: number; pendingPhotos: number; members: number; consultations: number }>>('/api/nen-members/overview'),
     careFlags: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/care-flags'),
     updateCareFlag: (id: string, data: { status: 'active' | 'resolved'; adviceReady: boolean }) => fetchApi<{ success: boolean }>(`/api/nen-members/care-flags/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
-    photos: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/photos'),
-    reviewPhoto: (id: string, data: { status: 'adopted' | 'rejected'; points: number }) => fetchApi<ApiResponse<{ awardedPoints: number; pointBalance: number | null; pointSync: string }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(data) }),
+    photos: (accountId: string) => fetchApi<ApiResponse<Array<Record<string, unknown>>>>(`/api/nen-members/photos?accountId=${encodeURIComponent(accountId)}`),
+    reviewPhoto: (id: string, data: {
+      accountId: string
+      status: 'adopted' | 'rejected'
+      reasonCode?: 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
+      reasonNote?: string
+    }) => fetchApi<ApiResponse<{
+      awardedPoints: number
+      pointBalance: number | null
+      pointSync: string
+      notificationStatus: 'sent' | 'failed'
+    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/review`, { method: 'PUT', body: JSON.stringify(data) }),
+    retryPhotoReviewNotification: (id: string, accountId: string) => fetchApi<ApiResponse<{
+      notificationStatus: 'sent'
+    }>>(`/api/nen-members/photos/${encodeURIComponent(id)}/notification/retry`, {
+      method: 'POST', body: JSON.stringify({ accountId }),
+    }),
     friendOverview: (friendId: string) => fetchApi<ApiResponse<NenFriendOverview>>(`/api/nen-members/friends/${encodeURIComponent(friendId)}`),
     ranks: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/ranks'),
     consultations: () => fetchApi<ApiResponse<Array<Record<string, unknown>>>>('/api/nen-members/consultations'),

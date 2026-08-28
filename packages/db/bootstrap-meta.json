@@ -204,7 +204,8 @@
     "195_staff_account_scope.sql",
     "196_support_mark_account_scope.sql",
     "197_notification_center_scope.sql",
-    "201_nen_photo_publication_consent.sql"
+    "201_nen_photo_publication_consent.sql",
+    "202_nen_photo_review_decisions.sql"
   ],
-  "migrationCount": 205
+  "migrationCount": 206
 }
