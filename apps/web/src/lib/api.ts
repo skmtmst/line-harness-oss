@@ -839,6 +839,39 @@ export type EcCommerceEvent = {
   processedAt: string | null
 }
 
+export type EcNotificationRun = {
+  id: string
+  recipientType: 'customer'
+  notificationName: string
+  source: 'EC連携'
+  sourceEventId: string
+  friendId: string
+  friendName: string | null
+  orderNumber: string | null
+  channel: 'line'
+  status: 'pending' | 'accepted' | 'excluded' | 'failed'
+  reason: string | null
+  receivedAt: string
+  acceptedAt: string | null
+  attemptCount: number | null
+  nextRetryAt: string | null
+  clickedAt: string | null
+  version: number | null
+  executionMode: 'automatic'
+  retryAvailable: false
+}
+
+export type EcNotificationRunList = {
+  items: EcNotificationRun[]
+  summary: { accepted: number; failed: number; excluded: number; pending: number }
+  coverage: {
+    source: 'current_ec_events'
+    unassignedHistoricalRowsExcluded: true
+    attemptHistoryAvailable: false
+    retryAvailable: false
+  }
+}
+
 export type EcShipment = {
   id: string
   eventType: string
@@ -2755,6 +2788,15 @@ export const api = {
       const suffix = query.size ? `?${query}` : ''
       return fetchApi<ApiResponse<EcCommerceEvent[]> & { pagination: { total: number; limit: number; offset: number } }>(
         `/api/ec-commerce/events${suffix}`,
+      )
+    },
+    notificationRuns: (params: { lineAccountId: string; view?: 'all' | 'failures'; limit?: number; offset?: number }) => {
+      const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
+      if (params.view) query.set('view', params.view)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<EcNotificationRunList> & { pagination: { total: number; limit: number; offset: number } }>(
+        `/api/ec-commerce/notification-runs?${query}`,
       )
     },
     settings: () =>
