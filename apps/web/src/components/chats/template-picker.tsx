@@ -5,6 +5,10 @@ import { createPortal } from 'react-dom'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { FolderDropdown } from '@/components/chats/inbox-dropdown'
+import {
+  templateMatchesFolder,
+  UNFILED_TEMPLATE_FOLDER_ID,
+} from '@/components/chats/template-folder-filter'
 
 /**
  * テンプレートを選ぶ（設計 V2 2-1-1）。
@@ -63,9 +67,7 @@ export default function TemplatePicker({
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
     const filtered = textTemplates.filter((t) => {
-      if (folderId === '__none__' ? t.folderId !== null : folderId && t.folderId !== folderId) {
-        return false
-      }
+      if (!templateMatchesFolder(t.folderId, folderId)) return false
       if (!q) return true
       return t.name.toLowerCase().includes(q) || t.messageContent.toLowerCase().includes(q)
     })
@@ -126,11 +128,18 @@ export default function TemplatePicker({
           */}
           <FolderDropdown
             value={folderId}
-            folders={folders.map((folder) => ({
-              id: folder.id,
-              name: folder.name,
-              count: folderCounts.get(folder.id) ?? 0,
-            }))}
+            folders={[
+              {
+                id: UNFILED_TEMPLATE_FOLDER_ID,
+                name: '未分類',
+                count: folderCounts.get('') ?? 0,
+              },
+              ...folders.map((folder) => ({
+                id: folder.id,
+                name: folder.name,
+                count: folderCounts.get(folder.id) ?? 0,
+              })),
+            ]}
             totalCount={textTemplates.length}
             onChange={setFolderId}
             ariaLabel="フォルダ"
