@@ -1,9 +1,9 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 177,
-  "unimplemented": 74,
-  "unconfirmed": 7,
+  "compared": 178,
+  "unimplemented": 75,
+  "unconfirmed": 5,
   "elsewhere": 4,
   "missing": 0,
   "features": [
@@ -49,7 +49,11 @@
       "unconfirmed": 0,
       "elsewhere": 4,
       "missing": 0,
-      "capturedAt": null
+      "capturedAt": {
+        "pr": 420,
+        "head": "87c150ad",
+        "on": "2026-08-28"
+      }
     },
     {
       "feature": 5,
@@ -67,8 +71,8 @@
       "name": "一斉配信",
       "total": 15,
       "compared": 10,
-      "unimplemented": 0,
-      "unconfirmed": 5,
+      "unimplemented": 2,
+      "unconfirmed": 3,
       "elsewhere": 0,
       "missing": 0,
       "capturedAt": null
@@ -259,12 +263,16 @@
       "feature": 22,
       "name": "写真審査",
       "total": 4,
-      "compared": 1,
-      "unimplemented": 3,
+      "compared": 2,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": null
+      "capturedAt": {
+        "pr": 447,
+        "head": "12c80878",
+        "on": "2026-08-28"
+      }
     },
     {
       "feature": 23,

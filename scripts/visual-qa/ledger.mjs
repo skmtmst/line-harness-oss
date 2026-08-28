@@ -12,12 +12,14 @@
  * **3つとも同じ数から出す。** 表とJSONとページを別々に書くと、必ずどれかが
  * 古くなる。古い数を根拠に「あと何枚」を話すことになる。
  */
-import { SCREENS, screensOf, CAPTURED_AT } from './screens.mjs'
+import { SCREENS, screensOf, CAPTURED_AT, WIDTHS } from './screens.mjs'
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
+/** `capture.spec.mjs` が置く基準画像。`elsewhere` の絵はここに在る。 */
+const SNAPSHOTS = join(ROOT, 'scripts', 'visual-qa', 'capture.spec.mjs-snapshots')
 
 /** 機能の名前。台帳の見出しに使う。 */
 export const FEATURE_NAMES = {
@@ -54,7 +56,16 @@ function capturedAt(feature) {
 function stateOf(screen) {
   if (screen.status === 'unimplemented') return 'unimplemented'
   if (screen.status === 'unconfirmed') return 'unconfirmed'
-  if (screen.status === 'elsewhere') return 'elsewhere'
+  if (screen.status === 'elsewhere') {
+    /*
+      **在ると言うだけでは数えない。** `shots` に書いた基準画像が
+      1440・1920 の両方そろっているかを見る。片方でも無ければ `missing`。
+      名前を書いただけで数えると、見ていないものが「撮ってある」列に入る。
+    */
+    if (!screen.shots) return 'missing'
+    const ok = WIDTHS.every((w) => existsSync(join(SNAPSHOTS, `${screen.shots}-${w}-darwin.png`)))
+    return ok ? 'elsewhere' : 'missing'
+  }
   const dir = join(ROOT, 'docs', 'design-qa', screen.dir)
   const names = screen.states
     ? screen.states.kinds.map((k) => `${screen.node}-${k}`)

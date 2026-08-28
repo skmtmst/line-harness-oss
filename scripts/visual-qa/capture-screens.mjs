@@ -191,6 +191,15 @@ const LIST_STATES = {
  * 当てはまる順に見て、最初に当たったものを使います。
  */
 const EMPTY_BODIES = [
+  /*
+    帯の口。**一覧の既定を返すと `summary.inUse` が無く、
+    「使用中 undefined件」と撮れる。** 型は `FriendFieldListSummary`。
+    `formLinks` は空でも `null`（未取得）ではなく **0（実値）** を返す。
+    0件の一覧なら、繋がっているフォームも本当に0件だから。
+  */
+  [/\/api\/friend-fields-stats/, {
+    total: 0, inUse: 0, registeredFriends: 0, formLinks: 0, updatedThisMonth: 0,
+  }],
   [/\/api\/list-stats/, {
     tags: { total: 0, unused: 0, taggedFriends: 0, assignedThisMonth: 0 },
     marks: { total: 0, inUse: 0, unanswered: 0, inProgress: 0, resolved: 0, changedLast7: 0 },

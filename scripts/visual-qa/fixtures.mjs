@@ -702,30 +702,53 @@ export const REMINDER_STATS = { total: 9, active: 7, waiting: 124, sentThisMonth
  * ここに設計の日本語を入れると欄は既定の1行入力として描かれ、
  * 「日付の欄だけ選べる」という決まりを**何も確かめないまま**撮れてしまう。
  */
+/**
+ * 友だち情報欄の帯（`/api/friend-fields-stats`）。**型は
+ * `FriendFieldListSummary`。** 一覧の既定（`{items,total,page,limit}`）を
+ * 返すと `summary.inUse` が無く、「使用中 undefined件」と撮れる。
+ *
+ * `formLinks` は `number | null` で、**null は未取得**。実装はそのとき
+ * 単位を消して「未取得」と出す（`field-list.tsx:103`）。回答フォームに
+ * アカウント所属が付くまで件数は出せない、と実装自身が書いているので
+ * （表の「回答フォーム」列の `title`）、ここは `null` にして
+ * **未取得の道が通ることを撮る。**
+ */
+export const FRIEND_FIELD_SUMMARY = {
+  total: 4,
+  inUse: 4,
+  registeredFriends: 187,
+  formLinks: null,
+  updatedThisMonth: 3,
+}
+
 export const FRIEND_FIELDS = [
   {
     id: 'field-birthday', folderId: null, name: '誕生日', fieldKey: 'birthday',
     type: 'date', options: null, defaultValue: null, source: 'manual',
     ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: true,
     displayOrder: 1, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+    usageCount: 187,
   },
   {
     id: 'field-contract-end', folderId: null, name: '契約終了日', fieldKey: 'contract_end',
     type: 'date', options: null, defaultValue: null, source: 'manual',
     ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
     displayOrder: 2, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+    usageCount: 164,
   },
   {
     id: 'field-next-delivery', folderId: null, name: '次回お届け日', fieldKey: 'next_delivery',
     type: 'date', options: null, defaultValue: null, source: 'ec',
     ecFieldPath: 'subscription.next_ship_at', ecIsMaster: true, isPersonal: false, isStarred: false,
     displayOrder: 3, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+    usageCount: 141,
   },
   {
     id: 'field-plan', folderId: null, name: 'ご契約プラン', fieldKey: 'plan',
     type: 'select', options: ['ライト', 'スタンダード', 'プレミアム'], defaultValue: null,
     source: 'manual', ecFieldPath: null, ecIsMaster: false, isPersonal: false, isStarred: false,
     displayOrder: 4, createdAt: '2026-01-05T00:00:00.000Z', updatedAt: '2026-01-05T00:00:00.000Z',
+    usageCount: 72,
   },
 ]
 

@@ -28,6 +28,9 @@
  *   status    'unimplemented' … 実装が無い。**撮らない。合格にもしない**
  *             'elsewhere'     … 別の仕掛け（`capture.spec.mjs`）で撮っている。
  *                               **台帳から消さない。**消すと見ていないように見える
+ *   shots     `status: 'elsewhere'` のときの、基準画像の名前（幅と `-darwin` を
+ *             除いたもの）。**台帳がその絵の有無を確かめる。** 名前だけ書いて
+ *             絵が無いと、見ていないものを「別の仕掛けで撮った」と数えてしまう
  *   why       `status` の理由。空にしない
  *
  * **`mode: 'page'` で重なりを撮らない。** `fullPage` は `position: fixed` を
@@ -349,8 +352,8 @@ export const SCREENS = [
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成', route: NEW_BC },
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件', route: NEW_BC,
-    status: 'unconfirmed',
-    why: '「保存した条件から選ぶ」は在るが**押せない（無効のまま）**。先に対象の選び方を決める必要がありそう。実装が無いのか、順番の問題かは未確認',
+    status: 'unimplemented',
+    why: '**確かめました（2026-08-28、`development` 2e438929）。順番の問題ではありません。** 「保存した条件から選ぶ」は `disabled` を直接書いてあり、`title` は「保存した条件は準備中です」（`broadcast-form.tsx:646-653`）。埋める順を変えても押せません',
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集', route: NEW_BC },
   {
@@ -368,7 +371,7 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック', route: NEW_BC,
     status: 'unconfirmed',
-    why: '「配信前チェック」が見つからない。本文と送信設定を埋めてから出るのかもしれない。未確認',
+    why: '**枠は在りました（2026-08-28）。**「配信前チェック」の見出しと `preflight` の作りが `broadcast-form.tsx:891-905` に在る。ただし本文を書いて予約をえらんでも「宛先と本文が決まると…ここに出します。」の置き文のまま。送信対象が `-人` のまま決まらないため。**こちらの固定データに宛先の数を返す口が無い疑いがあり、そこを直してから撮る**',
   },
   {
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認', route: NEW_BC,
@@ -386,8 +389,8 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集', route: NEW_BC,
-    status: 'unconfirmed',
-    why: '「この条件を保存」は在るが**押せない（無効のまま）**。条件を組んでからでないと押せないと思われる。未確認',
+    status: 'unimplemented',
+    why: '**確かめました（2026-08-28、`development` 2e438929）。条件を組んでも押せません。** 「この条件を保存」は `disabled` を直接書いてあり、`title` は「条件の保存は準備中です」（`broadcast-form.tsx:640-645`）。覚え書きも「条件の保存先が無い」',
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作', route: '/broadcasts',
@@ -911,9 +914,16 @@ export const SCREENS = [
     why: '1枚を大きく見る画面が無い。拡大・回転・切り取りも、自動で見つけたこと（人の顔・他社のロゴ・重複）も無い',
   },
   {
+    /*
+      **#447（head `12c80878`）で実装が入った。** それまでは「見送る」を
+      押した時点で確定し、理由も残らなかった。いまは窓が開き、理由を
+      5つから選んで補足を書ける。
+      窓は `position: fixed` なので **`page`（全面）では撮れない**。
+      設計の高さでビューポートを取る。
+    */
     ...PHOTO, node: 'N2J629', name: '22-1-B 写真を戻す理由をえらぶ',
-    status: 'unimplemented',
-    why: '戻すときに理由を選ぶ窓が無い。「見送る」を押すとその場で確定する（`nen-members/page.tsx:136`）。**理由が残らず、お客様にも伝わらない**',
+    mode: 'viewport', height: 1080,
+    steps: [{ click: '理由を選んで見送る', scope: 'main' }],
   },
   {
     ...PHOTO, node: 'J3Wxl8', name: '22-1-C 出しているもの',
@@ -1126,23 +1136,26 @@ export const SCREENS = [
   {
     node: 'H374MR', feature: 4, name: '4-1-H タグCSV一括登録',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
-    status: 'elsewhere',
+    status: 'elsewhere', shots: 'tags-csv-select',
     why: 'ファイルを選ばせる操作が要る。`capture.spec.mjs` の `tags-csv-select` が撮っている',
   },
   {
     node: 'sfTEW', feature: 4, name: '4-1-H-A CSV取り込み・確認（dry-run）',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
-    status: 'elsewhere', why: '同上。`tags-csv-preview` が撮っている',
+    status: 'elsewhere', shots: 'tags-csv-preview',
+    why: '同上。`tags-csv-preview` が撮っている',
   },
   {
     node: 'op1rh', feature: 4, name: '4-1-H-B CSV取り込み・完了',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
-    status: 'elsewhere', why: '同上。`tags-csv-success` が撮っている',
+    status: 'elsewhere', shots: 'tags-csv-success',
+    why: '同上。`tags-csv-success` が撮っている',
   },
   {
     node: 'QzRsJ', feature: 4, name: '4-1-H-C CSV取り込み・一部失敗',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
-    status: 'elsewhere', why: '同上。`tags-csv-partial` が撮っている',
+    status: 'elsewhere', shots: 'tags-csv-partial',
+    why: '同上。`tags-csv-partial` が撮っている',
   },
   { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page' },
   {
@@ -1254,8 +1267,10 @@ export function screensOf(feature) {
  * ものです）。**空欄を「確認済み」と読まないでください。**
  */
 export const CAPTURED_AT = {
+  4: { pr: 420, head: '87c150ad', on: '2026-08-28' },
   17: { pr: 441, head: '5fd7c048', on: '2026-08-28' },
   18: { pr: 443, head: 'f372ff30', on: '2026-08-28' },
   19: { pr: 465, head: null, on: '2026-08-28', note: 'Codexの修正待ち。#465 の比較結果を維持' },
   21: { pr: 446, head: 'd7e2bc9c', on: '2026-08-28' },
+  22: { pr: 447, head: '12c80878', on: '2026-08-28' },
 }
