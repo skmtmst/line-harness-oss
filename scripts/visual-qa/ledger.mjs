@@ -233,7 +233,9 @@ ${bars}
   console.log('| 分け方 | 枚数 | 何を指すか |')
   console.log('|---|---|---|')
   for (const [key, label, desc] of KINDS) {
-    console.log(`| **${label}** | ${un.filter((s) => s.gap === key).length} | ${desc} |`)
+    /* **0件の分け方は出さない。** 空の行が残ると、まだ在るように読める。 */
+    const n = un.filter((s) => s.gap === key).length
+    if (n) console.log(`| **${label}** | ${n} | ${desc} |`)
   }
   const noGap = un.filter((s) => !s.gap)
   if (noGap.length) console.log(`| （未分類） | ${noGap.length} | ${noGap.map((s) => s.node).join('・')} |`)

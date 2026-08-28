@@ -963,16 +963,21 @@ export const SCREENS = [
     states: { apis: ['**/api/mileage/rules*', '**/api/mileage/overview*'], kinds: ['loading', 'empty', 'error'] },
   },
   {
+    /*
+      **#495（head `7d890d3b`）でタブが入った。**
+      それまでタブは3本（残高／決めごと／履歴）で、行動スコアが無かった。
+    */
     ...MILEAGE, node: 'z3PB2', name: '17-2 行動スコア',
-    gap: 'pending',
-    gapNote: '**Codexが実装中。新しいPRのheadを待ちます。** 届いたら1440px・1920pxで比較します',
-    status: 'unimplemented',
-    why: '行動スコアがまるごと無い。PR #441 でタブは2本（友だちの残高／たまる決めごと）になったが、行動スコアは入っていない。**サイドバーの「マイル」はマイルだけ**',
+    route: '/mileage?tab=score', mode: 'page',
+    states: {
+      apis: ['**/api/action-scores/friends*'],
+      kinds: ['normal', 'loading', 'empty', 'error'],
+    },
   },
   {
     ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/earning-rules/new',
-    gap: 'build',
-    gapNote: '**`scoring_rules` の表（`002_round3.sql:114`）と `/api/scoring-rules` の作る・直す・消すが既に在る**（`api.scoring`）。画面をつなぐだけ',
+    gap: 'api',
+    gapNote: '**既存APIだけでは作れません。** いまの `scoring_rules` は（1）アカウント単位でない（2）下書き・テスト・公開が無い（3）公開版の固定と版履歴が無い（4）冪等性・頻度上限・スコア帯が無い。**CodexがDB・API基盤を実装中。** Claude側は実装せず、V6設計との差分整理だけ続けます',
     status: 'unimplemented',
     why: '`/mileage/earning-rules/new` は**マイルの付与ルール**を作る画面で、スコアのルールではない。17-2 が無いので行き先も無い',
   },
@@ -1484,7 +1489,8 @@ export const CAPTURED_AT = {
   17: [
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
-    { pr: 494, head: '0ca45f98', on: '2026-08-28', screens: ['vz0Ji', 'HIU5O'], note: '#494 は #441 を含む' },
+    { pr: 494, head: '0ca45f98', on: '2026-08-28', screens: ['HIU5O'], note: '#494 は #441 を含む' },
+    { pr: 495, head: '7d890d3b', on: '2026-08-28', screens: ['z3PB2', 'vz0Ji'], note: '#495 は #494 を含む' },
   ],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],

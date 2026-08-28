@@ -203,6 +203,16 @@ const EMPTY_BODIES = [
     `formLinks` は空でも `null`（未取得）ではなく **0（実値）** を返す。
     0件の一覧なら、繋がっているフォームも本当に0件だから。
   */
+  /*
+    行動スコア。**一覧の既定（配列）を返すと落ちる。**
+    型は `ActionScoreOverview`（`summary` / `items` / `pagination`）。
+    層の数も**0で埋める**。空は「取れて0件」なので `—` にしない。
+  */
+  [/\/api\/action-scores\/friends/, {
+    summary: { scoredFriends: 0, high: 0, normal: 0, low: 0, decreased30d: 0, highMin: 70, normalMin: 40 },
+    items: [],
+    pagination: { total: 0, limit: 20, offset: 0 },
+  }],
   [/\/api\/friend-fields-stats/, {
     total: 0, inUse: 0, registeredFriends: 0, formLinks: 0, updatedThisMonth: 0,
   }],
@@ -363,7 +373,13 @@ async function captureImpl(feature) {
      for (const shotSpec of shots) {
       const page = await newPage(browser, width, s.mode === 'viewport' ? s.height : 1080, s.clock)
       try {
-        if (shotSpec.kind) await applyState(page, s.states.apis, shotSpec.kind)
+        /*
+          `'normal'` は口を差し替えない。**ふつうの絵も同じ行から撮る**ため。
+          別の行にすると、状態の絵と本体の絵が別々のheadになりうる。
+        */
+        if (shotSpec.kind && shotSpec.kind !== 'normal') {
+          await applyState(page, s.states.apis, shotSpec.kind)
+        }
         await page.goto(`${BASE}${s.route}`, {
           /* 読み込み中は返事が来ないので `networkidle` を待てない。 */
           waitUntil: shotSpec.kind === 'loading' ? 'domcontentloaded' : 'networkidle',

@@ -3079,3 +3079,44 @@ export const MILEAGE_HISTORY = {
   ],
   pagination: { total: 5, limit: 50, offset: 0 },
 }
+
+/**
+ * 行動スコア（`/api/action-scores/friends`）。**型は `ActionScoreOverview`。**
+ *
+ * `lastChangedAt` と `lastReason` を **`null` にした行を1つ**入れてある。
+ * 未取得（`—`）と実値0（`0`）を、同じ列で見分けられるかを見る。
+ * `currentScore: 0` と `change30d: 0` の行も別に置いてある。
+ *
+ * `highMin` `normalMin` は層の境目。**帯の数と一覧の数が食い違わない**よう、
+ * `high` `normal` `low` の合計は `scoredFriends` に合わせる。
+ */
+const scoreRow = (i, name, currentScore, band, change30d, lastReason, lastChangedAt) => ({
+  friendId: `friend-${i}`,
+  displayName: name,
+  pictureUrl: null,
+  currentScore,
+  band,
+  change30d,
+  lastReason,
+  lastChangedAt,
+})
+
+export const ACTION_SCORES = {
+  summary: {
+    scoredFriends: 6,
+    high: 2, normal: 2, low: 2,
+    decreased30d: 2,
+    highMin: 70, normalMin: 40,
+  },
+  items: [
+    scoreRow(1, '高橋 直人', 92, 'high', 14, 'リンクを押した', '2026-08-24T16:30:00.000Z'),
+    scoreRow(2, '前田 さくら', 78, 'high', -6, '30日 反応なし', '2026-08-20T02:10:00.000Z'),
+    scoreRow(3, '菅野 亮', 61, 'normal', 3, '回答フォームに答えた', '2026-08-18T05:00:00.000Z'),
+    /* **一度も動いていない。** 理由も日時も取れない行。 */
+    scoreRow(4, '山田 太郎', 44, 'normal', 0, null, null),
+    scoreRow(5, '石田 未来', 22, 'low', -18, '配信をブロックした', '2026-08-12T09:45:00.000Z'),
+    /* **実値0。** `—` と並べて見分けられるか。 */
+    scoreRow(6, '新田 遥', 0, 'low', 0, 'まだ行動がありません', '2026-07-30T23:15:00.000Z'),
+  ],
+  pagination: { total: 6, limit: 20, offset: 0 },
+}

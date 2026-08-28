@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 187,
-  "unimplemented": 71,
+  "compared": 188,
+  "unimplemented": 70,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
@@ -229,8 +229,8 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 7,
-      "unimplemented": 4,
+      "compared": 8,
+      "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -260,10 +260,19 @@
           "head": "0ca45f98",
           "on": "2026-08-28",
           "screens": [
-            "vz0Ji",
             "HIU5O"
           ],
           "note": "#494 は #441 を含む"
+        },
+        {
+          "pr": 495,
+          "head": "7d890d3b",
+          "on": "2026-08-28",
+          "screens": [
+            "z3PB2",
+            "vz0Ji"
+          ],
+          "note": "#495 は #494 を含む"
         }
       ]
     },
@@ -816,17 +825,10 @@
     },
     {
       "feature": 17,
-      "node": "z3PB2",
-      "name": "17-2 行動スコア",
-      "gap": "pending",
-      "gapNote": "**Codexが実装中。新しいPRのheadを待ちます。** 届いたら1440px・1920pxで比較します"
-    },
-    {
-      "feature": 17,
       "node": "s6MBc",
       "name": "17-2-A スコアのルール",
-      "gap": "build",
-      "gapNote": "**`scoring_rules` の表（`002_round3.sql:114`）と `/api/scoring-rules` の作る・直す・消すが既に在る**（`api.scoring`）。画面をつなぐだけ"
+      "gap": "api",
+      "gapNote": "**既存APIだけでは作れません。** いまの `scoring_rules` は（1）アカウント単位でない（2）下書き・テスト・公開が無い（3）公開版の固定と版履歴が無い（4）冪等性・頻度上限・スコア帯が無い。**CodexがDB・API基盤を実装中。** Claude側は実装せず、V6設計との差分整理だけ続けます"
     },
     {
       "feature": 18,
