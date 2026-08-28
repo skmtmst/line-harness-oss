@@ -198,45 +198,52 @@
 
 ---
 
-## まだ束に振り分けられない94枚
+## 束9 内部の言葉（追加ぶん）
 
-**注記が「未一致」「P1」だけで、何が違うのかが台帳に残っていません。**
-これらは前の作業で `design-qa.md` の判定列だけを写したものです。
-元の文書には中身が書いてあるので、**読み直して注記を深めるのが次の仕事**です。
+束2・束3を書いたあとに注記を深めた結果、**同じ束に入るものが増えました。**
 
-| 機能 | 置き場 | 枚数 | Node | 元の文書 |
-|---|---|---|---|---|
-| 2 | inbox-v6 | 1 | `xGLVe` | `inbox-v6/design-qa.md` |
-| 4 | friend-attributes-v6 | 2 | `QKx8Q`・`XBkiQ` | `friend-attributes-v6/design-qa-searches-421.md` |
-| 7 | reminders-v6 | 4 | `M1EXwB`・`uJP22`・`J64xI`・`GC4St` | `reminders-v6/design-qa.md` |
-| 8 | auto-replies-v6 | 4 | `cmDfJ`・`K7vg2`・`nzWIX`・`ivDoe` | `auto-replies-v6/design-qa.md` |
-| 9 | friend-add-v6 | 3 | `uLQQc`・`txMO9`・`U3SI5` | `friend-add-v6/design-qa.md` |
-| 10 | webinars-v6 | 7 | `ZC13r`・`lvaY5`・`PV1Vh`・`d3rFGD`・`Xjk8q`・`Q8sHa`・`yxyzQ` | `webinars-v6/design-qa.md` |
-| 11 | templates-v6 | 6 | `W7LBc`・`GFlD7`・`FRkls`・`j9ixI`・`hsBtl`・`J3GxEZ` | `templates-v6/design-qa.md` |
-| 12 | rich-menus-v6 | 5 | `GO8RQ`・`XtfO3`・`kQ1bs`・`UMiJ9`・`TL7tp` | `rich-menus-v6/design-qa.md` |
-| 13 | forms-v6 | 4 | `EMBIK`・`vCqUj`・`cSqvP`・`v9tYhl` | `forms-v6/design-qa.md` |
-| 14 | common-vars-v6 | 2 | `WuKzU`・`gBtaK` | `common-vars-v6/design-qa.md` |
-| 15 | media-v6 | 3 | `g89Tc`・`voJtX`・`eXAJP` | `media-v6/design-qa.md` |
-| 16 | affiliates-v6 | 6 | `PouPn`・`GH8VL`・`n5VVTb`・`xqT1Z`・`jwrbf`・`GPWzq` | `affiliates-v6/design-qa.md` |
-| 17 | mileage-v6 | 3 | `s98Vfw`・`N46cQ`・`vz0Ji` | `mileage-v6/design-qa.md` |
-| 18 | inflow-v6 | 8 | `Q4bkTg`・`IhSBB`・`v0HaI`・`TEVk8`・`JupxW`・`BMmxU`・`BuVDB`・`Im2b1` | `inflow-v6/design-qa.md` |
-| 19 | conversions-v6 | 2 | `ZrpKn`・`GUxsj` | `conversions-v6/design-qa.md` |
-| 20 | analytics-v6 | 2 | `QQ1SR`・`dfwD4` | `analytics-v6/design-qa.md` |
-| 21 | nen-v6 | 4 | `VLMGH`・`DEX0k`・`q4lajm`・`HpKyF` | `nen-v6/design-qa.md` |
-| 22 | photos-v6 | 1 | `Qu6Vk` | `photos-v6/design-qa.md` |
-| 23 | ec-v6 | 1 | `eI3gs` | `ec-v6/design-qa.md` |
-| 24 | line-notify-v6 | 2 | `festr`・`Q55bb` | `line-notify-v6/design-qa.md` |
-| 25 | automations-v6 | 5 | `gief7`・`Rv8Jv`・`xOpDs`・`py5CG`・`syWp4` | `automations-v6/design-qa.md` |
-| 26 | webhooks-v6 | 2 | `k3WxrO`・`M0Gb7` | `webhooks-v6/design-qa.md` |
-| 27 | booking-v6 | 3 | `TV2DI`・`TnDbq`・`SbuUI` | `booking-v6/design-qa.md` |
-| 28 | booking-settings-v6 | 3 | `QSLEH`・`tksPc`・`GhOb3` | `booking-settings-v6/design-qa.md` |
-| 29 | events-v6 | 3 | `ugP5y`・`MKrPY`・`i5SN2j` | `events-v6/design-qa.md` |
-| 30 | staff-v6 | 3 | `e3jz3`・`EOTS4`・`I3ZSrU` | `staff-v6/design-qa.md` |
-| 31 | settings-v6 | 1 | `c4R6F` | `settings-v6/design-qa.md` |
-| 32 | operations-v6 | 4 | `UgonK`・`b3HfZ`・`UhC2O`・`U0BwS` | `operations-v6/design-qa.md` |
+| Node | 機能 | 出ている言葉 |
+|---|---|---|
+| `GC4St` | 7 リマインダ実行結果 | 内部IDが画面に出ている |
+| `DEX0k` | 21 NENコラム | 状態が `scheduled` `sent` `draft` のまま（`page.tsx:422`）。#446 が配信ジョブで直した `jobStatusLabel` をそのまま置ける |
+| `HpKyF` | 21 NEN配信の編集 | きっかけが `ec.order.delivered` `pet.birthday` のまま（`edit/campaign-editor.tsx:298-301`） |
+| `QKx8Q` `XBkiQ` | 4 保存した検索 | 友だち情報の項目名がキーのまま。対応マークとシナリオがIDの手入力 |
 
-**合計 94枚。** 判定そのものは元の文書で確かめたものなので、
-「要修正」という結論は動きません。**動くのは、何をどう直すかの中身です。**
+**合計15枚**（束2・束3とあわせて）。どれも言葉の置き換えだけで、
+**画面の作りを変えません。**
+
+---
+
+## 束10 取り返しがつかない・あとから追えない（9枚）
+
+**「壊れたことに気づく場所が無い」**という形の欠けです。
+どれも、間違いが起きたその瞬間ではなく、**あとで別の形で表に出ます。**
+
+| Node | 機能 | 気づけないこと |
+|---|---|---|
+| `v9tYhl` | 13 集まった回答 | 情報欄への書き込みが失敗した件数が出ない。**答えは受け取れているのに友だち情報へ入っていない**。あとでリマインダが動かない形で出る |
+| `voJtX` | 15 メディア詳細 | 使用中でも消せる。**消したあとに何が壊れたかを知る場所が無い** |
+| `gBtaK` | 14 共通情報の編集 | どこが変わるか見えないまま保存する。「会社名」を直すと何本のテンプレートの文が変わるか知らないまま |
+| `BuVDB` | 18 広告とのつなぎ | 対応が付いていない成果地点は広告へ返せないのに、**返せていないことに気づく場所が無い** |
+| `eI3gs` | 23 EC連携 | 結びつかなかった注文が出てこない。**買ってくれた事実がLINE側に何も残らない** |
+| `k3WxrO` | 26 外部連携 | 失敗した記録もやり直す操作も無い。**Slackへの通知が6回落ちていたことに気づけない** |
+| `UhC2O` | 32 更新履歴 | 緊急操作の履歴が `localStorage`。**端末を変えると読めず、消せてしまう** |
+| `e3jz3` | 30 ログインユーザー | `lastLoginAt` が無い。**辞めた人のログインが生きたまま残る** |
+| `jwVlo` | 30 入った記録 | 記録は残っているのに、読む場所が無い |
+
+**この束は、直す量は小さいのに見落とすと重いものが並びます。**
+
+---
+
+## 束ねられない111枚
+
+**残りは「その画面だけの差」です。** 文言・見出し・置き場所・段の分けかたが
+設計とずれているもので、**まとめて直す形になりません。**
+
+台帳（`screens.mjs` の `verdictNote`）に1枚ずつ何が違うかを書いてあります。
+**「未一致」だけだった94枚は、すべて中身を入れ直しました（残り0）。**
+
+機能ごとの数は [進捗台帳](v6-screen-ledger.md) を見てください。
 
 ---
 

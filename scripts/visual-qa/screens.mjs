@@ -198,7 +198,7 @@ export const SCREENS = [
   },
 
   // ── 機能2 受信箱 ────────────────────────────────────────
-  { ...INBOX, node: 'xGLVe', name: '2-1 受信箱', steps: OPEN_CHAT, verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inbox-v6/design-qa.md' },
+  { ...INBOX, node: 'xGLVe', name: '2-1 受信箱', steps: OPEN_CHAT, verdict: 'needs_fix', verdictNote: 'P1 見出しの副題に本名（河野 健太）が出ない。この部品が友だちの詳細を持っていない（データ未接続）。P2 見出しの★が無い。シナリオの札に🔗のアイコンが無く、日時が札の中に入っている（設計は札の外）。受信の吹き出しに最小幅が無く内容ぴったりになる。3カラム（一覧・トーク・顧客情報）と、見出しのアバターの頭文字・担当と対応の専用ドロップダウンは直って設計どおり', verdictSource: 'inbox-v6/design-qa.md' },
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }],
@@ -701,7 +701,7 @@ export const SCREENS = [
       **表は1本にせず、読む口の契約でそろえる形。**
     */
     ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果',
-    verdict: 'needs_fix', verdictNote: 'P1×5', verdictSource: 'reminders-v6/design-qa-execution-results-500.md', verdictHead: '409f00bb',
+    verdict: 'needs_fix', verdictNote: 'P1×5。(1) 失敗したのに「ありません」と書いている（要約カードは—通と正しく出すのに、通知実績の欄は「送る内容がありません 0通」と出る）。(2) 1440pxで列が切れる。(3) 内部IDが画面に出ている。(4) どのリマインダを見ているか分からない。(5) 通知の名前が出ていない。詳しくは reminders-v6/design-qa-execution-results-500.md。**t7UtYQ が手本で、5件のうち4件はそちらでは起きていない**', verdictSource: 'reminders-v6/design-qa-execution-results-500.md', verdictHead: '409f00bb',
     route: '/reminders/detail?id=reminder-1',
     states: {
       apis: ['**/api/reminders/*/runs*'],
@@ -809,7 +809,7 @@ export const SCREENS = [
     ①はじめて追加した人 と ②以前からの友だち の2つに分けるだけ。
     流入リンクで出し分ける仕組みがそもそも無い。
   */
-  { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'friend-add-v6/design-qa.md' },
+  { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信', verdict: 'needs_fix', verdictNote: 'P1 設計は「流入リンクごとに初回案内を並べる一覧」で、店頭QR・広告・紹介にそれぞれ別の初回案内を置いて優先順位で当てる。実装はアカウントに1枚の設定（FriendAddRouting）で、はじめて追加した人と以前からの友だち・ブロック解除した人の2つに分けるだけ。**流入リンクで出し分ける仕組みがそもそも無い**（page.tsx:712「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません。」）。作り込み不足ではなく別の形の機能。実装だけにある「どう振り分けられるか」の流れ図と注意の帯は、設定の効き方が読めるので残すべきもの', verdictSource: 'friend-add-v6/design-qa.md' },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定',
     gap: 'drop',
@@ -831,10 +831,10 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
   },
-  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'friend-add-v6/design-qa.md' },
+  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'needs_fix', verdictNote: 'P1 アクション追加が別窓でなく札の列。設計の段の構造に対応していない', verdictSource: 'friend-add-v6/design-qa.md' },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'friend-add-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 プレビューとテストの面が設計とそろわない', verdictSource: 'friend-add-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: 'テスト実行' }],
   },
   {
@@ -1091,8 +1091,8 @@ export const SCREENS = [
   },
 
   // ── 機能14 共通情報 ─────────────────────────────────────
-  { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'common-vars-v6/design-qa.md' },
-  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'common-vars-v6/design-qa.md' },
+  { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix', verdictNote: 'P1 一覧に「使われている場所」の数が出ない。共通情報は1か所直すと差し込んでいる全部の文が同時に変わるので、どこで使われているかが要る', verdictSource: 'common-vars-v6/design-qa.md' },
+  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1', verdict: 'needs_fix', verdictNote: 'P1 どこが変わるか見えないまま保存する。設計は「保存すると、下の15か所すべてが すぐに変わります」「使われている場所 15か所（テンプレート12件・回答フォーム3件）」「差し込んだときの見え方（いまの文 → 保存したあとの文）」の3つで支えるが、実装の編集画面は 名前・フォルダ・差し込み名・値・更新スケジュール だけで**どこで使われているかが1つも出ない**（grep 影響|使われて が /contents/vars 配下で0件）。「会社名」を直すとき、何本のテンプレートの文が変わるのかを知らないまま保存することになる。設計は「予約中の配信にも効きます」とまで書いている。P1 文字数の上限を超えるものが分からない（設計は影響の一覧で「本文が 66 / 60 字」と出す）。共通情報を長くするとカルーセルの本文が上限を超えて壊れる', verdictSource: 'common-vars-v6/design-qa.md' },
   {
     ...COMMON_VAR, node: 'uNBlA', name: '14-1-B 変える前に影響を見る',
     gap: 'api',
@@ -1109,10 +1109,10 @@ export const SCREENS = [
   },
 
   // ── 機能15 登録メディア ─────────────────────────────────
-  { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'media-v6/design-qa.md' },
+  { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア', verdict: 'needs_fix', verdictNote: 'P1 使っている先が一覧で見えない。設計は札に「3か所で使用中」「どこでも使っていない」を出すが、実装は「使用箇所」のボタンを1つずつ押して開く形で、**消してよいファイルを探すのに6件あれば6回押す**。絞り込み札「使っていない」も無い', verdictSource: 'media-v6/design-qa.md' },
   {
     ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'media-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 差し替えができない（grep 差し替え が /contents 配下で0件）。設計の詳細は「差し替える」が主役で、名前とURLは変わらず、使っている3か所すべてが新しい画像に変わり、予約中の配信にも効く。実装で同じことをするには消して入れ直すことになるが、**URLが変わるので使っている先が全部切れる**。商品写真を1枚だけ新しくするのは日常の作業。P1 使用中でも消せる（409が返ると「それでも削除しますか？」で消せる。page.tsx:183）。設計は「使われているあいだは削除できません。先にこの3か所から外してください。」。どちらが正しいかは決めごとだが、**いまは消したあとに何が壊れたかを知る場所が無い**', verdictSource: 'media-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: '夏の定番セット.jpgの使用箇所' }],
   },
   {
@@ -1121,7 +1121,7 @@ export const SCREENS = [
       常に出ている**ので、同じ絵で突き合わせる。
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'media-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 ファイルを入れる面が独立しておらず、一覧と同じ画面にある', verdictSource: 'media-v6/design-qa.md',
   },
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
@@ -1182,8 +1182,8 @@ export const SCREENS = [
     実装は `/scoring` の**1枚もの**で、帯・付与ルール・ランキングの3つだけ。
     **「使い道」「履歴」「行動スコア」はまるごと無い。**
   */
-  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'needs_fix', verdictNote: 'P2', verdictSource: 'mileage-v6/design-qa.md' },
-  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'needs_fix', verdictNote: 'P2', verdictSource: 'mileage-v6/design-qa.md' },
+  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'needs_fix', verdictNote: 'P2 帯の言葉が設計より薄い。設計は「マイルを持っている友だち1,284人／全体の62%。持っていない人786人」「たまっているマイル486,200／会社としての『あとで返すぶん』です」と、割合・未保有数・意味まで書く。実装は「マイル対象者1,284人」「保有マイル合計486,200mile」で、割合と未保有数と意味の説明が無い。**未取得と0の描き分けは正しい**（残高0の人は0、最終行動が無い人は—。「もうすぐ消えるマイル 未取得 — mile 失効ロットを接続後に表示」）', verdictSource: 'mileage-v6/design-qa.md' },
+  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'needs_fix', verdictNote: 'P2 たまる決めごとの面が設計とそろわない細部が残る。**止める・再開する操作と「動いています／止めています」は #441 で入って解決している**', verdictSource: 'mileage-v6/design-qa.md' },
   {
     ...MILEAGE, node: 'qlVLJ', name: '17-1-B マイルの使い道',
     gap: 'api',
@@ -1220,7 +1220,7 @@ export const SCREENS = [
       窓は `position: fixed` なので `page`（全面）では撮れない。
     */
     ...MILEAGE, node: 'vz0Ji', name: '17-1-F マイルを手で増やす・減らす',
-    verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'mileage-v6/design-qa-score-495.md',
+    verdict: 'needs_fix', verdictNote: 'P1 手で増やす・減らす操作が無い。**間違って付いたマイルを直せない**', verdictSource: 'mileage-v6/design-qa-score-495.md',
     route: '/mileage/friends/detail?id=friend-1', mode: 'viewport', height: 1080,
     steps: [{ click: 'マイルを手で増やす・減らす', scope: 'main' }],
   },
@@ -1273,10 +1273,10 @@ export const SCREENS = [
     実装は3本で、**「広告とのつなぎ」（成果を広告へ返す）が無い。**
   */
   { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: 'P1 タブに件数が付かない（設計は流入経路24／広告連携3）。帯4つの作りが違う（設計は流入元24本／今月312人・経路が分かる289人／クリック8,420回／平均の追加率6.4%）。左のフォルダの縦帯が無い（ジャンルはあるが別の作り）。「まとめて操作」「CSVで書き出す」が無い', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: 'P1 サイトスクリプトの面が設計とそろわない。18-1 全体の差（タブに件数が付かない・帯4つの作りが違う・左のフォルダの縦帯が無い・まとめて操作/CSVが無い）がここにも効く', verdictSource: 'inflow-v6/design-qa.md' },
   { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「Yahoo!広告 つないでいません」から実際につなげない。押すと「接続を作る画面は準備中です」で止まる。設計はそこから接続を作らせる', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: 'P1 流入リンクをつくる面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: 'P1 流入元の詳細の面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' },
   {
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
     gap: 'parts',
@@ -1299,8 +1299,8 @@ export const SCREENS = [
   { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 18-2-A 送信履歴が独立した画面として無く、18-2 の1枚の中に混ざっている', verdictSource: 'inflow-v6/design-qa.md' },
 
   // ── 機能19 コンバージョン ───────────────────────────────
-  { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'needs_fix', verdictNote: 'P2', verdictSource: 'conversions-v6/design-qa.md' },
-  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'conversions-v6/design-qa.md' },
+  { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'needs_fix', verdictNote: 'P2 「何が起きたら数えるか」にきっかけの名前（EC連携の「注文が確定」／回答フォームの送信）が出ず、種別と数え方のチップになっている。CSVで書き出す、中身を見る、使う場所を足す が無い。**「使う場所を足す」が無いので、作った成果地点を分析へつなぐ導線がこの画面に無い**。期間の選択も無い。成果地点名が長いと…で切れる（設計は折り返す）。**未取得と0件の描き分けは正しい**（金額を持たないものは「金額なし」、使われていないものは「どこからも使われていません」）', verdictSource: 'conversions-v6/design-qa.md' },
+  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report', verdict: 'needs_fix', verdictNote: 'P1 レポートの面が設計とそろわない。詳しくは conversions-v6/design-qa.md の「GUxsj レポート — P1」', verdictSource: 'conversions-v6/design-qa.md' },
   { ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'conversions-v6/design-qa.md' },
   {
     /*
@@ -1326,7 +1326,7 @@ export const SCREENS = [
   { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
   { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
   { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
-  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage', verdict: 'needs_fix', verdictNote: 'P1 設計の帯4つと「片づける」が無い。**最終利用が日本時間で出るのと、一度も使っていないものを—にするのは #445 で直って解決している**', verdictSource: 'analytics-v6/design-qa.md' },
   {
     ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
     gap: 'api',
@@ -1337,7 +1337,7 @@ export const SCREENS = [
   { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
   { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
   { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
-  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: 'P1 設計の帯5つと絞り込みが無い。**一覧の「集計状態」列（利用可能／一部集計／取得不可／—）は #445 で入って解決している**', verdictSource: 'analytics-v6/design-qa.md' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
@@ -1364,7 +1364,7 @@ export const SCREENS = [
   },
 
   // ── 機能22 写真審査 ─────────────────────────────────────
-  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'needs_fix', verdictNote: 'P0', verdictSource: 'photos-v6/design-qa.md' },
+  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'needs_fix', verdictNote: 'P0 写真審査の一覧が設計とそろわない（元の判定を引き継いでいる。中身は photos-v6/design-qa.md を見る）', verdictSource: 'photos-v6/design-qa.md' },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
     gap: 'build',
@@ -1398,7 +1398,7 @@ export const SCREENS = [
     設計のタブは4本（取り込みの記録／会員のつき合わせ／定期便／つなぎ先）。
     実装は1枚もので、**取り込みの記録だけ**がある。
   */
-  { ...EC, node: 'eI3gs', name: '23-1 EC連携', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'ec-v6/design-qa.md' },
+  { ...EC, node: 'eI3gs', name: '23-1 EC連携', verdict: 'needs_fix', verdictNote: 'P1 結びつかなかった注文が、どこにも出てこない。ECの注文にはLINEの友だちが誰なのか書かれておらず、メールか電話で結びつけて、どちらも一致しなかった注文が「会員のつき合わせ」に並ぶ設計。実装にはそれを集めて見る場所が無い。設計は候補（電話番号が同じ／確からしさ とても高い）と「結びつけると増える売上 ¥312,400（この24件ぶん。分析にも入ります）」まで出す。**いま結びつかなかった注文は、買ってくれた事実がLINE側に何も残らないまま**で、購入後の配信も成果地点もマイルも動かない。P1 つなぎ先を画面から変えられない（page.tsx:174「接続先や突合キーを画面から変える口が無い」）', verdictSource: 'ec-v6/design-qa.md' },
   {
     ...EC, node: 'ELayY', name: '23-1-A 会員のつき合わせ',
     gap: 'build',
@@ -1426,10 +1426,10 @@ export const SCREENS = [
     設計のタブは4本（顧客へのお知らせ9／運用者へのお知らせ11／
     送れなかったもの4／記録）。実装は**1枚もの**で、顧客へのお知らせだけ。
   */
-  { ...LINE_NOTIFY, node: 'festr', name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'line-notify-v6/design-qa.md' },
+  { ...LINE_NOTIFY, node: 'festr', name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: 'P1 送った記録が残らない（いつ・だれに・どのお知らせを送ったか）。届かなかったものを追うタブも無い', verdictSource: 'line-notify-v6/design-qa.md' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'line-notify-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 中身を編集する面が設計とそろわない。差し込みと、届く文の見え方の確認が足りない', verdictSource: 'line-notify-v6/design-qa.md',
     mode: 'viewport', height: 1136, steps: [{ click: '発送した', role: 'text' }],
   },
   {
@@ -1522,10 +1522,10 @@ export const SCREENS = [
   */
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webhooks-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 タブの言葉が英語混じり（設計は「こちらから送る6／こちらで受け取る3／やり取りの記録／見本14」、実装は「受信 (Incoming)／送信 (Outgoing)」）。「やり取りの記録」と「見本」のタブが無い', verdictSource: 'webhooks-v6/design-qa.md',
     steps: [{ click: '送信 (Outgoing)' }],
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webhooks-v6/design-qa.md' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: 'P1 こちらで受け取る面が設計とそろわない。見本から作る道が無い', verdictSource: 'webhooks-v6/design-qa.md' },
   {
     /*
       **撮る支度だけ。** 固定データは `INTEGRATION_RECORDS`。
@@ -1551,10 +1551,10 @@ export const SCREENS = [
     実装は一覧＋詳細で、**「予約を追加」は押せない**
     （「管理画面から予約を代理で入れる仕組みは準備中です」`bookings/page.tsx:289`）。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-v6/design-qa.md' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'needs_fix', verdictNote: 'P1 台帳が時間（縦）× 担当（横）の格子になっていない。設計は9:00の行に佐々木・山本・中川の3列があり、どこが空いているかが面で分かる。P1 電話で受けた予約がこの台帳に載らない（「予約を追加」は在るが押せない。bookings/page.tsx:289「管理画面から予約を代理で入れる仕組みは準備中です」）。設計の帯は「今日の予約12件・LINEから9・電話3」で**4件に1件は電話**。載らないので、今日の件数が本当の数にならず、電話とLINEの予約がぶつかっても気づけず、前日・当日のお知らせも送れない', verdictSource: 'booking-v6/design-qa.md' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 予約の詳細の面が設計とそろわない。代理で入れた予約をLINEの予約と同じ扱いにする道（前日・当日のお知らせ、成果地点「予約が入った」を数える）が無い', verdictSource: 'booking-v6/design-qa.md',
     mode: 'viewport', height: 1136, steps: [{ click: '高橋 直人', role: 'text' }],
   },
   /*
@@ -1566,7 +1566,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 電話の予約を入れる画面なのに、電話番号もお名前も入れられない。設計は「お名前（LINEにいない方）／電話番号／ペットの名前」を持ち、LINE未連携の人をそのまま登録できる。実装はLINEの友だち検索だけで、未連携は登録できないと断っている（断り方は正直で正しい。足りないのは顧客台帳の受け皿）。P1 お客様に何を送るかを選べない（設計は 受付をすぐLINEに送る／前日19:00に思い出してもらう／当日8:00に「本日おまちしています」の3つのチェック。実装は説明が2つ並ぶだけ）。P2 空き確認の緑帯（何分かかり何時まで押さえるか）、LINEプレビュー、この方について（来店回数・前回の申し送り）、つながる先、保存前の注意文が無い',
     verdictSource: 'booking-v6/cpdDi-1920.png', verdictHead: 'ba0bf62d',
   },
-  { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-v6/design-qa.md' },
+  { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'needs_fix', verdictNote: 'P1 今週の予約の面が設計とそろわない。時間×担当の格子でないため、空きが面で分からない', verdictSource: 'booking-v6/design-qa.md' },
   {
     ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
     gap: 'parts',
@@ -1592,9 +1592,9 @@ export const SCREENS = [
     実装はメニューと担当スタッフの2タブで、受付枠と休業日は
     `/booking/staff/shifts` の別ルートにある。
   */
-  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-settings-v6/design-qa.md' },
-  { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-settings-v6/design-qa.md' },
-  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-settings-v6/design-qa.md' },
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'needs_fix', verdictNote: 'P1 タブの分けかたが違う。設計は「メニュー8／受付枠／休業日／予約のルール」を1つの帯に並べるが、実装はメニューと担当スタッフの2タブで、**受付枠と休業日は /booking/staff/shifts の別ルート**。予約管理の画面からは飛べるが、予約設定の画面のタブには出てこない。「予約のルール」（先の予約が取れる範囲・締め切り・キャンセル期限）は BookingMenu が持っている（booking_window_days / cutoff_hours_before / cancel_deadline_hours_before）のに、**メニューごとに散っていてまとめて見る場所が無い**。P2 帯が設計と違う（設計は 出しているメニュー6つ／いちばん選ばれた トリミング小型犬142件／受け付けている時間9:00〜19:00／先の予約が取れる範囲60日先まで）。枠の稼働率が—なのは、受付時間の総枠数を数える仕組みが無いためで、正直な出し方', verdictSource: 'booking-settings-v6/design-qa.md' },
+  { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'needs_fix', verdictNote: 'P1 受付枠と休業日が予約設定のタブではなく /booking/staff/shifts の別ルートにある', verdictSource: 'booking-settings-v6/design-qa.md' },
+  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: 'P1 予約メニューをつくる面が設計とそろわない。予約のルールをメニューの中だけで決める形になっている', verdictSource: 'booking-settings-v6/design-qa.md' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
@@ -1603,9 +1603,9 @@ export const SCREENS = [
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
-  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'events-v6/design-qa.md' },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'events-v6/design-qa.md' },
-  { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'events-v6/design-qa.md' },
+  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'needs_fix', verdictNote: 'P1 帯が「数」で「次に何をするか」になっていない。設計の3つめ「あと少しで満席 2回（声をかけると埋まります）」と4つめ「申し込みが少ない 1回（8/31の回。あと3日です）」は、そのまま行動になる帯。実装の「定員の充足 55%」は全体の平均で、**どの回が危ないかは分からない**', verdictSource: 'events-v6/design-qa.md' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'needs_fix', verdictNote: 'P1 イベントをつくる面が設計とそろわない。キャンセル待ちを受ける設定はできるが、待っている人を数える場所が無い', verdictSource: 'events-v6/design-qa.md' },
+  { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1', verdict: 'needs_fix', verdictNote: 'P1 キャンセル待ちの人を数えられない（events/bookings/page.tsx:212「event_bookings に「キャンセル待ち」という状態が無い。イベント側に waitlist_enabled はあるが、待っている人を数える場所がまだない」）。設計はそこを主役に置き「キャンセル待ち3人（1人 取り消すと1人 回ります）」「24時間 返事がなければ次の方に回ります」と出す。**満席の回で取り消しが出たとき、次に誰へ声をかければいいのか分からない**', verdictSource: 'events-v6/design-qa.md' },
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/events/admin/events*', '**/api/events/admin/events/**'], kinds: ['loading', 'empty', 'error'] },
@@ -1618,10 +1618,10 @@ export const SCREENS = [
     設計のタブは4本（いまいる人8／招待中2／入った記録／権限のかたまり5）。
     実装は1枚もの。
   */
-  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'staff-v6/design-qa.md' },
+  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー', verdict: 'needs_fix', verdictNote: 'P1 一覧に「最後に入った」の列が持てない。StaffMember は createdAt / updatedAt / inviteStatus は持つが **lastLoginAt を持たない**。設計の帯「90日 入っていない 1人（辞めた方かもしれません）」も同じ理由で出せない。**辞めた人のログインが生きたまま残る、という形で表に出る**。実装の帯の「最終ログイン」は全体でいちばん新しい1件で、人ごとではない', verdictSource: 'staff-v6/design-qa.md' },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'staff-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P1 見せる範囲を決める面が設計とそろわない', verdictSource: 'staff-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: '高田 誠', role: 'text' }],
   },
   /*
@@ -1633,19 +1633,19 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 「入った記録」が記録の一覧ではない。staff/page.tsx:114 が記録ではなくログインユーザーを繰り返し、1人につき1行「最後の操作」を出すだけなので、過去の操作を追えない。設計は4,286件を新しい順に並べる。P1 記録できる操作が5種類（ログイン・ログアウト・ログイン失敗・個人情報を表示・CSVを書き出し。ACTION_LABEL）しかなく、設計の「テンプレートを消しました」「マイルを手で増やしました」「一斉配信を出しました」「外部連携を止めました」は口が持っていない。P2 「対象」と「元の値 → 新しい値」の列が無く、何がどう変わったか分からない。いつもと違う場所からのログインを赤く出す扱いも無い。帯・絞り込みチップ・CSV・ページ送りも無い',
     verdictSource: 'staff-v6/jwVlo-1920.png + apps/web/src/app/staff/page.tsx:114', verdictHead: '15febf7f',
   },
-  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'staff-v6/design-qa.md' },
+  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: 'P1 人を招待する面が設計とそろわない。招待の状態（招待中・期限切れ）と、見せる範囲を招待時に決める流れが設計どおりに並んでいない', verdictSource: 'staff-v6/design-qa.md' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
-  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'settings-v6/design-qa.md' },
+  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: 'P2 区分ごとの箱・グループごと切替・「必須」の錠前・右のプレビュー・初期値に戻す/保存・オフにしてもデータは残る説明は設計どおり。実装の説明はむしろ設計より具体的（APIも動いたままで管理画面から隠れるだけ、と書いてある）。差は並べ替えの置き場所ほか4点で、詳しくは settings-v6/design-qa.md', verdictSource: 'settings-v6/design-qa.md' },
 
   // ── 機能32 運用状態 ─────────────────────────────────────
   /* タブ3本は設計とそろっている（健全性チェック／緊急コントロール／更新履歴）。 */
-  { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'operations-v6/design-qa.md' },
-  { ...OPERATIONS, node: 'b3HfZ', name: '32-1-A 緊急コントロール', route: '/emergency?tab=control', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'operations-v6/design-qa.md' },
-  { ...OPERATIONS, node: 'UhC2O', name: '32-1-B 更新履歴', route: '/emergency?tab=history', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'operations-v6/design-qa.md' },
+  { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health', verdict: 'needs_fix', verdictNote: 'P1 健全性の6項目（LINE接続・月間配信数ほか）を、項目ごとに「確認する内容／結果／いまの数字／目安／最後の確認／中身を見る」で常に並べる形になっていない。「5分ごとに自動確認」「次は11:50に自動で確かめます」も無い', verdictSource: 'operations-v6/design-qa.md' },
+  { ...OPERATIONS, node: 'b3HfZ', name: '32-1-A 緊急コントロール', route: '/emergency?tab=control', verdict: 'needs_fix', verdictNote: 'P1 止める前に、何件・何人に効くかが出ない。設計は「予約中の一斉配信 1件（8/28 20:00 ／ 対象8,486人）」「シナリオ配信 4本 ／ 486人が進行中」「リマインダ 10本 ／ 明日の予約12件ぶん」と数で出す。実装は「停止対象を実行直前に取得します。」と書くだけで、**押すまで何を止めることになるのか分からない**。緊急停止は急いでいるときに押すものなので、そこを数で確かめられる必要がある。タブ3本・止めるものの選択・対象アカウント・停止理由・復旧は設計どおり', verdictSource: 'operations-v6/design-qa.md' },
+  { ...OPERATIONS, node: 'UhC2O', name: '32-1-B 更新履歴', route: '/emergency?tab=history', verdict: 'needs_fix', verdictNote: 'P1 緊急操作の履歴が localStorage（この端末に保存された履歴）で、画面にもそう書いてある。設計は「だれが いつ 何を止めたかが残ります」「消せません」と決めている。**端末を変えると読めず、消せてしまう**。P2 帯が設計と違う（設計は 止めた回数3回／いちばん長かった停止70分／管理画面の更新28回／いまの版 2026.08.25-1）。表の列（いつ・だれが・止めたもの・対象・理由・戻した）もそろわない', verdictSource: 'operations-v6/design-qa.md' },
   {
     ...OPERATIONS, node: 'U0BwS', name: '32-1-C 緊急停止の最終確認',
-    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'operations-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: 'P2 最終確認の窓と「確認のため『停止』と入力」は設計どおりで、**押し間違いでは起きない形になっている（設計に無い上乗せ）**。残る差は、止める対象の件数・人数が窓にも出ないこと', verdictSource: 'operations-v6/design-qa.md',
     route: '/emergency?tab=control', mode: 'viewport', height: 1136,
     /*
       **停止するものを1つ選んでから押す。** 何も選ばずに押すと
@@ -1719,7 +1719,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 マークごとの人数が「人」だけで数字が出ない（SupportMarkの型にfriendCountが無く、どの口も返さない）。未取得なら—と出すべきところが空。帯4つが無い',
     verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
-  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md' },
+  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: 'P1 設計の帯4つが無い（保存した条件12件・上限50件／配信で使用中5件／該当者0人2件／今月の呼び出し84回）。P2 友だち情報の項目名がキーのまま。eq の言い回しが設計とそろわない。**使用先・該当と、条件が eq mark-1 と出ていた件は #421 で直って解決している**', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
@@ -1796,7 +1796,7 @@ export const SCREENS = [
   {
     /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
     node: 'XBkiQ', feature: 4, name: '4-4-A 保存した検索の条件確認・編集',
-    verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md',
+    verdict: 'needs_fix', verdictNote: 'P1 対応マークとシナリオが、いまもIDの手入力。P1 50件の上限と共有の意味が編集画面に出ない', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md',
     dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
   },
 ]
