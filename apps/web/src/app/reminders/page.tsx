@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { Trash2 } from 'lucide-react'
 import type { Folder, ReminderTriggerType } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -12,6 +13,7 @@ import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import Pagination from '@/components/shared/pagination'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 /**
  * リマインダの一覧。
@@ -114,6 +116,15 @@ export default function RemindersPage() {
   const [dragId, setDragId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [pendingDelete, setPendingDelete] = useState<Reminder[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const [canDelete, setCanDelete] = useState(false)
+
+  useEffect(() => {
+    const role = window.localStorage.getItem('lh_staff_role')
+    setCanDelete(role === 'owner' || role === 'admin')
+  }, [])
 
   const loadFolders = useCallback(async () => {
     try {
@@ -197,17 +208,28 @@ export default function RemindersPage() {
     }
   }
 
-  const handleDeleteSelected = async () => {
-    if (selected.size === 0) return
-    if (!confirm(`${selected.size}件のリマインダを削除しますか？\n登録済みの配信予定も一緒に消えます。`))
-      return
-    setError('')
+  const requestDelete = (items: Reminder[]) => {
+    if (!canDelete || items.length === 0) return
+    setDeleteError('')
+    setPendingDelete(items)
+  }
+
+  const handleDeleteConfirmed = async () => {
+    if (deleting || pendingDelete.length === 0) return
+    setDeleting(true)
+    setDeleteError('')
     try {
-      for (const id of selected) await api.reminders.delete(id)
+      for (const reminder of pendingDelete) {
+        const result = await api.reminders.delete(reminder.id)
+        if (!result.success) throw new Error(result.error)
+      }
       setSelected(new Set())
-      void loadReminders()
-    } catch {
-      setError('削除に失敗しました')
+      setPendingDelete([])
+      await loadReminders()
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : '削除に失敗しました')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -393,18 +415,19 @@ export default function RemindersPage() {
                       <Th>
                         登録日
                       </Th>
+                      <Th className="w-14">操作</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {loading ? (
                       <tr>
-                        <td colSpan={9} className="text-ink-faint px-4 py-8 text-center text-sm">
+                        <td colSpan={10} className="text-ink-faint px-4 py-8 text-center text-sm">
                           読み込み中...
                         </td>
                       </tr>
                     ) : current.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="text-ink-faint px-4 py-8 text-center text-sm">
+                        <td colSpan={10} className="text-ink-faint px-4 py-8 text-center text-sm">
                           {/*
                             * 読み込みに失敗したときは「ありません」と言わない。
                             * 上に「読み込みに失敗しました」を出しているのに、ここで
@@ -516,6 +539,21 @@ export default function RemindersPage() {
                           <td className="text-ink-secondary px-4 py-3 text-xs tabular-nums whitespace-nowrap">
                             {formatDate(r.createdAt)}
                           </td>
+                          <td className="px-3 py-3 text-center">
+                            {canDelete ? (
+                              <button
+                                type="button"
+                                onClick={() => requestDelete([r])}
+                                className="text-danger hover:bg-danger-bg inline-flex h-8 w-8 items-center justify-center rounded-control"
+                                aria-label={`${r.name}を削除`}
+                                title="リマインダを削除"
+                              >
+                                <Trash2 aria-hidden="true" className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <span className="text-ink-faint text-xs">—</span>
+                            )}
+                          </td>
                         </tr>
                       ))
                     )}
@@ -528,18 +566,43 @@ export default function RemindersPage() {
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
               <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
-              <button
-                onClick={() => void handleDeleteSelected()}
-                disabled={selected.size === 0}
-                className="border-danger-bg text-danger hover:bg-danger-bg rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
-              >
-                選択したリマインダを削除
-                {selected.size > 0 && <span className="tabular-nums">（{selected.size}）</span>}
-              </button>
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => requestDelete(reminders.filter((reminder) => selected.has(reminder.id)))}
+                  disabled={selected.size === 0}
+                  className="border-danger-bg text-danger hover:bg-danger-bg rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
+                >
+                  選択したリマインダを削除
+                  {selected.size > 0 && <span className="tabular-nums">（{selected.size}）</span>}
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
+
+      {pendingDelete.length > 0 && (
+        <div data-design-node="Y0Sn3">
+          <ConfirmDialog
+            open
+            title={pendingDelete.length === 1
+              ? `「${pendingDelete[0].name}」を削除しますか？`
+              : `選択した${pendingDelete.length}件のリマインダを削除しますか？`}
+            description="削除すると未送信の通知予定はすべて取り消されます。送信済みの履歴は監査記録として残り、この操作は取り消せません。"
+            confirmLabel="削除する"
+            destructive
+            busy={deleting}
+            error={deleteError}
+            onConfirm={() => void handleDeleteConfirmed()}
+            onCancel={() => {
+              if (deleting) return
+              setPendingDelete([])
+              setDeleteError('')
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

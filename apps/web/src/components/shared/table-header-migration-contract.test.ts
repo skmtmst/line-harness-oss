@@ -19,12 +19,14 @@ const sources = Object.fromEntries(
 )
 
 describe('表見出しの第1段階移行', () => {
-  it('6ルートのV6標準見出し74セルを共通Thで維持する', () => {
+  it('6ルートのV6標準見出し75セルを共通Thで維持する', () => {
     const migrated = Object.values(sources).reduce(
       (sum, source) => sum + (source.match(/<Th\b/g)?.length ?? 0),
       0,
     )
-    expect(migrated).toBe(74)
+    // 199: リマインダ一覧の削除操作も通常の表列として追加した。
+    // 見出しだけ自前の th に戻さず、既存の共通 Th を使う。
+    expect(migrated).toBe(75)
 
     for (const [path, source] of Object.entries(sources)) {
       expect(source, `${path} が共通表部品をimportしていない`).toContain(

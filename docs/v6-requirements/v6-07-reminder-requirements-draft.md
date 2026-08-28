@@ -205,6 +205,14 @@ KPI:
 - スキップ・失敗理由
 - 再試行予定
 
+### 3-8. リマインダの削除
+
+- owner/adminだけが一覧の行または複数選択から削除できる
+- 実行前に対象名、未送信予定が取り消されること、送信済み履歴が残ることを確認する
+- 削除した定義は通常の一覧、実行対象、集計、タグの使用先から外す
+- 登録中の友だちは `cancelled` にし、完了済みの登録と配信履歴は保持する
+- 失敗した場合は確認画面を閉じず、理由と再実行の操作を残す
+
 ## 4. データ要件
 
 維持:
@@ -214,6 +222,12 @@ KPI:
 - `friend_reminders`
 - `friend_reminder_deliveries`
 - 現行時刻計算
+
+現行データを壊さず先に実装する項目:
+
+- `reminders.deleted_at`: 通常画面と自動実行から外す日時
+- 削除時は `reminders.is_active = 0` と、`active` な `friend_reminders` の取消を同じDBバッチで行う
+- `reminder_steps`、完了済み `friend_reminders`、`friend_reminder_deliveries` は削除しない
 
 追加:
 
@@ -260,6 +274,7 @@ KPI:
 - `POST /api/reminder-enrollments/{id}/resume`
 - `GET /api/reminders/{id}/runs`
 - `POST /api/reminder-runs/{id}/retry`
+- `DELETE /api/reminders/{id}`: 物理削除ではなく、未送信だけを止める安全削除
 
 開始・基準日更新・取消・再試行は冪等キー必須。
 
