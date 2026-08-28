@@ -908,7 +908,7 @@ CREATE TABLE "folders" (
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   color         TEXT
-);
+, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE CASCADE);
 
 CREATE TABLE form_opens (
   id TEXT PRIMARY KEY,
@@ -2830,6 +2830,9 @@ CREATE UNIQUE INDEX idx_event_waitlist_slot_identity
 CREATE INDEX idx_events_account_published_sort ON events (line_account_id, is_published, sort_order);
 
 CREATE INDEX idx_ffv_field ON friend_field_values(field_id, value);
+
+CREATE INDEX idx_folders_account_kind_order
+  ON folders(line_account_id, kind, display_order, id);
 
 CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
 

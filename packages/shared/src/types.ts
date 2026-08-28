@@ -225,6 +225,8 @@ export interface Folder {
   id: string;
   kind: string;
   name: string;
+  /** アカウント専用フォルダの所属。旧フォルダは null。 */
+  lineAccountId: string | null;
   parentId: string | null;
   displayOrder: number;
   /**

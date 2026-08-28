@@ -99,6 +99,7 @@ const FOLDER = {
   id: 'fo-1',
   kind: 'template',
   name: 'よく使う',
+  line_account_id: 'account-1',
   parent_id: null,
   display_order: 0,
   created_at: '2026-08-16',
@@ -397,6 +398,7 @@ describe('フォルダ', () => {
       kind: 'template',
       name: '孫',
       parentId: 'fo-1',
+      lineAccountId: 'account-1',
     });
     expect(res.status).toBe(422);
   });
@@ -407,18 +409,52 @@ describe('フォルダ', () => {
       kind: 'template',
       name: 'x',
       parentId: 'fo-1',
+      lineAccountId: 'account-1',
     });
     expect(res.status).toBe(422);
   });
 
   it('自分を自分の親にはできない', async () => {
-    const res = await req('/api/folders/fo-1', 'PATCH', { parentId: 'fo-1' });
+    const res = await req('/api/folders/fo-1?lineAccountId=account-1', 'PATCH', { parentId: 'fo-1' });
     expect(res.status).toBe(422);
   });
 
   it('種類で絞れる', async () => {
-    await req('/api/folders?kind=template', 'GET');
-    expect(folders.getFolders).toHaveBeenCalledWith(env.DB, 'template');
+    await req('/api/folders?kind=template&lineAccountId=account-1', 'GET');
+    expect(folders.getFolders).toHaveBeenCalledWith(
+      env.DB,
+      'template',
+      { lineAccountId: 'account-1' },
+    );
+  });
+
+  it('テンプレート用はLINE公式アカウント未選択なら返さない', async () => {
+    const res = await req('/api/folders?kind=template', 'GET');
+    expect(res.status).toBe(400);
+    expect(folders.getFolders).not.toHaveBeenCalled();
+  });
+
+  it('担当外アカウントのテンプレート用フォルダは存在を漏らさない', async () => {
+    const res = await req('/api/folders?kind=template&lineAccountId=account-2', 'GET');
+    expect(res.status).toBe(404);
+    expect(folders.getFolders).not.toHaveBeenCalled();
+  });
+
+  it('別アカウントのテンプレート用フォルダを更新・削除できない', async () => {
+    folders.getFolderById.mockResolvedValue({ ...FOLDER, line_account_id: 'account-2' });
+    const update = await req(
+      '/api/folders/fo-1?lineAccountId=account-1',
+      'PATCH',
+      { name: '盗用' },
+    );
+    const remove = await req(
+      '/api/folders/fo-1?lineAccountId=account-1',
+      'DELETE',
+    );
+    expect(update.status).toBe(404);
+    expect(remove.status).toBe(404);
+    expect(folders.updateFolder).not.toHaveBeenCalled();
+    expect(folders.deleteFolder).not.toHaveBeenCalled();
   });
 
   it('知らない種類での絞り込みは弾く', async () => {

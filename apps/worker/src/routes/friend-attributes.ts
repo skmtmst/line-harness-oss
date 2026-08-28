@@ -114,6 +114,7 @@ function serializeFolder(row: Folder) {
     id: row.id,
     kind: row.kind,
     name: row.name,
+    lineAccountId: row.line_account_id ?? null,
     parentId: row.parent_id,
     displayOrder: row.display_order,
     color: row.color ?? null,
@@ -124,6 +125,20 @@ function serializeFolder(row: Folder) {
 
 /** 色は #RRGGBB だけ許す。名前付きの色を混ぜると、画面での見た目が揃わない。 */
 const COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
+
+async function folderAccountAccess(
+  c: Context<Env>,
+  lineAccountId: unknown,
+): Promise<{ lineAccountId: string } | Response> {
+  if (typeof lineAccountId !== 'string' || !lineAccountId) {
+    return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+  }
+  const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  if (!accountScope.allowedAccountIds.includes(lineAccountId)) {
+    return c.json({ success: false, error: 'フォルダが見つかりません' }, 404);
+  }
+  return { lineAccountId };
+}
 
 /**
  * IPの末尾を伏せる。
@@ -553,7 +568,12 @@ friendAttributes.get('/api/folders', async (c) => {
     if (raw && !isFolderKind(raw)) {
       return c.json({ success: false, error: '知らないフォルダの種類です' }, 400);
     }
-    const items = await getFolders(c.env.DB, raw && isFolderKind(raw) ? raw : undefined);
+    const kind = raw && isFolderKind(raw) ? raw : undefined;
+    const scope = kind === 'template'
+      ? await folderAccountAccess(c, c.req.query('lineAccountId'))
+      : undefined;
+    if (scope instanceof Response) return scope;
+    const items = await getFolders(c.env.DB, kind, scope);
     return c.json({ success: true, data: items.map(serializeFolder) });
   } catch (err) {
     console.error('GET /api/folders error:', err);
@@ -569,10 +589,14 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
     }
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return c.json({ success: false, error: 'フォルダ名を入力してください' }, 400);
+    const scope = body.kind === 'template'
+      ? await folderAccountAccess(c, body.lineAccountId)
+      : undefined;
+    if (scope instanceof Response) return scope;
 
     // 入れ子は1段まで。深くすると画面が組み立てられなくなる。
     if (body.parentId) {
-      const parent = await getFolderById(c.env.DB, String(body.parentId));
+      const parent = await getFolderById(c.env.DB, String(body.parentId), scope);
       if (!parent) return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
       if (parent.parent_id) {
         return c.json({ success: false, error: 'フォルダは2段までです' }, 422);
@@ -598,6 +622,7 @@ friendAttributes.post('/api/folders', requireRole('owner', 'admin'), async (c) =
       parentId: body.parentId ? String(body.parentId) : null,
       displayOrder: Number(body.displayOrder ?? 0),
       color,
+      lineAccountId: scope?.lineAccountId ?? null,
     });
     return c.json({ success: true, data: serializeFolder(folder) }, 201);
   } catch (err) {
@@ -612,6 +637,14 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
     const existing = await getFolderById(c.env.DB, id);
     if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
 
+    const scope = existing.kind === 'template'
+      ? await folderAccountAccess(c, c.req.query('lineAccountId'))
+      : undefined;
+    if (scope instanceof Response) return scope;
+    if (scope && existing.line_account_id !== scope.lineAccountId) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+
     const body = await c.req.json<Record<string, unknown>>();
     const patch: Parameters<typeof updateFolder>[2] = {};
     if (body.name !== undefined) {
@@ -624,6 +657,16 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
       // 自分を自分の親にはできない。一覧の描画が無限に回る。
       if (parentId === id) {
         return c.json({ success: false, error: '自分自身を親にはできません' }, 422);
+      }
+      if (parentId) {
+        const parent = await getFolderById(c.env.DB, parentId, scope);
+        if (!parent) return c.json({ success: false, error: '親フォルダが見つかりません' }, 400);
+        if (parent.parent_id) {
+          return c.json({ success: false, error: 'フォルダは2段までです' }, 422);
+        }
+        if (parent.kind !== existing.kind) {
+          return c.json({ success: false, error: '別の種類のフォルダには入れられません' }, 422);
+        }
       }
       patch.parentId = parentId;
     }
@@ -641,7 +684,7 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
       }
     }
 
-    const folder = await updateFolder(c.env.DB, id, patch);
+    const folder = await updateFolder(c.env.DB, id, patch, scope);
     return c.json({ success: true, data: serializeFolder(folder!) });
   } catch (err) {
     console.error('PATCH /api/folders/:id error:', err);
@@ -652,7 +695,17 @@ friendAttributes.patch('/api/folders/:id', requireRole('owner', 'admin'), async 
 // 中身は消えず「未分類」に戻る。ただし子フォルダは一緒に消える。
 friendAttributes.delete('/api/folders/:id', requireRole('owner', 'admin'), async (c) => {
   try {
-    await deleteFolder(c.env.DB, c.req.param('id'));
+    const id = c.req.param('id');
+    const existing = await getFolderById(c.env.DB, id);
+    if (!existing) return c.json({ success: false, error: 'Not found' }, 404);
+    const scope = existing.kind === 'template'
+      ? await folderAccountAccess(c, c.req.query('lineAccountId'))
+      : undefined;
+    if (scope instanceof Response) return scope;
+    if (scope && existing.line_account_id !== scope.lineAccountId) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    await deleteFolder(c.env.DB, id, scope);
     return c.json({ success: true, data: null });
   } catch (err) {
     console.error('DELETE /api/folders/:id error:', err);
