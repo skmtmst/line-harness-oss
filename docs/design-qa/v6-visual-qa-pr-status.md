@@ -142,3 +142,16 @@
 [比較結果](photos-v6/design-qa.md) をそのまま残し、
 [#447 へコメント](https://github.com/skmtmst/line-harness-oss/pull/447)
 で返してあります。
+
+## 2026-08-28 夕：5本のheadで撮り直しました
+
+| PR | head | 撮った画面 | 結果 |
+|---|---|---|---|
+| [#433](https://github.com/skmtmst/line-harness-oss/pull/433) | `51020a97` | `M9cij` | **未実装 → 構造一致・要修正 P2** |
+| [#421](https://github.com/skmtmst/line-harness-oss/pull/421) | `f7b7974a` | `QKx8Q` `XBkiQ` | 内部ID・`eq`・`[object Object]` が**3つとも解決** |
+| [#441](https://github.com/skmtmst/line-harness-oss/pull/441) | `05c5b103` | 11画面 | **6枚が撮れる（前回3枚）。未実装 7→5** |
+| [#445](https://github.com/skmtmst/line-harness-oss/pull/445) | `787a4b46` | `QQ1SR` `dfwD4` | 要修正2件が**2件とも解決** |
+| [#447](https://github.com/skmtmst/line-harness-oss/pull/447) | `65adbc59` | `Qu6Vk` | **P0（生のUTC）解決** |
+
+**5本ぶんとも `--only` で対象を絞って撮りました。** 機能ごと丸ごと撮ると、
+別のPRで直った絵が直る前に戻ります（機能4で一度やりました）。

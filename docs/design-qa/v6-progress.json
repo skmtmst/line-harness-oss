@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 180,
-  "unimplemented": 73,
+  "compared": 183,
+  "unimplemented": 70,
   "unconfirmed": 5,
   "elsewhere": 4,
   "missing": 0,
@@ -64,7 +64,7 @@
         },
         {
           "pr": 421,
-          "head": "71aff344",
+          "head": "f7b7974a",
           "on": "2026-08-28",
           "screens": [
             "QKx8Q",
@@ -143,12 +143,18 @@
       "feature": 11,
       "name": "テンプレート",
       "total": 10,
-      "compared": 7,
-      "unimplemented": 3,
+      "compared": 8,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 433,
+          "head": "51020a97",
+          "on": "2026-08-28"
+        }
+      ]
     },
     {
       "feature": 12,
@@ -209,15 +215,15 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 4,
-      "unimplemented": 7,
+      "compared": 6,
+      "unimplemented": 5,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "capturedAt": [
         {
           "pr": 441,
-          "head": "5fd7c048",
+          "head": "05c5b103",
           "on": "2026-08-28"
         }
       ]
@@ -268,7 +274,7 @@
       "capturedAt": [
         {
           "pr": 445,
-          "head": "724f9324",
+          "head": "787a4b46",
           "on": "2026-08-28"
         }
       ]
@@ -302,7 +308,7 @@
       "capturedAt": [
         {
           "pr": 447,
-          "head": "12c80878",
+          "head": "65adbc59",
           "on": "2026-08-28"
         }
       ]

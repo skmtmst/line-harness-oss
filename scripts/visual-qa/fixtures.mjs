@@ -380,11 +380,55 @@ export const FRIEND_MILEAGE = {
     programId: 'mile-default',
     programName: 'NENマイル',
     available: 2450,
-    pending: 0,
-    lifetimeEarned: 2450,
-    spent: 0,
+    pending: 300,
+    lifetimeEarned: 3750,
+    spent: 1000,
   },
-  history: [],
+  /*
+    **`insights` と `connections` を落とさない。** `/mileage/friends/detail`
+    （`HIU5O`）が `mileage.insights` `mileage.connections` を読む。
+    無いと画面が落ちて撮れない。
+  */
+  insights: {
+    accountCount: 2,
+    rewardedActions: 34,
+    referralMiles: 1200,
+    qualityReferralCount: 3,
+    lastEarnedAt: '2026-08-24T16:30:00.000Z',
+  },
+  connections: [
+    { accountId: 'visual-qa-account', accountName: 'LINE 本店', friendId: 'friend-1' },
+    { accountId: 'visual-qa-account-2', accountName: 'LINE 二号店', friendId: 'friend-11' },
+  ],
+  /* `entryType` `status` は型の言葉から選ぶ（`MileageHistoryItem`）。 */
+  history: [
+    {
+      id: 'fm-1', entryType: 'grant', status: 'available', amount: 120,
+      reason: 'リンクを押した', source: 'tracked_link', sourceEventId: 'ev-1',
+      ruleName: 'リンククリックで120', mode: 'automatic',
+      occurredAt: '2026-08-24T16:30:00.000Z',
+    },
+    {
+      id: 'fm-2', entryType: 'spend', status: 'available', amount: -1000,
+      reason: 'クーポンと引き換え', source: 'manual', sourceEventId: 'ev-2',
+      ruleName: null, mode: 'manual',
+      occurredAt: '2026-08-22T09:45:00.000Z',
+    },
+    {
+      /* まだ確定していない。**`pending` を1件混ぜる。** */
+      id: 'fm-3', entryType: 'grant', status: 'pending', amount: 300,
+      reason: '回答フォームに答えた', source: 'form', sourceEventId: 'ev-3',
+      ruleName: 'フォーム回答で300', mode: 'automatic',
+      occurredAt: '2026-08-20T02:10:00.000Z',
+    },
+    {
+      /* **もとの出来事が残っていない。** 理由をたどれない行。 */
+      id: 'fm-4', entryType: 'expiration', status: 'void', amount: -80,
+      reason: '期限切れ', source: 'line', sourceEventId: null,
+      ruleName: null, mode: 'automatic',
+      occurredAt: '2026-07-30T23:15:00.000Z',
+    },
+  ],
 }
 
 /**
@@ -454,6 +498,16 @@ export const TEMPLATES = (() => {
         messageType: 'text',
         messageContent: `${label}のご連絡です。内容をご確認ください。`,
         folderId,
+        /*
+          **`usageCount` と `tapCount` は必須**（`templates/page.tsx:14-25`）。
+          入れないと「**undefined件で使用**」と出て、実装の不具合に見える。
+
+          **`0` を混ぜる。** 使用中の行は操作が「使用先を見る」に変わり、
+          削除の窓（`M9cij`）へ行けない。「未使用」の絞り込みも
+          `usageCount === 0` を数えるので、0が1つも無いと空になる。
+        */
+        usageCount: i % 3 === 0 ? 0 : i * 2,
+        tapCount: 0,
         createdAt: '2026-01-13T00:00:00.000Z',
         updatedAt: '2026-01-13T00:00:00.000Z',
       })
@@ -1715,30 +1769,36 @@ export const MILEAGE_OVERVIEW = {
 }
 
 /** 設計 `N46cQ` のたまる決めごと。**止めているものを2つ混ぜる。** */
+/**
+ * マイルの付与ルール。**`eventType` は画面の `EVENT_LABELS`
+ * （`mileage/page.tsx:20-34`）にある言葉から選ぶ。**
+ * `friend_add` `message` `booking` のような自作の名前を書くと、
+ * きっかけの列に**英語がそのまま**出て、実装の不具合に見える。
+ */
 export const MILEAGE_RULES = [
   {
-    id: 'mr-1', name: '友だち登録してくれた', eventType: 'friend_add', source: null,
+    id: 'mr-1', name: '友だち登録してくれた', eventType: 'friend_registered', source: null,
     amount: 100, initialStatus: 'available',
     conditions: { uniquePerSubject: true },
     isActive: true, validFrom: null, validUntil: null,
     createdAt: '2025-11-03T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z',
   },
   {
-    id: 'mr-2', name: 'LINEでメッセージを送ってくれた', eventType: 'message', source: null,
+    id: 'mr-2', name: 'LINEでメッセージを送ってくれた', eventType: 'message_received', source: null,
     amount: 10, initialStatus: 'available',
     conditions: { dailyCapActions: 1 },
     isActive: true, validFrom: null, validUntil: null,
     createdAt: '2025-11-03T00:00:00.000Z', updatedAt: '2026-06-01T00:00:00.000Z',
   },
   {
-    id: 'mr-3', name: '予約してくれたら 300 マイル', eventType: 'booking', source: 'booking',
+    id: 'mr-3', name: '予約してくれたら 300 マイル', eventType: 'booking_created', source: 'booking',
     amount: 300, initialStatus: 'pending',
     conditions: { uniquePerSubject: true },
     isActive: true, validFrom: null, validUntil: null,
     createdAt: '2026-01-15T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    id: 'mr-4', name: '紹介の成果が認められた', eventType: 'affiliate_conversion', source: 'affiliate',
+    id: 'mr-4', name: '紹介の成果が認められた', eventType: 'affiliate_conversion_approved', source: 'affiliate',
     amount: 500, initialStatus: 'pending',
     conditions: { beneficiary: 'referrer', uniquePerReferredFriend: true },
     isActive: true, validFrom: null, validUntil: null,
@@ -1746,7 +1806,7 @@ export const MILEAGE_RULES = [
   },
   {
     /* 止めている決めごと。**残高は減らないが、もう付かない。** */
-    id: 'mr-5', name: '春のキャンペーン参加', eventType: 'campaign', source: null,
+    id: 'mr-5', name: '春のキャンペーン参加', eventType: 'link_clicked', source: null,
     amount: 1000, initialStatus: 'available', conditions: {},
     isActive: false, validFrom: '2026-03-01T00:00:00.000Z', validUntil: '2026-03-31T00:00:00.000Z',
     createdAt: '2026-02-20T00:00:00.000Z', updatedAt: '2026-04-01T00:00:00.000Z',
@@ -2155,7 +2215,7 @@ export const EC_SETTINGS = [
 export const AUTOMATIONS = [
   {
     id: 'auto-1', name: 'はじめての人にあいさつする', description: '友だち追加でシナリオを始める',
-    eventType: 'friend_add', conditions: {},
+    eventType: 'friend_registered', conditions: {},
     actions: [{ type: 'start_scenario', params: { scenarioId: 'scenario-0' } }],
     isActive: true, priority: 1, lineAccountId: null,
     createdAt: '2026-02-01T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
@@ -2933,3 +2993,63 @@ export const SAVED_ANALYTICS_SNAPSHOTS = [
     createdAt: '2026-08-25T02:05:00.000Z',
   },
 ]
+
+/**
+ * マイルの履歴（`/api/mileage/history`）。**型は `MileageAdminHistory`。**
+ *
+ * `hasSourceEvent` と `mode` を散らしてある。**もとの出来事が残っていない
+ * 行**（`hasSourceEvent: false`）と、**手で足した行**（`mode: 'manual'`、
+ * `ruleName: null`）が、自動で付いた行と見分けられるかを見る。
+ *
+ * **`source` は `mileage-display.ts` の `SOURCE_LABELS` にある言葉から選ぶ**
+ * （`tracked_link` `form` `webinar` `manual` `admin_adjustment` など）。
+ * 無い言葉を書くと全部「その他の自動処理」に落ちて、**当てはめが
+ * 効いていないように見える。**
+ *
+ * `occurredAt` は UTC。画面が日本時間へ直しているかを見るため、
+ * **9時間をまたぐ時刻**（`2026-08-24T16:30:00.000Z` ＝ 8/25 01:30 JST）を
+ * 1件入れてある。
+ */
+export const MILEAGE_HISTORY = {
+  items: [
+    {
+      id: 'mh-1', primaryFriendId: 'friend-1', displayName: '高橋 直人', pictureUrl: null,
+      entryType: 'grant', status: 'available', amount: 120,
+      reason: 'リンクを押した', source: 'tracked_link', hasSourceEvent: true,
+      ruleName: 'リンククリックで120', mode: 'automatic',
+      occurredAt: '2026-08-24T16:30:00.000Z',
+    },
+    {
+      id: 'mh-2', primaryFriendId: 'friend-2', displayName: '前田 さくら', pictureUrl: null,
+      entryType: 'grant', status: 'pending', amount: 300,
+      reason: '回答フォームに答えた', source: 'form', hasSourceEvent: true,
+      ruleName: 'フォーム回答で300', mode: 'automatic',
+      occurredAt: '2026-08-24T02:10:00.000Z',
+    },
+    {
+      /* 手で足した。**決めごとに紐づかない。** */
+      id: 'mh-3', primaryFriendId: 'friend-3', displayName: '菅野 亮', pictureUrl: null,
+      entryType: 'adjustment', status: 'available', amount: 500,
+      reason: '店頭でのご来店ぶん', source: 'admin_adjustment', hasSourceEvent: false,
+      ruleName: null, mode: 'manual',
+      occurredAt: '2026-08-23T05:00:00.000Z',
+    },
+    {
+      /* 減らした側。 */
+      id: 'mh-4', primaryFriendId: 'friend-1', displayName: '高橋 直人', pictureUrl: null,
+      entryType: 'spend', status: 'available', amount: -1000,
+      reason: 'クーポンと引き換え', source: 'manual', hasSourceEvent: true,
+      ruleName: null, mode: 'manual',
+      occurredAt: '2026-08-22T09:45:00.000Z',
+    },
+    {
+      /* **もとの出来事が残っていない。** 理由をたどれない行。 */
+      id: 'mh-5', primaryFriendId: 'friend-4', displayName: '山田 太郎', pictureUrl: null,
+      entryType: 'expiration', status: 'void', amount: -80,
+      reason: '期限切れ', source: 'line', hasSourceEvent: false,
+      ruleName: 'メッセージで80', mode: 'automatic',
+      occurredAt: '2026-07-30T23:15:00.000Z',
+    },
+  ],
+  pagination: { total: 5, limit: 50, offset: 0 },
+}

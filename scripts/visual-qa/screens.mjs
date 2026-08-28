@@ -637,9 +637,16 @@ export const SCREENS = [
     steps: [{ click: 'リサーチ' }, { click: 'リサーチを作る' }],
   },
   {
+    /*
+      **#433（head `51020a97`）で窓が入った。** それまでは削除がブラウザの
+      `confirm()` で、撮ることもできなかった。実装側に
+      `data-design-node="M9cij"` の印が付いている（`templates/page.tsx:831`）。
+      使用中のテンプレートは「使用先を見る」に変わるので、
+      **使っていない行の「テンプレートを削除」を押す。**
+    */
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
-    status: 'unimplemented',
-    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`templates/page.tsx:236`）',
+    mode: 'viewport', height: 1080,
+    steps: [{ click: 'テンプレートを削除', scope: 'main' }],
   },
   {
     ...TEMPLATE, node: 'CzndJ', name: '11-1-H フォルダ操作',
@@ -792,15 +799,21 @@ export const SCREENS = [
     why: '交換できる使い道の考えがまるごと無い（`grep 使い道|交換|redemption` が `/scoring` 配下で0件）。**ためてもらう仕組みだけあって、使う先が無い**',
   },
   {
+    /*
+      **#441（head `05c5b103`）で「履歴」タブが入った。**
+      それまでは残高と決めごとの2タブしか無かった。
+    */
     ...MILEAGE, node: 'MvZm5', name: '17-1-C マイルの履歴',
-    status: 'unimplemented',
-    why: '増減の記録を並べる画面が無い。手で動かした分の理由も残らない（`grep 履歴` が0件）',
+    route: '/mileage?tab=history', mode: 'page',
   },
   { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new' },
   {
+    /*
+      **#441 で `/mileage/friends/detail` が入った。**
+      実装側に `data-design-node="HIU5O"` の印が付いている。
+    */
     ...MILEAGE, node: 'HIU5O', name: '17-1-E 友だちのマイル明細',
-    status: 'unimplemented',
-    why: 'マイルの画面から友だち1人の明細へ行けない。友だち詳細（`/friends/detail`）にマイルの帯は在るが、**何でたまったかの内訳は無い**',
+    route: '/mileage/friends/detail?id=friend-1', mode: 'page',
   },
   {
     ...MILEAGE, node: 'vz0Ji', name: '17-1-F マイルを手で増やす・減らす',
@@ -1283,12 +1296,13 @@ export function screensOf(feature) {
 export const CAPTURED_AT = {
   4: [
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
-    { pr: 421, head: '71aff344', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
+    { pr: 421, head: 'f7b7974a', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
   ],
-  17: [{ pr: 441, head: '5fd7c048', on: '2026-08-28' }],
+  11: [{ pr: 433, head: '51020a97', on: '2026-08-28' }],
+  17: [{ pr: 441, head: '05c5b103', on: '2026-08-28' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
-  20: [{ pr: 445, head: '724f9324', on: '2026-08-28' }],
+  20: [{ pr: 445, head: '787a4b46', on: '2026-08-28' }],
   21: [{ pr: 446, head: '4307088d', on: '2026-08-28' }],
-  22: [{ pr: 447, head: '12c80878', on: '2026-08-28' }],
+  22: [{ pr: 447, head: '65adbc59', on: '2026-08-28' }],
 }
