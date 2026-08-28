@@ -592,7 +592,7 @@ describe('飲食店向けテストAPI', () => {
 
   it('接続確認が成功した場合だけLINEアカウントと店舗をまとめて作成する', async () => {
     const secret = 'wizard-test-secret';
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/oauth/accessToken')) {
         return new Response(JSON.stringify({
@@ -605,6 +605,11 @@ describe('飲食店向けテストAPI', () => {
           headers: { 'Content-Type': 'application/json' },
         });
       }
+      if (url.includes('/webhook/endpoint')) {
+        if (init?.method === 'PUT') return new Response('{}', { status: 200 });
+        return new Response(JSON.stringify({ endpoint: 'https://worker.example.test/webhook', active: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.includes('/webhook/test')) return new Response('{}', { status: 200 });
       return new Response('{}', { status: 500 });
     }));
 
@@ -616,6 +621,7 @@ describe('飲食店向けテストAPI', () => {
     expect(payload).toContain('新店舗公式LINE');
     expect(payload).not.toContain(secret);
     expect(payload).not.toContain('wizard-access-token');
+    expect(payload).toContain('"webhook":"ok"');
     expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM rt_stores WHERE code = 'NEW'").get())
       .toMatchObject({ count: 1 });
     expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM line_accounts WHERE channel_id = '1234567890'").get())
@@ -630,6 +636,43 @@ describe('飲食店向けテストAPI', () => {
         line_tenant: '00000000-0000-4000-8000-000000000001',
         organization_tenant: '00000000-0000-4000-8000-000000000001',
       });
+  });
+
+  it('Webhook設定失敗でも店舗を作成し、秘密値を応答やログへ出さない', async () => {
+    const secret = 'webhook-failure-secret';
+    const token = 'webhook-failure-token';
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/oauth/accessToken')) return new Response(JSON.stringify({ access_token: token, expires_in: 2_592_000, token_type: 'Bearer' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('/v2/bot/info')) return new Response(JSON.stringify({ displayName: '失敗確認LINE', basicId: '@failed' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response('{}', { status: 500 });
+    }));
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const response = await request('/api/restaurant-test/stores/connect', { name: '失敗確認店', alias: 'FAILED', channelId: '9988', channelSecret: secret });
+      expect(response.status).toBe(201);
+      const payload = await response.text();
+      expect(payload).toContain('"webhook":"failed"');
+      expect(payload).not.toContain(secret);
+      expect(payload).not.toContain(token);
+      expect(JSON.stringify(error.mock.calls)).not.toContain(secret);
+      expect(JSON.stringify(error.mock.calls)).not.toContain(token);
+    } finally { error.mockRestore(); }
+  });
+
+  it('Webhookの利用がオフならinactiveを返す', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/oauth/accessToken')) return new Response(JSON.stringify({ access_token: 'inactive-token', expires_in: 2_592_000, token_type: 'Bearer' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('/v2/bot/info')) return new Response(JSON.stringify({ displayName: '停止中LINE' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('/webhook/test')) return new Response('{}', { status: 200 });
+      if (url.includes('/webhook/endpoint') && init?.method === 'PUT') return new Response('{}', { status: 200 });
+      if (url.includes('/webhook/endpoint')) return new Response(JSON.stringify({ endpoint: 'https://worker.example.test/webhook', active: false }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      return new Response('{}', { status: 500 });
+    }));
+    const response = await request('/api/restaurant-test/stores/connect', { name: '停止中店', alias: 'INACTIVE', channelId: '7766', channelSecret: 'inactive-secret' });
+    expect(response.status).toBe(201);
+    expect(await response.text()).toContain('"webhook":"inactive"');
   });
 
   it('LINEアカウントを指定して店舗を作成・編集でき、スタッフは操作できない', async () => {
