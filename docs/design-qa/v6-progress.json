@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 186,
-  "unimplemented": 72,
+  "compared": 187,
+  "unimplemented": 71,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
@@ -229,8 +229,8 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 6,
-      "unimplemented": 5,
+      "compared": 7,
+      "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -254,6 +254,16 @@
             "N46cQ",
             "k8VCU"
           ]
+        },
+        {
+          "pr": 494,
+          "head": "0ca45f98",
+          "on": "2026-08-28",
+          "screens": [
+            "vz0Ji",
+            "HIU5O"
+          ],
+          "note": "#494 は #441 を含む"
         }
       ]
     },
@@ -451,6 +461,505 @@
       "elsewhere": 0,
       "missing": 0,
       "capturedAt": null
+    }
+  ],
+  "gaps": [
+    {
+      "feature": 3,
+      "node": "LT8RS",
+      "name": "3-1-A 友だち（表示件数を開く）",
+      "gap": "parts",
+      "gapNote": "共通の `Select` に寄せる。タグ一覧は既にそれを使っている"
+    },
+    {
+      "feature": 3,
+      "node": "InCDe",
+      "name": "3-2-A 重複候補詳細・統合前確認",
+      "gap": "build",
+      "gapNote": "重複の口は在る。候補を1件ずつ開く導線が無い"
+    },
+    {
+      "feature": 3,
+      "node": "w8W4Eh",
+      "name": "3-3-A 統合ユーザー詳細",
+      "gap": "build",
+      "gapNote": "統合ユーザーの行を開く導線が無い"
+    },
+    {
+      "feature": 3,
+      "node": "vtBCu",
+      "name": "3-4 UID移行",
+      "gap": "build",
+      "gapNote": "`/hq` 側に在る見込み。権限の切り分けを決める"
+    },
+    {
+      "feature": 5,
+      "node": "RUxNf",
+      "name": "5-1-I シナリオ・配信開始確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 5,
+      "node": "NrBkW",
+      "name": "5-1-J シナリオ・配信開始完了",
+      "gap": "build",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 5,
+      "node": "M2b2B",
+      "name": "5-1-L シナリオ・配信結果",
+      "gap": "api",
+      "gapNote": "シナリオの配信結果を数える口が要る"
+    },
+    {
+      "feature": 6,
+      "node": "cPk8A",
+      "name": "6-1-B 対象条件",
+      "gap": "build",
+      "gapNote": "保存した検索の仕組みは #421 で入った。配信側から呼ぶだけ"
+    },
+    {
+      "feature": 6,
+      "node": "FpgxH",
+      "name": "6-1-H 最終確認",
+      "gap": "parts",
+      "gapNote": "`ConfirmDialog` を挟む。**1,284人へ送る操作に確認が無い**"
+    },
+    {
+      "feature": 6,
+      "node": "bPF0s",
+      "name": "6-1-I 予約完了",
+      "gap": "build",
+      "gapNote": "保存の返事を受けて完了の面を出す。口は在る"
+    },
+    {
+      "feature": 6,
+      "node": "sqFXf",
+      "name": "6-1-L 対象条件を編集",
+      "gap": "build",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 7,
+      "node": "s7T2dz",
+      "name": "7-1-C 対象と終了条件",
+      "gap": "api",
+      "gapNote": "終了・停止条件の保存先が要る"
+    },
+    {
+      "feature": 7,
+      "node": "JCz6J",
+      "name": "7-1-D 配信予定プレビュー",
+      "gap": "build",
+      "gapNote": "リマインダの設定から送信予定を計算して並べる"
+    },
+    {
+      "feature": 7,
+      "node": "W98zZQ",
+      "name": "7-1-E テスト送信確認",
+      "gap": "build",
+      "gapNote": "テスト送信は一斉配信とシナリオに在る。同じ形を移す"
+    },
+    {
+      "feature": 7,
+      "node": "s6Vvp",
+      "name": "7-1-F 最終確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 7,
+      "node": "PSmHo",
+      "name": "7-1-G 有効化完了",
+      "gap": "build",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 7,
+      "node": "GC4St",
+      "name": "7-1-H 実行結果",
+      "gap": "api",
+      "gapNote": "リマインダの段ごとの送信数・開封・失敗を数える口が要る"
+    },
+    {
+      "feature": 7,
+      "node": "Y0Sn3",
+      "name": "7-1-I 削除確認",
+      "gap": "parts",
+      "gapNote": "`ConfirmDialog` に替えるだけ。いまはブラウザの `confirm()`"
+    },
+    {
+      "feature": 8,
+      "node": "U9hzqH",
+      "name": "8-1-D 競合と優先順位",
+      "gap": "build",
+      "gapNote": "`priority` は在る。重なっているルールを出す"
+    },
+    {
+      "feature": 8,
+      "node": "g46ja",
+      "name": "8-1-E 自動応答テスト",
+      "gap": "build",
+      "gapNote": "ルールは在る。当てはめを画面で試すだけ"
+    },
+    {
+      "feature": 8,
+      "node": "Yj6CQ",
+      "name": "8-1-F 最終確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 8,
+      "node": "e6iJG",
+      "name": "8-1-G 有効化完了",
+      "gap": "build",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 8,
+      "node": "t7UtYQ",
+      "name": "8-1-H 実行結果",
+      "gap": "api",
+      "gapNote": "自動応答の実行を1件ずつ残す記録が要る"
+    },
+    {
+      "feature": 8,
+      "node": "Gy9OK",
+      "name": "8-1-I 削除確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 9,
+      "node": "s9gAx",
+      "name": "9-1-A 基本設定",
+      "gap": "drop",
+      "gapNote": "設定はアカウントに1枚。名前もフォルダも優先順位も要らない"
+    },
+    {
+      "feature": 9,
+      "node": "W1wzCa",
+      "name": "9-1-B 流入条件",
+      "gap": "drop",
+      "gapNote": "実装に「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と明記"
+    },
+    {
+      "feature": 9,
+      "node": "K0Dbr2",
+      "name": "9-1-C 初回案内",
+      "gap": "drop",
+      "gapNote": "最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**"
+    },
+    {
+      "feature": 9,
+      "node": "ec9vg",
+      "name": "9-1-F 最終確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 9,
+      "node": "quhg6",
+      "name": "9-1-G 有効化完了",
+      "gap": "build",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 9,
+      "node": "P2J0Te",
+      "name": "9-1-H 実行結果",
+      "gap": "build",
+      "gapNote": "`/api/friend-add-routing/events` は在る。画面が読んでいない"
+    },
+    {
+      "feature": 9,
+      "node": "Q3qP1r",
+      "name": "9-1-I 削除確認",
+      "gap": "drop",
+      "gapNote": "設定は1枚で消せない。削除という考えがそもそも無い"
+    },
+    {
+      "feature": 10,
+      "node": "Ho8z4",
+      "name": "10-1-D 通知・リマインド",
+      "gap": "api",
+      "gapNote": "前日・1時間前・開始時に走らせる仕掛けが要る"
+    },
+    {
+      "feature": 10,
+      "node": "GB0NR",
+      "name": "10-1-F 公開ページプレビュー",
+      "gap": "parts",
+      "gapNote": "`slug` は画面に出ている。公開ページを別窓で開くだけ"
+    },
+    {
+      "feature": 10,
+      "node": "D6yO7e",
+      "name": "10-1-G 公開前確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 10,
+      "node": "TimXl",
+      "name": "10-1-H 公開完了",
+      "gap": "build",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 10,
+      "node": "LKuAQ",
+      "name": "10-1-K 削除確認",
+      "gap": "parts",
+      "gapNote": "`webinarApi.remove` は在る。画面が呼んでいないだけ"
+    },
+    {
+      "feature": 11,
+      "node": "NNDMR",
+      "name": "11-1-C 質問を作る",
+      "gap": "api",
+      "gapNote": "「質問」の型と保存先が要る。いまの `messageType` に無い"
+    },
+    {
+      "feature": 12,
+      "node": "DIUbO",
+      "name": "12-1-C 切替メニューのつながり",
+      "gap": "build",
+      "gapNote": "リッチメニューの `pages` `areas` は在る。移り先を図にする"
+    },
+    {
+      "feature": 12,
+      "node": "NXdDk",
+      "name": "12-1-C-A つながりなし",
+      "gap": "build",
+      "gapNote": "上の空の状態"
+    },
+    {
+      "feature": 12,
+      "node": "szXsT",
+      "name": "12-1-F リッチメニューの削除確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 13,
+      "node": "ava2n",
+      "name": "13-1-B フォームのデザイン設定",
+      "gap": "drop",
+      "gapNote": "**作らない決めが実装に明記**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」"
+    },
+    {
+      "feature": 13,
+      "node": "gBp2J",
+      "name": "13-1-E フォームの削除確認",
+      "gap": "parts",
+      "gapNote": "一覧に削除の導線を足し、`ConfirmDialog` を当てる"
+    },
+    {
+      "feature": 14,
+      "node": "uNBlA",
+      "name": "14-1-B 変える前に影響を見る",
+      "gap": "api",
+      "gapNote": "共通情報の差し込み先を1件ずつ引く口が要る"
+    },
+    {
+      "feature": 14,
+      "node": "yPkWe",
+      "name": "14-1-C 共通情報の削除確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 15,
+      "node": "YfTfJ",
+      "name": "15-1-C メディアの削除確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 16,
+      "node": "njLGA",
+      "name": "16-1-C 支払い",
+      "gap": "api",
+      "gapNote": "締め日・支払日・振込先・未払い残高の表が要る"
+    },
+    {
+      "feature": 16,
+      "node": "QX70l",
+      "name": "16-1-G アフィリエイターを削除する確認",
+      "gap": "parts",
+      "gapNote": "`api.affiliates.delete` は在る。画面が呼んでいないだけ"
+    },
+    {
+      "feature": 16,
+      "node": "GqFTV",
+      "name": "16-1-H 支払いを確定する",
+      "gap": "api",
+      "gapNote": "同上（締める操作）"
+    },
+    {
+      "feature": 17,
+      "node": "qlVLJ",
+      "name": "17-1-B マイルの使い道",
+      "gap": "api",
+      "gapNote": "交換の定義（何と何マイルで替えるか）と、引き換えの記録が要る"
+    },
+    {
+      "feature": 17,
+      "node": "p9CcEB",
+      "name": "17-1-G マイルの使い道をつくる",
+      "gap": "api",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 17,
+      "node": "z3PB2",
+      "name": "17-2 行動スコア",
+      "gap": "drop",
+      "gapNote": "残高一覧に「コミット強／高アクション」の列として入っている。**別タブが要るか確認をお願いします**"
+    },
+    {
+      "feature": 17,
+      "node": "s6MBc",
+      "name": "17-2-A スコアのルール",
+      "gap": "drop",
+      "gapNote": "上と同じ。行動スコアを別に持たないなら、ルールの画面も要らない"
+    },
+    {
+      "feature": 18,
+      "node": "UIaM7",
+      "name": "18-1-E 流入リンクの削除確認",
+      "gap": "parts",
+      "gapNote": "同上"
+    },
+    {
+      "feature": 20,
+      "node": "URqOA",
+      "name": "20-1-D 定期レポートをつくる",
+      "gap": "api",
+      "gapNote": "決まった曜日・時刻に走らせる仕掛けと、送り先の保存が要る"
+    },
+    {
+      "feature": 21,
+      "node": "ymXJK",
+      "name": "21-1-E コラムを書く",
+      "gap": "api",
+      "gapNote": "コラムの正本はEC側。管理画面で書くなら保存先が要る"
+    },
+    {
+      "feature": 22,
+      "node": "hHrz8",
+      "name": "22-1-A 写真を1枚ずつ見る",
+      "gap": "build",
+      "gapNote": "写真は在る。拡大・回転・切り取りは画面側で作れる（**自動検出だけは別。下の「新規API」を参照**）"
+    },
+    {
+      "feature": 22,
+      "node": "J3Wxl8",
+      "name": "22-1-C 出しているもの",
+      "gap": "api",
+      "gapNote": "通した写真と掲載先（リッチメニュー・コラム・サイト）を結ぶ記録が要る"
+    },
+    {
+      "feature": 23,
+      "node": "ELayY",
+      "name": "23-1-A 会員のつき合わせ",
+      "gap": "build",
+      "gapNote": "注文は在る。`friendId` が空のものを並べて候補を出す"
+    },
+    {
+      "feature": 23,
+      "node": "bfB50",
+      "name": "23-1-B 定期便",
+      "gap": "api",
+      "gapNote": "Stripe定期便本体の接続。実装に「接続後に有効化します」と明記"
+    },
+    {
+      "feature": 23,
+      "node": "oHAN4",
+      "name": "23-1-C EC連携のつなぎ先",
+      "gap": "api",
+      "gapNote": "つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記"
+    },
+    {
+      "feature": 24,
+      "node": "X8JCA5",
+      "name": "24-1-B 送れなかったもの",
+      "gap": "api",
+      "gapNote": "届かなかったお知らせを残す記録が要る"
+    },
+    {
+      "feature": 24,
+      "node": "Se65i",
+      "name": "24-1-C お知らせの記録",
+      "gap": "api",
+      "gapNote": "いつ・だれに・どのお知らせを送ったかの記録が要る"
+    },
+    {
+      "feature": 24,
+      "node": "DpxOK",
+      "name": "24-2 運用者へのお知らせ",
+      "gap": "api",
+      "gapNote": "運用者へ知らせる仕掛けそのものが要る"
+    },
+    {
+      "feature": 24,
+      "node": "N2gAza",
+      "name": "24-2-A 運用者へのお知らせをつくる",
+      "gap": "api",
+      "gapNote": "同上（作る画面）"
+    },
+    {
+      "feature": 25,
+      "node": "DkPY0",
+      "name": "25-1-B オートメーションが動いた記録",
+      "gap": "api",
+      "gapNote": "オートメーションの実行を1件ずつ残す記録が要る。**動かなかった理由も**"
+    },
+    {
+      "feature": 25,
+      "node": "WjYAC",
+      "name": "25-1-C 見本から作る",
+      "gap": "build",
+      "gapNote": "見本は固定の組み合わせ。新しい口は要らない"
+    },
+    {
+      "feature": 26,
+      "node": "KNG00",
+      "name": "26-1-B やり取りの記録",
+      "gap": "api",
+      "gapNote": "外部連携のやり取りを残す記録と、やり直しの口が要る"
+    },
+    {
+      "feature": 27,
+      "node": "GFDqW",
+      "name": "27-1-D 代理予約・内容確認",
+      "gap": "parts",
+      "gapNote": "同上（代理予約）"
+    },
+    {
+      "feature": 27,
+      "node": "GfceK",
+      "name": "27-1-E 代理予約・登録完了",
+      "gap": "build",
+      "gapNote": "同上（代理予約）"
+    },
+    {
+      "feature": 27,
+      "node": "Lg8ff",
+      "name": "27-1-F 代理予約・予約枠の重なりと入力エラー",
+      "gap": "api",
+      "gapNote": "予約枠の重なりを判定する口が要る"
+    },
+    {
+      "feature": 4,
+      "node": "GMvBd",
+      "name": "4-3-A 対応マークを追加・編集",
+      "gap": "parts",
+      "gapNote": "一覧の下の追加欄を窓にする。追加の口は既に在る"
     }
   ]
 }

@@ -405,12 +405,16 @@ export const FRIEND_MILEAGE = {
     {
       id: 'fm-1', entryType: 'grant', status: 'available', amount: 120,
       reason: 'リンクを押した', source: 'tracked_link', sourceEventId: 'ev-1',
+      /* #494 で増えた2項目。手で動かした行だけ実行者と調整元IDが入る。 */
+      sourceReferenceId: null, executedByStaffName: null,
       ruleName: 'リンククリックで120', mode: 'automatic',
+      sourceReferenceId: null, executedByStaffName: null,
       occurredAt: '2026-08-24T16:30:00.000Z',
     },
     {
       id: 'fm-2', entryType: 'spend', status: 'available', amount: -1000,
       reason: 'クーポンと引き換え', source: 'manual', sourceEventId: 'ev-2',
+      sourceReferenceId: 'ORD-20260822-004', executedByStaffName: '佐々木 亮太',
       ruleName: null, mode: 'manual',
       occurredAt: '2026-08-22T09:45:00.000Z',
     },
@@ -418,13 +422,27 @@ export const FRIEND_MILEAGE = {
       /* まだ確定していない。**`pending` を1件混ぜる。** */
       id: 'fm-3', entryType: 'grant', status: 'pending', amount: 300,
       reason: '回答フォームに答えた', source: 'form', sourceEventId: 'ev-3',
+      sourceReferenceId: null, executedByStaffName: null,
       ruleName: 'フォーム回答で300', mode: 'automatic',
       occurredAt: '2026-08-20T02:10:00.000Z',
+    },
+    {
+      /*
+        **#494 で撮る行。** 手で増やしたぶん。`sourceReferenceId` に
+        問い合わせ番号、`executedByStaffName` に押した人が入る。
+        **誰がなぜ動かしたかが残る**ことを見る。
+      */
+      id: 'fm-5', entryType: 'adjustment', status: 'available', amount: 500,
+      reason: '問い合わせ対応：配送遅延のお詫び', source: 'admin_adjustment', sourceEventId: null,
+      sourceReferenceId: 'INQ-20260823-018', executedByStaffName: '佐々木 亮太',
+      ruleName: null, mode: 'manual',
+      occurredAt: '2026-08-23T05:00:00.000Z',
     },
     {
       /* **もとの出来事が残っていない。** 理由をたどれない行。 */
       id: 'fm-4', entryType: 'expiration', status: 'void', amount: -80,
       reason: '期限切れ', source: 'line', sourceEventId: null,
+      sourceReferenceId: null, executedByStaffName: null,
       ruleName: null, mode: 'automatic',
       occurredAt: '2026-07-30T23:15:00.000Z',
     },
@@ -3023,6 +3041,7 @@ export const MILEAGE_HISTORY = {
       entryType: 'grant', status: 'available', amount: 120,
       reason: 'リンクを押した', source: 'tracked_link', hasSourceEvent: true,
       ruleName: 'リンククリックで120', mode: 'automatic',
+      sourceReferenceId: null, executedByStaffName: null,
       occurredAt: '2026-08-24T16:30:00.000Z',
     },
     {
@@ -3038,6 +3057,7 @@ export const MILEAGE_HISTORY = {
       entryType: 'adjustment', status: 'available', amount: 500,
       reason: '店頭でのご来店ぶん', source: 'admin_adjustment', hasSourceEvent: false,
       ruleName: null, mode: 'manual',
+      sourceReferenceId: 'INQ-20260823-018', executedByStaffName: '佐々木 亮太',
       occurredAt: '2026-08-23T05:00:00.000Z',
     },
     {

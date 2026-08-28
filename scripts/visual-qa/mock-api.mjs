@@ -656,6 +656,14 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/mileage/rules') return { success: true, data: MILEAGE_RULES }
   /* PR #441 で増えた口。無いと一覧の既定が返り、履歴タブが落ちる。 */
   if (pathname === '/api/mileage/history') return { success: true, data: MILEAGE_HISTORY }
+  /*
+    #494 で増えた口。**`configured: true` と `approvalThreshold` を入れる。**
+    未設定だと「別のオーナー承認が必要になるマイル数」の欄しか撮れず、
+    決まっているときの絵が撮れない。
+  */
+  if (pathname === '/api/mileage/adjustment-policy') {
+    return { success: true, data: { configured: true, approvalThreshold: 5000 } }
+  }
   if (pathname === '/api/affiliates') return { success: true, data: AFFILIATES }
   if (pathname === '/api/affiliates-report') return { success: true, data: AFFILIATES_REPORT }
   if (pathname === '/api/affiliate-offers') return { success: true, data: AFFILIATE_OFFERS }
@@ -915,7 +923,21 @@ const server = createServer((req, res) => {
 
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, X-Admin-Session')
+  /*
+    **足りないと `Failed to fetch` になる。** 画面が付けた見出しが
+    ここに無いと、ブラウザが前検査で弾き、405 まで届かない。
+    **実装が生のエラーを出しているように見える。**
+
+    手動マイル調整で2回やった（`Idempotency-Key`、`X-Confirm-Irreversible`）。
+    数え上げるとまた漏れるので、**聞かれたものをそのまま返す。**
+    ここは画面確認用の口で、通すのは前検査だけ。
+    書き込みそのものは下で405に落ちる。
+  */
+  const asked = req.headers['access-control-request-headers']
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    asked || 'Content-Type, X-CSRF-Token, X-Admin-Session',
+  )
   /*
     **`GET, OPTIONS` だけにしない。** 書き込みの口を撮るときに
     CORS で弾かれ、**実装が壊れているように見える。** 実際、

@@ -31,6 +31,14 @@
  *   shots     `status: 'elsewhere'` のときの、基準画像の名前（幅と `-darwin` を
  *             除いたもの）。**台帳がその絵の有無を確かめる。** 名前だけ書いて
  *             絵が無いと、見ていないものを「別の仕掛けで撮った」と数えてしまう
+ *   gap       `status: 'unimplemented'` のときの片づけ方。空にしない
+ *             'parts' … **既存部品で作れる。** `ConfirmDialog` `ListState`
+ *                       `Select` など、もうリポジトリに在るものを当てるだけ
+ *             'build' … **通常実装。** 画面を新しく作るが、**口は既に在る**
+ *             'api'   … **新しいAPI・DBが要る。** 記録・集計・仕掛けが無い
+ *             'drop'  … **V6から外す候補。** 作らない決めがある、または
+ *                       ほかの画面に統合済み
+ *   gapNote   `gap` の理由。**「無い」ではなく「何が要るか」を書く**
  *   why       `status` の理由。空にしない
  *
  * **`mode: 'page'` で重なりを撮らない。** `fullPage` は `position: fixed` を
@@ -266,6 +274,8 @@ export const SCREENS = [
   { ...FRIENDS, node: 'PhxG6', name: '3-1 友だち' },
   {
     ...FRIENDS, node: 'LT8RS', name: '3-1-A 友だち（表示件数を開く）',
+    gap: 'parts',
+    gapNote: '共通の `Select` に寄せる。タグ一覧は既にそれを使っている',
     status: 'unimplemented',
     why: '表示件数が素のセレクトで、開いた中身が画像に写らない。**タグ一覧は共通の `Select` を使っていて、同じ操作の作りが画面ごとに違う**',
   },
@@ -285,17 +295,23 @@ export const SCREENS = [
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates' },
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
-    route: '/friends?tab=duplicates', status: 'unimplemented',
+    route: '/friends?tab=duplicates', gap: 'build',
+    gapNote: '重複の口は在る。候補を1件ずつ開く導線が無い',
+    status: 'unimplemented',
     why: '重複検出タブに「再計算」しか無く、**候補を1件ずつ開く導線が無い**。設計は統合前の確認まで見せる',
   },
   { ...FRIENDS, node: 'r7eSi', name: '3-3 統合ユーザー', route: '/friends?tab=merged' },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
-    route: '/friends?tab=merged', status: 'unimplemented',
+    route: '/friends?tab=merged', gap: 'build',
+    gapNote: '統合ユーザーの行を開く導線が無い',
+    status: 'unimplemented',
     why: '統合ユーザーの行を開く導線が無い（再計算とページ送りだけ）',
   },
   {
     ...FRIENDS, node: 'vtBCu', name: '3-4 UID移行', route: '/accounts?tab=migration',
+    gap: 'build',
+    gapNote: '`/hq` 側に在る見込み。権限の切り分けを決める',
     status: 'unimplemented',
     why: '`/accounts` を開くと `/hq` へ飛ばされる。画面確認アカウントの権限では入れない。権限の切り分けが要る',
   },
@@ -327,11 +343,15 @@ export const SCREENS = [
   },
   {
     ...SCENARIO, node: 'RUxNf', name: '5-1-I シナリオ・配信開始確認', route: EDIT,
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented',
     why: '編集画面に「配信を開始」が無い。状態は一覧の再開／停止で変えるだけで、**開始前の確認が挟まらない**',
   },
   {
     ...SCENARIO, node: 'NrBkW', name: '5-1-J シナリオ・配信開始完了', route: EDIT,
+    gap: 'build',
+    gapNote: '同上',
     status: 'unimplemented', why: '5-1-I（開始の確認）が無いため、その先も無い',
   },
   {
@@ -340,6 +360,8 @@ export const SCREENS = [
   },
   {
     ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果', route: EDIT,
+    gap: 'api',
+    gapNote: 'シナリオの配信結果を数える口が要る',
     status: 'unimplemented', why: '配信結果を開く導線が未確認',
   },
   {
@@ -352,6 +374,8 @@ export const SCREENS = [
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成', route: NEW_BC },
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件', route: NEW_BC,
+    gap: 'build',
+    gapNote: '保存した検索の仕組みは #421 で入った。配信側から呼ぶだけ',
     status: 'unimplemented',
     why: '**確かめました（2026-08-28、`development` 2e438929）。順番の問題ではありません。** 「保存した条件から選ぶ」は `disabled` を直接書いてあり、`title` は「保存した条件は準備中です」（`broadcast-form.tsx:646-653`）。埋める順を変えても押せません',
   },
@@ -384,11 +408,15 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認', route: NEW_BC,
+    gap: 'parts',
+    gapNote: '`ConfirmDialog` を挟む。**1,284人へ送る操作に確認が無い**',
     status: 'unimplemented',
     why: '**確かめました（2026-08-28）。最終確認の窓がありません。**「配信を予約する」は `save()` を直に呼びます（`broadcast-form.tsx:1002-1006`）。`/broadcasts` 配下に `ConfirmDialog` は1つもありません。**押した瞬間に予約が確定します。**',
   },
   {
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 予約完了', route: NEW_BC,
+    gap: 'build',
+    gapNote: '保存の返事を受けて完了の面を出す。口は在る',
     status: 'unimplemented',
     why: '**確かめました（2026-08-28）。予約できたことを知らせる画面がありません。** 保存に成功すると `router.push(\'/broadcasts\')` で一覧へ戻るだけです（`broadcasts/new/page.tsx:55`）。何通が・いつ・誰に予約されたかは、戻った先で探すことになります',
   },
@@ -399,6 +427,8 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集', route: NEW_BC,
+    gap: 'build',
+    gapNote: '同上',
     status: 'unimplemented',
     why: '**確かめました（2026-08-28、`development` 2e438929）。条件を組んでも押せません。** 「この条件を保存」は `disabled` を直接書いてあり、`title` は「条件の保存は準備中です」（`broadcast-form.tsx:640-645`）。覚え書きも「条件の保存先が無い」',
   },
@@ -425,34 +455,48 @@ export const SCREENS = [
   },
   {
     ...REMINDER, node: 's7T2dz', name: '7-1-C 対象と終了条件', route: '/reminders/new',
+    gap: 'api',
+    gapNote: '終了・停止条件の保存先が要る',
     status: 'unimplemented',
     why: '「終了・停止条件」（予約取消で即時停止・対応完了で残りを停止 など）が実装に無い。`grep 停止条件|終了条件` が `/reminders` 配下で0件',
   },
   {
     ...REMINDER, node: 'JCz6J', name: '7-1-D 配信予定プレビュー', route: '/reminders/new',
+    gap: 'build',
+    gapNote: 'リマインダの設定から送信予定を計算して並べる',
     status: 'unimplemented',
     why: '送信予定を日時ごとに並べて重複を検知する画面が無い。**送る前に何通いくかを見せる場所が無い**',
   },
   {
     ...REMINDER, node: 'W98zZQ', name: '7-1-E テスト送信確認', route: '/reminders/edit?id=reminder-3',
+    gap: 'build',
+    gapNote: 'テスト送信は一斉配信とシナリオに在る。同じ形を移す',
     status: 'unimplemented',
     why: 'テスト送信は一斉配信とシナリオには在るが、リマインダには無い（`grep テスト送信` が `/reminders` 配下で0件）',
   },
   {
     ...REMINDER, node: 's6Vvp', name: '7-1-F 最終確認', route: '/reminders/new',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented', why: '有効化前チェックと最終確認の段が無い。保存すると即座に一覧へ戻る',
   },
   {
     ...REMINDER, node: 'PSmHo', name: '7-1-G 有効化完了', route: '/reminders/new',
+    gap: 'build',
+    gapNote: '同上',
     status: 'unimplemented', why: '7-1-F が無いので、その後の完了画面も無い',
   },
   {
     ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果', route: '/reminders',
+    gap: 'api',
+    gapNote: 'リマインダの段ごとの送信数・開封・失敗を数える口が要る',
     status: 'unimplemented',
     why: 'ステップごとの送信数・開封率・エラーを出す画面が無い（`grep 実行結果|送信履歴|開封` が `/reminders` 配下で0件）',
   },
   {
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認', route: '/reminders',
+    gap: 'parts',
+    gapNote: '`ConfirmDialog` に替えるだけ。いまはブラウザの `confirm()`',
     status: 'unimplemented',
     why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`reminders/page.tsx:202`）',
   },
@@ -481,29 +525,41 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
+    gap: 'build',
+    gapNote: '`priority` は在る。重なっているルールを出す',
     status: 'unimplemented',
     why: '同じ言葉に複数のルールが当たるときの並びと止め方を見せる画面が無い。`grep 競合` が `/auto-replies` 配下で0件。**評価順の数字はあるが、重なっていることを教える場所が無い**',
   },
   {
     ...AUTO_REPLY, node: 'g46ja', name: '8-1-E 自動応答テスト',
+    gap: 'build',
+    gapNote: 'ルールは在る。当てはめを画面で試すだけ',
     status: 'unimplemented',
     why: '受信を想定した言葉を入れて、どのルールが反応するかを試す画面が無い（`grep テスト` が `/auto-replies` 配下で0件）',
   },
   {
     ...AUTO_REPLY, node: 'Yj6CQ', name: '8-1-F 最終確認',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented', why: '有効化前チェックと最終確認の段が無い。窓の「保存」で即座に反映される',
   },
   {
     ...AUTO_REPLY, node: 'e6iJG', name: '8-1-G 有効化完了',
+    gap: 'build',
+    gapNote: '同上',
     status: 'unimplemented', why: '8-1-F が無いので、その後の完了画面も無い',
   },
   {
     ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
+    gap: 'api',
+    gapNote: '自動応答の実行を1件ずつ残す記録が要る',
     status: 'unimplemented',
     why: '誰の何という入力に何が実行されたかを並べる画面が無い（`grep 実行結果|最近の実行|引継ぎ` が0件）。一覧の「当たった回数」までしか見えない',
   },
   {
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented',
     why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`auto-replies/page.tsx:243`）',
   },
@@ -523,16 +579,22 @@ export const SCREENS = [
   { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信' },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定',
+    gap: 'drop',
+    gapNote: '設定はアカウントに1枚。名前もフォルダも優先順位も要らない',
     status: 'unimplemented',
     why: '設定名・フォルダ・優先順位が無い。**設定はアカウントに1枚**なので、名前も順番も要らない作りになっている',
   },
   {
     ...FRIEND_ADD, node: 'W1wzCa', name: '9-1-B 流入条件',
+    gap: 'drop',
+    gapNote: '実装に「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と明記',
     status: 'unimplemented',
     why: '流入リンクを選ぶ仕組みが無い。画面にも「流入元の記録は友だち追加のたびに必ず走るので、ここでは選びません」と書いてある（`page.tsx:712`）',
   },
   {
     ...FRIEND_ADD, node: 'K0Dbr2', name: '9-1-C 初回案内',
+    gap: 'drop',
+    gapNote: '最初に送る本文はシナリオ側にある。**2か所に持つと必ず食い違う**',
     status: 'unimplemented',
     why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
   },
@@ -543,19 +605,27 @@ export const SCREENS = [
   },
   {
     ...FRIEND_ADD, node: 'ec9vg', name: '9-1-F 最終確認',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented', why: '有効化前チェックと最終確認の段が無い。「保存」で即座に反映される',
   },
   {
     ...FRIEND_ADD, node: 'quhg6', name: '9-1-G 有効化完了',
+    gap: 'build',
+    gapNote: '同上',
     status: 'unimplemented', why: '9-1-F が無いので、その後の完了画面も無い',
   },
   {
     ...FRIEND_ADD, node: 'P2J0Te', name: '9-1-H 実行結果',
+    gap: 'build',
+    gapNote: '`/api/friend-add-routing/events` は在る。画面が読んでいない',
     status: 'unimplemented',
     why: '誰がどの経路から入って何が実行されたかを並べる場所が無い。受け口（`/api/friend-add-routing/events`）は在るのに**画面が読んでいない**（`grep 履歴|events` が0件）',
   },
   {
     ...FRIEND_ADD, node: 'Q3qP1r', name: '9-1-I 削除確認',
+    gap: 'drop',
+    gapNote: '設定は1枚で消せない。削除という考えがそもそも無い',
     status: 'unimplemented', why: '設定はアカウントに1枚で消せない。削除という考えがそもそも無い',
   },
 
@@ -577,6 +647,8 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Ho8z4', name: '10-1-D 通知・リマインド',
+    gap: 'api',
+    gapNote: '前日・1時間前・開始時に走らせる仕掛けが要る',
     status: 'unimplemented',
     why: '前日・1時間前・開始時の案内も、未視聴者への見逃し案内も無い（`grep リマインド|見逃し|通知` が `/webinars` 配下で0件）',
   },
@@ -586,15 +658,21 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー', route: WEBINAR_EDIT,
+    gap: 'parts',
+    gapNote: '`slug` は画面に出ている。公開ページを別窓で開くだけ',
     status: 'unimplemented',
     why: '**確かめました（2026-08-28）。順番の問題ではありません。**「プレビュー」は `disabled` を直接書いてあり、`title` は「プレビューは準備中です」（`webinars/edit/page.tsx:892-897`）。覚え書きも「参加画面をそのまま開く導線が無い」',
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented', why: '公開前チェックと最終確認の段が無い。「保存」で即座に反映される',
   },
   {
     ...WEBINAR, node: 'TimXl', name: '10-1-H 公開完了',
+    gap: 'build',
+    gapNote: '同上',
     status: 'unimplemented', why: '10-1-G が無いので、その後の完了画面も無い',
   },
   {
@@ -607,6 +685,8 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'LKuAQ', name: '10-1-K 削除確認',
+    gap: 'parts',
+    gapNote: '`webinarApi.remove` は在る。画面が呼んでいないだけ',
     status: 'unimplemented',
     why: 'ウェビナーを消す導線がどこにも無い。受け口（`webinarApi.remove`）は在るのに**画面が一度も呼んでいない**。編集画面の「削除」はCTAの札を1枚外すもので、ウェビナー本体ではない（`edit/page.tsx:764`）',
   },
@@ -631,6 +711,8 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
+    gap: 'api',
+    gapNote: '「質問」の型と保存先が要る。いまの `messageType` に無い',
     status: 'unimplemented',
     why: '種類のタブが5本しかなく、**「質問」だけが無い**（`page.tsx:255-283`）。設計は「質問 8」のタブを持つ',
   },
@@ -685,17 +767,23 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT },
   {
     ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり', route: RM_EDIT,
+    gap: 'build',
+    gapNote: 'リッチメニューの `pages` `areas` は在る。移り先を図にする',
     status: 'unimplemented',
     why: '「どのメニューからどこへ移れるか」を図で見せる画面が無い。**戻るタブが無いことに気づく場所が無い**（`grep つながり|切替メニュー` が0件。参照の検査は削除しようとしたときの文言だけ）',
   },
   {
     ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし', route: RM_EDIT,
+    gap: 'build',
+    gapNote: '上の空の状態',
     status: 'unimplemented', why: '12-1-C が無いので、その空の状態も無い',
   },
   { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT },
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む' },
   {
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented',
     why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`rich-menus/page.tsx:193`）',
   },
@@ -714,6 +802,8 @@ export const SCREENS = [
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定', route: FORM_EDIT,
+    gap: 'drop',
+    gapNote: '**作らない決めが実装に明記**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」',
     status: 'unimplemented',
     why: '**確かめました（2026-08-28）。作らない決めです。** 「デザイン設定」は `disabled` を直接書いてあり（`form-submissions/edit/page.tsx:379-388`）、覚え書きに「フォームの見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」とあります。**V6から外す候補**',
   },
@@ -724,6 +814,8 @@ export const SCREENS = [
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答', steps: [{ click: '来店アンケート' }] },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
+    gap: 'parts',
+    gapNote: '一覧に削除の導線を足し、`ConfirmDialog` を当てる',
     status: 'unimplemented',
     why: '一覧に削除の導線が無い（`grep 削除|confirm` が `form-submissions/page.tsx` で0件）',
   },
@@ -737,11 +829,15 @@ export const SCREENS = [
   { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1' },
   {
     ...COMMON_VAR, node: 'uNBlA', name: '14-1-B 変える前に影響を見る',
+    gap: 'api',
+    gapNote: '共通情報の差し込み先を1件ずつ引く口が要る',
     status: 'unimplemented',
     why: '差し込み先を1件ずつ並べて、変える前と後の文を見せる画面が無い（`grep 影響|使われて` が `/contents/vars` 配下で0件）。**文字数の上限を超える先も出ない**',
   },
   {
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented',
     why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`contents/vars/page.tsx:150`）',
   },
@@ -761,6 +857,8 @@ export const SCREENS = [
   },
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented',
     why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`contents/page.tsx:175`）',
   },
@@ -780,6 +878,8 @@ export const SCREENS = [
   { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals' },
   {
     ...AFFILIATE, node: 'njLGA', name: '16-1-C 支払い',
+    gap: 'api',
+    gapNote: '締め日・支払日・振込先・未払い残高の表が要る',
     status: 'unimplemented',
     why: '「支払い」のタブが無い。締め日・支払日・振込先・未払い残高を扱う場所がどこにも無い（`grep 振込|締め` が0件）',
   },
@@ -793,11 +893,15 @@ export const SCREENS = [
   { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new' },
   {
     ...AFFILIATE, node: 'QX70l', name: '16-1-G アフィリエイターを削除する確認',
+    gap: 'parts',
+    gapNote: '`api.affiliates.delete` は在る。画面が呼んでいないだけ',
     status: 'unimplemented',
     why: '一覧に消す導線が無い。受け口（`api.affiliates.delete`）は在るのに**画面が呼んでいない**',
   },
   {
     ...AFFILIATE, node: 'GqFTV', name: '16-1-H 支払いを確定する',
+    gap: 'api',
+    gapNote: '同上（締める操作）',
     status: 'unimplemented', why: '16-1-C（支払い）が無いので、締める操作も無い',
   },
 
@@ -811,6 +915,8 @@ export const SCREENS = [
   { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules' },
   {
     ...MILEAGE, node: 'qlVLJ', name: '17-1-B マイルの使い道',
+    gap: 'api',
+    gapNote: '交換の定義（何と何マイルで替えるか）と、引き換えの記録が要る',
     status: 'unimplemented',
     why: '交換できる使い道の考えがまるごと無い（`grep 使い道|交換|redemption` が `/scoring` 配下で0件）。**ためてもらう仕組みだけあって、使う先が無い**',
   },
@@ -832,12 +938,20 @@ export const SCREENS = [
     route: '/mileage/friends/detail?id=friend-1', mode: 'page',
   },
   {
+    /*
+      **#494（head `0ca45f98`）で入った。** 友だちのマイル明細
+      （`HIU5O`）の右上「マイルを手で増やす・減らす」から窓が開く。
+      オーナーか管理者にしか出ない（`staff.me()` の `role` で分ける）。
+      窓は `position: fixed` なので `page`（全面）では撮れない。
+    */
     ...MILEAGE, node: 'vz0Ji', name: '17-1-F マイルを手で増やす・減らす',
-    status: 'unimplemented',
-    why: '手で増減する操作が無い（`grep 手で|調整|adjust` が `/scoring` 配下で0件）。**間違って付いたマイルを直せない**',
+    route: '/mileage/friends/detail?id=friend-1', mode: 'viewport', height: 1080,
+    steps: [{ click: 'マイルを手で増やす・減らす', scope: 'main' }],
   },
   {
     ...MILEAGE, node: 'p9CcEB', name: '17-1-G マイルの使い道をつくる',
+    gap: 'api',
+    gapNote: '同上',
     status: 'unimplemented', why: '17-1-B（使い道）が無いので、作る画面も無い',
   },
   {
@@ -847,11 +961,15 @@ export const SCREENS = [
   },
   {
     ...MILEAGE, node: 'z3PB2', name: '17-2 行動スコア',
+    gap: 'drop',
+    gapNote: '残高一覧に「コミット強／高アクション」の列として入っている。**別タブが要るか確認をお願いします**',
     status: 'unimplemented',
     why: '行動スコアがまるごと無い。PR #441 でタブは2本（友だちの残高／たまる決めごと）になったが、行動スコアは入っていない。**サイドバーの「マイル」はマイルだけ**',
   },
   {
     ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/earning-rules/new',
+    gap: 'drop',
+    gapNote: '上と同じ。行動スコアを別に持たないなら、ルールの画面も要らない',
     status: 'unimplemented',
     why: '`/mileage/earning-rules/new` は**マイルの付与ルール**を作る画面で、スコアのルールではない。17-2 が無いので行き先も無い',
   },
@@ -868,6 +986,8 @@ export const SCREENS = [
   { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig' },
   {
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
+    gap: 'parts',
+    gapNote: '同上',
     status: 'unimplemented', why: '一覧に消す確認の窓が無い。削除はブラウザの `confirm()` か、詳細の中の操作',
   },
   {
@@ -913,6 +1033,8 @@ export const SCREENS = [
   { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage' },
   {
     ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
+    gap: 'api',
+    gapNote: '決まった曜日・時刻に走らせる仕掛けと、送り先の保存が要る',
     status: 'unimplemented',
     why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が `/analytics` 配下で0件。PR #445 head `5d5f7a5f` でも確かめた）',
   },
@@ -933,6 +1055,8 @@ export const SCREENS = [
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
+    gap: 'api',
+    gapNote: 'コラムの正本はEC側。管理画面で書くなら保存先が要る',
     status: 'unimplemented',
     why: 'コラムを新しく書く画面が無い。実装は**外から取り込んだコラムの「配信文」だけ**を直せる（`page.tsx:414`「配信文を編集」）。題名・本文・写真・分類はこちらで作れない',
   },
@@ -945,6 +1069,8 @@ export const SCREENS = [
   { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査' },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
+    gap: 'build',
+    gapNote: '写真は在る。拡大・回転・切り取りは画面側で作れる（**自動検出だけは別。下の「新規API」を参照**）',
     status: 'unimplemented',
     why: '1枚を大きく見る画面が無い。拡大・回転・切り取りも、自動で見つけたこと（人の顔・他社のロゴ・重複）も無い',
   },
@@ -962,6 +1088,8 @@ export const SCREENS = [
   },
   {
     ...PHOTO, node: 'J3Wxl8', name: '22-1-C 出しているもの',
+    gap: 'api',
+    gapNote: '通した写真と掲載先（リッチメニュー・コラム・サイト）を結ぶ記録が要る',
     status: 'unimplemented',
     why: '通した写真をどこで使っているか（リッチメニュー・コラム・サイト）を並べるタブが無い。状態の札は4本（審査待ち／採用済み／見送り／すべて）で「出しているもの」が無い',
   },
@@ -974,16 +1102,22 @@ export const SCREENS = [
   { ...EC, node: 'eI3gs', name: '23-1 EC連携' },
   {
     ...EC, node: 'ELayY', name: '23-1-A 会員のつき合わせ',
+    gap: 'build',
+    gapNote: '注文は在る。`friendId` が空のものを並べて候補を出す',
     status: 'unimplemented',
     why: '結びつかなかった注文を並べて、候補と突き合わせる画面が無い。**`friendId` が空の注文が、どこにも出てこない**',
   },
   {
     ...EC, node: 'bfB50', name: '23-1-B 定期便',
+    gap: 'api',
+    gapNote: 'Stripe定期便本体の接続。実装に「接続後に有効化します」と明記',
     status: 'unimplemented',
     why: '定期便のタブが無い。画面に「定期便イベントは受信準備済みです。Stripe定期便本体の接続後に有効化します」と書いてある（`page.tsx:384`）',
   },
   {
     ...EC, node: 'oHAN4', name: '23-1-C EC連携のつなぎ先',
+    gap: 'api',
+    gapNote: 'つなぎ先と突合キーを画面から変える口が要る。実装に「口が無い」と明記',
     status: 'unimplemented',
     why: 'つなぎ先も、人を見分ける決めごとも画面から変えられない。「接続先や突合キーを画面から変える口が無い」と書いてある（`page.tsx:174`）',
   },
@@ -1000,21 +1134,29 @@ export const SCREENS = [
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
+    gap: 'api',
+    gapNote: '届かなかったお知らせを残す記録が要る',
     status: 'unimplemented',
     why: '届かなかったお知らせを並べるタブが無い。**発送や返金が届いていない人を、その日のうちに別の手だてで届ける場所が無い**',
   },
   {
     ...LINE_NOTIFY, node: 'Se65i', name: '24-1-C お知らせの記録',
+    gap: 'api',
+    gapNote: 'いつ・だれに・どのお知らせを送ったかの記録が要る',
     status: 'unimplemented',
     why: 'いつ・だれに・どのお知らせを送ったかの記録が無い。開かれた・押されたの数も出ない',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
+    gap: 'api',
+    gapNote: '運用者へ知らせる仕掛けそのものが要る',
     status: 'unimplemented',
     why: 'お店の人へ知らせる仕組みが無い（`grep 運用者` が `/line-notifications` 配下で0件）',
   },
   {
     ...LINE_NOTIFY, node: 'N2gAza', name: '24-2-A 運用者へのお知らせをつくる',
+    gap: 'api',
+    gapNote: '同上（作る画面）',
     status: 'unimplemented', why: '24-2 が無いので、作る画面も無い',
   },
 
@@ -1028,11 +1170,15 @@ export const SCREENS = [
   { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new' },
   {
     ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
+    gap: 'api',
+    gapNote: 'オートメーションの実行を1件ずつ残す記録が要る。**動かなかった理由も**',
     status: 'unimplemented',
     why: '動いた記録を並べる画面が無い。**「条件に外れて動かなかった」も出ないので、「動いていないはず」の切り分けができない**',
   },
   {
     ...AUTOMATION, node: 'WjYAC', name: '25-1-C 見本から作る',
+    gap: 'build',
+    gapNote: '見本は固定の組み合わせ。新しい口は要らない',
     status: 'unimplemented',
     why: '見本（よく使う組み合わせ）が無い。`grep 見本|テンプレート` が `/automations` 配下で0件',
   },
@@ -1057,6 +1203,8 @@ export const SCREENS = [
   { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る' },
   {
     ...WEBHOOK, node: 'KNG00', name: '26-1-B やり取りの記録',
+    gap: 'api',
+    gapNote: '外部連携のやり取りを残す記録と、やり直しの口が要る',
     status: 'unimplemented',
     why: '送った・受け取ったやり取りの記録が無い。**失敗したものをやり直す場所も無い**（`grep 記録|やり直す|deliveries` が `/webhooks` 配下で0件）',
   },
@@ -1085,14 +1233,20 @@ export const SCREENS = [
   { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }] },
   {
     ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
+    gap: 'parts',
+    gapNote: '同上（代理予約）',
     status: 'unimplemented', why: '代理予約の画面はできたが、内容確認の段は無い（1枚で入力して保存する）（PR #459 head `ba0bf62d` で確かめた）',
   },
   {
     ...BOOKING, node: 'GfceK', name: '27-1-E 代理予約・登録完了',
+    gap: 'build',
+    gapNote: '同上（代理予約）',
     status: 'unimplemented', why: '登録したあとの完了画面が無い。保存すると一覧へ戻る（PR #459 head `ba0bf62d` で確かめた）',
   },
   {
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
+    gap: 'api',
+    gapNote: '予約枠の重なりを判定する口が要る',
     status: 'unimplemented', why: '枠の重なりを止める検査が無い。設計は「9/02（火）11:00 は 佐々木 がふさがっています（2件）」と出す（PR #459 head `ba0bf62d` で確かめた）',
   },
 
@@ -1246,7 +1400,9 @@ export const SCREENS = [
   },
   {
     node: 'GMvBd', feature: 4, name: '4-3-A 対応マークを追加・編集',
-    dir: 'friend-attributes-v6', route: '/tags?tab=marks', status: 'unimplemented',
+    dir: 'friend-attributes-v6', route: '/tags?tab=marks', gap: 'parts',
+    gapNote: '一覧の下の追加欄を窓にする。追加の口は既に在る',
+    status: 'unimplemented',
     why: '追加・編集の画面が無い。一覧の下に名前と色だけの追加欄がある',
   },
   {
@@ -1325,6 +1481,7 @@ export const CAPTURED_AT = {
   17: [
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
+    { pr: 494, head: '0ca45f98', on: '2026-08-28', screens: ['vz0Ji', 'HIU5O'], note: '#494 は #441 を含む' },
   ],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],

@@ -8,6 +8,7 @@
  *   node scripts/visual-qa/ledger.mjs            … 進捗台帳（Markdown）
  *   node scripts/visual-qa/ledger.mjs --json     … 集計値（JSON）
  *   node scripts/visual-qa/ledger.mjs --html     … v6-progress.html
+ *   node scripts/visual-qa/ledger.mjs --gaps     … 未実装の片づけ方（Markdown）
  *
  * **3つとも同じ数から出す。** 表とJSONとページを別々に書くと、必ずどれかが
  * 古くなる。古い数を根拠に「あと何枚」を話すことになる。
@@ -213,12 +214,52 @@ ${bars}
     手で直すと、表と台帳とJSONがずれます。
   </footer>
 </main>`)
+} else if (process.argv.includes('--gaps')) {
+  /*
+    未実装をどう片づけるかの表。**`screens.mjs` の `gap` から出す。**
+    手で書くと、実装が進んだときに古い分類だけが残る。
+  */
+  const KINDS = [
+    ['parts', '既存部品で作れる', 'もうリポジトリに在るものを当てるだけ。`ConfirmDialog` `ListState` `Select` など'],
+    ['build', '通常実装', '画面を新しく作る。**口（API）は既に在る**ので、つなぐだけ'],
+    ['api', '新規API・DBが必要', '記録・集計・走らせる仕掛けが無い。**先に決めることがある**'],
+    ['drop', 'V6から除外候補', '作らない決めがある、またはほかの画面に統合済み。**判断をお願いします**'],
+  ]
+  const un = SCREENS.filter((s) => s.status === 'unimplemented')
+  console.log('# 未実装画面の片づけ方\n')
+  console.log('`scripts/visual-qa/screens.mjs` の `gap` から機械で組み立てています。**手で書き写していません。**\n')
+  console.log(`未実装 **${un.length}** 枚を4つに分けました。\n`)
+  console.log('| 分け方 | 枚数 | 何を指すか |')
+  console.log('|---|---|---|')
+  for (const [key, label, desc] of KINDS) {
+    console.log(`| **${label}** | ${un.filter((s) => s.gap === key).length} | ${desc} |`)
+  }
+  const noGap = un.filter((s) => !s.gap)
+  if (noGap.length) console.log(`| （未分類） | ${noGap.length} | ${noGap.map((s) => s.node).join('・')} |`)
+  const order = [17, 20, 22]
+  for (const [key, label, desc] of KINDS) {
+    const rows = un.filter((s) => s.gap === key)
+    if (!rows.length) continue
+    console.log(`\n## ${label}（${rows.length}枚）\n`)
+    console.log(`${desc}\n`)
+    console.log('| 機能 | Node | 画面 | 何が要るか |')
+    console.log('|---|---|---|---|')
+    const feats = [...order, ...[...new Set(rows.map((r) => r.feature))].filter((f) => !order.includes(f)).sort((a, b) => a - b)]
+    for (const f of feats) {
+      for (const r of rows.filter((x) => x.feature === f)) {
+        console.log(`| ${f} ${FEATURE_NAMES[f]} | \`${r.node}\` | ${r.name} | ${r.gapNote ?? '—'} |`)
+      }
+    }
+  }
 } else if (process.argv.includes('--json')) {
   console.log(JSON.stringify({
     generatedFrom: 'scripts/visual-qa/screens.mjs',
     total: SCREENS.length,
     ...all,
     features: rows.map((r) => ({ ...r, capturedAt: CAPTURED_AT[r.feature] ?? null })),
+    gaps: SCREENS.filter((s) => s.status === 'unimplemented').map((s) => ({
+      feature: s.feature, node: s.node, name: s.name, gap: s.gap ?? null, gapNote: s.gapNote ?? null,
+    })),
   }, null, 2))
 } else {
   console.log('# V6 進捗台帳（262画面）\n')
