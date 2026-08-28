@@ -471,6 +471,8 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'g2UNV', name: '5-1-K シナリオ・テスト送信', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '一括テスト送信', nth: 1 }],
+    verdict: 'needs_fix', verdictNote: 'P1 テスト送信の意味が設計と違う。設計は自分のLINEへ送る確認で「本番影響：なし」、待機は10秒へ短縮、タグ・情報欄の変更は実行しない、と明記する。実装は友だちを選んで本物のメッセージを実際に送る（画面にもその警告が出る）。開始ステップの指定・所要時間・設定サマリー・メッセージプレビュー・開始前の3項目チェックが無い',
+    verdictSource: 'scenarios-v6/g2UNV-1920.png', verdictHead: '6db5ad7f',
   },
   {
     /*
@@ -497,6 +499,8 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'q5G45', name: '5-1-M 一覧の状態（空・読込・エラー）', route: '/scenarios',
     states: { apis: ['**/api/scenarios*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「シナリオがありません。「＋ シナリオを作成」から作ってください。」を出す。持っているシナリオが消えたように見え、押せば同じものをもう1つ作る。#420 で友だち情報欄について直したのと同じ形が、こちらに残っている。帯が—と「取得できませんでした」になるのは設計どおりで正しい',
+    verdictSource: 'scenarios-v6/q5G45-error-1920.png', verdictHead: '6db5ad7f',
   },
 
   // ── 機能6 一斉配信 ──────────────────────────────────────
