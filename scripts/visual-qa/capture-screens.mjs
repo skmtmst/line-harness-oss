@@ -137,8 +137,13 @@ async function runSteps(page, steps = [], node = '') {
   for (const step of steps) {
     if (step.wait) { await page.waitForTimeout(step.wait); continue }
     if (step.fill !== undefined) {
-      // 入力してから撮る状態（保存した検索の名前など）。
-      await page.getByLabel(step.fill).fill(step.text ?? '')
+      /*
+        入力してから撮る状態（保存した検索の名前など）。
+        **名札の無い入れ物もある。** 配信の本文は `textarea` で、
+        `getByLabel` では引けない。`selector: true` のときは CSS で引く。
+      */
+      const box = step.selector ? page.locator(step.fill).first() : page.getByLabel(step.fill)
+      await box.fill(step.text ?? '')
       await page.waitForTimeout(step.after ?? 300)
       continue
     }

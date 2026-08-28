@@ -1,9 +1,9 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 184,
-  "unimplemented": 69,
-  "unconfirmed": 5,
+  "compared": 186,
+  "unimplemented": 72,
+  "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "features": [
@@ -44,8 +44,8 @@
       "feature": 4,
       "name": "友だち属性",
       "total": 21,
-      "compared": 15,
-      "unimplemented": 2,
+      "compared": 16,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 4,
       "missing": 0,
@@ -57,6 +57,7 @@
           "screens": [
             "HBTk0",
             "yKEdO",
+            "KoT6c",
             "A1ZYeP",
             "l25rlp",
             "rIhbN"
@@ -88,9 +89,9 @@
       "feature": 6,
       "name": "一斉配信",
       "total": 15,
-      "compared": 10,
-      "unimplemented": 2,
-      "unconfirmed": 3,
+      "compared": 11,
+      "unimplemented": 4,
+      "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "capturedAt": null
@@ -133,8 +134,8 @@
       "name": "ウェビナー",
       "total": 13,
       "compared": 8,
-      "unimplemented": 4,
-      "unconfirmed": 1,
+      "unimplemented": 5,
+      "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "capturedAt": null
@@ -185,8 +186,8 @@
       "name": "回答フォーム",
       "total": 7,
       "compared": 5,
-      "unimplemented": 1,
-      "unconfirmed": 1,
+      "unimplemented": 2,
+      "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "capturedAt": null

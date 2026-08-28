@@ -370,17 +370,27 @@ export const SCREENS = [
   },
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック', route: NEW_BC,
-    status: 'unconfirmed',
-    why: '**枠は在りました（2026-08-28）。**「配信前チェック」の見出しと `preflight` の作りが `broadcast-form.tsx:891-905` に在る。ただし本文を書いて予約をえらんでも「宛先と本文が決まると…ここに出します。」の置き文のまま。送信対象が `-人` のまま決まらないため。**こちらの固定データに宛先の数を返す口が無い疑いがあり、そこを直してから撮る**',
+    /*
+      **確かめました（2026-08-28）。実装は在ります。**
+      置き文のままだったのは、こちらの口が `POST /api/broadcasts/preflight` を
+      405 で弾いていたためでした。**数えるだけで何も保存しない口**なので
+      通すようにし、本文を書くと帯が埋まります
+      （「2件 未確認／1,284 人に届きます／…」）。
+      本文を入れないと帯が出ないので、`fill` してから撮る。
+    */
+    steps: [
+      { fill: 'main textarea', selector: true, text: '画面確認のための本文です。よろしくお願いします。', after: 1500 },
+    ],
   },
   {
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認', route: NEW_BC,
-    status: 'unconfirmed',
-    why: '「確認」が見つからない。6-1-G のあとに出るのかもしれない。未確認',
+    status: 'unimplemented',
+    why: '**確かめました（2026-08-28）。最終確認の窓がありません。**「配信を予約する」は `save()` を直に呼びます（`broadcast-form.tsx:1002-1006`）。`/broadcasts` 配下に `ConfirmDialog` は1つもありません。**押した瞬間に予約が確定します。**',
   },
   {
     ...BROADCAST, node: 'bPF0s', name: '6-1-I 予約完了', route: NEW_BC,
-    status: 'unconfirmed', why: '6-1-H（最終確認）が出せてから確かめる',
+    status: 'unimplemented',
+    why: '**確かめました（2026-08-28）。予約できたことを知らせる画面がありません。** 保存に成功すると `router.push(\'/broadcasts\')` で一覧へ戻るだけです（`broadcasts/new/page.tsx:55`）。何通が・いつ・誰に予約されたかは、戻った先で探すことになります',
   },
   { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細', route: '/broadcasts/detail?id=broadcast-2' },
   {
@@ -576,8 +586,8 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー', route: WEBINAR_EDIT,
-    status: 'unconfirmed',
-    why: '「プレビュー」の場所は在るが**押せない（無効のまま）**。「プレビューは準備中です」と書いてある（`edit/page.tsx:894`）',
+    status: 'unimplemented',
+    why: '**確かめました（2026-08-28）。順番の問題ではありません。**「プレビュー」は `disabled` を直接書いてあり、`title` は「プレビューは準備中です」（`webinars/edit/page.tsx:892-897`）。覚え書きも「参加画面をそのまま開く導線が無い」',
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
@@ -704,8 +714,8 @@ export const SCREENS = [
   { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定', route: FORM_EDIT,
-    status: 'unconfirmed',
-    why: '「デザイン設定」は在るが**押せない（無効のまま）**。「見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」と書いてある（`edit/page.tsx:377`）',
+    status: 'unimplemented',
+    why: '**確かめました（2026-08-28）。作らない決めです。** 「デザイン設定」は `disabled` を直接書いてあり（`form-submissions/edit/page.tsx:379-388`）、覚え書きに「フォームの見た目をこのアプリのデザインにそろえる方針にしたため、色やフォントを選ぶ画面は作っていない」とあります。**V6から外す候補**',
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定', route: FORM_EDIT,
@@ -1226,9 +1236,13 @@ export const SCREENS = [
     dir: 'friend-attributes-v6', route: '/tags/fields/new', mode: 'page',
   },
   {
+    /*
+      **#420（head `87c150ad`）で `/tags/fields/migrate` が入った。**
+      使用中の項目（`usageCount > 0`）の行にだけ「移行」が出る
+      （`field-list.tsx:143`）。使っていない項目は消せるので出ない。
+    */
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
-    dir: 'friend-attributes-v6', route: '—', status: 'unimplemented',
-    why: '項目移行の画面もルートも無い',
+    dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
   },
   {
     node: 'GMvBd', feature: 4, name: '4-3-A 対応マークを追加・編集',
@@ -1301,7 +1315,7 @@ export function screensOf(feature) {
  */
 export const CAPTURED_AT = {
   4: [
-    { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
+    { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
     { pr: 421, head: 'f7b7974a', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
   ],
   11: [

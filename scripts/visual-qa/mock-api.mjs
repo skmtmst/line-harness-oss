@@ -9,7 +9,7 @@
  *
  * 守っていること
  * - ローカル専用。`NODE_ENV=production` では起動しない。127.0.0.1 にだけ開く
- * - **更新は必ず失敗させる。** GET と OPTIONS 以外は 405。保存も配信も起きない。
+ * - **保存と配信は必ず失敗させる。** 405。数えるだけの POST（配信前チェック）だけ通す。
  *   ただし CORS では通す（`Allow-Methods` に書き込みも並べる）。ブラウザ側で
  *   弾くと、**画面が要求を出したのかどうかすら見えない。** 405 まで届かせて、
  *   画面が失敗をどう出すかを撮る
@@ -617,6 +617,23 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/analytics/cross') return { success: true, data: ANALYTICS_CROSS }
+  /*
+    配信前チェック。**数えるだけで、何も保存しない。**
+    `audienceCount` は20以上にしてある。20未満だと LINE 側の決まりで
+    開封が数えられず、**「開封は集計されません」側しか撮れない。**
+  */
+  if (pathname === '/api/broadcasts/preflight') {
+    return {
+      success: true,
+      data: {
+        audienceCount: 1284,
+        warnings: [
+          { level: 'info', message: 'ブロック中の友だち 42人を除いています' },
+          { level: 'warning', message: '同じ本文の配信を、この7日で1回送っています' },
+        ],
+      },
+    }
+  }
   /* PR #445 で増えた口。**当てはめが無いと一覧の既定が返り、画面が落ちる。** */
   if (pathname === '/api/analytics/funnels') return { success: true, data: ANALYTICS_FUNNEL_DEFS }
   if (/^\/api\/analytics\/funnels\/[^/]+\/runs\/latest$/.test(pathname)) {
@@ -919,7 +936,20 @@ const server = createServer((req, res) => {
   //
   // ただし画面側のエラー報告だけは 204 で受ける。405 を返すと、
   // 報告が失敗したこと自体が新しいエラーになって際限なく増える。
+  /*
+    **数えるだけの POST は通す。** 何も保存しない口まで405にすると、
+    その先の画面（配信前チェック→最終確認→予約完了）が**一度も
+    描かれず、未確認のまま**になる。保存・配信の口は下でこれまでどおり
+    405 に落ちる。
+  */
+  const READ_ONLY_POSTS = new Set(['/api/broadcasts/preflight'])
+
   if (method !== 'GET') {
+    if (READ_ONLY_POSTS.has(url.pathname) && method === 'POST') {
+      const body = bodyFor(url.pathname, url.searchParams)
+      res.writeHead(200).end(JSON.stringify(body ?? { success: false, error: 'not found' }))
+      return
+    }
     if (url.pathname === '/api/client-errors') {
       res.writeHead(204).end()
       return
