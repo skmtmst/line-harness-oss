@@ -39,10 +39,10 @@ V6を採用する。基準日から「何日前の何時」「何分前」を並
 |---|---|
 | リマインダ一覧 | `/reminders` |
 | リマインダを作る | `/reminders/new` |
-| リマインダを編集 | `/reminders/{id}` |
-| 公開前確認 | `/reminders/{id}?tab=confirm` |
-| 登録者と予定 | `/reminders/{id}?tab=enrollments` |
-| 実行履歴 | `/reminders/{id}?tab=runs` |
+| リマインダを編集 | `/reminders/edit?id={id}` |
+| 公開前確認 | `/reminders/detail?id={id}&tab=confirm` |
+| 登録者と予定 | `/reminders/detail?id={id}&tab=enrollments` |
+| 実行履歴 | `/reminders/detail?id={id}&tab=runs` |
 
 V6実Node ID 11画面を確認した。実装PRでは次を固定する。
 
@@ -249,10 +249,26 @@ KPI:
 
 `reminder_delivery_runs`:
 
-- `friend_reminder_id`, `step_id`, `scheduled_at`
-- `idempotency_key`, `line_retry_key`
-- `status`: scheduled / claimed / accepted / skipped / retrying / failed_permanent / cancelled
-- `attempt_count`, `next_retry_at`, `last_error_code`, `line_request_id`
+- `line_account_id`, `reminder_id`, `friend_reminder_id`, `friend_id`, `reminder_step_id`, `scheduled_at`
+- `idempotency_key`, `line_retry_key`, `manual_retry_key`
+- `status`: planned / claimed / succeeded / skipped / retry_wait / permanent_failed / cancelled
+- `attempt_count`, `retry_cycle_attempt_count`, `next_retry_at`, `lease_expires_at`
+- `last_error_code`, `last_error_message`, `line_request_id`, `message_log_id`, `started_at`, `completed_at`
+
+実装済み（段階1）:
+
+- LINE送信前に実行行とRetry-Keyを固定し、同じ通の同時実行を1件だけ取得する
+- Worker停止後は5分のlease切れで同じRetry-Keyを使って再開する
+- 一時失敗は初回送信後に最大5回まで自動再試行し、上限後は理由を残して手動確認へ移す
+- 成功時は配信済み印、本文ログ、LINE要求ID、実行結果を同じDB batchで確定する
+- 友だち解除・対象消失は送らず、スキップ理由を残す
+- 手動再試行は冪等キーを必須にし、取消済み登録は再開しない
+- 実行一覧APIは共通の `ownerKind=reminder` / `ownerId` を返す。他機能も同じ読取契約へ合わせる
+- 共通一覧は `occurredAt / subject / accountLabel / triggerLabel / reference / status / detail / durationMs / canRetry` の9項目を返す
+- 共通状態は `succeeded / failed / partial / skipped / pending / cancelled` の6つ。`failed` と `skipped` は混ぜない
+- リマインダ固有の `planned / claimed / retry_wait / permanent_failed` は書込台帳に残し、API境界で共通状態へ読み替える
+- `automation_runs` は自動化の版・実行計画と強く結合しているため、他機能の行を無理に保存しない
+- 機能ごとの書込台帳は維持し、共通一覧・集計では所有元と状態を読み替えて束ねる
 
 一意制約:
 

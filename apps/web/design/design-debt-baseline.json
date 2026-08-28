@@ -249,6 +249,9 @@
   "app/pools/new/page.tsx": {
     "unresolved-classname": 3
   },
+  "app/reminders/detail/page.tsx": {
+    "unresolved-classname": 24
+  },
   "app/reminders/edit/page.tsx": {
     "unresolved-classname": 9,
     "arbitrary-value": 7,

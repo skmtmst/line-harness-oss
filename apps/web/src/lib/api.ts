@@ -35,6 +35,8 @@ import type {
   AutomationLog,
   Chat,
   Reminder,
+  ReminderDeliveryRunStatus,
+  ReminderDeliveryRunsResponse,
   ReminderStep,
   ReminderTriggerType,
   ScoringRule,
@@ -2963,6 +2965,23 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<Reminder & { steps: ReminderStep[] }>>(`/api/reminders/${id}`),
+    runs: (
+      id: string,
+      params?: { status?: ReminderDeliveryRunStatus; search?: string; limit?: number; offset?: number },
+    ) => {
+      const query = new URLSearchParams()
+      if (params?.status) query.set('status', params.status)
+      if (params?.search) query.set('search', params.search)
+      if (params?.limit !== undefined) query.set('limit', String(params.limit))
+      if (params?.offset !== undefined) query.set('offset', String(params.offset))
+      const suffix = query.size ? `?${query}` : ''
+      return fetchApi<ApiResponse<ReminderDeliveryRunsResponse>>(`/api/reminders/${id}/runs${suffix}`)
+    },
+    retryRun: (runId: string, idempotencyKey: string) =>
+      fetchApi<ApiResponse<{ id: string; status: ReminderDeliveryRunStatus; replayed: boolean }>>(
+        `/api/reminder-runs/${runId}/retry`,
+        { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey } },
+      ),
     /** この友だちをこのリマインダに登録する（1人ぶん）。 */
     /**
      * 友だちをリマインダに登録する。
