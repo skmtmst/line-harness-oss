@@ -202,24 +202,37 @@ export const SCREENS = [
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }],
+    verdict: 'needs_fix', verdictNote: 'P2 ひな形1件ごとの★（よく使うに入れる）が無い。右側の「よく使うに登録済み」札と更新日も出ない',
+    verdictSource: 'inbox-v6/design-qa.md + docs/design-qa/inbox-v6/NfgOs-1920.png', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'H3lAOB', name: '2-3 顧客情報パネル非表示',
     steps: [...OPEN_CHAT, { click: '顧客情報を閉じる' }],
+    verdict: 'needs_fix', verdictNote: 'P2 見出しの★が無い。担当と対応の並びが逆。「顧客情報を表示」が「顧客情報を開く」。一覧の日時が相対でなく絶対',
+    verdictSource: 'inbox-v6/design-qa.md + docs/design-qa/inbox-v6/H3lAOB-1920.png', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'Xi4x9', name: '2-4 右パネル表示設定',
     steps: [...OPEN_CHAT, { click: '表示項目' }],
+    verdict: 'needs_fix', verdictNote: 'P1 表示項目の中身が設計と違う（設計は対応マーク・担当者／予約・EC／内部メモ、実装はプロフィール／★つき情報／リッチメニュー／友だち情報／フォーム回答）。P2 見出しが「表示・並び順」、初期状態に戻す・完了が無い',
+    verdictSource: 'inbox-v6/design-qa.md + docs/design-qa/inbox-v6/Xi4x9-1920.png', verdictHead: 'a4239357',
   },
   // 未読の会話が並んだ状態。開かずにそのまま撮る。
-  { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読' },
+  { ...INBOX, node: 'f0zn6', name: '2-5 新着・担当者別未読',
+    verdict: 'needs_fix', verdictNote: 'P1 「自分の未読 n」の絞り込みが無い。P2 未読が数字バッジでなく点だけ。新着行の色付けが無い',
+    verdictSource: 'inbox-v6/design-qa.md + docs/design-qa/inbox-v6/f0zn6-1920.png', verdictHead: 'a4239357',
+  },
   {
     ...INBOX, node: 'NWbuF', name: '2-6 テンプレート・全フォルダ展開',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }],
+    verdict: 'needs_fix', verdictNote: 'P2 フォルダ一覧に「未分類」が出ない。すべて20件のうち3件（未分類）だけ選べない',
+    verdictSource: 'inbox-v6/NWbuF-1920.png', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'B7CER8', name: '2-7 内部メモ入力',
     steps: [...OPEN_CHAT, { click: '内部メモ' }],
+    verdict: 'needs_fix', verdictNote: 'P2 設計は入力欄の上に出る「内部メモを追加」パネル（スタッフのみの札・記入例・社内限定の注記）、実装は中央のダイアログで札と注記が無い',
+    verdictSource: 'inbox-v6/B7CER8-1920.png', verdictHead: 'a4239357',
   },
   /*
     2-8 / 2-9 / 2-10 は「プルダウンを開いた状態」。素のセレクトのままだと
@@ -230,23 +243,37 @@ export const SCREENS = [
   {
     ...INBOX, node: 'YZaDK', name: '2-8 担当者プルダウンを開く',
     steps: [{ click: '担当者で絞り込む' }],
+    verdict: 'needs_fix', verdictNote: 'P2 選択肢に人のアイコンが無い。「未割当」が「未割り当て」で並びも先頭',
+    verdictSource: 'inbox-v6/YZaDK-1920.png', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'L35UOV', name: '2-9 担当者変更を開く',
     steps: [...OPEN_CHAT, { click: '担当者を変える' }],
+    verdict: 'needs_fix', verdictNote: 'P1 担当を変える窓に絞り込み用の「すべて」が混ざっている（担当者を「すべて」にはできない）。P2 顔写真の丸が無い',
+    verdictSource: 'inbox-v6/L35UOV-1920.png', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'IYjvu', name: '2-10 対応マーク変更を開く',
     steps: [...OPEN_CHAT, { click: '対応マークを変える' }],
+    verdict: 'match', verdictNote: '一致。未対応・対応中・保留・対応済の並び、色の丸、色付きの札、選択中の✓まで設計どおり',
+    verdictSource: 'inbox-v6/IYjvu-1920.png', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'TUveA', name: '2-11 テンプレート・予約フォルダ',
     // 「予約」だけだと**分類のチップ**に当たる。フォルダの行は
     // `role="option"` で「フォルダ 予約」という名前なので、そちらを指す。
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }, { click: 'フォルダ' }, { click: 'フォルダ 予約', role: 'option' }],
+    verdict: 'needs_fix', verdictNote: 'P2 フォルダを予約にしても上の区分チップが「すべて」のまま。「★ 予約内のよく使う」の見出しが無い。1件ごとの★が無い',
+    verdictSource: 'inbox-v6/TUveA-1920.png', verdictHead: 'a4239357',
   },
-  { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }] },
-  { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }] },
+  { ...INBOX, node: 'w72a2', name: '2-12 絞り込みを開く', steps: [{ click: '絞り込み' }],
+    verdict: 'needs_fix', verdictNote: 'P2 設計は420pxの浮くパネル、実装は右端の全高ドロワー。未読だけ表示がスイッチでなくチェック。期限とメッセージ種別は「まだ絞り込めません」で押せない（口が無いことを正直に出したもの。設計は押せる）',
+    verdictSource: 'inbox-v6/w72a2-1920.png', verdictHead: 'a4239357',
+  },
+  { ...INBOX, node: 'ASsb3', name: '2-13 保存した検索を開く', steps: [{ click: '保存した検索' }],
+    verdict: 'needs_fix', verdictNote: 'P1 保存した検索の中身（対応マーク・期限などの条件）と件数が出ず、名前だけ並ぶ。P2 よく使うの★と「…」が無く、削除が赤字で直に並ぶ',
+    verdictSource: 'inbox-v6/ASsb3-1920.png', verdictHead: 'a4239357',
+  },
   /*
     2-14 → 2-15 → 2-16 → 2-17 は一続きの流れ。
     「この条件を保存」で `Ln4zS` のモーダルを開き、名前を入れて保存する。
@@ -255,6 +282,8 @@ export const SCREENS = [
   {
     ...INBOX, node: 'ANgda', name: '2-14 保存した検索名を入力',
     steps: [{ click: '保存した検索' }, { click: 'この条件を保存' }],
+    verdict: 'needs_fix', verdictNote: 'P1 「保存する条件」が読むだけで変えられない（設計は対応マーク・期限・受信経路・担当者の4つを選び直せる）。期限の行が無い。P2 「よく使うに追加」の切替と「件数は自動更新される」注記が無い',
+    verdictSource: 'inbox-v6/ANgda-1920.png', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'tBlkL', name: '2-15 保存した検索・保存完了',
@@ -262,6 +291,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
     ],
+    verdict: 'needs_fix', verdictNote: 'P0 保存に失敗しても「保存しました」と出る。saved-view-dialog.tsx の submit が onSave の成否を見ずに setDone(true)。失敗の文は窓の後ろのパネルに出るため、窓を開けている人には見えない',
+    verdictSource: 'inbox-v6/tBlkL-1920.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
@@ -269,6 +300,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { click: 'この条件を保存', nth: 1 },
     ],
+    verdict: 'needs_fix', verdictNote: 'P2 設計は赤い帯の注意書きと、押せない保存ボタン。実装は入力欄の下の赤い文だけで、保存ボタンは押せるまま',
+    verdictSource: 'inbox-v6/AuSDY-1920.png', verdictHead: 'a4239357',
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -276,10 +309,15 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: 'VIPかつ未契約' }, { click: 'この条件を保存', nth: 1 },
     ],
+    verdict: 'needs_fix', verdictNote: 'P2 文言が設計と違う（設計「同じ名前の保存した検索があります。別の名前を入力してください。」／実装「同じ名前の検索がすでにあります。別の名前にしてください」）。設計は赤い帯、実装は入力欄の下の文',
+    verdictSource: 'inbox-v6/LHjwD-1920.png', verdictHead: 'a4239357',
   },
 
   // ── 機能3 友だち ────────────────────────────────────────
-  { ...FRIENDS, node: 'PhxG6', name: '3-1 友だち' },
+  { ...FRIENDS, node: 'PhxG6', name: '3-1 友だち',
+    verdict: 'needs_fix', verdictNote: 'P2 担当者の顔チップ（イニシャルの丸）が無く、未割り当ての「−」も出ない。ほかは設計どおり',
+    verdictSource: 'friends-v6/PhxG6-1920.png', verdictHead: '728deca0',
+  },
   {
     /*
       **表示件数は入っている。** `friend-list-table.tsx` に
@@ -297,17 +335,43 @@ export const SCREENS = [
   {
     ...FRIENDS, node: 'Igi72', name: '3-1-B 友だち（詳細検索・14軸）',
     steps: [{ click: '詳細条件' }],
+    verdict: 'needs_fix', verdictNote: 'P1 OR条件が4つだけで、しかも全部押せない（設計は対応マーク・シナリオ・イベント予約・カレンダー予約・回答フォーム・最終反応日・リマインダ・個別メモ・ステータスメッセージ・友だち登録日・その他）。「表示する友だち」（表示中・非表示・ブロックした人・友だちの状態）が丸ごと無い。「保存した検索から読み込む」が無い',
+    verdictSource: 'friends-v6/Igi72-1920.png', verdictHead: '728deca0',
   },
   {
     ...FRIENDS, node: 'IAf7j', name: '3-1-C 友だち（一括アクション）',
     steps: [{ click: '表示中の友だちをすべて選ぶ', role: 'checkbox' }],
+    /*
+      **設計の画面そのものが無い。** 設計（`IAf7j`）は「友だちを一括操作」という
+      別ページで、9つの操作タイルと右側の実行内容、選択した友だちの表まで見せる。
+      実装は一覧の上に「4人を選択中」の帯と「操作を選ぶ」ボタンが出るだけで、
+      押すと `friends/page.tsx:274` が「複数人への一括更新APIは未接続です」と
+      知らせて終わる。**撮れた絵は設計の画面ではない。**
+    */
+    status: 'unimplemented',
+    gap: 'api', gapNote: '複数人へまとめて タグ・シナリオ・担当者・対応マーク・リマインダ・メッセージ を反映する口が無い。画面も別ページとして作る必要がある',
+    why: '一覧での選択までしか無く、一括操作のページが無い',
   },
-  { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0' },
+  { ...FRIENDS, node: 'I6UAdr', name: '3-1-D 友だち詳細', route: '/friends/detail?id=friend-0',
+    verdict: 'needs_fix', verdictNote: 'P1 画面の作りが設計と大きく違う。見出しが友だちの名前でなく「友だち詳細」。タブが概要・履歴・友だち情報・回答フォーム・配信/シナリオ・予約・リマインダ・アクション・マイル・リッチメニューでなく、タイムライン・健康記録ほか。概要の「進行中の配信・自動処理」「同じ人としてつながる情報」「最近の履歴」「この友だちに行う操作」が無い',
+    verdictSource: 'friends-v6/I6UAdr-1920.png', verdictHead: '728deca0',
+  },
   {
     ...FRIENDS, node: 'bzDn6', name: '3-1-E 友だち一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/friends*', '**/api/friend-stats*'], kinds: ['loading', 'empty', 'error'] },
+    /*
+      **前の当てはめは `/api/friends/stats` に当たっていなかった。**
+      Playwright の `*` は `/` をまたがないので、末尾が `friends*` だと
+      `friends/stats` に届かない。当たらないまま撮ると、一覧が読めていないのに
+      上のカードだけ前の数（214人）が残り、**起きない絵**になる。実際にそうなった。
+    */
+    states: { apis: ['**/api/friends?**', '**/api/friends/stats*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「条件に合う友だちが見つかりません」を出し、「友だち一覧 0件」と数える。未取得と0件を区別していない',
+    verdictSource: 'friends-v6/bzDn6-error-1920.png', verdictHead: '728deca0',
   },
-  { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates' },
+  { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
+    verdict: 'needs_fix', verdictNote: 'P1 重複候補の一覧（候補・確信度・一致した根拠・所属アカウント・状態・確認ボタン）が丸ごと無い。アカウント間の重複マトリックスも無い。KPIの名前と粒度が設計と違う（設計は重複候補・確認済み・重複配信の削減・1配信あたりの無駄・根拠不足）。絞り込みと判定ルールが無い',
+    verdictSource: 'friends-v6/YzxU1-1920.png', verdictHead: '728deca0',
+  },
   {
     ...FRIENDS, node: 'InCDe', name: '3-2-A 重複候補詳細・統合前確認',
     route: '/friends?tab=duplicates', gap: 'build',
@@ -315,7 +379,10 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '重複検出タブに「再計算」しか無く、**候補を1件ずつ開く導線が無い**。設計は統合前の確認まで見せる',
   },
-  { ...FRIENDS, node: 'r7eSi', name: '3-3 統合ユーザー', route: '/friends?tab=merged' },
+  { ...FRIENDS, node: 'r7eSi', name: '3-3 統合ユーザー', route: '/friends?tab=merged',
+    verdict: 'needs_fix', verdictNote: 'P1 統合ユーザーの列（UID・最終接触・重複配信・詳細を見る）が無く、代わりに内部の識別子「identity-0」が出ている。統合ユーザーを作成する導線が無い。KPIの名前が設計と違う',
+    verdictSource: 'friends-v6/r7eSi-1920.png', verdictHead: '728deca0',
+  },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
     route: '/friends?tab=merged', gap: 'build',
