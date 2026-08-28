@@ -1559,6 +1559,8 @@ export const SCREENS = [
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る。P1 赤い帯と同時に「まだメニューがありません。上の「メニューを追加」から登録してください。」を出し、帯も0件・0人・0件と数える（未取得なので—にすべき）。P2 「旧デザインでは「メニュー」と「スタッフ」が別ページに分かれていました。」という作り替えの覚え書きが、運用の人に見える場所へ残っている',
+    verdictSource: 'booking-settings-v6/W6465r-error-1920.png', verdictHead: 'bd8efa54',
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
@@ -1568,6 +1570,8 @@ export const SCREENS = [
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/events/admin/events*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る。P1 赤い帯と同時に「イベントがまだありません／最初のイベントを作成」を出し、帯も0件・0人・0件と数える（未取得なので—にすべき）',
+    verdictSource: 'events-v6/k5m5Bc-error-1920.png', verdictHead: '6bb950f3',
   },
 
   // ── 機能30 ログインユーザー ─────────────────────────────
