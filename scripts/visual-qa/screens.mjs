@@ -1133,7 +1133,7 @@ export const SCREENS = [
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/media*', '**/api/media/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「ファイルがまだありません。」を出す。持っているファイルが消えたように見える。赤い帯を出しているぶん回答フォームよりはましだが、一覧の中は空の文でなく読めていない旨にすべき',
+    verdict: 'needs_fix', verdictNote: 'P1は #438 head `166f0c43` のコード上で修正済み・画像再確認待ち。`loadFailed` と `ListState kind="error"` を持ち、失敗時に空状態の文を出さない。現行比較画像は修正前の表示を含むため、API失敗状態の1440/1920画像を撮り直すまで要修正を維持する',
     verdictSource: 'media-v6/h8pBZr-error-1920.png', verdictHead: '166f0c43',
   },
 
@@ -1610,7 +1610,7 @@ export const SCREENS = [
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る。P1 赤い帯と同時に「まだメニューがありません。上の「メニューを追加」から登録してください。」を出し、帯も0件・0人・0件と数える（未取得なので—にすべき）。P2 「旧デザインでは「メニュー」と「スタッフ」が別ページに分かれていました。」という作り替えの覚え書きが、運用の人に見える場所へ残っている',
+    verdict: 'needs_fix', verdictNote: 'P1は #532 head `6cc74968` のコード上で修正済み・画像再確認待ち。失敗を `ListState kind="error"` へ分け、帯と補助データを `—`、APIの内部文言を運用者向け文へ置き換えている。API失敗状態の1440/1920画像で空の作成誘導が同時に出ないことを確認するまで要修正を維持する',
     verdictSource: 'booking-settings-v6/W6465r-error-1920.png', verdictHead: 'bd8efa54',
   },
 
@@ -1621,7 +1621,7 @@ export const SCREENS = [
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/events/admin/events*', '**/api/events/admin/events/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る。P1 赤い帯と同時に「イベントがまだありません／最初のイベントを作成」を出し、帯も0件・0人・0件と数える（未取得なので—にすべき）',
+    verdict: 'needs_fix', verdictNote: 'P1は #518 head `56793b6a`（件数は #533）でコード上は修正済み・画像再確認待ち。失敗を `ListState kind="error"` へ分け、空の作成誘導を出さず、帯は未取得を `—` とする。API失敗状態の1440/1920画像を確認するまで要修正を維持する',
     verdictSource: 'events-v6/k5m5Bc-error-1920.png', verdictHead: '6bb950f3',
   },
 
