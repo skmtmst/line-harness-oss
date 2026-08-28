@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 183,
-  "unimplemented": 70,
+  "compared": 184,
+  "unimplemented": 69,
   "unconfirmed": 5,
   "elsewhere": 4,
   "missing": 0,
@@ -143,8 +143,8 @@
       "feature": 11,
       "name": "テンプレート",
       "total": 10,
-      "compared": 8,
-      "unimplemented": 2,
+      "compared": 9,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -152,7 +152,20 @@
         {
           "pr": 433,
           "head": "51020a97",
-          "on": "2026-08-28"
+          "on": "2026-08-28",
+          "screens": [
+            "M9cij"
+          ]
+        },
+        {
+          "pr": 493,
+          "head": "62ddaebe",
+          "on": "2026-08-28",
+          "screens": [
+            "CzndJ",
+            "M9cij"
+          ],
+          "note": "#493 は #433 を含む"
         }
       ]
     },

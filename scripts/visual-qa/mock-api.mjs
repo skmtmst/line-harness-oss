@@ -9,7 +9,10 @@
  *
  * 守っていること
  * - ローカル専用。`NODE_ENV=production` では起動しない。127.0.0.1 にだけ開く
- * - **更新は必ず失敗させる。** GET と OPTIONS 以外は 405。保存も配信も起きない
+ * - **更新は必ず失敗させる。** GET と OPTIONS 以外は 405。保存も配信も起きない。
+ *   ただし CORS では通す（`Allow-Methods` に書き込みも並べる）。ブラウザ側で
+ *   弾くと、**画面が要求を出したのかどうかすら見えない。** 405 まで届かせて、
+ *   画面が失敗をどう出すかを撮る
  * - 実データ・秘密値を持たない。名前も固定の作り物
  * - 毎回まったく同じものを返す。乱数も時刻も使わない（画像が毎回同じになる）
  *
@@ -896,7 +899,13 @@ const server = createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Credentials', 'true')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, X-Admin-Session')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+  /*
+    **`GET, OPTIONS` だけにしない。** 書き込みの口を撮るときに
+    CORS で弾かれ、**実装が壊れているように見える。** 実際、
+    フォルダの並べ替え（`PATCH /api/folders/:id`）がそれで
+    「並び順を更新できませんでした」と出た。
+  */
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
 
   if (method === 'OPTIONS') {
     res.writeHead(204).end()

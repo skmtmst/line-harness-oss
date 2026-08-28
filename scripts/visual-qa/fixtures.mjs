@@ -508,6 +508,12 @@ export const TEMPLATES = (() => {
         */
         usageCount: i % 3 === 0 ? 0 : i * 2,
         tapCount: 0,
+        /*
+          **`isFavorite` は必須**（`templates/page.tsx:26`）。左の縦帯の
+          「よく使う」がこれを数える。入れないと `undefined` が偽になり、
+          **絞り込みが常に0件**になって、切替が効いていないように見える。
+        */
+        isFavorite: i === 0,
         createdAt: '2026-01-13T00:00:00.000Z',
         updatedAt: '2026-01-13T00:00:00.000Z',
       })

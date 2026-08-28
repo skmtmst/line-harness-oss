@@ -649,9 +649,15 @@ export const SCREENS = [
     steps: [{ click: 'テンプレートを削除', scope: 'main' }],
   },
   {
+    /*
+      **#493（head `62ddaebe`）でフォルダ操作が入った。** それまでは左の
+      縦帯がテンプレートの `category` から自動で生えているだけで、
+      `/api/folders` を一度も呼んでいなかった。いまは
+      `api.folders.list('template', accountId)` を読み、
+      作る・名前を変える・消す・並べ替える・移す・「よく使う」の
+      切替まで通っている。
+    */
     ...TEMPLATE, node: 'CzndJ', name: '11-1-H フォルダ操作',
-    status: 'unimplemented',
-    why: '「フォルダを追加」が無い。左の縦帯はテンプレートの `category` という文字から**自動で生えているだけ**で、`/api/folders` を一度も呼んでいない。作る・名前を変える・消すのどれもできない',
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
@@ -1298,7 +1304,10 @@ export const CAPTURED_AT = {
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
     { pr: 421, head: 'f7b7974a', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
   ],
-  11: [{ pr: 433, head: '51020a97', on: '2026-08-28' }],
+  11: [
+    { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
+    { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
+  ],
   17: [{ pr: 441, head: '05c5b103', on: '2026-08-28' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
