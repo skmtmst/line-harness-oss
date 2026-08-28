@@ -669,15 +669,17 @@ async function handleEvent(
     // 利用者が "コスト比較" などのアクションを起こした事実を chat 履歴で可視化する。
     // delivery_type='push' は厳密には push ではないが、incoming/non-test として
     // 既存 chat list / 詳細 SQL のフィルタを通すための妥当な値 (auto_reply text 同様)。
+    let postbackIncomingLogId: string | null = crypto.randomUUID();
     try {
       await db
         .prepare(
           `INSERT INTO messages_log (id, friend_id, direction, message_type, content, broadcast_id, scenario_step_id, source, line_account_id, created_at)
            VALUES (?, ?, 'incoming', 'text', ?, NULL, NULL, 'postback', ?, ?)`,
         )
-        .bind(crypto.randomUUID(), friend.id, postbackLogText, lineAccountId ?? null, jstNow())
+        .bind(postbackIncomingLogId, friend.id, postbackLogText, lineAccountId ?? null, jstNow())
         .run();
     } catch (err) {
+      postbackIncomingLogId = null;
       logWebhookStepFailure('incoming_postback_log', err, lineAccountId, event);
     }
 
@@ -694,6 +696,9 @@ async function handleEvent(
             workerUrl,
             logContext: 'postback',
             messageKind: 'postback',
+            incomingEventId: event.webhookEventId,
+            incomingMessageLogId: postbackIncomingLogId,
+            occurredAt: new Date(event.timestamp).toISOString(),
           })
         : { matched: false, replyTokenConsumed: false };
 
@@ -898,7 +903,14 @@ async function handleEvent(
       event.replyToken,
       // 種別は LINE から届いたものをそのまま渡す。ルール側で
       // 「画像には返さない」といった絞り込みができる。
-      { lineAccountId, workerUrl, messageKind: event.message?.type ?? 'text' },
+      {
+        lineAccountId,
+        workerUrl,
+        messageKind: event.message?.type ?? 'text',
+        incomingEventId: event.webhookEventId,
+        incomingMessageLogId: logId,
+        occurredAt: new Date(event.timestamp).toISOString(),
+      },
     );
 
     // auto_replies にマッチしなかった = 自発メッセージ → unread にする

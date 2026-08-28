@@ -504,7 +504,8 @@ export async function logOutgoingMessage(
     source: string;
     lineAccountId?: string | null;
   },
-): Promise<void> {
+): Promise<string | null> {
+  const id = crypto.randomUUID();
   try {
     await db
       .prepare(
@@ -512,7 +513,7 @@ export async function logOutgoingMessage(
          VALUES (?, ?, 'outgoing', ?, ?, NULL, NULL, ?, ?, ?, ?)`,
       )
       .bind(
-        crypto.randomUUID(),
+        id,
         params.friendId,
         params.messageType,
         params.content,
@@ -522,7 +523,9 @@ export async function logOutgoingMessage(
         jstNow(),
       )
       .run();
+    return id;
   } catch (err) {
     console.error('logOutgoingMessage failed:', err);
+    return null;
   }
 }

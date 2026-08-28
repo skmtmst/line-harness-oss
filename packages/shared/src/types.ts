@@ -1140,6 +1140,68 @@ export interface ReminderDeliveryRunsResponse {
   };
 }
 
+/** 自動応答の書込台帳が持つ詳細状態。実行の途中と最終結果を混ぜない。 */
+export type AutoReplyEvaluationStatus =
+  | "received"
+  | "evaluated"
+  | "matched"
+  | "skipped"
+  | "reply_accepted"
+  | "reply_failed"
+  | "actions_running"
+  | "completed"
+  | "partial_failed"
+  | "failed";
+
+export interface AutoReplyRun extends ExecutionRunListItem {
+  id: string;
+  autoReplyId: string | null;
+  autoReplyName: string | null;
+  friendId: string;
+  friendName: string | null;
+  messageKind: string;
+  inputPreview: string | null;
+  matchedKeyword: string | null;
+  versionNumber: number | null;
+  domainStatus: AutoReplyEvaluationStatus;
+  replyStatus: "not_attempted" | "accepted" | "failed";
+  actionSummary: Record<string, number>;
+  lineRequestId: string | null;
+}
+
+export interface AutoReplyRunsResponse {
+  rule: {
+    id: string | null;
+    name: string;
+    isActive: boolean | null;
+    priorityPosition: number | null;
+  };
+  summary: {
+    monthHits: number;
+    totalHits: number;
+    handovers: number;
+    errors: number;
+    lastRunAt: string | null;
+    averageResponseMs: number | null;
+  };
+  handovers: {
+    waiting: number;
+    inProgress: number;
+    completed: number;
+  };
+  triggerBreakdown: Array<{
+    trigger: string;
+    count: number;
+    share: number | null;
+  }>;
+  items: AutoReplyRun[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
 // -----------------------------------------------------------------------------
 // スコアリング (Lead Scoring)
 // -----------------------------------------------------------------------------

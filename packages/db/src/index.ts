@@ -34,6 +34,7 @@ export * from './forms';
 export * from './ad-platforms';
 export * from './staff';
 export * from './auto-replies';
+export * from './auto-reply-runs';
 export * from './traffic-pools';
 export * from './message-templates';
 export * from './rich-menus';
