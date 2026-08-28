@@ -11,6 +11,7 @@ import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Pagination from '@/components/shared/pagination'
 
 /**
@@ -114,6 +115,9 @@ export default function RemindersPage() {
   const [dragId, setDragId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [deleteTargets, setDeleteTargets] = useState<Array<Pick<Reminder, 'id' | 'name'>>>([])
+  const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   const loadFolders = useCallback(async () => {
     try {
@@ -197,19 +201,60 @@ export default function RemindersPage() {
     }
   }
 
-  const handleDeleteSelected = async () => {
+  const openDeleteSelected = () => {
     if (selected.size === 0) return
-    if (!confirm(`${selected.size}件のリマインダを削除しますか？\n登録済みの配信予定も一緒に消えます。`))
-      return
-    setError('')
-    try {
-      for (const id of selected) await api.reminders.delete(id)
-      setSelected(new Set())
-      void loadReminders()
-    } catch {
-      setError('削除に失敗しました')
-    }
+    setDeleteTargets(
+      reminders
+        .filter((reminder) => selected.has(reminder.id))
+        .map(({ id, name }) => ({ id, name })),
+    )
+    setDeleteError('')
   }
+
+  const handleDeleteSelected = async () => {
+    if (deleteTargets.length === 0 || deleteBusy) return
+    setDeleteBusy(true)
+    setDeleteError('')
+
+    const results: Array<{ target: Pick<Reminder, 'id' | 'name'>; succeeded: boolean }> = []
+    // 一度に大量の削除を投げず、1件ずつ結果を残す。途中で失敗しても、
+    // 成功した行まで「失敗した」と見せず、残りだけを確認画面に残す。
+    for (const target of deleteTargets) {
+      try {
+        const response = await api.reminders.delete(target.id)
+        results.push({ target, succeeded: response.success })
+      } catch {
+        results.push({ target, succeeded: false })
+      }
+    }
+    const succeededIds = new Set(
+      results.filter((result) => result.succeeded).map((result) => result.target.id),
+    )
+    const failedTargets = results
+      .filter((result) => !result.succeeded)
+      .map((result) => result.target)
+
+    setSelected((previous) => {
+      const next = new Set(previous)
+      for (const id of succeededIds) next.delete(id)
+      return next
+    })
+    await loadReminders()
+    setDeleteBusy(false)
+
+    if (failedTargets.length > 0) {
+      setDeleteTargets(failedTargets)
+      setDeleteError(`${failedTargets.length}件を削除できませんでした。状態を読み直してから、もう一度お試しください。`)
+      return
+    }
+    setDeleteTargets([])
+  }
+
+  const deleteTargetLabel = deleteTargets.length === 1
+    ? `「${deleteTargets[0].name}」`
+    : deleteTargets.length > 1
+      ? `「${deleteTargets.slice(0, 2).map((target) => target.name).join('」「')}」${deleteTargets.length > 2 ? `ほか${deleteTargets.length - 2}件` : ''}`
+      : '選択したリマインダ'
 
   const filtered = useMemo(() => {
     const needle = nameQuery.trim().toLowerCase()
@@ -529,7 +574,7 @@ export default function RemindersPage() {
               <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
 
               <button
-                onClick={() => void handleDeleteSelected()}
+                onClick={openDeleteSelected}
                 disabled={selected.size === 0}
                 className="border-danger-bg text-danger hover:bg-danger-bg rounded-control border px-3 py-2 text-sm font-medium disabled:opacity-40"
               >
@@ -539,6 +584,24 @@ export default function RemindersPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div data-design-node="Y0Sn3">
+        <ConfirmDialog
+          open={deleteTargets.length > 0}
+          title={`${deleteTargetLabel}を削除しますか？`}
+          description={`選択した${deleteTargets.length}件のリマインダと、登録済みの配信予定を削除します。この操作は取り消せません。`}
+          confirmLabel="リマインダを削除"
+          destructive
+          busy={deleteBusy}
+          error={deleteError}
+          onConfirm={() => void handleDeleteSelected()}
+          onCancel={() => {
+            if (deleteBusy) return
+            setDeleteTargets([])
+            setDeleteError('')
+          }}
+        />
       </div>
     </div>
   )
