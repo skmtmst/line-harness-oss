@@ -641,6 +641,12 @@ export default function RichMenusListPage() {
                 >
                   編集
                 </Link>
+                <Link
+                  href={`/rich-menus/connections?id=${encodeURIComponent(g.id)}`}
+                  className="text-ink-secondary hover:underline"
+                >
+                  切替のつながりを見る
+                </Link>
                 <button
                   onClick={() => handleDelete(g)}
                   className="text-ink-faint hover:text-red-600 hover:underline"
