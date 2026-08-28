@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { webinarApi, type Webinar, type WebinarInput, type WebinarScheduleRule } from '@/lib/api'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 const DAYS = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -56,6 +57,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false)
 
   const updateRule = (i: number, patch: Partial<WebinarScheduleRule>) =>
     setRules((prev) => prev.map((r, j) => (j === i ? { ...r, ...patch } : r)))
@@ -79,6 +81,29 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
   const dailyOverview = inferDailySchedule(rules)
   const nonDailyCount = rules.length - dailyRules.length
 
+  const isPublishing = status === 'active' && initial?.status !== 'active'
+
+  const publicationProblem = (): string => {
+    if (!videoPrefix.trim()) return '公開する前に動画を設定してください。動画が無いままでは友だちが視聴できません。'
+    if (rules.length === 0) return '公開する前に配信枠を1件以上設定してください。'
+    if (!Number.isFinite(durationMinutes) || durationMinutes < 1) return '動画の長さを1分以上で設定してください。'
+    return ''
+  }
+
+  const requestSave = () => {
+    if (!isPublishing) {
+      void save()
+      return
+    }
+    const problem = publicationProblem()
+    if (problem) {
+      setError(problem)
+      return
+    }
+    setError(null)
+    setPublishConfirmOpen(true)
+  }
+
   const save = async () => {
     setSaving(true)
     setError(null)
@@ -95,11 +120,11 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
     }
     try {
       if (initial) {
-        await webinarApi.update(initial.id, input)
-        router.push('/webinars')
+        const updated = await webinarApi.update(initial.id, input)
+        router.push(isPublishing ? `/webinars/published?id=${updated.data.id}` : '/webinars')
       } else {
         const created = await webinarApi.create(input)
-        router.push(`/webinars/edit?id=${created.data.id}`)
+        router.push(isPublishing ? `/webinars/published?id=${created.data.id}` : `/webinars/edit?id=${created.data.id}`)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -109,6 +134,18 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
 
   return (
     <div className="max-w-4xl space-y-5">
+      <ConfirmDialog
+        open={publishConfirmOpen}
+        title="このウェビナーを公開しますか"
+        description={`「${title || '名前未設定'}」を公開します。動画 ${durationMinutes}分、配信枠 ${rules.length}件、公開URL /webinar/${slug || '未設定'} です。公開後は友だちが申込・視聴できるため、内容を確認してください。`}
+        confirmLabel="この内容で公開する"
+        busy={saving}
+        onConfirm={() => {
+          setPublishConfirmOpen(false)
+          void save()
+        }}
+        onCancel={() => setPublishConfirmOpen(false)}
+      />
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {error}
@@ -320,7 +357,7 @@ export default function WebinarForm({ initial }: WebinarFormProps) {
 
       <div className="sticky bottom-3 z-10 flex items-center justify-between rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur">
         <span className="hidden text-xs text-slate-500 sm:block">変更内容を確認して本番へ反映します</span>
-        <button onClick={() => void save()} disabled={saving} className="ml-auto rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中...' : '変更を保存'}</button>
+        <button onClick={requestSave} disabled={saving} className="ml-auto rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50">{saving ? '保存中...' : isPublishing ? '公開内容を確認' : '変更を保存'}</button>
       </div>
     </div>
   )
