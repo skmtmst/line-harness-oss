@@ -18,11 +18,18 @@ const STATUS_LABEL: Record<EcNotificationRun['status'], string> = {
   failed: '送信できませんでした',
 }
 
-const STATUS_CLASS: Record<EcNotificationRun['status'], string> = {
-  pending: 'bg-warning-bg text-warning',
-  accepted: 'bg-success-bg text-success',
-  excluded: 'bg-canvas-sunken text-ink-faint',
-  failed: 'bg-danger-bg text-danger',
+function StatusBadge({ status }: { status: EcNotificationRun['status'] }) {
+  const label = STATUS_LABEL[status]
+  if (status === 'pending') {
+    return <span className="inline-flex rounded-pill bg-warning-bg px-2 py-1 text-xs font-semibold text-warning">{label}</span>
+  }
+  if (status === 'accepted') {
+    return <span className="inline-flex rounded-pill bg-success-bg px-2 py-1 text-xs font-semibold text-success">{label}</span>
+  }
+  if (status === 'excluded') {
+    return <span className="inline-flex rounded-pill bg-canvas-sunken px-2 py-1 text-xs font-semibold text-ink-faint">{label}</span>
+  }
+  return <span className="inline-flex rounded-pill bg-danger-bg px-2 py-1 text-xs font-semibold text-danger">{label}</span>
 }
 
 function formatJst(value: string | null): string {
@@ -151,11 +158,7 @@ export default function NotificationRunList({
                 <Tr key={item.id}>
                   <NameCell name={item.notificationName} sub={item.orderNumber ? `注文 ${item.orderNumber}` : item.source} />
                   <NameCell name={item.friendName || '名前は未取得'} sub="顧客へのお知らせ" />
-                  <Td>
-                    <span className={`inline-flex rounded-pill px-2 py-1 text-xs font-semibold ${STATUS_CLASS[item.status]}`}>
-                      {STATUS_LABEL[item.status]}
-                    </span>
-                  </Td>
+                  <Td><StatusBadge status={item.status} /></Td>
                   <Td>
                     <span className="block whitespace-nowrap text-sm">{formatJst(item.receivedAt)}</span>
                     <span className="mt-1 block whitespace-nowrap text-xs text-ink-faint">LINE受付 {formatJst(item.acceptedAt)}</span>
