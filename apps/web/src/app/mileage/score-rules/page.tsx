@@ -72,9 +72,26 @@ function cloneBundle(config: ActionScoreRuleConfiguration): ActionScoreRuleBundl
   }
 }
 
+/*
+ * 失敗の理由を、そのまま出してよいものだけ通す。
+ *
+ * `ApiError` の `message` は 400 以外だと `API error: <番号>` に落ちる
+ * （`lib/api.ts`）。素通しすると **`API error: 405` が利用者に見える。**
+ * 同じ機能の手動マイル調整（`mileage/friends/detail/mileage-adjustment-dialog.tsx`）
+ * と同じ形にそろえた。
+ */
 function fieldError(error: unknown) {
-  if (error instanceof ApiError) return error.message
-  return 'スコアのルールを処理できませんでした。もう一度お試しください。'
+  if (error instanceof ApiError) {
+    if (error.status === 400) return error.message
+    if (error.status === 403) return 'スコアのルールを変更する権限がありません。'
+    if (error.status === 404) return '対象のLINEアカウントを確認できませんでした。'
+    if (error.status === 405) return 'この環境ではスコアのルールを変更できません。'
+    if (error.status === 409) return 'ほかの人が先に保存しています。画面を読み直してからやり直してください。'
+    return 'スコアのルールを処理できませんでした。時間をおいてもう一度お試しください。'
+  }
+  return error instanceof Error
+    ? '通信に失敗しました。接続を確認してもう一度お試しください。'
+    : 'スコアのルールを処理できませんでした。もう一度お試しください。'
 }
 
 export default function ActionScoreRulesPage() {
@@ -309,8 +326,14 @@ export default function ActionScoreRulesPage() {
           </span>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-4">
-          <section className="rounded-v6-card border border-hairline bg-canvas shadow-v6-card xl:col-span-3">
+        {/*
+          **1440px では表を目いっぱい使う。** 4分割のままだと表に 820px しか
+          回らず、`table-layout: fixed` の6列が等分されて
+          「こちらに返信し**た**」「メッセ…」が切れる。
+          右の柱は 1536px（`2xl`）から戻す。それより狭いときは下に3枚並べる。
+        */}
+        <div className="grid gap-3 2xl:grid-cols-4">
+          <section className="rounded-v6-card border border-hairline bg-canvas shadow-v6-card 2xl:col-span-3">
             <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
               <div>
                 <p className="text-sm font-semibold text-v6-ink">点数が変わる決めごと</p>
@@ -323,7 +346,19 @@ export default function ActionScoreRulesPage() {
               <ListState kind="empty" title="スコアのルールがありません" description="公開するには、動かすルールを1件以上追加してください。" action={canEdit ? <Button onClick={addRule}>ルールを追加</Button> : undefined} />
             ) : (
               <DataTable>
-                <thead><TableHeadRow><Th>動作</Th><Th>名前・きっかけ</Th><Th>点数</Th><Th>回数</Th><Th>有効期間</Th><Th align="right">操作</Th></TableHeadRow></thead>
+                {/*
+                  **幅を決める。** `DataTable` は `table-layout: fixed` なので、
+                  決めないと6列が等分される。名前ときっかけがいちばん長いので、
+                  ほかを詰めて残りを回す。
+                */}
+                <thead><TableHeadRow>
+                  <Th className="w-24">動作</Th>
+                  <Th>名前・きっかけ</Th>
+                  <Th className="w-44">点数</Th>
+                  <Th className="w-52">回数</Th>
+                  <Th className="w-56">有効期間</Th>
+                  <Th align="right" className="w-20">操作</Th>
+                </TableHeadRow></thead>
                 <tbody>{bundle.rules.map((rule, index) => (
                   <Tr key={rule.id}>
                     <Td>
@@ -361,7 +396,7 @@ export default function ActionScoreRulesPage() {
                         size="full"
                       />
                       <TextInput
-                        className="mt-2 w-24"
+                        className="mt-2 w-full"
                         aria-label={`${rule.name}の点数`}
                         type="number"
                         min={rule.operation === 'set' ? 0 : 1}
@@ -384,7 +419,7 @@ export default function ActionScoreRulesPage() {
                       />
                       {['per_day', 'per_subject', 'per_subject_per_day'].includes(rule.frequency.kind) ? (
                         <TextInput
-                          className="mt-2 w-24"
+                          className="mt-2 w-full"
                           aria-label={`${rule.name}の上限回数`}
                           type="number"
                           min={1}
@@ -394,7 +429,7 @@ export default function ActionScoreRulesPage() {
                           onChange={(event) => updateRule(index, { frequency: { ...rule.frequency, limit: Number(event.target.value) } })}
                         />
                       ) : null}
-                      <p className="mt-1 flex items-center gap-1 text-xs text-v6-accent-hover"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />同じ記録は1回だけ</p>
+                      <p className="mt-1 flex items-center gap-1 whitespace-nowrap text-xs text-v6-accent-hover"><ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />同じ記録は1回だけ</p>
                     </Td>
                     <Td>
                       <TextInput aria-label={`${rule.name}の開始日時`} type="datetime-local" value={localDateTime(rule.validFrom)} disabled={!canEdit} onChange={(event) => updateRule(index, { validFrom: utcDateTime(event.target.value) })} />
@@ -409,7 +444,7 @@ export default function ActionScoreRulesPage() {
             )}
           </section>
 
-          <aside className="space-y-3">
+          <aside className="grid gap-3 md:grid-cols-3 2xl:grid-cols-1">
             <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
               <p className="text-sm font-semibold text-v6-ink">スコアの層</p>
               <p className="mt-1 text-xs text-v6-ink-faint">一覧と配信の「低い・ふつう・高い」に使います。</p>
