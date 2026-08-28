@@ -7,7 +7,7 @@ import { parseStickerMessageContent, stickerFallback } from '@line-crm/shared'
 import { api, ApiError, fetchApi } from '@/lib/api'
 import { OperatorDropdown, StatusDropdown, type ChatStatus } from '@/components/chats/inbox-dropdown'
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel'
-import SavedViewDialog from '@/components/chats/saved-view-dialog'
+import SavedViewDialog, { type SavedViewSaveResult } from '@/components/chats/saved-view-dialog'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 import { useAccount } from '@/contexts/account-context'
@@ -633,38 +633,41 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     sort: 'newest',
   })
 
-  const createSavedView = async (nameOverride?: string) => {
-    if (savingView) return
+  const createSavedView = async (nameOverride?: string): Promise<SavedViewSaveResult> => {
+    if (savingView) return { success: false, error: '保存処理が終わるまでお待ちください' }
     // モーダルから呼ぶときは、そこで打った名前をそのまま使う。
     // 状態の更新を待つと、1回目の保存が空の名前で走る。
     const name = (nameOverride ?? savedViewName).trim()
     if (!name) {
-      setSavedViewError('名前を入力してください')
-      return
+      const message = '名前を入力してください'
+      setSavedViewError(message)
+      return { success: false, error: message }
     }
     setSavingView(true)
     setSavedViewError('')
     try {
       if (!selectedAccountId) {
-        setSavedViewError('LINE公式アカウントを選んでください')
-        return
+        const message = 'LINE公式アカウントを選んでください'
+        setSavedViewError(message)
+        return { success: false, error: message }
       }
       const response = await api.chats.savedViews.create(selectedAccountId, {
         name,
         conditions: currentSavedViewConditions(),
       })
       if (!response.success) {
-        setSavedViewError(response.error || '保存できませんでした')
-        return
+        const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+        setSavedViewError(message)
+        return { success: false, error: message }
       }
       setSavedViewName('')
       await loadSavedViews()
-    } catch (savedViewCreateError) {
-      setSavedViewError(
-        savedViewCreateError instanceof Error
-          ? savedViewCreateError.message
-          : '保存できませんでした',
-      )
+      return { success: true }
+    } catch {
+      // API番号や通信ライブラリの文を、そのまま運用者へ見せない。
+      const message = '保存できませんでした。時間を置いてもう一度お試しください。'
+      setSavedViewError(message)
+      return { success: false, error: message }
     } finally {
       setSavingView(false)
     }
@@ -1190,7 +1193,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           saving={savingView}
           onSave={async (name) => {
             setSavedViewName(name)
-            await createSavedView(name)
+            return createSavedView(name)
           }}
           onClose={() => setSaveDialogOpen(false)}
         />
