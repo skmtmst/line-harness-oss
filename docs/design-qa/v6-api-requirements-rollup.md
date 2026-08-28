@@ -75,27 +75,121 @@ resume_at            待っているものの再開時刻
 `automation_run_steps` には `attempt_number` と `idempotency_key` があり、
 **「もう一度やる」も既にこの形で数えられます。**
 
-**足りないのは1つだけです。** `automation_id` が
-`automation_definitions` に固定されているので、
-**リマインダ・自動応答・シナリオ・お知らせ・外部連携が入りません。**
+### **【訂正】表を1本にまとめる案は取りません**
 
-`messages_log` は同じ問題を **`origin_kind` + `origin_id`** で
-先に解いています（`packages/db/bootstrap.sql`）。同じやり方で
-`owner_kind` + `owner_id` + `owner_version_id` を持たせれば、
-**7枚が1つの表と1つの口に乗ります。**
+**2026-08-28 に書き直しました。** 最初にここへ
+「`automation_runs` に `owner_kind` を足せば7枚が1つの表に乗る」
+と書きました。**根拠が2つとも誤りでした。**
 
-読む側は1本で足ります。
+**誤り1：`messages_log` の `origin_kind` は前例ではありません。**
+「同じ問題を先に解いている」と書きましたが、
+`packages/db/migrations/108_message_origin.sql` の本文にこうあります。
+
+> 使わない列を足してしまった。消せないので、なぜ使わないかを残す。
+> （中略）**どこからも読み書きしない。** 使うのは `source` と
+> `template_id_at_send`。
+
+読んでいるのは `chats.ts` の1か所だけで、**書いている場所はありません。**
+しかも同じ migration に、**なぜその列を足してしまったか**が書いてあります。
+
+> 突き合わせ表を書いたときに実物を確かめず、「記録していない」と決めつけていた。
+
+**わたしは同じことを繰り返しました。** 使われていない列を前例として引き、
+その上に「7枚が乗る」という設計判断を積みました。**列は消せないので、
+残っています。**
+
+**誤り2：`automation_runs` は自動化に強く結びついています。**
+`automation_version_id`・`current_step`・`execution_plan_json`・
+`lease_expires_at`・`resume_at` は、版とステップと再開のための持ちものです。
+`UNIQUE (line_account_id, automation_id, idempotency_key)` と
+4本の索引（`idx_automation_runs_due` ほか）もそこに合わせてあります。
+**`owner_kind` を足すだけでは、他の機能を安全には入れられません。**
+
+**取る方針。** 物理テーブルは各機能の安全な書込台帳のまま残し、
+**読む側のAPI契約に `ownerKind` / `ownerId` を持たせます。**
+リマインダ固有のもの（送信の二重防止など）はリマインダ側に残します。
+
+### 状態の言葉が、いま機能ごとにバラバラです
+
+**ここが横展開のいちばんの妨げです。** 同じ「失敗」を、台帳ごとに
+違う言葉で書いています。
+
+| いまの語彙 | どこ |
+|---|---|
+| `pending / sent / failed / failed_permanent / cancelled` | 2か所 |
+| `pending / sent / failed` | 2か所 |
+| `pending / processing / sent / skipped / failed / cancelled` | 1か所 |
+| `pending / processing / completed / failed` | 1か所 |
+| `queued / running / waiting / success / partial / failed / cancelled / skipped_condition` | `automation_runs` |
+| `success / partial / failed` | `automation_logs` |
+| `received / processed / duplicate / failed` | 1か所 |
+
+**表を1本にしなくても、契約の状態名を1つにすれば一覧部品は共通にできます。**
+
+### 共通の契約（案）
+
+読む口を1本にして、台帳ごとの言葉をここで揃えます。
 
 ```
 GET /api/execution-runs?ownerKind=reminder&ownerId=…&status=failed&limit=20&offset=0
 ```
 
+**`ownerKind` は新しく作らないでください。**
+`messages_log.source` に**もう本番で動いている語彙**があります
+（migration 028）。
+
+```
+broadcast / scenario / auto_reply / reminder / manual / user
+```
+
+7枚ぶんに足りないのは `automation` `notification` `integration` の3つだけです。
+
+**この語彙は生きています。** `origin_kind` と違って、書く場所も読む場所も
+あります（`auto-reply.ts:356` が `source: 'auto_reply'` で書き、
+`dashboard.ts:1065` が `source = 'reminder'` で読む、など）。
+
+**ただし `CHECK` はありません。** migration 028 は `TEXT` を足しただけで、
+値の一覧は migration 108 の本文とコードから拾ったものです。
+**契約側で受け取る値を決め切ってください。** DBに縛りが無いので、
+口が緩いと綴り違いがそのまま一覧に出ます。
+
+**状態は6つに寄せます。** 設計に出てくる言葉が全部入ります。
+
+| 契約 | 画面の言葉 | いまの台帳から |
+|---|---|---|
+| `succeeded` | 動きました／届きました／200 OK／結びつきました | `success` `sent` `processed` `completed` |
+| `failed` | 動きませんでした／届きませんでした／人が見つかりません | `failed` `failed_permanent` |
+| `partial` | 一部だけできました | `partial` |
+| `skipped` | 何もしていません | `skipped` `skipped_condition` `duplicate` |
+| `pending` | 再送待ち／確認待ち | `pending` `queued` `running` `processing` `waiting` |
+| `cancelled` | 取り消しました | `cancelled` |
+
+**`failed` と `skipped` を混ぜないでください。** `DkPY0` の設計は
+「動きませんでした／何もしていません」を**別の行として**出します。
+混ぜると、直すべき失敗と、条件に合わなかっただけのものが
+一覧で見分けられなくなります。
+
+一覧が要る項目は、7枚の設計を並べるとこれだけです。
+
+```
+occurredAt   日時
+subject      相手（友だち。無いときは「こちらで受け取った」）
+accountLabel どのLINEアカウント／どこから
+triggerLabel きっかけ（画面ごとの文。契約は文字列で受ける）
+reference    参照（#12466 ／ 受け取り口 2）。無い画面もある
+status       上の6つ
+detail       追記（15:21 に開きました ／ メニュー切替）
+durationMs   かかった時間。**持たない画面もある（`Se65i`）**
+canRetry     「もう一度やる」を出してよいか
+```
+
 ### 効きめ
 
-- **7枚が1つの基盤に乗ります。** 機能ごとに作ると表が7つ、口が7つ
+- **7枚が同じ一覧部品と同じ状態名で並びます。** 表は各機能のままでよく、
+  揃えるのは読む口の形だけ
 - **「動かなかった理由」を最初から持てます。** `DkPY0` の設計は
-  「動きませんでした／何もしていません」を出します。`status` に
-  `skipped_condition` が既にあるので、後から足す必要がありません
+  「動きませんでした／何もしていません」を出します。契約で
+  `failed` と `skipped` を分けておけば、後から足す必要がありません
 - **1枚だけ既にできています。** `P2J0Te`（9-1-H 友だち追加時配信の実行結果）は
   `/api/friend-add-routing/events` があるので「通常実装」に分類してあります。
   **形が使えることの証拠です**
@@ -248,9 +342,10 @@ EC側で書くなら、V6から外す候補になります。
 
 ## 進める順（おすすめ）
 
-1. **A の実行の記録** — 7枚が乗る。いま `GC4St` を作っているので、
-   **そのとき `owner_kind` を持たせるかどうかだけ決めてください。**
-   後から入れると7枚ぶん書き直しになります
+1. **A の実行の記録** — いま `GC4St` を作っています。**表はリマインダ専用の
+   ままでかまいません。** 決めるのは、読む口が返す形を上の契約に
+   合わせるかどうかだけです。ここを合わせておけば、残り6枚は
+   同じ一覧部品を写せます
 2. **通常実装の「完了の面」6枚** — 口が在るので、画面だけ
 3. **既存部品の確認の窓** — ふさいでいるPRが取り込まれた順に
 4. **B の時計で動くもの3枚** — 既にある2つの仕掛けに寄せられるか先に見る
