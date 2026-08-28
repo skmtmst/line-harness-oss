@@ -44,6 +44,9 @@
   .bar { width: 34%; min-width: 150px; }
   .track { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: var(--mute); }
   .compared { background: var(--ok); } .elsewhere { background: var(--ok); opacity: .55; }
+  .vMatch { background: var(--ok); } .vStructure { background: var(--warn); opacity: .55; }
+  .vNeedsFix { background: var(--warn); } .vUnimplemented { background: var(--gap); }
+  .vUnjudged { background: var(--mute); }
   .unconfirmed { background: var(--warn); } .unimplemented { background: var(--gap); }
   .missing { background: var(--mute); }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--ink-2); font-size: .8rem; margin: 0; }
@@ -60,291 +63,291 @@
 <main>
   <header>
     <h1>V6 画面比較の進捗</h1>
-    <p class="lede">Pencil の設計 262 画面を、1440px と 1920px の実装画像と並べた結果です。<strong>未実装を合格として数えていません。</strong></p>
+    <p class="lede">Pencil の設計 262 画面を、1440px と 1920px の実装画像と並べた結果です。<strong>帯は「撮れたか」ではなく「合っていたか」で塗っています。</strong>撮れた数で塗ると、要修正が何枚あっても帯は緑一色になります。</p>
   </header>
 
   <section class="cards">
     <div class="card"><b>262</b><span>画面の総数</span></div>
-    <div class="card ok"><b>195</b><span>比較済み（74.4%）</span></div>
-    <div class="card ok"><b>6</b><span>一致（2.3%）</span></div>
+    <div class="card ok"><b>194</b><span>比較済み（74%）</span></div>
+    <div class="card ok"><b>7</b><span>一致（2.7%）</span></div>
     <div class="card warn"><b>16</b><span>構造一致・データ未接続</span></div>
-    <div class="card warn"><b>96</b><span>要修正</span></div>
-    <div class="card warn"><b>77</b><span>未判定</span></div>
-    <div class="card gap"><b>252</b><span>完了まで残り</span></div>
-    <div class="card gap"><b>63</b><span>未実装</span></div>
+    <div class="card warn"><b>171</b><span>要修正</span></div>
+    <div class="card warn"><b>0</b><span>未判定</span></div>
+    <div class="card gap"><b>251</b><span>完了まで残り</span></div>
+    <div class="card gap"><b>64</b><span>未実装</span></div>
     <div class="card"><b>0</b><span>未確認</span></div>
     <div class="card"><b>4</b><span>別の仕掛けで撮影</span></div>
   </section>
 
   <p class="legend">
-    <span><i class="compared"></i>比較済み</span>
-    <span><i class="elsewhere"></i>別の仕掛けで撮影</span>
-    <span><i class="unconfirmed"></i>未確認</span>
-    <span><i class="unimplemented"></i>未実装</span>
-    <span><i class="missing"></i>未撮影</span>
+    <span><i class="vMatch"></i>一致</span>
+    <span><i class="vStructure"></i>構造一致・データ未接続</span>
+    <span><i class="vNeedsFix"></i>要修正</span>
+    <span><i class="vUnimplemented"></i>未実装</span>
+    <span><i class="vUnjudged"></i>未判定</span>
   </p>
 
   <div class="wrap">
     <table>
       <thead><tr>
         <th scope="col">機能</th><th scope="col">内訳</th><th scope="col" class="n">総数</th>
-        <th scope="col" class="n">比較済み</th><th scope="col" class="n">未実装</th>
-        <th scope="col" class="n">未確認</th><th scope="col" class="n">別仕掛け</th><th scope="col" class="n">未撮影</th><th scope="col">撮った先</th>
+        <th scope="col" class="n">一致</th><th scope="col" class="n">構造一致<br>データ未接続</th>
+        <th scope="col" class="n">要修正</th><th scope="col" class="n">未実装</th><th scope="col" class="n">未判定</th><th scope="col">撮った先</th>
       </tr></thead>
       <tbody>
       <tr>
         <th scope="row"><span class="num">1</span>ダッシュボード</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:5" title="比較済み 5"></span></div></td>
-        <td class="n">5</td><td class="n ok">5</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vStructure" style="flex:5" title="構造一致・データ未接続 5"></span></div></td>
+        <td class="n">5</td><td class="n ok">—</td>
+        <td class="n">5</td><td class="n">—</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">2</span>受信箱</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:17" title="比較済み 17"></span></div></td>
-        <td class="n">17</td><td class="n ok">17</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vMatch" style="flex:1" title="一致 1"></span><span class="vNeedsFix" style="flex:16" title="要修正 16"></span></div></td>
+        <td class="n">17</td><td class="n ok">1</td>
+        <td class="n">—</td><td class="n">16</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">3</span>友だち</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:8" title="比較済み 8"></span><span class="unimplemented" style="flex:3" title="未実装 3"></span></div></td>
-        <td class="n">11</td><td class="n ok">8</td>
-        <td class="n">3</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vMatch" style="flex:1" title="一致 1"></span><span class="vNeedsFix" style="flex:6" title="要修正 6"></span><span class="vUnimplemented" style="flex:4" title="未実装 4"></span></div></td>
+        <td class="n">11</td><td class="n ok">1</td>
+        <td class="n">—</td><td class="n">6</td>
+        <td class="n">4</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">4</span>友だち属性</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:16" title="比較済み 16"></span><span class="elsewhere" style="flex:4" title="別の仕掛けで撮影 4"></span><span class="unimplemented" style="flex:1" title="未実装 1"></span></div></td>
-        <td class="n">21</td><td class="n ok">16</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:16" title="要修正 16"></span><span class="vUnimplemented" style="flex:1" title="未実装 1"></span></div></td>
+        <td class="n">21</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">16</td>
         <td class="n">1</td><td class="n">—</td>
-        <td class="n">4</td><td class="n">—</td>
         <td class="at"><span class="pr">#420</span><code>87c150ad</code><small>HBTk0・yKEdO・KoT6c・A1ZYeP・l25rlp・rIhbN</small><br><span class="pr">#421</span><code>f7b7974a</code><small>QKx8Q・XBkiQ</small></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">5</span>シナリオ配信</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:12" title="比較済み 12"></span><span class="unimplemented" style="flex:2" title="未実装 2"></span></div></td>
-        <td class="n">14</td><td class="n ok">12</td>
+        <td class="bar"><div class="track"><span class="vMatch" style="flex:1" title="一致 1"></span><span class="vNeedsFix" style="flex:11" title="要修正 11"></span><span class="vUnimplemented" style="flex:2" title="未実装 2"></span></div></td>
+        <td class="n">14</td><td class="n ok">1</td>
+        <td class="n">—</td><td class="n">11</td>
         <td class="n">2</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
-        <td class="at"><span class="pr">#503</span><code>6db5ad7f</code><small>M2b2B</small></td>
+        <td class="at"><span class="pr">#503</span><code>6db5ad7f</code><small>M2b2B</small><br><span class="pr">#503</span><code>6db5ad7f</code><small>xfYLn・hz9ti</small></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">6</span>一斉配信</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:12" title="比較済み 12"></span><span class="unimplemented" style="flex:3" title="未実装 3"></span></div></td>
-        <td class="n">15</td><td class="n ok">12</td>
+        <td class="bar"><div class="track"><span class="vMatch" style="flex:1" title="一致 1"></span><span class="vNeedsFix" style="flex:11" title="要修正 11"></span><span class="vUnimplemented" style="flex:3" title="未実装 3"></span></div></td>
+        <td class="n">15</td><td class="n ok">1</td>
+        <td class="n">—</td><td class="n">11</td>
         <td class="n">3</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
-        <td class="at"><span class="pr">#497</span><code>84e5bab9</code><small>FpgxH</small></td>
+        <td class="at"><span class="pr">#497</span><code>84e5bab9</code><small>FpgxH</small><br><span class="pr">#503</span><code>6db5ad7f</code><small>q76C35・zZ9fA・XQfMD・p97Tf・Bw0zt・vW4Es・u6gHt・EGMb1・xkRDb・TmHjF</small></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">7</span>リマインダ</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:5" title="比較済み 5"></span><span class="unimplemented" style="flex:6" title="未実装 6"></span></div></td>
-        <td class="n">11</td><td class="n ok">5</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:5" title="要修正 5"></span><span class="vUnimplemented" style="flex:6" title="未実装 6"></span></div></td>
+        <td class="n">11</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">5</td>
         <td class="n">6</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#500</span><code>409f00bb</code><small>GC4St</small></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">8</span>自動応答</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:6" title="比較済み 6"></span><span class="unimplemented" style="flex:5" title="未実装 5"></span></div></td>
-        <td class="n">11</td><td class="n ok">6</td>
+        <td class="bar"><div class="track"><span class="vMatch" style="flex:1" title="一致 1"></span><span class="vNeedsFix" style="flex:5" title="要修正 5"></span><span class="vUnimplemented" style="flex:5" title="未実装 5"></span></div></td>
+        <td class="n">11</td><td class="n ok">1</td>
+        <td class="n">—</td><td class="n">5</td>
         <td class="n">5</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#501</span><code>93edbe17</code><small>t7UtYQ</small></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">9</span>友だち追加時の配信</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:3" title="比較済み 3"></span><span class="unimplemented" style="flex:7" title="未実装 7"></span></div></td>
-        <td class="n">10</td><td class="n ok">3</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:3" title="要修正 3"></span><span class="vUnimplemented" style="flex:7" title="未実装 7"></span></div></td>
+        <td class="n">10</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">3</td>
         <td class="n">7</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">10</span>ウェビナー</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:8" title="比較済み 8"></span><span class="unimplemented" style="flex:5" title="未実装 5"></span></div></td>
-        <td class="n">13</td><td class="n ok">8</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:8" title="要修正 8"></span><span class="vUnimplemented" style="flex:5" title="未実装 5"></span></div></td>
+        <td class="n">13</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">8</td>
         <td class="n">5</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">11</span>テンプレート</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:9" title="比較済み 9"></span><span class="unimplemented" style="flex:1" title="未実装 1"></span></div></td>
-        <td class="n">10</td><td class="n ok">9</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:9" title="要修正 9"></span><span class="vUnimplemented" style="flex:1" title="未実装 1"></span></div></td>
+        <td class="n">10</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">9</td>
         <td class="n">1</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#433</span><code>51020a97</code><small>M9cij</small><br><span class="pr">#493</span><code>62ddaebe</code><small>CzndJ・M9cij</small></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">12</span>リッチメニュー</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:6" title="比較済み 6"></span><span class="unimplemented" style="flex:3" title="未実装 3"></span></div></td>
-        <td class="n">9</td><td class="n ok">6</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:6" title="要修正 6"></span><span class="vUnimplemented" style="flex:3" title="未実装 3"></span></div></td>
+        <td class="n">9</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">6</td>
         <td class="n">3</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">13</span>回答フォーム</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:5" title="比較済み 5"></span><span class="unimplemented" style="flex:2" title="未実装 2"></span></div></td>
-        <td class="n">7</td><td class="n ok">5</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:5" title="要修正 5"></span><span class="vUnimplemented" style="flex:2" title="未実装 2"></span></div></td>
+        <td class="n">7</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">5</td>
         <td class="n">2</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">14</span>共通情報</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:2" title="比較済み 2"></span><span class="unimplemented" style="flex:2" title="未実装 2"></span></div></td>
-        <td class="n">4</td><td class="n ok">2</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:2" title="要修正 2"></span><span class="vUnimplemented" style="flex:2" title="未実装 2"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">2</td>
         <td class="n">2</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">15</span>登録メディア</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:4" title="比較済み 4"></span><span class="unimplemented" style="flex:1" title="未実装 1"></span></div></td>
-        <td class="n">5</td><td class="n ok">4</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:4" title="要修正 4"></span><span class="vUnimplemented" style="flex:1" title="未実装 1"></span></div></td>
+        <td class="n">5</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">4</td>
         <td class="n">1</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">16</span>成果とアフィリエイト</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:6" title="比較済み 6"></span><span class="unimplemented" style="flex:3" title="未実装 3"></span></div></td>
-        <td class="n">9</td><td class="n ok">6</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:6" title="要修正 6"></span><span class="vUnimplemented" style="flex:3" title="未実装 3"></span></div></td>
+        <td class="n">9</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">6</td>
         <td class="n">3</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">17</span>マイル・行動スコア</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:9" title="比較済み 9"></span><span class="unimplemented" style="flex:2" title="未実装 2"></span></div></td>
-        <td class="n">11</td><td class="n ok">9</td>
+        <td class="bar"><div class="track"><span class="vMatch" style="flex:1" title="一致 1"></span><span class="vStructure" style="flex:1" title="構造一致・データ未接続 1"></span><span class="vNeedsFix" style="flex:7" title="要修正 7"></span><span class="vUnimplemented" style="flex:2" title="未実装 2"></span></div></td>
+        <td class="n">11</td><td class="n ok">1</td>
+        <td class="n">1</td><td class="n">7</td>
         <td class="n">2</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#441</span><code>05c5b103</code><small>MvZm5・BmoGY・HIU5O</small><br><span class="pr">#441</span><code>e953109c</code><small>s98Vfw・N46cQ・k8VCU</small><br><span class="pr">#494</span><code>0ca45f98</code><small>HIU5O</small><br><span class="pr">#495</span><code>7d890d3b</code><small>z3PB2・vz0Ji</small><br><span class="pr">#496</span><code>4dac7986</code><small>s6MBc</small><br><span class="pr">#499</span><code>961722fc</code><small>s6MBc</small></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">18</span>流入と計測</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:8" title="比較済み 8"></span><span class="unimplemented" style="flex:1" title="未実装 1"></span></div></td>
-        <td class="n">9</td><td class="n ok">8</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:8" title="要修正 8"></span><span class="vUnimplemented" style="flex:1" title="未実装 1"></span></div></td>
+        <td class="n">9</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">8</td>
         <td class="n">1</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#443</span><code>f372ff30</code></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">19</span>コンバージョン</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:4" title="比較済み 4"></span></div></td>
-        <td class="n">4</td><td class="n ok">4</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vStructure" style="flex:1" title="構造一致・データ未接続 1"></span><span class="vNeedsFix" style="flex:3" title="要修正 3"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">1</td><td class="n">3</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#444</span><code>ccbd0975</code></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">20</span>分析</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:8" title="比較済み 8"></span><span class="unimplemented" style="flex:1" title="未実装 1"></span></div></td>
-        <td class="n">9</td><td class="n ok">8</td>
+        <td class="bar"><div class="track"><span class="vStructure" style="flex:6" title="構造一致・データ未接続 6"></span><span class="vNeedsFix" style="flex:2" title="要修正 2"></span><span class="vUnimplemented" style="flex:1" title="未実装 1"></span></div></td>
+        <td class="n">9</td><td class="n ok">—</td>
+        <td class="n">6</td><td class="n">2</td>
         <td class="n">1</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#445</span><code>787a4b46</code></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">21</span>NEN配信</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:6" title="比較済み 6"></span><span class="unimplemented" style="flex:1" title="未実装 1"></span></div></td>
-        <td class="n">7</td><td class="n ok">6</td>
+        <td class="bar"><div class="track"><span class="vStructure" style="flex:2" title="構造一致・データ未接続 2"></span><span class="vNeedsFix" style="flex:4" title="要修正 4"></span><span class="vUnimplemented" style="flex:1" title="未実装 1"></span></div></td>
+        <td class="n">7</td><td class="n ok">—</td>
+        <td class="n">2</td><td class="n">4</td>
         <td class="n">1</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#446</span><code>4307088d</code></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">22</span>写真審査</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:2" title="比較済み 2"></span><span class="unimplemented" style="flex:2" title="未実装 2"></span></div></td>
-        <td class="n">4</td><td class="n ok">2</td>
+        <td class="bar"><div class="track"><span class="vStructure" style="flex:1" title="構造一致・データ未接続 1"></span><span class="vNeedsFix" style="flex:1" title="要修正 1"></span><span class="vUnimplemented" style="flex:2" title="未実装 2"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">1</td><td class="n">1</td>
         <td class="n">2</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#447</span><code>65adbc59</code></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">23</span>EC連携</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:1" title="比較済み 1"></span><span class="unimplemented" style="flex:3" title="未実装 3"></span></div></td>
-        <td class="n">4</td><td class="n ok">1</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:1" title="要修正 1"></span><span class="vUnimplemented" style="flex:3" title="未実装 3"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">1</td>
         <td class="n">3</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">24</span>LINE通知</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:2" title="比較済み 2"></span><span class="unimplemented" style="flex:4" title="未実装 4"></span></div></td>
-        <td class="n">6</td><td class="n ok">2</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:2" title="要修正 2"></span><span class="vUnimplemented" style="flex:4" title="未実装 4"></span></div></td>
+        <td class="n">6</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">2</td>
         <td class="n">4</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">25</span>オートメーション</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:7" title="比較済み 7"></span><span class="unimplemented" style="flex:1" title="未実装 1"></span></div></td>
-        <td class="n">8</td><td class="n ok">7</td>
+        <td class="bar"><div class="track"><span class="vMatch" style="flex:1" title="一致 1"></span><span class="vNeedsFix" style="flex:6" title="要修正 6"></span><span class="vUnimplemented" style="flex:1" title="未実装 1"></span></div></td>
+        <td class="n">8</td><td class="n ok">1</td>
+        <td class="n">—</td><td class="n">6</td>
         <td class="n">1</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="pr">#502</span><code>75b010fc</code><small>DkPY0</small></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">26</span>外部連携</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:3" title="比較済み 3"></span><span class="unimplemented" style="flex:1" title="未実装 1"></span></div></td>
-        <td class="n">4</td><td class="n ok">3</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:3" title="要修正 3"></span><span class="vUnimplemented" style="flex:1" title="未実装 1"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">3</td>
         <td class="n">1</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">27</span>予約管理</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:4" title="比較済み 4"></span><span class="unimplemented" style="flex:3" title="未実装 3"></span></div></td>
-        <td class="n">7</td><td class="n ok">4</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:4" title="要修正 4"></span><span class="vUnimplemented" style="flex:3" title="未実装 3"></span></div></td>
+        <td class="n">7</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">4</td>
         <td class="n">3</td><td class="n">—</td>
-        <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">28</span>予約設定</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:4" title="比較済み 4"></span></div></td>
-        <td class="n">4</td><td class="n ok">4</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:4" title="要修正 4"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">4</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">29</span>イベント予約</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:4" title="比較済み 4"></span></div></td>
-        <td class="n">4</td><td class="n ok">4</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:4" title="要修正 4"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">4</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">30</span>ログインユーザー</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:4" title="比較済み 4"></span></div></td>
-        <td class="n">4</td><td class="n ok">4</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:4" title="要修正 4"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">4</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">31</span>機能設定</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:1" title="比較済み 1"></span></div></td>
-        <td class="n">1</td><td class="n ok">1</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:1" title="要修正 1"></span></div></td>
+        <td class="n">1</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">1</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>
       <tr>
         <th scope="row"><span class="num">32</span>運用状態</th>
-        <td class="bar"><div class="track"><span class="compared" style="flex:4" title="比較済み 4"></span></div></td>
-        <td class="n">4</td><td class="n ok">4</td>
-        <td class="n">—</td><td class="n">—</td>
+        <td class="bar"><div class="track"><span class="vNeedsFix" style="flex:4" title="要修正 4"></span></div></td>
+        <td class="n">4</td><td class="n ok">—</td>
+        <td class="n">—</td><td class="n">4</td>
         <td class="n">—</td><td class="n">—</td>
         <td class="at"><span class="none" title="まだ実装PRのheadで撮り直していません">—</span></td>
       </tr>

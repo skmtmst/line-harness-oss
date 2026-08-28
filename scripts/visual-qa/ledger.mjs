@@ -83,6 +83,16 @@ const LABELS = {
   unconfirmed: '未確認',
   elsewhere: '別の仕掛けで撮影',
   missing: '未撮影',
+  /*
+    **帯は「撮れたか」ではなく「合っていたか」で塗る。**
+    撮れた数で塗ると、要修正が161枚あっても帯は緑一色になり、
+    **もうすぐ終わりに見える。**
+  */
+  vMatch: '一致',
+  vStructure: '構造一致・データ未接続',
+  vNeedsFix: '要修正',
+  vUnimplemented: '未実装',
+  vUnjudged: '未判定',
 }
 
 function tally(list) {
@@ -126,10 +136,10 @@ if (process.argv.includes('--html')) {
     const seg = (n, cls) => (n ? `<span class="${cls}" style="flex:${n}" title="${LABELS[cls]} ${n}"></span>` : '')
     return `      <tr>
         <th scope="row"><span class="num">${r.feature}</span>${esc(r.name)}</th>
-        <td class="bar"><div class="track">${seg(r.compared, 'compared')}${seg(r.elsewhere, 'elsewhere')}${seg(r.unconfirmed, 'unconfirmed')}${seg(r.unimplemented, 'unimplemented')}${seg(r.missing, 'missing')}</div></td>
-        <td class="n">${r.total}</td><td class="n ok">${r.compared}</td>
-        <td class="n">${r.unimplemented || '—'}</td><td class="n">${r.unconfirmed || '—'}</td>
-        <td class="n">${r.elsewhere || '—'}</td><td class="n">${r.missing || '—'}</td>
+        <td class="bar"><div class="track">${seg(r.match, 'vMatch')}${seg(r.structureMatchDataPending, 'vStructure')}${seg(r.needsFix, 'vNeedsFix')}${seg(r.unimplemented, 'vUnimplemented')}${seg(r.unjudged, 'vUnjudged')}</div></td>
+        <td class="n">${r.total}</td><td class="n ok">${r.match || '—'}</td>
+        <td class="n">${r.structureMatchDataPending || '—'}</td><td class="n">${r.needsFix || '—'}</td>
+        <td class="n">${r.unimplemented || '—'}</td><td class="n">${r.unjudged || '—'}</td>
         <td class="at">${capturedAtHtml(r.feature)}</td>
       </tr>`
   }).join('\n')
@@ -179,6 +189,9 @@ if (process.argv.includes('--html')) {
   .bar { width: 34%; min-width: 150px; }
   .track { display: flex; height: 9px; border-radius: 5px; overflow: hidden; background: var(--mute); }
   .compared { background: var(--ok); } .elsewhere { background: var(--ok); opacity: .55; }
+  .vMatch { background: var(--ok); } .vStructure { background: var(--warn); opacity: .55; }
+  .vNeedsFix { background: var(--warn); } .vUnimplemented { background: var(--gap); }
+  .vUnjudged { background: var(--mute); }
   .unconfirmed { background: var(--warn); } .unimplemented { background: var(--gap); }
   .missing { background: var(--mute); }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--ink-2); font-size: .8rem; margin: 0; }
@@ -195,7 +208,7 @@ if (process.argv.includes('--html')) {
 <main>
   <header>
     <h1>V6 画面比較の進捗</h1>
-    <p class="lede">Pencil の設計 262 画面を、1440px と 1920px の実装画像と並べた結果です。<strong>未実装を合格として数えていません。</strong></p>
+    <p class="lede">Pencil の設計 262 画面を、1440px と 1920px の実装画像と並べた結果です。<strong>帯は「撮れたか」ではなく「合っていたか」で塗っています。</strong>撮れた数で塗ると、要修正が何枚あっても帯は緑一色になります。</p>
   </header>
 
   <section class="cards">
@@ -212,19 +225,19 @@ if (process.argv.includes('--html')) {
   </section>
 
   <p class="legend">
-    <span><i class="compared"></i>比較済み</span>
-    <span><i class="elsewhere"></i>別の仕掛けで撮影</span>
-    <span><i class="unconfirmed"></i>未確認</span>
-    <span><i class="unimplemented"></i>未実装</span>
-    <span><i class="missing"></i>未撮影</span>
+    <span><i class="vMatch"></i>一致</span>
+    <span><i class="vStructure"></i>構造一致・データ未接続</span>
+    <span><i class="vNeedsFix"></i>要修正</span>
+    <span><i class="vUnimplemented"></i>未実装</span>
+    <span><i class="vUnjudged"></i>未判定</span>
   </p>
 
   <div class="wrap">
     <table>
       <thead><tr>
         <th scope="col">機能</th><th scope="col">内訳</th><th scope="col" class="n">総数</th>
-        <th scope="col" class="n">比較済み</th><th scope="col" class="n">未実装</th>
-        <th scope="col" class="n">未確認</th><th scope="col" class="n">別仕掛け</th><th scope="col" class="n">未撮影</th><th scope="col">撮った先</th>
+        <th scope="col" class="n">一致</th><th scope="col" class="n">構造一致<br>データ未接続</th>
+        <th scope="col" class="n">要修正</th><th scope="col" class="n">未実装</th><th scope="col" class="n">未判定</th><th scope="col">撮った先</th>
       </tr></thead>
       <tbody>
 ${bars}
@@ -304,11 +317,11 @@ ${bars}
   console.log(`| **完了まで残り** | **${all.remaining}** |`)
   console.log('\n「完了まで残り」＝ 構造一致・データ未接続 ＋ 要修正 ＋ 未実装 ＋ 未判定。\n')
 
-  console.log('| 機能 | 名前 | 総数 | 比較済み | 一致 | 要修正 | 未判定 | 未実装 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |')
+  console.log('| 機能 | 名前 | 総数 | 比較済み | 一致 | 構造一致・データ未接続 | 要修正 | 未実装 | 未判定 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |')
   console.log('|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
-    console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.match} | ${r.needsFix + r.structureMatchDataPending} | ${r.unjudged} | ${r.unimplemented} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} | ${capturedAt(r.feature)} |`)
+    console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.match} | ${r.structureMatchDataPending} | ${r.needsFix} | ${r.unimplemented} | ${r.unjudged} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} | ${capturedAt(r.feature)} |`)
   }
-  console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.match}** | **${all.needsFix + all.structureMatchDataPending}** | **${all.unjudged}** | **${all.unimplemented}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** | |`)
+  console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.match}** | **${all.structureMatchDataPending}** | **${all.needsFix}** | **${all.unimplemented}** | **${all.unjudged}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** | |`)
   console.log('\n**「撮った先」が空**の機能は、まだ実装PRのheadで撮り直していません（自分の枝で撮ったものです）。**空欄を確認済みと読まないでください。**')
 }

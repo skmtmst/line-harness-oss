@@ -2520,6 +2520,34 @@ export const EVENTS = [
  * **`StaffMember` の型どおり。** `role` は `'owner'|'admin'|'staff'|'viewer'` の
  * 4つで、設計の「運用」「受付」「見るだけ」はその上に乗せた言い換え。
  */
+/**
+ * 入った記録（`GET /api/login-audit`、設計 `jwVlo`）。
+ *
+ * **用意していなかったので、表が空のまま撮れていました。** 空の絵を設計と
+ * 並べても何も比べていないので、実型に合わせて入れます。
+ *
+ * 型は `apps/web/src/lib/api.ts` の `loginAudit.list` の返り値。
+ * `action` は画面が名前を持っている5つだけ（`ACTION_LABEL`：login /
+ * logout / fail / view_personal / export）。**設計にある「テンプレートを
+ * 消しました」「マイルを手で増やしました」などは、いまの口が持っていません。**
+ * 持っていないものを固定データで足すと、実装が記録している気になります。
+ *
+ * `ip` は `null`。**画像に接続元のアドレスを出さない。**
+ * `connectionSource` は設計と同じく場所の名前で置きます。
+ */
+export const LOGIN_AUDIT = [
+  ['al-1', 'st-1', '佐々木 亮太', 'sasaki@example.com', 'owner', 'login', 'ログインユーザー', '東京（いつもの場所）', 'success', '2026-08-25T00:02:00.000Z'],
+  ['al-2', 'st-1', '佐々木 亮太', 'sasaki@example.com', 'owner', 'export', '友だち', '東京（いつもの場所）', 'success', '2026-08-24T09:20:00.000Z'],
+  ['al-3', 'st-4', '山本 京子', 'yamamoto@example.com', 'viewer', 'view_personal', '友だち詳細', '大阪（いつもの場所）', 'success', '2026-08-23T02:00:00.000Z'],
+  ['al-4', 'st-3', '高田 誠', 'takada@example.com', 'staff', 'fail', 'ログインユーザー', '福岡（はじめての場所）', 'failure', '2026-08-22T11:14:00.000Z'],
+  ['al-5', 'st-5', '中川 由美', 'nakagawa@example.com', 'staff', 'logout', 'ログインユーザー', '東京（いつもの場所）', 'success', '2026-08-21T07:40:00.000Z'],
+  ['al-6', 'st-2', '川野 健太', 'kawano@example.com', 'admin', 'login', 'ログインユーザー', '東京（いつもの場所）', 'success', '2026-08-21T00:00:00.000Z'],
+].map(([id, adminUserId, userName, email, role, action, screen, connectionSource, result, createdAt]) => ({
+  id, adminUserId, userName, email, role,
+  lineLinked: true, isActive: true,
+  action, screen, ip: null, connectionSource, result, createdAt,
+}))
+
 export const STAFF_MEMBERS = [
   {
     id: 'st-1', name: '佐々木 亮太', email: 'sasaki@example.com', role: 'owner',

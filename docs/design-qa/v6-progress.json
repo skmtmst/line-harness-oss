@@ -1,16 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 195,
-  "unimplemented": 63,
+  "compared": 194,
+  "unimplemented": 64,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
-  "match": 6,
+  "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 96,
-  "unjudged": 77,
-  "remaining": 252,
+  "needsFix": 171,
+  "unjudged": 0,
+  "remaining": 251,
   "features": [
     {
       "feature": 1,
@@ -37,26 +37,26 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "match": 0,
+      "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 1,
-      "unjudged": 16,
-      "remaining": 17,
+      "needsFix": 16,
+      "unjudged": 0,
+      "remaining": 16,
       "capturedAt": null
     },
     {
       "feature": 3,
       "name": "友だち",
       "total": 11,
-      "compared": 8,
-      "unimplemented": 3,
+      "compared": 7,
+      "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 7,
+      "needsFix": 6,
+      "unjudged": 0,
       "remaining": 10,
       "capturedAt": null
     },
@@ -71,8 +71,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 13,
+      "needsFix": 16,
+      "unjudged": 0,
       "remaining": 17,
       "capturedAt": [
         {
@@ -110,8 +110,8 @@
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 11,
+      "needsFix": 11,
+      "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
         {
@@ -122,6 +122,16 @@
             "M2b2B"
           ],
           "note": "新しい口は足さず既存の統計を読む"
+        },
+        {
+          "pr": 503,
+          "head": "6db5ad7f",
+          "on": "2026-08-28",
+          "screens": [
+            "xfYLn",
+            "hz9ti"
+          ],
+          "note": "撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた"
         }
       ]
     },
@@ -136,8 +146,8 @@
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 0,
-      "unjudged": 11,
+      "needsFix": 11,
+      "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
         {
@@ -148,6 +158,24 @@
             "FpgxH"
           ],
           "note": "Claudeが作ったDraft。#495 の上に積んである"
+        },
+        {
+          "pr": 503,
+          "head": "6db5ad7f",
+          "on": "2026-08-28",
+          "screens": [
+            "q76C35",
+            "zZ9fA",
+            "XQfMD",
+            "p97Tf",
+            "Bw0zt",
+            "vW4Es",
+            "u6gHt",
+            "EGMb1",
+            "xkRDb",
+            "TmHjF"
+          ],
+          "note": "固定データ（配信の帯・1件の配信）を足して撮り直した。**`FpgxH` は #497 の絵に戻した。** 機能ごと撮り直すと、別のPRで直った1枚が直る前に戻る"
         }
       ]
     },
@@ -162,8 +190,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 1,
+      "needsFix": 5,
+      "unjudged": 0,
       "remaining": 11,
       "capturedAt": [
         {
@@ -187,8 +215,8 @@
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 1,
+      "needsFix": 5,
+      "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
         {
@@ -229,8 +257,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 7,
-      "unjudged": 1,
+      "needsFix": 8,
+      "unjudged": 0,
       "remaining": 13,
       "capturedAt": null
     },
@@ -245,8 +273,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
-      "unjudged": 3,
+      "needsFix": 9,
+      "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
         {
@@ -280,8 +308,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 5,
-      "unjudged": 1,
+      "needsFix": 6,
+      "unjudged": 0,
       "remaining": 9,
       "capturedAt": null
     },
@@ -296,8 +324,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 4,
-      "unjudged": 1,
+      "needsFix": 5,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": null
     },
@@ -328,8 +356,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 5,
       "capturedAt": null
     },
@@ -360,8 +388,8 @@
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 1,
-      "needsFix": 4,
-      "unjudged": 3,
+      "needsFix": 7,
+      "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
         {
@@ -456,8 +484,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 1,
-      "needsFix": 2,
-      "unjudged": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": [
         {
@@ -576,8 +604,8 @@
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 5,
-      "unjudged": 1,
+      "needsFix": 6,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": [
         {
@@ -602,8 +630,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
-      "unjudged": 1,
+      "needsFix": 3,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": null
     },
@@ -618,8 +646,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 7,
       "capturedAt": null
     },
@@ -634,8 +662,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": null
     },
@@ -650,8 +678,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": null
     },
@@ -666,8 +694,8 @@
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 3,
-      "unjudged": 1,
+      "needsFix": 4,
+      "unjudged": 0,
       "remaining": 4,
       "capturedAt": null
     },
@@ -705,6 +733,13 @@
     }
   ],
   "gaps": [
+    {
+      "feature": 3,
+      "node": "IAf7j",
+      "name": "3-1-C 友だち（一括アクション）",
+      "gap": "api",
+      "gapNote": "複数人へまとめて タグ・シナリオ・担当者・対応マーク・リマインダ・メッセージ を反映する口が無い。画面も別ページとして作る必要がある"
+    },
     {
       "feature": 3,
       "node": "InCDe",

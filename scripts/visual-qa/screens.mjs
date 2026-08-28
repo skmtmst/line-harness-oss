@@ -528,8 +528,15 @@ export const SCREENS = [
     verdictSource: 'broadcasts-v6/XQfMD-1920.png', verdictHead: '6db5ad7f',
   },
   {
+    /*
+      **設計は重なる窓だが、実装は本文の下に開く欄。**
+      見えている範囲だけ撮ると、開いた中身が画面の外に残る。
+      ここは `page` で撮って、開いた欄まで写す。
+    */
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択', route: NEW_BC,
-    mode: 'viewport', height: 1080, steps: [{ click: 'テンプレートから選ぶ' }],
+    mode: 'page', steps: [{ click: 'テンプレートから選ぶ' }],
+    verdict: 'needs_fix', verdictNote: 'P1 ひな形が約60件、フォルダの絞り込みも検索も無く2列でそのまま並ぶ（設計はフォルダ選択＋検索＋3件の候補）。選んだひな形の更新日・使用回数・プレビューが出ず、読み込む前の確認窓も無い。P2 1件ごとの★（よく使う）が無い。カードの補足に内部の値「text」がそのまま出ている',
+    verdictSource: 'broadcasts-v6/p97Tf-1920.png', verdictHead: '6db5ad7f',
   },
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定', route: NEW_BC,
@@ -546,11 +553,19 @@ export const SCREENS = [
     */
     ...BROADCAST, node: 'h0kahp', name: '6-1-F テスト送信', route: NEW_BC,
     mode: 'viewport', height: 1080,
+    /*
+      **本文の入れ物には名札が無い。** `textarea` は `placeholder` だけなので
+      `getByLabel` では引けない。`selector: true` で CSS から引く。
+      名札で引こうとして 30 秒待って落ちた。
+    */
     steps: [
-      { fill: '管理用タイトル', text: '画面確認の配信' },
-      { fill: 'テキストを入力', text: '画面確認のための本文です。' },
+      { fill: 'input[placeholder^="例：8月キャンペーン"]', selector: true, text: '画面確認の配信' },
+      { fill: 'textarea[placeholder="テキストを入力"]', selector: true, text: '画面確認のための本文です。' },
       { click: 'テスト送信' },
+      { wait: 800 },
     ],
+    verdict: 'needs_fix', verdictNote: 'P1 テスト送信を押すと、先に配信を1件作ってから送る（broadcast-form.tsx:514 の api.broadcasts.create → testSend）。送信に失敗しても作った配信は消さないので、押すたびに配信が1件残る。画面は「テスト送信できませんでした」としか言わない。P1 送信先を選べない。設計は「テスト送信先を選択」の窓で相手を選び、テスト履歴と確認項目（改行と文字切れ・画像/ボタンの表示・変数の差し込み・リンクの遷移）と「本番の送信枠を消費しません」を見せる。撮った絵で送信が失敗しているのは、モックが書き込みを405で返すためで実装の不具合ではない',
+    verdictSource: 'broadcasts-v6/h0kahp-1920.png + apps/web/src/components/broadcasts/broadcast-form.tsx:514', verdictHead: '6db5ad7f',
   },
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック', route: NEW_BC,
@@ -970,6 +985,8 @@ export const SCREENS = [
     ...TEMPLATE, node: 'M9cij', name: '11-1-G テンプレートの削除確認',
     mode: 'viewport', height: 1080,
     steps: [{ click: 'テンプレートを削除', scope: 'main' }],
+    verdict: 'needs_fix', verdictNote: 'P2 設計の「先に差し替えてから削除する」流れが無い。設計は使用先を3つ挙げ、差し替え画面へ誘い、そのまま消すときは名前を打ち直させる。実装は使用中のテンプレートから削除の導線ごと外す作りで、危険は無い代わりに使用中のものを整理する手段が無い。窓にも使用先が出ない',
+    verdictSource: 'templates-v6/M9cij-1920.png', verdictHead: '62ddaebe',
   },
   {
     /*
@@ -980,7 +997,18 @@ export const SCREENS = [
       作る・名前を変える・消す・並べ替える・移す・「よく使う」の
       切替まで通っている。
     */
+    /*
+      **「…」を押さないと中身が写らない。** 開く前の絵を設計と並べても
+      何も比べていない。ボタンの読み上げ名は `フォルダ「◯◯」を操作`
+      （`components/shared/folder-panel.tsx:122`、PR #493 head `62ddaebe`）。
+      **この部品は #493 にしか無い。** いまの画面確認サーバ（`6db5ad7f`）の
+      木には入っていないので、撮るには #493 の木でサーバを起こす。
+    */
     ...TEMPLATE, node: 'CzndJ', name: '11-1-H フォルダ操作',
+    mode: 'viewport', height: 1080,
+    steps: [{ click: 'フォルダ「お問い合わせ」を操作' }],
+    verdict: 'needs_fix', verdictNote: 'P2 メニューの5項目（名前を変更・色を変える・並び順を上へ・並び順を下へ・フォルダを削除）は設計どおり（folder-panel.tsx:128-157、#493 head 62ddaebe）。ただし設計にある但し書き「削除しても、中のテンプレートは未分類に残ります。」がメニューに無い。開いた状態の撮影は #493 の木でサーバを起こさないとできないため、撮り方だけ先に入れた',
+    verdictSource: 'templates-v6/CzndJ-1920.png + /private/tmp/line-harness-v6-feature11-folders apps/web/src/components/shared/folder-panel.tsx', verdictHead: '62ddaebe',
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
@@ -1170,6 +1198,8 @@ export const SCREENS = [
     */
     ...MILEAGE, node: 'MvZm5', name: '17-1-C マイルの履歴',
     route: '/mileage?tab=history', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P1 「だれが」の列が無く、手で動かした記録を誰がやったか追えない（設計は自動／本人／担当者名を出す）。残高の列も無い。帯4つ（この30日の記録・手で動かした分・取り消し・反映を待っている）が無い。「マイルを手で増やす・減らす」と「履歴をCSVで書き出す」の導線が無い。P2 絞り込みが設計のチップ（すべて/付いた/使った/手で動かした/取り消し）でなくセレクト6つ。ページ送りが無い。日付欄が mm/dd/yyyy になるのは撮影側のブラウザ言語の癖',
+    verdictSource: 'mileage-v6/MvZm5-1920.png', verdictHead: '05c5b103',
   },
   { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'mileage-v6/design-qa.md' },
   {
@@ -1179,6 +1209,8 @@ export const SCREENS = [
     */
     ...MILEAGE, node: 'HIU5O', name: '17-1-E 友だちのマイル明細',
     route: '/mileage/friends/detail?id=friend-1', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P1 設計の右側が丸ごと無い（ランクの進み・ゴールドになった日・次のランクまでの差／9/30に消えるマイルの警告と「期限が近い人に知らせる」導線／この人がつながっている場所／つながる先）。「何でたまったか」（たまる決めごとごとの回数・たまったマイル・割合・いちばん最近）も無い。履歴に残高の列と「だれが」の列が無い。P2 帯の中身が設計と違う（設計はいまの残高・これまでにためた・使った・9/30に消える）。なお「30日以内に失効 — mile（未取得）」は未取得の出し方として正しく、ほかの画面の手本になる',
+    verdictSource: 'mileage-v6/HIU5O-1920.png', verdictHead: '0ca45f98',
   },
   {
     /*
@@ -1215,6 +1247,8 @@ export const SCREENS = [
       apis: ['**/api/action-scores/friends*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
+    verdict: 'needs_fix', verdictNote: 'P1 層の境目が設計と違う（設計 ふつう30〜69点・低い29点以下／実装 ふつう40〜69点・低い39点以下）。同じ点数の人が別の層に入る。P1 「内訳を見る」が無く、なぜその点数かを追えない。帯ごとの「この帯の人を見る」「この帯に配信する」も、文だけでボタンが無い。P2 呼び名が設計の「帯」でなく「層」。注意文から「マイル残高はスコアで増えも減りもしません」が落ちている。「点数が変わった理由は未取得」と正直に出しているのは正しい',
+    verdictSource: 'mileage-v6/z3PB2-normal-1920.png', verdictHead: '7d890d3b',
   },
   {
     /*
@@ -1278,6 +1312,8 @@ export const SCREENS = [
     ...CONVERSION, node: 'd8d3Mz', name: '19-1-C 成果地点の削除確認',
     route: '/conversions?tab=points', mode: 'viewport', height: 1080,
     steps: [{ click: '数えるのをやめる', scope: 'main' }],
+    verdict: 'needs_fix', verdictNote: 'P2 使っている場所を挙げるところまでは同じだが、設計は場所ごとに「何が止まるか」（紹介リンク11本が実質止まる／自動返信が動かなくなる／分析の線が消える）と「開く」の導線を付ける。実装は文だけで導線が無い。設計の3択（数えるのをやめる／別の成果地点に差し替えてから削除する／このまま削除する）のうち「数えるのをやめる」だけを出す作りで、消せない代わりに安全。過去の成果と金額を「そのまま残るもの」として出しているのは正しい',
+    verdictSource: 'conversions-v6/d8d3Mz-1920.png', verdictHead: 'ccbd0975',
   },
 
   // ── 機能20 分析 ─────────────────────────────────────────
@@ -1526,7 +1562,10 @@ export const SCREENS = [
     （`/booking/bookings/new`）。ただし**LINEの友だちに限る**。
     「LINE未連携の電話客は、顧客台帳の受け皿ができるまで登録できません。」
   */
-  { ...BOOKING, node: 'cpdDi', name: '27-1-B 電話の予約を入れる', route: '/booking/bookings/new' },
+  { ...BOOKING, node: 'cpdDi', name: '27-1-B 電話の予約を入れる', route: '/booking/bookings/new',
+    verdict: 'needs_fix', verdictNote: 'P1 電話の予約を入れる画面なのに、電話番号もお名前も入れられない。設計は「お名前（LINEにいない方）／電話番号／ペットの名前」を持ち、LINE未連携の人をそのまま登録できる。実装はLINEの友だち検索だけで、未連携は登録できないと断っている（断り方は正直で正しい。足りないのは顧客台帳の受け皿）。P1 お客様に何を送るかを選べない（設計は 受付をすぐLINEに送る／前日19:00に思い出してもらう／当日8:00に「本日おまちしています」の3つのチェック。実装は説明が2つ並ぶだけ）。P2 空き確認の緑帯（何分かかり何時まで押さえるか）、LINEプレビュー、この方について（来店回数・前回の申し送り）、つながる先、保存前の注意文が無い',
+    verdictSource: 'booking-v6/cpdDi-1920.png', verdictHead: 'ba0bf62d',
+  },
   { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-v6/design-qa.md' },
   {
     ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
@@ -1590,7 +1629,10 @@ export const SCREENS = [
     ただしタブは2本（ログインユーザー／入った記録）で、設計の4本のうち
     「招待中」「権限のかたまり」はまだ無い。
   */
-  { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit' },
+  { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit',
+    verdict: 'needs_fix', verdictNote: 'P1 「入った記録」が記録の一覧ではない。staff/page.tsx:114 が記録ではなくログインユーザーを繰り返し、1人につき1行「最後の操作」を出すだけなので、過去の操作を追えない。設計は4,286件を新しい順に並べる。P1 記録できる操作が5種類（ログイン・ログアウト・ログイン失敗・個人情報を表示・CSVを書き出し。ACTION_LABEL）しかなく、設計の「テンプレートを消しました」「マイルを手で増やしました」「一斉配信を出しました」「外部連携を止めました」は口が持っていない。P2 「対象」と「元の値 → 新しい値」の列が無く、何がどう変わったか分からない。いつもと違う場所からのログインを赤く出す扱いも無い。帯・絞り込みチップ・CSV・ページ送りも無い',
+    verdictSource: 'staff-v6/jwVlo-1920.png + apps/web/src/app/staff/page.tsx:114', verdictHead: '15febf7f',
+  },
   { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'staff-v6/design-qa.md' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
