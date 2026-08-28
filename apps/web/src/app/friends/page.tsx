@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowDownWideNarrow, Bookmark, Circle, Search, SlidersHorizontal, Star } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
@@ -14,6 +14,8 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import DuplicatesPage from '@/app/duplicates/page'
 import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 const SECONDARY_CONTROL = 'h-10 whitespace-nowrap rounded-v6-control border border-hairline bg-canvas px-4 text-sm font-medium text-v6-ink hover:bg-v6-surface-strong'
@@ -21,6 +23,7 @@ const SECONDARY_CONTROL = 'h-10 whitespace-nowrap rounded-v6-control border bord
 type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 type Notice = { title: string; message: string } | null
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 const MERGED_TABS = [
   { key: 'list', label: '友だち一覧' },
@@ -34,7 +37,7 @@ function FriendsPageInner({
   onExportReady,
 }: {
   onNotice: (notice: Notice) => void
-  onExportReady: (exporter: () => void) => void
+  onExportReady: (exporter: (() => void) | null) => void
 }) {
   const { selectedAccountId } = useAccount()
   const [friends, setFriends] = useState<FriendListItem[]>([])
@@ -55,9 +58,9 @@ function FriendsPageInner({
   const [operatorId, setOperatorId] = useState('')
   const [scenarioId, setScenarioId] = useState('')
   const [attentionOnly, setAttentionOnly] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const loadRequestRef = useRef(0)
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
@@ -86,8 +89,11 @@ function FriendsPageInner({
   }, [selectedAccountId])
 
   const loadFriends = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    const requestId = ++loadRequestRef.current
+    setLoadStatus('loading')
+    setFriends([])
+    setTotal(0)
+    setSelectedIds(new Set())
     try {
       const response = await api.friends.list({
         ...(advanced?.params ?? {}),
@@ -103,23 +109,33 @@ function FriendsPageInner({
         scenarioId: scenarioId || undefined,
         metadata: attentionOnly ? { __attention: '1' } : undefined,
       })
+      if (requestId !== loadRequestRef.current) return
       if (response.success) {
         setFriends(response.data.items)
         setTotal(response.data.total)
         setSelectedIds(new Set())
+        setLoadStatus('ready')
       } else {
-        setError(response.error)
+        setFriends([])
+        setTotal(0)
+        setLoadStatus('error')
       }
     } catch {
-      setError('友だちの読み込みに失敗しました。もう一度お試しください。')
-    } finally {
-      setLoading(false)
+      if (requestId !== loadRequestRef.current) return
+      setFriends([])
+      setTotal(0)
+      setLoadStatus('error')
     }
   }, [advanced, attentionOnly, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => setPage(1), [selectedAccountId])
-  useEffect(() => void loadFriends(), [loadFriends])
+  useEffect(() => {
+    void loadFriends()
+    return () => {
+      loadRequestRef.current += 1
+    }
+  }, [loadFriends])
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
@@ -155,7 +171,10 @@ function FriendsPageInner({
     URL.revokeObjectURL(url)
   }, [friends])
 
-  useEffect(() => onExportReady(exportCurrentPage), [exportCurrentPage, onExportReady])
+  useEffect(
+    () => onExportReady(loadStatus === 'ready' ? exportCurrentPage : null),
+    [exportCurrentPage, loadStatus, onExportReady],
+  )
 
   const toggleAttention = useCallback(async (friend: FriendListItem) => {
     const current = String(friend.metadata?.__attention ?? '') === '1'
@@ -261,7 +280,7 @@ function FriendsPageInner({
           <button type="button" aria-pressed={attentionOnly} onClick={() => resetPageWith(() => setAttentionOnly(!attentionOnly))} className={`inline-flex h-10.5 shrink-0 items-center gap-2 rounded-full bg-v6-warning-bg px-4 text-xs font-bold ${attentionOnly ? 'ring-2 ring-v6-warning-strong/30' : ''} text-v6-warning`}>
             <Star aria-hidden="true" className="h-3.5 w-3.5" />注目のみ
           </button>
-          <span className="shrink-0 whitespace-nowrap text-xs text-v6-ink-faint">{loading ? '—' : `${total.toLocaleString('ja-JP')}件`}</span>
+          <span className="shrink-0 whitespace-nowrap text-xs text-v6-ink-faint">{loadStatus === 'ready' ? `${total.toLocaleString('ja-JP')}件` : '—'}</span>
         </div>
       </section>
 
@@ -282,12 +301,15 @@ function FriendsPageInner({
         </section>
       ) : null}
 
-      {error ? <div role="alert" className="rounded-tile border border-v6-danger-border bg-v6-danger-bg p-4 text-sm text-v6-danger-text">{error}</div> : null}
-
-      {loading ? (
-        <div className={`overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card`}>
-          {Array.from({ length: Math.min(pageSize, 8) }, (_, index) => <div key={index} className="h-16.5 animate-pulse border-b border-v6-divider bg-gradient-to-r from-canvas via-v6-surface-strong to-canvas" />)}
-        </div>
+      {loadStatus === 'loading' ? (
+        <ListState kind="loading" title="友だちを読み込んでいます" />
+      ) : loadStatus === 'error' ? (
+        <ListState
+          kind="error"
+          title="友だちを表示できませんでした"
+          description="登録した友だちは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={<Button variant="secondary" onClick={() => void loadFriends()}>友だちを再読み込み</Button>}
+        />
       ) : (
         <FriendListTable
           friends={friends}
@@ -398,7 +420,10 @@ function FriendsPageHost() {
   const tab = useMergedTab(MERGED_TABS)
   const [notice, setNotice] = useState<Notice>(null)
   const [exportCurrentPage, setExportCurrentPage] = useState<(() => void) | null>(null)
-  const registerExporter = useCallback((exporter: () => void) => setExportCurrentPage(() => exporter), [])
+  const registerExporter = useCallback(
+    (exporter: (() => void) | null) => setExportCurrentPage(() => exporter),
+    [],
+  )
 
   return (
     <div data-friends-page="v6" data-design-node="PhxG6">
