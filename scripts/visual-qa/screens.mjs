@@ -860,9 +860,15 @@ export const SCREENS = [
   { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report' },
   { ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new' },
   {
+    /*
+      **#444（head `ccbd0975`）で窓が入った。** それまでは削除がブラウザの
+      `confirm()` で、撮ることもできなかった。実装側に
+      `data-design-node="d8d3Mz"` の印まで付いている。
+      窓は `position: fixed` なので `page`（全面）では撮れない。
+    */
     ...CONVERSION, node: 'd8d3Mz', name: '19-1-C 成果地点の削除確認',
-    status: 'unimplemented',
-    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**',
+    route: '/conversions?tab=points', mode: 'viewport', height: 1080,
+    steps: [{ click: '数えるのをやめる', scope: 'main' }],
   },
 
   // ── 機能20 分析 ─────────────────────────────────────────
@@ -1281,7 +1287,8 @@ export const CAPTURED_AT = {
   ],
   17: [{ pr: 441, head: '5fd7c048', on: '2026-08-28' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
-  19: [{ pr: 465, head: null, on: '2026-08-28', note: 'Codexの修正待ち。#465 の比較結果を維持' }],
-  21: [{ pr: 446, head: 'd7e2bc9c', on: '2026-08-28' }],
+  19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
+  20: [{ pr: 445, head: '724f9324', on: '2026-08-28' }],
+  21: [{ pr: 446, head: '4307088d', on: '2026-08-28' }],
   22: [{ pr: 447, head: '12c80878', on: '2026-08-28' }],
 }

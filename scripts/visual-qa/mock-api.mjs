@@ -19,7 +19,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { ANALYTICS_URL_CLICKS, ANALYTICS_FRIENDS, ANALYTICS_REACTIONS, ANALYTICS_ROUTES, ANALYTICS_USAGE, AD_PLATFORMS, AD_CONVERSION_LOGS, SAVED_SEARCHES, SUPPORT_MARKS, STAFF_MEMBERS, EVENTS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_REQUESTS, OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, AUTOMATIONS, AUTOMATION_LOGS, COMMON_ACTIONS, EC_OVERVIEW, EC_EVENTS, EC_SETTINGS, NEN_PHOTOS, NEN_OVERVIEW, NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, ANALYTICS_MESSAGES, ANALYTICS_BROADCASTS, ANALYTICS_TRACKED_LINKS, ANALYTICS_CROSS, ENTRY_ROUTES, ENTRY_ROUTE_GENRES, REF_SUMMARY, MILEAGE_OVERVIEW, MILEAGE_RULES, AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, CONVERSION_POINTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, FRIEND_FIELD_SUMMARY, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { ANALYTICS_FUNNEL_DEFS, ANALYTICS_FUNNEL_RUN, SAVED_ANALYTICS, SAVED_ANALYTICS_SNAPSHOTS, ANALYTICS_URL_CLICKS, ANALYTICS_FRIENDS, ANALYTICS_REACTIONS, ANALYTICS_ROUTES, ANALYTICS_USAGE, AD_PLATFORMS, AD_CONVERSION_LOGS, SAVED_SEARCHES, SUPPORT_MARKS, STAFF_MEMBERS, EVENTS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_REQUESTS, OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, AUTOMATIONS, AUTOMATION_LOGS, COMMON_ACTIONS, EC_OVERVIEW, EC_EVENTS, EC_SETTINGS, NEN_PHOTOS, NEN_OVERVIEW, NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, ANALYTICS_MESSAGES, ANALYTICS_BROADCASTS, ANALYTICS_TRACKED_LINKS, ANALYTICS_CROSS, ENTRY_ROUTES, ENTRY_ROUTE_GENRES, REF_SUMMARY, MILEAGE_OVERVIEW, MILEAGE_RULES, AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, CONVERSION_POINTS, CONVERSION_POINT_IMPACTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, FRIEND_FIELD_SUMMARY, REMINDERS, REMINDER_FOLDERS, BROADCASTS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -614,6 +614,21 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   if (pathname === '/api/analytics/cross') return { success: true, data: ANALYTICS_CROSS }
+  /* PR #445 で増えた口。**当てはめが無いと一覧の既定が返り、画面が落ちる。** */
+  if (pathname === '/api/analytics/funnels') return { success: true, data: ANALYTICS_FUNNEL_DEFS }
+  if (/^\/api\/analytics\/funnels\/[^/]+\/runs\/latest$/.test(pathname)) {
+    return { success: true, data: { ...ANALYTICS_FUNNEL_RUN, funnelId: pathname.split('/')[4] } }
+  }
+  if (/^\/api\/analytics\/funnels\/[^/]+\/run$/.test(pathname)) {
+    return { success: true, data: { ...ANALYTICS_FUNNEL_RUN, funnelId: pathname.split('/')[4] } }
+  }
+  if (pathname === '/api/analytics/saved') return { success: true, data: SAVED_ANALYTICS }
+  if (/^\/api\/analytics\/saved\/[^/]+\/snapshots$/.test(pathname)) {
+    return { success: true, data: SAVED_ANALYTICS_SNAPSHOTS }
+  }
+  if (/^\/api\/analytics\/results\/[^/]+\/audiences$/.test(pathname)) {
+    return { success: true, data: { audienceId: 'aud-1', friendCount: 42, state: 'available', stateReason: null } }
+  }
   if (pathname === '/api/entry-routes') return { success: true, data: ENTRY_ROUTES }
   if (pathname === '/api/entry-route-genres') return { success: true, data: ENTRY_ROUTE_GENRES }
   if (pathname === '/api/analytics/ref-summary') return { success: true, data: REF_SUMMARY }
@@ -625,6 +640,13 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/conversions/approvals') return { success: true, data: CONVERSION_APPROVALS }
   if (pathname === '/api/conversion-points') return { success: true, data: CONVERSION_POINTS }
   if (pathname === '/api/conversions/points') return { success: true, data: CONVERSION_POINTS }
+  /* 計測をやめる前に出す影響。窓（`d8d3Mz`）がこれを待つ。 */
+  if (/^\/api\/conversions\/points\/[^/]+\/impact$/.test(pathname)) {
+    const id = pathname.split('/')[4]
+    const point = CONVERSION_POINTS.find((p) => p.id === id) ?? CONVERSION_POINTS[0]
+    const impact = CONVERSION_POINT_IMPACTS[point.id] ?? { eventCount: 0, totalValue: 0 }
+    return { success: true, data: { point, ...impact, usedIn: point.usedIn } }
+  }
   if (pathname === '/api/conversions/report') {
     return {
       success: true,

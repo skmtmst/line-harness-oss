@@ -1608,31 +1608,69 @@ export const AFFILIATES_REPORT = [
 ]
 
 /** 成果地点（`ConversionPoint`）。設計は「成果地点3つ」。 */
+/**
+ * 成果地点。**型は `ConversionPointWithUsage`（`api.ts:97`）。**
+ *
+ * `usedIn` は**必ず入れる。** 型の覚え書きに「理由が無いときも空配列を
+ * 返す。省略は『未取得』と区別するため使わない」とある。省くと
+ * `point.usedIn.length` で画面が落ちる（`conversions/page.tsx:181`）。
+ *
+ * `status` は `'active' | 'stopped'`。止めたものは操作の列が
+ * 「過去実績を保持」になる。**止めた側も撮れるように1件混ぜてある。**
+ */
 export const CONVERSION_POINTS = [
   {
     id: 'cp-1', name: '体験申込フォームの送信', eventType: 'form_submit', value: 3000,
     measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30,
-    lineAccountId: null, createdAt: '2026-02-01T00:00:00.000Z',
+    lineAccountId: null, status: 'active', stoppedAt: null,
+    createdAt: '2026-02-01T00:00:00.000Z',
+    usedIn: [
+      { conversionPointId: 'cp-1', kind: 'analytics_funnel', consumerId: 'fn-1', consumerName: '体験申込までの流れ', href: '/analytics?tab=funnel' },
+      { conversionPointId: 'cp-1', kind: 'analytics_funnel', consumerId: 'fn-2', consumerName: '8月キャンペーンの効き', href: '/analytics?tab=funnel' },
+    ],
   },
   {
+    /* どこからも使われていない。**「0件」を撮るための1件。** */
     id: 'cp-2', name: '定期便の申込', eventType: 'purchase', value: 8000,
     measureMethod: 'url_reach', targetUrl: 'https://example.co.jp/thanks/subscription',
     countRepeat: false, attributionDays: 90, lineAccountId: null,
+    status: 'active', stoppedAt: null,
     createdAt: '2026-02-01T00:00:00.000Z',
+    usedIn: [],
   },
   {
     /*
       **`eventType` は画面が名前を知っている言葉から選ぶ**
-      （`conversions/page.tsx:27` の `EVENT_TYPE_LABELS`）。
+      （`conversions/page.tsx` の `EVENT_TYPE_LABELS`）。
       `'download'` のような知らない言葉を入れると、種別の列に
       **英語のまま**出て、実装の不具合に見える。
     */
     id: 'cp-3', name: '資料ダウンロード', eventType: 'url_click', value: null,
     measureMethod: 'url_reach', targetUrl: 'https://example.co.jp/download/done',
     countRepeat: true, attributionDays: null, lineAccountId: null,
+    status: 'active', stoppedAt: null,
     createdAt: '2026-06-11T00:00:00.000Z',
+    usedIn: [
+      { conversionPointId: 'cp-3', kind: 'analytics_funnel', consumerId: 'fn-3', consumerName: '資料からの申込', href: '/analytics?tab=funnel' },
+    ],
+  },
+  {
+    /* すでに止めてある。操作の列が「過去実績を保持」になる。 */
+    id: 'cp-4', name: '旧キャンペーンの申込', eventType: 'form_submit', value: 2000,
+    measureMethod: 'manual', targetUrl: null, countRepeat: false, attributionDays: 30,
+    lineAccountId: null, status: 'stopped', stoppedAt: '2026-07-31T15:00:00.000Z',
+    createdAt: '2026-01-10T00:00:00.000Z',
+    usedIn: [],
   },
 ]
+
+/** 計測をやめるときに出す影響。`/api/conversions/points/:id/impact`。 */
+export const CONVERSION_POINT_IMPACTS = {
+  'cp-1': { eventCount: 128, totalValue: 384000 },
+  'cp-2': { eventCount: 42, totalValue: 336000 },
+  'cp-3': { eventCount: 0, totalValue: 0 },
+  'cp-4': { eventCount: 9, totalValue: 18000 },
+}
 
 /**
  * 機能17 マイル。設計 `s98Vfw` の帯（友だち1,284人・486,200マイル）。
@@ -1860,55 +1898,81 @@ export const NEN_OVERVIEW = {
   coupons: 72,
 }
 
+/**
+ * NEN配信の段。**キーも並びも、`071_nen_engagement.sql` の種データどおり。**
+ *
+ * 勝手な名前（`shipped` `delivered` `pet_birthday` `winback`）で書いていた
+ * ころは、画面が `campaignKey` で分岐する作り（`campaign-display.ts` の
+ * `birthday_coupon`）に**一度も当たらず**、直っているものを
+ * 「直っていない」と撮っていた。
+ *
+ * 実装が受け付けるキーは `nen-campaigns.ts:19-21` の5本だけだが、
+ * 種データには7本ある（`order_confirmed` と `shipping_confirmed` は
+ * 画面から編集できない）。**7本とも出す。** 編集できない段が一覧に
+ * 並ぶことも、見るべきことのうち。
+ */
 export const NEN_CAMPAIGN_SETTINGS = [
   {
-    campaignKey: 'order_confirmed', label: '注文が確定', category: 'transactional',
-    triggerEvent: 'ec.order.confirmed', delayDays: 0, deliveryTime: '00:00',
+    campaignKey: 'order_confirmed', label: '注文完了', category: 'transactional',
+    triggerEvent: 'ec.order.confirmed', delayDays: 0, deliveryTime: '10:00',
     isEnabled: true, title: '注文ありがとうございます',
     bodyText: 'ご注文ありがとうございます。発送まで少しお待ちください。',
     buttonLabel: '注文をみる', buttonUrl: 'https://example.co.jp/orders',
     imageUrl: null, updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    campaignKey: 'shipped', label: '発送しました', category: 'transactional',
-    triggerEvent: 'ec.order.shipped', delayDays: 0, deliveryTime: '18:00',
+    campaignKey: 'shipping_confirmed', label: '発送完了', category: 'transactional',
+    triggerEvent: 'ec.order.shipped', delayDays: 0, deliveryTime: '10:00',
     isEnabled: true, title: 'お荷物の追跡番号',
     bodyText: '本日発送しました。追跡番号は {{追跡番号}} です。',
     buttonLabel: '追跡する', buttonUrl: 'https://example.co.jp/track',
     imageUrl: null, updatedAt: '2026-08-01T00:00:00.000Z',
   },
   {
-    campaignKey: 'delivered', label: '届きました', category: 'follow_up',
-    triggerEvent: 'ec.order.delivered', delayDays: 1, deliveryTime: '10:00',
-    isEnabled: true, title: '使い方のご案内',
-    bodyText: 'お届けした商品の使い方をご案内します。',
-    buttonLabel: null, buttonUrl: null, imageUrl: null,
-    updatedAt: '2026-08-01T00:00:00.000Z',
+    campaignKey: 'arrival_check', label: '商品到着の確認', category: 'follow_up',
+    triggerEvent: 'ec.order.shipped', delayDays: 5, deliveryTime: '10:00',
+    isEnabled: true, title: '商品は無事に届きましたか？',
+    bodyText: '発送から数日が経ちました。商品が無事に届いているか確認させてください。',
+    buttonLabel: '注文内容を確認する', buttonUrl: 'https://example.co.jp/orders',
+    imageUrl: null, updatedAt: '2026-08-02T00:00:00.000Z',
   },
   {
-    campaignKey: 'review_request', label: '口コミのお願い', category: 'follow_up',
-    triggerEvent: 'ec.order.delivered', delayDays: 7, deliveryTime: '20:00',
-    isEnabled: true, title: 'いかがでしたか',
-    bodyText: '{{ペットの名前}}ちゃん、{{商品名}}はいかがでしたか。',
+    campaignKey: 'review_request', label: '使用感・口コミのお願い', category: 'follow_up',
+    triggerEvent: 'ec.order.shipped', delayDays: 10, deliveryTime: '10:00',
+    isEnabled: true, title: '実際に使ってみていかがでしたか？',
+    bodyText: '{{ペットの名前}}ちゃん、{{商品名}}はいかがでしたか。よろしければ、ひとことだけ感想を聞かせてください。',
     buttonLabel: '感想を送る', buttonUrl: 'https://example.co.jp/review',
     imageUrl: null, updatedAt: '2026-08-10T00:00:00.000Z',
   },
   {
-    campaignKey: 'pet_birthday', label: 'ペットの誕生日', category: 'birthday',
-    triggerEvent: 'pet.birthday', delayDays: -3, deliveryTime: '10:00',
-    isEnabled: true, title: 'お誕生日おめでとうございます',
-    bodyText: '{{ペットの名前}}ちゃん、お誕生日おめでとうございます。',
-    buttonLabel: 'クーポンを使う', buttonUrl: 'https://example.co.jp/coupon',
-    imageUrl: null, updatedAt: '2026-07-01T00:00:00.000Z',
+    campaignKey: 'cross_sell', label: '他の商品・定期便のご案内', category: 'follow_up',
+    triggerEvent: 'ec.order.shipped', delayDays: 14, deliveryTime: '10:00',
+    isEnabled: false, title: '毎日のごはんを、もっと安心で手軽に',
+    bodyText: '然-NEN-には、素材や食べ方に合わせた商品と、お得で続けやすい定期便があります。',
+    buttonLabel: '商品をみる', buttonUrl: 'https://example.co.jp/items',
+    imageUrl: null, updatedAt: '2026-07-20T00:00:00.000Z',
   },
   {
-    /* 止めている段。**設計は「グレーの丸」で出す。** */
-    campaignKey: 'winback', label: '久しぶりの方へ', category: 'follow_up',
-    triggerEvent: 'ec.order.none_90d', delayDays: 90, deliveryTime: '11:00',
-    isEnabled: false, title: 'お久しぶりです',
-    bodyText: 'また会えるのを楽しみにしています。',
-    buttonLabel: null, buttonUrl: null, imageUrl: null,
-    updatedAt: '2026-05-01T00:00:00.000Z',
+    campaignKey: 'column', label: 'NENコラム', category: 'column',
+    triggerEvent: null, delayDays: 0, deliveryTime: '10:00',
+    isEnabled: true, title: 'NENコラムを更新しました',
+    bodyText: 'ジビエ、ペットフード、愛犬・愛猫の健康についてお届けします。',
+    buttonLabel: 'コラムを読む', buttonUrl: 'https://example.co.jp/column',
+    imageUrl: null, updatedAt: '2026-08-22T00:00:00.000Z',
+  },
+  {
+    /*
+      **`delayDays` は 0。** 誕生日の3日前は `delay_days` ではなく
+      `birthdayDeliveryTarget`（`nen-engagement.ts:414-429`）が決めている
+      （3日先の誕生日を探し、当日の10:00 JSTに送る）。
+      画面は `campaignKey === 'birthday_coupon'` で言い分ける。
+    */
+    campaignKey: 'birthday_coupon', label: 'お誕生日クーポン', category: 'birthday',
+    triggerEvent: null, delayDays: 0, deliveryTime: '10:00',
+    isEnabled: true, title: '{{pet_name}}ちゃん、お誕生日月おめでとうございます',
+    bodyText: '大切なお誕生日月をお祝いして、然-NEN-から特別なクーポンをお届けします。',
+    buttonLabel: 'クーポンを受け取る', buttonUrl: 'https://example.co.jp/coupon',
+    imageUrl: null, updatedAt: '2026-08-24T00:00:00.000Z',
   },
 ]
 
@@ -1955,11 +2019,11 @@ export const NEN_PETS = [
 
 /** 配信の記録。設計 `WeXbL`（送りました2,486／これから148／届きませんでした6）。 */
 export const NEN_JOBS = [
-  { id: 'nj-1', campaignKey: 'review_request', label: '口コミのお願い', friendName: 'Kenta Kawano', scheduledAt: '2026-08-25T11:00:00.000Z', status: 'pending', attempts: 0, lastError: null, sentAt: null },
-  { id: 'nj-2', campaignKey: 'shipped', label: '発送しました', friendName: 'Masato S.', scheduledAt: '2026-08-24T09:00:00.000Z', status: 'sent', attempts: 1, lastError: null, sentAt: '2026-08-24T09:00:02.000Z' },
-  { id: 'nj-3', campaignKey: 'pet_birthday', label: 'ペットの誕生日', friendName: '菅野 亮', scheduledAt: '2026-08-24T01:00:00.000Z', status: 'sent', attempts: 1, lastError: null, sentAt: '2026-08-24T01:00:01.000Z' },
+  { id: 'nj-1', campaignKey: 'review_request', label: '使用感・口コミのお願い', friendName: 'Kenta Kawano', scheduledAt: '2026-08-25T11:00:00.000Z', status: 'pending', attempts: 0, lastError: null, sentAt: null },
+  { id: 'nj-2', campaignKey: 'shipping_confirmed', label: '発送完了', friendName: 'Masato S.', scheduledAt: '2026-08-24T09:00:00.000Z', status: 'sent', attempts: 1, lastError: null, sentAt: '2026-08-24T09:00:02.000Z' },
+  { id: 'nj-3', campaignKey: 'birthday_coupon', label: 'お誕生日クーポン', friendName: '菅野 亮', scheduledAt: '2026-08-24T01:00:00.000Z', status: 'sent', attempts: 1, lastError: null, sentAt: '2026-08-24T01:00:01.000Z' },
   /* 届かなかったもの。**ブロックされた人。** 理由が残ることが要る。 */
-  { id: 'nj-4', campaignKey: 'delivered', label: '届きました', friendName: '山田 太郎', scheduledAt: '2026-08-23T01:00:00.000Z', status: 'failed', attempts: 3, lastError: 'ブロックされています', sentAt: null },
+  { id: 'nj-4', campaignKey: 'arrival_check', label: '商品到着の確認', friendName: '山田 太郎', scheduledAt: '2026-08-23T01:00:00.000Z', status: 'failed', attempts: 3, lastError: 'ブロックされています', sentAt: null },
 ]
 
 /**
@@ -2689,6 +2753,11 @@ export const ANALYTICS_USAGE = envelope({
 })
 
 /** 設計 `Fh2Qj`（押された4,182回・押した人1,864・20時台18.4%・押されていない6本）。 */
+/**
+ * URLクリック。**割合は 0〜1 で書く。** 画面は `percent` を付けて
+ * `Math.round(x * 1000) / 10` にする（`analytics/page.tsx:1281`）ので、
+ * `16.9` と書くと **1690%** と出る。**実装の不具合に見えるが書き間違い。**
+ */
 export const ANALYTICS_URL_CLICKS = envelope({
   state: 'available', stateReason: null,
   exposureAvailableFrom: '2026-06-01',
@@ -2699,7 +2768,7 @@ export const ANALYTICS_URL_CLICKS = envelope({
       trackedLinkId: 'tl-1', name: '夏の特集ページ', originalUrl: 'https://example.co.jp/summer',
       shortCode: 's3k9', isActive: true,
       actions: { tagName: '夏CP', scenarioName: null },
-      clicks: M(1840), knownClickPeople: M(812), deliveredPeople: M(4801), clickRate: M(16.9),
+      clicks: M(1840), knownClickPeople: M(812), deliveredPeople: M(4801), clickRate: M(0.169),
       firstClickedAt: M('2026-08-13T02:10:00.000Z'), lastClickedAt: M('2026-08-24T11:40:00.000Z'),
       usageLocations: ['一斉配信「夏のご案内」'],
     },
@@ -2707,7 +2776,7 @@ export const ANALYTICS_URL_CLICKS = envelope({
       trackedLinkId: 'tl-2', name: '空き枠を見る', originalUrl: 'https://example.co.jp/slots',
       shortCode: 'b7m2', isActive: true,
       actions: { tagName: null, scenarioName: '体験前フォロー' },
-      clicks: M(1420), knownClickPeople: M(704), deliveredPeople: M(3860), clickRate: M(18.2),
+      clicks: M(1420), knownClickPeople: M(704), deliveredPeople: M(3860), clickRate: M(0.182),
       firstClickedAt: M('2026-08-01T00:00:00.000Z'), lastClickedAt: M('2026-08-25T01:20:00.000Z'),
       usageLocations: ['シナリオ「体験前フォロー」・2通目'],
     },
@@ -2737,3 +2806,130 @@ export const ANALYTICS_URL_CLICKS = envelope({
     },
   ],
 })
+
+/* ── 機能20 分析（PR #445 で増えた口） ───────────────────────────── */
+
+/**
+ * ファネルの定義。`/api/analytics/funnels`（`v6Funnels.list`）。
+ *
+ * **`currentVersion` と `migrationState` を必ず入れる。** 版が無いものを
+ * `null` で、`needs_migration` のものを1本混ぜてある。**移行前のものが
+ * 一覧でどう出るかも見るべきことのうち。**
+ */
+export const ANALYTICS_FUNNEL_DEFS = [
+  {
+    id: 'fn-1', name: '体験申込までの流れ', windowDays: 30,
+    createdAt: '2026-06-01T00:00:00.000Z',
+    currentVersion: { id: 'fv-1', versionNumber: 3, createdAt: '2026-08-10T00:00:00.000Z' },
+    migrationState: 'ready',
+  },
+  {
+    id: 'fn-2', name: '8月キャンペーンの効き', windowDays: 14,
+    createdAt: '2026-07-28T00:00:00.000Z',
+    currentVersion: { id: 'fv-2', versionNumber: 1, createdAt: '2026-07-28T00:00:00.000Z' },
+    migrationState: 'ready',
+  },
+  {
+    /* 版がまだ無い。移行が要る側を撮るための1本。 */
+    id: 'fn-3', name: '資料からの申込', windowDays: 60,
+    createdAt: '2026-03-02T00:00:00.000Z',
+    currentVersion: null, migrationState: 'needs_migration',
+  },
+]
+
+/**
+ * ファネルの実行結果。`/api/analytics/funnels/:id/runs/latest`。
+ *
+ * **`conversionFromPrevious` は割合（0〜1）。百分率ではない。**
+ * `packages/db/src/analytics.ts` と worker の試験が `0.5`（2人中1人）で
+ * 揃えている。画面は `Math.round(x * 1000) / 10` で百分率にするので、
+ * `68.7` と書くと **6870%** と出る。**実装の不具合に見えるが書き間違い。**
+ *
+ * 1段目は前の段が無いので `null`、時間が測れない段も `null`。
+ * 0 で埋めると「0%で落ちた」「0秒で進んだ」と読めてしまう。
+ *
+ * `droppedAfter` は前後の `reached` の差と合わせる。ずれていると、
+ * 画面が自分で計算した数と食い違って見える。
+ */
+export const ANALYTICS_FUNNEL_RUN = {
+  runId: 'run-1', funnelId: 'fn-1', versionId: 'fv-1', versionNumber: 3,
+  lineAccountId: 'visual-qa-account',
+  cohortFrom: '2026-07-27', cohortTo: '2026-08-25', timeZone: 'Asia/Tokyo',
+  dataCutoffAt: '2026-08-25T02:00:00.000Z',
+  state: 'available', stateReason: null,
+  groups: [
+    {
+      key: 'all', label: 'すべて', entrants: 1284, completed: 42,
+      steps: [
+        { stepOrder: 1, label: '配信を開いた', reached: 1284, conversionFromPrevious: null, droppedAfter: 402, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+        { stepOrder: 2, label: 'リンクを押した', reached: 882, conversionFromPrevious: 0.687, droppedAfter: 658, inProgressAfter: 18, averageSecondsFromPrevious: 214, medianSecondsFromPrevious: 96 },
+        { stepOrder: 3, label: 'フォームを開いた', reached: 224, conversionFromPrevious: 0.254, droppedAfter: 182, inProgressAfter: 0, averageSecondsFromPrevious: 1860, medianSecondsFromPrevious: 720 },
+        { stepOrder: 4, label: '申し込んだ', reached: 42, conversionFromPrevious: 0.188, droppedAfter: 0, inProgressAfter: 0, averageSecondsFromPrevious: null, medianSecondsFromPrevious: null },
+      ],
+    },
+  ],
+}
+
+/**
+ * 保存した分析。`/api/analytics/saved`。
+ *
+ * **`latestSnapshot.state` を散らしてある**（`available` / `partial` /
+ * `unavailable`）。取れた・一部だけ・取れなかったを、同じ一覧の中で
+ * 見分けられるかを見る。**版がまだ無いものは `latestSnapshot: null`。**
+ */
+export const SAVED_ANALYTICS = [
+  {
+    id: 'sa-1', name: '体験申込までの流れ（8月）', kind: 'funnel', status: 'active',
+    currentVersionNumber: 3, createdBy: 'st-1', createdByName: '川野 健太',
+    createdAt: '2026-08-01T00:00:00.000Z', updatedAt: '2026-08-25T02:00:00.000Z',
+    snapshotCount: 4,
+    latestSnapshot: {
+      id: 'sn-1', state: 'available',
+      periodFrom: '2026-07-27', periodTo: '2026-08-25',
+      dataCutoffAt: '2026-08-25T02:00:00.000Z', createdAt: '2026-08-25T02:05:00.000Z',
+    },
+  },
+  {
+    /* 一部だけ取れた。0件と混ぜてはいけない側。 */
+    id: 'sa-2', name: 'タグ×流入経路のクロス', kind: 'cross', status: 'active',
+    currentVersionNumber: 1, createdBy: 'st-2', createdByName: '菅野 亮',
+    createdAt: '2026-07-10T00:00:00.000Z', updatedAt: '2026-08-24T02:00:00.000Z',
+    snapshotCount: 2,
+    latestSnapshot: {
+      id: 'sn-2', state: 'partial',
+      periodFrom: '2026-07-26', periodTo: '2026-08-24',
+      dataCutoffAt: '2026-08-24T02:00:00.000Z', createdAt: '2026-08-24T02:05:00.000Z',
+    },
+  },
+  {
+    /* 取れなかった。 */
+    id: 'sa-3', name: '資料からの申込', kind: 'funnel', status: 'active',
+    currentVersionNumber: 2, createdBy: 'st-1', createdByName: '川野 健太',
+    createdAt: '2026-05-02T00:00:00.000Z', updatedAt: '2026-08-20T02:00:00.000Z',
+    snapshotCount: 1,
+    latestSnapshot: {
+      id: 'sn-3', state: 'unavailable',
+      periodFrom: '2026-07-22', periodTo: '2026-08-20',
+      dataCutoffAt: '2026-08-20T02:00:00.000Z', createdAt: '2026-08-20T02:05:00.000Z',
+    },
+  },
+  {
+    /* まだ一度も取っていない。**`snapshotCount: 0` と `null` は別のこと。** */
+    id: 'sa-4', name: '休眠からの復帰（下書き）', kind: 'cross', status: 'archived',
+    currentVersionNumber: 1, createdBy: 'st-2', createdByName: '菅野 亮',
+    createdAt: '2026-08-26T00:00:00.000Z', updatedAt: '2026-08-26T00:00:00.000Z',
+    snapshotCount: 0, latestSnapshot: null,
+  },
+]
+
+/** 保存した分析の記録。`/api/analytics/saved/:id/snapshots`。 */
+export const SAVED_ANALYTICS_SNAPSHOTS = [
+  {
+    id: 'sn-1', savedAnalysisId: 'sa-1', analysisVersionId: 'fv-1',
+    sourceKind: 'funnel', sourceResultId: 'run-1',
+    periodFrom: '2026-07-27', periodTo: '2026-08-25', timeZone: 'Asia/Tokyo',
+    dataCutoffAt: '2026-08-25T02:00:00.000Z', state: 'available',
+    result: ANALYTICS_FUNNEL_RUN, createdBy: 'st-1',
+    createdAt: '2026-08-25T02:05:00.000Z',
+  },
+]

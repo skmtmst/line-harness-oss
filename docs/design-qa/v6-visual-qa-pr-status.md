@@ -110,3 +110,35 @@
 の実装完了の連絡を待ちます。連絡が来たら4画面を撮り直します。
 いまの比較結果（[#469](https://github.com/skmtmst/line-harness-oss/pull/469)、
 4枚のうち1枚しか撮れない）を、それまで**そのまま**にします。
+
+## 機能18（#443）：headが変わっていないので撮り直していません（2026-08-28）
+
+| | |
+|---|---|
+| 台帳に記録してあるhead | `f372ff30` |
+| いまの head | `f372ff30` |
+
+**同じです。** 台帳の決めごと（変更のないheadは撮り直さない）に従い、
+[#489](https://github.com/skmtmst/line-harness-oss/pull/489) の比較結果を
+そのまま維持します。9枚のうち8枚が撮れ、1枚が未実装のままです。
+
+`git log f372ff30..origin/codex/kenta-v6-feature18-inflow` は空でした。
+
+## 機能17（#441）：Codexが実装中。新しいheadを待ちます
+
+| | |
+|---|---|
+| 台帳に記録してあるhead | `5fd7c048` |
+| いまの head | `5fd7c048` |
+
+**同じです。** 新しいheadが届いたら、機能17の11画面を最優先で比較します。
+いまの比較結果（[#463](https://github.com/skmtmst/line-harness-oss/pull/463)、
+11枚のうち3枚しか撮れない）を、それまで維持します。
+
+## 機能22（#447）：UTC日時のP0は証拠を維持します
+
+`Qu6Vk` の「届いた日時が生のUTCで出る」（`nen-members/page.tsx:166`）は
+**実装をこちらで直しません。** 撮った絵と
+[比較結果](photos-v6/design-qa.md) をそのまま残し、
+[#447 へコメント](https://github.com/skmtmst/line-harness-oss/pull/447)
+で返してあります。

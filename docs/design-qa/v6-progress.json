@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 179,
-  "unimplemented": 74,
+  "compared": 180,
+  "unimplemented": 73,
   "unconfirmed": 5,
   "elsewhere": 4,
   "missing": 0,
@@ -243,17 +243,16 @@
       "feature": 19,
       "name": "コンバージョン",
       "total": 4,
-      "compared": 3,
-      "unimplemented": 1,
+      "compared": 4,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "capturedAt": [
         {
-          "pr": 465,
-          "head": null,
-          "on": "2026-08-28",
-          "note": "Codexの修正待ち。#465 の比較結果を維持"
+          "pr": 444,
+          "head": "ccbd0975",
+          "on": "2026-08-28"
         }
       ]
     },
@@ -266,7 +265,13 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 445,
+          "head": "724f9324",
+          "on": "2026-08-28"
+        }
+      ]
     },
     {
       "feature": 21,
@@ -280,7 +285,7 @@
       "capturedAt": [
         {
           "pr": 446,
-          "head": "d7e2bc9c",
+          "head": "4307088d",
           "on": "2026-08-28"
         }
       ]
