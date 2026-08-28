@@ -31,6 +31,13 @@ function formatJpDate(iso: string | null): string {
   })
 }
 
+function loadDetail(hasAccount: boolean, status: LoadStatus, readyDetail: string): string {
+  if (!hasAccount) return 'アカウントを選択'
+  if (status === 'loading') return '読み込み中'
+  if (status === 'error') return '取得できませんでした'
+  return readyDetail
+}
+
 export default function EventsListPage() {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
@@ -129,16 +136,26 @@ export default function EventsListPage() {
           title="イベント"
           value={dataReady ? String(items.length) : '—'}
           unit={dataReady ? '件' : ''}
-          detail={dataReady ? `受付中 ${kpi.open}` : '取得できませんでした'}
+          detail={loadDetail(Boolean(selectedAccountId), loadStatus, `受付中 ${kpi.open}`)}
         />
-        <Kpi title="申込" value={dataReady ? String(kpi.applied) : '—'} unit={dataReady ? '人' : ''} detail={dataReady ? '累計' : '取得できませんでした'} />
+        <Kpi
+          title="申込"
+          value={dataReady ? String(kpi.applied) : '—'}
+          unit={dataReady ? '人' : ''}
+          detail={loadDetail(Boolean(selectedAccountId), loadStatus, '累計')}
+        />
         <Kpi
           title="定員の充足"
           value={dataReady && kpi.rate !== null ? String(kpi.rate) : '—'}
           unit={dataReady && kpi.rate !== null ? '%' : ''}
-          detail={dataReady ? '受付中のもの' : '取得できませんでした'}
+          detail={loadDetail(Boolean(selectedAccountId), loadStatus, '受付中のもの')}
         />
-        <Kpi title="承認待ち" value={dataReady ? String(kpi.pending) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? '要対応' : '取得できませんでした'} />
+        <Kpi
+          title="承認待ち"
+          value={dataReady ? String(kpi.pending) : '—'}
+          unit={dataReady ? '件' : ''}
+          detail={loadDetail(Boolean(selectedAccountId), loadStatus, '要対応')}
+        />
       </div>
 
       <div
@@ -304,9 +321,15 @@ export default function EventsListPage() {
 
       <div data-design="tf" className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <span className="text-ink-faint text-xs">
-          {filtered.length === 0 ? '0件' : `${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件 / 全${filtered.length}件`}
+          {!selectedAccountId || loadStatus === 'error'
+            ? '—'
+            : loadStatus === 'loading'
+              ? '読み込み中'
+              : filtered.length === 0
+                ? '0件'
+                : `${(current - 1) * pageSize + 1}〜${Math.min(current * pageSize, filtered.length)}件 / 全${filtered.length}件`}
         </span>
-        <Pagination page={current} pageCount={pageCount} onPageChange={setPage} />
+        {dataReady ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} /> : null}
       </div>
     </div>
   )
