@@ -26,6 +26,7 @@ import {
   type TargetMode,
 } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
+import { newBroadcastDraftSession, persistBroadcastDraft } from '@/lib/broadcast-draft'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, {
@@ -266,7 +267,12 @@ export default function BroadcastForm({
   initialCondition = null,
 }: BroadcastFormProps) {
   const { selectedAccountId } = useAccount()
-  const createIdempotencyKey = useRef(crypto.randomUUID())
+  /*
+   * テスト送信と本番予約で同じ下書きを使う。
+   * 押すたびにPOSTすると、テストした回数だけ一覧へ下書きが増え、最後の予約は
+   * さらに別のレコードになる。アカウントを切り替えた場合だけ新しい下書きへ分ける。
+   */
+  const draftSession = useRef(newBroadcastDraftSession())
   const appliedInitialTemplate = useRef(false)
   const [title, setTitle] = useState('')
   const [bubbles, setBubbles] = useState<BroadcastBubble[]>([emptyBubble()])
@@ -504,11 +510,46 @@ export default function BroadcastForm({
     return new Date(Date.UTC(y, mo - 1, d, h - 9, m)).toISOString()
   }
 
+  const draftPayload = (scheduledAt: string | null) => {
+    const first = bubbles[0]
+    const legacy = bubbleLegacyMessage(first)
+    return {
+      title: title.trim() || '（テスト送信）',
+      messageType: legacy.messageType,
+      messageContent: legacy.messageContent,
+      messageBubbles: bubblesForSave(bubbles),
+      ...targetPayload(),
+      lineAccountId: selectedAccountId || null,
+      scheduledAt,
+      trackLinks,
+      folderId: folderId || null,
+      measureOpens,
+      stealthSpreadMinutes: Number(spreadMinutes) || 0,
+    }
+  }
+
+  /** テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。 */
+  const persistDraft = async (scheduledAt: string | null): Promise<ApiBroadcast> => {
+    const accountId = selectedAccountId || null
+    const payload = draftPayload(scheduledAt)
+    const result = await persistBroadcastDraft(
+      draftSession.current,
+      accountId,
+      payload,
+      {
+        create: api.broadcasts.create,
+        update: api.broadcasts.update,
+      },
+    )
+    draftSession.current = result.session
+    return result.broadcast
+  }
+
   /**
    * テスト送信。下書きを作って、そこから自分宛に送る。
    *
-   * 作った下書きは残る。送って終わりにすると、確かめた内容と本番で送る
-   * 内容が別物になりうる。同じ下書きをそのまま予約に進められるようにする。
+   * 最初だけ下書きを作り、2回目以降と本番予約は同じ行を更新する。
+   * 確かめた内容と本番で送る内容を同じ実体にし、テスト回数ぶん下書きを増やさない。
    */
   const handleTestSend = async () => {
     const validationError = validate()
@@ -520,26 +561,8 @@ export default function BroadcastForm({
     setError('')
     setTestResult('')
     try {
-      const first = bubbles[0]
-      const legacy = bubbleLegacyMessage(first)
-      const created = await api.broadcasts.create(
-        {
-          title: title.trim() || '（テスト送信）',
-          messageType: legacy.messageType,
-          messageContent: legacy.messageContent,
-          messageBubbles: bubblesForSave(bubbles),
-          ...targetPayload(),
-          lineAccountId: selectedAccountId || null,
-          scheduledAt: null,
-          trackLinks,
-          folderId: folderId || null,
-          measureOpens,
-          stealthSpreadMinutes: Number(spreadMinutes) || 0,
-        },
-        { idempotencyKey: crypto.randomUUID() },
-      )
-      if (!created.success) throw new Error(created.error)
-      const res = await api.broadcasts.testSend(created.data.id)
+      const draft = await persistDraft(null)
+      const res = await api.broadcasts.testSend(draft.id)
       if (res.success) {
         setTestResult(`テスト送信しました（${res.sent ?? 0}件）`)
       } else {
@@ -598,11 +621,10 @@ export default function BroadcastForm({
   const save = async () => {
     const validationError = validate(); if (validationError) { setError(validationError); return }
     setSaving(true); setError('')
-    const first = bubbles[0]
-    const legacy = bubbleLegacyMessage(first)
     try {
-      const res = await api.broadcasts.create({ title: title.trim(), messageType: legacy.messageType, messageContent: legacy.messageContent, messageBubbles: bubblesForSave(bubbles), ...targetPayload(), lineAccountId: selectedAccountId || null, scheduledAt: scheduledAtIso(), trackLinks, folderId: folderId || null, measureOpens, stealthSpreadMinutes: Number(spreadMinutes) || 0 }, { idempotencyKey: createIdempotencyKey.current })
-      if (res.success) { setConfirmOpen(false); onSuccess(res.data) } else setError(res.error)
+      const saved = await persistDraft(scheduledAtIso())
+      setConfirmOpen(false)
+      onSuccess(saved)
     } catch { setError('下書きを保存できませんでした') } finally { setSaving(false) }
   }
 

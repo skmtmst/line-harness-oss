@@ -8,9 +8,16 @@ const NEW_PAGE = readFileSync(join(process.cwd(), 'src/app/broadcasts/new/page.t
 
 describe('V6 一斉配信の予約完了', () => {
   it('作成結果の実IDを完了画面へ渡す', () => {
-    expect(FORM).toContain('onSuccess(res.data)')
+    expect(FORM).toContain('const saved = await persistDraft(scheduledAtIso())')
+    expect(FORM).toContain('onSuccess(saved)')
     expect(NEW_PAGE).toContain('/broadcasts/reserved?id=')
     expect(NEW_PAGE).toContain("broadcast.status === 'scheduled'")
+  })
+
+  it('テスト送信と最終予約は同じ下書きを更新する', () => {
+    expect(FORM).toContain('const draft = await persistDraft(null)')
+    expect(FORM).toContain('api.broadcasts.testSend(draft.id)')
+    expect(FORM).not.toContain('idempotencyKey: crypto.randomUUID()')
   })
 
   it('保存した配信を読み直し予約状態を確かめる', () => {
