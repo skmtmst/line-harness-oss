@@ -79,6 +79,17 @@ describe('友だち属性 V4 contract', () => {
     expect(migrate).not.toContain("import Header from '@/components/layout/header'")
   })
 
+  it('友だち情報欄の読込失敗を空状態や作成導線と混ぜない', () => {
+    const source = read('components/friend-fields/field-list.tsx')
+    const empty = source.indexOf('まだ友だち情報欄がありません')
+    expect(empty).toBeGreaterThan(-1)
+    expect(source.slice(0, empty).lastIndexOf("status === 'error'")).toBeGreaterThan(-1)
+    expect(source).toContain("status === 'ready' ? <Button href=\"/tags/fields/new\"")
+    expect(source).toContain('status === \'ready\' && error')
+    expect(source).toContain('友だち情報欄を再読み込み</Button>')
+    expect(source).toContain('setItems([])')
+  })
+
   it('友だち属性ではブラウザ標準confirmを使わない', () => {
     const sources = [
       read('components/friend-fields/tags-page-v4.tsx'),

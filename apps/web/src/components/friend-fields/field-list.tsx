@@ -57,8 +57,11 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
       if (!list.success || !stats.success) throw new Error('load failed')
       setItems(list.data); setSummary(stats.data); setStatus('ready')
     } catch (reason) {
-      setStatus(reason instanceof ApiError && reason.status === 403 ? 'forbidden' : 'error')
+      const forbidden = reason instanceof ApiError && reason.status === 403
+      setItems([])
+      setStatus(forbidden ? 'forbidden' : 'error')
       setSummary(null)
+      setError(forbidden ? '' : reason instanceof ApiError ? reason.message : '友だち情報欄を読み込めませんでした')
     }
   }, [accountId])
 
@@ -113,10 +116,10 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
           {Object.entries(FIELD_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <span className="flex-1" />
-        {status === 'forbidden' ? null : <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button>}
+        {status === 'ready' ? <Button href="/tags/fields/new" variant="primary">＋ 項目を追加</Button> : null}
       </div>
 
-      {error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
+      {status === 'ready' && error ? <p role="alert" className="mb-4 rounded-control border border-danger/20 bg-danger-bg p-3 text-sm text-danger">{error}</p> : null}
 
       <div className="overflow-hidden rounded-card border border-hairline bg-canvas [box-shadow:1px_1px_2px_rgba(15,23,42,0.10)]">
         <table className="w-full table-fixed text-sm">
@@ -126,7 +129,7 @@ export default function FriendFieldList({ accountId }: { accountId: string | nul
           <tbody className="divide-y divide-hairline">
             {status === 'loading' ? <tr><td colSpan={7} className="p-0"><ListState kind="loading" /></td></tr>
               : status === 'forbidden' ? <tr><td colSpan={7} className="p-0"><ListState kind="forbidden" description="友だち情報欄を見る権限がありません。オーナーか管理者に確認してください。" /></td></tr>
-              : status === 'error' ? <tr><td colSpan={7} className="p-0"><ListState kind="error" description="友だち情報欄を読み込めませんでした。再読み込みしてください。" /></td></tr>
+              : status === 'error' ? <tr><td colSpan={7} className="p-0"><ListState kind="error" description={error || '友だち情報欄を読み込めませんでした。'} action={<Button variant="secondary" onClick={() => void load()}>友だち情報欄を再読み込み</Button>} /></td></tr>
               : items.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="まだ友だち情報欄がありません" description="「＋ 項目を追加」から最初の項目を作ってください。" /></td></tr>
               : visible.length === 0 ? <tr><td colSpan={7} className="p-0"><ListState kind="empty" title="条件に合う項目はありません" description="項目名か種類を変えてください。" /></td></tr>
               : visible.map((field) => <tr key={field.id} className="hover:bg-canvas-sunken">
