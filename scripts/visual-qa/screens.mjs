@@ -425,6 +425,8 @@ export const SCREENS = [
     */
     ...SCENARIO, node: 'xfYLn', name: '5-1-D シナリオ・ステップ編集', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '編集', nth: 1 }],
+    verdict: 'needs_fix', verdictNote: 'P1 作り手の言葉が画面に出ている（「cron が 5 分粒度のため最大 5 分遅れる場合があります」）。運用の人に cron は通じない。P2 設計は「1通目を編集」の専用ページで、LINEプレビュー・配信の流れ・設定内容・配信前チェック（テスト送信が未完了です ほか4項目）を右に並べる。実装は一覧の行の下に開く欄で、それらが無い。時刻が09:00 AMと英語書式になるのは撮影側のブラウザ言語の癖',
+    verdictSource: 'scenarios-v6/xfYLn-1920.png', verdictHead: '6db5ad7f',
   },
   {
     ...SCENARIO, node: 'r6Gzsu', name: '5-1-E シナリオ・配信条件を開く', route: EDIT,
@@ -442,6 +444,8 @@ export const SCREENS = [
     */
     ...SCENARIO, node: 'hz9ti', name: '5-1-F シナリオ・送信後アクションを開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: 'アクション', nth: 1 }],
+    verdict: 'needs_fix', verdictNote: 'P1 選べる動作が設計の8つ（テキスト送信・テンプレート送信・タグ操作・友だち情報操作・シナリオ操作・リマインダ操作・対応マーク/表示操作・イベント予約操作）のうち5つで、テキスト送信・テンプレート送信・リマインダ操作・イベント予約操作が無い。実行の順番も、動作ごとの条件分岐（条件ON/OFF）も、保存済みセットの呼び出しも、「発動2回目以降も各動作を実行」も無い',
+    verdictSource: 'scenarios-v6/hz9ti-1920.png', verdictHead: '6db5ad7f',
   },
   {
     ...SCENARIO, node: 'dqFft', name: '5-1-G シナリオ・ステップ削除確認', route: EDIT,
@@ -913,6 +917,8 @@ export const SCREENS = [
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webinars*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗の詳しい説明が「API error: 500」とそのまま出る。P1 ウェビナーの件数だけ0と出る（ほかの3枚は—。未取得なので—にそろえる）。一覧の中を赤い枠と「もう一度読み込む」にしているのは正しい',
+    verdictSource: 'webinars-v6/zCQXe-error-1920.png', verdictHead: 'ed2e3633',
   },
 
   // ── 機能11 テンプレート ─────────────────────────────────
@@ -1499,6 +1505,8 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「受信Webhookがありません。「新規Webhook」から作成してください。」を出し、作成を誘う。P2 タブが「受信 (Incoming)」「送信 (Outgoing)」と英語を括弧で足しており、誘い文の「新規Webhook」と実際のボタン名「Webhookを追加」も違う',
+    verdictSource: 'webhooks-v6/f8SBSh-error-1920.png', verdictHead: '0389226d',
   },
 
   // ── 機能27 予約管理 ─────────────────────────────────────
@@ -1826,7 +1834,13 @@ export const CAPTURED_AT = {
   ],
   7: [{ pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
   8: [{ pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
-  5: [{ pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['M2b2B'], note: '新しい口は足さず既存の統計を読む' }],
+  5: [
+    { pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['M2b2B'], note: '新しい口は足さず既存の統計を読む' },
+    {
+      pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['xfYLn', 'hz9ti'],
+      note: '撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた',
+    },
+  ],
   25: [{ pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
