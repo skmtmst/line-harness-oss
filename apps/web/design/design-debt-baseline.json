@@ -228,8 +228,8 @@
     "unresolved-classname": 8
   },
   "app/mileage/page.tsx": {
-    "arbitrary-value": 11,
     "unresolved-classname": 2,
+    "arbitrary-value": 10,
     "direct-th": 7
   },
   "app/nen-campaigns/edit/campaign-editor.tsx": {
