@@ -429,18 +429,31 @@ export const SCREENS = [
   {
     ...SCENARIO, node: 'r6Gzsu', name: '5-1-E シナリオ・配信条件を開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '条件なし' }],
+    verdict: 'needs_fix', verdictNote: 'P1 条件軸が設計と違う。設計は標準互換15軸＋この画面だけの6軸で、イベント予約・カレンダー予約・共通情報・リマインダ・その他・担当者・流入経路・配信状況・予約状況・購入履歴がある。実装は13個で、それらが無い代わりに反応状態・表示状態がある。P2 現在の条件の要約と「条件を初期化」が無く、条件1行の4つの選び欄も出ない',
+    verdictSource: 'scenarios-v6/r6Gzsu-1920.png', verdictHead: '6db5ad7f',
   },
   {
+    /*
+      **`{ click: 'アクション' }` は「開始のきっかけ」のカードに当たっていた。**
+      カードの説明が「アクションなどから開始できます」なので、通の行の
+      「アクション」より先に見つかる。撮れたのは開始のきっかけの窓で、
+      設計の「送信後のアクション」ではない。`nth: 1` にする。
+      撮り直すまで判定は入れない。
+    */
     ...SCENARIO, node: 'hz9ti', name: '5-1-F シナリオ・送信後アクションを開く', route: EDIT,
-    mode: 'viewport', height: 1080, steps: [{ click: 'アクション' }],
+    mode: 'viewport', height: 1080, steps: [{ click: 'アクション', nth: 1 }],
   },
   {
     ...SCENARIO, node: 'dqFft', name: '5-1-G シナリオ・ステップ削除確認', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: 'この通を削除する' }],
+    verdict: 'needs_fix', verdictNote: 'P1 通の削除の確認が、ブラウザ標準の confirm（scenario-detail-client.tsx:731「このステップを削除してもよいですか？」）。どの通を消すのか、配信対象と送信後アクションも一緒に消えること、到達済みの履歴は監査記録として残ることを言わない。設計は画面内の確認窓で3つとも書いてある。撮った絵に窓が写っていないのは、標準の窓が画像に入らないため',
+    verdictSource: 'scenarios-v6/dqFft-1920.png + apps/web/src/app/scenarios/detail/scenario-detail-client.tsx:731', verdictHead: '6db5ad7f',
   },
   {
     ...SCENARIO, node: 'EvVO5', name: '5-1-H シナリオ・開始条件を開く', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '変更' }],
+    verdict: 'needs_fix', verdictNote: 'P1 設計の「シナリオの開始条件」の窓が無い。きっかけの6種類（友だち追加・タグ追加・フォーム回答・予約確定・手動開始・API/Webhook）を選ぶ面も、開始する友だちの条件も、初回のみ/毎回の選択も、一致人数の再計算（一致124人・すでに購読中8人・新規開始予定116人）も無い。実装は設定欄のトリガーのセレクト1つ',
+    verdictSource: 'scenarios-v6/EvVO5-1920.png', verdictHead: '6db5ad7f',
   },
   {
     ...SCENARIO, node: 'RUxNf', name: '5-1-I シナリオ・配信開始確認', route: EDIT,
