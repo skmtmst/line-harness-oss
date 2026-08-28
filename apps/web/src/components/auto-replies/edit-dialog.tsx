@@ -314,7 +314,7 @@ export default function EditDialog({ draft, templates, onClose, onSaved }: Props
                 )}
               </div>
               {foldersLoadState === 'error' && (
-                <span className="text-danger mt-1 block text-[11px]">
+                <span className="text-danger mt-1 block text-xs">
                   未取得と0件を区別するため、フォルダ選択を止めています。
                 </span>
               )}
