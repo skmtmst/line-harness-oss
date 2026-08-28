@@ -169,7 +169,11 @@ export default function ScenariosPage() {
       const response = await api.scenarios.update(target.id, { isActive: !target.isActive })
       if (!response.success) throw new Error(response.error)
       setToggleTarget(null)
-      void loadScenarios()
+      if (target.isActive) {
+        void loadScenarios()
+      } else {
+        router.push(`/scenarios/detail?id=${encodeURIComponent(target.id)}&started=1`)
+      }
     } catch {
       setToggleError(
         target.isActive
