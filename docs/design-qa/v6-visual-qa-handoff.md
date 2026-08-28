@@ -1,208 +1,309 @@
-# V6 画像比較の進め方（引き継ぎ）
+# V6 画像比較の引き継ぎ（2026-08-28）
 
-262枚の設計と実装を突き合わせる作業の、いまの状態と手順。
+262枚の設計と実装を突き合わせる作業の、いまの状態と続け方。
 **会話を切っても、ここと `screens.mjs` があれば続けられます。**
 
-## いまどこまで進んだか
+---
 
-**262枚のうち252枚を台帳に登録し、判定を付けました。**
-残るのは機能4の10枚（PR #402で比較済み・`screens.mjs` への統合はこれから）だけです。
+## 1. 担当の範囲
 
-| 機能 | 枚数 | 撮れた | PR |
-|---|---|---|---|
-| 1 ダッシュボード | 5 | 5 | [#413](https://github.com/skmtmst/line-harness-oss/pull/413) |
-| 2 受信箱 | 17 | 17 | [#424](https://github.com/skmtmst/line-harness-oss/pull/424) |
-| 3 友だち | 11 | 6 | [#434](https://github.com/skmtmst/line-harness-oss/pull/434) |
-| 4 友だち属性 | 21 | 11登録 | [#402](https://github.com/skmtmst/line-harness-oss/pull/402) |
-| 5 シナリオ配信 | 14 | 10 | [#439](https://github.com/skmtmst/line-harness-oss/pull/439) |
-| 6 一斉配信 | 15 | 9 | [#442](https://github.com/skmtmst/line-harness-oss/pull/442) |
-| 7 リマインダ | 11 | 3 | [#448](https://github.com/skmtmst/line-harness-oss/pull/448) |
-| 8 自動応答 | 11 | 4 | [#450](https://github.com/skmtmst/line-harness-oss/pull/450) |
-| 9 友だち追加時の配信 | 10 | 3 | [#451](https://github.com/skmtmst/line-harness-oss/pull/451) |
-| 10 ウェビナー | 13 | 7 | [#453](https://github.com/skmtmst/line-harness-oss/pull/453) |
-| 11 テンプレート | 10 | 6 | [#454](https://github.com/skmtmst/line-harness-oss/pull/454) |
-| 12 リッチメニュー | 9 | 5 | [#456](https://github.com/skmtmst/line-harness-oss/pull/456) |
-| 13 回答フォーム | 7 | 4 | [#457](https://github.com/skmtmst/line-harness-oss/pull/457) |
-| 14 共通情報 | 4 | 2 | [#458](https://github.com/skmtmst/line-harness-oss/pull/458) |
-| 15 登録メディア | 5 | 3 | [#460](https://github.com/skmtmst/line-harness-oss/pull/460) |
-| 16 成果とアフィリエイト | 9 | 6 | [#461](https://github.com/skmtmst/line-harness-oss/pull/461) |
-| 17 マイル・行動スコア | 11 | 3 | [#463](https://github.com/skmtmst/line-harness-oss/pull/463) |
-| 18 流入と計測 | 9 | 5 | [#464](https://github.com/skmtmst/line-harness-oss/pull/464) |
-| 19 コンバージョン | 4 | 3 | [#465](https://github.com/skmtmst/line-harness-oss/pull/465) |
-| 20 分析 | 9 | 4 | [#466](https://github.com/skmtmst/line-harness-oss/pull/466) |
-| 21 NEN配信 | 7 | 5 | [#468](https://github.com/skmtmst/line-harness-oss/pull/468) |
-| 22 写真審査 | 4 | 1 | [#469](https://github.com/skmtmst/line-harness-oss/pull/469) |
-| 23 EC連携 | 4 | 1 | [#470](https://github.com/skmtmst/line-harness-oss/pull/470) |
-| 24 LINE通知 | 6 | 2 | [#471](https://github.com/skmtmst/line-harness-oss/pull/471) |
-| 25 オートメーション | 8 | 5 | [#472](https://github.com/skmtmst/line-harness-oss/pull/472) |
-| 26 外部連携 | 4 | 2 | [#473](https://github.com/skmtmst/line-harness-oss/pull/473) |
-| 27 予約管理 | 7 | 3 | [#474](https://github.com/skmtmst/line-harness-oss/pull/474) |
-| 28 予約設定 | 4 | 3 | [#476](https://github.com/skmtmst/line-harness-oss/pull/476) |
-| 29 イベント予約 | 4 | 3 | [#477](https://github.com/skmtmst/line-harness-oss/pull/477) |
-| 30 ログインユーザー | 4 | 3 | [#479](https://github.com/skmtmst/line-harness-oss/pull/479) |
-| 31 機能設定 | 1 | 1 | [#480](https://github.com/skmtmst/line-harness-oss/pull/480) |
-| 32 運用状態 | 4 | 4 | [#481](https://github.com/skmtmst/line-harness-oss/pull/481) |
-| 台帳262枚 | — | — | [#407](https://github.com/skmtmst/line-harness-oss/pull/407) |
+**設計画像・実装画像・比較判定・Visual QA台帳だけ**を担当します。
 
-**合計：登録252枚／撮れる146枚／未実装99枚／未確認7枚。**
-
-**枝は積んでいます**（1→2→3→5→6→7→…→32）。下から順に統合してください。
-
-## 撮れた割合が高い機能・低い機能
-
-| | 機能 |
+| やること | やらないこと |
 |---|---|
-| 高い | 32 運用状態（4/4）・31 機能設定（1/1）・2 受信箱（17/17）・28 予約設定（3/4） |
-| 低い | 22 写真審査（1/4）・23 EC連携（1/4）・17 マイル（3/11）・9 友だち追加時（3/10） |
+| Pencil から設計画像を書き出す | `apps/worker/**` |
+| 実装画像を 1440px・1920px で撮る | `packages/db/**` |
+| 設計と実装を並べて比べる | migration |
+| 一致／構造一致・データ未接続／要修正／未実装／未確認 に分ける | API実装 |
+| 台帳と比較文書を更新する | **アプリの画面（`apps/web/**`）** |
 
-## 手順（1機能ぶん）
+**画面側の修正が要るときは、直接変えずに Node ID・ルート・差・推奨修正を
+文書に書いて Codex へ渡します。**
+
+> 2026-08-28 の途中まで、わたしは画面を直していました（#424 #448 #450 #457）。
+> そのあと範囲が変わっています。**いまは直しません。**
+
+---
+
+## 2. いまの数（2026-08-28 時点）
+
+| | 枚数 |
+|---|---|
+| 画面総数 | **262** |
+| 比較済み | **177**（67.6%） |
+| 未実装 | **74** |
+| 未確認 | **7** |
+| 別の仕掛けで撮影 | **4** |
+| 未撮影 | **0** |
+
+**この数を手で書き写さないでください。** 必ず生成器から出します。
+
+```bash
+node scripts/visual-qa/ledger.mjs          # 進捗台帳（Markdown）
+node scripts/visual-qa/ledger.mjs --json   # 集計値
+node scripts/visual-qa/ledger.mjs --html   # v6-progress.html
+```
+
+出力先：`docs/design-qa/v6-progress-ledger.md` / `v6-progress.json` / `v6-progress.html`
+
+---
+
+## 3. 作業の場所と、動かし方
+
+### 作業する worktree
+
+```
+/Volumes/My Passport/Github/line-harness-worktrees/v6-visual-qa
+```
+
+いまの枝：`codex/kenta-v6-feature4-remaining`（head `64c6c19a`）
+
+### 設計HTMLの置き場（リポジトリの外）
+
+```
+/Volumes/My Passport/Github/v6-design-ref/f<機能番号>/<NodeID>.html
+```
+
+**262枚ぶんすべて書き出し済み**です。Pencil をもう一度叩く必要はありません。
+
+### 立てるもの
+
+| ポート | 何 | どこから |
+|---|---|---|
+| 8788 | 固定データの口 | `node scripts/visual-qa/mock-api.mjs` |
+| 3101 | 画面（自分の枝） | `apps/web` で `./node_modules/.bin/next dev --port 3101` |
+| 3103 | 画面（PRのhead確認用） | `v6-f18-443` worktree の `apps/web` から port 3103 |
+
+**`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788` を必ず付ける。**
+
+**固定データを直したら、口を立て直す。** そうしないと古い返事のまま撮ります。
+
+```bash
+pkill -f "visual-qa/mock-api.mjs"; sleep 1
+nohup node scripts/visual-qa/mock-api.mjs > /tmp/mock.log 2>&1 &
+```
+
+### PRのheadで撮り直すとき
+
+`v6-f18-443` worktree を使い回します（`node_modules` は本体への symlink 済み）。
+
+```bash
+cd .../v6-f18-443 && git checkout -q --detach origin/<枝名>
+lsof -nP -iTCP:3103 -sTCP:LISTEN -t | xargs -r kill -9
+cd apps/web && NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 ./node_modules/.bin/next dev --port 3103 &
+until curl -sf -o /dev/null http://127.0.0.1:3103/; do sleep 2; done
+cd .../v6-visual-qa
+VISUAL_QA_BASE=http://localhost:3103 node scripts/visual-qa/capture-screens.mjs --feature N --impl
+```
+
+---
+
+## 4. 道具
+
+| ファイル | 何をする |
+|---|---|
+| `scripts/visual-qa/screens.mjs` | **台帳の正本。** 262行。撮り方をデータで持つ |
+| `scripts/visual-qa/capture-screens.mjs` | 撮る（`--check` / `--impl` / `--design`） |
+| `scripts/visual-qa/ledger.mjs` | 台帳・JSON・HTMLを機械で出す |
+| `scripts/visual-qa/diagnose.mjs` | 落ちた画面の原因を、口の返事の形から当てる |
+| `scripts/visual-qa/design-text.py` | 設計HTMLから文言を読む（画像より桁違いに安い） |
+| `scripts/visual-qa/fixtures.mjs` | 固定データ（88件） |
+| `scripts/visual-qa/mock-api.mjs` | 固定データを返す口 |
+| `scripts/visual-qa/capture.spec.mjs` | 基準画像（CSV取り込み4枚はこちらが撮る） |
+
+### 1機能ぶんの手順
 
 ```bash
 # 0. 枝を切る（前の機能の枝から積む）
 git checkout -b codex/kenta-v6-featureN-visual
 
-# 1. 設計の文言を読む。画像を読むより桁違いに安い
-#    設計HTMLは書き出し済み（/Volumes/My Passport/Github/v6-design-ref/fN/）
-python3 scripts/visual-qa/design-text.py …/fN/<id>.html 64 40
+# 1. 設計の文言を読む
+python3 scripts/visual-qa/design-text.py /Volumes/My\ Passport/Github/v6-design-ref/fN/<id>.html 64 45
 
 # 2. 画面が落ちるなら、口の返事の形から当てる
 node scripts/visual-qa/diagnose.mjs "/そのルート"
 
-# 3. screens.mjs に行を足す → 一度に洗い出す
+# 3. screens.mjs に行を足す → 検査 → 撮る
 node scripts/visual-qa/capture-screens.mjs --check
 node scripts/visual-qa/capture-screens.mjs --feature N --impl
 node scripts/visual-qa/capture-screens.mjs --feature N --design
 
-# 4. 基準画像と単体テスト
-npx playwright test scripts/visual-qa/capture.spec.mjs
+# 4. 比較文書を書く → 台帳を出し直す
+node scripts/visual-qa/ledger.mjs > docs/design-qa/v6-progress-ledger.md
+node scripts/visual-qa/ledger.mjs --json > docs/design-qa/v6-progress.json
+node scripts/visual-qa/ledger.mjs --html > docs/design-qa/v6-progress.html
+
+# 5. 単体テスト
 cd apps/web && npx vitest run --config vitest.config.ts
 ```
 
-先に `node scripts/visual-qa/mock-api.mjs &` と
-`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web exec next dev --port 3101 &`。
+### `screens.mjs` の書き方
 
-**設計の大きさは書き出したHTMLから自動で読みます**（`sizeFromHtml`）。
-台帳へ手で書き写す必要はありません。
+```js
+{
+  node: 'M1EXwB',              // Pencil の実ノードID
+  feature: 7,                  // 機能番号
+  name: '7-1 リマインダ',
+  dir: 'reminders-v6',         // 画像の置き場
+  route: '/reminders',         // 実装のルート（クエリも含める）
+  mode: 'page',                // 'page'（全体）/ 'viewport'（見えている範囲）
+  height: 1080,                // viewport のときの高さ＝設計の高さ
+  steps: [{ click: 'ボタン名' }],  // 名前は一部だけ。role: 'text' で文字そのもの
+  clock: '2026-08-19T12:00:00.000Z',  // 相対時刻を出す画面では必須
+  states: { apis: [...], kinds: ['loading','empty','error'] },  // 一覧の3状態
+  status: 'unimplemented' | 'unconfirmed' | 'elsewhere',
+  why: '理由。空にしない',
+}
+```
 
-## 何度も引っかかったこと
+---
 
-**画面が落ちる原因は、たいてい実装ではなく固定データの形。**
-一覧の口の既定（`{items,total,page,limit}`）が、通や配列を待っている
-画面へ返るとそこで落ちます。**今夜だけで9回**ありました
-（ウェビナー2・マイル・流入・NEN・EC・予約・共通アクション2）。
-`diagnose.mjs` が ★ を付けて教えます。
-
-**返事の形は口ごとに違う。** `{success,data}` だけではありません。
-
-| 形 | 口 |
-|---|---|
-| `{requests}` `{menus}` `{staff}` | 予約 |
-| `{items}` | イベント |
-| `{routes, totalFriends, …}` | 流入の集計 |
-| `{summary, members, pagination}` | マイル |
-| `{summary, daily, participants, sessions, dropoff, formFunnel}` | ウェビナーの分析 |
-
-**型に照らして固定データを書く。** 別名で書いた項目は握りつぶされ、画面は
-既定値のまま描かれます。エラーは出ません。今夜も3回やりました
-（`tagId`↔`tagIds`／`eventType: 'download'`／`lastLoginAt` は型に無い）。
-
-**型に無い項目を書かない。** 書くと**実装に在るように見えます。**
-（`StaffMember` に `lastLoginAt` は無く、設計の「最後に入った」は出せません。）
-
-**文字の一致だけで画面の状態を決めない。** 今夜2回やりました。
-「LINEでログイン」は説明文にも出ます（`/staff/new`）。
-「もう一度試す」は反映履歴の本文にも出ます（運用状態の更新履歴タブ）。
-**押せる形で在るかどうか**で見ます。
-
-**押せるものが操作の役を持っているとは限らない。** 表の行に `onClick` を
-付けただけのものは `button` でも `link` でもありません。`role: 'text'` を使います。
-
-**操作の名前は一部だけ書く。** 長く書くと、読み上げ名の空白の入り方が
-違うだけで当たりません。
-
-**「押せない」と「無い」は別。** `status: 'unconfirmed'` を使います。
-
-**重なりを `fullPage` で撮らない。** `position: fixed` が最初のビューポート
-位置に焼き込まれます。
-
-**時計は止める。日本時間で撮る。**
-
-## 判定の言葉
+## 5. 判定の言葉
 
 | 判定 | 意味 |
 |---|---|
-| 一致 | 実データまで繋いで比べ、差が無い |
-| 構造一致 | 配置・部品・文言が合う |
-| データ未接続 | 出どころが無く値が `—`。**最終的な「一致」にはしない** |
-| 未確認 | 押せる場所はあるが撮れない。**「無い」と言い切らない** |
-| 未実装 | 実装が無い。**合格画像にしない** |
-| 取得不能 | 権限などで辿り着けない |
+| **一致** | 実データまで繋いで比べ、差が無い |
+| **構造一致** | 配置・部品・文言が合う |
+| **データ未接続** | 出どころが無く値が `—`。**最終的な「一致」にはしない** |
+| **要修正** | 差がある。P0/P1/P2 を付ける |
+| **未確認** | 押せる場所はあるが撮れない。**「無い」と言い切らない** |
+| **未実装** | 実装が無い。**合格画像にしない** |
+| **取得不能** | 権限などで辿り着けない |
 
-## 全画面に効く決めごと
+### 全画面に効く決めごと
 
-**サイドバーの選択状態は比べません。** 設計の共通サイドバーはどの画面でも
-「友だち属性」が選ばれたままです（共通部品なので1つしか持てない）。
+- **サイドバーの選択状態は比べません。** 設計の共通サイドバーはどの画面でも
+  「友だち属性」が選ばれたままです（共通部品なので1つしか持てない）。
+  ここを差として数えると262枚すべてが未一致になります。
+- **未取得は `—`、実値0は `0件`。** 固定データでもこれを守ります。
+- **未実装を合格画像にしない。**
+- **固定値で実データがあるように見せない。**
 
-## 基準画像を更新したこと（2026-08-28）
+---
 
-`capture.spec.mjs-snapshots` の12枚を更新しました
-（analytics・automations・dashboard・rich-menus・staff・templates の1440/1920）。
+## 6. 何度も引っかかったこと（10）
 
-**画面を変えたからではありません。** これまで空だった口に固定データを
-入れたので、**中身が入った絵に変わった**ためです。基準画像が見張るのは
-「前回から変わっていないか」だけなので、意図して変えたぶんは更新します。
+1. **画面が落ちる原因は、たいてい実装ではなく固定データの形。**
+   一覧の口の既定（`{items,total,page,limit}`）が、通を待っている画面へ返ると落ちます。
+   これまでに**12回**。`diagnose.mjs` が★を付けて教えます。
 
-（設計との突き合わせは別で、**差がある画像を合格として扱いません。**）
+2. **型に照らして固定データを書く。** 別名で書いた項目は握りつぶされ、
+   画面は既定値のまま描かれます。エラーは出ません。
+   （`isShared`→`visibility`／`tagId`→`tagIds`／`lastActivityAt` を落とす／
+   型に無い `rank` を渡す／`eventType: 'download'` のような知らない言葉）
 
-## 全機能に共通して見えたこと
+3. **操作の名前は一部だけ書く。** 長く書くと、読み上げ名の空白の入り方が
+   違うだけで当たりません。
 
-**1. 記録が残らない・読めない**
+4. **押せるものが操作の役を持っているとは限らない。** 表の行に `onClick` を
+   付けただけのものは `button` でも `link` でもありません。`role: 'text'` を使います。
 
-| 機能 | 何が残らないか |
+5. **`?tab=xxx` が描けても、そのタブがあるとは限らない。**
+   知らないタブ名は既定の画面に落ちます。**タブの一覧をコードで見る。**
+
+6. **「押せない」と「無い」は別。** `status: 'unconfirmed'` を使います。
+
+7. **重なりを `fullPage` で撮らない。** `position: fixed` が最初のビューポート
+   位置に焼き込まれ、途中から始まる嘘の絵になります。
+
+8. **時計は止める。** 「6日前」は今日から数えます。止めないと翌朝に「7日前」へ
+   変わり、基準画像が赤くなります。実際に一度なりました。
+
+9. **日本時間で撮る。** 機械の時計帯のままだと設計の「14:16」が「12:16」になります。
+
+10. **試験の固定値を実装の不具合と読み違えない。**
+    CSV一部失敗の「入らなかった理由」が全行同じに見えましたが、
+    `capture.spec.mjs:372` の固定値でした。**実装はAPIが返す文をそのまま出します。**
+
+---
+
+## 7. PRの状態
+
+### わたしのPR：31本、すべて `MERGEABLE / CLEAN`
+
+1本の縦列に積んでいます。**下から順に取り込んでください。**
+
+| PR | 中身 |
 |---|---|
-| 8 自動応答 | 誰の何という入力に何が実行されたか |
-| 14 共通情報 | 変更の履歴（いつ・誰が・何から何へ） |
-| 17 マイル | 増減の記録。手で動かした理由 |
-| 24 LINE通知 | いつ・だれに・どのお知らせを送ったか |
-| 25 オートメーション | 動いた記録（コードに「残していない」と明記） |
-| 26 外部連携 | 送った・受け取ったやり取り |
-| 30 ログインユーザー | 入った記録（数だけ出て中身は読めない） |
-| 32 運用状態 | 緊急操作が `localStorage`。別の端末からは見えない |
+| #434 → #481 | 機能3〜32の比較（1機能1本） |
+| #488 | 一覧の状態18枚＋機能4の残り10枚を台帳へ |
+| #489 | 機能17・18をPRの最新headで再撮影 |
+| **#490** | **機能4の残り10画面＋262画面の台帳統合**（head `64c6c19a`、CI両方 pass） |
 
-**2. 「送る前に何が起きるか」を見せる場所が無い**
+`development` はこちらの枝を切ったあと **33コミット**進んでいます。
 
-| 機能 | 何が見えないか |
-|---|---|
-| 5 シナリオ | 開始前に何人へ届くか |
-| 7 リマインダ | 配信予定と重複 |
-| 14 共通情報 | 直すと何か所の文が変わるか |
-| 15 登録メディア | 差し替えると何か所に効くか |
-| 19 コンバージョン | 成果地点がどこから呼ばれているか |
-| 32 運用状態 | 止めると何件・何人に効くか |
+### Codexの実装PRと重なるファイル
 
-**3. 中の仕組みの言葉が画面に出ている**
-
-`silent rule` `automation rule 未登録`（8）／`friends.unfollow_count`（9）／
-`TEMPLATE` `(inline)`（8）／`sent` `pending` `failed`（21）／
-`受信 (Incoming)` `送信 (Outgoing)`（26）／`download`（19・こちらの固定データ由来）
-
-**4. 試す場所が無い**
-
-7 リマインダ・8 自動応答。どちらも**黙って動く**ものです。
-
-## 設計側で見つかった食い違い
-
-| 場所 | 何が食い違うか | 対応 |
+| Codex PR | 重なる | どうするのが良いか |
 |---|---|---|
-| `vUXKb` `NjK9q` | 接続状態の有効友だち4人 と 友だちの状態398人 | Pencilを直した |
-| `NjK9q` | 5件表示・総数5件なのに2ページ | Pencilを直した |
-| `NjK9q` | 表示件数のプルダウンが共通部品と別の見た目 | Pencilを直した |
-| `k6lHgo` | 対応マークのプルダウンに「保留」が無い | Pencilを直した |
-| `q76C35` | 「停止中／停止済み」が実装の型に無い | **未決** |
-| `M1EXwB` | フォルダの合計が 9 と 11 で合わない／9件なのに12ページ | 記録のみ |
-| `cmDfJ` | フォルダの合計が 14 と 16 で合わない | 記録のみ |
-| 差し込みの書き方 | `{会社名}`（14）と `{{name}}`（7）が混在 | 記録のみ |
-| 共通サイドバー | どの画面でも「友だち属性」が選択 | 比較対象から外す |
+| #429 | `app/reminders/new/page.tsx` | **#448 側を取り下げる。Codexのほうが良い**（未取得と0件を区別し、再読み込みも付く） |
+| #430 | `auto-replies` 3ファイル | `folderId` は #430 が直した。**#450 にしか無いものが2つ**（下記） |
+| #436 | `app/form-submissions/page.tsx` | **先に #436 を入れて**、#457 の帯の直しが要るか見直す |
+| #426 | `components/chats/template-picker.tsx` | **#426 を先に**入れるのが安全 |
+| #426/#432/#433/#436/#427 | `design-debt-baseline.json`<br>`button-migration-contract.test.ts` | `node apps/web/scripts/design-debt.mjs --update` で作り直す。**手で直さない** |
 
-Pencilを直すときは**必ず先に退避**します（`pencil-backups/` にmd5照合つき）。
-上書き保存で履歴が残りません。
+**#450 にしか無いもの**（#430 head `e6870247` でも直っていない）：
+1. 段の番号が上から **1 → 3 → 2** の順に出ている（`edit-dialog.tsx` の270／402／523行）
+2. 窓へ渡す中身を2か所で組み立てたまま（また食い違う）
+
+→ **この2つだけ別PRに切り出して #430 のあとに乗せるのが良い。**
+
+---
+
+## 8. Codexへ渡してある指摘
+
+| 文書 | 中身 |
+|---|---|
+| [`v6-list-states-for-codex.md`](v6-list-states-for-codex.md) | **一覧の状態18枚。** 共通部品（`shared/list-state.tsx`）は在るのに、使っているのは友だち属性の「タグ」タブだけ。ほとんどの一覧で、読み込みに失敗しているのに「ありません」と出る。ウェビナーは「最初のウェビナーを作成」まで誘い、押すと二重に作る |
+| [`friend-attributes-v6/design-qa-remaining10.md`](friend-attributes-v6/design-qa-remaining10.md) | **機能4のP0×2・P1×5・P2×2**、および必要なAPI6件（値・取得元・未取得時の表示） |
+| [`v6-recheck-2026-08-28.md`](v6-recheck-2026-08-28.md) | 実装PR28本の最新headでの再比較。5機能で判定を改めた |
+| [`v6-visual-qa-pr-status.md`](v6-visual-qa-pr-status.md) | PRの重なり・競合・developmentとの差 |
+| 各 `docs/design-qa/<機能>/design-qa.md` | 機能ごとの突き合わせ |
+
+### いちばん重い指摘（P0級）
+
+1. **一覧の状態18枚** — 読み込み失敗が「ありません」に見える（登録済みが消えたように見える）
+2. **`yKEdO` 4-2-C** — 同上＋「項目を追加」を誘う（押せば二重に作る）
+3. **`QKx8Q` 4-4** — 保存した検索の使用先が見えないまま消せる（配信の宛先が静かに壊れる）
+4. **機能17 マイル** — 使い道が無い（ためる仕組みだけあって返す先が無い）／手で直せない／記録が残らない
+5. **機能16** — 払う仕組みがまるごと無い（締め日・振込先・未払い残高）
+
+---
+
+## 9. 次にやること
+
+1. **機能19 は保留。** Codexの修正完了まで **#465 の比較結果を維持**します。
+2. **未実装74枚の再確認。** Codexの実装PRが進むたび、最新headで
+   `claims.sh` 相当の grep を回して「いまも無いか」を確かめます。
+3. **未確認7枚を潰す。** 押せない理由（無効なのか、順番なのか）を1枚ずつ。
+4. **設計側の食い違い**（記録だけにしてある分）を Pencil で直す。
+   Pencil を直すときは**必ず先に退避**（`pencil-backups/` にmd5照合つき）。
+   上書き保存で履歴が残りません。
+
+### 設計側の食い違い（未対応）
+
+| 場所 | 何が食い違うか |
+|---|---|
+| `M1EXwB` | フォルダの合計が すべて9 なのに 3+2+2+4=**11** ／ 9件なのに12ページ |
+| `cmDfJ` | すべて14 なのに 5+4+3+4=**16** |
+| `q76C35` | 「停止中／停止済み」が `BroadcastStatus` に無い（**未決**） |
+| 差し込みの書き方 | `{会社名}` / `{お名前}` / `{{name}}` が設計内で揃っていない。実装は `{{var.会社名}}` |
+| `sfTEW` | 「飛ばす／エラー」より実装の「重複で見送り／入力確認」のほうが正確。**設計を実装に寄せるほうが良い** |
+
+### 既に直した設計側の食い違い
+
+`vUXKb`/`NjK9q` の有効友だち数、`NjK9q` の2ページ、`NjK9q` の表示件数の見た目、
+`k6lHgo` の「保留」行。
+
+---
+
+## 10. 覚えておくこと
+
+- **`pnpm` は PATH にありません。** `npx` か `./node_modules/.bin/` を直に叩きます。
+- **反映履歴のゲート**は `- ` で始まる行に `#<PR番号>` を求めます。
+  見出しや本文に書いても数えません。**PRを作ってから**ファイルを足します（番号は当てられない）。
+- **`git diff --cached --check`** をコミット前に。`--cached` を付けないと意味がありません。
+- **force push しない。** 空の rebase 残骸を `rm -fr` もしない。
+- **worktree は外付け側**（`/Volumes/My Passport/...`）へ。`/private/tmp` は使いません。
+- Pencil の `Export(..., "png")` は砂嵐になります。`html-css` で書き出して Chromium で撮ります。
+- Pencil の一括書き出しは **55秒で切れます**。30件ずつに割ります。
