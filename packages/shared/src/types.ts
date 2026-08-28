@@ -487,6 +487,16 @@ export interface TemplateUsages {
     stepId: string;
     stepOrder: number;
   }>;
+  automations: Array<{ id: string; name: string; eventType: string }>;
+  reminderSteps: Array<{ reminderId: string; reminderName: string; stepId: string }>;
+  richMenuAreas: Array<{
+    groupId: string;
+    groupName: string;
+    pageName: string;
+    areaId: string;
+    label: string | null;
+  }>;
+  trackedLinks: Array<{ id: string; name: string }>;
 }
 
 // -----------------------------------------------------------------------------
