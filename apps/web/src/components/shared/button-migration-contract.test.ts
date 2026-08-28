@@ -37,7 +37,7 @@ function buttonOpenings(path: string, source: string): string[] {
 }
 
 describe('標準ボタンの第1段階移行', () => {
-  it('7ルートの標準操作31個を共通Buttonで維持する', () => {
+  it('7ルートの標準操作32個を共通Buttonで維持する', () => {
     const openings = Object.entries(sources).flatMap(([path, source]) => {
       expect(source, `${path} が共通Buttonを直接importしていない`).toContain(
         "import Button from '@/components/shared/button'",
@@ -45,8 +45,8 @@ describe('標準ボタンの第1段階移行', () => {
       return buttonOpenings(path, source)
     })
 
-    // 2026-08-28: テンプレート一覧の再読み込みも共通部品へ移した。
-    expect(openings).toHaveLength(31)
+    // 2026-08-28: テンプレート一覧の再読み込みとフォルダ追加も共通部品へ移した。
+    expect(openings).toHaveLength(32)
     expect(openings.filter((opening) => opening.includes('variant="primary"'))).toHaveLength(11)
   })
 

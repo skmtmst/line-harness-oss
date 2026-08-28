@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 
 /**
  * 一覧の左に置くフォルダの縦パネル。
@@ -22,6 +22,8 @@ export interface FolderPanelRow {
    * 未設定は null。色はフォルダに付き、属するタグに出る。
    */
   color?: string | null
+  /** 「よく使う」の星など、フォルダ以外の固定行に出す印。 */
+  icon?: ReactNode
   /**
    * 直せる行だけ渡す。「すべて」「未分類」は直せない。
    *
@@ -29,6 +31,12 @@ export interface FolderPanelRow {
    * 直したいときに作り直すしかなかった。
    */
   onEdit?: () => void
+  /** V6の「…」メニューを出す行だけ渡す。 */
+  onRename?: () => void
+  onChangeColor?: () => void
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  onDelete?: () => void
 }
 
 export default function FolderPanel({
@@ -46,17 +54,27 @@ export default function FolderPanel({
   /** 下に足すもの（分類の追加など）。 */
   children?: ReactNode
 }) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+
+  const runAction = (action: (() => void) | undefined) => {
+    setOpenMenuId(null)
+    action?.()
+  }
+
   return (
-    <aside className="bg-canvas rounded-card border-hairline h-fit overflow-hidden border">
+    <aside className="bg-canvas rounded-card border-hairline h-fit border">
       <div className="border-hairline flex items-center justify-between border-b px-4 py-3">
         <p className="text-ink text-sm font-semibold">フォルダ</p>
         <span className="text-ink-faint text-xs tabular-nums">{total}</span>
       </div>
       <nav className="p-2">
         {rows.map((row) => (
-          <div key={row.id} className="group flex items-center">
+          <div key={row.id} className="group relative flex items-center">
             <button
-              onClick={() => onSelect(row.id)}
+              onClick={() => {
+                setOpenMenuId(null)
+                onSelect(row.id)
+              }}
               className={`rounded-control flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
                 activeId === row.id
                   ? 'bg-accent-soft text-accent font-medium'
@@ -65,7 +83,9 @@ export default function FolderPanel({
             >
               {/* 色が付いているフォルダは丸で出す。フォルダの形を塗ると、
                   色が面で乗って名前より目立ってしまう。 */}
-              {row.color ? (
+              {row.icon ? (
+                <span className="shrink-0" aria-hidden="true">{row.icon}</span>
+              ) : row.color ? (
                 <span
                   className="rounded-pill h-3 w-3 shrink-0"
                   style={{ backgroundColor: row.color }}
@@ -91,8 +111,55 @@ export default function FolderPanel({
             </button>
             {/* 直す入口は行にカーソルを置いたときだけ。常に出していると、
                 選ぶつもりで押し間違える。消すのは編集の中に置く。 */}
-            {row.onEdit && (
+            {(row.onRename || row.onChangeColor || row.onMoveUp || row.onMoveDown || row.onDelete) ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setOpenMenuId((current) => current === row.id ? null : row.id)
+                  }}
+                  aria-label={`フォルダ「${row.label}」を操作`}
+                  aria-expanded={openMenuId === row.id}
+                  className="text-ink-faint hover:text-accent rounded-control px-2 py-1 text-base"
+                >
+                  …
+                </button>
+                {openMenuId === row.id && (
+                  <div className="bg-canvas border-hairline absolute left-3 top-full z-20 mt-1 w-52 rounded-control border py-1 shadow-lg">
+                    {row.onRename && (
+                      <button type="button" onClick={() => runAction(row.onRename)} className="hover:bg-canvas-sunken w-full px-3 py-2 text-left text-sm">
+                        名前を変更
+                      </button>
+                    )}
+                    {row.onChangeColor && (
+                      <button type="button" onClick={() => runAction(row.onChangeColor)} className="hover:bg-canvas-sunken w-full px-3 py-2 text-left text-sm">
+                        色を変える
+                      </button>
+                    )}
+                    {row.onMoveUp && (
+                      <button type="button" onClick={() => runAction(row.onMoveUp)} className="hover:bg-canvas-sunken w-full px-3 py-2 text-left text-sm">
+                        並び順を上へ
+                      </button>
+                    )}
+                    {row.onMoveDown && (
+                      <button type="button" onClick={() => runAction(row.onMoveDown)} className="hover:bg-canvas-sunken w-full px-3 py-2 text-left text-sm">
+                        並び順を下へ
+                      </button>
+                    )}
+                    {row.onDelete && (
+                      <div className="border-hairline mt-1 border-t">
+                        <button type="button" onClick={() => runAction(row.onDelete)} className="text-danger hover:bg-danger-bg w-full px-3 py-2 text-left text-sm">
+                          フォルダを削除
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : row.onEdit ? (
               <button
+                type="button"
                 onClick={row.onEdit}
                 aria-label={`フォルダ「${row.label}」を編集`}
                 title={`フォルダ「${row.label}」の名前と色を変える`}
@@ -100,7 +167,7 @@ export default function FolderPanel({
               >
                 編集
               </button>
-            )}
+            ) : null}
           </div>
         ))}
       </nav>

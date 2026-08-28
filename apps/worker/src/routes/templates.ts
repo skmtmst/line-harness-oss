@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getTemplatesWithUsageCount,
   getTemplateById,
@@ -7,6 +7,7 @@ import {
   updateTemplate,
   deleteTemplate,
   getCarouselTapTotals,
+  getFolderById,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -43,6 +44,25 @@ function checkCarousel(
   return { ok: false, error: errors.map((e) => e.message).join(' / ') };
 }
 
+async function validateTemplateFolder(
+  c: Context<Env>,
+  lineAccountId: string,
+  rawFolderId: unknown,
+): Promise<{ folderId: string | null } | Response> {
+  if (rawFolderId === null || rawFolderId === undefined || rawFolderId === '') {
+    return { folderId: null };
+  }
+  if (typeof rawFolderId !== 'string') {
+    return c.json({ success: false, error: 'folderId must be a string or null' }, 400);
+  }
+  const folder = await getFolderById(c.env.DB, rawFolderId, { lineAccountId });
+  if (!folder || folder.kind !== 'template') {
+    // 他アカウントのフォルダIDを渡されても、存在の有無は知らせない。
+    return c.json({ success: false, error: 'Template folder not found' }, 404);
+  }
+  return { folderId: folder.id };
+}
+
 
 templates.get('/api/templates', async (c) => {
   try {
@@ -75,6 +95,7 @@ templates.get('/api/templates', async (c) => {
         messageType: t.message_type,
         messageContent: t.message_content,
         folderId: t.folder_id ?? null,
+        isFavorite: t.is_favorite === 1,
         usageCount: t.usage_count,
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: taps.get(t.id) ?? 0,
@@ -105,6 +126,8 @@ templates.get('/api/templates/:id', async (c) => {
         category: item.category,
         messageType: item.message_type,
         messageContent: item.message_content,
+        folderId: item.folder_id ?? null,
+        isFavorite: item.is_favorite === 1,
         carouselActions: item.carousel_actions_json
           ? JSON.parse(item.carousel_actions_json)
           : null,
@@ -186,6 +209,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
       category?: string;
       messageType: string;
       messageContent: string;
+      folderId?: string | null;
+      isFavorite?: boolean;
     }>();
     if (!body.accountId) {
       return c.json({ success: false, error: 'account_id_required' }, 400);
@@ -196,16 +221,35 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (!body.name || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
+    if ('isFavorite' in body && typeof body.isFavorite !== 'boolean') {
+      return c.json({ success: false, error: 'isFavorite must be a boolean' }, 400);
+    }
     const carousel = checkCarousel(body.messageType, body.messageContent);
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
+    const folder = await validateTemplateFolder(c, body.accountId, body.folderId);
+    if (folder instanceof Response) return folder;
     const item = await createTemplate(c.env.DB, {
       ...body,
+      folderId: folder.folderId,
       lineAccountId: body.accountId,
       ...options.value,
     });
-    return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, createdAt: item.created_at } }, 201);
+    return c.json({
+      success: true,
+      data: {
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        messageType: item.message_type,
+        messageContent: item.message_content,
+        folderId: item.folder_id ?? null,
+        isFavorite: item.is_favorite === 1,
+        createdAt: item.created_at,
+        updatedAt: item.updated_at,
+      },
+    }, 201);
   } catch (err) {
     console.error('POST /api/templates error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
@@ -215,13 +259,23 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
 templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json<{ messageType?: string; messageContent?: string }>();
+    const body = await c.req.json<{
+      name?: string;
+      category?: string;
+      messageType?: string;
+      messageContent?: string;
+      folderId?: string | null;
+      isFavorite?: boolean;
+    }>();
     // 種別が送られていなければ、いまの種別で見る。本文だけ直す場合がある。
     const existing = await getTemplateById(c.env.DB, id);
     if (!existing || !await canAccessAllLineAccounts(
       c.env.DB, c.get('staff'), [existing.line_account_id],
     )) {
       return c.json({ success: false, error: 'Not found' }, 404);
+    }
+    if ('isFavorite' in body && typeof body.isFavorite !== 'boolean') {
+      return c.json({ success: false, error: 'isFavorite must be a boolean' }, 400);
     }
     const carousel = checkCarousel(
       body.messageType ?? existing?.message_type,
@@ -230,7 +284,16 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
-    await updateTemplate(c.env.DB, id, { ...body, ...options.value });
+    let folderPatch: { folderId?: string | null } = {};
+    if ('folderId' in body) {
+      if (!existing.line_account_id) {
+        return c.json({ success: false, error: 'Template folder not found' }, 404);
+      }
+      const folder = await validateTemplateFolder(c, existing.line_account_id, body.folderId);
+      if (folder instanceof Response) return folder;
+      folderPatch = folder;
+    }
+    await updateTemplate(c.env.DB, id, { ...body, ...options.value, ...folderPatch });
     const updated = await getTemplateById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -242,6 +305,8 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
         category: updated.category,
         messageType: updated.message_type,
         messageContent: updated.message_content,
+        folderId: updated.folder_id ?? null,
+        isFavorite: updated.is_favorite === 1,
         carouselActions: updated.carousel_actions_json
           ? JSON.parse(updated.carousel_actions_json)
           : null,

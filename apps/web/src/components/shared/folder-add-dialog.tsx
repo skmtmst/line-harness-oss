@@ -28,6 +28,10 @@ export const FOLDER_COLORS = [
 export interface FolderAddDialogProps {
   /** `folders.kind`。'broadcast' / 'scenario' など。 */
   kind: string
+  /** アカウント専用フォルダを作るときの所属。 */
+  lineAccountId?: string
+  /** 新しいフォルダを一覧のどこへ置くか。省略時は既存互換の0。 */
+  displayOrder?: number
   /** 窓の下に出す一言。「消しても中身は未分類に残る」など。 */
   note?: string
   /** 例に出す名前。 */
@@ -39,6 +43,8 @@ export interface FolderAddDialogProps {
 
 export default function FolderAddDialog({
   kind,
+  lineAccountId,
+  displayOrder,
   note,
   placeholder = '例: 01_キャンペーン',
   onClose,
@@ -55,7 +61,13 @@ export default function FolderAddDialog({
     setSaving(true)
     setError('')
     try {
-      const res = await api.folders.create({ kind, name: trimmed, color })
+      const res = await api.folders.create({
+        kind,
+        name: trimmed,
+        color,
+        lineAccountId,
+        displayOrder,
+      })
       if (!res.success) {
         setError(res.error)
         return

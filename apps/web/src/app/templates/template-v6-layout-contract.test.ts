@@ -47,6 +47,19 @@ describe('テンプレート一覧のV6画面構造', () => {
     expect(page).toContain('className="min-w-0 flex-1"')
   })
 
+  it('CzndJのフォルダを共通部品で作成・編集し、テンプレートを所属変更できる', () => {
+    expect(page).toContain("import FolderPanel from '@/components/shared/folder-panel'")
+    expect(page).toContain("import FolderAddDialog from '@/components/shared/folder-add-dialog'")
+    expect(page).toContain("import FolderEditDialog from '@/components/shared/folder-edit-dialog'")
+    expect(page).toContain('kind="template"')
+    expect(page).toContain('lineAccountId={selectedAccountId}')
+    expect(page).toContain('updates.folderId = editFolderId')
+    expect(page).toContain("{ id: 'favorites', label: 'よく使う'")
+    expect(page).toContain('isFavorite: !previous')
+    expect(page).not.toContain('setSelectedCategory')
+    expect(page).not.toContain('placeholder="例: general, 挨拶, 返信"')
+  })
+
   it('参照中は強制削除せず、使用先を確認させる', () => {
     expect(page).toContain('使用先を見る')
     expect(page).toContain('使用先を差し替えてから削除してください。')

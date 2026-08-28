@@ -10,6 +10,7 @@ const mocks = {
   updateTemplate: vi.fn(),
   deleteTemplate: vi.fn(),
   getCarouselTapTotals: vi.fn(),
+  getFolderById: vi.fn(),
 };
 vi.mock('@line-crm/db', () => mocks);
 
@@ -46,6 +47,21 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.getTemplateUsage.mockResolvedValue(EMPTY_USAGE);
   mocks.getTemplateById.mockResolvedValue({ id: 'tpl-1', line_account_id: 'account-1' });
+  mocks.getFolderById.mockImplementation(async (_db, id: string, scope?: { lineAccountId?: string }) => (
+    id === 'folder-1' && scope?.lineAccountId === 'account-1'
+      ? { id, kind: 'template', line_account_id: 'account-1' }
+      : null
+  ));
+  mocks.createTemplate.mockResolvedValue({
+    id: 'tpl-new',
+    name: '挨拶',
+    category: 'general',
+    message_type: 'text',
+    message_content: 'こんにちは',
+    folder_id: 'folder-1',
+    is_favorite: 0,
+    created_at: '2026-08-28',
+  });
   accountAccess.canAccessAllLineAccounts.mockResolvedValue(true);
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'],
@@ -126,5 +142,109 @@ describe('テンプレートのLINEアカウント境界', () => {
       accountIds: ['account-1'],
       includeUnassigned: false,
     });
+  });
+
+  it('同じLINEアカウントのフォルダに新規テンプレートを入れる', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: 'account-1',
+          name: '挨拶',
+          messageType: 'text',
+          messageContent: 'こんにちは',
+          folderId: 'folder-1',
+        }),
+      }),
+      env,
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.getFolderById).toHaveBeenCalledWith(
+      env.DB,
+      'folder-1',
+      { lineAccountId: 'account-1' },
+    );
+    expect(mocks.createTemplate).toHaveBeenCalledWith(
+      env.DB,
+      expect.objectContaining({ lineAccountId: 'account-1', folderId: 'folder-1' }),
+    );
+  });
+
+  it('別LINEアカウントまたは別機能のフォルダIDは存在を隠して拒否する', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: 'account-1',
+          name: '挨拶',
+          messageType: 'text',
+          messageContent: 'こんにちは',
+          folderId: 'other-account-folder',
+        }),
+      }),
+      env,
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: 'Template folder not found' });
+    expect(mocks.createTemplate).not.toHaveBeenCalled();
+  });
+
+  it('編集で未分類へ移し、よく使う状態も同じ保存口で更新する', async () => {
+    mocks.updateTemplate.mockResolvedValue(undefined);
+    mocks.getTemplateById
+      .mockResolvedValueOnce({
+        id: 'tpl-1',
+        line_account_id: 'account-1',
+        message_type: 'text',
+        message_content: 'こんにちは',
+      })
+      .mockResolvedValueOnce({
+        id: 'tpl-1',
+        name: '挨拶',
+        category: 'general',
+        message_type: 'text',
+        message_content: 'こんにちは',
+        folder_id: null,
+        is_favorite: 1,
+        line_account_id: 'account-1',
+      });
+
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates/tpl-1', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folderId: null, isFavorite: true }),
+      }),
+      env,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateTemplate).toHaveBeenCalledWith(
+      env.DB,
+      'tpl-1',
+      expect.objectContaining({ folderId: null, isFavorite: true }),
+    );
+    expect(await response.json()).toMatchObject({
+      data: { folderId: null, isFavorite: true },
+    });
+  });
+
+  it('よく使う状態は真偽値以外を保存しない', async () => {
+    const response = await makeApp().fetch(
+      new Request('https://example.com/api/templates/tpl-1', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isFavorite: 'true' }),
+      }),
+      env,
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'isFavorite must be a boolean' });
+    expect(mocks.updateTemplate).not.toHaveBeenCalled();
   });
 });

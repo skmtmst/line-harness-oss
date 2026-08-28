@@ -1630,22 +1630,50 @@ export const api = {
   },
   /** 汎用フォルダ。一覧13画面で共通に使う。 */
   folders: {
-    list: (kind?: string) =>
-      fetchApi<ApiResponse<Folder[]>>(`/api/folders${kind ? `?kind=${kind}` : ''}`),
+    list: (kind?: string, lineAccountId?: string) => {
+      const query = new URLSearchParams()
+      if (kind) query.set('kind', kind)
+      if (lineAccountId) query.set('lineAccountId', lineAccountId)
+      return fetchApi<ApiResponse<Folder[]>>(
+        `/api/folders${query.size ? `?${query.toString()}` : ''}`,
+      )
+    },
     /** 色（#RRGGBB）はフォルダに付く。中身の印にこの色が出る。 */
-    create: (data: { kind: string; name: string; parentId?: string | null; color?: string | null }) =>
+    create: (data: {
+      kind: string
+      name: string
+      parentId?: string | null
+      color?: string | null
+      lineAccountId?: string
+      displayOrder?: number
+    }) =>
       fetchApi<ApiResponse<Folder>>('/api/folders', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; parentId?: string | null; displayOrder?: number }) =>
-      fetchApi<ApiResponse<Folder>>(`/api/folders/${id}`, {
+    update: (
+      id: string,
+      data: {
+        name?: string
+        parentId?: string | null
+        displayOrder?: number
+        color?: string | null
+      },
+      lineAccountId?: string,
+    ) =>
+      fetchApi<ApiResponse<Folder>>(
+        `/api/folders/${id}${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`,
+        {
         method: 'PATCH',
         body: JSON.stringify(data),
-      }),
+        },
+      ),
     /** 中身は消えず未分類に戻る。子フォルダは一緒に消える。 */
-    delete: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/folders/${id}`, { method: 'DELETE' }),
+    delete: (id: string, lineAccountId?: string) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/folders/${id}${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`,
+        { method: 'DELETE' },
+      ),
   },
   tagGroups: {
     list: () => fetchApi<ApiResponse<TagGroup[]>>('/api/tag-groups'),
@@ -2388,6 +2416,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        folderId: string | null;
+        isFavorite: boolean;
         usageCount: number;
         /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
         tapCount: number;
@@ -2405,6 +2435,8 @@ export const api = {
         category: string;
         messageType: string;
         messageContent: string;
+        folderId: string | null;
+        isFavorite: boolean;
         /** 162: 選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
         carouselActions: unknown | null;
         /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2430,6 +2462,8 @@ export const api = {
       category: string
       messageType: string
       messageContent: string
+      folderId?: string | null
+      isFavorite?: boolean
       /** 162: 選択肢を押したときの動き。 */
       carouselActions?: unknown | null
       /** 162: 'none'（制限なし）／'once'（全体で1回） */
@@ -2437,19 +2471,26 @@ export const api = {
       /** 162: 制限を超えたときに返すテキスト。 */
       carouselTapLimitText?: string | null
     }) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; isFavorite: boolean; createdAt: string; updatedAt: string }>>(
         '/api/templates',
         { method: 'POST', body: JSON.stringify(data) },
       ),
     update: (
       id: string,
-      data: Partial<{ name: string; category: string; messageType: string; messageContent: string }> & {
+      data: Partial<{
+        name: string
+        category: string
+        messageType: string
+        messageContent: string
+        folderId: string | null
+        isFavorite: boolean
+      }> & {
         carouselActions?: unknown | null
         carouselTapLimitMode?: 'none' | 'once'
         carouselTapLimitText?: string | null
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; createdAt: string; updatedAt: string }>>(
+      fetchApi<ApiResponse<{ id: string; name: string; category: string; messageType: string; messageContent: string; folderId: string | null; isFavorite: boolean; createdAt: string; updatedAt: string }>>(
         `/api/templates/${id}`,
         { method: 'PUT', body: JSON.stringify(data) },
       ),

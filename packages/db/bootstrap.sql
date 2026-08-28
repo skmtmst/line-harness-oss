@@ -2391,7 +2391,7 @@ CREATE TABLE templates (
   carousel_tap_limit_text TEXT,
   created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id));
+, folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL, display_order INTEGER NOT NULL DEFAULT 0, line_account_id TEXT REFERENCES line_accounts(id), is_favorite INTEGER NOT NULL DEFAULT 0);
 
 CREATE TABLE tenants (
   id TEXT PRIMARY KEY,
@@ -3203,6 +3203,9 @@ CREATE INDEX idx_tags_line_account
   ON tags(line_account_id, display_order, id);
 
 CREATE INDEX idx_tags_order ON tags (folder_id, display_order);
+
+CREATE INDEX idx_templates_account_favorite_updated
+  ON templates(line_account_id, is_favorite, updated_at DESC);
 
 CREATE INDEX idx_templates_category ON templates (category);
 

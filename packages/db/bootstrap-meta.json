@@ -204,7 +204,8 @@
     "195_staff_account_scope.sql",
     "196_support_mark_account_scope.sql",
     "197_notification_center_scope.sql",
-    "204_template_folder_account_scope.sql"
+    "204_template_folder_account_scope.sql",
+    "205_template_favorites.sql"
   ],
-  "migrationCount": 205
+  "migrationCount": 206
 }

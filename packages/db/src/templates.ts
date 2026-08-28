@@ -9,6 +9,8 @@ export interface TemplateRow {
   message_content: string;
   /** テンプレートの置き場（099 で追加）。未分類は null。 */
   folder_id: string | null;
+  /** 一覧の「よく使う」に出すか。 */
+  is_favorite: number;
   /** 162: カルーセルの選択肢を押したときの動き。{ パネル番号: { 選択肢番号: [...] } } */
   carousel_actions_json: string | null;
   /** 162: 選択肢の押せる回数。'none'（制限なし）／'once'（全体で1回） */
@@ -50,6 +52,8 @@ export async function createTemplate(
     category?: string;
     messageType: string;
     messageContent: string;
+    folderId?: string | null;
+    isFavorite?: boolean;
     lineAccountId?: string | null;
   } & CarouselOptions,
 ): Promise<TemplateRow> {
@@ -60,8 +64,8 @@ export async function createTemplate(
       `INSERT INTO templates
          (id, name, category, message_type, message_content,
           carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
-          created_at, updated_at, line_account_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          folder_id, is_favorite, created_at, updated_at, line_account_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -72,6 +76,8 @@ export async function createTemplate(
       input.carouselActions ? JSON.stringify(input.carouselActions) : null,
       input.carouselTapLimitMode ?? 'none',
       input.carouselTapLimitText ?? null,
+      input.folderId ?? null,
+      input.isFavorite ? 1 : 0,
       now,
       now,
       input.lineAccountId ?? null,
@@ -83,7 +89,14 @@ export async function createTemplate(
 export async function updateTemplate(
   db: D1Database,
   id: string,
-  updates: Partial<{ name: string; category: string; messageType: string; messageContent: string }> &
+  updates: Partial<{
+    name: string;
+    category: string;
+    messageType: string;
+    messageContent: string;
+    folderId: string | null;
+    isFavorite: boolean;
+  }> &
     CarouselOptions,
 ): Promise<void> {
   const sets: string[] = [];
@@ -92,6 +105,8 @@ export async function updateTemplate(
   if (updates.category !== undefined) { sets.push('category = ?'); values.push(updates.category); }
   if (updates.messageType !== undefined) { sets.push('message_type = ?'); values.push(updates.messageType); }
   if (updates.messageContent !== undefined) { sets.push('message_content = ?'); values.push(updates.messageContent); }
+  if (updates.folderId !== undefined) { sets.push('folder_id = ?'); values.push(updates.folderId); }
+  if (updates.isFavorite !== undefined) { sets.push('is_favorite = ?'); values.push(updates.isFavorite ? 1 : 0); }
   if (updates.carouselActions !== undefined) {
     sets.push('carousel_actions_json = ?');
     values.push(updates.carouselActions ? JSON.stringify(updates.carouselActions) : null);

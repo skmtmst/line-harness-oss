@@ -8,9 +8,13 @@ import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manag
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import FolderPanel from '@/components/shared/folder-panel'
+import FolderAddDialog from '@/components/shared/folder-add-dialog'
+import FolderEditDialog from '@/components/shared/folder-edit-dialog'
 import { Tabs } from '@/components/shared/tabs'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
+import type { Folder } from '@line-crm/shared'
 
 interface Template {
   id: string
@@ -18,6 +22,8 @@ interface Template {
   category: string
   messageType: string
   messageContent: string
+  folderId: string | null
+  isFavorite: boolean
   usageCount: number
   /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
   tapCount: number
@@ -31,6 +37,8 @@ interface TemplateDetail {
   category: string
   messageType: string
   messageContent: string
+  folderId: string | null
+  isFavorite: boolean
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
@@ -81,6 +89,7 @@ export default function TemplatesPage() {
   const activeAccountRef = useRef<string | null>(selectedAccountId)
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
+  const [folders, setFolders] = useState<Folder[]>([])
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -89,8 +98,19 @@ export default function TemplatesPage() {
   // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
   const [nameQuery, setNameQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all')
-  const [selectedCategory, setSelectedCategory] = useState('all')
-  const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
+  const [selectedFolderId, setSelectedFolderId] = useState('all')
+  const [showFolderAdd, setShowFolderAdd] = useState(false)
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null)
+  const [pendingFolderDelete, setPendingFolderDelete] = useState<Folder | null>(null)
+  const [folderActionBusy, setFolderActionBusy] = useState(false)
+  const [folderActionError, setFolderActionError] = useState('')
+  const [form, setForm] = useState({
+    name: '',
+    category: 'general',
+    messageType: 'text',
+    messageContent: '',
+    folderId: null as string | null,
+  })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
   const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
@@ -104,6 +124,7 @@ export default function TemplatesPage() {
   const [drawerError, setDrawerError] = useState<string | null>(null)
   const [editContent, setEditContent] = useState<string | null>(null)
   const [editName, setEditName] = useState<string | null>(null)
+  const [editFolderId, setEditFolderId] = useState<string | null | undefined>(undefined)
   const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
@@ -112,11 +133,17 @@ export default function TemplatesPage() {
     setShowCreate(false)
     setPendingDelete(null)
     setDeleteError('')
+    setSelectedFolderId('all')
+    setShowFolderAdd(false)
+    setEditingFolder(null)
+    setPendingFolderDelete(null)
+    setFolderActionError('')
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) {
       setTemplates([])
+      setFolders([])
       setLoadError('')
       setLoading(false)
       return
@@ -124,15 +151,24 @@ export default function TemplatesPage() {
     const accountId = selectedAccountId
     setLoading(true)
     setTemplates([])
+    setFolders([])
     setLoadError('')
     try {
-      const res = await api.templates.list(undefined, accountId)
+      const [templateResult, folderResult] = await Promise.all([
+        api.templates.list(undefined, accountId),
+        api.folders.list('template', accountId),
+      ])
       if (activeAccountRef.current !== accountId) return
-      if (res.success) {
-        setTemplates(res.data)
-      } else {
-        setLoadError(res.error)
+      if (!templateResult.success) {
+        setLoadError(templateResult.error)
+        return
       }
+      if (!folderResult.success) {
+        setLoadError(folderResult.error)
+        return
+      }
+      setTemplates(templateResult.data)
+      setFolders(folderResult.data)
     } catch {
       if (activeAccountRef.current === accountId) {
         setLoadError('テンプレートの読み込みに失敗しました。')
@@ -186,24 +222,102 @@ export default function TemplatesPage() {
   }, [drawerId])
 
   // reset edits when drawer changes
-  useEffect(() => { setEditContent(null); setEditName(null) }, [drawerId])
+  useEffect(() => {
+    setEditContent(null)
+    setEditName(null)
+    setEditFolderId(undefined)
+  }, [drawerId])
 
   const filteredTemplates = templates.filter((t) => {
     // 名前は手元で絞る。打つたびに取り直すと重い。
-    if (nameQuery.trim() && !t.name.toLowerCase().includes(nameQuery.trim().toLowerCase())) {
+    const normalizedQuery = nameQuery.trim().toLowerCase()
+    if (normalizedQuery && !`${t.name}\n${t.messageContent}`.toLowerCase().includes(normalizedQuery)) {
       return false
     }
-    if (selectedCategory !== 'all' && (t.category || '未分類') !== selectedCategory) return false
+    if (selectedFolderId === 'favorites') {
+      if (!t.isFavorite) return false
+    } else if (selectedFolderId === 'unfiled') {
+      if (t.folderId !== null) return false
+    } else if (selectedFolderId !== 'all' && t.folderId !== selectedFolderId) {
+      return false
+    }
     if (typeFilter === 'all') return true
     if (typeFilter === 'unused') return t.usageCount === 0
     return t.messageType === typeFilter
   })
 
-  const categoryCounts = templates.reduce<Record<string, number>>((counts, template) => {
-    const category = template.category || '未分類'
-    counts[category] = (counts[category] ?? 0) + 1
-    return counts
-  }, {})
+  const folderById = new Map(folders.map((folder) => [folder.id, folder]))
+  const unfiledCount = templates.filter((template) => template.folderId === null).length
+  const favoriteCount = templates.filter((template) => template.isFavorite).length
+  const moveFolder = async (folderId: string, direction: -1 | 1) => {
+    if (!selectedAccountId || folderActionBusy) return
+    const ordered = [...folders].sort((left, right) => (
+      left.displayOrder - right.displayOrder || left.name.localeCompare(right.name, 'ja')
+    ))
+    const from = ordered.findIndex((folder) => folder.id === folderId)
+    const to = from + direction
+    if (from < 0 || to < 0 || to >= ordered.length) return
+    const next = [...ordered]
+    ;[next[from], next[to]] = [next[to]!, next[from]!]
+    setFolderActionBusy(true)
+    setFolderActionError('')
+    try {
+      const results = await Promise.all(next.map((folder, index) => (
+        api.folders.update(folder.id, { displayOrder: index }, selectedAccountId)
+      )))
+      const failed = results.find((result) => !result.success)
+      if (failed && !failed.success) throw new Error(failed.error)
+      await load()
+    } catch {
+      setFolderActionError('フォルダの並び順を更新できませんでした')
+      await load()
+    } finally {
+      setFolderActionBusy(false)
+    }
+  }
+
+  const confirmFolderDelete = async () => {
+    if (!pendingFolderDelete || !selectedAccountId || folderActionBusy) return
+    const folder = pendingFolderDelete
+    setFolderActionBusy(true)
+    setFolderActionError('')
+    try {
+      const result = await api.folders.delete(folder.id, selectedAccountId)
+      if (!result.success) throw new Error(result.error)
+      if (selectedFolderId === folder.id) setSelectedFolderId('all')
+      setPendingFolderDelete(null)
+      await load()
+    } catch {
+      setFolderActionError('フォルダを削除できませんでした')
+    } finally {
+      setFolderActionBusy(false)
+    }
+  }
+
+  const folderRows = [
+    {
+      id: 'all',
+      label: 'すべて',
+      count: templates.length,
+      icon: <span className="bg-accent rounded-pill block h-2 w-2" />,
+    },
+    { id: 'favorites', label: 'よく使う', count: favoriteCount, icon: '☆' },
+    { id: 'unfiled', label: '未分類', count: unfiledCount },
+    ...folders.map((folder, index) => ({
+      id: folder.id,
+      label: folder.name,
+      count: templates.filter((template) => template.folderId === folder.id).length,
+      color: folder.color,
+      onRename: () => setEditingFolder(folder),
+      onChangeColor: () => setEditingFolder(folder),
+      onMoveUp: index > 0 ? () => void moveFolder(folder.id, -1) : undefined,
+      onMoveDown: index < folders.length - 1 ? () => void moveFolder(folder.id, 1) : undefined,
+      onDelete: () => {
+        setFolderActionError('')
+        setPendingFolderDelete(folder)
+      },
+    })),
+  ]
 
   const handleCreate = async () => {
     if (!selectedAccountId) {
@@ -218,7 +332,13 @@ export default function TemplatesPage() {
       const res = await api.templates.create({ ...form, accountId: selectedAccountId })
       if (res.success) {
         setShowCreate(false)
-        setForm({ name: '', category: 'general', messageType: 'text', messageContent: '' })
+        setForm({
+          name: '',
+          category: 'general',
+          messageType: 'text',
+          messageContent: '',
+          folderId: null,
+        })
         load()
       } else {
         setFormError(res.error)
@@ -242,14 +362,20 @@ export default function TemplatesPage() {
     }
     setSavingEdit(true)
     try {
-      const updates: Record<string, string> = {}
+      const updates: {
+        messageContent?: string
+        name?: string
+        folderId?: string | null
+      } = {}
       if (editContent !== null) updates.messageContent = editContent
       if (editName !== null) updates.name = editName
+      if (editFolderId !== undefined) updates.folderId = editFolderId
       await api.templates.update(drawerData.id, updates)
       const r = await api.templates.get(drawerData.id)
       if (r.success && r.data) setDrawerData(r.data)
       setEditContent(null)
       setEditName(null)
+      setEditFolderId(undefined)
       load()
     } catch {
       setError('更新に失敗しました')
@@ -266,6 +392,22 @@ export default function TemplatesPage() {
     }
     setDeleteError('')
     setPendingDelete({ id, name })
+  }
+
+  const toggleFavorite = async (template: Template) => {
+    const previous = template.isFavorite
+    setTemplates((items) => items.map((item) => (
+      item.id === template.id ? { ...item, isFavorite: !previous } : item
+    )))
+    try {
+      const result = await api.templates.update(template.id, { isFavorite: !previous })
+      if (!result.success) throw new Error(result.error)
+    } catch {
+      setTemplates((items) => items.map((item) => (
+        item.id === template.id ? { ...item, isFavorite: previous } : item
+      )))
+      setError('「よく使う」を更新できませんでした')
+    }
   }
 
   const confirmDelete = async () => {
@@ -348,6 +490,9 @@ export default function TemplatesPage() {
           data-design-node="W7LBc FuBeQ"
         >
           <div className="flex items-center gap-2">
+            <Button onClick={() => setShowFolderAdd(true)}>
+              フォルダを追加
+            </Button>
             <Button
               onClick={() => {
                 if (!selectedAccountId) {
@@ -368,44 +513,34 @@ export default function TemplatesPage() {
       <div className={styles.body} data-design="Body">
       {activeSection === 'message' ? <>
       <div className={styles.contentLayout}>
-      <aside className={`${styles.folderRail} bg-canvas border-hairline shrink-0 rounded-card border p-3`} aria-label="テンプレートのフォルダ">
-        <div className="text-ink-secondary mb-2 flex items-center justify-between text-xs font-bold">
-          <span>フォルダ</span>
-          <span>{Object.keys(categoryCounts).length}</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setSelectedCategory('all')}
-          className={`flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === 'all' ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
+      <div className={styles.folderRail} aria-label="テンプレートのフォルダ">
+        <FolderPanel
+          rows={folderRows}
+          activeId={selectedFolderId}
+          onSelect={setSelectedFolderId}
+          total={`${folders.length}件`}
         >
-          <span>すべて</span>
-          <span className="text-xs tabular-nums">{templates.length}</span>
-        </button>
-        {Object.entries(categoryCounts).map(([category, count]) => (
           <button
-            key={category}
             type="button"
-            onClick={() => setSelectedCategory(category)}
-            className={`mt-1 flex w-full items-center justify-between rounded-control px-3 py-2 text-left text-sm ${selectedCategory === category ? 'bg-accent-soft font-bold text-accent' : 'text-ink-secondary hover:bg-canvas-sunken'}`}
-            title={category}
+            onClick={() => setShowFolderAdd(true)}
+            className="text-accent hover:bg-accent-soft rounded-control w-full px-3 py-2 text-left text-sm font-medium"
           >
-            <span className="min-w-0 truncate">{category}</span>
-            <span className="ml-2 shrink-0 text-xs tabular-nums">{count}</span>
+            ＋ フォルダを追加
           </button>
-        ))}
-      </aside>
+        </FolderPanel>
+      </div>
       <div className="min-w-0 flex-1">
 
       <div className="bg-info-bg text-info mb-3 rounded-control px-3 py-2 text-xs">
-        一覧からテンプレートの中身・使われている場所・送信数を確認できます。
+        フォルダはLINE公式アカウントごとに分かれます。上のタブは種類の絞り込みです。
       </div>
 
       {/* 検索と並び順（設計 `Body` の上）。 */}
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
         <input
           type="search"
-          placeholder="テンプレート名で検索"
-          aria-label="テンプレート名で検索"
+          placeholder="名前・本文・差し込んでいる項目で検索"
+          aria-label="名前・本文・差し込んでいる項目で検索"
           value={nameQuery}
           onChange={(e) => setNameQuery(e.target.value)}
           className="border-hairline rounded-control focus:ring-accent min-w-0 flex-1 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
@@ -416,6 +551,11 @@ export default function TemplatesPage() {
       {error && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
           {error}
+        </div>
+      )}
+      {folderActionError && (
+        <div className="bg-danger-bg text-danger mb-4 rounded-control px-4 py-3 text-sm">
+          {folderActionError}
         </div>
       )}
 
@@ -456,16 +596,19 @@ export default function TemplatesPage() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-secondary mb-1">カテゴリ</label>
-              <input
-                type="text"
-                className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="例: general, 挨拶, 返信"
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              />
-            </div>
+            <label className="block">
+              <span className="block text-xs font-medium text-ink-secondary mb-1">フォルダ</span>
+              <select
+                className="v6-select w-full"
+                value={form.folderId ?? ''}
+                onChange={(e) => setForm({ ...form, folderId: e.target.value || null })}
+              >
+                <option value="">未分類</option>
+                {folders.map((folder) => (
+                  <option key={folder.id} value={folder.id}>{folder.name}</option>
+                ))}
+              </select>
+            </label>
             <div>
               <label className="block text-xs font-medium text-ink-secondary mb-1">タイプ</label>
               <select
@@ -596,16 +739,37 @@ export default function TemplatesPage() {
                     className={`hover:bg-canvas-sunken cursor-pointer transition-colors ${drawerId === t.id ? 'bg-accent-soft' : ''}`}
                   >
                     <td className="px-4 py-3">
-                      <p className="text-sm font-medium text-ink">{t.name}</p>
+                      <div className="flex items-start gap-2">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            void toggleFavorite(t)
+                          }}
+                          aria-label={t.isFavorite ? `「${t.name}」をよく使うから外す` : `「${t.name}」をよく使うに追加`}
+                          aria-pressed={t.isFavorite}
+                          className={`shrink-0 text-base leading-none ${t.isFavorite ? 'text-warning' : 'text-ink-faint hover:text-warning'}`}
+                        >
+                          {t.isFavorite ? '★' : '☆'}
+                        </button>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-ink">{t.name}</p>
                       <p className="text-[11px] text-ink-faint mt-0.5 truncate max-w-md">
                         {t.messageContent.slice(0, 60)}{t.messageContent.length > 60 ? '...' : ''}
                       </p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
                         {messageTypeLabels[t.messageType] ?? t.messageType}
                       </span>
-                      <p className="text-ink-faint mt-1 max-w-40 truncate text-[11px]" title={t.category}>{t.category || '未分類'}</p>
+                      <p
+                        className="text-ink-faint mt-1 max-w-40 truncate text-[11px]"
+                        title={folderById.get(t.folderId ?? '')?.name ?? '未分類'}
+                      >
+                        {folderById.get(t.folderId ?? '')?.name ?? '未分類'}
+                      </p>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-sm ${t.usageCount === 0 ? 'text-ink-faint' : 'text-ink font-medium'}`}>
@@ -699,7 +863,7 @@ export default function TemplatesPage() {
                     {messageTypeLabels[drawerData.messageType] ?? drawerData.messageType}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
-                    {drawerData.category}
+                    {folderById.get(drawerData.folderId ?? '')?.name ?? '未分類'}
                   </span>
                   <span className="text-[10px] text-ink-faint">
                     更新: {formatDate(drawerData.updatedAt)}
@@ -744,7 +908,23 @@ export default function TemplatesPage() {
                   />
                 </div>
 
-                {(editContent !== null || editName !== null) && (
+                <label className="block">
+                  <span className="text-ink-faint mb-1.5 block text-xs font-medium uppercase tracking-wide">
+                    フォルダ
+                  </span>
+                  <select
+                    className="v6-select w-full"
+                    value={editFolderId === undefined ? drawerData.folderId ?? '' : editFolderId ?? ''}
+                    onChange={(event) => setEditFolderId(event.target.value || null)}
+                  >
+                    <option value="">未分類</option>
+                    {folders.map((folder) => (
+                      <option key={folder.id} value={folder.id}>{folder.name}</option>
+                    ))}
+                  </select>
+                </label>
+
+                {(editContent !== null || editName !== null || editFolderId !== undefined) && (
                   <div className="flex gap-2">
                     <button
                       onClick={handleSaveEdit}
@@ -754,7 +934,11 @@ export default function TemplatesPage() {
                       {savingEdit ? '保存中...' : '保存'}
                     </button>
                     <button
-                      onClick={() => { setEditContent(null); setEditName(null) }}
+                      onClick={() => {
+                        setEditContent(null)
+                        setEditName(null)
+                        setEditFolderId(undefined)
+                      }}
                       className="px-3 py-1.5 text-xs font-medium text-ink-secondary bg-canvas-sunken hover:bg-hairline rounded-md"
                     >
                       キャンセル
@@ -845,6 +1029,46 @@ export default function TemplatesPage() {
           onConfirm={() => void confirmDelete()}
         />
       </div>
+      {showFolderAdd && selectedAccountId && (
+        <FolderAddDialog
+          kind="template"
+          lineAccountId={selectedAccountId}
+          displayOrder={folders.length}
+          note="このLINE公式アカウントだけで使うフォルダを追加します。"
+          placeholder="例: 初回案内"
+          onClose={() => setShowFolderAdd(false)}
+          onAdded={() => void load()}
+        />
+      )}
+      {editingFolder && selectedAccountId && (
+        <FolderEditDialog
+          key={editingFolder.id}
+          folder={editingFolder}
+          lineAccountId={selectedAccountId}
+          onClose={() => setEditingFolder(null)}
+          onSaved={(action) => {
+            if (action === 'deleted' && selectedFolderId === editingFolder.id) {
+              setSelectedFolderId('all')
+            }
+            void load()
+          }}
+        />
+      )}
+      <ConfirmDialog
+        open={pendingFolderDelete !== null}
+        title={`「${pendingFolderDelete?.name ?? ''}」を削除しますか？`}
+        description="中のテンプレートは削除されず、「未分類」に残ります。"
+        confirmLabel="フォルダを削除"
+        destructive
+        busy={folderActionBusy}
+        error={folderActionError || undefined}
+        onCancel={() => {
+          if (folderActionBusy) return
+          setPendingFolderDelete(null)
+          setFolderActionError('')
+        }}
+        onConfirm={() => void confirmFolderDelete()}
+      />
       </div>
       </div>
       </> : <BroadcastAssetManager kind={activeSection} />}
