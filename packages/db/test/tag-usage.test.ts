@@ -5,7 +5,13 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getTagsWithUsage } from '../src/tags.js';
+import {
+  MAX_TAG_USAGE_COMPOUND_SELECT_TERMS,
+  TAG_USAGE_BLOCKING_REFERENCE_SELECTS,
+  buildTagUsageBlockingReferenceQueries,
+  collectTagUsageBlockingTagIds,
+  getTagsWithUsage,
+} from '../src/tags.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -171,6 +177,50 @@ describe('タグの使用先集計', () => {
       friend_count: 0,
       cleanup_reasons: [],
     });
+  });
+
+  it('運用参照の複合SELECTを安全な項数以下へ分割する', () => {
+    const queries = buildTagUsageBlockingReferenceQueries();
+    expect(queries.length).toBeGreaterThan(1);
+    for (const query of queries) {
+      expect(query.split(/\nUNION\n/u).length)
+        .toBeLessThanOrEqual(MAX_TAG_USAGE_COMPOUND_SELECT_TERMS);
+    }
+  });
+
+  it('参照元を1種類増やしても分割し、参照タグを集合へ合流する', async () => {
+    const addedReference = "SELECT id AS tag_id FROM tags WHERE id = 'tag-unused'";
+    const selects = [...TAG_USAGE_BLOCKING_REFERENCE_SELECTS, addedReference];
+    const queries = buildTagUsageBlockingReferenceQueries(selects);
+
+    expect(queries.every((query) => query.split(/\nUNION\n/u).length
+      <= MAX_TAG_USAGE_COMPOUND_SELECT_TERMS)).toBe(true);
+    await expect(collectTagUsageBlockingTagIds(db, selects))
+      .resolves.toContain('tag-unused');
+  });
+
+  it('フォーム内のタグIDではない文字列を参照タグとして返さない', async () => {
+    sqlite.exec(`
+      UPDATE forms
+         SET on_submit_tag_id = NULL,
+             layout = '{"fields":[{"type":"text","label":"お名前","choices":["月","火"]}]}'
+    `);
+    const formLayoutSelect = TAG_USAGE_BLOCKING_REFERENCE_SELECTS[3];
+
+    await expect(collectTagUsageBlockingTagIds(db, [formLayoutSelect]))
+      .resolves.toEqual(new Set());
+  });
+
+  it('フォーム内の文字列から実在するタグIDだけを返す', async () => {
+    sqlite.exec(`
+      UPDATE forms
+         SET on_submit_tag_id = NULL,
+             layout = '{"fields":[{"type":"text","label":"お名前","choices":["月","tag-main"]}]}'
+    `);
+    const formLayoutSelect = TAG_USAGE_BLOCKING_REFERENCE_SELECTS[3];
+
+    await expect(collectTagUsageBlockingTagIds(db, [formLayoutSelect]))
+      .resolves.toEqual(new Set(['tag-main']));
   });
 
   it('全角・空白・大文字小文字だけ違う名前を重複候補にする', async () => {
