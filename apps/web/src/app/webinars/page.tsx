@@ -1,8 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
+import Pagination from '@/components/shared/pagination'
+import { useAccount } from '@/contexts/account-context'
 import { webinarApi, type Webinar } from '@/lib/api'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
@@ -48,26 +51,44 @@ type SortKey = 'updated' | 'created' | 'name'
 type SavedFilter = '' | 'active' | 'draft'
 
 export default function WebinarsPage() {
+  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const activeAccountRef = useRef<string | null>(selectedAccountId)
   const [items, setItems] = useState<Webinar[]>([])
   const [query, setQuery] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updated')
   const [pageSize, setPageSize] = useState(20)
+  const [page, setPage] = useState(1)
   const [savedFilter, setSavedFilter] = useState<SavedFilter>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    activeAccountRef.current = selectedAccountId
+  }, [selectedAccountId])
+
   const refresh = useCallback(async () => {
+    if (!selectedAccountId) {
+      setItems([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+    const accountId = selectedAccountId
     setLoading(true)
+    setItems([])
     setError(null)
     try {
-      const res = await webinarApi.list()
+      const res = await webinarApi.list(accountId)
+      if (activeAccountRef.current !== accountId) return
       setItems(res.data)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      if (activeAccountRef.current === accountId) {
+        setError(e instanceof Error ? e.message : String(e))
+      }
     } finally {
-      setLoading(false)
+      if (activeAccountRef.current === accountId) setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
     void refresh()
@@ -89,8 +110,14 @@ export default function WebinarsPage() {
     })
   }, [items, query, savedFilter, sortKey])
 
-  const visible = filtered.slice(0, pageSize)
-  const hiddenCount = Math.max(0, filtered.length - visible.length)
+  useEffect(() => {
+    setPage(1)
+  }, [query, savedFilter, sortKey, pageSize, selectedAccountId])
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
+  const currentPage = Math.min(page, pageCount)
+  const visibleStart = (currentPage - 1) * pageSize
+  const visible = filtered.slice(visibleStart, visibleStart + pageSize)
 
   return (
     <>
@@ -205,15 +232,29 @@ export default function WebinarsPage() {
           ))}
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-
-        {loading ? (
+        {accountLoading || loading ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
             読み込み中...
+          </div>
+        ) : !selectedAccountId ? (
+          <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+            <div className="text-ink font-medium">
+              {accounts.length > 0
+                ? '上のバーでLINE公式アカウントを選んでください'
+                : 'LINE公式アカウントが登録されていません'}
+            </div>
+          </div>
+        ) : error ? (
+          <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
+            <div className="text-danger font-medium">ウェビナーを読み込めませんでした</div>
+            <p className="text-ink-secondary mt-2 text-sm">{error}</p>
+            <Button
+              variant="primary"
+              onClick={() => void refresh()}
+              className="mt-4"
+            >
+              もう一度読み込む
+            </Button>
           </div>
         ) : items.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
@@ -261,10 +302,18 @@ export default function WebinarsPage() {
             ))}
           </div>
         )}
-        {hiddenCount > 0 && (
-          <p className="text-ink-faint mt-3 text-center text-xs">
-            ほかに {hiddenCount} 件あります。表示件数を増やすと確認できます。
-          </p>
+        {!loading && !error && selectedAccountId && filtered.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-ink-faint text-xs tabular-nums">
+              {visibleStart + 1}〜{Math.min(visibleStart + pageSize, filtered.length)}件 / 全{filtered.length}件
+            </p>
+            <Pagination
+              page={currentPage}
+              pageCount={pageCount}
+              onPageChange={setPage}
+              ariaLabel="ウェビナー一覧のページ送り"
+            />
+          </div>
         )}
       </div>
     </>

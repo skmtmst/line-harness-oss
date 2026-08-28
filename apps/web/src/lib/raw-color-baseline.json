@@ -55,7 +55,7 @@
   "app/users/page.tsx": 4,
   "app/webhooks/page.tsx": 137,
   "app/webinars/edit/page.tsx": 211,
-  "app/webinars/page.tsx": 31,
+  "app/webinars/page.tsx": 28,
   "components/accounts/account-edit-modal.tsx": 17,
   "components/accounts/account-form-fields.tsx": 21,
   "components/accounts/account-settings-section.tsx": 10,

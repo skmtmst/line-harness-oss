@@ -411,8 +411,8 @@
     "direct-secondary-button": 2
   },
   "app/webinars/page.tsx": {
-    "direct-secondary-button": 2,
     "direct-primary-button": 1,
+    "direct-secondary-button": 2,
     "unresolved-classname": 1,
     "arbitrary-value": 2
   },
