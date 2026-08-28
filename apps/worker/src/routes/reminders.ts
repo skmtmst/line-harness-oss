@@ -13,10 +13,17 @@ import {
   getFriendReminders,
   cancelFriendReminder,
   getFolderById,
+  getReminderDeliveryRunById,
+  getReminderDeliveryRunSummary,
+  getReminderDeliveryStepSummaries,
+  listReminderDeliveryRuns,
+  retryReminderDeliveryRun,
+  type ReminderDeliveryRunStatus,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 
 const reminders = new Hono<Env>();
 
@@ -34,6 +41,24 @@ async function requireVisibleReminder(c: Context<Env>, next: () => Promise<void>
 
 const TRIGGER_TYPES = ['manual', 'booking', 'event', 'friend_field'] as const;
 const DELIVERY_MODES = ['time', 'countdown'] as const;
+const RUN_STATUSES: ReminderDeliveryRunStatus[] = [
+  'planned', 'claimed', 'succeeded', 'skipped',
+  'retry_wait', 'permanent_failed', 'cancelled',
+];
+
+function commonRunStatus(status: ReminderDeliveryRunStatus) {
+  if (status === 'succeeded') return 'succeeded' as const;
+  if (status === 'permanent_failed') return 'failed' as const;
+  if (status === 'skipped') return 'skipped' as const;
+  if (status === 'cancelled') return 'cancelled' as const;
+  return 'pending' as const;
+}
+
+function runDurationMs(startedAt: string | null, completedAt: string | null): number | null {
+  if (!startedAt || !completedAt) return null;
+  const duration = Date.parse(completedAt) - Date.parse(startedAt);
+  return Number.isFinite(duration) && duration >= 0 ? duration : null;
+}
 type TriggerType = (typeof TRIGGER_TYPES)[number];
 
 async function validateReminderFolder(
@@ -258,6 +283,93 @@ reminders.get('/api/reminders/:id', async (c) => {
   }
 });
 
+/** V6 7-1-H: 予定・成功・失敗を、未取得と0件を混ぜずに返す。 */
+reminders.get('/api/reminders/:id/runs', async (c) => {
+  try {
+    const reminderId = c.req.param('id');
+    const reminder = await getReminderById(c.env.DB, reminderId);
+    const accountId = reminder
+      ? (reminder as { line_account_id?: string | null }).line_account_id ?? null
+      : null;
+    // ルート共通middlewareに加え、個人名を返す口でも親リマインダの範囲を明示確認する。
+    if (!reminder || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: 'Reminder not found' }, 404);
+    }
+
+    const rawStatus = c.req.query('status');
+    const status = rawStatus && RUN_STATUSES.includes(rawStatus as ReminderDeliveryRunStatus)
+      ? rawStatus as ReminderDeliveryRunStatus
+      : undefined;
+    if (rawStatus && !status) {
+      return c.json({ success: false, error: 'statusの値が正しくありません' }, 400);
+    }
+    const rawLimit = Number(c.req.query('limit') ?? 20);
+    const rawOffset = Number(c.req.query('offset') ?? 0);
+    const limit = Number.isInteger(rawLimit) ? Math.min(100, Math.max(1, rawLimit)) : 20;
+    const offset = Number.isInteger(rawOffset) ? Math.max(0, rawOffset) : 0;
+    const search = c.req.query('search')?.trim().slice(0, 100) || undefined;
+
+    const [runs, summary, stepRows] = await Promise.all([
+      listReminderDeliveryRuns(c.env.DB, { reminderId, status, search, limit, offset }),
+      getReminderDeliveryRunSummary(c.env.DB, reminderId),
+      getReminderDeliveryStepSummaries(c.env.DB, reminderId),
+    ]);
+    return c.json({
+      success: true,
+      data: {
+        reminder: { id: reminder.id, name: reminder.name, isActive: Boolean(reminder.is_active) },
+        summary,
+        steps: stepRows.map((row, index) => ({
+          id: row.id,
+          stepNumber: index + 1,
+          offsetMinutes: row.offset_minutes,
+          messageType: row.message_type,
+          messageContent: row.message_content,
+          sent: row.sent,
+          // LINE Messaging APIは友だち単位の既読を返さない。0%を作らない。
+          openRate: null,
+          errors: row.errors,
+        })),
+        items: runs.items.map((row) => ({
+          id: row.id,
+          ownerKind: 'reminder' as const,
+          ownerId: row.reminder_id,
+          lineAccountId: row.line_account_id,
+          occurredAt: row.completed_at ?? row.started_at ?? row.scheduled_at,
+          subject: row.friend_name,
+          accountLabel: row.account_label,
+          triggerLabel: reminder.name,
+          reference: null,
+          status: commonRunStatus(row.status),
+          detail: row.last_error_message ?? `${Number(row.step_number)}通目`,
+          durationMs: runDurationMs(row.started_at, row.completed_at),
+          canRetry: row.status === 'retry_wait' || row.status === 'permanent_failed',
+          reminderId: row.reminder_id,
+          friendReminderId: row.friend_reminder_id,
+          friendId: row.friend_id,
+          friendName: row.friend_name,
+          reminderStepId: row.reminder_step_id,
+          stepNumber: Number(row.step_number),
+          scheduledAt: row.scheduled_at,
+          startedAt: row.started_at,
+          completedAt: row.completed_at,
+          domainStatus: row.status,
+          attemptCount: Number(row.attempt_count),
+          nextRetryAt: row.next_retry_at,
+          lastErrorCode: row.last_error_code,
+          lastErrorMessage: row.last_error_message,
+          lineRequestId: row.line_request_id,
+          messageLogId: row.message_log_id,
+        })),
+        pagination: { total: runs.total, limit, offset },
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/reminders/:id/runs error:', err);
+    return c.json({ success: false, error: '実行結果を読み込めませんでした' }, 500);
+  }
+});
+
 reminders.post('/api/reminders', requireRole('owner', 'admin'), async (c) => {
   try {
     const body = await c.req.json<{
@@ -425,6 +537,42 @@ reminders.delete('/api/friend-reminders/:id', requireRole('owner', 'admin'), asy
   } catch (err) {
     console.error('DELETE /api/friend-reminders/:id error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** 失敗した1通だけを、同じ依頼の二重受付なしで再試行する。 */
+reminders.post('/api/reminder-runs/:runId/retry', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const run = await getReminderDeliveryRunById(c.env.DB, c.req.param('runId'));
+    if (!run) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    const reminder = await getReminderById(c.env.DB, run.reminder_id);
+    const accountId = reminder
+      ? (reminder as { line_account_id?: string | null }).line_account_id ?? null
+      : null;
+    if (!reminder || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+      return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    }
+
+    const requestKey = c.req.header('Idempotency-Key');
+    if (!isValidIdempotencyKey(requestKey)) {
+      return c.json({ success: false, error: '再試行キーが必要です' }, 400);
+    }
+    const retried = await retryReminderDeliveryRun(c.env.DB, {
+      id: run.id,
+      requestKey,
+      now: new Date().toISOString(),
+    });
+    if (!retried) return c.json({ success: false, error: '実行結果が見つかりません' }, 404);
+    if (retried.kind === 'conflict') {
+      return c.json({ success: false, error: 'この実行は再試行できる状態ではありません' }, 409);
+    }
+    return c.json({
+      success: true,
+      data: { id: retried.run.id, status: retried.run.status, replayed: retried.kind === 'replay' },
+    });
+  } catch (err) {
+    console.error('POST /api/reminder-runs/:runId/retry error:', err);
+    return c.json({ success: false, error: '再試行を受け付けられませんでした' }, 500);
   }
 });
 

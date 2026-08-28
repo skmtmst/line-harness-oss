@@ -105,6 +105,32 @@ export class LineClient {
     return data;
   }
 
+  /**
+   * pushMessage と同じ送信を行い、監査画面に残せる LINE の要求IDも返す。
+   *
+   * 既存の pushMessage は戻り値をそのまま使う呼び出しがあるため変更しない。
+   * 要求IDが応答に無い場合は null のまま返し、代わりの値を作らない。
+   */
+  async pushMessageWithRequestId(
+    to: string,
+    messages: Message[],
+    retryKey?: string,
+    customAggregationUnits?: string[],
+  ): Promise<{ data: unknown; requestId: string | null }> {
+    const body: PushMessageRequest = { to, messages, customAggregationUnits };
+    const { data, headers } = await this.request(
+      'POST',
+      '/v2/bot/message/push',
+      body,
+      retryKey ? { 'X-Line-Retry-Key': retryKey } : {},
+    );
+    return {
+      data,
+      // Retry-Keyの409は、最初に受理した要求IDを別ヘッダーで返す。
+      requestId: headers.get('x-line-request-id') ?? headers.get('x-line-accepted-request-id'),
+    };
+  }
+
   async multicast(
     to: string[],
     messages: Message[],

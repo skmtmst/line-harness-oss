@@ -1035,6 +1035,111 @@ export interface FriendReminder {
   updatedAt: string;
 }
 
+/** 7機能の実行記録画面で共通に使う所有元。書込台帳は機能ごとに安全に保つ。 */
+export type ExecutionOwnerKind =
+  | "broadcast"
+  | "reminder"
+  | "scenario"
+  | "auto_reply"
+  | "manual"
+  | "user"
+  | "automation"
+  | "notification"
+  | "integration";
+
+/** 実行記録画面の共通状態。機能固有の状態はAPI境界でここへ読み替える。 */
+export type ExecutionRunStatus =
+  | "succeeded"
+  | "failed"
+  | "partial"
+  | "skipped"
+  | "pending"
+  | "cancelled";
+
+/** リマインダの書込台帳だけが持つ詳細状態。共通状態へ潰さず保存する。 */
+export type ReminderDeliveryRunStatus =
+  | "planned"
+  | "claimed"
+  | "succeeded"
+  | "skipped"
+  | "retry_wait"
+  | "permanent_failed"
+  | "cancelled";
+
+export interface ExecutionRunIdentity {
+  ownerKind: ExecutionOwnerKind;
+  ownerId: string;
+  lineAccountId: string | null;
+}
+
+/** 7機能の実行記録一覧が共通で読む9項目。 */
+export interface ExecutionRunListItem extends ExecutionRunIdentity {
+  occurredAt: string;
+  subject: string | null;
+  accountLabel: string | null;
+  triggerLabel: string;
+  reference: string | null;
+  status: ExecutionRunStatus;
+  detail: string | null;
+  durationMs: number | null;
+  canRetry: boolean;
+}
+
+export interface ReminderDeliveryRun extends ExecutionRunListItem {
+  id: string;
+  reminderId: string;
+  friendReminderId: string;
+  friendId: string;
+  friendName: string | null;
+  reminderStepId: string;
+  stepNumber: number;
+  scheduledAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  domainStatus: ReminderDeliveryRunStatus;
+  attemptCount: number;
+  nextRetryAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  /** LINEが返した要求ID。取れなかった場合はnullのままにし、作らない。 */
+  lineRequestId: string | null;
+  /** 実際に送った本文へ辿るためのmessages_log ID。成功前はnull。 */
+  messageLogId: string | null;
+}
+
+export interface ReminderDeliveryRunsResponse {
+  reminder: {
+    id: string;
+    name: string;
+    isActive: boolean;
+  };
+  summary: {
+    sent: number;
+    scheduled: number;
+    stopped: number;
+    errors: number;
+    targetCount: number;
+    nextScheduledAt: string | null;
+  };
+  steps: Array<{
+    id: string;
+    stepNumber: number;
+    offsetMinutes: number;
+    messageType: MessageType;
+    messageContent: string;
+    sent: number;
+    /** LINE Messaging APIは友だち単位の既読を返さないため、null。 */
+    openRate: number | null;
+    errors: number;
+  }>;
+  items: ReminderDeliveryRun[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
 // -----------------------------------------------------------------------------
 // スコアリング (Lead Scoring)
 // -----------------------------------------------------------------------------
