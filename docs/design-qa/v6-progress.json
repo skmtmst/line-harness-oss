@@ -996,8 +996,8 @@
       "feature": 13,
       "node": "gBp2J",
       "name": "13-1-E フォームの削除確認",
-      "gap": "parts",
-      "gapNote": "一覧に削除の導線を足し、`ConfirmDialog` を当てる"
+      "gap": "api",
+      "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
     },
     {
       "feature": 14,

@@ -1078,10 +1078,10 @@ export const SCREENS = [
   { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答', steps: [{ click: '来店アンケート' }], verdict: 'needs_fix', verdictNote: 'P1 情報欄への書き込みが失敗した件数が出ない（設計は「3件は欄が消えていて書けていません」）。**答えは受け取れているのに友だち情報へ入っていない状態が、画面のどこにも出ない。** あとでリマインダが動かない形で表に出る。P1 「1件ずつ見る／まとめて見る」の切り替え、絞り込み、CSVで書き出す、帯4つ（回答／開いた人のうち答えた割合／情報欄への書き込み／次回予定が入った人）が無い', verdictSource: 'forms-v6/design-qa.md' },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
-    gap: 'parts',
-    gapNote: '一覧に削除の導線を足し、`ConfirmDialog` を当てる',
+    gap: 'api',
+    gapNote: '確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要',
     status: 'unimplemented',
-    why: '一覧に削除の導線が無い（`grep 削除|confirm` が `form-submissions/page.tsx` で0件）',
+    why: '現行DELETEはフォーム本体とウェビナーCTAを物理削除する一方、回答は外部キーの実行環境により消えるか孤児化する。V6要件 §3-8 は、公開中・回答あり・利用中なら直接削除せず停止・保管へ移すよう要求しているため、一覧にDELETEとConfirmDialogだけを足さない',
   },
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
