@@ -1516,43 +1516,64 @@ export const SCREENS = [
     CSV取り込みの4枚は、ファイルを選ばせる必要があるので
     `capture.spec.mjs` が撮っている（`tags-csv-*`）。
   */
-  { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page' },
+  { node: 'hqrOv', feature: 4, name: '4-1 友だち属性・タグ', dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P2 フォルダの但し書きが設計の「中の項目」でなく「中のタグ」。帯・フォルダ・行・列・よく使うは数値まで設計どおり',
+    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
+  },
   {
     node: 'dKlkz', feature: 4, name: '4-1-F タグ削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'viewport', height: 1080,
     steps: [{ click: '削除', scope: 'main' }],
+    verdict: 'needs_fix', verdictNote: 'P2 注意文が設計と違う（設計「アフィリエイトのオファーで使用中のタグは削除できません」／実装「使用中のため、このタグは削除できません（4件から参照されています）」）。窓の作りは5行＋赤い注意＋名前の打ち直し＋2つのボタンまで一致。実装の文のほうが正しいので、Pencil側を直す候補',
+    verdictSource: 'friend-attributes-v6/dKlkz-1920.png + design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   {
     node: 'H374MR', feature: 4, name: '4-1-H タグCSV一括登録',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-select',
     why: 'ファイルを選ばせる操作が要る。`capture.spec.mjs` の `tags-csv-select` が撮っている',
+    verdict: 'structure_match_data_pending', verdictNote: 'CSV一括登録の選択画面。作りは一致。取り込みの口が固定データのままで、実データにつながっていない',
+    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   {
     node: 'sfTEW', feature: 4, name: '4-1-H-A CSV取り込み・確認（dry-run）',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-preview',
     why: '同上。`tags-csv-preview` が撮っている',
+    verdict: 'needs_fix', verdictNote: 'P1 CSV確認に「行」の列が無い。設計は12/13/14/15/16とCSVの行番号を出す。P2 扱いの言葉が設計と違う（設計「飛ばす／エラー」実装「重複で見送り／入力確認」。実装のほうが正確なのでPencil側を直す候補）',
+    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   {
     node: 'op1rh', feature: 4, name: '4-1-H-B CSV取り込み・完了',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-success',
     why: '同上。`tags-csv-success` が撮っている',
+    verdict: 'structure_match_data_pending', verdictNote: 'CSV取り込み・完了。作りは一致。取り込み結果が固定データのままで、実データにつながっていない',
+    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
   {
     node: 'QzRsJ', feature: 4, name: '4-1-H-C CSV取り込み・一部失敗',
     dir: 'friend-attributes-v6', route: '/tags', mode: 'page',
     status: 'elsewhere', shots: 'tags-csv-partial',
     why: '同上。`tags-csv-partial` が撮っている',
+    verdict: 'structure_match_data_pending', verdictNote: 'CSV取り込み・一部失敗。作りは一致。行ごとの失敗理由が口から返らず、いまの固定データは全行同じ文。実装は返ってきた文をそのまま出すので、口が理由を分ければ直る',
+    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
-  { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page' },
+  { node: 'HBTk0', feature: 4, name: '4-2 友だち情報欄', dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P1 「回答フォーム」「表示先」の列が無い。「入力済み」が未取得なのに0人と出る（withUsage=1を付けずに読んでいる）。帯4つが無い',
+    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
+  },
   {
     node: 'yKEdO', feature: 4, name: '4-2-C 一覧の状態（空・読込・エラー）',
     dir: 'friend-attributes-v6', route: '/tags?tab=fields', mode: 'page',
     states: { apis: ['**/api/friend-fields*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 読込・空・失敗の文が設計と違う（設計「読み込んでいます／データがありません／表示できませんでした」）。P0（失敗時に空の文と「項目を追加」の誘いが出る）は #420 で直った',
+    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
-  { node: 'rIhbN', feature: 4, name: '4-3 対応マーク', dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page' },
+  { node: 'rIhbN', feature: 4, name: '4-3 対応マーク', dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P1 マークごとの人数が「人」だけで数字が出ない（SupportMarkの型にfriendCountが無く、どの口も返さない）。未取得なら—と出すべきところが空。帯4つが無い',
+    verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
+  },
   { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
@@ -1561,33 +1582,47 @@ export const SCREENS = [
   {
     node: 'l25rlp', feature: 4, name: '4-1-A タグを作る・初期状態',
     dir: 'friend-attributes-v6', route: '/tags/new', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P2 ★の説明が設計と違う（設計「このスイッチ、またはタグ一覧の星をクリックして、友だち一覧への表示をON／OFFできます。」）。3.連動のOFF時の案内が、設計は4つに説明付き（本人へのマイル付与 +N mile／紹介者へのマイル付与／今後のマイル倍率 1.2・1.5・2.0・3.0倍／連動アクション テキスト送信・テンプレート送信・タグ操作・シナリオ開始など）、実装は説明の無い2列。「この設定で起きること」の3つ目の文言も違う',
+    verdictSource: 'friend-attributes-v6/l25rlp-1920.png', verdictHead: '87c150ad',
   },
   {
     node: 'tP0RW', feature: 4, name: '4-1-B タグを作る・連動ON',
     dir: 'friend-attributes-v6', route: '/tags/new', mode: 'page',
     steps: [{ click: 'タグ連動', role: 'switch' }],
+    verdict: 'needs_fix', verdictNote: 'P2 「ONの間だけ動きます。OFFに戻すと、以降にタグが付いても連動は実行されません（過去の付与は取り消されません）。」の注記が無い。「マイル タグが付いた瞬間に積みます」の見出しが無い。a〜eの番号と設計の言い回し（このタグが初めて付いた本人に／その人を紹介した人に ほか）が違う',
+    verdictSource: 'friend-attributes-v6/tP0RW-1920.png', verdictHead: 'baeb644b',
   },
   {
     node: 'LfrQs', feature: 4, name: '4-1-C 連動アクション追加ドロワー',
     dir: 'friend-attributes-v6', route: '/tags/new', mode: 'viewport', height: 1320,
     steps: [{ click: 'タグ連動', role: 'switch' }, { click: '＋ アクションを追加' }],
+    verdict: 'needs_fix', verdictNote: 'P2 見出しの副題にタグ名が入らない（設計は「「NEN会員（定期）」が付いたときに実行する処理を選びます。」）。節の名前が違う（処理の種類→アクションの種類、実行タイミング→実行するタイミング、実行順の位置→追加する位置）。位置に「4番目（いちばん最後）」の順番が出ない。13種類の処理と待機の注記は一致',
+    verdictSource: 'friend-attributes-v6/LfrQs-1920.png', verdictHead: 'baeb644b',
   },
   {
     node: 'ee0sk', feature: 4, name: '4-1-D タグを編集・既存設定あり',
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P2 連動アクションの種類名が設計と違う（設計 テキスト送信・タグ追加・シナリオ開始／実装 メッセージ・シナリオ）。複製のボタンが無い。「OFFに戻すと…すでに積んだマイルは取り消されません。」の注記が無い。4.の4枚のカードに設計の補足（このタグを持つ友だち／まだ受け取っていない人／紹介者が登録されている人／さかのぼりません）が無い',
+    verdictSource: 'friend-attributes-v6/ee0sk-1920.png', verdictHead: 'baeb644b',
   },
   {
     node: 'VjXGX', feature: 4, name: '4-1-E 遡及反映の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags/edit?id=tag-0', mode: 'viewport', height: 1590,
     steps: [{ click: '遡及反映', role: 'switch', onlyIfOff: true }, { click: '保存する' }],
+    verdict: 'needs_fix', verdictNote: 'P2 副題にタグ名が入らない。取り消し方の案内（マイル画面から手動で調整）が無い。「新規作成のときはこのダイアログは出ません」の注記が無い。表に見出し行を足したのは実装のほうが読みやすい',
+    verdictSource: 'friend-attributes-v6/VjXGX-1920.png', verdictHead: 'baeb644b',
   },
   {
     node: 'byqIW', feature: 4, name: '4-1-G 属性フォルダを追加・色編集',
     dir: 'friend-attributes-v6', route: '/tags/folders/new', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P2 設計は一覧に重なる小窓（フォルダを編集）、実装は別ページ。「一覧での表示」の見え方見本が無い。色の並びが設計と違う。「作成する場所（タグ／友だち情報欄）」は実装だけにある足し前',
+    verdictSource: 'friend-attributes-v6/byqIW-1920.png', verdictHead: 'baeb644b',
   },
   {
     node: 'A1ZYeP', feature: 4, name: '4-2-A 友だち情報欄の項目を追加',
     dir: 'friend-attributes-v6', route: '/tags/fields/new', mode: 'page',
+    verdict: 'needs_fix', verdictNote: 'P1 種類の選択肢が設計と違う（設計 1行・複数行・数値・日付・日時・電話・メール・URL・単一選択・複数選択・画像・PDF の12種類。実装は日時・画像・PDFが無く、真偽が増えて10種類）。P2 既定値が設計は「未設定」「［お名前］を使う」の選択、実装は自由入力。「200字まで」と「移すとタブの並びも変わります」の注記が無い',
+    verdictSource: 'friend-attributes-v6/A1ZYeP-1920.png', verdictHead: '87c150ad',
   },
   {
     /*
@@ -1610,6 +1645,8 @@ export const SCREENS = [
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
     dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'viewport', height: 1080,
     steps: [{ click: '削除', nth: 1, scope: 'main' }],
+    verdict: 'needs_fix', verdictNote: 'P1 何人に付いているか、どのマークへ置き換わるかを言わずに消せる。設計は「この対応マークを使用している3人は、削除後に「未対応」へ変更されます。元に戻せません。」',
+    verdictSource: 'friend-attributes-v6/zGZMA-1920.png', verdictHead: 'baeb644b',
   },
   {
     /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
