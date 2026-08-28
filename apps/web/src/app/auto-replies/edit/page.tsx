@@ -60,6 +60,7 @@ function AutoReplyEditInner() {
               respondToAll: res.data.respondToAll,
               name: res.data.name,
               keywordMatchMode: res.data.keywordMatchMode === 'all' ? 'all' : 'any',
+              folderId: res.data.folderId,
             })
           } else {
             setError(res.error)
@@ -75,6 +76,7 @@ function AutoReplyEditInner() {
             isActive: true,
             priority: 0,
             messageKinds: null,
+            folderId: null,
           })
         }
       } catch {
