@@ -59,6 +59,23 @@ function sizeFromHtml(src) {
  */
 const FAILURE_TEXTS = ['店舗が選ばれていません', 'Application error']
 
+/**
+ * **描き損なった値。出ていたら撮らない。**
+ *
+ * `undefined` / `Invalid Date` / `NaN` が画面に出るのは、返事に無い項目を
+ * そのまま文へ繋いだときです。**そのまま撮ると、その絵を設計と並べて
+ * 「実装の不具合」と言ってしまう**か、逆に見落とします。実際に一斉配信の
+ * 帯（`予約中 undefined`）と結果（`1通（undefined）`『Invalid Date 作成』）、
+ * シナリオの到達率（`NaN%`）で、どちらも起きました。
+ *
+ * **原因は2つあり、どちらでも撮らないのが正しい。**
+ *   - 固定データを用意していない（こちらの落ち）
+ *   - 実装が欠けた項目を守っていない（実装の落ち）
+ *
+ * 止めれば、どちらなのかを調べてから進めます。
+ */
+const BROKEN_VALUES = ['undefined', 'Invalid Date', 'NaN']
+
 const argv = process.argv.slice(2)
 const flag = (name) => argv.includes(`--${name}`)
 const value = (name) => {
@@ -157,6 +174,35 @@ function check() {
     }
   }
   if (stale.length) console.log('head が変わったので見直す:\n  ' + stale.join('\n  '))
+
+  /*
+    **`*` は `/` をまたがない。**
+    `**' + '/api/friends*` は `/api/friends/stats` に当たりません。当たらない
+    まま状態を撮ると、一覧が読めていないのに**帯だけ前の数が残る**、
+    起きない絵になります。機能3と機能6と機能12で実際に起きました。
+
+    モックが答える道を読み、当てはめの前置きの先に `/` で続く道があるのに
+    `/**` で受けていないものを挙げます。
+  */
+  const mockSrc = readFileSync(new URL('./mock-api.mjs', import.meta.url), 'utf8')
+  const mockPaths = new Set()
+  for (const m of mockSrc.matchAll(/'(\/api\/[^']+)'/g)) mockPaths.add(m[1])
+  for (const m of mockSrc.matchAll(/\/\^\\\/api\\\/([^$]+)\$\//g)) {
+    mockPaths.add('/api/' + m[1].replace(/\\\//g, '/').replace(/\(\?!stats\$\)/g, '').replace(/\(\[\^\/\]\+\)/g, ':id'))
+  }
+  const globGaps = []
+  for (const s of SCREENS) {
+    const globs = s.states?.apis ?? []
+    for (const g of globs) {
+      const m = g.match(/^\*\*(\/api\/[^*?]*?)\/?\*$/)
+      if (!m) continue
+      const prefix = m[1]
+      if (globs.some((other) => other === `**${prefix}/**`)) continue
+      const missed = [...mockPaths].filter((path) => path.startsWith(`${prefix}/`))
+      if (missed.length) globGaps.push(`${s.node}: ${g} が ${missed[0]} に届かない（\`**${prefix}/**\` も足す）`)
+    }
+  }
+  if (globGaps.length) problems.push(...globGaps)
 
   if (problems.length) {
     console.error('\n撮り方がそろっていません:\n  ' + problems.join('\n  '))
@@ -542,6 +588,16 @@ async function captureImpl(feature) {
         */
         for (const bad of FAILURE_TEXTS) {
           if (body.includes(bad)) throw new Error(`「${bad}」で止まっている`)
+        }
+        /*
+          **描き損なった値が出ていたら撮らない。**
+          `NaN` は「NaN%」のように単語の途中でも出るので、そのまま含みで見る。
+          `undefined` と `Invalid Date` も同じ。
+        */
+        for (const broken of BROKEN_VALUES) {
+          if (body.includes(broken)) {
+            throw new Error(`画面に「${broken}」が出ている（返事に無い項目をそのまま繋いでいる。固定データか実装のどちらかを直してから撮る）`)
+          }
         }
 
         await runSteps(page, s.steps, s.node)

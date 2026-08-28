@@ -291,7 +291,7 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: 'P0 保存に失敗しても「保存しました」と出る。saved-view-dialog.tsx の submit が onSave の成否を見ずに setDone(true)。失敗の文は窓の後ろのパネルに出るため、窓を開けている人には見えない',
+    verdict: 'needs_fix', verdictNote: 'P0 保存に失敗しても「保存しました」と出る。saved-view-dialog.tsx の submit が onSave の成否を見ずに setDone(true)。失敗の文は窓の後ろのパネルに出るため、窓を開けている人には見えない。**#513 で直す差分が出ている（未取り込み）。** onSave が成否を返し、成功のときだけ setDone(true) へ進む形になっている',
     verdictSource: 'inbox-v6/tBlkL-1920.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: 'a4239357',
   },
   {
@@ -365,7 +365,7 @@ export const SCREENS = [
       上のカードだけ前の数（214人）が残り、**起きない絵**になる。実際にそうなった。
     */
     states: { apis: ['**/api/friends?**', '**/api/friends/stats*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「条件に合う友だちが見つかりません」を出し、「友だち一覧 0件」と数える。未取得と0件を区別していない',
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「条件に合う友だちが見つかりません」を出し、「友だち一覧 0件」と数える。未取得と0件を区別していない。**#520 で直す差分が出ている（未取り込み）**',
     verdictSource: 'friends-v6/bzDn6-error-1920.png', verdictHead: '728deca0',
   },
   { ...FRIENDS, node: 'YzxU1', name: '3-2 重複検出', route: '/friends?tab=duplicates',
@@ -496,14 +496,14 @@ export const SCREENS = [
     */
     ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果',
     route: '/scenarios/results?id=scenario-1',
-    states: { apis: ['**/api/scenarios/*'], kinds: ['normal', 'loading', 'error'] },
+    states: { apis: ['**/api/scenarios/*', '**/api/scenarios/**'], kinds: ['normal', 'loading', 'error'] },
     verdict: 'match', verdictNote: '一致',
     verdictSource: 'scenarios-v6/design-qa-results-503.md', verdictHead: '6db5ad7f',
   },
   {
     ...SCENARIO, node: 'q5G45', name: '5-1-M 一覧の状態（空・読込・エラー）', route: '/scenarios',
-    states: { apis: ['**/api/scenarios*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「シナリオがありません。「＋ シナリオを作成」から作ってください。」を出す。持っているシナリオが消えたように見え、押せば同じものをもう1つ作る。#420 で友だち情報欄について直したのと同じ形が、こちらに残っている。帯が—と「取得できませんでした」になるのは設計どおりで正しい',
+    states: { apis: ['**/api/scenarios*', '**/api/scenarios/**', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「シナリオがありません。「＋ シナリオを作成」から作ってください。」を出す。持っているシナリオが消えたように見え、押せば同じものをもう1つ作る。#420 で友だち情報欄について直したのと同じ形が、こちらに残っている。帯が—と「取得できませんでした」になるのは設計どおりで正しい。**#519 で直す差分が出ている（未取り込み）**',
     verdictSource: 'scenarios-v6/q5G45-error-1920.png', verdictHead: '6db5ad7f',
   },
 
@@ -717,7 +717,7 @@ export const SCREENS = [
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
-    states: { apis: ['**/api/reminders*', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/reminders*', '**/api/reminders/**', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: 'P2 文言だけが設計と違う（設計「表示できませんでした／再読み込みしても直らない場合はエラー報告へ。」、実装「リマインダの読み込みに失敗しました。もう一度お試しください。」＋「いまは読み込めていません。上の案内をご覧ください。」）。**中身は正しい。** 失敗のとき帯は—と「取得できませんでした」、一覧の中は空の文でなく読めていない旨を出す。ほかの機能の手本になる',
     verdictSource: 'reminders-v6/dC0yg-error-1920.png', verdictHead: '409f00bb',
   },
@@ -796,7 +796,7 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/auto-replies*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/auto-replies*', '**/api/auto-replies/**', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: 'P1 内部の言葉とDBの列名が画面に出ている（「silent rule のみ — match するが返信しない (同 keyword の automation rule 未登録)」「適用外 (line_account_id が別アカに固定)」「返信あり (inline)」、列見出しの「TEMPLATE」）。P1 失敗のときに帯が0件・0回・0件・0件と出る（未取得なので—にすべき）。一覧の中を「いまは読み込めていません」にしているのは正しい',
     verdictSource: 'auto-replies-v6/q8wSqO-error-1920.png', verdictHead: '93edbe17',
   },
@@ -931,7 +931,7 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/webinars*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/webinars*', '**/api/webinars/**'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: 'P1 失敗の詳しい説明が「API error: 500」とそのまま出る。P1 ウェビナーの件数だけ0と出る（ほかの3枚は—。未取得なので—にそろえる）。一覧の中を赤い枠と「もう一度読み込む」にしているのは正しい',
     verdictSource: 'webinars-v6/zCQXe-error-1920.png', verdictHead: 'ed2e3633',
   },
@@ -1050,8 +1050,8 @@ export const SCREENS = [
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/rich-menu-groups*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る（rich-menus/page.tsx:452 が受け取った文字をそのまま描く。ApiErrorの既定文が英語と数字）。P1 失敗しているのに帯が今月のタップ16180回・最多タップ「商品を見る」4820回と前の数を出したままで、メニューは0件。読めなかったのに数が並ぶ',
+    states: { apis: ['**/api/rich-menu-groups*', '**/api/rich-menu-groups/**', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る（rich-menus/page.tsx:452 が受け取った文字をそのまま描く。ApiErrorの既定文が英語と数字）。P1 失敗のときメニューと出し分けが0件と出る（未取得なので—にすべき。今月のタップと最多タップは—と「集計を取れませんでした」で正しい）。**前に「帯に前の数が残る」と書いたのは誤りだった。** 当てはめが /api/rich-menu-groups/tap-stats に届いていなかっただけで、当てはめを直して撮り直したら—になった',
     verdictSource: 'rich-menus-v6/RW5Tb-error-1920.png + apps/web/src/app/rich-menus/page.tsx:452', verdictHead: '09dc476b',
   },
 
@@ -1085,7 +1085,7 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/forms*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: 'P0 読み込みに失敗しても失敗だと分からない。赤い帯も出ず、本文は「フォームがまだありません」だけで、空とまったく同じ絵になる。form-submissions/page.tsx:354 は loading か 0件かしか見ておらず、失敗の枝が無い。持っているフォームが消えたように見える',
     verdictSource: 'forms-v6/ZOPyc-error-1920.png + apps/web/src/app/form-submissions/page.tsx:354', verdictHead: '950073ab',
   },
@@ -1132,7 +1132,7 @@ export const SCREENS = [
   },
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/media*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/media*', '**/api/media/**'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「ファイルがまだありません。」を出す。持っているファイルが消えたように見える。赤い帯を出しているぶん回答フォームよりはましだが、一覧の中は空の文でなく読めていない旨にすべき',
     verdictSource: 'media-v6/h8pBZr-error-1920.png', verdictHead: '166f0c43',
   },
@@ -1287,7 +1287,7 @@ export const SCREENS = [
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
     verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md',
     route: '/inflow-links?tab=links',
-    states: { apis: ['**/api/entry-routes*', '**/api/analytics/ref-summary*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/entry-routes*', '**/api/entry-routes/**', '**/api/analytics/ref-summary*'], kinds: ['loading', 'empty', 'error'] },
   },
   /*
     **判定を改めた（PR #443 head `f372ff30`）。**
@@ -1507,8 +1507,8 @@ export const SCREENS = [
   {
     ...AUTOMATION, node: 'Vdbv5', name: '25-1-D 一覧の状態（空・読込・エラー）',
     route: '/automations',
-    states: { apis: ['**/api/automations*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「オートメーションがありません。「新規ルール」から作成してください。」を出し、作成を誘う。押せば同じルールをもう1つ作る。ルールの数も0件と出る（未取得なので—にすべき）。P2 誘い文の「新規ルール」と実際のボタン名「ルールを作成」が違う',
+    states: { apis: ['**/api/automations*', '**/api/automations/**'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「オートメーションがありません。「新規ルール」から作成してください。」を出し、作成を誘う。押せば同じルールをもう1つ作る。ルールの数も0件と出る（未取得なので—にすべき）。P2 誘い文の「新規ルール」と実際のボタン名「ルールを作成」が違う。**#516 で直す差分が出ている（未取り込み）**',
     verdictSource: 'automations-v6/Vdbv5-error-1920.png', verdictHead: '75b010fc',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
@@ -1541,7 +1541,7 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「受信Webhookがありません。「新規Webhook」から作成してください。」を出し、作成を誘う。P2 タブが「受信 (Incoming)」「送信 (Outgoing)」と英語を括弧で足しており、誘い文の「新規Webhook」と実際のボタン名「Webhookを追加」も違う',
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「受信Webhookがありません。「新規Webhook」から作成してください。」を出し、作成を誘う。P2 タブが「受信 (Incoming)」「送信 (Outgoing)」と英語を括弧で足しており、誘い文の「新規Webhook」と実際のボタン名「Webhookを追加」も違う。**#515 で直す差分が出ている（未取り込み）**',
     verdictSource: 'webhooks-v6/f8SBSh-error-1920.png', verdictHead: '0389226d',
   },
 
@@ -1608,7 +1608,7 @@ export const SCREENS = [
   { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'events-v6/design-qa.md' },
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/events/admin/events*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/events/admin/events*', '**/api/events/admin/events/**'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る。P1 赤い帯と同時に「イベントがまだありません／最初のイベントを作成」を出し、帯も0件・0人・0件と数える（未取得なので—にすべき）',
     verdictSource: 'events-v6/k5m5Bc-error-1920.png', verdictHead: '6bb950f3',
   },
