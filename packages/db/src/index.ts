@@ -19,6 +19,7 @@ export * from './friend-add-events';
 export * from './calendar';
 export * from './reminders';
 export * from './scoring';
+export * from './action-score-rules';
 export * from './templates';
 export * from './chats';
 export * from './inbox-reads';
