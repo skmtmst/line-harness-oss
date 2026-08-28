@@ -1,11 +1,15 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import Header from '@/components/layout/header'
 import { bookingApi, type BookingShift, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
+
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 const DAYS: Array<{ key: DayKey; weekday: number; label: string; tone: string }> = [
@@ -50,11 +54,13 @@ function StaffShiftsPageContent() {
   const [calendarConnected, setCalendarConnected] = useState(false)
   const [serviceAccountEmail, setServiceAccountEmail] = useState<string | null>(null)
   const [serviceAccountConfigured, setServiceAccountConfigured] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const [loadError, setLoadError] = useState(false)
   const [savingRules, setSavingRules] = useState(false)
   const [savingCalendar, setSavingCalendar] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const loadRequestRef = useRef(0)
 
   // スタッフの一覧は、誰も選ばれていないうちから要る。
   useEffect(() => {
@@ -81,8 +87,14 @@ function StaffShiftsPageContent() {
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
-    if (!selectedAccountId || !staffId) return
-    setLoading(true)
+    const requestId = ++loadRequestRef.current
+    if (!selectedAccountId || !staffId) {
+      setLoadStatus('ready')
+      setLoadError(false)
+      return
+    }
+    setLoadStatus('loading')
+    setLoadError(false)
     setError(null)
     try {
       const [staff, dated, rules, calendar] = await Promise.all([
@@ -91,6 +103,7 @@ function StaffShiftsPageContent() {
         bookingApi.getAvailabilityRules(selectedAccountId, staffId),
         bookingApi.getGoogleCalendar(selectedAccountId, staffId),
       ])
+      if (requestId !== loadRequestRef.current) return
       setStaffMember(staff.staff.find((item) => item.id === staffId) ?? null)
       setShifts(dated.shifts)
       if (rules.rules.length > 0) {
@@ -107,14 +120,22 @@ function StaffShiftsPageContent() {
       setCalendarConnected(Boolean(calendar.connection))
       setServiceAccountEmail(calendar.service_account.email)
       setServiceAccountConfigured(calendar.service_account.configured)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
+      setLoadStatus('ready')
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      setStaffMember(null)
+      setShifts([])
+      setLoadError(true)
+      setLoadStatus('error')
     }
   }, [selectedAccountId, staffId])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void load()
+    return () => {
+      loadRequestRef.current += 1
+    }
+  }, [load])
 
   async function saveRules() {
     if (!selectedAccountId || !staffId) return
@@ -130,8 +151,8 @@ function StaffShiftsPageContent() {
       })
       await bookingApi.putAvailabilityRules(selectedAccountId, staffId, rules)
       setSuccess('毎週の受付時間を保存しました。今後は期限切れせず、自動で枠が作られます。')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setError('受付時間を保存できませんでした。入力内容を確かめて、もう一度お試しください。')
     } finally {
       setSavingRules(false)
     }
@@ -146,8 +167,8 @@ function StaffShiftsPageContent() {
       await bookingApi.putGoogleCalendar(selectedAccountId, staffId, calendarId.trim())
       setCalendarConnected(true)
       setSuccess('Googleカレンダーに接続しました。予定ありの時間は予約枠から自動で除外されます。')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setError('Googleカレンダーへ接続できませんでした。共有設定とカレンダーIDを確かめてください。')
     } finally {
       setSavingCalendar(false)
     }
@@ -245,11 +266,16 @@ function StaffShiftsPageContent() {
       {success && <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">{success}</div>}
 
       {!selectedAccountId || !staffId ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center text-sm text-gray-500">
-          スタッフ一覧から対象スタッフを選んでください。
-        </div>
-      ) : loading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center text-sm text-gray-500">読み込み中…</div>
+        <ListState kind="empty" title="予約スタッフを選んでください" description="この画面のスタッフ選択から、受付時間を設定する人を選んでください。" />
+      ) : loadStatus === 'loading' ? (
+        <ListState kind="loading" title="受付時間と休業日を読み込んでいます" />
+      ) : loadStatus === 'error' && loadError ? (
+        <ListState
+          kind="error"
+          title="受付時間と休業日を表示できませんでした"
+          description="保存済みの設定は消えていません。再読み込みしても直らない場合はエラー報告へ。"
+          action={<Button variant="secondary" onClick={() => void load()}>受付時間と休業日を再読み込み</Button>}
+        />
       ) : (
         <div className="space-y-4">
           <section data-design="Week" className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
