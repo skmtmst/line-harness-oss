@@ -519,9 +519,9 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件', route: NEW_BC,
     gap: 'api',
-    gapNote: '#510で共通ConditionBuilder・人数確認・実送信は同じSegmentConditionへ統一済み。ただし #421 の saved_searches は `{ all, any, visibility }`、一斉配信は `{ operator, rules, groups }` で、15条件を欠落なく相互変換できない。「保存した条件」を共通SegmentConditionとして保存・検証・版移行するAPI契約が要る',
+    gapNote: '#510で共通ConditionBuilder・人数確認・実送信は同じSegmentConditionへ統一済み。#542 Draftで旧検索と混ぜない `segment_v1` の保存・検証APIを追加済み。取り込み順は #421 → #542。画面接続は別PRのため、まだ未実装扱い',
     status: 'unimplemented',
-    why: '**#510 head `ab1841bc` まで再確認しました（2026-08-29）。** 条件の作成・人数確認・送信は動く一方、「保存した条件から選ぶ」は `disabled` のままです。既存 `/api/saved-searches` は旧SearchConditionsだけを検証し、SegmentConditionを受け取れないため、画面をつなぐだけでは条件が壊れます',
+    why: '**#510 head `ab1841bc` と #542 head `57941197` を確認しました（2026-08-29）。** API契約はDraftで用意できましたが、「保存した条件から選ぶ」はまだ `disabled` のままです。#421 → #542 の取り込み後に、同じSegmentConditionのまま画面へ接続します',
   },
   { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集', route: NEW_BC,
     verdict: 'needs_fix', verdictNote: 'P1 本文の上限が設計と違う。設計は1通あたり5,000文字・合計22,500文字・最大5通で、4,500文字を超えると自動分割。実装は0/500・吹き出しは最大3。ボタン（最大4つ、ラベルと押したときの動作）の編集が無い。URLの扱いの表（サイト名・URL・計測）が無い。保存してテンプレート化、配信後のアクションが無い。P2 種類がタブでなくセレクト',
@@ -622,9 +622,9 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集', route: NEW_BC,
     gap: 'api',
-    gapNote: 'cPk8Aと同じ。共通SegmentConditionを保存した条件として読み書きし、下書き・人数確認・実送信へ同じ形のまま渡すAPI契約と版移行が要る',
+    gapNote: 'cPk8Aと同じ。#542 Draftで共通SegmentConditionの保存APIは用意済み。#421 → #542 の取り込み後に、下書き・人数確認・実送信へ同じ形のまま渡す画面接続が要る',
     status: 'unimplemented',
-    why: '**#510 head `ab1841bc` まで再確認しました（2026-08-29）。** 条件は編集できますが、「この条件を保存」は `disabled` のままです。旧SearchConditionsへの部分変換は、V6の共通15条件を欠落させるため採用しません',
+    why: '**#510 head `ab1841bc` と #542 head `57941197` を確認しました（2026-08-29）。** 条件は編集でき、保存APIもDraftで用意できましたが、「この条件を保存」は `disabled` のままです。旧SearchConditionsへの部分変換は採用しません',
   },
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作', route: '/broadcasts',
