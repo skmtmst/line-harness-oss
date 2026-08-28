@@ -31,12 +31,22 @@ const searches = {
     }
     return { ok: true as const, value: obj };
   },
+  validateSavedSegmentConditions: (raw: unknown) => {
+    const obj = raw as { version?: unknown; condition?: { rules?: unknown[] } } | null;
+    if (!obj || obj.version !== 1 || !obj.condition?.rules?.length) {
+      return { ok: false as const, error: '対象条件が1つもありません' };
+    }
+    return { ok: true as const, value: obj };
+  },
 };
 const accountAccess = {
   getVisibleLineAccountScope: vi.fn(),
 };
 const savedSearchInsights = {
   getSavedSearchMatchInsights: vi.fn(),
+};
+const segmentQuery = {
+  buildSegmentWhere: vi.fn(),
 };
 const folders = {
   getFolders: vi.fn(),
@@ -50,6 +60,7 @@ const folders = {
 vi.mock('@line-crm/db', () => ({ ...marks, ...searches, ...folders }));
 vi.mock('../services/account-access.js', () => accountAccess);
 vi.mock('../services/saved-search-insights.js', () => savedSearchInsights);
+vi.mock('../services/segment-query.js', () => segmentQuery);
 
 const { friendAttributes } = await import('./friend-attributes.js');
 
@@ -131,6 +142,7 @@ beforeEach(() => {
   savedSearchInsights.getSavedSearchMatchInsights.mockResolvedValue(new Map([
     ['s-1', { matchCount: 7, matchCountError: null }],
   ]));
+  segmentQuery.buildSegmentWhere.mockReturnValue({ sql: '1 = 1', bindings: [] });
   accountAccess.getVisibleLineAccountScope.mockResolvedValue({
     accounts: [{ id: 'account-1' }],
     ids: ['account-1'],
@@ -314,6 +326,70 @@ describe('保存した検索', () => {
   it('条件が空なら422', async () => {
     const res = await req('/api/saved-searches?lineAccountId=account-1', 'POST', { name: 'x', conditions: {} });
     expect(res.status).toBe(422);
+  });
+
+  it('配信対象条件は専用形式で保存し、同じ条件評価器を通す', async () => {
+    const conditions = {
+      version: 1,
+      condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
+    };
+    searches.createSavedSearch.mockResolvedValueOnce({
+      ...SEARCH,
+      condition_format: 'segment_v1',
+      conditions_json: JSON.stringify(conditions),
+    });
+    const res = await req('/api/saved-searches?format=segment_v1&lineAccountId=account-1', 'POST', {
+      name: 'VIP向け',
+      conditions,
+    });
+    expect(res.status).toBe(201);
+    expect(segmentQuery.buildSegmentWhere).toHaveBeenCalledWith(conditions.condition);
+    expect(searches.countSavedSearches).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      scope: 'friends',
+      conditionFormat: 'segment_v1',
+    }));
+    expect(searches.createSavedSearch).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      name: 'VIP向け',
+      scope: 'friends',
+      conditionFormat: 'segment_v1',
+      conditions,
+    }));
+  });
+
+  it('実送信の評価器が読めない配信対象条件は保存しない', async () => {
+    segmentQuery.buildSegmentWhere.mockImplementationOnce(() => { throw new Error('bad rule'); });
+    const res = await req('/api/saved-searches?format=segment_v1&lineAccountId=account-1', 'POST', {
+      name: '壊れた条件',
+      conditions: {
+        version: 1,
+        condition: { operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] },
+      },
+    });
+    expect(res.status).toBe(422);
+    expect(await res.json()).toMatchObject({ error: '保存した対象条件を確認してください' });
+    expect(searches.createSavedSearch).not.toHaveBeenCalled();
+  });
+
+  it('配信対象条件の一覧では旧検索の集計器を使わない', async () => {
+    searches.getSavedSearches.mockResolvedValueOnce([{ ...SEARCH, condition_format: 'segment_v1' }]);
+    const res = await req('/api/saved-searches?format=segment_v1&lineAccountId=account-1', 'GET');
+    expect(res.status).toBe(200);
+    expect(searches.getSavedSearches).toHaveBeenCalledWith(
+      env.DB,
+      'friends',
+      expect.objectContaining({ lineAccountId: 'account-1' }),
+      'segment_v1',
+    );
+    expect(savedSearchInsights.getSavedSearchMatchInsights).not.toHaveBeenCalled();
+  });
+
+  it('旧検索の口から配信対象条件を更新できない', async () => {
+    searches.getSavedSearchById.mockResolvedValueOnce({ ...SEARCH, condition_format: 'segment_v1' });
+    const res = await req('/api/saved-searches/s-1?lineAccountId=account-1', 'PATCH', {
+      name: '別の名前',
+    });
+    expect(res.status).toBe(404);
+    expect(searches.updateSavedSearch).not.toHaveBeenCalled();
   });
 
   it('別機能の scope は汎用APIで扱わない', async () => {

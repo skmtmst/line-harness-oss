@@ -204,7 +204,8 @@
     "195_staff_account_scope.sql",
     "196_support_mark_account_scope.sql",
     "197_notification_center_scope.sql",
-    "203_saved_search_references.sql"
+    "203_saved_search_references.sql",
+    "206_saved_search_condition_format.sql"
   ],
-  "migrationCount": 205
+  "migrationCount": 206
 }

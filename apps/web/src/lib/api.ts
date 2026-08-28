@@ -17,6 +17,8 @@ import type {
   SupportMark,
   Folder,
   SavedSearch,
+  SavedSegmentPreset,
+  SavedSegmentConditions,
   MediaItem,
   MediaUsage,
   CommonVar,
@@ -1308,6 +1310,54 @@ export const api = {
       }),
     delete: (id: string, accountId: string) =>
       fetchApi<ApiResponse<null>>(`/api/saved-searches/${id}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'DELETE' }),
+  },
+  /** 一斉配信などで再利用する共通の対象条件。旧い友だち検索とは形を混ぜない。 */
+  segmentPresets: {
+    list: (accountId: string) =>
+      fetchApi<ApiResponse<SavedSegmentPreset[]>>(
+        `/api/saved-searches?format=segment_v1&lineAccountId=${encodeURIComponent(accountId)}`,
+      ),
+    create: (data: { name: string; accountId: string; condition: SegmentCondition; isShared?: boolean }) =>
+      fetchApi<ApiResponse<SavedSegmentPreset>>(
+        `/api/saved-searches?format=segment_v1&lineAccountId=${encodeURIComponent(data.accountId)}`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name: data.name,
+            conditions: {
+              version: 1,
+              condition: data.condition as SavedSegmentConditions['condition'],
+            } satisfies SavedSegmentConditions,
+            isShared: data.isShared,
+          }),
+        },
+      ),
+    update: (
+      id: string,
+      accountId: string,
+      data: { name?: string; condition?: SegmentCondition; isShared?: boolean },
+    ) =>
+      fetchApi<ApiResponse<SavedSegmentPreset>>(
+        `/api/saved-searches/${id}?format=segment_v1&lineAccountId=${encodeURIComponent(accountId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            name: data.name,
+            conditions: data.condition
+              ? ({
+                  version: 1,
+                  condition: data.condition as SavedSegmentConditions['condition'],
+                } satisfies SavedSegmentConditions)
+              : undefined,
+            isShared: data.isShared,
+          }),
+        },
+      ),
+    delete: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/saved-searches/${id}?format=segment_v1&lineAccountId=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE' },
+      ),
   },
   /**
    * 機能のオン／オフ。account_settings の key/value に入る。
