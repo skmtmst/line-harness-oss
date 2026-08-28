@@ -487,7 +487,21 @@ export type MileageHistoryItem = {
   reason: string
   source: string
   sourceEventId: string | null
+  ruleName: string | null
+  mode: 'automatic' | 'manual'
   occurredAt: string
+}
+export type MileageSelfInsights = {
+  accountCount: number
+  rewardedActions: number
+  referralMiles: number
+  qualityReferralCount: number
+  lastEarnedAt: string | null
+}
+export type MileageConnectedAccount = {
+  accountId: string
+  accountName: string
+  friendId: string
 }
 export type MileageRule = {
   id: string
@@ -543,6 +557,25 @@ export type MileageAdminOverview = {
     queuedEvents: number
   }
   members: MileageAdminMember[]
+  pagination: { total: number; limit: number; offset: number }
+}
+export type MileageAdminHistoryItem = {
+  id: string
+  primaryFriendId: string
+  displayName: string
+  pictureUrl: string | null
+  entryType: MileageHistoryItem['entryType']
+  status: MileageHistoryItem['status']
+  amount: number
+  reason: string
+  source: string
+  hasSourceEvent: boolean
+  ruleName: string | null
+  mode: 'automatic' | 'manual'
+  occurredAt: string
+}
+export type MileageAdminHistory = {
+  items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
 }
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
@@ -1047,10 +1080,20 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<FriendDetail>>(`/api/friends/${id}`),
-    mileage: (id: string, limit = 10) =>
-      fetchApi<ApiResponse<{ summary: MileageSummary; history: MileageHistoryItem[] }>>(
-        `/api/friends/${id}/mileage?limit=${limit}`,
-      ),
+    mileage: (id: string, params?: number | { limit?: number; accountId?: string }) => {
+      const query = new URLSearchParams()
+      const options = typeof params === 'number' ? { limit: params } : params
+      query.set('limit', String(options?.limit ?? 10))
+      if (options?.accountId) query.set('accountId', options.accountId)
+      return fetchApi<ApiResponse<{
+        summary: MileageSummary
+        history: MileageHistoryItem[]
+        insights: MileageSelfInsights
+        connections: MileageConnectedAccount[]
+      }>>(
+          `/api/friends/${id}/mileage?${query.toString()}`,
+        )
+    },
     /**
      * 友だち追加の内訳（設計 V2 4-6）。
      * returning は「以前からのお客さまに『はじめまして』が届いた数」でもある。
@@ -3074,6 +3117,28 @@ export const api = {
       if (params?.offset !== undefined) query.set('offset', String(params.offset))
       const suffix = query.toString() ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<MileageAdminOverview>>(`/api/mileage/overview${suffix}`)
+    },
+    history: (params: {
+      accountId: string
+      search?: string
+      entryType?: MileageHistoryItem['entryType']
+      status?: MileageHistoryItem['status']
+      mode?: 'automatic' | 'manual'
+      from?: string
+      to?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.search) query.set('search', params.search)
+      if (params.entryType) query.set('entryType', params.entryType)
+      if (params.status) query.set('status', params.status)
+      if (params.mode) query.set('mode', params.mode)
+      if (params.from) query.set('from', params.from)
+      if (params.to) query.set('to', params.to)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<MileageAdminHistory>>(`/api/mileage/history?${query.toString()}`)
     },
     rules: () => fetchApi<ApiResponse<MileageRule[]>>('/api/mileage/rules'),
     createRule: (data: {

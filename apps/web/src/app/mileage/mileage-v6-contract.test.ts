@@ -8,6 +8,8 @@ const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
 const LEGACY = readFileSync(join(HERE, '..', 'scoring', 'page.tsx'), 'utf8')
 const LEGACY_NEW = readFileSync(join(HERE, '..', 'scoring', 'new', 'page.tsx'), 'utf8')
 const NEW_RULE = readFileSync(join(HERE, 'earning-rules', 'new', 'page.tsx'), 'utf8')
+const HISTORY = readFileSync(join(HERE, 'mileage-history-tab.tsx'), 'utf8')
+const FRIEND_DETAIL = readFileSync(join(HERE, 'friends', 'detail', 'page.tsx'), 'utf8')
 const MENU = readFileSync(join(HERE, '..', '..', 'lib', 'menu.ts'), 'utf8')
 
 describe('V6 マイルの正本URLと概念分離', () => {
@@ -17,12 +19,23 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(LEGACY_NEW).toContain("permanentRedirect('/mileage/earning-rules/new')")
   })
 
-  it('本文タイトルを重ねず、実装済み2タブだけを出す', () => {
+  it('本文タイトルを重ねず、実装済み3タブだけを出す', () => {
     expect(PAGE).toContain('data-mileage-design="v6"')
     expect(PAGE).toContain("{ key: 'balances', label: '友だちの残高' }")
     expect(PAGE).toContain("{ key: 'earning-rules', label: 'たまる決めごと' }")
+    expect(PAGE).toContain("{ key: 'history', label: '履歴' }")
     expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
     expect(PAGE).not.toContain('準備中')
+  })
+
+  it('履歴と友だち別明細をV6の実Nodeへ接続する', () => {
+    expect(HISTORY).toContain('data-design-node="MvZm5"')
+    expect(HISTORY).toContain('api.mileage.history')
+    expect(HISTORY).toContain("kind=\"error\"")
+    expect(FRIEND_DETAIL).toContain('data-design-node="HIU5O"')
+    expect(FRIEND_DETAIL).toContain('api.friends.mileage')
+    expect(FRIEND_DETAIL).toContain('usePageTitle')
+    expect(FRIEND_DETAIL).not.toContain('準備中')
   })
 
   it('残高は共通トップバーで選んだLINEアカウントだけを取得する', () => {

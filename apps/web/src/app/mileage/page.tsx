@@ -4,13 +4,17 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import Pagination from '@/components/shared/pagination'
 import { useAccount } from '@/contexts/account-context'
 import { api, type MileageAdminOverview, type MileageRule } from '@/lib/api'
+import { formatMileageDate } from './mileage-display'
+import MileageHistoryTab from './mileage-history-tab'
 
 const PAGE_SIZE = 50
 const TABS = [
   { key: 'balances', label: '友だちの残高' },
   { key: 'earning-rules', label: 'たまる決めごと' },
+  { key: 'history', label: '履歴' },
 ] as const
 
 const EVENT_LABELS: Record<string, string> = {
@@ -60,15 +64,6 @@ const EVENT_COLORS: Record<string, string> = {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat('ja-JP').format(value)
-}
-
-function formatDate(value: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value.slice(0, 16).replace('T', ' ')
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  }).format(date)
 }
 
 function ruleLimit(rule: MileageRule) {
@@ -140,13 +135,14 @@ function MileagePageInner() {
     setLoading(true)
     setError('')
     try {
-      await Promise.all([loadOverview(), loadRules()])
+      if (tab === 'balances') await loadOverview()
+      if (tab === 'earning-rules') await loadRules()
     } catch {
       setError('マイルデータの読み込みに失敗しました。もう一度お試しください。')
     } finally {
       setLoading(false)
     }
-  }, [loadOverview, loadRules])
+  }, [loadOverview, loadRules, tab])
 
   useEffect(() => {
     if (accountLoading) return
@@ -190,7 +186,7 @@ function MileagePageInner() {
   }, [accounts, selectedAccountId])
 
   return (
-    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : 'N46cQ'}>
+    <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : tab === 'earning-rules' ? 'N46cQ' : 'MvZm5'}>
       <div data-design="Tabs">
         <MergedTabs
           basePath="/mileage"
@@ -199,7 +195,9 @@ function MileagePageInner() {
           defaultKey="balances"
           actions={tab === 'balances'
             ? <Button onClick={() => void reloadAll()}>残高を再読み込み</Button>
-            : <Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>}
+            : tab === 'earning-rules'
+              ? <Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>
+              : undefined}
         />
       </div>
 
@@ -294,6 +292,8 @@ function MileagePageInner() {
         </div>
       </section>}
 
+      {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
+
       {tab === 'balances' && <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
@@ -376,7 +376,7 @@ function MileagePageInner() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-xs text-gray-500">{formatDate(member.lastActivityAt)}</td>
+                      <td className="px-4 py-4 text-xs text-gray-500">{formatMileageDate(member.lastActivityAt)}</td>
                     </tr>
                   )
                 })}
@@ -388,18 +388,12 @@ function MileagePageInner() {
         {totalPages > 1 && (
           <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
             <span className="text-xs text-gray-500">{currentPage} / {totalPages}ページ</span>
-            <div className="flex gap-2">
-              <button
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 disabled:opacity-40"
-              >前へ</button>
-              <button
-                disabled={offset + PAGE_SIZE >= (overview?.pagination.total ?? 0)}
-                onClick={() => setOffset(offset + PAGE_SIZE)}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 disabled:opacity-40"
-              >次へ</button>
-            </div>
+            <Pagination
+              page={currentPage}
+              pageCount={totalPages}
+              onPageChange={(nextPage) => setOffset((nextPage - 1) * PAGE_SIZE)}
+              disabled={loading}
+            />
           </div>
         )}
       </section>}
