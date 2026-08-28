@@ -88,8 +88,13 @@ const MEDIA = { feature: 15, dir: 'media-v6', route: '/contents', mode: 'page' }
 /** 成果とアフィリエイト。`/conversions?tab=` の5タブに寄せてある。 */
 const AFFILIATE = { feature: 16, dir: 'affiliates-v6', mode: 'page' }
 
-/** マイル・行動スコア。実装は `/scoring` の1枚もので、設計の5タブは無い。 */
-const MILEAGE = { feature: 17, dir: 'mileage-v6', route: '/scoring', mode: 'page' }
+/**
+ * マイル・行動スコア。
+ *
+ * **正本は `/mileage` に移った**（PR #441 head `5fd7c048`）。`/scoring` は
+ * 恒久の転送になっている。タブは `?tab=balances` `?tab=earning-rules`。
+ */
+const MILEAGE = { feature: 17, dir: 'mileage-v6', route: '/mileage?tab=balances', mode: 'page' }
 
 /** 流入と計測。`/inflow-links?tab=` の3タブ（流入経路／サイトスクリプト／広告連携）。 */
 const INFLOW = { feature: 18, dir: 'inflow-v6', mode: 'page' }
@@ -773,7 +778,7 @@ export const SCREENS = [
     **「使い道」「履歴」「行動スコア」はまるごと無い。**
   */
   { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル' },
-  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと' },
+  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules' },
   {
     ...MILEAGE, node: 'qlVLJ', name: '17-1-B マイルの使い道',
     status: 'unimplemented',
@@ -784,7 +789,7 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '増減の記録を並べる画面が無い。手で動かした分の理由も残らない（`grep 履歴` が0件）',
   },
-  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/scoring/new' },
+  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new' },
   {
     ...MILEAGE, node: 'HIU5O', name: '17-1-E 友だちのマイル明細',
     status: 'unimplemented',
@@ -801,17 +806,18 @@ export const SCREENS = [
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
+    route: '/mileage?tab=earning-rules',
     states: { apis: ['**/api/mileage/rules*', '**/api/mileage/overview*'], kinds: ['loading', 'empty', 'error'] },
   },
   {
     ...MILEAGE, node: 'z3PB2', name: '17-2 行動スコア',
     status: 'unimplemented',
-    why: '行動スコアがまるごと無い（`grep 行動スコア|score` が `/scoring` 配下で0件）。**サイドバーの「マイル」はマイルだけ**',
+    why: '行動スコアがまるごと無い。PR #441 でタブは2本（友だちの残高／たまる決めごと）になったが、行動スコアは入っていない。**サイドバーの「マイル」はマイルだけ**',
   },
   {
-    ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/scoring/new',
+    ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/earning-rules/new',
     status: 'unimplemented',
-    why: '`/scoring/new` は**マイルの付与ルール**を作る画面で、スコアのルールではない。17-2 が無いので行き先も無い',
+    why: '`/mileage/earning-rules/new` は**マイルの付与ルール**を作る画面で、スコアのルールではない。17-2 が無いので行き先も無い',
   },
 
   // ── 機能18 流入と計測 ───────────────────────────────────
@@ -833,15 +839,14 @@ export const SCREENS = [
     route: '/inflow-links?tab=links',
     states: { apis: ['**/api/entry-routes*', '**/api/analytics/ref-summary*'], kinds: ['loading', 'empty', 'error'] },
   },
-  {
-    ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）',
-    status: 'unimplemented',
-    why: '成果を広告へ返す仕組みが無い。fbclid・gclid などの目印と成果地点の対応付けを扱う場所が無い（タブが3本しかない）',
-  },
-  {
-    ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴',
-    status: 'unimplemented', why: '18-2 が無いので、送った・断られた・やり直した記録も無い',
-  },
+  /*
+    **判定を改めた（PR #443 head `f372ff30`）。**
+    「成果を広告へ返す仕組みが無い」と書いていたが、独立したタブが無い
+    だけで、**中身は「広告連携」タブに入っている。** 返した記録も、
+    クリックの種類（fbclid）も、失敗の理由も出る。
+  */
+  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads' },
+  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads' },
 
   // ── 機能19 コンバージョン ───────────────────────────────
   { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points' },

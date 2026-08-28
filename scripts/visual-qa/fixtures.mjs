@@ -1618,13 +1618,20 @@ export const CONVERSION_POINTS = [
  * 一覧の既定（`{items,total,page,limit}`）を返すと `summary.total…` を
  * 読もうとして画面ごと落ちる。
  */
-const mileageMember = (i, name, available, lifetime, rank) => ({
+/*
+  **`MileageAdminMember` の型どおり。** `rank` は型に無いので渡さない
+  （渡すと「実装にランクがある」ように見える）。`lastActivityAt` は
+  型に在るのに落としていて、一覧の「最終行動」が全員 `—` で撮れていた。
+*/
+const mileageMember = (i, name, available, lifetime, lastActivityAt) => ({
   identityKey: `mk-${i}`, primaryFriendId: `friend-${i}`, displayName: name,
   pictureUrl: null, accountCount: 1, accountNames: ['LINE 本店'],
   available, pending: 0, lifetimeEarned: lifetime,
-  actionCount: 40 - i, messageCount: 18 - i, linkClickCount: 12 - i,
+  actionCount: 40 - i * 6, messageCount: 18 - i, linkClickCount: 12 - i,
   formCount: 3, bookingCount: 2, webinarCount: 1, instagramCount: 0,
-  followingDays: 300 - i * 20, unfollowCount: 0, rank,
+  followingDays: 300 - i * 20, unfollowCount: 0,
+  referralMiles: Math.max(0, 3500 - i * 700), qualityReferralCount: Math.max(0, 7 - i * 2),
+  lastActivityAt,
 })
 
 export const MILEAGE_OVERVIEW = {
@@ -1633,12 +1640,15 @@ export const MILEAGE_OVERVIEW = {
     activeMembers30d: 498, totalActions: 4180, queuedEvents: 0,
   },
   members: [
-    mileageMember(1, '高橋 直人', 8420, 12400, 'ゴールド'),
-    mileageMember(2, 'Kenta Kawano', 5200, 7800, 'ゴールド'),
-    mileageMember(3, 'Masato S.', 3140, 4600, 'シルバー'),
-    mileageMember(4, '菅野 亮', 2050, 2900, 'シルバー'),
-    /* 0マイルの人。**持っていない786人がいることが要る。** */
-    mileageMember(5, '山田 太郎', 0, 0, 'ブロンズ'),
+    mileageMember(1, '高橋 直人', 8420, 12400, '2026-08-24T05:02:00.000Z'),
+    mileageMember(2, 'Kenta Kawano', 5200, 7800, '2026-08-23T01:20:00.000Z'),
+    mileageMember(3, 'Masato S.', 3140, 4600, '2026-08-20T08:40:00.000Z'),
+    mileageMember(4, '菅野 亮', 2050, 2900, '2026-08-12T02:10:00.000Z'),
+    /*
+      0マイルの人。**持っていない786人がいることが要る。**
+      いちども動いていないので `lastActivityAt` は null。
+    */
+    mileageMember(5, '山田 太郎', 0, 0, null),
   ],
   pagination: { total: 1284, limit: 20, offset: 0 },
 }
@@ -2416,5 +2426,56 @@ export const SAVED_SEARCHES = [
     conditions: { all: [{ field: 'booking_date', op: 'within', value: '7d' }], any: [] },
     createdBy: 'st-1', lineAccountId: 'visual-qa-account', isShared: true,
     createdAt: '2026-07-15T00:00:00.000Z', updatedAt: '2026-08-22T00:00:00.000Z',
+  },
+]
+
+/**
+ * 広告とのつなぎ（機能18-2）。設計 `BuVDB`（Meta・Google・X・TikTok）。
+ *
+ * **鍵は伏せた形で持つ。** `config` は「先頭と末尾だけ残して伏せてある」と
+ * 型の覚え書きにある。生の値を書くと、実装より多くの物を見せてしまう。
+ */
+export const AD_PLATFORMS = [
+  {
+    id: 'ad-meta', name: 'meta', displayName: 'Meta広告',
+    config: { clickIdType: 'fbclid', pixelId: '12••••••89', accessToken: 'EAA••••••3f' },
+    isActive: true, createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T02:20:00.000Z',
+  },
+  {
+    id: 'ad-google', name: 'google', displayName: 'Google広告',
+    config: { clickIdType: 'gclid', customerId: '123-•••-4567', conversionAction: 'purchase' },
+    isActive: true, createdAt: '2026-03-01T00:00:00.000Z', updatedAt: '2026-08-25T02:20:00.000Z',
+  },
+  {
+    /* 権限が足りない先。**設計の「もう一度つなぎ直してください」。** */
+    id: 'ad-x', name: 'x', displayName: 'X（旧Twitter）',
+    config: { clickIdType: 'twclid', pixelId: 'o••••1' },
+    isActive: false, createdAt: '2026-05-10T00:00:00.000Z', updatedAt: '2026-08-01T00:00:00.000Z',
+  },
+]
+
+/** 広告へ返した記録（設計 `Im2b1`）。**断られたものが要る。** */
+export const AD_CONVERSION_LOGS = [
+  {
+    id: 'acl-1', adPlatformId: 'ad-meta', friendId: 'friend-1', eventName: '体験申込',
+    clickId: 'fb.1.1724••••.AbCdEf', clickIdType: 'fbclid', status: 'sent',
+    errorMessage: null, createdAt: '2026-08-25T02:20:00.000Z',
+  },
+  {
+    id: 'acl-2', adPlatformId: 'ad-google', friendId: 'friend-2', eventName: '定期便の申込',
+    clickId: 'Cj0KCQ••••', clickIdType: 'gclid', status: 'sent',
+    errorMessage: null, createdAt: '2026-08-25T01:10:00.000Z',
+  },
+  {
+    id: 'acl-3', adPlatformId: 'ad-meta', friendId: 'friend-3', eventName: '体験申込',
+    clickId: 'fb.1.1724••••.GhIjKl', clickIdType: 'fbclid', status: 'pending',
+    errorMessage: null, createdAt: '2026-08-25T02:40:00.000Z',
+  },
+  {
+    /* 断られたもの。**理由が残ることが要る。** */
+    id: 'acl-4', adPlatformId: 'ad-meta', friendId: 'friend-4', eventName: '体験申込',
+    clickId: null, clickIdType: null, status: 'failed',
+    errorMessage: 'クリックの目印が結びつきませんでした',
+    createdAt: '2026-08-24T09:00:00.000Z',
   },
 ]
