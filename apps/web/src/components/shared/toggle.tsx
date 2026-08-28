@@ -8,12 +8,15 @@ import styles from './toggle.module.css'
  */
 export default function Toggle({
   checked,
+  disabled,
   locked,
   label,
   onChange,
   className,
 }: {
   checked: boolean
+  /** 現在値を保ったまま操作だけを止める。閲覧権限だけの画面で使う。 */
+  disabled?: boolean
   /** 消せない項目。オンのまま押せない。 */
   locked?: boolean
   /** 読み上げ用の名前。何のスイッチかを必ず渡す。 */
@@ -28,7 +31,7 @@ export default function Toggle({
       role="switch"
       aria-checked={on}
       aria-label={label}
-      disabled={locked}
+      disabled={locked || disabled}
       onClick={onChange ? () => onChange(!checked) : undefined}
       className={[styles.toggle, on && !locked && styles.on, locked && styles.locked, className]
         .filter(Boolean)

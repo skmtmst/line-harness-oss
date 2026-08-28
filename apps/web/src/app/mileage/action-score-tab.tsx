@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Send, Users } from 'lucide-react'
+import { Download, Send, Settings2, Users } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
@@ -177,9 +177,12 @@ export default function ActionScoreTab({ accountId }: { accountId: string }) {
           {filter === 'all' ? <span className="text-xs text-v6-ink-faint">高い・ふつう・低いの層を選ぶと、友だち検索と配信へ引き継げます。</span> : null}
           {filter === 'decreased' ? <span className="text-xs text-v6-ink-faint">下がっている人は、この一覧で理由を確認できます。</span> : null}
         </div>
-        <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
-          <Download className="h-4 w-4" aria-hidden="true" />行動スコアをCSVで書き出す
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button href="/mileage/score-rules"><Settings2 className="h-4 w-4" aria-hidden="true" />スコアのルールを編集</Button>
+          <Button onClick={exportCurrentPage} disabled={!overview?.items.length}>
+            <Download className="h-4 w-4" aria-hidden="true" />行動スコアをCSVで書き出す
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
