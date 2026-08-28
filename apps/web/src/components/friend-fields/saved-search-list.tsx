@@ -71,11 +71,12 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     setConditionLabels({})
     try {
       if (!accountId) return
-      const [savedSearches, tagResult, markResult, scenarioResult] = await Promise.allSettled([
+      const [savedSearches, tagResult, markResult, scenarioResult, fieldResult] = await Promise.allSettled([
         api.savedSearches.list(accountId),
         api.tags.list(),
         api.supportMarks.list(accountId),
         api.scenarios.list({ accountId }),
+        api.friendFields.list(),
       ])
       if (sequence !== loadSequence.current) return
       if (savedSearches.status === 'rejected') throw savedSearches.reason
@@ -88,6 +89,9 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
           : {},
         scenarios: scenarioResult.status === 'fulfilled' && scenarioResult.value.success
           ? Object.fromEntries(scenarioResult.value.data.map((scenario) => [scenario.id, scenario.name]))
+          : {},
+        fields: fieldResult.status === 'fulfilled' && fieldResult.value.success
+          ? Object.fromEntries(fieldResult.value.data.map((field) => [field.fieldKey, field.name]))
           : {},
       })
     } catch (reason) {
