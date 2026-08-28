@@ -86,8 +86,26 @@ const LABELS = {
 }
 
 function tally(list) {
-  const out = { compared: 0, unimplemented: 0, unconfirmed: 0, elsewhere: 0, missing: 0 }
-  for (const s of list) out[stateOf(s)] += 1
+  const out = {
+    compared: 0, unimplemented: 0, unconfirmed: 0, elsewhere: 0, missing: 0,
+    /* 判定の内訳。**「撮れた」と「合っていた」は別に数える。** */
+    match: 0, structureMatchDataPending: 0, needsFix: 0, unjudged: 0,
+  }
+  const VERDICT_KEY = {
+    match: 'match',
+    structure_match_data_pending: 'structureMatchDataPending',
+    needs_fix: 'needsFix',
+  }
+  for (const s of list) {
+    out[stateOf(s)] += 1
+    if (s.status) continue
+    /* **空欄を一致として数えない。** 判定が無ければ「未判定」。 */
+    const key = VERDICT_KEY[s.verdict]
+    if (key) out[key] += 1
+    else out.unjudged += 1
+  }
+  /* **完了まで残り。** 一致以外の全部。 */
+  out.remaining = out.structureMatchDataPending + out.needsFix + out.unimplemented + out.unjudged
   return out
 }
 
@@ -183,6 +201,11 @@ if (process.argv.includes('--html')) {
   <section class="cards">
     <div class="card"><b>${SCREENS.length}</b><span>画面の総数</span></div>
     <div class="card ok"><b>${all.compared}</b><span>比較済み（${pct(all.compared)}%）</span></div>
+    <div class="card ok"><b>${all.match}</b><span>一致（${pct(all.match)}%）</span></div>
+    <div class="card warn"><b>${all.structureMatchDataPending}</b><span>構造一致・データ未接続</span></div>
+    <div class="card warn"><b>${all.needsFix}</b><span>要修正</span></div>
+    <div class="card warn"><b>${all.unjudged}</b><span>未判定</span></div>
+    <div class="card gap"><b>${all.remaining}</b><span>完了まで残り</span></div>
     <div class="card gap"><b>${all.unimplemented}</b><span>未実装</span></div>
     <div class="card"><b>${all.unconfirmed}</b><span>未確認</span></div>
     <div class="card"><b>${all.elsewhere}</b><span>別の仕掛けで撮影</span></div>
@@ -268,11 +291,24 @@ ${bars}
   console.log('# V6 進捗台帳（262画面）\n')
   console.log('`scripts/visual-qa/screens.mjs` から機械で組み立てています。**手で書き写していません。**\n')
   console.log(`総数 **${SCREENS.length}** ／ 比較済み **${all.compared}** ／ 未実装 **${all.unimplemented}** ／ 未確認 **${all.unconfirmed}** ／ 別の仕掛けで撮影 **${all.elsewhere}** ／ 未撮影 **${all.missing}**\n`)
-  console.log('| 機能 | 名前 | 総数 | 比較済み | 未実装 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |')
-  console.log('|---|---|---|---|---|---|---|---|---|')
+
+  console.log('## 判定\n')
+  console.log('**「撮れた」と「合っていた」は別に数えます。** 空欄は一致にしません。\n')
+  console.log('| 判定 | 数 |')
+  console.log('|---|---|')
+  console.log(`| 一致 | **${all.match}** |`)
+  console.log(`| 構造一致・データ未接続 | ${all.structureMatchDataPending} |`)
+  console.log(`| 要修正 | ${all.needsFix} |`)
+  console.log(`| 未実装 | ${all.unimplemented} |`)
+  console.log(`| 未判定 | ${all.unjudged} |`)
+  console.log(`| **完了まで残り** | **${all.remaining}** |`)
+  console.log('\n「完了まで残り」＝ 構造一致・データ未接続 ＋ 要修正 ＋ 未実装 ＋ 未判定。\n')
+
+  console.log('| 機能 | 名前 | 総数 | 比較済み | 一致 | 要修正 | 未判定 | 未実装 | 未確認 | 別の仕掛け | 未撮影 | 撮った先 |')
+  console.log('|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
-    console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.unimplemented} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} | ${capturedAt(r.feature)} |`)
+    console.log(`| ${r.feature} | ${r.name} | ${r.total} | ${r.compared} | ${r.match} | ${r.needsFix + r.structureMatchDataPending} | ${r.unjudged} | ${r.unimplemented} | ${r.unconfirmed} | ${r.elsewhere} | ${r.missing} | ${capturedAt(r.feature)} |`)
   }
-  console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.unimplemented}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** | |`)
+  console.log(`| | **合計** | **${SCREENS.length}** | **${all.compared}** | **${all.match}** | **${all.needsFix + all.structureMatchDataPending}** | **${all.unjudged}** | **${all.unimplemented}** | **${all.unconfirmed}** | **${all.elsewhere}** | **${all.missing}** | |`)
   console.log('\n**「撮った先」が空**の機能は、まだ実装PRのheadで撮り直していません（自分の枝で撮ったものです）。**空欄を確認済みと読まないでください。**')
 }

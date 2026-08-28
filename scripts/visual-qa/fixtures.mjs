@@ -665,10 +665,15 @@ export const SCENARIO_STATS = {
   activeNow: 116,
   completed: 312,
   paused: 0,
+  /*
+    **`reachRate` です。`reachedRate` ではありません。**
+    `packages/shared/src/types.ts` の `ScenarioStats` に照らして直しました。
+    別名で書くと握りつぶされ、何も試していない絵が基準になります。
+  */
   steps: SCENARIO_STEPS.map((step, index) => ({
     stepOrder: step.stepOrder,
     reachedCount: [428, 381, 312][index] ?? 0,
-    reachedRate: [1, 0.89, 0.73][index] ?? 0,
+    reachRate: [1, 0.89, 0.73][index] ?? 0,
   })),
 }
 
@@ -3484,55 +3489,12 @@ const execRow = (over) => ({
 })
 
 /* ── M2b2B シナリオ配信結果 ─────────────────────────────────
-   既存：`friend_scenarios`（参加中・完了・一時停止）／`scenario_steps`
-         （段の名前）／`messages_log.scenario_step_id`（段ごとの送信数）／
-         `link_clicks`（押された数）
-   **無い：開封。** LINEは友だち単位の既読を返さない。
-   **無い：エラー人数。** シナリオ配信の失敗を1件ずつ残す記録が無い。
+   **固定データは作りません。** PR #503 は**新しい口を1本も足さず**、
+   既存の `api.scenarios.get(id)` と `api.scenarios.stats(id)` を読みます。
+   使うのは上の `SCENARIO_STEPS` と `SCENARIO_STATS`。
+
+   （推測の形で `SCENARIO_RESULTS` を書いていましたが、実装が来たので外しました。）
 */
-export const SCENARIO_RESULTS = {
-  scenario: { id: 'scenario-0', name: '新規登録7日間フォロー', isActive: true },
-  summary: {
-    started: 386,
-    completed: 264,
-    completedRate: 0.684,
-    active: 428,
-    /* **未取得。** 失敗を1件ずつ残す記録が無い。0人と書かない。 */
-    errors: null,
-    /* **未取得。** 一時停止と離脱を分ける印が `friend_scenarios` に無い。 */
-    droppedOut: null,
-  },
-  steps: [
-    { id: 'ss-1', stepOrder: 1, name: '登録直後', sent: 386,
-      /* **取れない。** 設計の「開封 82.4%」はここ。 */
-      openRate: null, clicks: 178, clickRate: 0.461, errors: null },
-    { id: 'ss-2', stepOrder: 2, name: '1日後', sent: 371,
-      openRate: null, clicks: 117, clickRate: 0.316, errors: null },
-    { id: 'ss-3', stepOrder: 3, name: '3日後', sent: 352,
-      openRate: null, clicks: 79, clickRate: 0.224, errors: null },
-    /* **一度も送っていない段。** 実値0と未取得を並べて見分ける。 */
-    { id: 'ss-4', stepOrder: 4, name: '7日後', sent: 0,
-      openRate: null, clicks: 0, clickRate: null, errors: null },
-  ],
-  items: [
-    execRow({ ownerKind: 'scenario', ownerId: 'scenario-0', occurredAt: '2026-08-24T01:00:00.000Z',
-      subject: 'Kenta Kawano', triggerLabel: '1通目：登録直後', reference: null,
-      status: 'succeeded', domainStatus: 'delivered', detail: '送りました', durationMs: 520 }),
-    execRow({ ownerKind: 'scenario', ownerId: 'scenario-0', occurredAt: '2026-08-24T00:40:00.000Z',
-      subject: 'Masato S.', triggerLabel: '2通目：1日後', reference: null,
-      status: 'pending', domainStatus: 'scheduled', detail: 'これから送ります' }),
-    /* **条件で送らなかった。** 失敗ではない。 */
-    execRow({ ownerKind: 'scenario', ownerId: 'scenario-0', occurredAt: '2026-08-24T00:20:00.000Z',
-      subject: '前田 さくら', triggerLabel: '3通目：3日後', reference: null,
-      status: 'skipped', domainStatus: 'condition_not_met',
-      detail: '配信条件に合わなかったため送っていません' }),
-    /* **止めた人。** 離脱と一時停止を分けられるか。 */
-    execRow({ ownerKind: 'scenario', ownerId: 'scenario-0', occurredAt: '2026-08-23T09:00:00.000Z',
-      subject: '石田 未来', triggerLabel: '2通目：1日後', reference: null,
-      status: 'cancelled', domainStatus: 'paused', detail: '購読を止めました' }),
-  ],
-  pagination: { total: 4, limit: 20, offset: 0 },
-}
 
 /* ── Se65i 運用者通知の記録 ─────────────────────────────────
    既存：`notifications`（title・body・channel・category・

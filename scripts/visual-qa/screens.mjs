@@ -169,31 +169,36 @@ export const SCREENS = [
   // ── 機能1 ダッシュボード ────────────────────────────────
   {
     node: 'vUXKb', feature: 1, name: '1-1 ダッシュボード',
+    verdict: 'structure_match_data_pending', verdictNote: '構造一致 / データ未接続', verdictSource: 'dashboard-v6/design-qa.md',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
   },
   {
     node: 'ZN0ov', feature: 1, name: '1-1-1 ダッシュボード編集',
+    verdict: 'structure_match_data_pending', verdictNote: '構造一致', verdictSource: 'dashboard-v6/design-qa.md',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: 'ダッシュボード編集' }],
   },
   {
     node: 'JN6mQ', feature: 1, name: '1-1-2 友だち追加QR',
+    verdict: 'structure_match_data_pending', verdictNote: '構造一致 / データ未接続', verdictSource: 'dashboard-v6/design-qa.md',
     dir: 'dashboard-v6', route: '/', mode: 'viewport', height: 1668, clock: DASHBOARD_CLOCK,
     steps: [{ click: 'QRを表示' }],
   },
   {
     node: 'NjK9q', feature: 1, name: '1-1-3 対応受信の表示件数を開く',
+    verdict: 'structure_match_data_pending', verdictNote: '構造一致', verdictSource: 'dashboard-v6/design-qa.md',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '表示件数' }],
   },
   {
     node: 'Alekb', feature: 1, name: '1-1-4 通知パネルを開く',
+    verdict: 'structure_match_data_pending', verdictNote: '構造一致 / データ未接続', verdictSource: 'dashboard-v6/design-qa.md',
     dir: 'dashboard-v6', route: '/', mode: 'page', clock: DASHBOARD_CLOCK,
     steps: [{ click: '通知' }],
   },
 
   // ── 機能2 受信箱 ────────────────────────────────────────
-  { ...INBOX, node: 'xGLVe', name: '2-1 受信箱', steps: OPEN_CHAT },
+  { ...INBOX, node: 'xGLVe', name: '2-1 受信箱', steps: OPEN_CHAT, verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inbox-v6/design-qa.md' },
   {
     ...INBOX, node: 'NfgOs', name: '2-2 テンプレート選択',
     steps: [...OPEN_CHAT, { click: '▧ テンプレートを選択' }],
@@ -287,6 +292,7 @@ export const SCREENS = [
       共通の `Select` に寄せれば開いた姿も残せる（P2）。
     */
     ...FRIENDS, node: 'LT8RS', name: '3-1-A 友だち（表示件数を開く）',
+    verdict: 'match', verdictNote: '一致', verdictSource: 'v6-recheck-496-and-classification.md', verdictHead: '2e438929',
   },
   {
     ...FRIENDS, node: 'Igi72', name: '3-1-B 友だち（詳細検索・14軸）',
@@ -375,10 +381,19 @@ export const SCREENS = [
       **開封率とエラー人数は `null`。** 取れないものを数で埋めない。
       実装PRの番号と head が届いたら route/states を実物から書く。
     */
-    ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果', route: EDIT,
-    gap: 'api',
-    gapNote: 'シナリオの配信結果を数える口が要る',
-    status: 'unimplemented', why: '配信結果を開く導線が未確認',
+    /*
+      **PR #503（head `6db5ad7f`）で `/scenarios/results` が入った。**
+      **新しい口は1本も足していない。** 既存の `api.scenarios.get(id)` と
+      `api.scenarios.stats(id)`（`ScenarioStats`）を読むだけ。
+
+      開封率・クリック率・失敗数は取れないので、画面もCSVも `—`。
+      設計の数（82.4% など）を固定で置いていないことを確認済み。
+    */
+    ...SCENARIO, node: 'M2b2B', name: '5-1-L シナリオ・配信結果',
+    route: '/scenarios/results?id=scenario-1',
+    states: { apis: ['**/api/scenarios/*'], kinds: ['normal', 'loading', 'error'] },
+    verdict: 'match', verdictNote: '一致',
+    verdictSource: 'scenarios-v6/design-qa-results-503.md', verdictHead: '6db5ad7f',
   },
   {
     ...SCENARIO, node: 'q5G45', name: '5-1-M 一覧の状態（空・読込・エラー）', route: '/scenarios',
@@ -430,6 +445,7 @@ export const SCREENS = [
       `steps` で埋めてから撮る。
     */
     ...BROADCAST, node: 'FpgxH', name: '6-1-H 最終確認',
+    verdict: 'match', verdictNote: '一致', verdictSource: 'broadcasts-v6/design-qa-final-confirm-497.md', verdictHead: '84e5bab9',
     route: NEW_BC, mode: 'viewport', height: 1080,
     steps: [
       { fill: 'main input[placeholder^="例：8月"]', selector: true, text: '8月キャンペーンのお知らせ', after: 400 },
@@ -474,10 +490,11 @@ export const SCREENS = [
     実装は `/reminders/new` の1枚もので、段の縦帯も右の「設定内容」も無い。
     **段ごとの画面が無いので、設計の A〜G は1枚ずつには対応しない。**
   */
-  { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ', route: '/reminders' },
-  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new' },
+  { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ', route: '/reminders', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'reminders-v6/design-qa.md' },
+  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'reminders-v6/design-qa.md' },
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'reminders-v6/design-qa.md',
     route: '/reminders/edit?id=reminder-3',
   },
   {
@@ -521,6 +538,7 @@ export const SCREENS = [
       **表は1本にせず、読む口の契約でそろえる形。**
     */
     ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果',
+    verdict: 'needs_fix', verdictNote: 'P1×5', verdictSource: 'reminders-v6/design-qa-execution-results-500.md', verdictHead: '409f00bb',
     route: '/reminders/detail?id=reminder-1',
     states: {
       apis: ['**/api/reminders/*/runs*'],
@@ -544,17 +562,20 @@ export const SCREENS = [
     設計は5段のウィザード（基本設定→どんなときに動くか→何を返すか→優先順位→確認）。
     実装は一覧の上に出る**1枚の窓**で、段も右の「設定内容」も無い。
   */
-  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答' },
+  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'auto-replies-v6/design-qa.md' },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'auto-replies-v6/design-qa.md',
     route: '/auto-replies/edit?id=ar-2',
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'auto-replies-v6/design-qa.md',
     route: '/auto-replies/edit?id=ar-2',
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'auto-replies-v6/design-qa.md',
     route: '/auto-replies/edit?id=ar-2',
   },
   {
@@ -594,6 +615,7 @@ export const SCREENS = [
       固定データに2行入れてある。
     */
     ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
+    verdict: 'match', verdictNote: '一致', verdictSource: 'auto-replies-v6/design-qa-execution-results-501.md', verdictHead: '93edbe17',
     route: '/auto-replies/runs?id=rule-a',
     states: {
       apis: ['**/api/auto-reply-runs*'],
@@ -620,7 +642,7 @@ export const SCREENS = [
     ①はじめて追加した人 と ②以前からの友だち の2つに分けるだけ。
     流入リンクで出し分ける仕組みがそもそも無い。
   */
-  { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信' },
+  { ...FRIEND_ADD, node: 'uLQQc', name: '9-1 友だち追加時の配信', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'friend-add-v6/design-qa.md' },
   {
     ...FRIEND_ADD, node: 's9gAx', name: '9-1-A 基本設定',
     gap: 'drop',
@@ -642,9 +664,10 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '最初に送る文面をここで書く場所が無い。実装は**シナリオを選ぶ**だけで、本文はシナリオ側にある',
   },
-  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加' },
+  { ...FRIEND_ADD, node: 'txMO9', name: '9-1-D アクション追加', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'friend-add-v6/design-qa.md' },
   {
     ...FRIEND_ADD, node: 'U3SI5', name: '9-1-E プレビューとテスト',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'friend-add-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: 'テスト実行' }],
   },
   {
@@ -679,14 +702,16 @@ export const SCREENS = [
     実装は作成が1枚、編集が4つのタブ。**「通知・リマインド」の段だけが
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
-  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー' },
-  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new' },
+  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md' },
+  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md' },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT,
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: 'いつ見られるようにするか' }],
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム', route: WEBINAR_EDIT,
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: '見ている途中に出すもの' }],
   },
   {
@@ -698,6 +723,7 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT,
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: 'いつ見られるようにするか' }],
   },
   {
@@ -721,10 +747,12 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT,
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: '概要・分析' }],
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析', route: WEBINAR_EDIT,
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webinars-v6/design-qa.md',
     steps: [{ click: '概要・分析' }],
   },
   {
@@ -744,13 +772,15 @@ export const SCREENS = [
     設計のタブは6本（メッセージ／カルーセル／リッチメッセージ／質問／
     クーポン／リサーチ）。実装は5本で、**「質問」だけが無い。**
   */
-  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート' },
+  { ...TEMPLATE, node: 'W7LBc', name: '11-1 テンプレート', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md' },
   {
     ...TEMPLATE, node: 'GFlD7', name: '11-1-A メッセージを作る',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'テンプレートを作る' }],
   },
   {
     ...TEMPLATE, node: 'FRkls', name: '11-1-B カルーセルを作る',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
   },
   {
@@ -762,14 +792,17 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'リッチメッセージ' }, { click: 'リッチメッセージを作る' }],
   },
   {
     ...TEMPLATE, node: 'hsBtl', name: '11-1-E クーポンを作る',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'クーポン' }, { click: 'クーポンを作る' }],
   },
   {
     ...TEMPLATE, node: 'J3GxEZ', name: '11-1-F リサーチを作る',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'templates-v6/design-qa.md',
     steps: [{ click: 'リサーチ' }, { click: 'リサーチを作る' }],
   },
   {
@@ -806,9 +839,9 @@ export const SCREENS = [
     段は無いが**中身は同じ画面に全部ある**ので、同じ絵を3つの設計と
     突き合わせる形にする。
   */
-  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー' },
-  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new' },
-  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT },
+  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
   {
     ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり', route: RM_EDIT,
     gap: 'build',
@@ -822,8 +855,8 @@ export const SCREENS = [
     gapNote: '上の空の状態',
     status: 'unimplemented', why: '12-1-C が無いので、その空の状態も無い',
   },
-  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT },
-  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む' },
+  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'rich-menus-v6/design-qa.md' },
   {
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
     gap: 'parts',
@@ -842,8 +875,8 @@ export const SCREENS = [
     同じ画面で、編集は別ルート。**「デザイン設定」は押せない状態で置いてある**
     （見た目をアプリにそろえる方針にしたため、と画面に書いてある）。
   */
-  { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム' },
-  { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT },
+  { ...FORM, node: 'EMBIK', name: '13-1 回答フォーム', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'forms-v6/design-qa.md' },
+  { ...FORM, node: 'vCqUj', name: '13-1-A フォームを作る', route: FORM_EDIT, verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'forms-v6/design-qa.md' },
   {
     ...FORM, node: 'ava2n', name: '13-1-B フォームのデザイン設定', route: FORM_EDIT,
     gap: 'drop',
@@ -853,9 +886,10 @@ export const SCREENS = [
   },
   {
     ...FORM, node: 'cSqvP', name: '13-1-C フォームのオプション設定', route: FORM_EDIT,
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'forms-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: 'オプション設定' }],
   },
-  { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答', steps: [{ click: '来店アンケート' }] },
+  { ...FORM, node: 'v9tYhl', name: '13-1-D 集まった回答', steps: [{ click: '来店アンケート' }], verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'forms-v6/design-qa.md' },
   {
     ...FORM, node: 'gBp2J', name: '13-1-E フォームの削除確認',
     gap: 'parts',
@@ -869,8 +903,8 @@ export const SCREENS = [
   },
 
   // ── 機能14 共通情報 ─────────────────────────────────────
-  { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報' },
-  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1' },
+  { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'common-vars-v6/design-qa.md' },
+  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'common-vars-v6/design-qa.md' },
   {
     ...COMMON_VAR, node: 'uNBlA', name: '14-1-B 変える前に影響を見る',
     gap: 'api',
@@ -887,9 +921,10 @@ export const SCREENS = [
   },
 
   // ── 機能15 登録メディア ─────────────────────────────────
-  { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア' },
+  { ...MEDIA, node: 'g89Tc', name: '15-1 登録メディア', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'media-v6/design-qa.md' },
   {
     ...MEDIA, node: 'voJtX', name: '15-1-A メディアの詳細と差し替え',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'media-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: '夏の定番セット.jpgの使用箇所' }],
   },
   {
@@ -898,6 +933,7 @@ export const SCREENS = [
       常に出ている**ので、同じ絵で突き合わせる。
     */
     ...MEDIA, node: 'eXAJP', name: '15-1-B ファイルを入れる',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'media-v6/design-qa.md',
   },
   {
     ...MEDIA, node: 'YfTfJ', name: '15-1-C メディアの削除確認',
@@ -917,9 +953,9 @@ export const SCREENS = [
     実装は5本で、**「支払い」が無く**、代わりに「成果地点（CV）」と
     「レポート」がある。支払いの2枚（`njLGA` `GqFTV`）は行き先が無い。
   */
-  { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates' },
-  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers' },
-  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals' },
+  { ...AFFILIATE, node: 'PouPn', name: '16-1 成果とアフィリエイト', route: '/conversions?tab=affiliates', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'GH8VL', name: '16-1-A 案件', route: '/conversions?tab=offers', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
+  { ...AFFILIATE, node: 'n5VVTb', name: '16-1-B 成果承認', route: '/conversions?tab=approvals', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
   {
     ...AFFILIATE, node: 'njLGA', name: '16-1-C 支払い',
     gap: 'api',
@@ -927,14 +963,15 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '「支払い」のタブが無い。締め日・支払日・振込先・未払い残高を扱う場所がどこにも無い（`grep 振込|締め` が0件）',
   },
-  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new' },
+  { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
   {
     ...AFFILIATE, node: 'jwrbf', name: '16-1-E アフィリエイターの成果内訳',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md',
     route: '/conversions?tab=affiliates', mode: 'viewport', height: 1136,
     /* 表の行は `onClick` だけで、押せる役を持っていない。文字で探す。 */
     steps: [{ click: '田中 明', role: 'text' }],
   },
-  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new' },
+  { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'affiliates-v6/design-qa.md' },
   {
     ...AFFILIATE, node: 'QX70l', name: '16-1-G アフィリエイターを削除する確認',
     gap: 'parts',
@@ -955,8 +992,8 @@ export const SCREENS = [
     実装は `/scoring` の**1枚もの**で、帯・付与ルール・ランキングの3つだけ。
     **「使い道」「履歴」「行動スコア」はまるごと無い。**
   */
-  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル' },
-  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules' },
+  { ...MILEAGE, node: 's98Vfw', name: '17-1 マイル', verdict: 'needs_fix', verdictNote: 'P2', verdictSource: 'mileage-v6/design-qa.md' },
+  { ...MILEAGE, node: 'N46cQ', name: '17-1-A たまる決めごと', route: '/mileage?tab=earning-rules', verdict: 'needs_fix', verdictNote: 'P2', verdictSource: 'mileage-v6/design-qa.md' },
   {
     ...MILEAGE, node: 'qlVLJ', name: '17-1-B マイルの使い道',
     gap: 'api',
@@ -972,7 +1009,7 @@ export const SCREENS = [
     ...MILEAGE, node: 'MvZm5', name: '17-1-C マイルの履歴',
     route: '/mileage?tab=history', mode: 'page',
   },
-  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new' },
+  { ...MILEAGE, node: 'BmoGY', name: '17-1-D たまる決めごとをつくる', route: '/mileage/earning-rules/new', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'mileage-v6/design-qa.md' },
   {
     /*
       **#441 で `/mileage/friends/detail` が入った。**
@@ -989,6 +1026,7 @@ export const SCREENS = [
       窓は `position: fixed` なので `page`（全面）では撮れない。
     */
     ...MILEAGE, node: 'vz0Ji', name: '17-1-F マイルを手で増やす・減らす',
+    verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'mileage-v6/design-qa-score-495.md',
     route: '/mileage/friends/detail?id=friend-1', mode: 'viewport', height: 1080,
     steps: [{ click: 'マイルを手で増やす・減らす', scope: 'main' }],
   },
@@ -1000,6 +1038,7 @@ export const SCREENS = [
   },
   {
     ...MILEAGE, node: 'k8VCU', name: '17-1-H たまる決めごと・一覧の状態',
+    verdict: 'match', verdictNote: '一致', verdictSource: 'mileage-v6/design-qa.md',
     route: '/mileage?tab=earning-rules',
     states: { apis: ['**/api/mileage/rules*', '**/api/mileage/overview*'], kinds: ['loading', 'empty', 'error'] },
   },
@@ -1025,6 +1064,7 @@ export const SCREENS = [
       `publishedVersion` の2つしか持たない。
     */
     ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/score-rules',
+    verdict: 'needs_fix', verdictNote: 'P2（つながる先・パンくず・読む場面と直す場面の分離）', verdictSource: 'mileage-v6/design-qa-score-rules-496.md', verdictHead: '961722fc',
     states: {
       apis: ['**/api/action-scores/rules?*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
@@ -1036,11 +1076,11 @@ export const SCREENS = [
     設計のタブは4本（流入経路24／サイトスクリプト／広告連携3／広告とのつなぎ5）。
     実装は3本で、**「広告とのつなぎ」（成果を広告へ返す）が無い。**
   */
-  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links' },
-  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script' },
-  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads' },
-  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new' },
-  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig' },
+  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
   {
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
     gap: 'parts',
@@ -1049,6 +1089,7 @@ export const SCREENS = [
   },
   {
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md',
     route: '/inflow-links?tab=links',
     states: { apis: ['**/api/entry-routes*', '**/api/analytics/ref-summary*'], kinds: ['loading', 'empty', 'error'] },
   },
@@ -1058,13 +1099,13 @@ export const SCREENS = [
     だけで、**中身は「広告連携」タブに入っている。** 返した記録も、
     クリックの種類（fbclid）も、失敗の理由も出る。
   */
-  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads' },
-  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads' },
+  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'inflow-v6/design-qa.md' },
 
   // ── 機能19 コンバージョン ───────────────────────────────
-  { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points' },
-  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report' },
-  { ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new' },
+  { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'needs_fix', verdictNote: 'P2', verdictSource: 'conversions-v6/design-qa.md' },
+  { ...CONVERSION, node: 'GUxsj', name: '19-1-A コンバージョン レポート', route: '/conversions?tab=report', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'conversions-v6/design-qa.md' },
+  { ...CONVERSION, node: 'GtylA', name: '19-1-B 成果地点をつくる', route: '/conversions/new', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'conversions-v6/design-qa.md' },
   {
     /*
       **#444（head `ccbd0975`）で窓が入った。** それまでは削除がブラウザの
@@ -1084,10 +1125,10 @@ export const SCREENS = [
     使われ方・保存した分析が入っている。数は `AnalyticsMetric`
     （`{value, state, reason}`）で、**未取得と実値0を型で分けている。**
   */
-  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends' },
-  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions' },
-  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes' },
-  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage' },
+  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'analytics-v6/design-qa.md' },
   {
     ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
     gap: 'api',
@@ -1095,19 +1136,20 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が `/analytics` 配下で0件。PR #445 head `5d5f7a5f` でも確かめた）',
   },
-  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross' },
-  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel' },
-  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks' },
-  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved' },
+  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'analytics-v6/design-qa.md' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
-  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信' },
-  { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }] },
-  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }] },
-  { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', steps: [{ click: '配信履歴' }] },
+  { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'nen-v6/design-qa.md' },
+  { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }], verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'nen-v6/design-qa.md' },
+  { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }], verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'nen-v6/design-qa.md' },
+  { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', steps: [{ click: '配信履歴' }], verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'nen-v6/design-qa.md' },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
+    verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'nen-v6/design-qa.md',
     route: '/nen-campaigns/edit?key=review_request',
   },
   {
@@ -1119,11 +1161,12 @@ export const SCREENS = [
   },
   {
     ...NEN, node: 'i9sQP', name: '21-1-F NENコラム・一覧の状態',
+    verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'nen-v6/design-qa.md',
     states: { apis: ['**/api/nen-campaigns/columns*', '**/api/nen-campaigns/overview*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能22 写真審査 ─────────────────────────────────────
-  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査' },
+  { ...PHOTO, node: 'Qu6Vk', name: '22-1 写真審査', verdict: 'needs_fix', verdictNote: 'P0', verdictSource: 'photos-v6/design-qa.md' },
   {
     ...PHOTO, node: 'hHrz8', name: '22-1-A 写真を1枚ずつ見る',
     gap: 'build',
@@ -1140,6 +1183,7 @@ export const SCREENS = [
       設計の高さでビューポートを取る。
     */
     ...PHOTO, node: 'N2J629', name: '22-1-B 写真を戻す理由をえらぶ',
+    verdict: 'structure_match_data_pending', verdictNote: '構造一致・要修正 P1', verdictSource: 'photos-v6/design-qa.md',
     mode: 'viewport', height: 1080,
     steps: [{ click: '理由を選んで見送る', scope: 'main' }],
   },
@@ -1156,7 +1200,7 @@ export const SCREENS = [
     設計のタブは4本（取り込みの記録／会員のつき合わせ／定期便／つなぎ先）。
     実装は1枚もので、**取り込みの記録だけ**がある。
   */
-  { ...EC, node: 'eI3gs', name: '23-1 EC連携' },
+  { ...EC, node: 'eI3gs', name: '23-1 EC連携', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'ec-v6/design-qa.md' },
   {
     ...EC, node: 'ELayY', name: '23-1-A 会員のつき合わせ',
     gap: 'build',
@@ -1184,9 +1228,10 @@ export const SCREENS = [
     設計のタブは4本（顧客へのお知らせ9／運用者へのお知らせ11／
     送れなかったもの4／記録）。実装は**1枚もの**で、顧客へのお知らせだけ。
   */
-  { ...LINE_NOTIFY, node: 'festr', name: '24-1 LINE通知' },
+  { ...LINE_NOTIFY, node: 'festr', name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'line-notify-v6/design-qa.md' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'line-notify-v6/design-qa.md',
     mode: 'viewport', height: 1136, steps: [{ click: '発送した', role: 'text' }],
   },
   {
@@ -1234,8 +1279,8 @@ export const SCREENS = [
     見本12／共通アクション14）で、オートメーションと共通アクションが
     **同じ帯**に並ぶ。実装は `/automations` と `/common-actions` の別ページ。
   */
-  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations' },
-  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new' },
+  { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
   {
     /*
       **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
@@ -1247,6 +1292,7 @@ export const SCREENS = [
       設計にはあるので、差として記録だけしておく。
     */
     ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
+    verdict: 'match', verdictNote: '一致', verdictSource: 'automations-v6/design-qa-execution-results-502.md', verdictHead: '75b010fc',
     route: '/automations/runs',
     states: {
       apis: ['**/api/automation-runs*'],
@@ -1265,9 +1311,9 @@ export const SCREENS = [
     route: '/automations',
     states: { apis: ['**/api/automations*'], kinds: ['loading', 'empty', 'error'] },
   },
-  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions' },
-  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new' },
-  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1' },
+  { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
+  { ...AUTOMATION, node: 'syWp4', name: '25-2-B 共通アクションの版と使われている場所', route: '/common-actions/versions?id=ca-1', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
 
   // ── 機能26 外部連携 ─────────────────────────────────────
   /*
@@ -1276,9 +1322,10 @@ export const SCREENS = [
   */
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webhooks-v6/design-qa.md',
     steps: [{ click: '送信 (Outgoing)' }],
   },
-  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る' },
+  { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'webhooks-v6/design-qa.md' },
   {
     /*
       **撮る支度だけ。** 固定データは `INTEGRATION_RECORDS`。
@@ -1302,9 +1349,10 @@ export const SCREENS = [
     実装は一覧＋詳細で、**「予約を追加」は押せない**
     （「管理画面から予約を代理で入れる仕組みは準備中です」`bookings/page.tsx:289`）。
   */
-  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理' },
+  { ...BOOKING, node: 'TV2DI', name: '27-1 予約管理', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-v6/design-qa.md' },
   {
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-v6/design-qa.md',
     mode: 'viewport', height: 1136, steps: [{ click: '高橋 直人', role: 'text' }],
   },
   /*
@@ -1313,7 +1361,7 @@ export const SCREENS = [
     「LINE未連携の電話客は、顧客台帳の受け皿ができるまで登録できません。」
   */
   { ...BOOKING, node: 'cpdDi', name: '27-1-B 電話の予約を入れる', route: '/booking/bookings/new' },
-  { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }] },
+  { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }], verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-v6/design-qa.md' },
   {
     ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
     gap: 'parts',
@@ -1339,18 +1387,18 @@ export const SCREENS = [
     実装はメニューと担当スタッフの2タブで、受付枠と休業日は
     `/booking/staff/shifts` の別ルートにある。
   */
-  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定' },
-  { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts' },
-  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new' },
+  { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-settings-v6/design-qa.md' },
+  { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-settings-v6/design-qa.md' },
+  { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'booking-settings-v6/design-qa.md' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/booking/admin/menus*', '**/api/booking/admin/staff*'], kinds: ['loading', 'empty', 'error'] },
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
-  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約' },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new' },
-  { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1' },
+  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'events-v6/design-qa.md' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'events-v6/design-qa.md' },
+  { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'events-v6/design-qa.md' },
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/events/admin/events*'], kinds: ['loading', 'empty', 'error'] },
@@ -1361,9 +1409,10 @@ export const SCREENS = [
     設計のタブは4本（いまいる人8／招待中2／入った記録／権限のかたまり5）。
     実装は1枚もの。
   */
-  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー' },
+  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'staff-v6/design-qa.md' },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'staff-v6/design-qa.md',
     mode: 'viewport', height: 1080, steps: [{ click: '高田 誠', role: 'text' }],
   },
   /*
@@ -1372,18 +1421,19 @@ export const SCREENS = [
     「招待中」「権限のかたまり」はまだ無い。
   */
   { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit' },
-  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new' },
+  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'staff-v6/design-qa.md' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
-  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定' },
+  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'settings-v6/design-qa.md' },
 
   // ── 機能32 運用状態 ─────────────────────────────────────
   /* タブ3本は設計とそろっている（健全性チェック／緊急コントロール／更新履歴）。 */
-  { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health' },
-  { ...OPERATIONS, node: 'b3HfZ', name: '32-1-A 緊急コントロール', route: '/emergency?tab=control' },
-  { ...OPERATIONS, node: 'UhC2O', name: '32-1-B 更新履歴', route: '/emergency?tab=history' },
+  { ...OPERATIONS, node: 'UgonK', name: '32-1 運用状態・健全性チェック', route: '/emergency?tab=health', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'operations-v6/design-qa.md' },
+  { ...OPERATIONS, node: 'b3HfZ', name: '32-1-A 緊急コントロール', route: '/emergency?tab=control', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'operations-v6/design-qa.md' },
+  { ...OPERATIONS, node: 'UhC2O', name: '32-1-B 更新履歴', route: '/emergency?tab=history', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'operations-v6/design-qa.md' },
   {
     ...OPERATIONS, node: 'U0BwS', name: '32-1-C 緊急停止の最終確認',
+    verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'operations-v6/design-qa.md',
     route: '/emergency?tab=control', mode: 'viewport', height: 1136,
     /*
       **停止するものを1つ選んでから押す。** 何も選ばずに押すと
@@ -1436,7 +1486,7 @@ export const SCREENS = [
     states: { apis: ['**/api/friend-fields*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
   },
   { node: 'rIhbN', feature: 4, name: '4-3 対応マーク', dir: 'friend-attributes-v6', route: '/tags?tab=marks', mode: 'page' },
-  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page' },
+  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
@@ -1479,6 +1529,7 @@ export const SCREENS = [
       （`field-list.tsx:143`）。使っていない項目は消せるので出ない。
     */
     node: 'KoT6c', feature: 4, name: '4-2-B 友だち情報欄・項目移行',
+    verdict: 'needs_fix', verdictNote: 'P1（「dry-run」が画面に出ている）', verdictSource: 'v6-recheck-496-and-classification.md', verdictHead: '87c150ad',
     dir: 'friend-attributes-v6', route: '/tags/fields/migrate?id=field-birthday', mode: 'page',
   },
   {
@@ -1496,6 +1547,7 @@ export const SCREENS = [
   {
     /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
     node: 'XBkiQ', feature: 4, name: '4-4-A 保存した検索の条件確認・編集',
+    verdict: 'needs_fix', verdictNote: 'P1', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md',
     dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
   },
 ]
@@ -1572,6 +1624,7 @@ export const CAPTURED_AT = {
   ],
   7: [{ pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
   8: [{ pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
+  5: [{ pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['M2b2B'], note: '新しい口は足さず既存の統計を読む' }],
   25: [{ pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],

@@ -22,7 +22,7 @@ import { pathToFileURL } from 'node:url'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mkdirSync, existsSync, readFileSync } from 'node:fs'
-import { SCREENS, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
+import { SCREENS, CAPTURED_AT, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const BASE = process.env.VISUAL_QA_BASE ?? 'http://localhost:3101'
@@ -67,19 +67,49 @@ const value = (name) => {
 }
 
 /** 台帳の行が撮り方を持っているか。**黙って抜けたまま進まないための検査。** */
+/** 設計の総数。**ここが動いたら、必ず誰かが行を足し引きしている。** */
+const TOTAL_SCREENS = 262
+
 function check() {
   const problems = []
   const seen = new Set()
+  if (SCREENS.length !== TOTAL_SCREENS) {
+    problems.push(`総数が ${SCREENS.length} 件（${TOTAL_SCREENS} 件のはず）`)
+  }
   for (const s of SCREENS) {
     if (seen.has(s.node)) problems.push(`${s.node}: 二重に書いてある`)
     seen.add(s.node)
     if (!s.dir) problems.push(`${s.node}: dir が無い`)
     if (['unimplemented', 'unconfirmed', 'elsewhere'].includes(s.status)) {
       if (!s.why) problems.push(`${s.node}: ${s.status} なのに理由が無い`)
+      /* **未実装を一致にできない。** 撮っていないものを合格として数えない。 */
+      if (s.status === 'unimplemented' && s.verdict === 'match') {
+        problems.push(`${s.node}: 未実装なのに verdict が match`)
+      }
       continue
     }
     if (s.status && !['unimplemented', 'unconfirmed', 'elsewhere'].includes(s.status)) {
       problems.push(`${s.node}: 知らない status（${s.status}）`)
+    }
+    /*
+      判定（`verdict`）の検査。**実装の状態（`status`）とは別**に持つ。
+      「撮れた」と「合っていた」は違う。**空欄を一致として数えない。**
+    */
+    if (!s.verdict) {
+      problems.push(`${s.node}: 比較済みなのに verdict が無い（未判定）`)
+    } else if (!VERDICTS.includes(s.verdict)) {
+      problems.push(`${s.node}: 知らない verdict（${s.verdict}）`)
+    } else {
+      if (!s.verdictSource) problems.push(`${s.node}: verdict の出どころ（verdictSource）が無い`)
+      /* データ未接続は、**何が繋がっていないか**を書く。 */
+      if (s.verdict === 'structure_match_data_pending' && !s.verdictNote) {
+        problems.push(`${s.node}: 構造一致・データ未接続なのに、未接続の中身が書いていない`)
+      }
+      /* 要修正は、**P0/P1/P2 か参照先**を残す。 */
+      if (s.verdict === 'needs_fix') {
+        const ok = /P[012]/.test(s.verdictNote ?? '') || /\.md/.test(s.verdictSource ?? '')
+        if (!ok) problems.push(`${s.node}: 要修正なのに P0/P1/P2 も参照先も無い`)
+      }
     }
     if (!s.route || s.route === '—') problems.push(`${s.node}: route が無い`)
     if (!['page', 'viewport'].includes(s.mode)) problems.push(`${s.node}: mode が page/viewport ではない`)
@@ -89,13 +119,49 @@ function check() {
       problems.push(`${s.node}: 設計HTMLも大きさの控えも無い`)
     }
   }
-  if (problems.length) {
-    console.error('撮り方がそろっていません:\n  ' + problems.join('\n  '))
-    process.exit(1)
-  }
+  /*
+    **数え上げは、落ちるときにも出す。** 出さないと「あと何枚か」が
+    分からないまま止まり、直す手がかりが消える。
+  */
   const byFeature = {}
   for (const s of SCREENS) byFeature[s.feature] = (byFeature[s.feature] ?? 0) + 1
   console.log(`${SCREENS.length}件。機能ごと: ` + Object.entries(byFeature).map(([k, v]) => `${k}=${v}`).join(' '))
+
+  /* 判定の内訳。**「完了まで残り」は、一致以外の全部。** */
+  const tally = { match: 0, structure_match_data_pending: 0, needs_fix: 0, unjudged: 0, unimplemented: 0 }
+  for (const s of SCREENS) {
+    if (s.status === 'unimplemented') { tally.unimplemented += 1; continue }
+    if (s.status) continue
+    if (s.verdict && VERDICTS.includes(s.verdict)) tally[s.verdict] += 1
+    else tally.unjudged += 1
+  }
+  const left = tally.structure_match_data_pending + tally.needs_fix + tally.unimplemented + tally.unjudged
+  console.log(
+    `判定: 一致 ${tally.match} ／ 構造一致・データ未接続 ${tally.structure_match_data_pending}`
+    + ` ／ 要修正 ${tally.needs_fix} ／ 未実装 ${tally.unimplemented} ／ 未判定 ${tally.unjudged}`
+    + ` ／ **完了まで残り ${left}**`,
+  )
+
+  /*
+    **判定したときの head が変わっていたら、もう一度見る。**
+    `CAPTURED_AT` に新しい head が入っているのに `verdictHead` が古いままなら、
+    その画面の判定は古い実装に対するものです。
+  */
+  const stale = []
+  for (const s of SCREENS) {
+    if (!s.verdictHead) continue
+    const entries = (CAPTURED_AT[s.feature] ?? []).filter((e) => !e.screens || e.screens.includes(s.node))
+    const latest = entries.at(-1)
+    if (latest && latest.head && !latest.head.startsWith(s.verdictHead) && !s.verdictHead.startsWith(latest.head)) {
+      stale.push(`${s.node}: 判定は ${s.verdictHead}、いまの撮った先は ${latest.head}`)
+    }
+  }
+  if (stale.length) console.log('head が変わったので見直す:\n  ' + stale.join('\n  '))
+
+  if (problems.length) {
+    console.error('\n撮り方がそろっていません:\n  ' + problems.join('\n  '))
+    process.exit(1)
+  }
 }
 
 async function newPage(browser, width, height, clock) {
@@ -196,6 +262,9 @@ const LIST_STATES = {
  *
  * 当てはまる順に見て、最初に当たったものを使います。
  */
+/** 判定の3種類。**実装の状態（`status`）とは別に持つ。** */
+const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
+
 const EMPTY_BODIES = [
   /*
     帯の口。**一覧の既定を返すと `summary.inUse` が無く、

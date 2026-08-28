@@ -1,6 +1,6 @@
 # 実行の記録・残り4枚 — 比較の下ごしらえ
 
-最終更新：2026-08-28（#502 の結果を反映）
+最終更新：2026-08-28（#502・#503 と、顧客通知の読む先の訂正を反映）
 
 対象：`M2b2B` シナリオ配信結果／`Se65i` 運用者通知の記録／
 `X8JCA5` 送れなかった通知／`KNG00` 外部連携の記録
@@ -51,8 +51,8 @@ if (pathname === '<実物の道>') {
 | Node | 既存を読むだけで作れるか | いちばん重い不足 |
 |---|---|---|
 | `M2b2B` | **ほぼ作れる** | エラー人数／ステップ別のクリック |
-| `Se65i` | **列が1本足りない** | `notifications` に `friend_id` が無い |
-| `X8JCA5` | **`Se65i` と同じ列 ＋ 理由の置き場** | 届かなかった理由 |
+| `Se65i` | **作れる見込み**（`ec_events` ＋ `messages_log`） | 開封・クリック（取れない） |
+| `X8JCA5` | **`Se65i` と同じ2つ ＋ 理由の言い換え** | メールで送り直した記録 |
 | `KNG00` | **読む先が無い** | やり取り1件ずつの記録そのもの |
 
 **`M2b2B` がいちばん近い**ので、`DkPY0` のやり方をそのまま写せます。
@@ -123,35 +123,62 @@ detail / durationMs / canRetry
 
 ---
 
-## 2. `Se65i` 運用者通知の記録（機能24）
+## 2. `Se65i` お客様へのお知らせの記録（機能24）
 
-### 既存資産
+### 【訂正】読む先は `notifications` ではありません
+
+**2026-08-28 に直しました。** ここを `notifications` と書いたのは誤りです。
+**`notifications` は運用者へのお知らせ側**で、`Se65i`・`X8JCA5` が
+並べるのは**お客様へのお知らせ**です。
+
+読む候補は、既にあるこの2つです。
+
+| 何 | どこ | 持っているもの |
+|---|---|---|
+| 受け取ったできごと | **`ec_events`** | `friend_id` ／ `status`（received・processing・processed・skipped・failed）／ `error_message` ／ `received_at` ／ `processed_at` ／ `payload`（注文番号） |
+| 実際に送った本文 | **`messages_log`（`source='ec_transactional'`）** | `friend_id` ／ `line_account_id` ／ `content` ／ `created_at` |
+
+**どちらも生きています。** `source: 'ec_transactional'` は
+`apps/worker/src/routes/ec-integrations.ts:430` が書いています。
+
+**「新規DBが必須」とはまだ決まりません。** `DkPY0`（#502）や
+`M2b2B`（#503）と同じく、**既存を読むだけで作れる見込みがあります。**
+
+### 気をつけること：所属アカウントを推測しない
+
+**`ec_events` に `line_account_id` はありません。** あるのは
+`line_user_id` と `friend_id`（**`null` になりうる**）です。
+アカウントは `friend_id` → `friends` を辿って初めて決まります。
+
+**`friend_id` が空の過去のできごとは、どのアカウントのものか
+決められません。推測で並べないでください。**
+
+### 運用者側（参考）
 
 | 何 | どこ |
 |---|---|
-| お知らせ本体 | `notifications`（`title` `body` `channel` `category` `line_account_id` `created_at`） |
-| 状態 | `notifications.status`（`pending` / `sent` / `failed`）**3つだけ** |
+| 運用者へのお知らせ | `notifications`（`title` `body` `channel` `category` `line_account_id`） |
 | 決めごと | `notification_rules`（`event_type` `conditions` `channels`） |
 
 ### 不足
 
 | 設計にある | いまの置き場 | |
 |---|---|---|
-| **だれに送ったか** | **無い** | `notifications` に `friend_id` がありません。設計の1列目「いつ・だれに」が作れない |
+| **だれに送ったか** | **`ec_events.friend_id`** | **取れます。** ただし `null` の行がある（下の注意） |
 | **開かれた 3,682通 96.2%** | **無い** | **取れません** |
 | **押された 842通 22.9%** | **無い** | お知らせ本文のURLを短縮していれば `link_clicks` から出せる見込み。**いまは結びついていない** |
 | **注文番号 #12492** | **たぶん `metadata`** | JSONの中なので、決めごとにしないと引けない |
 | 届かなかった理由 | **無い** | `status='failed'` としか残らない |
 | 「開いていない 140」の絞り込み | **無い** | 上と同じ |
 
-**`friend_id` が無いのがいちばん重い。** 記録として最低限の
-「だれに」が入っていません。
+**「だれに」は `ec_events.friend_id` から取れます。**
+**「注文番号」は `ec_events.payload` の中**にあるので、引くための
+決めごとが要ります。
 
-**列が無いだけでなく、書いてもいません。**
-`packages/db/src/notifications.ts:115` の `INSERT` は
-`id, rule_id, event_type, title, body, channel, metadata,
-line_account_id, category, created_at` の10列だけです。
-**後から列を足しても、過去のぶんは埋まりません。**
+（`notifications` に `friend_id` が無いのは事実で、
+`packages/db/src/notifications.ts:115` の `INSERT` も10列で
+書いていません。**ただしそれは運用者側の表なので、
+ここの判断材料にはなりません。**）
 
 ### 除外候補
 

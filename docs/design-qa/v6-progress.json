@@ -1,11 +1,16 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 194,
-  "unimplemented": 64,
+  "compared": 195,
+  "unimplemented": 63,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
+  "match": 6,
+  "structureMatchDataPending": 16,
+  "needsFix": 96,
+  "unjudged": 77,
+  "remaining": 252,
   "features": [
     {
       "feature": 1,
@@ -16,6 +21,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 5,
+      "needsFix": 0,
+      "unjudged": 0,
+      "remaining": 5,
       "capturedAt": null
     },
     {
@@ -27,6 +37,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 1,
+      "unjudged": 16,
+      "remaining": 17,
       "capturedAt": null
     },
     {
@@ -38,6 +53,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 1,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 7,
+      "remaining": 10,
       "capturedAt": null
     },
     {
@@ -49,6 +69,11 @@
       "unconfirmed": 0,
       "elsewhere": 4,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 3,
+      "unjudged": 13,
+      "remaining": 17,
       "capturedAt": [
         {
           "pr": 420,
@@ -78,12 +103,27 @@
       "feature": 5,
       "name": "シナリオ配信",
       "total": 14,
-      "compared": 11,
-      "unimplemented": 3,
+      "compared": 12,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": null
+      "match": 1,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 11,
+      "remaining": 13,
+      "capturedAt": [
+        {
+          "pr": 503,
+          "head": "6db5ad7f",
+          "on": "2026-08-28",
+          "screens": [
+            "M2b2B"
+          ],
+          "note": "新しい口は足さず既存の統計を読む"
+        }
+      ]
     },
     {
       "feature": 6,
@@ -94,6 +134,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 1,
+      "structureMatchDataPending": 0,
+      "needsFix": 0,
+      "unjudged": 11,
+      "remaining": 14,
       "capturedAt": [
         {
           "pr": 497,
@@ -115,6 +160,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 4,
+      "unjudged": 1,
+      "remaining": 11,
       "capturedAt": [
         {
           "pr": 500,
@@ -135,6 +185,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 1,
+      "structureMatchDataPending": 0,
+      "needsFix": 4,
+      "unjudged": 1,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 501,
@@ -156,6 +211,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 3,
+      "unjudged": 0,
+      "remaining": 10,
       "capturedAt": null
     },
     {
@@ -167,6 +227,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 7,
+      "unjudged": 1,
+      "remaining": 13,
       "capturedAt": null
     },
     {
@@ -178,6 +243,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 6,
+      "unjudged": 3,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 433,
@@ -208,6 +278,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 5,
+      "unjudged": 1,
+      "remaining": 9,
       "capturedAt": null
     },
     {
@@ -219,6 +294,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 4,
+      "unjudged": 1,
+      "remaining": 7,
       "capturedAt": null
     },
     {
@@ -230,6 +310,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 2,
+      "unjudged": 0,
+      "remaining": 4,
       "capturedAt": null
     },
     {
@@ -241,6 +326,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 3,
+      "unjudged": 1,
+      "remaining": 5,
       "capturedAt": null
     },
     {
@@ -252,6 +342,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 6,
+      "unjudged": 0,
+      "remaining": 9,
       "capturedAt": null
     },
     {
@@ -263,6 +358,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 1,
+      "structureMatchDataPending": 1,
+      "needsFix": 4,
+      "unjudged": 3,
+      "remaining": 10,
       "capturedAt": [
         {
           "pr": 441,
@@ -332,6 +432,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 8,
+      "unjudged": 0,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 443,
@@ -349,6 +454,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 1,
+      "needsFix": 2,
+      "unjudged": 1,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 444,
@@ -366,6 +476,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 6,
+      "needsFix": 2,
+      "unjudged": 0,
+      "remaining": 9,
       "capturedAt": [
         {
           "pr": 445,
@@ -383,6 +498,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 2,
+      "needsFix": 4,
+      "unjudged": 0,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 446,
@@ -400,6 +520,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 1,
+      "needsFix": 1,
+      "unjudged": 0,
+      "remaining": 4,
       "capturedAt": [
         {
           "pr": 447,
@@ -417,6 +542,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 1,
+      "unjudged": 0,
+      "remaining": 4,
       "capturedAt": null
     },
     {
@@ -428,6 +558,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 2,
+      "unjudged": 0,
+      "remaining": 6,
       "capturedAt": null
     },
     {
@@ -439,6 +574,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 1,
+      "structureMatchDataPending": 0,
+      "needsFix": 5,
+      "unjudged": 1,
+      "remaining": 7,
       "capturedAt": [
         {
           "pr": 502,
@@ -460,6 +600,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 2,
+      "unjudged": 1,
+      "remaining": 4,
       "capturedAt": null
     },
     {
@@ -471,6 +616,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 3,
+      "unjudged": 1,
+      "remaining": 7,
       "capturedAt": null
     },
     {
@@ -482,6 +632,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 3,
+      "unjudged": 1,
+      "remaining": 4,
       "capturedAt": null
     },
     {
@@ -493,6 +648,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 3,
+      "unjudged": 1,
+      "remaining": 4,
       "capturedAt": null
     },
     {
@@ -504,6 +664,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 3,
+      "unjudged": 1,
+      "remaining": 4,
       "capturedAt": null
     },
     {
@@ -515,6 +680,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 1,
+      "unjudged": 0,
+      "remaining": 1,
       "capturedAt": null
     },
     {
@@ -526,6 +696,11 @@
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
+      "match": 0,
+      "structureMatchDataPending": 0,
+      "needsFix": 4,
+      "unjudged": 0,
+      "remaining": 4,
       "capturedAt": null
     }
   ],
@@ -564,13 +739,6 @@
       "name": "5-1-J シナリオ・配信開始完了",
       "gap": "build",
       "gapNote": "同上"
-    },
-    {
-      "feature": 5,
-      "node": "M2b2B",
-      "name": "5-1-L シナリオ・配信結果",
-      "gap": "api",
-      "gapNote": "シナリオの配信結果を数える口が要る"
     },
     {
       "feature": 6,
