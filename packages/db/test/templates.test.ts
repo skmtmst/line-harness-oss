@@ -75,4 +75,31 @@ describe('テンプレートの使用先', () => {
     const templates = await getTemplatesWithUsageCount(db);
     expect(templates[0]?.usage_count).toBe(6);
   });
+
+  it('選択したLINEアカウントだけを一覧SQLへ渡す', async () => {
+    const calls: Array<{ sql: string; values: unknown[] }> = [];
+    const db = {
+      prepare: (sql: string) => ({
+        bind: (...values: unknown[]) => ({
+          all: async () => {
+            calls.push({ sql, values });
+            return { results: [] };
+          },
+        }),
+        all: async () => {
+          calls.push({ sql, values: [] });
+          return { results: [] };
+        },
+      }),
+    } as unknown as D1Database;
+
+    await getTemplatesWithUsageCount(db, 'general', {
+      accountIds: ['account-1'],
+      includeUnassigned: false,
+    });
+
+    expect(calls[0]?.sql).toContain('category = ?');
+    expect(calls[0]?.sql).toContain('line_account_id IN (?)');
+    expect(calls[0]?.values).toEqual(['general', 'account-1']);
+  });
 });

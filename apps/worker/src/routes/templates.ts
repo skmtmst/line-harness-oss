@@ -11,6 +11,7 @@ import {
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { validateCarousel } from '../services/carousel-validation.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 
 const templates = new Hono<Env>();
 
@@ -46,7 +47,15 @@ function checkCarousel(
 templates.get('/api/templates', async (c) => {
   try {
     const category = c.req.query('category') ?? undefined;
-    const items = await getTemplatesWithUsageCount(c.env.DB, category);
+    const requestedAccountId = c.req.query('account_id');
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (requestedAccountId && !scope.allowedAccountIds.includes(requestedAccountId)) {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
+    const items = await getTemplatesWithUsageCount(c.env.DB, category, {
+      accountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
+      includeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
+    });
     // 押された回数は1回のクエリでまとめて取る。1件ずつ引くと、
     // 20件並べば20回叩くことになる。
     let taps = new Map<string, number>();
@@ -60,6 +69,7 @@ templates.get('/api/templates', async (c) => {
       success: true,
       data: items.map((t) => ({
         id: t.id,
+        accountId: t.line_account_id,
         name: t.name,
         category: t.category,
         messageType: t.message_type,
@@ -82,12 +92,15 @@ templates.get('/api/templates/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const item = await getTemplateById(c.env.DB, id);
-    if (!item) return c.json({ success: false, error: 'Template not found' }, 404);
+    if (!item || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [item.line_account_id])) {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
     const usedBy = await getTemplateUsage(c.env.DB, id);
     return c.json({
       success: true,
       data: {
         id: item.id,
+        accountId: item.line_account_id,
         name: item.name,
         category: item.category,
         messageType: item.message_type,
@@ -117,11 +130,8 @@ templates.get('/api/templates/:id/usages', async (c) => {
   try {
     const templateId = c.req.param('id');
 
-    const tpl = await c.env.DB
-      .prepare(`SELECT id FROM templates WHERE id = ?`)
-      .bind(templateId)
-      .first<{ id: string }>();
-    if (!tpl) {
+    const tpl = await getTemplateById(c.env.DB, templateId);
+    if (!tpl || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [tpl.line_account_id])) {
       return c.json({ success: false, error: 'Template not found' }, 404);
     }
 
@@ -170,7 +180,19 @@ function readCarouselOptions(body: Record<string, unknown>):
 
 templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
   try {
-    const body = await c.req.json<{ name: string; category?: string; messageType: string; messageContent: string }>();
+    const body = await c.req.json<{
+      accountId?: string;
+      name: string;
+      category?: string;
+      messageType: string;
+      messageContent: string;
+    }>();
+    if (!body.accountId) {
+      return c.json({ success: false, error: 'account_id_required' }, 400);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId])) {
+      return c.json({ success: false, error: 'Template not found' }, 404);
+    }
     if (!body.name || !body.messageType || !body.messageContent) {
       return c.json({ success: false, error: 'name, messageType, messageContent are required' }, 400);
     }
@@ -178,7 +200,11 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (!carousel.ok) return c.json({ success: false, error: carousel.error }, 422);
     const options = readCarouselOptions(body as unknown as Record<string, unknown>);
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
-    const item = await createTemplate(c.env.DB, { ...body, ...options.value });
+    const item = await createTemplate(c.env.DB, {
+      ...body,
+      lineAccountId: body.accountId,
+      ...options.value,
+    });
     return c.json({ success: true, data: { id: item.id, name: item.name, category: item.category, messageType: item.message_type, createdAt: item.created_at } }, 201);
   } catch (err) {
     console.error('POST /api/templates error:', err);
@@ -192,6 +218,11 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
     const body = await c.req.json<{ messageType?: string; messageContent?: string }>();
     // 種別が送られていなければ、いまの種別で見る。本文だけ直す場合がある。
     const existing = await getTemplateById(c.env.DB, id);
+    if (!existing || !await canAccessAllLineAccounts(
+      c.env.DB, c.get('staff'), [existing.line_account_id],
+    )) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     const carousel = checkCarousel(
       body.messageType ?? existing?.message_type,
       body.messageContent ?? existing?.message_content,
@@ -206,6 +237,7 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       success: true,
       data: {
         id: updated.id,
+        accountId: updated.line_account_id,
         name: updated.name,
         category: updated.category,
         messageType: updated.message_type,
@@ -226,6 +258,12 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
 templates.delete('/api/templates/:id', requireRole('owner', 'admin'), async (c) => {
   try {
     const id = c.req.param('id');
+    const existing = await getTemplateById(c.env.DB, id);
+    if (!existing || !await canAccessAllLineAccounts(
+      c.env.DB, c.get('staff'), [existing.line_account_id],
+    )) {
+      return c.json({ success: false, error: 'Not found' }, 404);
+    }
     // ON DELETE SET NULL や本文の控えがあっても、参照中の設定を運用者に知らせず
     // 切ることはしない。すべての利用先を先に差し替えてもらう。
     const usage = await getTemplateUsage(c.env.DB, id);

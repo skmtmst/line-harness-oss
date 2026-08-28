@@ -17,6 +17,7 @@ export interface TemplateRow {
   carousel_tap_limit_text: string | null;
   created_at: string;
   updated_at: string;
+  line_account_id: string | null;
 }
 
 export async function getTemplates(db: D1Database, category?: string): Promise<TemplateRow[]> {
@@ -49,6 +50,7 @@ export async function createTemplate(
     category?: string;
     messageType: string;
     messageContent: string;
+    lineAccountId?: string | null;
   } & CarouselOptions,
 ): Promise<TemplateRow> {
   const id = crypto.randomUUID();
@@ -58,8 +60,8 @@ export async function createTemplate(
       `INSERT INTO templates
          (id, name, category, message_type, message_content,
           carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
-          created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          created_at, updated_at, line_account_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -72,6 +74,7 @@ export async function createTemplate(
       input.carouselTapLimitText ?? null,
       now,
       now,
+      input.lineAccountId ?? null,
     )
     .run();
   return (await getTemplateById(db, id))!;
@@ -265,6 +268,11 @@ export interface TemplateRowWithUsage extends TemplateRow {
   usage_count: number;
 }
 
+export interface TemplateListScope {
+  accountIds: string[];
+  includeUnassigned: boolean;
+}
+
 /**
  * 一覧画面用に template + 使用数を返す。
  * - auto_replies は indexed lookup (1 SQL)
@@ -274,12 +282,27 @@ export interface TemplateRowWithUsage extends TemplateRow {
 export async function getTemplatesWithUsageCount(
   db: D1Database,
   category?: string,
+  scope?: TemplateListScope,
 ): Promise<TemplateRowWithUsage[]> {
   // 1. templates 本体
-  const tplSql = category
-    ? `SELECT * FROM templates WHERE category = ? ORDER BY created_at DESC`
-    : `SELECT * FROM templates ORDER BY created_at DESC`;
-  const tplStmt = category ? db.prepare(tplSql).bind(category) : db.prepare(tplSql);
+  const filters: string[] = [];
+  const values: unknown[] = [];
+  if (category) {
+    filters.push('category = ?');
+    values.push(category);
+  }
+  if (scope) {
+    if (scope.accountIds.length > 0) {
+      filters.push(
+        `(line_account_id IN (${scope.accountIds.map(() => '?').join(',')})${scope.includeUnassigned ? ' OR line_account_id IS NULL' : ''})`,
+      );
+      values.push(...scope.accountIds);
+    } else {
+      filters.push(scope.includeUnassigned ? 'line_account_id IS NULL' : '1 = 0');
+    }
+  }
+  const tplSql = `SELECT * FROM templates${filters.length ? ` WHERE ${filters.join(' AND ')}` : ''} ORDER BY created_at DESC`;
+  const tplStmt = values.length > 0 ? db.prepare(tplSql).bind(...values) : db.prepare(tplSql);
   const templates = await tplStmt.all<TemplateRow>();
 
   // 2. 列で参照している設定は1回の問い合わせでまとめて数える。

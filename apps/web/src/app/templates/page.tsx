@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api, type BroadcastAssetKind } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
@@ -9,6 +9,7 @@ import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
 import { Tabs } from '@/components/shared/tabs'
 import styles from './templates-v6.module.css'
+import { useAccount } from '@/contexts/account-context'
 
 interface Template {
   id: string
@@ -75,11 +76,14 @@ function formatDate(iso: string): string {
 }
 
 export default function TemplatesPage() {
+  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const activeAccountRef = useRef<string | null>(selectedAccountId)
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
   const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
   const [nameQuery, setNameQuery] = useState('')
@@ -98,30 +102,51 @@ export default function TemplatesPage() {
   const [editName, setEditName] = useState<string | null>(null)
   const [savingEdit, setSavingEdit] = useState(false)
 
+  useEffect(() => {
+    activeAccountRef.current = selectedAccountId
+    setDrawerId(null)
+    setShowCreate(false)
+  }, [selectedAccountId])
+
   const load = useCallback(async () => {
+    if (!selectedAccountId) {
+      setTemplates([])
+      setLoadError('')
+      setLoading(false)
+      return
+    }
+    const accountId = selectedAccountId
     setLoading(true)
-    setError('')
+    setTemplates([])
+    setLoadError('')
     try {
-      const res = await api.templates.list()
+      const res = await api.templates.list(undefined, accountId)
+      if (activeAccountRef.current !== accountId) return
       if (res.success) {
         setTemplates(res.data)
       } else {
-        setError(res.error)
+        setLoadError(res.error)
       }
     } catch {
-      setError('テンプレートの読み込みに失敗しました。')
+      if (activeAccountRef.current === accountId) {
+        setLoadError('テンプレートの読み込みに失敗しました。')
+      }
     } finally {
-      setLoading(false)
+      if (activeAccountRef.current === accountId) setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
     let cancelled = false
+    if (!selectedAccountId) {
+      setAssetCounts({})
+      return () => { cancelled = true }
+    }
     void Promise.all(
       ASSET_KINDS.map(async (kind) => {
-        const result = await api.broadcastMessageAssets.list({ kind })
+        const result = await api.broadcastMessageAssets.list({ kind, accountId: selectedAccountId })
         return [kind, result.success ? result.data.length : undefined] as const
       }),
     ).then((entries) => {
@@ -129,7 +154,7 @@ export default function TemplatesPage() {
       setAssetCounts(Object.fromEntries(entries.filter((entry) => entry[1] !== undefined)))
     })
     return () => { cancelled = true }
-  }, [])
+  }, [selectedAccountId])
 
   // Drawer fetch
   useEffect(() => {
@@ -175,12 +200,16 @@ export default function TemplatesPage() {
   }, {})
 
   const handleCreate = async () => {
+    if (!selectedAccountId) {
+      setFormError('上のバーでLINE公式アカウントを選んでください')
+      return
+    }
     if (!form.name.trim()) { setFormError('テンプレート名を入力してください'); return }
     if (!form.messageContent.trim()) { setFormError('メッセージ内容を入力してください'); return }
     setSaving(true)
     setFormError('')
     try {
-      const res = await api.templates.create(form)
+      const res = await api.templates.create({ ...form, accountId: selectedAccountId })
       if (res.success) {
         setShowCreate(false)
         setForm({ name: '', category: 'general', messageType: 'text', messageContent: '' })
@@ -302,7 +331,16 @@ export default function TemplatesPage() {
           data-design-node="W7LBc FuBeQ"
         >
           <div className="flex items-center gap-2">
-            <Button onClick={() => setShowCreate(true)} variant="primary">
+            <Button
+              onClick={() => {
+                if (!selectedAccountId) {
+                  setError('上のバーでLINE公式アカウントを選んでください')
+                  return
+                }
+                setShowCreate(true)
+              }}
+              variant="primary"
+            >
               テンプレートを作る
             </Button>
           </div>
@@ -485,7 +523,7 @@ export default function TemplatesPage() {
       )}
 
       {/* Table */}
-      {loading ? (
+      {accountLoading || loading ? (
         <div className="bg-canvas rounded-card border border-hairline overflow-hidden">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="px-4 py-4 border-b border-hairline flex items-center gap-4 animate-pulse">
@@ -498,6 +536,22 @@ export default function TemplatesPage() {
               <div className="h-3 bg-canvas-sunken rounded w-24" />
             </div>
           ))}
+        </div>
+      ) : !selectedAccountId ? (
+        <div className="bg-canvas rounded-card border-hairline border p-12 text-center">
+          <p className="text-ink font-medium">
+            {accounts.length > 0
+              ? '上のバーでLINE公式アカウントを選んでください'
+              : 'LINE公式アカウントが登録されていません'}
+          </p>
+        </div>
+      ) : loadError ? (
+        <div className="bg-danger-bg border-danger/30 rounded-card border p-12 text-center">
+          <p className="text-danger font-medium">テンプレートを読み込めませんでした</p>
+          <p className="text-ink-secondary mt-2 text-sm">{loadError}</p>
+          <Button className="mt-4" variant="primary" onClick={() => void load()}>
+            もう一度読み込む
+          </Button>
         </div>
       ) : filteredTemplates.length === 0 ? (
         <div className="bg-canvas rounded-card border border-hairline p-12 text-center">
