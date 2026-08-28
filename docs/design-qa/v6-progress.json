@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 192,
-  "unimplemented": 66,
+  "compared": 193,
+  "unimplemented": 65,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
@@ -130,12 +130,22 @@
       "feature": 8,
       "name": "自動応答",
       "total": 11,
-      "compared": 5,
-      "unimplemented": 6,
+      "compared": 6,
+      "unimplemented": 5,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 501,
+          "head": "93edbe17",
+          "on": "2026-08-28",
+          "screens": [
+            "t7UtYQ"
+          ],
+          "note": "#501 は #500 を含む"
+        }
+      ]
     },
     {
       "feature": 9,
@@ -642,13 +652,6 @@
       "name": "8-1-G 有効化完了",
       "gap": "build",
       "gapNote": "同上"
-    },
-    {
-      "feature": 8,
-      "node": "t7UtYQ",
-      "name": "8-1-H 実行結果",
-      "gap": "api",
-      "gapNote": "自動応答の実行を1件ずつ残す記録が要る。**共通契約は #500 で入った**（所有元9つ・状態6つ・一覧9項目）。写すのは画面側。撮る支度は済んでいる"
     },
     {
       "feature": 8,

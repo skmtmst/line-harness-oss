@@ -3315,97 +3315,138 @@ export const REMINDER_RUNS = {
 }
 
 /*
-  自動応答の実行結果（`t7UtYQ`）。**Codex の Draft PR が来る前の下ごしらえ。**
+  自動応答の実行結果（`t7UtYQ`）— PR #501 head `93edbe17`。
 
-  `packages/shared/src/types.ts` の `ExecutionRunListItem`（共通9項目）に
-  合わせてあります。機能固有の状態は `domainStatus` に置き、
-  **共通状態へ潰さずに持ちます**（リマインダ #500 と同じ形）。
+  **`packages/shared/src/types.ts` の `AutoReplyRunsResponse` に
+  合わせてあります。** 口は `GET /api/auto-reply-runs?ruleId=rule-a`。
 
-  **ルートも口も、まだ Codex から届いていません。** 実装が来たら
-  型と実際の返事に照らして直します。ここで撮って合格にはしません。
+  値は実装の写像に照らしてあります
+  （`apps/worker/src/routes/auto-reply-runs.ts`）。
 
-  設計（`f8/t7UtYQ.html`）の数に寄せてあります。
-  今期ヒット214回／累計1,842回／引継ぎ36件／エラー3件。
+    commonStatus  completed / reply_accepted → succeeded
+                  reply_failed / failed      → failed
+                  partial_failed             → partial
+                  skipped                    → skipped
+                  それ以外                    → pending
+
+  **見送りの行がいちばん大事です。** 選んだルールが条件で見送られ、
+  後ろのルールが動いても、この画面は「選んだルールは何もしなかった」と
+  出します（`effectiveDomainStatus`）。`detail` は `SKIP_LABELS` の文言。
 */
-const arRow = (n, name, input, action, domainStatus, status, over) => ({
-  id: `arr-${n}`,
+const arRow = (n, over) => ({
+  id: `are-${n}`,
   ownerKind: 'auto_reply',
-  ownerId: 'auto-reply-1',
+  ownerId: 'rule-a',
   lineAccountId: 'visual-qa-account',
-  occurredAt: over?.occurredAt ?? '2026-08-24T01:32:00.000Z',
-  subject: name,
+  occurredAt: over.occurredAt,
+  subject: over.friendName ?? null,
   accountLabel: '然-NEN- TEST',
-  triggerLabel: `入力：${input}`,
-  reference: over?.reference ?? null,
-  status,
-  detail: over?.detail ?? action,
-  durationMs: over?.durationMs ?? 800,
-  canRetry: over?.canRetry ?? (domainStatus === 'failed'),
-  domainStatus,
-  matchedRuleName: over?.matchedRuleName ?? '予約問い合わせ',
-  /* **見送られたルール。** どれが飛ばされ、なぜかを1件ずつ持つ。 */
-  skippedRules: over?.skippedRules ?? [],
-  actionResults: over?.actionResults ?? [{ kind: action, status: 'succeeded' }],
-  lastErrorCode: over?.lastErrorCode ?? null,
-  lastErrorMessage: over?.lastErrorMessage ?? null,
+  triggerLabel: over.triggerLabel,
+  reference: over.reference ?? null,
+  status: over.status,
+  detail: over.detail,
+  durationMs: over.durationMs ?? 800,
+  canRetry: false,
+  autoReplyId: over.autoReplyId ?? 'rule-a',
+  autoReplyName: over.autoReplyName ?? '予約問い合わせ',
+  friendId: `friend-${n}`,
+  friendName: over.friendName ?? null,
+  messageKind: over.messageKind ?? 'text',
+  inputPreview: over.inputPreview,
+  matchedKeyword: over.matchedKeyword ?? null,
+  versionNumber: over.versionNumber ?? 3,
+  domainStatus: over.domainStatus,
+  replyStatus: over.replyStatus ?? 'not_attempted',
+  actionSummary: over.actionSummary ?? {},
+  lineRequestId: over.lineRequestId ?? null,
 })
 
 export const AUTO_REPLY_RUNS = {
-  autoReply: { id: 'auto-reply-1', name: '予約問い合わせ', isActive: true, priority: 1 },
+  rule: { id: 'rule-a', name: '予約問い合わせ', isActive: true, priorityPosition: 1 },
   summary: {
-    hitsThisPeriod: 214, hitsTotal: 1842, handoffs: 36, errors: 3,
+    monthHits: 214, totalHits: 1842, handovers: 36, errors: 3,
     lastRunAt: '2026-08-24T01:32:00.000Z',
-    /* **平均応答は未取得。** 数えていないものを0.0秒と書かない。 */
-    averageResponseMs: null,
+    /* **800ms → 「0.8秒」** と出るか。未取得は空の返事側で `null` にする。 */
+    averageResponseMs: 800,
   },
-  triggers: [
-    { key: 'reserve', label: '予約', count: 128, ratio: 0.598 },
-    { key: 'reschedule', label: '日程変更', count: 54, ratio: 0.252 },
-    { key: 'cancel', label: 'キャンセル', count: 32, ratio: 0.150 },
+  handovers: { waiting: 8, inProgress: 21, completed: 7 },
+  triggerBreakdown: [
+    { trigger: '予約', count: 128, share: 0.598 },
+    { trigger: '日程変更', count: 54, share: 0.252 },
+    { trigger: 'キャンセル', count: 32, share: 0.150 },
+    /* **割合が取れない行。** `—` と `0%` を見分けられるか。 */
+    { trigger: 'その他', count: 0, share: null },
   ],
   items: [
-    arRow(1, 'Kenta Kawano', '予約を変更したい', '返信＋タグ追加', 'succeeded', 'succeeded'),
-    arRow(2, 'Masato S.', '予約の確認', '返信＋担当通知', 'succeeded', 'succeeded',
-      { occurredAt: '2026-08-24T01:28:00.000Z' }),
-    /* **確認待ち。** 失敗ではない。 */
-    arRow(3, '菅野 亮', '予約キャンセル', '担当者へ引継ぎ', 'handoff_waiting', 'pending',
-      { occurredAt: '2026-08-24T01:21:00.000Z', durationMs: null,
-        detail: '担当者へ引継ぎ（確認待ち）' }),
-    /* **失敗。** 理由が要る。 */
-    arRow(4, '山田 太郎', '予約', '返信処理', 'failed', 'failed',
-      { occurredAt: '2026-08-24T01:14:00.000Z', durationMs: 2400,
-        lastErrorCode: 'webhook_timeout',
-        lastErrorMessage: 'Webhookの応答がありませんでした。',
-        detail: 'Webhookの応答がありませんでした。',
-        actionResults: [{ kind: '返信処理', status: 'failed' }] }),
-    /* **何もしていない。** 条件に合わず、どのルールも動かなかった。
-       **これを「成功」と書かせない。** */
-    arRow(5, '石田 未来', 'こんにちは', '何もしていません', 'skipped', 'skipped',
-      { occurredAt: '2026-08-24T01:05:00.000Z', durationMs: 0,
-        matchedRuleName: null,
-        detail: 'どの条件にも合わなかったため、何もしていません。',
-        actionResults: [],
-        skippedRules: [
-          { name: '予約問い合わせ', reason: '条件に合いません' },
-          { name: '営業時間外の案内', reason: '営業時間内です' },
-        ] }),
+    /* 1. ふつうに動いた（返信＋処理まで完了） */
+    arRow(1, {
+      occurredAt: '2026-08-24T01:32:00.000Z', friendName: 'Kenta Kawano',
+      inputPreview: '予約を変更したい', triggerLabel: '予約', matchedKeyword: '予約',
+      domainStatus: 'completed', status: 'succeeded',
+      detail: '返信と設定した処理が完了しました',
+      replyStatus: 'accepted', actionSummary: { reply: 1, tag: 1 },
+      reference: 'ml-9001', lineRequestId: 'req-a1', durationMs: 800,
+    }),
+    /* 2. 返信だけ受け付けられた */
+    arRow(2, {
+      occurredAt: '2026-08-24T01:28:00.000Z', friendName: 'Masato S.',
+      inputPreview: '予約の確認', triggerLabel: '予約', matchedKeyword: '予約',
+      domainStatus: 'reply_accepted', status: 'succeeded',
+      detail: '返信と設定した処理が完了しました',
+      replyStatus: 'accepted', actionSummary: { reply: 1, notify: 1 },
+      reference: 'ml-9002', lineRequestId: 'req-a2', durationMs: 620,
+    }),
+    /* 3. 一部だけできた。**成功ではない** */
+    arRow(3, {
+      occurredAt: '2026-08-24T01:21:00.000Z', friendName: '菅野 亮',
+      inputPreview: '予約キャンセル', triggerLabel: 'キャンセル', matchedKeyword: 'キャンセル',
+      domainStatus: 'partial_failed', status: 'partial',
+      detail: '返信または一部の処理だけ完了しました',
+      replyStatus: 'accepted', actionSummary: { reply: 1, handover: 0 },
+      reference: 'ml-9003', durationMs: 1450,
+    }),
+    /* 4. 返信を受け付けてもらえなかった */
+    arRow(4, {
+      occurredAt: '2026-08-24T01:14:00.000Z', friendName: '山田 太郎',
+      inputPreview: '予約', triggerLabel: '予約', matchedKeyword: '予約',
+      domainStatus: 'reply_failed', status: 'failed',
+      detail: 'LINEへの返信を受け付けてもらえませんでした',
+      replyStatus: 'failed', actionSummary: { reply: 0 },
+      reference: 'ml-9004', durationMs: 2400,
+    }),
     /*
-      **ここが要の行。** 先に当たるはずのルールが見送られ、
-      あとのルールだけが動いた。**run 全体を「成功」と書くと、
-      見送られたことが消える。** 共通状態は `partial`。
+      5. **要の行。** 「予約問い合わせ」が条件で見送られ、
+      後ろのルールが動いた。**それでもこの画面は skipped。**
+      `autoReplyId` は選んだルール（`rule-a`）のまま。
     */
-    arRow(6, '前田 さくら', '予約したい', '返信処理', 'partial', 'partial',
-      { occurredAt: '2026-08-24T00:58:00.000Z', durationMs: 1100,
-        matchedRuleName: '営業時間外の案内',
-        detail: '「予約問い合わせ」は見送り。「営業時間外の案内」を実行しました。',
-        skippedRules: [
-          { name: '予約問い合わせ', reason: '1日1回までの上限に達しています' },
-        ],
-        actionResults: [{ kind: '返信処理', status: 'succeeded' }] }),
-    /* **取り消し。** 送る前に止めた。 */
-    arRow(7, null, '予約', '取り消し', 'cancelled', 'cancelled',
-      { occurredAt: '2026-08-23T23:40:00.000Z', durationMs: null,
-        detail: '配信前に取り消しました。', actionResults: [] }),
+    arRow(5, {
+      occurredAt: '2026-08-24T00:58:00.000Z', friendName: '前田 さくら',
+      inputPreview: '予約したい', triggerLabel: '条件に合いませんでした',
+      matchedKeyword: null,
+      domainStatus: 'skipped', status: 'skipped',
+      detail: '1人1回の設定により何もしませんでした',
+      replyStatus: 'not_attempted', actionSummary: {},
+      reference: 'ml-9005', durationMs: 40,
+    }),
+    /* 6. 別の見送り理由。文言が理由ごとに変わるか */
+    arRow(6, {
+      occurredAt: '2026-08-24T00:41:00.000Z', friendName: '石田 未来',
+      inputPreview: 'こんにちは', triggerLabel: '条件に合いませんでした',
+      matchedKeyword: null,
+      domainStatus: 'skipped', status: 'skipped',
+      detail: '担当者が対応中のため何もしませんでした',
+      replyStatus: 'not_attempted', actionSummary: {},
+      reference: 'ml-9006', durationMs: 35,
+    }),
+    /* 7. まだ処理中。**時間が取れない行**（`—` になるか） */
+    arRow(7, {
+      occurredAt: '2026-08-24T00:30:00.000Z', friendName: null,
+      inputPreview: '予約', triggerLabel: '確認中', matchedKeyword: null,
+      domainStatus: 'actions_running', status: 'pending',
+      detail: '処理中です',
+      replyStatus: 'accepted', actionSummary: { reply: 1 },
+      reference: null, durationMs: null, versionNumber: null,
+    }),
   ],
   pagination: { total: 7, limit: 20, offset: 0 },
 }

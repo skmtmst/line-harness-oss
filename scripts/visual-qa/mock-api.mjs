@@ -882,23 +882,26 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     }
   }
   /*
-    自動応答の実行結果（`t7UtYQ`）。**Codex の実装が来る前の下ごしらえ。**
+    自動応答の実行結果（`t7UtYQ`）— PR #501。
+    **口は1本。** `GET /api/auto-reply-runs?ruleId=rule-a`。
+    仮に置いていた `/api/auto-replies/:id/runs` と
+    `/api/execution-runs?ownerKind=auto_reply` は外した。
 
-    **ルートがまだ決まっていません。** リマインダ #500 に合わせた
-    `/api/auto-replies/:id/runs` と、共通契約をそのまま口にした
-    `/api/execution-runs?ownerKind=auto_reply` の**両方に答えます。**
-    どちらで来ても撮れるようにしておき、実装が来たら片方に寄せます。
+    絞り込み・検索・ページ送りをここで効かせる。効かせないと、
+    押しても数が変わらず「効いていない」ように見える。
   */
-  if (/^\/api\/auto-replies\/[^/]+\/runs$/.test(pathname)
-    || (pathname === '/api/execution-runs' && query.get('ownerKind') === 'auto_reply')) {
+  if (pathname === '/api/auto-reply-runs') {
     const status = query.get('status') ?? ''
     const search = (query.get('search') ?? '').trim()
     const limit = Number(query.get('limit') ?? 20)
     const offset = Number(query.get('offset') ?? 0)
     let items = AUTO_REPLY_RUNS.items
-    /* 共通状態でも機能固有の状態でも絞れる。どちらで来るか未定なので。 */
-    if (status) items = items.filter((x) => x.status === status || x.domainStatus === status)
-    if (search) items = items.filter((x) => (x.subject ?? '').includes(search) || x.triggerLabel.includes(search))
+    /* `status` は台帳の状態（`AutoReplyEvaluationStatus`）で来る。 */
+    if (status) items = items.filter((x) => x.domainStatus === status)
+    if (search) {
+      items = items.filter((x) =>
+        (x.friendName ?? '').includes(search) || (x.inputPreview ?? '').includes(search))
+    }
     return {
       success: true,
       data: {

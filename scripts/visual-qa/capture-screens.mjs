@@ -230,13 +230,14 @@ const EMPTY_BODIES = [
   */
   /*
     自動応答の実行結果（`t7UtYQ`）。**空は「取れて0件」。**
-    まとめの数は0で埋め、**平均応答だけ `null`**（数えていないものを
-    0.0秒と書かない）。
+    まとめの数は0で埋め、**平均応答と最終実行だけ `null`**
+    （数えていないものを 0.0秒 と書かせない）。
   */
-  [/\/api\/(auto-replies\/[^/]+\/runs|execution-runs)/, {
-    autoReply: { id: 'auto-reply-1', name: '予約問い合わせ', isActive: true, priority: 1 },
-    summary: { hitsThisPeriod: 0, hitsTotal: 0, handoffs: 0, errors: 0, lastRunAt: null, averageResponseMs: null },
-    triggers: [],
+  [/\/api\/auto-reply-runs/, {
+    rule: { id: 'rule-a', name: '予約問い合わせ', isActive: true, priorityPosition: 1 },
+    summary: { monthHits: 0, totalHits: 0, handovers: 0, errors: 0, lastRunAt: null, averageResponseMs: null },
+    handovers: { waiting: 0, inProgress: 0, completed: 0 },
+    triggerBreakdown: [],
     items: [],
     pagination: { total: 0, limit: 20, offset: 0 },
   }],
