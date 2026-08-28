@@ -807,29 +807,29 @@
       "feature": 7,
       "node": "JCz6J",
       "name": "7-1-D 配信予定プレビュー",
-      "gap": "build",
-      "gapNote": "リマインダの設定から送信予定を計算して並べる"
+      "gap": "api",
+      "gapNote": "設定だけを画面側で計算せず、`POST /api/reminders/{id}/preview` で各通の予定日時、過去で作られない通、条件で外れる通、取消時に止まる通を返す必要がある"
     },
     {
       "feature": 7,
       "node": "W98zZQ",
       "name": "7-1-E テスト送信確認",
-      "gap": "build",
-      "gapNote": "テスト送信は一斉配信とシナリオに在る。同じ形を移す"
+      "gap": "api",
+      "gapNote": "リマインダ専用のdry-run／テスト送信APIが要る。実登録、予定、送信後アクション、履歴、回数制限を更新せずにプレビューと送信結果を返す"
     },
     {
       "feature": 7,
       "node": "s6Vvp",
       "name": "7-1-F 最終確認",
-      "gap": "parts",
-      "gapNote": "同上"
+      "gap": "api",
+      "gapNote": "公開版、`validate`、`preview`、`publish` が要る。基準日・通・テスト・対象・終了条件をサーバーで確認し、公開する版を固定してから有効化する"
     },
     {
       "feature": 7,
       "node": "PSmHo",
       "name": "7-1-G 有効化完了",
-      "gap": "build",
-      "gapNote": "同上"
+      "gap": "api",
+      "gapNote": "`publish` の返事（公開版、対象、予定件数、最初の実行、監視先）を受けて完了画面を出す。最終確認のAPI契約と同時に作る"
     },
     {
       "feature": 7,
@@ -842,29 +842,29 @@
       "feature": 8,
       "node": "U9hzqH",
       "name": "8-1-D 競合と優先順位",
-      "gap": "build",
-      "gapNote": "`priority` は在る。重なっているルールを出す"
+      "gap": "api",
+      "gapNote": "`GET /api/auto-replies/conflicts` とsimulateが要る。候補、実際に勝つルール、勝つ理由、優先順位変更後の差を同じ評価器から返す"
     },
     {
       "feature": 8,
       "node": "g46ja",
       "name": "8-1-E 自動応答テスト",
-      "gap": "build",
-      "gapNote": "ルールは在る。当てはめを画面で試すだけ"
+      "gap": "api",
+      "gapNote": "`POST /api/auto-replies/test` のdry-runが要る。評価順、一致・不一致理由、勝ったルール、返信、実行予定アクション、抑止理由を返し、状態を更新しない"
     },
     {
       "feature": 8,
       "node": "Yj6CQ",
       "name": "8-1-F 最終確認",
-      "gap": "parts",
-      "gapNote": "同上"
+      "gap": "api",
+      "gapNote": "下書き・validate・conflicts・test・publishが要る。競合とループ防止をサーバーで確認し、公開版を固定してから有効化する"
     },
     {
       "feature": 8,
       "node": "e6iJG",
       "name": "8-1-G 有効化完了",
-      "gap": "build",
-      "gapNote": "同上"
+      "gap": "api",
+      "gapNote": "`publish` の返事（公開版、優先順位、監視、競合解消結果）を受けて完了画面を出す。8-1-Fと同じ契約で作る"
     },
     {
       "feature": 8,
@@ -898,15 +898,15 @@
       "feature": 9,
       "node": "ec9vg",
       "name": "9-1-F 最終確認",
-      "gap": "parts",
-      "gapNote": "同上"
+      "gap": "api",
+      "gapNote": "`friend-add-rules` のdraft、validate、conflicts、test、publishと冪等キーが要る。流入条件・初回案内・アクション・二重送信防止を確認し、公開版を固定する"
     },
     {
       "feature": 9,
       "node": "quhg6",
       "name": "9-1-G 有効化完了",
-      "gap": "build",
-      "gapNote": "同上"
+      "gap": "api",
+      "gapNote": "`publish` の返事（公開版、対象見込み、二重送信防止、監視先）を受けて完了画面を出す。9-1-Fと同じ契約で作る"
     },
     {
       "feature": 9,
