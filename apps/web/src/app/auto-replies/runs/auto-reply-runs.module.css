@@ -217,11 +217,15 @@
   gap: 2px;
 }
 
-.alert strong,
-.alert span {
+.alert strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.alert span {
+  line-height: 1.4;
+  white-space: normal;
 }
 
 .alert strong {

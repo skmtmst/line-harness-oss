@@ -49,4 +49,9 @@ describe('V6 自動応答・実行結果 t7UtYQ', () => {
     expect(css).toContain('grid-template-columns: 34px minmax(160px, 1fr)')
     expect(css).not.toContain('overflow-x: auto')
   })
+
+  it('要確認の説明を省略せずに読める', () => {
+    expect(page).toContain('実行結果で理由を確認してください')
+    expect(css).toMatch(/\.alert span \{[\s\S]*white-space: normal/)
+  })
 })

@@ -258,7 +258,7 @@ export default function AutoReplyRunsPage() {
             ) : errors > 0 ? (
               <div className={styles.alert}>
                 <TriangleAlert size={18} aria-hidden="true" />
-                <div><strong>実行エラー {errors.toLocaleString('ja-JP')}件</strong><span>結果を開いて理由を確認してください</span></div>
+                <div><strong>実行エラー {errors.toLocaleString('ja-JP')}件</strong><span>実行結果で理由を確認してください</span></div>
                 <Button href="#recent-runs"><Eye size={16} />実行結果を確認</Button>
               </div>
             ) : <p className={styles.quiet}>確認が必要なエラーはありません。</p>}
