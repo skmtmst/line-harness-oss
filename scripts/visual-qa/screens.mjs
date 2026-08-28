@@ -132,8 +132,12 @@ const BOOKING_SET = { feature: 28, dir: 'booking-settings-v6', route: '/booking/
 /** イベント予約。一覧・作成・申込者の3ルート。 */
 const EVENT = { feature: 29, dir: 'events-v6', route: '/events', mode: 'page' }
 
-/** ログインユーザー。実装は1枚もので、編集は窓で開く。 */
-const STAFF = { feature: 30, dir: 'staff-v6', route: '/staff', mode: 'page' }
+/**
+ * ログインユーザー。
+ * PR #475 head `15febf7f` で**タブが2本**になった（ログインユーザー／入った記録）。
+ * 設計の4本のうち「招待中」「権限のかたまり」はまだ無い。
+ */
+const STAFF = { feature: 30, dir: 'staff-v6', route: '/staff?tab=members', mode: 'page' }
 
 /** 機能設定。サイドメニューに出す機能を切り替える1枚。 */
 const FEATURE_SET = { feature: 31, dir: 'settings-v6', route: '/settings', mode: 'page' }
@@ -860,40 +864,24 @@ export const SCREENS = [
 
   // ── 機能20 分析 ─────────────────────────────────────────
   /*
-    設計のタブは8本（友だちの増減／配信の反応／経路と成果／使われ方／
-    クロス分析／ファネル／URLクリック／保存した分析18）。
-    実装は5本で、**4本が無く、代わりに「Google Analytics」がある**
-    （中身は Search Console の画面）。
+    **判定を全面的に改めた（PR #445 head `5d5f7a5f`）。**
+    タブが5本 → **設計どおりの8本**になった。友だちの増減・経路と成果・
+    使われ方・保存した分析が入っている。数は `AnalyticsMetric`
+    （`{value, state, reason}`）で、**未取得と実値0を型で分けている。**
   */
-  {
-    ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）',
-    status: 'unimplemented',
-    why: '友だちの増減を日ごとに並べるタブが無い。増えた・減った・残っている割合をまとめて見る場所が無い',
-  },
-  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=messages' },
-  {
-    ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果',
-    status: 'unimplemented',
-    why: '経路ごとに広告費と成果を差し引きまで出すタブが無い。**赤字の経路が分からない**',
-  },
-  {
-    ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方',
-    status: 'unimplemented',
-    why: '作ったのに使っていないものを数えるタブが無い。片づける導線も無い',
-  },
+  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends' },
+  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions' },
+  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes' },
+  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage' },
   {
     ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
     status: 'unimplemented',
-    why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が0件）',
+    why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が `/analytics` 配下で0件。PR #445 head `5d5f7a5f` でも確かめた）',
   },
   { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross' },
   { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel' },
-  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=clicks' },
-  {
-    ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析',
-    status: 'unimplemented',
-    why: '分析の条件を保存する仕組みが無い。**設計は結果までそのまま残す**（あとから軸を変えても過去の結果は書き換わらない）',
-  },
+  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks' },
+  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
@@ -1043,23 +1031,24 @@ export const SCREENS = [
     ...BOOKING, node: 'TnDbq', name: '27-1-A 予約の詳細',
     mode: 'viewport', height: 1136, steps: [{ click: '高橋 直人', role: 'text' }],
   },
-  {
-    ...BOOKING, node: 'cpdDi', name: '27-1-B 電話の予約を入れる',
-    status: 'unimplemented',
-    why: '「予約を追加」は在るが**押せない（無効のまま）**。「管理画面から予約を代理で入れる仕組みは準備中です」と書いてある（`bookings/page.tsx:289`）',
-  },
+  /*
+    **判定を改めた（PR #459 head `ba0bf62d`）。** 代理予約の画面ができた
+    （`/booking/bookings/new`）。ただし**LINEの友だちに限る**。
+    「LINE未連携の電話客は、顧客台帳の受け皿ができるまで登録できません。」
+  */
+  { ...BOOKING, node: 'cpdDi', name: '27-1-B 電話の予約を入れる', route: '/booking/bookings/new' },
   { ...BOOKING, node: 'SbuUI', name: '27-1-C 今週の予約', steps: [{ click: '今週' }] },
   {
     ...BOOKING, node: 'GFDqW', name: '27-1-D 代理予約・内容確認',
-    status: 'unimplemented', why: '27-1-B が無いので、その確認も無い',
+    status: 'unimplemented', why: '代理予約の画面はできたが、内容確認の段は無い（1枚で入力して保存する）（PR #459 head `ba0bf62d` で確かめた）',
   },
   {
     ...BOOKING, node: 'GfceK', name: '27-1-E 代理予約・登録完了',
-    status: 'unimplemented', why: '27-1-B が無いので、その完了も無い',
+    status: 'unimplemented', why: '登録したあとの完了画面が無い。保存すると一覧へ戻る（PR #459 head `ba0bf62d` で確かめた）',
   },
   {
     ...BOOKING, node: 'Lg8ff', name: '27-1-F 代理予約・予約枠の重なりと入力エラー',
-    status: 'unimplemented', why: '27-1-B が無いので、その入力の検査も無い',
+    status: 'unimplemented', why: '枠の重なりを止める検査が無い。設計は「9/02（火）11:00 は 佐々木 がふさがっています（2件）」と出す（PR #459 head `ba0bf62d` で確かめた）',
   },
 
   // ── 機能28 予約設定 ─────────────────────────────────────
@@ -1095,11 +1084,12 @@ export const SCREENS = [
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
     mode: 'viewport', height: 1080, steps: [{ click: '高田 誠', role: 'text' }],
   },
-  {
-    ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録',
-    status: 'unimplemented',
-    why: '入った記録を並べる画面が無い。窓の中に「このユーザーにはログイン履歴が N 件あります」と**数だけ**出る（`staff/page.tsx:31`）。いつ・だれが・何をしたかは読めない',
-  },
+  /*
+    **判定を改めた（PR #475 head `15febf7f`）。** 「入った記録」のタブができた。
+    ただしタブは2本（ログインユーザー／入った記録）で、設計の4本のうち
+    「招待中」「権限のかたまり」はまだ無い。
+  */
+  { ...STAFF, node: 'jwVlo', name: '30-1-B 入った記録', route: '/staff?tab=audit' },
   { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────

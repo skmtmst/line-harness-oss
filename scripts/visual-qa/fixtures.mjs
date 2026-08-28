@@ -2479,3 +2479,182 @@ export const AD_CONVERSION_LOGS = [
     createdAt: '2026-08-24T09:00:00.000Z',
   },
 ]
+
+/**
+ * 機能20 分析の4タブ（PR #445 head `5d5f7a5f` で実装された）。
+ *
+ * **`AnalyticsMetric<T>` は `{value, state, reason}` の3つ組。**
+ * 未取得（`value: null` ＋ 理由）と 実値0（`value: 0`）を型で分けています。
+ * `value` だけ書くと画面が読めず、**全部が未取得に見えます。**
+ */
+const M = (value, state = 'available', reason = null) => ({ value, state, reason })
+const envelope = (data) => ({
+  lineAccountId: 'visual-qa-account',
+  timeZone: 'Asia/Tokyo',
+  period: { from: '2026-07-27', to: '2026-08-25' },
+  dataCutoffAt: '2026-08-25T02:00:00.000Z',
+  data,
+})
+
+/** 設計 `Zxezb`（いま12,486人・この30日で+486・-174・残っている96.4%）。 */
+export const ANALYTICS_FRIENDS = envelope({
+  state: 'available', stateReason: null,
+  metrics: {
+    added: M(486), removed: M(174), net: M(312),
+    currentFriends: M(12486), firstTime: M(432), returning: M(54),
+  },
+  days: Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(Date.UTC(2026, 6, 27 + i)).toISOString().slice(0, 10)
+    /* 8/13 は一斉配信「夏のご案内」を出した日。設計の説明に合わせて谷を作る。 */
+    const spike = d === '2026-08-13'
+    const added = 12 + ((i * 7) % 9)
+    const removed = spike ? 38 : 3 + (i % 4)
+    return { date: d, added, removed, net: added - removed }
+  }),
+  campaigns: [
+    { id: 'broadcast-1', name: '夏のご案内', kind: 'broadcast', occurredAt: '2026-08-13T02:00:00.000Z', date: '2026-08-13' },
+    { id: 'scenario-0', name: '新規登録7日間フォロー', kind: 'scenario', occurredAt: '2026-08-05T01:00:00.000Z', date: '2026-08-05' },
+  ],
+  historyAvailableFrom: '2026-02-01',
+})
+
+/** 設計 `J6Inc`（18回・のべ86,420人・押された割合6.8%）。 */
+export const ANALYTICS_REACTIONS = envelope({
+  metrics: {
+    sent: M(18), delivered: M(86420), opened: M(52140),
+    lineClicked: M(5876), trackedClicks: M(4182),
+    /*
+      **20人未満は開封が取れない。** 未取得を0と書かず、理由を添える。
+      ここを 0 にすると「取れているのに0件」に見える。
+    */
+    unavailableCampaigns: M(2, 'partial', '20人未満の配信は開封が取れません'),
+  },
+  campaigns: [
+    {
+      id: 'broadcast-1', name: '夏のご案内', kind: 'broadcast', sentAt: '2026-08-13T02:00:00.000Z',
+      targetPeople: M(4980), delivered: M(4801), opened: M(3120),
+      lineClicked: M(326), outcomes: M(42), fetchedAt: '2026-08-25T02:00:00.000Z',
+    },
+    {
+      id: 'broadcast-2', name: '定期便のお知らせ', kind: 'broadcast', sentAt: '2026-08-20T11:00:00.000Z',
+      targetPeople: M(3980), delivered: M(3860), opened: M(2410),
+      lineClicked: M(262), outcomes: M(18), fetchedAt: '2026-08-25T02:00:00.000Z',
+    },
+    {
+      /* 20人未満。**開封は取れない。** 0ではなく未取得。 */
+      id: 'broadcast-3', name: '社内テスト配信', kind: 'broadcast', sentAt: '2026-08-18T00:00:00.000Z',
+      targetPeople: M(12), delivered: M(12),
+      opened: M(null, 'unavailable', '20人未満のため取れません'),
+      lineClicked: M(null, 'unavailable', '20人未満のため取れません'),
+      outcomes: M(0), fetchedAt: '2026-08-25T02:00:00.000Z',
+    },
+  ],
+  trackedClickHours: Array.from({ length: 24 }, (_, h) => ({
+    hour: h, clicks: h === 20 ? 782 : 40 + ((h * 37) % 180),
+  })),
+  clickDefinition: 'こちらで作った中継URLの押された回数です。直接貼ったURLは数えられません。',
+})
+
+/** 設計 `YBGtm`（成果486件 ¥1,284,000／広告費 ¥482,000／差し引き +¥802,000）。 */
+export const ANALYTICS_ROUTES = envelope({
+  attributionModel: 'first_touch',
+  attributionLabel: 'はじめて触れた経路で数えます',
+  routes: [
+    {
+      id: 'er-2', refCode: 'store-qr', name: '店頭QRコード',
+      clicks: M(3480), friendAdds: M(128), currentFriends: M(119), reactionPeople: M(86),
+      conversions: { approved: M(28), pending: M(3), rejected: M(1), revenue: M(624000) },
+      adCost: M(0), costPerFriend: M(0),
+      costPerConversion: M(0), profitAfterAdCost: M(624000),
+    },
+    {
+      id: 'er-3', refCode: 'ig-profile', name: 'Instagramプロフィール',
+      clicks: M(3700), friendAdds: M(75), currentFriends: M(68), reactionPeople: M(41),
+      conversions: { approved: M(12), pending: M(2), rejected: M(0), revenue: M(312000) },
+      adCost: M(482000), costPerFriend: M(6427),
+      costPerConversion: M(40167), profitAfterAdCost: M(-170000),
+    },
+    {
+      /*
+        **広告費が取り込めていない経路。** 未取得を 0 と書かない。
+        0 と書くと「広告費ゼロで黒字」という嘘の絵になる。
+      */
+      id: 'er-1', refCode: 'summer-ig', name: '夏のInstagram投稿',
+      clicks: M(1240), friendAdds: M(86), currentFriends: M(78), reactionPeople: M(52),
+      conversions: { approved: M(12), pending: M(2), rejected: M(0), revenue: M(348000) },
+      adCost: M(null, 'unavailable', '広告側の費用を取り込んでいません'),
+      costPerFriend: M(null, 'unavailable', '広告費が無いので出せません'),
+      costPerConversion: M(null, 'unavailable', '広告費が無いので出せません'),
+      profitAfterAdCost: M(null, 'unavailable', '広告費が無いので出せません'),
+    },
+  ],
+  searchConsoleHref: '/search-console',
+})
+
+/** 設計 `QQ1SR`（使っている18／43・作ったのに使っていない32個）。 */
+export const ANALYTICS_USAGE = envelope({
+  state: 'available', stateReason: null,
+  checkedAt: '2026-08-25T02:00:00.000Z',
+  automaticDeletion: false,
+  categories: [
+    { key: 'templates', label: 'テンプレート', href: '/templates', created: M(64), inUse: M(50), unused: M(14), brokenReferences: M(0), lastUsedAt: M('2026-08-24T05:00:00.000Z') },
+    { key: 'tags', label: 'タグ', href: '/tags', created: M(101), inUse: M(92), unused: M(9), brokenReferences: M(2), lastUsedAt: M('2026-08-25T01:00:00.000Z') },
+    { key: 'forms', label: '回答フォーム', href: '/form-submissions', created: M(18), inUse: M(14), unused: M(4), brokenReferences: M(0), lastUsedAt: M('2026-08-24T05:22:00.000Z') },
+    {
+      /* 一度も使われていない種類。**最後に使った日は未取得（0ではない）。** */
+      key: 'rich_menus', label: 'リッチメニュー', href: '/rich-menus',
+      created: M(4), inUse: M(3), unused: M(1), brokenReferences: M(0),
+      lastUsedAt: M(null, 'unavailable', '使われた記録がありません'),
+    },
+  ],
+})
+
+/** 設計 `Fh2Qj`（押された4,182回・押した人1,864・20時台18.4%・押されていない6本）。 */
+export const ANALYTICS_URL_CLICKS = envelope({
+  state: 'available', stateReason: null,
+  exposureAvailableFrom: '2026-06-01',
+  hasMore: false,
+  clickRateDefinition: '届いた人のうち、1回でも押した人の割合です。同じ人が何度押しても1人と数えます。',
+  links: [
+    {
+      trackedLinkId: 'tl-1', name: '夏の特集ページ', originalUrl: 'https://example.co.jp/summer',
+      shortCode: 's3k9', isActive: true,
+      actions: { tagName: '夏CP', scenarioName: null },
+      clicks: M(1840), knownClickPeople: M(812), deliveredPeople: M(4801), clickRate: M(16.9),
+      firstClickedAt: M('2026-08-13T02:10:00.000Z'), lastClickedAt: M('2026-08-24T11:40:00.000Z'),
+      usageLocations: ['一斉配信「夏のご案内」'],
+    },
+    {
+      trackedLinkId: 'tl-2', name: '空き枠を見る', originalUrl: 'https://example.co.jp/slots',
+      shortCode: 'b7m2', isActive: true,
+      actions: { tagName: null, scenarioName: '体験前フォロー' },
+      clicks: M(1420), knownClickPeople: M(704), deliveredPeople: M(3860), clickRate: M(18.2),
+      firstClickedAt: M('2026-08-01T00:00:00.000Z'), lastClickedAt: M('2026-08-25T01:20:00.000Z'),
+      usageLocations: ['シナリオ「体験前フォロー」・2通目'],
+    },
+    {
+      /*
+        **配った人数が取れないリンク。** 押された数は分かるが割合は出せない。
+        0 と書くと「誰にも届いていないのに押された」というありえない絵になる。
+      */
+      trackedLinkId: 'tl-3', name: '資料ダウンロード', originalUrl: 'https://example.co.jp/download',
+      shortCode: 'd1x4', isActive: true,
+      actions: { tagName: null, scenarioName: null },
+      clicks: M(922), knownClickPeople: M(348),
+      deliveredPeople: M(null, 'unavailable', 'このリンクを配った人数を持っていません'),
+      clickRate: M(null, 'unavailable', '配った人数が無いので出せません'),
+      firstClickedAt: M('2026-07-02T00:00:00.000Z'), lastClickedAt: M('2026-08-20T09:00:00.000Z'),
+      usageLocations: ['リッチメニュー「通常メニュー（会員向け）」'],
+    },
+    {
+      /* 一度も押されていないリンク。**0件（未取得ではない）。** */
+      trackedLinkId: 'tl-4', name: '旧キャンペーン', originalUrl: 'https://example.co.jp/spring',
+      shortCode: 'p0q8', isActive: false,
+      actions: { tagName: null, scenarioName: null },
+      clicks: M(0), knownClickPeople: M(0), deliveredPeople: M(1240), clickRate: M(0),
+      firstClickedAt: M(null, 'unavailable', 'まだ押されていません'),
+      lastClickedAt: M(null, 'unavailable', 'まだ押されていません'),
+      usageLocations: [],
+    },
+  ],
+})
