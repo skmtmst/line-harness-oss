@@ -6,6 +6,7 @@ import type { FriendAddRouting, FriendAddAction } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 
 type Option = { id: string; name: string }
 
@@ -228,15 +229,7 @@ export default function FriendAddSettingsPage() {
           description="友だちに追加されたときに何を配信するかを決めます。はじめての人と、以前からの友だち・ブロックを解除した人で分けられます。"
           action={
             <div className="flex flex-wrap items-center gap-2">
-              {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。
-                  他の画面（一斉配信・成果とアフィリエイトなど）と同じ扱い。 */}
-              <button
-                disabled
-                title="マニュアルは準備中です"
-                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
-              >
-                マニュアル
-              </button>
+              <Button href="/friend-add-settings/runs">実行結果を見る</Button>
               <TestRunButton accountId={accountId} scenarioName={scenarioName} />
               <button
                 type="button"
@@ -246,6 +239,15 @@ export default function FriendAddSettingsPage() {
                 className="bg-accent hover:bg-accent-hover text-on-accent rounded-control px-4 py-2 text-sm font-bold disabled:opacity-50"
               >
                 {saving ? '保存中…' : '保存'}
+              </button>
+              {/* 行き先の文書が無いので押せない。仮のリンクは行き止まりになる。
+                  他の画面（一斉配信・成果とアフィリエイトなど）と同じ扱い。 */}
+              <button
+                disabled
+                title="マニュアルは準備中です"
+                className="border-hairline text-ink-faint rounded-control border px-3 py-2 text-sm font-medium opacity-50"
+              >
+                マニュアル
               </button>
             </div>
           }
