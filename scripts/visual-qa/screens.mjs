@@ -710,10 +710,10 @@ export const SCREENS = [
   },
   {
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認', route: '/reminders',
-    gap: 'parts',
-    gapNote: '`ConfirmDialog` に替えるだけ。いまはブラウザの `confirm()`',
+    gap: 'pending',
+    gapNote: '#498で未送信だけを取消し、送信済み履歴を残すsoft deleteと確認窓を実装済み。#514で一部失敗時に成功分と残りを分けて再試行可能にする。取り込み順は #498 → #514',
     status: 'unimplemented',
-    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`reminders/page.tsx:202`）',
+    why: 'developmentは物理削除で `friend_reminders` と送信済み `friend_reminder_deliveries` までCASCADEし、設計の「送信済み履歴は監査記録として残る」に反する。#498 head `ac288d48` は `deleted_at` と未来予定のcancelを追加し、#514 head `9a72dba6` は複数削除の部分失敗を再試行可能にした。統合後のheadで `Y0Sn3` を撮るまで未実装扱いを維持する',
   },
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
@@ -790,9 +790,9 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',
     gap: 'parts',
-    gapNote: '同上',
+    gapNote: '既存 `ConfirmDialog` にルール名、新しい受信への応答と後続処理が止まること、過去の実行履歴は残ることを表示する。`auto_reply_hits` は外部キーを持たず削除後も残るため新規DBは不要',
     status: 'unimplemented',
-    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`auto-replies/page.tsx:243`）',
+    why: '現行はブラウザの `confirm()` から同じDELETEを呼ぶだけで撮影できない。定義を消しても `auto_reply_hits` は設計どおり監査記録として残る。API契約を変えず、同じ削除操作の前に影響を読ませる共通確認窓へ置き換えられる。ただし `auto-replies/page.tsx` を触る #430・#450・#491 の統合順を先に解く',
   },
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',

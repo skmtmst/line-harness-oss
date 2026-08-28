@@ -835,8 +835,8 @@
       "feature": 7,
       "node": "Y0Sn3",
       "name": "7-1-I 削除確認",
-      "gap": "parts",
-      "gapNote": "`ConfirmDialog` に替えるだけ。いまはブラウザの `confirm()`"
+      "gap": "pending",
+      "gapNote": "#498で未送信だけを取消し、送信済み履歴を残すsoft deleteと確認窓を実装済み。#514で一部失敗時に成功分と残りを分けて再試行可能にする。取り込み順は #498 → #514"
     },
     {
       "feature": 8,
@@ -871,7 +871,7 @@
       "node": "Gy9OK",
       "name": "8-1-I 削除確認",
       "gap": "parts",
-      "gapNote": "同上"
+      "gapNote": "既存 `ConfirmDialog` にルール名、新しい受信への応答と後続処理が止まること、過去の実行履歴は残ることを表示する。`auto_reply_hits` は外部キーを持たず削除後も残るため新規DBは不要"
     },
     {
       "feature": 9,

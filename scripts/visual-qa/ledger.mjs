@@ -265,7 +265,7 @@ ${bars}
   const un = SCREENS.filter((s) => s.status === 'unimplemented')
   console.log('# 未実装画面の片づけ方\n')
   console.log('`scripts/visual-qa/screens.mjs` の `gap` から機械で組み立てています。**手で書き写していません。**\n')
-  console.log(`未実装 **${un.length}** 枚を4つに分けました。\n`)
+  console.log(`未実装 **${un.length}** 枚を片づけ方ごとに分けました。\n`)
   console.log('| 分け方 | 枚数 | 何を指すか |')
   console.log('|---|---|---|')
   for (const [key, label, desc] of KINDS) {
