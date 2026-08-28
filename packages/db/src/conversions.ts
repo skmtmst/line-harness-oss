@@ -48,11 +48,93 @@ export interface ConversionEvent {
 
 // ── Conversion Points CRUD ──────────────────────────────────────────────────
 
-export async function getConversionPoints(db: D1Database): Promise<ConversionPoint[]> {
+export async function getConversionPoints(
+  db: D1Database,
+  opts: { lineAccountId?: string | null } = {},
+): Promise<ConversionPoint[]> {
+  const scoped = 'lineAccountId' in opts;
   const result = await db
-    .prepare(`SELECT * FROM conversion_points ORDER BY status = 'active' DESC, created_at DESC`)
+    .prepare(
+      `SELECT * FROM conversion_points
+        ${scoped ? 'WHERE line_account_id IS ?' : ''}
+        ORDER BY status = 'active' DESC, created_at DESC`,
+    )
+    .bind(...(scoped ? [opts.lineAccountId ?? null] : []))
     .all<ConversionPoint>();
   return result.results;
+}
+
+export interface ConversionPointUsage {
+  conversionPointId: string;
+  kind: 'analytics_funnel';
+  consumerId: string;
+  consumerName: string;
+  href: string;
+}
+
+/**
+ * 成果地点を設定として参照している場所を、構造化された列だけから集める。
+ *
+ * JSON文字列の全文検索は、似たIDや説明文まで拾うため正本にしない。旧ファネルは
+ * `funnel_steps.kind` と `match_json.conversionPointId`、V6ファネルは公開版の
+ * `steps_json[].match.conversionPointId` を見る。同じファネルが移行前後の両方に
+ * 残っていても、画面では1件にまとめる。
+ */
+export async function getConversionPointUsage(
+  db: D1Database,
+  opts: { lineAccountId?: string | null } = {},
+): Promise<ConversionPointUsage[]> {
+  const scoped = 'lineAccountId' in opts;
+  const accountCondition = scoped ? 'AND f.line_account_id IS ?' : '';
+  const accountValues = scoped ? [opts.lineAccountId ?? null] : [];
+  const [legacy, versioned] = await Promise.all([
+    db.prepare(
+      `SELECT
+         json_extract(fs.match_json, '$.conversionPointId') AS conversion_point_id,
+         f.id AS consumer_id,
+         f.name AS consumer_name
+       FROM funnel_steps fs
+       JOIN funnels f ON f.id = fs.funnel_id
+       WHERE fs.kind = 'conversion'
+         AND json_type(fs.match_json, '$.conversionPointId') = 'text'
+         ${accountCondition}`,
+    ).bind(...accountValues).all<{ conversion_point_id: string; consumer_id: string; consumer_name: string }>(),
+    db.prepare(
+      `WITH latest AS (
+         SELECT funnel_id, MAX(version_number) AS version_number
+         FROM analytics_funnel_versions
+         GROUP BY funnel_id
+       )
+       SELECT
+         json_extract(step.value, '$.match.conversionPointId') AS conversion_point_id,
+         f.id AS consumer_id,
+         f.name AS consumer_name
+       FROM analytics_funnel_versions v
+       JOIN latest l
+         ON l.funnel_id = v.funnel_id AND l.version_number = v.version_number
+       JOIN funnels f ON f.id = v.funnel_id
+       CROSS JOIN json_each(v.steps_json) AS step
+       WHERE json_extract(step.value, '$.kind') = 'conversion'
+         AND json_type(step.value, '$.match.conversionPointId') = 'text'
+         ${accountCondition}`,
+    ).bind(...accountValues).all<{ conversion_point_id: string; consumer_id: string; consumer_name: string }>(),
+  ]);
+
+  const result: ConversionPointUsage[] = [];
+  const seen = new Set<string>();
+  for (const row of [...legacy.results, ...versioned.results]) {
+    const key = `${row.conversion_point_id}:analytics_funnel:${row.consumer_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({
+      conversionPointId: row.conversion_point_id,
+      kind: 'analytics_funnel',
+      consumerId: row.consumer_id,
+      consumerName: row.consumer_name,
+      href: '/analytics?tab=funnel',
+    });
+  }
+  return result;
 }
 
 export async function getConversionPointById(
@@ -365,21 +447,28 @@ export interface ConversionReport {
 
 export async function getConversionReport(
   db: D1Database,
-  opts: { startDate?: string; endDate?: string } = {},
+  opts: { startDate?: string; endDate?: string; lineAccountId?: string | null } = {},
 ): Promise<ConversionReport[]> {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+  const eventConditions: string[] = [];
+  const eventValues: unknown[] = [];
+  const pointConditions: string[] = [];
+  const pointValues: unknown[] = [];
 
   if (opts.startDate) {
-    conditions.push('ce.created_at >= ?');
-    values.push(opts.startDate);
+    eventConditions.push('ce.created_at >= ?');
+    eventValues.push(opts.startDate);
   }
   if (opts.endDate) {
-    conditions.push('ce.created_at <= ?');
-    values.push(opts.endDate);
+    eventConditions.push('ce.created_at <= ?');
+    eventValues.push(opts.endDate);
+  }
+  if ('lineAccountId' in opts) {
+    pointConditions.push('cp.line_account_id IS ?');
+    pointValues.push(opts.lineAccountId ?? null);
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const joinConditions = eventConditions.length > 0 ? `AND ${eventConditions.join(' AND ')}` : '';
+  const where = pointConditions.length > 0 ? `WHERE ${pointConditions.join(' AND ')}` : '';
 
   const result = await db
     .prepare(
@@ -390,11 +479,12 @@ export async function getConversionReport(
          COUNT(ce.id) as total_count,
          COALESCE(SUM(CASE WHEN ce.id IS NULL THEN 0 ELSE COALESCE(ce.value_snapshot, cp.value, 0) END), 0) as total_value
        FROM conversion_points cp
-       LEFT JOIN conversion_events ce ON ce.conversion_point_id = cp.id ${conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : ''}
+       LEFT JOIN conversion_events ce ON ce.conversion_point_id = cp.id ${joinConditions}
+       ${where}
        GROUP BY cp.id
        ORDER BY total_count DESC`,
     )
-    .bind(...values)
+    .bind(...eventValues, ...pointValues)
     .all<{
       conversion_point_id: string;
       conversion_point_name: string;

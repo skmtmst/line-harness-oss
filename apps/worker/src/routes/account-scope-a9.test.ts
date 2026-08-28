@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   createAsset: vi.fn(), deleteAsset: vi.fn(), getAsset: vi.fn(), listAssets: vi.fn(), updateAsset: vi.fn(),
   createLink: vi.fn(), deleteLink: vi.fn(), getLink: vi.fn(), getLinks: vi.fn(), updateLink: vi.fn(),
   createPoint: vi.fn(), deletePoint: vi.fn(), getPoint: vi.fn(), getPoints: vi.fn(), updatePoint: vi.fn(),
-  getEvents: vi.fn(), getReport: vi.fn(), getApprovals: vi.fn(), setApproval: vi.fn(), trackConversion: vi.fn(),
+  getEvents: vi.fn(), getReport: vi.fn(), getUsage: vi.fn(), getApprovals: vi.fn(), setApproval: vi.fn(), trackConversion: vi.fn(),
   canAccess: vi.fn(), getScope: vi.fn(),
 }));
 
@@ -35,6 +35,7 @@ vi.mock('@line-crm/db', () => ({
   stopConversionPoint: mocks.deletePoint,
   getConversionPointById: mocks.getPoint,
   getConversionPoints: mocks.getPoints,
+  getConversionPointUsage: mocks.getUsage,
   updateConversionPoint: mocks.updatePoint,
   getConversionEvents: mocks.getEvents,
   getConversionReport: mocks.getReport,
@@ -91,6 +92,7 @@ beforeEach(() => {
   mocks.listAssets.mockResolvedValue([asset('own-asset', 'own'), asset('unassigned-asset', null)]);
   mocks.getLinks.mockResolvedValue([link('own-link', 'own'), link('other-link', 'other')]);
   mocks.getPoints.mockResolvedValue([point('own-point', 'own'), point('other-point', 'other')]);
+  mocks.getUsage.mockResolvedValue([]);
   mocks.getEvents.mockResolvedValue([{ id: 'own-event' }]);
   mocks.getReport.mockResolvedValue([
     { conversionPointId: 'own-point' }, { conversionPointId: 'other-point' },

@@ -2,6 +2,7 @@ import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import {
   getConversionPoints,
   getConversionPointById,
+  getConversionPointUsage,
   createConversionPoint,
   updateConversionPoint,
   stopConversionPoint,
@@ -61,6 +62,19 @@ async function visibleConversionPointIds(c: Context<Env>) {
     .bind(...scope.allowedAccountIds)
     .all<{ id: string }>();
   return new Set(rows.results.map((row) => row.id));
+}
+
+/** 選択中アカウントが渡されたときだけ、その1件へ絞る。未指定は後方互換の可視範囲。 */
+async function requestedLineAccountId(c: Context<Env>): Promise<string | undefined | Response> {
+  const lineAccountId = c.req.query('lineAccountId');
+  if (lineAccountId === undefined) return undefined;
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'lineAccountId is required' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+  return lineAccountId;
 }
 
 const MEASURE_METHODS: ConversionMeasureMethod[] = ['url_reach', 'webhook', 'manual'];
@@ -159,14 +173,54 @@ function readMeasureOptions(
 // GET /api/conversions/points - list all
 conversions.get('/api/conversions/points', async (c) => {
   try {
+    const requestedAccount = await requestedLineAccountId(c);
+    if (requestedAccount instanceof Response) return requestedAccount;
     const visibleIds = await visibleConversionPointIds(c);
-    const items = (await getConversionPoints(c.env.DB)).filter((item) => visibleIds.has(item.id));
+    const [points, usage] = await Promise.all([
+      getConversionPoints(c.env.DB, requestedAccount === undefined ? {} : { lineAccountId: requestedAccount }),
+      getConversionPointUsage(c.env.DB, requestedAccount === undefined ? {} : { lineAccountId: requestedAccount }),
+    ]);
+    const usageByPoint = new Map<string, typeof usage>();
+    for (const item of usage) {
+      const current = usageByPoint.get(item.conversionPointId) ?? [];
+      current.push(item);
+      usageByPoint.set(item.conversionPointId, current);
+    }
+    const items = points.filter((item) => visibleIds.has(item.id));
     return c.json({
       success: true,
-      data: items.map(serializeConversionPoint),
+      data: items.map((item) => ({
+        ...serializeConversionPoint(item),
+        usedIn: usageByPoint.get(item.id) ?? [],
+      })),
     });
   } catch (err) {
     console.error('GET /api/conversions/points error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+// GET /api/conversions/points/:id/impact - 停止前に、残る実績と利用先を確認する
+conversions.get('/api/conversions/points/:id/impact', requireVisibleConversionPoint, async (c) => {
+  try {
+    const point = await getConversionPointById(c.env.DB, c.req.param('id'));
+    if (!point) return c.json({ success: false, error: 'Not found' }, 404);
+    const [report, usage] = await Promise.all([
+      getConversionReport(c.env.DB, { lineAccountId: point.line_account_id }),
+      getConversionPointUsage(c.env.DB, { lineAccountId: point.line_account_id }),
+    ]);
+    const result = report.find((row) => row.conversionPointId === point.id);
+    return c.json({
+      success: true,
+      data: {
+        point: serializeConversionPoint(point),
+        eventCount: result?.totalCount ?? 0,
+        totalValue: result?.totalValue ?? 0,
+        usedIn: usage.filter((item) => item.conversionPointId === point.id),
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/conversions/points/:id/impact error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
@@ -351,10 +405,13 @@ conversions.get('/api/conversions/events', async (c) => {
 // GET /api/conversions/report - aggregated report
 conversions.get('/api/conversions/report', requireRole('owner', 'admin'), async (c) => {
   try {
+    const requestedAccount = await requestedLineAccountId(c);
+    if (requestedAccount instanceof Response) return requestedAccount;
     const visibleIds = await visibleConversionPointIds(c);
     const report = (await getConversionReport(c.env.DB, {
       startDate: c.req.query('startDate'),
       endDate: c.req.query('endDate'),
+      ...(requestedAccount === undefined ? {} : { lineAccountId: requestedAccount }),
     })).filter((row) => visibleIds.has(row.conversionPointId));
 
     return c.json({ success: true, data: report });

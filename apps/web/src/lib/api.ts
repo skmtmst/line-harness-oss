@@ -86,6 +86,26 @@ export type TagDeleteImpactReferences = {
   friendAddSettings: number
 }
 
+export type ConversionPointUsage = {
+  conversionPointId: string
+  kind: 'analytics_funnel'
+  consumerId: string
+  consumerName: string
+  href: string
+}
+
+export type ConversionPointWithUsage = ConversionPoint & {
+  /** 理由が無いときも空配列を返す。省略は「未取得」と区別するため使わない。 */
+  usedIn: ConversionPointUsage[]
+}
+
+export type ConversionPointImpact = {
+  point: ConversionPoint
+  eventCount: number
+  totalValue: number
+  usedIn: ConversionPointUsage[]
+}
+
 export type TagDeleteImpact = {
   tag: { id: string; name: string }
   /** タグを外される友だちの人数。**これだけでは削除を止めない。** */
@@ -2216,8 +2236,10 @@ export const api = {
       ),
   },
   conversions: {
-    points: () =>
-      fetchApi<ApiResponse<ConversionPoint[]>>('/api/conversions/points'),
+    points: (params?: { lineAccountId?: string }) =>
+      fetchApi<ApiResponse<ConversionPointWithUsage[]>>(
+        '/api/conversions/points?' + new URLSearchParams(params as Record<string, string>),
+      ),
     createPoint: (data: {
       name: string
       eventType: string
@@ -2251,12 +2273,14 @@ export const api = {
       }),
     stopPoint: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/conversions/points/${id}`, { method: 'DELETE' }),
+    pointImpact: (id: string) =>
+      fetchApi<ApiResponse<ConversionPointImpact>>(`/api/conversions/points/${id}/impact`),
     track: (data: { conversionPointId: string; friendId: string; userId?: string | null; affiliateCode?: string | null; metadata?: Record<string, unknown> | null; idempotencyKey?: string | null }) =>
       fetchApi<ApiResponse<unknown>>('/api/conversions/track', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    report: (params?: { startDate?: string; endDate?: string }) =>
+    report: (params?: { startDate?: string; endDate?: string; lineAccountId?: string }) =>
       fetchApi<ApiResponse<{ conversionPointId: string; conversionPointName: string; eventType: string; totalCount: number; totalValue: number }[]>>(
         '/api/conversions/report?' + new URLSearchParams(params as Record<string, string>),
       ),

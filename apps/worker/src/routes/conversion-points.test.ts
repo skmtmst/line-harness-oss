@@ -5,6 +5,7 @@ import type { Env } from '../index.js';
 const mocks = {
   getConversionPoints: vi.fn(),
   getConversionPointById: vi.fn(),
+  getConversionPointUsage: vi.fn(),
   createConversionPoint: vi.fn(),
   updateConversionPoint: vi.fn(),
   stopConversionPoint: vi.fn(),
@@ -69,7 +70,10 @@ const POINT = {
   created_at: '2026-08-15',
 };
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.getConversionPointUsage.mockResolvedValue([]);
+});
 
 describe('成果地点の作成', () => {
   it('計測方法を指定しなければ manual になる', async () => {
@@ -215,6 +219,48 @@ describe('一覧', () => {
       measureMethod: 'url_reach',
       targetUrl: 'https://example.com/a',
       countRepeat: false,
+      usedIn: [],
+    });
+  });
+
+  it('構造化された利用先を成果地点ごとに返す', async () => {
+    mocks.getConversionPoints.mockResolvedValue([POINT]);
+    mocks.getConversionPointUsage.mockResolvedValue([{
+      conversionPointId: 'cp-1',
+      kind: 'analytics_funnel',
+      consumerId: 'funnel-1',
+      consumerName: '購入ファネル',
+      href: '/analytics?tab=funnel',
+    }]);
+    const res = await req('/api/conversions/points', 'GET');
+    const body = (await res.json()) as { data: Array<{ usedIn: Array<{ consumerName: string }> }> };
+    expect(body.data[0]?.usedIn).toEqual([expect.objectContaining({ consumerName: '購入ファネル' })]);
+  });
+
+  it('選択中LINEアカウントだけをDBへ要求する', async () => {
+    mocks.getConversionPoints.mockResolvedValue([POINT]);
+    await req('/api/conversions/points?lineAccountId=account-a', 'GET');
+    expect(mocks.getConversionPoints).toHaveBeenCalledWith(env.DB, { lineAccountId: 'account-a' });
+  });
+
+  it('停止前に過去実績と利用先を返す', async () => {
+    mocks.getConversionPointById.mockResolvedValue(POINT);
+    mocks.getConversionReport.mockResolvedValue([{
+      conversionPointId: 'cp-1', conversionPointName: '購入完了', eventType: 'purchase',
+      totalCount: 12, totalValue: 60_000,
+    }]);
+    mocks.getConversionPointUsage.mockResolvedValue([{
+      conversionPointId: 'cp-1',
+      kind: 'analytics_funnel',
+      consumerId: 'funnel-1',
+      consumerName: '購入ファネル',
+      href: '/analytics?tab=funnel',
+    }]);
+    const res = await req('/api/conversions/points/cp-1/impact', 'GET');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      success: true,
+      data: { eventCount: 12, totalValue: 60_000, usedIn: [{ consumerName: '購入ファネル' }] },
     });
   });
 });

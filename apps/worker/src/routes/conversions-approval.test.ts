@@ -13,6 +13,7 @@ const dbMocks = {
   recoverStuckDeliveries: vi.fn(),
   // conversions route deps
   getConversionPoints: vi.fn(),
+  getConversionPointUsage: vi.fn().mockResolvedValue([]),
   getConversionPointById: vi.fn(),
   createConversionPoint: vi.fn(),
   stopConversionPoint: vi.fn(),
