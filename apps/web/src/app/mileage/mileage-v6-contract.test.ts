@@ -25,6 +25,13 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(PAGE).not.toContain('準備中')
   })
 
+  it('残高は共通トップバーで選んだLINEアカウントだけを取得する', () => {
+    expect(PAGE).toContain('selectedAccountId')
+    expect(PAGE).toContain('accountId: accountAtRequest')
+    expect(PAGE).toContain('accountAtRequest !== latestAccountRef.current')
+    expect(PAGE).not.toContain('<option value="all">全アカウント横断</option>')
+  })
+
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {
     expect(NEW_RULE).toContain('api.mileage.createRule')
     expect(NEW_RULE).toContain("parent={['マイル', '/mileage?tab=earning-rules']}")

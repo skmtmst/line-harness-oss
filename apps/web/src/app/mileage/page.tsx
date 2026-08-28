@@ -1,8 +1,9 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
 import { api, type MileageAdminOverview, type MileageRule } from '@/lib/api'
 
@@ -90,11 +91,12 @@ function commitmentLabel(actions: number, miles: number) {
 
 function MileagePageInner() {
   const tab = useMergedTab(TABS, 'tab', 'balances')
-  const { accounts } = useAccount()
+  const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  latestAccountRef.current = selectedAccountId
   const [overview, setOverview] = useState<MileageAdminOverview | null>(null)
   const [rules, setRules] = useState<MileageRule[]>([])
   const [amounts, setAmounts] = useState<Record<string, string>>({})
-  const [accountId, setAccountId] = useState('all')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
@@ -118,15 +120,21 @@ function MileagePageInner() {
   }, [])
 
   const loadOverview = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setOverview(null)
+      return
+    }
     const res = await api.mileage.overview({
-      accountId: accountId === 'all' ? undefined : accountId,
+      accountId: accountAtRequest,
       search: search || undefined,
       limit: PAGE_SIZE,
       offset,
     })
+    if (accountAtRequest !== latestAccountRef.current) return
     if (!res.success) throw new Error(res.error)
     setOverview(res.data)
-  }, [accountId, offset, search])
+  }, [offset, search, selectedAccountId])
 
   const reloadAll = useCallback(async () => {
     setLoading(true)
@@ -140,7 +148,12 @@ function MileagePageInner() {
     }
   }, [loadOverview, loadRules])
 
-  useEffect(() => { void reloadAll() }, [reloadAll])
+  useEffect(() => {
+    if (accountLoading) return
+    setOffset(0)
+    setOverview(null)
+    void reloadAll()
+  }, [accountLoading, reloadAll])
 
   const updateRule = async (rule: MileageRule, updates: Partial<MileageRule>) => {
     setSavingRuleId(rule.id)
@@ -171,11 +184,10 @@ function MileagePageInner() {
   const summary = overview?.summary
   const members = overview?.members ?? []
   const accountLabel = useMemo(() => {
-    if (accountId === 'all') return `${accounts.length}アカウント横断`
-    return accounts.find((account) => account.id === accountId)?.displayName
-      || accounts.find((account) => account.id === accountId)?.name
+    return accounts.find((account) => account.id === selectedAccountId)?.displayName
+      || accounts.find((account) => account.id === selectedAccountId)?.name
       || '選択アカウント'
-  }, [accountId, accounts])
+  }, [accounts, selectedAccountId])
 
   return (
     <div data-mileage-design="v6" data-design-node={tab === 'balances' ? 's98Vfw' : 'N46cQ'}>
@@ -193,25 +205,23 @@ function MileagePageInner() {
 
       {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
+      {!selectedAccountId && !accountLoading ? (
+        <ListState
+          kind="empty"
+          title="LINEアカウントを選択してください"
+          description="友だちの残高は、共通トップバーで選んだLINEアカウントごとに表示します。"
+        />
+      ) : <>
+
       {tab === 'balances' && <>
       <div className="mb-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-medium tracking-wider text-indigo-200">HARNESS MILEAGE</p>
             <h2 className="mt-1 text-xl font-bold">行動が、そのまま顧客との資産になる</h2>
-            <p className="mt-1 text-sm text-slate-300">{accountLabel}で同一ユーザーをまとめ、マイルと行動量を表示しています。</p>
+            <p className="mt-1 text-sm text-slate-300">{accountLabel}の友だちと、本人確認済みの共通マイル残高を表示しています。</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <select
-              value={accountId}
-              onChange={(event) => { setAccountId(event.target.value); setOffset(0) }}
-              className="min-w-48 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none [&>option]:text-gray-900"
-            >
-              <option value="all">全アカウント横断</option>
-              {accounts.map((account) => (
-                <option key={account.id} value={account.id}>{account.displayName || account.name}</option>
-              ))}
-            </select>
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
@@ -393,6 +403,7 @@ function MileagePageInner() {
           </div>
         )}
       </section>}
+      </>}
     </div>
   )
 }
