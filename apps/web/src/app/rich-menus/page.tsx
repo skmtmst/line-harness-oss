@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal'
 import type { RichMenuTapStats } from '@/lib/api'
 import type { Folder } from '@line-crm/shared'
@@ -15,6 +15,35 @@ import Pagination from '@/components/shared/pagination'
 const UNFILED = '__unfiled__'
 
 type SortKey = 'taps' | 'updated' | 'name' | 'manual'
+
+type RichMenuAction = 'load' | 'reorder' | 'delete' | 'externalDelete' | 'import'
+
+/** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
+function richMenuError(error: unknown, action: RichMenuAction): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) return 'このLINEアカウントのリッチメニューを操作する権限がありません。'
+    if (error.status === 404) return '対象のリッチメニューが見つかりません。一覧を読み直してください。'
+    if (error.status === 409) {
+      return action === 'delete' || action === 'externalDelete'
+        ? '使用中のため削除できませんでした。表示先を確認してから、もう一度お試しください。'
+        : 'ほかの変更と重なりました。一覧を読み直してから、もう一度お試しください。'
+    }
+    if (error.status === 429) return 'LINEへの操作が混み合っています。少し待ってから、もう一度お試しください。'
+  }
+
+  switch (action) {
+    case 'load':
+      return 'リッチメニューを読み込めませんでした。通信状態を確認して、もう一度読み込んでください。'
+    case 'reorder':
+      return 'リッチメニューの順番を変更できませんでした。一覧を読み直してから、もう一度お試しください。'
+    case 'delete':
+      return 'リッチメニューを削除できませんでした。状態を確認して、もう一度お試しください。'
+    case 'externalDelete':
+      return 'LINE上のリッチメニューを削除できませんでした。LINEの状態を確認して、もう一度お試しください。'
+    case 'import':
+      return 'LINE上のリッチメニューを取り込めませんでした。LINEの状態を確認して、もう一度お試しください。'
+  }
+}
 
 /**
  * よく使う絞り込み。
@@ -135,7 +164,7 @@ export default function RichMenusListPage() {
         tapRes.status === 'fulfilled' && tapRes.value.success ? tapRes.value.data : null,
       )
       if (groupsRes.status === 'fulfilled') {
-        if (!groupsRes.value.success) throw new Error(groupsRes.value.error ?? '取得失敗')
+        if (!groupsRes.value.success) throw new Error('load_failed')
         setGroups(groupsRes.value.data)
       } else {
         throw groupsRes.reason
@@ -145,20 +174,16 @@ export default function RichMenusListPage() {
         if (v.success) {
           setExternal(v.data)
         } else {
-          setExternalError(v.error ?? 'LINE 上の状態取得に失敗')
+          setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
           setExternal(null)
         }
       } else {
-        setExternalError(
-          externalRes.reason instanceof Error
-            ? externalRes.reason.message
-            : String(externalRes.reason),
-        )
+        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
         setExternal(null)
       }
     } catch (e) {
       if (activeAccountRef.current === accountId) {
-        setError(e instanceof Error ? e.message : String(e))
+        setError(richMenuError(e, 'load'))
       }
     } finally {
       if (activeAccountRef.current === accountId) setLoading(false)
@@ -203,7 +228,7 @@ export default function RichMenusListPage() {
       ])
       await reload()
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      alert(richMenuError(e, 'reorder'))
     } finally {
       setReorderBusy(false)
     }
@@ -220,10 +245,10 @@ export default function RichMenusListPage() {
     if (!confirm(`「${group.name}」を削除します。元には戻せません。`)) return
     try {
       const res = await api.richMenuGroups.delete(group.id)
-      if (!res.success) throw new Error(res.error ?? '削除失敗')
+      if (!res.success) throw new Error('delete_failed')
       await reload()
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      alert(richMenuError(e, 'delete'))
     }
   }
 
@@ -238,10 +263,10 @@ export default function RichMenusListPage() {
       return
     try {
       const res = await api.richMenuGroups.deleteExternal(menu.richMenuId, selectedAccount.id)
-      if (!res.success) throw new Error(res.error ?? '削除失敗')
+      if (!res.success) throw new Error('delete_failed')
       await reload()
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      alert(richMenuError(e, 'externalDelete'))
     }
   }
 
@@ -256,11 +281,11 @@ export default function RichMenusListPage() {
       return
     try {
       const res = await api.richMenuGroups.importFromLine(menu.richMenuId, selectedAccount.id)
-      if (!res.success) throw new Error(res.error ?? '取り込み失敗')
+      if (!res.success) throw new Error('import_failed')
       alert(`取り込みました: ${res.data?.name ?? menu.name}`)
       await reload()
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e))
+      alert(richMenuError(e, 'import'))
     }
   }
 
@@ -482,7 +507,7 @@ export default function RichMenusListPage() {
       )}
       {selectedAccount && !loading && externalError && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded mb-6">
-          LINE 公式アカウントの状態取得に失敗しました: {externalError}
+          {externalError}
         </div>
       )}
 
