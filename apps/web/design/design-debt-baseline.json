@@ -33,6 +33,9 @@
     "direct-primary-button": 1,
     "unresolved-classname": 1
   },
+  "app/automations/runs/page.tsx": {
+    "unresolved-classname": 20
+  },
   "app/booking/bookings/detail/page.tsx": {
     "direct-secondary-button": 3,
     "direct-primary-button": 3,

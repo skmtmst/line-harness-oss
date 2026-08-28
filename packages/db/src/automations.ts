@@ -25,6 +25,147 @@ export interface AutomationLogRow {
   created_at: string;
 }
 
+export type AutomationRunDomainStatus =
+  | 'queued'
+  | 'running'
+  | 'waiting'
+  | 'success'
+  | 'partial'
+  | 'failed'
+  | 'cancelled'
+  | 'skipped_condition';
+
+export interface AutomationExecutionRunRow {
+  id: string;
+  line_account_id: string;
+  account_name: string | null;
+  automation_id: string;
+  automation_name: string;
+  automation_version_id: string;
+  friend_id: string | null;
+  friend_name: string | null;
+  source_event_id: string;
+  trigger_type: string;
+  status: AutomationRunDomainStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  duration_ms: number | null;
+  successful_actions: string | null;
+  skipped_actions: string | null;
+  failed_action: string | null;
+  failure_code: string | null;
+}
+
+export interface AutomationExecutionRunSummaryRow {
+  total: number;
+  executed: number;
+  skipped: number;
+  failed: number;
+  most_run_name: string | null;
+  most_run_count: number | null;
+}
+
+export interface AutomationExecutionRunsQuery {
+  allowedAccountIds: string[];
+  from: string;
+  to: string;
+  status?: AutomationRunDomainStatus[];
+  search?: string;
+  limit: number;
+  offset: number;
+}
+
+function automationRunWhere(input: AutomationExecutionRunsQuery, includeFilters: boolean) {
+  if (input.allowedAccountIds.length === 0) return { sql: '1 = 0', binds: [] as unknown[] };
+  const clauses = [
+    `r.line_account_id IN (${input.allowedAccountIds.map(() => '?').join(', ')})`,
+    'datetime(r.created_at) >= datetime(?)',
+    'datetime(r.created_at) < datetime(?)',
+  ];
+  const binds: unknown[] = [...input.allowedAccountIds, input.from, input.to];
+  if (includeFilters && input.status?.length) {
+    clauses.push(`r.status IN (${input.status.map(() => '?').join(', ')})`);
+    binds.push(...input.status);
+  }
+  if (includeFilters && input.search?.trim()) {
+    const needle = `%${input.search.trim()}%`;
+    clauses.push(`(
+      COALESCE(f.display_name, '') LIKE ? OR d.name LIKE ? OR
+      v.trigger_type LIKE ? OR r.source_event_id LIKE ?
+    )`);
+    binds.push(needle, needle, needle, needle);
+  }
+  return { sql: clauses.join(' AND '), binds };
+}
+
+/**
+ * V6 25-1-B: 新しい横断台帳を作らず、既存automation_runsを読み取り用に整える。
+ * 書込時の詳細状態はそのまま保存し、共通状態への読み替えはAPI境界で行う。
+ */
+export async function getAutomationExecutionRuns(
+  db: D1Database,
+  input: AutomationExecutionRunsQuery,
+): Promise<{ rows: AutomationExecutionRunRow[]; total: number; summary: AutomationExecutionRunSummaryRow }> {
+  const filtered = automationRunWhere(input, true);
+  const summaryScope = automationRunWhere(input, false);
+
+  const [itemsResult, totalRow, summaryCounts, mostRun] = await Promise.all([
+    db.prepare(
+      `SELECT r.id, r.line_account_id, la.name AS account_name,
+              r.automation_id, d.name AS automation_name, r.automation_version_id,
+              r.friend_id, f.display_name AS friend_name, r.source_event_id,
+              v.trigger_type, r.status, r.started_at, r.completed_at, r.created_at,
+              CASE WHEN r.started_at IS NOT NULL AND r.completed_at IS NOT NULL
+                   THEN MAX(0, ROUND((julianday(r.completed_at) - julianday(r.started_at)) * 86400000))
+                   ELSE NULL END AS duration_ms,
+              GROUP_CONCAT(CASE WHEN s.status = 'success' THEN s.action_type END, ' / ') AS successful_actions,
+              GROUP_CONCAT(CASE WHEN s.status = 'skipped' THEN s.action_type END, ' / ') AS skipped_actions,
+              MAX(CASE WHEN s.status = 'failed' THEN s.action_type END) AS failed_action,
+              MAX(CASE WHEN s.status = 'failed' THEN s.error_code END) AS failure_code
+         FROM automation_runs r
+         JOIN automation_definitions d ON d.id = r.automation_id
+         JOIN automation_versions v ON v.id = r.automation_version_id
+         LEFT JOIN friends f ON f.id = r.friend_id
+         LEFT JOIN line_accounts la ON la.id = r.line_account_id
+         LEFT JOIN automation_run_steps s ON s.automation_run_id = r.id
+        WHERE ${filtered.sql}
+        GROUP BY r.id
+        ORDER BY datetime(r.created_at) DESC, r.id DESC
+        LIMIT ? OFFSET ?`,
+    ).bind(...filtered.binds, input.limit, input.offset).all<AutomationExecutionRunRow>(),
+    db.prepare(`SELECT COUNT(*) AS total FROM automation_runs r
+      JOIN automation_definitions d ON d.id = r.automation_id
+      JOIN automation_versions v ON v.id = r.automation_version_id
+      LEFT JOIN friends f ON f.id = r.friend_id
+      WHERE ${filtered.sql}`).bind(...filtered.binds).first<{ total: number }>(),
+    db.prepare(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN r.status IN ('success', 'partial', 'failed') THEN 1 ELSE 0 END) AS executed,
+        SUM(CASE WHEN r.status = 'skipped_condition' THEN 1 ELSE 0 END) AS skipped,
+        SUM(CASE WHEN r.status IN ('failed', 'partial') THEN 1 ELSE 0 END) AS failed
+      FROM automation_runs r WHERE ${summaryScope.sql}`)
+      .bind(...summaryScope.binds).first<{ total: number; executed: number; skipped: number; failed: number }>(),
+    db.prepare(`SELECT d.name AS most_run_name, COUNT(*) AS most_run_count
+      FROM automation_runs r JOIN automation_definitions d ON d.id = r.automation_id
+      WHERE ${summaryScope.sql} AND r.status IN ('success', 'partial', 'failed')
+      GROUP BY r.automation_id, d.name ORDER BY most_run_count DESC, d.name ASC LIMIT 1`)
+      .bind(...summaryScope.binds).first<{ most_run_name: string; most_run_count: number }>(),
+  ]);
+
+  return {
+    rows: itemsResult.results,
+    total: Number(totalRow?.total ?? 0),
+    summary: {
+      total: Number(summaryCounts?.total ?? 0),
+      executed: Number(summaryCounts?.executed ?? 0),
+      skipped: Number(summaryCounts?.skipped ?? 0),
+      failed: Number(summaryCounts?.failed ?? 0),
+      most_run_name: mostRun?.most_run_name ?? null,
+      most_run_count: mostRun ? Number(mostRun.most_run_count) : null,
+    },
+  };
+}
+
 // --- 自動化ルール ---
 
 export async function getAutomations(db: D1Database): Promise<AutomationRow[]> {

@@ -238,6 +238,7 @@ export default function AutomationsPage() {
           description="「〜のとき、〜する」を登録して自動で実行します。友だち一覧から手で実行したり、毎日決まった時刻に動かすこともできます。"
           action={
             <div className="flex flex-wrap gap-2">
+              <Button href="/automations/runs">動いた記録を見る</Button>
               <Button href="/common-actions">共通アクションを見る</Button>
               <Button variant="primary" onClick={() => setShowCreate(true)}>
                 ルールを作成

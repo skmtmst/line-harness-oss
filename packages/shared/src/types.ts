@@ -1140,6 +1140,52 @@ export interface ReminderDeliveryRunsResponse {
   };
 }
 
+/** オートメーションの書込台帳だけが持つ詳細状態。 */
+export type AutomationRunDomainStatus =
+  | "queued"
+  | "running"
+  | "waiting"
+  | "success"
+  | "partial"
+  | "failed"
+  | "cancelled"
+  | "skipped_condition";
+
+/** V6 25-1-Bで表示する、既存automation_runsの読み取りモデル。 */
+export interface AutomationExecutionRun extends ExecutionRunListItem {
+  id: string;
+  automationId: string;
+  automationName: string;
+  automationVersionId: string;
+  friendId: string | null;
+  friendName: string | null;
+  sourceEventId: string;
+  domainStatus: AutomationRunDomainStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  successfulActions: string[];
+  skippedActions: string[];
+  failedAction: string | null;
+  failureReason: string | null;
+}
+
+export interface AutomationExecutionRunsResponse {
+  summary: {
+    total: number;
+    executed: number;
+    skipped: number;
+    failed: number;
+    mostRunName: string | null;
+    mostRunCount: number | null;
+  };
+  items: AutomationExecutionRun[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+  };
+}
+
 // -----------------------------------------------------------------------------
 // スコアリング (Lead Scoring)
 // -----------------------------------------------------------------------------

@@ -33,6 +33,8 @@ import type {
   Template,
   Automation,
   AutomationLog,
+  AutomationExecutionRunsResponse,
+  ExecutionRunStatus,
   Chat,
   Reminder,
   ReminderDeliveryRunStatus,
@@ -2638,6 +2640,27 @@ export const api = {
       fetchApi<ApiResponse<AutomationLog[]>>(
         `/api/automations/${id}/logs` + (limit ? `?limit=${limit}` : ''),
       ),
+    runs: (params: {
+      accountId?: string
+      status?: ExecutionRunStatus | 'executed' | 'problems'
+      search?: string
+      from?: string
+      to?: string
+      limit?: number
+      offset?: number
+    } = {}) => {
+      const query = new URLSearchParams()
+      if (params.accountId) query.set('lineAccountId', params.accountId)
+      if (params.status) query.set('status', params.status)
+      if (params.search) query.set('search', params.search)
+      if (params.from) query.set('from', params.from)
+      if (params.to) query.set('to', params.to)
+      if (params.limit) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<AutomationExecutionRunsResponse>>(
+        `/api/automation-runs${query.size ? `?${query}` : ''}`,
+      )
+    },
   },
   commonActions: {
     resources: (accountId: string, excludeId?: string) => {
