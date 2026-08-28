@@ -504,8 +504,14 @@ export const SCREENS = [
   },
 
   // ── 機能6 一斉配信 ──────────────────────────────────────
-  { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信', route: '/broadcasts' },
-  { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成', route: NEW_BC },
+  { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信', route: '/broadcasts',
+    verdict: 'needs_fix', verdictNote: 'P1 帯に「予約中 undefined」「失敗 undefined」と出る。broadcast-kpis.tsx は stats が在るかしか見ず、欠けた項目をそのまま文へ繋ぐ（未取得なら—にすべき）。撮った絵でそうなったのは /api/broadcasts/stats の固定データを用意していなかったこちらの落ちで、固定データは足した。P2 帯の4枚が設計（予約中・下書き・今月の配信・平均開封率）と違う。列の並びも違い、開封（率）が「-」で—でない。日付欄が mm/dd/yyyy になるのは撮影側のブラウザ言語の癖',
+    verdictSource: 'broadcasts-v6/q76C35-1920.png + apps/web/src/components/broadcasts/broadcast-kpis.tsx:40', verdictHead: 'ccb2085a',
+  },
+  { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成', route: NEW_BC,
+    verdict: 'needs_fix', verdictNote: 'P1 節の番号が画面の並びと合っていない（上から 1.送る相手 → 3.送る内容 → 2.送る時間）。設計の5段の進み表示（基本設定・対象者・メッセージ・送信設定・確認）が無く、1枚の長い画面になっている。配信方法（新しいメッセージを作成／テンプレートを選択／過去の配信を複製）と「最近の配信」からの複製が無い。社内メモが無い。P2 右の設定内容（配信対象・配信日時・送信数・配信後）が無く、配信名の字数（14 / 60文字）も出ない。送信対象の未取得が「−」で「—」でない',
+    verdictSource: 'broadcasts-v6/zZ9fA-1920.png', verdictHead: 'd206bc50',
+  },
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件', route: NEW_BC,
     gap: 'build',

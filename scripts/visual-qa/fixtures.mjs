@@ -161,6 +161,24 @@ export const LIST_STATS = {
   reminders: { total: 9, active: 7, waiting: 124, sentThisMonth: 386, failed: 2 },
 }
 
+/**
+ * 一斉配信の帯（`components/broadcasts/broadcast-kpis.tsx`）。
+ *
+ * **用意していなかったので「予約中 undefined」と出ていました。**
+ * 画面は `stats` が在るかしか見ず、欠けた項目をそのまま繋ぐので、
+ * 中身の無い返事でも文字として `undefined` が出ます。
+ *
+ * 数は設計 `q76C35` の帯から。予約中4件・今月12件・1,842人へ到達・
+ * 平均開封率69.4%。**失敗は設計に数が無いので実値0**（未取得の `—` とは別）。
+ */
+export const BROADCAST_STATS = {
+  thisMonth: 12,
+  scheduled: 4,
+  delivered: 1842,
+  failed: 0,
+  openRate: 69.4,
+}
+
 /** Pencil ★V6 `PhxG6` の友だち一覧。実在の顧客データは使わない。 */
 export const FRIEND_STATS = {
   active: 214,
