@@ -25,6 +25,7 @@ import {
   mileageSourceLabel,
   mileageStatusLabel,
 } from '../../mileage-display'
+import MileageAdjustmentDialog from './mileage-adjustment-dialog'
 
 type MileageDetail = {
   summary: MileageSummary
@@ -42,6 +43,9 @@ function FriendMileageInner() {
   const [mileage, setMileage] = useState<MileageDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [canAdjust, setCanAdjust] = useState(false)
+  const [canConfigureAdjustmentPolicy, setCanConfigureAdjustmentPolicy] = useState(false)
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false)
   usePageTitle(friend?.displayName ? `${friend.displayName}のマイル明細` : null)
 
   const load = useCallback(async () => {
@@ -55,18 +59,23 @@ function FriendMileageInner() {
     setLoading(true)
     setError(false)
     try {
-      const [friendResponse, mileageResponse] = await Promise.all([
+      const [friendResponse, mileageResponse, staffResponse] = await Promise.all([
         api.friends.get(friendId),
         api.friends.mileage(friendId, { limit: 100, accountId: selectedAccountId }),
+        api.staff.me().catch(() => null),
       ])
       if (request !== requestRef.current) return
       if (!friendResponse.success || !mileageResponse.success) throw new Error('load_failed')
       setFriend(friendResponse.data)
       setMileage(mileageResponse.data)
+      setCanAdjust(Boolean(staffResponse?.success && (staffResponse.data.role === 'owner' || staffResponse.data.role === 'admin')))
+      setCanConfigureAdjustmentPolicy(Boolean(staffResponse?.success && staffResponse.data.role === 'owner'))
     } catch {
       if (request !== requestRef.current) return
       setFriend(null)
       setMileage(null)
+      setCanAdjust(false)
+      setCanConfigureAdjustmentPolicy(false)
       setError(true)
     } finally {
       if (request === requestRef.current) setLoading(false)
@@ -114,7 +123,7 @@ function FriendMileageInner() {
         <CardHeader
           title="友だちと接続LINEアカウント"
           meta={mileage.connections.length > 0 ? `${mileage.connections.length}件を表示` : '—'}
-          action={<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button>}
+          action={<div className="flex flex-wrap gap-2">{canAdjust ? <Button variant="primary" onClick={() => setAdjustmentOpen(true)}>マイルを手で増やす・減らす</Button> : null}<Button href={`/friends/detail?id=${encodeURIComponent(friend.id)}`}>友だちの詳細を見る</Button></div>}
         />
         <div className="flex flex-wrap items-center gap-4 p-4">
           {friend.pictureUrl ? <img src={friend.pictureUrl} alt="" className="h-12 w-12 rounded-full object-cover" /> : <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-lg font-bold text-accent">{displayName.slice(0, 1)}</div>}
@@ -144,14 +153,29 @@ function FriendMileageInner() {
                   <Td><p className="font-semibold text-v6-ink">{mileageEntryTypeLabel(item.entryType)}</p><p className="mt-1 text-xs text-v6-ink-faint">{mileageStatusLabel(item.status)}</p></Td>
                   <Td align="right"><span className={item.amount < 0 ? 'font-bold text-v6-danger' : 'font-bold text-accent'}>{formatMileageChange(item.amount)} mile</span></Td>
                   <Td><p className="max-w-56 truncate font-medium text-v6-ink" title={item.reason}>{item.reason}</p></Td>
-                  <Td><p>{mileageSourceLabel(item.source)}</p><p className="mt-1 text-xs text-v6-ink-faint">{item.sourceEventId ? '元の記録あり' : '元の記録なし'}</p></Td>
-                  <Td><p>{item.ruleName ?? '—'}</p><p className="mt-1 text-xs text-v6-ink-faint">{item.mode === 'manual' ? '実行者は未取得' : '自動処理'}</p></Td>
+                  <Td>
+                    <p>{mileageSourceLabel(item.source)}</p>
+                    <p className="mt-1 max-w-44 truncate text-xs text-v6-ink-faint" title={item.sourceReferenceId ?? undefined}>
+                      {item.sourceReferenceId ? `調整元ID: ${item.sourceReferenceId}` : item.sourceEventId ? '元の記録あり' : '元の記録なし'}
+                    </p>
+                  </Td>
+                  <Td><p>{item.ruleName ?? '—'}</p><p className="mt-1 text-xs text-v6-ink-faint">{item.mode === 'manual' ? item.executedByStaffName ?? '実行者は未取得' : '自動処理'}</p></Td>
                 </Tr>
               ))}
             </tbody>
           </DataTable>
         )}
       </Card>
+      <MileageAdjustmentDialog
+        open={adjustmentOpen}
+        accountId={selectedAccountId}
+        friendId={friend.id}
+        friendName={displayName}
+        currentBalance={mileage.summary.available}
+        onCancel={() => setAdjustmentOpen(false)}
+        onCompleted={load}
+        canConfigurePolicy={canConfigureAdjustmentPolicy}
+      />
     </div>
   )
 }

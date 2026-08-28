@@ -10,6 +10,8 @@ const LEGACY_NEW = readFileSync(join(HERE, '..', 'scoring', 'new', 'page.tsx'), 
 const NEW_RULE = readFileSync(join(HERE, 'earning-rules', 'new', 'page.tsx'), 'utf8')
 const HISTORY = readFileSync(join(HERE, 'mileage-history-tab.tsx'), 'utf8')
 const FRIEND_DETAIL = readFileSync(join(HERE, 'friends', 'detail', 'page.tsx'), 'utf8')
+const ADJUSTMENT = readFileSync(join(HERE, 'friends', 'detail', 'mileage-adjustment-dialog.tsx'), 'utf8')
+const API = readFileSync(join(HERE, '..', '..', 'lib', 'api.ts'), 'utf8')
 const MENU = readFileSync(join(HERE, '..', '..', 'lib', 'menu.ts'), 'utf8')
 
 describe('V6 マイルの正本URLと概念分離', () => {
@@ -65,5 +67,26 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(NEW_RULE).toContain('api.mileage.createRule')
     expect(NEW_RULE).toContain("parent={['マイル', '/mileage?tab=earning-rules']}")
     expect(NEW_RULE).not.toContain('api.scoring.create')
+  })
+
+  it('手動増減はV6実Node・確認段階・冪等キーを通して追記する', () => {
+    expect(FRIEND_DETAIL).toContain('<MileageAdjustmentDialog')
+    expect(ADJUSTMENT).toContain('designNode="vz0Ji"')
+    expect(ADJUSTMENT).toContain("useState<'input' | 'confirm'>('input')")
+    expect(ADJUSTMENT).toContain('変更前')
+    expect(ADJUSTMENT).toContain('変更量')
+    expect(ADJUSTMENT).toContain('変更後')
+    expect(ADJUSTMENT).toContain('crypto.randomUUID()')
+    expect(ADJUSTMENT).toContain('reasonCategory')
+    expect(ADJUSTMENT).toContain('sourceReferenceId')
+    expect(ADJUSTMENT).toContain('setAdjustmentPolicy')
+    expect(ADJUSTMENT).toContain('承認境界を保存')
+    expect(API).toContain("'Idempotency-Key': idempotencyKey")
+    expect(API).toContain("'X-Confirm-Irreversible': 'mileage-adjustment'")
+  })
+
+  it('未接続の通知と失効を実行済みに見せない', () => {
+    expect(ADJUSTMENT).toContain('送信・失効台帳が接続されるまで実行しません')
+    expect(ADJUSTMENT).not.toContain('「マイルが付きました」と届きます')
   })
 })

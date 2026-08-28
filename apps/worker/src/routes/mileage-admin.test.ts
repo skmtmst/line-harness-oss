@@ -19,6 +19,12 @@ const dbMocks = {
   getFriendScoreHistory: vi.fn(),
   addScore: vi.fn(),
   applyMileageRulesForEvent: vi.fn(),
+  getMileageManualAdjustmentPolicy: vi.fn(),
+  setMileageManualAdjustmentPolicy: vi.fn(),
+  postMileageAdjustment: vi.fn(),
+  MileageAdjustmentError: class MileageAdjustmentError extends Error {
+    constructor(public readonly code: string) { super(code); }
+  },
 };
 vi.mock('@line-crm/db', () => dbMocks);
 
@@ -31,7 +37,10 @@ const { authMiddleware } = await import('../middleware/auth.js');
 const { scoring } = await import('./scoring.js');
 type Env = import('../index.js').Env;
 
-const env = { DB: {} as D1Database, API_KEY: 'owner-key' } as unknown as Env['Bindings'];
+const d1 = {
+  prepare: vi.fn(),
+};
+const env = { DB: d1 as unknown as D1Database, API_KEY: 'owner-key' } as unknown as Env['Bindings'];
 
 function app() {
   const instance = new Hono<Env>();
@@ -50,6 +59,10 @@ function call(path: string, init?: RequestInit) {
 beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.getStaffByApiKey.mockResolvedValue(null);
+  dbMocks.getMileageManualAdjustmentPolicy.mockResolvedValue({ approvalThreshold: 10_000 });
+  d1.prepare.mockImplementation(() => ({
+    bind: () => ({ first: vi.fn().mockResolvedValue({ id: 'friend-1' }) }),
+  }));
   accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
     allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
   });
@@ -151,5 +164,186 @@ describe('mileage admin API', () => {
     });
     expect(response.status).toBe(400);
     expect(dbMocks.updateMileageRule).not.toHaveBeenCalled();
+  });
+
+  it('requires an explicit confirmation and a configured high-value policy', async () => {
+    const request = {
+      method: 'POST',
+      headers: { 'Idempotency-Key': '11111111-2222-4333-8444-555555555555' },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 100,
+        reasonCategory: 'customer_support', reason: '電話対応のお礼',
+      }),
+    } satisfies RequestInit;
+    expect((await call('/api/mileage/adjustments', request)).status).toBe(428);
+
+    dbMocks.getMileageManualAdjustmentPolicy.mockResolvedValueOnce(null);
+    const response = await call('/api/mileage/adjustments', {
+      ...request,
+      headers: { ...request.headers, 'X-Confirm-Irreversible': 'mileage-adjustment' },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'ADJUSTMENT_POLICY_REQUIRED' });
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('appends a confirmed low-value adjustment with a stable idempotency key', async () => {
+    dbMocks.postMileageAdjustment.mockResolvedValue({
+      entry: { id: 'entry-1', amount: -250 }, balanceBefore: 1_000, balanceAfter: 750, replayed: false,
+    });
+    const response = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'decrease', amount: 250,
+        reasonCategory: 'order_correction', reason: '注文取消分', sourceReferenceId: 'ORDER-1',
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      data: { entryId: 'entry-1', balanceBefore: 1_000, amount: -250, balanceAfter: 750, replayed: false },
+    });
+    expect(dbMocks.postMileageAdjustment).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      friendId: 'friend-1', amount: -250, idempotencyKey: '11111111-2222-4333-8444-555555555555',
+      lineAccountId: 'account-1', executedByStaffId: 'env-owner',
+    }));
+  });
+
+  it('allows an admin to adjust mileage but rejects staff even with mileage visibility', async () => {
+    dbMocks.postMileageAdjustment.mockResolvedValue({
+      entry: { id: 'entry-admin', amount: 100 }, balanceBefore: 0, balanceAfter: 100, replayed: false,
+    });
+    dbMocks.getStaffByApiKey.mockResolvedValueOnce({
+      id: 'admin-1', name: '管理者', role: 'admin', access_level: 'full', permission_keys: '[]',
+      assigned_line_account_id: 'account-1', can_access_descendant_accounts: 0,
+    });
+    const admin = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer admin-key',
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 100,
+        reasonCategory: 'customer_support', reason: '問い合わせ対応',
+      }),
+    });
+    expect(admin.status).toBe(201);
+    expect(dbMocks.postMileageAdjustment).toHaveBeenCalledWith(env.DB, expect.objectContaining({
+      executedByStaffId: 'admin-1', executedByStaffName: '管理者',
+    }));
+
+    vi.clearAllMocks();
+    dbMocks.getStaffByApiKey.mockResolvedValueOnce({
+      id: 'staff-1', name: '担当者', role: 'staff', access_level: 'full', permission_keys: '["/mileage"]',
+      assigned_line_account_id: 'account-1', can_access_descendant_accounts: 0,
+    });
+    const staff = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer staff-key',
+        'Idempotency-Key': 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 100,
+        reasonCategory: 'customer_support', reason: '問い合わせ対応',
+      }),
+    });
+    expect(staff.status).toBe(403);
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid idempotency keys and maps insufficient balance safely', async () => {
+    const invalid = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': 'not-a-uuid',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'decrease', amount: 1,
+        reasonCategory: 'grant_correction', reason: '誤付与の訂正',
+      }),
+    });
+    expect(invalid.status).toBe(400);
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+
+    dbMocks.postMileageAdjustment.mockRejectedValueOnce(
+      new dbMocks.MileageAdjustmentError('insufficient_balance'),
+    );
+    const insufficient = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'decrease', amount: 1,
+        reasonCategory: 'grant_correction', reason: '誤付与の訂正',
+      }),
+    });
+    expect(insufficient.status).toBe(400);
+    expect(await insufficient.json()).toMatchObject({ code: 'insufficient_balance' });
+  });
+
+  it('blocks high-value and cross-account adjustments before writing the ledger', async () => {
+    dbMocks.getMileageManualAdjustmentPolicy.mockResolvedValueOnce({ approvalThreshold: 500 });
+    const high = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': '11111111-2222-4333-8444-555555555555',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-1', direction: 'increase', amount: 500,
+        reasonCategory: 'campaign', reason: 'キャンペーン調整',
+      }),
+    });
+    expect(high.status).toBe(400);
+    expect(await high.json()).toMatchObject({ code: 'OWNER_APPROVAL_REQUIRED' });
+
+    d1.prepare.mockImplementationOnce(() => ({
+      bind: () => ({ first: vi.fn().mockResolvedValue(null) }),
+    }));
+    const hidden = await call('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify({
+        accountId: 'account-1', friendId: 'friend-hidden', direction: 'increase', amount: 10,
+        reasonCategory: 'other', reason: '確認',
+      }),
+    });
+    expect(hidden.status).toBe(404);
+    expect(dbMocks.postMileageAdjustment).not.toHaveBeenCalled();
+  });
+
+  it('lets only owners configure the approval threshold', async () => {
+    const owner = await call('/api/mileage/adjustment-policy', {
+      method: 'PUT', body: JSON.stringify({ accountId: 'account-1', approvalThreshold: 5_000 }),
+    });
+    expect(owner.status).toBe(200);
+    expect(dbMocks.setMileageManualAdjustmentPolicy).toHaveBeenCalledWith(env.DB, 'account-1', {
+      approvalThreshold: 5_000,
+    });
+
+    dbMocks.getStaffByApiKey.mockResolvedValueOnce({
+      id: 'admin-1', name: '管理者', role: 'admin', access_level: 'full', permission_keys: '[]',
+      assigned_line_account_id: 'account-1', can_access_descendant_accounts: 0,
+    });
+    const admin = await call('/api/mileage/adjustment-policy', {
+      method: 'PUT',
+      headers: { Authorization: 'Bearer admin-key' },
+      body: JSON.stringify({ accountId: 'account-1', approvalThreshold: 1_000 }),
+    });
+    expect(admin.status).toBe(403);
   });
 });

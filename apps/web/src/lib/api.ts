@@ -487,8 +487,10 @@ export type MileageHistoryItem = {
   reason: string
   source: string
   sourceEventId: string | null
+  sourceReferenceId: string | null
   ruleName: string | null
   mode: 'automatic' | 'manual'
+  executedByStaffName: string | null
   occurredAt: string
 }
 export type MileageSelfInsights = {
@@ -502,6 +504,17 @@ export type MileageConnectedAccount = {
   accountId: string
   accountName: string
   friendId: string
+}
+export type MileageAdjustmentPolicy = {
+  configured: boolean
+  approvalThreshold: number | null
+}
+export type MileageAdjustmentResult = {
+  entryId: string
+  balanceBefore: number
+  amount: number
+  balanceAfter: number
+  replayed: boolean
 }
 export type MileageRule = {
   id: string
@@ -570,8 +583,10 @@ export type MileageAdminHistoryItem = {
   reason: string
   source: string
   hasSourceEvent: boolean
+  sourceReferenceId: string | null
   ruleName: string | null
   mode: 'automatic' | 'manual'
+  executedByStaffName: string | null
   occurredAt: string
 }
 export type MileageAdminHistory = {
@@ -3140,6 +3155,31 @@ export const api = {
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<MileageAdminHistory>>(`/api/mileage/history?${query.toString()}`)
     },
+    adjustmentPolicy: (accountId: string) =>
+      fetchApi<ApiResponse<MileageAdjustmentPolicy>>(
+        `/api/mileage/adjustment-policy?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    setAdjustmentPolicy: (data: { accountId: string; approvalThreshold: number }) =>
+      fetchApi<ApiResponse<MileageAdjustmentPolicy>>('/api/mileage/adjustment-policy', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    adjust: (data: {
+      accountId: string
+      friendId: string
+      direction: 'increase' | 'decrease'
+      amount: number
+      reasonCategory: 'customer_support' | 'order_correction' | 'grant_correction' | 'campaign' | 'other'
+      reason: string
+      sourceReferenceId?: string
+    }, idempotencyKey: string) => fetchApi<ApiResponse<MileageAdjustmentResult>>('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify(data),
+    }),
     rules: () => fetchApi<ApiResponse<MileageRule[]>>('/api/mileage/rules'),
     createRule: (data: {
       name: string

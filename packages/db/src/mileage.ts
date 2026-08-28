@@ -269,6 +269,178 @@ export async function postMileageEntry(
   return entry;
 }
 
+export type MileageAdjustmentErrorCode =
+  | 'friend_not_found'
+  | 'insufficient_balance'
+  | 'idempotency_conflict';
+
+export class MileageAdjustmentError extends Error {
+  constructor(public readonly code: MileageAdjustmentErrorCode) {
+    super(code);
+    this.name = 'MileageAdjustmentError';
+  }
+}
+
+export interface PostMileageAdjustmentInput {
+  programId?: string;
+  friendId: string;
+  amount: number;
+  reason: string;
+  reasonCategory: string;
+  sourceReferenceId?: string | null;
+  idempotencyKey: string;
+  executedByStaffId: string;
+  executedByStaffName: string;
+  lineAccountId: string;
+  occurredAt?: string;
+}
+
+export interface MileageAdjustmentResult {
+  entry: MileageLedgerEntry;
+  balanceBefore: number;
+  balanceAfter: number;
+  replayed: boolean;
+}
+
+type MileageAdjustmentMetadata = {
+  adjustmentFingerprint?: string;
+  balanceBefore?: number;
+  balanceAfter?: number;
+};
+
+function parseAdjustmentMetadata(value: string | null): MileageAdjustmentMetadata {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value) as MileageAdjustmentMetadata;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function adjustmentResult(
+  entry: MileageLedgerEntry,
+  fingerprint: string,
+  replayed: boolean,
+): MileageAdjustmentResult {
+  const metadata = parseAdjustmentMetadata(entry.metadata);
+  if (
+    metadata.adjustmentFingerprint !== fingerprint ||
+    !Number.isFinite(metadata.balanceBefore) ||
+    !Number.isFinite(metadata.balanceAfter)
+  ) {
+    throw new MileageAdjustmentError('idempotency_conflict');
+  }
+  return {
+    entry,
+    balanceBefore: Number(metadata.balanceBefore),
+    balanceAfter: Number(metadata.balanceAfter),
+    replayed,
+  };
+}
+
+/**
+ * Append one manual adjustment without ever mutating the existing ledger.
+ *
+ * The balance check and INSERT share one SQLite statement. Two deductions that
+ * race cannot both observe the same old balance: D1 serializes the write and
+ * the second statement re-evaluates the wallet before inserting. The stable
+ * `(program_id, idempotency_key)` constraint makes retries return the original
+ * before/after values instead of applying the delta again.
+ */
+export async function postMileageAdjustment(
+  db: D1Database,
+  input: PostMileageAdjustmentInput,
+): Promise<MileageAdjustmentResult> {
+  if (!Number.isInteger(input.amount) || input.amount === 0) {
+    throw new Error('Mileage adjustment amount must be a non-zero integer');
+  }
+  const programId = input.programId ?? DEFAULT_MILEAGE_PROGRAM_ID;
+  await ensureBuiltInProgram(db, programId);
+
+  const fingerprint = JSON.stringify({
+    friendId: input.friendId,
+    amount: input.amount,
+    reason: input.reason,
+    reasonCategory: input.reasonCategory,
+    sourceReferenceId: input.sourceReferenceId ?? null,
+    lineAccountId: input.lineAccountId,
+  });
+  const existing = await db
+    .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
+    .bind(programId, input.idempotencyKey)
+    .first<MileageLedgerEntry>();
+  if (existing) return adjustmentResult(existing, fingerprint, true);
+
+  const id = crypto.randomUUID();
+  const now = input.occurredAt ?? jstNow();
+  const baseMetadata = JSON.stringify({
+    adjustmentFingerprint: fingerprint,
+    reasonCategory: input.reasonCategory,
+    sourceReferenceId: input.sourceReferenceId ?? null,
+    lineAccountId: input.lineAccountId,
+    executedByStaffId: input.executedByStaffId,
+    executedByStaffName: input.executedByStaffName,
+  });
+
+  const write = await db
+    .prepare(
+      `WITH identity AS (
+         SELECT id, user_id FROM friends WHERE id = ? AND line_account_id = ?
+       ), wallet AS (
+         SELECT COALESCE(SUM(CASE WHEN ml.status = 'available' THEN ml.amount ELSE 0 END), 0) AS available
+           FROM mileage_ledger ml
+           LEFT JOIN identity ON 1 = 1
+          WHERE ml.program_id = ?
+            AND ${FRIEND_WALLET_SCOPE_SQL}
+       )
+       INSERT OR IGNORE INTO mileage_ledger
+         (id, program_id, beneficiary_user_id, beneficiary_friend_id,
+          engagement_event_id, mileage_rule_id, entry_type, status, amount, reason, source,
+          source_event_id, idempotency_key, reverses_entry_id, metadata,
+          occurred_at, created_at)
+       SELECT ?, ?, identity.user_id, identity.id,
+              NULL, NULL, 'adjustment', 'available', ?, ?, 'admin_adjustment',
+              NULL, ?, NULL,
+              json_set(?, '$.balanceBefore', wallet.available,
+                          '$.balanceAfter', wallet.available + ?),
+              ?, ?
+         FROM identity CROSS JOIN wallet
+        WHERE ? > 0 OR wallet.available + ? >= 0`,
+    )
+    .bind(
+      input.friendId,
+      input.lineAccountId,
+      programId,
+      input.friendId,
+      id,
+      programId,
+      input.amount,
+      input.reason,
+      input.idempotencyKey,
+      baseMetadata,
+      input.amount,
+      now,
+      now,
+      input.amount,
+      input.amount,
+    )
+    .run();
+
+  const inserted = await db
+    .prepare(`SELECT * FROM mileage_ledger WHERE program_id = ? AND idempotency_key = ?`)
+    .bind(programId, input.idempotencyKey)
+    .first<MileageLedgerEntry>();
+  if (inserted) return adjustmentResult(inserted, fingerprint, (write.meta?.changes ?? 0) === 0);
+
+  const friend = await db
+    .prepare(`SELECT id FROM friends WHERE id = ? AND line_account_id = ?`)
+    .bind(input.friendId, input.lineAccountId)
+    .first<{ id: string }>();
+  if (!friend) throw new MileageAdjustmentError('friend_not_found');
+  throw new MileageAdjustmentError('insufficient_balance');
+}
+
 export interface MileageSummary {
   programId: string;
   programName: string;
@@ -350,8 +522,10 @@ export interface MileageHistoryItem {
   reason: string;
   source: string;
   sourceEventId: string | null;
+  sourceReferenceId: string | null;
   ruleName: string | null;
   mode: 'automatic' | 'manual';
+  executedByStaffName: string | null;
   occurredAt: string;
 }
 
@@ -369,7 +543,10 @@ export async function getMileageHistoryForFriend(
          SELECT user_id FROM friends WHERE id = ?
        )
        SELECT ml.id, ml.entry_type, ml.status, ml.amount, ml.reason,
-              ml.source, ml.source_event_id, mr.name AS rule_name, ml.occurred_at
+              ml.source, ml.source_event_id, mr.name AS rule_name,
+              json_extract(ml.metadata, '$.sourceReferenceId') AS source_reference_id,
+              json_extract(ml.metadata, '$.executedByStaffName') AS executed_by_staff_name,
+              ml.occurred_at
          FROM mileage_ledger ml
          LEFT JOIN identity ON 1 = 1
          LEFT JOIN mileage_rules mr ON mr.id = ml.mileage_rule_id
@@ -387,7 +564,9 @@ export async function getMileageHistoryForFriend(
       reason: string;
       source: string;
       source_event_id: string | null;
+      source_reference_id: string | null;
       rule_name: string | null;
+      executed_by_staff_name: string | null;
       occurred_at: string;
     }>();
 
@@ -399,10 +578,12 @@ export async function getMileageHistoryForFriend(
     reason: row.reason,
     source: row.source,
     sourceEventId: row.source_event_id,
+    sourceReferenceId: row.source_reference_id,
     ruleName: row.rule_name,
     mode: row.entry_type === 'adjustment' || row.source === 'manual' || row.source === 'admin_adjustment'
       ? 'manual'
       : 'automatic',
+    executedByStaffName: row.executed_by_staff_name,
     occurredAt: row.occurred_at,
   }));
 }
@@ -1512,8 +1693,10 @@ export interface MileageAdminHistoryItem {
   reason: string;
   source: string;
   hasSourceEvent: boolean;
+  sourceReferenceId: string | null;
   ruleName: string | null;
   mode: 'automatic' | 'manual';
+  executedByStaffName: string | null;
   occurredAt: string;
 }
 
@@ -1863,7 +2046,10 @@ export async function getMileageAdminHistory(
         `${ctes}
          SELECT lr.id, sp.primary_friend_id, sp.display_name, sp.picture_url,
                 lr.entry_type, lr.status, lr.amount, lr.reason, lr.source,
-                lr.source_event_id, mr.name AS rule_name, lr.occurred_at
+                lr.source_event_id, mr.name AS rule_name,
+                json_extract(lr.metadata, '$.sourceReferenceId') AS source_reference_id,
+                json_extract(lr.metadata, '$.executedByStaffName') AS executed_by_staff_name,
+                lr.occurred_at
            FROM ledger_rows lr
            INNER JOIN selected_profiles sp ON sp.identity_key = lr.identity_key
            LEFT JOIN mileage_rules mr ON mr.id = lr.mileage_rule_id
@@ -1883,7 +2069,9 @@ export async function getMileageAdminHistory(
         reason: string;
         source: string;
         source_event_id: string | null;
+        source_reference_id: string | null;
         rule_name: string | null;
+        executed_by_staff_name: string | null;
         occurred_at: string;
       }>(),
     db
@@ -1910,10 +2098,12 @@ export async function getMileageAdminHistory(
       reason: row.reason,
       source: row.source,
       hasSourceEvent: Boolean(row.source_event_id),
+      sourceReferenceId: row.source_reference_id,
       ruleName: row.rule_name,
       mode: row.entry_type === 'adjustment' || row.source === 'manual' || row.source === 'admin_adjustment'
         ? 'manual'
         : 'automatic',
+      executedByStaffName: row.executed_by_staff_name,
       occurredAt: row.occurred_at,
     })),
     pagination: { total: Number(count?.total ?? 0), limit, offset },
