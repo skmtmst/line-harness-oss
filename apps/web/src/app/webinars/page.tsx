@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
-import { webinarApi, type Webinar } from '@/lib/api'
+import Button from '@/components/shared/button'
+import ListState, { type ListStateKind } from '@/components/shared/list-state'
+import { ApiError, webinarApi, type Webinar } from '@/lib/api'
 
 const STATUS_LABEL: Record<Webinar['status'], string> = {
   draft: '下書き', active: '公開中', archived: 'アーカイブ',
@@ -13,6 +15,34 @@ const STATUS_BADGE: Record<Webinar['status'], string> = {
   draft: 'bg-gray-100 text-gray-600',
   active: 'bg-green-100 text-green-700',
   archived: 'bg-amber-100 text-amber-700',
+}
+
+type WebinarLoadFailure = {
+  kind: Extract<ListStateKind, 'error' | 'forbidden'>
+  title: string
+  description: string
+}
+
+function webinarLoadFailure(error: unknown): WebinarLoadFailure {
+  if (error instanceof ApiError && error.status === 403) {
+    return {
+      kind: 'forbidden',
+      title: 'ウェビナーを見る権限がありません',
+      description: 'このLINEアカウントを見る権限を、オーナーか管理者に確認してください。',
+    }
+  }
+  if (error instanceof ApiError && error.status === 429) {
+    return {
+      kind: 'error',
+      title: 'ウェビナーの読み込みが混み合っています',
+      description: '少し待ってから、もう一度読み込んでください。',
+    }
+  }
+  return {
+    kind: 'error',
+    title: 'ウェビナーを表示できませんでした',
+    description: '通信状態を確認して、もう一度読み込んでください。',
+  }
 }
 
 function scheduleSummary(w: Webinar): string {
@@ -48,16 +78,16 @@ export default function WebinarsPage() {
   const [items, setItems] = useState<Webinar[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadFailure, setLoadFailure] = useState<WebinarLoadFailure | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
-    setError(null)
+    setLoadFailure(null)
     try {
       const res = await webinarApi.list()
       setItems(res.data)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setLoadFailure(webinarLoadFailure(e))
     } finally {
       setLoading(false)
     }
@@ -70,6 +100,7 @@ export default function WebinarsPage() {
   // タイトルと slug の両方を見る。URLで探すこともあるため。
   const q = query.trim()
   const shown = q ? items.filter((w) => w.title.includes(q) || w.slug.includes(q)) : items
+  const hasListData = !loading && loadFailure === null
 
   return (
     <>
@@ -116,11 +147,11 @@ export default function WebinarsPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ウェビナー</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {items.length}
+            {hasListData ? items.length : '—'}
             <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            公開中 {items.filter((w) => w.status === 'active').length}
+            公開中 {hasListData ? items.filter((w) => w.status === 'active').length : '—'}
           </p>
         </div>
         {/* 申込・視聴の集計を返す口が無い。個別のウェビナーを開けば見られるが、
@@ -186,16 +217,15 @@ export default function WebinarsPage() {
           ))}
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-            {error}
-          </div>
-        )}
-
         {loading ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center text-gray-500">
-            読み込み中...
-          </div>
+          <ListState kind="loading" />
+        ) : loadFailure ? (
+          <ListState
+            kind={loadFailure.kind}
+            title={loadFailure.title}
+            description={loadFailure.description}
+            action={<Button onClick={() => void refresh()}>もう一度読み込む</Button>}
+          />
         ) : shown.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
             <div className="text-gray-700 font-medium mb-2">ウェビナーがまだありません</div>
