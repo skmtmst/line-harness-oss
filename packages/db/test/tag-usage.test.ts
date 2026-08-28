@@ -179,6 +179,16 @@ describe('タグの使用先集計', () => {
     });
   });
 
+  it('削除済みリマインダのタグ参照は使用中として数えない', async () => {
+    sqlite.prepare(`UPDATE reminders SET deleted_at = datetime('now') WHERE id = 'reminder-only'`).run();
+
+    const rows = await getTagsWithUsage(db);
+    expect(rows.find((row) => row.id === 'tag-reminder-only')).toMatchObject({
+      friend_count: 0,
+      cleanup_reasons: ['unused'],
+    });
+  });
+
   it('運用参照の複合SELECTを安全な項数以下へ分割する', () => {
     const queries = buildTagUsageBlockingReferenceQueries();
     expect(queries.length).toBeGreaterThan(1);

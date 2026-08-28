@@ -164,7 +164,7 @@ reminders.get('/api/reminders', async (c) => {
        */
       const result = await c.env.DB
         .prepare(
-          `SELECT * FROM reminders WHERE line_account_id = ?
+          `SELECT * FROM reminders WHERE line_account_id = ? AND deleted_at IS NULL
             ORDER BY display_order ASC, created_at DESC`,
         )
         .bind(lineAccountId)

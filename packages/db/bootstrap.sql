@@ -1749,7 +1749,7 @@ CREATE TABLE "reminders" (
   repeat_yearly INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
   updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-, display_order INTEGER NOT NULL DEFAULT 0);
+, display_order INTEGER NOT NULL DEFAULT 0, deleted_at TEXT);
 
 CREATE TABLE rich_menu_area_taps (
   id              TEXT PRIMARY KEY,
@@ -3062,6 +3062,10 @@ CREATE INDEX idx_reminders_display_order ON reminders(display_order, created_at)
 CREATE INDEX idx_reminders_folder ON reminders(folder_id);
 
 CREATE INDEX idx_reminders_status_scheduled ON booking_reminders (status, scheduled_at);
+
+CREATE INDEX idx_reminders_visible_order
+  ON reminders (line_account_id, display_order, created_at)
+  WHERE deleted_at IS NULL;
 
 CREATE INDEX idx_rich_menu_area_taps_area  ON rich_menu_area_taps(area_id, tapped_at);
 

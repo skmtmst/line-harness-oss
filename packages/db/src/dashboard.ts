@@ -1052,8 +1052,8 @@ export async function getListStats(db: D1Database, scope: AccountStatsScope): Pr
       const row = await db
         .prepare(
           `SELECT
-             (SELECT COUNT(*) FROM reminders WHERE ${reminderScope.sql}) AS total,
-             (SELECT COUNT(*) FROM reminders WHERE is_active = 1 AND ${reminderScope.sql}) AS active,
+             (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND ${reminderScope.sql}) AS total,
+             (SELECT COUNT(*) FROM reminders WHERE deleted_at IS NULL AND is_active = 1 AND ${reminderScope.sql}) AS active,
              (SELECT COUNT(*) FROM friend_reminders fr JOIN friends f ON f.id = fr.friend_id WHERE fr.status = 'active' AND ${friendScope.sql}) AS waiting`,
         )
         .bind(...reminderScope.binds, ...reminderScope.binds, ...friendScope.binds)
