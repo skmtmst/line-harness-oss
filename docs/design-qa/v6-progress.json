@@ -765,15 +765,15 @@
       "feature": 5,
       "node": "RUxNf",
       "name": "5-1-I シナリオ・配信開始確認",
-      "gap": "parts",
-      "gapNote": "同上"
+      "gap": "pending",
+      "gapNote": "#521 head `7d5d74fd` で開始・停止の確認窓を実装済み。最新headを1440/1920で比較してから未実装を外す"
     },
     {
       "feature": 5,
       "node": "NrBkW",
       "name": "5-1-J シナリオ・配信開始完了",
-      "gap": "build",
-      "gapNote": "同上"
+      "gap": "pending",
+      "gapNote": "#522 head `3c88b8bd` で開始完了と実績確認への導線を実装済み。取り込み順は #521 → #522"
     },
     {
       "feature": 6,
@@ -933,22 +933,22 @@
       "feature": 10,
       "node": "GB0NR",
       "name": "10-1-F 公開ページプレビュー",
-      "gap": "parts",
-      "gapNote": "`slug` は画面に出ている。公開ページを別窓で開くだけ"
+      "gap": "pending",
+      "gapNote": "#507 head `579fa25c` で実URLの公開ページを別窓で開く導線を実装済み。画像確認待ち"
     },
     {
       "feature": 10,
       "node": "D6yO7e",
       "name": "10-1-G 公開前確認",
-      "gap": "parts",
-      "gapNote": "同上"
+      "gap": "pending",
+      "gapNote": "#508 head `61eeb3c7` で動画・配信枠・長さを検査し、公開内容を読む確認窓を実装済み。取り込み順は #507 → #508"
     },
     {
       "feature": 10,
       "node": "TimXl",
       "name": "10-1-H 公開完了",
-      "gap": "build",
-      "gapNote": "同上"
+      "gap": "pending",
+      "gapNote": "#508 head `61eeb3c7` で公開完了画面と公開後の導線を実装済み。取り込み順は #507 → #508"
     },
     {
       "feature": 10,
@@ -1157,22 +1157,22 @@
       "feature": 27,
       "node": "GFDqW",
       "name": "27-1-D 代理予約・内容確認",
-      "gap": "parts",
-      "gapNote": "同上（代理予約）"
+      "gap": "pending",
+      "gapNote": "#459 head `ba0bf62d` に入力→内容確認→登録完了→競合回復の4段が実装済み。`confirm` 状態を操作して画像確認する"
     },
     {
       "feature": 27,
       "node": "GfceK",
       "name": "27-1-E 代理予約・登録完了",
-      "gap": "build",
-      "gapNote": "同上（代理予約）"
+      "gap": "pending",
+      "gapNote": "#459 head `ba0bf62d` の `done` 状態に実装済み。登録成功レスポンスを返して画像確認する"
     },
     {
       "feature": 27,
       "node": "Lg8ff",
       "name": "27-1-F 代理予約・予約枠の重なりと入力エラー",
-      "gap": "api",
-      "gapNote": "予約枠の重なりを判定する口が要る"
+      "gap": "pending",
+      "gapNote": "#459 head `ba0bf62d` で予約枠の重なり判定と `slot_conflict` / `slot_not_available` の回復画面を実装済み。競合レスポンスで画像確認する"
     },
     {
       "feature": 4,
