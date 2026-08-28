@@ -13,6 +13,7 @@ import {
   incrementAffiliateLinkClick,
   enqueueFollowingMileageMilestones,
   processPendingMileageEvents,
+  processActionScoreInactivity,
 } from '@line-crm/db';
 import { processStepDeliveries } from './services/step-delivery.js';
 import { processScheduledBroadcasts, processQueuedBroadcasts } from './services/broadcast.js';
@@ -29,6 +30,7 @@ import { processDueMeetConsultationReminders } from './services/meet-consultatio
 import { processDueAutomationRuns } from './services/automation-engine.js';
 import { createAutomationActionExecutors } from './services/automation-action-executors.js';
 import { processScheduledAutomationTriggers } from './services/automation-triggers.js';
+import { dispatchActionScoreApplications } from './services/action-score-events.js';
 import { runEventBookingExpirer } from './services/event-booking-expirer.js';
 import { sendEventBookingNotification } from './services/event-booking-notifier.js';
 import { sendBookingNotification } from './services/booking-notifier.js';
@@ -61,6 +63,7 @@ import { calendar } from './routes/calendar.js';
 import { meetConsultations } from './routes/meet-consultations.js';
 import { reminders } from './routes/reminders.js';
 import { scoring } from './routes/scoring.js';
+import { actionScoreRules } from './routes/action-score-rules.js';
 import { templates } from './routes/templates.js';
 import { chats } from './routes/chats.js';
 import { conversations } from './routes/conversations.js';
@@ -313,6 +316,7 @@ app.route('/', calendar);
 app.route('/', meetConsultations);
 app.route('/', reminders);
 app.route('/', scoring);
+app.route('/', actionScoreRules);
 app.route('/', templates);
 app.route('/', chats);
 app.route('/', conversations);
@@ -1415,6 +1419,29 @@ async function scheduled(
             console.log(
               `[friend-field-reminders] enrolled=${result.enrolled} skipped=${result.skipped}`,
             );
+          }
+        }),
+      );
+    }
+    if (jstMinutes === 10) {
+      jobs.push(
+        processActionScoreInactivity(env.DB, {
+          now: new Date(event.scheduledTime).toISOString(),
+          limit: 200,
+        }).then(async (result) => {
+          for (const transition of result.transitions) {
+            const account = dbAccounts.find((item) => item.id === transition.lineAccountId);
+            await dispatchActionScoreApplications(env.DB, {
+              ...transition,
+              lineAccessToken: account?.channel_access_token,
+            });
+          }
+          if (result.candidates > 0) {
+            console.log(JSON.stringify({
+              event: 'action_score_inactivity_tick',
+              candidates: result.candidates,
+              applied: result.applied,
+            }));
           }
         }),
       );

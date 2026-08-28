@@ -26,6 +26,7 @@ import { LineClient } from '@line-crm/line-sdk';
 import type { Message } from '@line-crm/line-sdk';
 import { sendAdConversions } from './ad-conversion.js';
 import { dispatchAutomationEventWithLogging } from './automation-triggers.js';
+import { applyActionScoreEvent } from './action-score-events.js';
 
 import {
   applyRichMenuTargeting,
@@ -74,7 +75,7 @@ export async function fireEvent(
   // Phase 1: fire webhooks, apply scoring rules, and ad conversion postback concurrently.
   const phase1: Promise<unknown>[] = [
     fireOutgoingWebhooks(db, eventType, payload, outgoingWebhookLineAccountId),
-    processScoring(db, eventType, payload),
+    processScoring(db, eventType, payload, outgoingWebhookLineAccountId, lineAccessToken),
   ];
   if (payload.friendId && payload.conversionEventName) {
     phase1.push(
@@ -217,9 +218,26 @@ async function processScoring(
   db: D1Database,
   eventType: string,
   payload: EventPayload,
+  lineAccountId?: string | null,
+  lineAccessToken?: string,
 ): Promise<void> {
   if (!payload.friendId) return;
   try {
+    if (lineAccountId && payload.sourceEventId && payload.sourceKind && payload.occurredAt) {
+      const v6 = await applyActionScoreEvent(db, {
+        lineAccountId,
+        friendId: payload.friendId,
+        eventType,
+        source: payload.sourceKind,
+        sourceEventId: payload.sourceEventId,
+        subjectKey: typeof payload.eventData?.subjectKey === 'string' ? payload.eventData.subjectKey : null,
+        occurredAt: payload.occurredAt,
+        lineAccessToken,
+      });
+      // 公開後または明示停止後は旧グローバルルールへ戻さない。二重加点と
+      // 「止めたのに動く」を同時に防ぐ。
+      if (v6.configured) return;
+    }
     await applyScoring(db, payload.friendId, eventType);
   } catch (err) {
     console.error('processScoring error:', err);

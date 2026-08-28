@@ -102,6 +102,7 @@ function app() {
     a.get(path, (c) => c.json({ success: true }));
   }
   a.get('/api/mileage/history', (c) => c.json({ success: true }));
+  a.get('/api/action-scores/rules', (c) => c.json({ success: true }));
   return a;
 }
 
@@ -372,6 +373,8 @@ describe('staff feature permissions', () => {
   test('mileage permission protects mileage APIs', async () => {
     expect((await app().request('/api/mileage/history', bearer('mileage-key'), crossSiteEnv())).status).toBe(200);
     expect((await app().request('/api/mileage/history', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+    expect((await app().request('/api/action-scores/rules', bearer('mileage-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/action-scores/rules', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
   });
 
   test.each(['/api/support', '/api/friends/friend-1', '/api/support-marks'])(
