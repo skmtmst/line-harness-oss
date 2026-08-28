@@ -744,22 +744,22 @@
       "feature": 3,
       "node": "InCDe",
       "name": "3-2-A 重複候補詳細・統合前確認",
-      "gap": "build",
-      "gapNote": "重複の口は在る。候補を1件ずつ開く導線が無い"
+      "gap": "api",
+      "gapNote": "集計口だけでは作れない。候補ID、友だち2件、根拠、確信度、pending/linked/different/deferred/invalidated、判定者・理由・履歴を持つ `identity_candidates` と候補詳細・判定APIが要る"
     },
     {
       "feature": 3,
       "node": "w8W4Eh",
       "name": "3-3-A 統合ユーザー詳細",
-      "gap": "build",
-      "gapNote": "統合ユーザーの行を開く導線が無い"
+      "gap": "api",
+      "gapNote": "元の友だちを残した非破壊リンク、解除履歴、項目ごとの採用値と出所、配信優先順位を扱う `friend_identity_links`・`user_profile_values`・`user_delivery_priorities` と詳細APIが要る"
     },
     {
       "feature": 3,
       "node": "vtBCu",
       "name": "3-4 UID移行",
-      "gap": "build",
-      "gapNote": "`/hq` 側に在る見込み。権限の切り分けを決める"
+      "gap": "api",
+      "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
     },
     {
       "feature": 5,
@@ -786,8 +786,8 @@
       "feature": 6,
       "node": "bPF0s",
       "name": "6-1-I 予約完了",
-      "gap": "build",
-      "gapNote": "保存の返事を受けて完了の面を出す。口は在る"
+      "gap": "pending",
+      "gapNote": "#510 head `ab1841bc` で予約完了画面を実データへ接続済み。#497を土台にしているため、取り込み順は #495 → #497 → #510。最新headを1440/1920で比較してから未実装を外す"
     },
     {
       "feature": 6,
@@ -912,8 +912,8 @@
       "feature": 9,
       "node": "P2J0Te",
       "name": "9-1-H 実行結果",
-      "gap": "build",
-      "gapNote": "`/api/friend-add-routing/events` は在る。画面が読んでいない"
+      "gap": "pending",
+      "gapNote": "#506 head `5dc99107` で既存 `/api/friend-add-routing/events` を読む `/friend-add-settings/runs` を実装済み。最新headを1440/1920で比較してから未実装を外す"
     },
     {
       "feature": 9,
@@ -968,15 +968,15 @@
       "feature": 12,
       "node": "DIUbO",
       "name": "12-1-C 切替メニューのつながり",
-      "gap": "build",
-      "gapNote": "リッチメニューの `pages` `areas` は在る。移り先を図にする"
+      "gap": "pending",
+      "gapNote": "#509 head `e148615c` で既存のpages/areasから切替のつながりを解析する `/rich-menus/connections` を実装済み。最新headを1440/1920で比較してから未実装を外す"
     },
     {
       "feature": 12,
       "node": "NXdDk",
       "name": "12-1-C-A つながりなし",
-      "gap": "build",
-      "gapNote": "上の空の状態"
+      "gap": "pending",
+      "gapNote": "#509 head `e148615c` の切替解析画面に、つながりが無い場合の状態を実装済み。空の固定データで画像確認する"
     },
     {
       "feature": 12,
@@ -1080,8 +1080,8 @@
       "feature": 22,
       "node": "hHrz8",
       "name": "22-1-A 写真を1枚ずつ見る",
-      "gap": "build",
-      "gapNote": "写真は在る。拡大・回転・切り取りは画面側で作れる（**自動検出だけは別。下の「新規API」を参照**）"
+      "gap": "api",
+      "gapNote": "一覧写真を拡大するだけでは完成しない。非公開original、review/public派生画像、crop/rotateの版、risk flag、同意、審査競合、original download権限を持つasset・decision API/DBが要る"
     },
     {
       "feature": 22,
@@ -1094,8 +1094,8 @@
       "feature": 23,
       "node": "ELayY",
       "name": "23-1-A 会員のつき合わせ",
-      "gap": "build",
-      "gapNote": "注文は在る。`friendId` が空のものを並べて候補を出す"
+      "gap": "api",
+      "gapNote": "`friendId` が空のeventを並べるだけでは足りない。検証済みemail/電話の候補、account/shop境界、linked/rejected/deferred判断、影響確認、過去eventの再処理範囲を持つidentity候補・判断API/DBが要る"
     },
     {
       "feature": 23,
@@ -1144,7 +1144,7 @@
       "node": "WjYAC",
       "name": "25-1-C 見本から作る",
       "gap": "build",
-      "gapNote": "見本は固定の組み合わせ。新しい口は要らない"
+      "gapNote": "見本は固定データでよい。ただし実IDを埋めず、選択した見本から公開ではなく下書きを作り、タグ・シナリオ・テンプレートを利用者が選び直す。V6オートメーション実装チェーンの作成API上に載せる"
     },
     {
       "feature": 26,
