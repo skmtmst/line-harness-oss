@@ -1043,10 +1043,10 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: 'P2 設計は別画面だが実装は一覧の中に埋め込み。**設計より近い場所にあるので悪い差ではない**。ただし絞り込みの札に「管理画面の外」が無く、絞れない', verdictSource: 'rich-menus-v6/design-qa.md' },
   {
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
-    gap: 'parts',
-    gapNote: '同上',
+    gap: 'api',
+    gapNote: '確認窓だけでは作れない。現在表示中の人数、次に表示されるメニュー、切替元、自動応答・オートメーション等の参照元を返す影響確認と、LINE取り下げの完了を保証する実行記録が要る。`force=true` は管理画面へ出さない',
     status: 'unimplemented',
-    why: '削除はブラウザの `confirm()`。設計の確認ダイアログではないうえ、**撮れない**（`rich-menus/page.tsx:193`）',
+    why: '設計 `szXsT` と要件 §5-9 は、表示中8,140人、次に出るメニュー、切替元、自動応答の参照を確認し、先にLINEから取り下げる二段階を求める。現行は公開中を409で止めるだけで、`?force=true` ならLINE残骸を許したままD1行を物理削除できる。影響内訳と取り下げ完了の契約が無いまま `ConfirmDialog` へ接続しない',
   },
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
@@ -1164,10 +1164,10 @@ export const SCREENS = [
   { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', verdict: 'needs_fix', verdictNote: 'P1 案件をつくる面で、報酬の決め方（案件ごとの決まった額）を主にできない', verdictSource: 'affiliates-v6/design-qa.md' },
   {
     ...AFFILIATE, node: 'QX70l', name: '16-1-G アフィリエイターを削除する確認',
-    gap: 'parts',
-    gapNote: '`api.affiliates.delete` は在る。画面が呼んでいないだけ',
+    gap: 'drop',
+    gapNote: '物理削除確認はV6から除外する。紹介者は停止・アーカイブし、過去成果・承認・未払い・支払い記録を保持する。個人情報削除は識別情報の匿名化として別要件にする',
     status: 'unimplemented',
-    why: '一覧に消す導線が無い。受け口（`api.affiliates.delete`）は在るのに**画面が呼んでいない**',
+    why: '要件 §1・§10・§15 は一般UIからの物理削除と、過去の支払い記録を消すことを禁止している。設計 `QX70l` の「記録ごと削除」は正式要件と矛盾する。#440側も `DELETE /api/affiliates/:id` を405 `PHYSICAL_DELETE_DISABLED` に変え、停止は `PUT { isActive: false }` としているため、この削除画面を実装しない',
   },
   {
     ...AFFILIATE, node: 'GqFTV', name: '16-1-H 支払いを確定する',
@@ -1279,9 +1279,9 @@ export const SCREENS = [
   { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: 'P1 流入元の詳細の面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' },
   {
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
-    gap: 'parts',
-    gapNote: '同上',
-    status: 'unimplemented', why: '一覧に消す確認の窓が無い。削除はブラウザの `confirm()` か、詳細の中の操作',
+    gap: 'api',
+    gapNote: '確認窓だけでは作れない。投稿・広告・自動処理・成果対応の使用先、過去流入数、転送先候補を返す影響確認と、停止・アーカイブ・別リンクへの転送を行う契約が要る。履歴がある経路は物理削除しない',
+    status: 'unimplemented', why: '設計 `UIaM7` と要件 §4-6 は、URL停止、別リンクへの転送、過去の流入・友だち・成果・広告送信履歴の保持を求める。現行 `DELETE /api/entry-routes/:id` は影響確認なしでD1行を物理削除するだけで、停止・アーカイブ・転送・参照中の削除防止を保証しない。ブラウザの `confirm()` を共通窓へ替えるだけでは要件を満たさない',
   },
   {
     ...INFLOW, node: 'BMmxU', name: '18-1-F 一覧の状態（空・読込・エラー）',
