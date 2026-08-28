@@ -491,6 +491,12 @@ export default function RemindersPage() {
                             >
                               実行結果を確認
                             </Link>
+                            <Link
+                              href={`/reminders/detail?id=${encodeURIComponent(r.id)}&status=planned`}
+                              className="text-info mt-1 block text-xs hover:underline"
+                            >
+                              配信予定を確認
+                            </Link>
                           </td>
                           <td className="px-4 py-3">
                             <span className="bg-canvas-sunken text-ink-secondary rounded-pill px-2 py-0.5 text-xs whitespace-nowrap">

@@ -4,6 +4,7 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
+const LIST_PAGE = fs.readFileSync(path.join(__dirname, '..', 'page.tsx'), 'utf8')
 const API = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'lib', 'api.ts'), 'utf8')
 const SHARED_TYPES = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', '..', '..', '..', 'packages', 'shared', 'src', 'types.ts'),
@@ -12,7 +13,7 @@ const SHARED_TYPES = fs.readFileSync(
 
 describe('V6 7-1-H リマインダ実行結果', () => {
   it('Pencilの実Nodeと共通部品を正本にする', () => {
-    expect(PAGE).toContain('data-design-node="GC4St"')
+    expect(PAGE).toContain("data-design-node={isPlannedView ? 'JCz6J' : 'GC4St'}")
     expect(PAGE).toContain("@/components/shared/summary-card")
     expect(PAGE).toContain("@/components/shared/list-state")
     expect(PAGE).toContain("@/components/shared/pagination")
@@ -23,7 +24,19 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(PAGE).not.toMatch(/<h1[\s>]/)
     expect(PAGE).not.toContain('リマインダの実行結果</h1>')
     expect(PAGE).not.toContain('data-page-title')
-    expect(PAGE).toContain("usePageTitle(data?.reminder.name ? `${data.reminder.name}・実行結果` : null)")
+    expect(PAGE).toContain("`${data.reminder.name}・${isPlannedView ? '配信予定' : '実行結果'}`")
+  })
+
+  it('予定の導線では既存の実行台帳をplannedで絞り、作り物の予定を出さない', () => {
+    expect(PAGE).toContain("const isPlannedView = searchParams.get('status') === 'planned'")
+    expect(PAGE).toContain("isPlannedView ? 'planned' : ''")
+    expect(PAGE).toContain("setStatus(isPlannedView ? 'planned' : '')")
+    expect(PAGE).toContain("{ label: '配信予定', current: true }")
+    expect(PAGE).toContain("{ label: '実行結果', href: `/reminders/detail?id=${reminderId}` }")
+    expect(LIST_PAGE).toContain('status=planned')
+    expect(LIST_PAGE).toContain('配信予定を確認')
+    expect(PAGE).toContain('予約や対象条件が変わると、予定も変わります。')
+    expect(PAGE).not.toContain('360人へ送ります')
   })
 
   it('実行結果APIを読み、固定の設計値を画面へ埋め込まない', () => {

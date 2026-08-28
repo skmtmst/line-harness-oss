@@ -100,10 +100,11 @@ function csvFor(items: ReminderDeliveryRun[]): string {
 export default function ReminderRunsPage() {
   const searchParams = useSearchParams()
   const reminderId = searchParams.get('id') ?? ''
+  const isPlannedView = searchParams.get('status') === 'planned'
   const [data, setData] = useState<ReminderDeliveryRunsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>('')
+  const [status, setStatus] = useState<'' | ReminderDeliveryRunStatus>(isPlannedView ? 'planned' : '')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZES)[number]>(20)
@@ -111,7 +112,17 @@ export default function ReminderRunsPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState('')
   const [exporting, setExporting] = useState(false)
-  usePageTitle(data?.reminder.name ? `${data.reminder.name}・実行結果` : null)
+  usePageTitle(
+    data?.reminder.name
+      ? `${data.reminder.name}・${isPlannedView ? '配信予定' : '実行結果'}`
+      : null,
+  )
+
+  // 同じpathnameのままタブを切り替えても、URLの表示目的と取得条件をずらさない。
+  useEffect(() => {
+    setStatus(isPlannedView ? 'planned' : '')
+    setPage(1)
+  }, [isPlannedView])
 
   const load = useCallback(async () => {
     if (!reminderId) return
@@ -145,7 +156,8 @@ export default function ReminderRunsPage() {
   }, [page, pageCount])
 
   const firstStep = data?.steps[0] ?? null
-  const hasErrors = (data?.summary.errors ?? 0) > 0
+  // 配信予定だけを見る画面で、過去の失敗を現在の予定の警告として混ぜない。
+  const hasErrors = !isPlannedView && (data?.summary.errors ?? 0) > 0
 
   const retry = async (runId: string) => {
     setRetryingId(runId)
@@ -200,12 +212,19 @@ export default function ReminderRunsPage() {
   )
 
   return (
-    <div className={styles.page} data-design-node="GC4St">
+    <div className={styles.page} data-design-node={isPlannedView ? 'JCz6J' : 'GC4St'}>
       <Tabs
-        items={[
-          { label: '設定', href: `/reminders/edit?id=${reminderId}` },
-          { label: '実行結果', current: true },
-        ]}
+        items={isPlannedView
+          ? [
+              { label: '設定', href: `/reminders/edit?id=${reminderId}` },
+              { label: '配信予定', current: true },
+              { label: '実行結果', href: `/reminders/detail?id=${reminderId}` },
+            ]
+          : [
+              { label: '設定', href: `/reminders/edit?id=${reminderId}` },
+              { label: '配信予定', href: `/reminders/detail?id=${reminderId}&status=planned` },
+              { label: '実行結果', current: true },
+            ]}
         actions={(
           <Button onClick={() => void exportCsv()} disabled={exporting || loading}>
             {exporting ? 'CSVを準備しています' : 'CSVで書き出す'}
@@ -215,9 +234,11 @@ export default function ReminderRunsPage() {
 
       <NoteBar tone={error || hasErrors ? 'danger' : 'info'}>
         {error
-          ? '実行結果を確認できませんでした。再読み込みしてから、操作を続けてください。'
+          ? `${isPlannedView ? '配信予定' : '実行結果'}を確認できませんでした。再読み込みしてから、操作を続けてください。`
           : hasErrors
           ? `${data?.summary.errors ?? 0}件を送れませんでした。理由を確認し、必要なものだけ再試行してください。`
+          : isPlannedView
+          ? 'これから送る予定を友だちごとに確認できます。予約や対象条件が変わると、予定も変わります。'
           : '配信予定・送信済み・送れなかった理由を、友だちごとに確認できます。'}
       </NoteBar>
 
@@ -293,7 +314,9 @@ export default function ReminderRunsPage() {
                   }
                 }}
               />
-              <Button onClick={() => { setSearch(searchInput.trim()); setPage(1) }}>実行結果を検索</Button>
+              <Button onClick={() => { setSearch(searchInput.trim()); setPage(1) }}>
+                {isPlannedView ? '配信予定を検索' : '実行結果を検索'}
+              </Button>
               <Select
                 aria-label="実行結果で絞り込む"
                 value={status}
