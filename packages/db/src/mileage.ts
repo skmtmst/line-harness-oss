@@ -350,6 +350,8 @@ export interface MileageHistoryItem {
   reason: string;
   source: string;
   sourceEventId: string | null;
+  ruleName: string | null;
+  mode: 'automatic' | 'manual';
   occurredAt: string;
 }
 
@@ -367,9 +369,10 @@ export async function getMileageHistoryForFriend(
          SELECT user_id FROM friends WHERE id = ?
        )
        SELECT ml.id, ml.entry_type, ml.status, ml.amount, ml.reason,
-              ml.source, ml.source_event_id, ml.occurred_at
+              ml.source, ml.source_event_id, mr.name AS rule_name, ml.occurred_at
          FROM mileage_ledger ml
          LEFT JOIN identity ON 1 = 1
+         LEFT JOIN mileage_rules mr ON mr.id = ml.mileage_rule_id
         WHERE ml.program_id = ?
           AND ${FRIEND_WALLET_SCOPE_SQL}
         ORDER BY ml.occurred_at DESC, ml.created_at DESC, ml.id DESC
@@ -384,6 +387,7 @@ export async function getMileageHistoryForFriend(
       reason: string;
       source: string;
       source_event_id: string | null;
+      rule_name: string | null;
       occurred_at: string;
     }>();
 
@@ -395,6 +399,10 @@ export async function getMileageHistoryForFriend(
     reason: row.reason,
     source: row.source,
     sourceEventId: row.source_event_id,
+    ruleName: row.rule_name,
+    mode: row.entry_type === 'adjustment' || row.source === 'manual' || row.source === 'admin_adjustment'
+      ? 'manual'
+      : 'automatic',
     occurredAt: row.occurred_at,
   }));
 }
@@ -409,6 +417,12 @@ export interface MileageSelfInsights {
   /** Distinct introduced people who produced at least one quality reward. */
   qualityReferralCount: number;
   lastEarnedAt: string | null;
+}
+
+export interface MileageConnectedAccount {
+  accountId: string;
+  accountName: string;
+  friendId: string;
 }
 
 export interface MileageEarningOpportunity {
@@ -493,6 +507,42 @@ export async function getMileageSelfInsights(
     qualityReferralCount: Number(row?.quality_referral_count ?? 0),
     lastEarnedAt: row?.last_earned_at ?? null,
   };
+}
+
+/**
+ * List only connected accounts the authenticated operator may see. The caller
+ * provides its resolved account scope so a verified cross-account wallet does
+ * not reveal a hidden account name or friend id.
+ */
+export async function getMileageConnectedAccountsForFriend(
+  db: D1Database,
+  friendId: string,
+  allowedAccountIds: string[],
+): Promise<MileageConnectedAccount[]> {
+  if (allowedAccountIds.length === 0) return [];
+  const placeholders = allowedAccountIds.map(() => '?').join(',');
+  const rows = await db
+    .prepare(
+      `WITH identity AS (
+         SELECT user_id FROM friends WHERE id = ?
+       )
+       SELECT f.line_account_id AS account_id,
+              COALESCE(la.name, '名前未設定') AS account_name,
+              f.id AS friend_id
+         FROM friends f
+         LEFT JOIN identity ON 1 = 1
+         LEFT JOIN line_accounts la ON la.id = f.line_account_id
+        WHERE f.line_account_id IN (${placeholders})
+          AND (f.id = ? OR (identity.user_id IS NOT NULL AND f.user_id = identity.user_id))
+        ORDER BY COALESCE(la.display_order, 0) ASC, account_name ASC, f.id ASC`,
+    )
+    .bind(friendId, ...allowedAccountIds, friendId)
+    .all<{ account_id: string; account_name: string; friend_id: string }>();
+  return rows.results.map((row) => ({
+    accountId: row.account_id,
+    accountName: row.account_name,
+    friendId: row.friend_id,
+  }));
 }
 
 /**
@@ -1451,16 +1501,64 @@ export interface MileageAdminOverview {
   pagination: { total: number; limit: number; offset: number };
 }
 
+export interface MileageAdminHistoryItem {
+  id: string;
+  primaryFriendId: string;
+  displayName: string;
+  pictureUrl: string | null;
+  entryType: MileageEntryType;
+  status: MileageEntryStatus;
+  amount: number;
+  reason: string;
+  source: string;
+  hasSourceEvent: boolean;
+  ruleName: string | null;
+  mode: 'automatic' | 'manual';
+  occurredAt: string;
+}
+
+export interface MileageAdminHistory {
+  items: MileageAdminHistoryItem[];
+  pagination: { total: number; limit: number; offset: number };
+}
+
 /** Aggregate one wallet per canonical user across all connected LINE accounts. */
 export async function getMileageAdminOverview(
   db: D1Database,
-  options: { accountId?: string | null; search?: string; limit?: number; offset?: number } = {},
+  options: {
+    accountId?: string | null;
+    visibleAccountIds?: string[];
+    search?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
 ): Promise<MileageAdminOverview> {
   await ensureDefaultMileageProgram(db);
   const accountId = options.accountId || null;
   const search = (options.search ?? '').trim();
   const limit = Math.min(100, Math.max(1, options.limit ?? 50));
   const offset = Math.max(0, options.offset ?? 0);
+  const visibleAccountIds = accountId
+    ? [...new Set([accountId, ...(options.visibleAccountIds ?? [])])]
+    : [];
+  const visiblePlaceholders = visibleAccountIds.map(() => '?').join(',');
+  const walletScopeSql = accountId
+    ? `AND (
+         bf.line_account_id IN (${visiblePlaceholders})
+         OR (
+           ml.beneficiary_friend_id IS NULL
+           AND ml.beneficiary_user_id IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM friends vf
+              WHERE vf.user_id = ml.beneficiary_user_id
+                AND vf.line_account_id IN (${visiblePlaceholders})
+           )
+         )
+       )`
+    : '';
+  const activityScopeSql = accountId
+    ? `AND af.line_account_id IN (${visiblePlaceholders})`
+    : '';
 
   const ctes = `WITH profiles AS (
     SELECT CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END AS identity_key,
@@ -1481,7 +1579,7 @@ export async function getMileageAdminOverview(
       LEFT JOIN users u ON u.id = f.user_id
       LEFT JOIN line_accounts la ON la.id = f.line_account_id
      WHERE (? IS NULL OR f.line_account_id = ?)
-     GROUP BY identity_key
+     GROUP BY 1
   ), wallet AS (
     SELECT CASE
              WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
@@ -1505,9 +1603,14 @@ export async function getMileageAdminOverview(
              ELSE NULL END) AS quality_referral_count
       FROM mileage_ledger ml
       LEFT JOIN friends bf ON bf.id = ml.beneficiary_friend_id
+      INNER JOIN profiles p ON p.identity_key = CASE
+        WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
+          THEN 'user:' || COALESCE(ml.beneficiary_user_id, bf.user_id)
+        ELSE 'friend:' || ml.beneficiary_friend_id
+      END
      WHERE ml.program_id = 'default'
-       AND (? IS NULL OR bf.line_account_id = ?)
-     GROUP BY identity_key
+       ${walletScopeSql}
+     GROUP BY 1
   ), activity AS (
     SELECT CASE
              WHEN COALESCE(ee.actor_user_id, af.user_id) IS NOT NULL
@@ -1524,12 +1627,21 @@ export async function getMileageAdminOverview(
            MAX(ee.occurred_at) AS last_activity_at
       FROM engagement_events ee
       LEFT JOIN friends af ON af.id = ee.actor_friend_id
+      INNER JOIN profiles p ON p.identity_key = CASE
+        WHEN COALESCE(ee.actor_user_id, af.user_id) IS NOT NULL
+          THEN 'user:' || COALESCE(ee.actor_user_id, af.user_id)
+        ELSE 'friend:' || ee.actor_friend_id
+      END
      WHERE ee.program_id = 'default'
        AND ee.actor_friend_id IS NOT NULL
-       AND (? IS NULL OR af.line_account_id = ?)
-     GROUP BY identity_key
+       ${activityScopeSql}
+     GROUP BY 1
   )`;
-  const scopeBinds = [accountId, accountId, accountId, accountId, accountId, accountId];
+  const scopeBinds = [
+    accountId,
+    accountId,
+    ...(accountId ? [...visibleAccountIds, ...visibleAccountIds, ...visibleAccountIds] : []),
+  ];
 
   const rows = await db
     .prepare(
@@ -1601,11 +1713,21 @@ export async function getMileageAdminOverview(
     }>();
   const queueSummary = await db
     .prepare(
-      `SELECT COUNT(*) AS queued_events
-         FROM mileage_event_queue
-        WHERE status IN ('pending','processing','failed') AND attempts < 5`,
+      `${ctes}
+       SELECT COUNT(*) AS queued_events
+         FROM mileage_event_queue q
+         INNER JOIN engagement_events ee ON ee.id = q.engagement_event_id
+         LEFT JOIN friends af ON af.id = ee.actor_friend_id
+         INNER JOIN profiles p ON p.identity_key = CASE
+           WHEN COALESCE(ee.actor_user_id, af.user_id) IS NOT NULL
+             THEN 'user:' || COALESCE(ee.actor_user_id, af.user_id)
+           ELSE 'friend:' || ee.actor_friend_id
+         END
+        WHERE q.status IN ('pending','processing','failed')
+          AND q.attempts < 5
+          ${activityScopeSql}`,
     )
-    .bind()
+    .bind(...scopeBinds, ...(accountId ? visibleAccountIds : []))
     .first<{ queued_events: number }>();
 
   return {
@@ -1644,6 +1766,157 @@ export async function getMileageAdminOverview(
       limit,
       offset,
     },
+  };
+}
+
+/**
+ * Return the append-only mileage ledger for people visible in one selected
+ * LINE account. A verified user can have friends in several LINE accounts;
+ * those ledger rows stay one wallet, but the link target always uses a friend
+ * from the selected account. Unlinked friends never cross account boundaries.
+ */
+export async function getMileageAdminHistory(
+  db: D1Database,
+  options: {
+    accountId: string;
+    visibleAccountIds?: string[];
+    search?: string;
+    entryType?: MileageEntryType;
+    status?: MileageEntryStatus;
+    mode?: 'automatic' | 'manual';
+    from?: string;
+    to?: string;
+    limit?: number;
+    offset?: number;
+  },
+): Promise<MileageAdminHistory> {
+  await ensureDefaultMileageProgram(db);
+  const accountId = options.accountId.trim();
+  if (!accountId) throw new Error('Mileage history accountId is required');
+  const search = (options.search ?? '').trim();
+  const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+  const offset = Math.max(0, options.offset ?? 0);
+  const visibleAccountIds = [...new Set([accountId, ...(options.visibleAccountIds ?? [])])];
+  const visiblePlaceholders = visibleAccountIds.map(() => '?').join(',');
+
+  const ctes = `WITH selected_profiles AS (
+    SELECT CASE WHEN f.user_id IS NOT NULL THEN 'user:' || f.user_id ELSE 'friend:' || f.id END AS identity_key,
+           MIN(f.id) AS primary_friend_id,
+           COALESCE(MAX(u.display_name), MAX(f.display_name), '名前未設定') AS display_name,
+           MAX(f.picture_url) AS picture_url
+      FROM friends f
+      LEFT JOIN users u ON u.id = f.user_id
+     WHERE f.line_account_id = ?
+     GROUP BY identity_key
+  ), ledger_rows AS (
+    SELECT ml.*,
+           CASE
+             WHEN COALESCE(ml.beneficiary_user_id, bf.user_id) IS NOT NULL
+               THEN 'user:' || COALESCE(ml.beneficiary_user_id, bf.user_id)
+             ELSE 'friend:' || ml.beneficiary_friend_id
+           END AS identity_key
+      FROM mileage_ledger ml
+      LEFT JOIN friends bf ON bf.id = ml.beneficiary_friend_id
+     WHERE ml.program_id = 'default'
+       AND (
+         bf.line_account_id IN (${visiblePlaceholders})
+         OR (
+           ml.beneficiary_friend_id IS NULL
+           AND ml.beneficiary_user_id IS NOT NULL
+           AND EXISTS (
+             SELECT 1 FROM friends vf
+              WHERE vf.user_id = ml.beneficiary_user_id
+                AND vf.line_account_id IN (${visiblePlaceholders})
+           )
+         )
+       )
+  )`;
+  const scopeBinds = [accountId, ...visibleAccountIds, ...visibleAccountIds];
+  const where = ["(? = '' OR sp.display_name LIKE '%' || ? || '%')"];
+  const filters: unknown[] = [search, search];
+  if (options.entryType) {
+    where.push('lr.entry_type = ?');
+    filters.push(options.entryType);
+  }
+  if (options.status) {
+    where.push('lr.status = ?');
+    filters.push(options.status);
+  }
+  if (options.mode === 'manual') {
+    where.push("(lr.entry_type = 'adjustment' OR lr.source IN ('manual', 'admin_adjustment'))");
+  } else if (options.mode === 'automatic') {
+    where.push("NOT (lr.entry_type = 'adjustment' OR lr.source IN ('manual', 'admin_adjustment'))");
+  }
+  if (options.from) {
+    where.push("date(lr.occurred_at, '+9 hours') >= date(?)");
+    filters.push(options.from);
+  }
+  if (options.to) {
+    where.push("date(lr.occurred_at, '+9 hours') <= date(?)");
+    filters.push(options.to);
+  }
+  const whereSql = where.join(' AND ');
+
+  const [rows, count] = await Promise.all([
+    db
+      .prepare(
+        `${ctes}
+         SELECT lr.id, sp.primary_friend_id, sp.display_name, sp.picture_url,
+                lr.entry_type, lr.status, lr.amount, lr.reason, lr.source,
+                lr.source_event_id, mr.name AS rule_name, lr.occurred_at
+           FROM ledger_rows lr
+           INNER JOIN selected_profiles sp ON sp.identity_key = lr.identity_key
+           LEFT JOIN mileage_rules mr ON mr.id = lr.mileage_rule_id
+          WHERE ${whereSql}
+          ORDER BY lr.occurred_at DESC, lr.created_at DESC, lr.id DESC
+          LIMIT ? OFFSET ?`,
+      )
+      .bind(...scopeBinds, ...filters, limit, offset)
+      .all<{
+        id: string;
+        primary_friend_id: string;
+        display_name: string;
+        picture_url: string | null;
+        entry_type: MileageEntryType;
+        status: MileageEntryStatus;
+        amount: number;
+        reason: string;
+        source: string;
+        source_event_id: string | null;
+        rule_name: string | null;
+        occurred_at: string;
+      }>(),
+    db
+      .prepare(
+        `${ctes}
+         SELECT COUNT(*) AS total
+           FROM ledger_rows lr
+           INNER JOIN selected_profiles sp ON sp.identity_key = lr.identity_key
+          WHERE ${whereSql}`,
+      )
+      .bind(...scopeBinds, ...filters)
+      .first<{ total: number }>(),
+  ]);
+
+  return {
+    items: rows.results.map((row) => ({
+      id: row.id,
+      primaryFriendId: row.primary_friend_id,
+      displayName: row.display_name,
+      pictureUrl: row.picture_url,
+      entryType: row.entry_type,
+      status: row.status,
+      amount: Number(row.amount),
+      reason: row.reason,
+      source: row.source,
+      hasSourceEvent: Boolean(row.source_event_id),
+      ruleName: row.rule_name,
+      mode: row.entry_type === 'adjustment' || row.source === 'manual' || row.source === 'admin_adjustment'
+        ? 'manual'
+        : 'automatic',
+      occurredAt: row.occurred_at,
+    })),
+    pagination: { total: Number(count?.total ?? 0), limit, offset },
   };
 }
 

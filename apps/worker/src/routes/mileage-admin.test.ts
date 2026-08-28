@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 const dbMocks = {
   getStaffByApiKey: vi.fn().mockResolvedValue(null),
   getMileageAdminOverview: vi.fn(),
+  getMileageAdminHistory: vi.fn(),
   getMileageRules: vi.fn(),
   getMileageRuleById: vi.fn(),
   createMileageRule: vi.fn(),
@@ -20,6 +21,11 @@ const dbMocks = {
   applyMileageRulesForEvent: vi.fn(),
 };
 vi.mock('@line-crm/db', () => dbMocks);
+
+const accountAccessMocks = {
+  getVisibleLineAccountScope: vi.fn(),
+};
+vi.mock('../services/account-access.js', () => accountAccessMocks);
 
 const { authMiddleware } = await import('../middleware/auth.js');
 const { scoring } = await import('./scoring.js');
@@ -44,6 +50,9 @@ function call(path: string, init?: RequestInit) {
 beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.getStaffByApiKey.mockResolvedValue(null);
+  accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+    allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
+  });
 });
 
 describe('mileage admin API', () => {
@@ -72,7 +81,56 @@ describe('mileage admin API', () => {
     expect(response.status).toBe(200);
     expect(dbMocks.getMileageAdminOverview).toHaveBeenCalledWith(env.DB, {
       accountId: 'account-1', search: '田', limit: 100, offset: 0,
+      visibleAccountIds: ['account-1'],
     });
+    expect(accountAccessMocks.getVisibleLineAccountScope).toHaveBeenCalledWith(
+      env.DB, expect.objectContaining({ role: 'owner' }),
+    );
+  });
+
+  it('requires and authorizes the selected account before reading history', async () => {
+    expect((await call('/api/mileage/history')).status).toBe(400);
+    expect(dbMocks.getMileageAdminHistory).not.toHaveBeenCalled();
+
+    accountAccessMocks.getVisibleLineAccountScope.mockResolvedValueOnce({
+      allowedAccountIds: ['account-1'], canSeeUnassigned: false, ids: ['account-1'], accounts: [],
+    });
+    expect((await call('/api/mileage/history?accountId=hidden')).status).toBe(404);
+    expect(dbMocks.getMileageAdminHistory).not.toHaveBeenCalled();
+  });
+
+  it('returns filtered mileage history with bounded pagination', async () => {
+    dbMocks.getMileageAdminHistory.mockResolvedValue({
+      items: [], pagination: { total: 0, limit: 100, offset: 0 },
+    });
+    const response = await call(
+      '/api/mileage/history?accountId=account-1&entryType=grant&status=available&mode=automatic&from=2026-08-01&to=2026-08-31&limit=999',
+    );
+    expect(response.status).toBe(200);
+    expect(dbMocks.getMileageAdminHistory).toHaveBeenCalledWith(env.DB, {
+      accountId: 'account-1',
+      visibleAccountIds: ['account-1'],
+      search: '',
+      entryType: 'grant',
+      status: 'available',
+      mode: 'automatic',
+      from: '2026-08-01',
+      to: '2026-08-31',
+      limit: 100,
+      offset: 0,
+    });
+  });
+
+  it('rejects unknown mileage-history filters', async () => {
+    const response = await call('/api/mileage/history?accountId=account-1&entryType=delete');
+    expect(response.status).toBe(400);
+    expect(dbMocks.getMileageAdminHistory).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid or reversed mileage-history dates', async () => {
+    expect((await call('/api/mileage/history?accountId=account-1&from=2026-8-1')).status).toBe(400);
+    expect((await call('/api/mileage/history?accountId=account-1&from=2026-09-01&to=2026-08-31')).status).toBe(400);
+    expect(dbMocks.getMileageAdminHistory).not.toHaveBeenCalled();
   });
 
   it('serializes editable mileage rules', async () => {

@@ -14,12 +14,14 @@ import {
   updateMileageRule,
   deleteMileageRule,
   getMileageAdminOverview,
+  getMileageAdminHistory,
   applyMileageRulesForEvent,
 } from '@line-crm/db';
-import type { MileageRuleRow } from '@line-crm/db';
+import type { MileageEntryStatus, MileageEntryType, MileageRuleRow } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 
 const scoring = new Hono<Env>();
 
@@ -46,12 +48,21 @@ function serializeMileageRule(rule: MileageRuleRow) {
 
 // ========== マイル管理 ==========
 
-scoring.get('/api/mileage/overview', requireRole('owner', 'admin'), async (c) => {
+scoring.get('/api/mileage/overview', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!accountScope.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
     const limit = Math.min(100, Math.max(1, Number(c.req.query('limit') || 50)));
     const offset = Math.max(0, Number(c.req.query('offset') || 0));
     const overview = await getMileageAdminOverview(c.env.DB, {
-      accountId: c.req.query('accountId') || null,
+      accountId,
+      visibleAccountIds: accountScope.allowedAccountIds,
       search: c.req.query('search') || '',
       limit: Number.isFinite(limit) ? limit : 50,
       offset: Number.isFinite(offset) ? offset : 0,
@@ -59,6 +70,64 @@ scoring.get('/api/mileage/overview', requireRole('owner', 'admin'), async (c) =>
     return c.json({ success: true, data: overview });
   } catch (err) {
     console.error('GET /api/mileage/overview error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+const MILEAGE_ENTRY_TYPES = new Set<MileageEntryType>([
+  'grant', 'reversal', 'spend', 'expiration', 'adjustment',
+]);
+const MILEAGE_ENTRY_STATUSES = new Set<MileageEntryStatus>(['pending', 'available', 'void']);
+const MILEAGE_MODES = new Set(['automatic', 'manual'] as const);
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+scoring.get('/api/mileage/history', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!accountId) {
+      return c.json({ success: false, error: 'accountId is required' }, 400);
+    }
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!accountScope.allowedAccountIds.includes(accountId)) {
+      return c.json({ success: false, error: 'LINE account not found' }, 404);
+    }
+    const entryTypeValue = c.req.query('entryType');
+    const statusValue = c.req.query('status');
+    const modeValue = c.req.query('mode');
+    const fromValue = c.req.query('from')?.trim();
+    const toValue = c.req.query('to')?.trim();
+    if (entryTypeValue && !MILEAGE_ENTRY_TYPES.has(entryTypeValue as MileageEntryType)) {
+      return c.json({ success: false, error: 'entryType is invalid' }, 400);
+    }
+    if (statusValue && !MILEAGE_ENTRY_STATUSES.has(statusValue as MileageEntryStatus)) {
+      return c.json({ success: false, error: 'status is invalid' }, 400);
+    }
+    if (modeValue && !MILEAGE_MODES.has(modeValue as 'automatic' | 'manual')) {
+      return c.json({ success: false, error: 'mode is invalid' }, 400);
+    }
+    if ((fromValue && !DATE_ONLY.test(fromValue)) || (toValue && !DATE_ONLY.test(toValue))) {
+      return c.json({ success: false, error: 'from and to must be YYYY-MM-DD' }, 400);
+    }
+    if (fromValue && toValue && fromValue > toValue) {
+      return c.json({ success: false, error: 'from must not be after to' }, 400);
+    }
+    const requestedLimit = Number(c.req.query('limit') || 50);
+    const requestedOffset = Number(c.req.query('offset') || 0);
+    const history = await getMileageAdminHistory(c.env.DB, {
+      accountId,
+      visibleAccountIds: accountScope.allowedAccountIds,
+      search: c.req.query('search') || '',
+      entryType: entryTypeValue as MileageEntryType | undefined,
+      status: statusValue as MileageEntryStatus | undefined,
+      mode: modeValue as 'automatic' | 'manual' | undefined,
+      from: fromValue || undefined,
+      to: toValue || undefined,
+      limit: Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50,
+      offset: Number.isFinite(requestedOffset) ? Math.max(0, requestedOffset) : 0,
+    });
+    return c.json({ success: true, data: history });
+  } catch (err) {
+    console.error('GET /api/mileage/history error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
   }
 });
