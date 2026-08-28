@@ -32,9 +32,23 @@ describe('V6 保存した検索の画面契約', () => {
     expect(list).toContain('条件を確認・編集')
   })
 
-  it('取得口の無い使用先件数を作らない', () => {
-    expect(editPage).toContain('取得口の接続後に表示します')
+  it('該当人数と使用先を正データで表示し、使用中は削除を止める', () => {
+    expect(list).toContain('search.matchCount')
+    expect(list).toContain('search.usedIn')
+    expect(list).toContain('search.canDelete !== true')
+    expect(editPage).toContain('original.usedIn')
+    expect(editPage).toContain('original.canDelete !== true')
+    expect(editPage).toContain('使用先が無いことをサーバーで確認済みです')
     expect(editPage).not.toContain('一斉配信「VIP未契約案内」')
     expect(editPage).not.toContain('オートメーション「3日後フォロー」')
+  })
+
+  it('読込失敗を空状態や別アカウントの前回データと混ぜない', () => {
+    expect(list).toContain('const loadSequence = useRef(0)')
+    expect(list).toContain("setLoadError('')")
+    expect(list).toContain('setItems([])')
+    expect(list).toContain('kind="error"')
+    expect(list).toContain('保存した検索を再読み込み')
+    expect(list.indexOf('loadError ?')).toBeLessThan(list.indexOf('items.length === 0'))
   })
 })

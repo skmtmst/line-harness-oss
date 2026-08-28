@@ -1,10 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { SavedSearch } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 
 /**
  * 条件1本を人が読める行にする。
@@ -42,6 +44,13 @@ function splitConditions(conditions: unknown): { all: string[]; any: string[]; n
   }
 }
 
+const USAGE_KIND_LABELS = {
+  broadcast: '一斉配信',
+  automation: 'オートメーション',
+  scenario: 'シナリオ',
+  other: 'そのほか',
+} as const
+
 /**
  * 保存した検索の一覧。
  *
@@ -51,20 +60,28 @@ function splitConditions(conditions: unknown): { all: string[]; any: string[]; n
 export default function SavedSearchList({ accountId }: { accountId: string | null }) {
   const [items, setItems] = useState<SavedSearch[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [error, setError] = useState('')
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
+  const loadSequence = useRef(0)
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current
     setLoading(true)
+    setLoadError('')
     setError('')
+    setItems([])
     try {
       if (!accountId) return
       const res = await api.savedSearches.list(accountId)
+      if (sequence !== loadSequence.current) return
       if (res.success) setItems(res.data)
-    } catch {
-      setError('読み込みに失敗しました')
+    } catch (reason) {
+      if (sequence === loadSequence.current) {
+        setLoadError(reason instanceof ApiError ? reason.message : '保存した検索を読み込めませんでした')
+      }
     } finally {
-      setLoading(false)
+      if (sequence === loadSequence.current) setLoading(false)
     }
   }, [accountId])
 
@@ -82,8 +99,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       if (!accountId) return
       await api.savedSearches.delete(search.id, accountId)
       void load()
-    } catch {
-      setError('削除に失敗しました')
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました')
     }
   }
 
@@ -112,9 +129,14 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         開かないと中身が読めなかった。条件は読めてこそ直せる。
       */}
       {loading ? (
-        <p className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
-          読み込み中...
-        </p>
+        <ListState kind="loading" />
+      ) : !accountId ? null
+      : loadError ? (
+        <ListState
+          kind="error"
+          description={loadError}
+          action={<Button type="button" onClick={() => void load()}>保存した検索を再読み込み</Button>}
+        />
       ) : items.length === 0 ? (
         <p className="bg-canvas rounded-card border-hairline text-ink-faint border p-8 text-center text-sm">
           保存した検索はまだありません。
@@ -126,6 +148,16 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
         <div className="space-y-3">
           {items.map((search) => {
             const { all, any, note } = splitConditions(search.conditions)
+            const deleteDisabled = !search.lineAccountId || search.canDelete !== true
+            const deleteTitle = !search.lineAccountId
+              ? '管理者が対象アカウントを割り当てるまで変更できません'
+              : search.usedIn === undefined
+                ? '使用先を確認できないため削除できません'
+              : search.usedIn.length > 0
+                ? `使用中のため削除できません（${search.usedIn?.length ?? 0}件）`
+              : search.canDelete === true
+                ? '保存した検索を削除'
+                : '削除できるか確認できません'
             return (
               <section
                 key={search.id}
@@ -158,6 +190,19 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   <span className="text-ink-faint ml-auto text-xs">
                     {new Date(search.createdAt).toLocaleDateString('ja-JP')}
                   </span>
+                  <span
+                    className="rounded-pill bg-canvas-sunken px-2 py-0.5 text-caption font-semibold text-ink-secondary"
+                    title={search.matchCountError ?? undefined}
+                  >
+                    該当 {search.matchCount === null || search.matchCount === undefined ? '—' : `${search.matchCount.toLocaleString('ja-JP')}人`}
+                  </span>
+                  <span className="rounded-pill bg-canvas-sunken px-2 py-0.5 text-caption font-semibold text-ink-secondary">
+                    使用先 {search.usedIn === undefined
+                      ? '—'
+                      : search.usedIn.length === 0
+                        ? 'なし'
+                        : `${search.usedIn.length}件`}
+                  </span>
                   {search.lineAccountId ? (
                     <Link
                       href={`/tags/searches/edit?id=${encodeURIComponent(search.id)}`}
@@ -168,13 +213,25 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
                   ) : null}
                   <button
                     onClick={() => remove(search)}
-                    disabled={!search.lineAccountId}
-                    title={!search.lineAccountId ? '管理者が対象アカウントを割り当てるまで変更できません' : undefined}
+                    disabled={deleteDisabled}
+                    title={deleteTitle}
                     className="hover:bg-danger-bg text-danger rounded-md px-2.5 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     削除
                   </button>
                 </div>
+
+                {search.usedIn && search.usedIn.length > 0 ? (
+                  <div className="mb-3 flex flex-wrap gap-2 rounded-control border border-warning/20 bg-warning-bg p-2 text-xs text-warning">
+                    <span className="font-bold">使用中</span>
+                    {search.usedIn.map((usage) => (
+                      <span key={`${usage.kind}:${usage.id}`}>
+                        {USAGE_KIND_LABELS[usage.kind]}「{usage.name}」
+                        （{usage.mode === 'live' ? '条件を自動反映' : '固定した条件'}）
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
 
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="bg-canvas-sunken rounded-card p-3">
@@ -224,7 +281,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       <ConfirmDialog
         open={pendingDelete !== null}
         title={`保存した検索「${pendingDelete?.name ?? ''}」を削除しますか？`}
-        description="保存した絞り込み条件を削除します。友だち自体は削除されません。"
+        description="使用先が無いことをサーバーで確認済みです。保存した絞り込み条件だけを削除し、友だち自体は削除しません。"
         confirmLabel="削除する"
         destructive
         onCancel={() => setPendingDelete(null)}

@@ -39,6 +39,23 @@ export interface SavedSearchAccess {
   canManageAll: boolean;
 }
 
+export const SAVED_SEARCH_REFERENCE_KINDS = ['broadcast', 'automation', 'scenario', 'other'] as const;
+export type SavedSearchReferenceKind = (typeof SAVED_SEARCH_REFERENCE_KINDS)[number];
+export const SAVED_SEARCH_REFERENCE_MODES = ['live', 'fixed'] as const;
+export type SavedSearchReferenceMode = (typeof SAVED_SEARCH_REFERENCE_MODES)[number];
+
+/** 保存した検索をIDで参照している実データ。 */
+export interface SavedSearchReference {
+  saved_search_id: string;
+  line_account_id: string;
+  reference_kind: SavedSearchReferenceKind;
+  reference_id: string;
+  reference_name: string;
+  reference_mode: SavedSearchReferenceMode;
+  last_used_at: string | null;
+  created_at: string;
+}
+
 export const INBOX_SAVED_VIEW_STATUSES = ['unread', 'in_progress', 'on_hold', 'resolved'] as const;
 export const INBOX_SAVED_VIEW_CHANNELS = ['line', 'email'] as const;
 export const INBOX_SAVED_VIEW_SORTS = ['newest', 'waiting_desc'] as const;
@@ -254,6 +271,79 @@ export async function countSavedSearches(
     .bind(input.scope, input.createdBy, input.lineAccountId)
     .first<{ c: number }>();
   return Number(row?.c ?? 0);
+}
+
+/**
+ * 保存検索の使用先をまとめて返す。
+ *
+ * 一覧で1件ずつ問い合わせると最大50回になるため、選択中アカウント内を
+ * 1回で読む。IDだけでなくline_account_idも絞り、別アカウントの利用先を
+ * 混ぜない。
+ */
+export async function getSavedSearchReferences(
+  db: D1Database,
+  savedSearchIds: string[],
+  lineAccountId: string,
+): Promise<SavedSearchReference[]> {
+  const ids = [...new Set(savedSearchIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+  const placeholders = ids.map(() => '?').join(', ');
+  const result = await db
+    .prepare(
+      `SELECT saved_search_id, line_account_id, reference_kind, reference_id,
+              reference_name, reference_mode, last_used_at, created_at
+         FROM saved_search_references
+        WHERE line_account_id = ? AND saved_search_id IN (${placeholders})
+        ORDER BY reference_kind ASC, reference_name ASC, reference_id ASC`,
+    )
+    .bind(lineAccountId, ...ids)
+    .all<SavedSearchReference>();
+  return result.results;
+}
+
+/** 利用側が保存検索を参照し始めたときに同じ台帳へ登録する。 */
+export async function upsertSavedSearchReference(
+  db: D1Database,
+  input: {
+    savedSearchId: string;
+    lineAccountId: string;
+    kind: SavedSearchReferenceKind;
+    referenceId: string;
+    referenceName: string;
+    mode: SavedSearchReferenceMode;
+    lastUsedAt?: string | null;
+  },
+): Promise<void> {
+  await db.prepare(
+    `INSERT INTO saved_search_references
+       (saved_search_id, line_account_id, reference_kind, reference_id,
+        reference_name, reference_mode, last_used_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(saved_search_id, reference_kind, reference_id) DO UPDATE SET
+       line_account_id = excluded.line_account_id,
+       reference_name = excluded.reference_name,
+       reference_mode = excluded.reference_mode,
+       last_used_at = excluded.last_used_at`,
+  ).bind(
+    input.savedSearchId,
+    input.lineAccountId,
+    input.kind,
+    input.referenceId,
+    input.referenceName,
+    input.mode,
+    input.lastUsedAt ?? null,
+    jstNow(),
+  ).run();
+}
+
+export async function removeSavedSearchReference(
+  db: D1Database,
+  input: { savedSearchId: string; kind: SavedSearchReferenceKind; referenceId: string },
+): Promise<void> {
+  await db.prepare(
+    `DELETE FROM saved_search_references
+      WHERE saved_search_id = ? AND reference_kind = ? AND reference_id = ?`,
+  ).bind(input.savedSearchId, input.kind, input.referenceId).run();
 }
 
 export async function createSavedSearch(

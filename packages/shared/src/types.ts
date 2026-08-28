@@ -346,6 +346,26 @@ export interface SavedSearch {
   isShared: boolean;
   displayOrder: number;
   createdAt: string;
+  /** 現在の保存条件に一致する友だち数。評価不能・未取得は null。 */
+  matchCount?: number | null;
+  /** matchCount が null のとき、黙って0件にせず理由を返す。 */
+  matchCountError?: string | null;
+  /** 配信・自動化など、保存検索をIDで参照している利用先。 */
+  usedIn?: SavedSearchUsage[];
+  /** 使用先が無いとサーバーで確認できたときだけ true。 */
+  canDelete?: boolean;
+}
+
+export type SavedSearchUsageKind = "broadcast" | "automation" | "scenario" | "other";
+export type SavedSearchReferenceMode = "live" | "fixed";
+
+/** 保存した検索を参照している実データ。固定値の説明には使わない。 */
+export interface SavedSearchUsage {
+  kind: SavedSearchUsageKind;
+  id: string;
+  name: string;
+  mode: SavedSearchReferenceMode;
+  lastUsedAt: string | null;
 }
 
 /**

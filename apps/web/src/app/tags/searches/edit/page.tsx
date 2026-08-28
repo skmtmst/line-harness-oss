@@ -9,7 +9,7 @@ import type {
   SavedSearchConditions,
   Tag,
 } from '@line-crm/shared'
-import { api } from '@/lib/api'
+import { api, ApiError } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/layout/breadcrumb'
@@ -33,6 +33,12 @@ const EDITABLE_KINDS: Array<{ value: SavedSearchConditionKind; label: string }> 
 ]
 
 const UNSUPPORTED_KINDS = new Set<SavedSearchConditionKind>(['form', 'purchase'])
+const USAGE_KIND_LABELS = {
+  broadcast: '一斉配信',
+  automation: 'オートメーション',
+  scenario: 'シナリオ',
+  other: 'そのほか',
+} as const
 
 function conditionProblem(condition: SavedSearchCondition): string | null {
   if (UNSUPPORTED_KINDS.has(condition.kind)) return '未接続の条件を削除してください'
@@ -272,12 +278,12 @@ function SavedSearchEditInner() {
   }
 
   const remove = async () => {
-    if (!selectedAccountId || !id) return
+    if (!selectedAccountId || !id || original?.canDelete !== true) return
     try {
       await api.savedSearches.delete(id, selectedAccountId)
       router.push('/tags?tab=searches')
-    } catch {
-      setError('削除できませんでした')
+    } catch (deleteError) {
+      setError(deleteError instanceof ApiError ? deleteError.message : '削除できませんでした')
     }
   }
 
@@ -325,8 +331,22 @@ function SavedSearchEditInner() {
 
           <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
             <h2 className="text-base font-bold text-v6-ink">この条件の使用先</h2>
-            <p className="mt-3 text-sm text-v6-ink-faint">—</p>
-            <p className="mt-2 text-xs leading-5 text-v6-ink-faint">一斉配信・オートメーションからの参照数は、取得口の接続後に表示します。</p>
+            {original.usedIn === undefined ? (
+              <p className="mt-3 text-sm text-v6-ink-faint">—</p>
+            ) : original.usedIn.length === 0 ? (
+              <p className="mt-3 text-sm font-semibold text-v6-ink-secondary">使用先はありません</p>
+            ) : (
+              <ul className="mt-3 space-y-2 text-sm text-v6-ink-secondary">
+                {original.usedIn.map((usage) => (
+                  <li key={`${usage.kind}:${usage.id}`} className="rounded-v6-control bg-v6-warning-bg p-2">
+                    <span className="font-bold">{USAGE_KIND_LABELS[usage.kind]}</span>
+                    <span className="ml-1">{usage.name}</span>
+                    <span className="ml-1 text-xs text-v6-ink-faint">{usage.mode === 'live' ? '条件を自動反映' : '固定した条件'}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs leading-5 text-v6-ink-faint">使用先がある検索は、先に参照を外すまで削除できません。</p>
           </section>
 
           <section className="rounded-v6-card border border-hairline bg-canvas p-4 shadow-v6-card">
@@ -343,7 +363,7 @@ function SavedSearchEditInner() {
       </div>
 
       <StickyBar
-        status={<button type="button" onClick={() => setDeleteOpen(true)} className="rounded-v6-control bg-v6-danger px-4 py-2 text-sm font-bold text-on-accent">この条件を削除</button>}
+        status={<button type="button" disabled={original.canDelete !== true} onClick={() => setDeleteOpen(true)} title={original.canDelete === true ? 'この条件を削除' : original.usedIn === undefined ? '使用先を確認できないため削除できません' : original.usedIn.length > 0 ? `使用中のため削除できません（${original.usedIn.length}件）` : '削除できるか確認できません'} className="rounded-v6-control bg-v6-danger px-4 py-2 text-sm font-bold text-on-accent disabled:cursor-not-allowed disabled:opacity-40">この条件を削除</button>}
         actions={(
           <>
             <Button href="/tags?tab=searches">キャンセル</Button>
@@ -352,7 +372,7 @@ function SavedSearchEditInner() {
           </>
         )}
       />
-      <ConfirmDialog open={deleteOpen} title={`「${name}」を削除しますか？`} description="保存した条件だけを削除します。友だちは削除されません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
+      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
       <span className="hidden">{[...(conditions.all ?? []), ...(conditions.any ?? [])].map((condition) => describeSavedCondition(condition, tags)).join('|')}</span>
     </div>
   )
