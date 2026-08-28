@@ -12,6 +12,14 @@ describe('V6 リマインダ作成の契約', () => {
     expect(PAGE).toContain('setFolderId(event.target.value)')
   })
 
+  it('選択中のLINEアカウントへ作り、未取得のフォルダを0件として見せない', () => {
+    expect(PAGE).toContain('lineAccountId: selectedAccountId!')
+    expect(PAGE).toContain("foldersLoadState === 'error'")
+    expect(PAGE).toContain('フォルダを読み込めませんでした')
+    expect(PAGE).toContain('フォルダを再読み込み')
+    expect(PAGE).toContain("disabled={foldersLoadState !== 'ready'}")
+  })
+
   it('フォルダ選択を準備中に戻さない', () => {
     expect(PAGE).not.toContain('フォルダ分けは準備中です')
     expect(PAGE).not.toMatch(/<select disabled[^>]*>[\s\S]*?<option>未分類<\/option>/)
