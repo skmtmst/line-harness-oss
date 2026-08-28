@@ -6,7 +6,7 @@ export function resolveStep(requested: Step, state: { choice: Choice; createdOff
   if (requested === 'api' && !state.choice) return 'choose'
   if (requested === 'api' && state.choice === 'new' && !state.createdOfficial) return 'create'
   if (requested === 'credentials' && !state.apiEnabled) return 'api'
-  if (requested === 'verify' && (!state.channelId.trim() || !state.channelSecret.trim())) return 'credentials'
+  if (requested === 'verify' && !state.connected && (!state.channelId.trim() || !state.channelSecret.trim())) return 'credentials'
   if (requested === 'done' && !state.connected) return 'choose'
   return requested
 }

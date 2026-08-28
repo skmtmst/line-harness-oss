@@ -20,6 +20,14 @@ describe('店舗アカウント追加フロー', () => {
     expect(resolveStep('verify', { ...ready, channelSecret: '' })).toBe('credentials')
   })
 
+  it('接続済みならシークレットを消去した後もverifyを表示する', () => {
+    expect(resolveStep('verify', { ...ready, channelSecret: '', connected: {} })).toBe('verify')
+  })
+
+  it('接続済みならシークレットを消去した後もdoneを表示する', () => {
+    expect(resolveStep('done', { ...ready, channelSecret: '', connected: {} })).toBe('done')
+  })
+
   it('必要な操作を済ませた段階はそのまま表示する', () => {
     expect(resolveStep('create', { ...ready, choice: 'new' })).toBe('create')
     expect(resolveStep('api', ready)).toBe('api')
