@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { eventsApi, type EventListItem } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -9,6 +9,8 @@ import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
 import Select from '@/components/shared/select'
 import { TableHeadRow, Th } from '@/components/shared/table'
+
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 /**
  * イベント予約（設計 V2 8-3 / node Ih3xS）。
@@ -32,30 +34,40 @@ function formatJpDate(iso: string | null): string {
 export default function EventsListPage() {
   const { selectedAccountId } = useAccount()
   const [items, setItems] = useState<EventListItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<'all' | 'open' | 'pending' | 'full'>('all')
   const [sort, setSort] = useState<'date' | 'applications' | 'name'>('date')
   const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
+  const loadRequestRef = useRef(0)
 
   const refresh = useCallback(async () => {
-    if (!selectedAccountId) return
-    setLoading(true)
-    setError(null)
+    const requestId = ++loadRequestRef.current
+    if (!selectedAccountId) {
+      setItems([])
+      setLoadStatus('ready')
+      return
+    }
+    setLoadStatus('loading')
+    setItems([])
     try {
       const res = await eventsApi.listEvents(selectedAccountId)
+      if (requestId !== loadRequestRef.current) return
       setItems(res.items)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
+      setLoadStatus('ready')
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      setItems([])
+      setLoadStatus('error')
     }
   }, [selectedAccountId])
 
   useEffect(() => {
     void refresh()
+    return () => {
+      loadRequestRef.current += 1
+    }
   }, [refresh])
 
   useEffect(() => {
@@ -102,6 +114,7 @@ export default function EventsListPage() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = Math.min(page, pageCount)
   const shown = filtered.slice((current - 1) * pageSize, current * pageSize)
+  const dataReady = loadStatus === 'ready'
 
   return (
     <div data-design-node="ugP5y">
@@ -114,18 +127,18 @@ export default function EventsListPage() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <Kpi
           title="イベント"
-          value={String(items.length)}
-          unit="件"
-          detail={`受付中 ${kpi.open}`}
+          value={dataReady ? String(items.length) : '—'}
+          unit={dataReady ? '件' : ''}
+          detail={dataReady ? `受付中 ${kpi.open}` : '取得できませんでした'}
         />
-        <Kpi title="申込" value={String(kpi.applied)} unit="人" detail="累計" />
+        <Kpi title="申込" value={dataReady ? String(kpi.applied) : '—'} unit={dataReady ? '人' : ''} detail={dataReady ? '累計' : '取得できませんでした'} />
         <Kpi
           title="定員の充足"
-          value={kpi.rate === null ? '—' : String(kpi.rate)}
-          unit="%"
-          detail="受付中のもの"
+          value={dataReady && kpi.rate !== null ? String(kpi.rate) : '—'}
+          unit={dataReady && kpi.rate !== null ? '%' : ''}
+          detail={dataReady ? '受付中のもの' : '取得できませんでした'}
         />
-        <Kpi title="承認待ち" value={String(kpi.pending)} unit="件" detail="要対応" />
+        <Kpi title="承認待ち" value={dataReady ? String(kpi.pending) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? '要対応' : '取得できませんでした'} />
       </div>
 
       <div
@@ -185,10 +198,10 @@ export default function EventsListPage() {
       <div data-design-node="k5m5Bc">
       {!selectedAccountId ? (
         <ListState kind="empty" title="LINEアカウントを選択してください" description="サイドバーで運用するLINEアカウントを選んでください。" />
-      ) : loading ? (
+      ) : loadStatus === 'loading' ? (
         <ListState kind="loading" />
-      ) : error ? (
-        <ListState kind="error" description={error} action={<Button onClick={() => void refresh()}>再読み込み</Button>} />
+      ) : loadStatus === 'error' ? (
+        <ListState kind="error" description="登録したイベントは消えていません。再読み込みしても直らない場合はエラー報告へ。" action={<Button onClick={() => void refresh()}>イベントを再読み込み</Button>} />
       ) : items.length === 0 ? (
         <ListState
           kind="empty"

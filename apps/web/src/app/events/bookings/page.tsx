@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
@@ -13,6 +13,8 @@ import {
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { TableHeadRow, Th } from '@/components/shared/table'
+
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: 'requested', label: '承認待ち' },
@@ -43,6 +45,7 @@ function formatJp(iso: string): string {
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Asia/Tokyo',
   })
 }
 
@@ -54,47 +57,74 @@ function BookingsInner() {
   const [items, setItems] = useState<EventBookingItem[]>([])
   const [waitlist, setWaitlist] = useState<EventWaitlistItem[]>([])
   const [totalCapacity, setTotalCapacity] = useState<number | null>(null)
+  const [capacityLoadStatus, setCapacityLoadStatus] = useState<LoadStatus>('loading')
   const [tab, setTab] = useState<string>('requested')
-  const [loading, setLoading] = useState(true)
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const loadRequestRef = useRef(0)
 
   const refresh = useCallback(async () => {
-    if (!selectedAccountId || !eventId) return
-    setLoading(true)
-    setError(null)
+    const requestId = ++loadRequestRef.current
+    if (!selectedAccountId || !eventId) {
+      setEvent(null)
+      setItems([])
+      setWaitlist([])
+      setLoadStatus('ready')
+      return
+    }
+    setLoadStatus('loading')
+    setActionError(null)
+    setEvent(null)
+    setItems([])
+    setWaitlist([])
     try {
       const [evRes, listRes, waitlistRes] = await Promise.all([
-        event == null ? eventsApi.getEvent(selectedAccountId, eventId) : Promise.resolve(event),
+        eventsApi.getEvent(selectedAccountId, eventId),
         eventsApi.listBookings(selectedAccountId, eventId),
         eventsApi.listWaitlist(selectedAccountId, eventId),
       ])
+      if (requestId !== loadRequestRef.current) return
       setEvent(evRes)
       setItems(listRes.items)
       setWaitlist(waitlistRes.waitlist)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
+      setLoadStatus('ready')
+    } catch {
+      if (requestId !== loadRequestRef.current) return
+      setEvent(null)
+      setItems([])
+      setWaitlist([])
+      setLoadStatus('error')
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId, eventId])
 
   useEffect(() => {
     void refresh()
+    return () => {
+      loadRequestRef.current += 1
+    }
   }, [refresh])
 
   // 枠の合計＝定員。一覧APIからしか取れない。
   useEffect(() => {
-    if (!selectedAccountId || !eventId) return
+    setTotalCapacity(null)
+    if (!selectedAccountId || !eventId) {
+      setCapacityLoadStatus('ready')
+      return
+    }
+    setCapacityLoadStatus('loading')
     let alive = true
     eventsApi
       .listEvents(selectedAccountId)
       .then((r) => {
-        if (alive) setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
+        if (!alive) return
+        setTotalCapacity(r.items.find((x) => x.id === eventId)?.total_capacity ?? null)
+        setCapacityLoadStatus('ready')
       })
       .catch(() => {
-        // 定員が出ないだけ。一覧と操作はできる。
+        if (!alive) return
+        setTotalCapacity(null)
+        setCapacityLoadStatus('error')
       })
     return () => {
       alive = false
@@ -117,8 +147,8 @@ function BookingsInner() {
     try {
       await eventsApi.decideBooking(selectedAccountId, eventId, id, action, reason)
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setActionError('予約を確定・拒否できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -131,8 +161,8 @@ function BookingsInner() {
     try {
       await eventsApi.adminCancelBooking(selectedAccountId, eventId, id)
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setActionError('予約をキャンセルできませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -144,8 +174,8 @@ function BookingsInner() {
     try {
       await eventsApi.updateBooking(selectedAccountId, eventId, id, { status })
       await refresh()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+    } catch {
+      setActionError('来場状態を変更できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
       setBusy(false)
     }
@@ -157,6 +187,7 @@ function BookingsInner() {
   // 定員は一覧APIが持っている（枠の合計）。詳細APIには入っていない。
   const capacity = totalCapacity ?? 0
   const shownItems = tab === 'all' ? items : items.filter((item) => item.status === tab)
+  const dataReady = loadStatus === 'ready'
 
   function csvCell(value: unknown): string {
     const raw = String(value ?? '')
@@ -210,12 +241,12 @@ function BookingsInner() {
       </nav>
 
       <div data-design="Head" className="mb-4 flex flex-wrap items-center gap-2">
-        <Button onClick={downloadCsv}>CSVで書き出す</Button>
+        <Button onClick={downloadCsv} disabled={!dataReady}>CSVで書き出す</Button>
       </div>
 
       <div data-design="Sel" className="bg-canvas rounded-card border-hairline mb-4 border p-3">
         <span className="text-ink-faint mr-2 text-xs">イベント</span>
-        <span className="text-ink text-sm font-medium">{event?.name ?? '読み込み中…'}</span>
+        <span className="text-ink text-sm font-medium">{event?.name ?? (loadStatus === 'loading' ? '読み込み中…' : '—')}</span>
         <Link href="/events" className="text-accent ml-3 text-xs hover:underline">
           ほかのイベントを選ぶ
         </Link>
@@ -224,19 +255,33 @@ function BookingsInner() {
       <div data-design="KPIs" className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
         <EventKpi
           title="申込"
-          value={String(confirmed + pending)}
-          unit="人"
-          detail={capacity > 0 ? `定員 ${capacity} ・ 残り${Math.max(0, capacity - confirmed)}` : '定員なし'}
+          value={dataReady ? String(confirmed + pending) : '—'}
+          unit={dataReady ? '人' : ''}
+          detail={dataReady
+            ? capacityLoadStatus === 'loading'
+              ? '定員を確認しています'
+              : capacityLoadStatus === 'error'
+                ? '定員は取得できませんでした'
+                : capacity > 0
+                  ? `定員 ${capacity} ・ 残り${Math.max(0, capacity - confirmed)}`
+                  : '定員なし'
+            : '取得できませんでした'}
         />
-        <EventKpi title="承認待ち" value={String(pending)} unit="件" detail="対応が必要" />
+        <EventKpi title="承認待ち" value={dataReady ? String(pending) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? '対応が必要' : '取得できませんでした'} />
         <EventKpi
           title="キャンセル待ち"
-          value={String(waitlist.length)}
-          unit="人"
-          detail={event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です'}
+          value={dataReady ? String(waitlist.length) : '—'}
+          unit={dataReady ? '人' : ''}
+          detail={dataReady ? (event?.waitlist_enabled ? '空きが出たら順に案内' : '受け付けない設定です') : '取得できませんでした'}
         />
-        <EventKpi title="キャンセル" value={String(cancelled)} unit="件" detail="この一覧のうち" />
+        <EventKpi title="キャンセル" value={dataReady ? String(cancelled) : '—'} unit={dataReady ? '件' : ''} detail={dataReady ? 'この一覧のうち' : '取得できませんでした'} />
       </div>
+
+      {actionError ? (
+        <div className="bg-danger-bg text-danger rounded-card mb-4 border border-danger/20 px-4 py-3 text-sm" role="alert">
+          {actionError}
+        </div>
+      ) : null}
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="flex border-b border-gray-200 overflow-x-auto">
@@ -255,10 +300,10 @@ function BookingsInner() {
             ))}
           </div>
 
-          {loading ? (
+          {loadStatus === 'loading' ? (
             <ListState kind="loading" />
-          ) : error ? (
-            <ListState kind="error" description={error} action={<Button onClick={() => void refresh()}>再読み込み</Button>} />
+          ) : loadStatus === 'error' ? (
+            <ListState kind="error" description="申込者とキャンセル待ちを読み込めませんでした。登録内容は消えていません。" action={<Button onClick={() => void refresh()}>申込者を再読み込み</Button>} />
           ) : tab === 'waitlist' ? (
             waitlist.length === 0 ? (
               <ListState kind="empty" title="キャンセル待ちはありません" description="空き待ちの友だちはまだいません。" />
