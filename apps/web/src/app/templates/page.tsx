@@ -63,8 +63,8 @@ const ASSET_KINDS: readonly BroadcastAssetKind[] = [
 const messageTypeLabels: Record<string, string> = {
   text: 'テキスト',
   image: '画像',
-  flex: 'Flex',
-  carousel: 'Carousel',
+  flex: 'カード型',
+  carousel: 'カルーセル',
 }
 
 const typeBadgeColor: Record<string, string> = {
@@ -90,7 +90,8 @@ export default function TemplatesPage() {
   const [activeSection, setActiveSection] = useState<'message' | BroadcastAssetKind>('message')
   const [templates, setTemplates] = useState<Template[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
-  const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number>>>({})
+  // undefined = 読み込み中、null = 取得失敗、number = 取得済み。
+  const [assetCounts, setAssetCounts] = useState<Partial<Record<BroadcastAssetKind, number | null>>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
@@ -188,12 +189,16 @@ export default function TemplatesPage() {
     }
     void Promise.all(
       ASSET_KINDS.map(async (kind) => {
-        const result = await api.broadcastMessageAssets.list({ kind, accountId: selectedAccountId })
-        return [kind, result.success ? result.data.length : undefined] as const
+        try {
+          const result = await api.broadcastMessageAssets.list({ kind, accountId: selectedAccountId })
+          return [kind, result.success ? result.data.length : null] as const
+        } catch {
+          return [kind, null] as const
+        }
       }),
     ).then((entries) => {
       if (cancelled) return
-      setAssetCounts(Object.fromEntries(entries.filter((entry) => entry[1] !== undefined)))
+      setAssetCounts(Object.fromEntries(entries))
     })
     return () => { cancelled = true }
   }, [selectedAccountId])
@@ -249,6 +254,11 @@ export default function TemplatesPage() {
   const folderById = new Map(folders.map((folder) => [folder.id, folder]))
   const unfiledCount = templates.filter((template) => template.folderId === null).length
   const favoriteCount = templates.filter((template) => template.isFavorite).length
+  const countsUnavailable = !selectedAccountId || Boolean(loadError)
+  const assetCount = (kind: BroadcastAssetKind): number | string | undefined => {
+    const count = assetCounts[kind]
+    return count === null ? '—' : count
+  }
   const moveFolder = async (folderId: string, direction: -1 | 1) => {
     if (!selectedAccountId || folderActionBusy) return
     const ordered = [...folders].sort((left, right) => (
@@ -298,15 +308,15 @@ export default function TemplatesPage() {
     {
       id: 'all',
       label: 'すべて',
-      count: templates.length,
+      count: countsUnavailable ? '—' : templates.length,
       icon: <span className="bg-accent rounded-pill block h-2 w-2" />,
     },
-    { id: 'favorites', label: 'よく使う', count: favoriteCount, icon: '☆' },
-    { id: 'unfiled', label: '未分類', count: unfiledCount },
+    { id: 'favorites', label: 'よく使う', count: countsUnavailable ? '—' : favoriteCount, icon: '☆' },
+    { id: 'unfiled', label: '未分類', count: countsUnavailable ? '—' : unfiledCount },
     ...folders.map((folder, index) => ({
       id: folder.id,
       label: folder.name,
-      count: templates.filter((template) => template.folderId === folder.id).length,
+      count: countsUnavailable ? '—' : templates.filter((template) => template.folderId === folder.id).length,
       color: folder.color,
       onRename: () => setEditingFolder(folder),
       onChangeColor: () => setEditingFolder(folder),
@@ -451,31 +461,31 @@ export default function TemplatesPage() {
           items={[
             {
               label: 'メッセージ',
-              count: loading ? undefined : templates.length,
+              count: accountLoading || loading ? undefined : countsUnavailable ? '—' : templates.length,
               current: activeSection === 'message',
               onClick: () => { setActiveSection('message'); setShowCreate(false) },
             },
             {
               label: 'カルーセル',
-              count: assetCounts.card_message,
+              count: assetCount('card_message'),
               current: activeSection === 'card_message',
               onClick: () => { setActiveSection('card_message'); setShowCreate(false) },
             },
             {
               label: 'リッチメッセージ',
-              count: assetCounts.rich_message,
+              count: assetCount('rich_message'),
               current: activeSection === 'rich_message',
               onClick: () => { setActiveSection('rich_message'); setShowCreate(false) },
             },
             {
               label: 'クーポン',
-              count: assetCounts.coupon,
+              count: assetCount('coupon'),
               current: activeSection === 'coupon',
               onClick: () => { setActiveSection('coupon'); setShowCreate(false) },
             },
             {
               label: 'リサーチ',
-              count: assetCounts.research,
+              count: assetCount('research'),
               current: activeSection === 'research',
               onClick: () => { setActiveSection('research'); setShowCreate(false) },
             },
@@ -518,7 +528,7 @@ export default function TemplatesPage() {
           rows={folderRows}
           activeId={selectedFolderId}
           onSelect={setSelectedFolderId}
-          total={`${folders.length}件`}
+          total={countsUnavailable ? '—' : `${folders.length}件`}
         >
           <button
             type="button"
@@ -564,7 +574,7 @@ export default function TemplatesPage() {
         {([
           { key: 'all', label: '全て' },
           { key: 'text', label: 'テキスト' },
-          { key: 'flex', label: 'Flex' },
+          { key: 'flex', label: 'カード型' },
           { key: 'image', label: '画像' },
           { key: 'unused', label: '未使用' },
         ] as const).map(({ key, label }) => (
@@ -591,7 +601,7 @@ export default function TemplatesPage() {
               <input
                 type="text"
                 className="w-full border border-hairline rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="例: コスト比較 flex"
+                placeholder="例: コスト比較 カード型"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
@@ -617,7 +627,7 @@ export default function TemplatesPage() {
                 onChange={(e) => setForm({ ...form, messageType: e.target.value })}
               >
                 <option value="text">テキスト</option>
-                <option value="flex">Flex</option>
+                <option value="flex">カード型</option>
                 <option value="image">画像</option>
               </select>
             </div>
@@ -879,7 +889,7 @@ export default function TemplatesPage() {
                         try {
                           return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
                         } catch {
-                          return <p className="text-xs text-red-500">Flex JSON parse 失敗</p>
+                          return <p className="text-xs text-red-500">内容を表示できません</p>
                         }
                       })()
                     ) : drawerData.messageType === 'image' ? (

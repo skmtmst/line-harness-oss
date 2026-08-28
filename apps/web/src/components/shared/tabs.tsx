@@ -8,7 +8,7 @@ export interface TabItem {
   /** 押したときの行き先。省くとボタンとして描く。 */
   href?: string
   /** 見出しの右に出す数。0 も出す（「0件ある」は情報なので隠さない）。 */
-  count?: number
+  count?: number | string
   /** いま開いているタブ。 */
   current?: boolean
   disabled?: boolean

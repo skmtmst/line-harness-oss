@@ -16,7 +16,7 @@ import { type ReactNode, useState } from 'react'
 export interface FolderPanelRow {
   id: string
   label: string
-  count: number
+  count: number | string
   /**
    * フォルダの色（#RRGGBB）。115 で folders.color を足した。
    * 未設定は null。色はフォルダに付き、属するタグに出る。
