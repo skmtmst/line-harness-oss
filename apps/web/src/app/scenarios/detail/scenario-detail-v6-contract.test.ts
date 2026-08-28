@@ -12,6 +12,10 @@ const LIST_TABLE = fs.readFileSync(
   path.join(__dirname, '..', '..', '..', 'components', 'scenarios', 'scenario-list.tsx'),
   'utf8',
 )
+const DIALOGS = fs.readFileSync(
+  path.join(__dirname, '..', '..', '..', 'components', 'scenarios', 'scenario-dialogs.tsx'),
+  'utf8',
+)
 
 describe('V6 シナリオ編集の契約', () => {
   it('上部の一括テスト送信を既存の全通テスト送信へ接続する', () => {
@@ -19,10 +23,19 @@ describe('V6 シナリオ編集の契約', () => {
       "onClick={() => setTestSend({ stepId: null, label: 'このシナリオの全通' })}",
     )
     expect(PAGE).not.toContain('一括テスト送信は準備中です')
+    expect(PAGE).toContain('lineAccountId={scenario?.lineAccountId ?? null}')
   })
 
   it('一括テスト送信の操作を画面内に重複させない', () => {
     expect(PAGE.match(/>\s*一括テスト送信\s*<\/button>/g)).toHaveLength(1)
+  })
+
+  it('テスト送信先を同じLINEアカウントから取得し、失敗後も操作へ戻れる', () => {
+    expect(DIALOGS).toContain('accountId: lineAccountId ?? selectedAccountId ?? undefined')
+    expect(DIALOGS).toContain("setFriendsStatus('loading')")
+    expect(DIALOGS).toContain("setFriendsStatus('error')")
+    expect(DIALOGS).toContain('finally {')
+    expect(DIALOGS).toContain('setSending(false)')
   })
 
   it('一覧のフォルダ追加を既存の共通ダイアログへ接続する', () => {

@@ -1809,6 +1809,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
       {testSend && (
         <TestSendDialog
           scenarioId={id}
+          lineAccountId={scenario?.lineAccountId ?? null}
           stepId={testSend.stepId}
           stepLabel={testSend.label}
           onClose={() => setTestSend(null)}
