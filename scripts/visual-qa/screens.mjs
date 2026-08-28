@@ -505,12 +505,12 @@ export const SCREENS = [
 
   // ── 機能6 一斉配信 ──────────────────────────────────────
   { ...BROADCAST, node: 'q76C35', name: '6-1 一斉配信', route: '/broadcasts',
-    verdict: 'needs_fix', verdictNote: 'P1 帯に「予約中 undefined」「失敗 undefined」と出る。broadcast-kpis.tsx は stats が在るかしか見ず、欠けた項目をそのまま文へ繋ぐ（未取得なら—にすべき）。撮った絵でそうなったのは /api/broadcasts/stats の固定データを用意していなかったこちらの落ちで、固定データは足した。P2 帯の4枚が設計（予約中・下書き・今月の配信・平均開封率）と違う。列の並びも違い、開封（率）が「-」で—でない。日付欄が mm/dd/yyyy になるのは撮影側のブラウザ言語の癖',
-    verdictSource: 'broadcasts-v6/q76C35-1920.png + apps/web/src/components/broadcasts/broadcast-kpis.tsx:40', verdictHead: 'ccb2085a',
+    verdict: 'needs_fix', verdictNote: 'P2 帯の4枚が設計（予約中・下書き・今月の配信・平均開封率）と違い、今月の配信・到達・平均開封率・失敗になっている。列の並びも違い、開封（率）の未取得が「-」で「—」でない。フォルダごとの「…」（名前を変える・消す）が無い。日付欄が mm/dd/yyyy になるのは撮影側のブラウザ言語の癖。以前ここに出ていた「予約中 undefined」は /api/broadcasts/stats の固定データを用意していなかったこちらの落ちで、足して消えた。ただし broadcast-kpis.tsx:40 は欠けた項目をそのまま文へ繋ぐので、守りは足りないまま',
+    verdictSource: 'broadcasts-v6/q76C35-1920.png + apps/web/src/components/broadcasts/broadcast-kpis.tsx:40', verdictHead: '6db5ad7f',
   },
   { ...BROADCAST, node: 'zZ9fA', name: '6-1-A 一斉配信を作成', route: NEW_BC,
     verdict: 'needs_fix', verdictNote: 'P1 節の番号が画面の並びと合っていない（上から 1.送る相手 → 3.送る内容 → 2.送る時間）。設計の5段の進み表示（基本設定・対象者・メッセージ・送信設定・確認）が無く、1枚の長い画面になっている。配信方法（新しいメッセージを作成／テンプレートを選択／過去の配信を複製）と「最近の配信」からの複製が無い。社内メモが無い。P2 右の設定内容（配信対象・配信日時・送信数・配信後）が無く、配信名の字数（14 / 60文字）も出ない。送信対象の未取得が「−」で「—」でない',
-    verdictSource: 'broadcasts-v6/zZ9fA-1920.png', verdictHead: 'd206bc50',
+    verdictSource: 'broadcasts-v6/zZ9fA-1920.png', verdictHead: '6db5ad7f',
   },
   {
     ...BROADCAST, node: 'cPk8A', name: '6-1-B 対象条件', route: NEW_BC,
@@ -519,7 +519,10 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '**確かめました（2026-08-28、`development` 2e438929）。順番の問題ではありません。** 「保存した条件から選ぶ」は `disabled` を直接書いてあり、`title` は「保存した条件は準備中です」（`broadcast-form.tsx:646-653`）。埋める順を変えても押せません',
   },
-  { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集', route: NEW_BC },
+  { ...BROADCAST, node: 'XQfMD', name: '6-1-C メッセージ編集', route: NEW_BC,
+    verdict: 'needs_fix', verdictNote: 'P1 本文の上限が設計と違う。設計は1通あたり5,000文字・合計22,500文字・最大5通で、4,500文字を超えると自動分割。実装は0/500・吹き出しは最大3。ボタン（最大4つ、ラベルと押したときの動作）の編集が無い。URLの扱いの表（サイト名・URL・計測）が無い。保存してテンプレート化、配信後のアクションが無い。P2 種類がタブでなくセレクト',
+    verdictSource: 'broadcasts-v6/XQfMD-1920.png', verdictHead: '6db5ad7f',
+  },
   {
     ...BROADCAST, node: 'p97Tf', name: '6-1-D テンプレート選択', route: NEW_BC,
     mode: 'viewport', height: 1080, steps: [{ click: 'テンプレートから選ぶ' }],
@@ -527,10 +530,23 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'Bw0zt', name: '6-1-E 送信設定', route: NEW_BC,
     mode: 'viewport', height: 1136, steps: [{ click: '日時を指定して予約' }],
+    verdict: 'needs_fix', verdictNote: 'P1 送信枠（使用予定と残り通数）が出ない。前後の配信と重ならないかを見る配信スケジュールも、重複時の送信（1人1通にまとめる）も、配信優先度も無い。予約時刻の直前に対象人数と送信枠を再確認する旨の注意も無い。P2 開封数の計測が独立した切り替えでなく「この配信の開封数は取らない」のチェックとして3.送る内容の中にある。日付欄が mm/dd/yyyy、時刻が10:00 AM になるのは撮影側のブラウザ言語の癖',
+    verdictSource: 'broadcasts-v6/Bw0zt-1920.png', verdictHead: '6db5ad7f',
   },
   {
+    /*
+      **空のまま押すと窓が開かない。** 「管理用タイトルを入力してください」が
+      出るだけで、テスト送信の窓は出ない。先に管理名と本文を埋める。
+      （その注意文が、欄から遠い本文の下に出るのも差として残る）
+      撮り直すまで判定は入れない。
+    */
     ...BROADCAST, node: 'h0kahp', name: '6-1-F テスト送信', route: NEW_BC,
-    mode: 'viewport', height: 1080, steps: [{ click: 'テスト送信' }],
+    mode: 'viewport', height: 1080,
+    steps: [
+      { fill: '管理用タイトル', text: '画面確認の配信' },
+      { fill: 'テキストを入力', text: '画面確認のための本文です。' },
+      { click: 'テスト送信' },
+    ],
   },
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック', route: NEW_BC,
@@ -545,6 +561,8 @@ export const SCREENS = [
     steps: [
       { fill: 'main textarea', selector: true, text: '画面確認のための本文です。よろしくお願いします。', after: 1500 },
     ],
+    verdict: 'needs_fix', verdictNote: 'P1 送信枠を見ない。設計は残り3,787/5,000通を出し、足りなければ「配信枠が不足しています」で止めて対象を見直させる。実装の配信前チェック6件に送信枠の行が無く、足りなくても進める。確認項目の3つのチェック（対象人数・メッセージ表示・配信日時）も無い。実装の6件（文字数・ブロック除外・同じ本文の重複・URL・テスト送信・開封集計）は設計より細かく、そこは良い',
+    verdictSource: 'broadcasts-v6/vW4Es-1920.png', verdictHead: '6db5ad7f',
   },
   {
     /*
@@ -572,10 +590,15 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '**確かめました（2026-08-28）。予約できたことを知らせる画面がありません。** 保存に成功すると `router.push(\'/broadcasts\')` で一覧へ戻るだけです（`broadcasts/new/page.tsx:55`）。何通が・いつ・誰に予約されたかは、戻った先で探すことになります',
   },
-  { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細', route: '/broadcasts/detail?id=broadcast-2' },
+  { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細', route: '/broadcasts/detail?id=broadcast-2',
+    verdict: 'needs_fix', verdictNote: 'P1 開封が送信より多く出る。送信624件・到達624件と並べて開封2,410件（62.4%）と出す。手元の記録（624）とLINE側の集計（3,862のうち2,410）を混ぜているのに、どちらの母数かを画面が言わない。桁の合わない2つを並べても何も言わない。P2 メッセージの種類が「1通（carousel）」と内部の語のまま出る。設計のタブ（クリック・友だち・エラー・配信内容）、ボタンとリンクごとの反応、設定サマリー、メッセージプレビュー、CSVで書き出す が無い',
+    verdictSource: 'broadcasts-v6/u6gHt-1920.png', verdictHead: '6db5ad7f',
+  },
   {
     ...BROADCAST, node: 'EGMb1', name: '6-1-K 削除確認', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: '削除' }],
+    verdict: 'needs_fix', verdictNote: 'P1 配信の削除の確認が、ブラウザ標準の confirm（broadcasts/page.tsx:139「この配信を削除してもよいですか？」）。どの配信か、予約中か送信済みかを言わない。設計は画面内の確認窓',
+    verdictSource: 'broadcasts-v6/EGMb1-1920.png + apps/web/src/app/broadcasts/page.tsx:139', verdictHead: '6db5ad7f',
   },
   {
     ...BROADCAST, node: 'sqFXf', name: '6-1-L 対象条件を編集', route: NEW_BC,
@@ -587,10 +610,22 @@ export const SCREENS = [
   {
     ...BROADCAST, node: 'xkRDb', name: '6-1-M フォルダ操作', route: '/broadcasts',
     mode: 'viewport', height: 1080, steps: [{ click: 'フォルダを追加' }],
+    verdict: 'needs_fix', verdictNote: 'P2 フォルダの追加はできるが、フォルダごとの「…」（名前を変える・消す・並べ替える）が無い。設計の一覧はフォルダごとに件数と「…」を持つ',
+    verdictSource: 'broadcasts-v6/xkRDb-1920.png', verdictHead: '6db5ad7f',
   },
   {
     ...BROADCAST, node: 'TmHjF', name: '6-1-N 一覧の状態（空・読込・エラー）', route: '/broadcasts',
-    states: { apis: ['**/api/broadcasts*', '**/api/list-stats*'], kinds: ['loading', 'empty', 'error'] },
+    /*
+      **末尾が `broadcasts*` だと `/api/broadcasts/stats` に届かない。**
+      Playwright の `*` は `/` をまたがない。届かないまま撮ると、一覧が
+      読めていないのに帯だけ数が残る。機能3でも同じことが起きていた。
+    */
+    states: {
+      apis: ['**/api/broadcasts?**', '**/api/broadcasts', '**/api/broadcasts/stats*', '**/api/list-stats*'],
+      kinds: ['loading', 'empty', 'error'],
+    },
+    verdict: 'needs_fix', verdictNote: 'P2 文言だけが設計と違う（設計「表示できませんでした／再読み込みしても直らない場合はエラー報告へ。」）。中身は正しい。失敗のとき帯は—、一覧の中は「いまは読み込めていません。上の案内をご覧ください。」。ただし共通部品の data-list-state が付いておらず、状態を名前で言えていない（試験から状態を見分けられない）',
+    verdictSource: 'broadcasts-v6/TmHjF-error-1920.png', verdictHead: '6db5ad7f',
   },
 
   // ── 機能7 リマインダ ────────────────────────────────────
@@ -664,6 +699,8 @@ export const SCREENS = [
   {
     ...REMINDER, node: 'dC0yg', name: '7-1-J 一覧の状態（空・読込・エラー）', route: '/reminders',
     states: { apis: ['**/api/reminders*', '**/api/list-stats*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P2 文言だけが設計と違う（設計「表示できませんでした／再読み込みしても直らない場合はエラー報告へ。」、実装「リマインダの読み込みに失敗しました。もう一度お試しください。」＋「いまは読み込めていません。上の案内をご覧ください。」）。**中身は正しい。** 失敗のとき帯は—と「取得できませんでした」、一覧の中は空の文でなく読めていない旨を出す。ほかの機能の手本になる',
+    verdictSource: 'reminders-v6/dC0yg-error-1920.png', verdictHead: '409f00bb',
   },
 
   // ── 機能8 自動応答 ──────────────────────────────────────
@@ -741,6 +778,8 @@ export const SCREENS = [
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/auto-replies*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 内部の言葉とDBの列名が画面に出ている（「silent rule のみ — match するが返信しない (同 keyword の automation rule 未登録)」「適用外 (line_account_id が別アカに固定)」「返信あり (inline)」、列見出しの「TEMPLATE」）。P1 失敗のときに帯が0件・0回・0件・0件と出る（未取得なので—にすべき）。一覧の中を「いまは読み込めていません」にしているのは正しい',
+    verdictSource: 'auto-replies-v6/q8wSqO-error-1920.png', verdictHead: '93edbe17',
   },
 
   // ── 機能9 友だち追加時の配信 ────────────────────────────
@@ -1759,7 +1798,14 @@ export const CAPTURED_AT = {
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
     { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
   ],
-  6: [{ pr: 497, head: '84e5bab9', on: '2026-08-28', screens: ['FpgxH'], note: 'Claudeが作ったDraft。#495 の上に積んである' }],
+  6: [
+    { pr: 497, head: '84e5bab9', on: '2026-08-28', screens: ['FpgxH'], note: 'Claudeが作ったDraft。#495 の上に積んである' },
+    {
+      pr: 503, head: '6db5ad7f', on: '2026-08-28',
+      screens: ['q76C35', 'zZ9fA', 'XQfMD', 'p97Tf', 'Bw0zt', 'vW4Es', 'u6gHt', 'EGMb1', 'xkRDb', 'TmHjF'],
+      note: '固定データ（配信の帯・1件の配信）を足して撮り直した。**`FpgxH` は #497 の絵に戻した。** 機能ごと撮り直すと、別のPRで直った1枚が直る前に戻る',
+    },
+  ],
   17: [
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },

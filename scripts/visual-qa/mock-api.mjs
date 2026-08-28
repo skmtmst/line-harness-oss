@@ -979,6 +979,17 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/duplicates/stats') return { success: true, data: DUPLICATE_STATS }
   if (pathname === '/api/users-grouped') return { success: true, data: USERS_GROUPED }
   if (pathname === '/api/broadcasts') return { success: true, data: BROADCASTS }
+  /*
+    **1件の配信。** 用意していなかったので一覧の既定が返り、詳細画面が
+    「1通（undefined）」「Invalid Date 作成」と出していた。
+    実装側に守りが無いのは残るが、**まず正しい形を返す。**
+  */
+  // `stats` を外す。外さないと `/api/broadcasts/stats` まで拾い、帯が1件の配信になる。実際にそうなった。
+  const broadcast = pathname.match(/^\/api\/broadcasts\/(?!stats$)([^/]+)$/)
+  if (broadcast) {
+    const row = BROADCASTS.find((r) => r.id === broadcast[1]) ?? BROADCASTS[0]
+    return { success: true, data: row }
+  }
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
