@@ -8,6 +8,7 @@ import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { useAccount } from '@/contexts/account-context'
 
 /**
  * 登録メディア一覧。
@@ -67,6 +68,9 @@ function formatSize(bytes: number): string {
 }
 
 export default function MediaLibraryPage() {
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const latestAccountRef = useRef(selectedAccountId)
+  latestAccountRef.current = selectedAccountId
   const [items, setItems] = useState<MediaItem[]>([])
   const [loading, setLoading] = useState(true)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -90,25 +94,38 @@ export default function MediaLibraryPage() {
   const fileInput = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
+    const accountAtRequest = selectedAccountId
+    if (!accountAtRequest) {
+      setItems([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
     setLoadFailed(false)
     setError('')
     try {
-      const res = await api.media.list()
+      const res = await api.media.list(accountAtRequest)
+      if (accountAtRequest !== latestAccountRef.current) return
       if (res.success) setItems(res.data)
     } catch {
-      setLoadFailed(true)
+      if (accountAtRequest === latestAccountRef.current) setLoadFailed(true)
     } finally {
-      setLoading(false)
+      if (accountAtRequest === latestAccountRef.current) setLoading(false)
     }
-  }, [])
+  }, [selectedAccountId])
 
   useEffect(() => {
+    if (accountLoading) return
+    setSelected(new Set())
+    setUsagesFor(null)
+    setPreview(null)
+    setPage(1)
     void load()
-  }, [load])
+  }, [accountLoading, load])
 
   const upload = async (files: File[]) => {
-    if (files.length === 0) return
+    if (files.length === 0 || !selectedAccountId) return
+    const accountAtRequest = selectedAccountId
     setUploading(true)
     setError('')
     try {
@@ -121,10 +138,12 @@ export default function MediaLibraryPage() {
           reader.readAsDataURL(file)
         })
         const res = await api.media.upload({
+          accountId: accountAtRequest,
           filename: file.name,
           mimeType: file.type,
           data: dataUrl,
         })
+        if (accountAtRequest !== latestAccountRef.current) return
         if (!res.success) {
           // 1枚でも弾かれたら、そこで止めて理由を出す。残りを黙って
           // 上げ続けると、どれが通ってどれが落ちたか分からなくなる。
@@ -142,12 +161,14 @@ export default function MediaLibraryPage() {
   }
 
   const rename = async () => {
-    if (!renaming) return
+    if (!renaming || !selectedAccountId) return
+    const accountAtRequest = selectedAccountId
     const filename = renaming.value.trim()
     if (!filename) return
     setError('')
     try {
-      const res = await api.media.update(renaming.id, { filename })
+      const res = await api.media.update(renaming.id, accountAtRequest, { filename })
+      if (accountAtRequest !== latestAccountRef.current) return
       if (!res.success) {
         setError(res.error)
         return
@@ -160,13 +181,16 @@ export default function MediaLibraryPage() {
   }
 
   const showUsages = async (item: MediaItem) => {
+    if (!selectedAccountId) return
+    const accountAtRequest = selectedAccountId
     setError('')
     if (usagesFor?.id === item.id) {
       setUsagesFor(null)
       return
     }
     try {
-      const res = await api.media.usages(item.id)
+      const res = await api.media.usages(item.id, accountAtRequest)
+      if (accountAtRequest !== latestAccountRef.current) return
       if (res.success) setUsagesFor({ id: item.id, items: res.data })
     } catch {
       setError('使用箇所の読み込みに失敗しました')
@@ -175,12 +199,14 @@ export default function MediaLibraryPage() {
 
   /** 選んだ札をまとめて消す。使用中はAPIでも必ず止める。 */
   const removeSelected = async () => {
-    if (selected.size === 0) return
+    if (selected.size === 0 || !selectedAccountId) return
+    const accountAtRequest = selectedAccountId
     if (!confirm(`${selected.size}件のメディアを削除しますか？`)) return
     setError('')
     for (const id of selected) {
       try {
-        await api.media.delete(id)
+        await api.media.delete(id, accountAtRequest)
+        if (accountAtRequest !== latestAccountRef.current) return
       } catch (e) {
         if (e instanceof ApiError && e.status === 409) {
           const name = items.find((m) => m.id === id)?.filename ?? id
@@ -219,6 +245,10 @@ export default function MediaLibraryPage() {
 
   return (
     <div data-design-node="g89Tc" data-media-design="v6">
+
+      {!selectedAccountId && !accountLoading && (
+        <ListState kind="empty" title="LINEアカウントを選択してください" description="登録メディアはLINEアカウントごとに管理します。" />
+      )}
 
       {error && (
         <Notice tone="error" message={error} onClose={() => setError('')} className="mb-4" />

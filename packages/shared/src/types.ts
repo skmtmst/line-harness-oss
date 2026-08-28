@@ -252,6 +252,7 @@ export interface SupportMark {
 /** メディアライブラリの1件 */
 export interface MediaItem {
   id: string;
+  lineAccountId: string | null;
   folderId: string | null;
   kind: "image" | "video" | "audio" | "file";
   filename: string;

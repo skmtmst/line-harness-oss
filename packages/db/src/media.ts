@@ -25,6 +25,7 @@ export type MediaRefKind = (typeof MEDIA_REF_KINDS)[number];
 
 export interface Media {
   id: string;
+  line_account_id: string | null;
   folder_id: string | null;
   kind: string;
   filename: string;
@@ -50,10 +51,10 @@ export interface MediaUsage {
 
 export async function getMedia(
   db: D1Database,
-  opts: { kind?: MediaKind; folderId?: string; limit?: number } = {},
+  opts: { lineAccountId: string; kind?: MediaKind; folderId?: string; limit?: number },
 ): Promise<Media[]> {
-  const conditions: string[] = [];
-  const values: unknown[] = [];
+  const conditions: string[] = ['m.line_account_id = ?'];
+  const values: unknown[] = [opts.lineAccountId];
   if (opts.kind) {
     conditions.push('kind = ?');
     values.push(opts.kind);
@@ -78,14 +79,20 @@ export async function getMedia(
   return result.results;
 }
 
-export async function getMediaById(db: D1Database, id: string): Promise<Media | null> {
-  return db.prepare(`SELECT * FROM media WHERE id = ?`).bind(id).first<Media>();
+export async function getMediaById(
+  db: D1Database,
+  id: string,
+  lineAccountId: string,
+): Promise<Media | null> {
+  return db.prepare(`SELECT * FROM media WHERE id = ? AND line_account_id = ?`)
+    .bind(id, lineAccountId).first<Media>();
 }
 
 export async function createMedia(
   db: D1Database,
   input: {
     kind: MediaKind;
+    lineAccountId: string;
     filename: string;
     mimeType: string;
     sizeBytes: number;
@@ -102,12 +109,13 @@ export async function createMedia(
   await db
     .prepare(
       `INSERT INTO media
-         (id, folder_id, kind, filename, mime_type, size_bytes, width, height,
+         (id, line_account_id, folder_id, kind, filename, mime_type, size_bytes, width, height,
           duration_ms, r2_key, public_url, uploaded_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
+      input.lineAccountId,
       input.folderId ?? null,
       input.kind,
       input.filename,
@@ -122,12 +130,13 @@ export async function createMedia(
       jstNow(),
     )
     .run();
-  return (await getMediaById(db, id))!;
+  return (await getMediaById(db, id, input.lineAccountId))!;
 }
 
 export async function updateMedia(
   db: D1Database,
   id: string,
+  lineAccountId: string,
   input: { filename?: string; folderId?: string | null },
 ): Promise<Media | null> {
   const sets: string[] = [];
@@ -141,14 +150,14 @@ export async function updateMedia(
     values.push(input.folderId ?? null);
   }
   if (sets.length > 0) {
-    values.push(id);
-    await db.prepare(`UPDATE media SET ${sets.join(', ')} WHERE id = ?`).bind(...values).run();
+    values.push(id, lineAccountId);
+    await db.prepare(`UPDATE media SET ${sets.join(', ')} WHERE id = ? AND line_account_id = ?`).bind(...values).run();
   }
-  return getMediaById(db, id);
+  return getMediaById(db, id, lineAccountId);
 }
 
-export async function deleteMedia(db: D1Database, id: string): Promise<void> {
-  await db.prepare(`DELETE FROM media WHERE id = ?`).bind(id).run();
+export async function deleteMedia(db: D1Database, id: string, lineAccountId: string): Promise<void> {
+  await db.prepare(`DELETE FROM media WHERE id = ? AND line_account_id = ?`).bind(id, lineAccountId).run();
 }
 
 /**

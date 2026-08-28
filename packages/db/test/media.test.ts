@@ -16,11 +16,12 @@ describe('登録メディア一覧', () => {
     const prepare = vi.fn(() => ({ bind }))
     const db = { prepare } as unknown as D1Database
 
-    const rows = await getMedia(db)
+    const rows = await getMedia(db, { lineAccountId: 'account-1' })
 
     const sql = String(prepare.mock.calls[0]?.[0])
     expect(sql).toContain('FROM media_usages u WHERE u.media_id = m.id')
+    expect(sql).toContain('m.line_account_id = ?')
     expect(rows[0]?.usage_count).toBe(4)
-    expect(bind).toHaveBeenCalledWith(200)
+    expect(bind).toHaveBeenCalledWith('account-1', 200)
   })
 })
