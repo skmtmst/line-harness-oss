@@ -924,10 +924,10 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'LKuAQ', name: '10-1-K 削除確認',
-    gap: 'parts',
-    gapNote: '`webinarApi.remove` は在る。画面が呼んでいないだけ',
+    gap: 'drop',
+    gapNote: '物理削除はV6要件の除外対象。公開停止・アーカイブへ置き換え、申込・視聴・分析・監査は保持する。現行 `webinarApi.remove` は視聴履歴を物理削除する一方、申込記録を削除対象に含めず孤児化させるため、画面へそのまま接続しない',
     status: 'unimplemented',
-    why: 'ウェビナーを消す導線がどこにも無い。受け口（`webinarApi.remove`）は在るのに**画面が一度も呼んでいない**。編集画面の「削除」はCTAの札を1枚外すもので、ウェビナー本体ではない（`edit/page.tsx:764`）',
+    why: 'V6詳細要件 §11・§14 は視聴履歴の物理削除を禁止している。現行 `deleteWebinar` は viewer・funnel・コメント等を物理削除し、`webinar_registrations` は残すため、削除確認を足すだけでは履歴消失と孤児データを発生させる。編集画面の「削除」はCTAの札を1枚外すもので、ウェビナー本体ではない（`edit/page.tsx:764`）',
   },
   {
     ...WEBINAR, node: 'zCQXe', name: '10-1-L 一覧の状態（空・読込・エラー）',

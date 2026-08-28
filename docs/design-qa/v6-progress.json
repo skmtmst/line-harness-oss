@@ -954,8 +954,8 @@
       "feature": 10,
       "node": "LKuAQ",
       "name": "10-1-K 削除確認",
-      "gap": "parts",
-      "gapNote": "`webinarApi.remove` は在る。画面が呼んでいないだけ"
+      "gap": "drop",
+      "gapNote": "物理削除はV6要件の除外対象。公開停止・アーカイブへ置き換え、申込・視聴・分析・監査は保持する。現行 `webinarApi.remove` は視聴履歴を物理削除する一方、申込記録を削除対象に含めず孤児化させるため、画面へそのまま接続しない"
     },
     {
       "feature": 11,
@@ -1123,7 +1123,7 @@
       "node": "Se65i",
       "name": "24-1-C お知らせの記録",
       "gap": "api",
-      "gapNote": "いつ・だれに・どのお知らせを送ったかの記録が要る"
+      "gapNote": "いつ・だれに・どのお知らせを送ったかの記録が要る。読む元は ec_events と messages_log(source=ec_transactional)。**開封は作らない**"
     },
     {
       "feature": 24,
