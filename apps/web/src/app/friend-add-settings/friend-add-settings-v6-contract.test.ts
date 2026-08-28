@@ -12,4 +12,18 @@ describe('V6 友だち追加時配信の契約', () => {
     expect(PAGE).toContain('disabled={saving}')
     expect(PAGE).not.toContain("disabled={saving || routingError() !== ''}")
   })
+
+  it('未選択のアカウントへ勝手に保存せず、切替前の応答も表示しない', () => {
+    expect(PAGE).toContain('const accountId = selectedAccountId')
+    expect(PAGE).not.toContain('selectedAccountId ?? accounts[0]')
+    expect(PAGE).toContain('loadedAccountId !== accountId')
+    expect(PAGE).toContain('activeAccountRef.current !== accountId')
+  })
+
+  it('読み込みと保存の通信失敗から再操作できる', () => {
+    expect(PAGE).toContain('もう一度読み込む')
+    expect(PAGE).toContain('保存できませんでした。通信を確認して、もう一度お試しください。')
+    expect(PAGE).toContain('finally')
+    expect(PAGE).toContain('setSaving(false)')
+  })
 })
