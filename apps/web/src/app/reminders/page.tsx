@@ -218,19 +218,40 @@ export default function RemindersPage() {
     if (deleting || pendingDelete.length === 0) return
     setDeleting(true)
     setDeleteError('')
-    try {
-      for (const reminder of pendingDelete) {
+    const results: Array<{ reminder: Reminder; succeeded: boolean }> = []
+
+    // 1件ずつ結果を残す。途中で失敗しても、成功した削除まで失敗扱いにしない。
+    for (const reminder of pendingDelete) {
+      try {
         const result = await api.reminders.delete(reminder.id)
-        if (!result.success) throw new Error(result.error)
+        results.push({ reminder, succeeded: result.success })
+      } catch {
+        results.push({ reminder, succeeded: false })
       }
-      setSelected(new Set())
-      setPendingDelete([])
-      await loadReminders()
-    } catch (caught) {
-      setDeleteError(caught instanceof Error ? caught.message : '削除に失敗しました')
-    } finally {
-      setDeleting(false)
     }
+
+    const succeededIds = new Set(
+      results.filter((result) => result.succeeded).map((result) => result.reminder.id),
+    )
+    const failedReminders = results
+      .filter((result) => !result.succeeded)
+      .map((result) => result.reminder)
+
+    setSelected((previous) => {
+      const next = new Set(previous)
+      for (const id of succeededIds) next.delete(id)
+      return next
+    })
+    await loadReminders()
+    setDeleting(false)
+
+    if (failedReminders.length > 0) {
+      // API番号や内部例外は出さず、失敗分だけ確認画面へ残してやり直せるようにする。
+      setPendingDelete(failedReminders)
+      setDeleteError(`${failedReminders.length}件を削除できませんでした。状態を読み直してから、もう一度お試しください。`)
+      return
+    }
+    setPendingDelete([])
   }
 
   const filtered = useMemo(() => {
