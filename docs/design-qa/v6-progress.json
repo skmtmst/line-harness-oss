@@ -1,0 +1,331 @@
+{
+  "generatedFrom": "scripts/visual-qa/screens.mjs",
+  "total": 262,
+  "compared": 177,
+  "unimplemented": 74,
+  "unconfirmed": 7,
+  "elsewhere": 4,
+  "missing": 0,
+  "features": [
+    {
+      "feature": 1,
+      "name": "ダッシュボード",
+      "total": 5,
+      "compared": 5,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 2,
+      "name": "受信箱",
+      "total": 17,
+      "compared": 17,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 3,
+      "name": "友だち",
+      "total": 11,
+      "compared": 7,
+      "unimplemented": 4,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 4,
+      "name": "友だち属性",
+      "total": 21,
+      "compared": 14,
+      "unimplemented": 3,
+      "unconfirmed": 0,
+      "elsewhere": 4,
+      "missing": 0
+    },
+    {
+      "feature": 5,
+      "name": "シナリオ配信",
+      "total": 14,
+      "compared": 11,
+      "unimplemented": 3,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 6,
+      "name": "一斉配信",
+      "total": 15,
+      "compared": 10,
+      "unimplemented": 0,
+      "unconfirmed": 5,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 7,
+      "name": "リマインダ",
+      "total": 11,
+      "compared": 4,
+      "unimplemented": 7,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 8,
+      "name": "自動応答",
+      "total": 11,
+      "compared": 5,
+      "unimplemented": 6,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 9,
+      "name": "友だち追加時の配信",
+      "total": 10,
+      "compared": 3,
+      "unimplemented": 7,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 10,
+      "name": "ウェビナー",
+      "total": 13,
+      "compared": 8,
+      "unimplemented": 4,
+      "unconfirmed": 1,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 11,
+      "name": "テンプレート",
+      "total": 10,
+      "compared": 7,
+      "unimplemented": 3,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 12,
+      "name": "リッチメニュー",
+      "total": 9,
+      "compared": 6,
+      "unimplemented": 3,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 13,
+      "name": "回答フォーム",
+      "total": 7,
+      "compared": 5,
+      "unimplemented": 1,
+      "unconfirmed": 1,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 14,
+      "name": "共通情報",
+      "total": 4,
+      "compared": 2,
+      "unimplemented": 2,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 15,
+      "name": "登録メディア",
+      "total": 5,
+      "compared": 4,
+      "unimplemented": 1,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 16,
+      "name": "成果とアフィリエイト",
+      "total": 9,
+      "compared": 6,
+      "unimplemented": 3,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 17,
+      "name": "マイル・行動スコア",
+      "total": 11,
+      "compared": 4,
+      "unimplemented": 7,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 18,
+      "name": "流入と計測",
+      "total": 9,
+      "compared": 8,
+      "unimplemented": 1,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 19,
+      "name": "コンバージョン",
+      "total": 4,
+      "compared": 3,
+      "unimplemented": 1,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 20,
+      "name": "分析",
+      "total": 9,
+      "compared": 8,
+      "unimplemented": 1,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 21,
+      "name": "NEN配信",
+      "total": 7,
+      "compared": 6,
+      "unimplemented": 1,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 22,
+      "name": "写真審査",
+      "total": 4,
+      "compared": 1,
+      "unimplemented": 3,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 23,
+      "name": "EC連携",
+      "total": 4,
+      "compared": 1,
+      "unimplemented": 3,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 24,
+      "name": "LINE通知",
+      "total": 6,
+      "compared": 2,
+      "unimplemented": 4,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 25,
+      "name": "オートメーション",
+      "total": 8,
+      "compared": 6,
+      "unimplemented": 2,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 26,
+      "name": "外部連携",
+      "total": 4,
+      "compared": 3,
+      "unimplemented": 1,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 27,
+      "name": "予約管理",
+      "total": 7,
+      "compared": 4,
+      "unimplemented": 3,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 28,
+      "name": "予約設定",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 29,
+      "name": "イベント予約",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 30,
+      "name": "ログインユーザー",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 31,
+      "name": "機能設定",
+      "total": 1,
+      "compared": 1,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    },
+    {
+      "feature": 32,
+      "name": "運用状態",
+      "total": 4,
+      "compared": 4,
+      "unimplemented": 0,
+      "unconfirmed": 0,
+      "elsewhere": 0,
+      "missing": 0
+    }
+  ]
+}
