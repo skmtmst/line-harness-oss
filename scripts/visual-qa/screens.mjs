@@ -276,11 +276,17 @@ export const SCREENS = [
   // ── 機能3 友だち ────────────────────────────────────────
   { ...FRIENDS, node: 'PhxG6', name: '3-1 友だち' },
   {
+    /*
+      **表示件数は入っている。** `friend-list-table.tsx` に
+      `10 / 20 / 30 / 40 / 50件表示` の5つがあり、設計の並びと同じ。
+      未実装から外した（最新 `codex/development` `2e438929` で確認）。
+
+      **開いた中身は撮れません。** 素の `<select>` なので、
+      開いた一覧はブラウザ（OS）が描き、画像に入らない。
+      閉じた姿と、選べる5つが同じことで判定する。
+      共通の `Select` に寄せれば開いた姿も残せる（P2）。
+    */
     ...FRIENDS, node: 'LT8RS', name: '3-1-A 友だち（表示件数を開く）',
-    gap: 'parts',
-    gapNote: '共通の `Select` に寄せる。タグ一覧は既にそれを使っている',
-    status: 'unimplemented',
-    why: '表示件数が素のセレクトで、開いた中身が画像に写らない。**タグ一覧は共通の `Select` を使っていて、同じ操作の作りが画面ごとに違う**',
   },
   {
     ...FRIENDS, node: 'Igi72', name: '3-1-B 友だち（詳細検索・14軸）',
@@ -986,11 +992,19 @@ export const SCREENS = [
     },
   },
   {
-    ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/earning-rules/new',
-    gap: 'api',
-    gapNote: '**既存APIだけでは作れません。** いまの `scoring_rules` は（1）アカウント単位でない（2）下書き・テスト・公開が無い（3）公開版の固定と版履歴が無い（4）冪等性・頻度上限・スコア帯が無い。**CodexがDB・API基盤を実装中。** Claude側は実装せず、V6設計との差分整理だけ続けます',
-    status: 'unimplemented',
-    why: '`/mileage/earning-rules/new` は**マイルの付与ルール**を作る画面で、スコアのルールではない。17-2 が無いので行き先も無い',
+    /*
+      **PR #496（head `4dac7986`）で `/mileage/score-rules` が入った。**
+      アカウント単位・下書き・テスト・公開・停止・版番号が揃い、
+      「新規API・DB拡張が必要」だった4つの理由のうち3つが解けた。
+      残るのは**版履歴**（過去の版を並べて見る面）で、
+      `ActionScoreRuleConfiguration` は `editableVersion` と
+      `publishedVersion` の2つしか持たない。
+    */
+    ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/score-rules',
+    states: {
+      apis: ['**/api/action-scores/rules?*'],
+      kinds: ['normal', 'loading', 'empty', 'error'],
+    },
   },
 
   // ── 機能18 流入と計測 ───────────────────────────────────
@@ -1419,10 +1433,10 @@ export const SCREENS = [
   },
   {
     node: 'GMvBd', feature: 4, name: '4-3-A 対応マークを追加・編集',
-    dir: 'friend-attributes-v6', route: '/tags?tab=marks', gap: 'parts',
-    gapNote: '一覧の下の追加欄を窓にする。追加の口は既に在る',
+    dir: 'friend-attributes-v6', route: '/tags?tab=marks', gap: 'api',
+    gapNote: '**既存部品だけでは作れません。** 設計は1枚の画面で、名前・色・並び順・初期値のほかに**「自動変更ルール」**（担当者を割り当てたときなど、きっかけでマークを自動で変える）を持つ。ここに新しい口とテーブルが要る。名前・色・並び順・初期値までなら既存部品で作れる',
     status: 'unimplemented',
-    why: '追加・編集の画面が無い。一覧の下に名前と色だけの追加欄がある',
+    why: '追加・編集の画面が無い。一覧の下に名前と色だけの追加欄がある（`components/friend-fields/mark-list.tsx`）。設計の自動変更ルールに当たるものは、口も画面も無い',
   },
   {
     node: 'zGZMA', feature: 4, name: '4-3-B 対応マーク削除の確認ダイアログ',
@@ -1503,6 +1517,7 @@ export const CAPTURED_AT = {
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
     { pr: 494, head: '0ca45f98', on: '2026-08-28', screens: ['HIU5O'], note: '#494 は #441 を含む' },
     { pr: 495, head: '7d890d3b', on: '2026-08-28', screens: ['z3PB2', 'vz0Ji'], note: '#495 は #494 を含む' },
+    { pr: 496, head: '4dac7986', on: '2026-08-28', screens: ['s6MBc'], note: '#496 は #495 を含む' },
   ],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],

@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 189,
-  "unimplemented": 69,
+  "compared": 191,
+  "unimplemented": 67,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
@@ -33,8 +33,8 @@
       "feature": 3,
       "name": "友だち",
       "total": 11,
-      "compared": 7,
-      "unimplemented": 4,
+      "compared": 8,
+      "unimplemented": 3,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -239,8 +239,8 @@
       "feature": 17,
       "name": "マイル・行動スコア",
       "total": 11,
-      "compared": 8,
-      "unimplemented": 3,
+      "compared": 9,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
@@ -283,6 +283,15 @@
             "vz0Ji"
           ],
           "note": "#495 は #494 を含む"
+        },
+        {
+          "pr": 496,
+          "head": "4dac7986",
+          "on": "2026-08-28",
+          "screens": [
+            "s6MBc"
+          ],
+          "note": "#496 は #495 を含む"
         }
       ]
     },
@@ -483,13 +492,6 @@
     }
   ],
   "gaps": [
-    {
-      "feature": 3,
-      "node": "LT8RS",
-      "name": "3-1-A 友だち（表示件数を開く）",
-      "gap": "parts",
-      "gapNote": "共通の `Select` に寄せる。タグ一覧は既にそれを使っている"
-    },
     {
       "feature": 3,
       "node": "InCDe",
@@ -827,13 +829,6 @@
       "gapNote": "同上"
     },
     {
-      "feature": 17,
-      "node": "s6MBc",
-      "name": "17-2-A スコアのルール",
-      "gap": "api",
-      "gapNote": "**既存APIだけでは作れません。** いまの `scoring_rules` は（1）アカウント単位でない（2）下書き・テスト・公開が無い（3）公開版の固定と版履歴が無い（4）冪等性・頻度上限・スコア帯が無い。**CodexがDB・API基盤を実装中。** Claude側は実装せず、V6設計との差分整理だけ続けます"
-    },
-    {
       "feature": 18,
       "node": "UIaM7",
       "name": "18-1-E 流入リンクの削除確認",
@@ -963,8 +958,8 @@
       "feature": 4,
       "node": "GMvBd",
       "name": "4-3-A 対応マークを追加・編集",
-      "gap": "parts",
-      "gapNote": "一覧の下の追加欄を窓にする。追加の口は既に在る"
+      "gap": "api",
+      "gapNote": "**既存部品だけでは作れません。** 設計は1枚の画面で、名前・色・並び順・初期値のほかに**「自動変更ルール」**（担当者を割り当てたときなど、きっかけでマークを自動で変える）を持つ。ここに新しい口とテーブルが要る。名前・色・並び順・初期値までなら既存部品で作れる"
     }
   ]
 }

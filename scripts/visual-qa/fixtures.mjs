@@ -3120,3 +3120,98 @@ export const ACTION_SCORES = {
   ],
   pagination: { total: 6, limit: 20, offset: 0 },
 }
+
+/*
+  行動スコアのルール（PR #496）。
+
+  **`packages/db/src/action-score-rules.ts` の `DEFAULT_RULES` と
+  `ActionScoreRuleConfiguration` に合わせてあります。** 名前を勝手に付けると、
+  画面の `EVENT_OPTIONS`（`eventType|source` で引き当てる）に当たらず、
+  「きっかけ」の選択が先頭へ落ちます。**それを実装の不具合と読み違えます。**
+
+  ここは**公開済み**の姿です。第1版が動いていて、第2版が下書きにある。
+  `status: 'published'` と `currentPublishedVersionId` が入っているので、
+  「公開中のルールを停止」が出ます。
+*/
+const SCORE_RULES = [
+  { id: 'message-replied', name: 'こちらに返信した', eventType: 'message_received', source: 'line_webhook',
+    operation: 'delta', value: 8, frequency: { kind: 'per_day', limit: 1 },
+    sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true },
+  { id: 'delivery-url-clicked', name: '配信のURLを押した', eventType: 'link_clicked', source: 'tracked_link',
+    operation: 'delta', value: 5, frequency: { kind: 'per_subject', limit: 1 },
+    sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true },
+  { id: 'form-answered', name: '回答フォームに答えた', eventType: 'form_submitted', source: 'form',
+    operation: 'delta', value: 15, frequency: { kind: 'unlimited', limit: 1 },
+    sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true },
+  { id: 'booking-created', name: '予約をした', eventType: 'booking_created', source: null,
+    operation: 'delta', value: 20, frequency: { kind: 'unlimited', limit: 1 },
+    sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true },
+  { id: 'purchase-completed', name: '買った', eventType: 'purchase_completed', source: 'stripe',
+    operation: 'delta', value: 25, frequency: { kind: 'unlimited', limit: 1 },
+    sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: true },
+  /* **期間を入れた行。** 有効期間の欄が空のままだと撮れない。 */
+  { id: 'inactive-30-days', name: '30日間反応がない', eventType: 'inactivity_30d', source: 'scheduler',
+    operation: 'delta', value: -10, frequency: { kind: 'once_per_period', limit: 1 },
+    sameSourceEventOnce: true, validFrom: '2026-08-01T00:00:00.000Z', validUntil: '2026-12-31T14:59:00.000Z',
+    enabled: true },
+  /* **止めてある行。** 「動かす／止める」の見分けが撮れる。 */
+  { id: 'friend-blocked', name: 'ブロックした', eventType: 'friend_unfollow', source: 'line_webhook',
+    operation: 'set', value: 0, frequency: { kind: 'unlimited', limit: 1 },
+    sameSourceEventOnce: true, validFrom: null, validUntil: null, enabled: false },
+]
+
+const SCORE_BANDS = { min: 0, max: 100, normalMin: 30, highMin: 70 }
+
+const scoreBundle = () => ({
+  rules: SCORE_RULES.map((rule) => ({ ...rule, frequency: { ...rule.frequency } })),
+  bands: { ...SCORE_BANDS },
+})
+
+export const ACTION_SCORE_RULE_CONFIG = {
+  configured: true,
+  status: 'published',
+  currentDraftVersionId: 'asrv-2',
+  currentPublishedVersionId: 'asrv-1',
+  editableVersion: {
+    id: 'asrv-2', versionNumber: 2, status: 'draft',
+    createdAt: '2026-08-27T02:10:00.000Z', publishedAt: null,
+    ...scoreBundle(),
+  },
+  publishedVersion: {
+    id: 'asrv-1', versionNumber: 1, status: 'published',
+    createdAt: '2026-08-20T01:00:00.000Z', publishedAt: '2026-08-20T01:05:00.000Z',
+    ...scoreBundle(),
+  },
+}
+
+export const ACTION_SCORE_BANDS = { ...SCORE_BANDS }
+
+/*
+  「ルールをテスト」は**送られてきた設定でその場で計算します。**
+  固定の答えを返すと、点数や帯を変えても同じ絵が出て、
+  **効いていないことに気づけません。**
+  `packages/db/src/action-score-rules.ts` の `testActionScoreRuleBundle` と
+  同じ順番（上から当てはめ、`set` は置き換え、最後に上下限で切る）です。
+*/
+export function testActionScoreRules(bundle, input) {
+  const bands = bundle?.bands ?? SCORE_BANDS
+  const band = (score) => (score >= bands.highMin ? 'high' : score >= bands.normalMin ? 'normal' : 'low')
+  let score = Number(input.currentScore)
+  const matched = []
+  for (const rule of bundle?.rules ?? []) {
+    if (!rule.enabled) continue
+    if (rule.eventType !== input.eventType) continue
+    if (rule.source && rule.source !== (input.source ?? null)) continue
+    const before = score
+    const next = rule.operation === 'set' ? rule.value : score + rule.value
+    score = Math.max(bands.min, Math.min(bands.max, next))
+    matched.push({ ruleId: rule.id, ruleName: rule.name, scoreBefore: before, scoreAfter: score })
+  }
+  return {
+    scoreBefore: Number(input.currentScore),
+    scoreAfter: score,
+    bandBefore: band(Number(input.currentScore)),
+    bandAfter: band(score),
+    matched,
+  }
+}

@@ -213,6 +213,26 @@ const EMPTY_BODIES = [
     items: [],
     pagination: { total: 0, limit: 20, offset: 0 },
   }],
+  /*
+    行動スコアのルール（PR #496）。**一覧の既定（配列）を返すと画面が空白になる。**
+    型は `ActionScoreRuleConfiguration`。
+
+    **実装の「未設定」とは違う姿です。** 実装の `not_configured` は
+    `DEFAULT_RULES` 7件を返します（`packages/db/src/action-score-rules.ts`）。
+    ここで撮るのは**ルールを全部消した下書き**、つまり
+    「公開するには1件以上要る」と出る面です。
+  */
+  [/\/api\/action-scores\/rules\?/, {
+    configured: false,
+    status: 'not_configured',
+    currentDraftVersionId: null,
+    currentPublishedVersionId: null,
+    editableVersion: {
+      id: null, versionNumber: 1, status: 'draft', createdAt: null, publishedAt: null,
+      rules: [], bands: { min: 0, max: 100, normalMin: 30, highMin: 70 },
+    },
+    publishedVersion: null,
+  }],
   [/\/api\/friend-fields-stats/, {
     total: 0, inUse: 0, registeredFriends: 0, formLinks: 0, updatedThisMonth: 0,
   }],
