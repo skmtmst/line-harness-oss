@@ -59,6 +59,16 @@ describe('テンプレート一覧のV6画面構造', () => {
     expect(detail).not.toContain('削除すると、その箇所の本文が空になります')
   })
 
+  it('M9cijの削除確認を共通ダイアログで表示し、ブラウザ標準確認へ戻さない', () => {
+    expect(page).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
+    expect(detail).toContain("import ConfirmDialog from '@/components/shared/confirm-dialog'")
+    expect(page).toContain('data-design-node="M9cij"')
+    expect(detail).toContain('data-design-node="M9cij"')
+    expect(page).toContain('open={pendingDelete !== null}')
+    expect(detail).toContain('open={deleteOpen && usageCount === 0}')
+    expect(page + detail).not.toContain("confirm('このテンプレートを削除しますか？')")
+  })
+
   it('詳細もタイトルを本文へ重ねず、データ由来の名前をトップバーへ渡す', () => {
     expect(detail).toContain('usePageTitle(template?.name ?? null)')
     expect(detail).not.toContain("import Header from '@/components/layout/header'")

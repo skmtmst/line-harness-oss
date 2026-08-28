@@ -7,6 +7,7 @@ import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { Tabs } from '@/components/shared/tabs'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
@@ -92,6 +93,9 @@ export default function TemplatesPage() {
   const [form, setForm] = useState({ name: '', category: 'general', messageType: 'text', messageContent: '' })
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Drawer
   const [drawerId, setDrawerId] = useState<string | null>(null)
@@ -106,6 +110,8 @@ export default function TemplatesPage() {
     activeAccountRef.current = selectedAccountId
     setDrawerId(null)
     setShowCreate(false)
+    setPendingDelete(null)
+    setDeleteError('')
   }, [selectedAccountId])
 
   const load = useCallback(async () => {
@@ -251,24 +257,35 @@ export default function TemplatesPage() {
     setSavingEdit(false)
   }
 
-  const handleDelete = async (id: string, usageCount: number) => {
+  const handleDelete = (template: Pick<Template, 'id' | 'name' | 'usageCount'>) => {
+    const { id, name, usageCount } = template
     if (usageCount > 0) {
       setDrawerId(id)
       setError(`${usageCount}件で使用中です。使用先を差し替えてから削除してください。`)
       return
     }
-    if (!confirm('このテンプレートを削除しますか？')) return
+    setDeleteError('')
+    setPendingDelete({ id, name })
+  }
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    const target = pendingDelete
+    setDeleting(true)
+    setDeleteError('')
     try {
-      const result = await api.templates.delete(id)
+      const result = await api.templates.delete(target.id)
       if (!result.success) {
-        setError(result.error)
-        setDrawerId(id)
+        setDeleteError(result.error)
         return
       }
-      if (drawerId === id) setDrawerId(null)
-      load()
+      setPendingDelete(null)
+      if (drawerId === target.id) setDrawerId(null)
+      await load()
     } catch {
-      setError('削除に失敗しました')
+      setDeleteError('削除に失敗しました')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -616,7 +633,7 @@ export default function TemplatesPage() {
                         </Button>
                       ) : (
                         <button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(t.id, t.usageCount) }}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(t) }}
                           className="hover:bg-danger-bg rounded-md px-2.5 py-1 text-xs font-medium text-red-500"
                         >
                           テンプレートを削除
@@ -811,6 +828,23 @@ export default function TemplatesPage() {
           </div>
         </>
       )}
+      <div data-design-node="M9cij">
+        <ConfirmDialog
+          open={pendingDelete !== null}
+          title="テンプレートを削除しますか？"
+          description={`「${pendingDelete?.name ?? ''}」を削除します。この操作は元に戻せません。`}
+          confirmLabel="テンプレートを削除"
+          destructive
+          busy={deleting}
+          error={deleteError || undefined}
+          onCancel={() => {
+            if (deleting) return
+            setPendingDelete(null)
+            setDeleteError('')
+          }}
+          onConfirm={() => void confirmDelete()}
+        />
+      </div>
       </div>
       </div>
       </> : <BroadcastAssetManager kind={activeSection} />}

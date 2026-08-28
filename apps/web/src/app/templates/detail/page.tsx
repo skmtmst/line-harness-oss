@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { usePageTitle } from '@/components/shell/page-chrome'
 
 interface Usage {
@@ -30,6 +31,9 @@ function TemplateDetailInner() {
   const [usage, setUsage] = useState<Usage | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   usePageTitle(template?.name ?? null)
 
   useEffect(() => {
@@ -61,17 +65,20 @@ function TemplateDetailInner() {
     : 0
 
   const remove = async () => {
-    if (usageCount > 0) {
-      setError(`${usageCount}か所で使用中です。下の使用先を差し替えてから削除してください。`)
-      return
-    }
-    if (!confirm('このテンプレートを削除しますか？')) return
-    setError('')
+    if (usageCount > 0 || !template) return
+    setDeleting(true)
+    setDeleteError('')
     try {
-      await api.templates.delete(id)
+      const result = await api.templates.delete(id)
+      if (!result.success) {
+        setDeleteError(result.error)
+        return
+      }
       router.push('/templates')
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '削除に失敗しました')
+      setDeleteError(e instanceof ApiError ? e.message : '削除に失敗しました')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -204,7 +211,10 @@ function TemplateDetailInner() {
                   : 'どこからも呼ばれていないので、削除しても他の画面に影響しません。'}
               </p>
               <button
-                onClick={() => void remove()}
+                onClick={() => {
+                  setDeleteError('')
+                  setDeleteOpen(true)
+                }}
                 disabled={usageCount > 0}
                 title={usageCount > 0 ? '使用先を差し替えると削除できます' : undefined}
                 className="text-danger hover:bg-danger-bg rounded-control mt-3 px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40"
@@ -251,6 +261,23 @@ function TemplateDetailInner() {
           </div>
         </div>
       )}
+      <div data-design-node="M9cij">
+        <ConfirmDialog
+          open={deleteOpen && usageCount === 0}
+          title="テンプレートを削除しますか？"
+          description={`「${template?.name ?? ''}」を削除します。この操作は元に戻せません。`}
+          confirmLabel="テンプレートを削除"
+          destructive
+          busy={deleting}
+          error={deleteError || undefined}
+          onCancel={() => {
+            if (deleting) return
+            setDeleteOpen(false)
+            setDeleteError('')
+          }}
+          onConfirm={() => void remove()}
+        />
+      </div>
     </div>
   )
 }
