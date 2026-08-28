@@ -25,6 +25,14 @@ describe('V6リッチメニューの画面契約', () => {
     expect(bar.indexOf('出す順番を変える')).toBeGreaterThan(bar.indexOf('表示件数'))
     expect(PAGE).not.toContain('準備中')
   })
+
+  it('LINEアカウント切替前の応答を捨て、全件をページ送りでたどれる', () => {
+    expect(PAGE).toContain('activeAccountRef.current !== accountId')
+    expect(PAGE).toContain("import Pagination from '@/components/shared/pagination'")
+    expect(PAGE).toContain('pageCount={pageCount}')
+    expect(PAGE).toContain('const list = sorted')
+    expect(PAGE).not.toContain('「表示」を増やすと出ます')
+  })
 })
 
 describe('V6リッチメニューの公開安全契約', () => {
