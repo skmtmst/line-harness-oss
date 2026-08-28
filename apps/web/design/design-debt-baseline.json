@@ -313,6 +313,9 @@
     "direct-primary-button": 1,
     "arbitrary-value": 1
   },
+  "app/scenarios/results/page.tsx": {
+    "unresolved-classname": 23
+  },
   "app/scoring/new/page.tsx": {
     "direct-th": 3,
     "unresolved-classname": 8
