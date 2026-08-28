@@ -49,6 +49,9 @@ describe('V6 機能20 分析', () => {
     expect(PAGE).toContain('保存時点の結果は書き換わりません')
     expect(PAGE).toContain('定期レポートは現在「なし」です')
     expect(PAGE).not.toContain('保存した分析はまだ接続されていません')
+    expect(PAGE).toContain('DateTimeMetricCell metric={item.lastUsedAt}')
+    expect(PAGE).toContain('<Th>集計状態</Th>')
+    expect(PAGE).toContain('SAVED_STATE_LABELS[item.latestSnapshot.state]')
   })
 
   it('保存と個人一覧への移動は閲覧権限と分ける', () => {

@@ -20,8 +20,10 @@ import {
 import KpiCard from '@/components/dashboard/kpi-card'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
+import Chip, { type ChipTone } from '@/components/shared/chip'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
+import { formatAnalyticsDateTime } from './analytics-time'
 
 const TABS = [
   { key: 'friends', label: '友だちの増減' },
@@ -599,7 +601,7 @@ function CrossTab({ accountId, canManage }: { accountId: string; canManage: bool
               <div className="flex items-start justify-between gap-2">
                 <h3 className="text-ink text-sm font-semibold">この表から読めること</h3>
                 {crossResult && <span className="text-ink-faint shrink-0 text-xs">
-                  データ締切 {new Date(crossResult.dataCutoffAt).toLocaleString('ja-JP')}
+                  データ締切 {formatAnalyticsDateTime(crossResult.dataCutoffAt)}
                 </span>}
               </div>
               <ul className="text-ink-secondary mt-2 space-y-1.5 text-xs leading-relaxed">
@@ -884,7 +886,7 @@ function FunnelTab({ accountId, canManage }: { accountId: string; canManage: boo
                 段の列だけで、条件で分ける口を持っていない。 */}
             {run && <p className="text-ink-faint mt-2 text-xs">
               集計期間 {new Date(run.cohortFrom).toLocaleDateString('ja-JP')}〜{new Date(run.cohortTo).toLocaleDateString('ja-JP')}
-              ／データ締切 {new Date(run.dataCutoffAt).toLocaleString('ja-JP')}
+              ／データ締切 {formatAnalyticsDateTime(run.dataCutoffAt)}
             </p>}
             {runError && <p className="text-danger mt-2 text-xs">{runError}</p>}
             {run?.stateReason && <p className="text-warning mt-2 text-xs">{run.stateReason}</p>}
@@ -1293,6 +1295,12 @@ function MetricCell({ metric, percent, currency }: {
   </span>
 }
 
+function DateTimeMetricCell({ metric }: { metric: AnalyticsMetric<string> }) {
+  return <span className={metric.value === null ? 'text-ink-faint' : 'text-ink'} title={metric.reason ?? undefined}>
+    {formatAnalyticsDateTime(metric.value)}
+  </span>
+}
+
 function OverviewState({ loading, error }: { loading: boolean; error: string }) {
   if (loading) return <div className="bg-canvas rounded-card border-hairline text-ink-faint border p-10 text-center text-sm">分析を読み込んでいます</div>
   if (error) return <div className="bg-danger-bg rounded-card border-danger text-danger border p-6 text-sm">{error}</div>
@@ -1380,7 +1388,7 @@ function UsageOverviewTab({ accountId }: { accountId: string }) {
     {overview.stateReason && <div className="bg-warning-bg border-warning rounded-card border px-4 py-3 text-sm">{overview.stateReason}</div>}
     <div className="bg-canvas rounded-card border-hairline overflow-hidden border"><table className="w-full table-fixed">
       <thead><TableHeadRow><Th>機能</Th><Th align="right">作成</Th><Th align="right">利用中</Th><Th align="right">未使用</Th><Th align="right">参照切れ</Th><Th>最終利用</Th></TableHeadRow></thead>
-      <tbody className="divide-hairline divide-y">{overview.categories.map((item) => <tr key={item.key} className="text-sm"><td className="px-4 py-3"><Link href={item.href} className="text-accent font-medium hover:underline">{item.label}</Link></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.brokenReferences} /></td><td className="text-ink-secondary truncate px-3 py-3"><MetricCell metric={item.lastUsedAt} /></td></tr>)}</tbody>
+      <tbody className="divide-hairline divide-y">{overview.categories.map((item) => <tr key={item.key} className="text-sm"><td className="px-4 py-3"><Link href={item.href} className="text-accent font-medium hover:underline">{item.label}</Link></td><td className="px-3 py-3 text-right"><MetricCell metric={item.created} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.inUse} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.unused} /></td><td className="px-3 py-3 text-right"><MetricCell metric={item.brokenReferences} /></td><td className="text-ink-secondary truncate px-3 py-3"><DateTimeMetricCell metric={item.lastUsedAt} /></td></tr>)}</tbody>
     </table></div>
     <p className="text-ink-faint text-xs">未使用の項目は自動で削除しません。各機能の使用先を確認してから停止・削除します。</p>
   </div>
@@ -1409,6 +1417,13 @@ const SAVED_STATE_LABELS: Record<SavedAnalyticsSnapshot['state'], string> = {
   partial: '一部集計',
   unavailable: '取得不可',
   failed: '失敗',
+}
+
+const SAVED_STATE_TONES: Record<SavedAnalyticsSnapshot['state'], ChipTone> = {
+  available: 'ok',
+  partial: 'warn',
+  unavailable: 'danger',
+  failed: 'danger',
 }
 
 function SavedAnalyticsTab({ accountId }: { accountId: string }) {
@@ -1509,6 +1524,7 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
                     <Th>作成者</Th>
                     <Th>定義版</Th>
                     <Th>最新の期間</Th>
+                    <Th>集計状態</Th>
                     <Th align="right">結果</Th>
                   </TableHeadRow>
                 </thead>
@@ -1535,6 +1551,13 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
                           {item.latestSnapshot
                             ? `${item.latestSnapshot.periodFrom.slice(0, 10)}〜${item.latestSnapshot.periodTo.slice(0, 10)}`
                             : '—'}
+                        </td>
+                        <td className="px-3 py-3 text-xs">
+                          {item.latestSnapshot ? (
+                            <Chip tone={SAVED_STATE_TONES[item.latestSnapshot.state]}>
+                              {SAVED_STATE_LABELS[item.latestSnapshot.state]}
+                            </Chip>
+                          ) : <span className="text-ink-faint">—</span>}
                         </td>
                         <td className="text-ink-secondary px-3 py-3 text-right text-sm">{item.snapshotCount}件</td>
                       </tr>
@@ -1571,7 +1594,7 @@ function SavedAnalyticsTab({ accountId }: { accountId: string }) {
                       {snapshot.periodFrom.slice(0, 10)}〜{snapshot.periodTo.slice(0, 10)}
                     </p>
                     <p className="text-ink-faint mt-1 text-xs tabular-nums">
-                      データ締切 {new Date(snapshot.dataCutoffAt).toLocaleString('ja-JP')}
+                      データ締切 {formatAnalyticsDateTime(snapshot.dataCutoffAt)}
                     </p>
                   </li>
                 ))}
