@@ -37,6 +37,8 @@ import type {
   Reminder,
   ReminderDeliveryRunStatus,
   ReminderDeliveryRunsResponse,
+  AutoReplyEvaluationStatus,
+  AutoReplyRunsResponse,
   ReminderStep,
   ReminderTriggerType,
   ScoringRule,
@@ -2607,6 +2609,22 @@ export const api = {
       fetchApi<ApiResponse<null>>(`/api/auto-replies/${id}`, {
         method: 'DELETE',
       }),
+    runs: (params?: {
+      ruleId?: string;
+      status?: AutoReplyEvaluationStatus;
+      search?: string;
+      limit?: number;
+      offset?: number;
+    }) => {
+      const query = new URLSearchParams()
+      if (params?.ruleId) query.set('ruleId', params.ruleId)
+      if (params?.status) query.set('status', params.status)
+      if (params?.search) query.set('search', params.search)
+      if (params?.limit) query.set('limit', String(params.limit))
+      if (params?.offset) query.set('offset', String(params.offset))
+      const suffix = query.size > 0 ? `?${query}` : ''
+      return fetchApi<ApiResponse<AutoReplyRunsResponse>>(`/api/auto-reply-runs${suffix}`)
+    },
   },
   automations: {
     list: (params?: { accountId?: string }) => {
