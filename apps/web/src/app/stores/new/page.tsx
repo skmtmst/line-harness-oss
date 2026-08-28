@@ -1,13 +1,12 @@
 'use client'
 
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Suspense, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { MANUAL_LINKS } from '@/lib/manual-links'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
+import { resolveStep, type Choice, type Step } from './step'
 
-type Step = 'choose' | 'create' | 'api' | 'credentials' | 'verify' | 'done'
-type Choice = 'existing' | 'new' | null
 type Connected = Awaited<ReturnType<typeof restaurantTestApi.connectStore>>['data']
 
 const validSteps: Step[] = ['choose', 'create', 'api', 'credentials', 'verify', 'done']
@@ -32,7 +31,7 @@ function NewStoreFlow() {
   const searchParams = useSearchParams()
   const { selectedAccountId } = useAccount()
   const requested = searchParams.get('step') as Step | null
-  const step = requested && validSteps.includes(requested) ? requested : 'choose'
+  const requestedStep = requested && validSteps.includes(requested) ? requested : 'choose'
   const [choice, setChoice] = useState<Choice>(null)
   const [createdOfficial, setCreatedOfficial] = useState(false)
   const [apiEnabled, setApiEnabled] = useState(false)
@@ -42,6 +41,11 @@ function NewStoreFlow() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [connected, setConnected] = useState<Connected | null>(null)
+  const step = resolveStep(requestedStep, { choice, createdOfficial, apiEnabled, channelId, channelSecret, connected })
+
+  useEffect(() => {
+    if (step !== requestedStep) router.replace(`/stores/new?step=${step}`)
+  }, [requestedStep, router, step])
 
   const move = (next: Step) => router.replace(`/stores/new?step=${next}`)
   const progress = step === 'done' ? 3 : step === 'verify' ? 2 : 1
@@ -85,7 +89,7 @@ function NewStoreFlow() {
       {step === 'verify' ? <section><h1 className="text-3xl font-bold">接続の確認</h1><p className="mt-3 text-ink-secondary">店舗の呼び名を決めて、LINE公式アカウントへ接続します。</p><div className="mt-8 rounded-card border border-hairline bg-canvas p-7"><Field label="この店舗の呼び名" help="統括画面や店舗コンソールで見分ける名前です。" error={errors.alias}><input value={alias} onChange={event => setAlias(event.target.value)} className="w-full rounded-control border border-hairline bg-canvas px-4 py-3 outline-none focus-visible:border-action focus-visible:ring-2 focus-visible:ring-action" /></Field>{connected ? <dl className="mt-8 grid gap-4 border-t border-hairline pt-6 sm:grid-cols-2"><Result label="表示名" value={connected.lineAccountName} /><Result label="ベーシックID" value={connected.basicId || '取得できませんでした'} /><Result label="友だち数" value={connected.friendCount === null ? '接続後に確認できます' : `${connected.friendCount}人`} /><Result label="Webhookの状態" value={connected.webhook === 'ok' ? '設定済み' : connected.webhook === 'inactive' ? 'LINE側の「Webhookの利用」がオフです。LINE Developers の Messaging API設定でオンにしてください' : 'Webhookの設定に失敗しました。あとから店舗の設定でやり直せます'} /></dl> : null}</div></section> : null}
       {step === 'done' ? <section className="text-center"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-bg text-3xl text-success">✓</div><h1 className="mt-6 text-3xl font-bold">{connected?.store.name || alias}を使いはじめられます</h1><p className="mt-3 text-ink-secondary">店舗アカウントの追加が完了しました。</p><div className="mx-auto mt-10 max-w-2xl rounded-card border border-hairline bg-canvas p-7 text-left"><h2 className="text-lg font-bold">次にやること</h2><ol className="mt-5 space-y-4 text-sm text-ink-secondary"><li>1. LINE Developersで「Webhookの利用」をオンにする</li><li>2. 店舗コンソールの基本設定を確認する</li><li>3. 友だち追加用の案内を準備する</li></ol></div></section> : null}
     </main>
-    <footer className="fixed inset-x-0 bottom-0 border-t border-hairline bg-canvas"><div className="mx-auto flex min-h-20 max-w-5xl items-center justify-between gap-6 px-6"><p className="text-sm text-ink-secondary">{connected ? '接続情報を保存しました' : '入力内容はこの画面で保持されています'}</p><div className="flex shrink-0 gap-3">{step !== 'choose' && step !== 'done' ? <button type="button" disabled={saving || Boolean(connected)} onClick={back} className={`${buttonClass} border border-hairline bg-canvas`}>戻る</button> : null}{step === 'verify' ? connected ? <button type="button" onClick={() => move('done')} className={`${buttonClass} bg-accent text-on-accent`}>次へ</button> : <button type="button" disabled={saving} onClick={() => void connect()} className={`${buttonClass} bg-accent text-on-accent`}>{saving ? '接続中…' : '接続して保存'}</button> : step === 'done' ? <button type="button" onClick={() => router.replace('/hq')} className={`${buttonClass} bg-accent text-on-accent`}>統括の店舗一覧へ</button> : <button type="button" disabled={(step === 'choose' && !choice) || (step === 'create' && !createdOfficial) || (step === 'api' && !apiEnabled)} onClick={next} className={`${buttonClass} bg-accent text-on-accent`}>次へ</button>}</div></div></footer>
+    <footer className="fixed inset-x-0 bottom-0 border-t border-hairline bg-canvas"><div className="mx-auto flex min-h-20 max-w-5xl items-center justify-center gap-6 px-6"><p className="flex-1 text-sm text-ink-secondary">{connected ? '接続情報を保存しました' : '入力内容はこの画面で保持されています'}</p><div className="flex shrink-0 gap-3">{step !== 'choose' && step !== 'done' ? <button type="button" disabled={saving || Boolean(connected)} onClick={back} className={`${buttonClass} border border-hairline bg-canvas`}>戻る</button> : null}{step === 'verify' ? connected ? <button type="button" onClick={() => move('done')} className={`${buttonClass} bg-accent text-on-accent`}>次へ</button> : <button type="button" disabled={saving} onClick={() => void connect()} className={`${buttonClass} bg-accent text-on-accent`}>{saving ? '接続中…' : '接続して保存'}</button> : step === 'done' ? <button type="button" onClick={() => router.replace('/hq')} className={`${buttonClass} bg-accent text-on-accent`}>統括の店舗一覧へ</button> : <button type="button" disabled={(step === 'choose' && !choice) || (step === 'create' && !createdOfficial) || (step === 'api' && !apiEnabled)} onClick={next} className={`${buttonClass} bg-accent text-on-accent`}>次へ</button>}</div><div className="flex-1" aria-hidden="true" /></div></footer>
   </div>
 }
 
