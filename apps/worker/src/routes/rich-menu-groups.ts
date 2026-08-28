@@ -29,6 +29,7 @@ import {
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { canAccessAllLineAccounts } from '../services/account-access.js';
 import { validateRichMenuImage } from '../lib/image-validator.js';
 import { resolveTrackedLinkBaseUrl } from '../lib/link-base-url.js';
 import { currentMonthRange } from '../lib/jst-range.js';
@@ -375,6 +376,9 @@ richMenuGroups.get('/api/rich-menu-groups/external/:richMenuId/image', async (c)
   const richMenuId = c.req.param('richMenuId');
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
   const res = await fetch(
@@ -404,6 +408,9 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
   const richMenuId = c.req.query('richMenuId');
   if (!accountId || !richMenuId) {
     return c.json({ success: false, error: 'accountId and richMenuId query params required' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
   }
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
@@ -582,6 +589,9 @@ richMenuGroups.post('/api/rich-menu-groups/import', requireRole('owner', 'admin'
 richMenuGroups.get('/api/rich-menu-groups/external', async (c) => {
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
   const auth = `Bearer ${account.channel_access_token}`;
@@ -672,6 +682,9 @@ richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', requireRole(
   const richMenuId = c.req.param('richMenuId');
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const account = await getLineAccountById(c.env.DB, accountId);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 404);
 
@@ -714,6 +727,9 @@ richMenuGroups.delete('/api/rich-menu-groups/external/:richMenuId', requireRole(
 richMenuGroups.get('/api/rich-menu-groups/tap-stats', async (c) => {
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const range = currentMonthRange(jstNow());
   const from = c.req.query('from') || range.from;
   const to = c.req.query('to') || range.to;
@@ -728,6 +744,9 @@ richMenuGroups.get('/api/rich-menu-groups/tap-stats', async (c) => {
 richMenuGroups.get('/api/rich-menu-groups', async (c) => {
   const accountId = c.req.query('accountId');
   if (!accountId) return c.json({ success: false, error: 'accountId query param required' }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const groups = await getRichMenuGroups(c.env.DB, accountId);
   // 各 group の代表画像 (default_page_id の image_r2_key、なければ order_index=0 の page) を取得。
   // 一覧カードでサムネを出すために 1 クエリで JOIN する。
@@ -772,7 +791,9 @@ richMenuGroups.get('/api/rich-menu-groups', async (c) => {
 richMenuGroups.get('/api/rich-menu-groups/:groupId', async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'not found' }, 404);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
   return c.json({ success: true, data: serializeGroupWithPages(group) });
 });
 
@@ -785,6 +806,9 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), asyn
   }
   const parsed = parseCreateBody(body);
   if (!parsed.ok) return c.json({ success: false, error: parsed.error }, 400);
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [parsed.value.accountId])) {
+    return c.json({ success: false, error: 'line account not found' }, 404);
+  }
   const switcherRejection = rejectRichmenuswitchInCreate(parsed.value.pages);
   if (switcherRejection) return c.json({ success: false, error: switcherRejection }, 400);
   const created = await createRichMenuGroup(c.env.DB, parsed.value);
@@ -794,7 +818,9 @@ richMenuGroups.post('/api/rich-menu-groups', requireRole('owner', 'admin'), asyn
 richMenuGroups.patch('/api/rich-menu-groups/:groupId', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
   const existing = await getRichMenuGroupById(c.env.DB, groupId);
-  if (!existing) return c.json({ success: false, error: 'not found' }, 404);
+  if (!existing || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
 
   let body: unknown;
   try {
@@ -821,7 +847,9 @@ richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireRole('owner', 'ad
   // ?force=true (確信を持って残骸を残してもよい) でだけ進める。
   const force = c.req.query('force') === 'true';
   const existing = await getRichMenuGroupById(c.env.DB, groupId);
-  if (!existing) return c.json({ success: false, error: 'not found' }, 404);
+  if (!existing || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [existing.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
   if (existing.status === 'published' && !force) {
     return c.json(
       {
@@ -840,6 +868,10 @@ richMenuGroups.delete('/api/rich-menu-groups/:groupId', requireRole('owner', 'ad
 
 richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requireRole('owner', 'admin'), async (c) => {
   const { groupId, pageId } = c.req.param();
+  const group = await getRichMenuGroupById(c.env.DB, groupId);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'group not found' }, 404);
+  }
   const contentType = c.req.header('content-type') ?? '';
   if (contentType !== 'image/png' && contentType !== 'image/jpeg') {
     return c.json({ success: false, error: 'content-type must be image/png or image/jpeg' }, 400);
@@ -851,9 +883,6 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
   const buf = new Uint8Array(await c.req.arrayBuffer());
   const validation = validateRichMenuImage(buf, buf.byteLength);
   if (!validation.ok) return c.json({ success: false, error: validation.error }, 400);
-
-  const group = await getRichMenuGroupById(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'group not found' }, 404);
 
   // group.size と画像サイズが一致してないと publish 時に LINE API でコンテンツアップロードが
   // 弾かれる (richmenu の宣言サイズと content の dimensions は一致必須)。事前に拒否する。
@@ -881,6 +910,14 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/pages/:pageId/image', requir
 // 画像取得 — エディタからの <img src="..."> 用。private cache でアクセス制御は auth に委ねる。
 richMenuGroups.get('/api/rich-menu-images/:key{.+}', async (c) => {
   const key = c.req.param('key');
+  const [root, accountId] = key.split('/');
+  if (
+    root !== 'rich-menus'
+    || !accountId
+    || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])
+  ) {
+    return c.notFound();
+  }
   const obj = await c.env.IMAGES.get(key);
   if (!obj) return c.notFound();
   return new Response(obj.body, {
@@ -1034,7 +1071,9 @@ function createLineClient(channelAccessToken: string): LineRichMenuClient {
 richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'not found' }, 404);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
   if (group.publishing_at) return c.json({ success: false, error: 'already publishing' }, 409);
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
@@ -1119,7 +1158,9 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/publish', requireRole('owner
 richMenuGroups.post('/api/rich-menu-groups/:groupId/unpublish', requireRole('owner', 'admin'), async (c) => {
   const groupId = c.req.param('groupId');
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'not found' }, 404);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
 
   const account = await getLineAccountById(c.env.DB, group.account_id);
   if (!account) return c.json({ success: false, error: 'line account not found' }, 500);
@@ -1184,7 +1225,9 @@ richMenuGroups.post('/api/rich-menu-groups/:groupId/apply-to-tag', requireRole('
   const tagId = (r.tagId as string | null | undefined) ?? null;
 
   const group = await getRichMenuGroupWithPages(c.env.DB, groupId);
-  if (!group) return c.json({ success: false, error: 'not found' }, 404);
+  if (!group || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [group.account_id])) {
+    return c.json({ success: false, error: 'not found' }, 404);
+  }
   if (group.status !== 'published') {
     return c.json(
       { success: false, error: 'group must be published before applying to friends' },
