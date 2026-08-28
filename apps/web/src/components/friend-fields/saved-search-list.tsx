@@ -2,33 +2,25 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { SavedSearch } from '@line-crm/shared'
+import type { SavedSearch, SavedSearchCondition, Tag } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { describeSavedCondition, type SavedSearchConditionLabels } from '@/components/friends/saved-search-utils'
 
-/**
- * 条件1本を人が読める行にする。
- *
- * 条件の形は保存した時期によって違う（型が決まっていない）。読める鍵が
- * 入っていればそれを並べ、分からない形なら中身をそのまま出す。件数だけ
- * 出していた頃は「2件」としか分からず、開かないと中身が読めなかった。
- */
-function describeOne(item: unknown): string {
-  if (typeof item === 'string') return item
-  if (!item || typeof item !== 'object') return String(item)
-  const o = item as Record<string, unknown>
-  const label = o.label ?? o.field ?? o.key ?? o.type
-  const op = o.op ?? o.operator ?? o.comparator
-  const raw = o.value ?? o.values ?? o.val
-  const value = Array.isArray(raw) ? raw.join('・') : raw
-  const parts = [label, op, value].filter((v) => v !== undefined && v !== null && v !== '')
-  return parts.length > 0 ? parts.map(String).join(' ') : JSON.stringify(item)
+function isSavedSearchCondition(item: unknown): item is SavedSearchCondition {
+  if (!item || typeof item !== 'object') return false
+  const value = item as Partial<SavedSearchCondition>
+  return typeof value.kind === 'string' && typeof value.op === 'string'
 }
 
 /** 保存した条件の中身。all（かつ）と any（または）に分けて返す。 */
-function splitConditions(conditions: unknown): { all: string[]; any: string[]; note: string | null } {
+function splitConditions(
+  conditions: unknown,
+  tags: Tag[],
+  labels: SavedSearchConditionLabels,
+): { all: string[]; any: string[]; note: string | null } {
   const c = conditions as { all?: unknown[]; any?: unknown[]; visibility?: string } | null
   if (!c) return { all: [], any: [], note: null }
   const note =
@@ -38,8 +30,8 @@ function splitConditions(conditions: unknown): { all: string[]; any: string[]; n
         ? '表示状態を問わない'
         : null
   return {
-    all: (c.all ?? []).map(describeOne),
-    any: (c.any ?? []).map(describeOne),
+    all: (c.all ?? []).map((item) => isSavedSearchCondition(item) ? describeSavedCondition(item, tags, labels) : '条件を確認できません'),
+    any: (c.any ?? []).map((item) => isSavedSearchCondition(item) ? describeSavedCondition(item, tags, labels) : '条件を確認できません'),
     note,
   }
 }
@@ -62,6 +54,8 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [error, setError] = useState('')
+  const [tags, setTags] = useState<Tag[]>([])
+  const [conditionLabels, setConditionLabels] = useState<SavedSearchConditionLabels>({})
   const [pendingDelete, setPendingDelete] = useState<SavedSearch | null>(null)
   const loadSequence = useRef(0)
 
@@ -71,11 +65,28 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
     setLoadError('')
     setError('')
     setItems([])
+    setTags([])
+    setConditionLabels({})
     try {
       if (!accountId) return
-      const res = await api.savedSearches.list(accountId)
+      const [savedSearches, tagResult, markResult, scenarioResult] = await Promise.allSettled([
+        api.savedSearches.list(accountId),
+        api.tags.list(),
+        api.supportMarks.list(accountId),
+        api.scenarios.list({ accountId }),
+      ])
       if (sequence !== loadSequence.current) return
-      if (res.success) setItems(res.data)
+      if (savedSearches.status === 'rejected') throw savedSearches.reason
+      if (savedSearches.value.success) setItems(savedSearches.value.data)
+      if (tagResult.status === 'fulfilled' && tagResult.value.success) setTags(tagResult.value.data)
+      setConditionLabels({
+        marks: markResult.status === 'fulfilled' && markResult.value.success
+          ? Object.fromEntries(markResult.value.data.map((mark) => [mark.id, mark.name]))
+          : {},
+        scenarios: scenarioResult.status === 'fulfilled' && scenarioResult.value.success
+          ? Object.fromEntries(scenarioResult.value.data.map((scenario) => [scenario.id, scenario.name]))
+          : {},
+      })
     } catch (reason) {
       if (sequence === loadSequence.current) {
         setLoadError(reason instanceof ApiError ? reason.message : '保存した検索を読み込めませんでした')
@@ -147,7 +158,7 @@ export default function SavedSearchList({ accountId }: { accountId: string | nul
       ) : (
         <div className="space-y-3">
           {items.map((search) => {
-            const { all, any, note } = splitConditions(search.conditions)
+            const { all, any, note } = splitConditions(search.conditions, tags, conditionLabels)
             const deleteDisabled = !search.lineAccountId || search.canDelete !== true
             const deleteTitle = !search.lineAccountId
               ? '管理者が対象アカウントを割り当てるまで変更できません'

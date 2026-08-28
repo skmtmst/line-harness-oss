@@ -32,6 +32,14 @@ describe('V6 保存した検索の画面契約', () => {
     expect(list).toContain('条件を確認・編集')
   })
 
+  it('条件は共通の日本語変換を使い、内部の演算子や値を直書きしない', () => {
+    expect(list).toContain('describeSavedCondition')
+    expect(list).toContain('api.supportMarks.list(accountId)')
+    expect(list).toContain('api.scenarios.list({ accountId })')
+    expect(list).not.toContain('function describeOne')
+    expect(list).not.toContain("parts.map(String).join(' ')")
+  })
+
   it('該当人数と使用先を正データで表示し、使用中は削除を止める', () => {
     expect(list).toContain('search.matchCount')
     expect(list).toContain('search.usedIn')

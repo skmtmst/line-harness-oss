@@ -15,7 +15,6 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import Breadcrumb from '@/components/layout/breadcrumb'
 import StickyBar from '@/components/shared/sticky-bar'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { describeSavedCondition } from '@/components/friends/saved-search-utils'
 import { TextInput } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -373,7 +372,6 @@ function SavedSearchEditInner() {
         )}
       />
       <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使用先が無いことをサーバーで確認済みです。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); void remove() }} />
-      <span className="hidden">{[...(conditions.all ?? []), ...(conditions.any ?? [])].map((condition) => describeSavedCondition(condition, tags)).join('|')}</span>
     </div>
   )
 }
