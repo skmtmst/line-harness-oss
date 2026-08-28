@@ -779,8 +779,8 @@
       "feature": 6,
       "node": "cPk8A",
       "name": "6-1-B 対象条件",
-      "gap": "build",
-      "gapNote": "保存した検索の仕組みは #421 で入った。配信側から呼ぶだけ"
+      "gap": "api",
+      "gapNote": "#510で共通ConditionBuilder・人数確認・実送信は同じSegmentConditionへ統一済み。ただし #421 の saved_searches は `{ all, any, visibility }`、一斉配信は `{ operator, rules, groups }` で、15条件を欠落なく相互変換できない。「保存した条件」を共通SegmentConditionとして保存・検証・版移行するAPI契約が要る"
     },
     {
       "feature": 6,
@@ -793,8 +793,8 @@
       "feature": 6,
       "node": "sqFXf",
       "name": "6-1-L 対象条件を編集",
-      "gap": "build",
-      "gapNote": "同上"
+      "gap": "api",
+      "gapNote": "cPk8Aと同じ。共通SegmentConditionを保存した条件として読み書きし、下書き・人数確認・実送信へ同じ形のまま渡すAPI契約と版移行が要る"
     },
     {
       "feature": 7,
