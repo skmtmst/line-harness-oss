@@ -5,6 +5,7 @@ import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import SummaryCard from '@/components/shared/summary-card'
 import { useAccount } from '@/contexts/account-context'
 import { api, type MileageAdminOverview, type MileageRule } from '@/lib/api'
 import { formatMileageDate } from './mileage-display'
@@ -66,6 +67,22 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ja-JP').format(value)
 }
 
+function isMileageAdminOverview(value: unknown): value is MileageAdminOverview {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<MileageAdminOverview>
+  return Array.isArray(candidate.members)
+    && !!candidate.summary
+    && typeof candidate.summary.totalMembers === 'number'
+    && typeof candidate.summary.totalAvailable === 'number'
+    && typeof candidate.summary.activeMembers30d === 'number'
+    && typeof candidate.summary.totalActions === 'number'
+    && typeof candidate.summary.queuedEvents === 'number'
+    && !!candidate.pagination
+    && typeof candidate.pagination.total === 'number'
+    && typeof candidate.pagination.limit === 'number'
+    && typeof candidate.pagination.offset === 'number'
+}
+
 function ruleLimit(rule: MileageRule) {
   if (rule.conditions.uniquePerReferredFriendPerSubject) return '紹介された人・対象ごとに1回'
   if (rule.conditions.uniquePerReferredFriend) return '紹介された人1人につき1回'
@@ -96,7 +113,8 @@ function MileagePageInner() {
   const [search, setSearch] = useState('')
   const [offset, setOffset] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
   const [savingRuleId, setSavingRuleId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -128,17 +146,18 @@ function MileagePageInner() {
     })
     if (accountAtRequest !== latestAccountRef.current) return
     if (!res.success) throw new Error(res.error)
+    if (!isMileageAdminOverview(res.data)) throw new Error('invalid_mileage_overview')
     setOverview(res.data)
   }, [offset, search, selectedAccountId])
 
   const reloadAll = useCallback(async () => {
     setLoading(true)
-    setError('')
+    setLoadError('')
     try {
       if (tab === 'balances') await loadOverview()
       if (tab === 'earning-rules') await loadRules()
     } catch {
-      setError('マイルデータの読み込みに失敗しました。もう一度お試しください。')
+      setLoadError('マイルデータを読み込めませんでした。')
     } finally {
       setLoading(false)
     }
@@ -153,13 +172,13 @@ function MileagePageInner() {
 
   const updateRule = async (rule: MileageRule, updates: Partial<MileageRule>) => {
     setSavingRuleId(rule.id)
-    setError('')
+    setActionError('')
     try {
       const res = await api.mileage.updateRule(rule.id, updates)
       if (!res.success) throw new Error(res.error)
       await Promise.all([loadRules(), loadOverview()])
     } catch {
-      setError('マイルルールの更新に失敗しました。')
+      setActionError('たまる決めごとを更新できませんでした。もう一度お試しください。')
     } finally {
       setSavingRuleId(null)
     }
@@ -168,14 +187,14 @@ function MileagePageInner() {
   const saveAmount = async (rule: MileageRule) => {
     const amount = Number(amounts[rule.id])
     if (!Number.isInteger(amount) || amount <= 0) {
-      setError('付与マイルは1以上の整数で入力してください。')
+      setActionError('付与マイルは1以上の整数で入力してください。')
       return
     }
     if (amount === rule.amount) return
     await updateRule(rule, { amount })
   }
 
-  const totalPages = Math.max(1, Math.ceil((overview?.pagination.total ?? 0) / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil((overview?.pagination?.total ?? 0) / PAGE_SIZE))
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1
   const summary = overview?.summary
   const members = overview?.members ?? []
@@ -201,7 +220,7 @@ function MileagePageInner() {
         />
       </div>
 
-      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {actionError && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{actionError}</div>}
 
       {!selectedAccountId && !accountLoading ? (
         <ListState
@@ -211,7 +230,24 @@ function MileagePageInner() {
         />
       ) : <>
 
-      {tab === 'balances' && <>
+      {tab === 'balances' && loading ? (
+        <ListState
+          kind="loading"
+          title="友だちのマイルを読み込んでいます"
+          description="残高と履歴を集計しています。このまま少しお待ちください。"
+        />
+      ) : null}
+
+      {tab === 'balances' && loadError ? (
+        <ListState
+          kind="error"
+          title="友だちのマイルを表示できませんでした"
+          description="再読み込みしても直らない場合はエラー報告へ。"
+          action={<Button onClick={() => void reloadAll()}>残高を再読み込み</Button>}
+        />
+      ) : null}
+
+      {tab === 'balances' && !loading && !loadError && <>
       <div className="mb-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-5 text-white shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -231,21 +267,19 @@ function MileagePageInner() {
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {[
-          ['マイル対象者', summary?.totalMembers, '人'],
-          ['保有マイル合計', summary?.totalAvailable, 'mile'],
-          ['30日アクティブ', summary?.activeMembers30d, '人'],
-          ['記録済みアクション', summary?.totalActions, '件'],
-          ['反映待ち', summary?.queuedEvents, '件'],
-        ].map(([label, value, unit]) => (
-          <div key={String(label)} className="rounded-xl border border-gray-200 bg-white p-4">
-            <p className="text-xs text-gray-500">{label}</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">
-              {loading || value === undefined ? '—' : formatNumber(Number(value))}
-              <span className="ml-1 text-xs font-medium text-gray-400">{unit}</span>
-            </p>
-          </div>
-        ))}
+        <SummaryCard variant="v6" title="マイル対象者" value={summary?.totalMembers ?? null} unit="人" detail="選択中のLINEアカウント" />
+        <SummaryCard variant="v6" title="保有マイル合計" value={summary?.totalAvailable ?? null} unit=" mile" detail="利用可能な残高の合計" />
+        <SummaryCard variant="v6" title="30日アクティブ" value={summary?.activeMembers30d ?? null} unit="人" detail="30日以内に行動した友だち" />
+        <SummaryCard variant="v6" title="記録済みアクション" value={summary?.totalActions ?? null} unit="件" detail="マイルの根拠になった行動" />
+        <SummaryCard
+          variant="v6"
+          title="もうすぐ消えるマイル"
+          value={null}
+          unit=" mile"
+          detail="失効ロットを接続後に表示"
+          badge="未取得"
+          badgeTone="neutral"
+        />
       </div>
       </>}
 
@@ -254,6 +288,30 @@ function MileagePageInner() {
           <h2 className="text-sm font-semibold text-gray-900">マイル付与ルール</h2>
           <p className="mt-1 text-xs text-gray-500">付与数を変更すると、変更後に発生した行動から新しい値が使われます。</p>
         </div>
+        {loading ? (
+          <ListState
+            kind="loading"
+            title="たまる決めごとを読み込んでいます"
+            description="このまま少しお待ちください。"
+            className="m-4"
+          />
+        ) : loadError ? (
+          <ListState
+            kind="error"
+            title="たまる決めごとを表示できませんでした"
+            description="再読み込みしても直らない場合はエラー報告へ。"
+            action={<Button onClick={() => void reloadAll()}>決めごとを再読み込み</Button>}
+            className="m-4"
+          />
+        ) : rules.length === 0 ? (
+          <ListState
+            kind="empty"
+            title="まだ決めごとがありません"
+            description="どんなことをしたら何マイル付けるかを決めます。"
+            action={<Button href="/mileage/earning-rules/new" variant="primary">決めごとを作る</Button>}
+            className="m-4"
+          />
+        ) : (
         <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
           {rules.map((rule) => (
             <div key={rule.id} className={`rounded-xl border p-4 ${rule.isActive ? 'border-gray-200' : 'border-gray-100 bg-gray-50 opacity-70'}`}>
@@ -264,16 +322,19 @@ function MileagePageInner() {
                   </span>
                   <p className="mt-2 text-sm font-semibold text-gray-900">{rule.name}</p>
                 </div>
-                <button
-                  type="button"
+                <Button
                   disabled={savingRuleId === rule.id}
                   onClick={() => void updateRule(rule, { isActive: !rule.isActive })}
-                  className={`relative inline-flex h-6 w-11 shrink-0 rounded-full transition-colors ${rule.isActive ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                  aria-label={`${rule.name}を${rule.isActive ? '無効' : '有効'}にする`}
+                  aria-label={`${rule.name}を${rule.isActive ? '停止' : '再開'}する`}
                 >
-                  <span className={`mt-1 h-4 w-4 rounded-full bg-white transition-transform ${rule.isActive ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
+                  {savingRuleId === rule.id
+                    ? '反映しています'
+                    : rule.isActive ? '決めごとを停止' : '決めごとを再開'}
+                </Button>
               </div>
+              <p className={`mt-3 text-xs font-semibold ${rule.isActive ? 'text-green-700' : 'text-gray-500'}`}>
+                {rule.isActive ? '動いています' : '止めています'}
+              </p>
               <div className="mt-4 flex items-end gap-2">
                 <input
                   type="number"
@@ -290,11 +351,12 @@ function MileagePageInner() {
             </div>
           ))}
         </div>
+        )}
       </section>}
 
       {tab === 'history' && selectedAccountId ? <MileageHistoryTab key={selectedAccountId} accountId={selectedAccountId} /> : null}
 
-      {tab === 'balances' && <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {tab === 'balances' && !loading && !loadError && <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold text-gray-900">マイル・コミットランキング</h2>
@@ -303,10 +365,12 @@ function MileagePageInner() {
           <span className="text-xs text-gray-400">{formatNumber(overview?.pagination.total ?? 0)}人</span>
         </div>
 
-        {loading ? (
-          <div className="p-12 text-center text-sm text-gray-400">集計中...</div>
-        ) : members.length === 0 ? (
-          <div className="p-12 text-center text-sm text-gray-400">該当するユーザーがいません</div>
+        {members.length === 0 ? (
+          <ListState
+            kind="empty"
+            title="該当する友だちがいません"
+            description="検索条件を変えると、ほかの友だちを確認できます。"
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1050px]">

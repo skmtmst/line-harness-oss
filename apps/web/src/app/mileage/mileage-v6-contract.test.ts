@@ -45,6 +45,22 @@ describe('V6 マイルの正本URLと概念分離', () => {
     expect(PAGE).not.toContain('<option value="all">全アカウント横断</option>')
   })
 
+  it('一覧の読込・空・失敗を言い分け、失効値を取得済みに見せない', () => {
+    expect(PAGE).toContain('kind="loading"')
+    expect(PAGE).toContain('kind="empty"')
+    expect(PAGE).toContain('kind="error"')
+    expect(PAGE).toContain('まだ決めごとがありません')
+    expect(PAGE).toContain('もうすぐ消えるマイル')
+    expect(PAGE).toContain('badge="未取得"')
+    expect(PAGE).not.toContain('該当するユーザーがいません')
+  })
+
+  it('既存の更新APIから決めごとの停止と再開を操作できる', () => {
+    expect(PAGE).toContain("updateRule(rule, { isActive: !rule.isActive })")
+    expect(PAGE).toContain("rule.isActive ? '決めごとを停止' : '決めごとを再開'")
+    expect(PAGE).toContain("rule.isActive ? '動いています' : '止めています'")
+  })
+
   it('作成画面も mileage_rules のAPIと正本URLを使う', () => {
     expect(NEW_RULE).toContain('api.mileage.createRule')
     expect(NEW_RULE).toContain("parent={['マイル', '/mileage?tab=earning-rules']}")
