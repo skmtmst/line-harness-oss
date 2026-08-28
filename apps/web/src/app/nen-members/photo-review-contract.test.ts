@@ -41,4 +41,9 @@ describe('V6 photo review contract', () => {
     expect(page).toContain('retryPhotoReviewNotification');
     expect(page).toContain('LINE通知を再送');
   });
+
+  it('shows the received time in Japan time instead of slicing UTC text', () => {
+    expect(page).toContain('formatPhotoReceivedAt(photo.created_at)');
+    expect(page).not.toContain("text(photo.created_at).replace('T', ' ').slice(0, 16)");
+  });
 });

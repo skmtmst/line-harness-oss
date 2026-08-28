@@ -5,6 +5,7 @@ import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
+import { formatPhotoReceivedAt } from './photo-review-time'
 
 type PhotoStatus = 'all' | 'pending' | 'adopted' | 'rejected'
 type ReviewReasonCode = 'quality' | 'privacy' | 'unrelated' | 'duplicate' | 'other'
@@ -163,7 +164,7 @@ export default function PhotoReviewsPage() {
         {visiblePhotos.map((photo) => <article key={text(photo.id)} className="overflow-hidden rounded-v6-card border border-hairline bg-canvas shadow-v6-card">
           <img src={text(photo.image_url)} alt={`${text(photo.pet_name)}ちゃんの投稿写真`} className="aspect-square w-full object-cover" />
           <div className="p-4">
-            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-v6-ink">{text(photo.pet_name)}ちゃん</p><p className="mt-1 text-xs text-v6-ink-faint">{text(photo.owner_name) || '名前未取得'}・{text(photo.created_at).replace('T', ' ').slice(0, 16)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-v6-warning-bg text-v6-warning' : photo.status === 'adopted' ? 'bg-v6-accent-soft text-v6-accent-hover' : 'bg-v6-surface-strong text-v6-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '採用' : '見送り'}</span></div>
+            <div className="flex items-start justify-between gap-3"><div><p className="font-bold text-v6-ink">{text(photo.pet_name)}ちゃん</p><p className="mt-1 text-xs text-v6-ink-faint">{text(photo.owner_name) || '名前未取得'}・{formatPhotoReceivedAt(photo.created_at)}</p></div><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${photo.status === 'pending' ? 'bg-v6-warning-bg text-v6-warning' : photo.status === 'adopted' ? 'bg-v6-accent-soft text-v6-accent-hover' : 'bg-v6-surface-strong text-v6-ink-faint'}`}>{photo.status === 'pending' ? '審査待ち' : photo.status === 'adopted' ? '採用' : '見送り'}</span></div>
             <p className="mt-3 min-h-10 text-sm leading-5 text-v6-ink-secondary">{text(photo.caption) || 'コメントなし'}</p>
             {photo.status === 'adopted' && <p className="mt-3 rounded-v6-control bg-v6-accent-soft px-3 py-2 text-xs font-semibold text-v6-accent-hover">5ポイント付与済み・{photo.publication_consent_at && !photo.publication_withdrawn_at ? '公開中' : '公開は未同意'}</p>}
             {photo.status === 'rejected' && <div className="mt-3 rounded-v6-control bg-v6-surface px-3 py-2 text-xs text-v6-ink-secondary"><span className="font-semibold">見送った理由：</span>{REVIEW_REASONS.find((reason) => reason.value === photo.review_reason_code)?.label ?? '理由未記録'}{text(photo.review_reason_note) && <p className="mt-1 text-v6-ink-faint">{text(photo.review_reason_note)}</p>}</div>}
