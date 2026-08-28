@@ -577,11 +577,32 @@ export const SCREENS = [
     status: 'unimplemented', why: '8-1-F が無いので、その後の完了画面も無い',
   },
   {
+    /*
+      **撮る支度だけ先にしてあります。まだ撮っていません。**
+
+      固定データ（`AUTO_REPLY_RUNS`）と口（`/api/auto-replies/:id/runs` と
+      `/api/execution-runs?ownerKind=auto_reply` の両方）を用意し、
+      空の返事も入れました。**`status` を外せば撮れます。**
+
+      **Codex から Draft PR の番号と head が届くまで外しません。**
+      ルートも `?id=` の付け方も、実装を見ないと決められません。
+      下の `route` と `states` は #500（リマインダ）に合わせた見込みで、
+      実装が来たら実物に照らして直します。
+
+      固定データには**7つの状態**を入れてあります。とくに
+      `partial`（先のルールが見送られ、あとのルールだけ動いた）を
+      1行入れました。**ここを「成功」と書く実装を捕まえるためです。**
+    */
     ...AUTO_REPLY, node: 't7UtYQ', name: '8-1-H 実行結果',
+    route: '/auto-replies/detail?id=auto-reply-1',
+    states: {
+      apis: ['**/api/auto-replies/*/runs*', '**/api/execution-runs*'],
+      kinds: ['normal', 'loading', 'empty', 'error'],
+    },
     gap: 'api',
-    gapNote: '自動応答の実行を1件ずつ残す記録が要る',
+    gapNote: '自動応答の実行を1件ずつ残す記録が要る。**共通契約は #500 で入った**（所有元9つ・状態6つ・一覧9項目）。写すのは画面側。撮る支度は済んでいる',
     status: 'unimplemented',
-    why: '誰の何という入力に何が実行されたかを並べる画面が無い（`grep 実行結果|最近の実行|引継ぎ` が0件）。一覧の「当たった回数」までしか見えない',
+    why: '誰の何という入力に何が実行されたかを並べる画面が無い（`grep 実行結果|最近の実行|引継ぎ` が0件）。一覧の「当たった回数」までしか見えない。**Codex の Draft PR 待ち**',
   },
   {
     ...AUTO_REPLY, node: 'Gy9OK', name: '8-1-I 削除確認',

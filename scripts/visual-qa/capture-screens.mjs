@@ -228,6 +228,18 @@ const EMPTY_BODIES = [
     空は「取れて0件」なので `—` にしない。
     **`openRate` は `null` のまま。** 既読は取れないので0%を作らない。
   */
+  /*
+    自動応答の実行結果（`t7UtYQ`）。**空は「取れて0件」。**
+    まとめの数は0で埋め、**平均応答だけ `null`**（数えていないものを
+    0.0秒と書かない）。
+  */
+  [/\/api\/(auto-replies\/[^/]+\/runs|execution-runs)/, {
+    autoReply: { id: 'auto-reply-1', name: '予約問い合わせ', isActive: true, priority: 1 },
+    summary: { hitsThisPeriod: 0, hitsTotal: 0, handoffs: 0, errors: 0, lastRunAt: null, averageResponseMs: null },
+    triggers: [],
+    items: [],
+    pagination: { total: 0, limit: 20, offset: 0 },
+  }],
   [/\/api\/reminders\/[^/]+\/runs/, {
     reminder: { id: 'reminder-1', name: 'Google Meet相談リマインダ', isActive: true },
     summary: { sent: 0, scheduled: 0, stopped: 0, errors: 0, targetCount: 0, nextScheduledAt: null },

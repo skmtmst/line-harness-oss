@@ -3313,3 +3313,99 @@ export const REMINDER_RUNS = {
   ],
   pagination: { total: 7, limit: 20, offset: 0 },
 }
+
+/*
+  自動応答の実行結果（`t7UtYQ`）。**Codex の Draft PR が来る前の下ごしらえ。**
+
+  `packages/shared/src/types.ts` の `ExecutionRunListItem`（共通9項目）に
+  合わせてあります。機能固有の状態は `domainStatus` に置き、
+  **共通状態へ潰さずに持ちます**（リマインダ #500 と同じ形）。
+
+  **ルートも口も、まだ Codex から届いていません。** 実装が来たら
+  型と実際の返事に照らして直します。ここで撮って合格にはしません。
+
+  設計（`f8/t7UtYQ.html`）の数に寄せてあります。
+  今期ヒット214回／累計1,842回／引継ぎ36件／エラー3件。
+*/
+const arRow = (n, name, input, action, domainStatus, status, over) => ({
+  id: `arr-${n}`,
+  ownerKind: 'auto_reply',
+  ownerId: 'auto-reply-1',
+  lineAccountId: 'visual-qa-account',
+  occurredAt: over?.occurredAt ?? '2026-08-24T01:32:00.000Z',
+  subject: name,
+  accountLabel: '然-NEN- TEST',
+  triggerLabel: `入力：${input}`,
+  reference: over?.reference ?? null,
+  status,
+  detail: over?.detail ?? action,
+  durationMs: over?.durationMs ?? 800,
+  canRetry: over?.canRetry ?? (domainStatus === 'failed'),
+  domainStatus,
+  matchedRuleName: over?.matchedRuleName ?? '予約問い合わせ',
+  /* **見送られたルール。** どれが飛ばされ、なぜかを1件ずつ持つ。 */
+  skippedRules: over?.skippedRules ?? [],
+  actionResults: over?.actionResults ?? [{ kind: action, status: 'succeeded' }],
+  lastErrorCode: over?.lastErrorCode ?? null,
+  lastErrorMessage: over?.lastErrorMessage ?? null,
+})
+
+export const AUTO_REPLY_RUNS = {
+  autoReply: { id: 'auto-reply-1', name: '予約問い合わせ', isActive: true, priority: 1 },
+  summary: {
+    hitsThisPeriod: 214, hitsTotal: 1842, handoffs: 36, errors: 3,
+    lastRunAt: '2026-08-24T01:32:00.000Z',
+    /* **平均応答は未取得。** 数えていないものを0.0秒と書かない。 */
+    averageResponseMs: null,
+  },
+  triggers: [
+    { key: 'reserve', label: '予約', count: 128, ratio: 0.598 },
+    { key: 'reschedule', label: '日程変更', count: 54, ratio: 0.252 },
+    { key: 'cancel', label: 'キャンセル', count: 32, ratio: 0.150 },
+  ],
+  items: [
+    arRow(1, 'Kenta Kawano', '予約を変更したい', '返信＋タグ追加', 'succeeded', 'succeeded'),
+    arRow(2, 'Masato S.', '予約の確認', '返信＋担当通知', 'succeeded', 'succeeded',
+      { occurredAt: '2026-08-24T01:28:00.000Z' }),
+    /* **確認待ち。** 失敗ではない。 */
+    arRow(3, '菅野 亮', '予約キャンセル', '担当者へ引継ぎ', 'handoff_waiting', 'pending',
+      { occurredAt: '2026-08-24T01:21:00.000Z', durationMs: null,
+        detail: '担当者へ引継ぎ（確認待ち）' }),
+    /* **失敗。** 理由が要る。 */
+    arRow(4, '山田 太郎', '予約', '返信処理', 'failed', 'failed',
+      { occurredAt: '2026-08-24T01:14:00.000Z', durationMs: 2400,
+        lastErrorCode: 'webhook_timeout',
+        lastErrorMessage: 'Webhookの応答がありませんでした。',
+        detail: 'Webhookの応答がありませんでした。',
+        actionResults: [{ kind: '返信処理', status: 'failed' }] }),
+    /* **何もしていない。** 条件に合わず、どのルールも動かなかった。
+       **これを「成功」と書かせない。** */
+    arRow(5, '石田 未来', 'こんにちは', '何もしていません', 'skipped', 'skipped',
+      { occurredAt: '2026-08-24T01:05:00.000Z', durationMs: 0,
+        matchedRuleName: null,
+        detail: 'どの条件にも合わなかったため、何もしていません。',
+        actionResults: [],
+        skippedRules: [
+          { name: '予約問い合わせ', reason: '条件に合いません' },
+          { name: '営業時間外の案内', reason: '営業時間内です' },
+        ] }),
+    /*
+      **ここが要の行。** 先に当たるはずのルールが見送られ、
+      あとのルールだけが動いた。**run 全体を「成功」と書くと、
+      見送られたことが消える。** 共通状態は `partial`。
+    */
+    arRow(6, '前田 さくら', '予約したい', '返信処理', 'partial', 'partial',
+      { occurredAt: '2026-08-24T00:58:00.000Z', durationMs: 1100,
+        matchedRuleName: '営業時間外の案内',
+        detail: '「予約問い合わせ」は見送り。「営業時間外の案内」を実行しました。',
+        skippedRules: [
+          { name: '予約問い合わせ', reason: '1日1回までの上限に達しています' },
+        ],
+        actionResults: [{ kind: '返信処理', status: 'succeeded' }] }),
+    /* **取り消し。** 送る前に止めた。 */
+    arRow(7, null, '予約', '取り消し', 'cancelled', 'cancelled',
+      { occurredAt: '2026-08-23T23:40:00.000Z', durationMs: null,
+        detail: '配信前に取り消しました。', actionResults: [] }),
+  ],
+  pagination: { total: 7, limit: 20, offset: 0 },
+}
