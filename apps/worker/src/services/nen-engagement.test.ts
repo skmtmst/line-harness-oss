@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  birthdayDeliveryTarget,
   buildDefaultColumnIntro,
   buildNenDeliveryMessages,
   buildNenFlexMessage,
@@ -21,6 +22,15 @@ const campaign = {
 };
 
 describe('buildNenFlexMessage', () => {
+  it('schedules birthday delivery at 10:00 JST three days before, including year boundaries', () => {
+    expect(birthdayDeliveryTarget(new Date('2026-08-27T15:00:00.000Z'))).toMatchObject({
+      issueYear: 2026, monthDay: '08-31', deliveryAt: new Date('2026-08-28T01:00:00.000Z'),
+    });
+    expect(birthdayDeliveryTarget(new Date('2026-12-28T15:00:00.000Z'))).toMatchObject({
+      issueYear: 2027, monthDay: '01-01', deliveryAt: new Date('2026-12-29T01:00:00.000Z'),
+    });
+  });
+
   it('uses the copy fixed when the job was queued', () => {
     const snapshot = JSON.stringify({ ...campaign, title: '予約時の見出し' });
     const fixed = readNenCampaignSnapshot(snapshot, campaign.campaign_key);
