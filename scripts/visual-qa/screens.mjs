@@ -291,7 +291,7 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: 'P0 保存に失敗しても「保存しました」と出る。saved-view-dialog.tsx の submit が onSave の成否を見ずに setDone(true)。失敗の文は窓の後ろのパネルに出るため、窓を開けている人には見えない。**#513 で直す差分が出ている（未取り込み）。** onSave が成否を返し、成功のときだけ setDone(true) へ進む形になっている',
+    verdict: 'needs_fix', verdictNote: 'P0は #513 head `60b39036` で修正済み・画像再確認待ち。onSaveが成否を返し、成功のときだけsetDone(true)へ進む。現行の比較画像は修正前headなので、#513を土台に保存APIを失敗させて「保存しました」が出ないことを確認するまで要修正を維持する',
     verdictSource: 'inbox-v6/tBlkL-1920.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: 'a4239357',
   },
   {
@@ -1086,7 +1086,7 @@ export const SCREENS = [
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P0 読み込みに失敗しても失敗だと分からない。赤い帯も出ず、本文は「フォームがまだありません」だけで、空とまったく同じ絵になる。form-submissions/page.tsx:354 は loading か 0件かしか見ておらず、失敗の枝が無い。持っているフォームが消えたように見える',
+    verdict: 'needs_fix', verdictNote: '以前のP0判定は撮影側の当てはめ漏れを含むため撤回し、#436 head `950073ab` の再比較待ち。コードには `ListState kind="error"`、再読み込み、回答一覧側の失敗分岐がある。APIを確実に失敗させた1440/1920画像で、空状態の作成誘導が同時に出ないことを確認するまで要修正を維持する',
     verdictSource: 'forms-v6/ZOPyc-error-1920.png + apps/web/src/app/form-submissions/page.tsx:354', verdictHead: '950073ab',
   },
 
