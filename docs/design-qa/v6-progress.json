@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 191,
-  "unimplemented": 67,
+  "compared": 192,
+  "unimplemented": 66,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
@@ -110,12 +110,21 @@
       "feature": 7,
       "name": "リマインダ",
       "total": 11,
-      "compared": 4,
-      "unimplemented": 7,
+      "compared": 5,
+      "unimplemented": 6,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 500,
+          "head": "409f00bb",
+          "on": "2026-08-28",
+          "screens": [
+            "GC4St"
+          ]
+        }
+      ]
     },
     {
       "feature": 8,
@@ -598,13 +607,6 @@
       "name": "7-1-G 有効化完了",
       "gap": "build",
       "gapNote": "同上"
-    },
-    {
-      "feature": 7,
-      "node": "GC4St",
-      "name": "7-1-H 実行結果",
-      "gap": "api",
-      "gapNote": "リマインダの段ごとの送信数・開封・失敗を数える口が要る"
     },
     {
       "feature": 7,

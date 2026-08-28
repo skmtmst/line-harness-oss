@@ -3215,3 +3215,101 @@ export function testActionScoreRules(bundle, input) {
     matched,
   }
 }
+
+/*
+  リマインダの実行結果（PR #500）。
+
+  **`packages/shared/src/types.ts` の `ReminderDeliveryRunsResponse` に
+  合わせてあります。** 共通の9項目（`ExecutionRunListItem`）と、
+  リマインダの書込台帳だけが持つ詳細（`domainStatus` ほか）の両方を
+  1行に入れる形です。
+
+  設計（`f7/GC4St.html`）の数に寄せてあります。
+  送信済み1,126通／送信予定398通／停止28人／エラー2件。
+
+  **`openRate` は `null` のままにします。** LINE は友だち単位の既読を
+  返しません。実装も `openRate: null` を返し、コードにその旨が書いてあります。
+  ここで数を作ると、**取れないものが取れているように撮れます。**
+*/
+const runRow = (n, name, step, domainStatus, status, over) => ({
+  id: `rdr-${n}`,
+  ownerKind: 'reminder',
+  ownerId: 'reminder-1',
+  lineAccountId: 'visual-qa-account',
+  occurredAt: over?.occurredAt ?? '2026-08-24T00:00:00.000Z',
+  subject: name,
+  accountLabel: '然-NEN- TEST',
+  triggerLabel: 'Google Meet相談リマインダ',
+  reference: null,
+  status,
+  detail: over?.detail ?? `${step}通目`,
+  durationMs: over?.durationMs ?? 420,
+  canRetry: domainStatus === 'retry_wait' || domainStatus === 'permanent_failed',
+  reminderId: 'reminder-1',
+  friendReminderId: `fr-${n}`,
+  friendId: `friend-${n}`,
+  friendName: name,
+  reminderStepId: `rs-${step}`,
+  stepNumber: step,
+  scheduledAt: over?.scheduledAt ?? '2026-08-24T00:00:00.000Z',
+  startedAt: over?.startedAt ?? '2026-08-24T00:00:00.000Z',
+  completedAt: over?.completedAt ?? '2026-08-24T00:00:07.000Z',
+  domainStatus,
+  attemptCount: over?.attemptCount ?? 1,
+  nextRetryAt: over?.nextRetryAt ?? null,
+  lastErrorCode: over?.lastErrorCode ?? null,
+  lastErrorMessage: over?.lastErrorMessage ?? null,
+  lineRequestId: over?.lineRequestId ?? null,
+  messageLogId: over?.messageLogId ?? null,
+})
+
+export const REMINDER_RUNS = {
+  reminder: { id: 'reminder-1', name: 'Google Meet相談リマインダ', isActive: true },
+  summary: {
+    sent: 1126, scheduled: 398, stopped: 28, errors: 2,
+    targetCount: 398,
+    nextScheduledAt: '2026-08-24T00:00:00.000Z',
+  },
+  steps: [
+    { id: 'rs-1', stepNumber: 1, offsetMinutes: -1440, messageType: 'text',
+      messageContent: '明日のGoogle Meet相談のご案内です。', sent: 382, openRate: null, errors: 1 },
+    { id: 'rs-2', stepNumber: 2, offsetMinutes: -60, messageType: 'text',
+      messageContent: 'まもなく開始のお時間です。', sent: 361, openRate: null, errors: 0 },
+    { id: 'rs-3', stepNumber: 3, offsetMinutes: 0, messageType: 'text',
+      messageContent: '本日のご案内です。', sent: 383, openRate: null, errors: 1 },
+  ],
+  items: [
+    runRow(1, 'Kenta Kawano', 1, 'succeeded', 'succeeded',
+      { completedAt: '2026-08-24T00:00:04.000Z', durationMs: 4000, lineRequestId: 'req-8f21', messageLogId: 'ml-1' }),
+    runRow(2, 'Masato S.', 2, 'succeeded', 'succeeded',
+      { occurredAt: '2026-08-24T00:15:00.000Z', startedAt: '2026-08-24T00:15:00.000Z',
+        completedAt: '2026-08-24T00:15:03.000Z', durationMs: 3000, lineRequestId: 'req-8f22', messageLogId: 'ml-2' }),
+    /* **再試行待ち。** 「もう一度やる」が出る行。 */
+    runRow(3, '菅野 亮', 3, 'retry_wait', 'pending',
+      { occurredAt: '2026-08-24T00:32:00.000Z', startedAt: '2026-08-24T00:32:00.000Z',
+        completedAt: null, durationMs: null, attemptCount: 2,
+        nextRetryAt: '2026-08-24T01:02:00.000Z',
+        lastErrorCode: 'rate_limited', lastErrorMessage: '送信が混み合っています。時間をおいて送り直します。',
+        detail: '送信が混み合っています。時間をおいて送り直します。' }),
+    /* **送れなかったもの。** 理由が要る行。 */
+    runRow(4, '前田 さくら', 1, 'permanent_failed', 'failed',
+      { occurredAt: '2026-08-23T00:00:09.000Z', startedAt: '2026-08-23T00:00:00.000Z',
+        completedAt: '2026-08-23T00:00:09.000Z', durationMs: 9000, attemptCount: 3,
+        lastErrorCode: 'blocked', lastErrorMessage: 'ブロックされています。',
+        detail: 'ブロックされています。' }),
+    /* **送らなかったもの。** 失敗ではない。見分けが撮れる。 */
+    runRow(5, '石田 未来', 2, 'skipped', 'skipped',
+      { occurredAt: '2026-08-23T00:15:00.000Z', startedAt: '2026-08-23T00:15:00.000Z',
+        completedAt: '2026-08-23T00:15:00.000Z', durationMs: 0,
+        detail: '予約が取り消されたため送っていません。' }),
+    /* **これから送るもの。** 実行時刻がまだ無い（`—` になるか）。 */
+    runRow(6, '新田 遥', 1, 'planned', 'pending',
+      { occurredAt: '2026-08-25T00:00:00.000Z', scheduledAt: '2026-08-25T00:00:00.000Z',
+        startedAt: null, completedAt: null, durationMs: null, attemptCount: 0 }),
+    /* **消された友だち。** 名前が取れない行。 */
+    runRow(7, null, 3, 'cancelled', 'cancelled',
+      { occurredAt: '2026-08-22T00:00:00.000Z', startedAt: null, completedAt: null,
+        durationMs: null, attemptCount: 0, detail: 'リマインダを取り消しました。' }),
+  ],
+  pagination: { total: 7, limit: 20, offset: 0 },
+}

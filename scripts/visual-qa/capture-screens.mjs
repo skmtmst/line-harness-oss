@@ -222,6 +222,19 @@ const EMPTY_BODIES = [
     ここで撮るのは**ルールを全部消した下書き**、つまり
     「公開するには1件以上要る」と出る面です。
   */
+  /*
+    リマインダの実行結果（PR #500）。**一覧の既定（配列）を返すと落ちる。**
+    型は `ReminderDeliveryRunsResponse`。まとめの数も**0で埋める**。
+    空は「取れて0件」なので `—` にしない。
+    **`openRate` は `null` のまま。** 既読は取れないので0%を作らない。
+  */
+  [/\/api\/reminders\/[^/]+\/runs/, {
+    reminder: { id: 'reminder-1', name: 'Google Meet相談リマインダ', isActive: true },
+    summary: { sent: 0, scheduled: 0, stopped: 0, errors: 0, targetCount: 0, nextScheduledAt: null },
+    steps: [],
+    items: [],
+    pagination: { total: 0, limit: 20, offset: 0 },
+  }],
   [/\/api\/action-scores\/rules\?/, {
     configured: false,
     status: 'not_configured',

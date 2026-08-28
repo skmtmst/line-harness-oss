@@ -507,11 +507,18 @@ export const SCREENS = [
     status: 'unimplemented', why: '7-1-F が無いので、その後の完了画面も無い',
   },
   {
-    ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果', route: '/reminders',
-    gap: 'api',
-    gapNote: 'リマインダの段ごとの送信数・開封・失敗を数える口が要る',
-    status: 'unimplemented',
-    why: 'ステップごとの送信数・開封率・エラーを出す画面が無い（`grep 実行結果|送信履歴|開封` が `/reminders` 配下で0件）',
+    /*
+      **PR #500（head `409f00bb`）で `/reminders/detail` が入った。**
+      7機能で共通に使う `ExecutionRunListItem`（9項目）と、
+      リマインダの書込台帳だけが持つ `domainStatus` の両方を返す。
+      **表は1本にせず、読む口の契約でそろえる形。**
+    */
+    ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果',
+    route: '/reminders/detail?id=reminder-1',
+    states: {
+      apis: ['**/api/reminders/*/runs*'],
+      kinds: ['normal', 'loading', 'empty', 'error'],
+    },
   },
   {
     ...REMINDER, node: 'Y0Sn3', name: '7-1-I 削除確認', route: '/reminders',
@@ -1520,6 +1527,7 @@ export const CAPTURED_AT = {
     { pr: 496, head: '4dac7986', on: '2026-08-28', screens: ['s6MBc'], note: '#496 は #495 を含む' },
     { pr: 499, head: '961722fc', on: '2026-08-28', screens: ['s6MBc'], note: 'Claudeが作ったDraft。#496 の上に積んである' },
   ],
+  7: [{ pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
   20: [{ pr: 445, head: '787a4b46', on: '2026-08-28' }],
