@@ -27,7 +27,8 @@ describe('V6 シナリオ一覧の読込状態', () => {
 
   it('操作失敗は内部エラーを出さず一覧読込失敗と分ける', () => {
     expect(PAGE).toContain("const [actionError, setActionError] = useState('')")
-    expect(PAGE).toContain('シナリオの状態を変更できませんでした。')
+    expect(PAGE).toContain('シナリオを停止できませんでした。')
+    expect(PAGE).toContain('シナリオを開始できませんでした。')
     expect(PAGE).toContain('フォルダを変更できませんでした。')
     expect(PAGE).toContain('シナリオを削除できませんでした。')
     expect(PAGE).toContain('{actionError}')
