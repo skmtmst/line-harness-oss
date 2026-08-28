@@ -39,5 +39,20 @@ describe('NEN配信のテスト送信先', () => {
   test('誕生日クーポンはV6どおり3日前10時と案内する', () => {
     expect(page).toContain('誕生日の3日前、10:00に自動送信');
     expect(page).not.toContain('誕生日月の1日に自動送信');
+    expect(page).toContain('formatCampaignTiming(setting)');
+  });
+
+  test('取得済みの失敗・待機件数を表示し、配信日時を日本時間へ変える', () => {
+    expect(page).toContain("overview?.jobs.pending ?? '—'");
+    expect(page).toContain("overview?.jobs.failed ?? '—'");
+    expect(page).toContain('formatNenJobDateTime(job.scheduledAt)');
+    expect(page).not.toContain('予定：{job.scheduledAt}');
+  });
+
+  test('一覧の読込失敗を0件や空状態として表示しない', () => {
+    expect(page).toContain("const [loadError, setLoadError] = useState('')");
+    expect(page).toContain('if (loadError)');
+    expect(page).toContain('kind="error"');
+    expect(page).toContain('フォロー配信を再読み込み');
   });
 });
