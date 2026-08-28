@@ -979,6 +979,8 @@ export const SCREENS = [
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/templates*', '**/api/broadcast-message-assets*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときもタブの件数とフォルダ件数が0と出る（未取得なので—にすべき）。一覧の中を赤い枠で「テンプレートを読み込めませんでした／もう一度読み込む」にしているのは正しい。P2 区分のチップに「Flex」という作り手の言葉が出る',
+    verdictSource: 'templates-v6/NKyoA-error-1920.png', verdictHead: '62ddaebe',
   },
 
   // ── 機能12 リッチメニュー ───────────────────────────────
@@ -1015,6 +1017,8 @@ export const SCREENS = [
   {
     ...RICH_MENU, node: 'RW5Tb', name: '12-1-G 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/rich-menu-groups*', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗の知らせが「API error: 500」とそのまま出る（rich-menus/page.tsx:452 が受け取った文字をそのまま描く。ApiErrorの既定文が英語と数字）。P1 失敗しているのに帯が今月のタップ16180回・最多タップ「商品を見る」4820回と前の数を出したままで、メニューは0件。読めなかったのに数が並ぶ',
+    verdictSource: 'rich-menus-v6/RW5Tb-error-1920.png + apps/web/src/app/rich-menus/page.tsx:452', verdictHead: '09dc476b',
   },
 
   // ── 機能13 回答フォーム ─────────────────────────────────
@@ -1048,6 +1052,8 @@ export const SCREENS = [
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/forms*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P0 読み込みに失敗しても失敗だと分からない。赤い帯も出ず、本文は「フォームがまだありません」だけで、空とまったく同じ絵になる。form-submissions/page.tsx:354 は loading か 0件かしか見ておらず、失敗の枝が無い。持っているフォームが消えたように見える',
+    verdictSource: 'forms-v6/ZOPyc-error-1920.png + apps/web/src/app/form-submissions/page.tsx:354', verdictHead: '950073ab',
   },
 
   // ── 機能14 共通情報 ─────────────────────────────────────
@@ -1093,6 +1099,8 @@ export const SCREENS = [
   {
     ...MEDIA, node: 'h8pBZr', name: '15-1-D 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/media*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「ファイルがまだありません。」を出す。持っているファイルが消えたように見える。赤い帯を出しているぶん回答フォームよりはましだが、一覧の中は空の文でなく読めていない旨にすべき',
+    verdictSource: 'media-v6/h8pBZr-error-1920.png', verdictHead: '166f0c43',
   },
 
   // ── 機能16 成果とアフィリエイト ─────────────────────────
@@ -1458,6 +1466,8 @@ export const SCREENS = [
     ...AUTOMATION, node: 'Vdbv5', name: '25-1-D 一覧の状態（空・読込・エラー）',
     route: '/automations',
     states: { apis: ['**/api/automations*'], kinds: ['loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときに赤い帯と同時に「オートメーションがありません。「新規ルール」から作成してください。」を出し、作成を誘う。押せば同じルールをもう1つ作る。ルールの数も0件と出る（未取得なので—にすべき）。P2 誘い文の「新規ルール」と実際のボタン名「ルールを作成」が違う',
+    verdictSource: 'automations-v6/Vdbv5-error-1920.png', verdictHead: '75b010fc',
   },
   { ...AUTOMATION, node: 'xOpDs', name: '25-2 共通アクション', route: '/common-actions', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
   { ...AUTOMATION, node: 'py5CG', name: '25-2-A 共通アクションをつくる', route: '/common-actions/new', verdict: 'needs_fix', verdictNote: '未一致', verdictSource: 'automations-v6/design-qa.md' },
