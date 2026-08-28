@@ -23,6 +23,7 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(PAGE).not.toMatch(/<h1[\s>]/)
     expect(PAGE).not.toContain('リマインダの実行結果</h1>')
     expect(PAGE).not.toContain('data-page-title')
+    expect(PAGE).toContain("usePageTitle(data?.reminder.name ? `${data.reminder.name}・実行結果` : null)")
   })
 
   it('実行結果APIを読み、固定の設計値を画面へ埋め込まない', () => {
@@ -57,6 +58,15 @@ describe('V6 7-1-H リマインダ実行結果', () => {
     expect(PAGE).toContain("crypto.randomUUID()")
     expect(PAGE).toContain('api.reminders.retryRun(runId')
     expect(PAGE).toContain('const canRetry = item.canRetry')
+    expect(PAGE).toContain('通知実績を表示できませんでした')
+    expect(PAGE).toContain('送る内容を表示できませんでした')
+    expect(PAGE).toContain('setData(null)')
+  })
+
+  it('通知名を本文から出し、内部の友だちIDを画面へ出さない', () => {
+    expect(PAGE).toContain('function stepLabel(')
+    expect(PAGE).toContain("item.accountLabel ?? '所属アカウントは未取得'")
+    expect(PAGE).not.toContain('<span className={styles.cellSub}>{item.friendId}</span>')
   })
 
   it('操作名から行き先と結果が分かる', () => {

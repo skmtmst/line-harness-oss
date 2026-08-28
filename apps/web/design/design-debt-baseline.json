@@ -250,7 +250,7 @@
     "unresolved-classname": 3
   },
   "app/reminders/detail/page.tsx": {
-    "unresolved-classname": 24
+    "unresolved-classname": 29
   },
   "app/reminders/edit/page.tsx": {
     "unresolved-classname": 9,

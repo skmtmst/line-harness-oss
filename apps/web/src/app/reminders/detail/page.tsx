@@ -8,6 +8,7 @@ import type {
   ReminderDeliveryRunStatus,
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
@@ -68,6 +69,12 @@ function timingLabel(offsetMinutes: number): string {
   return `${abs}分${before ? '前' : '後'}`
 }
 
+/** 通知の本文を、番号だけでなく人が見分けられる短い名前にする。 */
+function stepLabel(step: ReminderDeliveryRunsResponse['steps'][number]): string {
+  const firstLine = step.messageContent.trim().split(/\r?\n/, 1)[0]?.trim()
+  return firstLine ? firstLine.slice(0, 40) : `${step.stepNumber}通目`
+}
+
 function csvCell(value: unknown): string {
   return `"${String(value ?? '').replaceAll('"', '""')}"`
 }
@@ -104,11 +111,14 @@ export default function ReminderRunsPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState('')
   const [exporting, setExporting] = useState(false)
+  usePageTitle(data?.reminder.name ? `${data.reminder.name}・実行結果` : null)
 
   const load = useCallback(async () => {
     if (!reminderId) return
     setLoading(true)
     setError('')
+    // 読み直しに失敗したとき、前に取れた数字を現在値として残さない。
+    setData(null)
     try {
       const response = await api.reminders.runs(reminderId, {
         status: status || undefined,
@@ -203,8 +213,10 @@ export default function ReminderRunsPage() {
         )}
       />
 
-      <NoteBar tone={hasErrors ? 'danger' : 'info'}>
-        {hasErrors
+      <NoteBar tone={error || hasErrors ? 'danger' : 'info'}>
+        {error
+          ? '実行結果を確認できませんでした。再読み込みしてから、操作を続けてください。'
+          : hasErrors
           ? `${data?.summary.errors ?? 0}件を送れませんでした。理由を確認し、必要なものだけ再試行してください。`
           : '配信予定・送信済み・送れなかった理由を、友だちごとに確認できます。'}
       </NoteBar>
@@ -221,9 +233,14 @@ export default function ReminderRunsPage() {
       <div className={styles.columns}>
         <main className={styles.main}>
           <Card overflow="hidden">
-            <CardHeader title="通知実績" meta={`${data?.steps.length ?? 0}通`} />
-            <div className={styles.tableWrap}>
-              <DataTable>
+            <CardHeader title="通知実績" meta={loading || error ? '—通' : `${data?.steps.length ?? 0}通`} />
+            {loading ? <ListState kind="loading" title="通知実績を読み込んでいます" /> : null}
+            {!loading && error ? (
+              <ListState kind="error" title="通知実績を表示できませんでした" description="実行結果を再読み込みしてください。" />
+            ) : null}
+            {!loading && !error && (data?.steps.length ?? 0) > 0 ? (
+              <div className={styles.tableWrap}>
+                <DataTable>
                 <thead>
                   <TableHeadRow>
                     <Th>通知</Th>
@@ -236,7 +253,10 @@ export default function ReminderRunsPage() {
                 <tbody>
                   {(data?.steps ?? []).map((step) => (
                     <Tr key={step.id}>
-                      <Td><span className={styles.cellMain}>{step.stepNumber}通目</span></Td>
+                      <Td>
+                        <span className={styles.cellMain} title={stepLabel(step)}>{stepLabel(step)}</span>
+                        <span className={styles.cellSub}>{step.stepNumber}通目</span>
+                      </Td>
                       <Td>{timingLabel(step.offsetMinutes)}</Td>
                       <Td align="right">{step.sent.toLocaleString('ja-JP')}通</Td>
                       <Td align="right" title="LINEは友だち単位の既読を返しません">—</Td>
@@ -244,9 +264,10 @@ export default function ReminderRunsPage() {
                     </Tr>
                   ))}
                 </tbody>
-              </DataTable>
-            </div>
-            {!loading && (data?.steps.length ?? 0) === 0 ? (
+                </DataTable>
+              </div>
+            ) : null}
+            {!loading && !error && (data?.steps.length ?? 0) === 0 ? (
               <ListState kind="empty" title="送る内容がありません" description="設定画面で通知を追加してください。" />
             ) : null}
           </Card>
@@ -301,7 +322,7 @@ export default function ReminderRunsPage() {
             ) : null}
             {!loading && !error && (data?.items.length ?? 0) > 0 ? (
               <div className={styles.tableWrap}>
-                <DataTable>
+                <DataTable className={styles.runsTable}>
                   <thead>
                     <TableHeadRow>
                       <Th>友だち</Th>
@@ -318,13 +339,19 @@ export default function ReminderRunsPage() {
                     {data!.items.map((item) => {
                       const view = STATUS_VIEW[item.domainStatus]
                       const canRetry = item.canRetry
+                      const step = data!.steps.find((candidate) => candidate.id === item.reminderStepId)
+                      const notificationLabel = step ? stepLabel(step) : `${item.stepNumber}通目`
                       return (
                         <Tr key={item.id}>
                           <Td>
                             <span className={styles.cellMain}>{item.friendName ?? '削除済みの友だち'}</span>
-                            <span className={styles.cellSub}>{item.friendId}</span>
+                            <span className={styles.cellSub}>{item.accountLabel ?? '所属アカウントは未取得'}</span>
                           </Td>
-                          <Td>{item.stepNumber}通目</Td>
+                          <Td>
+                            <span className={styles.cellMain} title={notificationLabel}>
+                              {notificationLabel}
+                            </span>
+                          </Td>
                           <Td><StatusBadge tone={view.tone} size="compact">{view.label}</StatusBadge></Td>
                           <Td>{formatJst(item.scheduledAt)}</Td>
                           <Td>{formatJst(item.completedAt ?? item.startedAt)}</Td>
@@ -371,8 +398,11 @@ export default function ReminderRunsPage() {
           </Card>
 
           <Card overflow="hidden">
-            <CardHeader title="LINEで届く内容" meta={firstStep ? `${firstStep.stepNumber}通目` : '—'} />
-            {firstStep ? <p className={styles.preview}>{firstStep.messageContent}</p> : <p className={styles.hint}>送る内容はまだありません。</p>}
+            <CardHeader title="LINEで届く内容" meta={firstStep ? stepLabel(firstStep) : '—'} />
+            {loading ? <p className={styles.hint}>送る内容を確認しています。</p> : null}
+            {!loading && error ? <p className={styles.hint}>送る内容を表示できませんでした。</p> : null}
+            {!loading && !error && firstStep ? <p className={styles.preview}>{firstStep.messageContent}</p> : null}
+            {!loading && !error && !firstStep ? <p className={styles.hint}>送る内容はまだありません。</p> : null}
           </Card>
 
           <Card padding="default">

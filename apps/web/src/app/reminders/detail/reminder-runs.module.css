@@ -48,6 +48,16 @@
   min-width: 0;
 }
 
+/* 8列を等分すると、理由と再試行の操作が読めなくなる。役割ごとに幅を決める。 */
+.runsTable :global(th:nth-child(1)) { width: 15%; }
+.runsTable :global(th:nth-child(2)) { width: 10%; }
+.runsTable :global(th:nth-child(3)) { width: 10%; }
+.runsTable :global(th:nth-child(4)) { width: 13%; }
+.runsTable :global(th:nth-child(5)) { width: 13%; }
+.runsTable :global(th:nth-child(6)) { width: 6%; }
+.runsTable :global(th:nth-child(7)) { width: 18%; }
+.runsTable :global(th:nth-child(8)) { width: 15%; }
+
 .cellMain {
   display: block;
   overflow: hidden;
@@ -127,7 +137,8 @@
   gap: 8px;
 }
 
-@media (max-width: 1180px) {
+/* 1440pxでは右390pxを下へ送り、一覧に読むための幅を渡す。 */
+@media (max-width: 1535px) {
   .columns {
     grid-template-columns: minmax(0, 1fr);
   }
