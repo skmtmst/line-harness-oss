@@ -3656,3 +3656,137 @@ export const INTEGRATION_RECORDS = {
   ],
   pagination: { total: 5, limit: 20, offset: 0 },
 }
+
+/*
+  オートメーションの実行結果（`DkPY0`）— PR #502 head `75b010fc`。
+
+  **`AutomationExecutionRunsResponse` に合わせてあります。**
+  口は `GET /api/automation-runs?lineAccountId=&status=&search=&from=&to=`。
+  **新しい表は作らず、既存の `automation_runs` を読むだけ**の実装です。
+
+  文言は実装の写像そのままです（`apps/worker/src/routes/automations.ts`）。
+  `TRIGGER_LABELS` `ACTION_LABELS` `safeFailureReason` を通した後の形。
+  **失敗の理由は日本語に置き換えられ、`failure_code` は出ません。**
+
+  **「もう一度やる」は出しません。** `canRetry` は常に `false`。
+  安全な再実行の口が無いため、意図して外してあります（実装にその旨の注釈あり）。
+*/
+const autoRow = (n, over) => ({
+  id: `arun-${n}`,
+  ownerKind: 'automation',
+  ownerId: over.automationId,
+  lineAccountId: 'visual-qa-account',
+  occurredAt: over.occurredAt,
+  subject: over.friendName ?? null,
+  accountLabel: over.accountLabel ?? 'LINE 本店',
+  triggerLabel: over.triggerLabel,
+  reference: null,
+  status: over.status,
+  detail: over.detail,
+  durationMs: over.durationMs ?? null,
+  /* **常に false。** 安全な再実行の口が無い。 */
+  canRetry: false,
+  automationId: over.automationId,
+  automationName: over.automationName,
+  automationVersionId: `${over.automationId}-v2`,
+  friendId: over.friendName ? `friend-${n}` : null,
+  friendName: over.friendName ?? null,
+  sourceEventId: `evt-${n}`,
+  domainStatus: over.domainStatus,
+  startedAt: over.startedAt ?? over.occurredAt,
+  completedAt: over.completedAt ?? over.occurredAt,
+  successfulActions: over.successfulActions ?? [],
+  skippedActions: over.skippedActions ?? [],
+  failedAction: over.failedAction ?? null,
+  failureReason: over.failureReason ?? null,
+})
+
+export const AUTOMATION_RUNS = {
+  summary: {
+    total: 9660, executed: 9412, skipped: 242, failed: 6,
+    mostRunName: '予約のご案内', mostRunCount: 3820,
+  },
+  items: [
+    /* 1. 動いた。処理を2つ実行 */
+    autoRow(1, {
+      occurredAt: '2026-08-24T05:02:00.000Z', friendName: '佐藤 千尋',
+      automationId: 'auto-1', automationName: '予約のご案内',
+      triggerLabel: 'メッセージが届いたとき',
+      domainStatus: 'success', status: 'succeeded',
+      successfulActions: ['メニューを切り替え', 'メッセージを送信'],
+      detail: 'メニューを切り替え／メッセージを送信', durationMs: 400,
+    }),
+    /* 2. 動いた。処理は1つ */
+    autoRow(2, {
+      occurredAt: '2026-08-24T00:05:00.000Z', friendName: '高橋 直人',
+      automationId: 'auto-2', automationName: '反応がない人へ',
+      triggerLabel: '行動スコアが条件に達したとき',
+      domainStatus: 'success', status: 'succeeded',
+      successfulActions: ['対応マークを変更'],
+      detail: '対応マークを変更', durationMs: 300,
+    }),
+    /*
+      3. **条件に合わず何もしていない。** 失敗ではない。
+      設計の「動きませんでした／何もしていません」がここ。
+    */
+    autoRow(3, {
+      occurredAt: '2026-08-23T11:00:00.000Z', friendName: '前田 さくら',
+      automationId: 'auto-3', automationName: '友だち追加のお礼',
+      triggerLabel: '友だちが追加されたとき',
+      domainStatus: 'skipped_condition', status: 'skipped',
+      detail: '条件に合わなかったため、何もしていません', durationMs: 30,
+    }),
+    /*
+      4. **一部だけ。** 成功・見送り・失敗が1行に混ざる。
+      **「成功」と1語で書かせないための行。**
+    */
+    autoRow(4, {
+      occurredAt: '2026-08-23T09:30:00.000Z', friendName: '菅野 亮',
+      automationId: 'auto-1', automationName: '予約のご案内',
+      triggerLabel: '予約が確定したとき',
+      domainStatus: 'partial', status: 'partial',
+      successfulActions: ['タグを追加'],
+      skippedActions: ['シナリオを開始'],
+      failedAction: '外部連携へ送信',
+      failureReason: '外部連携先が応答しませんでした',
+      detail: 'タグを追加。シナリオを開始は見送り。外部連携先が応答しませんでした',
+      durationMs: 10400,
+    }),
+    /* 5. 失敗。**理由は日本語。`failure_code` は出ない** */
+    autoRow(5, {
+      occurredAt: '2026-08-23T02:10:00.000Z', friendName: '山田 太郎',
+      automationId: 'auto-4', automationName: '発送のお知らせ',
+      triggerLabel: '発送が完了したとき',
+      domainStatus: 'failed', status: 'failed',
+      failedAction: 'メッセージを送信',
+      failureReason: 'LINEへの送信を完了できませんでした',
+      detail: 'LINEへの送信を完了できませんでした', durationMs: 2400,
+    }),
+    /* 6. まだ動いている。**時間が取れない行**（`—` になるか） */
+    autoRow(6, {
+      occurredAt: '2026-08-24T05:10:00.000Z', friendName: '石田 未来',
+      automationId: 'auto-2', automationName: '反応がない人へ',
+      triggerLabel: 'タグが変わったとき',
+      domainStatus: 'running', status: 'pending',
+      detail: null, durationMs: null, completedAt: null,
+    }),
+    /* 7. 待っている（指定時間まで） */
+    autoRow(7, {
+      occurredAt: '2026-08-24T04:00:00.000Z', friendName: null,
+      automationId: 'auto-5', automationName: '定期便のリマインド',
+      triggerLabel: '定期便の予定が近づいたとき',
+      domainStatus: 'waiting', status: 'pending',
+      successfulActions: ['指定時間まで待機'],
+      detail: '指定時間まで待機', durationMs: null, completedAt: null,
+    }),
+    /* 8. 取り消した */
+    autoRow(8, {
+      occurredAt: '2026-08-22T23:00:00.000Z', friendName: '新田 遥',
+      automationId: 'auto-3', automationName: '友だち追加のお礼',
+      triggerLabel: '友だちが追加されたとき',
+      domainStatus: 'cancelled', status: 'cancelled',
+      detail: null, durationMs: null,
+    }),
+  ],
+  pagination: { total: 8, limit: 20, offset: 0 },
+}

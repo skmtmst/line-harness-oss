@@ -233,6 +233,15 @@ const EMPTY_BODIES = [
     まとめの数は0で埋め、**平均応答と最終実行だけ `null`**
     （数えていないものを 0.0秒 と書かせない）。
   */
+  /*
+    オートメーションの実行結果（`DkPY0`）。**空は「取れて0件」。**
+    いちばん多いものだけ `null`（並べる元が無いので0件と書かせない）。
+  */
+  [/\/api\/automation-runs/, {
+    summary: { total: 0, executed: 0, skipped: 0, failed: 0, mostRunName: null, mostRunCount: null },
+    items: [],
+    pagination: { total: 0, limit: 20, offset: 0 },
+  }],
   [/\/api\/auto-reply-runs/, {
     rule: { id: 'rule-a', name: '予約問い合わせ', isActive: true, priorityPosition: 1 },
     summary: { monthHits: 0, totalHits: 0, handovers: 0, errors: 0, lastRunAt: null, averageResponseMs: null },

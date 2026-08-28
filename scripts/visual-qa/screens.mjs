@@ -1237,11 +1237,21 @@ export const SCREENS = [
   { ...AUTOMATION, node: 'gief7', name: '25-1 オートメーション', route: '/automations' },
   { ...AUTOMATION, node: 'Rv8Jv', name: '25-1-A オートメーションをつくる', route: '/automations/new' },
   {
+    /*
+      **PR #502（head `75b010fc`）で `/automations/runs` が入った。**
+      **新しい表は作っていない。** 既存の `automation_runs` を読むだけ。
+      口は `GET /api/automation-runs`。
+
+      「もう一度やる」は**意図して出していない。** 部分成功した処理を
+      二重に実行しない安全な口が無いため（`automations.ts` に注釈あり）。
+      設計にはあるので、差として記録だけしておく。
+    */
     ...AUTOMATION, node: 'DkPY0', name: '25-1-B オートメーションが動いた記録',
-    gap: 'api',
-    gapNote: 'オートメーションの実行を1件ずつ残す記録が要る。**動かなかった理由も**',
-    status: 'unimplemented',
-    why: '動いた記録を並べる画面が無い。**「条件に外れて動かなかった」も出ないので、「動いていないはず」の切り分けができない**',
+    route: '/automations/runs',
+    states: {
+      apis: ['**/api/automation-runs*'],
+      kinds: ['normal', 'loading', 'empty', 'error'],
+    },
   },
   {
     ...AUTOMATION, node: 'WjYAC', name: '25-1-C 見本から作る',
@@ -1562,6 +1572,7 @@ export const CAPTURED_AT = {
   ],
   7: [{ pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
   8: [{ pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
+  25: [{ pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
   20: [{ pr: 445, head: '787a4b46', on: '2026-08-28' }],

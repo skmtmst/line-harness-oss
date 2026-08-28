@@ -1,8 +1,8 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 193,
-  "unimplemented": 65,
+  "compared": 194,
+  "unimplemented": 64,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
@@ -434,12 +434,22 @@
       "feature": 25,
       "name": "オートメーション",
       "total": 8,
-      "compared": 6,
-      "unimplemented": 2,
+      "compared": 7,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 502,
+          "head": "75b010fc",
+          "on": "2026-08-28",
+          "screens": [
+            "DkPY0"
+          ],
+          "note": "#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む"
+        }
+      ]
     },
     {
       "feature": 26,
@@ -925,13 +935,6 @@
       "name": "24-2-A 運用者へのお知らせをつくる",
       "gap": "api",
       "gapNote": "同上（作る画面）"
-    },
-    {
-      "feature": 25,
-      "node": "DkPY0",
-      "name": "25-1-B オートメーションが動いた記録",
-      "gap": "api",
-      "gapNote": "オートメーションの実行を1件ずつ残す記録が要る。**動かなかった理由も**"
     },
     {
       "feature": 25,
