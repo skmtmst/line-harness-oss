@@ -25,6 +25,7 @@ import {
   getMileageManualAdjustmentPolicy,
   setMileageManualAdjustmentPolicy,
 } from '../src/account-settings.js';
+import { getActionScoreOverview } from '../src/scoring.js';
 
 const PACKAGE_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BENIGN = /duplicate column name|already exists/i;
@@ -688,5 +689,43 @@ describe('configurable mileage rules', () => {
     expect((results.find((result) => result.status === 'rejected') as PromiseRejectedResult).reason)
       .toMatchObject({ code: 'insufficient_balance' });
     expect((await getMileageSummaryForFriend(db, 'friend-2')).available).toBe(20);
+  });
+
+  it('builds account-scoped action-score bands and 30-day changes from existing score history', async () => {
+    sqlite.prepare(
+      `INSERT INTO friends (id, line_user_id, display_name, line_account_id, score)
+       VALUES ('friend-3', 'U3', 'ユーザーC', 'account-1', 10),
+              ('friend-4', 'U4', '未採点ユーザー', 'account-1', 0)`,
+    ).run();
+    sqlite.prepare(`UPDATE friends SET score = 75 WHERE id = 'friend-1'`).run();
+    sqlite.prepare(`UPDATE friends SET score = 40 WHERE id = 'friend-2'`).run();
+    sqlite.prepare(
+      `INSERT INTO friend_scores (id, friend_id, scoring_rule_id, score_change, reason, created_at)
+       VALUES ('score-old', 'friend-1', NULL, 80, '過去の反応', '2026-06-01T10:00:00.000+09:00'),
+              ('score-down', 'friend-1', NULL, -5, '30日間反応なし', '2026-08-09T10:00:00.000+09:00'),
+              ('score-other', 'friend-2', NULL, 40, '別アカウント', '2026-08-09T11:00:00.000+09:00'),
+              ('score-low', 'friend-3', NULL, 10, 'メッセージ返信', '2026-08-08T10:00:00.000+09:00')`,
+    ).run();
+
+    const overview = await getActionScoreOverview(db, {
+      accountId: 'account-1', now: FIXED_NOW.toISOString(), filter: 'all', limit: 20,
+    });
+    expect(overview.summary).toMatchObject({
+      scoredFriends: 2, high: 1, normal: 0, low: 1, decreased30d: 1,
+      highMin: 70, normalMin: 30,
+    });
+    expect(overview.items.map((item) => item.friendId)).toEqual(['friend-1', 'friend-3']);
+    expect(overview.items.some((item) => item.friendId === 'friend-4')).toBe(false);
+    expect(overview.items[0]).toMatchObject({
+      currentScore: 75, band: 'high', change30d: -5,
+      lastReason: '30日間反応なし', lastChangedAt: '2026-08-09T10:00:00.000+09:00',
+    });
+    expect(overview.items.some((item) => item.friendId === 'friend-2')).toBe(false);
+
+    const decreased = await getActionScoreOverview(db, {
+      accountId: 'account-1', now: FIXED_NOW.toISOString(), filter: 'decreased', limit: 20,
+    });
+    expect(decreased.pagination.total).toBe(1);
+    expect(decreased.items[0].friendId).toBe('friend-1');
   });
 });

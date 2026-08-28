@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ArrowDownWideNarrow, Bookmark, Circle, Search, SlidersHorizontal, Star } from 'lucide-react'
 import type { Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListItem } from '@/lib/api'
@@ -22,6 +23,12 @@ type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 type Notice = { title: string; message: string } | null
 
+function scoreBoundary(raw: string | null) {
+  if (raw === null || !/^-?\d+$/.test(raw)) return undefined
+  const value = Number(raw)
+  return Number.isSafeInteger(value) ? value : undefined
+}
+
 const MERGED_TABS = [
   { key: 'list', label: '友だち一覧' },
   { key: 'duplicates', label: '重複検出' },
@@ -37,6 +44,10 @@ function FriendsPageInner({
   onExportReady: (exporter: () => void) => void
 }) {
   const { selectedAccountId } = useAccount()
+  const searchParams = useSearchParams()
+  const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
+  const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
+  const hasScoreRange = scoreMin !== undefined || scoreMax !== undefined
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -102,6 +113,8 @@ function FriendsPageInner({
         operatorId: operatorId || undefined,
         scenarioId: scenarioId || undefined,
         metadata: attentionOnly ? { __attention: '1' } : undefined,
+        scoreMin,
+        scoreMax,
       })
       if (response.success) {
         setFriends(response.data.items)
@@ -115,7 +128,7 @@ function FriendsPageInner({
     } finally {
       setLoading(false)
     }
-  }, [advanced, attentionOnly, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => setPage(1), [selectedAccountId])
@@ -170,6 +183,17 @@ function FriendsPageInner({
   return (
     <div data-friends-design="v6" className="space-y-3.5">
       <FriendKpis />
+
+      {hasScoreRange ? (
+        <div className="flex items-center justify-between rounded-v6-control border border-v6-accent-border bg-v6-accent-soft px-4 py-2.5 text-xs text-v6-ink-secondary">
+          <span>
+            行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
+            {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
+            {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
+          </span>
+          <Link href="/friends" className="font-semibold text-v6-action hover:underline">この条件を外す</Link>
+        </div>
+      ) : null}
 
       <section className={`rounded-v6-card border border-hairline bg-canvas px-4 py-3.5 shadow-v6-card`} data-design="V6SearchPanel" data-design-node="pRHvc">
         <form

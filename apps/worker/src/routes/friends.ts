@@ -174,6 +174,18 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       c.req.query('handled') === 'unhandled' ? 'unhandled' : null;
     const operatorId = c.req.query('operatorId');
     const scenarioId = c.req.query('scenarioId');
+    const parseScoreBoundary = (name: 'scoreMin' | 'scoreMax') => {
+      const raw = c.req.query(name);
+      if (raw === undefined) return { provided: false, value: 0 };
+      if (!/^-?\d+$/.test(raw)) return null;
+      const value = Number(raw);
+      return Number.isSafeInteger(value) ? { provided: true, value } : null;
+    };
+    const scoreMin = parseScoreBoundary('scoreMin');
+    const scoreMax = parseScoreBoundary('scoreMax');
+    if (!scoreMin || !scoreMax || (scoreMin.provided && scoreMax.provided && scoreMin.value > scoreMax.value)) {
+      return c.json({ success: false, error: 'scoreMin and scoreMax must be integers with min <= max' }, 400);
+    }
 
     const db = c.env.DB;
 
@@ -185,6 +197,10 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       binds.push(tagId);
     }
     if (lineAccountId) {
+      const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!scope.allowedAccountIds.includes(lineAccountId)) {
+        return c.json({ success: false, error: 'LINE account not found' }, 404);
+      }
       conditions.push('f.line_account_id = ?');
       binds.push(lineAccountId);
     } else {
@@ -195,6 +211,14 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
     if (search) {
       conditions.push('f.display_name LIKE ?');
       binds.push(`%${search}%`);
+    }
+    if (scoreMin.provided) {
+      conditions.push('f.score >= ?');
+      binds.push(scoreMin.value);
+    }
+    if (scoreMax.provided) {
+      conditions.push('f.score <= ?');
+      binds.push(scoreMax.value);
     }
     // Unhandled filter: chats.status === 'unread'.
     //
