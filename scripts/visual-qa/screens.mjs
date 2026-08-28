@@ -38,6 +38,9 @@
  *             'api'   … **新しいAPI・DBが要る。** 記録・集計・仕掛けが無い
  *             'drop'  … **V6から外す候補。** 作らない決めがある、または
  *                       ほかの画面に統合済み
+ *             'pending' … **Codexが実装中。** 新しいPRのheadを待つ。
+ *                       分けておかないと「作る話がまだ出ていない」ものと
+ *                       同じ列に並び、**待っているだけなのに止まって見える**
  *   gapNote   `gap` の理由。**「無い」ではなく「何が要るか」を書く**
  *   why       `status` の理由。空にしない
  *
@@ -961,15 +964,15 @@ export const SCREENS = [
   },
   {
     ...MILEAGE, node: 'z3PB2', name: '17-2 行動スコア',
-    gap: 'drop',
-    gapNote: '残高一覧に「コミット強／高アクション」の列として入っている。**別タブが要るか確認をお願いします**',
+    gap: 'pending',
+    gapNote: '**Codexが実装中。新しいPRのheadを待ちます。** 届いたら1440px・1920pxで比較します',
     status: 'unimplemented',
     why: '行動スコアがまるごと無い。PR #441 でタブは2本（友だちの残高／たまる決めごと）になったが、行動スコアは入っていない。**サイドバーの「マイル」はマイルだけ**',
   },
   {
     ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/earning-rules/new',
-    gap: 'drop',
-    gapNote: '上と同じ。行動スコアを別に持たないなら、ルールの画面も要らない',
+    gap: 'build',
+    gapNote: '**`scoring_rules` の表（`002_round3.sql:114`）と `/api/scoring-rules` の作る・直す・消すが既に在る**（`api.scoring`）。画面をつなぐだけ',
     status: 'unimplemented',
     why: '`/mileage/earning-rules/new` は**マイルの付与ルール**を作る画面で、スコアのルールではない。17-2 が無いので行き先も無い',
   },

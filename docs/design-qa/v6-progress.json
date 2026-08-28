@@ -818,15 +818,15 @@
       "feature": 17,
       "node": "z3PB2",
       "name": "17-2 行動スコア",
-      "gap": "drop",
-      "gapNote": "残高一覧に「コミット強／高アクション」の列として入っている。**別タブが要るか確認をお願いします**"
+      "gap": "pending",
+      "gapNote": "**Codexが実装中。新しいPRのheadを待ちます。** 届いたら1440px・1920pxで比較します"
     },
     {
       "feature": 17,
       "node": "s6MBc",
       "name": "17-2-A スコアのルール",
-      "gap": "drop",
-      "gapNote": "上と同じ。行動スコアを別に持たないなら、ルールの画面も要らない"
+      "gap": "build",
+      "gapNote": "**`scoring_rules` の表（`002_round3.sql:114`）と `/api/scoring-rules` の作る・直す・消すが既に在る**（`api.scoring`）。画面をつなぐだけ"
     },
     {
       "feature": 18,
