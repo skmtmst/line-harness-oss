@@ -2477,22 +2477,33 @@
       ]
     },
     "/form-submissions": {
-      "node": "v2tEQe",
-      "name": "V2 6-3 回答フォーム",
+      "node": "EMBIK",
+      "name": "V6 13-1 回答フォーム",
       "sections": [
-        "Head",
         "KPIs"
       ],
       "parts": [
-        "回答フォーム",
-        "マニュアル",
-        "並び替え",
-        "フォルダを追加",
         "フォーム",
-        "回答",
+        "公開中",
         "今月の回答",
-        "回答率"
-      ]
+        "回答率",
+        "フォームを作る",
+        "まだ回答フォームがありません",
+        "条件に合うフォームはありません"
+      ],
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "EMBIK",
+          "ZOPyc",
+          "v9tYhl"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Claudeの設計画像・実装画像比較待ち"
+      }
     },
     "/mileage": {
       "node": "s98Vfw",

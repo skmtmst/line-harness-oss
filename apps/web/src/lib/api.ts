@@ -1487,11 +1487,11 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
-    list: () =>
+    list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null }>>>(
-        '/api/forms',
+        `/api/forms?account_id=${encodeURIComponent(accountId)}`,
       ),
-    get: (id: string) =>
+    get: (id: string, accountId: string) =>
       fetchApi<
         ApiResponse<{
           id: string
@@ -1506,14 +1506,23 @@ export const api = {
           isActive: boolean
           submitCount: number
         }>
-      >(`/api/forms/${id}`),
-    create: (data: { name: string; description?: string | null; layout?: FormLayout }) =>
+      >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
+    create: (
+      accountId: string,
+      data: { name: string; description?: string | null; layout?: FormLayout },
+    ) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/forms', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, accountId }),
+      }),
+    createDraft: (accountId: string, name?: string) =>
+      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>('/api/forms/drafts', {
+        method: 'POST',
+        body: JSON.stringify({ name, accountId }),
       }),
     update: (
       id: string,
+      accountId: string,
       data: {
         name?: string
         description?: string | null
@@ -1526,12 +1535,15 @@ export const api = {
         isActive?: boolean
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}`, {
+      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    remove: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/forms/${id}`, { method: 'DELETE' }),
+    remove: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE' },
+      ),
   },
   /** NENコラム。 */
   nenColumns: {
