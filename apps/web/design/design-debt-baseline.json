@@ -320,6 +320,9 @@
     "direct-primary-button": 1,
     "arbitrary-value": 1
   },
+  "app/scenarios/results/page.tsx": {
+    "unresolved-classname": 23
+  },
   "app/search-console/page.tsx": {
     "arbitrary-value": 11,
     "direct-th": 5

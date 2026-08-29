@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioStep, ScenarioTriggerType, MessageType, DeliveryMode, Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Header from '@/components/layout/header'
+import Button from '@/components/shared/button'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ActionEditor from '@/components/scenarios/action-editor'
 import TriggerEditor from '@/components/scenarios/trigger-editor'
@@ -1111,6 +1112,7 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
                一覧へ戻る導線は設計では最下部にあり、ここには置かない
                （下の「シナリオ一覧に戻る」がそれ）。 */
             <div className="flex flex-wrap items-center gap-2">
+              <Button href={`/scenarios/results?id=${id}`}>配信結果を見る</Button>
               <button
                 disabled
                 title="マニュアルは準備中です"
