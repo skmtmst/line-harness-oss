@@ -40,10 +40,15 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   const { selectedAccountId } = useAccount()
 
   useEffect(() => {
+    if (!selectedAccountId) {
+      setLoading(false)
+      setError('LINEアカウントを選んでください')
+      return
+    }
     let cancelled = false
     void (async () => {
       try {
-        const res = await api.nenCampaigns.settings()
+        const res = await api.nenCampaigns.settings(selectedAccountId)
         if (cancelled) return
         if (res.success) {
           const found = res.data.find((s) => s.campaignKey === campaignKey) ?? null
@@ -60,7 +65,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     return () => {
       cancelled = true
     }
-  }, [campaignKey])
+  }, [campaignKey, selectedAccountId])
 
   useEffect(() => {
     setTestLoginUsers([])
@@ -117,7 +122,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
   }
 
   const save = async () => {
-    if (!setting) return
+    if (!setting || !selectedAccountId) return
     if (!merged.title?.trim()) {
       setError('タイトルを入力してください')
       return
@@ -126,7 +131,7 @@ export default function CampaignEditor({ campaignKey }: { campaignKey: string })
     setError('')
     setNotice('')
     try {
-      const res = await api.nenCampaigns.updateSetting(setting.campaignKey, {
+      const res = await api.nenCampaigns.updateSetting(selectedAccountId, setting.campaignKey, {
         isEnabled: merged.isEnabled,
         title: merged.title,
         bodyText: merged.bodyText,

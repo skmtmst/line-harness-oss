@@ -12,6 +12,9 @@ import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../service
 const ecCommerce = new Hono<Env>();
 const EVENT_TYPE_SET = new Set<string>(EC_EVENT_TYPES);
 const STATUS_SET = new Set(['received', 'processing', 'processed', 'skipped', 'failed']);
+const NOTIFICATION_EVENT_TYPES = EC_EVENT_TYPES.filter(
+  (eventType) => eventType !== 'ec.customer.profile_updated',
+);
 
 const EVENT_LABELS: Record<string, string> = {
   'ec.order.confirmed': '注文完了',
@@ -39,6 +42,30 @@ const FIXED_FIELDS: Record<string, string[]> = {
   'ec.subscription.card_updated': ['定期便番号', 'カード変更・再決済結果', 'お支払い金額', '定期便管理URL'],
   'ec.subscription.cancelled': ['解約受付の案内', '定期便番号'],
 };
+
+type NotificationRunStatus = 'pending' | 'accepted' | 'excluded' | 'failed';
+
+function notificationRunStatus(status: string): NotificationRunStatus {
+  if (status === 'processed') return 'accepted';
+  if (status === 'skipped') return 'excluded';
+  if (status === 'failed') return 'failed';
+  return 'pending';
+}
+
+/**
+ * 生の例外文は外部サービス名・識別子を含み得るので管理画面へ返さない。
+ * 現行台帳で運用者が安全に判断できる範囲だけを、日本語の理由にする。
+ */
+function notificationRunReason(status: string, errorMessage: string | null): string | null {
+  if (status === 'skipped' && errorMessage === 'notification_disabled') {
+    return 'このお知らせが停止中だったため、送信しませんでした';
+  }
+  if (status === 'skipped') return '送信対象外になりました';
+  if (status === 'failed') {
+    return '自動処理中に問題が起きました。受信箱またはEC連携の記録を確認してください';
+  }
+  return null;
+}
 
 function isValidHttpsUrl(value: string): boolean {
   if (!value) return true;
@@ -168,6 +195,115 @@ ecCommerce.get('/api/ec-commerce/events', requireRole('owner', 'admin', 'staff')
       receivedAt: row.received_at,
       processedAt: row.processed_at,
     })),
+    pagination: { total: countRow?.count ?? 0, limit, offset },
+  });
+});
+
+/**
+ * 現行EC通知の読み取り専用履歴。
+ *
+ * ec_events 自体には LINE アカウント列が無い。そのため、友だちとの結び付きから
+ * 選択中アカウントを確認できる行だけを返す。所属不明の過去行を推測で混ぜない。
+ * 共通送信台帳・版・再試行が揃うまでの段階実装であり、送達や既読は表さない。
+ */
+ecCommerce.get('/api/ec-commerce/notification-runs', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const lineAccountId = c.req.query('lineAccountId')?.trim() || '';
+  if (!lineAccountId) {
+    return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+  }
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
+  }
+
+  const requestedLimit = Number(c.req.query('limit') || '20');
+  const requestedOffset = Number(c.req.query('offset') || '0');
+  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 20;
+  const offset = Number.isInteger(requestedOffset) ? Math.max(requestedOffset, 0) : 0;
+  const view = c.req.query('view') || 'all';
+  if (view !== 'all' && view !== 'failures') {
+    return c.json({ success: false, error: '表示条件が正しくありません' }, 400);
+  }
+
+  const eventPlaceholders = NOTIFICATION_EVENT_TYPES.map(() => '?').join(', ');
+  const failureClause = view === 'failures' ? "AND e.status = 'failed'" : '';
+  const commonBindings: Array<string | number> = [lineAccountId, ...NOTIFICATION_EVENT_TYPES];
+  const rowsStatement = c.env.DB.prepare(
+    `SELECT e.id, e.external_event_id, e.event_type, e.status, e.error_message,
+            e.received_at, e.processed_at,
+            json_extract(e.payload, '$.order.number') AS order_number,
+            e.friend_id, f.display_name AS friend_name
+       FROM ec_events e
+       INNER JOIN friends f ON f.id = e.friend_id AND f.line_account_id = ?
+      WHERE e.event_type IN (${eventPlaceholders})
+        ${failureClause}
+      ORDER BY e.received_at DESC
+      LIMIT ? OFFSET ?`,
+  ).bind(...commonBindings, limit, offset);
+  const countStatement = c.env.DB.prepare(
+    `SELECT COUNT(*) AS count
+       FROM ec_events e
+       INNER JOIN friends f ON f.id = e.friend_id AND f.line_account_id = ?
+      WHERE e.event_type IN (${eventPlaceholders})
+        ${failureClause}`,
+  ).bind(...commonBindings);
+  const summaryStatement = c.env.DB.prepare(
+    `SELECT
+       SUM(CASE WHEN e.status = 'processed' THEN 1 ELSE 0 END) AS accepted,
+       SUM(CASE WHEN e.status = 'failed' THEN 1 ELSE 0 END) AS failed,
+       SUM(CASE WHEN e.status = 'skipped' THEN 1 ELSE 0 END) AS excluded,
+       SUM(CASE WHEN e.status IN ('received', 'processing') THEN 1 ELSE 0 END) AS pending
+       FROM ec_events e
+       INNER JOIN friends f ON f.id = e.friend_id AND f.line_account_id = ?
+      WHERE e.event_type IN (${eventPlaceholders})`,
+  ).bind(...commonBindings);
+
+  const [rows, countRow, summary] = await Promise.all([
+    rowsStatement.all<{
+      id: string; external_event_id: string; event_type: string; status: string;
+      error_message: string | null; received_at: string; processed_at: string | null;
+      order_number: string | null; friend_id: string; friend_name: string | null;
+    }>(),
+    countStatement.first<{ count: number }>(),
+    summaryStatement.first<{ accepted: number; failed: number; excluded: number; pending: number }>(),
+  ]);
+
+  return c.json({
+    success: true,
+    data: {
+      items: rows.results.map((row) => ({
+        id: row.id,
+        recipientType: 'customer' as const,
+        notificationName: EVENT_LABELS[row.event_type] || row.event_type,
+        source: 'EC連携',
+        sourceEventId: row.external_event_id,
+        friendId: row.friend_id,
+        friendName: row.friend_name,
+        orderNumber: row.order_number,
+        channel: 'line' as const,
+        status: notificationRunStatus(row.status),
+        reason: notificationRunReason(row.status, row.error_message),
+        receivedAt: row.received_at,
+        acceptedAt: row.status === 'processed' ? row.processed_at : null,
+        attemptCount: null,
+        nextRetryAt: null,
+        clickedAt: null,
+        version: null,
+        executionMode: 'automatic' as const,
+        retryAvailable: false,
+      })),
+      summary: {
+        accepted: summary?.accepted ?? 0,
+        failed: summary?.failed ?? 0,
+        excluded: summary?.excluded ?? 0,
+        pending: summary?.pending ?? 0,
+      },
+      coverage: {
+        source: 'current_ec_events' as const,
+        unassignedHistoricalRowsExcluded: true,
+        attemptHistoryAvailable: false,
+        retryAvailable: false,
+      },
+    },
     pagination: { total: countRow?.count ?? 0, limit, offset },
   });
 });
