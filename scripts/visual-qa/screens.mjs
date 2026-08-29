@@ -968,17 +968,17 @@ export const SCREENS = [
     実装は作成が1枚、編集が4つのタブ。**「通知・リマインド」の段だけが
     まるごと無い**（`grep リマインド|見逃し` が `/webinars` 配下で0件）。
   */
-  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー', verdict: 'needs_fix', verdictNote: 'P1 一覧に申込人数・視聴人数が出ない。帯の3つ（申込・平均視聴率・平均視聴時間）がどれも—で、札に「一覧では数えられません」「視聴ログの集計は未対応」と書いてある。どのウェビナーが効いているかを一覧で比べられず、1本ずつ開いて覚えて比べることになる。WebinarAnalytics は1本ぶんを返せるので、足りていないのはまとめて数える口。P2 表でなく札の格子。左のフォルダの縦帯が無く「フォルダを追加」は押せない。CTA反応の帯が無い。「並び替え」が在るが押せない', verdictSource: 'webinars-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: 'P1 作成の段（設計は複数段に分ける）が無く、1枚の画面になっている', verdictSource: 'webinars-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...WEBINAR, node: 'ZC13r', name: '10-1 ウェビナー', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。** **P1 どのウェビナーが効いているかを一覧で比べられない。** 設計は行ごとに **申込184人 / 視聴142人** を出す。実装の帯は 申込 `—`「一覧では数えられません」／平均視聴率 `—`「申込者のうち」／平均視聴時間 `—`「視聴ログの集計は未対応」の3つとも `—`。**断り方は正しい**（数えていないものを0にしない）が、比べるには1本ずつ「概要・分析を見る」を開いて覚えておくことになる。6本あれば6回開く。`WebinarAnalytics` は1本ぶんを全部返せるので、**足りないのはまとめて数える口だけ**。P2 設計は表、実装は札の格子で作りが違う。1440・1920とも横スクロール0、壊れ値・内部語0件', verdictSource: 'webinars-v6/ZC13r.txt + webinars-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...WEBINAR, node: 'lvaY5', name: '10-1-A ウェビナーを作成', route: '/webinars/new', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P1 作成の段が無い。設計は 基本 → 動画・公開設定 → CTA・フォーム → 通知 → 視聴後 → 公開前確認 と進むが、実装は1枚に並ぶ。P2 公開前確認（`D6yO7e`）と公開完了（`TimXl`）が未実装で、段の終わりが無い。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/lvaY5.txt + webinars-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...WEBINAR, node: 'PV1Vh', name: '10-1-B 動画・公開設定', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: 'P1 10-1-B 動画・公開設定が独立しておらず、視聴後アクション（Xjk8q）と同じタブに混ざっている', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 設計との差は動画の入れ方と公開範囲の並び。`Xjk8q`（視聴後アクション）と同じタブに同居していて、設計のように段で分かれていない。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/PV1Vh.txt + webinars-v6/design-qa.md',
     steps: [{ click: 'いつ見られるようにするか' }],
     verdictHead: 'c275749d',
   },
   {
     ...WEBINAR, node: 'd3rFGD', name: '10-1-C CTA・フォーム', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: 'P1 CTA・フォームの面が設計とそろわない。案内を送る仕組み（前日20:00・1時間前・開始時・未視聴者へ翌日10:00の見逃し案内）は画面にも口にも無く、grep で0件', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 CTA・フォームの作りが設計とそろわない。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/d3rFGD.txt + webinars-v6/design-qa.md',
     steps: [{ click: '見ている途中に出すもの' }],
     verdictHead: 'c275749d',
   },
@@ -992,7 +992,7 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Xjk8q', name: '10-1-E 視聴後アクション', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: 'P1 10-1-E 視聴後アクションが独立しておらず、10-1-B と同じタブに混ざっている', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 視聴後アクションが `PV1Vh` と同じタブに同居している。設計は別の段。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/Xjk8q.txt + webinars-v6/design-qa.md',
     steps: [{ click: 'いつ見られるようにするか' }],
     verdictHead: 'c275749d',
   },
@@ -1025,13 +1025,13 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: 'P1 参加者管理の面が設計とそろわない。1本ぶんの申込・視聴・CTAは WebinarAnalytics が返せるが、一覧では数えられない', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 参加者管理が `yxyzQ`（分析）と同じタブに同居している。設計は別の画面。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/Q8sHa.txt + webinars-v6/design-qa.md',
     steps: [{ click: '概要・分析' }],
     verdictHead: 'c275749d',
   },
   {
     ...WEBINAR, node: 'yxyzQ', name: '10-1-J 分析', route: WEBINAR_EDIT,
-    verdict: 'needs_fix', verdictNote: 'P1 10-1-J 分析が独立しておらず、10-1-I 参加者管理と同じタブに混ざっている', verdictSource: 'webinars-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** 1本ぶんの申込・視聴・CTAは `WebinarAnalytics` から出せている。P2 `Q8sHa` と同じタブに同居。**一覧側でまとめて数える口が無い**ので、`ZC13r` の帯が `—` のままになる（同じ根）。1440・1920とも横スクロール0', verdictSource: 'webinars-v6/yxyzQ.txt + webinars-v6/design-qa.md',
     steps: [{ click: '概要・分析' }],
     verdictHead: 'c275749d',
   },
@@ -1147,9 +1147,9 @@ export const SCREENS = [
     段は無いが**中身は同じ画面に全部ある**ので、同じ絵を3つの設計と
     突き合わせる形にする。
   */
-  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: 'P1 どれが出るかを決める「順番」が画面に出ない。リッチメニューは同じ友だちが複数に当てはまると**いちばん上の1つだけ**が出るのに、並び順の既定は「タップ数が多い順」（page.tsx:93）で、画面の並びと実際に出る順番が関係ない。targetingPriority はデータとして持っているのに一覧が一度も出していない（grep が0件）。出し分けを2件以上使い始めた時点で効いてくる。P2 表でなく札の格子。絞り込みの札が3つで「条件で出し分け」「管理画面の外」で絞れない。状態に「予約」が無い（status は draft と published の2つだけで、publishingAt は持っているのに予約中を出せない）。「保存した検索」が無い', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: 'P1 形とボタンを決める段が無く、1枚の画面に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-B 誰に出すかが独立しておらず、同じ1枚の中に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮り、設計の記述と突き合わせた。P1 どれが出るかを決める『順番』が画面に出ない。** リッチメニューは**同じ友だちが複数に当てはまったとき、いちばん上の1つだけ**が出る。つまり順番がそのまま「お客さまに何が見えるか」。設計は3つで支える——見出しの「出す順番を変える」／「上にあるものが優先されます。同じ友だちが複数のメニューに当てはまるときは、いちばん上の1つだけが出ます。」の断り／並び順の既定を「出す順番（自分で決めた順）」にする。**実装はどれも無い**（本文を数えて「評価順」「順番」「上から順」「優先」すべて0件）。並び順の既定は「タップ数が多い順」（`page.tsx:93`）なので、**画面に出ている並びは実際に出る順番と関係が無い**。上から2番目に見えるメニューが最後に判定されることがある。`targetingPriority` はデータとして持っているのに、画面が一度も出していない。P2 設計は表、実装は札の格子。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/GO8RQ.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 形とボタンの段が無く、`kQ1bs`（誰に出すか）`UMiJ9`（公開のしかた）と同じ1枚に同居している。設計は段で分ける。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/XtfO3.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 `XtfO3` と同じ1枚の中にある。P1 出し分けの条件を決める画面なのに、**当てはまったときにどれが優先されるか**が出ない（`GO8RQ` と同じ根）。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/kQ1bs.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     /*
       **#509 で `/rich-menus/connections?id=` が入った。**
@@ -1171,8 +1171,8 @@ export const SCREENS = [
     verdictSource: 'rich-menus-v6/NXdDk-1920.png',
     verdictHead: 'e148615c',
   },
-  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-D 公開のしかたが独立しておらず、同じ1枚の中に混ざっている。日時を決めて出す「予約中」の状態を出せない', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
-  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: 'P2 設計は別画面だが実装は一覧の中に埋め込み。**設計より近い場所にあるので悪い差ではない**。ただし絞り込みの札に「管理画面の外」が無く、絞れない', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 公開のしかたが `XtfO3` と同じ1枚の中にある。設計は別の段。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/UMiJ9.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: '**development `c275749d` で撮った。** P2 管理画面の外のメニューが、設計では別画面だが実装は一覧の中の節になっている。取り込みと削除はできる。1440・1920とも横スクロール0', verdictSource: 'rich-menus-v6/TL7tp.txt + rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
     gap: 'api',
