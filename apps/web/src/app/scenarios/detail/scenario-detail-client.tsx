@@ -45,6 +45,7 @@ import ScheduleInput, {
   type ScheduleValue,
 } from '@/components/scenarios/schedule-input'
 import BulkPreviewModal from '@/components/scenarios/bulk-preview-modal'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 
 type ScenarioWithSteps = Scenario & { steps: ScenarioStep[] }
 
@@ -258,6 +259,9 @@ export default function ScenarioDetailClient({
   /** 表の行で開いている1通ぶんのプレビュー。設計の「プレビュー」。 */
   const [previewStepId, setPreviewStepId] = useState<string | null>(null)
   const [duplicatingStepId, setDuplicatingStepId] = useState<string | null>(null)
+  const [deleteStepTarget, setDeleteStepTarget] = useState<ScenarioStep | null>(null)
+  const [deletingStepId, setDeletingStepId] = useState<string | null>(null)
+  const [deleteStepError, setDeleteStepError] = useState('')
   const [showStepForm, setShowStepForm] = useState(false)
   /** 何通目のあとに差し込むか。末尾に足すときは null。 */
   const [insertAfter, setInsertAfter] = useState<number | null>(null)
@@ -734,14 +738,22 @@ export default function ScenarioDetailClient({
     }
   }
 
-  const handleDeleteStep = async (stepId: string) => {
-    if (!confirm('このステップを削除してもよいですか？')) return
+  const handleDeleteStep = async () => {
+    if (!deleteStepTarget || deletingStepId) return
+    const stepId = deleteStepTarget.id
+    setDeletingStepId(stepId)
+    setDeleteStepError('')
     try {
-      await api.scenarios.deleteStep(id, stepId)
+      const result = await api.scenarios.deleteStep(id, stepId)
+      if (!result.success) throw new Error(result.error)
       if (editingStepId === stepId) closeStepForm()
-      loadScenario()
+      setDeleteStepTarget(null)
+      void loadScenario()
+      void reloadStats()
     } catch {
-      setError('ステップの削除に失敗しました')
+      setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。')
+    } finally {
+      setDeletingStepId(null)
     }
   }
 
@@ -1697,7 +1709,10 @@ export default function ScenarioDetailClient({
                             </button>
                             <button
                               type="button"
-                              onClick={() => void handleDeleteStep(step.id)}
+                              onClick={() => {
+                                setDeleteStepError('')
+                                setDeleteStepTarget(step)
+                              }}
                               title="この通を削除する"
                               aria-label="この通を削除する"
                               className="text-ink-faint hover:text-danger"
@@ -1770,6 +1785,24 @@ export default function ScenarioDetailClient({
         open={previewOpen}
         scenarioId={id}
         onClose={() => setPreviewOpen(false)}
+      />
+
+      <ConfirmDialog
+        open={deleteStepTarget !== null}
+        title={deleteStepTarget ? `${deleteStepTarget.stepOrder}通目を削除しますか？` : 'この通を削除しますか？'}
+        description={deleteStepTarget
+          ? `${deleteStepTarget.stepOrder}通目と、その配信対象・送信後アクションが削除されます。到達済みの履歴は監査記録として残ります。この操作は取り消せません。`
+          : ''}
+        confirmLabel="この通を削除"
+        destructive
+        busy={deletingStepId !== null}
+        error={deleteStepError}
+        onConfirm={() => void handleDeleteStep()}
+        onCancel={() => {
+          if (deletingStepId) return
+          setDeleteStepTarget(null)
+          setDeleteStepError('')
+        }}
       />
 
       {/* シナリオ全体の配信対象 */}
