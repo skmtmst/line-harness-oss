@@ -44,13 +44,14 @@ const rule = {
   conditions: '{}', channels: '["dashboard"]', line_account_id: 'account-a',
   is_active: 1, created_at: '2026-08-28', updated_at: '2026-08-28',
 };
+const draftRule = { ...rule, is_active: 0 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.canAccess.mockResolvedValue(true);
   mocks.getRules.mockResolvedValue([rule]);
   mocks.getRule.mockResolvedValue(rule);
-  mocks.createRule.mockResolvedValue(rule);
+  mocks.createRule.mockResolvedValue(draftRule);
   mocks.getNotifications.mockResolvedValue([]);
 });
 
@@ -88,7 +89,31 @@ describe('operator notification account boundary', () => {
     expect(response.status).toBe(201);
     expect(mocks.createRule).toHaveBeenCalledWith(env.DB, expect.objectContaining({
       lineAccountId: 'account-a', name: '予約通知', eventType: 'booking_created',
+      channels: ['dashboard'],
     }));
+    const body = await response.json() as { data: { isActive: boolean } };
+    expect(body.data.isActive).toBe(false);
+  });
+
+  it('does not publish a rule before recipient resolution and delivery are connected', async () => {
+    const response = await app().request('/api/notifications/rules/rule-a', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lineAccountId: 'account-a', isActive: true }),
+    }, env);
+    expect(response.status).toBe(409);
+    expect(mocks.updateRule).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown delivery channel instead of saving an inert value', async () => {
+    const response = await app().request('/api/notifications/rules', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        lineAccountId: 'account-a', name: '予約通知', eventType: 'booking_created',
+        channels: ['slack'],
+      }),
+    }, env);
+    expect(response.status).toBe(400);
+    expect(mocks.createRule).not.toHaveBeenCalled();
   });
 
   it('looks up and updates the rule through the same account boundary', async () => {

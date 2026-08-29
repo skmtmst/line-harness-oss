@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import MergedTabs, { useMergedTab } from '@/components/layout/merged-tabs'
 import NotificationRunList from '@/components/line-notifications/notification-run-list'
+import OperatorNotificationRules from '@/components/line-notifications/operator-notification-rules'
 import { api, type EcCommerceOverview, type EcNotificationSetting } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 
@@ -14,6 +15,7 @@ type Category = typeof categories[number][0]
 
 const TABS = [
   { key: 'customer', label: '顧客へのお知らせ' },
+  { key: 'operator', label: '運用者へのお知らせ' },
   { key: 'failures', label: '送れなかったもの' },
   { key: 'history', label: '記録' },
 ] as const
@@ -112,6 +114,7 @@ export default function LineNotificationsPage() {
     <MergedTabs basePath="/line-notifications" tabs={TABS} active={tab} defaultKey="customer" />
     {tab === 'failures' ? <NotificationRunList lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <NotificationRunList lineAccountId={selectedAccountId} mode="history" /> : null}
+    {tab === 'operator' ? <OperatorNotificationRules lineAccountId={selectedAccountId} /> : null}
     {tab === 'customer' ? <>
     <div data-design="KPIs" className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {[

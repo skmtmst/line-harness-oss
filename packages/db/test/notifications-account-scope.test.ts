@@ -59,6 +59,7 @@ describe('notification rule account scope', () => {
       lineAccountId: 'account-a', name: '回答受付', eventType: 'form_submitted',
     });
     expect(created.line_account_id).toBe('account-a');
+    expect(created.is_active).toBe(0);
 
     await updateNotificationRule(db, 'rule-b', 'account-a', { name: '変更してはいけない' });
     expect(sqlite.prepare('SELECT name FROM notification_rules WHERE id = ?').get('rule-b'))
