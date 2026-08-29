@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 196,
-  "unimplemented": 62,
+  "compared": 198,
+  "unimplemented": 60,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 173,
+  "needsFix": 175,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -169,14 +169,14 @@
       "feature": 6,
       "name": "一斉配信",
       "total": 15,
-      "compared": 12,
-      "unimplemented": 3,
+      "compared": 13,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
-      "needsFix": 11,
+      "needsFix": 12,
       "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
@@ -222,17 +222,27 @@
       "feature": 7,
       "name": "リマインダ",
       "total": 11,
-      "compared": 5,
-      "unimplemented": 6,
+      "compared": 6,
+      "unimplemented": 5,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 5,
+      "needsFix": 6,
       "unjudged": 0,
       "remaining": 11,
       "capturedAt": [
+        {
+          "pr": 514,
+          "head": "9a72dba6",
+          "on": "2026-08-29",
+          "screens": [
+            "Y0Sn3",
+            "M1EXwB"
+          ],
+          "note": "削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**"
+        },
         {
           "pr": 500,
           "head": "409f00bb",
@@ -819,13 +829,6 @@
     },
     {
       "feature": 6,
-      "node": "bPF0s",
-      "name": "6-1-I 予約完了",
-      "gap": "pending",
-      "gapNote": "#510 head `ab1841bc` で予約完了画面を実データへ接続済み。#497を土台にしているため、取り込み順は #495 → #497 → #510。最新headを1440/1920で比較してから未実装を外す"
-    },
-    {
-      "feature": 6,
       "node": "sqFXf",
       "name": "6-1-L 対象条件を編集",
       "gap": "api",
@@ -865,13 +868,6 @@
       "name": "7-1-G 有効化完了",
       "gap": "api",
       "gapNote": "`publish` の返事（公開版、対象、予定件数、最初の実行、監視先）を受けて完了画面を出す。最終確認のAPI契約と同時に作る"
-    },
-    {
-      "feature": 7,
-      "node": "Y0Sn3",
-      "name": "7-1-I 削除確認",
-      "gap": "pending",
-      "gapNote": "#498で未送信だけを取消し、送信済み履歴を残すsoft deleteと確認窓を実装済み。#514で一部失敗時に成功分と残りを分けて再試行可能にする。取り込み順は #498 → #514"
     },
     {
       "feature": 8,

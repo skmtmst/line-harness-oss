@@ -727,6 +727,12 @@ export const BROADCASTS = [
   totalCount: Number(totalCount),
   successCount: Number(successCount),
   folderId: null,
+  /*
+    **どのアカウントの配信かを持たせる。** 持たせないと、予約完了の画面
+    （`/broadcasts/reserved`）が「選択中のアカウントの配信ではありません」で
+    止まり、設計と並べる面が出ない。**空のまま撮って合格にしない。**
+  */
+  lineAccountId: 'visual-qa-account',
   createdAt: '2026-08-16T00:00:00.000Z',
 }))
 
