@@ -1636,6 +1636,29 @@ CREATE TABLE nen_pet_profiles (
   updated_at TEXT NOT NULL
 , breed TEXT, weight_kg REAL, concerns TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(concerns)), recommended_daily_grams INTEGER, recommended_daily_min_grams INTEGER, recommended_daily_max_grams INTEGER, venison_daily_grams INTEGER, food_cycle_days INTEGER, image_r2_key TEXT, image_url TEXT);
 
+CREATE TABLE nen_photo_review_events (
+  id TEXT PRIMARY KEY,
+  photo_id TEXT NOT NULL REFERENCES nen_photo_submissions(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  from_status TEXT NOT NULL CHECK (from_status = 'pending'),
+  to_status TEXT NOT NULL CHECK (to_status IN ('adopted', 'rejected')),
+  reason_code TEXT CHECK (reason_code IS NULL OR reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')),
+  reason_note TEXT,
+  awarded_points INTEGER NOT NULL DEFAULT 0,
+  reviewed_by TEXT NOT NULL,
+  reviewed_by_name TEXT NOT NULL,
+  notification_status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (notification_status IN ('pending', 'sent', 'failed')),
+  notification_error TEXT,
+  notification_attempt_count INTEGER NOT NULL DEFAULT 0
+    CHECK (notification_attempt_count >= 0),
+  notification_first_failed_at TEXT,
+  notification_sent_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(photo_id, from_status)
+);
+
 CREATE TABLE nen_photo_submissions (
   id TEXT PRIMARY KEY,
   friend_id TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
@@ -1650,7 +1673,10 @@ CREATE TABLE nen_photo_submissions (
   created_at TEXT NOT NULL,
   reviewed_at TEXT,
   updated_at TEXT NOT NULL
-);
+, line_account_id TEXT REFERENCES line_accounts(id), publication_consent_version TEXT, publication_consent_at TEXT, publication_withdrawn_at TEXT, public_pet_name INTEGER NOT NULL DEFAULT 0
+  CHECK (public_pet_name IN (0, 1)), review_reason_code TEXT
+  CHECK (review_reason_code IS NULL OR review_reason_code IN ('quality', 'privacy', 'unrelated', 'duplicate', 'other')), review_reason_note TEXT, reviewed_by TEXT, reviewed_by_name TEXT, review_notification_status TEXT NOT NULL DEFAULT 'not_required'
+  CHECK (review_notification_status IN ('not_required', 'pending', 'sent', 'failed')));
 
 CREATE TABLE nen_point_ledger (
   id TEXT PRIMARY KEY,
@@ -3099,6 +3125,20 @@ CREATE INDEX idx_nen_pet_profiles_birthday
 
 CREATE INDEX idx_nen_pet_profiles_customer
   ON nen_pet_profiles(customer_id);
+
+CREATE INDEX idx_nen_photo_review_events_account_created
+  ON nen_photo_review_events(line_account_id, created_at DESC);
+
+CREATE INDEX idx_nen_photo_review_events_notification
+  ON nen_photo_review_events(notification_status, created_at)
+  WHERE notification_status IN ('pending', 'failed');
+
+CREATE INDEX idx_nen_photos_account_status
+  ON nen_photo_submissions(line_account_id, status, created_at DESC);
+
+CREATE INDEX idx_nen_photos_publication
+  ON nen_photo_submissions(line_account_id, publication_consent_at, reviewed_at DESC)
+  WHERE status = 'adopted' AND publication_withdrawn_at IS NULL;
 
 CREATE INDEX idx_nen_photos_status ON nen_photo_submissions(status, created_at DESC);
 

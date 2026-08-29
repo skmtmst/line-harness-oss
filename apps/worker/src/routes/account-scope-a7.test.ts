@@ -88,7 +88,6 @@ describe('A-7 tenant scope', () => {
 
   test.each([
     '/api/nen-members/care-flags',
-    '/api/nen-members/photos',
     '/api/nen-members/ranks',
     '/api/nen-members/consultations',
   ])('%s filters rows to visible accounts', async (path) => {
@@ -98,14 +97,29 @@ describe('A-7 tenant scope', () => {
     expect(harness.sql[0].bindings).toEqual(['own-account']);
   });
 
+  test('/api/nen-members/photos requires and filters to one selected account', async () => {
+    const harness = app();
+    expect((await harness.instance.request('/api/nen-members/photos?accountId=own-account')).status).toBe(200);
+    expect(harness.sql[0].query).toContain('ps.line_account_id = ? AND f.line_account_id = ?');
+    expect(harness.sql[0].bindings).toEqual(['own-account', 'own-account']);
+  });
+
   test.each([
     ['/api/nen-members/care-flags/flag-1', 'PUT', { status: 'resolved' }, { friend_id: 'friend-1', line_account_id: 'other-account' }],
-    ['/api/nen-members/photos/photo-1/review', 'PUT', { status: 'rejected' }, { friend_id: 'friend-1', line_account_id: 'other-account', status: 'pending' }],
     ['/api/nen-members/friends/friend-1', 'GET', undefined, { id: 'friend-1', line_account_id: 'other-account' }],
   ])('%s hides another tenant row', async (path, method, body, row) => {
     mocks.canAccess.mockResolvedValue(false);
     const response = await app(row).instance.request(path, body === undefined ? { method } : json(method, body));
     expect(response.status).toBe(404);
+  });
+
+  test('/api/nen-members/photos/:id/review rejects an inaccessible selected account before lookup', async () => {
+    mocks.canAccess.mockResolvedValue(false);
+    const response = await app().instance.request(
+      '/api/nen-members/photos/photo-1/review',
+      json('PUT', { accountId: 'other-account', status: 'rejected', reasonCode: 'quality' }),
+    );
+    expect(response.status).toBe(403);
   });
 
   test('keeps own-tenant care-flag updates working', async () => {

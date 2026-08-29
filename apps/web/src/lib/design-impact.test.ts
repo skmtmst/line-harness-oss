@@ -10,7 +10,7 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする37ファイルだけを利用先に数える', () => {
+  it('共通Buttonを直接importする38ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -33,6 +33,7 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/mileage-history-tab.tsx',
       'app/mileage/page.tsx',
       'app/nen-campaigns/page.tsx',
+      'app/nen-members/page.tsx',
       'app/page.tsx',
       'app/reminders/new/page.tsx',
       'app/reminders/page.tsx',
