@@ -4305,3 +4305,74 @@ export const AUTOMATION_TEMPLATES = [
     actionLabel: 'メッセージを送る',
   },
 ]
+
+/*
+  リマインダの下書きと、公開までの4つの返事。
+
+  **型は `packages/shared/src/types.ts:1078` から。** `ReminderDraftVersion`
+  `ReminderValidationResult` `ReminderPreviewResult` `ReminderPublishResult`。
+
+  **数えていないものは `null` にする。** `audience` `excluded` `next7Days`
+  はどれも `number | null` で、画面は `null` を `—人` に描く。0を入れると
+  「数えたら0だった」に化ける。ここでは対象は数えられている（124人）が、
+  **除外だけは数える口が無い**ので `null` のままにしてある。
+*/
+export const REMINDER_DRAFT = {
+  reminderId: 'reminder-3', versionId: 'rv-3-2', versionNumber: 2, status: 'draft',
+  settings: {
+    name: '予約前日のお知らせ', description: '前日の19:00に、翌日の予約をお知らせします。',
+    lineAccountId: 'visual-qa-account', triggerType: 'booking', deliveryMode: 'time',
+    triggerFieldId: null, repeatYearly: false, triggerOffsetMinutes: -1440,
+    sendAtTime: '19:00', targetTagId: 'tag-0', folderId: null,
+    stopConditions: {
+      bookingCancelled: true, supportMarkCompleted: true,
+      daysAfterTarget: 3, friendBlocked: true,
+    },
+    steps: [
+      {
+        stableStepId: 'rs-1', offsetMinutes: -1440, messageType: 'text',
+        messageContent: '明日のご予約をお待ちしています。ご来店は10分前を目安にお願いします。',
+        offsetDays: -1, sendAtTime: '19:00', templateId: null,
+      },
+      {
+        stableStepId: 'rs-2', offsetMinutes: -120, messageType: 'text',
+        messageContent: '本日おまちしています。道順はこちらからご確認ください。',
+        offsetDays: 0, sendAtTime: '08:00', templateId: null,
+      },
+    ],
+  },
+  lastTestStatus: 'succeeded', lastTestedAt: '2026-08-28T09:12:00.000Z', publishedAt: null,
+}
+
+/*
+  届く予定。**過去になる通と、重なる通を、そのまま出す。**
+  `state` は `scheduled | past | duplicate` の3つ。都合の悪いものを隠すと、
+  公開してから「送られなかった」に気づくことになる。
+*/
+export const REMINDER_PREVIEW = {
+  targetDate: '2026-09-03',
+  items: [
+    { stableStepId: 'rs-1', stepNumber: 1, scheduledAt: '2026-09-02T10:00:00.000Z', label: '前日 19:00', state: 'scheduled' },
+    { stableStepId: 'rs-2', stepNumber: 2, scheduledAt: '2026-09-02T23:00:00.000Z', label: '当日 08:00', state: 'scheduled' },
+  ],
+  summary: { audience: 124, next7Days: 38, next30Days: 162, duplicateCount: 0 },
+}
+
+/* 公開前チェック。**通ったものだけでなく、注意も出す。** */
+export const REMINDER_VALIDATION = {
+  valid: true,
+  checks: [
+    { key: 'trigger', label: '基準日が決まっています', status: 'passed', message: '予約日を基準にします' },
+    { key: 'steps', label: 'すべての通に送る時刻があります', status: 'passed', message: '2通とも時刻が入っています' },
+    { key: 'test', label: 'テスト送信が終わっています', status: 'passed', message: '2026/08/28 18:12 に成功' },
+    { key: 'stop', label: '止める条件があります', status: 'passed', message: '予約取消・対応完了・ブロックで止まります' },
+    { key: 'audience', label: '届く人がいます', status: 'warning', message: '除外される人数は数えられません' },
+  ],
+  audience: { matched: 124, excluded: null },
+}
+
+export const REMINDER_PUBLISHED = {
+  reminderId: 'reminder-3', versionId: 'rv-3-2', versionNumber: 2,
+  publishedAt: '2026-08-29T02:30:00.000Z',
+  audience: 124, plannedDeliveries: 38, nextScheduledAt: '2026-09-02T10:00:00.000Z',
+}

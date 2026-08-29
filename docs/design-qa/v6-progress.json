@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 219,
-  "unimplemented": 39,
+  "compared": 224,
+  "unimplemented": 34,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 196,
+  "needsFix": 201,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -244,17 +244,30 @@
       "feature": 7,
       "name": "リマインダ",
       "total": 11,
-      "compared": 6,
-      "unimplemented": 5,
+      "compared": 11,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
+      "needsFix": 11,
       "unjudged": 0,
       "remaining": 11,
       "capturedAt": [
+        {
+          "pr": 551,
+          "head": "44692a37",
+          "on": "2026-08-29",
+          "screens": [
+            "s7T2dz",
+            "JCz6J",
+            "W98zZQ",
+            "s6Vvp",
+            "PSmHo"
+          ],
+          "note": "公開までの5段。`?stage=` で1枚ずつ開く。届く予定・公開前チェック・公開の3つの口だけモックで405に落とさず、**公開の人数は公開前チェックと同じ数から作る**"
+        },
         {
           "pr": 514,
           "head": "9a72dba6",
@@ -1000,41 +1013,6 @@
       "name": "3-4 UID移行",
       "gap": "api",
       "gapNote": "異なるLINEプロバイダー間のUID自動変換はできない。検証済み対応表の取込、dry-run、競合判断、本移行、照合、切り戻しを持つ `uid_migration_runs/items` とowner・二者確認APIが要る"
-    },
-    {
-      "feature": 7,
-      "node": "s7T2dz",
-      "name": "7-1-C 対象と終了条件",
-      "gap": "api",
-      "gapNote": "終了・停止条件の保存先が要る"
-    },
-    {
-      "feature": 7,
-      "node": "JCz6J",
-      "name": "7-1-D 配信予定プレビュー",
-      "gap": "api",
-      "gapNote": "設定だけを画面側で計算せず、`POST /api/reminders/{id}/preview` で各通の予定日時、過去で作られない通、条件で外れる通、取消時に止まる通を返す必要がある"
-    },
-    {
-      "feature": 7,
-      "node": "W98zZQ",
-      "name": "7-1-E テスト送信確認",
-      "gap": "api",
-      "gapNote": "リマインダ専用のdry-run／テスト送信APIが要る。実登録、予定、送信後アクション、履歴、回数制限を更新せずにプレビューと送信結果を返す"
-    },
-    {
-      "feature": 7,
-      "node": "s6Vvp",
-      "name": "7-1-F 最終確認",
-      "gap": "api",
-      "gapNote": "公開版、`validate`、`preview`、`publish` が要る。基準日・通・テスト・対象・終了条件をサーバーで確認し、公開する版を固定してから有効化する"
-    },
-    {
-      "feature": 7,
-      "node": "PSmHo",
-      "name": "7-1-G 有効化完了",
-      "gap": "api",
-      "gapNote": "`publish` の返事（公開版、対象、予定件数、最初の実行、監視先）を受けて完了画面を出す。最終確認のAPI契約と同時に作る"
     },
     {
       "feature": 8,
