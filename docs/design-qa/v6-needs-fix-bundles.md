@@ -115,7 +115,7 @@
 
 | Node | 機能 | どこが | 対象PR |
 |---|---|---|---|
-| `ZOPyc` | 13 | 失敗時も帯が「フォーム 0件」「公開中 0件」 | **無し**（#436 では未対応。**次にいちばん要る**） |
+| `ZOPyc` | 13 | 失敗時も帯が「フォーム 0件」「公開中 0件」 | **#556** `6037aeef`（`form-kpi-value.tsx` を足して未取得と0件を分ける） |
 | `q8wSqO` | 8 | 失敗時に帯が 0件・0回・0件・0件 | **無し** |
 | `NKyoA` | 11 | 失敗時にタブとフォルダの件数が 0 | #528 `1b95452d` |
 | `zCQXe` | 10 | ウェビナーだけ 0件（ほか3枚は `—`） | #524 `a6c35ee0` |
@@ -125,7 +125,7 @@
 | `k5m5Bc` | 29 | 0件・0人・0件 | #533 `d1070487` |
 | `bzDn6` | 3 | 「友だち一覧 0件」 | #520 `4848a8f3` |
 | `HBTk0` | 4 | 「入力済み」が未取得なのに `0人` | **無し**（`?withUsage=1` を付けて読む必要あり） |
-| `q76C35` | 6 | 欠けた項目をそのまま繋いで `undefined` | **無し** |
+| `q76C35` | 6 | 欠けた項目をそのまま繋いで `undefined` | **#557** `697cee2c`（`broadcast-kpi-values.tsx`） |
 | `bV5Vs` | 5 | 到達率が取れないと `NaN%` | #534 `0158ba8e` |
 
 **完了条件**
@@ -140,8 +140,8 @@
 
 | Node | 機能 | いまの形 | 対象PR |
 |---|---|---|---|
-| `dqFft` | 5 通の削除 | ブラウザ標準の `confirm` | **無し** |
-| `EGMb1` | 6 配信の削除 | ブラウザ標準の `confirm` | **無し** |
+| `dqFft` | 5 通の削除 | ブラウザ標準の `confirm` | **#553** `2fdded68`（`scenario-detail-client.tsx`） |
+| `EGMb1` | 6 配信の削除 | ブラウザ標準の `confirm` | **#554** `875a9ed3`（`broadcasts/page.tsx`） |
 | `zGZMA` | 4 対応マークの削除 | 人数も移り先も言わない | **無し**（人数のAPIが要る＝束11） |
 | `h0kahp` | 6 テスト送信 | **押すたびに配信が残る件は #543 `819895dd` で解決済み。** 送信先を選べない差は残る | #543 |
 | `Y0Sn3` | 7 | **#498→#514 で解決済み。手本** | 済 |
@@ -266,6 +266,39 @@
 **その画面だけの差**です。文言・見出し・置き場所・段の分けかたが
 設計とずれているもので、まとめて直す形になりません。
 `screens.mjs` の `verdictNote` に1枚ずつ書いてあります。
+
+---
+
+## #550〜#559 が、どの束のどれに当たるか
+
+**PRの名前ではなく、変えたファイルと画面の Node で対応づけました。**
+名前は書き手の言葉なので、同じ言葉でも別の画面を触っていることがあります。
+
+| PR | head | 変えたファイル（要点） | Node | 束 |
+|---|---|---|---|---|
+| #550 | `f7c5a99e` | `components/broadcasts/segment-preset*` `broadcast-form.tsx` | `cPk8A` `sqFXf` | 束7（設計の面が無い） |
+| #551 | `44692a37` | `components/reminders/reminder-publish-flow.tsx` `app/reminders/new`・`edit` | `s7T2dz` `JCz6J` `W98zZQ` `s6Vvp` `PSmHo` | 束7 |
+| #552 | `6ce43563` | `components/automations/automation-template-gallery.tsx` `automation-draft-editor.tsx` | `WjYAC`（`gief7` `Rv8Jv` の「見本から始める道が無い」も動く） | 束10（導線が無い） |
+| #553 | `2fdded68` | `app/scenarios/detail/scenario-detail-client.tsx` | `dqFft` | **束5** |
+| #554 | `875a9ed3` | `app/broadcasts/page.tsx` | `EGMb1` | **束5** |
+| #555 | `e873eeb9` | `components/chats/saved-view-dialog.tsx` | `tBlkL` | P0-1 の続き |
+| #556 | `6037aeef` | `app/form-submissions/form-kpi-value.tsx` `page.tsx` | `ZOPyc` | **束4** |
+| #557 | `697cee2c` | `components/broadcasts/broadcast-kpi-values.tsx` | `q76C35` | **束4** |
+| #558 | `ef7b5773` | `app/affiliates/affiliate-reward.ts` `tabs.tsx` | `PouPn` `xqT1Z` `jwrbf` | 束6（数が合わない）— **画像確認済み。4項目とも通った** |
+| #559 | `888e80f9` | `app/contents/page.tsx` `components/shared/filter-chip.tsx` | `g89Tc` | **束4** — **画像確認済み。7項目のうち6つ通り、P1が1つ残る** |
+
+**#550〜#557 は、まだ画像で確かめていません。** どれも head が
+動いていないので、取り込まれた順に `--only` で変わった Node だけ
+撮り直します。
+
+**#555 は `tBlkL` の続きです。** P0（保存に失敗しても「保存しました」）は
+#513 `60b39036` で直っており、#555 はそのあとの未入力エラーの出し方です。
+**別のPRが同じファイルを触っているので、撮り直す順を間違えると
+片方の直りが絵から消えます**（機能6で一度やりました）。
+
+**#553 と #554 で、束5 の「ブラウザ標準の `confirm`」は
+`zGZMA` を残すだけになります。** `zGZMA` は消す前に人数を出す必要が
+あり、そのAPIが無いので束11のままです。
 
 ---
 
