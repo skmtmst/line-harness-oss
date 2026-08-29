@@ -79,6 +79,15 @@
             "LHjwD"
           ],
           "note": "保存した検索の窓。未入力は赤帯＋押せない保存ボタン。同じ部品を使う4枚を撮り直した"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "xGLVe"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -260,6 +269,15 @@
             "g2UNV"
           ],
           "note": "`codex/development` 直結へ張り替え。**#529 の母数の直りは入っていない**（#427 単体では 41% だけ）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "M1EXwB"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -398,6 +416,15 @@
             "Y0Sn3"
           ],
           "note": "`codex/development` 直結へ張り替え。削除確認の窓は入っているが、失敗の文が `API error: 405` のまま"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "M1EXwB"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -503,13 +530,19 @@
       "remaining": 13,
       "capturedAt": [
         {
-          "pr": 524,
-          "head": "a6c35ee0",
-          "on": "2026-08-29",
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
           "screens": [
-            "zCQXe"
+            "ZC13r",
+            "lvaY5",
+            "PV1Vh",
+            "d3rFGD",
+            "Xjk8q",
+            "Q8sHa",
+            "yxyzQ"
           ],
-          "note": "ウェビナーの帯を未取得 `—` に。束4"
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -529,13 +562,18 @@
       "remaining": 10,
       "capturedAt": [
         {
-          "pr": 528,
-          "head": "1b95452d",
-          "on": "2026-08-29",
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
           "screens": [
-            "NKyoA"
+            "W7LBc",
+            "GFlD7",
+            "FRkls",
+            "j9ixI",
+            "hsBtl",
+            "J3GxEZ"
           ],
-          "note": "タブとフォルダの件数を未取得 `—` に。束4"
+          "note": "同上。質問のひな形に `createdAt`/`updatedAt` を足すまで `Invalid Date` で撮れなかった"
         }
       ]
     },
@@ -611,6 +649,16 @@
             "ZOPyc"
           ],
           "note": "回答フォームの帯を未取得と0件で分ける。失敗のときは作成の誘いを出さない。**`codex/development` 直結へ張り替えられたが撮り直していない**——`page.tsx` と `form-kpi-value.tsx` の blob が `6037aeef` と同一"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "vCqUj",
+            "cSqvP"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -638,6 +686,16 @@
             "gBtaK"
           ],
           "note": "保存前に影響を見る面。値を変えてから保存を押さないと出ない"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "WuKzU",
+            "gBtaK"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -673,6 +731,15 @@
             "g89Tc"
           ],
           "note": "寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "eXAJP"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -692,24 +759,17 @@
       "remaining": 9,
       "capturedAt": [
         {
-          "pr": 558,
-          "head": "ef7b5773",
-          "on": "2026-08-29",
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
           "screens": [
             "PouPn",
+            "GH8VL",
+            "n5VVTb",
             "xqT1Z",
-            "jwrbf"
+            "GPWzq"
           ],
-          "note": "案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える"
-        },
-        {
-          "pr": 563,
-          "head": "64798425",
-          "on": "2026-08-29",
-          "screens": [
-            "jwrbf"
-          ],
-          "note": "帯から `ref_tracking` を外した。**`ref_code` は列見出しに残っている**"
+          "note": "同上"
         }
       ]
     },
@@ -794,6 +854,18 @@
             "s6MBc"
           ],
           "note": "Claudeが作ったDraft。#496 の上に積んである。**head は動いたが撮り直していない**——`apps/web` の差分0件"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "s98Vfw",
+            "N46cQ",
+            "BmoGY",
+            "k8VCU"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -854,6 +926,17 @@
           "pr": 444,
           "head": "ccbd0975",
           "on": "2026-08-28"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "ZrpKn",
+            "GUxsj",
+            "GtylA"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -933,6 +1016,18 @@
             "HpKyF"
           ],
           "note": "きっかけの内部名を日本語へ。束3"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "VLMGH",
+            "q4lajm",
+            "WeXbL",
+            "i9sQP"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -955,6 +1050,16 @@
           "pr": 447,
           "head": "65adbc59",
           "on": "2026-08-28"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "Qu6Vk",
+            "N2J629"
+          ],
+          "note": "development そのもので撮った。「理由を選んで見送る」→「見送る」に名前が変わっていた"
         }
       ]
     },
@@ -972,7 +1077,17 @@
       "needsFix": 1,
       "unjudged": 0,
       "remaining": 4,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "eI3gs"
+          ],
+          "note": "同上"
+        }
+      ]
     },
     {
       "feature": 24,
@@ -1057,6 +1172,17 @@
             "Vdbv5"
           ],
           "note": "タブ帯5本と見本から下書きを作る道。**`DkPY0` は撮り直していない**（#502 `75b010fc` のまま）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "xOpDs",
+            "py5CG",
+            "syWp4"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -1102,6 +1228,15 @@
             "f8SBSh"
           ],
           "note": "タブの英語を外す（束3）。**#527 は #515 を含む**"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "M0Gb7"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -1139,6 +1274,17 @@
             "Lg8ff"
           ],
           "note": "重なりから選び直して登録まで通した。`ApiError.code` を足して、機械コードと人へ見せる文を別の契約に分けている"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "TV2DI",
+            "TnDbq",
+            "SbuUI"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -1174,6 +1320,16 @@
             "W6465r"
           ],
           "note": "予約設定の帯を未取得 `—` に。束1と束4"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "QSLEH",
+            "GhOb3"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     },
@@ -1293,6 +1449,16 @@
             "U0BwS"
           ],
           "note": "緊急停止の下見と最終確認。**撮る前に `pnpm dev` で起こす**（`predev` が `@/generated/release-log.json` を作る。`npx next dev` 直叩きだと500で真っ白になる）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "UgonK",
+            "UhC2O"
+          ],
+          "note": "development そのもので撮った"
         }
       ]
     }

@@ -1114,6 +1114,31 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   if (pathname === '/api/inbox/saved-views') return { success: true, data: INBOX_SAVED_VIEWS }
   if (pathname === '/api/chats') return { success: true, data: CHATS }
   if (pathname === '/api/chats/stats') return { success: true, data: INBOX_STATS }
+  /*
+    やり取り1件。**`friendName` を必ず返す**（型は `ChatDetail`、
+    `app/chats/page.tsx:54`。`Chat` を継ぎ、`friendName: string`）。
+
+    `/chats?friend=<id>` は**友だちのid**をそのままこの道へ渡すので、
+    やり取りの無い友だちでも引ける必要がある。返さないと、画面が
+    作る行の `friendName` が `undefined` になり、`:1444` の
+    `chat.friendName.charAt(0)` で受信箱ごと落ちる。
+  */
+  const oneChat = /^\/api\/chats\/([^/]+)$/.exec(pathname)
+  if (oneChat) {
+    const found = CHATS.find((c) => c.id === oneChat[1] || c.friendId === oneChat[1])
+    const friend = FRIENDS.find((f) => f.id === oneChat[1])
+    if (found) return { success: true, data: { ...found, messages: [] } }
+    if (!friend) return { success: false, error: 'Not found' }
+    /* やり取りがまだ無い友だち。**名前は友だちから採る。** */
+    return { success: true, data: {
+      id: friend.id, friendId: friend.id,
+      friendName: friend.displayName || '名前の登録がありません',
+      friendPictureUrl: null, operatorId: null, status: 'unread', notes: null,
+      revision: 1, lastMessageAt: null, lastMessageContent: null,
+      lastMessageDirection: null, lastMessageType: null, isUnread: false,
+      createdAt: friend.createdAt ?? '2026-08-20T00:00:00.000Z', messages: [],
+    } }
+  }
   if (pathname === '/api/support/inbox') {
     /*
       **同じ口を2つの画面が読む。返す形が違う。**

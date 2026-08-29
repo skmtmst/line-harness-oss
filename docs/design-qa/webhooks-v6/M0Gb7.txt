@@ -1,0 +1,15 @@
+Webhook
+未対応の通知
+外部連携
+
+受信・送信のWebhookと、SlackやメールへのSlack通知をまとめて設定します。どれも「外部とやりとりする設定」です。
+
+マニュアル
+通知先を追加
+Webhookを追加
+受信 (Incoming)
+送信 (Outgoing)
+名前	ソースタイプ	エンドポイントURL	シークレット	ステータス	作成日
+予約サービスから	booking	http://localhost:3180/api/webhooks/incoming/iw-1/receive	設定済	有効	2026/5/2	シークレット更新削除
+アンケートツールから	survey	http://localhost:3180/api/webhooks/incoming/iw-2/receive	設定済	有効	2026/6/14	シークレット更新削除
+テスト用	other	http://localhost:3180/api/webhooks/incoming/iw-3/receive	未設定	無効	2026/8/20	シークレット設定削除

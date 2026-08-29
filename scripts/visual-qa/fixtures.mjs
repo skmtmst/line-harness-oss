@@ -4439,6 +4439,8 @@ export const QUESTION_TEMPLATE_PUBLISHED = {
   id: 'template-q-pub', name: '継続の意思をうかがう', category: '未分類',
   messageType: 'text', messageContent: 'ご利用ありがとうございます。',
   folderId: null, usageCount: 2, tapCount: 41, isFavorite: false,
+  /* **`createdAt` と `updatedAt` は必須。** 無いと一覧の日付が `Invalid Date` になる。 */
+  createdAt: '2026-08-12T02:00:00.000Z', updatedAt: '2026-08-26T04:30:00.000Z',
   questionStatus: 'published',
   question: {
     intro: 'ご利用ありがとうございます。',
@@ -4466,6 +4468,7 @@ export const QUESTION_TEMPLATE_DRAFT = {
   id: 'template-q-draft', name: '（下書き）誕生月の希望をきく', category: '未分類',
   messageType: 'text', messageContent: '',
   folderId: null, usageCount: 0, tapCount: 0, isFavorite: false,
+  createdAt: '2026-08-24T09:15:00.000Z', updatedAt: '2026-08-24T09:15:00.000Z',
   questionStatus: 'draft',
   question: {
     text: '誕生月に何が届くとうれしいですか？',
