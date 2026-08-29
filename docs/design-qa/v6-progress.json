@@ -42,7 +42,19 @@
       "needsFix": 16,
       "unjudged": 0,
       "remaining": 16,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 513,
+          "head": "60b39036",
+          "on": "2026-08-29",
+          "screens": [
+            "tBlkL",
+            "AuSDY",
+            "LHjwD"
+          ],
+          "note": "保存の成否を窓へ返す直し。**P0は解決**"
+        }
+      ]
     },
     {
       "feature": 3,
@@ -150,6 +162,15 @@
       "unjudged": 0,
       "remaining": 14,
       "capturedAt": [
+        {
+          "pr": 543,
+          "head": "819895dd",
+          "on": "2026-08-29",
+          "screens": [
+            "h0kahp"
+          ],
+          "note": "テスト送信と本番予約で同じ下書きを使う直し。押すたびに配信が増える件は解決"
+        },
         {
           "pr": 497,
           "head": "84e5bab9",
@@ -327,7 +348,17 @@
       "needsFix": 5,
       "unjudged": 0,
       "remaining": 7,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 436,
+          "head": "950073ab",
+          "on": "2026-08-29",
+          "screens": [
+            "ZOPyc"
+          ],
+          "note": "読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る"
+        }
+      ]
     },
     {
       "feature": 14,

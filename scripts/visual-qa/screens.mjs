@@ -291,8 +291,8 @@ export const SCREENS = [
       { click: '保存した検索' }, { click: 'この条件を保存' },
       { fill: '検索名', text: '未対応・期限超過' }, { click: 'この条件を保存', nth: 1 },
     ],
-    verdict: 'needs_fix', verdictNote: 'P0は #513 head `60b39036` で修正済み・画像再確認待ち。onSaveが成否を返し、成功のときだけsetDone(true)へ進む。現行の比較画像は修正前headなので、#513を土台に保存APIを失敗させて「保存しました」が出ないことを確認するまで要修正を維持する',
-    verdictSource: 'inbox-v6/tBlkL-1920.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: 'a4239357',
+    verdict: 'needs_fix', verdictNote: '**P0は #513 で解決した。** 保存に失敗したとき、窓は「保存しました」へ進まず、窓の中に「保存できませんでした。時間を置いてもう一度お試しください。」を出して開いたまま残る。API の番号（405）も素通ししていない。ただし**設計のこのNodeは「保存完了」の画面**で、画面確認では書き込みを常に405で止める決めごとのため、完了の絵そのものは撮れない。窓の作りの残る差は ANgda と同じ（保存する条件を窓の中で変えられない・期限の行が無い・よく使うに追加が無い）',
+    verdictSource: 'inbox-v6/tBlkL-1920.png + apps/web/src/components/chats/saved-view-dialog.tsx', verdictHead: '60b39036',
   },
   {
     ...INBOX, node: 'AuSDY', name: '2-16 保存した検索名・未入力エラー',
@@ -301,7 +301,7 @@ export const SCREENS = [
       { click: 'この条件を保存', nth: 1 },
     ],
     verdict: 'needs_fix', verdictNote: 'P2 設計は赤い帯の注意書きと、押せない保存ボタン。実装は入力欄の下の赤い文だけで、保存ボタンは押せるまま',
-    verdictSource: 'inbox-v6/AuSDY-1920.png', verdictHead: 'a4239357',
+    verdictSource: 'inbox-v6/AuSDY-1920.png', verdictHead: '60b39036',
   },
   {
     ...INBOX, node: 'LHjwD', name: '2-17 保存した検索名・重複エラー',
@@ -310,7 +310,7 @@ export const SCREENS = [
       { fill: '検索名', text: 'VIPかつ未契約' }, { click: 'この条件を保存', nth: 1 },
     ],
     verdict: 'needs_fix', verdictNote: 'P2 文言が設計と違う（設計「同じ名前の保存した検索があります。別の名前を入力してください。」／実装「同じ名前の検索がすでにあります。別の名前にしてください」）。設計は赤い帯、実装は入力欄の下の文',
-    verdictSource: 'inbox-v6/LHjwD-1920.png', verdictHead: 'a4239357',
+    verdictSource: 'inbox-v6/LHjwD-1920.png', verdictHead: '60b39036',
   },
 
   // ── 機能3 友だち ────────────────────────────────────────
@@ -564,8 +564,8 @@ export const SCREENS = [
       { click: 'テスト送信' },
       { wait: 800 },
     ],
-    verdict: 'needs_fix', verdictNote: 'P1 押すたびに配信が1件残る問題は #543 head `819895dd` で、最初のテストだけ下書きを作り、2回目以降と最終予約は同じ下書きを更新する形へ修正済み。#510 → #543 の順に取り込み、同headでの画像・操作確認が終わるまでは解決扱いにしない。P1 送信先を選べない差は残る。設計は「テスト送信先を選択」の窓で相手を選び、テスト履歴と確認項目（改行と文字切れ・画像/ボタンの表示・変数の差し込み・リンクの遷移）と「本番の送信枠を消費しません」を見せる。撮った絵で送信が失敗しているのは、モックが書き込みを405で返すためで実装の不具合ではない',
-    verdictSource: 'broadcasts-v6/h0kahp-1920.png + apps/web/src/components/broadcasts/broadcast-form.tsx:514', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**「押すたびに配信が1件残る」は #543 で解決した。** 実物の persistBroadcastDraft を動かして確かめた。テスト3回＋本番予約で **create は1回、あとは同じ id への update**（本番予約も同じ id を使う）。アカウントを切り替えたときだけ別の下書きへ分ける。P1 送信先を選べないのは残る。設計は「テスト送信先を選択」の窓で相手を選び、テスト履歴と確認項目（改行と文字切れ・画像/ボタンの表示・変数の差し込み・リンクの遷移）と「本番の送信枠を消費しません」を見せる。撮った絵で送信が失敗しているのは、モックが書き込みを405で返すためで実装の不具合ではない',
+    verdictSource: 'broadcasts-v6/h0kahp-1920.png + apps/web/src/components/broadcasts/broadcast-form.tsx:514', verdictHead: '819895dd',
   },
   {
     ...BROADCAST, node: 'vW4Es', name: '6-1-G 配信前チェック', route: NEW_BC,
@@ -1086,7 +1086,7 @@ export const SCREENS = [
   {
     ...FORM, node: 'ZOPyc', name: '13-1-F 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/forms*', '**/api/forms/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: '以前のP0判定は撮影側の当てはめ漏れを含むため撤回し、#436 head `950073ab` の再比較待ち。コードには `ListState kind="error"`、再読み込み、回答一覧側の失敗分岐がある。APIを確実に失敗させた1440/1920画像で、空状態の作成誘導が同時に出ないことを確認するまで要修正を維持する',
+    verdict: 'needs_fix', verdictNote: 'P1 失敗のときも帯の「フォーム 0件」「公開中 0件」が出る（form-submissions/page.tsx:312-327 が loadError を見ずに forms.length を描く。未取得なので—にすべき）。**P0は #436 で解決した。** 失敗は⚠と「回答フォームを読み込めませんでした／通信状態を確認して、もう一度読み込んでください。」＋再読み込みボタンになり、空の文も「フォームを作る」の誘いも出なくなった。読込・空・失敗が data-list-state でも名前で分かれている',
     verdictSource: 'forms-v6/ZOPyc-error-1920.png + apps/web/src/app/form-submissions/page.tsx:354', verdictHead: '950073ab',
   },
 
@@ -1879,6 +1879,7 @@ export const CAPTURED_AT = {
     { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
   ],
   6: [
+    { pr: 543, head: '819895dd', on: '2026-08-29', screens: ['h0kahp'], note: 'テスト送信と本番予約で同じ下書きを使う直し。押すたびに配信が増える件は解決' },
     { pr: 497, head: '84e5bab9', on: '2026-08-28', screens: ['FpgxH'], note: 'Claudeが作ったDraft。#495 の上に積んである' },
     {
       pr: 503, head: '6db5ad7f', on: '2026-08-28',
@@ -1903,6 +1904,8 @@ export const CAPTURED_AT = {
       note: '撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた',
     },
   ],
+  2: [{ pr: 513, head: '60b39036', on: '2026-08-29', screens: ['tBlkL', 'AuSDY', 'LHjwD'], note: '保存の成否を窓へ返す直し。**P0は解決**' }],
+  13: [{ pr: 436, head: '950073ab', on: '2026-08-29', screens: ['ZOPyc'], note: '読込・空・失敗を分ける直し。**P0は解決**。帯の2枚が0件のまま残る' }],
   25: [{ pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
