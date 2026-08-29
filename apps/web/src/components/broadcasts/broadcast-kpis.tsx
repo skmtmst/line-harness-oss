@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api, type BroadcastStats } from '@/lib/api'
+import { BroadcastKpiValue, buildBroadcastKpiCards } from './broadcast-kpi-values'
 
 /**
  * 一斉配信の一覧に出す数（設計 `V2 4-2 一斉配信` の KPIs）。
@@ -32,34 +33,7 @@ export default function BroadcastKpis() {
     }
   }, [])
 
-  const cards = [
-    {
-      title: '今月の配信',
-      value: stats?.thisMonth ?? null,
-      unit: '件',
-      detail: stats ? `予約中 ${stats.scheduled}` : '—',
-    },
-    {
-      title: '到達',
-      value: stats?.delivered ?? null,
-      unit: '通',
-      detail: stats ? `失敗 ${stats.failed}` : '—',
-    },
-    {
-      title: '平均開封率',
-      value: stats?.openRate ?? null,
-      unit: '%',
-      // LINEは20人未満の配信だと開封数を返さない。0として混ぜると
-      // 平均が不当に下がるので、その配信は外している。
-      detail: '過去28日 ・ 20人未満の配信は除く',
-    },
-    {
-      title: '失敗',
-      value: stats?.failed ?? null,
-      unit: '通',
-      detail: '過去28日',
-    },
-  ]
+  const cards = buildBroadcastKpiCards(stats)
 
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -70,12 +44,7 @@ export default function BroadcastKpis() {
             {loading ? (
               <span className="bg-canvas-sunken inline-block h-7 w-14 animate-pulse rounded" />
             ) : (
-              <>
-                <span className="text-ink text-2xl font-bold tabular-nums">
-                  {card.value === null ? '—' : card.value.toLocaleString('ja-JP')}
-                </span>
-                <span className="text-ink-secondary text-xs">{card.unit}</span>
-              </>
+              <BroadcastKpiValue value={card.value} unit={card.unit} />
             )}
           </p>
           <p className="text-ink-faint mt-1 text-[11px] leading-relaxed">{card.detail}</p>
