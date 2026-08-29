@@ -8,6 +8,7 @@ import { api } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Header from '@/components/layout/header'
 import EditDialog, { type AutoReplyDraft } from '@/components/auto-replies/edit-dialog'
+import Notice from '@/components/shared/notice'
 
 interface EffectiveAccount {
   accountId: string
@@ -74,7 +75,7 @@ function actionSummary(rule: { actions: unknown[] | null }): string[] {
     const r = item as Record<string, unknown>
     const type = r.actionType ?? r.action_type
     if (typeof type !== 'string') return []
-    return [ACTION_SUMMARY_LABELS[type] ?? type]
+    return [ACTION_SUMMARY_LABELS[type] ?? '設定済みの処理']
   })
 }
 
@@ -104,7 +105,32 @@ interface TemplateLite {
   messageContent: string
 }
 
-const matchTypeLabel: Record<'exact' | 'contains', string> = { exact: '完全一致', contains: '包含' }
+const matchTypeLabel: Record<'exact' | 'contains', string> = { exact: '完全一致', contains: '一部一致' }
+
+const responseTypeLabel: Record<string, string> = {
+  silent: '何もしない',
+  text: '文章',
+  image: '画像',
+  flex: 'カード',
+  carousel: 'カルーセル',
+  location: '位置情報',
+  video: '動画',
+  audio: '音声',
+  sticker: 'スタンプ',
+}
+
+function responseLabel(type: string): string {
+  return responseTypeLabel[type] ?? '種類を確認できません'
+}
+
+function KpiValue({ value, unit }: { value: number | null; unit: string }) {
+  return (
+    <>
+      {value === null ? '—' : value.toLocaleString('ja-JP')}
+      <span className="text-ink-faint ml-0.5 text-xs font-normal">{unit}</span>
+    </>
+  )
+}
 
 /**
  * 設定してある条件をその場で読める形にする。
@@ -119,7 +145,7 @@ function conditionChips(r: AutoReply) {
   if (r.cooldownMinutes) chips.push(`${r.cooldownMinutes}分あけて`)
   if (r.skipWhenOperatorActive) chips.push('対応中は止める')
   if (r.messageKinds && r.messageKinds.length > 0) {
-    chips.push(`${r.messageKinds.join('・')}のみ`)
+    chips.push(`${r.messageKinds.map(responseLabel).join('・')}のみ`)
   }
   return chips
 }
@@ -143,12 +169,19 @@ export default function AutoRepliesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
+    // アカウントを切り替えた直後に読み込みが失敗しても、前のアカウントの
+    // ルールと件数を残さない。古い値は実値0より危険なため、先に空にする。
+    setItems([])
     try {
       const [arRes, tplRes] = await Promise.all([
         api.autoReplies.list({ accountId: selectedAccountId || undefined }),
         api.templates.list(),
       ])
-      if (arRes.success) setItems(arRes.data)
+      if (!arRes.success) {
+        setError('自動応答を読み込めませんでした。時間をおいて再読み込みしてください。')
+        return
+      }
+      setItems(arRes.data)
       if (tplRes.success) setTemplates(tplRes.data.map((t) => ({
         id: t.id,
         name: t.name,
@@ -156,7 +189,7 @@ export default function AutoRepliesPage() {
         messageContent: t.messageContent,
       })))
     } catch {
-      setError('読み込みに失敗しました')
+      setError('自動応答を読み込めませんでした。時間をおいて再読み込みしてください。')
     } finally {
       setLoading(false)
     }
@@ -178,7 +211,7 @@ export default function AutoRepliesPage() {
       // 古い shape の fallback (effectiveAccounts 計算前)
       if (!r.lineAccountId) return <span className="text-ink-faint italic">全アカウント</span>
       const acc = accountById.get(r.lineAccountId)
-      return <span className="text-ink-secondary">{acc?.displayName ?? acc?.name ?? r.lineAccountId.slice(0, 8)}</span>
+      return <span className="text-ink-secondary">{acc?.displayName ?? acc?.name ?? 'アカウント名を確認できません'}</span>
     }
     return (
       <div className="flex flex-wrap gap-1">
@@ -190,7 +223,7 @@ export default function AutoRepliesPage() {
               <span
                 key={ea.accountId}
                 className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-canvas-sunken text-ink-faint line-through"
-                title={`${label}: 適用外 (line_account_id 別アカ固定)`}
+                title={`${label}: このLINEアカウントでは使いません`}
               >
                 {label}
               </span>
@@ -201,7 +234,7 @@ export default function AutoRepliesPage() {
               <span
                 key={ea.accountId}
                 className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-success-bg text-green-700 font-medium"
-                title={`${label}: 返信あり (${ea.via === 'automation' ? 'automation 経由' : 'inline'})`}
+                title={`${label}: ${ea.via === 'automation' ? '自動処理を通じて返信します' : 'このルールから返信します'}`}
               >
                 ✓ {label}{ea.via === 'automation' && <span className="text-green-500">⚙</span>}
               </span>
@@ -212,7 +245,7 @@ export default function AutoRepliesPage() {
             <span
               key={ea.accountId}
               className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-amber-50 text-amber-700"
-              title={`${label}: silent (match するが返信なし — automation rule 未登録)`}
+              title={`${label}: 返信内容が設定されていないため、何もしません`}
             >
               ⚠ {label}
             </span>
@@ -223,18 +256,23 @@ export default function AutoRepliesPage() {
   }
 
   const renderResponseCell = (r: AutoReply) => {
-    if (r.responseType === 'silent') return <span className="text-ink-faint text-xs">silent</span>
-    if (r.responseType === 'flex') return <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-medium">flex</span>
-    if (r.responseType === 'image') return <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-medium">image</span>
-    return <span className="px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium">text</span>
+    const label = responseLabel(r.responseType)
+    if (r.responseType === 'silent') return <span className="text-ink-faint text-xs">{label}</span>
+    if (r.responseType === 'flex' || r.responseType === 'carousel') {
+      return <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 text-[10px] font-medium">{label}</span>
+    }
+    if (['image', 'video', 'audio', 'sticker', 'location'].includes(r.responseType)) {
+      return <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[10px] font-medium">{label}</span>
+    }
+    return <span className="px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-secondary text-[10px] font-medium">{label}</span>
   }
 
   const renderTemplateCell = (r: AutoReply) => {
-    if (!r.templateId) return <span className="text-[11px] text-ink-faint italic">(inline)</span>
+    if (!r.templateId) return <span className="text-[11px] text-ink-faint">この画面で設定</span>
     const tpl = templateById.get(r.templateId)
     return (
       <a href="/templates" className="text-blue-600 hover:underline text-xs">
-        {tpl?.name ?? `(未知 ${r.templateId.slice(0, 6)})`}
+        {tpl?.name ?? '名前を確認できません'}
       </a>
     )
   }
@@ -249,14 +287,24 @@ export default function AutoRepliesPage() {
     }
   }
 
-  // ヒット数の合計（152）。KPI に出す。
-  const monthlyHits = items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)
-  const totalHits = items.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
+  const listAvailable = !loading && !error
+  const hitCountsAvailable = listAvailable && items.every((r) => r.hits !== undefined)
+  // ヒット数が1行でも欠けているときは、少ない合計を実値として見せない。
+  const monthlyHits = hitCountsAvailable
+    ? items.reduce((sum, r) => sum + (r.hits?.period ?? 0), 0)
+    : null
+  const totalHits = hitCountsAvailable
+    ? items.reduce((sum, r) => sum + (r.hits?.total ?? 0), 0)
+    : null
   // 曜日か時間帯を決めているルール。「営業時間外だけ返す」の類がいくつあるか。
-  const timeRestrictedCount = items.filter(
-    (r) => r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0,
-  ).length
-  const neverHitCount = items.filter((r) => (r.hits?.total ?? 0) === 0).length
+  const timeRestrictedCount = listAvailable
+    ? items.filter(
+        (r) => r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0,
+      ).length
+    : null
+  const neverHitCount = hitCountsAvailable
+    ? items.filter((r) => r.hits?.total === 0).length
+    : null
 
   // キーワードと返す本文の両方を見る。名前を付けていないルールは
   // キーワードでしか探せない。
@@ -278,7 +326,7 @@ export default function AutoRepliesPage() {
   const inSaved = inFolder.filter((r) => {
     if (savedFilter === 'inactive') return !r.isActive
     if (savedFilter === 'used') return (r.hits?.period ?? 0) > 0
-    if (savedFilter === 'never') return (r.hits?.total ?? 0) === 0
+    if (savedFilter === 'never') return r.hits?.total === 0
     if (savedFilter === 'timed') {
       return Boolean(r.activeFrom || r.activeUntil || (r.responseWeekdays?.length ?? 0) > 0)
     }
@@ -289,7 +337,7 @@ export default function AutoRepliesPage() {
   const sortedItems = [...inSaved].sort((a, b) => {
     switch (sortKey) {
       case 'hits':
-        return (b.hits?.period ?? 0) - (a.hits?.period ?? 0)
+        return (b.hits?.period ?? -1) - (a.hits?.period ?? -1)
       case 'priority':
         // 評価順は「実際に見る順」。一覧の並びと動く順を合わせる。
         return a.priority - b.priority || a.createdAt.localeCompare(b.createdAt)
@@ -304,7 +352,7 @@ export default function AutoRepliesPage() {
   const hiddenCount = sortedItems.length - shownInFolder.length
 
   return (
-    <div>
+    <div data-design-node="q8wSqO">
       <div data-design="Head">
       <Header
         title="自動応答"
@@ -354,48 +402,50 @@ export default function AutoRepliesPage() {
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">ルール</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {items.length}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+            <KpiValue value={listAvailable ? items.length : null} unit="件" />
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            停止中 {items.filter((r) => !r.isActive).length}
+            {loading ? '読み込み中' : error ? 'ルール数を取得できませんでした' : `停止中 ${items.filter((r) => !r.isActive).length}`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">今月のヒット</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {monthlyHits}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">回</span>
+            <KpiValue value={monthlyHits} unit="回" />
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            累計 {totalHits} 回・ヒット数はルールごとに数えます
+            {loading
+              ? '読み込み中'
+              : error || !hitCountsAvailable
+                ? 'ヒット数を取得できませんでした'
+                : `累計 ${totalHits?.toLocaleString('ja-JP')} 回・ヒット数はルールごとに数えます`}
           </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">営業時間外の応答</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {timeRestrictedCount}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+            <KpiValue value={timeRestrictedCount} unit="件" />
           </p>
-          <p className="text-ink-faint mt-0.5 text-xs">曜日か時間帯を決めているルール</p>
+          <p className="text-ink-faint mt-0.5 text-xs">
+            {loading ? '読み込み中' : error ? '設定数を取得できませんでした' : '曜日か時間帯を決めているルール'}
+          </p>
         </div>
         <div className="bg-canvas rounded-card border-hairline border p-4">
           <p className="text-ink-faint text-xs">未ヒット</p>
           <p className="text-ink mt-1 text-2xl font-bold tabular-nums">
-            {neverHitCount}
-            <span className="text-ink-faint ml-0.5 text-xs font-normal">件</span>
+            <KpiValue value={neverHitCount} unit="件" />
           </p>
           <p className="text-ink-faint mt-0.5 text-xs">
-            一度も当たっていないルール（30日以上の絞り込みは準備中）
+            {loading
+              ? '読み込み中'
+              : error || !hitCountsAvailable
+                ? 'ヒット数を取得できませんでした'
+                : '一度も当たっていないルール（30日以上の絞り込みは準備中）'}
           </p>
         </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
-      )}
+      {error && <Notice tone="error" message={error} className="mb-4" />}
 
       {/* 複数当てはまったときの挙動。書いていないと必ず問い合わせになる。 */}
       <div className="bg-info-bg text-info mb-4 rounded-lg p-3 text-xs leading-relaxed">
@@ -405,9 +455,9 @@ export default function AutoRepliesPage() {
       </div>
 
       <div className="mb-4 p-3 bg-info-bg border border-hairline rounded-lg text-xs text-info space-y-1">
-        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700">✓ アカ名</span> 返信あり (inline) / <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700">✓ アカ名 ⚙</span> automation 経由</p>
-        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">⚠ アカ名</span> silent rule のみ — match するが返信しない (同 keyword の automation rule 未登録)</p>
-        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through">アカ名</span> 適用外 (line_account_id が別アカに固定)</p>
+        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700">✓ アカウント名</span> このルールから返信 / <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-success-bg text-green-700">✓ アカウント名 ⚙</span> 自動処理を通じて返信</p>
+        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">⚠ アカウント名</span> 返信内容が設定されていないため、何もしません</p>
+        <p><span className="inline-flex items-center px-1.5 py-0.5 rounded bg-canvas-sunken text-ink-faint line-through">アカウント名</span> このLINEアカウントでは使いません</p>
       </div>
 
       <div
@@ -515,7 +565,7 @@ export default function AutoRepliesPage() {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">自動応答名</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">一致のしかた</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">実行するアクション</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">template</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint">返信内容</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">応答条件</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">適用アカウント</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-ink-faint uppercase">ヒット数</th>
@@ -523,7 +573,10 @@ export default function AutoRepliesPage() {
                 <th className="px-4 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody
+              data-list-state={loading ? 'loading' : error ? 'error' : shownInFolder.length === 0 ? 'empty' : 'ready'}
+              className="divide-y divide-gray-100"
+            >
               {loading ? (
                 <tr><td colSpan={10} className="px-4 py-8 text-center text-ink-faint text-sm">読み込み中...</td></tr>
               ) : shownInFolder.length === 0 ? (
@@ -575,10 +628,10 @@ export default function AutoRepliesPage() {
                     </td>
                     <td className="px-4 py-3">{renderEffectiveCell(r)}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? 0}</span>
+                      <span className="text-ink text-sm tabular-nums">{r.hits?.period ?? '—'}</span>
                       <span className="text-ink-faint text-xs">回</span>
                       <span className="text-ink-faint ml-1 text-[10px]">
-                        （累計 {r.hits?.total ?? 0}）
+                        （累計 {r.hits?.total ?? '—'}）
                       </span>
                     </td>
                     <td className="px-4 py-3">
