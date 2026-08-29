@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 203,
-  "unimplemented": 55,
+  "compared": 205,
+  "unimplemented": 53,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 180,
+  "needsFix": 182,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -390,17 +390,28 @@
       "feature": 12,
       "name": "リッチメニュー",
       "total": 9,
-      "compared": 6,
-      "unimplemented": 3,
+      "compared": 8,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 6,
+      "needsFix": 8,
       "unjudged": 0,
       "remaining": 9,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 509,
+          "head": "e148615c",
+          "on": "2026-08-29",
+          "screens": [
+            "DIUbO",
+            "NXdDk"
+          ],
+          "note": "切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した"
+        }
+      ]
     },
     {
       "feature": 13,
@@ -999,20 +1010,6 @@
       "name": "11-1-C 質問を作る",
       "gap": "api",
       "gapNote": "「質問」の型と保存先が要る。いまの `messageType` に無い"
-    },
-    {
-      "feature": 12,
-      "node": "DIUbO",
-      "name": "12-1-C 切替メニューのつながり",
-      "gap": "pending",
-      "gapNote": "#509 head `e148615c` で既存のpages/areasから切替のつながりを解析する `/rich-menus/connections` を実装済み。最新headを1440/1920で比較してから未実装を外す"
-    },
-    {
-      "feature": 12,
-      "node": "NXdDk",
-      "name": "12-1-C-A つながりなし",
-      "gap": "pending",
-      "gapNote": "#509 head `e148615c` の切替解析画面に、つながりが無い場合の状態を実装済み。空の固定データで画像確認する"
     },
     {
       "feature": 12,

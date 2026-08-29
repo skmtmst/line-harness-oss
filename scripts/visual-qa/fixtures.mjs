@@ -1307,6 +1307,17 @@ const sixAreas = (prefix) => [
   rmArea(`${prefix}-f`, 1666, 843, 834, 843, null, 'message', {}, null),
 ]
 
+/**
+ * 切替のつながり（設計 `DIUbO`）を出すための面。
+ *
+ * **設計が指摘しているのは「戻れない」ことです。**
+ * トップ → 商品／予約 の2本を張り、**商品からはトップへ戻れるが、
+ * 予約からは戻れない**形にしてあります。つながりが1本も無いと
+ * `NXdDk`（つながりなし）の絵しか撮れません。
+ */
+const switchArea = (id, label, targetPageId) =>
+  rmArea(id, 0, 0, 833, 843, label, 'richmenuswitch', { targetPageId }, null)
+
 export const RICH_MENU_GROUP_DETAILS = {
   'rmg-1': {
     ...(() => {
@@ -1317,12 +1328,16 @@ export const RICH_MENU_GROUP_DETAILS = {
       {
         id: 'rmp-1', orderIndex: 0, name: 'トップ', aliasId: 'top',
         lineRichmenuId: 'richmenu-top', imageR2Key: 'rm/top.png', imageContentType: 'image/png',
-        areas: sixAreas('rma-top'),
+        areas: [
+          ...sixAreas('rma-top'),
+          switchArea('rma-top-s1', '商品を見る', 'rmp-2'),
+          switchArea('rma-top-s2', '予約する', 'rmp-3'),
+        ],
       },
       {
         id: 'rmp-2', orderIndex: 1, name: '商品を見る', aliasId: 'products',
         lineRichmenuId: 'richmenu-products', imageR2Key: 'rm/products.png', imageContentType: 'image/png',
-        areas: sixAreas('rma-products'),
+        areas: [...sixAreas('rma-products'), switchArea('rma-products-s1', 'トップへ戻る', 'rmp-1')],
       },
       {
         /* 設計 `DIUbO`「『予約する』からトップへ戻るタブがありません」。 */

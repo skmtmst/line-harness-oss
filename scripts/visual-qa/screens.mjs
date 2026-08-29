@@ -1074,17 +1074,25 @@ export const SCREENS = [
   { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: 'P1 形とボタンを決める段が無く、1枚の画面に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' },
   { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-B 誰に出すかが独立しておらず、同じ1枚の中に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' },
   {
-    ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり', route: RM_EDIT,
-    gap: 'pending',
-    gapNote: '#509 head `e148615c` で既存のpages/areasから切替のつながりを解析する `/rich-menus/connections` を実装済み。最新headを1440/1920で比較してから未実装を外す',
-    status: 'unimplemented',
-    why: '#509で切替グラフ、戻れないページ、下書きの切替先を出す画面と契約試験が入った。未統合なので画像確認待ち',
+    /*
+      **#509 で `/rich-menus/connections?id=` が入った。**
+      既存の pages / areas から切替のつながりを解析する。
+      `NXdDk` は同じ画面の「つながりが無い」状態。
+    */
+    ...RICH_MENU, node: 'DIUbO', name: '12-1-C 切替メニューのつながり',
+    route: '/rich-menus/connections?id=rmg-1', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**#509 で切替のつながりが入り、未実装ではなくなった。** 設計がいちばん心配していた「戻れない」を実際に見つける。トップ（入口）→商品を見る／予約する、商品を見る→トップへ戻る（**入口へ戻れます**）、予約する（**入口へ戻れません**・赤い!）。上に「1件の確認事項があります。公開する前に、入口からの行き先と戻り道を確認してください。」。**「矢印は保存済みの切替ボタンです。番号や内部IDは表示しません。」と、内部IDを出さないことを画面で宣言している。** 切替先が下書きのままかも「LINEへ未公開」で分かる。P2 設計の「よくある事故」3つのうち、**切替先だけ『誰に出すか』が違う**は見ていない。設計は線の図、実装はカードの並び',
+    verdictSource: 'rich-menus-v6/DIUbO-1920.png',
+    verdictHead: 'e148615c',
   },
   {
-    ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし', route: RM_EDIT,
-    gap: 'pending',
-    gapNote: '#509 head `e148615c` の切替解析画面に、つながりが無い場合の状態を実装済み。空の固定データで画像確認する',
-    status: 'unimplemented', why: '#509の未統合実装に含まれるため、空状態のNode単位画像確認を待つ',
+    ...RICH_MENU, node: 'NXdDk', name: '12-1-C-A つながりなし',
+    route: '/rich-menus/connections?id=rmg-2', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**#509 でつながりなしの状態も入った。** 「切替のつながりはありません／このメニューには、別ページへ切り替えるボタンがまだありません。」＋「メニューのボタンを編集」。上に「ページを切り替えるボタンを作ると、ここで行き先と戻り道を確認できます。」。**空を失敗と混ぜず、次にやることを出している。** P2 設計との細かな差は未確認',
+    verdictSource: 'rich-menus-v6/NXdDk-1920.png',
+    verdictHead: 'e148615c',
   },
   { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-D 公開のしかたが独立しておらず、同じ1枚の中に混ざっている。日時を決めて出す「予約中」の状態を出せない', verdictSource: 'rich-menus-v6/design-qa.md' },
   { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: 'P2 設計は別画面だが実装は一覧の中に埋め込み。**設計より近い場所にあるので悪い差ではない**。ただし絞り込みの札に「管理画面の外」が無く、絞れない', verdictSource: 'rich-menus-v6/design-qa.md' },
@@ -1938,6 +1946,7 @@ export const CAPTURED_AT = {
       note: '固定データ（配信の帯・1件の配信）を足して撮り直した。**`FpgxH` は #497 の絵に戻した。** 機能ごと撮り直すと、別のPRで直った1枚が直る前に戻る',
     },
   ],
+  12: [{ pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' }],
   17: [
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
