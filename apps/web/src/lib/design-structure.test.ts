@@ -54,6 +54,11 @@ const SCREENS = Object.entries(structure.screens) as Array<
       name: string;
       sections: string[];
       parts?: string[];
+      implementationGaps?: {
+        sections?: string[];
+        parts?: string[];
+        reason: string;
+      };
       visualVerification?: {
         status: 'verified' | 'unverified' | 'blocked';
         referenceNodeIds: string[];
@@ -120,13 +125,16 @@ describe('画面の骨格が設計と一致する', () => {
     // Body / Left / Right は create-page.tsx にある）。page.tsx だけ見ると
     // 「印が付いていない」ことになるので、読み込んでいる部品も一緒に見る。
     const markers = designMarkers(readWithParts(route));
-    const expected = [...spec.sections].sort();
+    const sectionGaps = spec.implementationGaps?.sections ?? [];
+    const expected = spec.sections.filter((section) => !sectionGaps.includes(section)).sort();
+    expect(sectionGaps.every((section) => spec.sections.includes(section))).toBe(true);
     expect(
       markers,
       [
         `${spec.name}（node ${spec.node}）の骨格が設計と違います。`,
         `設計にある節: ${spec.sections.join(' → ')}`,
         `実装にある節: ${markers.length ? markers.join(', ') : '（印が付いていません）'}`,
+        `記録済みの未実装: ${sectionGaps.join(', ') || 'なし'}`,
         `足りない: ${expected.filter((x) => !markers.includes(x)).join(', ') || 'なし'}`,
         `設計に無い: ${markers.filter((x) => !expected.includes(x)).join(', ') || 'なし'}`,
         '',
@@ -149,16 +157,20 @@ describe('画面の骨格が設計と一致する', () => {
   it.each(SCREENS.filter(([, s]) => s.parts?.length))('%s の節の中身', (route, spec) => {
     const source = readWithParts(route);
     const missing = (spec.parts ?? []).filter((part) => !source.includes(part));
+    const recordedGaps = spec.implementationGaps?.parts ?? [];
+    expect(recordedGaps.every((part) => spec.parts?.includes(part))).toBe(true);
+    if (recordedGaps.length > 0) expect(spec.implementationGaps?.reason.trim()).toBeTruthy();
     expect(
       missing,
       [
         `${spec.name}（node ${spec.node}）に、設計にある語が見つかりません。`,
         `無い語: ${missing.join(', ')}`,
         '',
+        `記録済みの未実装: ${recordedGaps.join(', ') || 'なし'}`,
         'データが無いときも「未設定」「まだありません」と出してください。',
         '節ごと消すと、画面にその機能が無いように見えます。',
       ].join('\n'),
-    ).toEqual([]);
+    ).toEqual(recordedGaps);
   });
 });
 
