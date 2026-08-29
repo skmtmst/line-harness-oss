@@ -71,9 +71,12 @@ export async function createNotificationRule(
 ): Promise<NotificationRuleRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
+  // A rule is only a draft until the operator delivery executor is connected.
+  // The legacy table defaults to active, which made a newly-saved definition
+  // look live even though no recipient resolution or delivery was performed.
   await db.prepare(`INSERT INTO notification_rules
-    (id, name, event_type, conditions, channels, line_account_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    (id, name, event_type, conditions, channels, line_account_id, is_active, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`)
     .bind(
       id,
       input.name,

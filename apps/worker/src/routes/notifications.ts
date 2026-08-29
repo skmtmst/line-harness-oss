@@ -13,6 +13,31 @@ import { canAccessAllLineAccounts } from '../services/account-access.js';
 
 const notifications = new Hono<Env>();
 
+const OPERATOR_NOTIFICATION_CHANNELS = new Set(['dashboard', 'email', 'line']);
+
+function serializeRule(item: Awaited<ReturnType<typeof getNotificationRuleById>> extends infer T
+  ? Exclude<T, null>
+  : never) {
+  return {
+    id: item.id,
+    name: item.name,
+    eventType: item.event_type,
+    conditions: JSON.parse(item.conditions),
+    channels: JSON.parse(item.channels),
+    isActive: Boolean(item.is_active),
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  };
+}
+
+function normalizeChannels(channels: unknown): string[] | null {
+  if (!Array.isArray(channels) || channels.length === 0) return ['dashboard'];
+  if (!channels.every((channel) => typeof channel === 'string' && OPERATOR_NOTIFICATION_CHANNELS.has(channel))) {
+    return null;
+  }
+  return [...new Set(channels)];
+}
+
 // ========== 通知ルールCRUD ==========
 
 notifications.get('/api/notifications/rules', requireRole('owner', 'admin'), async (c) => {
@@ -25,16 +50,7 @@ notifications.get('/api/notifications/rules', requireRole('owner', 'admin'), asy
     const items = await getNotificationRules(c.env.DB, lineAccountId);
     return c.json({
       success: true,
-      data: items.map((r) => ({
-        id: r.id,
-        name: r.name,
-        eventType: r.event_type,
-        conditions: JSON.parse(r.conditions),
-        channels: JSON.parse(r.channels),
-        isActive: Boolean(r.is_active),
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      })),
+      data: items.map((item) => serializeRule(item)),
     });
   } catch (err) {
     console.error('GET /api/notifications/rules error:', err);
@@ -53,15 +69,7 @@ notifications.get('/api/notifications/rules/:id', requireRole('owner', 'admin'),
     if (!item) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
-      data: {
-        id: item.id,
-        name: item.name,
-        eventType: item.event_type,
-        conditions: JSON.parse(item.conditions),
-        channels: JSON.parse(item.channels),
-        isActive: Boolean(item.is_active),
-        createdAt: item.created_at,
-      },
+      data: serializeRule(item),
     });
   } catch (err) {
     console.error('GET /api/notifications/rules/:id error:', err);
@@ -73,16 +81,26 @@ notifications.post('/api/notifications/rules', requireRole('owner', 'admin'), as
   try {
     const body = await c.req.json<{ lineAccountId: string; name: string; eventType: string; conditions?: Record<string, unknown>; channels?: string[] }>();
     const lineAccountId = body.lineAccountId?.trim();
-    if (!lineAccountId || !body.name || !body.eventType) {
+    const name = body.name?.trim();
+    const eventType = body.eventType?.trim();
+    const channels = normalizeChannels(body.channels);
+    if (!lineAccountId || !name || !eventType) {
       return c.json({ success: false, error: 'LINEアカウント、名前、きっかけは必須です' }, 400);
     }
+    if (!channels) return c.json({ success: false, error: '利用できない通知方法が含まれています' }, 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
-    const item = await createNotificationRule(c.env.DB, { ...body, lineAccountId });
+    const item = await createNotificationRule(c.env.DB, {
+      lineAccountId,
+      name,
+      eventType,
+      conditions: body.conditions,
+      channels,
+    });
     return c.json({
       success: true,
-      data: { id: item.id, name: item.name, eventType: item.event_type, channels: JSON.parse(item.channels), createdAt: item.created_at },
+      data: serializeRule(item),
     }, 201);
   } catch (err) {
     console.error('POST /api/notifications/rules error:', err);
@@ -103,6 +121,14 @@ notifications.put('/api/notifications/rules/:id', requireRole('owner', 'admin'),
     }>();
     const lineAccountId = body.lineAccountId?.trim();
     if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    if (body.isActive === true) {
+      return c.json({
+        success: false,
+        error: '受け取る人と送信処理を接続するまで、運用者へのお知らせは公開できません',
+      }, 409);
+    }
+    const channels = body.channels === undefined ? undefined : normalizeChannels(body.channels);
+    if (channels === null) return c.json({ success: false, error: '利用できない通知方法が含まれています' }, 400);
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
       return c.json({ success: false, error: 'このLINEアカウントを変更する権限がありません' }, 403);
     }
@@ -112,14 +138,14 @@ notifications.put('/api/notifications/rules/:id', requireRole('owner', 'admin'),
       name: body.name,
       eventType: body.eventType,
       conditions: body.conditions,
-      channels: body.channels,
+      channels,
       isActive: body.isActive,
     });
     const updated = await getNotificationRuleById(c.env.DB, id, lineAccountId);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
       success: true,
-      data: { id: updated.id, name: updated.name, eventType: updated.event_type, channels: JSON.parse(updated.channels), isActive: Boolean(updated.is_active) },
+      data: serializeRule(updated),
     });
   } catch (err) {
     console.error('PUT /api/notifications/rules/:id error:', err);
