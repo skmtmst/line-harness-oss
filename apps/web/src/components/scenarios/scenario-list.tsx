@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
-import type { Scenario, DeliveryMode } from '@line-crm/shared'
+import type { Scenario, DeliveryMode, Folder } from '@line-crm/shared'
+import { TableHeadRow, Th } from '@/components/shared/table'
 
 type ScenarioRow = Scenario & {
   stepCount?: number
@@ -29,6 +30,8 @@ interface ScenarioListProps {
   scenarios: ScenarioRow[]
   onToggleActive: (id: string, current: boolean) => void
   onDelete: (id: string) => void
+  folders?: Folder[]
+  onMoveFolder?: (id: string, folderId: string) => void
   /** 掴んで並べ替えたときに、見えている順で呼ばれる。 */
   onReorder?: (ids: string[]) => void
   loading?: boolean
@@ -45,6 +48,8 @@ export default function ScenarioList({
   scenarios,
   onToggleActive,
   onDelete,
+  folders = [],
+  onMoveFolder,
   onReorder,
   loading,
 }: ScenarioListProps) {
@@ -78,8 +83,8 @@ export default function ScenarioList({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px]">
           <thead>
-            <tr className="bg-canvas-sunken border-hairline border-b">
-              <th className="w-10 px-2 py-3" aria-label="並び替え" />
+            <TableHeadRow>
+              <Th className="w-10 px-2" aria-label="並び替え" />
               {/*
                 名前の桁だけ「余ったぶんを全部取る」形にする。
                 `w-full max-w-0` は表の桁でよく使う組み合わせで、
@@ -90,31 +95,34 @@ export default function ScenarioList({
                 説明が途中で切れ、狭い画面では他の桁が潰れて
                 「配信方 / 式」「読了 / 済」と縦になっていた。
               */}
-              <th className="text-ink-faint w-full max-w-0 px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
+              <Th className="w-full max-w-0">
                 シナリオ名
-              </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
+              </Th>
+              <Th>
                 配信方式
-              </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
+              </Th>
+              <Th>
+                フォルダ
+              </Th>
+              <Th>
                 購読中
-              </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
+              </Th>
+              <Th>
                 読了済
-              </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
+              </Th>
+              <Th>
                 通数
-              </th>
+              </Th>
               {/* 配り終えた人をどうするか。一覧で見えないと、シナリオを
                   つないだつもりが繋がっていないことに気づけない。 */}
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
+              <Th>
                 終了後
-              </th>
-              <th className="text-ink-faint px-4 py-3 text-left text-xs font-semibold whitespace-nowrap uppercase">
+              </Th>
+              <Th>
                 状態
-              </th>
-              <th className="px-4 py-3" />
-            </tr>
+              </Th>
+              <Th aria-label="操作" />
+            </TableHeadRow>
           </thead>
           <tbody className="divide-hairline divide-y">
             {scenarios.map((s) => (
@@ -167,6 +175,22 @@ export default function ScenarioList({
                 <td className="text-ink-secondary px-4 py-3 text-sm whitespace-nowrap">
                   {deliveryModeLabels[s.deliveryMode ?? 'relative']}
                 </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <select
+                    value={s.folderId ?? ''}
+                    onChange={(event) => onMoveFolder?.(s.id, event.target.value)}
+                    aria-label={`${s.name}のフォルダ`}
+                    disabled={!onMoveFolder}
+                    className="v6-select h-9 w-36 rounded-control border border-hairline bg-canvas text-xs font-semibold text-ink"
+                  >
+                    <option value="">未分類</option>
+                    {folders.map((folder) => (
+                      <option key={folder.id} value={folder.id}>
+                        {folder.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
                 <td className="text-ink px-4 py-3 text-sm tabular-nums whitespace-nowrap">
                   {(s.subscriberCount ?? 0).toLocaleString('ja-JP')}
                   <span className="text-ink-faint ml-0.5 text-xs">人</span>
@@ -210,16 +234,6 @@ export default function ScenarioList({
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button
                     onClick={() => {
-                      // 全アカウント共通は、どのアカウントから触っても全部に効く。
-                      // 別のアカウントを見ているつもりで止めてしまう事故を防ぐ。
-                      if (
-                        s.lineAccountId === null &&
-                        !confirm(
-                          `「${s.name}」は全アカウント共通のシナリオです。${s.isActive ? '停止' : '再開'}するとすべてのアカウントに影響します。続けますか？`,
-                        )
-                      ) {
-                        return
-                      }
                       onToggleActive(s.id, s.isActive)
                     }}
                     disabled={loading}
