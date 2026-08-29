@@ -21,7 +21,7 @@ import { chromium } from '@playwright/test'
 import { pathToFileURL } from 'node:url'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { SCREENS, CAPTURED_AT, DESIGN_SIZE, WIDTHS, screensOf } from './screens.mjs'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
@@ -637,6 +637,23 @@ async function captureImpl(feature) {
           path: join(out, `${s.node}${shotSpec.suffix}-${width}.png`),
           fullPage: s.mode === 'page',
         })
+        /*
+          **絵の隣に、写っている文字も置く。**
+
+          内部の言葉が出ていないか、未取得が `0件` になっていないか、
+          失敗のときに空の文が出ていないか——**確かめたいことの多くは
+          文字で足りる。** 絵を1枚読むより桁違いに安いので、
+          まず `grep` で見て、置き場や列の切れなど**目でしか分からない
+          ことだけ絵を開く**。
+
+          1920px のときだけ書く（1440と中身は同じで、置き場だけが違う）。
+        */
+        if (width === 1920) {
+          /* 左のメニューと上の帯は毎回同じなので落とす。本文だけ残す。 */
+          const text = await page.locator('main').first().innerText()
+            .catch(() => page.locator('body').innerText())
+          writeFileSync(join(out, `${s.node}${shotSpec.suffix}.txt`), text, 'utf-8')
+        }
         /*
           **どの状態が出ているかを名前で言えるか**も一緒に記録する。
           共通部品を使っていない画面は `—` になる。それ自体が結果。
