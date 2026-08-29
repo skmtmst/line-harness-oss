@@ -72,10 +72,9 @@ function makeBlock(kind: string, type?: FormInputType, count = 0): FormBlock {
 }
 
 function FormEditInner() {
-  const { selectedAccountId } = useAccount()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  const { selectedAccount } = useAccount()
+  const { selectedAccount, selectedAccountId } = useAccount()
 
   /**
    * 友だちに配るURL。
@@ -160,8 +159,8 @@ function FormEditInner() {
             : [],
         })
 
-        if (!id) return
-        const res = await api.forms.get(id)
+        if (!id || !selectedAccountId) return
+        const res = await api.forms.get(id, selectedAccountId)
         if (res.success) {
           setName(res.data.name)
           setDescription(res.data.description ?? '')
@@ -177,7 +176,7 @@ function FormEditInner() {
         setLoading(false)
       }
     })()
-  }, [id])
+  }, [id, selectedAccountId])
 
   // いま編集している並び（共通ヘッダ か セクション）
   const blocks = useMemo(
@@ -308,6 +307,10 @@ function FormEditInner() {
   }
 
   const save = async () => {
+    if (!selectedAccountId) {
+      setError('LINE公式アカウントを選んでください')
+      return
+    }
     if (!name.trim()) {
       setError('フォーム名を入力してください')
       return
@@ -324,7 +327,7 @@ function FormEditInner() {
     setError('')
     setNotice('')
     try {
-      const res = await api.forms.update(id, {
+      const res = await api.forms.update(id, selectedAccountId, {
         name: name.trim(),
         description: description.trim() || null,
         layout,

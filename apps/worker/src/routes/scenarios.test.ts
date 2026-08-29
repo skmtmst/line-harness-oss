@@ -1,5 +1,12 @@
 import { describe, expect, test, beforeEach, vi } from 'vitest';
 import { Hono } from 'hono';
+import type { Env } from '../index.js';
+
+const accountAccessMocks = vi.hoisted(() => ({
+  canAccessAllLineAccounts: vi.fn(),
+}));
+
+vi.mock('../services/account-access.js', () => accountAccessMocks);
 
 const dbMocks = {
   getScenarios: vi.fn(),
@@ -66,9 +73,19 @@ function makeScenarioDb(rows: ScenarioRow[]) {
 }
 
 function setupApp(db: D1Database) {
-  const app = new Hono<{ Bindings: { DB: D1Database } }>();
+  const app = new Hono<Env>();
   app.use('*', async (c, next) => {
-    c.env = { DB: db };
+    c.env = { DB: db } as Env['Bindings'];
+    c.set('staff', {
+      id: 'owner-1',
+      name: '管理者',
+      role: 'owner',
+      readOnly: false,
+      tenantId: 'tenant-1',
+      permissionKeys: ['/scenarios'],
+      assignedLineAccountId: null,
+      canAccessDescendantAccounts: true,
+    });
     await next();
   });
   app.route('/', scenariosModule);
@@ -88,6 +105,7 @@ const rowBase = {
 
 beforeEach(() => {
   for (const fn of Object.values(dbMocks)) fn.mockReset();
+  accountAccessMocks.canAccessAllLineAccounts.mockReset().mockResolvedValue(true);
 });
 
 describe('GET /api/scenarios?lineAccountId=X', () => {
@@ -149,5 +167,66 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { success: boolean; data: unknown[] };
     expect(body.data).toEqual([]);
+  });
+});
+
+describe('POST /api/scenarios/:id/test-send', () => {
+  function testSendDb() {
+    let stepReads = 0;
+    const db = {
+      prepare(sql: string) {
+        const statement = {
+          bind() {
+            return statement;
+          },
+          async first() {
+            if (/SELECT id, line_account_id FROM scenarios/i.test(sql)) {
+              return { id: 'scenario-1', line_account_id: 'account-1' };
+            }
+            return null;
+          },
+          async all() {
+            stepReads += 1;
+            return { results: [] };
+          },
+        };
+        return statement;
+      },
+    } as unknown as D1Database;
+    return { db, stepReads: () => stepReads };
+  }
+
+  test('別LINEアカウントの友だちには送信処理を始めない', async () => {
+    dbMocks.getScenarioById.mockResolvedValue({ id: 'scenario-1', line_account_id: 'account-1' });
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-2', line_account_id: 'account-2' });
+    const { db, stepReads } = testSendDb();
+
+    const response = await setupApp(db).request('/api/scenarios/scenario-1/test-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ friendId: 'friend-2' }),
+    });
+
+    expect(response.status).toBe(422);
+    expect(await response.json()).toMatchObject({ success: false });
+    expect(stepReads()).toBe(0);
+  });
+
+  test('担当者から見えない友だちは存在を隠して送信処理を始めない', async () => {
+    dbMocks.getScenarioById.mockResolvedValue({ id: 'scenario-1', line_account_id: 'account-1' });
+    dbMocks.getFriendById.mockResolvedValue({ id: 'friend-hidden', line_account_id: 'account-1' });
+    accountAccessMocks.canAccessAllLineAccounts
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const { db, stepReads } = testSendDb();
+
+    const response = await setupApp(db).request('/api/scenarios/scenario-1/test-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ friendId: 'friend-hidden' }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(stepReads()).toBe(0);
   });
 });

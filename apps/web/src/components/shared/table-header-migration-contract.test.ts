@@ -52,9 +52,12 @@ describe('表見出しの第1段階移行', () => {
     expect(sources['app/affiliates/tabs.tsx'].match(/<th\b/g)).toHaveLength(20)
 
     const debt = totals(countDebt().counts) as Record<string, number>
-    // 4-1 の表に「表示」列（★）を足したぶん1つ増えた。
-    // 共通の `Th` へ寄せるのは、横展開のときにまとめて行う。
-    expect(debt['direct-th']).toBe(291)
+    // 2026-08-29: 統合ユーザー一覧の見出し6つを共通 `Th` へ寄せ、
+    // V6の7列へ増やしても直書きを残さなかった。
+    // 分析の死んだ旧UIから直書き見出し15個を削除した。現在画面の見出しは
+    // 共通の `Th` を通すため、この数へは戻さない。
+    // シナリオ一覧と友だち情報欄の見出しも共通の `Th` へ寄せ、261まで減った。
+    expect(debt['direct-th']).toBe(261)
   })
 
   it('V5基準・V6優先と画面画像の未検証を契約へ残す', () => {

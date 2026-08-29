@@ -61,7 +61,7 @@ export default function AccountMigration() {
           api.scenarios.list(),
           api.templates.list(),
           api.autoReplies.list(),
-          api.forms.list(),
+          api.forms.list(selectedAccountId),
           api.reminders.list(),
           api.commonVars.list(),
           api.supportMarks.list(selectedAccountId),
