@@ -528,11 +528,13 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
  */
 export class ApiError extends Error {
   readonly status: number
+  readonly code: string | undefined
 
-  constructor(status: number, message?: string) {
+  constructor(status: number, message?: string, code?: string) {
     super(message || `API error: ${status}`)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -564,6 +566,25 @@ export function extractApiErrorMessage(raw: string, status: number): string {
     // Not JSON — fall through to the status-only message.
   }
   return ''
+}
+
+/**
+ * 画面分岐にだけ使う、Worker由来の機械コードを取り出す。
+ *
+ * 本文を利用者へ表示してよいかとは別の契約。英小文字と数字のsnake_caseだけに
+ * 絞り、SQL・外部API・HTMLなどの内部文言はコードとしても受け取らない。
+ */
+export function extractApiErrorCode(raw: string): string | undefined {
+  if (!raw) return undefined
+  try {
+    const body = JSON.parse(raw) as { error?: unknown }
+    if (typeof body.error === 'string' && /^[a-z][a-z0-9_]{0,63}$/.test(body.error)) {
+      return body.error
+    }
+  } catch {
+    // JSONでなければ機械コードも無い。
+  }
+  return undefined
 }
 
 function reportServerFailure(path: string, status: number): void {
@@ -621,7 +642,14 @@ export async function fetchApi<T>(path: string, options?: RequestInit): Promise<
     window.dispatchEvent(new CustomEvent(SESSION_LOST_EVENT))
   }
   if (res.status >= 500) reportServerFailure(path, res.status)
-  if (!res.ok) throw new ApiError(res.status, extractApiErrorMessage(await res.text(), res.status))
+  if (!res.ok) {
+    const raw = await res.text()
+    throw new ApiError(
+      res.status,
+      extractApiErrorMessage(raw, res.status),
+      extractApiErrorCode(raw),
+    )
+  }
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }

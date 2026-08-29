@@ -28,4 +28,16 @@ describe('V6 代理予約の接続契約', () => {
     expect(PAGE).not.toContain('前日19:00')
     expect(PAGE).not.toContain('当日8:00')
   })
+
+  test('予約枠の競合を表示文言ではなく安全な機械コードで判定して選び直せる', () => {
+    expect(PAGE).toContain('ApiError,')
+    expect(PAGE).toContain('cause instanceof ApiError')
+    expect(PAGE).toContain("cause.code === 'slot_conflict' || cause.code === 'slot_not_available'")
+    expect(PAGE).toContain("setStep('conflict')")
+    expect(PAGE).toContain('選んだ時間は、ほかの予約で埋まりました')
+    expect(PAGE).toContain('予約を登録できませんでした。状態を確認して、もう一度お試しください。')
+    expect(PAGE).not.toContain("message.includes('slot_conflict')")
+    expect(PAGE).not.toContain('cause.status === 409 || cause.status === 422')
+    expect(PAGE).not.toContain('API error:')
+  })
 })
