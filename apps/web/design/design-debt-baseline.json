@@ -158,7 +158,6 @@
     "arbitrary-value": 2
   },
   "app/form-submissions/page.tsx": {
-    "direct-secondary-button": 1,
     "arbitrary-value": 12,
     "direct-th": 4,
     "direct-primary-button": 1
@@ -222,6 +221,15 @@
   "app/login/two-factor/page.tsx": {
     "arbitrary-value": 1,
     "direct-primary-button": 1
+  },
+  "app/mileage/earning-rules/new/page.tsx": {
+    "direct-th": 3,
+    "unresolved-classname": 8
+  },
+  "app/mileage/page.tsx": {
+    "unresolved-classname": 2,
+    "arbitrary-value": 10,
+    "direct-th": 7
   },
   "app/nen-campaigns/edit/campaign-editor.tsx": {
     "direct-secondary-button": 3,
@@ -312,16 +320,6 @@
     "direct-secondary-button": 3,
     "direct-primary-button": 1,
     "arbitrary-value": 1
-  },
-  "app/scoring/new/page.tsx": {
-    "direct-th": 3,
-    "unresolved-classname": 8
-  },
-  "app/scoring/page.tsx": {
-    "direct-secondary-button": 3,
-    "arbitrary-value": 11,
-    "unresolved-classname": 2,
-    "direct-th": 7
   },
   "app/search-console/page.tsx": {
     "arbitrary-value": 11,
