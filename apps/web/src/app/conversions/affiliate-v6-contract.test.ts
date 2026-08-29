@@ -36,4 +36,9 @@ describe('V6 成果・アフィリエイトの契約', () => {
     expect(TABS).toContain('<Th align="right">報酬</Th>')
     expect(TABS).not.toContain('<Th align="right">参考報酬</Th>')
   })
+
+  it('利用者向けの集計名へデータベースの内部名を出さない', () => {
+    expect(TABS).toContain('>クリック</p>')
+    expect(TABS).not.toContain('ref_tracking')
+  })
 })
