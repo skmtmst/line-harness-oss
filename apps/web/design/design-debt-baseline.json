@@ -464,7 +464,7 @@
   "components/broadcasts/broadcast-form.tsx": {
     "arbitrary-value": 25,
     "direct-primary-button": 2,
-    "direct-secondary-button": 11,
+    "direct-secondary-button": 9,
     "unresolved-classname": 3
   },
   "components/broadcasts/broadcast-kpis.tsx": {
