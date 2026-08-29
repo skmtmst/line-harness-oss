@@ -15,6 +15,10 @@ import {
   getMileageHistoryForFriend,
   getMileageSelfInsights,
   getMileageEarningOpportunitiesForFriend,
+  listMileageRewards,
+  getMileageRewardRedemptionCounts,
+  reserveMileageRewardRedemption,
+  MileageRewardError,
   type Affiliate,
   type AffiliateLink,
   type AffiliateLinkStat,
@@ -22,6 +26,9 @@ import {
 import { resolveLinkBaseUrl } from '../lib/link-base-url.js';
 import { signCrossAccountToken } from '../lib/cross-account-token.js';
 import type { Env } from '../index.js';
+import { sha256Hex } from '../middleware/auth.js';
+import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import { deliverMileageReward } from '../services/mileage-reward-delivery.js';
 
 /**
  * Self-serve affiliate API for LIFF clients.
@@ -40,7 +47,12 @@ const affiliateSelfRoutes = new Hono<Env>();
 /** Max self-issued links per affiliate. The 21st issuance is a 400. */
 const MAX_SELF_LINKS = 20;
 
-type ResolvedFriend = { id: string; display_name: string; user_id: string | null };
+type ResolvedFriend = {
+  id: string;
+  display_name: string;
+  user_id: string | null;
+  line_account_id: string;
+};
 
 /**
  * Verify a LINE access token and resolve the backing friend row.
@@ -98,7 +110,12 @@ async function resolveFriendFromLineToken(
     (account) => account.login_channel_id === tokenClientId,
   )?.id ?? null;
   const friend = await getFriendByLineUserIdForAccount(db, userId, lineAccountId);
-  if (!friend) return { status: 'no_friend' };
+  // アカウントを特定できないトークンや、legacy fallback が別アカウントの
+  // friend を返した場合は使わない。交換では残高と在庫を動かすため、
+  // LINE user ID が同じというだけで別アカウントへ入れてはいけない。
+  if (!lineAccountId || !friend || friend.line_account_id !== lineAccountId) {
+    return { status: 'no_friend' };
+  }
   return { status: 'ok', friend: friend as unknown as ResolvedFriend };
 }
 
@@ -205,6 +222,104 @@ affiliateSelfRoutes.get('/api/liff/mileage/me', async (c) => {
   } catch (err) {
     console.error('GET /api/liff/mileage/me error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+/** Published mileage uses for the verified friend. Unknown numbers stay null. */
+affiliateSelfRoutes.get('/api/liff/mileage/rewards', async (c) => {
+  try {
+    const token = c.req.query('lineAccessToken');
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    const [rewards, mileage, redemptionCounts] = await Promise.all([
+      listMileageRewards(c.env.DB, {
+        lineAccountId: resolved.friend.line_account_id,
+        customerVisible: true,
+      }),
+      getMileageSummaryForFriend(c.env.DB, resolved.friend.id),
+      getMileageRewardRedemptionCounts(c.env.DB, {
+        lineAccountId: resolved.friend.line_account_id,
+        friendId: resolved.friend.id,
+      }),
+    ]);
+    return c.json({
+      success: true,
+      availableMiles: mileage.available,
+      rewards: rewards.map((reward) => {
+        const version = reward.currentVersion;
+        const outOfCodes = reward.rewardKind === 'coupon' && reward.availableCodeCount === 0;
+        const enoughMileage = version ? mileage.available >= version.requiredMiles : false;
+        const friendLimitReached = Boolean(
+          version?.perFriendLimit
+          && (redemptionCounts.byRewardId.get(reward.id) ?? 0) >= version.perFriendLimit,
+        );
+        const stockLimitReached = Boolean(
+          version?.stockLimit != null
+          && (redemptionCounts.byVersionId.get(version.id) ?? 0) >= version.stockLimit,
+        );
+        return {
+          ...reward,
+          canRedeem: Boolean(version) && enoughMileage && !outOfCodes
+            && !friendLimitReached && !stockLimitReached,
+          unavailableReason: !version
+            ? '交換条件を確認できません'
+            : !enoughMileage
+              ? '必要なマイルが足りません'
+              : outOfCodes
+                ? '在庫切れです'
+                : friendLimitReached
+                  ? 'この使い道の交換上限に達しています'
+                  : stockLimitReached
+                    ? '在庫切れです'
+                    : null,
+        };
+      }),
+    });
+  } catch (error) {
+    console.error('GET /api/liff/mileage/rewards error:', error);
+    return c.json({ success: false, error: '使い道を読み込めませんでした' }, 500);
+  }
+});
+
+affiliateSelfRoutes.post('/api/liff/mileage/rewards/:id/redeem', async (c) => {
+  try {
+    const body = await c.req.json<{ lineAccessToken?: unknown }>()
+      .catch((): { lineAccessToken?: unknown } => ({}));
+    const token = typeof body.lineAccessToken === 'string' ? body.lineAccessToken : '';
+    if (!token) return c.json({ success: false, error: 'lineAccessToken is required' }, 400);
+    const idempotencyKey = c.req.header('Idempotency-Key')?.trim();
+    if (!isValidIdempotencyKey(idempotencyKey)) {
+      return c.json({ success: false, error: '有効なIdempotency-Keyが必要です' }, 400);
+    }
+    const resolved = await resolveFriendFromLineToken(c.env, token);
+    if (resolved.status !== 'ok') return unresolvedResponse(c, resolved);
+    const rewardId = c.req.param('id');
+    const requestFingerprint = await sha256Hex(
+      `${resolved.friend.line_account_id}\n${resolved.friend.id}\n${rewardId}`,
+    );
+    const reserved = await reserveMileageRewardRedemption(c.env.DB, {
+      lineAccountId: resolved.friend.line_account_id,
+      friendId: resolved.friend.id,
+      rewardId,
+      idempotencyKey,
+      requestFingerprint,
+    });
+    const delivery = await deliverMileageReward(c.env.DB, reserved.redemption.id, {
+      credentialEncryptionKey: c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+    });
+    return c.json({
+      success: delivery.status === 'succeeded',
+      replayed: reserved.kind === 'existing',
+      redemptionId: reserved.redemption.id,
+      ...delivery,
+    }, delivery.status === 'succeeded' ? 200 : 202);
+  } catch (error) {
+    if (error instanceof MileageRewardError) {
+      return c.json({ success: false, error: error.message, code: error.code }, error.status as 400);
+    }
+    console.error('POST /api/liff/mileage/rewards/:id/redeem error:', error);
+    return c.json({ success: false, error: '交換を受け付けられませんでした' }, 500);
   }
 });
 
