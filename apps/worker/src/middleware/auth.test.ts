@@ -13,6 +13,7 @@ vi.mock('@line-crm/db', () => ({
     if (token === 'friends-key') return { id: 'friends-1', name: 'Friends Staff', role: 'staff', permission_keys: '["/friends"]' };
     if (token === 'chats-key') return { id: 'chats-1', name: 'Chats Staff', role: 'staff', permission_keys: '["/chats"]' };
     if (token === 'tags-key') return { id: 'tags-1', name: 'Tags Staff', role: 'staff', permission_keys: '["/tags"]' };
+    if (token === 'mileage-key') return { id: 'mileage-1', name: 'Mileage Staff', role: 'staff', permission_keys: '["/mileage"]' };
     if (token === 'no-permissions-key') return { id: 'none-1', name: 'No Permission Staff', role: 'staff', permission_keys: '[]' };
     if (token !== 'staff-key') return null;
     return {
@@ -100,6 +101,7 @@ function app() {
   ]) {
     a.get(path, (c) => c.json({ success: true }));
   }
+  a.get('/api/mileage/history', (c) => c.json({ success: true }));
   return a;
 }
 
@@ -365,6 +367,11 @@ describe('staff feature permissions', () => {
     expect((await app().request('/api/friends/friend-1', bearer('friends-key'), crossSiteEnv())).status).toBe(200);
     expect((await app().request('/api/friends/friend-1/messages', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
     expect((await app().request('/api/friends/friend-1/fields', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
+  });
+
+  test('mileage permission protects mileage APIs', async () => {
+    expect((await app().request('/api/mileage/history', bearer('mileage-key'), crossSiteEnv())).status).toBe(200);
+    expect((await app().request('/api/mileage/history', bearer('friends-key'), crossSiteEnv())).status).toBe(403);
   });
 
   test.each(['/api/support', '/api/friends/friend-1', '/api/support-marks'])(

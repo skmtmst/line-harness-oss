@@ -11,6 +11,8 @@ import {
   enrollFriendInScenario,
   getMileageSummaryForFriend,
   getMileageHistoryForFriend,
+  getMileageSelfInsights,
+  getMileageConnectedAccountsForFriend,
   jstNow,
   getTagAddedScenarioIds,
 } from '@line-crm/db';
@@ -610,16 +612,25 @@ friends.get('/api/friends/:id/mileage', requireVisibleFriend, async (c) => {
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
+    const requestedAccountId = c.req.query('accountId')?.trim();
+    const friendAccountId =
+      ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
+    if (requestedAccountId && friendAccountId !== requestedAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
     const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(100, Math.max(1, requestedLimit))
       : 10;
-    const [summary, history] = await Promise.all([
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const [summary, history, insights, connections] = await Promise.all([
       getMileageSummaryForFriend(c.env.DB, friendId),
       getMileageHistoryForFriend(c.env.DB, friendId, { limit }),
+      getMileageSelfInsights(c.env.DB, friendId),
+      getMileageConnectedAccountsForFriend(c.env.DB, friendId, accountScope.allowedAccountIds),
     ]);
-    return c.json({ success: true, data: { summary, history } });
+    return c.json({ success: true, data: { summary, history, insights, connections } });
   } catch (err) {
     console.error('GET /api/friends/:id/mileage error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);
