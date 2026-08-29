@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 201,
-  "unimplemented": 57,
+  "compared": 203,
+  "unimplemented": 55,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 178,
+  "needsFix": 180,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -319,17 +319,27 @@
       "feature": 10,
       "name": "ウェビナー",
       "total": 13,
-      "compared": 9,
-      "unimplemented": 4,
+      "compared": 11,
+      "unimplemented": 2,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 9,
+      "needsFix": 11,
       "unjudged": 0,
       "remaining": 13,
       "capturedAt": [
+        {
+          "pr": 508,
+          "head": "61eeb3c7",
+          "on": "2026-08-29",
+          "screens": [
+            "TimXl",
+            "GB0NR"
+          ],
+          "note": "公開完了と公開ページの導線。**#508 は #507 を含む**"
+        },
         {
           "pr": 546,
           "head": "de0848b9",
@@ -971,24 +981,10 @@
     },
     {
       "feature": 10,
-      "node": "GB0NR",
-      "name": "10-1-F 公開ページプレビュー",
-      "gap": "pending",
-      "gapNote": "#507 head `579fa25c` で実URLの公開ページを別窓で開く導線を実装済み。画像確認待ち"
-    },
-    {
-      "feature": 10,
       "node": "D6yO7e",
       "name": "10-1-G 公開前確認",
       "gap": "pending",
       "gapNote": "#508 head `61eeb3c7` で動画・配信枠・長さを検査し、公開内容を読む確認窓を実装済み。取り込み順は #507 → #508"
-    },
-    {
-      "feature": 10,
-      "node": "TimXl",
-      "name": "10-1-H 公開完了",
-      "gap": "pending",
-      "gapNote": "#508 head `61eeb3c7` で公開完了画面と公開後の導線を実装済み。取り込み順は #507 → #508"
     },
     {
       "feature": 10,

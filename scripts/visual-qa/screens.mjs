@@ -934,10 +934,11 @@ export const SCREENS = [
   },
   {
     ...WEBINAR, node: 'GB0NR', name: '10-1-F 公開ページプレビュー', route: WEBINAR_EDIT,
-    gap: 'pending',
-    gapNote: '#507 head `579fa25c` で実URLの公開ページを別窓で開く導線を実装済み。画像確認待ち',
-    status: 'unimplemented',
-    why: 'developmentではdisabledだが、#507に `data-design-node="GB0NR"` と公開URLの確認導線がある。#507 headの画像確認待ち',
+    mode: 'viewport', height: 1080,
+    verdict: 'needs_fix',
+    verdictNote: '**#507 で公開ページを見る導線が実データへつながった。** ただし撮った head では**押せない**まま（`<Button data-design-node="GB0NR" disabled title={previewUnavailableReason}>`）。LIFF IDが確認できないアカウントでは理由付きで止める作りで、**押せて何も起きないより良い**。P1 押せる状態の絵は、LIFF IDを持つ固定データを用意しないと撮れない。設計は押せる',
+    verdictSource: 'webinars-v6/GB0NR-1920.png',
+    verdictHead: '61eeb3c7',
   },
   {
     ...WEBINAR, node: 'D6yO7e', name: '10-1-G 公開前確認',
@@ -946,10 +947,17 @@ export const SCREENS = [
     status: 'unimplemented', why: '#508で `ConfirmDialog` を使った公開前確認を実装済み。最新headの画像確認待ち',
   },
   {
+    /*
+      **`/webinars/published?id=` で開く。** 公開の口が実際に返したIDだけを
+      渡す作りで（`webinar-form.tsx` の `updated.data.id`）、
+      `status !== 'active'` のときは完了として出さない。
+    */
     ...WEBINAR, node: 'TimXl', name: '10-1-H 公開完了',
-    gap: 'pending',
-    gapNote: '#508 head `61eeb3c7` で公開完了画面と公開後の導線を実装済み。取り込み順は #507 → #508',
-    status: 'unimplemented', why: '#508に `/webinars/published` と `data-design-node="TimXl"` がある。画像確認待ち',
+    route: '/webinars/published?id=webinar-1', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**#507 → #508 で公開完了が入り、未実装ではなくなった。** 「公開しました」＋公開状態・公開URL・動画の長さ43分・配信枠2件。**出せないものを出さない**のが良い：「所属するLINE公式アカウントのLIFF IDを確認できないため、公開ページのボタンは出していません。」と理由を添えて隠す。「公開後の申込数や視聴結果は、編集画面の「概要・分析」で確認できます。」も書いてある。完了画面へ渡すIDは公開の口が実際に返したものだけ（契約試験が `?status=success` を禁じている）。P2 設計との細かな差は未確認（設計 TimXl の面と1枚ずつ並べるのは次の回）',
+    verdictSource: 'webinars-v6/TimXl-1920.png',
+    verdictHead: '61eeb3c7',
   },
   {
     ...WEBINAR, node: 'Q8sHa', name: '10-1-I 参加者管理', route: WEBINAR_EDIT,
@@ -1913,7 +1921,10 @@ export const CAPTURED_AT = {
     { pr: 420, head: '87c150ad', on: '2026-08-28', screens: ['HBTk0', 'yKEdO', 'KoT6c', 'A1ZYeP', 'l25rlp', 'rIhbN'] },
     { pr: 421, head: 'f7b7974a', on: '2026-08-28', screens: ['QKx8Q', 'XBkiQ'] },
   ],
-  10: [{ pr: 546, head: 'de0848b9', on: '2026-08-29', screens: ['Ho8z4'], note: '通知とリマインド。既存の申込と5分ごとの仕掛けを使う' }],
+  10: [
+    { pr: 508, head: '61eeb3c7', on: '2026-08-29', screens: ['TimXl', 'GB0NR'], note: '公開完了と公開ページの導線。**#508 は #507 を含む**' },
+    { pr: 546, head: 'de0848b9', on: '2026-08-29', screens: ['Ho8z4'], note: '通知とリマインド。既存の申込と5分ごとの仕掛けを使う' },
+  ],
   11: [
     { pr: 433, head: '51020a97', on: '2026-08-28', screens: ['M9cij'] },
     { pr: 493, head: '62ddaebe', on: '2026-08-28', screens: ['CzndJ', 'M9cij'], note: '#493 は #433 を含む' },
