@@ -43,6 +43,14 @@ async function request(
   }, environment());
 }
 
+async function patchStatus(id: string, status: unknown, staff = operator()) {
+  return app(staff).request(`/api/tenants/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  }, environment());
+}
+
 beforeEach(() => {
   testDb = createTestD1();
   testDb.raw.exec("ALTER TABLE tenants ADD COLUMN feature_packs TEXT NOT NULL DEFAULT '[]'");
@@ -67,7 +75,7 @@ describe('tenant creation and feature packs', () => {
   it.each([
     [{ name: '新しい統括' }, '[]'],
     [{ name: '飲食店の統括', featurePacks: ['restaurant'] }, '["restaurant"]'],
-  ])('統括と作成者のowner所属を一括作成する', async (body, expectedPacks) => {
+  ])('統括を作成する', async (body, expectedPacks) => {
     const response = await request('/api/tenants', body);
     expect(response.status).toBe(201);
     const result = await response.json<{
@@ -82,13 +90,8 @@ describe('tenant creation and feature packs', () => {
       feature_packs: expectedPacks,
     });
     expect(testDb.raw.prepare(
-      'SELECT name, role, tenant_id, invite_status FROM staff_members WHERE tenant_id = ?',
-    ).get(result.data.id)).toEqual({
-      name: '運営担当',
-      role: 'owner',
-      tenant_id: result.data.id,
-      invite_status: 'active',
-    });
+      'SELECT COUNT(*) AS count FROM staff_members WHERE tenant_id = ?',
+    ).get(result.data.id)).toEqual({ count: 0 });
   });
 
   it('同じ名前の2回目をINSERT前に400で拒否する', async () => {
@@ -107,17 +110,6 @@ describe('tenant creation and feature packs', () => {
     const response = await request('/api/tenants', { name: '対象統括', featurePacks: ['ec'] });
     expect(response.status).toBe(400);
     expect(await response.text()).not.toContain('ec');
-  });
-
-  it('staff_members作成が失敗したらtenantsも残さない', async () => {
-    testDb.raw.exec(`CREATE TRIGGER reject_new_owner
-      BEFORE INSERT ON staff_members
-      BEGIN SELECT RAISE(ABORT, 'rejected'); END`);
-    const response = await request('/api/tenants', { name: '残らない統括' });
-    expect(response.status).toBe(500);
-    expect(testDb.raw.prepare(
-      'SELECT COUNT(*) AS count FROM tenants WHERE name = ?',
-    ).get('残らない統括')).toEqual({ count: 0 });
   });
 
   it.each([
@@ -142,18 +134,41 @@ describe('tenant creation and feature packs', () => {
   });
 });
 
+describe('tenant status', () => {
+  it.each(['active', 'suspended', 'archived'])('%sへ変更すると200を返す', async (status) => {
+    const response = await patchStatus(DEFAULT_TENANT_ID, status);
+    expect(response.status).toBe(200);
+    expect(testDb.raw.prepare('SELECT status FROM tenants WHERE id = ?').get(DEFAULT_TENANT_ID))
+      .toEqual({ status });
+  });
+
+  it.each(['deleted', 'unknown', '', null])('不正な状態 %s を400で拒否する', async (status) => {
+    expect((await patchStatus(DEFAULT_TENANT_ID, status)).status).toBe(400);
+  });
+
+  it.each([
+    operator({ tenantId: 'another-tenant' }),
+    operator({ role: 'admin' }),
+    operator({ readOnly: true }),
+  ])('管理権限のない利用者を403にする', async (staff) => {
+    expect((await patchStatus(DEFAULT_TENANT_ID, 'archived', staff)).status).toBe(403);
+  });
+});
+
 describe('tenant list', () => {
-  it('一覧を返し、include_deleted指定も受け付ける', async () => {
+  it('archivedを通常は除外し、include_archived=1なら含める', async () => {
     testDb.raw.prepare(
       "INSERT INTO tenants (id, name, status) VALUES ('archived-tenant', '保管済み', 'archived')",
     ).run();
     const normal = await app(operator()).request('/api/tenants', {}, environment());
     const included = await app(operator()).request(
-      '/api/tenants?include_deleted=1', {}, environment(),
+      '/api/tenants?include_archived=1', {}, environment(),
     );
     expect(normal.status).toBe(200);
     expect(included.status).toBe(200);
-    await expect(normal.json()).resolves.toMatchObject({ success: true });
-    await expect(included.json()).resolves.toMatchObject({ success: true });
+    const normalBody = await normal.json<{ data: Array<{ id: string }> }>();
+    const includedBody = await included.json<{ data: Array<{ id: string }> }>();
+    expect(normalBody.data.map(({ id }) => id)).not.toContain('archived-tenant');
+    expect(includedBody.data.map(({ id }) => id)).toContain('archived-tenant');
   });
 });

@@ -12,6 +12,7 @@ type BoundaryAccount = {
 };
 
 type FeaturePack = 'restaurant';
+type TenantStatus = 'active' | 'suspended' | 'archived';
 
 type TenantRow = {
   id: string;
@@ -23,6 +24,7 @@ type TenantRow = {
 };
 
 const ALLOWED_FEATURE_PACKS = new Set<FeaturePack>(['restaurant']);
+const ALLOWED_TENANT_STATUSES = new Set<TenantStatus>(['active', 'suspended', 'archived']);
 
 function parseFeaturePacks(value: unknown): FeaturePack[] | null {
   if (value === undefined) return [];
@@ -80,23 +82,11 @@ tenants.post('/api/tenants', async (c) => {
     .first<{ id: string }>();
   if (duplicate) return c.json({ success: false, error: '同じ名前の統括が存在します' }, 400);
 
-  const staff = c.get('staff')!;
   const tenantId = crypto.randomUUID();
-  const membershipId = crypto.randomUUID();
-  // Temporary until OPS-b introduces an operator flag: the creator needs an
-  // owner membership because there is otherwise no route into the new tenant.
-  const membershipApiKey = crypto.randomUUID();
   try {
     await db.batch([
       db.prepare(`INSERT INTO tenants (id, name, status, feature_packs)
         VALUES (?, ?, 'active', ?)`).bind(tenantId, name, JSON.stringify(featurePacks)),
-      db.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id)
-        VALUES (?, ?, 'owner', ?, ?)`).bind(
-          membershipId,
-          staff.name,
-          membershipApiKey,
-          tenantId,
-        ),
     ]);
   } catch {
     return c.json({ success: false, error: '統括を作成できませんでした' }, 500);
@@ -110,10 +100,10 @@ tenants.post('/api/tenants', async (c) => {
 
 tenants.get('/api/tenants', async (c) => {
   if (!canManageTenants(c)) return forbidden(c);
-  const includeDeleted = c.req.query('include_deleted') === '1';
+  const includeArchived = c.req.query('include_archived') === '1';
   const query = `SELECT id, name, status, feature_packs, created_at, updated_at
     FROM tenants
-    ${includeDeleted ? '' : "WHERE status <> 'deleted'"}
+    ${includeArchived ? '' : "WHERE status <> 'archived'"}
     ORDER BY created_at ASC, id ASC`;
   const result = await dbFor(c.env).prepare(query).all<TenantRow>();
   return c.json({
@@ -123,6 +113,25 @@ tenants.get('/api/tenants', async (c) => {
       featurePacks: JSON.parse(packs) as FeaturePack[],
     })),
   });
+});
+
+tenants.patch('/api/tenants/:id/status', async (c) => {
+  if (!canManageTenants(c)) return forbidden(c);
+  const body = await c.req.json<{ status?: unknown }>().catch(() => null);
+  const status = body?.status;
+  if (typeof status !== 'string' || !ALLOWED_TENANT_STATUSES.has(status as TenantStatus)) {
+    return c.json({ success: false, error: '利用できない状態です' }, 400);
+  }
+
+  // This only records the tenant state. Enforcing it for login and delivery is
+  // a separate rollout; changing the state here does not delete child data.
+  const result = await dbFor(c.env).prepare(`UPDATE tenants
+    SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')
+    WHERE id = ?`)
+    .bind(status, c.req.param('id'))
+    .run();
+  if (!result.meta.changes) return c.json({ success: false, error: 'tenant not found' }, 404);
+  return c.json({ success: true, data: { status: status as TenantStatus } });
 });
 
 tenants.patch('/api/tenants/:id/feature-packs', async (c) => {
