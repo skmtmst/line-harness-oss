@@ -18,12 +18,12 @@ const CAMPAIGN_KEYS = new Set([
 const MAX_BODY_BYTES = 256 * 1024;
 const ACCOUNT_ACCESS_ERROR = 'このLINEアカウントを操作する権限がありません';
 
-async function adminAccountScope(c: Context<Env>) {
+async function adminAccountScope(c: Context<Env>, accountAlias = 'f') {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const where = scope.allowedAccountIds.length
-    ? `AND (f.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`
+    ? `AND (${accountAlias}.line_account_id IN (${scope.allowedAccountIds.map(() => '?').join(',')})${scope.canSeeUnassigned ? ` OR ${accountAlias}.line_account_id IS NULL` : ''})`
     : scope.canSeeUnassigned
-      ? 'AND f.line_account_id IS NULL'
+      ? `AND ${accountAlias}.line_account_id IS NULL`
       : 'AND 1 = 0';
   return { scope, where };
 }
@@ -48,18 +48,24 @@ async function verifyEccubeSignature(secret: string, timestamp: string, signatur
   return diff === 0;
 }
 
-nenCampaigns.get('/api/nen-campaigns/overview', async (c) => {
+nenCampaigns.get('/api/nen-campaigns/overview', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const { scope, where } = await adminAccountScope(c);
+  const columnScope = await adminAccountScope(c, 'c');
   const [settings, jobs, columns, pets, coupons] = await Promise.all([
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_campaign_settings WHERE is_enabled = 1 AND category != 'transactional'`).first<{ count: number }>(),
     c.env.DB.prepare(
       `SELECT COUNT(*) AS total,
-              SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
-              SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent,
-              SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
-         FROM nen_delivery_jobs`,
-    ).first<{ total: number; pending: number; sent: number; failed: number }>(),
-    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_columns`).first<{ count: number }>(),
-    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_pet_profiles`).first<{ count: number }>(),
+              SUM(CASE WHEN j.status = 'pending' THEN 1 ELSE 0 END) AS pending,
+              SUM(CASE WHEN j.status = 'sent' THEN 1 ELSE 0 END) AS sent,
+              SUM(CASE WHEN j.status = 'failed' THEN 1 ELSE 0 END) AS failed
+         FROM nen_delivery_jobs j
+         JOIN friends f ON f.id = j.friend_id
+        WHERE 1 = 1 ${where}`,
+    ).bind(...scope.allowedAccountIds).first<{ total: number; pending: number; sent: number; failed: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_columns c WHERE 1 = 1 ${columnScope.where}`)
+      .bind(...columnScope.scope.allowedAccountIds).first<{ count: number }>(),
+    c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_pet_profiles p JOIN friends f ON f.id = p.friend_id WHERE 1 = 1 ${where}`)
+      .bind(...scope.allowedAccountIds).first<{ count: number }>(),
     c.env.DB.prepare(`SELECT COUNT(*) AS count FROM nen_coupon_issues`).first<{ count: number }>(),
   ]);
   return c.json({ success: true, data: {
@@ -163,15 +169,17 @@ nenCampaigns.post('/api/nen-campaigns/test-send', requireRole('owner', 'admin'),
   return c.json({ success: true });
 });
 
-nenCampaigns.get('/api/nen-campaigns/jobs', async (c) => {
+nenCampaigns.get('/api/nen-campaigns/jobs', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const { scope, where } = await adminAccountScope(c);
   const rows = await c.env.DB.prepare(
     `SELECT j.id, j.campaign_key, s.label, f.display_name, j.scheduled_at, j.status,
             j.attempts, j.last_error, j.sent_at
        FROM nen_delivery_jobs j
        JOIN nen_campaign_settings s ON s.campaign_key = j.campaign_key
        JOIN friends f ON f.id = j.friend_id
+      WHERE 1 = 1 ${where}
       ORDER BY j.created_at DESC LIMIT 100`,
-  ).all<Record<string, unknown>>();
+  ).bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results.map((row) => ({
     id: row.id, campaignKey: row.campaign_key, label: row.label, friendName: row.display_name,
     scheduledAt: row.scheduled_at, status: row.status, attempts: row.attempts,
@@ -179,8 +187,10 @@ nenCampaigns.get('/api/nen-campaigns/jobs', async (c) => {
   })) });
 });
 
-nenCampaigns.get('/api/nen-campaigns/columns', async (c) => {
-  const rows = await c.env.DB.prepare(`SELECT * FROM nen_columns ORDER BY published_at DESC, created_at DESC`).all<Record<string, unknown>>();
+nenCampaigns.get('/api/nen-campaigns/columns', requireRole('owner', 'admin', 'staff'), async (c) => {
+  const { scope, where } = await adminAccountScope(c, 'c');
+  const rows = await c.env.DB.prepare(`SELECT * FROM nen_columns c WHERE 1 = 1 ${where} ORDER BY published_at DESC, created_at DESC`)
+    .bind(...scope.allowedAccountIds).all<Record<string, unknown>>();
   return c.json({ success: true, data: rows.results.map((row) => ({
     id: row.id, externalId: row.external_id, slug: row.slug, title: row.title, category: row.category,
     excerpt: row.excerpt, introText: typeof row.intro_text === 'string' && row.intro_text.trim()
@@ -210,6 +220,11 @@ nenCampaigns.put('/api/nen-campaigns/columns/:id/message', requireRole('owner', 
   const introText = body?.introText?.trim() || '';
   if (!introText || introText.length > 1500) {
     return c.json({ success: false, error: 'introText is required and must be 1500 characters or fewer' }, 400);
+  }
+  const column = await c.env.DB.prepare(`SELECT line_account_id FROM nen_columns WHERE id = ?`)
+    .bind(c.req.param('id')).first<{ line_account_id: string | null }>();
+  if (!column || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [column.line_account_id])) {
+    return c.json({ success: false, error: 'Column not found' }, 404);
   }
   const result = await c.env.DB.prepare(
     `UPDATE nen_columns SET intro_text = ?, updated_at = ? WHERE id = ?`,
