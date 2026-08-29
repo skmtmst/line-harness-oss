@@ -13,8 +13,51 @@ import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { validateCarousel } from '../services/carousel-validation.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
+import { parseQuestion, type ScenarioQuestion } from '../services/scenario-question.js';
 
 const templates = new Hono<Env>();
+
+const QUESTION_BEHAVIORS = new Set([
+  'none',
+  'url',
+  'tel',
+  'add_friend',
+  'mail',
+  'form',
+  'scenario',
+]);
+
+function readQuestionPayload(body: Record<string, unknown>):
+  | { ok: true; question: ScenarioQuestion | null; questionJson?: string | null }
+  | { ok: false; error: string } {
+  if (!('question' in body)) return { ok: true, question: null };
+  if (body.question === null) return { ok: true, question: null, questionJson: null };
+  if (!body.question || typeof body.question !== 'object' || Array.isArray(body.question)) {
+    return { ok: false, error: '質問の内容を読み取れません' };
+  }
+  const raw = JSON.stringify(body.question);
+  const question = parseQuestion(raw);
+  if (!question) return { ok: false, error: '質問文と選択肢を入力してください' };
+  if (question.text.length > 160) return { ok: false, error: '質問文は160文字以内で入力してください' };
+  if (question.choices.length > 13) return { ok: false, error: '選択肢は13件以内で入力してください' };
+  if (question.choices.some((choice) => !choice || typeof choice !== 'object' || typeof choice.label !== 'string')) {
+    return { ok: false, error: 'すべての選択肢に文字を入力してください' };
+  }
+  if (question.choices.some((choice) => !choice.label.trim())) {
+    return { ok: false, error: 'すべての選択肢に文字を入力してください' };
+  }
+  if (question.choices.some((choice) => choice.label.length > 20)) {
+    return { ok: false, error: '選択肢の文字は20文字以内で入力してください' };
+  }
+  if (question.choices.some((choice) => typeof choice.behavior !== 'string' || !QUESTION_BEHAVIORS.has(choice.behavior))) {
+    return { ok: false, error: '選択後の動きを確認してください' };
+  }
+  return { ok: true, question, questionJson: raw };
+}
+
+function questionValue(raw: string | null): ScenarioQuestion | null {
+  return parseQuestion(raw);
+}
 
 /**
  * カルーセルなら中身を確かめる。
@@ -94,6 +137,8 @@ templates.get('/api/templates', async (c) => {
         category: t.category,
         messageType: t.message_type,
         messageContent: t.message_content,
+        question: questionValue(t.question_json),
+        questionStatus: t.question_status,
         folderId: t.folder_id ?? null,
         isFavorite: t.is_favorite === 1,
         usageCount: t.usage_count,
@@ -128,6 +173,8 @@ templates.get('/api/templates/:id', async (c) => {
         messageContent: item.message_content,
         folderId: item.folder_id ?? null,
         isFavorite: item.is_favorite === 1,
+        question: questionValue(item.question_json),
+        questionStatus: item.question_status,
         carouselActions: item.carousel_actions_json
           ? JSON.parse(item.carousel_actions_json)
           : null,
@@ -211,6 +258,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
       messageContent: string;
       folderId?: string | null;
       isFavorite?: boolean;
+      question?: unknown;
+      questionStatus?: 'draft' | 'published';
     }>();
     if (!body.accountId) {
       return c.json({ success: false, error: 'account_id_required' }, 400);
@@ -230,11 +279,19 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
     if (!options.ok) return c.json({ success: false, error: options.error }, 400);
     const folder = await validateTemplateFolder(c, body.accountId, body.folderId);
     if (folder instanceof Response) return folder;
+    const question = readQuestionPayload(body as unknown as Record<string, unknown>);
+    if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
+      return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
+    }
     const item = await createTemplate(c.env.DB, {
       ...body,
       folderId: folder.folderId,
       lineAccountId: body.accountId,
       ...options.value,
+      questionJson: question.questionJson,
+      questionStatus: body.questionStatus,
+      ...(question.question ? { messageType: 'text', messageContent: question.question.intro?.trim() || question.question.text } : {}),
     });
     return c.json({
       success: true,
@@ -246,6 +303,8 @@ templates.post('/api/templates', requireRole('owner', 'admin'), async (c) => {
         messageContent: item.message_content,
         folderId: item.folder_id ?? null,
         isFavorite: item.is_favorite === 1,
+        question: questionValue(item.question_json),
+        questionStatus: item.question_status,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
       },
@@ -266,6 +325,8 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       messageContent?: string;
       folderId?: string | null;
       isFavorite?: boolean;
+      question?: unknown;
+      questionStatus?: 'draft' | 'published';
     }>();
     // 種別が送られていなければ、いまの種別で見る。本文だけ直す場合がある。
     const existing = await getTemplateById(c.env.DB, id);
@@ -293,7 +354,19 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
       if (folder instanceof Response) return folder;
       folderPatch = folder;
     }
-    await updateTemplate(c.env.DB, id, { ...body, ...options.value, ...folderPatch });
+    const question = readQuestionPayload(body as unknown as Record<string, unknown>);
+    if (!question.ok) return c.json({ success: false, error: question.error }, 422);
+    if (body.questionStatus && body.questionStatus !== 'draft' && body.questionStatus !== 'published') {
+      return c.json({ success: false, error: '質問の保存状態を確認してください' }, 400);
+    }
+    await updateTemplate(c.env.DB, id, {
+      ...body,
+      ...options.value,
+      questionJson: question.questionJson,
+      questionStatus: body.questionStatus,
+      ...(question.question ? { messageType: 'text', messageContent: question.question.intro?.trim() || question.question.text } : {}),
+      ...folderPatch,
+    });
     const updated = await getTemplateById(c.env.DB, id);
     if (!updated) return c.json({ success: false, error: 'Not found' }, 404);
     return c.json({
@@ -307,6 +380,8 @@ templates.put('/api/templates/:id', requireRole('owner', 'admin'), async (c) => 
         messageContent: updated.message_content,
         folderId: updated.folder_id ?? null,
         isFavorite: updated.is_favorite === 1,
+        question: questionValue(updated.question_json),
+        questionStatus: updated.question_status,
         carouselActions: updated.carousel_actions_json
           ? JSON.parse(updated.carousel_actions_json)
           : null,

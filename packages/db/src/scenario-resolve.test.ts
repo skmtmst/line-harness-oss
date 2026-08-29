@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { resolveStepContent } from './scenario-resolve.js';
 
-function mockDb(tplRow: { message_type: string; message_content: string } | null): D1Database {
+function mockDb(tplRow: { message_type: string; message_content: string; question_json?: string | null } | null): D1Database {
   return {
     prepare: () => ({
       bind: () => ({
@@ -22,6 +22,7 @@ describe('resolveStepContent', () => {
       messageType: 'text',
       messageContent: 'hello',
       templateIdAtSend: null,
+      questionJson: null,
     });
   });
 
@@ -38,6 +39,7 @@ describe('resolveStepContent', () => {
       messageType: 'flex',
       messageContent: '{"foo":"bar"}',
       templateIdAtSend: 'tpl-1',
+      questionJson: null,
     });
   });
 
@@ -51,6 +53,7 @@ describe('resolveStepContent', () => {
       messageType: 'text',
       messageContent: 'fallback',
       templateIdAtSend: null,
+      questionJson: null,
     });
   });
 
@@ -65,5 +68,20 @@ describe('resolveStepContent', () => {
     );
     expect(result.messageType).toBe('flex');
     expect(result.templateIdAtSend).toBe('tpl-carousel');
+  });
+
+  it('質問テンプレートは step の控えよりテンプレートの最新版を優先する', async () => {
+    const question = JSON.stringify({ text: '続けますか？', tapMode: 'single', choices: [{ label: 'はい', behavior: 'none' }] });
+    const result = await resolveStepContent(
+      mockDb({ message_type: 'text', message_content: '続けますか？', question_json: question }),
+      {
+        template_id: 'tpl-question',
+        message_type: 'text',
+        message_content: '古い質問',
+        question_json: JSON.stringify({ text: '古い質問', tapMode: 'single', choices: [{ label: 'はい', behavior: 'none' }] }),
+      },
+    );
+    expect(result.questionJson).toBe(question);
+    expect(result.templateIdAtSend).toBe('tpl-question');
   });
 });

@@ -60,6 +60,24 @@ describe('テンプレート一覧のV6画面構造', () => {
     expect(page).not.toContain('placeholder="例: general, 挨拶, 返信"')
   })
 
+  it('フォルダ取得だけが失敗してもテンプレートを0件にせず一覧を維持する', () => {
+    expect(page).toContain('Promise.allSettled')
+    expect(page).toContain("setFolderLoadStatus('error')")
+    expect(page).toContain('テンプレート一覧はそのまま確認できます。')
+    expect(page).toContain("folderLoadStatus === 'ready' ? `${folders.length}件` : '—'")
+    expect(page).toContain("templateCountsAvailable ? templates.length : '—'")
+    expect(page).not.toContain('const [templateResult, folderResult] = await Promise.all(')
+  })
+
+  it('フォルダの読込中と失敗をListStateで分け、再読込できる', () => {
+    expect(page).toContain("import ListState from '@/components/shared/list-state'")
+    expect(page).toContain('kind="loading"')
+    expect(page).toContain('フォルダを読み込んでいます')
+    expect(page).toContain('kind="error"')
+    expect(page).toContain('フォルダを表示できませんでした')
+    expect(page).toContain('onClick={() => void load()}')
+  })
+
   it('参照中は強制削除せず、使用先を確認させる', () => {
     expect(page).toContain('使用先を見る')
     expect(page).toContain('使用先を差し替えてから削除してください。')

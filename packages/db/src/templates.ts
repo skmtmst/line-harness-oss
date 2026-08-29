@@ -17,6 +17,9 @@ export interface TemplateRow {
   carousel_tap_limit_mode: string;
   /** 162: 制限を超えたときに返すテキスト。空なら何も返さない。 */
   carousel_tap_limit_text: string | null;
+  /** 質問テンプレート。scenario_steps.question_json と同じ形。 */
+  question_json: string | null;
+  question_status: 'draft' | 'published';
   created_at: string;
   updated_at: string;
   line_account_id: string | null;
@@ -45,6 +48,12 @@ export interface CarouselOptions {
   carouselTapLimitText?: string | null;
 }
 
+export interface QuestionOptions {
+  /** JSON文字列。null は通常テンプレート。 */
+  questionJson?: string | null;
+  questionStatus?: 'draft' | 'published';
+}
+
 export async function createTemplate(
   db: D1Database,
   input: {
@@ -55,7 +64,7 @@ export async function createTemplate(
     folderId?: string | null;
     isFavorite?: boolean;
     lineAccountId?: string | null;
-  } & CarouselOptions,
+  } & CarouselOptions & QuestionOptions,
 ): Promise<TemplateRow> {
   const id = crypto.randomUUID();
   const now = jstNow();
@@ -64,8 +73,9 @@ export async function createTemplate(
       `INSERT INTO templates
          (id, name, category, message_type, message_content,
           carousel_actions_json, carousel_tap_limit_mode, carousel_tap_limit_text,
-          folder_id, is_favorite, created_at, updated_at, line_account_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          folder_id, is_favorite, question_json, question_status,
+          created_at, updated_at, line_account_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -78,6 +88,8 @@ export async function createTemplate(
       input.carouselTapLimitText ?? null,
       input.folderId ?? null,
       input.isFavorite ? 1 : 0,
+      input.questionJson ?? null,
+      input.questionStatus ?? 'published',
       now,
       now,
       input.lineAccountId ?? null,
@@ -97,7 +109,7 @@ export async function updateTemplate(
     folderId: string | null;
     isFavorite: boolean;
   }> &
-    CarouselOptions,
+    CarouselOptions & QuestionOptions,
 ): Promise<void> {
   const sets: string[] = [];
   const values: unknown[] = [];
@@ -118,6 +130,14 @@ export async function updateTemplate(
   if (updates.carouselTapLimitText !== undefined) {
     sets.push('carousel_tap_limit_text = ?');
     values.push(updates.carouselTapLimitText);
+  }
+  if (updates.questionJson !== undefined) {
+    sets.push('question_json = ?');
+    values.push(updates.questionJson);
+  }
+  if (updates.questionStatus !== undefined) {
+    sets.push('question_status = ?');
+    values.push(updates.questionStatus);
   }
   if (sets.length === 0) return;
   sets.push('updated_at = ?');

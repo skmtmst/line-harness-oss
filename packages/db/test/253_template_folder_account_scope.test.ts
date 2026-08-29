@@ -7,15 +7,15 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ACCOUNT_SCOPE = readFileSync(
-  join(ROOT, 'migrations', '204_template_folder_account_scope.sql'),
+  join(ROOT, 'migrations', '253_template_folder_account_scope.sql'),
   'utf8',
 );
 const FAVORITES = readFileSync(
-  join(ROOT, 'migrations', '205_template_favorites.sql'),
+  join(ROOT, 'migrations', '254_template_favorites.sql'),
   'utf8',
 );
 
-describe('204-205 テンプレートのフォルダとよく使う', () => {
+describe('253-254 テンプレートのフォルダとよく使う', () => {
   let db: Database.Database;
 
   beforeEach(() => {

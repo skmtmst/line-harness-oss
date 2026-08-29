@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api, type BroadcastAssetKind } from '@/lib/api'
+import Link from 'next/link'
+import { api, type BroadcastAssetKind, type TemplateQuestion } from '@/lib/api'
 import FlexPreviewComponent from '@/components/flex-preview'
 import ImageUploader from '@/components/shared/image-uploader'
 import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
@@ -11,6 +12,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import FolderEditDialog from '@/components/shared/folder-edit-dialog'
+import ListState from '@/components/shared/list-state'
 import { Tabs } from '@/components/shared/tabs'
 import styles from './templates-v6.module.css'
 import { useAccount } from '@/contexts/account-context'
@@ -24,6 +26,8 @@ interface Template {
   messageContent: string
   folderId: string | null
   isFavorite: boolean
+  question: TemplateQuestion | null
+  questionStatus: 'draft' | 'published'
   usageCount: number
   /** 162: 選択肢が押された回数の合計。押される仕掛けが無いものは 0。 */
   tapCount: number
@@ -39,6 +43,8 @@ interface TemplateDetail {
   messageContent: string
   folderId: string | null
   isFavorite: boolean
+  question: TemplateQuestion | null
+  questionStatus: 'draft' | 'published'
   usedBy: {
     autoReplies: Array<{ id: string; keyword: string; matchType: 'exact' | 'contains'; lineAccountId: string | null }>
     automations: Array<{ id: string; name: string; eventType: string }>
@@ -51,7 +57,7 @@ interface TemplateDetail {
   updatedAt: string
 }
 
-type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'unused'
+type TypeFilter = 'all' | 'text' | 'flex' | 'image' | 'question' | 'unused'
 
 const ASSET_KINDS: readonly BroadcastAssetKind[] = [
   'card_message',
@@ -65,6 +71,7 @@ const messageTypeLabels: Record<string, string> = {
   image: '画像',
   flex: 'Flex',
   carousel: 'Carousel',
+  question: '質問',
 }
 
 const typeBadgeColor: Record<string, string> = {
@@ -72,6 +79,7 @@ const typeBadgeColor: Record<string, string> = {
   flex: 'bg-purple-100 text-purple-700',
   image: 'bg-info-bg text-info',
   carousel: 'bg-amber-100 text-amber-700',
+  question: 'bg-accent-soft text-accent-deep',
 }
 
 function formatDate(iso: string): string {
@@ -94,6 +102,7 @@ export default function TemplatesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [folderLoadStatus, setFolderLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [showCreate, setShowCreate] = useState(false)
   // 名前の絞り込み（設計 `Body` の「テンプレート名で検索」）。
   const [nameQuery, setNameQuery] = useState('')
@@ -145,6 +154,7 @@ export default function TemplatesPage() {
       setTemplates([])
       setFolders([])
       setLoadError('')
+      setFolderLoadStatus('ready')
       setLoading(false)
       return
     }
@@ -153,29 +163,25 @@ export default function TemplatesPage() {
     setTemplates([])
     setFolders([])
     setLoadError('')
-    try {
-      const [templateResult, folderResult] = await Promise.all([
+    setFolderLoadStatus('loading')
+    const [templateOutcome, folderOutcome] = await Promise.allSettled([
         api.templates.list(undefined, accountId),
         api.folders.list('template', accountId),
       ])
-      if (activeAccountRef.current !== accountId) return
-      if (!templateResult.success) {
-        setLoadError(templateResult.error)
-        return
-      }
-      if (!folderResult.success) {
-        setLoadError(folderResult.error)
-        return
-      }
-      setTemplates(templateResult.data)
-      setFolders(folderResult.data)
-    } catch {
-      if (activeAccountRef.current === accountId) {
-        setLoadError('テンプレートの読み込みに失敗しました。')
-      }
-    } finally {
-      if (activeAccountRef.current === accountId) setLoading(false)
+    if (activeAccountRef.current !== accountId) return
+
+    if (templateOutcome.status === 'fulfilled' && templateOutcome.value.success) {
+      setTemplates(templateOutcome.value.data)
+    } else {
+      setLoadError('テンプレートを読み込めませんでした。状態を読み直して、もう一度お試しください。')
     }
+    if (folderOutcome.status === 'fulfilled' && folderOutcome.value.success) {
+      setFolders(folderOutcome.value.data)
+      setFolderLoadStatus('ready')
+    } else {
+      setFolderLoadStatus('error')
+    }
+    setLoading(false)
   }, [selectedAccountId])
 
   useEffect(() => { load() }, [load])
@@ -243,6 +249,8 @@ export default function TemplatesPage() {
     }
     if (typeFilter === 'all') return true
     if (typeFilter === 'unused') return t.usageCount === 0
+    if (typeFilter === 'question') return Boolean(t.question)
+    if (typeFilter === 'text') return t.messageType === 'text' && t.question === null
     return t.messageType === typeFilter
   })
 
@@ -294,19 +302,22 @@ export default function TemplatesPage() {
     }
   }
 
+  const templateCountsAvailable = !loading && !loadError
   const folderRows = [
     {
       id: 'all',
       label: 'すべて',
-      count: templates.length,
+      count: templateCountsAvailable ? templates.length : '—',
       icon: <span className="bg-accent rounded-pill block h-2 w-2" />,
     },
-    { id: 'favorites', label: 'よく使う', count: favoriteCount, icon: '☆' },
-    { id: 'unfiled', label: '未分類', count: unfiledCount },
-    ...folders.map((folder, index) => ({
+    { id: 'favorites', label: 'よく使う', count: templateCountsAvailable ? favoriteCount : '—', icon: '☆' },
+    { id: 'unfiled', label: '未分類', count: templateCountsAvailable ? unfiledCount : '—' },
+    ...(folderLoadStatus === 'ready' ? folders : []).map((folder, index) => ({
       id: folder.id,
       label: folder.name,
-      count: templates.filter((template) => template.folderId === folder.id).length,
+      count: templateCountsAvailable
+        ? templates.filter((template) => template.folderId === folder.id).length
+        : '—',
       color: folder.color,
       onRename: () => setEditingFolder(folder),
       onChangeColor: () => setEditingFolder(folder),
@@ -505,6 +516,12 @@ export default function TemplatesPage() {
             >
               テンプレートを作る
             </Button>
+            <Button
+              href="/templates/questions/new"
+              variant="secondary"
+            >
+              質問を作る
+            </Button>
           </div>
         </div>
       )}
@@ -518,15 +535,34 @@ export default function TemplatesPage() {
           rows={folderRows}
           activeId={selectedFolderId}
           onSelect={setSelectedFolderId}
-          total={`${folders.length}件`}
+          total={folderLoadStatus === 'ready' ? `${folders.length}件` : '—'}
         >
-          <button
-            type="button"
-            onClick={() => setShowFolderAdd(true)}
-            className="text-accent hover:bg-accent-soft rounded-control w-full px-3 py-2 text-left text-sm font-medium"
-          >
-            ＋ フォルダを追加
-          </button>
+          {folderLoadStatus === 'loading' ? (
+            <ListState
+              kind="loading"
+              title="フォルダを読み込んでいます"
+              description="取得できるまで件数は表示しません。"
+            />
+          ) : folderLoadStatus === 'error' ? (
+            <ListState
+              kind="error"
+              title="フォルダを表示できませんでした"
+              description="テンプレート一覧はそのまま確認できます。"
+              action={(
+                <Button variant="primary" onClick={() => void load()}>
+                  もう一度読み込む
+                </Button>
+              )}
+            />
+          ) : selectedAccountId ? (
+            <button
+              type="button"
+              onClick={() => setShowFolderAdd(true)}
+              className="text-accent hover:bg-accent-soft rounded-control w-full px-3 py-2 text-left text-sm font-medium"
+            >
+              ＋ フォルダを追加
+            </button>
+          ) : null}
         </FolderPanel>
       </div>
       <div className="min-w-0 flex-1">
@@ -534,6 +570,12 @@ export default function TemplatesPage() {
       <div className="bg-info-bg text-info mb-3 rounded-control px-3 py-2 text-xs">
         フォルダはLINE公式アカウントごとに分かれます。上のタブは種類の絞り込みです。
       </div>
+
+      {error && (
+        <div className="bg-danger-bg border-danger-bg text-danger mb-4 rounded-control border p-4 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* 検索と並び順（設計 `Body` の上）。 */}
       <div className="bg-canvas rounded-card border-hairline mb-3 flex flex-wrap items-center gap-2 border p-3">
@@ -548,11 +590,6 @@ export default function TemplatesPage() {
       </div>
 
 
-      {error && (
-        <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
-        </div>
-      )}
       {folderActionError && (
         <div className="bg-danger-bg text-danger mb-4 rounded-control px-4 py-3 text-sm">
           {folderActionError}
@@ -566,6 +603,7 @@ export default function TemplatesPage() {
           { key: 'text', label: 'テキスト' },
           { key: 'flex', label: 'Flex' },
           { key: 'image', label: '画像' },
+          { key: 'question', label: '質問' },
           { key: 'unused', label: '未使用' },
         ] as const).map(({ key, label }) => (
           <button
@@ -761,8 +799,8 @@ export default function TemplatesPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                        {messageTypeLabels[t.messageType] ?? t.messageType}
+                      <span className={`inline-flex items-center rounded px-2 py-0.5 text-[10px] font-medium ${typeBadgeColor[t.question ? 'question' : t.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                        {messageTypeLabels[t.question ? 'question' : t.messageType] ?? t.messageType}
                       </span>
                       <p
                         className="text-ink-faint mt-1 max-w-40 truncate text-[11px]"
@@ -859,8 +897,8 @@ export default function TemplatesPage() {
             ) : !drawerData ? null : (
               <div className="p-4 space-y-5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
-                    {messageTypeLabels[drawerData.messageType] ?? drawerData.messageType}
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${typeBadgeColor[drawerData.question ? 'question' : drawerData.messageType] ?? 'bg-canvas-sunken text-ink-secondary'}`}>
+                    {messageTypeLabels[drawerData.question ? 'question' : drawerData.messageType] ?? drawerData.messageType}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-info-bg text-info">
                     {folderById.get(drawerData.folderId ?? '')?.name ?? '未分類'}
@@ -874,7 +912,17 @@ export default function TemplatesPage() {
                 <div>
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">プレビュー</h4>
                   <div className="border border-hairline rounded-lg p-3 bg-canvas-sunken overflow-x-auto">
-                    {drawerData.messageType === 'flex' ? (
+                    {drawerData.question ? (
+                      <div className="space-y-2">
+                        {drawerData.question.intro && <p className="text-sm whitespace-pre-wrap">{drawerData.question.intro}</p>}
+                        <p className="text-sm font-semibold whitespace-pre-wrap">{drawerData.question.text}</p>
+                        {drawerData.question.choices.map((choice, index) => (
+                          <div key={index} className="border-hairline rounded-control border px-3 py-2 text-center text-xs font-semibold text-accent">
+                            {choice.label}
+                          </div>
+                        ))}
+                      </div>
+                    ) : drawerData.messageType === 'flex' ? (
                       (() => {
                         try {
                           return <FlexPreviewComponent content={drawerData.messageContent} maxWidth={420} />
@@ -898,7 +946,14 @@ export default function TemplatesPage() {
                 </div>
 
                 {/* Edit JSON / content */}
-                <div>
+                {drawerData.question ? (
+                  <Button
+                    href={`/templates/questions/new?id=${encodeURIComponent(drawerData.id)}`}
+                    variant="secondary"
+                  >
+                    質問を編集
+                  </Button>
+                ) : <div>
                   <h4 className="text-[11px] font-medium text-ink-faint mb-1.5 uppercase tracking-wide">内容 / JSON 編集</h4>
                   <textarea
                     rows={drawerData.messageType === 'flex' ? 12 : 4}
@@ -906,7 +961,7 @@ export default function TemplatesPage() {
                     value={editContent ?? drawerData.messageContent}
                     onChange={(e) => setEditContent(e.target.value)}
                   />
-                </div>
+                </div>}
 
                 <label className="block">
                   <span className="text-ink-faint mb-1.5 block text-xs font-medium uppercase tracking-wide">
