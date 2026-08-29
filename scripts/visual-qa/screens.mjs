@@ -1439,10 +1439,10 @@ export const SCREENS = [
       連絡先は作り物（`example.com`）だけを置く。
     */
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
-    gap: 'api',
-    gapNote: '届かなかったお知らせを残す記録が要る',
+    gap: 'pending',
+    gapNote: '#545 head `03022681` は土台の#504を含み、`/line-notifications?tab=failures` を実装済み。失敗理由・未取得と0件・安全な再試行導線を画像と操作で確認する',
     status: 'unimplemented',
-    why: '届かなかったお知らせを並べるタブが無い。**発送や返金が届いていない人を、その日のうちに別の手だてで届ける場所が無い**',
+    why: '#504で送れなかったものの一覧を実装済み。#545 headに含まれるため、画像と操作確認待ち',
   },
   {
     /*
@@ -1464,10 +1464,10 @@ export const SCREENS = [
       それを見張る試験まで付いています。
     */
     ...LINE_NOTIFY, node: 'Se65i', name: '24-1-C お知らせの記録',
-    gap: 'api',
-    gapNote: 'いつ・だれに・どのお知らせを送ったかの記録が要る。読む元は ec_events と messages_log(source=ec_transactional)。**開封は作らない**',
+    gap: 'pending',
+    gapNote: '#545 head `03022681` は土台の#504を含み、既存 `ec_events` と `messages_log(source=ec_transactional)` を読む記録を実装済み。**開封は作らない**。通常・空・失敗を確認する',
     status: 'unimplemented',
-    why: 'いつ・だれに・どのお知らせを送ったかの記録が無い。押された数も出ない。**#504 で実装中**',
+    why: '#504で顧客へのお知らせ記録を実装済み。#545 headに含まれるため、画像と操作確認待ち',
   },
   {
     ...LINE_NOTIFY, node: 'DpxOK', name: '24-2 運用者へのお知らせ',
