@@ -22,7 +22,7 @@
  */
 import { createServer } from 'node:http'
 import { readArrayGetPaths } from './api-shapes.mjs'
-import { ANALYTICS_FUNNEL_DEFS, ANALYTICS_FUNNEL_RUN, SAVED_ANALYTICS, SAVED_ANALYTICS_SNAPSHOTS, ANALYTICS_URL_CLICKS, ANALYTICS_FRIENDS, ANALYTICS_REACTIONS, ANALYTICS_ROUTES, ANALYTICS_USAGE, AD_PLATFORMS, AD_CONVERSION_LOGS, SAVED_SEARCHES, SEGMENT_PRESETS, SUPPORT_MARKS, STAFF_MEMBERS, LOGIN_AUDIT, OPERATION_CONTROL_PREVIEW, OPERATION_CONTROL_PREVIEW_ONE, EVENTS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_TAKEN_SLOT, bookingAvailability, BOOKING_REQUESTS, OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, INTEGRATION_RECORDS, AUTOMATIONS, AUTOMATION_TEMPLATES, AUTOMATION_LOGS, AUTOMATION_RUNS, COMMON_ACTIONS, EC_OVERVIEW, EC_EVENTS, EC_SETTINGS, EC_NOTIFICATION_RUNS, EC_NOTIFICATION_FAILURES, NOTIFICATION_RULES, NEN_PHOTOS, NEN_OVERVIEW, NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, ANALYTICS_MESSAGES, ANALYTICS_BROADCASTS, ANALYTICS_TRACKED_LINKS, ANALYTICS_CROSS, ENTRY_ROUTES, ENTRY_ROUTE_GENRES, REF_SUMMARY, MILEAGE_OVERVIEW, MILEAGE_REWARDS, MILEAGE_RULES, MILEAGE_HISTORY, ACTION_SCORES, ACTION_SCORE_RULE_CONFIG, ACTION_SCORE_BANDS, testActionScoreRules, AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, AFFILIATE_REPORT_V2, AFFILIATE_LINKS, AFFILIATE_JOURNEYS, CONVERSION_POINTS, CONVERSION_POINT_IMPACTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, COMMON_VAR_IMPACT, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, WEBINAR_NOTIFICATIONS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_RUNS, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, FRIEND_FIELD_SUMMARY, REMINDERS, REMINDER_DRAFT, REMINDER_PREVIEW, REMINDER_VALIDATION, REMINDER_PUBLISHED, REMINDER_RUNS, REMINDER_FOLDERS, BROADCASTS, BROADCAST_STATS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
+import { ANALYTICS_FUNNEL_DEFS, ANALYTICS_FUNNEL_RUN, SAVED_ANALYTICS, SAVED_ANALYTICS_SNAPSHOTS, ANALYTICS_URL_CLICKS, ANALYTICS_FRIENDS, ANALYTICS_REACTIONS, ANALYTICS_ROUTES, ANALYTICS_USAGE, AD_PLATFORMS, AD_CONVERSION_LOGS, SAVED_SEARCHES, SEGMENT_PRESETS, SUPPORT_MARKS, STAFF_MEMBERS, LOGIN_AUDIT, OPERATION_CONTROL_PREVIEW, OPERATION_CONTROL_PREVIEW_ONE, EVENTS, BOOKING_MENUS, BOOKING_STAFF, BOOKING_MENU_STAFF, BOOKING_TAKEN_SLOT, bookingAvailability, BOOKING_REQUESTS, OUTGOING_WEBHOOKS, INCOMING_WEBHOOKS, INTEGRATION_RECORDS, AUTOMATIONS, AUTOMATION_TEMPLATES, AUTOMATION_LOGS, AUTOMATION_RUNS, COMMON_ACTIONS, EC_OVERVIEW, EC_EVENTS, EC_SETTINGS, EC_NOTIFICATION_RUNS, EC_NOTIFICATION_FAILURES, NOTIFICATION_RULES, NEN_PHOTOS, NEN_OVERVIEW, NEN_CAMPAIGN_SETTINGS, NEN_COLUMNS, NEN_PETS, NEN_JOBS, ANALYTICS_MESSAGES, ANALYTICS_BROADCASTS, ANALYTICS_TRACKED_LINKS, ANALYTICS_CROSS, ENTRY_ROUTES, ENTRY_ROUTE_GENRES, REF_SUMMARY, MILEAGE_OVERVIEW, MILEAGE_REWARDS, MILEAGE_RULES, MILEAGE_HISTORY, ACTION_SCORES, ACTION_SCORE_RULE_CONFIG, ACTION_SCORE_BANDS, testActionScoreRules, AFFILIATES, AFFILIATE_OFFERS, CONVERSION_APPROVALS, AFFILIATES_REPORT, AFFILIATE_REPORT_V2, AFFILIATE_LINKS, AFFILIATE_JOURNEYS, CONVERSION_POINTS, CONVERSION_POINT_IMPACTS, MEDIA_ITEMS, MEDIA_FOLDERS, MEDIA_USAGE, COMMON_VARS, COMMON_VAR_FOLDERS, COMMON_VAR_SCHEDULES, COMMON_VAR_IMPACT, FORMS, FORM_SUBMISSIONS, FORM_LAYOUT_VISIT, RICH_MENU_GROUP_DETAILS, RICH_MENU_GROUPS, RICH_MENU_FOLDERS, RICH_MENU_TAP_STATS, RICH_MENU_EXTERNAL, BROADCAST_MESSAGE_ASSETS, WEBINARS, WEBINAR_ANALYTICS, WEBINAR_NOTIFICATIONS, FRIEND_ADD_ROUTING, FRIEND_ADD_BREAKDOWN, FRIEND_ADD_EVENTS, AUTO_REPLIES, AUTO_REPLY_RUNS, AUTO_REPLY_FOLDERS, FRIEND_FIELDS, FRIEND_FIELD_SUMMARY, REMINDERS, REMINDER_DRAFT, REMINDER_PREVIEW, REMINDER_VALIDATION, REMINDER_PUBLISHED, REMINDER_RUNS, REMINDER_FOLDERS, BROADCASTS, BROADCAST_STATS, CHATS, DUPLICATE_STATS, SCENARIO_STATS, SCENARIO_STEPS, USERS_GROUPED, INBOX_STATS, INBOX_SAVED_VIEWS, FRIEND_MESSAGES, FRIEND_MILEAGE, FRIEND_DETAILS, TEMPLATES, QUESTION_TEMPLATE_PUBLISHED, QUESTION_TEMPLATE_DRAFT, TEMPLATE_FOLDERS, FRIENDS, FRIEND_SCENARIOS, FRIEND_STATS, LIST_STATS, OPERATORS, TAGS, TAG_GROUPS } from './fixtures.mjs'
 
 if (process.env.NODE_ENV === 'production') {
   console.error('[visual-qa] 本番では起動しない。画面確認専用のため。')
@@ -70,6 +70,10 @@ const ACCOUNT = {
  * 落ちるため、混ぜられない）。
  */
 const EMPTY_PAGE = { items: [], total: 0, page: 1, limit: 20 }
+
+/* 保存したひな形と、送られてきた本文（撮影中だけ持つ）。 */
+const SAVED_TEMPLATES = new Map()
+const SAVED_BODIES = []
 
 /** 期間の端。**時計を読まない**（読むと画像が毎回変わる）。 */
 const FIXED_FROM = '2026-01-01'
@@ -455,7 +459,34 @@ function bodyFor(pathname, query = new URLSearchParams()) {
     return { success: true, data: FRIEND_MESSAGES[messages[1]] ?? [] }
   }
   // テンプレート選択（設計 `NfgOs` / `NWbuF`）。空だと選ぶものが1つも出ない。
-  if (pathname === '/api/templates') return { success: true, data: TEMPLATES }
+  if (pathname === '/api/templates') {
+    /* **質問のひな形も一覧に混ぜる。** 下書きが選択肢に出ないことを見るため。 */
+    return { success: true, data: [...TEMPLATES, QUESTION_TEMPLATE_PUBLISHED, QUESTION_TEMPLATE_DRAFT] }
+  }
+  const tplUsages = /^\/api\/templates\/([^/]+)\/usages$/.exec(pathname)
+  if (tplUsages) {
+    /* 使用先。**公開済みの質問は2つのシナリオで使われている**ことにする。 */
+    if (tplUsages[1] === 'template-q-pub') {
+      return { success: true, data: { autoReplies: [], scenarioSteps: [
+        { scenarioId: 'scenario-1', scenarioName: '新規登録7日間フォロー', stepId: 'ss-2', stepOrder: 2 },
+        { scenarioId: 'scenario-2', scenarioName: '休眠ユーザー復帰', stepId: 'ss-9', stepOrder: 1 },
+      ] } }
+    }
+    return { success: true, data: { autoReplies: [], scenarioSteps: [] } }
+  }
+  const oneTemplate = /^\/api\/templates\/([^/]+)$/.exec(pathname)
+  if (oneTemplate) {
+    /*
+      1件取得。**保存したものをそのまま返す**（`SAVED_TEMPLATES`）。
+      作り直した値を返すと、回答先が保たれたのか、こちらが作り直した
+      のかが区別できなくなる。
+    */
+    const saved = SAVED_TEMPLATES.get(oneTemplate[1])
+    if (saved) return { success: true, data: saved }
+    const found = [...TEMPLATES, QUESTION_TEMPLATE_PUBLISHED, QUESTION_TEMPLATE_DRAFT]
+      .find((t) => t.id === oneTemplate[1])
+    return found ? { success: true, data: found } : { success: false, error: 'Not found' }
+  }
   if (pathname === '/api/folders' && query.get('kind') === 'template') {
     return { success: true, data: TEMPLATE_FOLDERS }
   }
@@ -1277,6 +1308,51 @@ const server = createServer((req, res) => {
       : remPost[2] === 'validate' ? REMINDER_VALIDATION
         : REMINDER_PUBLISHED
     res.writeHead(200).end(JSON.stringify({ success: true, data: body }))
+    return
+  }
+
+  /*
+    ひな形の保存。**この口だけは 405 に落とさない。**
+
+    405 のままだと、下書き保存も公開も一度も通らず、
+    「下書きは選択肢に出ない」「公開なら選べる」「回答先が保たれる」の
+    3つを確かめられない。
+
+    **中身は作らない。送られてきたものをそのまま返す**
+    （Workerの `templates.ts:276` と同じ形）。値を作り直すと、
+    保たれたのか作り直したのかが区別できなくなる。
+    送られた本文は `SAVED_BODIES` に残して、あとで読めるようにする。
+  */
+  const tplWrite = /^\/api\/templates(?:\/([^/]+))?$/.exec(url.pathname)
+  if ((method === 'POST' || method === 'PUT') && tplWrite) {
+    let raw = ''
+    req.setEncoding('utf-8')
+    req.on('data', (chunk) => { raw += chunk })
+    req.on('end', () => {
+      let sent = {}
+      try { sent = JSON.parse(raw || '{}') } catch { sent = {} }
+      const id = tplWrite[1] ?? 'template-q-new'
+      const saved = {
+        id,
+        name: sent.name ?? '',
+        category: sent.category ?? '未分類',
+        messageType: sent.messageType ?? 'text',
+        messageContent: sent.messageContent ?? '',
+        question: sent.question ?? null,
+        questionStatus: sent.questionStatus ?? null,
+        folderId: null, usageCount: 0, tapCount: 0, isFavorite: false,
+        createdAt: '2026-08-29T03:00:00.000Z',
+      }
+      SAVED_TEMPLATES.set(id, saved)
+      SAVED_BODIES.push({ method, path: url.pathname, body: sent })
+      res.writeHead(method === 'POST' ? 201 : 200)
+        .end(JSON.stringify({ success: true, data: saved }))
+    })
+    return
+  }
+  /* 送られた本文を読み出すための、撮影用のぞき口。画面からは使わない。 */
+  if (method === 'GET' && url.pathname === '/__saved-bodies') {
+    res.writeHead(200).end(JSON.stringify(SAVED_BODIES))
     return
   }
 

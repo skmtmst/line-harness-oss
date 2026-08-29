@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 224,
-  "unimplemented": 34,
+  "compared": 225,
+  "unimplemented": 33,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 201,
+  "needsFix": 202,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -409,34 +409,25 @@
       "feature": 11,
       "name": "テンプレート",
       "total": 10,
-      "compared": 9,
-      "unimplemented": 1,
+      "compared": 10,
+      "unimplemented": 0,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 9,
+      "needsFix": 10,
       "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
         {
-          "pr": 433,
-          "head": "51020a97",
-          "on": "2026-08-28",
+          "pr": 572,
+          "head": "e4ab641f",
+          "on": "2026-08-29",
           "screens": [
-            "M9cij"
-          ]
-        },
-        {
-          "pr": 493,
-          "head": "62ddaebe",
-          "on": "2026-08-28",
-          "screens": [
-            "CzndJ",
-            "M9cij"
+            "NNDMR"
           ],
-          "note": "#493 は #433 を含む"
+          "note": "質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持"
         }
       ]
     },
@@ -1154,13 +1145,6 @@
       "name": "10-1-K 削除確認",
       "gap": "drop",
       "gapNote": "物理削除はV6要件の除外対象。公開停止・アーカイブへ置き換え、申込・視聴・分析・監査は保持する。現行 `webinarApi.remove` は視聴履歴を物理削除する一方、申込記録を削除対象に含めず孤児化させるため、画面へそのまま接続しない"
-    },
-    {
-      "feature": 11,
-      "node": "NNDMR",
-      "name": "11-1-C 質問を作る",
-      "gap": "api",
-      "gapNote": "「質問」の型と保存先が要る。いまの `messageType` に無い"
     },
     {
       "feature": 12,

@@ -4423,3 +4423,56 @@ export const OPERATION_CONTROL_PREVIEW_ONE = {
     automation_actions: 1,
   },
 }
+
+/*
+  質問のひな形（#572）。**下書きと公開済みを1つずつ入れる。**
+
+  形は `ScenarioQuestion`（`components/scenarios/question-editor.tsx:34`）。
+  **`answerTarget` という欄は無い。** 回答先は選択肢ごとに
+  `addTagIds` / `removeTagIds` / `field` / `scenario` へ分かれて入る。
+
+  **シナリオの選択肢に出るのは公開済みだけ**
+  （`scenario-detail-client.tsx:339` が `!t.question || t.questionStatus === 'published'`）。
+  下書きが混ざらないことを見るため、両方を同じ一覧へ入れておく。
+*/
+export const QUESTION_TEMPLATE_PUBLISHED = {
+  id: 'template-q-pub', name: '継続の意思をうかがう', category: '未分類',
+  messageType: 'text', messageContent: 'ご利用ありがとうございます。',
+  folderId: null, usageCount: 2, tapCount: 41, isFavorite: false,
+  questionStatus: 'published',
+  question: {
+    intro: 'ご利用ありがとうございます。',
+    text: '来月も続けますか？',
+    altText: '継続の確認',
+    tapMode: 'single',
+    choices: [
+      {
+        label: '続ける', behavior: 'none',
+        userMessage: '続けます', reply: 'ありがとうございます。引き続きよろしくお願いします。',
+        addTagIds: ['tag-0'], removeTagIds: ['tag-4'],
+        field: { fieldId: 'ff-plan', value: '継続' },
+      },
+      {
+        label: 'やめる', behavior: 'scenario',
+        scenario: { op: 'start', scenarioId: 'scenario-2', restart: 'from_start', rememberPrevious: false },
+        userMessage: 'やめます', reply: 'かしこまりました。',
+        addTagIds: ['tag-4'], removeTagIds: [],
+      },
+    ],
+  },
+}
+
+export const QUESTION_TEMPLATE_DRAFT = {
+  id: 'template-q-draft', name: '（下書き）誕生月の希望をきく', category: '未分類',
+  messageType: 'text', messageContent: '',
+  folderId: null, usageCount: 0, tapCount: 0, isFavorite: false,
+  questionStatus: 'draft',
+  question: {
+    text: '誕生月に何が届くとうれしいですか？',
+    tapMode: 'single',
+    choices: [
+      { label: 'クーポン', behavior: 'none', addTagIds: ['tag-5'] },
+      { label: 'サンプル', behavior: 'none', addTagIds: [] },
+    ],
+  },
+}

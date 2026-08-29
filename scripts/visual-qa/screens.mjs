@@ -1052,11 +1052,17 @@ export const SCREENS = [
     steps: [{ click: 'カルーセル' }, { click: 'カードセットを作る' }],
   },
   {
+    /*
+      **#572 で「質問」ができた。** ルートは `/templates/questions/new`。
+      `?id=` が無いので読み込みは走らず、通常状態がそのまま出る。
+      **使用先は 0 と言わず「保存後にシナリオから選べます」**（`:214`）。
+    */
     ...TEMPLATE, node: 'NNDMR', name: '11-1-C 質問を作る',
-    gap: 'api',
-    gapNote: '「質問」の型と保存先が要る。いまの `messageType` に無い',
-    status: 'unimplemented',
-    why: '種類のタブが5本しかなく、**「質問」だけが無い**（`page.tsx:255-283`）。設計は「質問 8」のタブを持つ',
+    route: '/templates/questions/new', mode: 'page',
+    verdict: 'needs_fix',
+    verdictNote: '**#572 `e4ab641f` で「質問」ができ、未実装ではなくなった**（種類のタブに質問が無く `gap: \'api\'` だった）。ルートは `/templates/questions/new`。**画面**：上部バーだけに「質問を作る」（本文はパンくずのみで重複なし）、管理名＋フォルダ（既存フォルダを補完）、**質問と選択肢の2カラム**（`xl:grid-cols-2`。先頭の選択肢だけ開き、他は見出しで開閉する仕様）、LINEプレビュー、答えをどこに残すか、この質問を使う場所、下部追従バー（「下書きはシナリオの選択肢に出ません。」＋ キャンセル／下書きに保存／テンプレートを保存）。1440・1920とも横スクロール0、`undefined` / `NaN` / 内部IDは0件。**動作を4つとも通した**：①「下書きに保存」は `POST /api/templates` に `questionStatus:"draft"` を送る、②「テンプレートを保存」は `"published"`、③**下書きと公開済みを同じ一覧に入れると、シナリオの選択肢には公開済みだけが出る**（`scenario-detail-client.tsx:339`）、④**回答先が保たれる**——公開済みを開いて保存し直すと `addTagIds` `removeTagIds` `field` `scenario` が選択肢ごとにそのまま送られ、開き直しても変わらない（`answerTarget` という欄は無く、回答先は選択肢ごとに分かれて入る）。**配信**：即時配信は専用の契約テストがあり、質問は `text`＋`flex` の2通で送られ記録も2件（**ふつうのテキストへ潰れない**）。土台の `buildQuestionMessages` も7件で押さえてある。**P2 使用先が取れないと「シナリオ 0通」と出る**——`usages` が失敗しても `usageCount` が初期値0のままで、未取得の状態を持たない（`questions/new/page.tsx:71`）。**P2 テスト送信の経路に、質問での契約テストが無い**（`scenario-test-send.ts:44` は即時配信と同じ `buildQuestionMessages` を呼ぶのでコード上は同じ。試験だけが片側にしかない）。**P2 `<main>` が入れ子**（画面の外枠と `questions/new/page.tsx:145` の2つ）。1ページに1つにしてほしい',
+    verdictSource: 'templates-v6/NNDMR-1440.png + apps/worker 契約テスト43件',
+    verdictHead: 'e4ab641f',
   },
   {
     ...TEMPLATE, node: 'j9ixI', name: '11-1-D リッチメッセージを作る',
@@ -1111,7 +1117,7 @@ export const SCREENS = [
   },
   {
     ...TEMPLATE, node: 'NKyoA', name: '11-1-I 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/templates*', '**/api/broadcast-message-assets*'], kinds: ['loading', 'empty', 'error'] },
+    states: { apis: ['**/api/templates*', '**/api/templates/**', '**/api/broadcast-message-assets*'], kinds: ['loading', 'empty', 'error'] },
     verdict: 'needs_fix', verdictNote: 'P1 失敗のときもタブの件数とフォルダ件数が0と出る（未取得なので—にすべき）。一覧の中を赤い枠で「テンプレートを読み込めませんでした／もう一度読み込む」にしているのは正しい。P2 区分のチップに「Flex」という作り手の言葉が出る',
     verdictSource: 'templates-v6/NKyoA-error-1920.png', verdictHead: '62ddaebe',
   },
@@ -2146,6 +2152,7 @@ export const CAPTURED_AT = {
     
     { pr: 514, head: '9a72dba6', on: '2026-08-29', screens: ['Y0Sn3', 'M1EXwB'], note: '削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**' },
     { pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
+  11: [{ pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' }],
   8: [
     { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。通常も撮るようにした（行が無い3状態だけでは内部語が見えない）' },
     
