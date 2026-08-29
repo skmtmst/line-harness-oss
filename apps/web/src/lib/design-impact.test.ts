@@ -10,7 +10,7 @@ describe('共通部品の影響範囲', () => {
   const pagination = join(SRC, 'components', 'shared', 'pagination.tsx')
   const paginationCss = join(SRC, 'components', 'shared', 'pagination.module.css')
 
-  it('共通Buttonを直接importする30ファイルだけを利用先に数える', () => {
+  it('共通Buttonを直接importする32ファイルだけを利用先に数える', () => {
     expect(directImporters(files, button).map((file) => relative(SRC, file))).toEqual([
       'app/affiliates/tabs.tsx',
       'app/analytics/page.tsx',
@@ -30,7 +30,9 @@ describe('共通部品の影響範囲', () => {
       'app/mileage/friends/detail/mileage-adjustment-dialog.tsx',
       'app/mileage/friends/detail/page.tsx',
       'app/mileage/mileage-history-tab.tsx',
+      'app/mileage/mileage-rewards-tab.tsx',
       'app/mileage/page.tsx',
+      'app/mileage/rewards/reward-editor.tsx',
       'app/mileage/score-rules/page.tsx',
       'app/page.tsx',
       'app/reminders/page.tsx',

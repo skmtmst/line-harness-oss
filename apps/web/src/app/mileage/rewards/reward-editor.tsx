@@ -246,16 +246,16 @@ export default function MileageRewardEditor({ rewardId }: { rewardId?: string })
   return (
     <div data-design-node="p9CcEB" className="space-y-4 pb-24">
       {isPublishedWithoutDraft ? (
-        <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+        <div className="flex items-start gap-3 rounded-v6-card border border-v6-action/25 bg-v6-action-soft p-4 text-sm text-v6-ink">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
           <div><p className="font-semibold">公開中の版はそのまま保たれます</p><p className="mt-1 text-xs">編集を始めると前の版から新しい下書きを作ります。公開するまで、友だちが使う内容は変わりません。</p></div>
         </div>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-        <div className="space-y-5 rounded-xl border border-gray-200 bg-white p-6">
+      <div className="mileage-reward-editor-columns grid gap-4">
+        <div className="space-y-5 rounded-v6-card border border-hairline bg-canvas p-6">
           <section className="space-y-4">
-            <h2 className="text-sm font-semibold text-gray-900">1. 友だちに見える内容</h2>
+            <h2 className="text-sm font-semibold text-v6-ink">1. 友だちに見える内容</h2>
             <Field label="使い道の名前" htmlFor="reward-name" required>
               <TextInput id="reward-name" value={form.name} onChange={(event) => set('name', event.target.value)} placeholder="例：500円分の交換コード" />
             </Field>
@@ -267,8 +267,8 @@ export default function MileageRewardEditor({ rewardId }: { rewardId?: string })
             </Field>
           </section>
 
-          <section className="space-y-4 border-t border-gray-100 pt-5">
-            <h2 className="text-sm font-semibold text-gray-900">2. 必要なマイルと回数</h2>
+          <section className="space-y-4 border-t border-v6-divider pt-5">
+            <h2 className="text-sm font-semibold text-v6-ink">2. 必要なマイルと回数</h2>
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="必要マイル" htmlFor="reward-miles" required><TextInput id="reward-miles" type="number" min={1} step={1} value={form.requiredMiles} onChange={(event) => set('requiredMiles', event.target.value)} /></Field>
               <Field label="交換できる総数" htmlFor="reward-stock" note="空欄なら上限なし"><TextInput id="reward-stock" type="number" min={1} step={1} value={form.stockLimit} onChange={(event) => set('stockLimit', event.target.value)} /></Field>
@@ -280,8 +280,8 @@ export default function MileageRewardEditor({ rewardId }: { rewardId?: string })
             </div>
           </section>
 
-          <section className="space-y-4 border-t border-gray-100 pt-5">
-            <h2 className="text-sm font-semibold text-gray-900">3. 交換したときに渡すもの</h2>
+          <section className="space-y-4 border-t border-v6-divider pt-5">
+            <h2 className="text-sm font-semibold text-v6-ink">3. 交換したときに渡すもの</h2>
             <Field label="渡すもの" required>
               <Select aria-label="渡すもの" size="full" value={form.rewardKind} options={KIND_OPTIONS} onChange={(value) => set('rewardKind', value as MileageRewardKind)} />
             </Field>
@@ -302,30 +302,31 @@ export default function MileageRewardEditor({ rewardId }: { rewardId?: string })
             </div>
           </section>
 
-          {actionError || validationError ? <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{actionError || validationError}</p> : null}
+          {actionError || validationError ? <p role="alert" className="rounded-v6-control border border-v6-danger-border bg-v6-danger-bg p-3 text-sm text-v6-danger">{actionError || validationError}</p> : null}
         </div>
 
         <aside className="space-y-4">
-          <section className="rounded-xl border border-gray-200 bg-white p-5">
-            <h2 className="text-sm font-semibold text-gray-900">友だちに見える内容</h2>
-            <div className="mt-4 rounded-xl border border-gray-200 p-4">
-              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-50 text-indigo-700"><Gift className="h-5 w-5" /></span><div><p className="font-semibold text-gray-900">{form.name || '使い道の名前'}</p><p className="text-xs text-gray-500">{Number(form.requiredMiles || 0).toLocaleString('ja-JP')} mile</p></div></div>
-              <p className="mt-4 text-sm text-gray-700">{form.description || '交換すると受け取れるものの説明が表示されます。'}</p>
-              <p className="mt-4 text-xs text-gray-500">{form.rewardKind === 'coupon' ? '交換コードを1件渡します' : selectedAction ? `「${selectedAction.name}」を実行します` : '渡す動きを選んでください'}</p>
+          <section className="rounded-v6-card border border-hairline bg-canvas p-5">
+            <h2 className="text-sm font-semibold text-v6-ink">友だちに見える内容</h2>
+            <div className="mt-4 rounded-v6-card border border-hairline p-4">
+              <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-v6-purple-bg text-v6-purple"><Gift className="h-5 w-5" /></span><div><p className="font-semibold text-v6-ink">{form.name || '使い道の名前'}</p><p className="text-xs text-v6-ink-faint">{Number(form.requiredMiles || 0).toLocaleString('ja-JP')} mile</p></div></div>
+              <p className="mt-4 text-sm text-v6-ink-secondary">{form.description || '交換すると受け取れるものの説明が表示されます。'}</p>
+              <p className="mt-4 text-xs text-v6-ink-faint">{form.rewardKind === 'coupon' ? '交換コードを1件渡します' : selectedAction ? `「${selectedAction.name}」を実行します` : '渡す動きを選んでください'}</p>
             </div>
           </section>
-          <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+          <section className="rounded-v6-card border border-v6-warning/30 bg-v6-warning-bg p-5 text-sm text-v6-warning">
             <div className="flex gap-3"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" /><div><p className="font-semibold">公開前に確認してください</p><ul className="mt-2 list-disc space-y-1 pl-4 text-xs"><li>公開した版は後から書き換えません</li><li>交換は同じ操作を繰り返しても1回だけです</li><li>渡せなかったときの再試行・返金方法を決めます</li></ul></div></div>
           </section>
         </aside>
       </div>
 
-      <div className="sticky bottom-0 z-10 flex items-center justify-between rounded-xl border border-gray-200 bg-white/95 px-5 py-3 shadow-lg backdrop-blur">
+      <div className="sticky bottom-0 z-10 flex items-center justify-between rounded-v6-card border border-hairline bg-canvas/95 px-5 py-3 shadow-v6-card backdrop-blur">
         <Button href="/mileage?tab=rewards">戻る</Button>
         <div className="flex gap-2"><Button disabled={saving} onClick={() => void save()}>{saving ? '保存中…' : '下書きを保存'}</Button><Button variant="primary" disabled={saving || Boolean(validationError)} onClick={() => setPublishOpen(true)}>公開する</Button></div>
       </div>
 
       <ConfirmDialog open={publishOpen} title="この使い道を公開しますか" description="公開すると、友だちがこの内容で交換できるようになります。公開済みの版は固定され、次の変更は新しい下書きとして作ります。" confirmLabel="この内容で公開" busy={saving} error={actionError || undefined} onCancel={() => setPublishOpen(false)} onConfirm={() => void publish()} />
+      <style jsx>{`@media (min-width: 1280px) { .mileage-reward-editor-columns { grid-template-columns: minmax(0, 1fr) 390px; } }`}</style>
     </div>
   )
 }
