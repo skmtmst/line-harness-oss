@@ -1413,6 +1413,20 @@ async function runTestSend(
     .first<{ id: string; line_account_id: string | null }>();
   if (!scenario) return c.json({ success: false, error: 'Scenario not found' }, 404);
 
+  // テスト送信は本物のLINE送信。IDを直接渡されても、見えない友だちや
+  // 別アカウントの友だちへシナリオ側のトークンで送らない。
+  const friend = await getFriendById(c.env.DB, friendId);
+  const friendAccountId = (friend as { line_account_id?: string | null } | null)?.line_account_id ?? null;
+  if (!friend || !await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [friendAccountId])) {
+    return c.json({ success: false, error: '送り先の友だちが見つかりません。' }, 404);
+  }
+  if (scenario.line_account_id && friendAccountId !== scenario.line_account_id) {
+    return c.json(
+      { success: false, error: 'このシナリオと同じLINEアカウントの友だちを選んでください。' },
+      422,
+    );
+  }
+
   const rows = stepId
     ? await c.env.DB.prepare(`SELECT * FROM scenario_steps WHERE id = ? AND scenario_id = ?`)
         .bind(stepId, scenarioId)
