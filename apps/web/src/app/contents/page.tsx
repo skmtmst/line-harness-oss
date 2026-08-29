@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaItem, MediaUsage } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
-import { formatStamp } from '@/lib/common-vars'
 import Pagination from '@/components/shared/pagination'
 import Button from '@/components/shared/button'
 import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import SearchField from '@/components/shared/search-field'
+import Select from '@/components/shared/select'
 import { useAccount } from '@/contexts/account-context'
 
 /**
@@ -23,8 +24,21 @@ import { useAccount } from '@/contexts/account-context'
  * 画面を2つに分けて、共通情報は /contents/vars へ移した。
  */
 
-/** 1ページに出す枚数。Lステップと同じく、下にページ番号を並べる。 */
-const PER_PAGE = 20
+type MediaSort = 'newest' | 'oldest' | 'name' | 'size' | 'usage'
+
+const SORT_OPTIONS: Array<{ value: MediaSort; label: string }> = [
+  { value: 'newest', label: '入れた日が新しい順' },
+  { value: 'oldest', label: '入れた日が古い順' },
+  { value: 'name', label: 'ファイル名順' },
+  { value: 'size', label: '容量が大きい順' },
+  { value: 'usage', label: '使われている順' },
+]
+
+const PAGE_SIZE_OPTIONS = [
+  { value: '10', label: '10件表示' },
+  { value: '20', label: '20件表示' },
+  { value: '50', label: '50件表示' },
+]
 
 /**
  * 絞り込みの種別。保存できる kind は image / video / audio / file の4つ。
@@ -68,6 +82,18 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+function formatMediaDetails(item: MediaItem): string {
+  const format = item.mimeType.split('/').at(-1)?.replace('jpeg', 'jpg').toUpperCase() ?? ''
+  const details = [format]
+  if (item.width != null && item.height != null) {
+    details.push(`${item.width}×${item.height}`)
+  } else if (item.durationMs != null) {
+    details.push(`${Math.round(item.durationMs / 1000)}秒`)
+  }
+  details.push(formatSize(item.sizeBytes))
+  return details.filter(Boolean).join(' ／ ')
+}
+
 export default function MediaLibraryPage() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const latestAccountRef = useRef(selectedAccountId)
@@ -84,6 +110,8 @@ export default function MediaLibraryPage() {
   )
   const [query, setQuery] = useState('')
   const [showUnusedOnly, setShowUnusedOnly] = useState(false)
+  const [sort, setSort] = useState<MediaSort>('newest')
+  const [pageSize, setPageSize] = useState(20)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -224,18 +252,29 @@ export default function MediaLibraryPage() {
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    return items.filter(
+    const next = items.filter(
       (item) =>
         kinds.has(item.kind) &&
         (!showUnusedOnly || item.usageCount === 0) &&
         (!needle || item.filename.toLowerCase().includes(needle)),
     )
-  }, [items, kinds, query, showUnusedOnly])
+    return next.toSorted((left, right) => {
+      if (sort === 'oldest') return left.createdAt.localeCompare(right.createdAt)
+      if (sort === 'name') return left.filename.localeCompare(right.filename, 'ja')
+      if (sort === 'size') return right.sizeBytes - left.sizeBytes
+      if (sort === 'usage') {
+        if (left.usageCount == null) return right.usageCount == null ? 0 : 1
+        if (right.usageCount == null) return -1
+        return right.usageCount - left.usageCount
+      }
+      return right.createdAt.localeCompare(left.createdAt)
+    })
+  }, [items, kinds, query, showUnusedOnly, sort])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const current = useMemo(
-    () => filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE),
-    [filtered, page],
+    () => filtered.slice((page - 1) * pageSize, page * pageSize),
+    [filtered, page, pageSize],
   )
 
   useEffect(() => {
@@ -313,8 +352,44 @@ export default function MediaLibraryPage() {
         </dl>
       </div>
 
-      {/* 種別の絞り込みと検索。Lステップと同じく格子の右肩に置く。 */}
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <SearchField
+          value={query}
+          onChange={(value) => {
+            setQuery(value)
+            setPage(1)
+          }}
+          onClear={() => {
+            setQuery('')
+            setPage(1)
+          }}
+          placeholder="ファイル名で検索"
+          aria-label="ファイル名で検索"
+          className="min-w-64 flex-1"
+        />
+        <Select
+          aria-label="並び順"
+          value={sort}
+          options={SORT_OPTIONS}
+          onChange={(value) => {
+            setSort(value as MediaSort)
+            setPage(1)
+          }}
+        />
+        <Select
+          aria-label="表示件数"
+          value={String(pageSize)}
+          options={PAGE_SIZE_OPTIONS}
+          onChange={(value) => {
+            setPageSize(Number(value))
+            setPage(1)
+          }}
+          size="page-size"
+        />
+      </div>
+
+      {/* 種別と使用状態。選ぶと必ず1ページ目へ戻る。 */}
+      <div className="mb-3 flex flex-wrap items-center gap-3">
         {KINDS.map((kind) => (
           <label key={kind.key} className="text-ink-secondary flex items-center gap-1.5 text-sm">
             <input
@@ -343,17 +418,6 @@ export default function MediaLibraryPage() {
         >
           使っていない
         </FilterChip>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setPage(1)
-          }}
-          placeholder="メディア名を検索"
-          aria-label="メディア名を検索"
-          className="border-hairline rounded-control focus:ring-accent w-56 border px-3 py-2 text-sm focus:ring-2 focus:outline-none"
-        />
       </div>
 
       {loading ? (
@@ -451,7 +515,7 @@ export default function MediaLibraryPage() {
                       </span>
                     </label>
                     <p className="text-ink-faint text-[11px] tabular-nums">
-                      登録：{formatStamp(item.createdAt)}・{formatSize(item.sizeBytes)}
+                      {formatMediaDetails(item)}
                     </p>
                     <p
                       className={`text-xs font-medium tabular-nums ${
