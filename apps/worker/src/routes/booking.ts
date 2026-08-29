@@ -23,7 +23,9 @@ import {
   verifyStaffCalendarConnection,
 } from '../services/booking-calendar-sync.js';
 import {
+  completeIdempotencyResponse,
   findIdempotencyResponse,
+  reserveIdempotencyResponse,
   saveIdempotencyResponse,
 } from '../services/booking-idempotency.js';
 import { sendBookingNotification } from '../services/booking-notifier.js';
@@ -886,6 +888,8 @@ booking.get('/api/booking/admin/availability', async (c) => {
 booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff'), async (c) => {
   const accountId = await resolveAccountIdAdmin(c);
   if (!accountId) return c.json({ error: 'missing_account_id' }, 400);
+  const idemKey = c.req.header('Idempotency-Key')?.trim();
+  if (!idemKey) return c.json({ error: 'missing_idempotency_key' }, 400);
   const body = await c.req.json<{
     friend_id: string;
     menu_id: string;
@@ -903,6 +907,40 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     .first<{ id: string; is_following: number }>();
   if (!friend) return c.json({ error: 'friend_not_found' }, 404);
   if (friend.is_following === 0) return c.json({ error: 'cannot_book' }, 403);
+
+  const cached = await findIdempotencyResponse(c.env.DB, {
+    key: idemKey,
+    lineAccountId: accountId,
+    friendId: body.friend_id,
+    now: new Date(),
+  });
+  if (cached) {
+    if (cached.status !== 202) {
+      return c.json(
+        cached.body as Record<string, unknown>,
+        cached.status as 200 | 201 | 400 | 409 | 422,
+      );
+    }
+    const pendingBookingId = (cached.body as { booking_id?: unknown }).booking_id;
+    if (typeof pendingBookingId === 'string') {
+      const created = await c.env.DB
+        .prepare(
+          `SELECT id, status, external_event_id FROM bookings
+            WHERE id = ? AND line_account_id = ? AND friend_id = ?`,
+        )
+        .bind(pendingBookingId, accountId, body.friend_id)
+        .first<{ id: string; status: string; external_event_id: string | null }>();
+      if (created) {
+        return c.json({
+          booking_id: created.id,
+          status: created.status,
+          calendar_sync: created.external_event_id ? 'synced' : 'pending',
+          replayed: true,
+        }, 201);
+      }
+    }
+    return c.json({ error: 'request_in_progress' }, 409);
+  }
 
   // staff が同じ account に属することを保証（別 tenant の staff への予約を防ぐ）。
   if (!(await assertStaffInAccount(c.env.DB, body.staff_id, accountId))) {
@@ -957,6 +995,29 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
   }
 
   const bookingId = crypto.randomUUID();
+  const reserved = await reserveIdempotencyResponse(c.env.DB, {
+    key: idemKey,
+    lineAccountId: accountId,
+    friendId: body.friend_id,
+    body: { error: 'request_in_progress', booking_id: bookingId },
+    ttlMinutes: IDEMPOTENCY_TTL_MINUTES,
+    now: new Date(),
+  });
+  if (!reserved) {
+    const raced = await findIdempotencyResponse(c.env.DB, {
+      key: idemKey,
+      lineAccountId: accountId,
+      friendId: body.friend_id,
+      now: new Date(),
+    });
+    if (raced && raced.status !== 202) {
+      return c.json(
+        raced.body as Record<string, unknown>,
+        raced.status as 200 | 201 | 400 | 409 | 422,
+      );
+    }
+    return c.json({ error: raced ? 'request_in_progress' : 'idempotency_key_conflict' }, 409);
+  }
   const nowIso = new Date().toISOString();
   const insertResult = await c.env.DB
     .prepare(
@@ -1013,7 +1074,15 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     )
     .run();
   if ((insertResult.meta?.changes ?? 0) === 0) {
-    return c.json({ error: 'slot_conflict' }, 409);
+    const response = { error: 'slot_conflict' };
+    await completeIdempotencyResponse(c.env.DB, {
+      key: idemKey,
+      lineAccountId: accountId,
+      friendId: body.friend_id,
+      status: 409,
+      body: response,
+    });
+    return c.json(response, 409);
   }
 
   await insertConfirmationReminders(c.env.DB, {
@@ -1057,7 +1126,15 @@ booking.post('/api/booking/admin/bookings', requireRole('owner', 'admin', 'staff
     })
       .catch((error) => console.error('booking automation event failed:', error)),
   );
-  return c.json({ booking_id: bookingId, status: 'confirmed', calendar_sync: calendarSync }, 201);
+  const response = { booking_id: bookingId, status: 'confirmed', calendar_sync: calendarSync };
+  await completeIdempotencyResponse(c.env.DB, {
+    key: idemKey,
+    lineAccountId: accountId,
+    friendId: body.friend_id,
+    status: 201,
+    body: response,
+  });
+  return c.json(response, 201);
 });
 
 booking.get('/api/booking/admin/staff', async (c) => {
