@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { Scenario, ScenarioTriggerType, DeliveryMode } from '@line-crm/shared'
 import { api } from '@/lib/api'
@@ -12,9 +12,11 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
+import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
 
 type ScenarioWithCount = Scenario & { stepCount?: number }
+type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
 const UNFILED = '__unfiled__'
@@ -38,12 +40,13 @@ export default function ScenariosPage() {
   /** よく使う絞り込み。いま数えられるのは「停止中のみ」だけ。 */
   const [stoppedOnly, setStoppedOnly] = useState(false)
   const [createdThisMonthOnly, setCreatedThisMonthOnly] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loadStatus, setLoadStatus] = useState<LoadStatus>('loading')
+  const [actionError, setActionError] = useState('')
   const [creating, setCreating] = useState(false)
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const loadRequestRef = useRef(0)
 
   const loadFolders = useCallback(async () => {
     const res = await api.folders.list('scenario')
@@ -55,48 +58,34 @@ export default function ScenariosPage() {
   }, [loadFolders])
 
   const loadScenarios = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    const requestId = ++loadRequestRef.current
+    setLoadStatus('loading')
+    setActionError('')
+    setScenarios([])
     try {
       const res = await api.scenarios.list({ accountId: selectedAccountId || undefined })
+      if (requestId !== loadRequestRef.current) return
       if (res.success) {
         setScenarios(res.data)
+        setLoadStatus('ready')
       } else {
-        setError(res.error)
+        setScenarios([])
+        setLoadStatus('error')
       }
     } catch {
-      setError('シナリオの読み込みに失敗しました。もう一度お試しください。')
-    } finally {
-      setLoading(false)
+      if (requestId !== loadRequestRef.current) return
+      setScenarios([])
+      setLoadStatus('error')
     }
   }, [selectedAccountId])
 
   useEffect(() => {
     if (accountLoading) return
-    let cancelled = false
-    const fetchData = async () => {
-      setLoading(true)
-      setError('')
-      try {
-        const res = await api.scenarios.list({ accountId: selectedAccountId || undefined })
-        if (cancelled) return
-        if (res.success) {
-          setScenarios(res.data)
-        } else {
-          setError(res.error)
-        }
-      } catch {
-        if (cancelled) return
-        setError('シナリオの読み込みに失敗しました。もう一度お試しください。')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    fetchData()
+    void loadScenarios()
     return () => {
-      cancelled = true
+      loadRequestRef.current += 1
     }
-  }, [selectedAccountId, accountLoading])
+  }, [accountLoading, loadScenarios])
 
   /**
    * シナリオを作って、配信方式の選択へ送る。
@@ -112,7 +101,7 @@ export default function ScenariosPage() {
   const handleCreate = async () => {
     if (creating) return
     setCreating(true)
-    setError('')
+    setActionError('')
     const res = await api.scenarios.create({
       // 仮の名前。3段目で必ず聞くが、そこを飛ばした人のぶんが一覧で
       // 区別できるように日付を足す。
@@ -127,7 +116,7 @@ export default function ScenariosPage() {
     if (res.success) {
       router.push(`/scenarios/mode?id=${res.data.id}`)
     } else {
-      setError(res.error)
+      setActionError('シナリオを作成できませんでした。状態を読み直してから、もう一度お試しください。')
       setCreating(false)
     }
   }
@@ -139,7 +128,7 @@ export default function ScenariosPage() {
    * 失敗したときだけ読み直して、元の並びに戻す。
    */
   const handleReorder = async (ids: string[]) => {
-    setError('')
+    setActionError('')
     const rank = new Map(ids.map((id, i) => [id, i]))
     setScenarios((prev) =>
       [...prev].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9)),
@@ -148,38 +137,38 @@ export default function ScenariosPage() {
       const res = await api.scenarios.reorder(ids)
       if (!res.success) throw new Error(res.error)
     } catch {
-      setError('並び順を保存できませんでした')
-      loadScenarios()
+      setActionError('並び順を保存できませんでした。最新の並び順を読み直しました。')
+      void loadScenarios()
     }
   }
 
   const handleToggleActive = async (id: string, current: boolean) => {
     try {
       await api.scenarios.update(id, { isActive: !current })
-      loadScenarios()
+      void loadScenarios()
     } catch {
-      setError('ステータスの変更に失敗しました')
+      setActionError('シナリオの状態を変更できませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
 
   /** 一覧からフォルダを付け替える。作ったフォルダへ中身を入れる操作。 */
   const handleMoveFolder = async (id: string, folderId: string) => {
-    setError('')
+    setActionError('')
     try {
       const res = await api.scenarios.update(id, { folderId: folderId || null })
       if (!res.success) throw new Error(res.error)
       void loadScenarios()
     } catch {
-      setError('フォルダの変更に失敗しました')
+      setActionError('フォルダを変更できませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
 
   const handleDelete = async (id: string) => {
     try {
       await api.scenarios.delete(id)
-      loadScenarios()
+      void loadScenarios()
     } catch {
-      setError('削除に失敗しました')
+      setActionError('シナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     }
   }
 
@@ -354,25 +343,21 @@ export default function ScenariosPage() {
       </div>
 
 
-      {error && (
+      {actionError && (
         <div className="mb-4 p-4 bg-danger-bg border border-danger-bg rounded-lg text-danger text-sm">
-          {error}
+          {actionError}
         </div>
       )}
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="bg-canvas rounded-card border border-hairline p-5 animate-pulse space-y-3">
-              <div className="h-4 bg-gray-200 rounded w-3/4" />
-              <div className="h-3 bg-canvas-sunken rounded w-full" />
-              <div className="flex gap-4">
-                <div className="h-3 bg-canvas-sunken rounded w-24" />
-                <div className="h-3 bg-canvas-sunken rounded w-16" />
-              </div>
-            </div>
-          ))}
-        </div>
+      {loadStatus === 'loading' ? (
+        <ListState kind="loading" title="シナリオを読み込んでいます" />
+      ) : loadStatus === 'error' ? (
+        <ListState
+          kind="error"
+          title="シナリオを表示できませんでした"
+          description="登録したシナリオは消えていません。再読み込みしても直らない場合は、エラー報告へ連絡してください。"
+          action={<Button variant="secondary" onClick={() => void loadScenarios()}>シナリオを再読み込み</Button>}
+        />
       ) : (
         <ScenarioList
           scenarios={scenarios
@@ -395,7 +380,6 @@ export default function ScenariosPage() {
           onMoveFolder={handleMoveFolder}
           onToggleActive={handleToggleActive}
           onDelete={handleDelete}
-          loading={loading}
         />
       )}
         </div>
