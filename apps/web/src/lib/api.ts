@@ -1550,7 +1550,7 @@ export const api = {
   },
   /** NENコラム。 */
   nenColumns: {
-    list: () =>
+    list: (accountId: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1561,10 +1561,10 @@ export const api = {
             published_at: string | null
           }>
         >
-      >('/api/nen-campaigns/columns'),
+      >(`/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`),
     /** コラムに添える紹介文。本文そのものはEC側にある。 */
-    updateMessage: (id: string, introText: string) =>
-      fetchApi<ApiResponse<null>>(`/api/nen-campaigns/columns/${id}/message`, {
+    updateMessage: (accountId: string, id: string, introText: string) =>
+      fetchApi<ApiResponse<null>>(`/api/nen-campaigns/columns/${id}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT',
         body: JSON.stringify({ introText }),
       }),
@@ -2898,47 +2898,56 @@ export const api = {
     },
   },
   nenCampaigns: {
-    overview: () => fetchApi<ApiResponse<{
+    overview: (accountId: string) => fetchApi<ApiResponse<{
       activeCampaigns: number
       jobs: { total: number; pending: number; sent: number; failed: number }
       columns: number
       pets: number
       coupons: number
-    }>>('/api/nen-campaigns/overview'),
-    settings: () => fetchApi<ApiResponse<NenCampaignSetting[]>>('/api/nen-campaigns/settings'),
-    updateSetting: (campaignKey: string, data: Pick<NenCampaignSetting,
+    }>>(`/api/nen-campaigns/overview?lineAccountId=${encodeURIComponent(accountId)}`),
+    settings: (accountId: string) => fetchApi<ApiResponse<NenCampaignSetting[]>>(
+      `/api/nen-campaigns/settings?lineAccountId=${encodeURIComponent(accountId)}`,
+    ),
+    updateSetting: (accountId: string, campaignKey: string, data: Pick<NenCampaignSetting,
       'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl'>) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}`, {
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
     testSend: (data: { campaignKey: string; accountId: string; friendId: string }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/test-send', { method: 'POST', body: JSON.stringify(data) }),
-    jobs: () => fetchApi<ApiResponse<Array<{
+    jobs: (accountId: string) => fetchApi<ApiResponse<Array<{
       id: string; campaignKey: string; label: string; friendName: string | null
       scheduledAt: string; status: string; attempts: number; lastError: string | null; sentAt: string | null
-    }>>>('/api/nen-campaigns/jobs'),
-    columns: () => fetchApi<ApiResponse<NenColumn[]>>('/api/nen-campaigns/columns'),
+    }>>>(`/api/nen-campaigns/jobs?lineAccountId=${encodeURIComponent(accountId)}`),
+    columns: (accountId: string) => fetchApi<ApiResponse<NenColumn[]>>(
+      `/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`,
+    ),
     deliverColumn: (id: string, data: { accountId: string; scheduledAt?: string }) =>
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),
       }),
-    updateColumnMessage: (id: string, introText: string) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message`, {
+    updateColumnMessage: (accountId: string, id: string, introText: string) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify({ introText }),
       }),
-    pets: (search?: string) => fetchApi<ApiResponse<NenPetProfile[]>>(
-      `/api/nen-campaigns/pets${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+    pets: (accountId: string, search?: string) => {
+      const query = new URLSearchParams({ lineAccountId: accountId })
+      if (search) query.set('search', search)
+      return fetchApi<ApiResponse<NenPetProfile[]>>(`/api/nen-campaigns/pets?${query}`)
+    },
+    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: JSON.stringify(data) }),
+    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deletePet: (accountId: string, id: string) => fetchApi<{ success: boolean }>(
+      `/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'DELETE' },
     ),
-    createPet: (data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
-      fetchApi<ApiResponse<{ id: string }>>('/api/nen-campaigns/pets', { method: 'POST', body: JSON.stringify(data) }),
-    updatePet: (id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
-    deletePet: (id: string) => fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-    birthdayCoupon: () => fetchApi<ApiResponse<{
+    birthdayCoupon: (accountId: string) => fetchApi<ApiResponse<{
       isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number; updatedAt: string
-    }>>('/api/nen-campaigns/birthday-coupon'),
-    updateBirthdayCoupon: (data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number }) =>
-      fetchApi<{ success: boolean }>('/api/nen-campaigns/birthday-coupon', { method: 'PUT', body: JSON.stringify(data) }),
+    }>>(`/api/nen-campaigns/birthday-coupon?lineAccountId=${encodeURIComponent(accountId)}`),
+    updateBirthdayCoupon: (accountId: string, data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number }) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/birthday-coupon?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
   },
   nenMembers: {
     overview: () => fetchApi<ApiResponse<{ pets: number; healthLogs: number; activeCare: number; pendingPhotos: number; members: number; consultations: number }>>('/api/nen-members/overview'),

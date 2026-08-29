@@ -1534,7 +1534,9 @@ CREATE TABLE nen_delivery_jobs (
   last_error TEXT,
   sent_at TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, campaign_snapshot TEXT CHECK (
+  campaign_snapshot IS NULL OR json_valid(campaign_snapshot)
+),
   UNIQUE (campaign_key, friend_id, source_key)
 );
 
