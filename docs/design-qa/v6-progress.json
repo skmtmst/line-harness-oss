@@ -1,14 +1,14 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 205,
-  "unimplemented": 53,
+  "compared": 206,
+  "unimplemented": 52,
   "unconfirmed": 0,
   "elsewhere": 4,
   "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
-  "needsFix": 182,
+  "needsFix": 183,
   "unjudged": 0,
   "remaining": 251,
   "features": [
@@ -443,17 +443,28 @@
       "feature": 14,
       "name": "共通情報",
       "total": 4,
-      "compared": 2,
-      "unimplemented": 2,
+      "compared": 3,
+      "unimplemented": 1,
       "unconfirmed": 0,
       "elsewhere": 0,
       "missing": 0,
       "match": 0,
       "structureMatchDataPending": 0,
-      "needsFix": 2,
+      "needsFix": 3,
       "unjudged": 0,
       "remaining": 4,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 548,
+          "head": "d4a85ad4",
+          "on": "2026-08-29",
+          "screens": [
+            "uNBlA",
+            "gBtaK"
+          ],
+          "note": "保存前に影響を見る面。値を変えてから保存を押さないと出ない"
+        }
+      ]
     },
     {
       "feature": 15,
@@ -1031,13 +1042,6 @@
       "name": "13-1-E フォームの削除確認",
       "gap": "api",
       "gapNote": "確認窓だけでは作れない。削除前にフォーム名・公開状態・回答数・利用中の場所・開けなくなるURLを返す影響確認が要る。公開中・回答あり・利用中は物理削除せず、停止・保管へ移す契約と `status` / `deleted_at` が必要"
-    },
-    {
-      "feature": 14,
-      "node": "uNBlA",
-      "name": "14-1-B 変える前に影響を見る",
-      "gap": "pending",
-      "gapNote": "#548 head `d4a85ad4` で影響確認APIと画面を実装済み。文字数上限は未接続のため `—` と理由を出す。1440/1920で通常・未取得・所属不明フォーム・送信済みの扱いを比較してから未実装を外す"
     },
     {
       "feature": 14,

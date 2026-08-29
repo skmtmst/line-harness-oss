@@ -1147,16 +1147,30 @@ export const SCREENS = [
 
   // ── 機能14 共通情報 ─────────────────────────────────────
   { ...COMMON_VAR, node: 'WuKzU', name: '14-1 共通情報', verdict: 'needs_fix', verdictNote: 'P1 一覧に「使われている場所」の数が出ない。共通情報は1か所直すと差し込んでいる全部の文が同時に変わるので、どこで使われているかが要る', verdictSource: 'common-vars-v6/design-qa.md' },
-  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1', verdict: 'needs_fix', verdictNote: 'P1 どこが変わるか見えないまま保存する。設計は「保存すると、下の15か所すべてが すぐに変わります」「使われている場所 15か所（テンプレート12件・回答フォーム3件）」「差し込んだときの見え方（いまの文 → 保存したあとの文）」の3つで支えるが、実装の編集画面は 名前・フォルダ・差し込み名・値・更新スケジュール だけで**どこで使われているかが1つも出ない**（grep 影響|使われて が /contents/vars 配下で0件）。「会社名」を直すとき、何本のテンプレートの文が変わるのかを知らないまま保存することになる。設計は「予約中の配信にも効きます」とまで書いている。P1 文字数の上限を超えるものが分からない（設計は影響の一覧で「本文が 66 / 60 字」と出す）。共通情報を長くするとカルーセルの本文が上限を超えて壊れる', verdictSource: 'common-vars-v6/design-qa.md' },
+  { ...COMMON_VAR, node: 'gBtaK', name: '14-1-A 共通情報を編集', route: '/contents/vars/edit?id=cv-1', verdict: 'needs_fix', verdictNote: 'P1 編集画面そのものには、どこで使われているかが1つも出ない（名前・フォルダ・差し込み名・値・更新スケジュールだけ）。**ただし #548 で「保存」を押すと影響確認の面（`uNBlA`）へ進むようになった**ので、「どこが変わるか見えないまま保存する」状態ではなくなった。P2 設計は値の下に「保存すると、下の15か所すべてが すぐに変わります」と常に出す。実装は押してから出る', verdictSource: 'common-vars-v6/uNBlA-1920.png' },
   {
+    /*
+      **#548 で「変える前に影響を見る」が入った。**
+      編集画面（`/contents/vars/edit?id=`）の中に、影響の一覧が出る。
+      文字数の上限は口が無いので `—` と理由が出る。
+    */
     ...COMMON_VAR, node: 'uNBlA', name: '14-1-B 変える前に影響を見る',
-    route: '/contents/vars/edit?id=cv-1',
-    mode: 'viewport', height: 1080,
-    steps: [{ fill: '値', text: '株式会社NENグループ' }, { click: '保存' }],
-    gap: 'pending',
-    gapNote: '#548 head `d4a85ad4` で影響確認APIと画面を実装済み。文字数上限は未接続のため `—` と理由を出す。1440/1920で通常・未取得・所属不明フォーム・送信済みの扱いを比較してから未実装を外す',
-    status: 'unimplemented',
-    why: '#548で `data-design-node="uNBlA"` の影響確認画面とアカウント単位の取得口が入った。回答フォームは所属を確かめられないため内容を出さず件数だけ安全側に含める。#437 → #548 の積み順を保ち、正確なheadの画像比較待ち',
+    route: '/contents/vars/edit?id=cv-1', mode: 'page',
+    /*
+      **値を変えてから「保存」を押さないと出ない。**
+      `reviewBeforeSave` は `value === item.value` のとき影響を見ずに
+      そのまま保存する（`contents/vars/edit/page.tsx:136`）。
+      変えずに押すと保存が走るだけで、影響の面は撮れない。
+    */
+    steps: [
+      { fill: '#cv-value', selector: true, text: '株式会社NEN（新しい表記）' },
+      { click: '保存' },
+      { wait: 800 },
+    ],
+    verdict: 'needs_fix',
+    verdictNote: '**#548 で「変える前に影響を見る」が入り、未実装ではなくなった。束9の手本になる。** 「「会社名」を直すと、使用中の15か所へ反映されます。内容を確認してから保存してください。」＋帯4つ（変わる場所15か所〈下書き・配信予定・自動処理を含みます〉／すぐ効くもの12か所／文字数の確認 **—件・要確認・「送信先ごとの上限は未接続です」**／送信済みの文1か所〈過去に送った内容は変わりません〉）。表に現在の文と保存後の文を並べる。**所属を確定できないものを黙って落とさない**：「所属するLINEアカウントを確認できない回答フォームが3件あります。内容を見せず、安全のため影響件数に含めています。」。P2 設計の「本文が 66 / 60 字」（文字数の上限超え）は口が無く—のまま。理由を添えているので正しい出し方',
+    verdictSource: 'common-vars-v6/uNBlA-1920.png',
+    verdictHead: 'd4a85ad4',
   },
   {
     ...COMMON_VAR, node: 'yPkWe', name: '14-1-C 共通情報の削除確認',
@@ -1947,6 +1961,7 @@ export const CAPTURED_AT = {
     },
   ],
   12: [{ pr: 509, head: 'e148615c', on: '2026-08-29', screens: ['DIUbO', 'NXdDk'], note: '切替のつながり。既存の pages / areas から解析する。固定データに切替ボタンを足した' }],
+  14: [{ pr: 548, head: 'd4a85ad4', on: '2026-08-29', screens: ['uNBlA', 'gBtaK'], note: '保存前に影響を見る面。値を変えてから保存を押さないと出ない' }],
   17: [
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
