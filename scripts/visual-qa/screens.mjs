@@ -410,8 +410,8 @@ export const SCREENS = [
 
   // ── 機能5 シナリオ配信 ──────────────────────────────────
   { ...SCENARIO, node: 'TC1b1', name: '5-1 シナリオ配信', route: '/scenarios',
-    verdict: 'needs_fix', verdictNote: 'P1 完了率が画面の2つの数と合わない。購読中1,028人・読了済728人と出しながら完了率41%と出す（scenarios/page.tsx:234 が completed/(subscribers+completed) で割っている）。設計は71%（728/1,028）。P2 一覧に登録日の列が無い。配信方式に「経過時間（旧）」と内部の旧表記が出る。設計の緑の案内帯（作成しただけでは配信されません…）が本文の副題になっている',
-    verdictSource: 'scenarios-v6/TC1b1-1920.png + apps/web/src/app/scenarios/page.tsx:234', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#529 `4cb2b0d9` で束6の完了条件を満たした。** 読了済 728人 に **「登録合計 1,756人のうち 41%」** と**母数を明記**するようになった（728÷1,756＝41%で合う）。以前は 購読中 1,028人 の隣に 41% だけを置いていたため、読む人には 728÷1,028＝71% との食い違いに見えていた。購読中にも「現在配信中・重複を含む」と断りが付く。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（シナリオごとの離脱地点、フォルダの色）はこの直しの外',
+    verdictSource: 'scenarios-v6/TC1b1.txt', verdictHead: '4cb2b0d9',
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
     verdict: 'needs_fix', verdictNote: 'P2 設計の3段の進み表示（STEP1 シナリオ情報／STEP2 配信方式／STEP3 1通目を設定）が無い。フォルダをこの画面で選べない（設計はシナリオ情報のカードで選ぶ）。2つのカードの本文・例・チップは設計どおり',
@@ -435,8 +435,8 @@ export const SCREENS = [
     */
     ...SCENARIO, node: 'xfYLn', name: '5-1-D シナリオ・ステップ編集', route: EDIT,
     mode: 'viewport', height: 1080, steps: [{ click: '編集', nth: 1 }],
-    verdict: 'needs_fix', verdictNote: 'P1 作り手の言葉が画面に出ている（「cron が 5 分粒度のため最大 5 分遅れる場合があります」）。運用の人に cron は通じない。P2 設計は「1通目を編集」の専用ページで、LINEプレビュー・配信の流れ・設定内容・配信前チェック（テスト送信が未完了です ほか4項目）を右に並べる。実装は一覧の行の下に開く欄で、それらが無い。時刻が09:00 AMと英語書式になるのは撮影側のブラウザ言語の癖',
-    verdictSource: 'scenarios-v6/xfYLn-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#530 `2568c474` で束3の完了条件を満たした。** 本文から `cron` が消えた（数えて0件）。以前は「**cron** が 5 分粒度のため…」と、動かしている仕組みの名前がそのまま出ていた。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の通の編集（分岐の作り、送信後アクションの並び）はこの直しの外',
+    verdictSource: 'scenarios-v6/xfYLn.txt', verdictHead: '2568c474',
   },
   {
     ...SCENARIO, node: 'r6Gzsu', name: '5-1-E シナリオ・配信条件を開く', route: EDIT,
@@ -653,8 +653,8 @@ export const SCREENS = [
     verdictHead: '51827fe1',
   },
   { ...BROADCAST, node: 'u6gHt', name: '6-1-J 結果詳細', route: '/broadcasts/detail?id=broadcast-2',
-    verdict: 'needs_fix', verdictNote: 'P1 開封が送信より多く出る。送信624件・到達624件と並べて開封2,410件（62.4%）と出す。手元の記録（624）とLINE側の集計（3,862のうち2,410）を混ぜているのに、どちらの母数かを画面が言わない。桁の合わない2つを並べても何も言わない。P2 メッセージの種類が「1通（carousel）」と内部の語のまま出る。設計のタブ（クリック・友だち・エラー・配信内容）、ボタンとリンクごとの反応、設定サマリー、メッセージプレビュー、CSVで書き出す が無い',
-    verdictSource: 'broadcasts-v6/u6gHt-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#531 `1a943082` で束3と束6の完了条件を満たした。** ①内部の言葉が消えた——「1通（**carousel**）」が日本語になり、`carousel` `flex` `image` `text` はいずれも0件。②**桁の合わない数を並べなくなった**——以前は 送信624・到達624 と並べて**開封2,410**（62.4%）と出し、どちらの母数か言わなかった。いまは **開封 `—件`／クリック `—件`** で、理由を3つ書く：「開封は LINE の集計値です。個人単位では取れないため『誰が読んだか』は分かりません」「配信対象が20人未満のときは、LINE側の仕様で開封数・クリック数が表示されません」「クリックは短縮URL経由の実測値です。LINE側の集計値とは数字がずれることがあります」。アカウント別も「記録していません」と断る。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計のタブ（クリック・友だち・エラー・配信内容）、ボタンごとの反応、CSVで書き出す が無い',
+    verdictSource: 'broadcasts-v6/u6gHt.txt', verdictHead: '1a943082',
   },
   {
     ...BROADCAST, node: 'EGMb1', name: '6-1-K 削除確認', route: '/broadcasts',
@@ -774,7 +774,7 @@ export const SCREENS = [
       **表は1本にせず、読む口の契約でそろえる形。**
     */
     ...REMINDER, node: 'GC4St', name: '7-1-H 実行結果',
-    verdict: 'needs_fix', verdictNote: 'P1×5。(1) 失敗したのに「ありません」と書いている（要約カードは—通と正しく出すのに、通知実績の欄は「送る内容がありません 0通」と出る）。(2) 1440pxで列が切れる。(3) 内部IDが画面に出ている。(4) どのリマインダを見ているか分からない。(5) 通知の名前が出ていない。詳しくは reminders-v6/design-qa-execution-results-500.md。**t7UtYQ が手本で、5件のうち4件はそちらでは起きていない**', verdictSource: 'reminders-v6/design-qa-execution-results-500.md', verdictHead: '409f00bb',
+    verdict: 'needs_fix', verdictNote: '**#511 `4bc71249` で束3の完了条件を満たした。** 実行結果に内部IDが出ていたのが、`reminder-` `rr-` `friend-` を数えて**すべて0件**になった。`undefined` も0件。通常・読込・空・失敗の4状態が `data-list-state` で分かれる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の実行結果（通ごとの内訳、失敗の理由別のまとめ）はこの直しの外', verdictSource: 'reminders-v6/GC4St-normal.txt', verdictHead: '4bc71249',
     route: '/reminders/detail?id=reminder-1',
     states: {
       apis: ['**/api/reminders/*/runs*'],
@@ -807,7 +807,7 @@ export const SCREENS = [
     設計は5段のウィザード（基本設定→どんなときに動くか→何を返すか→優先順位→確認）。
     実装は一覧の上に出る**1枚の窓**で、段も右の「設定内容」も無い。
   */
-  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: 'P1 内部の言葉とDBの列名が一覧の本体に出ている。青い箱に「√アカ名 返信あり (inline)／√アカ名 automation 経由」「⚠アカ名 silent rule のみ — match するが返信しない (同 keyword の automation rule 未登録)」「アカ名 適用外 (line_account_id が別アカに固定)」。表の「送る内容」列にも `text` `(inline)` がそのまま出る。**#544 の head でも残っている。** P1 「条件が重なっている」を知らせる帯が無い（設計の4つめは「要確認（条件重複）」、実装は「未ヒット」）。上から順に最初に当てはまった1つだけが動く仕組みなので、重なりに気づく場所が要る', verdictSource: 'auto-replies-v6/Gy9OK-1920.png' },
+  { ...AUTO_REPLY, node: 'cmDfJ', name: '8-1 自動応答', verdict: 'needs_fix', verdictNote: '**#566 `d0680774` で束3の完了条件を満たした。** `silent rule` `automation rule` `line_account_id` `inline` `TEMPLATE` `keyword` `match` `silent` `flex` `image` を数えて**すべて0件**。**#540（実行結果側）では直らない**——#540 と #566 は同じ `auto-reply-runs` の上の兄弟で、一覧の言葉を直しているのは #566。実際に #540 `857cebc5` で撮ると7語とも残っていた。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（ルールごとの当たり方の推移）はこの直しの外', verdictSource: 'auto-replies-v6/cmDfJ.txt' , verdictHead: 'd0680774' },
   {
     ...AUTO_REPLY, node: 'K7vg2', name: '8-1-A 自動応答ルール編集',
     verdict: 'needs_fix', verdictNote: 'P1 ルール編集の段が無い。設計の A・B・C（ルール編集／反応条件／応答とアクション）が、実装では一覧の上に出る1枚の窓に全部入っている。右の「設定内容」も無い', verdictSource: 'auto-replies-v6/design-qa.md',
@@ -1492,13 +1492,14 @@ export const SCREENS = [
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
   { ...NEN, node: 'VLMGH', name: '21-1 NEN配信', verdict: 'needs_fix', verdictNote: 'P1 画面の名前がメニューと違う（メニューと上の帯は「NEN配信」、見出しは「フォロー配信」）。押した名前と着いた先の名前が違うと、着いた場所が合っているか確かめられない。P1 押せない操作が理由なしに3つ置いてある（マニュアル・並び替え・フォルダを追加。3つとも disabled）。さらに上の帯に押せる「マニュアル」があり、同じ名前が2つあって片方だけ押せる', verdictSource: 'nen-v6/design-qa.md' },
-  { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }], verdict: 'needs_fix', verdictNote: 'P1 コラムの状態が英語のまま出る（scheduled / sent / draft。page.tsx:422）。設計は「出したもの／下書き／予約ずみ」。#446 が配信ジョブで直したのと同じ形で、jobStatusLabel と同じ当てはめをコラムにも置けば済む', verdictSource: 'nen-v6/design-qa.md' },
+  { ...NEN, node: 'DEX0k', name: '21-1-A NENコラム', steps: [{ click: 'NENコラム' }], verdict: 'needs_fix', verdictNote: '**#525 `deff5ffb` で束3の完了条件を満たした。** 状態が `scheduled` `sent` `draft` のまま出ていたのが、数えて**すべて0件**になった。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（回ごとの配信結果への導線）はこの直しの外', verdictSource: 'nen-v6/DEX0k.txt' , verdictHead: 'deff5ffb' },
   { ...NEN, node: 'q4lajm', name: '21-1-B ペット・記念日', steps: [{ click: 'ペット・誕生日' }], verdict: 'needs_fix', verdictNote: 'P1 帯4つ（登録864匹・友だち1,284人のうち62%／今月誕生日72匹／誕生日配信の開封94.6%／クーポン利用38.2%）が無い。一覧の「次の配信」列（9/1に誕生日クーポン／送れません）と「これまでの配信」列（6回）が無い。LINEプレビューが無い。クーポンの決めごととペットの一覧は在る', verdictSource: 'nen-v6/design-qa.md' },
   { ...NEN, node: 'WeXbL', name: '21-1-C NEN配信の履歴', steps: [{ click: '配信履歴' }], verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'nen-v6/design-qa.md' },
   {
     ...NEN, node: 'HpKyF', name: '21-1-D NEN配信の中身を編集する',
-    verdict: 'needs_fix', verdictNote: 'P1 きっかけが ec.order.delivered のまま生で出る（edit/campaign-editor.tsx:298-301）。設計は「注文が届いたとき」。pet.birthday も同じ。P1 誕生日配信では「何日後に送るか」の欄が効かないのに出ている。一覧は「誕生日の3日前 10:00」と出るのに編集画面は「0日後」に見える。campaignKey === birthday_coupon のときは日数の欄を隠し、一覧が使っている formatCampaignTiming をそのまま置けばよい', verdictSource: 'nen-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**#526 `dfcc9a53` で束3の完了条件を満たした。** きっかけが `ec.order.delivered` `pet.birthday` のような内部の名前で出ていたのが、数えて**すべて0件**になった。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の編集の作り（配信条件の組み立て）はこの直しの外', verdictSource: 'nen-v6/HpKyF.txt',
     route: '/nen-campaigns/edit?key=review_request',
+    verdictHead: 'dfcc9a53',
   },
   {
     ...NEN, node: 'ymXJK', name: '21-1-E コラムを書く',
@@ -1680,8 +1681,10 @@ export const SCREENS = [
   */
   {
     ...WEBHOOK, node: 'k3WxrO', name: '26-1 外部連携',
-    verdict: 'needs_fix', verdictNote: 'P1 タブの言葉が英語混じり（設計は「こちらから送る6／こちらで受け取る3／やり取りの記録／見本14」、実装は「受信 (Incoming)／送信 (Outgoing)」）。「やり取りの記録」と「見本」のタブが無い', verdictSource: 'webhooks-v6/design-qa.md',
-    steps: [{ click: '送信 (Outgoing)' }],
+    verdict: 'needs_fix', verdictNote: '**#527 `c6fd4388` で束3の完了条件を満たした。** タブが「受信 (Incoming)」「送信 (Outgoing)」から **「こちらで受け取る」「こちらから送る」** になり、`Incoming` `Outgoing` は0件。見出しも「受信Webhook作成」→「受け取る設定を追加」、空の文も「こちらで受け取る設定はまだありません。」に変わった。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（Webhookごとの直近の成否、再送の導線）はこの直しの外', verdictSource: 'webhooks-v6/k3WxrO.txt',
+    /* **#527 でタブ名が変わった**（「送信 (Outgoing)」→「こちらから送る」）。 */
+    steps: [{ click: 'こちらから送る' }],
+    verdictHead: 'c6fd4388',
   },
   { ...WEBHOOK, node: 'M0Gb7', name: '26-1-A こちらで受け取る', verdict: 'needs_fix', verdictNote: 'P1 こちらで受け取る面が設計とそろわない。見本から作る道が無い', verdictSource: 'webhooks-v6/design-qa.md' },
   {
@@ -1702,8 +1705,8 @@ export const SCREENS = [
   {
     ...WEBHOOK, node: 'f8SBSh', name: '26-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/webhooks/**'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: '**#515 `09054b78` で、束1の完了条件を満たした。** 失敗のとき「受信Webhookを表示できませんでした／**登録内容は消えていません。**再読み込みしても直らない場合はエラー報告へ。」となり、**作成の誘い（「新規Webhook」から作成してください）を同時に出さなくなった**。読込・空・失敗が `data-list-state` で分かれる。この画面は件数の帯を持たないので、束4（未取得と0件）は当てはまらない。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 タブが「受信 (Incoming)」「送信 (Outgoing)」と英語を括弧で足す形（束3）',
-    verdictSource: 'webhooks-v6/f8SBSh-error.txt', verdictHead: '09054b78',
+    verdict: 'needs_fix', verdictNote: '**#515 → #527 `c6fd4388` で束1と束3の完了条件を満たした。** 失敗のとき「受信Webhookを表示できませんでした／**登録内容は消えていません。**」となり、**作成の誘いを同時に出さない**（束1、#515）。タブの英語も消えた（束3、#527）。読込・空・失敗が `data-list-state` で分かれる。この画面は件数の帯を持たないので束4は当てはまらない。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（直近の成否と再送）はこの直しの外',
+    verdictSource: 'webhooks-v6/f8SBSh-error.txt', verdictHead: 'c6fd4388',
   },
 
   // ── 機能27 予約管理 ─────────────────────────────────────
@@ -1958,7 +1961,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 マークごとの人数が「人」だけで数字が出ない（SupportMarkの型にfriendCountが無く、どの口も返さない）。未取得なら—と出すべきところが空。帯4つが無い',
     verdictSource: 'friend-attributes-v6/design-qa-remaining10.md', verdictHead: '87c150ad',
   },
-  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: 'P1 設計の帯4つが無い（保存した条件12件・上限50件／配信で使用中5件／該当者0人2件／今月の呼び出し84回）。P2 友だち情報の項目名がキーのまま。eq の言い回しが設計とそろわない。**使用先・該当と、条件が eq mark-1 と出ていた件は #421 で直って解決している**', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md' },
+  { node: 'QKx8Q', feature: 4, name: '4-4 保存した検索', dir: 'friend-attributes-v6', route: '/tags?tab=searches', mode: 'page', verdict: 'needs_fix', verdictNote: '**#539 → #541 `e929f22a` で束3の完了条件を満たした。** 保存した検索の一覧に内部の識別子（`ss-`）や `support_mark` `scenario_id` といった列名が出なくなった（数えて0件）。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧の作り（条件の要約、使用先の表示）はこの直しの外', verdictSource: 'tags-v6/QKx8Q.txt' , verdictHead: 'e929f22a' },
 
   // ── 機能4 友だち属性 ─────────────────────────────────────
   // 一覧・状態・削除・CSVは `capture.spec.mjs` で基準画像として撮っている。
@@ -2035,8 +2038,9 @@ export const SCREENS = [
   {
     /* **#421（head `71aff344`）で `/tags/searches/edit` が入った。** */
     node: 'XBkiQ', feature: 4, name: '4-4-A 保存した検索の条件確認・編集',
-    verdict: 'needs_fix', verdictNote: 'P1 対応マークとシナリオが、いまもIDの手入力。P1 50件の上限と共有の意味が編集画面に出ない', verdictSource: 'friend-attributes-v6/design-qa-searches-421.md',
+    verdict: 'needs_fix', verdictNote: '**#539 → #541 `e929f22a` で束3の完了条件を満たした。** 条件の編集で、対応マークとシナリオが**IDの手入力ではなく選ぶ形**になり、項目名もキーのまま出なくなった（`ss-` `support_mark` `scenario_id` はいずれも0件）。**#541 は #539 を含む**ので、この head で両方を見たことになる。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の条件の組み立て（入れ子の and/or）はこの直しの外', verdictSource: 'tags-v6/XBkiQ.txt',
     dir: 'friend-attributes-v6', route: '/tags/searches/edit?id=ss-1', mode: 'page',
+    verdictHead: 'e929f22a',
   },
 ]
 
@@ -2119,6 +2123,7 @@ export const CAPTURED_AT = {
   26: [
     { pr: 547, head: '48715569', on: '2026-08-29', screens: ['KNG00'], note: 'やり取りの記録。送受信・安全な再送・通常/読込/空/失敗' },
     { pr: 515, head: '09054b78', on: '2026-08-29', screens: ['f8SBSh'], note: '外部連携の失敗を空と分ける。束1' },
+    { pr: 527, head: 'c6fd4388', on: '2026-08-29', screens: ['k3WxrO', 'f8SBSh'], note: 'タブの英語を外す（束3）。**#527 は #515 を含む**' },
   ],
   15: [
     { pr: 559, head: '7922c002', on: '2026-08-29', screens: ['g89Tc'], note: '未取得を一括削除で選べないようにした。**#559 は #438 を含む**' },
@@ -2129,6 +2134,7 @@ export const CAPTURED_AT = {
     { pr: 563, head: '64798425', on: '2026-08-29', screens: ['jwrbf'], note: '帯から `ref_tracking` を外した。**`ref_code` は列見出しに残っている**' },
   ],
   6: [
+    { pr: 531, head: '1a943082', on: '2026-08-29', screens: ['u6gHt'], note: '内部語を外し、開封の母数を明記。束3と束6' },
     { pr: 561, head: '51827fe1', on: '2026-08-29', screens: ['bPF0s'], note: '予約完了の5段とSTEP帯、右390pxの取り消し導線、確認窓、409の文。取り消しの口だけモックで405に落とさず、Workerと同じく状態を見て分ける' },
     { pr: 557, head: '697cee2c', on: '2026-08-29', screens: ['q76C35'], note: '帯の未取得を `—` に。返事を差し替えて失敗・一部欠け・実値0の3つを見た' },
     { pr: 554, head: '875a9ed3', on: '2026-08-29', screens: ['EGMb1'], note: '配信の削除を画面内の確認窓へ' },
@@ -2156,14 +2162,16 @@ export const CAPTURED_AT = {
     { pr: 551, head: '44692a37', on: '2026-08-29', screens: ['s7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo'], note: '公開までの5段。`?stage=` で1枚ずつ開く。届く予定・公開前チェック・公開の3つの口だけモックで405に落とさず、**公開の人数は公開前チェックと同じ数から作る**' },
     
     { pr: 514, head: '9a72dba6', on: '2026-08-29', screens: ['Y0Sn3', 'M1EXwB'], note: '削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**。**#498 単体（`ac288d48`）では撮り直さない**——`reminders/page.tsx` の blob は違うが、それは #514 が #498 の上でさらに直したため。撮った木のほうが新しく（`ac288d48` は `9a72dba6` の祖先）、#498 で撮り直すと #514 の直りを絵から巻き戻すことになる' },
-    { pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
+    { pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] },
+    { pr: 511, head: '4bc71249', on: '2026-08-29', screens: ['GC4St'], note: '実行結果から内部IDを外す。束3' }],
   11: [{ pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' }],
   8: [
-    { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。通常も撮るようにした（行が無い3状態だけでは内部語が見えない）' },
     
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ'], note: '削除確認の窓。**#544 は #491 を含む**' },
-    { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
+    { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
+    { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO', 'cmDfJ'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）' }],
   5: [
+    { pr: 529, head: '4cb2b0d9', on: '2026-08-29', screens: ['TC1b1'], note: '読了済の母数を明記。束6' },
     { pr: 534, head: '0158ba8e', on: '2026-08-29', screens: ['bV5Vs'], note: '到達率の `NaN%` を消す。束4' },
     { pr: 519, head: 'a8e00234', on: '2026-08-29', screens: ['q5G45'], note: 'シナリオの失敗を未登録と分ける。束1と束4' },
     { pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },
@@ -2174,6 +2182,7 @@ export const CAPTURED_AT = {
       pr: 503, head: '6db5ad7f', on: '2026-08-28', screens: ['xfYLn', 'hz9ti'],
       note: '撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた',
     },
+    { pr: 530, head: '2568c474', on: '2026-08-29', screens: ['xfYLn'], note: '通の編集から `cron` を外す。束3' },
   ],
   2: [
     { pr: 513, head: '60b39036', on: '2026-08-29', screens: ['tBlkL', 'AuSDY', 'LHjwD'], note: '保存の成否を窓へ返す直し。**P0は解決**' },
@@ -2197,10 +2206,15 @@ export const CAPTURED_AT = {
   10: [{ pr: 524, head: 'a6c35ee0', on: '2026-08-29', screens: ['zCQXe'], note: 'ウェビナーの帯を未取得 `—` に。束4' }],
   11: [{ pr: 528, head: '1b95452d', on: '2026-08-29', screens: ['NKyoA'], note: 'タブとフォルダの件数を未取得 `—` に。束4' }],
   12: [{ pr: 523, head: '47e7846e', on: '2026-08-29', screens: ['RW5Tb'], note: '内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える' }],
+  4: [{ pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' }],
   9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
   20: [{ pr: 445, head: '787a4b46', on: '2026-08-28' }],
-  21: [{ pr: 446, head: '4307088d', on: '2026-08-28' }],
+  21: [
+    { pr: 446, head: '4307088d', on: '2026-08-28' },
+    { pr: 525, head: 'deff5ffb', on: '2026-08-29', screens: ['DEX0k'], note: '状態の内部語を日本語へ。束3' },
+    { pr: 526, head: 'dfcc9a53', on: '2026-08-29', screens: ['HpKyF'], note: 'きっかけの内部名を日本語へ。束3' },
+  ],
   22: [{ pr: 447, head: '65adbc59', on: '2026-08-28' }],
 }
