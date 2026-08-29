@@ -21,6 +21,17 @@ import {
   postMileageAdjustment,
   MileageAdjustmentError,
   getActionScoreOverview,
+  createMileageRewardDraft,
+  createMileageRewardDraftFromPublished,
+  getMileageReward,
+  getMileageRewardAdminOverview,
+  importMileageRewardCodes,
+  publishMileageReward,
+  reorderMileageRewards,
+  setMileageRewardStatus,
+  updateMileageRewardDraft,
+  encryptCredential,
+  MileageRewardError,
 } from '@line-crm/db';
 import type {
   ActionScoreFilter,
@@ -28,14 +39,30 @@ import type {
   MileageEntryStatus,
   MileageEntryType,
   MileageRuleRow,
+  MileageRewardDraftInput,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { auditLog } from '../lib/audit-log.js';
 import { requireIrreversibleConfirmation, requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
+import { sha256Hex } from '../middleware/auth.js';
 
 const scoring = new Hono<Env>();
+
+function mileageRewardError(c: Parameters<typeof auditLog>[0], error: unknown) {
+  if (error instanceof MileageRewardError) {
+    return c.json({ success: false, error: error.message, code: error.code }, error.status as 400);
+  }
+  console.error('mileage rewards error:', error);
+  return c.json({ success: false, error: '使い道を処理できませんでした' }, 500);
+}
+
+async function canUseMileageAccount(c: Parameters<typeof auditLog>[0], accountId: string) {
+  if (!accountId) return false;
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  return scope.allowedAccountIds.includes(accountId);
+}
 
 function serializeMileageRule(rule: MileageRuleRow) {
   let conditions: Record<string, unknown> = {};
@@ -59,6 +86,184 @@ function serializeMileageRule(rule: MileageRuleRow) {
 }
 
 // ========== マイル管理 ==========
+
+scoring.get('/api/mileage/rewards', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    return c.json({ success: true, data: await getMileageRewardAdminOverview(c.env.DB, accountId) });
+  } catch (error) {
+    return mileageRewardError(c, error);
+  }
+});
+
+scoring.get('/api/mileage/rewards/:id', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const accountId = c.req.query('accountId')?.trim() ?? '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    const reward = await getMileageReward(c.env.DB, { id: c.req.param('id'), lineAccountId: accountId });
+    if (!reward) return c.json({ success: false, error: '使い道が見つかりません' }, 404);
+    return c.json({ success: true, data: reward });
+  } catch (error) {
+    return mileageRewardError(c, error);
+  }
+});
+
+scoring.post('/api/mileage/rewards', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; draft?: MileageRewardDraftInput }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    if (!body.draft) return c.json({ success: false, error: '使い道の内容を入力してください' }, 400);
+    const reward = await createMileageRewardDraft(c.env.DB, {
+      lineAccountId: accountId,
+      createdBy: c.get('staff').id,
+      draft: body.draft,
+    });
+    auditLog(c, 'mileage.reward.create', { kind: 'mileage_reward', id: reward.id });
+    return c.json({ success: true, data: reward }, 201);
+  } catch (error) {
+    return mileageRewardError(c, error);
+  }
+});
+
+scoring.put('/api/mileage/rewards/:id/draft', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{
+      accountId?: unknown;
+      expectedVersionId?: unknown;
+      draft?: MileageRewardDraftInput;
+    }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    const expectedVersionId = typeof body.expectedVersionId === 'string'
+      ? body.expectedVersionId.trim()
+      : '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    if (!body.draft || !expectedVersionId) {
+      return c.json({ success: false, error: '読み込んだ版と変更内容が必要です' }, 400);
+    }
+    const reward = await updateMileageRewardDraft(c.env.DB, {
+      id: c.req.param('id'), lineAccountId: accountId, expectedVersionId,
+      updatedBy: c.get('staff').id, draft: body.draft,
+    });
+    auditLog(c, 'mileage.reward.update', { kind: 'mileage_reward', id: reward.id });
+    return c.json({ success: true, data: reward });
+  } catch (error) {
+    return mileageRewardError(c, error);
+  }
+});
+
+scoring.post('/api/mileage/rewards/:id/draft', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    const reward = await createMileageRewardDraftFromPublished(c.env.DB, {
+      id: c.req.param('id'), lineAccountId: accountId, createdBy: c.get('staff').id,
+    });
+    return c.json({ success: true, data: reward }, 201);
+  } catch (error) {
+    return mileageRewardError(c, error);
+  }
+});
+
+scoring.post(
+  '/api/mileage/rewards/:id/publish',
+  requireRole('owner', 'admin'),
+  requireIrreversibleConfirmation('mileage-reward-publish'),
+  async (c) => {
+    try {
+      const body = await c.req.json<{ accountId?: unknown }>();
+      const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+      if (!await canUseMileageAccount(c, accountId)) {
+        return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+      }
+      const reward = await publishMileageReward(c.env.DB, {
+        id: c.req.param('id'), lineAccountId: accountId, publishedBy: c.get('staff').id,
+      });
+      auditLog(c, 'mileage.reward.publish', { kind: 'mileage_reward', id: reward.id });
+      return c.json({ success: true, data: reward });
+    } catch (error) {
+      return mileageRewardError(c, error);
+    }
+  },
+);
+
+scoring.post('/api/mileage/rewards/:id/status', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; status?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    const status = body.status === 'published' || body.status === 'stopped' || body.status === 'archived'
+      ? body.status
+      : null;
+    if (!status) return c.json({ success: false, error: '状態を確認してください' }, 400);
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    const reward = await setMileageRewardStatus(c.env.DB, {
+      id: c.req.param('id'), lineAccountId: accountId, status,
+    });
+    auditLog(c, 'mileage.reward.status', { kind: 'mileage_reward', id: reward.id });
+    return c.json({ success: true, data: reward });
+  } catch (error) {
+    return mileageRewardError(c, error);
+  }
+});
+
+scoring.put('/api/mileage/rewards-order', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; ids?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    const ids = Array.isArray(body.ids) && body.ids.every((id) => typeof id === 'string')
+      ? body.ids as string[]
+      : [];
+    await reorderMileageRewards(c.env.DB, { lineAccountId: accountId, ids });
+    return c.json({ success: true, data: null });
+  } catch (error) {
+    return mileageRewardError(c, error);
+  }
+});
+
+scoring.post('/api/mileage/rewards/:id/codes', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const body = await c.req.json<{ accountId?: unknown; codes?: unknown }>();
+    const accountId = typeof body.accountId === 'string' ? body.accountId.trim() : '';
+    if (!await canUseMileageAccount(c, accountId)) {
+      return c.json({ success: false, error: 'LINE公式アカウントが見つかりません' }, 404);
+    }
+    const codes = Array.isArray(body.codes)
+      ? [...new Set(body.codes.filter((code): code is string => typeof code === 'string')
+        .map((code) => code.trim()).filter(Boolean))]
+      : [];
+    if (!codes.length || codes.length > 10_000) {
+      return c.json({ success: false, error: '交換コードは1〜10,000件で登録してください' }, 400);
+    }
+    const protectedCodes = await Promise.all(codes.map(async (code) => ({
+      ciphertext: await encryptCredential(code, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY),
+      fingerprint: await sha256Hex(code),
+    })));
+    const result = await importMileageRewardCodes(c.env.DB, {
+      rewardId: c.req.param('id'), lineAccountId: accountId, codes: protectedCodes,
+    });
+    auditLog(c, 'mileage.reward.codes.import', { kind: 'mileage_reward', id: c.req.param('id') });
+    return c.json({ success: true, data: result }, 201);
+  } catch (error) {
+    return mileageRewardError(c, error);
+  }
+});
 
 scoring.get('/api/mileage/overview', requireRole('owner', 'admin', 'staff'), async (c) => {
   try {
