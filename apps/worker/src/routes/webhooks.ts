@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import {
   getIncomingWebhooks,
   getIncomingWebhookById,
@@ -10,10 +10,21 @@ import {
   createOutgoingWebhook,
   updateOutgoingWebhook,
   deleteOutgoingWebhook,
+  createWebhookInteraction,
+  finishWebhookInteraction,
+  getWebhookInteractionById,
+  listFailedWebhookInteractionsForRetry,
+  listWebhookInteractions,
+  type WebhookInteractionRow,
 } from '@line-crm/db';
 import type { Env } from '../index.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { canAccessAllLineAccounts } from '../services/account-access.js';
+import {
+  retryWebhookInteraction,
+  webhookFailureLabel,
+  webhookResponseLabel,
+} from '../services/webhook-interactions.js';
 
 const webhooks = new Hono<Env>();
 
@@ -429,6 +440,118 @@ webhooks.delete('/api/webhooks/outgoing/:id', requireRole('owner'), async (c) =>
   }
 });
 
+function serializeInteraction(row: WebhookInteractionRow) {
+  return {
+    id: row.id,
+    direction: row.direction,
+    webhookName: row.webhook_name,
+    eventType: row.event_type,
+    triggerSummary: row.trigger_summary,
+    status: row.status,
+    responseLabel: webhookResponseLabel(row),
+    responseStatus: row.response_status,
+    attemptCount: row.attempt_count,
+    durationMs: row.duration_ms,
+    failureReason: webhookFailureLabel(row.failure_reason),
+    canRetry: row.direction === 'outgoing' && row.status === 'failed' && Boolean(row.webhook_id),
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    retryOfId: row.retry_of_id,
+  };
+}
+
+async function requireInteractionAccount(c: Context<Env>) {
+  const lineAccountId = c.req.query('lineAccountId')?.trim();
+  if (!lineAccountId) return { error: c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400) };
+  if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [lineAccountId])) {
+    return { error: c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403) };
+  }
+  return { lineAccountId };
+}
+
+// ========== 送った・受け取ったやり取りの記録 ==========
+
+webhooks.get('/api/webhooks/interactions', requireRole('owner', 'admin', 'staff'), async (c) => {
+  try {
+    const access = await requireInteractionAccount(c);
+    if ('error' in access) return access.error;
+    const direction = c.req.query('direction');
+    const status = c.req.query('status');
+    const result = await listWebhookInteractions(c.env.DB, {
+      lineAccountId: access.lineAccountId,
+      periodDays: Number(c.req.query('periodDays') ?? 30),
+      direction: direction === 'incoming' || direction === 'outgoing' ? direction : undefined,
+      status: status === 'succeeded' || status === 'failed' ? status : undefined,
+      search: c.req.query('search'),
+      page: Number(c.req.query('page') ?? 1),
+      limit: Number(c.req.query('limit') ?? 20),
+    });
+    return c.json({
+      success: true,
+      data: {
+        items: result.items.map(serializeInteraction),
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        summary: result.summary,
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/webhooks/interactions error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.post('/api/webhooks/interactions/:id/retry', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const access = await requireInteractionAccount(c);
+    if ('error' in access) return access.error;
+    const original = await getWebhookInteractionById(c.env.DB, c.req.param('id'), access.lineAccountId);
+    if (!original) return c.json({ success: false, error: 'Not found' }, 404);
+    const retried = await retryWebhookInteraction(c.env.DB, original);
+    return c.json({ success: true, data: serializeInteraction(retried) });
+  } catch (err) {
+    const code = err instanceof Error ? err.message : 'retry_failed';
+    if (code === 'not_retryable' || code === 'already_retried') {
+      return c.json({ success: false, error: code }, 409);
+    }
+    if (code === 'webhook_not_found') return c.json({ success: false, error: code }, 404);
+    if (code === 'webhook_inactive' || code === 'payload_unavailable') {
+      return c.json({ success: false, error: code }, 400);
+    }
+    console.error('POST /api/webhooks/interactions/:id/retry error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
+webhooks.post('/api/webhooks/interactions/retry-failed', requireRole('owner', 'admin'), async (c) => {
+  try {
+    const access = await requireInteractionAccount(c);
+    if ('error' in access) return access.error;
+    // 1件につき最大6回の外部通信になる。1リクエストの外部通信上限を越えないよう5件まで。
+    const failed = await listFailedWebhookInteractionsForRetry(c.env.DB, access.lineAccountId, 5);
+    let succeeded = 0;
+    let failedAgain = 0;
+    let skipped = 0;
+    await Promise.all(failed.map(async (item) => {
+      try {
+        const result = await retryWebhookInteraction(c.env.DB, item);
+        if (result.status === 'succeeded') succeeded++;
+        else failedAgain++;
+      } catch {
+        skipped++;
+      }
+    }));
+    return c.json({
+      success: true,
+      data: { requested: failed.length, succeeded, failed: failedAgain, skipped },
+    });
+  } catch (err) {
+    console.error('POST /api/webhooks/interactions/retry-failed error:', err);
+    return c.json({ success: false, error: 'Internal server error' }, 500);
+  }
+});
+
 // ========== 受信Webhookエンドポイント (外部システムからの受信) ==========
 
 webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
@@ -463,9 +586,58 @@ webhooks.post('/api/webhooks/incoming/:id/receive', async (c) => {
 
     const { fireEvent } = await import('../services/event-bus.js');
     const eventType = `incoming_webhook.${wh.source_type}`;
-    await fireEvent(c.env.DB, eventType, {
-      eventData: { webhookId: wh.id, source: wh.source_type, payload },
-    }, undefined, wh.line_account_id ?? null);
+    const started = Date.now();
+    let interaction: WebhookInteractionRow | null = null;
+    if (wh.line_account_id) {
+      try {
+        interaction = await createWebhookInteraction(c.env.DB, {
+          lineAccountId: wh.line_account_id,
+          direction: 'incoming',
+          webhookId: wh.id,
+          webhookName: wh.name,
+          eventType,
+          triggerSummary: `${wh.name}から受け取った`,
+          // 受信は送り直さないため本文を保管しない。顧客情報を台帳へ複製しない。
+          requestBodyJson: null,
+        });
+      } catch (logError) {
+        // 台帳の一時障害で、署名確認済みの受信処理まで止めない。
+        console.error('受信Webhookの記録開始に失敗:', logError);
+      }
+    }
+    try {
+      await fireEvent(c.env.DB, eventType, {
+        eventData: { webhookId: wh.id, source: wh.source_type, payload },
+      }, undefined, wh.line_account_id ?? null);
+    } catch (eventError) {
+      if (interaction && wh.line_account_id) {
+        try {
+          await finishWebhookInteraction(c.env.DB, interaction.id, wh.line_account_id, {
+            status: 'failed',
+            responseStatus: 500,
+            attemptCount: 1,
+            durationMs: Date.now() - started,
+            failureReason: 'processing_failed',
+          });
+        } catch (logError) {
+          console.error('受信Webhookの失敗記録を更新できませんでした:', logError);
+        }
+      }
+      throw eventError;
+    }
+    if (interaction && wh.line_account_id) {
+      try {
+        await finishWebhookInteraction(c.env.DB, interaction.id, wh.line_account_id, {
+          status: 'succeeded',
+          responseStatus: 200,
+          attemptCount: 1,
+          durationMs: Date.now() - started,
+        });
+      } catch (logError) {
+        // 受信処理は完了している。台帳の一時障害だけで送信元へ500を返さない。
+        console.error('受信Webhookの成功記録を更新できませんでした:', logError);
+      }
+    }
 
     return c.json({ success: true, data: { received: true, source: wh.source_type } });
   } catch (err) {

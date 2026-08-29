@@ -42,6 +42,9 @@ import type {
   IncomingWebhookCreated,
   OutgoingWebhook,
   OutgoingWebhookCreated,
+  WebhookInteraction,
+  WebhookInteractionDirection,
+  WebhookInteractionList,
   NotificationRule,
   Notification,
   NotificationCenterData,
@@ -3144,6 +3147,35 @@ export const api = {
         fetchApi<ApiResponse<null>>(
           `/api/webhooks/outgoing/${id}?lineAccountId=${encodeURIComponent(lineAccountId)}`,
           { method: 'DELETE' },
+        ),
+    },
+    interactions: {
+      list: (lineAccountId: string, params?: {
+        periodDays?: number
+        direction?: WebhookInteractionDirection
+        status?: 'succeeded' | 'failed'
+        search?: string
+        page?: number
+        limit?: number
+      }) => {
+        const query = new URLSearchParams({ lineAccountId })
+        if (params?.periodDays) query.set('periodDays', String(params.periodDays))
+        if (params?.direction) query.set('direction', params.direction)
+        if (params?.status) query.set('status', params.status)
+        if (params?.search) query.set('search', params.search)
+        if (params?.page) query.set('page', String(params.page))
+        if (params?.limit) query.set('limit', String(params.limit))
+        return fetchApi<ApiResponse<WebhookInteractionList>>(`/api/webhooks/interactions?${query}`)
+      },
+      retry: (id: string, lineAccountId: string) =>
+        fetchApi<ApiResponse<WebhookInteraction>>(
+          `/api/webhooks/interactions/${id}/retry?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: '{}' },
+        ),
+      retryFailed: (lineAccountId: string) =>
+        fetchApi<ApiResponse<{ requested: number; succeeded: number; failed: number; skipped: number }>>(
+          `/api/webhooks/interactions/retry-failed?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+          { method: 'POST', body: '{}' },
         ),
     },
   },

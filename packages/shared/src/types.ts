@@ -949,6 +949,47 @@ export interface OutgoingWebhookCreated extends Omit<OutgoingWebhook, 'hasSecret
   secret: string;
 }
 
+export type WebhookInteractionDirection = 'outgoing' | 'incoming';
+export type WebhookInteractionStatus = 'pending' | 'succeeded' | 'failed' | 'retried';
+
+/**
+ * 外部連携の1回分の安全な表示。URL、シークレット、送受信本文は含めない。
+ */
+export interface WebhookInteraction {
+  id: string;
+  direction: WebhookInteractionDirection;
+  webhookName: string;
+  eventType: string;
+  triggerSummary: string;
+  status: WebhookInteractionStatus;
+  responseLabel: string;
+  responseStatus: number | null;
+  attemptCount: number;
+  durationMs: number | null;
+  failureReason: string | null;
+  canRetry: boolean;
+  startedAt: string;
+  completedAt: string | null;
+  retryOfId: string | null;
+}
+
+export interface WebhookInteractionSummary {
+  total: number;
+  outgoing: number;
+  incoming: number;
+  succeeded: number;
+  failed: number;
+  averageDurationMs: number | null;
+}
+
+export interface WebhookInteractionList {
+  items: WebhookInteraction[];
+  total: number;
+  page: number;
+  limit: number;
+  summary: WebhookInteractionSummary;
+}
+
 // -----------------------------------------------------------------------------
 // Google Calendar 連携
 // -----------------------------------------------------------------------------
