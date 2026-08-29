@@ -225,7 +225,13 @@ function SettingCard({
   )
 }
 
-export default function ScenarioDetailClient({ scenarioId }: { scenarioId: string }) {
+export default function ScenarioDetailClient({
+  scenarioId,
+  showStarted = false,
+}: {
+  scenarioId: string
+  showStarted?: boolean
+}) {
   const id = scenarioId
 
   const [scenario, setScenario] = useState<ScenarioWithSteps | null>(null)
@@ -1150,6 +1156,21 @@ export default function ScenarioDetailClient({ scenarioId }: { scenarioId: strin
           }
         />
       </div>
+
+      {showStarted ? (
+        <div
+          data-design-node="NrBkW"
+          className="border-success bg-success-bg text-success mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border px-4 py-3 text-sm"
+          role="status"
+        >
+          <p className="font-semibold">
+            配信を開始しました。条件を満たした友だちから順に配信します。
+          </p>
+          <Link href={`/scenarios/results?id=${encodeURIComponent(id)}`} className="font-semibold underline underline-offset-2">
+            開始後の結果を見る
+          </Link>
+        </div>
+      ) : null}
 
       {/*
         同時購読の決まり。シナリオを組む前に知っておかないと設計を間違える。
