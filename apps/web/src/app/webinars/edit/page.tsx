@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/layout/header'
 import WebinarForm from '@/components/webinars/webinar-form'
+import WebinarNotifications from '@/components/webinars/webinar-notifications'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import {
@@ -832,6 +833,7 @@ function CtasTab({ webinarId, accountId }: { webinarId: string; accountId: strin
 const TABS = [
   ['settings', 'いつ見られるようにするか'],
   ['ctas', '見ている途中に出すもの'],
+  ['notifications', '通知とリマインド'],
   ['comments', 'コメント演出'],
   ['analytics', '概要・分析'],
 ] as const
@@ -966,6 +968,7 @@ function EditWebinarInner() {
             {tab === 'settings' && <WebinarForm initial={webinar} />}
             {tab === 'comments' && <CommentsTab webinarId={webinar.id} />}
             {tab === 'ctas' && <CtasTab webinarId={webinar.id} accountId={webinar.accountId} />}
+            {tab === 'notifications' && <WebinarNotifications webinar={webinar} publicUrl={publicUrl} />}
             {tab === 'analytics' && <AnalyticsTab webinarId={webinar.id} durationSeconds={webinar.durationSeconds} />}
           </div>
         </div>

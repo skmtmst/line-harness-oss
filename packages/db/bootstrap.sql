@@ -2543,6 +2543,50 @@ CREATE TABLE webinar_journey_followups (
   UNIQUE (webinar_id, friend_id, kind)
 );
 
+CREATE TABLE webinar_notification_jobs (
+  id                TEXT PRIMARY KEY,
+  webinar_id        TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
+  registration_id   TEXT NOT NULL REFERENCES webinar_registrations(id) ON DELETE CASCADE,
+  friend_id         TEXT NOT NULL REFERENCES friends(id) ON DELETE CASCADE,
+  session_start_at  INTEGER NOT NULL,
+  settings_version  INTEGER NOT NULL,
+  kind              TEXT NOT NULL CHECK (kind IN (
+    'day_before', 'hour_before', 'session_start', 'missed', 'completed'
+  )),
+  scheduled_at      INTEGER NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (status IN ('pending', 'sending', 'sent', 'failed', 'cancelled', 'skipped')),
+  attempt_count     INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at   INTEGER,
+  lease_expires_at  INTEGER,
+  retry_key         TEXT NOT NULL,
+  sent_at           TEXT,
+  cancelled_at      TEXT,
+  last_error        TEXT,
+  created_at        TEXT NOT NULL,
+  updated_at        TEXT NOT NULL,
+  UNIQUE (registration_id, settings_version, kind)
+);
+
+CREATE TABLE webinar_notification_settings (
+  webinar_id                  TEXT PRIMARY KEY REFERENCES webinars(id) ON DELETE CASCADE,
+  version                     INTEGER NOT NULL DEFAULT 1,
+  registration_enabled        INTEGER NOT NULL DEFAULT 1,
+  day_before_enabled          INTEGER NOT NULL DEFAULT 1,
+  day_before_time_minutes     INTEGER NOT NULL DEFAULT 1200,
+  hour_before_enabled         INTEGER NOT NULL DEFAULT 1,
+  hour_before_minutes         INTEGER NOT NULL DEFAULT 60,
+  start_enabled               INTEGER NOT NULL DEFAULT 1,
+  missed_enabled              INTEGER NOT NULL DEFAULT 1,
+  missed_time_minutes         INTEGER NOT NULL DEFAULT 600,
+  completed_enabled           INTEGER NOT NULL DEFAULT 1,
+  created_at                  TEXT NOT NULL,
+  updated_at                  TEXT NOT NULL,
+  CHECK (day_before_time_minutes BETWEEN 0 AND 1439),
+  CHECK (hour_before_minutes BETWEEN 1 AND 10080),
+  CHECK (missed_time_minutes BETWEEN 0 AND 1439)
+);
+
 CREATE TABLE webinar_picker_opens (
   id              TEXT PRIMARY KEY,
   webinar_id      TEXT NOT NULL REFERENCES webinars(id) ON DELETE CASCADE,
@@ -2557,7 +2601,8 @@ CREATE TABLE webinar_registrations (
   friend_id TEXT NOT NULL REFERENCES friends(id),
   session_start_at INTEGER NOT NULL,
   notified_at TEXT,
-  created_at TEXT NOT NULL,
+  created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active'
+  CHECK (status IN ('active', 'cancelled')), cancelled_at TEXT,
   UNIQUE (webinar_id, friend_id, session_start_at)
 );
 
@@ -3253,8 +3298,17 @@ CREATE INDEX idx_webinar_funnel_events_webinar_created
 CREATE INDEX idx_webinar_journey_followups_status
   ON webinar_journey_followups (status, updated_at);
 
+CREATE INDEX idx_webinar_notification_jobs_due
+  ON webinar_notification_jobs (status, scheduled_at, next_attempt_at);
+
+CREATE INDEX idx_webinar_notification_jobs_webinar
+  ON webinar_notification_jobs (webinar_id, created_at);
+
 CREATE INDEX idx_webinar_picker_opens_opened
   ON webinar_picker_opens (webinar_id, opened_at);
+
+CREATE INDEX idx_webinar_regs_active_friend
+  ON webinar_registrations (webinar_id, friend_id, status, session_start_at);
 
 CREATE INDEX idx_webinar_regs_due
   ON webinar_registrations (notified_at, session_start_at);
