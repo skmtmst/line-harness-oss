@@ -87,6 +87,7 @@ describe('友だち属性 V4 contract', () => {
     expect(source).toContain("status === 'ready' ? <Button href=\"/tags/fields/new\"")
     expect(source).toContain('status === \'ready\' && error')
     expect(source).toContain('友だち情報欄を再読み込み</Button>')
+    expect(source).toContain("setError(forbidden ? '' : '再読み込みしても直らない場合はエラー報告へ。')")
     expect(source).toContain('setItems([])')
   })
 
