@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
+  completeIdempotencyResponse,
   findIdempotencyResponse,
   purgeExpiredIdempotency,
+  reserveIdempotencyResponse,
   saveIdempotencyResponse,
 } from './booking-idempotency.js';
 
@@ -37,9 +39,12 @@ function memDB(): { db: D1Database; rows: Map<string, Row> } {
         },
         async run() {
           if (sql.startsWith('INSERT')) {
-            const [key, accountId, friendId, status, body, expiresAt] = bound as [
-              string, string, string, number, string, string,
-            ];
+            const isReservation = bound.length === 5;
+            const [key, accountId, friendId] = bound as [string, string, string];
+            const status = isReservation ? 202 : Number(bound[3]);
+            const body = String(bound[isReservation ? 3 : 4]);
+            const expiresAt = String(bound[isReservation ? 4 : 5]);
+            const inserted = !rows.has(key);
             if (!rows.has(key)) {
               rows.set(key, {
                 key,
@@ -50,6 +55,18 @@ function memDB(): { db: D1Database; rows: Map<string, Row> } {
                 expires_at: expiresAt,
               });
             }
+            return { success: true, meta: { changes: inserted ? 1 : 0 } };
+          }
+          if (sql.startsWith('UPDATE')) {
+            const [status, body, key, accountId, friendId] = bound as [
+              number, string, string, string, string,
+            ];
+            const row = rows.get(key);
+            if (!row || row.line_account_id !== accountId || row.friend_id !== friendId) {
+              return { success: true, meta: { changes: 0 } };
+            }
+            row.response_status = status;
+            row.response_body = body;
             return { success: true, meta: { changes: 1 } };
           }
           if (sql.startsWith('DELETE')) {
@@ -76,6 +93,37 @@ function memDB(): { db: D1Database; rows: Map<string, Row> } {
 }
 
 describe('idempotency', () => {
+  test('同時予約は最初の1件だけキーを確保し、完了応答へ置き換える', async () => {
+    const { db } = memDB();
+    const params = {
+      key: 'admin-create-1',
+      lineAccountId: 'A1',
+      friendId: 'F1',
+      body: { error: 'request_in_progress', booking_id: 'B1' },
+      ttlMinutes: 5,
+      now: new Date('2026-05-08T00:00:00Z'),
+    };
+    await expect(reserveIdempotencyResponse(db, params)).resolves.toBe(true);
+    await expect(reserveIdempotencyResponse(db, params)).resolves.toBe(false);
+
+    await completeIdempotencyResponse(db, {
+      key: params.key,
+      lineAccountId: params.lineAccountId,
+      friendId: params.friendId,
+      status: 201,
+      body: { booking_id: 'B1', status: 'confirmed' },
+    });
+    await expect(findIdempotencyResponse(db, {
+      key: params.key,
+      lineAccountId: params.lineAccountId,
+      friendId: params.friendId,
+      now: new Date('2026-05-08T00:01:00Z'),
+    })).resolves.toEqual({
+      status: 201,
+      body: { booking_id: 'B1', status: 'confirmed' },
+    });
+  });
+
   test('save → find returns same response', async () => {
     const { db } = memDB();
     await saveIdempotencyResponse(db, {

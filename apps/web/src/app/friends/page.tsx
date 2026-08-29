@@ -2,8 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ArrowDownWideNarrow, Bookmark, Circle, Search, SlidersHorizontal, Star } from 'lucide-react'
-import type { Scenario, Tag } from '@line-crm/shared'
+import type { SavedSearch, Scenario, Tag } from '@line-crm/shared'
 import { api, type FriendListItem } from '@/lib/api'
 import FriendKpis from '@/components/friends/friend-kpis'
 import FriendListTable from '@/components/friends/friend-list-table'
@@ -16,6 +17,7 @@ import MergedUsersPage from '@/app/users/page'
 import { EmbeddedPageProvider } from '@/components/layout/embedded-page-context'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import { savedSearchParams, savedSearchSummary } from '@/components/friends/saved-search-utils'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const
 const SECONDARY_CONTROL = 'h-10 whitespace-nowrap rounded-v6-control border border-hairline bg-canvas px-4 text-sm font-medium text-v6-ink hover:bg-v6-surface-strong'
@@ -24,6 +26,12 @@ type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 type Notice = { title: string; message: string } | null
 type LoadStatus = 'loading' | 'ready' | 'error'
+
+function scoreBoundary(raw: string | null) {
+  if (raw === null || !/^-?\d+$/.test(raw)) return undefined
+  const value = Number(raw)
+  return Number.isSafeInteger(value) ? value : undefined
+}
 
 const MERGED_TABS = [
   { key: 'list', label: '友だち一覧' },
@@ -40,6 +48,12 @@ function FriendsPageInner({
   onExportReady: (exporter: (() => void) | null) => void
 }) {
   const { selectedAccountId } = useAccount()
+  const searchParams = useSearchParams()
+  const scoreMin = scoreBoundary(searchParams.get('scoreMin'))
+  const scoreMax = scoreBoundary(searchParams.get('scoreMax'))
+  const hasScoreRange = scoreMin !== undefined || scoreMax !== undefined
+  const audienceId = searchParams.get('audienceId')?.trim() || ''
+  const directSavedSearchId = searchParams.get('savedSearch')
   const [friends, setFriends] = useState<FriendListItem[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
   const [operators, setOperators] = useState<Array<{ id: string; name: string }>>([])
@@ -101,6 +115,7 @@ function FriendsPageInner({
         limit: pageSize,
         tagId: selectedTagId || undefined,
         accountId: selectedAccountId || undefined,
+        audienceId: audienceId || undefined,
         search: searchSubmitted || undefined,
         includeChatStatus: true,
         sort: sortMode,
@@ -108,6 +123,8 @@ function FriendsPageInner({
         operatorId: operatorId || undefined,
         scenarioId: scenarioId || undefined,
         metadata: attentionOnly ? { __attention: '1' } : undefined,
+        scoreMin,
+        scoreMax,
       })
       if (requestId !== loadRequestRef.current) return
       if (response.success) {
@@ -126,10 +143,18 @@ function FriendsPageInner({
       setTotal(0)
       setLoadStatus('error')
     }
-  }, [advanced, attentionOnly, operatorId, page, pageSize, responseFilter, scenarioId, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
+  }, [advanced, attentionOnly, audienceId, operatorId, page, pageSize, responseFilter, scenarioId, scoreMax, scoreMin, searchSubmitted, selectedAccountId, selectedTagId, sortMode])
 
   useEffect(() => void loadOptions(), [loadOptions])
   useEffect(() => setPage(1), [selectedAccountId])
+  useEffect(() => {
+    if (!directSavedSearchId) return
+    setAdvanced({
+      params: { savedSearchId: directSavedSearchId },
+      summary: ['保存した検索を適用中'],
+    })
+    setPage(1)
+  }, [directSavedSearchId])
   useEffect(() => {
     void loadFriends()
     return () => {
@@ -189,6 +214,17 @@ function FriendsPageInner({
   return (
     <div data-friends-design="v6" className="space-y-3.5">
       <FriendKpis />
+
+      {hasScoreRange ? (
+        <div className="flex items-center justify-between rounded-v6-control border border-v6-accent-border bg-v6-accent-soft px-4 py-2.5 text-xs text-v6-ink-secondary">
+          <span>
+            行動スコア：{scoreMin !== undefined ? `${scoreMin}点以上` : ''}
+            {scoreMin !== undefined && scoreMax !== undefined ? '〜' : ''}
+            {scoreMax !== undefined ? `${scoreMax}点以下` : ''}
+          </span>
+          <Link href="/friends" className="font-semibold text-v6-action hover:underline">この条件を外す</Link>
+        </div>
+      ) : null}
 
       <section className={`rounded-v6-card border border-hairline bg-canvas px-4 py-3.5 shadow-v6-card`} data-design="V6SearchPanel" data-design-node="pRHvc">
         <form
@@ -327,12 +363,18 @@ function FriendsPageInner({
         />
       )}
 
-      <AdvancedSearchDialog open={advancedOpen} tags={allTags} fieldNames={[]} onClose={() => setAdvancedOpen(false)} onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }} />
+      <AdvancedSearchDialog open={advancedOpen} accountId={selectedAccountId} tags={allTags} fieldNames={[]} onClose={() => setAdvancedOpen(false)} onApply={(result) => { setAdvanced(result); setAdvancedOpen(false); setPage(1) }} />
       {savedOpen ? (
         <SavedSearchDialog
+          accountId={selectedAccountId}
+          tags={allTags}
           onClose={() => setSavedOpen(false)}
           onApply={(result) => {
             setAdvanced(result)
+            if (result.params.sort) setSortMode(result.params.sort)
+            if (result.params.limit && PAGE_SIZE_OPTIONS.includes(Number(result.params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])) {
+              setPageSize(Number(result.params.limit) as (typeof PAGE_SIZE_OPTIONS)[number])
+            }
             setSavedOpen(false)
             setPage(1)
           }}
@@ -363,53 +405,78 @@ function NoticeDialog({ notice, onClose }: { notice: Exclude<Notice, null>; onCl
 }
 
 function SavedSearchDialog({
+  accountId,
+  tags,
   onClose,
   onApply,
   onOpenAdvanced,
 }: {
+  accountId: string | null
+  tags: Tag[]
   onClose: () => void
   onApply: (result: AdvancedSearchResult) => void
   onOpenAdvanced: () => void
 }) {
-  const [saved, setSaved] = useState<AdvancedSearchResult | null>(null)
+  const [saved, setSaved] = useState<SavedSearch[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('friends.savedSearch')
-      if (!raw) return
-      const parsed = JSON.parse(raw) as Partial<AdvancedSearchResult>
-      if (parsed.params && Array.isArray(parsed.summary) && parsed.summary.every((item) => typeof item === 'string')) {
-        setSaved({ params: parsed.params, summary: parsed.summary })
-      }
-    } catch {
-      setSaved(null)
+    let cancelled = false
+    setLoading(true)
+    setError('')
+    if (!accountId) {
+      setSaved([])
+      setLoading(false)
+      return
     }
-  }, [])
+    void api.savedSearches.list(accountId).then((res) => {
+      if (!cancelled && res.success) setSaved(res.data)
+    }).catch(() => {
+      if (!cancelled) setError('保存した検索を読み込めませんでした')
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [accountId])
 
   return (
     <div className="fixed inset-0 z-100 flex items-center justify-center bg-ink/35 p-4" role="presentation" onMouseDown={onClose}>
       <section role="dialog" aria-modal="true" aria-labelledby="saved-search-title" className={`w-full max-w-lg rounded-v6-dialog border border-hairline bg-canvas p-5 shadow-v6-card`} onMouseDown={(event) => event.stopPropagation()}>
         <h2 id="saved-search-title" className="text-lg font-bold text-v6-ink">保存した検索</h2>
-        {saved ? (
-          <div className="mt-4 rounded-tile border border-hairline bg-v6-surface p-4">
-            <p className="text-sm font-bold text-v6-ink">最後に保存した条件</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {saved.summary.map((summary) => <span key={summary} className="rounded-full bg-canvas px-3 py-1.5 text-xs text-v6-ink-secondary">{summary}</span>)}
-            </div>
+        {loading ? <p className="mt-4 text-sm text-v6-ink-faint">読み込み中…</p> : null}
+        {error ? <p className="mt-4 rounded-v6-control bg-v6-danger-bg p-3 text-sm text-v6-danger">{error}</p> : null}
+        {!loading && saved.length > 0 ? (
+          <div className="mt-4 max-h-80 space-y-2 overflow-y-auto">
+            {saved.map((search) => {
+              const summary = savedSearchSummary(search.conditions, tags)
+              return (
+                <button
+                  key={search.id}
+                  type="button"
+                  onClick={() => onApply({ params: savedSearchParams(search.id, search.conditions), summary })}
+                  className="w-full rounded-tile border border-v6-divider bg-v6-surface p-4 text-left hover:border-v6-accent"
+                >
+                  <span className="flex items-center gap-2 text-sm font-bold text-v6-ink">
+                    {search.name}
+                    <span className="rounded-pill bg-canvas px-2 py-0.5 text-xs font-medium text-v6-ink-faint">{search.isShared ? '全員' : '自分だけ'}</span>
+                  </span>
+                  <span className="mt-2 block text-xs leading-5 text-v6-ink-secondary">{summary.slice(0, 3).join(' ／ ') || '条件を確認してください'}</span>
+                </button>
+              )
+            })}
           </div>
-        ) : (
+        ) : !loading ? (
           <div className="mt-4 rounded-tile border border-hairline bg-v6-surface p-4">
             <p className="text-sm font-semibold text-v6-ink-secondary">保存した条件はまだありません。</p>
             <p className="mt-1 text-xs leading-5 text-v6-ink-faint">「詳細条件」で絞り込みを組み、条件を保存すると次回からここで呼び出せます。</p>
           </div>
-        )}
+        ) : null}
         <div className="mt-5 flex items-center justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-v6-control border border-hairline bg-canvas px-4 py-2 text-sm font-semibold text-v6-ink-secondary hover:bg-v6-surface-strong">閉じる</button>
-          {saved ? (
-            <button type="button" onClick={() => onApply(saved)} className="rounded-v6-control bg-v6-accent px-5 py-2 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">この条件で表示</button>
-          ) : (
+          {saved.length === 0 ? (
             <button type="button" onClick={onOpenAdvanced} className="rounded-v6-control bg-v6-accent px-5 py-2 text-sm font-bold text-on-accent hover:bg-v6-accent-hover">詳細条件を設定</button>
-          )}
+          ) : null}
         </div>
       </section>
     </div>
