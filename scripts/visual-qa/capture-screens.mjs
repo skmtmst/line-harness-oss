@@ -331,6 +331,22 @@ const VERDICTS = ['match', 'structure_match_data_pending', 'needs_fix']
 
 const EMPTY_BODIES = [
   /*
+    統合ユーザー。**一覧の既定（配列）を返すと画面ごと落ちる。**
+    画面は `data.rows` と `data.total` を読むので、`rows` の無い返事だと
+    `rows.map` で落ちて「もう一度試す」の絵になる。型は
+    `apps/web/src/app/users/page.tsx` の `usersGrouped.list`。
+  */
+  [/\/api\/users-grouped/, { rows: [], total: 0, page: 1, pageSize: 20, computedAt: null }],
+  /*
+    重複の集計。画面（`components/users/summary-bar.tsx`）は
+    `totalFollowing` `uniquePeople` `friendDups` を読む。
+    **数えて0なので0を入れる。** 重複率は 0 で割らない守りが実装側にある。
+  */
+  [/\/api\/duplicates\/stats/, {
+    totalFollowing: 0, uniquePeople: 0, friendDups: 0, duplicateGroups: 0,
+    wastedPerBroadcastYen: 0, msgUnitYen: 3, perAccount: [], pairwiseOverlap: [],
+  }],
+  /*
     マイルの使い道。**一覧の既定（配列）を返すと落ちる。**
     画面は `rewards` と `summary` を読む。数はすべて0（取れて0件）だが、
     **まだ数えていない `neverRedeemedFriendCount` だけは `null`** のまま。

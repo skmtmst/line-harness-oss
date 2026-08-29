@@ -1,11 +1,11 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 223,
+  "compared": 224,
   "unimplemented": 34,
   "unconfirmed": 0,
   "elsewhere": 4,
-  "missing": 1,
+  "missing": 0,
   "match": 7,
   "structureMatchDataPending": 16,
   "needsFix": 201,
@@ -72,17 +72,27 @@
       "feature": 3,
       "name": "友だち",
       "total": 11,
-      "compared": 6,
+      "compared": 7,
       "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 1,
+      "missing": 0,
       "match": 1,
       "structureMatchDataPending": 0,
       "needsFix": 6,
       "unjudged": 0,
       "remaining": 10,
-      "capturedAt": null
+      "capturedAt": [
+        {
+          "pr": 565,
+          "head": "ea2e730d",
+          "on": "2026-08-29",
+          "screens": [
+            "r7eSi"
+          ],
+          "note": "統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）"
+        }
+      ]
     },
     {
       "feature": 4,
@@ -579,6 +589,15 @@
             "jwrbf"
           ],
           "note": "案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える"
+        },
+        {
+          "pr": 563,
+          "head": "64798425",
+          "on": "2026-08-29",
+          "screens": [
+            "jwrbf"
+          ],
+          "note": "帯から `ref_tracking` を外した。**`ref_code` は列見出しに残っている**"
         }
       ]
     },
@@ -818,6 +837,15 @@
             "N2gAza"
           ],
           "note": "顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない"
+        },
+        {
+          "pr": 564,
+          "head": "ad59fde6",
+          "on": "2026-08-29",
+          "screens": [
+            "DpxOK"
+          ],
+          "note": "絞り込みチップを状態で言い分ける。失敗・権限不足は `—`"
         }
       ]
     },
@@ -910,6 +938,15 @@
             "Lg8ff"
           ],
           "note": "代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない"
+        },
+        {
+          "pr": 562,
+          "head": "45789965",
+          "on": "2026-08-29",
+          "screens": [
+            "Lg8ff"
+          ],
+          "note": "重なりから選び直して登録まで通した。`ApiError.code` を足して、機械コードと人へ見せる文を別の契約に分けている"
         }
       ]
     },

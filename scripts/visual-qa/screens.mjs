@@ -390,8 +390,8 @@ export const SCREENS = [
       apis: ['**/api/users-grouped*', '**/api/duplicates/stats*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
     },
-    verdict: 'needs_fix', verdictNote: 'P1 統合ユーザーの列（UID・最終接触・重複配信・詳細を見る）が無く、代わりに内部の識別子「identity-0」が出ている。統合ユーザーを作成する導線が無い。KPIの名前が設計と違う',
-    verdictSource: 'friends-v6/r7eSi-1920.png', verdictHead: '728deca0',
+    verdict: 'needs_fix', verdictNote: '**#565 `ea2e730d` で、記録していたP1が直った。通常・読込・空・失敗を撮り、押して確かめた。** ①**内部の統合キーが消えた**——`identity-0` も `url_token` / `uid` / `solo` も本文に0件。②**設計の7列になった**——統合ユーザー／連絡先／紐付くアカウント／UID／最終接触／重複配信／操作。③**複数アカウントを配信済みと決めつけない**——重複配信は「要確認」「対象外」で、紐付きは「要確認」「UIDで連携」「未連携」。④**未取得と0件を分ける**——連絡先の無いところは `—`（メール未登録は「未登録」）、失敗のとき件数は **`—人`**、空のときは **「0人中 0〜0人」**。⑤**「詳細を見る」は実際に開く**——押すと同じ行の下に 登録アカウント詳細（アカウントごとのUIDと登録日）・メール（フォーム回答）・電話（フォーム回答）・連携の状態 が出て、ボタンは「閉じる」に変わる。新しい口は呼ばない（既に読んだ値を開くだけ）。⑥**「再計算」は本当に読み直す**——`GET /api/users-grouped?...&refresh=1` を投げる。1440・1920とも横スクロール0。`undefined` / `NaN` / `API error` は無い。**P2 失敗のとき、上の4枚（統合ユーザー・紐付く友だち・重複している行・重複率）が空の箱のまま**になり、読み込み中と見分けがつかない。`SummaryBar` は `stats` が `null` のとき骨組みだけを描き、失敗の状態を持っていない（`components/users/summary-bar.tsx:29`）。表のほうは `—人` と断っているので、帯もそろえてほしい。P2 統合ユーザーを作る導線はまだ無い',
+    verdictSource: 'friends-v6/r7eSi-normal.txt + r7eSi-error.txt', verdictHead: 'ea2e730d',
   },
   {
     ...FRIENDS, node: 'w8W4Eh', name: '3-3-A 統合ユーザー詳細',
@@ -1282,11 +1282,11 @@ export const SCREENS = [
   { ...AFFILIATE, node: 'xqT1Z', name: '16-1-D アフィリエイターを登録する', route: '/affiliates/new', verdict: 'needs_fix', verdictNote: '**#558 で「報酬が売上×率でしか出ない」が直った。** どう支払うかを **成果1件ごとに定額／売上に対する割合／報酬なし（計測のみ）** から選べる。定額のときは「1件あたりの報酬」に「金額は案件ごとに決めます。」と添える。1440・1920とも横スクロール0。P2 設計との細かな差（連絡先・支払い条件の並び）は未確認', verdictSource: 'affiliates-v6/xqT1Z.txt' },
   {
     ...AFFILIATE, node: 'jwrbf', name: '16-1-E アフィリエイターの成果内訳',
-    verdict: 'needs_fix', verdictNote: '**#558 で案件別の内訳が入り、承認待ちを確定報酬へ入れないことが絵で分かるようになった。** 表は「案件／報酬単価／承認済み／審査中／確定報酬」で、無料体験の申込は **承認済み7×¥3,000＝¥21,000**、審査中2件は入らない。定期便は2×¥8,000＝¥16,000、友だち追加だけは1×¥300＝¥300。1440・1920とも横スクロール0。P1 帯の見出しに **「クリック (ref_tracking)」** とDBのテーブル名が出ている（束3）。P2 「確定までの保留」の意味が本文で説明されていない', verdictSource: 'affiliates-v6/jwrbf.txt',
+    verdict: 'needs_fix', verdictNote: '**#563 `64798425` で `ref_tracking` が画面から消えた**（本文を数えて0件）。帯の見出しは「クリック」だけになった。**ほかの集計に後退は無い**——確定報酬 ¥86,000／¥144,000／¥93,000、案件別は 無料体験7×¥3,000＝¥21,000・定期便2×¥8,000＝¥16,000・友だち追加1×¥300＝¥300 で、審査中2件は入らない。1440・1920とも横スクロール0。**P2 同じ束の言葉がもう1つ残っている**——内訳の下の表に **`ref_code`** が列見出しとして出ている（「リンク別クリック」と「帰属ジャーニー」の2か所）。これもDBの列名で、`ref_tracking` と同じ理由で運用の人には読めない。「計測コード」などの画面の言葉にしてほしい', verdictSource: 'affiliates-v6/jwrbf.txt',
     route: '/conversions?tab=affiliates', mode: 'viewport', height: 1136,
     /* 表の行は `onClick` だけで、押せる役を持っていない。文字で探す。 */
     steps: [{ click: '田中 明', role: 'text' }],
-    verdictHead: 'ef7b5773',
+    verdictHead: '64798425',
   },
   { ...AFFILIATE, node: 'GPWzq', name: '16-1-F 案件をつくる', route: '/affiliate-offers/new', verdict: 'needs_fix', verdictNote: 'P1 案件をつくる面で、報酬の決め方（案件ごとの決まった額）を主にできない', verdictSource: 'affiliates-v6/design-qa.md' },
   {
@@ -1603,9 +1603,9 @@ export const SCREENS = [
     route: '/line-notifications?tab=operator', mode: 'page',
     states: { apis: ['**/api/notifications/rules?**', '**/api/notifications/rules'], kinds: ['normal', 'loading', 'empty', 'error', 'forbidden'] },
     verdict: 'needs_fix',
-    verdictNote: '**#545 で運用者へのお知らせが入り、未実装ではなくなった。** 通常・読込・空・失敗・**権限不足**の5つが揃い、`data-list-state` でも名前で分かれる。権限不足は「表示する権限がありません／見るには権限が要ります。オーナーか管理者に追加を依頼してください。」。**帯は0件と未取得を分ける**：保存したお知らせ3件・受け取る人を設定済み0件・今日届いた数 **—件**（送信処理を接続後に表示）で、画面にも「0件と未取得を分けています」と書いてある。1440・1920とも横スクロール0。P2 権限不足と失敗のとき、絞り込みチップだけ「すべて 0／下書き 0／受け取る人がいない 0」と0を出す。読めていないので帯と同じく `—` にするか、チップ自体を出さないほうがよい',
-    verdictSource: 'line-notify-v6/DpxOK-forbidden.txt',
-    verdictHead: '03022681',
+    verdictNote: '**#564 `ad59fde6` で、記録していたP2が直った。5状態すべてを撮って確かめた。** 絞り込みチップが状態で言い分ける：通常「すべて 3／下書き 1／受け取る人がいない 3」、空「0／0／0」（数えて0）、失敗と権限不足は **「すべて —／下書き —／受け取る人がいない —」**。帯も同じで、失敗・権限不足は3枚とも `—件`。**読めていないものを0と断定しなくなった。** 通常・読込・空・失敗・権限不足の5つが `data-list-state` で名前で分かれ、1440・1920とも横スクロール0。P2 送信処理が接続されるまで「今日届いた数」は `—件` のまま（画面にも「送信処理を接続後に表示」と書いてあり、これは正しい断り方）',
+    verdictSource: 'line-notify-v6/DpxOK-forbidden.txt + DpxOK-normal.txt',
+    verdictHead: 'ad59fde6',
   },
   {
     ...LINE_NOTIFY, node: 'N2gAza', name: '24-2-A 運用者へのお知らせをつくる',
@@ -1805,9 +1805,9 @@ export const SCREENS = [
       ],
     }],
     verdict: 'needs_fix',
-    verdictNote: '**P1 競合の回復画面に届かない。実際に競合を起こして確かめた。** 埋まった枠を選んで登録すると、画面は確認の段のまま赤帯に **`API error: 409`** と出す。設計・実装の「この時間には予約を入れられません／空いている時間を選び直す」（`page.tsx:346`）は**一度も描かれない**。原因は画面ではなくAPIの受け側：Workerは `{error:\'slot_conflict\'}` を **409** で返す（`booking.ts:1074`。`slot_not_available` は **422**、`:982`）が、`apps/web/src/lib/api.ts:308` の `BODY_MESSAGE_STATUSES` は **400 だけ**を本文の読める状態としているため、本文が捨てられて `ApiError` の文が `API error: 409` になる。`page.tsx:199` の `message.includes(\'slot_conflict\')` は決して真にならない。**運用の人には内部の番号だけが残り、選び直す導線も消える。** 直すなら 409・422 を `BODY_MESSAGE_STATUSES` に足すか、`ApiError.status` で分ける（文字ではなく番号で見る方が確か）。P2 設計は重なりを**登録前に**止める（「9/02(火) 11:00 は 佐々木 がふさがっています（2件）」）。実装は登録を試して初めて分かる',
-    verdictSource: 'booking-v6/Lg8ff-1440.png',
-    verdictHead: 'ba0bf62d',
+    verdictNote: '**#562 `45789965` で、記録していたP1が直った。実際に重なりを起こし、選び直して登録まで通した。** ①**`API error: 409` は出ない**——赤帯は「選んだ時間は、ほかの予約で埋まりました」。②**回復画面へ進む**——「この時間には予約を入れられません／最新の空き時間を読み直して、別の時間を選んでください。入力したお客様・メニュー・担当者・要望は残っています。」と「空いている時間を選び直す」。③**選び直したあと登録を完了できる**——押して10:00を選び直すと「予約を登録しました」まで進み、予約IDが出る。直し方も良い：文字で見分けるのをやめ、`ApiError.code` を足して**機械コードと人へ見せる文を別の契約に分けた**。`extractApiErrorCode` は `^[a-z][a-z0-9_]{0,63}$` に絞るので、SQLや外部APIの文言はコードとしても入らない。1440・1920とも横スクロール0。`API error` / `Failed to fetch` / `undefined` / `NaN` はどこにも無い。P2 設計は重なりを**登録前に**止める（「9/02(火) 11:00 は 佐々木 がふさがっています（2件）」）。実装は登録を試して初めて分かる',
+    verdictSource: 'booking-v6/Lg8ff-1440.png + booking-v6/Lg8ff-recovered.txt',
+    verdictHead: '45789965',
   },
 
   // ── 機能28 予約設定 ─────────────────────────────────────
@@ -2107,15 +2107,24 @@ export const CAPTURED_AT = {
     { pr: 559, head: '7922c002', on: '2026-08-29', screens: ['g89Tc'], note: '未取得を一括削除で選べないようにした。**#559 は #438 を含む**' },
     { pr: 560, head: '7c1acd0f', on: '2026-08-29', screens: ['g89Tc'], note: '寸法・並び順・表示件数。**#560 は #559 を取り込んでいる**（`7922c002` が親）ので、一括削除の止め方もこの head で見ている' },
   ],
-  16: [{ pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' }],
+  16: [
+    { pr: 558, head: 'ef7b5773', on: '2026-08-29', screens: ['PouPn', 'xqT1Z', 'jwrbf'], note: '案件ごとの決まった額を紹介者一覧へ反映。率が0のときだけ確定した定額へ切り替える' },
+    { pr: 563, head: '64798425', on: '2026-08-29', screens: ['jwrbf'], note: '帯から `ref_tracking` を外した。**`ref_code` は列見出しに残っている**' },
+  ],
   6: [
     { pr: 561, head: '51827fe1', on: '2026-08-29', screens: ['bPF0s'], note: '予約完了の5段とSTEP帯、右390pxの取り消し導線、確認窓、409の文。取り消しの口だけモックで405に落とさず、Workerと同じく状態を見て分ける' },
     { pr: 557, head: '697cee2c', on: '2026-08-29', screens: ['q76C35'], note: '帯の未取得を `—` に。返事を差し替えて失敗・一部欠け・実値0の3つを見た' },
     { pr: 554, head: '875a9ed3', on: '2026-08-29', screens: ['EGMb1'], note: '配信の削除を画面内の確認窓へ' },
     { pr: 550, head: 'f7c5a99e', on: '2026-08-29', screens: ['cPk8A', 'sqFXf'], note: '対象条件の保存と呼び出し。**固定データの形は `SegmentCondition`**（`{operator, rules}`）。別名で書いて画面を落とした' },
   ],
-  27: [{ pr: 459, head: 'ba0bf62d', on: '2026-08-29', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない' }],
-  24: [{ pr: 545, head: '03022681', on: '2026-08-29', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない' }],
+  27: [
+    { pr: 459, head: 'ba0bf62d', on: '2026-08-29', screens: ['GFDqW', 'GfceK', 'Lg8ff'], note: '代理予約の入力→確認→完了→競合を実際に操作して撮った。競合だけ回復画面に届かない' },
+    { pr: 562, head: '45789965', on: '2026-08-29', screens: ['Lg8ff'], note: '重なりから選び直して登録まで通した。`ApiError.code` を足して、機械コードと人へ見せる文を別の契約に分けている' },
+  ],
+  24: [
+    { pr: 545, head: '03022681', on: '2026-08-29', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない' },
+    { pr: 564, head: 'ad59fde6', on: '2026-08-29', screens: ['DpxOK'], note: '絞り込みチップを状態で言い分ける。失敗・権限不足は `—`' },
+  ],
   17: [
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
@@ -2157,6 +2166,7 @@ export const CAPTURED_AT = {
     { pr: 502, head: '75b010fc', on: '2026-08-28', screens: ['DkPY0'], note: '#502 は #500 を含む。新しい表は作らず既存の automation_runs を読む' },
     { pr: 552, head: '6ce43563', on: '2026-08-29', screens: ['gief7', 'Rv8Jv', 'WjYAC', 'Vdbv5'], note: 'タブ帯5本と見本から下書きを作る道。**`DkPY0` は撮り直していない**（#502 `75b010fc` のまま）' },
   ],
+  3: [{ pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' }],
   9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
