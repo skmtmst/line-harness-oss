@@ -717,7 +717,7 @@ export const SCREENS = [
     **段ごとの画面が無いので、設計の A〜G は1枚ずつには対応しない。**
   */
   { ...REMINDER, node: 'M1EXwB', name: '7-1 リマインダ', route: '/reminders', verdict: 'needs_fix', verdictNote: 'P1 失敗の帯が無い（設計の4つめは「失敗 2通（要確認）」、実装は「今月の配信」）。P1 状態で絞る札4つ（有効のみ・下書き・停止中・失敗あり）が無い。P1 列に「基準日」「予定」「最終送信」が無い（実装は 配信方式・きっかけ・送る内容・フォルダ・稼働・登録日）。P2 送信予定の単位が設計の「通」でなく「人」。並び順・表示件数が無い。P2 状態が2つしか出せない。Reminder.isActive が真偽値ひとつなので、下書きと停止中を分けられない。**#498 → #514 で行ごとのごみ箱が入り、設計と同じ位置になった**（前は下の「選択したリマインダを削除」だけだった）', verdictSource: 'reminders-v6/M1EXwB-1920.png' },
-  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new', verdict: 'needs_fix', verdictNote: 'P1 作成の段の構造が無い。設計は段ごとに 対象の絞り込み・停止条件・配信予定の下見・テスト送信・最終確認へ進むが、実装にあるのは1段目の入力だけ', verdictSource: 'reminders-v6/design-qa.md' },
+  { ...REMINDER, node: 'uJP22', name: '7-1-A リマインダを作成', route: '/reminders/new', verdict: 'needs_fix', verdictNote: '**画面全体は要修正のまま。** P1 作成の段の構造が無い。設計は段ごとに 対象の絞り込み・停止条件・配信予定の下見・テスト送信・最終確認へ進むが、実装にあるのは1段目の入力だけ（段の実装は #551 が別に進めている。`s7T2dz` ほか5枚を見る）。**画面全体の一致判定は行っていない。** ／ **#429 の受入条件だけは確認済み**（新head `0f612926`。**撮り直していない**——`reminders/new/page.tsx` `edit/page.tsx` `lib/api.ts` の blob が旧head `838116b4` と同一で、差分は Worker の `feature-settings.ts` と試験と反映履歴だけ）。①既存フォルダを選べる（`api.folders.list(\'reminder\')` の結果を `<option>` に並べる）②選んだ `folderId` が保存の口へ渡る（`api.reminders.create({ folderId: folderId || null })`）③再読み込みが動く（`foldersReloadToken` を増やして読み直す。失敗のときだけ「フォルダを再読み込み」が出る）④**取得できて0件と、取得失敗を混ぜない**——`foldersLoadState` が `loading|ready|error` の3つで、失敗のときは選べなくして「フォルダを読み込めませんでした。未取得と0件を区別するため、選択を止めています。」と書く。0件のときは「未分類」だけが選べる ⑤**別アカウントのフォルダは混ざりようがない**——`folders` 表に `line_account_id` が無く（`bootstrap.sql:899`）、`getFolders` も `WHERE kind = ?` だけ。**アカウント別フォルダという概念が設計に無い**ので、混ぜる余地が無い（「正しく絞れている」ではない）', verdictSource: 'reminders-v6/design-qa.md + #429 head 0f612926 のコード' , verdictHead: '0f612926' },
   {
     ...REMINDER, node: 'J64xI', name: '7-1-B 通知ステップ編集',
     verdict: 'needs_fix', verdictNote: 'P1 通知ステップ編集の面が設計とそろわない', verdictSource: 'reminders-v6/design-qa.md',
@@ -2142,12 +2142,13 @@ export const CAPTURED_AT = {
     { pr: 549, head: '0ae3e094', on: '2026-08-29', screens: ['qlVLJ', 'p9CcEB'], note: 'マイルの使い道を交換まで接続。公開版の固定・二重交換の防止・渡せなかったときの決めごとが入っている' },
     { pr: 441, head: '05c5b103', on: '2026-08-28', screens: ['MvZm5', 'BmoGY', 'HIU5O'] },
     { pr: 441, head: 'e953109c', on: '2026-08-28', screens: ['s98Vfw', 'N46cQ', 'k8VCU'] },
-    { pr: 494, head: '0ca45f98', on: '2026-08-28', screens: ['HIU5O'], note: '#494 は #441 を含む' },
+    { pr: 494, head: '0ca45f98', on: '2026-08-28', screens: ['HIU5O'], note: '#494 は #441 を含む。**新head `5470ede3` でも撮り直していない**——apps/web の20ファイルすべて blob が同一で、差分は Worker の機能設定だけ' },
     { pr: 495, head: '7d890d3b', on: '2026-08-28', screens: ['z3PB2', 'vz0Ji'], note: '#495 は #494 を含む' },
     { pr: 496, head: '4dac7986', on: '2026-08-28', screens: ['s6MBc'], note: '#496 は #495 を含む' },
     { pr: 499, head: '961722fc', on: '2026-08-28', screens: ['s6MBc'], note: 'Claudeが作ったDraft。#496 の上に積んである' },
   ],
   7: [
+    { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },
     { pr: 551, head: '44692a37', on: '2026-08-29', screens: ['s7T2dz', 'JCz6J', 'W98zZQ', 's6Vvp', 'PSmHo'], note: '公開までの5段。`?stage=` で1枚ずつ開く。届く予定・公開前チェック・公開の3つの口だけモックで405に落とさず、**公開の人数は公開前チェックと同じ数から作る**' },
     
     { pr: 514, head: '9a72dba6', on: '2026-08-29', screens: ['Y0Sn3', 'M1EXwB'], note: '削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**' },
