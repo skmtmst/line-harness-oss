@@ -817,13 +817,15 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'nzWIX', name: '8-1-B 反応条件',
-    verdict: 'needs_fix', verdictNote: 'P1 8-1-B 反応条件が独立しておらず、8-1-A と同じ1枚の中にある', verdictSource: 'auto-replies-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**#491 → #544 `6053c271` で撮った**（#544 は #491 を含む）。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の編集は段ごとに 一致条件・返信内容・送信後の動き へ進む。実装との差は段の口がつながってから見る', verdictSource: 'auto-replies-v6/nzWIX.txt',
     route: '/auto-replies/edit?id=ar-2',
+    verdictHead: '6053c271',
   },
   {
     ...AUTO_REPLY, node: 'ivDoe', name: '8-1-C 応答とアクション',
-    verdict: 'needs_fix', verdictNote: 'P1 8-1-C 応答とアクションが独立しておらず、8-1-A と同じ1枚の中にある', verdictSource: 'auto-replies-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**#491 → #544 `6053c271` で撮った**（#544 は #491 を含む）。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計との差は、送信後の動きの並びと、条件の組み立て。段の口がつながってから見る', verdictSource: 'auto-replies-v6/ivDoe.txt',
     route: '/auto-replies/edit?id=ar-2',
+    verdictHead: '6053c271',
   },
   {
     ...AUTO_REPLY, node: 'U9hzqH', name: '8-1-D 競合と優先順位',
@@ -1578,11 +1580,12 @@ export const SCREENS = [
     設計のタブは4本（顧客へのお知らせ9／運用者へのお知らせ11／
     送れなかったもの4／記録）。実装は**1枚もの**で、顧客へのお知らせだけ。
   */
-  { ...LINE_NOTIFY, node: 'festr', name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: 'P1 送った記録が残らない（いつ・だれに・どのお知らせを送ったか）。届かなかったものを追うタブも無い', verdictSource: 'line-notify-v6/design-qa.md' },
+  { ...LINE_NOTIFY, node: 'festr', name: '24-1 LINE通知', verdict: 'needs_fix', verdictNote: '**#504 `806ed169` で撮った。** 帯は 通知テンプレート 4件（顧客向けの重要通知）／通知ON 3件（現在送信する設定）／送信完了 2,412件（EC連携からの累計）／要確認 2件（送信に失敗した通知）で、**札ごとに何の数かを書く**。種類の絞り込みも すべて4・注文1・銀行振込1・発送1・キャンセル・返金1・定期便**0** と、数えて0のものを0で出す。「通知のON/OFFを切り替えても、ECから受け取った記録は消えません」と、切っても消えないことを断る。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は種類ごとに直近の送信結果と失敗理由をその場で開く。実装は数と絞り込みまで', verdictSource: 'line-notify-v6/festr.txt' , verdictHead: '806ed169' },
   {
     ...LINE_NOTIFY, node: 'Q55bb', name: '24-1-A お知らせの中身を編集する',
-    verdict: 'needs_fix', verdictNote: 'P1 中身を編集する面が設計とそろわない。差し込みと、届く文の見え方の確認が足りない', verdictSource: 'line-notify-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**#504 `806ed169` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の通知テンプレート編集は、差し込みの一覧と送信前の見え方を並べて確かめる。実装との差は送信処理がつながってから見る', verdictSource: 'line-notify-v6/Q55bb.txt',
     mode: 'viewport', height: 1136, steps: [{ click: '発送した', role: 'text' }],
+    verdictHead: '806ed169',
   },
   {
     ...LINE_NOTIFY, node: 'X8JCA5', name: '24-1-B 送れなかったもの',
@@ -1828,7 +1831,7 @@ export const SCREENS = [
     `/booking/staff/shifts` の別ルートにある。
   */
   { ...BOOKING_SET, node: 'QSLEH', name: '28-1 予約設定', verdict: 'needs_fix', verdictNote: 'P1 タブの分けかたが違う。設計は「メニュー8／受付枠／休業日／予約のルール」を1つの帯に並べるが、実装はメニューと担当スタッフの2タブで、**受付枠と休業日は /booking/staff/shifts の別ルート**。予約管理の画面からは飛べるが、予約設定の画面のタブには出てこない。「予約のルール」（先の予約が取れる範囲・締め切り・キャンセル期限）は BookingMenu が持っている（booking_window_days / cutoff_hours_before / cancel_deadline_hours_before）のに、**メニューごとに散っていてまとめて見る場所が無い**。P2 帯が設計と違う（設計は 出しているメニュー6つ／いちばん選ばれた トリミング小型犬142件／受け付けている時間9:00〜19:00／先の予約が取れる範囲60日先まで）。枠の稼働率が—なのは、受付時間の総枠数を数える仕組みが無いためで、正直な出し方', verdictSource: 'booking-settings-v6/design-qa.md' },
-  { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'needs_fix', verdictNote: 'P1 受付枠と休業日が予約設定のタブではなく /booking/staff/shifts の別ルートにある', verdictSource: 'booking-settings-v6/design-qa.md' },
+  { ...BOOKING_SET, node: 'tksPc', name: '28-1-A 受付枠と休業日', route: '/booking/staff/shifts', verdict: 'needs_fix', verdictNote: '**#517 `43d3d20e` で撮った。** 「スタッフごとの受付時間を決めます。**Googleカレンダーをつなぐと、そちらの予定が入っている時間は自動で受付を止めます。**」と、外の予定との関係を先に書く。「特別休業日を設定」「変更を保存」があり、編集する人を選ぶまでは何も出さない。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の受付時間は曜日×時間の格子で、休業日と重ねて見せる。実装は人ごとの一覧まで', verdictSource: 'booking-settings-v6/tksPc.txt' , verdictHead: '43d3d20e' },
   { ...BOOKING_SET, node: 'GhOb3', name: '28-1-B 予約メニューをつくる', route: '/booking/menus/new', verdict: 'needs_fix', verdictNote: 'P1 予約メニューをつくる面が設計とそろわない。予約のルールをメニューの中だけで決める形になっている', verdictSource: 'booking-settings-v6/design-qa.md' },
   {
     ...BOOKING_SET, node: 'W6465r', name: '28-1-C 一覧の状態（空・読込・エラー）',
@@ -1873,7 +1876,7 @@ export const SCREENS = [
   { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: '**#475 `15febf7f` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の追加画面は、招待の送り方（LINE連携・メール）と担当範囲の割り当てを1枚で決める。実装との細かな差は、招待の口がつながってから見る', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '15febf7f' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
-  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: 'P2 区分ごとの箱・グループごと切替・「必須」の錠前・右のプレビュー・初期値に戻す/保存・オフにしてもデータは残る説明は設計どおり。実装の説明はむしろ設計より具体的（APIも動いたままで管理画面から隠れるだけ、と書いてある）。差は並べ替えの置き場所ほか4点で、詳しくは settings-v6/design-qa.md', verdictSource: 'settings-v6/design-qa.md' },
+  { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: '**#478 `66883866` で撮った。** **オフにしたときに何が起きないかを先に書く**——「オフにしても作ったデータは削除されません。**公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。**」。機能設定・並び替え・初期値に戻すが揃う。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は機能ごとに「いま使っている数」を並べて、切ってよいかを判断させる。実装は一覧と並び替えまで', verdictSource: 'settings-v6/c4R6F.txt' , verdictHead: '66883866' },
 
   // ── 機能32 運用状態 ─────────────────────────────────────
   /* タブ3本は設計とそろっている（健全性チェック／緊急コントロール／更新履歴）。 */
@@ -2147,6 +2150,7 @@ export const CAPTURED_AT = {
     { pr: 562, head: '45789965', on: '2026-08-29', screens: ['Lg8ff'], note: '重なりから選び直して登録まで通した。`ApiError.code` を足して、機械コードと人へ見せる文を別の契約に分けている' },
   ],
   24: [
+    { pr: 504, head: '806ed169', on: '2026-08-30', screens: ['festr', 'Q55bb'], note: '顧客通知の一覧とテンプレート。**`DpxOK` はここでは撮らない**——#504 に運用者タブは無く、撮ると #564 の絵を巻き戻す（実際に一度やって git から戻した）' },
     { pr: 545, head: '03022681', on: '2026-08-29', screens: ['X8JCA5', 'Se65i', 'DpxOK', 'N2gAza'], note: '顧客通知の記録と失敗、運用者通知の一覧と作成。**#545 は #504 を含む**。個人の既読は作っていない' },
     { pr: 564, head: 'ad59fde6', on: '2026-08-29', screens: ['DpxOK'], note: '絞り込みチップを状態で言い分ける。失敗・権限不足は `—`' },
   ],
@@ -2170,7 +2174,7 @@ export const CAPTURED_AT = {
   11: [{ pr: 572, head: 'e4ab641f', on: '2026-08-29', screens: ['NNDMR'], note: '質問のひな形。下書き/公開の送信内容、シナリオの選択肢、回答先の往復、配信の契約テストまで確認。撮影は既存の2枚を維持' }],
   8: [
     
-    { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ'], note: '削除確認の窓。**#544 は #491 を含む**' },
+    { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ', 'K7vg2', 'nzWIX', 'ivDoe'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' },
     { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO', 'cmDfJ'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。**#540 では直らない**（一覧の言葉はこちら）' }],
   5: [
@@ -2206,7 +2210,10 @@ export const CAPTURED_AT = {
   3: [
     { pr: 520, head: '4848a8f3', on: '2026-08-29', screens: ['bzDn6'], note: '友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**' },
     { pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' }],
-  28: [{ pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' }],
+  28: [
+    { pr: 517, head: '43d3d20e', on: '2026-08-30', screens: ['tksPc'], note: '受付時間。Googleカレンダーとの関係を先に書く' },
+    { pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' },
+  ],
   29: [
     { pr: 533, head: 'd1070487', on: '2026-08-29', screens: ['k5m5Bc'], note: 'イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**' },
     { pr: 467, head: '6bb950f3', on: '2026-08-30', screens: ['MKrPY', 'i5SN2j', 'ugP5y'], note: 'イベント予約の作成・予約者・一覧。キャンセル待ちの口を撮影モックへ足した（無いと `waitlist.length` で落ちる）' },
@@ -2216,6 +2223,7 @@ export const CAPTURED_AT = {
   12: [{ pr: 523, head: '47e7846e', on: '2026-08-29', screens: ['RW5Tb'], note: '内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える' }],
   4: [{ pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' }],
   30: [{ pr: 475, head: '15febf7f', on: '2026-08-30', screens: ['EOTS4', 'I3ZSrU', 'e3jz3', 'jwVlo'], note: 'ログインユーザーの一覧・追加・役割。development 直結' }],
+  31: [{ pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' }],
   9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
