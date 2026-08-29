@@ -234,16 +234,6 @@ export default function ScenarioList({
                 <td className="px-4 py-3 text-right whitespace-nowrap">
                   <button
                     onClick={() => {
-                      // 全アカウント共通は、どのアカウントから触っても全部に効く。
-                      // 別のアカウントを見ているつもりで止めてしまう事故を防ぐ。
-                      if (
-                        s.lineAccountId === null &&
-                        !confirm(
-                          `「${s.name}」は全アカウント共通のシナリオです。${s.isActive ? '停止' : '再開'}するとすべてのアカウントに影響します。続けますか？`,
-                        )
-                      ) {
-                        return
-                      }
                       onToggleActive(s.id, s.isActive)
                     }}
                     disabled={loading}

@@ -12,10 +12,15 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import FolderPanel from '@/components/shared/folder-panel'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
 import Button from '@/components/shared/button'
+import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import ScenarioList from '@/components/scenarios/scenario-list'
 
-type ScenarioWithCount = Scenario & { stepCount?: number }
+type ScenarioWithCount = Scenario & {
+  stepCount?: number
+  subscriberCount?: number
+  completedCount?: number
+}
 type LoadStatus = 'loading' | 'ready' | 'error'
 
 /** 未分類を表す印。空文字は「すべて」なので別の値にする。 */
@@ -46,6 +51,9 @@ export default function ScenariosPage() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderFilter, setFolderFilter] = useState('')
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [toggleTarget, setToggleTarget] = useState<ScenarioWithCount | null>(null)
+  const [toggleBusy, setToggleBusy] = useState(false)
+  const [toggleError, setToggleError] = useState('')
   const loadRequestRef = useRef(0)
 
   const loadFolders = useCallback(async () => {
@@ -142,12 +150,34 @@ export default function ScenariosPage() {
     }
   }
 
-  const handleToggleActive = async (id: string, current: boolean) => {
+  const requestToggleActive = (id: string) => {
+    const target = scenarios.find((scenario) => scenario.id === id)
+    if (!target) {
+      setActionError('対象のシナリオを確認できませんでした。一覧を読み直してください。')
+      return
+    }
+    setToggleError('')
+    setToggleTarget(target)
+  }
+
+  const confirmToggleActive = async () => {
+    if (!toggleTarget || toggleBusy) return
+    const target = toggleTarget
+    setToggleBusy(true)
+    setToggleError('')
     try {
-      await api.scenarios.update(id, { isActive: !current })
+      const response = await api.scenarios.update(target.id, { isActive: !target.isActive })
+      if (!response.success) throw new Error(response.error)
+      setToggleTarget(null)
       void loadScenarios()
     } catch {
-      setActionError('シナリオの状態を変更できませんでした。状態を読み直してから、もう一度お試しください。')
+      setToggleError(
+        target.isActive
+          ? 'シナリオを停止できませんでした。状態を読み直してから、もう一度お試しください。'
+          : 'シナリオを開始できませんでした。状態を読み直してから、もう一度お試しください。',
+      )
+    } finally {
+      setToggleBusy(false)
     }
   }
 
@@ -232,6 +262,35 @@ export default function ScenariosPage() {
           onAdded={() => void loadFolders()}
         />
       )}
+
+      {toggleTarget ? (
+        <div data-design-node="RUxNf">
+          <ConfirmDialog
+            open
+            title={`「${toggleTarget.name}」を${toggleTarget.isActive ? '停止' : '開始'}しますか？`}
+            description={[
+              toggleTarget.lineAccountId === null ? '全LINEアカウントに適用されるシナリオです。' : '',
+              `現在の購読中は${toggleTarget.subscriberCount === undefined ? '—人（人数を確認できませんでした）' : `${toggleTarget.subscriberCount}人`}です。`,
+              `配信内容は${toggleTarget.stepCount === undefined ? '—通（通数を確認できませんでした）' : `${toggleTarget.stepCount}通`}です。`,
+              toggleTarget.isActive
+                ? '停止すると新しい配信を止めます。これまでの配信履歴は残ります。'
+                : toggleTarget.subscriberCount === 0
+                  ? '現在届く人はいません。開始後に登録された友だちから配信対象になります。'
+                  : '開始すると、登録条件に合う友だちへの配信が動き始めます。',
+            ].filter(Boolean).join(' ')}
+            confirmLabel={toggleTarget.isActive ? 'シナリオを停止' : 'シナリオを開始'}
+            destructive={toggleTarget.isActive}
+            busy={toggleBusy}
+            error={toggleError || undefined}
+            onConfirm={() => void confirmToggleActive()}
+            onCancel={() => {
+              if (toggleBusy) return
+              setToggleTarget(null)
+              setToggleError('')
+            }}
+          />
+        </div>
+      ) : null}
 
       {/* 一覧本体（設計 `Body`）。 */}
       <div data-design="Body">
@@ -378,7 +437,7 @@ export default function ScenariosPage() {
           onReorder={handleReorder}
           folders={folders}
           onMoveFolder={handleMoveFolder}
-          onToggleActive={handleToggleActive}
+          onToggleActive={(id) => requestToggleActive(id)}
           onDelete={handleDelete}
         />
       )}
