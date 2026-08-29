@@ -414,8 +414,8 @@ export const SCREENS = [
     verdictSource: 'scenarios-v6/TC1b1.txt', verdictHead: '5f09837c',
   },
   { ...SCENARIO, node: 'cCB7r', name: '5-1-A シナリオ作成・配信方式', route: '/scenarios/mode?id=scenario-0',
-    verdict: 'needs_fix', verdictNote: 'P2 設計の3段の進み表示（STEP1 シナリオ情報／STEP2 配信方式／STEP3 1通目を設定）が無い。フォルダをこの画面で選べない（設計はシナリオ情報のカードで選ぶ）。2つのカードの本文・例・チップは設計どおり',
-    verdictSource: 'scenarios-v6/cCB7r-1920.png', verdictHead: '6db5ad7f',
+    verdict: 'needs_fix', verdictNote: '**#569 `92f03199` で配信方式の選択が入った。** 「シナリオ「新規登録7日間フォロー」を作成しました。続けて配信方式を選んでください。」と、**いま何が済んで次に何をするか**を書く。段の表示（✓シナリオ情報 → 2 配信方式 → 3 1通目）があり、「あとから変更できますが、**設定済みのステップは作り直しになります**」と、戻れないわけではないが手戻りが出ることを先に断る。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は配信方式ごとの見本（何日後・何時・くり返し）をその場で見せる。実装は選ぶところまで',
+    verdictSource: 'scenarios-v6/cCB7r.txt', verdictHead: '92f03199',
   },
   { ...SCENARIO, node: 'kk8dz', name: '5-1-B シナリオ作成・1通目設定', route: '/scenarios/first-step?id=scenario-0',
     verdict: 'needs_fix', verdictNote: 'P2 STEP表示が無い。右側にLINEプレビューの吹き出しと設定サマリー（配信対象・配信日時・送信数・配信後）が無い。本文の字数（52 / 5,000）が出ない。種類のタブが設計の6つ（テキスト・画像・テンプレート・質問・カルーセル・その他）と違う9つ。時刻欄が「10:00 AM」と英語書式になるのは撮影側のブラウザ言語の癖で、実装の不具合ではない',
@@ -1411,7 +1411,7 @@ export const SCREENS = [
       `publishedVersion` の2つしか持たない。
     */
     ...MILEAGE, node: 's6MBc', name: '17-2-A スコアのルール', route: '/mileage/score-rules',
-    verdict: 'needs_fix', verdictNote: 'P2（つながる先・パンくず・読む場面と直す場面の分離）', verdictSource: 'mileage-v6/design-qa-score-rules-496.md', verdictHead: '961722fc',
+    verdict: 'needs_fix', verdictNote: 'P2（つながる先・パンくず・読む場面と直す場面の分離）', verdictSource: 'mileage-v6/design-qa-score-rules-496.md', verdictHead: '642b8222',
     states: {
       apis: ['**/api/action-scores/rules?*'],
       kinds: ['normal', 'loading', 'empty', 'error'],
@@ -1839,9 +1839,9 @@ export const SCREENS = [
   },
 
   // ── 機能29 イベント予約 ─────────────────────────────────
-  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'needs_fix', verdictNote: 'P1 帯が「数」で「次に何をするか」になっていない。設計の3つめ「あと少しで満席 2回（声をかけると埋まります）」と4つめ「申し込みが少ない 1回（8/31の回。あと3日です）」は、そのまま行動になる帯。実装の「定員の充足 55%」は全体の平均で、**どの回が危ないかは分からない**', verdictSource: 'events-v6/design-qa.md' },
-  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'needs_fix', verdictNote: 'P1 イベントをつくる面が設計とそろわない。キャンセル待ちを受ける設定はできるが、待っている人を数える場所が無い', verdictSource: 'events-v6/design-qa.md' },
-  { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1', verdict: 'needs_fix', verdictNote: 'P1 キャンセル待ちの人を数えられない（events/bookings/page.tsx:212「event_bookings に「キャンセル待ち」という状態が無い。イベント側に waitlist_enabled はあるが、待っている人を数える場所がまだない」）。設計はそこを主役に置き「キャンセル待ち3人（1人 取り消すと1人 回ります）」「24時間 返事がなければ次の方に回ります」と出す。**満席の回で取り消しが出たとき、次に誰へ声をかければいいのか分からない**', verdictSource: 'events-v6/design-qa.md' },
+  { ...EVENT, node: 'ugP5y', name: '29-1 イベント予約', verdict: 'needs_fix', verdictNote: '**#467 `6bb950f3` で撮り直した。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P1 帯が「数」で「次に何をするか」になっていない。設計の3つめ「あと少しで満席 2回（声をかけると埋まります）」と4つめ「申し込みが少ない 1回（8/31の回。あと3日です）」は、そのまま行動になる帯。実装の「定員の充足 55%」は全体の平均で、**どの回が危ないかは分からない**', verdictSource: 'events-v6/ugP5y.txt' , verdictHead: '6bb950f3' },
+  { ...EVENT, node: 'MKrPY', name: '29-1-A イベントをつくる', route: '/events/new', verdict: 'needs_fix', verdictNote: '**#467 `6bb950f3` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計のイベント作成は回ごとの枠（日時・定員・受付終了）をその場で並べて作る。実装との差は枠の口がつながってから見る', verdictSource: 'events-v6/MKrPY.txt' , verdictHead: '6bb950f3' },
+  { ...EVENT, node: 'i5SN2j', name: '29-1-B 申込者の一覧', route: '/events/bookings?id=ev-1', verdict: 'needs_fix', verdictNote: '**#467 `6bb950f3` で予約者の一覧が撮れるようになった。** 帯は 申込 0人（定員12・残り12）／承認待ち 0件（対応が必要）／**キャンセル待ち 2人**／キャンセル 0件。状態の札は 承認待ち・確定・拒否・キャンセル・期限切れ・参加済・無断・キャンセル待ち・全件 で、**内部の語（`confirmed` `requested` `waiting` `invited`）は0件**。1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計は「あと少しで満席」「声をかけると埋まります」のように、次にする行動を帯へ出す。実装は数まで。**撮影の断り**：キャンセル待ちの固定データを2人入れているため、帯が「2人／受け付けない設定です」と並ぶ。イベント側の受付設定と別の値なので、実装の食い違いではない', verdictSource: 'events-v6/i5SN2j.txt' , verdictHead: '6bb950f3' },
   {
     ...EVENT, node: 'k5m5Bc', name: '29-1-C 一覧の状態（空・読込・エラー）',
     states: { apis: ['**/api/events/admin/events*', '**/api/events/admin/events/**'], kinds: ['loading', 'empty', 'error'] },
@@ -1854,11 +1854,12 @@ export const SCREENS = [
     設計のタブは4本（いまいる人8／招待中2／入った記録／権限のかたまり5）。
     実装は1枚もの。
   */
-  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー', verdict: 'needs_fix', verdictNote: 'P1 一覧に「最後に入った」の列が持てない。StaffMember は createdAt / updatedAt / inviteStatus は持つが **lastLoginAt を持たない**。設計の帯「90日 入っていない 1人（辞めた方かもしれません）」も同じ理由で出せない。**辞めた人のログインが生きたまま残る、という形で表に出る**。実装の帯の「最終ログイン」は全体でいちばん新しい1件で、人ごとではない', verdictSource: 'staff-v6/design-qa.md' },
+  { ...STAFF, node: 'e3jz3', name: '30-1 ログインユーザー', verdict: 'needs_fix', verdictNote: '**#475 `15febf7f` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の役割の編集は、権限を項目ごとに見せて差分を確かめてから保存する。実装との差は権限の口がつながってから見る', verdictSource: 'staff-v6/e3jz3.txt' , verdictHead: '15febf7f' },
   {
     ...STAFF, node: 'EOTS4', name: '30-1-A 見せる範囲を決める',
-    verdict: 'needs_fix', verdictNote: 'P1 見せる範囲を決める面が設計とそろわない', verdictSource: 'staff-v6/design-qa.md',
+    verdict: 'needs_fix', verdictNote: '**#475 `15febf7f` で撮った。** 帯は 管理スタッフ 5人（管理者2・その他3）／二要素認証 **2 / 5**（未設定3人）／過去30日のログイン 2回（失敗1）／最終ログイン 09:02 佐々木 亮太。上に **「🔑 二段階認証が未設定のユーザーが 3人 います」** と、**数ではなく次にすることを出す帯**がある。表は ユーザー・役割・担当範囲・LINE連携・二段階認証・利用状態・操作。内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の一覧は最後の操作と、権限の変更履歴への導線を持つ', verdictSource: 'staff-v6/EOTS4.txt',
     mode: 'viewport', height: 1080, steps: [{ click: '高田 誠', role: 'text' }],
+    verdictHead: '15febf7f',
   },
   /*
     **判定を改めた（PR #475 head `15febf7f`）。** 「入った記録」のタブができた。
@@ -1869,7 +1870,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 「入った記録」が記録の一覧ではない。staff/page.tsx:114 が記録ではなくログインユーザーを繰り返し、1人につき1行「最後の操作」を出すだけなので、過去の操作を追えない。設計は4,286件を新しい順に並べる。P1 記録できる操作が5種類（ログイン・ログアウト・ログイン失敗・個人情報を表示・CSVを書き出し。ACTION_LABEL）しかなく、設計の「テンプレートを消しました」「マイルを手で増やしました」「一斉配信を出しました」「外部連携を止めました」は口が持っていない。P2 「対象」と「元の値 → 新しい値」の列が無く、何がどう変わったか分からない。いつもと違う場所からのログインを赤く出す扱いも無い。帯・絞り込みチップ・CSV・ページ送りも無い',
     verdictSource: 'staff-v6/jwVlo-1920.png + apps/web/src/app/staff/page.tsx:114', verdictHead: '15febf7f',
   },
-  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: 'P1 人を招待する面が設計とそろわない。招待の状態（招待中・期限切れ）と、見せる範囲を招待時に決める流れが設計どおりに並んでいない', verdictSource: 'staff-v6/design-qa.md' },
+  { ...STAFF, node: 'I3ZSrU', name: '30-1-C 人を招待する', route: '/staff/new', verdict: 'needs_fix', verdictNote: '**#475 `15febf7f` で撮った。** 内部語・壊れ値は0件、1440・1920とも横スクロール0。**画面全体は要修正のまま**：P2 設計の追加画面は、招待の送り方（LINE連携・メール）と担当範囲の割り当てを1枚で決める。実装との細かな差は、招待の口がつながってから見る', verdictSource: 'staff-v6/I3ZSrU.txt' , verdictHead: '15febf7f' },
 
   // ── 機能31 機能設定 ─────────────────────────────────────
   { ...FEATURE_SET, node: 'c4R6F', name: '31-1 機能設定', verdict: 'needs_fix', verdictNote: 'P2 区分ごとの箱・グループごと切替・「必須」の錠前・右のプレビュー・初期値に戻す/保存・オフにしてもデータは残る説明は設計どおり。実装の説明はむしろ設計より具体的（APIも動いたままで管理画面から隠れるだけ、と書いてある）。差は並べ替えの置き場所ほか4点で、詳しくは settings-v6/design-qa.md', verdictSource: 'settings-v6/design-qa.md' },
@@ -2156,7 +2157,7 @@ export const CAPTURED_AT = {
     { pr: 494, head: '0ca45f98', on: '2026-08-28', screens: ['HIU5O'], note: '#494 は #441 を含む。**新head `5470ede3` でも撮り直していない**——apps/web の20ファイルすべて blob が同一で、差分は Worker の機能設定だけ' },
     { pr: 495, head: '55301679', on: '2026-08-30', screens: ['z3PB2', 'vz0Ji'], note: '**`codex/development` 直結へ張り替えられたが撮り直していない**——`mileage/page.tsx` と `action-score-tab.tsx` の blob が `7d890d3b` と同一。**`pRHvc` は `screens.mjs` に無いNode**なので判断待ちで飛ばした' },
     { pr: 496, head: '4dac7986', on: '2026-08-28', screens: ['s6MBc'], note: '#496 は #495 を含む' },
-    { pr: 499, head: '961722fc', on: '2026-08-28', screens: ['s6MBc'], note: 'Claudeが作ったDraft。#496 の上に積んである' },
+    { pr: 499, head: '642b8222', on: '2026-08-30', screens: ['s6MBc'], note: 'Claudeが作ったDraft。#496 の上に積んである。**head は動いたが撮り直していない**——`apps/web` の差分0件' },
   ],
   7: [
     { pr: 429, head: '0f612926', on: '2026-08-29', screens: ['uJP22'], note: '**撮り直していない。** 旧head `838116b4` から `reminders/new` の blob が不変（差分は Worker の機能設定だけ）。#429 の受入条件5項目だけをコードで確認した。画面全体は要修正のまま' },
@@ -2185,6 +2186,7 @@ export const CAPTURED_AT = {
       note: '撮り方が別の画面に当たっていたので直して撮り直した。固定データの `reachRate` を直したので `NaN%` も消えた',
     },
     { pr: 530, head: '2568c474', on: '2026-08-29', screens: ['xfYLn'], note: '通の編集から `cron` を外す。束3' },
+    { pr: 569, head: '92f03199', on: '2026-08-30', screens: ['cCB7r'], note: '配信方式の選択。段の表示と、作り直しになる断りが入っている' },
     { pr: 427, head: '5f09837c', on: '2026-08-30', screens: ['TC1b1', 'bV5Vs', 'g2UNV'], note: '`codex/development` 直結へ張り替え。**#529 の母数の直りは入っていない**（#427 単体では 41% だけ）' },
   ],
   2: [
@@ -2205,11 +2207,15 @@ export const CAPTURED_AT = {
     { pr: 520, head: '4848a8f3', on: '2026-08-29', screens: ['bzDn6'], note: '友だち一覧の帯を未取得 `—人` に。**development 直結の根元PR**' },
     { pr: 565, head: 'ea2e730d', on: '2026-08-29', screens: ['r7eSi'], note: '統合ユーザーの7列。内部の統合キーを外し、未取得と0件を分ける。空の返事の形も直した（`rows` の無い返事だと画面ごと落ちる）' }],
   28: [{ pr: 532, head: '6cc74968', on: '2026-08-29', screens: ['W6465r'], note: '予約設定の帯を未取得 `—` に。束1と束4' }],
-  29: [{ pr: 533, head: 'd1070487', on: '2026-08-29', screens: ['k5m5Bc'], note: 'イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**' }],
+  29: [
+    { pr: 533, head: 'd1070487', on: '2026-08-29', screens: ['k5m5Bc'], note: 'イベント予約の帯を未取得 `—` に。**#533 は #518 を含む**' },
+    { pr: 467, head: '6bb950f3', on: '2026-08-30', screens: ['MKrPY', 'i5SN2j', 'ugP5y'], note: 'イベント予約の作成・予約者・一覧。キャンセル待ちの口を撮影モックへ足した（無いと `waitlist.length` で落ちる）' },
+  ],
   10: [{ pr: 524, head: 'a6c35ee0', on: '2026-08-29', screens: ['zCQXe'], note: 'ウェビナーの帯を未取得 `—` に。束4' }],
   11: [{ pr: 528, head: '1b95452d', on: '2026-08-29', screens: ['NKyoA'], note: 'タブとフォルダの件数を未取得 `—` に。束4' }],
   12: [{ pr: 523, head: '47e7846e', on: '2026-08-29', screens: ['RW5Tb'], note: '内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える' }],
   4: [{ pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' }],
+  30: [{ pr: 475, head: '15febf7f', on: '2026-08-30', screens: ['EOTS4', 'I3ZSrU', 'e3jz3', 'jwVlo'], note: 'ログインユーザーの一覧・追加・役割。development 直結' }],
   9: [{ pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' }],
   18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],

@@ -546,6 +546,31 @@ function bodyFor(pathname, query = new URLSearchParams()) {
   }
   const eventBookings = /^\/api\/events\/admin\/events\/([^/]+)\/bookings$/.exec(pathname)
   if (eventBookings) return { items: [] }
+  /*
+    キャンセル待ち。**包まずに `waitlist` で返す**
+    （`api.ts:4140` が `{ waitlist: EventWaitlistItem[] }` を読む）。
+    無いと `waitlist.length` で画面ごと落ちる。
+
+    **並んでいる人と、声をかけた人の2つを入れる。** `status` は
+    `waiting`（並んでいる）と `invited`（声をかけた）で、
+    声をかけた人だけ `notified_at` を持つ。0件にすると、
+    「あと少しで満席」の見え方を確かめられない。
+  */
+  const eventWaitlist = /^\/api\/events\/admin\/events\/([^/]+)\/waitlist$/.exec(pathname)
+  if (eventWaitlist) {
+    return { waitlist: [
+      {
+        id: 'ew-1', slot_id: 'es-1', friend_id: 'friend-2', status: 'waiting',
+        notified_at: null, created_at: '2026-08-27T02:10:00.000Z',
+        slot_starts_at: '2026-09-05T01:00:00.000Z', friend_name: '佐藤 花子',
+      },
+      {
+        id: 'ew-2', slot_id: 'es-1', friend_id: 'friend-3', status: 'invited',
+        notified_at: '2026-08-28T05:00:00.000Z', created_at: '2026-08-27T06:40:00.000Z',
+        slot_starts_at: '2026-09-05T01:00:00.000Z', friend_name: null,
+      },
+    ] }
+  }
   if (pathname === '/api/booking/admin/requests') return { requests: BOOKING_REQUESTS }
   if (pathname === '/api/booking/admin/menus') return { menus: BOOKING_MENUS }
   if (pathname === '/api/booking/admin/staff') return { staff: BOOKING_STAFF }
