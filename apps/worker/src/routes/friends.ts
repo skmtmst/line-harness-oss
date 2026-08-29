@@ -11,8 +11,12 @@ import {
   enrollFriendInScenario,
   getMileageSummaryForFriend,
   getMileageHistoryForFriend,
+  getMileageSelfInsights,
+  getMileageConnectedAccountsForFriend,
   jstNow,
   getTagAddedScenarioIds,
+  getSavedSearchById,
+  validateSearchConditions,
 } from '@line-crm/db';
 import type { Friend as DbFriend, Tag as DbTag } from '@line-crm/db';
 import { fireEvent } from '../services/event-bus.js';
@@ -27,6 +31,7 @@ import {
   isValidIdempotencyKey,
   reserveOutboundSend,
 } from '../services/outbound-idempotency.js';
+import { compileSavedSearch } from '../services/saved-search-filter.js';
 
 const friends = new Hono<Env>();
 
@@ -173,6 +178,7 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       c.req.query('handled') === 'unhandled' ? 'unhandled' : null;
     const operatorId = c.req.query('operatorId');
     const scenarioId = c.req.query('scenarioId');
+    const savedSearchId = c.req.query('savedSearchId');
 
     const db = c.env.DB;
     const staff = c.get('staff');
@@ -215,12 +221,44 @@ friends.get('/api/friends', requireRole('owner', 'admin', 'staff'), async (c) =>
       binds.push(audienceId);
     }
     if (lineAccountId) {
+      const visibleScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+      if (!visibleScope.allowedAccountIds.includes(lineAccountId)) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
       conditions.push('f.line_account_id = ?');
       binds.push(lineAccountId);
     } else {
       const { scope, where } = await adminAccountScope(c, 'f.');
       conditions.push(where);
       binds.push(...scope.allowedAccountIds);
+    }
+    if (savedSearchId) {
+      if (!lineAccountId) {
+        return c.json({ success: false, error: 'LINE公式アカウントを選んでください' }, 400);
+      }
+      const row = await getSavedSearchById(db, savedSearchId, lineAccountId);
+      const staff = c.get('staff');
+      if (!row
+          || row.scope !== 'friends'
+          || (!row.is_shared && row.created_by !== staff.id && staff.role !== 'owner' && staff.role !== 'admin')) {
+        return c.json({ success: false, error: '保存した検索が見つかりません' }, 404);
+      }
+      let rawConditions: unknown;
+      try {
+        rawConditions = JSON.parse(row.conditions_json);
+      } catch {
+        return c.json({ success: false, error: '保存した検索の条件が壊れています' }, 422);
+      }
+      const validated = validateSearchConditions(rawConditions);
+      if (!validated.ok) {
+        return c.json({ success: false, error: validated.error }, 422);
+      }
+      const compiled = compileSavedSearch(validated.value);
+      if (!compiled.ok) {
+        return c.json({ success: false, error: compiled.error }, 422);
+      }
+      conditions.push(compiled.value.sql);
+      binds.push(...compiled.value.binds);
     }
     if (search) {
       conditions.push('f.display_name LIKE ?');
@@ -642,16 +680,25 @@ friends.get('/api/friends/:id/mileage', requireVisibleFriend, async (c) => {
     if (!friend) {
       return c.json({ success: false, error: 'Friend not found' }, 404);
     }
+    const requestedAccountId = c.req.query('accountId')?.trim();
+    const friendAccountId =
+      ((friend as unknown as Record<string, unknown>).line_account_id as string | null) ?? null;
+    if (requestedAccountId && friendAccountId !== requestedAccountId) {
+      return c.json({ success: false, error: 'Friend not found' }, 404);
+    }
 
     const requestedLimit = Number.parseInt(c.req.query('limit') ?? '', 10);
     const limit = Number.isFinite(requestedLimit)
       ? Math.min(100, Math.max(1, requestedLimit))
       : 10;
-    const [summary, history] = await Promise.all([
+    const accountScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const [summary, history, insights, connections] = await Promise.all([
       getMileageSummaryForFriend(c.env.DB, friendId),
       getMileageHistoryForFriend(c.env.DB, friendId, { limit }),
+      getMileageSelfInsights(c.env.DB, friendId),
+      getMileageConnectedAccountsForFriend(c.env.DB, friendId, accountScope.allowedAccountIds),
     ]);
-    return c.json({ success: true, data: { summary, history } });
+    return c.json({ success: true, data: { summary, history, insights, connections } });
   } catch (err) {
     console.error('GET /api/friends/:id/mileage error:', err);
     return c.json({ success: false, error: 'Internal server error' }, 500);

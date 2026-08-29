@@ -2520,39 +2520,50 @@
       ]
     },
     "/form-submissions": {
-      "node": "v2tEQe",
-      "name": "V2 6-3 回答フォーム",
+      "node": "EMBIK",
+      "name": "V6 13-1 回答フォーム",
       "sections": [
-        "Head",
         "KPIs"
       ],
       "parts": [
-        "回答フォーム",
-        "マニュアル",
-        "並び替え",
-        "フォルダを追加",
         "フォーム",
-        "回答",
+        "公開中",
         "今月の回答",
-        "回答率"
-      ]
+        "回答率",
+        "フォームを作る",
+        "まだ回答フォームがありません",
+        "条件に合うフォームはありません"
+      ],
+      "visualVerification": {
+        "status": "unverified",
+        "referenceNodeIds": [
+          "EMBIK",
+          "ZOPyc",
+          "v9tYhl"
+        ],
+        "requiredViewports": [
+          1440,
+          1920
+        ],
+        "reason": "Claudeの設計画像・実装画像比較待ち"
+      }
     },
-    "/scoring": {
-      "node": "qivt1",
-      "name": "V2 6-4 マイル",
+    "/mileage": {
+      "node": "s98Vfw",
+      "name": "V6 17-1 マイル・友だちの残高",
       "sections": [
-        "Head"
+        "Tabs"
       ],
       "parts": [
-        "マイル",
-        "マニュアル",
-        "残高をCSV出力",
-        "購入や紹介でたまるマイルを管理します"
+        "友だちの残高",
+        "たまる決めごと",
+        "残高を再読み込み",
+        "決めごとを作る"
       ]
     },
-    "/scoring/new": {
-      "node": "Wd0Rr",
-      "name": "V2 6-4-1 付与ルールを作る",
+    "/mileage/earning-rules/new": {
+      "node": "BmoGY",
+      "name": "V6 17-1-D たまる決めごとをつくる",
       "sections": [
         "Body",
         "Crumb",
@@ -2561,8 +2572,8 @@
         "Right"
       ],
       "parts": [
-        "付与ルールを作る",
-        "ルールを作成",
+        "たまる決めごとをつくる",
+        "たまる決めごとを作る",
         "どのルールか",
         "ルール名",
         "きっかけ",

@@ -951,6 +951,13 @@ CREATE TABLE "folders" (
   color         TEXT
 );
 
+CREATE TABLE form_accounts (
+  form_id         TEXT NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (form_id, line_account_id)
+);
+
 CREATE TABLE form_opens (
   id TEXT PRIMARY KEY,
   form_id TEXT NOT NULL,
@@ -1568,7 +1575,9 @@ CREATE TABLE nen_delivery_jobs (
   last_error TEXT,
   sent_at TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL, campaign_snapshot TEXT CHECK (
+  campaign_snapshot IS NULL OR json_valid(campaign_snapshot)
+),
   UNIQUE (campaign_key, friend_id, source_key)
 );
 
@@ -2113,6 +2122,22 @@ CREATE TABLE rt_tables (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(store_id, code)
+);
+
+CREATE TABLE saved_search_references (
+  saved_search_id TEXT NOT NULL,
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  reference_kind TEXT NOT NULL
+    CHECK (reference_kind IN ('broadcast','automation','scenario','other')),
+  reference_id TEXT NOT NULL,
+  reference_name TEXT NOT NULL,
+  reference_mode TEXT NOT NULL DEFAULT 'live'
+    CHECK (reference_mode IN ('live','fixed')),
+  last_used_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
+  PRIMARY KEY (saved_search_id, reference_kind, reference_id),
+  FOREIGN KEY (saved_search_id, line_account_id)
+    REFERENCES saved_searches(id, line_account_id) ON DELETE RESTRICT
 );
 
 CREATE TABLE saved_searches (
@@ -2883,6 +2908,9 @@ CREATE INDEX idx_ffv_field ON friend_field_values(field_id, value);
 
 CREATE INDEX idx_folders_kind_order ON folders(kind, display_order);
 
+CREATE INDEX idx_form_accounts_account
+  ON form_accounts(line_account_id, form_id);
+
 CREATE INDEX idx_form_opens_form ON form_opens (form_id, opened_at);
 
 CREATE INDEX idx_form_submissions_form ON form_submissions (form_id);
@@ -3170,8 +3198,14 @@ CREATE INDEX idx_rt_sync_events_recent ON rt_sync_events(store_id, received_at D
 
 CREATE INDEX idx_rt_tables_store ON rt_tables(store_id, is_active);
 
+CREATE INDEX idx_saved_search_references_account
+  ON saved_search_references(line_account_id, saved_search_id, reference_kind);
+
 CREATE INDEX idx_saved_searches_account_scope
   ON saved_searches(line_account_id, scope, created_by, display_order);
+
+CREATE UNIQUE INDEX idx_saved_searches_id_account
+  ON saved_searches(id, line_account_id);
 
 CREATE INDEX idx_saved_searches_scope ON saved_searches(scope, display_order);
 

@@ -652,6 +652,8 @@ export type FriendListParams = {
   operatorId?: string
   /** 現在配信中のシナリオ。 */
   scenarioId?: string
+  /** サーバーへ保存したAND/OR条件。選択中のLINEアカウントが必須。 */
+  savedSearchId?: string
 
   // ── 詳細検索（設計 V2 2-2 の「絞り込み条件を設定」）─────────────────
   // どれも足し算。指定が無ければ何も起きない。
@@ -729,7 +731,34 @@ export type MileageHistoryItem = {
   reason: string
   source: string
   sourceEventId: string | null
+  sourceReferenceId: string | null
+  ruleName: string | null
+  mode: 'automatic' | 'manual'
+  executedByStaffName: string | null
   occurredAt: string
+}
+export type MileageSelfInsights = {
+  accountCount: number
+  rewardedActions: number
+  referralMiles: number
+  qualityReferralCount: number
+  lastEarnedAt: string | null
+}
+export type MileageConnectedAccount = {
+  accountId: string
+  accountName: string
+  friendId: string
+}
+export type MileageAdjustmentPolicy = {
+  configured: boolean
+  approvalThreshold: number | null
+}
+export type MileageAdjustmentResult = {
+  entryId: string
+  balanceBefore: number
+  amount: number
+  balanceAfter: number
+  replayed: boolean
 }
 export type MileageRule = {
   id: string
@@ -785,6 +814,27 @@ export type MileageAdminOverview = {
     queuedEvents: number
   }
   members: MileageAdminMember[]
+  pagination: { total: number; limit: number; offset: number }
+}
+export type MileageAdminHistoryItem = {
+  id: string
+  primaryFriendId: string
+  displayName: string
+  pictureUrl: string | null
+  entryType: MileageHistoryItem['entryType']
+  status: MileageHistoryItem['status']
+  amount: number
+  reason: string
+  source: string
+  hasSourceEvent: boolean
+  sourceReferenceId: string | null
+  ruleName: string | null
+  mode: 'automatic' | 'manual'
+  executedByStaffName: string | null
+  occurredAt: string
+}
+export type MileageAdminHistory = {
+  items: MileageAdminHistoryItem[]
   pagination: { total: number; limit: number; offset: number }
 }
 /** Friend list items, optionally hydrated with chat status (when ?includeChatStatus=true) */
@@ -1271,6 +1321,7 @@ export const api = {
       if (params?.handled) query.handled = params.handled
       if (params?.operatorId) query.operatorId = params.operatorId
       if (params?.scenarioId) query.scenarioId = params.scenarioId
+      if (params?.savedSearchId) query.savedSearchId = params.savedSearchId
       if (params?.tagIds?.length) query.tagIds = params.tagIds.join(',')
       if (params?.excludeTagIds?.length) query.excludeTagIds = params.excludeTagIds.join(',')
       if (params?.statusMessage) query.statusMessage = params.statusMessage
@@ -1290,10 +1341,20 @@ export const api = {
     },
     get: (id: string) =>
       fetchApi<ApiResponse<FriendDetail>>(`/api/friends/${id}`),
-    mileage: (id: string, limit = 10) =>
-      fetchApi<ApiResponse<{ summary: MileageSummary; history: MileageHistoryItem[] }>>(
-        `/api/friends/${id}/mileage?limit=${limit}`,
-      ),
+    mileage: (id: string, params?: number | { limit?: number; accountId?: string }) => {
+      const query = new URLSearchParams()
+      const options = typeof params === 'number' ? { limit: params } : params
+      query.set('limit', String(options?.limit ?? 10))
+      if (options?.accountId) query.set('accountId', options.accountId)
+      return fetchApi<ApiResponse<{
+        summary: MileageSummary
+        history: MileageHistoryItem[]
+        insights: MileageSelfInsights
+        connections: MileageConnectedAccount[]
+      }>>(
+          `/api/friends/${id}/mileage?${query.toString()}`,
+        )
+    },
     /**
      * 友だち追加の内訳（設計 V2 4-6）。
      * returning は「以前からのお客さまに『はじめまして』が届いた数」でもある。
@@ -1775,11 +1836,11 @@ export const api = {
   },
   /** 回答フォーム。 */
   forms: {
-    list: () =>
+    list: (accountId: string) =>
       fetchApi<ApiResponse<Array<{ id: string; name: string; description: string | null }>>>(
-        '/api/forms',
+        `/api/forms?account_id=${encodeURIComponent(accountId)}`,
       ),
-    get: (id: string) =>
+    get: (id: string, accountId: string) =>
       fetchApi<
         ApiResponse<{
           id: string
@@ -1794,14 +1855,23 @@ export const api = {
           isActive: boolean
           submitCount: number
         }>
-      >(`/api/forms/${id}`),
-    create: (data: { name: string; description?: string | null; layout?: FormLayout }) =>
+      >(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`),
+    create: (
+      accountId: string,
+      data: { name: string; description?: string | null; layout?: FormLayout },
+    ) =>
       fetchApi<ApiResponse<{ id: string }>>('/api/forms', {
         method: 'POST',
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, accountId }),
+      }),
+    createDraft: (accountId: string, name?: string) =>
+      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>('/api/forms/drafts', {
+        method: 'POST',
+        body: JSON.stringify({ name, accountId }),
       }),
     update: (
       id: string,
+      accountId: string,
       data: {
         name?: string
         description?: string | null
@@ -1814,16 +1884,19 @@ export const api = {
         isActive?: boolean
       },
     ) =>
-      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}`, {
+      fetchApi<ApiResponse<{ id: string }>>(`/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       }),
-    remove: (id: string) =>
-      fetchApi<ApiResponse<null>>(`/api/forms/${id}`, { method: 'DELETE' }),
+    remove: (id: string, accountId: string) =>
+      fetchApi<ApiResponse<null>>(
+        `/api/forms/${id}?account_id=${encodeURIComponent(accountId)}`,
+        { method: 'DELETE' },
+      ),
   },
   /** NENコラム。 */
   nenColumns: {
-    list: () =>
+    list: (accountId: string) =>
       fetchApi<
         ApiResponse<
           Array<{
@@ -1834,10 +1907,10 @@ export const api = {
             published_at: string | null
           }>
         >
-      >('/api/nen-campaigns/columns'),
+      >(`/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`),
     /** コラムに添える紹介文。本文そのものはEC側にある。 */
-    updateMessage: (id: string, introText: string) =>
-      fetchApi<ApiResponse<null>>(`/api/nen-campaigns/columns/${id}/message`, {
+    updateMessage: (accountId: string, id: string, introText: string) =>
+      fetchApi<ApiResponse<null>>(`/api/nen-campaigns/columns/${id}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT',
         body: JSON.stringify({ introText }),
       }),
@@ -3171,47 +3244,56 @@ export const api = {
     },
   },
   nenCampaigns: {
-    overview: () => fetchApi<ApiResponse<{
+    overview: (accountId: string) => fetchApi<ApiResponse<{
       activeCampaigns: number
       jobs: { total: number; pending: number; sent: number; failed: number }
       columns: number
       pets: number
       coupons: number
-    }>>('/api/nen-campaigns/overview'),
-    settings: () => fetchApi<ApiResponse<NenCampaignSetting[]>>('/api/nen-campaigns/settings'),
-    updateSetting: (campaignKey: string, data: Pick<NenCampaignSetting,
+    }>>(`/api/nen-campaigns/overview?lineAccountId=${encodeURIComponent(accountId)}`),
+    settings: (accountId: string) => fetchApi<ApiResponse<NenCampaignSetting[]>>(
+      `/api/nen-campaigns/settings?lineAccountId=${encodeURIComponent(accountId)}`,
+    ),
+    updateSetting: (accountId: string, campaignKey: string, data: Pick<NenCampaignSetting,
       'isEnabled' | 'title' | 'bodyText' | 'delayDays' | 'deliveryTime' | 'buttonLabel' | 'buttonUrl' | 'imageUrl'>) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}`, {
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/settings/${encodeURIComponent(campaignKey)}?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify(data),
       }),
     testSend: (data: { campaignKey: string; accountId: string; friendId: string }) =>
       fetchApi<{ success: boolean }>('/api/nen-campaigns/test-send', { method: 'POST', body: JSON.stringify(data) }),
-    jobs: () => fetchApi<ApiResponse<Array<{
+    jobs: (accountId: string) => fetchApi<ApiResponse<Array<{
       id: string; campaignKey: string; label: string; friendName: string | null
       scheduledAt: string; status: string; attempts: number; lastError: string | null; sentAt: string | null
-    }>>>('/api/nen-campaigns/jobs'),
-    columns: () => fetchApi<ApiResponse<NenColumn[]>>('/api/nen-campaigns/columns'),
+    }>>>(`/api/nen-campaigns/jobs?lineAccountId=${encodeURIComponent(accountId)}`),
+    columns: (accountId: string) => fetchApi<ApiResponse<NenColumn[]>>(
+      `/api/nen-campaigns/columns?lineAccountId=${encodeURIComponent(accountId)}`,
+    ),
     deliverColumn: (id: string, data: { accountId: string; scheduledAt?: string }) =>
       fetchApi<ApiResponse<{ queued: number }>>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/deliver`, {
         method: 'POST', body: JSON.stringify(data),
       }),
-    updateColumnMessage: (id: string, introText: string) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message`, {
+    updateColumnMessage: (accountId: string, id: string, introText: string) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/columns/${encodeURIComponent(id)}/message?lineAccountId=${encodeURIComponent(accountId)}`, {
         method: 'PUT', body: JSON.stringify({ introText }),
       }),
-    pets: (search?: string) => fetchApi<ApiResponse<NenPetProfile[]>>(
-      `/api/nen-campaigns/pets${search ? `?search=${encodeURIComponent(search)}` : ''}`,
+    pets: (accountId: string, search?: string) => {
+      const query = new URLSearchParams({ lineAccountId: accountId })
+      if (search) query.set('search', search)
+      return fetchApi<ApiResponse<NenPetProfile[]>>(`/api/nen-campaigns/pets?${query}`)
+    },
+    createPet: (accountId: string, data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
+      fetchApi<ApiResponse<{ id: string }>>(`/api/nen-campaigns/pets?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'POST', body: JSON.stringify(data) }),
+    updatePet: (accountId: string, id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    deletePet: (accountId: string, id: string) => fetchApi<{ success: boolean }>(
+      `/api/nen-campaigns/pets/${encodeURIComponent(id)}?lineAccountId=${encodeURIComponent(accountId)}`,
+      { method: 'DELETE' },
     ),
-    createPet: (data: { friendId: string; customerId?: string; name: string; animalType: string; gender: string; birthday?: string }) =>
-      fetchApi<ApiResponse<{ id: string }>>('/api/nen-campaigns/pets', { method: 'POST', body: JSON.stringify(data) }),
-    updatePet: (id: string, data: { name: string; animalType: string; gender: string; birthday?: string }) =>
-      fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) }),
-    deletePet: (id: string) => fetchApi<{ success: boolean }>(`/api/nen-campaigns/pets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
-    birthdayCoupon: () => fetchApi<ApiResponse<{
+    birthdayCoupon: (accountId: string) => fetchApi<ApiResponse<{
       isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number; updatedAt: string
-    }>>('/api/nen-campaigns/birthday-coupon'),
-    updateBirthdayCoupon: (data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number }) =>
-      fetchApi<{ success: boolean }>('/api/nen-campaigns/birthday-coupon', { method: 'PUT', body: JSON.stringify(data) }),
+    }>>(`/api/nen-campaigns/birthday-coupon?lineAccountId=${encodeURIComponent(accountId)}`),
+    updateBirthdayCoupon: (accountId: string, data: { isEnabled: boolean; codePrefix: string; benefitLabel: string; discountAmount: number; validityDays: number }) =>
+      fetchApi<{ success: boolean }>(`/api/nen-campaigns/birthday-coupon?lineAccountId=${encodeURIComponent(accountId)}`, { method: 'PUT', body: JSON.stringify(data) }),
   },
   nenMembers: {
     overview: () => fetchApi<ApiResponse<{ pets: number; healthLogs: number; activeCare: number; pendingPhotos: number; members: number; consultations: number }>>('/api/nen-members/overview'),
@@ -3325,6 +3407,8 @@ export const api = {
     create: (data: {
       name: string
       description?: string | null
+      /** 新しいリマインダを動かすLINEアカウント。 */
+      lineAccountId: string
       triggerType?: ReminderTriggerType
       triggerOffsetMinutes?: number | null
       sendAtTime?: string | null
@@ -3421,6 +3505,53 @@ export const api = {
       const suffix = query.toString() ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<MileageAdminOverview>>(`/api/mileage/overview${suffix}`)
     },
+    history: (params: {
+      accountId: string
+      search?: string
+      entryType?: MileageHistoryItem['entryType']
+      status?: MileageHistoryItem['status']
+      mode?: 'automatic' | 'manual'
+      from?: string
+      to?: string
+      limit?: number
+      offset?: number
+    }) => {
+      const query = new URLSearchParams({ accountId: params.accountId })
+      if (params.search) query.set('search', params.search)
+      if (params.entryType) query.set('entryType', params.entryType)
+      if (params.status) query.set('status', params.status)
+      if (params.mode) query.set('mode', params.mode)
+      if (params.from) query.set('from', params.from)
+      if (params.to) query.set('to', params.to)
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.offset !== undefined) query.set('offset', String(params.offset))
+      return fetchApi<ApiResponse<MileageAdminHistory>>(`/api/mileage/history?${query.toString()}`)
+    },
+    adjustmentPolicy: (accountId: string) =>
+      fetchApi<ApiResponse<MileageAdjustmentPolicy>>(
+        `/api/mileage/adjustment-policy?accountId=${encodeURIComponent(accountId)}`,
+      ),
+    setAdjustmentPolicy: (data: { accountId: string; approvalThreshold: number }) =>
+      fetchApi<ApiResponse<MileageAdjustmentPolicy>>('/api/mileage/adjustment-policy', {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
+    adjust: (data: {
+      accountId: string
+      friendId: string
+      direction: 'increase' | 'decrease'
+      amount: number
+      reasonCategory: 'customer_support' | 'order_correction' | 'grant_correction' | 'campaign' | 'other'
+      reason: string
+      sourceReferenceId?: string
+    }, idempotencyKey: string) => fetchApi<ApiResponse<MileageAdjustmentResult>>('/api/mileage/adjustments', {
+      method: 'POST',
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+        'X-Confirm-Irreversible': 'mileage-adjustment',
+      },
+      body: JSON.stringify(data),
+    }),
     rules: () => fetchApi<ApiResponse<MileageRule[]>>('/api/mileage/rules'),
     createRule: (data: {
       name: string
