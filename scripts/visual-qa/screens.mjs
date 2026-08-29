@@ -1137,9 +1137,9 @@ export const SCREENS = [
     段は無いが**中身は同じ画面に全部ある**ので、同じ絵を3つの設計と
     突き合わせる形にする。
   */
-  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: 'P1 どれが出るかを決める「順番」が画面に出ない。リッチメニューは同じ友だちが複数に当てはまると**いちばん上の1つだけ**が出るのに、並び順の既定は「タップ数が多い順」（page.tsx:93）で、画面の並びと実際に出る順番が関係ない。targetingPriority はデータとして持っているのに一覧が一度も出していない（grep が0件）。出し分けを2件以上使い始めた時点で効いてくる。P2 表でなく札の格子。絞り込みの札が3つで「条件で出し分け」「管理画面の外」で絞れない。状態に「予約」が無い（status は draft と published の2つだけで、publishingAt は持っているのに予約中を出せない）。「保存した検索」が無い', verdictSource: 'rich-menus-v6/design-qa.md' },
-  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: 'P1 形とボタンを決める段が無く、1枚の画面に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' },
-  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-B 誰に出すかが独立しておらず、同じ1枚の中に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'GO8RQ', name: '12-1 リッチメニュー', verdict: 'needs_fix', verdictNote: 'P1 どれが出るかを決める「順番」が画面に出ない。リッチメニューは同じ友だちが複数に当てはまると**いちばん上の1つだけ**が出るのに、並び順の既定は「タップ数が多い順」（page.tsx:93）で、画面の並びと実際に出る順番が関係ない。targetingPriority はデータとして持っているのに一覧が一度も出していない（grep が0件）。出し分けを2件以上使い始めた時点で効いてくる。P2 表でなく札の格子。絞り込みの札が3つで「条件で出し分け」「管理画面の外」で絞れない。状態に「予約」が無い（status は draft と published の2つだけで、publishingAt は持っているのに予約中を出せない）。「保存した検索」が無い', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'XtfO3', name: '12-1-A メニューを作る・形とボタン', route: '/rich-menus/new', verdict: 'needs_fix', verdictNote: 'P1 形とボタンを決める段が無く、1枚の画面に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'kQ1bs', name: '12-1-B メニューを作る・誰に出すか', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-B 誰に出すかが独立しておらず、同じ1枚の中に混ざっている', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     /*
       **#509 で `/rich-menus/connections?id=` が入った。**
@@ -1161,8 +1161,8 @@ export const SCREENS = [
     verdictSource: 'rich-menus-v6/NXdDk-1920.png',
     verdictHead: 'e148615c',
   },
-  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-D 公開のしかたが独立しておらず、同じ1枚の中に混ざっている。日時を決めて出す「予約中」の状態を出せない', verdictSource: 'rich-menus-v6/design-qa.md' },
-  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: 'P2 設計は別画面だが実装は一覧の中に埋め込み。**設計より近い場所にあるので悪い差ではない**。ただし絞り込みの札に「管理画面の外」が無く、絞れない', verdictSource: 'rich-menus-v6/design-qa.md' },
+  { ...RICH_MENU, node: 'UMiJ9', name: '12-1-D メニューを作る・公開のしかた', route: RM_EDIT, verdict: 'needs_fix', verdictNote: 'P1 12-1-D 公開のしかたが独立しておらず、同じ1枚の中に混ざっている。日時を決めて出す「予約中」の状態を出せない', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...RICH_MENU, node: 'TL7tp', name: '12-1-E 管理画面の外のメニューを取り込む', verdict: 'needs_fix', verdictNote: 'P2 設計は別画面だが実装は一覧の中に埋め込み。**設計より近い場所にあるので悪い差ではない**。ただし絞り込みの札に「管理画面の外」が無く、絞れない', verdictSource: 'rich-menus-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...RICH_MENU, node: 'szXsT', name: '12-1-F リッチメニューの削除確認',
     gap: 'api',
@@ -1431,11 +1431,11 @@ export const SCREENS = [
     設計のタブは4本（流入経路24／サイトスクリプト／広告連携3／広告とのつなぎ5）。
     実装は3本で、**「広告とのつなぎ」（成果を広告へ返す）が無い。**
   */
-  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: 'P1 タブに件数が付かない（設計は流入経路24／広告連携3）。帯4つの作りが違う（設計は流入元24本／今月312人・経路が分かる289人／クリック8,420回／平均の追加率6.4%）。左のフォルダの縦帯が無い（ジャンルはあるが別の作り）。「まとめて操作」「CSVで書き出す」が無い', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: 'P1 サイトスクリプトの面が設計とそろわない。18-1 全体の差（タブに件数が付かない・帯4つの作りが違う・左のフォルダの縦帯が無い・まとめて操作/CSVが無い）がここにも効く', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「Yahoo!広告 つないでいません」から実際につなげない。押すと「接続を作る画面は準備中です」で止まる。設計はそこから接続を作らせる', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: 'P1 流入リンクをつくる面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: 'P1 流入元の詳細の面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'Q4bkTg', name: '18-1 流入と計測', route: '/inflow-links?tab=links', verdict: 'needs_fix', verdictNote: 'P1 タブに件数が付かない（設計は流入経路24／広告連携3）。帯4つの作りが違う（設計は流入元24本／今月312人・経路が分かる289人／クリック8,420回／平均の追加率6.4%）。左のフォルダの縦帯が無い（ジャンルはあるが別の作り）。「まとめて操作」「CSVで書き出す」が無い', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'IhSBB', name: '18-1-A サイトスクリプト', route: '/inflow-links?tab=script', verdict: 'needs_fix', verdictNote: 'P1 サイトスクリプトの面が設計とそろわない。18-1 全体の差（タブに件数が付かない・帯4つの作りが違う・左のフォルダの縦帯が無い・まとめて操作/CSVが無い）がここにも効く', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'v0HaI', name: '18-1-B 広告連携', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「Yahoo!広告 つないでいません」から実際につなげない。押すと「接続を作る画面は準備中です」で止まる。設計はそこから接続を作らせる', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'TEVk8', name: '18-1-C 流入リンクをつくる', route: '/inflow-links/new', verdict: 'needs_fix', verdictNote: 'P1 流入リンクをつくる面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'JupxW', name: '18-1-D 流入元の詳細', route: '/inflow-links/detail?ref=summer-ig', verdict: 'needs_fix', verdictNote: 'P1 流入元の詳細の面が設計とそろわない', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...INFLOW, node: 'UIaM7', name: '18-1-E 流入リンクの削除確認',
     gap: 'api',
@@ -1447,6 +1447,7 @@ export const SCREENS = [
     verdict: 'needs_fix', verdictNote: 'P1 一覧の状態に共通部品（ListState）を使っておらず、読込・空・失敗の言い分けが設計とそろわない。ほかの機能は同じ部品へ寄せている', verdictSource: 'inflow-v6/design-qa.md',
     route: '/inflow-links?tab=links',
     states: { apis: ['**/api/entry-routes*', '**/api/entry-routes/**', '**/api/analytics/ref-summary*'], kinds: ['loading', 'empty', 'error'] },
+    verdictHead: 'c275749d',
   },
   /*
     **判定を改めた（PR #443 head `f372ff30`）。**
@@ -1454,8 +1455,8 @@ export const SCREENS = [
     だけで、**中身は「広告連携」タブに入っている。** 返した記録も、
     クリックの種類（fbclid）も、失敗の理由も出る。
   */
-  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「成果地点と、広告に返す名前の対応」が無い。対応が付いていない成果地点は広告へ返せないのに、**返せていないことに気づく場所がどこにも無い**。P1 「失敗したものをまとめてやり直す」が無い（試行・次の再試行は—のまま）。P2 帯が「広告側へ返した成果 1件」だけ（設計は 送った866／待っている12／断られた7／やり直して成功23）', verdictSource: 'inflow-v6/design-qa.md' },
-  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 18-2-A 送信履歴が独立した画面として無く、18-2 の1枚の中に混ざっている', verdictSource: 'inflow-v6/design-qa.md' },
+  { ...INFLOW, node: 'BuVDB', name: '18-2 広告とのつなぎ（成果の対応付け）', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 「成果地点と、広告に返す名前の対応」が無い。対応が付いていない成果地点は広告へ返せないのに、**返せていないことに気づく場所がどこにも無い**。P1 「失敗したものをまとめてやり直す」が無い（試行・次の再試行は—のまま）。P2 帯が「広告側へ返した成果 1件」だけ（設計は 送った866／待っている12／断られた7／やり直して成功23）', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...INFLOW, node: 'Im2b1', name: '18-2-A 広告への送信履歴', route: '/inflow-links?tab=ads', verdict: 'needs_fix', verdictNote: 'P1 18-2-A 送信履歴が独立した画面として無く、18-2 の1枚の中に混ざっている', verdictSource: 'inflow-v6/design-qa.md' , verdictHead: 'c275749d' },
 
   // ── 機能19 コンバージョン ───────────────────────────────
   { ...CONVERSION, node: 'ZrpKn', name: '19-1 コンバージョン', route: '/conversions?tab=points', verdict: 'needs_fix', verdictNote: 'P2 「何が起きたら数えるか」にきっかけの名前（EC連携の「注文が確定」／回答フォームの送信）が出ず、種別と数え方のチップになっている。CSVで書き出す、中身を見る、使う場所を足す が無い。**「使う場所を足す」が無いので、作った成果地点を分析へつなぐ導線がこの画面に無い**。期間の選択も無い。成果地点名が長いと…で切れる（設計は折り返す）。**未取得と0件の描き分けは正しい**（金額を持たないものは「金額なし」、使われていないものは「どこからも使われていません」）', verdictSource: 'conversions-v6/design-qa.md' },
@@ -1482,10 +1483,10 @@ export const SCREENS = [
     使われ方・保存した分析が入っている。数は `AnalyticsMetric`
     （`{value, state, reason}`）で、**未取得と実値0を型で分けている。**
   */
-  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
-  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
-  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
-  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage', verdict: 'needs_fix', verdictNote: 'P1 設計の帯4つと「片づける」が無い。**最終利用が日本時間で出るのと、一度も使っていないものを—にするのは #445 で直って解決している**', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'Zxezb', name: '20-1 分析（友だちの増減）', route: '/analytics?tab=friends', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'J6Inc', name: '20-1-A 配信の反応', route: '/analytics?tab=reactions', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'YBGtm', name: '20-1-B 経路と成果', route: '/analytics?tab=routes', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'QQ1SR', name: '20-1-C 使われ方', route: '/analytics?tab=usage', verdict: 'needs_fix', verdictNote: 'P1 設計の帯4つと「片づける」が無い。**最終利用が日本時間で出るのと、一度も使っていないものを—にするのは #445 で直って解決している**', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
   {
     ...ANALYTICS, node: 'URqOA', name: '20-1-D 定期レポートをつくる',
     gap: 'api',
@@ -1493,10 +1494,10 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '決まった曜日・時刻にレポートを送る仕組みが無い（`grep 定期レポート` が `/analytics` 配下で0件。PR #445 head `5d5f7a5f` でも確かめた）',
   },
-  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
-  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
-  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' },
-  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: 'P1 設計の帯5つと絞り込みが無い。**一覧の「集計状態」列（利用可能／一部集計／取得不可／—）は #445 で入って解決している**', verdictSource: 'analytics-v6/design-qa.md' },
+  { ...ANALYTICS, node: 'f5HsX', name: '20-2 クロス分析', route: '/analytics?tab=cross', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'C2I7ry', name: '20-2-A ファネル分析', route: '/analytics?tab=funnel', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'Fh2Qj', name: '20-2-B URLクリック', route: '/analytics?tab=url-clicks', verdict: 'structure_match_data_pending', verdictNote: '構造一致・データ未接続', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
+  { ...ANALYTICS, node: 'dfwD4', name: '20-2-C 保存した分析', route: '/analytics?tab=saved', verdict: 'needs_fix', verdictNote: 'P1 設計の帯5つと絞り込みが無い。**一覧の「集計状態」列（利用可能／一部集計／取得不可／—）は #445 で入って解決している**', verdictSource: 'analytics-v6/design-qa.md' , verdictHead: 'c275749d' },
 
   // ── 機能21 NEN配信 ──────────────────────────────────────
   /* タブ4本は設計とそろっている（配信フロー／NENコラム／ペット／配信履歴）。 */
@@ -2230,14 +2231,27 @@ export const CAPTURED_AT = {
   4: [{ pr: 541, head: 'e929f22a', on: '2026-08-29', screens: ['QKx8Q', 'XBkiQ'], note: '保存した検索から内部IDを外し、選ぶ形へ。**#541 は #539 を含む**。束3' }],
   30: [{ pr: 475, head: '15febf7f', on: '2026-08-30', screens: ['EOTS4', 'I3ZSrU', 'e3jz3', 'jwVlo'], note: 'ログインユーザーの一覧・追加・役割。development 直結' }],
   31: [{ pr: 478, head: '66883866', on: '2026-08-30', screens: ['c4R6F'], note: '機能設定。オフにしても消えないことを先に書く' }],
+  /*
+    **`codex/development` そのもので撮った回。** 8/29 に根元PRが9本
+    入り、多くの画面がここで初めて「どのheadで見たか」を持てた。
+    **`--only` を付け忘れて機能まるごと撮り、`DIUbO` `NXdDk`（#509）と
+    `RW5Tb`（#523）を巻き戻した。git から戻した。**
+  */
   1: [{ pr: 419, head: 'c84baa63', on: '2026-08-30', screens: ['vUXKb', 'ZN0ov', 'JN6mQ', 'NjK9q', 'Alekb'], note: 'ダッシュボード。お知らせの口を撮影モックへ足した（`counts` の4つが欠けると `undefined.all` で落ちる）' }],
+  12: [{ pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['GO8RQ', 'XtfO3', 'kQ1bs', 'UMiJ9', 'TL7tp'], note: '同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**' }],
   9: [
     { pr: 431, head: '2ab18c88', on: '2026-08-30', screens: ['uLQQc', 'txMO9', 'U3SI5'], note: '友だち追加時の配信。はじめての人と以前からの友だちを分ける説明が入っている' },
     { pr: 506, head: '5dc99107', on: '2026-08-29', screens: ['P2J0Te'], note: '友だち追加時配信の実行結果。既存の `/api/friend-add-routing/events` を読む' },
   ],
-  18: [{ pr: 443, head: 'f372ff30', on: '2026-08-28' }],
+  18: [
+    { pr: 443, head: 'f372ff30', on: '2026-08-28' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['Q4bkTg', 'IhSBB', 'v0HaI', 'TEVk8', 'JupxW', 'BMmxU', 'BuVDB', 'Im2b1'], note: 'development そのもので撮った（根元9本のマージ後）' },
+  ],
   19: [{ pr: 444, head: 'ccbd0975', on: '2026-08-28' }],
-  20: [{ pr: 445, head: '787a4b46', on: '2026-08-28', note: '**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`、head `17b32da7`）。撮り直していない——判定は取り込み前の head のままで、画面のファイルは #445 自身の変更なので中身は同じ' }],
+  20: [
+    { pr: 445, head: '787a4b46', on: '2026-08-28', note: '**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`）' },
+    { pr: 0, head: 'c275749d', on: '2026-08-30', screens: ['Zxezb', 'J6Inc', 'YBGtm', 'QQ1SR', 'f5HsX', 'C2I7ry', 'Fh2Qj', 'dfwD4'], note: 'development そのもので撮った（根元9本のマージ後）' },
+  ],
   21: [
     { pr: 446, head: '4307088d', on: '2026-08-28' },
     { pr: 525, head: 'deff5ffb', on: '2026-08-29', screens: ['DEX0k'], note: '状態の内部語を日本語へ。束3' },

@@ -555,13 +555,17 @@
       "remaining": 9,
       "capturedAt": [
         {
-          "pr": 523,
-          "head": "47e7846e",
-          "on": "2026-08-29",
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
           "screens": [
-            "RW5Tb"
+            "GO8RQ",
+            "XtfO3",
+            "kQ1bs",
+            "UMiJ9",
+            "TL7tp"
           ],
-          "note": "内部の言葉の直し（束3）。**束4は半分**——タップ側は `—` だが、メニュー・公開中・出し分けは失敗時も0を数える"
+          "note": "同上。**`DIUbO` `NXdDk`（#509）と `RW5Tb`（#523）は別PRの絵なので戻した**"
         }
       ]
     },
@@ -812,6 +816,22 @@
           "pr": 443,
           "head": "f372ff30",
           "on": "2026-08-28"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "Q4bkTg",
+            "IhSBB",
+            "v0HaI",
+            "TEVk8",
+            "JupxW",
+            "BMmxU",
+            "BuVDB",
+            "Im2b1"
+          ],
+          "note": "development そのもので撮った（根元9本のマージ後）"
         }
       ]
     },
@@ -856,7 +876,23 @@
           "pr": 445,
           "head": "787a4b46",
           "on": "2026-08-28",
-          "note": "**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`、head `17b32da7`）。撮り直していない——判定は取り込み前の head のままで、画面のファイルは #445 自身の変更なので中身は同じ"
+          "note": "**#445 は 2026-08-29 に `codex/development` へマージ済み**（merge commit `6a00834f`）"
+        },
+        {
+          "pr": 0,
+          "head": "c275749d",
+          "on": "2026-08-30",
+          "screens": [
+            "Zxezb",
+            "J6Inc",
+            "YBGtm",
+            "QQ1SR",
+            "f5HsX",
+            "C2I7ry",
+            "Fh2Qj",
+            "dfwD4"
+          ],
+          "note": "development そのもので撮った（根元9本のマージ後）"
         }
       ]
     },
