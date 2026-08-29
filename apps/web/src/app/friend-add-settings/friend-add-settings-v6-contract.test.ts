@@ -6,6 +6,15 @@ import { describe, expect, it } from 'vitest'
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
 describe('V6 友だち追加時配信の契約', () => {
+  it('画面名とマニュアルはV6共通トップバーだけに置き、画面固有の操作は残す', () => {
+    expect(PAGE).not.toContain("import Header from '@/components/layout/header'")
+    expect(PAGE).not.toContain('title="友だち追加時の配信"')
+    expect(PAGE).not.toContain('マニュアル')
+    expect(PAGE).toContain('data-design="Actions"')
+    expect(PAGE).toContain('<TestRunButton accountId={accountId} scenarioName={scenarioName} />')
+    expect(PAGE).toContain("{saving ? '保存中…' : '保存'}")
+  })
+
   it('不完全な設定でも保存操作から理由を表示できる', () => {
     expect(PAGE).toContain('const problem = routingError()')
     expect(PAGE).toContain('setError(problem)')
