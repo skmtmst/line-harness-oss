@@ -379,7 +379,17 @@ export const SCREENS = [
     status: 'unimplemented',
     why: '現行 `/api/duplicates/stats` はアカウント別件数と重複マトリックスだけを返し、候補行・根拠・判定状態を返さない。正式要件 §9・§11・§14 が候補台帳と判定APIを要求しているため、画面の導線追加だけでは完成しない',
   },
-  { ...FRIENDS, node: 'r7eSi', name: '3-3 統合ユーザー', route: '/friends?tab=merged',
+  {
+    /*
+      **中身は `/users` の画面**（`app/friends/page.tsx:426` が
+      `MergedUsersPage` を埋め込む）。#565 が変えたのはそちらのファイル。
+      空・読込・失敗も見る。
+    */
+    ...FRIENDS, node: 'r7eSi', name: '3-3 統合ユーザー', route: '/friends?tab=merged',
+    states: {
+      apis: ['**/api/users-grouped*', '**/api/duplicates/stats*'],
+      kinds: ['normal', 'loading', 'empty', 'error'],
+    },
     verdict: 'needs_fix', verdictNote: 'P1 統合ユーザーの列（UID・最終接触・重複配信・詳細を見る）が無く、代わりに内部の識別子「identity-0」が出ている。統合ユーザーを作成する導線が無い。KPIの名前が設計と違う',
     verdictSource: 'friends-v6/r7eSi-1920.png', verdictHead: '728deca0',
   },
@@ -873,9 +883,10 @@ export const SCREENS = [
   },
   {
     ...AUTO_REPLY, node: 'q8wSqO', name: '8-1-J 一覧の状態（空・読込・エラー）',
-    states: { apis: ['**/api/auto-replies*', '**/api/auto-replies/**', '**/api/folders*'], kinds: ['loading', 'empty', 'error'] },
-    verdict: 'needs_fix', verdictNote: 'P1 内部の言葉とDBの列名が画面に出ている（「silent rule のみ — match するが返信しない (同 keyword の automation rule 未登録)」「適用外 (line_account_id が別アカに固定)」「返信あり (inline)」、列見出しの「TEMPLATE」）。P1 失敗のときに帯が0件・0回・0件・0件と出る（未取得なので—にすべき）。一覧の中を「いまは読み込めていません」にしているのは正しい',
-    verdictSource: 'auto-replies-v6/q8wSqO-error-1920.png', verdictHead: '93edbe17',
+    /* **通常も撮る。** 内部の言葉は行の上に出るので、行が無い3状態だけでは見えない。 */
+    states: { apis: ['**/api/auto-replies*', '**/api/auto-replies/**', '**/api/folders*'], kinds: ['normal', 'loading', 'empty', 'error'] },
+    verdict: 'needs_fix', verdictNote: '**#566 `d0680774` で、記録していたP1が2つとも直った。通常・読込・空・失敗を別々に撮って確かめた。** ①**内部の言葉が9つとも消えた**（`silent` `match` `automation rule` `line_account_id` `inline` `template`/`TEMPLATE` `raw text` `flex` `image`。通常状態の本文を数えて全部0）。凡例は「このルールから返信」「自動処理を通じて返信」「返信内容が設定されていないため、何もしません」「このLINEアカウントでは使いません」に、種類は「文章・画像・カード・カルーセル…」に、テンプレート欄は「この画面で設定」／ひな形の名前に、一致は「一部一致／完全一致」になった。**内部IDの代替表示もしない**——読めないアカウントは `lineAccountId.slice(0,8)` ではなく「アカウント名を確認できません」、読めないひな形は「(未知 xxxxxx)」ではなく「名前を確認できません」。②**失敗のとき帯が `—` になる**（ルール —件／今月のヒット —回／営業時間外の応答 —件／未ヒット —件）。しかも札ごとに理由を書く（「ルール数を取得できませんでした」）。**前の数を残さない**ことも確かめた——先に読めた状態（5件・552回・累計3,979）から失敗させると、どの数も残らず `—` になる（`setItems([])` を読み込みの前に置いている）。**ヒット数が1行でも欠けたら合計を出さない**（`hits !== undefined` を全行で見る）作りで、少ない合計を実値として見せない。4状態とも `data-list-state` で分かれ、1440・1920とも横スクロール0。`undefined` / `Invalid Date` / `NaN` / `API error` / `Failed to fetch` はどこにも無い。P2 設計との残る差（ルールごとの当たり方の推移、複数アカウントの出し分けの面）は未確認',
+    verdictSource: 'auto-replies-v6/q8wSqO-normal.txt + q8wSqO-error.txt', verdictHead: 'd0680774',
   },
 
   // ── 機能9 友だち追加時の配信 ────────────────────────────
@@ -1770,6 +1781,29 @@ export const SCREENS = [
       { click: '予約内容を確認する', after: 700 },
       { click: 'この内容で予約を入れる', after: 1200 },
     ],
+    /*
+      **重なったあと、選び直して最後まで進めるかを見る。**
+      画面が出るだけでは足りない。`recoverConflict()` は入力へ戻して
+      時刻だけ消し、空きを読み直す。お客様・メニュー・担当・日付は
+      残っているはずなので、時刻を選び直すだけで登録まで行けるか確かめる。
+    */
+    variants: [{
+      suffix: '-recovered',
+      steps: [
+        { fill: 'input[placeholder="名前を2文字以上入力"]', selector: true, text: '菅野', after: 900 },
+        { click: '菅野 亮', after: 500 },
+        { select: '予約メニュー', label: 'トリミング（小型犬）' },
+        { select: '担当者', label: '佐々木' },
+        { fill: '日付', text: '2026-09-03', after: 900 },
+        { select: '空いている時間', label: '14:00〜15:45' },
+        { click: '予約内容を確認する', after: 700 },
+        { click: 'この内容で予約を入れる', after: 1200 },
+        { click: '空いている時間を選び直す', after: 1500 },
+        { select: '空いている時間', label: '10:00〜11:45' },
+        { click: '予約内容を確認する', after: 700 },
+        { click: 'この内容で予約を入れる', after: 1500 },
+      ],
+    }],
     verdict: 'needs_fix',
     verdictNote: '**P1 競合の回復画面に届かない。実際に競合を起こして確かめた。** 埋まった枠を選んで登録すると、画面は確認の段のまま赤帯に **`API error: 409`** と出す。設計・実装の「この時間には予約を入れられません／空いている時間を選び直す」（`page.tsx:346`）は**一度も描かれない**。原因は画面ではなくAPIの受け側：Workerは `{error:\'slot_conflict\'}` を **409** で返す（`booking.ts:1074`。`slot_not_available` は **422**、`:982`）が、`apps/web/src/lib/api.ts:308` の `BODY_MESSAGE_STATUSES` は **400 だけ**を本文の読める状態としているため、本文が捨てられて `ApiError` の文が `API error: 409` になる。`page.tsx:199` の `message.includes(\'slot_conflict\')` は決して真にならない。**運用の人には内部の番号だけが残り、選び直す導線も消える。** 直すなら 409・422 を `BODY_MESSAGE_STATUSES` に足すか、`ApiError.status` で分ける（文字ではなく番号で見る方が確か）。P2 設計は重なりを**登録前に**止める（「9/02(火) 11:00 は 佐々木 がふさがっています（2件）」）。実装は登録を試して初めて分かる',
     verdictSource: 'booking-v6/Lg8ff-1440.png',
@@ -2097,6 +2131,8 @@ export const CAPTURED_AT = {
     { pr: 514, head: '9a72dba6', on: '2026-08-29', screens: ['Y0Sn3', 'M1EXwB'], note: '削除確認と、未送信だけ取り消して送信済みを残す直し。**#514 は #498 を含む**' },
     { pr: 500, head: '409f00bb', on: '2026-08-28', screens: ['GC4St'] }],
   8: [
+    { pr: 566, head: 'd0680774', on: '2026-08-29', screens: ['q8wSqO'], note: '内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。通常も撮るようにした（行が無い3状態だけでは内部語が見えない）' },
+    
     { pr: 544, head: '6053c271', on: '2026-08-29', screens: ['Gy9OK', 'cmDfJ'], note: '削除確認の窓。**#544 は #491 を含む**' },
     { pr: 501, head: '93edbe17', on: '2026-08-28', screens: ['t7UtYQ'], note: '#501 は #500 を含む' }],
   5: [{ pr: 553, head: '2fdded68', on: '2026-08-29', screens: ['dqFft'], note: '通の削除を画面内の確認窓へ。シナリオごと削除はまだ標準の confirm' },

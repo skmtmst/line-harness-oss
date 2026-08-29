@@ -1,11 +1,11 @@
 {
   "generatedFrom": "scripts/visual-qa/screens.mjs",
   "total": 262,
-  "compared": 224,
+  "compared": 223,
   "unimplemented": 34,
   "unconfirmed": 0,
   "elsewhere": 4,
-  "missing": 0,
+  "missing": 1,
   "match": 7,
   "structureMatchDataPending": 16,
   "needsFix": 201,
@@ -72,11 +72,11 @@
       "feature": 3,
       "name": "友だち",
       "total": 11,
-      "compared": 7,
+      "compared": 6,
       "unimplemented": 4,
       "unconfirmed": 0,
       "elsewhere": 0,
-      "missing": 0,
+      "missing": 1,
       "match": 1,
       "structureMatchDataPending": 0,
       "needsFix": 6,
@@ -303,6 +303,15 @@
       "unjudged": 0,
       "remaining": 10,
       "capturedAt": [
+        {
+          "pr": 566,
+          "head": "d0680774",
+          "on": "2026-08-29",
+          "screens": [
+            "q8wSqO"
+          ],
+          "note": "内部の言葉9つを画面の言葉へ。失敗のとき帯を `—` にし、前の数を残さない。通常も撮るようにした（行が無い3状態だけでは内部語が見えない）"
+        },
         {
           "pr": 544,
           "head": "6053c271",
